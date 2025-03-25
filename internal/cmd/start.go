@@ -109,10 +109,9 @@ func executeDag(ctx *Context, specPath string, loadOpts []digraph.LoadOption, re
 
 	var opts agent.Options
 	if rootDAGName != "" && rootRequestID != "" {
-		opts.RootDAG = &digraph.RootDAG{
-			Name:      rootDAGName,
-			RequestID: rootRequestID,
-		}
+		opts.RootDAG = digraph.NewRootDAG(rootDAGName, rootRequestID)
+	} else {
+		opts.RootDAG = digraph.NewRootDAG(dag.Name, requestID)
 	}
 
 	agentInstance := agent.New(

@@ -2,6 +2,7 @@ package digraph
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 
@@ -22,14 +23,24 @@ type RootDAG struct {
 	RequestID string
 }
 
+func NewRootDAG(name, requestID string) *RootDAG {
+	return &RootDAG{
+		Name:      name,
+		RequestID: requestID,
+	}
+}
+
 func GetDAGByName(ctx context.Context, name string) (*DAG, error) {
 	c := GetContext(ctx)
 	return c.client.GetDAG(ctx, name)
 }
 
-func GetResult(ctx context.Context, name, requestID string) (*Status, error) {
+func GetSubResult(ctx context.Context, name, requestID string) (*Status, error) {
 	c := GetContext(ctx)
-	return c.client.GetStatus(ctx, name, requestID)
+	if c.rootDAG == nil {
+		return nil, fmt.Errorf("root DAG is not set")
+	}
+	return c.client.GetSubStatus(ctx, name, requestID, *c.rootDAG)
 }
 
 func ApplyEnvs(ctx context.Context) {

@@ -7,10 +7,16 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
+)
+
+const (
+	// SubWorkflowsDir is the name of the directory where sub-workflow executions are stored.
+	SubWorkflowsDir = "subworkflow_data"
 )
 
 // Execution represents a single execution of a DAG with its associated timestamp and request ID.
@@ -47,6 +53,28 @@ func (e Execution) CreateRecord(_ context.Context, timestamp TimeInUTC, cache *f
 		return nil, fmt.Errorf("failed to create attempt directory: %w", err)
 	}
 	return NewRecord(filepath.Join(dir, "status.json"), cache, opts...), nil
+}
+
+func (e Execution) CreateSubExecution(_ context.Context, timestamp TimeInUTC, reqID string) (*Execution, error) {
+	dirName := "exec_" + timestamp.Format(dateTimeFormatUTC) + "_" + reqID
+	dir := filepath.Join(e.baseDir, SubWorkflowsDir, dirName)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create sub-execution directory: %w", err)
+	}
+	return NewExecution(dir)
+}
+
+func (e Execution) GetSubExecution(_ context.Context, reqID string, cache *filecache.Cache[*persistence.Status]) (*Execution, error) {
+	globPattern := filepath.Join(e.baseDir, SubWorkflowsDir, "exec_*_"+reqID)
+	matches, err := filepath.Glob(globPattern)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list sub workflows executions: %w", err)
+	}
+	// Sort the matches by timestamp
+	sort.Slice(matches, func(i, j int) bool {
+		return matches[i] > matches[j]
+	})
+	return NewExecution(matches[0])
 }
 
 // LatestRecord returns the most recent record for this execution.

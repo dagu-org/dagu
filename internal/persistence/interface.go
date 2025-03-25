@@ -16,11 +16,12 @@ var (
 
 type HistoryStore interface {
 	NewRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string) (Record, error)
-	NewSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, rootReqID, reqID string) (Record, error)
+	NewSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, rootDAG digraph.RootDAG) (Record, error)
 	Update(ctx context.Context, name, reqID string, status Status) error
 	Recent(ctx context.Context, name string, itemLimit int) []Record
 	Latest(ctx context.Context, name string) (Record, error)
 	FindByRequestID(ctx context.Context, name string, reqID string) (Record, error)
+	FindBySubRequestID(ctx context.Context, dagName, reqID string, rootDAG digraph.RootDAG) (Record, error)
 	RemoveOld(ctx context.Context, name string, retentionDays int) error
 	Rename(ctx context.Context, oldName, newName string) error
 }

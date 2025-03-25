@@ -327,7 +327,7 @@ func (a *Agent) setup(ctx context.Context) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	if a.rootDAG != nil {
+	if a.rootDAG != nil && a.rootDAG.RequestID != a.requestID {
 		logger.Debug(ctx, "Initiating sub-DAG execution", "rootDAG", a.rootDAG.Name, "rootRequestID", a.rootDAG.RequestID)
 		a.subExecution.Store(true)
 	}
@@ -496,6 +496,10 @@ func (a *Agent) setupHistoryRecord(ctx context.Context) (persistence.Record, err
 		logger.Error(ctx, "History data cleanup failed", "err", err)
 	}
 
+	if a.subExecution.Load() {
+		return a.historyStore.NewSubRecord(ctx, a.dag, time.Now(), a.requestID, *a.rootDAG)
+	}
+
 	return a.historyStore.NewRecord(ctx, a.dag, time.Now(), a.requestID)
 }
 
@@ -602,10 +606,10 @@ type dbClient struct {
 	historyStore persistence.HistoryStore
 }
 
-func newDBClient(hsStore persistence.HistoryStore, dagStore persistence.DAGStore) *dbClient {
+func newDBClient(h persistence.HistoryStore, d persistence.DAGStore) *dbClient {
 	return &dbClient{
-		historyStore: hsStore,
-		dagStore:     dagStore,
+		historyStore: h,
+		dagStore:     d,
 	}
 }
 
@@ -614,8 +618,8 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error
 	return o.dagStore.GetDetails(ctx, name)
 }
 
-func (o *dbClient) GetStatus(ctx context.Context, name string, requestID string) (*digraph.Status, error) {
-	historyRecord, err := o.historyStore.FindByRequestID(ctx, name, requestID)
+func (o *dbClient) GetSubStatus(ctx context.Context, name, reqID string, rootDAG digraph.RootDAG) (*digraph.Status, error) {
+	historyRecord, err := o.historyStore.FindBySubRequestID(ctx, name, reqID, rootDAG)
 	if err != nil {
 		return nil, err
 	}

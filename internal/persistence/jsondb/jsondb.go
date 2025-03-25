@@ -18,8 +18,9 @@ import (
 
 // Error definitions for common issues
 var (
-	ErrInvalidPath    = errors.New("invalid path")
-	ErrRequestIDEmpty = errors.New("requestID is empty")
+	ErrInvalidPath        = errors.New("invalid path")
+	ErrRequestIDEmpty     = errors.New("requestID is empty")
+	ErrRootRequestIDEmpty = errors.New("root requestID is empty")
 )
 
 var _ persistence.HistoryStore = (*JSONDB)(nil)
@@ -141,21 +142,19 @@ func (db *JSONDB) NewRecord(ctx context.Context, dag *digraph.DAG, timestamp tim
 }
 
 // NewSubRecord creates a new history record for the specified sub-DAG execution.
-func (db *JSONDB) NewSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, rootReqID, reqID string) (persistence.Record, error) {
+func (db *JSONDB) NewSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, rootDAG digraph.RootDAG) (persistence.Record, error) {
 	if reqID == "" {
-		logger.Error(ctx, "RequestID is empty")
+		return nil, ErrRequestIDEmpty
 	}
-	if rootReqID == "" {
-		logger.Error(ctx, "RootRequestID is empty")
-	}
-	root := NewDataRoot(db.baseDir, dag.Name)
-
-	// FIXME:
-	logger.Warn(ctx, "CreateExecution not implemented")
-	exec, err := root.CreateExecution(NewUTC(timestamp), reqID)
+	root := NewDataRoot(db.baseDir, rootDAG.Name)
+	rootExec, err := root.FindByRequestID(ctx, rootDAG.RequestID)
 	if err != nil {
-		logger.Error(ctx, "Failed to create execution", "err", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to find root execution: %w", err)
+	}
+
+	exec, err := rootExec.CreateSubExecution(ctx, NewUTC(timestamp), reqID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create sub execution: %w", err)
 	}
 
 	record, err := exec.CreateRecord(ctx, NewUTC(timestamp), db.cache, WithDAG(dag))
@@ -236,7 +235,7 @@ func (db *JSONDB) Latest(ctx context.Context, dagName string) (persistence.Recor
 }
 
 // FindByRequestID finds a history record by request ID.
-func (db *JSONDB) FindByRequestID(ctx context.Context, dagName string, reqID string) (persistence.Record, error) {
+func (db *JSONDB) FindByRequestID(ctx context.Context, dagName, reqID string) (persistence.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -257,6 +256,33 @@ func (db *JSONDB) FindByRequestID(ctx context.Context, dagName string, reqID str
 	}
 
 	return exec.LatestRecord(ctx, db.cache)
+}
+
+// FindBySubRequestID finds a history record by request ID for a sub-DAG.
+func (db *JSONDB) FindBySubRequestID(ctx context.Context, dagName, reqID string, rootDAG digraph.RootDAG) (persistence.Record, error) {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("FindBySubRequestID canceled: %w", ctx.Err())
+	default:
+		// Continue with operation
+	}
+
+	if reqID == "" {
+		return nil, ErrRequestIDEmpty
+	}
+
+	root := NewDataRoot(db.baseDir, rootDAG.Name)
+	exec, err := root.FindByRequestID(ctx, rootDAG.RequestID)
+	if err != nil {
+		return nil, err
+	}
+
+	subExec, err := exec.GetSubExecution(ctx, reqID, db.cache)
+	if err != nil {
+		return nil, err
+	}
+	return subExec.LatestRecord(ctx, db.cache)
 }
 
 // RemoveOld removes history records older than retentionDays for the specified key.
