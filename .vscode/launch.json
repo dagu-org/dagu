@@ -37,21 +37,6 @@
                 "start",
                 "${input:pathToSpec}"
             ]
-        },
-        {
-            "name": "StartSub",
-            "type": "go",
-            "request": "launch",
-            "mode": "auto",
-            "program": "${workspaceFolder}/cmd/",
-            "args": [
-                "start",
-                "--request-id=04a60fa6-adfd-4f52-b2e3-a4a5d24a1861",
-                "--root-dag-name=_parent",
-                "--root-request-id=863617f9-f48f-4359-bf73-1ee9fb0d155e",
-                "--quiet",
-                "/Users/hamadayouta/dev/dagu/.local/dags/_child.yaml"
-            ]
         }
     ],
     "inputs": [

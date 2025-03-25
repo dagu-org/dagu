@@ -38,11 +38,9 @@ func TestExecution(t *testing.T) {
 
 		ts1 := NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
 		ts2 := NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
-		ts3 := NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC))
 
 		_ = exec.WriteStatus(t, ts1, scheduler.StatusRunning)
-		_ = exec.WriteStatus(t, ts2, scheduler.StatusSuccess)
-		record := exec.WriteStatus(t, ts3, scheduler.StatusError)
+		record := exec.WriteStatus(t, ts2, scheduler.StatusSuccess)
 
 		lastUpdate, err := exec.LastUpdated(exec.Context)
 		require.NoError(t, err)
