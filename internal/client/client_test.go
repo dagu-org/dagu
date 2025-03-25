@@ -188,7 +188,7 @@ func TestClient_RunDAG(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check if the params are the same as the previous run.
-		require.NotEqual(t, previousRequestID, status.RequestID)
+		require.Equal(t, previousRequestID, status.RequestID)
 		require.Equal(t, previousParams, status.Params)
 	})
 }

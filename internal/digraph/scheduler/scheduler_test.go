@@ -961,7 +961,7 @@ func (gh graphHelper) Schedule(t *testing.T, expectedStatus scheduler.Status) sc
 	logFilename := fmt.Sprintf("%s_%s.log", dag.Name, gh.Config.ReqID)
 	logFilePath := path.Join(gh.Config.LogDir, logFilename)
 
-	ctx := digraph.NewContext(gh.Context, dag, nil, nil, gh.Config.ReqID, logFilePath, nil)
+	ctx := digraph.NewContext(gh.Context, dag, nil, digraph.RootDAG{}, gh.Config.ReqID, logFilePath, nil)
 
 	var doneNodes []*scheduler.Node
 	nodeCompletedChan := make(chan *scheduler.Node)

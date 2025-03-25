@@ -107,13 +107,14 @@ func executeDag(ctx *Context, specPath string, loadOpts []digraph.LoadOption, re
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	var opts agent.Options
+	var rootDAG digraph.RootDAG
 	if rootDAGName != "" && rootRequestID != "" {
-		opts.RootDAG = digraph.NewRootDAG(rootDAGName, rootRequestID)
+		rootDAG = digraph.NewRootDAG(rootDAGName, rootRequestID)
 	} else {
-		opts.RootDAG = digraph.NewRootDAG(dag.Name, requestID)
+		rootDAG = digraph.NewRootDAG(dag.Name, requestID)
 	}
 
+	var opts agent.Options
 	agentInstance := agent.New(
 		requestID,
 		dag,
@@ -122,6 +123,7 @@ func executeDag(ctx *Context, specPath string, loadOpts []digraph.LoadOption, re
 		cli,
 		dagStore,
 		ctx.historyStore(),
+		rootDAG,
 		opts,
 	)
 

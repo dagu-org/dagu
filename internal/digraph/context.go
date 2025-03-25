@@ -2,7 +2,6 @@ package digraph
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strings"
 
@@ -11,7 +10,7 @@ import (
 )
 
 type Context struct {
-	rootDAG   *RootDAG
+	rootDAG   RootDAG
 	requestID string
 	dag       *DAG
 	client    DBClient
@@ -23,8 +22,8 @@ type RootDAG struct {
 	RequestID string
 }
 
-func NewRootDAG(name, requestID string) *RootDAG {
-	return &RootDAG{
+func NewRootDAG(name, requestID string) RootDAG {
+	return RootDAG{
 		Name:      name,
 		RequestID: requestID,
 	}
@@ -37,10 +36,7 @@ func GetDAGByName(ctx context.Context, name string) (*DAG, error) {
 
 func GetSubResult(ctx context.Context, name, requestID string) (*Status, error) {
 	c := GetContext(ctx)
-	if c.rootDAG == nil {
-		return nil, fmt.Errorf("root DAG is not set")
-	}
-	return c.client.GetSubStatus(ctx, name, requestID, *c.rootDAG)
+	return c.client.GetSubStatus(ctx, requestID, c.rootDAG)
 }
 
 func ApplyEnvs(ctx context.Context) {
@@ -71,21 +67,11 @@ func (c Context) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalO
 	return cmdutil.EvalString(ctx, s, opts...)
 }
 
-func (c Context) RootRequestID() string {
-	if c.rootDAG != nil {
-		return c.rootDAG.RequestID
-	}
-	return c.requestID
+func (c Context) RootDAG() RootDAG {
+	return c.rootDAG
 }
 
-func (c Context) RootDAGName() string {
-	if c.rootDAG != nil {
-		return c.rootDAG.Name
-	}
-	return c.dag.Name
-}
-
-func NewContext(ctx context.Context, d *DAG, c DBClient, rd *RootDAG, reqID, logFile string, params []string) context.Context {
+func NewContext(ctx context.Context, d *DAG, c DBClient, rd RootDAG, reqID, logFile string, params []string) context.Context {
 	var envs = map[string]string{
 		EnvKeySchedulerLogPath: logFile,
 		EnvKeyRequestID:        reqID,

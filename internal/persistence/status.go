@@ -39,7 +39,7 @@ func (f *StatusFactory) CreateDefault() Status {
 
 type StatusOption func(*Status)
 
-func WithRootDAG(rootDAG *digraph.RootDAG) StatusOption {
+func WithRootDAG(rootDAG digraph.RootDAG) StatusOption {
 	return func(s *Status) {
 		s.RootRequestID = rootDAG.RequestID
 		s.RootDAGName = rootDAG.Name

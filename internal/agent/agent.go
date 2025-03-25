@@ -43,7 +43,7 @@ type Agent struct {
 	socketServer *sock.Server
 	logDir       string
 	logFile      string
-	rootDAG      *digraph.RootDAG
+	rootDAG      digraph.RootDAG
 
 	// requestID is request ID to identify DAG execution uniquely.
 	// The request ID can be used for history lookup, retry, etc.
@@ -66,8 +66,6 @@ type Options struct {
 	// If it's specified the agent will execute the DAG with the same
 	// configuration as the specified history.
 	RetryTarget *persistence.Status
-	// RootDAG is the root DAG name for the sub-DAG execution.
-	RootDAG *digraph.RootDAG
 }
 
 // New creates a new Agent.
@@ -79,10 +77,11 @@ func New(
 	cli client.Client,
 	dagStore persistence.DAGStore,
 	historyStore persistence.HistoryStore,
+	rootDAG digraph.RootDAG,
 	opts Options,
 ) *Agent {
 	return &Agent{
-		rootDAG:      opts.RootDAG,
+		rootDAG:      rootDAG,
 		requestID:    requestID,
 		dag:          dag,
 		dry:          opts.Dry,
@@ -110,7 +109,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Add structured logging context
 	logFields := []any{"dag", a.dag.Name, "requestID", a.requestID}
-	if a.rootDAG != nil {
+	if a.subExecution.Load() {
 		logFields = append(logFields, "rootDAG", a.rootDAG.Name, "rootRequestID", a.rootDAG.RequestID)
 	}
 	ctx = logger.WithValues(ctx, logFields...)
@@ -327,7 +326,7 @@ func (a *Agent) setup(ctx context.Context) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	if a.rootDAG != nil && a.rootDAG.RequestID != a.requestID {
+	if a.rootDAG.RequestID != a.requestID {
 		logger.Debug(ctx, "Initiating sub-DAG execution", "rootDAG", a.rootDAG.Name, "rootRequestID", a.rootDAG.RequestID)
 		a.subExecution.Store(true)
 	}
@@ -497,7 +496,7 @@ func (a *Agent) setupHistoryRecord(ctx context.Context) (persistence.Record, err
 	}
 
 	if a.subExecution.Load() {
-		return a.historyStore.NewSubRecord(ctx, a.dag, time.Now(), a.requestID, *a.rootDAG)
+		return a.historyStore.NewSubRecord(ctx, a.dag, time.Now(), a.requestID, a.rootDAG)
 	}
 
 	return a.historyStore.NewRecord(ctx, a.dag, time.Now(), a.requestID)
@@ -618,8 +617,8 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error
 	return o.dagStore.GetDetails(ctx, name)
 }
 
-func (o *dbClient) GetSubStatus(ctx context.Context, name, reqID string, rootDAG digraph.RootDAG) (*digraph.Status, error) {
-	historyRecord, err := o.historyStore.FindBySubRequestID(ctx, name, reqID, rootDAG)
+func (o *dbClient) GetSubStatus(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (*digraph.Status, error) {
+	historyRecord, err := o.historyStore.FindBySubRequestID(ctx, reqID, rootDAG)
 	if err != nil {
 		return nil, err
 	}

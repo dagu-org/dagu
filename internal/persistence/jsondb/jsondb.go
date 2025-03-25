@@ -259,7 +259,7 @@ func (db *JSONDB) FindByRequestID(ctx context.Context, dagName, reqID string) (p
 }
 
 // FindBySubRequestID finds a history record by request ID for a sub-DAG.
-func (db *JSONDB) FindBySubRequestID(ctx context.Context, dagName, reqID string, rootDAG digraph.RootDAG) (persistence.Record, error) {
+func (db *JSONDB) FindBySubRequestID(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (persistence.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():

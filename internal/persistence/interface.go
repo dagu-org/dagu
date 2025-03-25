@@ -21,7 +21,7 @@ type HistoryStore interface {
 	Recent(ctx context.Context, name string, itemLimit int) []Record
 	Latest(ctx context.Context, name string) (Record, error)
 	FindByRequestID(ctx context.Context, name string, reqID string) (Record, error)
-	FindBySubRequestID(ctx context.Context, dagName, reqID string, rootDAG digraph.RootDAG) (Record, error)
+	FindBySubRequestID(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (Record, error)
 	RemoveOld(ctx context.Context, name string, retentionDays int) error
 	Rename(ctx context.Context, oldName, newName string) error
 }

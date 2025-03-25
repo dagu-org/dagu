@@ -5,7 +5,7 @@ import "context"
 // DBClient gets a result of a DAG execution.
 type DBClient interface {
 	GetDAG(ctx context.Context, name string) (*DAG, error)
-	GetSubStatus(ctx context.Context, name string, requestID string, rootDAG RootDAG) (*Status, error)
+	GetSubStatus(ctx context.Context, requestID string, rootDAG RootDAG) (*Status, error)
 }
 
 // Status is the result of a DAG execution.
