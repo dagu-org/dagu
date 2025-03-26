@@ -144,6 +144,13 @@ func TestDAGExecution(t *testing.T) {
 			},
 		},
 		{
+			name: "NestedGraph",
+			dag:  "nested_parent.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": "value is 123",
+			},
+		},
+		{
 			name: "Issue-810",
 			dag:  "issue-810.yaml",
 			expectedOutputs: map[string]any{
