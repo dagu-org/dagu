@@ -48,7 +48,7 @@ func (th JSONDBTest) CreateRecord(t *testing.T, ts time.Time, requestID string, 
 
 	defer record.Close(th.Context)
 
-	status := persistence.NewStatusFactory(dag.DAG).CreateDefault()
+	status := persistence.NewStatusFactory(dag.DAG).Default()
 	status.RequestID = requestID
 	status.Status = s
 

@@ -85,7 +85,7 @@ func runRetry(ctx *Context, args []string) error {
 	return nil
 }
 
-func executeRetry(ctx *Context, dag *digraph.DAG, originalStatus *persistence.StatusFile) error {
+func executeRetry(ctx *Context, dag *digraph.DAG, originalStatus *persistence.Execution) error {
 	const logPrefix = "retry_"
 
 	reqID := originalStatus.Status.RequestID

@@ -315,7 +315,7 @@ func (r *Record) ReadStatus(ctx context.Context) (*persistence.Status, error) {
 
 // Read returns the full status file information, including the file path.
 // The context can be used to cancel the operation.
-func (r *Record) Read(ctx context.Context) (*persistence.StatusFile, error) {
+func (r *Record) Read(ctx context.Context) (*persistence.Execution, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -333,7 +333,7 @@ func (r *Record) Read(ctx context.Context) (*persistence.StatusFile, error) {
 		})
 
 		if cacheErr == nil {
-			return persistence.NewStatusFile(r.file, *status), nil
+			return persistence.NewExecution(r.file, *status), nil
 		}
 	}
 
@@ -346,7 +346,7 @@ func (r *Record) Read(ctx context.Context) (*persistence.StatusFile, error) {
 		return nil, fmt.Errorf("failed to parse status file: %w", parseErr)
 	}
 
-	return persistence.NewStatusFile(r.file, *parsed), nil
+	return persistence.NewExecution(r.file, *parsed), nil
 }
 
 // parseLocked reads the status file and returns the last valid status.

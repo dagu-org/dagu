@@ -313,7 +313,8 @@ func TestClient_ReadHistory(t *testing.T) {
 
 func testNewStatus(dag *digraph.DAG, requestID string, status scheduler.Status, nodeStatus scheduler.NodeStatus) persistence.Status {
 	nodes := []scheduler.NodeData{{State: scheduler.NodeState{Status: nodeStatus}}}
-	startedAt := persistence.Time(time.Now())
+	tm := time.Now()
+	startedAt := &tm
 	return persistence.NewStatusFactory(dag).Create(
 		requestID, status, 0, *startedAt, persistence.WithNodes(nodes),
 	)

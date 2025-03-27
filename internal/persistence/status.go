@@ -19,7 +19,7 @@ func NewStatusFactory(dag *digraph.DAG) *StatusFactory {
 	return &StatusFactory{dag: dag}
 }
 
-func (f *StatusFactory) CreateDefault() Status {
+func (f *StatusFactory) Default() Status {
 	return Status{
 		Name:       f.dag.GetName(),
 		Status:     scheduler.StatusNone,
@@ -103,7 +103,7 @@ func (f *StatusFactory) Create(
 	startedAt time.Time,
 	opts ...StatusOption,
 ) Status {
-	statusObj := f.CreateDefault()
+	statusObj := f.Default()
 	statusObj.RequestID = requestID
 	statusObj.Status = status
 	statusObj.StatusText = status.String()
@@ -124,22 +124,6 @@ func StatusFromJSON(s string) (*Status, error) {
 		return nil, err
 	}
 	return status, err
-}
-
-type StatusFile struct {
-	File   string
-	Status Status
-}
-
-func NewStatusFile(file string, status Status) *StatusFile {
-	return &StatusFile{
-		File:   file,
-		Status: status,
-	}
-}
-
-type StatusResponse struct {
-	Status *Status `json:"status"`
 }
 
 type Status struct {
@@ -169,17 +153,6 @@ func (st *Status) SetStatusToErrorIfRunning() {
 	}
 }
 
-func FormatTime(val time.Time) string {
-	if val.IsZero() {
-		return ""
-	}
-	return stringutil.FormatTime(val)
-}
-
-func Time(t time.Time) *time.Time {
-	return &t
-}
-
 type PID int
 
 func (p PID) String() string {
@@ -189,8 +162,11 @@ func (p PID) String() string {
 	return fmt.Sprintf("%d", p)
 }
 
-func (p PID) IsRunning() bool {
-	return p > 0
+func FormatTime(val time.Time) string {
+	if val.IsZero() {
+		return ""
+	}
+	return stringutil.FormatTime(val)
 }
 
 func nodeOrNil(s *digraph.Step) *Node {

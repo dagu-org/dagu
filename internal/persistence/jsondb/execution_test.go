@@ -62,7 +62,7 @@ func (et ExecutionTest) WriteStatus(t *testing.T, ts TimeInUTC, s scheduler.Stat
 	t.Helper()
 
 	dag := &digraph.DAG{Name: "test-dag"}
-	status := persistence.NewStatusFactory(dag).CreateDefault()
+	status := persistence.NewStatusFactory(dag).Default()
 	status.RequestID = "test-id-1"
 	status.Status = s
 

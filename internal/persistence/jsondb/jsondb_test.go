@@ -175,7 +175,7 @@ func TestJSONDB(t *testing.T) {
 		require.NoError(t, err)
 		defer record.Close(th.Context)
 
-		statusToWrite := persistence.NewStatusFactory(subDAG.DAG).CreateDefault()
+		statusToWrite := persistence.NewStatusFactory(subDAG.DAG).Default()
 		statusToWrite.RequestID = "sub-id"
 		err = record.Write(th.Context, statusToWrite)
 		require.NoError(t, err)

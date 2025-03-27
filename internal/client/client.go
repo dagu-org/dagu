@@ -177,7 +177,7 @@ func (*client) GetCurrentStatus(_ context.Context, dag *digraph.DAG) (*persisten
 			return nil, err
 		}
 		// The DAG is not running so return the default status
-		status := persistence.NewStatusFactory(dag).CreateDefault()
+		status := persistence.NewStatusFactory(dag).Default()
 		return &status, nil
 	}
 	return persistence.StatusFromJSON(ret)
@@ -241,16 +241,16 @@ handleError:
 
 	if errors.Is(err, persistence.ErrNoStatusData) {
 		// No status for today
-		return persistence.NewStatusFactory(dag).CreateDefault(), nil
+		return persistence.NewStatusFactory(dag).Default(), nil
 	}
 
-	return persistence.NewStatusFactory(dag).CreateDefault(), err
+	return persistence.NewStatusFactory(dag).Default(), err
 }
 
-func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []persistence.StatusFile {
+func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []persistence.Execution {
 	records := e.historyStore.Recent(ctx, dag.Name, n)
 
-	var ret []persistence.StatusFile
+	var ret []persistence.Execution
 	for _, record := range records {
 		if statusFile, err := record.Read(ctx); err == nil {
 			ret = append(ret, *statusFile)
