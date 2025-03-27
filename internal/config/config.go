@@ -50,7 +50,7 @@ func (cfg *Global) setTimezone() error {
 			return fmt.Errorf("failed to load timezone: %w", err)
 		}
 		cfg.Location = loc
-		os.Setenv("TZ", cfg.TZ)
+		_ = os.Setenv("TZ", cfg.TZ)
 	} else {
 		_, offset := time.Now().Zone()
 		if offset == 0 {

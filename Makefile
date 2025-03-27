@@ -51,7 +51,7 @@ COLOR_RED=\033[0;31m
 # Go packages for the tools
 
 PKG_swagger=github.com/go-swagger/go-swagger/cmd/swagger
-PKG_golangci_lint=github.com/golangci/golangci-lint/cmd/golangci-lint
+PKG_golangci_lint=github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 PKG_gotestsum=gotest.tools/gotestsum
 PKG_addlicense=github.com/google/addlicense
 PKG_changelog-from-release=github.com/rhysd/changelog-from-release/v3@latest

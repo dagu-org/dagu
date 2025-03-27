@@ -98,7 +98,7 @@ func (r *Record) Open(ctx context.Context) error {
 
 	// Ensure the directory exists
 	dir := filepath.Dir(r.file)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
@@ -358,11 +358,13 @@ func (r *Record) parseLocked() (*persistence.Status, error) {
 // ParseStatusFile reads the status file and returns the last valid status.
 // The bufferSize parameter controls the size of the read buffer.
 func ParseStatusFile(file string) (*persistence.Status, error) {
-	f, err := os.Open(file)
+	f, err := os.Open(file) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrReadFailed, err)
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 
 	var (
 		offset int64

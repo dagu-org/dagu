@@ -76,12 +76,12 @@ func (e *jq) Run(_ context.Context) error {
 			break
 		}
 		if err, ok := v.(error); ok {
-			_, _ = e.stderr.Write([]byte(fmt.Sprintf("%#v", err)))
+			_, _ = fmt.Fprintf(e.stderr, "failed to run jq query: %v", err)
 			continue
 		}
 		val, err := json.MarshalIndent(v, "", "    ")
 		if err != nil {
-			_, _ = e.stderr.Write([]byte(fmt.Sprintf("%#v", err)))
+			_, _ = fmt.Fprintf(e.stderr, "failed to marshal jq output: %v", err)
 			continue
 		}
 		if e.cfg.Raw {
