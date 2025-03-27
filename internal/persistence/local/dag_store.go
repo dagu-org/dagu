@@ -150,7 +150,7 @@ func (d *dagStoreImpl) Delete(_ context.Context, name string) error {
 // ensureDirExist ensures that the base directory exists.
 func (d *dagStoreImpl) ensureDirExist() error {
 	if !fileExists(d.baseDir) {
-		if err := os.MkdirAll(d.baseDir, 0755); err != nil {
+		if err := os.MkdirAll(d.baseDir, 0750); err != nil {
 			return err
 		}
 	}

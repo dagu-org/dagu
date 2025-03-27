@@ -70,7 +70,9 @@ func TestNode(t *testing.T) {
 		t.Parallel()
 
 		random := path.Join(os.TempDir(), uuid.Must(uuid.NewRandom()).String())
-		defer os.Remove(random)
+		defer func() {
+			_ = os.Remove(random)
+		}()
 
 		node := setupNode(t, withNodeCommand("echo hello"), withNodeStdout(random))
 		node.Execute(t)
@@ -83,7 +85,9 @@ func TestNode(t *testing.T) {
 		t.Parallel()
 
 		random := path.Join(os.TempDir(), uuid.Must(uuid.NewRandom()).String())
-		defer os.Remove(random)
+		defer func() {
+			_ = os.Remove(random)
+		}()
 
 		node := setupNode(t,
 			withNodeCommand("sh"),
@@ -251,7 +255,7 @@ func (n nodeHelper) Execute(t *testing.T) {
 	t.Helper()
 
 	reqID := reqID()
-	err := n.Node.Setup(n.Context, n.Config.Paths.LogDir, reqID)
+	err := n.Setup(n.Context, n.Config.Paths.LogDir, reqID)
 	require.NoError(t, err, "failed to setup node")
 
 	err = n.Node.Execute(n.execContext(reqID))
@@ -272,16 +276,16 @@ func (n nodeHelper) ExecuteFail(t *testing.T, expectedErr string) {
 func (n nodeHelper) AssertLogContains(t *testing.T, expected string) {
 	t.Helper()
 
-	dat, err := os.ReadFile(n.Node.LogFile())
-	require.NoErrorf(t, err, "failed to read log file %q", n.Node.LogFile())
+	dat, err := os.ReadFile(n.LogFile())
+	require.NoErrorf(t, err, "failed to read log file %q", n.LogFile())
 	require.Contains(t, string(dat), expected, "log file does not contain expected string")
 }
 
 func (n nodeHelper) AssertOutput(t *testing.T, key, value string) {
 	t.Helper()
 
-	require.NotNil(t, n.Node.NodeData().Step.OutputVariables, "output variables not set")
-	data, ok := n.Node.NodeData().Step.OutputVariables.Load(key)
+	require.NotNil(t, n.NodeData().Step.OutputVariables, "output variables not set")
+	data, ok := n.NodeData().Step.OutputVariables.Load(key)
 	require.True(t, ok, "output variable not found")
 	require.Equal(t, fmt.Sprintf(`%s=%s`, key, value), data, "output variable value mismatch")
 }

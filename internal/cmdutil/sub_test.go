@@ -105,8 +105,10 @@ func TestSubstituteCommands(t *testing.T) {
 			if tt.setupEnv != nil {
 				for k, v := range tt.setupEnv {
 					oldValue := os.Getenv(k)
-					os.Setenv(k, v)
-					defer os.Setenv(k, oldValue)
+					_ = os.Setenv(k, v)
+					defer func() {
+						_ = os.Setenv(k, oldValue)
+					}()
 				}
 			}
 

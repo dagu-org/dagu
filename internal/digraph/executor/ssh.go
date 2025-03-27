@@ -154,7 +154,9 @@ func (e *sshExec) Run(_ context.Context) error {
 		return err
 	}
 	e.session = session
-	defer session.Close()
+	defer func() {
+		_ = session.Close()
+	}()
 
 	// Once a Session is created, you can execute a single command on
 	// the remote side using the Run method.
@@ -176,7 +178,7 @@ func getPublicKeySigner(path string) (ssh.Signer, error) {
 	//
 	// If you have an encrypted private key, the crypto/x509 package
 	// can be used to decrypt it.
-	key, err := os.ReadFile(path)
+	key, err := os.ReadFile(path) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}

@@ -268,7 +268,7 @@ func parseStringParams(ctx BuildContext, input string) ([]paramPair, error) {
 					func(match string) string {
 						cmdStr := strings.Trim(match, "`")
 						cmdStr = os.ExpandEnv(cmdStr)
-						cmdOut, err := exec.Command("sh", "-c", cmdStr).Output()
+						cmdOut, err := exec.Command("sh", "-c", cmdStr).Output() //nolint:gosec
 						if err != nil {
 							cmdErr = err
 							// Leave the original command if it fails

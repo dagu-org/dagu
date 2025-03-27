@@ -404,11 +404,12 @@ func escapeArg(input string) string {
 	escaped := strings.Builder{}
 
 	for _, char := range input {
-		if char == '\r' {
+		switch char {
+		case '\r':
 			_, _ = escaped.WriteString("\\r")
-		} else if char == '\n' {
+		case '\n':
 			_, _ = escaped.WriteString("\\n")
-		} else {
+		default:
 			_, _ = escaped.WriteRune(char)
 		}
 	}

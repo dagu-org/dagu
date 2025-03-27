@@ -371,7 +371,9 @@ func TestScheduler(t *testing.T) {
 			// Create file during the retry interval
 			f, err := os.Create(file)
 			require.NoError(t, err)
-			defer f.Close()
+			defer func() {
+				_ = f.Close()
+			}()
 
 			t.Cleanup(func() {
 				_ = os.Remove(file)
@@ -1029,7 +1031,7 @@ func (sr scheduleResult) AssertDoneCount(t *testing.T, expected int) {
 func (sr scheduleResult) AssertNodeStatus(t *testing.T, stepName string, expected scheduler.NodeStatus) {
 	t.Helper()
 
-	target := sr.ExecutionGraph.NodeByName(stepName)
+	target := sr.NodeByName(stepName)
 	if target == nil {
 		if sr.Config.OnExit != nil && sr.Config.OnExit.Name == stepName {
 			target = sr.Scheduler.HandlerNode(digraph.HandlerOnExit)
@@ -1055,7 +1057,7 @@ func (sr scheduleResult) AssertNodeStatus(t *testing.T, stepName string, expecte
 func (sr scheduleResult) Node(t *testing.T, stepName string) *scheduler.Node {
 	t.Helper()
 
-	if node := sr.ExecutionGraph.NodeByName(stepName); node != nil {
+	if node := sr.NodeByName(stepName); node != nil {
 		return node
 	}
 

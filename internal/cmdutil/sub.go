@@ -11,7 +11,7 @@ import (
 // runCommand executes cmdStr in a shell, capturing stdout (and ignoring stderr).
 func runCommand(cmdStr string) (string, error) {
 	sh := GetShellCommand("")
-	cmd := exec.Command(sh, "-c", cmdStr)
+	cmd := exec.Command(sh, "-c", cmdStr) // nolint:gosec
 	cmd.Env = os.Environ()
 
 	var stdout bytes.Buffer
