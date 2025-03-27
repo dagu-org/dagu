@@ -242,7 +242,7 @@ func (*mergeTransformer) Transformer(
 
 // readFile reads the contents of the file into a map.
 func readFile(file string) (cfg map[string]any, err error) {
-	data, err := os.ReadFile(file)
+	data, err := os.ReadFile(file) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %q: %v", file, err)
 	}

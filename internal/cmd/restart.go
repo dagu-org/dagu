@@ -106,7 +106,9 @@ func executeDAG(ctx *Context, cli client.Client, dag *digraph.DAG) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file: %w", err)
 	}
-	defer logFile.Close()
+	defer func() {
+		_ = logFile.Close()
+	}()
 
 	ctx.LogToFile(logFile)
 

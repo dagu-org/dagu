@@ -49,7 +49,7 @@ func NewExecution(dir string) (*Execution, error) {
 func (e Execution) CreateRecord(_ context.Context, timestamp TimeInUTC, cache *filecache.Cache[*persistence.Status], opts ...RecordOption) (*Record, error) {
 	dirName := "attempt_" + timestamp.Format(dateTimeFormatUTC)
 	dir := filepath.Join(e.baseDir, dirName)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create attempt directory: %w", err)
 	}
 	return NewRecord(filepath.Join(dir, "status.json"), cache, opts...), nil
@@ -58,7 +58,7 @@ func (e Execution) CreateRecord(_ context.Context, timestamp TimeInUTC, cache *f
 func (e Execution) CreateSubExecution(_ context.Context, timestamp TimeInUTC, reqID string) (*Execution, error) {
 	dirName := "exec_" + timestamp.Format(dateTimeFormatUTC) + "_" + reqID
 	dir := filepath.Join(e.baseDir, SubWorkflowsDir, dirName)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create sub-execution directory: %w", err)
 	}
 	return NewExecution(dir)

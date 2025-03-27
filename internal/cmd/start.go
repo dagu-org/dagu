@@ -89,7 +89,9 @@ func executeDag(ctx *Context, specPath string, loadOpts []digraph.LoadOption, re
 		logger.Error(ctx, "failed to initialize log file", "DAG", dag.Name, "err", err)
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
-	defer logFile.Close()
+	defer func() {
+		_ = logFile.Close()
+	}()
 
 	ctx.LogToFile(logFile)
 

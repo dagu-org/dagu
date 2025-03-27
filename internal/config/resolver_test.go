@@ -19,7 +19,7 @@ func TestResolver(t *testing.T) {
 		tmpDir := fileutil.MustTempDir("test")
 		defer os.RemoveAll(tmpDir)
 
-		os.Setenv("TEST_APP_HOME", filepath.Join(tmpDir, build.Slug))
+		_ = os.Setenv("TEST_APP_HOME", filepath.Join(tmpDir, build.Slug))
 		r := config.NewResolver("TEST_APP_HOME", filepath.Join(tmpDir, ".dagu"), config.XDGConfig{})
 
 		assert.Equal(t, r, config.PathResolver{

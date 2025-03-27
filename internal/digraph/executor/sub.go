@@ -74,7 +74,7 @@ func newSubWorkflow(
 		args = append(args, config.Params)
 	}
 
-	cmd := exec.CommandContext(ctx, executable, args...)
+	cmd := exec.CommandContext(ctx, executable, args...) // nolint:gosec
 	if len(step.Dir) > 0 && !fileutil.FileExists(step.Dir) {
 		return nil, ErrWorkingDirNotExist
 	}

@@ -40,10 +40,10 @@ func TestSSHExecutor(t *testing.T) {
 	})
 
 	t.Run("ExpandEnv", func(t *testing.T) {
-		os.Setenv("TEST_SSH_EXEC_USER", "testuser")
-		os.Setenv("TEST_SSH_EXEC_IP", "testip")
-		os.Setenv("TEST_SSH_EXEC_PORT", "23")
-		os.Setenv("TEST_SSH_EXEC_PASSWORD", "testpassword")
+		_ = os.Setenv("TEST_SSH_EXEC_USER", "testuser")
+		_ = os.Setenv("TEST_SSH_EXEC_IP", "testip")
+		_ = os.Setenv("TEST_SSH_EXEC_PORT", "23")
+		_ = os.Setenv("TEST_SSH_EXEC_PASSWORD", "testpassword")
 
 		step := digraph.Step{
 			Name: "ssh-exec",

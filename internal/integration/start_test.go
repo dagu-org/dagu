@@ -58,8 +58,10 @@ steps:
 		t.Run(tc.name, func(t *testing.T) {
 			// Setup test case
 			configFile, tempDir := tc.setupFunc(t)
-			os.Setenv(tc.envVarName, tempDir)
-			defer os.Unsetenv(tc.envVarName)
+			_ = os.Setenv(tc.envVarName, tempDir)
+			defer func() {
+				_ = os.Unsetenv(tc.envVarName)
+			}()
 
 			// Get DAG path
 			dagPath := tc.dagPath(t, tempDir)

@@ -1,7 +1,7 @@
 ---
 swagger: "2.0"
 info:
-  version: "0.0.1" # バージョンは据え置きで互換性維持
+  version: "0.0.1"
   title: "Dagu"
   contact:
     name: "Dagu"

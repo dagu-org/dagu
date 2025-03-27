@@ -70,7 +70,7 @@ func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 
 	root := getProjectRoot(t)
 	executablePath := path.Join(root, ".local", "bin", "dagu")
-	os.Setenv("DAGU_EXECUTABLE", executablePath)
+	_ = os.Setenv("DAGU_EXECUTABLE", executablePath)
 
 	cfg, err := config.Load()
 	require.NoError(t, err)
@@ -295,7 +295,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		opt(helper)
 	}
 
-	rootDAG := digraph.NewRootDAG(d.DAG.Name, requestID)
+	rootDAG := digraph.NewRootDAG(d.Name, requestID)
 
 	helper.Agent = agent.New(
 		requestID,
@@ -322,40 +322,40 @@ type Agent struct {
 func (a *Agent) RunError(t *testing.T) {
 	t.Helper()
 
-	err := a.Agent.Run(a.Context)
+	err := a.Run(a.Context)
 	assert.Error(t, err)
 
-	status := a.Agent.Status().Status
+	status := a.Status().Status
 	require.Equal(t, scheduler.StatusError.String(), status.String())
 }
 
 func (a *Agent) RunCancel(t *testing.T) {
 	t.Helper()
 
-	err := a.Agent.Run(a.Context)
+	err := a.Run(a.Context)
 	assert.NoError(t, err)
 
-	status := a.Agent.Status().Status
+	status := a.Status().Status
 	require.Equal(t, scheduler.StatusCancel.String(), status.String())
 }
 
 func (a *Agent) RunCheckErr(t *testing.T, expectedErr string) {
 	t.Helper()
 
-	err := a.Agent.Run(a.Context)
+	err := a.Run(a.Context)
 	require.Error(t, err, "expected error %q, got nil", expectedErr)
 	require.Contains(t, err.Error(), expectedErr)
-	status := a.Agent.Status()
+	status := a.Status()
 	require.Equal(t, scheduler.StatusCancel.String(), status.Status.String())
 }
 
 func (a *Agent) RunSuccess(t *testing.T) {
 	t.Helper()
 
-	err := a.Agent.Run(a.Context)
+	err := a.Run(a.Context)
 	assert.NoError(t, err, "failed to run agent")
 
-	status := a.Agent.Status().Status
+	status := a.Status().Status
 	require.Equal(t, scheduler.StatusSuccess.String(), status.String(), "expected status %q, got %q", scheduler.StatusSuccess, status)
 }
 
@@ -395,7 +395,7 @@ func setShell(t *testing.T, shell string) {
 
 	shPath, err := exec.LookPath(shell)
 	require.NoError(t, err, "failed to find shell")
-	os.Setenv("SHELL", shPath)
+	_ = os.Setenv("SHELL", shPath)
 }
 
 func genRequestID() string {
@@ -419,7 +419,7 @@ func ReadTestdata(t *testing.T, filename string) []byte {
 	t.Helper()
 
 	path := TestdataPath(t, filename)
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec
 	require.NoError(t, err, "failed to read testdata file %q", filename)
 
 	return data

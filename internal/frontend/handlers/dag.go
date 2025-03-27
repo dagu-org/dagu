@@ -275,7 +275,7 @@ func (h *DAG) doRemoteProxy(body any, originalReq *http.Request, node config.Rem
 
 	defer func() {
 		if resp.Body != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 	}()
 
@@ -933,10 +933,10 @@ func (h *DAG) searchDAGs(ctx context.Context, params dags.SearchDAGsParams) (
 
 func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
 	if decoder == nil {
-		return os.ReadFile(f)
+		return os.ReadFile(f) //nolint:gosec
 	}
 
-	r, err := os.Open(f)
+	r, err := os.Open(f) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %w", f, err)
 	}

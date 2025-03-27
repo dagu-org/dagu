@@ -27,7 +27,9 @@ func TestOpenLogFile(t *testing.T) {
 			LogDir: "",
 		}, "12345678")
 		require.NoError(t, err)
-		defer file.Close()
+		defer func() {
+			_ = file.Close()
+		}()
 
 		assert.NotNil(t, file)
 		assert.True(t, filepath.IsAbs(file.Name()))
@@ -122,7 +124,9 @@ func TestCreateLogFile(t *testing.T) {
 
 		file, err := cmd.CreateLogFile(filePath)
 		require.NoError(t, err)
-		defer file.Close()
+		defer func() {
+			_ = file.Close()
+		}()
 
 		assert.NotNil(t, file)
 		assert.Equal(t, filePath, file.Name())
