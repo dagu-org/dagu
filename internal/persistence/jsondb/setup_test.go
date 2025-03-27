@@ -10,22 +10,21 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/dagu-org/dagu/internal/persistence/jsondb/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type testHelper struct {
+type JSONDBTest struct {
 	Context context.Context
 	DB      *JSONDB
 	tmpDir  string
 }
 
-func testSetup(t *testing.T) testHelper {
+func setupTestJSONDB(t *testing.T) JSONDBTest {
 	tmpDir, err := os.MkdirTemp("", "test")
 	require.NoError(t, err)
 
-	th := testHelper{
+	th := JSONDBTest{
 		Context: context.Background(),
 		DB:      New(tmpDir),
 		tmpDir:  tmpDir,
@@ -37,8 +36,30 @@ func testSetup(t *testing.T) testHelper {
 	return th
 }
 
-func (th testHelper) DAG(name string) dagTestHelper {
-	return dagTestHelper{
+func (th JSONDBTest) CreateRecord(t *testing.T, ts time.Time, requestID string, s scheduler.Status) *Record {
+	t.Helper()
+
+	dag := th.DAG("test_DAG")
+	record, err := th.DB.NewRecord(th.Context, dag.DAG, ts, requestID)
+	require.NoError(t, err)
+
+	err = record.Open(th.Context)
+	require.NoError(t, err)
+
+	defer record.Close(th.Context)
+
+	status := persistence.NewStatusFactory(dag.DAG).Default()
+	status.RequestID = requestID
+	status.Status = s
+
+	err = record.Write(th.Context, status)
+	require.NoError(t, err)
+
+	return record.(*Record)
+}
+
+func (th JSONDBTest) DAG(name string) DAGTest {
+	return DAGTest{
 		th: th,
 		DAG: &digraph.DAG{
 			Name:     name,
@@ -47,41 +68,45 @@ func (th testHelper) DAG(name string) dagTestHelper {
 	}
 }
 
-type dagTestHelper struct {
-	th testHelper
+type DAGTest struct {
+	th JSONDBTest
 	*digraph.DAG
 }
 
-func (d dagTestHelper) Writer(t *testing.T, requestID string, startedAt time.Time) writerTestHelper {
+func (d DAGTest) Writer(t *testing.T, requestID string, startedAt time.Time) WriterTest {
 	t.Helper()
 
-	addr := storage.NewAddress(d.th.tmpDir, d.DAG.Name)
-	st := storage.New()
-	filePath := st.GenerateFilePath(d.th.Context, addr, storage.NewUTC(startedAt), requestID)
-	writer := NewWriter(filePath)
+	root := NewDataRoot(d.th.tmpDir, d.DAG.Name)
+	execution, err := root.CreateExecution(NewUTC(startedAt), requestID)
+	require.NoError(t, err)
+
+	record, err := execution.CreateRecord(d.th.Context, NewUTC(startedAt), d.th.DB.cache, WithDAG(d.DAG))
+	require.NoError(t, err)
+
+	writer := NewWriter(record.file)
 	require.NoError(t, writer.Open())
 
 	t.Cleanup(func() {
 		require.NoError(t, writer.close())
 	})
 
-	return writerTestHelper{
+	return WriterTest{
 		th: d.th,
 
 		RequestID: requestID,
-		FilePath:  filePath,
+		FilePath:  record.file,
 		Writer:    writer,
 	}
 }
 
-func (w writerTestHelper) Write(t *testing.T, status persistence.Status) {
+func (w WriterTest) Write(t *testing.T, status persistence.Status) {
 	t.Helper()
 
 	err := w.Writer.write(status)
 	require.NoError(t, err)
 }
 
-func (w writerTestHelper) AssertContent(t *testing.T, name, requestID string, status scheduler.Status) {
+func (w WriterTest) AssertContent(t *testing.T, name, requestID string, status scheduler.Status) {
 	t.Helper()
 
 	data, err := ParseStatusFile(w.FilePath)
@@ -92,14 +117,14 @@ func (w writerTestHelper) AssertContent(t *testing.T, name, requestID string, st
 	assert.Equal(t, status, data.Status)
 }
 
-func (w writerTestHelper) Close(t *testing.T) {
+func (w WriterTest) Close(t *testing.T) {
 	t.Helper()
 
 	require.NoError(t, w.Writer.close())
 }
 
-type writerTestHelper struct {
-	th testHelper
+type WriterTest struct {
+	th JSONDBTest
 
 	RequestID string
 	FilePath  string

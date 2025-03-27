@@ -75,9 +75,10 @@ func TestClient_GetStatus(t *testing.T) {
 		cli := th.Client
 
 		// Open the history store and write a status before updating it.
-		record := th.HistoryStore.NewRecord(ctx, dag.DAG, now, requestID)
+		record, err := th.HistoryStore.NewRecord(ctx, dag.DAG, now, requestID)
+		require.NoError(t, err)
 
-		err := record.Open(ctx)
+		err = record.Open(ctx)
 		require.NoError(t, err)
 
 		status := testNewStatus(dag.DAG, requestID, scheduler.StatusSuccess, scheduler.NodeStatusSuccess)
@@ -187,7 +188,7 @@ func TestClient_RunDAG(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check if the params are the same as the previous run.
-		require.NotEqual(t, previousRequestID, status.RequestID)
+		require.Equal(t, previousRequestID, status.RequestID)
 		require.Equal(t, previousParams, status.Params)
 	})
 }
@@ -312,7 +313,8 @@ func TestClient_ReadHistory(t *testing.T) {
 
 func testNewStatus(dag *digraph.DAG, requestID string, status scheduler.Status, nodeStatus scheduler.NodeStatus) persistence.Status {
 	nodes := []scheduler.NodeData{{State: scheduler.NodeState{Status: nodeStatus}}}
-	startedAt := persistence.Time(time.Now())
+	tm := time.Now()
+	startedAt := &tm
 	return persistence.NewStatusFactory(dag).Create(
 		requestID, status, 0, *startedAt, persistence.WithNodes(nodes),
 	)

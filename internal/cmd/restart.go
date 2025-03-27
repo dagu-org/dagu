@@ -118,6 +118,8 @@ func executeDAG(ctx *Context, cli client.Client, dag *digraph.DAG) error {
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
+	rootDAG := digraph.NewRootDAG(dag.Name, requestID)
+
 	agentInstance := agent.New(
 		requestID,
 		dag,
@@ -126,6 +128,7 @@ func executeDAG(ctx *Context, cli client.Client, dag *digraph.DAG) error {
 		cli,
 		dagStore,
 		ctx.historyStore(),
+		rootDAG,
 		agent.Options{Dry: false})
 
 	listenSignals(ctx, agentInstance)

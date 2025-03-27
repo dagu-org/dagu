@@ -1,3 +1,6 @@
+// Package jsondb provides a JSON-based persistence implementation for DAG execution history.
+// It manages the storage and retrieval of execution status data in a hierarchical directory
+// structure organized by date, with high-performance read/write operations and optional caching.
 package jsondb
 
 import (
@@ -11,14 +14,13 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
-	"github.com/dagu-org/dagu/internal/persistence/jsondb/storage"
 )
 
 // Error definitions for common issues
 var (
-	ErrRequestIDNotFound = errors.New("request ID not found")
-	ErrInvalidPath       = errors.New("invalid path")
-	ErrRequestIDEmpty    = errors.New("requestID is empty")
+	ErrInvalidPath        = errors.New("invalid path")
+	ErrRequestIDEmpty     = errors.New("requestID is empty")
+	ErrRootRequestIDEmpty = errors.New("root requestID is empty")
 )
 
 var _ persistence.HistoryStore = (*JSONDB)(nil)
@@ -29,7 +31,6 @@ type JSONDB struct {
 	latestStatusToday bool                                  // Whether to only return today's status
 	cache             *filecache.Cache[*persistence.Status] // Optional cache for read operations
 	maxWorkers        int                                   // Maximum number of parallel workers
-	storage           storage.Storage                       // Storage interface for managing history records
 }
 
 // Option defines functional options for configuring JSONDB.
@@ -37,10 +38,10 @@ type Option func(*Options)
 
 // Options holds configuration options for JSONDB.
 type Options struct {
-	FileCache         *filecache.Cache[*persistence.Status]
-	LatestStatusToday bool
-	MaxWorkers        int
-	OperationTimeout  time.Duration
+	FileCache         *filecache.Cache[*persistence.Status] // Optional cache for status files
+	LatestStatusToday bool                                  // Whether to only return today's status
+	MaxWorkers        int                                   // Maximum number of parallel workers
+	OperationTimeout  time.Duration                         // Timeout for operations
 }
 
 // WithFileCache sets the file cache for JSONDB.
@@ -73,13 +74,12 @@ func New(baseDir string, opts ...Option) *JSONDB {
 		latestStatusToday: options.LatestStatusToday,
 		cache:             options.FileCache,
 		maxWorkers:        options.MaxWorkers,
-		storage:           storage.New(),
 	}
 }
 
 // Update updates the status for a specific request ID.
 // It handles the entire lifecycle of opening, writing, and closing the history record.
-func (db *JSONDB) Update(ctx context.Context, dagName, requestID string, status persistence.Status) error {
+func (db *JSONDB) Update(ctx context.Context, dagName, reqID string, status persistence.Status) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -88,12 +88,12 @@ func (db *JSONDB) Update(ctx context.Context, dagName, requestID string, status 
 		// Continue with operation
 	}
 
-	if requestID == "" {
+	if reqID == "" {
 		return ErrRequestIDEmpty
 	}
 
 	// Find the history record
-	historyRecord, err := db.FindByRequestID(ctx, dagName, requestID)
+	historyRecord, err := db.FindByRequestID(ctx, dagName, reqID)
 	if err != nil {
 		return fmt.Errorf("failed to find history record: %w", err)
 	}
@@ -117,15 +117,53 @@ func (db *JSONDB) Update(ctx context.Context, dagName, requestID string, status 
 	return nil
 }
 
-// NewRecord creates a new history record for the specified key, timestamp, and request ID.
-func (db *JSONDB) NewRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, requestID string) persistence.Record {
-	if requestID == "" {
-		logger.Error(ctx, "requestID is empty")
+// NewRecord creates a new history record for the specified DAG execution.
+func (db *JSONDB) NewRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string) (persistence.Record, error) {
+	if reqID == "" {
+		return nil, ErrRequestIDEmpty
 	}
 
-	addr := storage.NewAddress(db.baseDir, dag.Name)
-	filePath := db.storage.GenerateFilePath(ctx, addr, storage.NewUTC(timestamp), requestID)
-	return NewRecord(filePath, db.cache, WithDAG(dag))
+	ts := NewUTC(timestamp)
+
+	dataRoot := NewDataRoot(db.baseDir, dag.Name)
+	exec, err := dataRoot.CreateExecution(ts, reqID)
+	if err != nil {
+		logger.Error(ctx, "Failed to create execution", "err", err)
+		return nil, err
+	}
+
+	record, err := exec.CreateRecord(ctx, ts, db.cache, WithDAG(dag))
+	if err != nil {
+		logger.Error(ctx, "Failed to create record", "err", err)
+		return nil, err
+	}
+
+	return record, nil
+}
+
+// NewSubRecord creates a new history record for the specified sub-DAG execution.
+func (db *JSONDB) NewSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, rootDAG digraph.RootDAG) (persistence.Record, error) {
+	if reqID == "" {
+		return nil, ErrRequestIDEmpty
+	}
+	root := NewDataRoot(db.baseDir, rootDAG.Name)
+	rootExec, err := root.FindByRequestID(ctx, rootDAG.RequestID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find root execution: %w", err)
+	}
+
+	exec, err := rootExec.CreateSubExecution(ctx, NewUTC(timestamp), reqID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create sub execution: %w", err)
+	}
+
+	record, err := exec.CreateRecord(ctx, NewUTC(timestamp), db.cache, WithDAG(dag))
+	if err != nil {
+		logger.Error(ctx, "Failed to create record", "err", err)
+		return nil, err
+	}
+
+	return record, nil
 }
 
 // Recent returns the most recent history records for the specified key, up to itemLimit.
@@ -145,16 +183,18 @@ func (db *JSONDB) Recent(ctx context.Context, dagName string, itemLimit int) []p
 	}
 
 	// Get the latest matches
-	addr := storage.NewAddress(db.baseDir, dagName)
-	files := db.storage.Latest(ctx, addr, itemLimit)
-	if len(files) == 0 {
-		return nil
-	}
+	root := NewDataRoot(db.baseDir, dagName)
+	items := root.Latest(ctx, itemLimit)
 
-	// Create history records
-	records := make([]persistence.Record, 0, len(files))
-	for _, file := range files {
-		records = append(records, NewRecord(file, db.cache))
+	// Get the latest record for each item
+	records := make([]persistence.Record, 0, len(items))
+	for _, item := range items {
+		record, err := item.LatestRecord(ctx, db.cache)
+		if err != nil {
+			logger.Error(ctx, "Failed to get latest record", "err", err)
+			continue
+		}
+		records = append(records, record)
 	}
 
 	return records
@@ -170,31 +210,32 @@ func (db *JSONDB) Latest(ctx context.Context, dagName string) (persistence.Recor
 		// Continue with operation
 	}
 
-	addr := storage.NewAddress(db.baseDir, dagName)
+	root := NewDataRoot(db.baseDir, dagName)
 
 	if db.latestStatusToday {
 		startOfDay := time.Now().Truncate(24 * time.Hour)
-		startOfDayInUTC := storage.NewUTC(startOfDay)
+		startOfDayInUTC := NewUTC(startOfDay)
 
 		// Get the latest file for today
-		file, err := db.storage.LatestAfter(ctx, addr, startOfDayInUTC)
+		exec, err := root.LatestAfter(ctx, startOfDayInUTC)
 		if err != nil {
+			logger.Error(ctx, "Failed to get latest after", "err", err)
 			return nil, err
 		}
 
-		return NewRecord(file, db.cache), nil
+		return exec.LatestRecord(ctx, db.cache)
 	}
 
 	// Get the latest file
-	files := db.storage.Latest(ctx, addr, 1)
-	if len(files) == 0 {
+	latestExec := root.Latest(ctx, 1)
+	if len(latestExec) == 0 {
 		return nil, persistence.ErrNoStatusData
 	}
-	return NewRecord(files[0], db.cache), nil
+	return latestExec[0].LatestRecord(ctx, db.cache)
 }
 
 // FindByRequestID finds a history record by request ID.
-func (db *JSONDB) FindByRequestID(ctx context.Context, dagName string, requestID string) (persistence.Record, error) {
+func (db *JSONDB) FindByRequestID(ctx context.Context, dagName, reqID string) (persistence.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -203,19 +244,45 @@ func (db *JSONDB) FindByRequestID(ctx context.Context, dagName string, requestID
 		// Continue with operation
 	}
 
-	if requestID == "" {
+	if reqID == "" {
 		return nil, ErrRequestIDEmpty
 	}
 
-	// Find matching files
-	addr := storage.NewAddress(db.baseDir, dagName)
-	file, err := db.storage.FindByRequestID(ctx, addr, requestID)
+	root := NewDataRoot(db.baseDir, dagName)
+	exec, err := root.FindByRequestID(ctx, reqID)
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to glob pattern: %w", err)
+		return nil, err
 	}
 
-	// Return the most recent file
-	return NewRecord(file, db.cache), nil
+	return exec.LatestRecord(ctx, db.cache)
+}
+
+// FindBySubRequestID finds a history record by request ID for a sub-DAG.
+func (db *JSONDB) FindBySubRequestID(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (persistence.Record, error) {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("FindBySubRequestID canceled: %w", ctx.Err())
+	default:
+		// Continue with operation
+	}
+
+	if reqID == "" {
+		return nil, ErrRequestIDEmpty
+	}
+
+	root := NewDataRoot(db.baseDir, rootDAG.Name)
+	exec, err := root.FindByRequestID(ctx, rootDAG.RequestID)
+	if err != nil {
+		return nil, err
+	}
+
+	subExec, err := exec.GetSubExecution(ctx, reqID)
+	if err != nil {
+		return nil, err
+	}
+	return subExec.LatestRecord(ctx, db.cache)
 }
 
 // RemoveOld removes history records older than retentionDays for the specified key.
@@ -233,12 +300,12 @@ func (db *JSONDB) RemoveOld(ctx context.Context, dagName string, retentionDays i
 		return nil
 	}
 
-	addr := storage.NewAddress(db.baseDir, dagName)
-	return db.storage.RemoveOld(ctx, addr, retentionDays)
+	root := NewDataRoot(db.baseDir, dagName)
+	return root.RemoveOld(ctx, retentionDays)
 }
 
 // Rename renames all history records from oldKey to newKey.
-func (db *JSONDB) Rename(ctx context.Context, oldPath, newNameOrPath string) error {
+func (db *JSONDB) Rename(ctx context.Context, oldNameOrPath, newNameOrPath string) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -247,10 +314,7 @@ func (db *JSONDB) Rename(ctx context.Context, oldPath, newNameOrPath string) err
 		// Continue with operation
 	}
 
-	oldAddr := storage.NewAddress(db.baseDir, oldPath)
-	newAddr := storage.NewAddress(db.baseDir, newNameOrPath)
-	if err := db.storage.Rename(ctx, oldAddr, newAddr); err != nil {
-		return fmt.Errorf("failed to rename: %w", err)
-	}
-	return nil
+	root := NewDataRoot(db.baseDir, oldNameOrPath)
+	newRoot := NewDataRoot(db.baseDir, newNameOrPath)
+	return root.Rename(ctx, newRoot)
 }

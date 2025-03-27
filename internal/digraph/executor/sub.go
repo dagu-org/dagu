@@ -63,6 +63,8 @@ func newSubWorkflow(
 	args := []string{
 		"start",
 		fmt.Sprintf("--request-id=%s", requestID),
+		fmt.Sprintf("--root-dag-name=%s", c.RootDAG().Name),
+		fmt.Sprintf("--root-request-id=%s", c.RootDAG().RequestID),
 		"--quiet",
 		subDAG.Location,
 	}
@@ -103,7 +105,7 @@ func (e *subWorkflow) Run(ctx context.Context) error {
 	}
 
 	// get results from the subworkflow
-	result, err := digraph.GetResult(ctx, e.subDAG, e.requestID)
+	result, err := digraph.GetSubResult(ctx, e.requestID)
 	if err != nil {
 		return fmt.Errorf("failed to collect result: %w", err)
 	}

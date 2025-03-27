@@ -22,7 +22,7 @@ type Client interface {
 	GetCurrentStatus(ctx context.Context, dag *digraph.DAG) (*persistence.Status, error)
 	GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, requestID string) (*persistence.Status, error)
 	GetLatestStatus(ctx context.Context, dag *digraph.DAG) (persistence.Status, error)
-	GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []persistence.StatusFile
+	GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []persistence.Execution
 	UpdateStatus(ctx context.Context, dag *digraph.DAG, status persistence.Status) error
 	UpdateDAG(ctx context.Context, name string, spec string) error
 	DeleteDAG(ctx context.Context, name string) error

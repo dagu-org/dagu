@@ -177,7 +177,7 @@ func (*client) GetCurrentStatus(_ context.Context, dag *digraph.DAG) (*persisten
 			return nil, err
 		}
 		// The DAG is not running so return the default status
-		status := persistence.NewStatusFactory(dag).CreateDefault()
+		status := persistence.NewStatusFactory(dag).Default()
 		return &status, nil
 	}
 	return persistence.StatusFromJSON(ret)
@@ -190,20 +190,20 @@ func (e *client) GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, req
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by request id: %w", err)
 	}
-	historyStatus, err := record.ReadStatus(ctx)
+	latestStatus, err := record.ReadStatus(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}
 
-	// If the DAG is running, set the status to error if the request ID does not match
+	// If the DAG is running, set the currentStatus to error if the request ID does not match
 	// Because the DAG execution must be stopped
 	// TODO: Handle different request IDs for the same DAG
-	status, _ := e.GetCurrentStatus(ctx, dag)
-	if status != nil && status.RequestID != requestID {
-		historyStatus.SetStatusToErrorIfRunning()
+	currentStatus, _ := e.GetCurrentStatus(ctx, dag)
+	if currentStatus != nil && currentStatus.RequestID != requestID {
+		latestStatus.SetStatusToErrorIfRunning()
 	}
 
-	return historyStatus, err
+	return latestStatus, err
 }
 
 func (*client) currentStatus(_ context.Context, dag *digraph.DAG) (*persistence.Status, error) {
@@ -241,23 +241,23 @@ handleError:
 
 	if errors.Is(err, persistence.ErrNoStatusData) {
 		// No status for today
-		return persistence.NewStatusFactory(dag).CreateDefault(), nil
+		return persistence.NewStatusFactory(dag).Default(), nil
 	}
 
-	return persistence.NewStatusFactory(dag).CreateDefault(), err
+	return persistence.NewStatusFactory(dag).Default(), err
 }
 
-func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []persistence.StatusFile {
+func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []persistence.Execution {
 	records := e.historyStore.Recent(ctx, dag.Name, n)
 
-	var ret []persistence.StatusFile
+	var executions []persistence.Execution
 	for _, record := range records {
-		if statusFile, err := record.Read(ctx); err == nil {
-			ret = append(ret, *statusFile)
+		if execution, err := record.ReadExecution(ctx); err == nil {
+			executions = append(executions, *execution)
 		}
 	}
 
-	return ret
+	return executions
 }
 
 var errDAGIsRunning = errors.New("the DAG is running")

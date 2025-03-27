@@ -10,9 +10,23 @@ import (
 )
 
 type Context struct {
-	dag    *DAG
-	client DBClient
-	envs   map[string]string
+	rootDAG   RootDAG
+	requestID string
+	dag       *DAG
+	client    DBClient
+	envs      map[string]string
+}
+
+type RootDAG struct {
+	Name      string
+	RequestID string
+}
+
+func NewRootDAG(name, requestID string) RootDAG {
+	return RootDAG{
+		Name:      name,
+		RequestID: requestID,
+	}
 }
 
 func GetDAGByName(ctx context.Context, name string) (*DAG, error) {
@@ -20,9 +34,9 @@ func GetDAGByName(ctx context.Context, name string) (*DAG, error) {
 	return c.client.GetDAG(ctx, name)
 }
 
-func GetResult(ctx context.Context, name, requestID string) (*Status, error) {
+func GetSubResult(ctx context.Context, requestID string) (*Status, error) {
 	c := GetContext(ctx)
-	return c.client.GetStatus(ctx, name, requestID)
+	return c.client.GetSubStatus(ctx, requestID, c.rootDAG)
 }
 
 func ApplyEnvs(ctx context.Context) {
@@ -53,11 +67,15 @@ func (c Context) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalO
 	return cmdutil.EvalString(ctx, s, opts...)
 }
 
-func NewContext(ctx context.Context, dag *DAG, client DBClient, requestID, logFile string, params []string) context.Context {
+func (c Context) RootDAG() RootDAG {
+	return c.rootDAG
+}
+
+func NewContext(ctx context.Context, d *DAG, c DBClient, rd RootDAG, reqID, logFile string, params []string) context.Context {
 	var envs = map[string]string{
 		EnvKeySchedulerLogPath: logFile,
-		EnvKeyRequestID:        requestID,
-		EnvKeyDAGName:          dag.Name,
+		EnvKeyRequestID:        reqID,
+		EnvKeyDAGName:          d.Name,
 	}
 	for _, param := range params {
 		parts := strings.SplitN(param, "=", 2)
@@ -69,9 +87,11 @@ func NewContext(ctx context.Context, dag *DAG, client DBClient, requestID, logFi
 	}
 
 	return context.WithValue(ctx, ctxKey{}, Context{
-		dag:    dag,
-		client: client,
-		envs:   envs,
+		rootDAG:   rd,
+		requestID: reqID,
+		dag:       d,
+		client:    c,
+		envs:      envs,
 	})
 }
 

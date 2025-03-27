@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/robfig/cron/v3"
 )
 
@@ -15,7 +16,6 @@ import (
 const (
 	defaultHistoryRetentionDays = 30
 	defaultMaxCleanUpTime       = 60 * time.Second
-	maxSocketNameLength         = 50 // Maximum length for socket name (108 - 16 - 34 - 8 = 50)
 )
 
 // DAG contains all information about a workflow.
@@ -152,21 +152,23 @@ func (d *DAG) HasTag(tag string) bool {
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
 func (d *DAG) SockAddr() string {
-	// Normalize the location path
-	normalizedPath := strings.ReplaceAll(d.Location, " ", "_")
-	name := strings.TrimSuffix(filepath.Base(normalizedPath), filepath.Ext(filepath.Base(normalizedPath)))
+	return SockAddr(d.Location, "")
+}
 
-	// Generate hash for uniqueness
-	hash := md5.New() // nolint // gosec
-	hash.Write([]byte(normalizedPath))
-	hashSum := hash.Sum(nil)
+// SockAddrSub returns the unix socket address for a specific request ID.
+// This is used to control sub DAG executions.
+func (d *DAG) SockAddrSub(requestID string) string {
+	return SockAddr(d.GetName(), requestID)
+}
 
-	// Truncate name if necessary
-	if len(name) > maxSocketNameLength {
-		name = name[:maxSocketNameLength-1]
+// GetName returns the name of the DAG.
+// If the name is not set, it returns the default name (filename without extension).
+func (d *DAG) GetName() string {
+	name := d.Name
+	if name != "" {
+		return name
 	}
-
-	return filepath.Join("/tmp", fmt.Sprintf("@dagu-%s-%x.sock", name, hashSum))
+	return defaultName(d.Location)
 }
 
 // String implements the Stringer interface.
@@ -257,4 +259,36 @@ func (d *DAG) setupHandlers(workDir string) {
 			handler.setup(workDir)
 		}
 	}
+}
+
+// SockAddr returns the unix socket address for the DAG.
+// The address is used to communicate with the agent process.
+func SockAddr(name, key string) string {
+	maxSocketNameLength := 50 // Maximum length for socket name
+	name = fileutil.SafeName(name)
+	key = fileutil.SafeName(key)
+
+	// Create MD5 hash of the combined name and requestID and take first 8 chars
+	combined := name + key
+	hashLength := 6
+	hash := fmt.Sprintf("%x", md5.Sum([]byte(combined)))[:hashLength] // nolint:gosec
+
+	// Calculate the total length with the full name
+	prefix := "@dagu_"
+	connector := "_"
+	suffix := ".sock"
+	totalLen := len(prefix) + len(name) + len(connector) + len(hash) + len(suffix)
+
+	// Truncate name only if the total length exceeds maxSocketNameLength (50)
+	if totalLen > maxSocketNameLength {
+		// Calculate how much to truncate
+		excessLen := totalLen - maxSocketNameLength
+		nameLen := len(name) - excessLen
+		name = name[:nameLen]
+	}
+
+	// Build the socket name
+	socketName := prefix + name + connector + hash + suffix
+
+	return filepath.Join("/tmp", socketName)
 }

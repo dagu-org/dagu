@@ -333,7 +333,6 @@ func (n *Node) Cancel(ctx context.Context) {
 func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-
 	c := digraph.GetExecContext(ctx)
 	c = c.WithEnv(
 		digraph.EnvKeyLogPath, n.Log(),
