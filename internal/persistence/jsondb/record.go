@@ -306,16 +306,16 @@ func (r *Record) ReadStatus(ctx context.Context) (*persistence.Status, error) {
 		// Continue with operation
 	}
 
-	statusFile, err := r.Read(ctx)
+	execution, err := r.ReadExecution(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &statusFile.Status, nil
+	return &execution.Status, nil
 }
 
-// Read returns the full status file information, including the file path.
+// ReadExecution returns the full status file information, including the file path.
 // The context can be used to cancel the operation.
-func (r *Record) Read(ctx context.Context) (*persistence.Execution, error) {
+func (r *Record) ReadExecution(ctx context.Context) (*persistence.Execution, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():

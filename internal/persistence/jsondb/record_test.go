@@ -99,14 +99,14 @@ func TestHistoryRecord_Read(t *testing.T) {
 	hr := NewRecord(file, nil)
 
 	// Read status - should get the last entry (test2)
-	statusFile, err := hr.Read(context.Background())
+	execution, err := hr.ReadExecution(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, scheduler.StatusSuccess.String(), statusFile.Status.Status.String())
+	assert.Equal(t, scheduler.StatusSuccess.String(), execution.Status.Status.String())
 
 	// Read using ReadStatus
-	status, err := hr.ReadStatus(context.Background())
+	latestStatus, err := hr.ReadStatus(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, scheduler.StatusSuccess.String(), status.Status.String())
+	assert.Equal(t, scheduler.StatusSuccess.String(), latestStatus.Status.String())
 }
 
 func TestHistoryRecord_Compact(t *testing.T) {

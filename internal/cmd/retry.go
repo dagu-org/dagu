@@ -55,17 +55,17 @@ func runRetry(ctx *Context, args []string) error {
 		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
 	}
 
-	status, err := historyRecord.Read(ctx)
+	execution, err := historyRecord.ReadExecution(ctx)
 	if err != nil {
 		logger.Error(ctx, "Failed to read status", "err", err)
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 
-	if status.Status.Params != "" {
+	if execution.Status.Params != "" {
 		// backward compatibility
-		loadOpts = append(loadOpts, digraph.WithParams(status.Status.Params))
+		loadOpts = append(loadOpts, digraph.WithParams(execution.Status.Params))
 	} else {
-		loadOpts = append(loadOpts, digraph.WithParams(status.Status.ParamsList))
+		loadOpts = append(loadOpts, digraph.WithParams(execution.Status.ParamsList))
 	}
 
 	dag, err := digraph.Load(ctx, absolutePath, loadOpts...)
@@ -73,11 +73,11 @@ func runRetry(ctx *Context, args []string) error {
 		logger.Error(ctx, "Failed to load DAG specification", "path", specFilePath, "err", err)
 		// nolint : staticcheck
 		return fmt.Errorf("failed to load DAG specification from %s with params %s: %w",
-			specFilePath, status.Status.Params, err)
+			specFilePath, execution.Status.Params, err)
 	}
 
 	// Execute DAG retry
-	if err := executeRetry(ctx, dag, status); err != nil {
+	if err := executeRetry(ctx, dag, execution); err != nil {
 		logger.Error(ctx, "Failed to execute retry", "path", specFilePath, "err", err)
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
