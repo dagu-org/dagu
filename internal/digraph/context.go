@@ -34,7 +34,7 @@ func GetDAGByName(ctx context.Context, name string) (*DAG, error) {
 	return c.client.GetDAG(ctx, name)
 }
 
-func GetSubResult(ctx context.Context, name, requestID string) (*Status, error) {
+func GetSubResult(ctx context.Context, requestID string) (*Status, error) {
 	c := GetContext(ctx)
 	return c.client.GetSubStatus(ctx, requestID, c.rootDAG)
 }

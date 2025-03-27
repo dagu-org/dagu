@@ -64,7 +64,7 @@ func (e Execution) CreateSubExecution(_ context.Context, timestamp TimeInUTC, re
 	return NewExecution(dir)
 }
 
-func (e Execution) GetSubExecution(_ context.Context, reqID string, cache *filecache.Cache[*persistence.Status]) (*Execution, error) {
+func (e Execution) GetSubExecution(_ context.Context, reqID string) (*Execution, error) {
 	globPattern := filepath.Join(e.baseDir, SubWorkflowsDir, "exec_*_"+reqID)
 	matches, err := filepath.Glob(globPattern)
 	if err != nil {

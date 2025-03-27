@@ -278,7 +278,7 @@ func (db *JSONDB) FindBySubRequestID(ctx context.Context, reqID string, rootDAG 
 		return nil, err
 	}
 
-	subExec, err := exec.GetSubExecution(ctx, reqID, db.cache)
+	subExec, err := exec.GetSubExecution(ctx, reqID)
 	if err != nil {
 		return nil, err
 	}
