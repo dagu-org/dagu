@@ -368,22 +368,27 @@ You can define positional parameters in the DAG file and override them when runn
 
 ```yaml
 # Default positional parameters
-params: input.csv output.csv 60  # Default values for $1, $2, and $3
+params: input.csv output.csv 60 # Default values for $1, $2, and $3
 
 steps:
   # Using positional parameters
-  - name: data processing
-    command: python
+  - name: Installation
+    command: pipx install pandas --include-deps
+
+  - name: Data processing
+    command: pipx run
     script: |
       import sys
       import pandas as pd
-      
+
       input_file = "$1"    # First parameter
       output_file = "$2"   # Second parameter
       timeout = "$3"       # Third parameter
-      
+
       print(f"Processing {input_file} -> {output_file} with timeout {timeout}s")
       # Add your processing logic here
+    depends:
+      - Installation
 ```
 
 Run the DAG with custom parameters:
