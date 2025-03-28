@@ -144,6 +144,13 @@ func TestDAGExecution(t *testing.T) {
 			},
 		},
 		{
+			name: "Script",
+			dag:  "perl-script.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": "Hello World",
+			},
+		},
+		{
 			name: "Issue-810",
 			dag:  "issue-810.yaml",
 			expectedOutputs: map[string]any{
