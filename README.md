@@ -373,7 +373,7 @@ params: input.csv output.csv 60  # Default values for $1, $2, and $3
 steps:
   # Using positional parameters
   - name: data processing
-    command: python
+    command: pipx run --spec pandas python 
     script: |
       import sys
       import pandas as pd
