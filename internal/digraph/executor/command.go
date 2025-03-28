@@ -106,26 +106,27 @@ type commandConfig struct {
 func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.Cmd, error) {
 	var cmd *exec.Cmd
 	switch {
+	case cfg.Command != "" && scriptFile != "":
+		args, err := cfg.evalArgs()
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate command args: %w", err)
+		}
+		cmd = exec.CommandContext(cfg.Ctx, cfg.Command, append(args, scriptFile)...) // nolint: gosec
+
 	case cfg.ShellCommand != "" && scriptFile != "":
 		// If script is provided ignore the shell command args
 
-		// nolint: gosec
-		cmd = exec.CommandContext(cfg.Ctx, cfg.ShellCommand, scriptFile)
+		cmd = exec.CommandContext(cfg.Ctx, cfg.ShellCommand, scriptFile) // nolint: gosec
 
 	case cfg.ShellCommand != "" && cfg.ShellCommandArgs != "":
 		// nolint: gosec
 		cmd = exec.CommandContext(cfg.Ctx, cfg.ShellCommand, "-c", cfg.ShellCommandArgs)
 
 	default:
-		args := make([]string, len(cfg.Args))
-		for i, arg := range cfg.Args {
-			arg, err := cmdutil.EvalString(cfg.Ctx, arg)
-			if err != nil {
-				return nil, fmt.Errorf("failed to evaluate command args: %w", err)
-			}
-			args[i] = arg
+		args, err := cfg.evalArgs()
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate command args: %w", err)
 		}
-
 		cmd = createDirectCommand(cfg.Ctx, cfg.Command, args, scriptFile)
 
 	}
@@ -140,6 +141,18 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 	}
 
 	return cmd, nil
+}
+
+func (cfg *commandConfig) evalArgs() ([]string, error) {
+	args := make([]string, len(cfg.Args))
+	for i, arg := range cfg.Args {
+		arg, err := cmdutil.EvalString(cfg.Ctx, arg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate command args: %w", err)
+		}
+		args[i] = arg
+	}
+	return args, nil
 }
 
 func init() {
