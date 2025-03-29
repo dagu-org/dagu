@@ -6,3 +6,5 @@ dist/
 
 # Webpack profile output
 compilation-stats.json
+
+package-lock.json
