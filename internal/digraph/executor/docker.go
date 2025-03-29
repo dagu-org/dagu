@@ -49,6 +49,7 @@ var _ Executor = (*docker)(nil)
 
 type docker struct {
 	image         string
+	platform      string
 	containerName string
 	pull          bool
 	autoRemove    bool
@@ -120,7 +121,7 @@ func (e *docker) Run(ctx context.Context) error {
 
 	// New container creation logic
 	if e.pull {
-		reader, err := cli.ImagePull(ctx, e.image, image.PullOptions{})
+		reader, err := cli.ImagePull(ctx, e.image, image.PullOptions{Platform: e.platform})
 		if err != nil {
 			return err
 		}
