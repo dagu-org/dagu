@@ -110,8 +110,11 @@ func (e *docker) Run(ctx context.Context) error {
 		args = append(args, val)
 	}
 
-	// If containerName is set, use exec instead of creating a new container
-	if e.containerName != "" {
+	// If image is not set or execConfig is set, use exec instead of creating a new container
+	if e.image == "" || e.execConfig != nil {
+		if e.containerName == "" {
+			return fmt.Errorf("containerName must be set in exec mode")
+		}
 		return e.execInContainer(ctx, cli, args)
 	}
 
@@ -143,7 +146,7 @@ func (e *docker) Run(ctx context.Context) error {
 	containerConfig.Env = env
 
 	resp, err := cli.ContainerCreate(
-		ctx, &containerConfig, e.hostConfig, e.networkConfig, nil, "",
+		ctx, &containerConfig, e.hostConfig, e.networkConfig, nil, e.containerName,
 	)
 	if err != nil {
 		return err
