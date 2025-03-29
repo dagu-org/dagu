@@ -88,7 +88,7 @@ func TestDAGExecution(t *testing.T) {
 			},
 		},
 		{
-			name: "Json",
+			name: "JSON",
 			dag:  "json.yaml",
 			expectedOutputs: map[string]any{
 				"OUT1": "Starting server at localhost:8080",
@@ -137,10 +137,17 @@ func TestDAGExecution(t *testing.T) {
 			},
 		},
 		{
-			name: "JsonVar",
+			name: "JSONVar",
 			dag:  "json_var.yaml",
 			expectedOutputs: map[string]any{
 				"OUT1": "Starting server at localhost:8080",
+			},
+		},
+		{
+			name: "NestedGraph",
+			dag:  "nested_parent.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": "value is 123",
 			},
 		},
 		{

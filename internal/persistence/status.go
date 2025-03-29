@@ -1,4 +1,4 @@
-package model
+package persistence
 
 import (
 	"encoding/json"
@@ -19,12 +19,12 @@ func NewStatusFactory(dag *digraph.DAG) *StatusFactory {
 	return &StatusFactory{dag: dag}
 }
 
-func (f *StatusFactory) CreateDefault() Status {
+func (f *StatusFactory) Default() Status {
 	return Status{
-		Name:       f.dag.Name,
+		Name:       f.dag.GetName(),
 		Status:     scheduler.StatusNone,
 		StatusText: scheduler.StatusNone.String(),
-		PID:        PID(pidNotRunning),
+		PID:        PID(0),
 		Nodes:      FromSteps(f.dag.Steps),
 		OnExit:     nodeOrNil(f.dag.HandlerOn.Exit),
 		OnSuccess:  nodeOrNil(f.dag.HandlerOn.Success),
@@ -38,6 +38,13 @@ func (f *StatusFactory) CreateDefault() Status {
 }
 
 type StatusOption func(*Status)
+
+func WithRootDAG(rootDAG digraph.RootDAG) StatusOption {
+	return func(s *Status) {
+		s.RootRequestID = rootDAG.RequestID
+		s.RootDAGName = rootDAG.Name
+	}
+}
 
 func WithNodes(nodes []scheduler.NodeData) StatusOption {
 	return func(s *Status) {
@@ -54,7 +61,7 @@ func WithFinishedAt(t time.Time) StatusOption {
 func WithOnExitNode(node *scheduler.Node) StatusOption {
 	return func(s *Status) {
 		if node != nil {
-			s.OnExit = FromNode(node.Data())
+			s.OnExit = FromNode(node.NodeData())
 		}
 	}
 }
@@ -62,7 +69,7 @@ func WithOnExitNode(node *scheduler.Node) StatusOption {
 func WithOnSuccessNode(node *scheduler.Node) StatusOption {
 	return func(s *Status) {
 		if node != nil {
-			s.OnSuccess = FromNode(node.Data())
+			s.OnSuccess = FromNode(node.NodeData())
 		}
 	}
 }
@@ -70,7 +77,7 @@ func WithOnSuccessNode(node *scheduler.Node) StatusOption {
 func WithOnFailureNode(node *scheduler.Node) StatusOption {
 	return func(s *Status) {
 		if node != nil {
-			s.OnFailure = FromNode(node.Data())
+			s.OnFailure = FromNode(node.NodeData())
 		}
 	}
 }
@@ -78,7 +85,7 @@ func WithOnFailureNode(node *scheduler.Node) StatusOption {
 func WithOnCancelNode(node *scheduler.Node) StatusOption {
 	return func(s *Status) {
 		if node != nil {
-			s.OnCancel = FromNode(node.Data())
+			s.OnCancel = FromNode(node.NodeData())
 		}
 	}
 }
@@ -96,7 +103,7 @@ func (f *StatusFactory) Create(
 	startedAt time.Time,
 	opts ...StatusOption,
 ) Status {
-	statusObj := f.CreateDefault()
+	statusObj := f.Default()
 	statusObj.RequestID = requestID
 	statusObj.Status = status
 	statusObj.StatusText = status.String()
@@ -119,38 +126,40 @@ func StatusFromJSON(s string) (*Status, error) {
 	return status, err
 }
 
-type StatusFile struct {
-	File   string
-	Status Status
-}
-
-type StatusResponse struct {
-	Status *Status `json:"status"`
-}
-
 type Status struct {
-	RequestID  string           `json:"RequestId"`
-	Name       string           `json:"Name"`
-	Status     scheduler.Status `json:"Status"`
-	StatusText string           `json:"StatusText"`
-	PID        PID              `json:"Pid"`
-	Nodes      []*Node          `json:"Nodes"`
-	OnExit     *Node            `json:"OnExit"`
-	OnSuccess  *Node            `json:"OnSuccess"`
-	OnFailure  *Node            `json:"OnFailure"`
-	OnCancel   *Node            `json:"OnCancel"`
-	StartedAt  string           `json:"StartedAt"`
-	FinishedAt string           `json:"FinishedAt"`
-	Log        string           `json:"Log"`
-	Params     string           `json:"Params,omitempty"`
-	ParamsList []string         `json:"ParamsList,omitempty"`
+	RootDAGName   string           `json:"RootDAGName,omitempty"`
+	RootRequestID string           `json:"RootRequestId,omitempty"`
+	RequestID     string           `json:"RequestId,omitempty"`
+	Name          string           `json:"Name,omitempty"`
+	Status        scheduler.Status `json:"Status"`
+	StatusText    string           `json:"StatusText"`
+	PID           PID              `json:"Pid,omitempty"`
+	Nodes         []*Node          `json:"Nodes,omitempty"`
+	OnExit        *Node            `json:"OnExit,omitempty"`
+	OnSuccess     *Node            `json:"OnSuccess,omitempty"`
+	OnFailure     *Node            `json:"OnFailure,omitempty"`
+	OnCancel      *Node            `json:"OnCancel,omitempty"`
+	StartedAt     string           `json:"StartedAt,omitempty"`
+	FinishedAt    string           `json:"FinishedAt,omitempty"`
+	Log           string           `json:"Log,omitempty"`
+	Params        string           `json:"Params,omitempty"`
+	ParamsList    []string         `json:"ParamsList,omitempty"`
 }
 
-func (st *Status) CorrectRunningStatus() {
+func (st *Status) SetStatusToErrorIfRunning() {
 	if st.Status == scheduler.StatusRunning {
 		st.Status = scheduler.StatusError
 		st.StatusText = st.Status.String()
 	}
+}
+
+type PID int
+
+func (p PID) String() string {
+	if p <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d", p)
 }
 
 func FormatTime(val time.Time) string {
@@ -158,25 +167,6 @@ func FormatTime(val time.Time) string {
 		return ""
 	}
 	return stringutil.FormatTime(val)
-}
-
-func Time(t time.Time) *time.Time {
-	return &t
-}
-
-type PID int
-
-const pidNotRunning PID = -1
-
-func (p PID) String() string {
-	if p == pidNotRunning {
-		return ""
-	}
-	return fmt.Sprintf("%d", p)
-}
-
-func (p PID) IsRunning() bool {
-	return p != pidNotRunning
 }
 
 func nodeOrNil(s *digraph.Step) *Node {

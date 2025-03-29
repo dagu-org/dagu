@@ -29,20 +29,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     apt-get install -y \
     sudo \
-    git \
-    curl \
-    wget \
-    zip \
-    unzip \
-    sudo \
     tzdata \
-    build-essential \
     jq \
-    python3 \
-    python3-pip \
-    openjdk-11-jdk \
-    nodejs \
-    npm \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

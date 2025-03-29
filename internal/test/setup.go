@@ -295,6 +295,8 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		opt(helper)
 	}
 
+	rootDAG := digraph.NewRootDAG(d.DAG.Name, requestID)
+
 	helper.Agent = agent.New(
 		requestID,
 		d.DAG,
@@ -303,6 +305,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		d.Client,
 		d.DAGStore,
 		d.HistoryStore,
+		rootDAG,
 		helper.opts,
 	)
 

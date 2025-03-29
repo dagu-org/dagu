@@ -1,6 +1,3 @@
-// Copyright (C) 2025 Yota Hamada
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 package digraph
 
 import "context"
@@ -8,7 +5,7 @@ import "context"
 // DBClient gets a result of a DAG execution.
 type DBClient interface {
 	GetDAG(ctx context.Context, name string) (*DAG, error)
-	GetStatus(ctx context.Context, name string, requestID string) (*Status, error)
+	GetSubStatus(ctx context.Context, requestID string, rootDAG RootDAG) (*Status, error)
 }
 
 // Status is the result of a DAG execution.

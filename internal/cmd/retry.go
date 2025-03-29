@@ -8,7 +8,7 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/spf13/cobra"
 )
 
@@ -45,7 +45,7 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to resolve absolute path for %s: %w", specFilePath, err)
 	}
 
-	status, err := ctx.historyStore().FindByRequestID(ctx, absolutePath, requestID)
+	historyRecord, err := ctx.historyStore().FindByRequestID(ctx, absolutePath, requestID)
 	if err != nil {
 		logger.Error(ctx, "Failed to retrieve historical execution", "requestID", requestID, "err", err)
 		return fmt.Errorf("failed to retrieve historical execution for request ID %s: %w", requestID, err)
@@ -55,11 +55,17 @@ func runRetry(ctx *Context, args []string) error {
 		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
 	}
 
-	if status.Status.Params != "" {
+	execution, err := historyRecord.ReadExecution(ctx)
+	if err != nil {
+		logger.Error(ctx, "Failed to read status", "err", err)
+		return fmt.Errorf("failed to read status: %w", err)
+	}
+
+	if execution.Status.Params != "" {
 		// backward compatibility
-		loadOpts = append(loadOpts, digraph.WithParams(status.Status.Params))
+		loadOpts = append(loadOpts, digraph.WithParams(execution.Status.Params))
 	} else {
-		loadOpts = append(loadOpts, digraph.WithParams(status.Status.ParamsList))
+		loadOpts = append(loadOpts, digraph.WithParams(execution.Status.ParamsList))
 	}
 
 	dag, err := digraph.Load(ctx, absolutePath, loadOpts...)
@@ -67,11 +73,11 @@ func runRetry(ctx *Context, args []string) error {
 		logger.Error(ctx, "Failed to load DAG specification", "path", specFilePath, "err", err)
 		// nolint : staticcheck
 		return fmt.Errorf("failed to load DAG specification from %s with params %s: %w",
-			specFilePath, status.Status.Params, err)
+			specFilePath, execution.Status.Params, err)
 	}
 
 	// Execute DAG retry
-	if err := executeRetry(ctx, dag, status); err != nil {
+	if err := executeRetry(ctx, dag, execution); err != nil {
 		logger.Error(ctx, "Failed to execute retry", "path", specFilePath, "err", err)
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
@@ -79,20 +85,17 @@ func runRetry(ctx *Context, args []string) error {
 	return nil
 }
 
-func executeRetry(ctx *Context, dag *digraph.DAG, originalStatus *model.StatusFile) error {
-	newRequestID, err := generateRequestID()
-	if err != nil {
-		return fmt.Errorf("failed to generate new request ID: %w", err)
-	}
-
+func executeRetry(ctx *Context, dag *digraph.DAG, originalStatus *persistence.Execution) error {
 	const logPrefix = "retry_"
-	logFile, err := ctx.OpenLogFile(logPrefix, dag, newRequestID)
+
+	reqID := originalStatus.Status.RequestID
+	logFile, err := ctx.OpenLogFile(logPrefix, dag, reqID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
 	defer logFile.Close()
 
-	logger.Info(ctx, "DAG retry initiated", "DAG", dag.Name, "originalRequestID", originalStatus.Status.RequestID, "newRequestID", newRequestID, "logFile", logFile.Name())
+	logger.Info(ctx, "DAG retry initiated", "DAG", dag.Name, "requestID", originalStatus.Status.RequestID, "logFile", logFile.Name())
 
 	ctx.LogToFile(logFile)
 
@@ -108,14 +111,17 @@ func executeRetry(ctx *Context, dag *digraph.DAG, originalStatus *model.StatusFi
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
 
+	rootDAG := digraph.NewRootDAG(dag.Name, reqID)
+
 	agentInstance := agent.New(
-		newRequestID,
+		reqID,
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
 		cli,
 		dagStore,
 		ctx.historyStore(),
+		rootDAG,
 		agent.Options{RetryTarget: &originalStatus.Status},
 	)
 
@@ -126,7 +132,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, originalStatus *model.StatusFi
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
-			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, newRequestID, err)
+			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, reqID, err)
 		}
 	}
 

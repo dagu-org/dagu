@@ -35,9 +35,9 @@ func newSubWorkflow(
 		return nil, fmt.Errorf("failed to get executable path: %w", err)
 	}
 
-	stepContext := digraph.GetStepContext(ctx)
+	c := digraph.GetExecContext(ctx)
 
-	config, err := digraph.EvalStringFields(stepContext, struct {
+	config, err := digraph.EvalObject(ctx, struct {
 		Name   string
 		Params string
 	}{
@@ -48,7 +48,7 @@ func newSubWorkflow(
 		return nil, fmt.Errorf("failed to substitute string fields: %w", err)
 	}
 
-	subDAG, err := stepContext.GetDAGByName(config.Name)
+	subDAG, err := digraph.GetDAGByName(ctx, config.Name)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to find subworkflow %q: %w", config.Name, err,
@@ -63,6 +63,8 @@ func newSubWorkflow(
 	args := []string{
 		"start",
 		fmt.Sprintf("--request-id=%s", requestID),
+		fmt.Sprintf("--root-dag-name=%s", c.RootDAG().Name),
+		fmt.Sprintf("--root-request-id=%s", c.RootDAG().RequestID),
 		"--quiet",
 		subDAG.Location,
 	}
@@ -77,7 +79,7 @@ func newSubWorkflow(
 		return nil, ErrWorkingDirNotExist
 	}
 	cmd.Dir = step.Dir
-	cmd.Env = append(cmd.Env, stepContext.AllEnvs()...)
+	cmd.Env = append(cmd.Env, c.AllEnvs()...)
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
@@ -103,8 +105,7 @@ func (e *subWorkflow) Run(ctx context.Context) error {
 	}
 
 	// get results from the subworkflow
-	stepContext := digraph.GetStepContext(ctx)
-	result, err := stepContext.GetResult(e.subDAG, e.requestID)
+	result, err := digraph.GetSubResult(ctx, e.requestID)
 	if err != nil {
 		return fmt.Errorf("failed to collect result: %w", err)
 	}

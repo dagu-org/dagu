@@ -3,7 +3,7 @@ package handlers
 import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/frontend/gen/models"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/go-openapi/swag"
 )
 
@@ -26,7 +26,7 @@ func convertToDAG(dag *digraph.DAG) *models.DAG {
 	}
 }
 
-func convertToStatusDetails(s model.Status) *models.DAGStatusDetails {
+func convertToStatusDetails(s persistence.Status) *models.DAGStatusDetails {
 	status := &models.DAGStatusDetails{
 		Log:        swag.String(s.Log),
 		Name:       swag.String(s.Name),
@@ -56,7 +56,7 @@ func convertToStatusDetails(s model.Status) *models.DAGStatusDetails {
 	return status
 }
 
-func convertToNode(node *model.Node) *models.Node {
+func convertToNode(node *persistence.Node) *models.Node {
 	return &models.Node{
 		DoneCount:  swag.Int64(int64(node.DoneCount)),
 		Error:      swag.String(node.Error),
