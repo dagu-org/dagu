@@ -19,20 +19,15 @@ COPY --from=ui-builder /app/dist/ ./internal/frontend/assets/
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags="${LDFLAGS}" -o ./bin/dagu ./cmd
 
 # Stage 3: Final Image
-FROM --platform=$TARGETPLATFORM ubuntu:24.04
+FROM --platform=$TARGETPLATFORM alpine:3.21.3
 ARG USER="dagu"
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
 
 # Install common tools
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && \
-    apt-get install -y \
-    sudo \
-    tzdata \
-    jq \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk update && \
+    apk add jq tzdata sudo shadow bash && \
+    rm -rf /var/cache/apk/*
 
 COPY --from=go-builder /app/bin/dagu /usr/local/bin/
 COPY ./entrypoint.sh /entrypoint.sh
