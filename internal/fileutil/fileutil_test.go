@@ -11,15 +11,15 @@ func TestResolvePath(t *testing.T) {
 	origHome := os.Getenv("HOME")
 	origTempDir := os.Getenv("TEMP_DIR")
 	defer func() {
-		os.Setenv("HOME", origHome)
-		os.Setenv("TEMP_DIR", origTempDir)
+		_ = os.Setenv("HOME", origHome)
+		_ = os.Setenv("TEMP_DIR", origTempDir)
 	}()
 
 	// Set up test environment variables
 	testHome := "/test/home"
 	testTempDir := "/test/temp"
-	os.Setenv("HOME", testHome)
-	os.Setenv("TEMP_DIR", testTempDir)
+	_ = os.Setenv("HOME", testHome)
+	_ = os.Setenv("TEMP_DIR", testTempDir)
 
 	// Get current working directory for absolute path tests
 	cwd, err := os.Getwd()

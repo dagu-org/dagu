@@ -71,7 +71,9 @@ func (et ExecutionTest) WriteStatus(t *testing.T, ts TimeInUTC, s scheduler.Stat
 	err = record.Open(et.Context)
 	require.NoError(t, err)
 
-	defer record.Close(et.Context)
+	defer func() {
+		_ = record.Close(et.Context)
+	}()
 
 	err = record.Write(et.Context, status)
 	require.NoError(t, err)

@@ -145,7 +145,7 @@ func (dr *DataRoot) CreateExecution(timestamp TimeInUTC, reqID string) (*Executi
 	dirName := "exec_" + timestamp.Format(dateTimeFormatUTC) + "_" + reqID
 	dir := filepath.Join(dr.executionsDir, timestamp.Format("2006"), timestamp.Format("01"), timestamp.Format("02"), dirName)
 
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
@@ -174,7 +174,7 @@ func (dr DataRoot) Create() error {
 	if dr.Exists() {
 		return nil
 	}
-	if err := os.MkdirAll(dr.executionsDir, 0755); err != nil {
+	if err := os.MkdirAll(dr.executionsDir, 0750); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dr.executionsDir, err)
 	}
 	return nil
@@ -229,7 +229,7 @@ func (dr DataRoot) Rename(ctx context.Context, newRoot DataRoot) error {
 		newDir := filepath.Join(newRoot.executionsDir, year, month, day, filepath.Base(targetDir))
 
 		// Make sure the new directory exists
-		if err := os.MkdirAll(filepath.Dir(newDir), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(newDir), 0750); err != nil {
 			logger.Error(ctx, "Failed to create new directory", "err", err, "new", newDir)
 			return fmt.Errorf("failed to create directory %s: %w", newDir, err)
 		}

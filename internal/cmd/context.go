@@ -183,7 +183,7 @@ func (s *Context) dagStore() (persistence.DAGStore, error) {
 	baseDir := s.cfg.Paths.DAGsDir
 	_, err := os.Stat(baseDir)
 	if os.IsNotExist(err) {
-		if err := os.MkdirAll(baseDir, 0755); err != nil {
+		if err := os.MkdirAll(baseDir, 0750); err != nil {
 			return nil, fmt.Errorf("failed to initialize directory %s: %w", baseDir, err)
 		}
 	}
@@ -382,7 +382,7 @@ func SetupLogDirectory(config LogFileSettings) (string, error) {
 	}
 
 	logDir := filepath.Join(baseDir, safeName)
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if err := os.MkdirAll(logDir, 0750); err != nil {
 		return "", fmt.Errorf("failed to initialize directory %s: %w", logDir, err)
 	}
 
@@ -410,7 +410,7 @@ func CreateLogFile(filepath string) (*os.File, error) {
 	flags := os.O_CREATE | os.O_WRONLY | os.O_APPEND | os.O_SYNC
 	permissions := os.FileMode(0644)
 
-	file, err := os.OpenFile(filepath, flags, permissions)
+	file, err := os.OpenFile(filepath, flags, permissions) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("failed to create/open log file %s: %w", filepath, err)
 	}

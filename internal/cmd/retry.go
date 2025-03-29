@@ -93,7 +93,9 @@ func executeRetry(ctx *Context, dag *digraph.DAG, originalStatus *persistence.Ex
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
-	defer logFile.Close()
+	defer func() {
+		_ = logFile.Close()
+	}()
 
 	logger.Info(ctx, "DAG retry initiated", "DAG", dag.Name, "requestID", originalStatus.Status.RequestID, "logFile", logFile.Name())
 

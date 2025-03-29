@@ -61,13 +61,17 @@ basePath: "/dagu"
 	// 1. Request without the base path should return 404.
 	resp, err := http.Get("http://127.0.0.1:" + port + "/api/v1/health")
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	require.Equal(t, http.StatusNotFound, resp.StatusCode)
 
 	// 2. Request with the base path should return 200.
 	resp, err = http.Get("http://127.0.0.1:" + port + "/dagu/api/v1/health")
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Optionally, decode the JSON response to check for expected health status.

@@ -62,7 +62,9 @@ func runDry(ctx *Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
-	defer logFile.Close()
+	defer func() {
+		_ = logFile.Close()
+	}()
 
 	ctx.LogToFile(logFile)
 

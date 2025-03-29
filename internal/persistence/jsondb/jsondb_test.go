@@ -173,7 +173,9 @@ func TestJSONDB(t *testing.T) {
 		// Write the status
 		err = record.Open(th.Context)
 		require.NoError(t, err)
-		defer record.Close(th.Context)
+		defer func() {
+			_ = record.Close(th.Context)
+		}()
 
 		statusToWrite := persistence.NewStatusFactory(subDAG.DAG).Default()
 		statusToWrite.RequestID = "sub-id"
