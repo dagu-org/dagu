@@ -1,6 +1,13 @@
 import React, { CSSProperties } from 'react';
 import mermaid from 'mermaid';
 import '@fortawesome/fontawesome-free/css/all.min.css';
+import { IconButton, Stack } from '@mui/material';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faMagnifyingGlassPlus,
+  faMagnifyingGlassMinus,
+  faRotateLeft,
+} from '@fortawesome/free-solid-svg-icons';
 
 type Props = {
   def: string;
@@ -28,6 +35,7 @@ function Mermaid({ def, style = {} }: Props) {
   const [uniqueId] = React.useState(
     () => `mermaid-${Math.random().toString(36).substr(2, 9)}`
   );
+  const [scale, setScale] = React.useState(1);
 
   const mStyle = {
     ...style,
@@ -36,6 +44,18 @@ function Mermaid({ def, style = {} }: Props) {
   const dStyle: CSSProperties = {
     overflowX: 'auto',
     padding: '2em',
+  };
+
+  const zoomIn = () => {
+    setScale((prevScale) => Math.min(prevScale + 0.1, 2));
+  };
+
+  const zoomOut = () => {
+    setScale((prevScale) => Math.max(prevScale - 0.1, 0.5));
+  };
+
+  const resetZoom = () => {
+    setScale(1);
   };
 
   const render = async () => {
@@ -91,9 +111,74 @@ function Mermaid({ def, style = {} }: Props) {
     renderWithRetry();
   }, [def]);
 
+  React.useEffect(() => {
+    if (ref.current) {
+      const svg = ref.current.querySelector('svg');
+      if (svg) {
+        svg.style.transform = `scale(${scale})`;
+        svg.style.transformOrigin = 'top left';
+      }
+    }
+  }, [scale]);
+
   return (
     <div style={dStyle}>
-      <div className="mermaid" ref={ref} style={mStyle} />
+      <Stack direction="row" justifyContent="right" spacing={1} sx={{ mb: 2 }}>
+        <IconButton
+          size="small"
+          onClick={zoomIn}
+          sx={{
+            border: '1px solid rgba(0, 0, 0, 0.12)',
+            borderRadius: '4px',
+            color: 'rgba(0, 0, 0, 0.54)',
+            padding: '8px',
+            '&:hover': {
+              backgroundColor: 'rgba(0, 0, 0, 0.04)',
+            },
+          }}
+        >
+          <FontAwesomeIcon icon={faMagnifyingGlassPlus} />
+        </IconButton>
+        <IconButton
+          size="small"
+          onClick={zoomOut}
+          sx={{
+            border: '1px solid rgba(0, 0, 0, 0.12)',
+            borderRadius: '4px',
+            color: 'rgba(0, 0, 0, 0.54)',
+            padding: '8px',
+            '&:hover': {
+              backgroundColor: 'rgba(0, 0, 0, 0.04)',
+            },
+          }}
+        >
+          <FontAwesomeIcon icon={faMagnifyingGlassMinus} />
+        </IconButton>
+        <IconButton
+          size="small"
+          onClick={resetZoom}
+          sx={{
+            border: '1px solid rgba(0, 0, 0, 0.12)',
+            borderRadius: '4px',
+            color: 'rgba(0, 0, 0, 0.54)',
+            padding: '8px',
+            '&:hover': {
+              backgroundColor: 'rgba(0, 0, 0, 0.04)',
+            },
+          }}
+        >
+          <FontAwesomeIcon icon={faRotateLeft} />
+        </IconButton>
+      </Stack>
+      <div
+        className="mermaid"
+        ref={ref}
+        style={{
+          ...mStyle,
+          overflow: 'auto',
+          maxHeight: '80vh',
+        }}
+      />
     </div>
   );
 }
