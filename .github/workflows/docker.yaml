@@ -47,7 +47,7 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}
-  # Build and push ubuntu-based dev image
+  # Build and push alpine-based dev image
   docker-dev:
     runs-on: ubuntu-latest
     permissions:
