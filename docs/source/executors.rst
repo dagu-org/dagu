@@ -110,7 +110,14 @@ Note that the environment variables of the host (where `dagu` is running) will n
             autoRemove: true
         command: printenv
 
-See the Docker's API documentation for all available options.
+Available creating container configuration options:
+
+- `image`: Name or ID of the image to create the container (required)
+- `containerName`: Name of the newly created container (optional)
+- `pull`: Pull the `image` from remote registry, default `true` (optional)
+- `platform`: Pull `image` for a specific platform instead of the current one. If you set `pull` to `false`, it will not have any effect.
+
+For further customizing the newly created container, check the Docker's API document:
 
 - For `container`, see `ContainerConfig <https://pkg.go.dev/github.com/docker/docker/api/types/container#Config>`_.
 - For `host`, see `HostConfig <https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig>`_.
