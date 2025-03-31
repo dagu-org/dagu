@@ -1,13 +1,8 @@
 import React, { CSSProperties } from 'react';
 import mermaid from 'mermaid';
 import '@fortawesome/fontawesome-free/css/all.min.css';
-import { IconButton, Stack } from '@mui/material';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faMagnifyingGlassPlus,
-  faMagnifyingGlassMinus,
-  faRotateLeft,
-} from '@fortawesome/free-solid-svg-icons';
+import { ToggleButton, ToggleButtonGroup } from '@mui/material';
+import { ZoomIn, ZoomOut, RestartAlt } from '@mui/icons-material';
 
 type Props = {
   def: string;
@@ -44,6 +39,14 @@ function Mermaid({ def, style = {} }: Props) {
   const dStyle: CSSProperties = {
     overflowX: 'auto',
     padding: '2em',
+    position: 'relative',
+  };
+
+  const controlsStyle: CSSProperties = {
+    position: 'absolute',
+    top: '1em',
+    right: '2em',
+    zIndex: 1,
   };
 
   const zoomIn = () => {
@@ -111,55 +114,46 @@ function Mermaid({ def, style = {} }: Props) {
     renderWithRetry();
   }, [def]);
 
+  React.useEffect(() => {
+    if (ref.current) {
+      const svg = ref.current.querySelector('svg');
+      if (svg) {
+        svg.style.transform = `scale(${scale})`;
+        svg.style.transformOrigin = 'top left';
+      }
+    }
+  }, [scale]);
+
   return (
     <div style={dStyle}>
-      <Stack direction="row" justifyContent="right" spacing={1} sx={{ mb: 2 }}>
-        <IconButton
+      <div style={controlsStyle}>
+        <ToggleButtonGroup
           size="small"
-          onClick={zoomIn}
           sx={{
-            border: '1px solid rgba(0, 0, 0, 0.12)',
-            borderRadius: '4px',
-            color: 'rgba(0, 0, 0, 0.54)',
-            padding: '8px',
-            '&:hover': {
-              backgroundColor: 'rgba(0, 0, 0, 0.04)',
+            backgroundColor: 'white',
+            '& .MuiToggleButton-root': {
+              border: '1px solid rgba(0, 0, 0, 0.12)',
+              borderRadius: '4px !important',
+              marginRight: '8px',
+              padding: '4px 8px',
+              color: 'rgba(0, 0, 0, 0.54)',
+              '&:hover': {
+                backgroundColor: 'rgba(0, 0, 0, 0.04)',
+              },
             },
           }}
         >
-          <FontAwesomeIcon icon={faMagnifyingGlassPlus} />
-        </IconButton>
-        <IconButton
-          size="small"
-          onClick={zoomOut}
-          sx={{
-            border: '1px solid rgba(0, 0, 0, 0.12)',
-            borderRadius: '4px',
-            color: 'rgba(0, 0, 0, 0.54)',
-            padding: '8px',
-            '&:hover': {
-              backgroundColor: 'rgba(0, 0, 0, 0.04)',
-            },
-          }}
-        >
-          <FontAwesomeIcon icon={faMagnifyingGlassMinus} />
-        </IconButton>
-        <IconButton
-          size="small"
-          onClick={resetZoom}
-          sx={{
-            border: '1px solid rgba(0, 0, 0, 0.12)',
-            borderRadius: '4px',
-            color: 'rgba(0, 0, 0, 0.54)',
-            padding: '8px',
-            '&:hover': {
-              backgroundColor: 'rgba(0, 0, 0, 0.04)',
-            },
-          }}
-        >
-          <FontAwesomeIcon icon={faRotateLeft} />
-        </IconButton>
-      </Stack>
+          <ToggleButton value="zoomin" onClick={zoomIn}>
+            <ZoomIn fontSize="small" />
+          </ToggleButton>
+          <ToggleButton value="zoomout" onClick={zoomOut}>
+            <ZoomOut fontSize="small" />
+          </ToggleButton>
+          <ToggleButton value="reset" onClick={resetZoom}>
+            <RestartAlt fontSize="small" />
+          </ToggleButton>
+        </ToggleButtonGroup>
+      </div>
       <div
         className="mermaid"
         ref={ref}
