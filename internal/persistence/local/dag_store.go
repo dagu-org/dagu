@@ -20,23 +20,28 @@ import (
 
 var _ persistence.DAGStore = (*dagStoreImpl)(nil)
 
+// DAGStoreOption is a functional option for configuring the DAG store
 type DAGStoreOption func(*DAGStoreOptions)
 
+// DAGStoreOptions contains configuration options for the DAG store
 type DAGStoreOptions struct {
-	FileCache *filecache.Cache[*digraph.DAG]
+	FileCache *filecache.Cache[*digraph.DAG] // Optional cache for DAG objects
 }
 
+// WithFileCache returns a DAGStoreOption that sets the file cache for DAG storage
 func WithFileCache(cache *filecache.Cache[*digraph.DAG]) DAGStoreOption {
 	return func(o *DAGStoreOptions) {
 		o.FileCache = cache
 	}
 }
 
+// dagStoreImpl implements the DAGStore interface with local filesystem storage
 type dagStoreImpl struct {
-	baseDir   string
-	fileCache *filecache.Cache[*digraph.DAG]
+	baseDir   string                        // Base directory for DAG storage
+	fileCache *filecache.Cache[*digraph.DAG] // Optional cache for DAG objects
 }
 
+// NewDAGStore creates a new DAG store implementation using the local filesystem
 func NewDAGStore(dir string, opts ...DAGStoreOption) persistence.DAGStore {
 	options := &DAGStoreOptions{}
 	for _, opt := range opts {
@@ -89,7 +94,8 @@ func (d *dagStoreImpl) GetSpec(_ context.Context, name string) (string, error) {
 	return string(dat), nil
 }
 
-// TODO: use 0600 // nolint: gosec
+// FileMode used for newly created DAG files
+// TODO: Consider using more restrictive permissions (0600) for security
 const defaultPerm os.FileMode = 0744
 
 // UpdateSpec updates the specification of a DAG by its name.
@@ -112,6 +118,7 @@ func (d *dagStoreImpl) UpdateSpec(ctx context.Context, name string, spec []byte)
 	return nil
 }
 
+// errDAGFileAlreadyExists is returned when attempting to create a DAG with an ID that already exists
 var errDAGFileAlreadyExists = errors.New("the DAG file already exists")
 
 // Create creates a new DAG with the given name and specification.
