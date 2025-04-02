@@ -14,12 +14,12 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// Schedule schedule
+// Schedule Schedule configuration for DAG execution
 //
 // swagger:model Schedule
 type Schedule struct {
 
-	// expression
+	// Cron expression or schedule pattern
 	// Required: true
 	Expression *string `json:"Expression"`
 }

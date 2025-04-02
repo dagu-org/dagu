@@ -40,7 +40,7 @@ type PostDAGActionParams struct {
 	  In: body
 	*/
 	Body *models.PostDAGActionRequest
-	/*The ID of the DAG.
+	/*The ID of the DAG
 	  Required: true
 	  In: path
 	*/

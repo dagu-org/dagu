@@ -30,7 +30,7 @@ type DeleteDAGParams struct {
 	// HTTP Request Object
 	HTTPRequest *http.Request `json:"-"`
 
-	/*The ID of the DAG.
+	/*The ID of the DAG
 	  Required: true
 	  In: path
 	*/

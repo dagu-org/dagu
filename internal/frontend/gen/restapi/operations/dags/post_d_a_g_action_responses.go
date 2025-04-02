@@ -17,7 +17,7 @@ import (
 const PostDAGActionOKCode int = 200
 
 /*
-PostDAGActionOK A successful response.
+PostDAGActionOK A successful response
 
 swagger:response postDAGActionOK
 */
@@ -58,8 +58,98 @@ func (o *PostDAGActionOK) WriteResponse(rw http.ResponseWriter, producer runtime
 	}
 }
 
+// PostDAGActionBadRequestCode is the HTTP code returned for type PostDAGActionBadRequest
+const PostDAGActionBadRequestCode int = 400
+
 /*
-PostDAGActionDefault Generic error response.
+PostDAGActionBadRequest Invalid action requested
+
+swagger:response postDAGActionBadRequest
+*/
+type PostDAGActionBadRequest struct {
+
+	/*
+	  In: Body
+	*/
+	Payload *models.Error `json:"body,omitempty"`
+}
+
+// NewPostDAGActionBadRequest creates PostDAGActionBadRequest with default headers values
+func NewPostDAGActionBadRequest() *PostDAGActionBadRequest {
+
+	return &PostDAGActionBadRequest{}
+}
+
+// WithPayload adds the payload to the post d a g action bad request response
+func (o *PostDAGActionBadRequest) WithPayload(payload *models.Error) *PostDAGActionBadRequest {
+	o.Payload = payload
+	return o
+}
+
+// SetPayload sets the payload to the post d a g action bad request response
+func (o *PostDAGActionBadRequest) SetPayload(payload *models.Error) {
+	o.Payload = payload
+}
+
+// WriteResponse to the client
+func (o *PostDAGActionBadRequest) WriteResponse(rw http.ResponseWriter, producer runtime.Producer) {
+
+	rw.WriteHeader(400)
+	if o.Payload != nil {
+		payload := o.Payload
+		if err := producer.Produce(rw, payload); err != nil {
+			panic(err) // let the recovery middleware deal with this
+		}
+	}
+}
+
+// PostDAGActionNotFoundCode is the HTTP code returned for type PostDAGActionNotFound
+const PostDAGActionNotFoundCode int = 404
+
+/*
+PostDAGActionNotFound DAG not found
+
+swagger:response postDAGActionNotFound
+*/
+type PostDAGActionNotFound struct {
+
+	/*
+	  In: Body
+	*/
+	Payload *models.Error `json:"body,omitempty"`
+}
+
+// NewPostDAGActionNotFound creates PostDAGActionNotFound with default headers values
+func NewPostDAGActionNotFound() *PostDAGActionNotFound {
+
+	return &PostDAGActionNotFound{}
+}
+
+// WithPayload adds the payload to the post d a g action not found response
+func (o *PostDAGActionNotFound) WithPayload(payload *models.Error) *PostDAGActionNotFound {
+	o.Payload = payload
+	return o
+}
+
+// SetPayload sets the payload to the post d a g action not found response
+func (o *PostDAGActionNotFound) SetPayload(payload *models.Error) {
+	o.Payload = payload
+}
+
+// WriteResponse to the client
+func (o *PostDAGActionNotFound) WriteResponse(rw http.ResponseWriter, producer runtime.Producer) {
+
+	rw.WriteHeader(404)
+	if o.Payload != nil {
+		payload := o.Payload
+		if err := producer.Produce(rw, payload); err != nil {
+			panic(err) // let the recovery middleware deal with this
+		}
+	}
+}
+
+/*
+PostDAGActionDefault Generic error response
 
 swagger:response postDAGActionDefault
 */

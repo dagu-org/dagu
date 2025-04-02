@@ -34,7 +34,7 @@ func NewListDAGs(ctx *middleware.Context, handler ListDAGsHandler) *ListDAGs {
 
 # List all DAGs
 
-Returns a list of DAGs with optional pagination and search filters.
+Returns a list of DAGs with optional pagination and search filters
 */
 type ListDAGs struct {
 	Context *middleware.Context

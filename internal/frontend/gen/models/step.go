@@ -56,7 +56,7 @@ type Step struct {
 	// Required: true
 	Output *string `json:"Output"`
 
-	// Parameters to pass to the sub DAG
+	// Parameters to pass to the sub DAG in JSON format
 	Params string `json:"Params,omitempty"`
 
 	// Conditions that must be met before the step can start

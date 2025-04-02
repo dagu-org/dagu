@@ -15,16 +15,16 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// SearchDAGsResponse search d a gs response
+// SearchDAGsResponse Response object for searching DAGs
 //
 // swagger:model SearchDAGsResponse
 type SearchDAGsResponse struct {
 
-	// errors
+	// Errors encountered during the search
 	// Required: true
 	Errors []string `json:"Errors"`
 
-	// results
+	// Search results matching the query
 	// Required: true
 	Results []*SearchDAGsResultItem `json:"Results"`
 }

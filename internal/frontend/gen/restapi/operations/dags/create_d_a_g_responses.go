@@ -17,7 +17,7 @@ import (
 const CreateDAGOKCode int = 200
 
 /*
-CreateDAGOK A successful response.
+CreateDAGOK A successful response
 
 swagger:response createDAGOK
 */
@@ -58,8 +58,53 @@ func (o *CreateDAGOK) WriteResponse(rw http.ResponseWriter, producer runtime.Pro
 	}
 }
 
+// CreateDAGBadRequestCode is the HTTP code returned for type CreateDAGBadRequest
+const CreateDAGBadRequestCode int = 400
+
 /*
-CreateDAGDefault Generic error response.
+CreateDAGBadRequest Invalid request body
+
+swagger:response createDAGBadRequest
+*/
+type CreateDAGBadRequest struct {
+
+	/*
+	  In: Body
+	*/
+	Payload *models.Error `json:"body,omitempty"`
+}
+
+// NewCreateDAGBadRequest creates CreateDAGBadRequest with default headers values
+func NewCreateDAGBadRequest() *CreateDAGBadRequest {
+
+	return &CreateDAGBadRequest{}
+}
+
+// WithPayload adds the payload to the create d a g bad request response
+func (o *CreateDAGBadRequest) WithPayload(payload *models.Error) *CreateDAGBadRequest {
+	o.Payload = payload
+	return o
+}
+
+// SetPayload sets the payload to the create d a g bad request response
+func (o *CreateDAGBadRequest) SetPayload(payload *models.Error) {
+	o.Payload = payload
+}
+
+// WriteResponse to the client
+func (o *CreateDAGBadRequest) WriteResponse(rw http.ResponseWriter, producer runtime.Producer) {
+
+	rw.WriteHeader(400)
+	if o.Payload != nil {
+		payload := o.Payload
+		if err := producer.Produce(rw, payload); err != nil {
+			panic(err) // let the recovery middleware deal with this
+		}
+	}
+}
+
+/*
+CreateDAGDefault Generic error response
 
 swagger:response createDAGDefault
 */

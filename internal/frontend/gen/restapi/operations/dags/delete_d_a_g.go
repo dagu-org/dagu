@@ -34,7 +34,7 @@ func NewDeleteDAG(ctx *middleware.Context, handler DeleteDAGHandler) *DeleteDAG 
 
 # Delete a DAG
 
-Deletes a DAG by its ID.
+Deletes a DAG by its ID
 */
 type DeleteDAG struct {
 	Context *middleware.Context

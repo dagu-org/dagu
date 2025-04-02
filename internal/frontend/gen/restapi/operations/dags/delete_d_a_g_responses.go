@@ -17,7 +17,7 @@ import (
 const DeleteDAGOKCode int = 200
 
 /*
-DeleteDAGOK A successful response.
+DeleteDAGOK DAG successfully deleted
 
 swagger:response deleteDAGOK
 */
@@ -38,8 +38,53 @@ func (o *DeleteDAGOK) WriteResponse(rw http.ResponseWriter, producer runtime.Pro
 	rw.WriteHeader(200)
 }
 
+// DeleteDAGNotFoundCode is the HTTP code returned for type DeleteDAGNotFound
+const DeleteDAGNotFoundCode int = 404
+
 /*
-DeleteDAGDefault Generic error response.
+DeleteDAGNotFound DAG not found
+
+swagger:response deleteDAGNotFound
+*/
+type DeleteDAGNotFound struct {
+
+	/*
+	  In: Body
+	*/
+	Payload *models.Error `json:"body,omitempty"`
+}
+
+// NewDeleteDAGNotFound creates DeleteDAGNotFound with default headers values
+func NewDeleteDAGNotFound() *DeleteDAGNotFound {
+
+	return &DeleteDAGNotFound{}
+}
+
+// WithPayload adds the payload to the delete d a g not found response
+func (o *DeleteDAGNotFound) WithPayload(payload *models.Error) *DeleteDAGNotFound {
+	o.Payload = payload
+	return o
+}
+
+// SetPayload sets the payload to the delete d a g not found response
+func (o *DeleteDAGNotFound) SetPayload(payload *models.Error) {
+	o.Payload = payload
+}
+
+// WriteResponse to the client
+func (o *DeleteDAGNotFound) WriteResponse(rw http.ResponseWriter, producer runtime.Producer) {
+
+	rw.WriteHeader(404)
+	if o.Payload != nil {
+		payload := o.Payload
+		if err := producer.Produce(rw, payload); err != nil {
+			panic(err) // let the recovery middleware deal with this
+		}
+	}
+}
+
+/*
+DeleteDAGDefault Generic error response
 
 swagger:response deleteDAGDefault
 */

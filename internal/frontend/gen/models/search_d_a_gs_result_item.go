@@ -14,7 +14,7 @@ import (
 	"github.com/go-openapi/swag"
 )
 
-// SearchDAGsResultItem search d a gs result item
+// SearchDAGsResultItem Individual search result item for a DAG
 //
 // swagger:model SearchDAGsResultItem
 type SearchDAGsResultItem struct {
@@ -22,10 +22,10 @@ type SearchDAGsResultItem struct {
 	// d a g
 	DAG *DAG `json:"DAG,omitempty"`
 
-	// matches
+	// Details of where matches were found
 	Matches []*SearchDAGsMatchItem `json:"Matches"`
 
-	// name
+	// Name of the matching DAG
 	Name string `json:"Name,omitempty"`
 }
 

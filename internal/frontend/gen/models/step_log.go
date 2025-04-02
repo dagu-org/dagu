@@ -14,16 +14,16 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// StepLog step log
+// StepLog Log information for a specific step
 //
 // swagger:model StepLog
 type StepLog struct {
 
-	// content
+	// Log content
 	// Required: true
 	Content *string `json:"Content"`
 
-	// log file
+	// Path to the log file
 	// Required: true
 	LogFile *string `json:"LogFile"`
 

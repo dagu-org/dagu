@@ -4,7 +4,7 @@ info:
   version: "0.0.1"
   title: "Dagu"
   contact:
-    name: "Dagu"
+    name: "Dagu Developers"
     url: "https://github.com/dagu-org/dagu"
   description: >
     REST API for Dagu - a compact, portable workflow engine for orchestrating 
@@ -23,11 +23,21 @@ consumes:
 produces:
   - "application/json"
 
+securityDefinitions:
+  bearerAuth:
+    type: "apiKey"
+    name: "Authorization"
+    in: "header"
+    description: "API authentication using Bearer token format"
+  basicAuth:
+    type: "basic"
+    description: "Basic authentication with username and password when enabled"
+
 tags:
   - name: "dags"
-    description: "Operations about DAGs"
+    description: "Operations for managing and executing DAGs (Directed Acyclic Graphs)"
   - name: "system"
-    description: "System operations"
+    description: "System operations for monitoring and managing the Dagu server"
 
 paths:
   /health:
@@ -54,7 +64,7 @@ paths:
   /dags:
     get:
       summary: "List all DAGs"
-      description: "Returns a list of DAGs with optional pagination and search filters."
+      description: "Returns a list of DAGs with optional pagination and search filters"
       operationId: "listDAGs"
       tags:
         - "dags"
@@ -63,35 +73,41 @@ paths:
           in: "query"
           required: false
           type: "integer"
-          description: "Page number (for pagination)."
+          description: "Page number (for pagination)"
+          default: 1
         - name: "limit"
           in: "query"
           required: false
           type: "integer"
-          description: "Number of items to return per page."
+          description: "Number of items to return per page"
+          default: 20
         - name: "searchName"
           in: "query"
           required: false
           type: "string"
-          description: "Filter DAGs by matching name."
+          description: "Filter DAGs by matching name"
         - name: "searchTag"
           in: "query"
           required: false
           type: "string"
-          description: "Filter DAGs by matching tag."
+          description: "Filter DAGs by matching tag"
       responses:
         "200":
-          description: "A successful response."
+          description: "A successful response"
           schema:
             $ref: "#/definitions/ListDAGsResponse"
+        "400":
+          description: "Invalid parameters provided"
+          schema:
+            $ref: "#/definitions/Error"
         default:
-          description: "Generic error response."
+          description: "Generic error response"
           schema:
             $ref: "#/definitions/Error"
 
     post:
       summary: "Create a new DAG"
-      description: "Creates a new DAG."
+      description: "Creates a new DAG definition"
       operationId: "createDAG"
       tags:
         - "dags"
@@ -103,18 +119,22 @@ paths:
             $ref: "#/definitions/CreateDAGRequest"
       responses:
         "200":
-          description: "A successful response."
+          description: "A successful response"
           schema:
             $ref: "#/definitions/CreateDAGResponse"
+        "400":
+          description: "Invalid request body"
+          schema:
+            $ref: "#/definitions/Error"
         default:
-          description: "Generic error response."
+          description: "Generic error response"
           schema:
             $ref: "#/definitions/Error"
 
   /dags/{dagId}:
     get:
       summary: "Get DAG details"
-      description: "Returns details of a DAG, including files, logs, etc."
+      description: "Returns details of a DAG, including files, logs, and execution status"
       operationId: "getDAGDetails"
       tags:
         - "dags"
@@ -123,35 +143,39 @@ paths:
           in: "path"
           required: true
           type: "string"
-          description: "The ID of the DAG."
+          description: "The ID of the DAG"
         - name: "tab"
           in: "query"
           required: false
           type: "string"
-          description: "Tab name for UI navigation."
+          description: "Tab name for UI navigation"
         - name: "file"
           in: "query"
           required: false
           type: "string"
-          description: "Specific file related to the DAG."
+          description: "Specific file related to the DAG"
         - name: "step"
           in: "query"
           required: false
           type: "string"
-          description: "Step name within the DAG."
+          description: "Step name within the DAG"
       responses:
         "200":
-          description: "A successful response."
+          description: "A successful response"
           schema:
             $ref: "#/definitions/GetDAGDetailsResponse"
+        "404":
+          description: "DAG not found"
+          schema:
+            $ref: "#/definitions/Error"
         default:
-          description: "Generic error response."
+          description: "Generic error response"
           schema:
             $ref: "#/definitions/Error"
 
     post:
       summary: "Perform an action on a DAG"
-      description: "Performs a specified action (e.g., start, stop) on the given DAG."
+      description: "Performs a specified action (e.g., start, stop) on the given DAG"
       operationId: "postDAGAction"
       tags:
         - "dags"
@@ -160,7 +184,7 @@ paths:
           in: "path"
           required: true
           type: "string"
-          description: "The ID of the DAG."
+          description: "The ID of the DAG"
         - in: "body"
           name: "body"
           required: true
@@ -168,17 +192,25 @@ paths:
             $ref: "#/definitions/PostDAGActionRequest"
       responses:
         "200":
-          description: "A successful response."
+          description: "A successful response"
           schema:
             $ref: "#/definitions/PostDAGActionResponse"
+        "400":
+          description: "Invalid action requested"
+          schema:
+            $ref: "#/definitions/Error"
+        "404":
+          description: "DAG not found"
+          schema:
+            $ref: "#/definitions/Error"
         default:
-          description: "Generic error response."
+          description: "Generic error response"
           schema:
             $ref: "#/definitions/Error"
 
     delete:
       summary: "Delete a DAG"
-      description: "Deletes a DAG by its ID."
+      description: "Deletes a DAG by its ID"
       operationId: "deleteDAG"
       tags:
         - "dags"
@@ -187,19 +219,23 @@ paths:
           in: "path"
           required: true
           type: "string"
-          description: "The ID of the DAG."
+          description: "The ID of the DAG"
       responses:
         "200":
-          description: "A successful response."
+          description: "DAG successfully deleted"
+        "404":
+          description: "DAG not found"
+          schema:
+            $ref: "#/definitions/Error"
         default:
-          description: "Generic error response."
+          description: "Generic error response"
           schema:
             $ref: "#/definitions/Error"
 
   /search:
     get:
       summary: "Search DAGs"
-      description: "Searches for DAGs based on a query string."
+      description: "Searches for DAGs based on a query string"
       operationId: "searchDAGs"
       tags:
         - "dags"
@@ -208,42 +244,46 @@ paths:
           in: "query"
           required: true
           type: "string"
-          description: "A search query string."
+          description: "A search query string"
       responses:
         "200":
-          description: "A successful response."
+          description: "A successful response"
           schema:
             $ref: "#/definitions/SearchDAGsResponse"
+        "400":
+          description: "Invalid search query"
+          schema:
+            $ref: "#/definitions/Error"
         default:
-          description: "Generic error response."
+          description: "Generic error response"
           schema:
             $ref: "#/definitions/Error"
 
   /tags:
     get:
       summary: "List all tags"
-      description: "Returns a list of tags used in DAGs."
+      description: "Returns a list of all tags used across DAGs"
       operationId: "listTags"
       tags:
         - "dags"
       responses:
         "200":
-          description: "A successful response."
+          description: "A successful response"
           schema:
             $ref: "#/definitions/ListTagResponse"
         default:
-          description: "Generic error response."
+          description: "Generic error response"
           schema:
             $ref: "#/definitions/Error"
 
 definitions:
   Error:
     type: object
-    description: "Generic error response object."
+    description: "Generic error response object"
     properties:
       code:
         type: string
-        description: "Error code indicating the type of error."
+        description: "Error code indicating the type of error"
         enum:
           - "validation_error"
           - "not_found"
@@ -252,17 +292,17 @@ definitions:
           - "bad_gateway"
       message:
         type: string
-        description: "Short error message."
+        description: "Short error message"
       details:
         type: object
-        description: "Additional error details."
+        description: "Additional error details"
     required:
       - code
       - message
 
   HealthResponse:
     type: object
-    description: "Response object for the health check endpoint."
+    description: "Response object for the health check endpoint"
     properties:
       status:
         type: string
@@ -285,21 +325,21 @@ definitions:
 
   CreateDAGRequest:
     type: object
-    description: "Request body for creating a DAG."
+    description: "Request body for creating a DAG"
     properties:
       action:
         type: string
-        description: "Action to perform upon creation (if any)."
+        description: "Action to perform upon creation (if any)"
       value:
         type: string
-        description: "Associated value for the action."
+        description: "Associated value for the action"
     required:
       - action
       - value
 
   PostDAGActionRequest:
     type: object
-    description: "Request body for posting an action to a DAG."
+    description: "Request body for posting an action to a DAG"
     properties:
       action:
         type: string
@@ -312,42 +352,42 @@ definitions:
           - mark-failed
           - save
           - rename
-        description: "Action to be performed on the DAG."
+        description: "Action to be performed on the DAG"
       value:
         type: string
-        description: "Optional extra value for the action."
+        description: "Optional extra value for the action"
       requestId:
         type: string
-        description: "Unique request ID for the action."
+        description: "Unique request ID for the action"
       step:
         type: string
-        description: "Step name if the action targets a specific step."
+        description: "Step name if the action targets a specific step"
       params:
         type: string
-        description: "Additional parameters for the action."
+        description: "Additional parameters for the action in JSON format"
     required:
       - action
 
   ListDAGsResponse:
     type: object
-    description: "Response object for listing all DAGs."
+    description: "Response object for listing all DAGs"
     properties:
       DAGs:
         type: array
-        description: "List of DAGs with their status and metadata."
+        description: "List of DAGs with their status and metadata"
         items:
           $ref: "#/definitions/DAGStatusFile"
       Errors:
         type: array
-        description: "List of errors encountered during the request."
+        description: "List of errors encountered during the request"
         items:
           type: string
       HasError:
         type: boolean
-        description: "Whether any errors were encountered."
+        description: "Whether any errors were encountered"
       PageCount:
         type: integer
-        description: "Total number of pages available."
+        description: "Total number of pages available"
     required:
       - DAGs
       - Errors
@@ -356,41 +396,44 @@ definitions:
 
   CreateDAGResponse:
     type: object
+    description: "Response object for creating a DAG"
     properties:
       DagID:
         type: string
+        description: "ID of the newly created DAG"
     required:
       - DagID
 
   GetDAGDetailsResponse:
     type: object
-    description: "Response object for getting details of a DAG."
+    description: "Response object for getting details of a DAG"
     properties:
       Title:
         type: string
-        description: "Title of the Page."
+        description: "Title of the Page"
       DAG:
         $ref: "#/definitions/DAGStatusFileDetails"
       Tab:
         type: string
-        description: "Tab name for UI navigation."
+        description: "Tab name for UI navigation"
       Graph:
         type: string
-        description: "Graph data for visualization."
+        description: "Graph data for visualization"
       Definition:
         type: string
-        description: "DAG definition."
+        description: "DAG definition"
       LogData:
         $ref: "#/definitions/DAGLogData"
       LogUrl:
         type: string
+        description: "URL to access logs directly"
       StepLog:
         $ref: "#/definitions/StepLog"
       ScLog:
         $ref: "#/definitions/SchedulerLog"
       Errors:
         type: array
-        description: "List of errors encountered during the request."
+        description: "List of errors encountered during the request"
         items:
           type: string
     required:
@@ -407,27 +450,32 @@ definitions:
 
   PostDAGActionResponse:
     type: object
-    description: "Response object for posting an action to a DAG."
+    description: "Response object for posting an action to a DAG"
     properties:
       NewDagID:
         type: string
-        description: "New DAG ID, if the action resulted in a new DAG."
+        description: "New DAG ID, if the action resulted in a new DAG"
 
   DAGStatusFile:
     type: object
+    description: "DAG file with its status information"
     properties:
       File:
         type: string
+        description: "Path to the DAG file"
       Dir:
         type: string
+        description: "Directory containing the DAG file"
       DAG:
         $ref: "#/definitions/DAG"
       Status:
         $ref: "#/definitions/DAGStatus"
       Suspended:
         type: boolean
+        description: "Whether the DAG is suspended"
       Error:
         type: string
+        description: "Error message if any"
     required:
       - File
       - Dir
@@ -478,9 +526,11 @@ definitions:
 
   Schedule:
     type: object
+    description: "Schedule configuration for DAG execution"
     properties:
       Expression:
         type: string
+        description: "Cron expression or schedule pattern"
     required:
       - Expression
 
@@ -508,7 +558,7 @@ definitions:
         description: "RFC 3339 timestamp when the DAG execution started"
       FinishedAt:
         type: string
-        description: "RFC 3339 timestamp when the DAG execution completed"
+        description: "RFC 3339 timestamp when the DAG execution finished"
       Log:
         type: string
         description: "Path to the execution log file"
@@ -532,16 +582,20 @@ definitions:
     properties:
       File:
         type: string
+        description: "Path to the DAG file"
       Dir:
         type: string
+        description: "Directory containing the DAG file"
       DAG:
         $ref: "#/definitions/DAGDetails"
       Status:
         $ref: "#/definitions/DAGStatusDetails"
       Suspended:
         type: boolean
+        description: "Whether the DAG is suspended"
       Error:
         type: string
+        description: "Error message if any"
     required:
       - File
       - Dir
@@ -552,6 +606,7 @@ definitions:
 
   DAGDetails:
     type: object
+    description: "Detailed DAG configuration information"
     properties:
       Location:
         type: string
@@ -645,19 +700,26 @@ definitions:
 
   DAGStatusDetails:
     type: object
+    description: "Detailed status of DAG execution including child nodes"
     properties:
       RequestId:
         type: string
+        description: "Unique identifier for the execution request"
       Name:
         type: string
+        description: "Name of the DAG"
       Status:
         type: integer
+        description: "Numeric status code"
       StatusText:
         type: string
+        description: "Human-readable status description"
       Pid:
         type: integer
+        description: "Process ID of the DAG execution"
       Nodes:
         type: array
+        description: "Status of individual steps within the DAG"
         items:
           $ref: "#/definitions/Node"
       OnExit:
@@ -670,14 +732,16 @@ definitions:
         $ref: "#/definitions/Node"
       StartedAt:
         type: string
-        description: "Timestamp when the DAG started."
+        description: "RFC3339 timestamp when the DAG run started"
       FinishedAt:
         type: string
-        description: "Timestamp when the DAG finished."
+        description: "RFC3339 timestamp when the DAG run finished"
       Log:
         type: string
+        description: "Path to the log file"
       Params:
         type: string
+        description: "Parameters in JSON format"
     required:
       - RequestId
       - Name
@@ -705,10 +769,10 @@ definitions:
         description: "Path to step-specific log file"
       StartedAt:
         type: string
-        description: "RFC 3339 timestamp when the step started executing"
+        description: "RFC3339 timestamp when the step started"
       FinishedAt:
         type: string
-        description: "RFC 3339 timestamp when the step completed"
+        description: "RFC3339 timestamp when the step finished"
       Status:
         type: integer
         description: "Numeric status code for the step execution"
@@ -776,7 +840,7 @@ definitions:
         description: "Sub DAG to run"
       Params:
         type: string
-        description: "Parameters to pass to the sub DAG"
+        description: "Parameters to pass to the sub DAG in JSON format"
       Depends:
         type: array
         description: "List of step names that must complete before this step can start"
@@ -810,13 +874,16 @@ definitions:
 
   SearchDAGsResponse:
     type: object
+    description: "Response object for searching DAGs"
     properties:
       Results:
         type: array
+        description: "Search results matching the query"
         items:
           $ref: "#/definitions/SearchDAGsResultItem"
       Errors:
         type: array
+        description: "Errors encountered during the search"
         items:
           type: string
     required:
@@ -825,35 +892,45 @@ definitions:
 
   SearchDAGsResultItem:
     type: object
+    description: "Individual search result item for a DAG"
     properties:
       Name:
         type: string
+        description: "Name of the matching DAG"
       DAG:
         $ref: "#/definitions/DAG"
       Matches:
         type: array
+        description: "Details of where matches were found"
         items:
           $ref: "#/definitions/SearchDAGsMatchItem"
 
   SearchDAGsMatchItem:
     type: object
+    description: "Details of a search match within a DAG"
     properties:
       Line:
         type: string
+        description: "Matching line content"
       LineNumber:
         type: integer
+        description: "Line number where match was found"
       StartLine:
         type: integer
+        description: "Start line for context"
 
   StepLog:
     type: object
+    description: "Log information for a specific step"
     properties:
       Step:
         $ref: "#/definitions/Node"
       LogFile:
         type: string
+        description: "Path to the log file"
       Content:
         type: string
+        description: "Log content"
     required:
       - Step
       - LogFile
@@ -861,24 +938,30 @@ definitions:
 
   SchedulerLog:
     type: object
+    description: "Log information for the scheduler"
     properties:
       LogFile:
         type: string
+        description: "Path to the scheduler log file"
       Content:
         type: string
+        description: "Log content"
     required:
       - LogFile
       - Content
 
   DAGLogData:
     type: object
+    description: "Aggregated log data for a DAG"
     properties:
       GridData:
         type: array
+        description: "Grid data for visualization"
         items:
           $ref: "#/definitions/DAGLogGridItem"
       Logs:
         type: array
+        description: "Log data from executions"
         items:
           $ref: "#/definitions/DAGLogStatusFile"
     required:
@@ -887,11 +970,14 @@ definitions:
 
   DAGLogGridItem:
     type: object
+    description: "Grid item for log visualization"
     properties:
       Name:
         type: string
+        description: "Name of the data point"
       Vals:
         type: array
+        description: "Values for the data point"
         items:
           type: integer
     required:
@@ -900,9 +986,11 @@ definitions:
 
   DAGLogStatusFile:
     type: object
+    description: "Log status file information"
     properties:
       File:
         type: string
+        description: "Path to the log file"
       Status:
         $ref: "#/definitions/DAGStatusDetails"
     required:
@@ -941,8 +1029,8 @@ definitions:
         items:
           type: string
       Errors:
-        description: "List of errors encountered during the request"
         type: array
+        description: "List of errors encountered during the request"
         items:
           type: string
     required:

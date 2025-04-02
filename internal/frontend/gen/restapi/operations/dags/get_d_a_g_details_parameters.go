@@ -31,20 +31,20 @@ type GetDAGDetailsParams struct {
 	// HTTP Request Object
 	HTTPRequest *http.Request `json:"-"`
 
-	/*The ID of the DAG.
+	/*The ID of the DAG
 	  Required: true
 	  In: path
 	*/
 	DagID string
-	/*Specific file related to the DAG.
+	/*Specific file related to the DAG
 	  In: query
 	*/
 	File *string
-	/*Step name within the DAG.
+	/*Step name within the DAG
 	  In: query
 	*/
 	Step *string
-	/*Tab name for UI navigation.
+	/*Tab name for UI navigation
 	  In: query
 	*/
 	Tab *string

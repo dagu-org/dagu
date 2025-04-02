@@ -34,7 +34,7 @@ func NewPostDAGAction(ctx *middleware.Context, handler PostDAGActionHandler) *Po
 
 # Perform an action on a DAG
 
-Performs a specified action (e.g., start, stop) on the given DAG.
+Performs a specified action (e.g., start, stop) on the given DAG
 */
 type PostDAGAction struct {
 	Context *middleware.Context

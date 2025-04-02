@@ -14,16 +14,16 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// DAGLogGridItem d a g log grid item
+// DAGLogGridItem Grid item for log visualization
 //
 // swagger:model DAGLogGridItem
 type DAGLogGridItem struct {
 
-	// name
+	// Name of the data point
 	// Required: true
 	Name *string `json:"Name"`
 
-	// vals
+	// Values for the data point
 	// Required: true
 	Vals []int64 `json:"Vals"`
 }

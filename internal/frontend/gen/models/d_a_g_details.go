@@ -15,7 +15,7 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// DAGDetails d a g details
+// DAGDetails Detailed DAG configuration information
 //
 // swagger:model DAGDetails
 type DAGDetails struct {

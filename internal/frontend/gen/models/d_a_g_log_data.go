@@ -15,16 +15,16 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// DAGLogData d a g log data
+// DAGLogData Aggregated log data for a DAG
 //
 // swagger:model DAGLogData
 type DAGLogData struct {
 
-	// grid data
+	// Grid data for visualization
 	// Required: true
 	GridData []*DAGLogGridItem `json:"GridData"`
 
-	// logs
+	// Log data from executions
 	// Required: true
 	Logs []*DAGLogStatusFile `json:"Logs"`
 }
