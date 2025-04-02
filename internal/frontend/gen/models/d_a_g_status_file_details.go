@@ -23,15 +23,15 @@ type DAGStatusFileDetails struct {
 	// Required: true
 	DAG *DAGDetails `json:"DAG"`
 
-	// dir
+	// Directory containing the DAG file
 	// Required: true
 	Dir *string `json:"Dir"`
 
-	// error
+	// Error message if any
 	// Required: true
 	Error *string `json:"Error"`
 
-	// file
+	// Path to the DAG file
 	// Required: true
 	File *string `json:"File"`
 
@@ -39,7 +39,7 @@ type DAGStatusFileDetails struct {
 	// Required: true
 	Status *DAGStatusDetails `json:"Status"`
 
-	// suspended
+	// Whether the DAG is suspended
 	// Required: true
 	Suspended *bool `json:"Suspended"`
 }

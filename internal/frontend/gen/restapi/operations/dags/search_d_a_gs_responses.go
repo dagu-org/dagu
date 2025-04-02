@@ -17,7 +17,7 @@ import (
 const SearchDAGsOKCode int = 200
 
 /*
-SearchDAGsOK A successful response.
+SearchDAGsOK A successful response
 
 swagger:response searchDAGsOK
 */
@@ -58,8 +58,53 @@ func (o *SearchDAGsOK) WriteResponse(rw http.ResponseWriter, producer runtime.Pr
 	}
 }
 
+// SearchDAGsBadRequestCode is the HTTP code returned for type SearchDAGsBadRequest
+const SearchDAGsBadRequestCode int = 400
+
 /*
-SearchDAGsDefault Generic error response.
+SearchDAGsBadRequest Invalid search query
+
+swagger:response searchDAGsBadRequest
+*/
+type SearchDAGsBadRequest struct {
+
+	/*
+	  In: Body
+	*/
+	Payload *models.Error `json:"body,omitempty"`
+}
+
+// NewSearchDAGsBadRequest creates SearchDAGsBadRequest with default headers values
+func NewSearchDAGsBadRequest() *SearchDAGsBadRequest {
+
+	return &SearchDAGsBadRequest{}
+}
+
+// WithPayload adds the payload to the search d a gs bad request response
+func (o *SearchDAGsBadRequest) WithPayload(payload *models.Error) *SearchDAGsBadRequest {
+	o.Payload = payload
+	return o
+}
+
+// SetPayload sets the payload to the search d a gs bad request response
+func (o *SearchDAGsBadRequest) SetPayload(payload *models.Error) {
+	o.Payload = payload
+}
+
+// WriteResponse to the client
+func (o *SearchDAGsBadRequest) WriteResponse(rw http.ResponseWriter, producer runtime.Producer) {
+
+	rw.WriteHeader(400)
+	if o.Payload != nil {
+		payload := o.Payload
+		if err := producer.Produce(rw, payload); err != nil {
+			panic(err) // let the recovery middleware deal with this
+		}
+	}
+}
+
+/*
+SearchDAGsDefault Generic error response
 
 swagger:response searchDAGsDefault
 */

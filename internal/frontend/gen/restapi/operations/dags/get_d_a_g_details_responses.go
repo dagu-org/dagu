@@ -17,7 +17,7 @@ import (
 const GetDAGDetailsOKCode int = 200
 
 /*
-GetDAGDetailsOK A successful response.
+GetDAGDetailsOK A successful response
 
 swagger:response getDAGDetailsOK
 */
@@ -58,8 +58,53 @@ func (o *GetDAGDetailsOK) WriteResponse(rw http.ResponseWriter, producer runtime
 	}
 }
 
+// GetDAGDetailsNotFoundCode is the HTTP code returned for type GetDAGDetailsNotFound
+const GetDAGDetailsNotFoundCode int = 404
+
 /*
-GetDAGDetailsDefault Generic error response.
+GetDAGDetailsNotFound DAG not found
+
+swagger:response getDAGDetailsNotFound
+*/
+type GetDAGDetailsNotFound struct {
+
+	/*
+	  In: Body
+	*/
+	Payload *models.Error `json:"body,omitempty"`
+}
+
+// NewGetDAGDetailsNotFound creates GetDAGDetailsNotFound with default headers values
+func NewGetDAGDetailsNotFound() *GetDAGDetailsNotFound {
+
+	return &GetDAGDetailsNotFound{}
+}
+
+// WithPayload adds the payload to the get d a g details not found response
+func (o *GetDAGDetailsNotFound) WithPayload(payload *models.Error) *GetDAGDetailsNotFound {
+	o.Payload = payload
+	return o
+}
+
+// SetPayload sets the payload to the get d a g details not found response
+func (o *GetDAGDetailsNotFound) SetPayload(payload *models.Error) {
+	o.Payload = payload
+}
+
+// WriteResponse to the client
+func (o *GetDAGDetailsNotFound) WriteResponse(rw http.ResponseWriter, producer runtime.Producer) {
+
+	rw.WriteHeader(404)
+	if o.Payload != nil {
+		payload := o.Payload
+		if err := producer.Produce(rw, payload); err != nil {
+			panic(err) // let the recovery middleware deal with this
+		}
+	}
+}
+
+/*
+GetDAGDetailsDefault Generic error response
 
 swagger:response getDAGDetailsDefault
 */

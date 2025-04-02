@@ -14,12 +14,12 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// DAGLogStatusFile d a g log status file
+// DAGLogStatusFile Log status file information
 //
 // swagger:model DAGLogStatusFile
 type DAGLogStatusFile struct {
 
-	// file
+	// Path to the log file
 	// Required: true
 	File *string `json:"File"`
 

@@ -10,7 +10,7 @@
 //	BasePath: /api/v1
 //	Version: 0.0.1
 //	License: GPL-3.0 https://github.com/dagu-org/dagu/blob/main/LICENSE.md
-//	Contact: Dagu https://github.com/dagu-org/dagu
+//	Contact: Dagu Developers https://github.com/dagu-org/dagu
 //
 //	Consumes:
 //	  - application/json

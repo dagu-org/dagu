@@ -17,7 +17,7 @@ import (
 const ListDAGsOKCode int = 200
 
 /*
-ListDAGsOK A successful response.
+ListDAGsOK A successful response
 
 swagger:response listDAGsOK
 */
@@ -58,8 +58,53 @@ func (o *ListDAGsOK) WriteResponse(rw http.ResponseWriter, producer runtime.Prod
 	}
 }
 
+// ListDAGsBadRequestCode is the HTTP code returned for type ListDAGsBadRequest
+const ListDAGsBadRequestCode int = 400
+
 /*
-ListDAGsDefault Generic error response.
+ListDAGsBadRequest Invalid parameters provided
+
+swagger:response listDAGsBadRequest
+*/
+type ListDAGsBadRequest struct {
+
+	/*
+	  In: Body
+	*/
+	Payload *models.Error `json:"body,omitempty"`
+}
+
+// NewListDAGsBadRequest creates ListDAGsBadRequest with default headers values
+func NewListDAGsBadRequest() *ListDAGsBadRequest {
+
+	return &ListDAGsBadRequest{}
+}
+
+// WithPayload adds the payload to the list d a gs bad request response
+func (o *ListDAGsBadRequest) WithPayload(payload *models.Error) *ListDAGsBadRequest {
+	o.Payload = payload
+	return o
+}
+
+// SetPayload sets the payload to the list d a gs bad request response
+func (o *ListDAGsBadRequest) SetPayload(payload *models.Error) {
+	o.Payload = payload
+}
+
+// WriteResponse to the client
+func (o *ListDAGsBadRequest) WriteResponse(rw http.ResponseWriter, producer runtime.Producer) {
+
+	rw.WriteHeader(400)
+	if o.Payload != nil {
+		payload := o.Payload
+		if err := producer.Produce(rw, payload); err != nil {
+			panic(err) // let the recovery middleware deal with this
+		}
+	}
+}
+
+/*
+ListDAGsDefault Generic error response
 
 swagger:response listDAGsDefault
 */

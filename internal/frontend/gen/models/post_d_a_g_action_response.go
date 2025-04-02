@@ -12,12 +12,12 @@ import (
 	"github.com/go-openapi/swag"
 )
 
-// PostDAGActionResponse Response object for posting an action to a DAG.
+// PostDAGActionResponse Response object for posting an action to a DAG
 //
 // swagger:model PostDAGActionResponse
 type PostDAGActionResponse struct {
 
-	// New DAG ID, if the action resulted in a new DAG.
+	// New DAG ID, if the action resulted in a new DAG
 	NewDagID string `json:"NewDagID,omitempty"`
 }
 

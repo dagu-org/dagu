@@ -34,7 +34,7 @@ func NewListTags(ctx *middleware.Context, handler ListTagsHandler) *ListTags {
 
 # List all tags
 
-Returns a list of tags used in DAGs.
+Returns a list of all tags used across DAGs
 */
 type ListTags struct {
 	Context *middleware.Context

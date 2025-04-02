@@ -14,7 +14,7 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// DAGStatusFile d a g status file
+// DAGStatusFile DAG file with its status information
 //
 // swagger:model DAGStatusFile
 type DAGStatusFile struct {
@@ -23,15 +23,15 @@ type DAGStatusFile struct {
 	// Required: true
 	DAG *DAG `json:"DAG"`
 
-	// dir
+	// Directory containing the DAG file
 	// Required: true
 	Dir *string `json:"Dir"`
 
-	// error
+	// Error message if any
 	// Required: true
 	Error *string `json:"Error"`
 
-	// file
+	// Path to the DAG file
 	// Required: true
 	File *string `json:"File"`
 
@@ -39,7 +39,7 @@ type DAGStatusFile struct {
 	// Required: true
 	Status *DAGStatus `json:"Status"`
 
-	// suspended
+	// Whether the DAG is suspended
 	// Required: true
 	Suspended *bool `json:"Suspended"`
 }

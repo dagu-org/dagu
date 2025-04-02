@@ -15,7 +15,7 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// HealthResponse Response object for the health check endpoint.
+// HealthResponse Response object for the health check endpoint
 //
 // swagger:model HealthResponse
 type HealthResponse struct {

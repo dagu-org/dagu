@@ -17,7 +17,7 @@ import (
 const ListTagsOKCode int = 200
 
 /*
-ListTagsOK A successful response.
+ListTagsOK A successful response
 
 swagger:response listTagsOK
 */
@@ -59,7 +59,7 @@ func (o *ListTagsOK) WriteResponse(rw http.ResponseWriter, producer runtime.Prod
 }
 
 /*
-ListTagsDefault Generic error response.
+ListTagsDefault Generic error response
 
 swagger:response listTagsDefault
 */

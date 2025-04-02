@@ -34,7 +34,7 @@ func NewSearchDAGs(ctx *middleware.Context, handler SearchDAGsHandler) *SearchDA
 
 # Search DAGs
 
-Searches for DAGs based on a query string.
+Searches for DAGs based on a query string
 */
 type SearchDAGs struct {
 	Context *middleware.Context

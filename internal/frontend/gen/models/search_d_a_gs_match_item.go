@@ -12,18 +12,18 @@ import (
 	"github.com/go-openapi/swag"
 )
 
-// SearchDAGsMatchItem search d a gs match item
+// SearchDAGsMatchItem Details of a search match within a DAG
 //
 // swagger:model SearchDAGsMatchItem
 type SearchDAGsMatchItem struct {
 
-	// line
+	// Matching line content
 	Line string `json:"Line,omitempty"`
 
-	// line number
+	// Line number where match was found
 	LineNumber int64 `json:"LineNumber,omitempty"`
 
-	// start line
+	// Start line for context
 	StartLine int64 `json:"StartLine,omitempty"`
 }
 

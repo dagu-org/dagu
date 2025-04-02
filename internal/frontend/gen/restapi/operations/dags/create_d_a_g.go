@@ -34,7 +34,7 @@ func NewCreateDAG(ctx *middleware.Context, handler CreateDAGHandler) *CreateDAG 
 
 # Create a new DAG
 
-Creates a new DAG.
+Creates a new DAG definition
 */
 type CreateDAG struct {
 	Context *middleware.Context

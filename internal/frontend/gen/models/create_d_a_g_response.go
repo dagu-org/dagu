@@ -14,12 +14,12 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// CreateDAGResponse create d a g response
+// CreateDAGResponse Response object for creating a DAG
 //
 // swagger:model CreateDAGResponse
 type CreateDAGResponse struct {
 
-	// dag ID
+	// ID of the newly created DAG
 	// Required: true
 	DagID *string `json:"DagID"`
 }

@@ -14,16 +14,16 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// CreateDAGRequest Request body for creating a DAG.
+// CreateDAGRequest Request body for creating a DAG
 //
 // swagger:model CreateDAGRequest
 type CreateDAGRequest struct {
 
-	// Action to perform upon creation (if any).
+	// Action to perform upon creation (if any)
 	// Required: true
 	Action *string `json:"action"`
 
-	// Associated value for the action.
+	// Associated value for the action
 	// Required: true
 	Value *string `json:"value"`
 }

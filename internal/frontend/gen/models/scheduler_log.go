@@ -14,16 +14,16 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// SchedulerLog scheduler log
+// SchedulerLog Log information for the scheduler
 //
 // swagger:model SchedulerLog
 type SchedulerLog struct {
 
-	// content
+	// Log content
 	// Required: true
 	Content *string `json:"Content"`
 
-	// log file
+	// Path to the scheduler log file
 	// Required: true
 	LogFile *string `json:"LogFile"`
 }

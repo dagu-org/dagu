@@ -15,20 +15,20 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// Error Generic error response object.
+// Error Generic error response object
 //
 // swagger:model Error
 type Error struct {
 
-	// Error code indicating the type of error.
+	// Error code indicating the type of error
 	// Required: true
 	// Enum: [validation_error not_found internal_error unauthorized bad_gateway]
 	Code *string `json:"code"`
 
-	// Additional error details.
+	// Additional error details
 	Details interface{} `json:"details,omitempty"`
 
-	// Short error message.
+	// Short error message
 	// Required: true
 	Message *string `json:"message"`
 }

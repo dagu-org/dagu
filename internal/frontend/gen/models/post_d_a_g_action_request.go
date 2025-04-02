@@ -15,26 +15,26 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// PostDAGActionRequest Request body for posting an action to a DAG.
+// PostDAGActionRequest Request body for posting an action to a DAG
 //
 // swagger:model PostDAGActionRequest
 type PostDAGActionRequest struct {
 
-	// Action to be performed on the DAG.
+	// Action to be performed on the DAG
 	// Required: true
 	// Enum: [start suspend stop retry mark-success mark-failed save rename]
 	Action *string `json:"action"`
 
-	// Additional parameters for the action.
+	// Additional parameters for the action in JSON format
 	Params string `json:"params,omitempty"`
 
-	// Unique request ID for the action.
+	// Unique request ID for the action
 	RequestID string `json:"requestId,omitempty"`
 
-	// Step name if the action targets a specific step.
+	// Step name if the action targets a specific step
 	Step string `json:"step,omitempty"`
 
-	// Optional extra value for the action.
+	// Optional extra value for the action
 	Value string `json:"value,omitempty"`
 }
 

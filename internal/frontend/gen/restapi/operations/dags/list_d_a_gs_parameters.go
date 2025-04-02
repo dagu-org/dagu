@@ -16,11 +16,21 @@ import (
 )
 
 // NewListDAGsParams creates a new ListDAGsParams object
-//
-// There are no default values defined in the spec.
+// with the default values initialized.
 func NewListDAGsParams() ListDAGsParams {
 
-	return ListDAGsParams{}
+	var (
+		// initialize parameters with default values
+
+		limitDefault = int64(20)
+		pageDefault  = int64(1)
+	)
+
+	return ListDAGsParams{
+		Limit: &limitDefault,
+
+		Page: &pageDefault,
+	}
 }
 
 // ListDAGsParams contains all the bound params for the list d a gs operation
@@ -32,19 +42,21 @@ type ListDAGsParams struct {
 	// HTTP Request Object
 	HTTPRequest *http.Request `json:"-"`
 
-	/*Number of items to return per page.
+	/*Number of items to return per page
 	  In: query
+	  Default: 20
 	*/
 	Limit *int64
-	/*Page number (for pagination).
+	/*Page number (for pagination)
 	  In: query
+	  Default: 1
 	*/
 	Page *int64
-	/*Filter DAGs by matching name.
+	/*Filter DAGs by matching name
 	  In: query
 	*/
 	SearchName *string
-	/*Filter DAGs by matching tag.
+	/*Filter DAGs by matching tag
 	  In: query
 	*/
 	SearchTag *string
@@ -97,6 +109,7 @@ func (o *ListDAGsParams) bindLimit(rawData []string, hasKey bool, formats strfmt
 	// AllowEmptyValue: false
 
 	if raw == "" { // empty values pass all other validations
+		// Default values have been previously initialized by NewListDAGsParams()
 		return nil
 	}
 
@@ -120,6 +133,7 @@ func (o *ListDAGsParams) bindPage(rawData []string, hasKey bool, formats strfmt.
 	// AllowEmptyValue: false
 
 	if raw == "" { // empty values pass all other validations
+		// Default values have been previously initialized by NewListDAGsParams()
 		return nil
 	}
 

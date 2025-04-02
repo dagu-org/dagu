@@ -32,7 +32,7 @@ func init() {
     "description": "REST API for Dagu - a compact, portable workflow engine for orchestrating  command execution across diverse environments including shell scripts,  Python commands, containerized operations, and remote commands.\n",
     "title": "Dagu",
     "contact": {
-      "name": "Dagu",
+      "name": "Dagu Developers",
       "url": "https://github.com/dagu-org/dagu"
     },
     "license": {
@@ -46,7 +46,7 @@ func init() {
   "paths": {
     "/dags": {
       "get": {
-        "description": "Returns a list of DAGs with optional pagination and search filters.",
+        "description": "Returns a list of DAGs with optional pagination and search filters",
         "tags": [
           "dags"
         ],
@@ -55,38 +55,46 @@ func init() {
         "parameters": [
           {
             "type": "integer",
-            "description": "Page number (for pagination).",
+            "default": 1,
+            "description": "Page number (for pagination)",
             "name": "page",
             "in": "query"
           },
           {
             "type": "integer",
-            "description": "Number of items to return per page.",
+            "default": 20,
+            "description": "Number of items to return per page",
             "name": "limit",
             "in": "query"
           },
           {
             "type": "string",
-            "description": "Filter DAGs by matching name.",
+            "description": "Filter DAGs by matching name",
             "name": "searchName",
             "in": "query"
           },
           {
             "type": "string",
-            "description": "Filter DAGs by matching tag.",
+            "description": "Filter DAGs by matching tag",
             "name": "searchTag",
             "in": "query"
           }
         ],
         "responses": {
           "200": {
-            "description": "A successful response.",
+            "description": "A successful response",
             "schema": {
               "$ref": "#/definitions/ListDAGsResponse"
             }
           },
+          "400": {
+            "description": "Invalid parameters provided",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
           "default": {
-            "description": "Generic error response.",
+            "description": "Generic error response",
             "schema": {
               "$ref": "#/definitions/Error"
             }
@@ -94,7 +102,7 @@ func init() {
         }
       },
       "post": {
-        "description": "Creates a new DAG.",
+        "description": "Creates a new DAG definition",
         "tags": [
           "dags"
         ],
@@ -112,13 +120,19 @@ func init() {
         ],
         "responses": {
           "200": {
-            "description": "A successful response.",
+            "description": "A successful response",
             "schema": {
               "$ref": "#/definitions/CreateDAGResponse"
             }
           },
+          "400": {
+            "description": "Invalid request body",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
           "default": {
-            "description": "Generic error response.",
+            "description": "Generic error response",
             "schema": {
               "$ref": "#/definitions/Error"
             }
@@ -128,7 +142,7 @@ func init() {
     },
     "/dags/{dagId}": {
       "get": {
-        "description": "Returns details of a DAG, including files, logs, etc.",
+        "description": "Returns details of a DAG, including files, logs, and execution status",
         "tags": [
           "dags"
         ],
@@ -137,39 +151,45 @@ func init() {
         "parameters": [
           {
             "type": "string",
-            "description": "The ID of the DAG.",
+            "description": "The ID of the DAG",
             "name": "dagId",
             "in": "path",
             "required": true
           },
           {
             "type": "string",
-            "description": "Tab name for UI navigation.",
+            "description": "Tab name for UI navigation",
             "name": "tab",
             "in": "query"
           },
           {
             "type": "string",
-            "description": "Specific file related to the DAG.",
+            "description": "Specific file related to the DAG",
             "name": "file",
             "in": "query"
           },
           {
             "type": "string",
-            "description": "Step name within the DAG.",
+            "description": "Step name within the DAG",
             "name": "step",
             "in": "query"
           }
         ],
         "responses": {
           "200": {
-            "description": "A successful response.",
+            "description": "A successful response",
             "schema": {
               "$ref": "#/definitions/GetDAGDetailsResponse"
             }
           },
+          "404": {
+            "description": "DAG not found",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
           "default": {
-            "description": "Generic error response.",
+            "description": "Generic error response",
             "schema": {
               "$ref": "#/definitions/Error"
             }
@@ -177,7 +197,7 @@ func init() {
         }
       },
       "post": {
-        "description": "Performs a specified action (e.g., start, stop) on the given DAG.",
+        "description": "Performs a specified action (e.g., start, stop) on the given DAG",
         "tags": [
           "dags"
         ],
@@ -186,7 +206,7 @@ func init() {
         "parameters": [
           {
             "type": "string",
-            "description": "The ID of the DAG.",
+            "description": "The ID of the DAG",
             "name": "dagId",
             "in": "path",
             "required": true
@@ -202,13 +222,25 @@ func init() {
         ],
         "responses": {
           "200": {
-            "description": "A successful response.",
+            "description": "A successful response",
             "schema": {
               "$ref": "#/definitions/PostDAGActionResponse"
             }
           },
+          "400": {
+            "description": "Invalid action requested",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "404": {
+            "description": "DAG not found",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
           "default": {
-            "description": "Generic error response.",
+            "description": "Generic error response",
             "schema": {
               "$ref": "#/definitions/Error"
             }
@@ -216,7 +248,7 @@ func init() {
         }
       },
       "delete": {
-        "description": "Deletes a DAG by its ID.",
+        "description": "Deletes a DAG by its ID",
         "tags": [
           "dags"
         ],
@@ -225,7 +257,7 @@ func init() {
         "parameters": [
           {
             "type": "string",
-            "description": "The ID of the DAG.",
+            "description": "The ID of the DAG",
             "name": "dagId",
             "in": "path",
             "required": true
@@ -233,10 +265,16 @@ func init() {
         ],
         "responses": {
           "200": {
-            "description": "A successful response."
+            "description": "DAG successfully deleted"
+          },
+          "404": {
+            "description": "DAG not found",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
           },
           "default": {
-            "description": "Generic error response.",
+            "description": "Generic error response",
             "schema": {
               "$ref": "#/definitions/Error"
             }
@@ -276,7 +314,7 @@ func init() {
     },
     "/search": {
       "get": {
-        "description": "Searches for DAGs based on a query string.",
+        "description": "Searches for DAGs based on a query string",
         "tags": [
           "dags"
         ],
@@ -285,7 +323,7 @@ func init() {
         "parameters": [
           {
             "type": "string",
-            "description": "A search query string.",
+            "description": "A search query string",
             "name": "q",
             "in": "query",
             "required": true
@@ -293,13 +331,19 @@ func init() {
         ],
         "responses": {
           "200": {
-            "description": "A successful response.",
+            "description": "A successful response",
             "schema": {
               "$ref": "#/definitions/SearchDAGsResponse"
             }
           },
+          "400": {
+            "description": "Invalid search query",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
           "default": {
-            "description": "Generic error response.",
+            "description": "Generic error response",
             "schema": {
               "$ref": "#/definitions/Error"
             }
@@ -309,7 +353,7 @@ func init() {
     },
     "/tags": {
       "get": {
-        "description": "Returns a list of tags used in DAGs.",
+        "description": "Returns a list of all tags used across DAGs",
         "tags": [
           "dags"
         ],
@@ -317,13 +361,13 @@ func init() {
         "operationId": "listTags",
         "responses": {
           "200": {
-            "description": "A successful response.",
+            "description": "A successful response",
             "schema": {
               "$ref": "#/definitions/ListTagResponse"
             }
           },
           "default": {
-            "description": "Generic error response.",
+            "description": "Generic error response",
             "schema": {
               "$ref": "#/definitions/Error"
             }
@@ -334,7 +378,7 @@ func init() {
   },
   "definitions": {
     "CreateDAGRequest": {
-      "description": "Request body for creating a DAG.",
+      "description": "Request body for creating a DAG",
       "type": "object",
       "required": [
         "action",
@@ -342,22 +386,24 @@ func init() {
       ],
       "properties": {
         "action": {
-          "description": "Action to perform upon creation (if any).",
+          "description": "Action to perform upon creation (if any)",
           "type": "string"
         },
         "value": {
-          "description": "Associated value for the action.",
+          "description": "Associated value for the action",
           "type": "string"
         }
       }
     },
     "CreateDAGResponse": {
+      "description": "Response object for creating a DAG",
       "type": "object",
       "required": [
         "DagID"
       ],
       "properties": {
         "DagID": {
+          "description": "ID of the newly created DAG",
           "type": "string"
         }
       }
@@ -415,6 +461,7 @@ func init() {
       }
     },
     "DAGDetails": {
+      "description": "Detailed DAG configuration information",
       "type": "object",
       "required": [
         "Location",
@@ -519,6 +566,7 @@ func init() {
       }
     },
     "DAGLogData": {
+      "description": "Aggregated log data for a DAG",
       "type": "object",
       "required": [
         "GridData",
@@ -526,12 +574,14 @@ func init() {
       ],
       "properties": {
         "GridData": {
+          "description": "Grid data for visualization",
           "type": "array",
           "items": {
             "$ref": "#/definitions/DAGLogGridItem"
           }
         },
         "Logs": {
+          "description": "Log data from executions",
           "type": "array",
           "items": {
             "$ref": "#/definitions/DAGLogStatusFile"
@@ -540,6 +590,7 @@ func init() {
       }
     },
     "DAGLogGridItem": {
+      "description": "Grid item for log visualization",
       "type": "object",
       "required": [
         "Name",
@@ -547,9 +598,11 @@ func init() {
       ],
       "properties": {
         "Name": {
+          "description": "Name of the data point",
           "type": "string"
         },
         "Vals": {
+          "description": "Values for the data point",
           "type": "array",
           "items": {
             "type": "integer"
@@ -558,6 +611,7 @@ func init() {
       }
     },
     "DAGLogStatusFile": {
+      "description": "Log status file information",
       "type": "object",
       "required": [
         "File",
@@ -565,6 +619,7 @@ func init() {
       ],
       "properties": {
         "File": {
+          "description": "Path to the log file",
           "type": "string"
         },
         "Status": {
@@ -588,7 +643,7 @@ func init() {
       ],
       "properties": {
         "FinishedAt": {
-          "description": "RFC 3339 timestamp when the DAG execution completed",
+          "description": "RFC 3339 timestamp when the DAG execution finished",
           "type": "string"
         },
         "Log": {
@@ -626,6 +681,7 @@ func init() {
       }
     },
     "DAGStatusDetails": {
+      "description": "Detailed status of DAG execution including child nodes",
       "type": "object",
       "required": [
         "RequestId",
@@ -645,16 +701,19 @@ func init() {
       ],
       "properties": {
         "FinishedAt": {
-          "description": "Timestamp when the DAG finished.",
+          "description": "RFC3339 timestamp when the DAG run finished",
           "type": "string"
         },
         "Log": {
+          "description": "Path to the log file",
           "type": "string"
         },
         "Name": {
+          "description": "Name of the DAG",
           "type": "string"
         },
         "Nodes": {
+          "description": "Status of individual steps within the DAG",
           "type": "array",
           "items": {
             "$ref": "#/definitions/Node"
@@ -673,27 +732,33 @@ func init() {
           "$ref": "#/definitions/Node"
         },
         "Params": {
+          "description": "Parameters in JSON format",
           "type": "string"
         },
         "Pid": {
+          "description": "Process ID of the DAG execution",
           "type": "integer"
         },
         "RequestId": {
+          "description": "Unique identifier for the execution request",
           "type": "string"
         },
         "StartedAt": {
-          "description": "Timestamp when the DAG started.",
+          "description": "RFC3339 timestamp when the DAG run started",
           "type": "string"
         },
         "Status": {
+          "description": "Numeric status code",
           "type": "integer"
         },
         "StatusText": {
+          "description": "Human-readable status description",
           "type": "string"
         }
       }
     },
     "DAGStatusFile": {
+      "description": "DAG file with its status information",
       "type": "object",
       "required": [
         "File",
@@ -708,18 +773,22 @@ func init() {
           "$ref": "#/definitions/DAG"
         },
         "Dir": {
+          "description": "Directory containing the DAG file",
           "type": "string"
         },
         "Error": {
+          "description": "Error message if any",
           "type": "string"
         },
         "File": {
+          "description": "Path to the DAG file",
           "type": "string"
         },
         "Status": {
           "$ref": "#/definitions/DAGStatus"
         },
         "Suspended": {
+          "description": "Whether the DAG is suspended",
           "type": "boolean"
         }
       }
@@ -740,24 +809,28 @@ func init() {
           "$ref": "#/definitions/DAGDetails"
         },
         "Dir": {
+          "description": "Directory containing the DAG file",
           "type": "string"
         },
         "Error": {
+          "description": "Error message if any",
           "type": "string"
         },
         "File": {
+          "description": "Path to the DAG file",
           "type": "string"
         },
         "Status": {
           "$ref": "#/definitions/DAGStatusDetails"
         },
         "Suspended": {
+          "description": "Whether the DAG is suspended",
           "type": "boolean"
         }
       }
     },
     "Error": {
-      "description": "Generic error response object.",
+      "description": "Generic error response object",
       "type": "object",
       "required": [
         "code",
@@ -765,7 +838,7 @@ func init() {
       ],
       "properties": {
         "code": {
-          "description": "Error code indicating the type of error.",
+          "description": "Error code indicating the type of error",
           "type": "string",
           "enum": [
             "validation_error",
@@ -776,17 +849,17 @@ func init() {
           ]
         },
         "details": {
-          "description": "Additional error details.",
+          "description": "Additional error details",
           "type": "object"
         },
         "message": {
-          "description": "Short error message.",
+          "description": "Short error message",
           "type": "string"
         }
       }
     },
     "GetDAGDetailsResponse": {
-      "description": "Response object for getting details of a DAG.",
+      "description": "Response object for getting details of a DAG",
       "type": "object",
       "required": [
         "Title",
@@ -805,24 +878,25 @@ func init() {
           "$ref": "#/definitions/DAGStatusFileDetails"
         },
         "Definition": {
-          "description": "DAG definition.",
+          "description": "DAG definition",
           "type": "string"
         },
         "Errors": {
-          "description": "List of errors encountered during the request.",
+          "description": "List of errors encountered during the request",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "Graph": {
-          "description": "Graph data for visualization.",
+          "description": "Graph data for visualization",
           "type": "string"
         },
         "LogData": {
           "$ref": "#/definitions/DAGLogData"
         },
         "LogUrl": {
+          "description": "URL to access logs directly",
           "type": "string"
         },
         "ScLog": {
@@ -832,11 +906,11 @@ func init() {
           "$ref": "#/definitions/StepLog"
         },
         "Tab": {
-          "description": "Tab name for UI navigation.",
+          "description": "Tab name for UI navigation",
           "type": "string"
         },
         "Title": {
-          "description": "Title of the Page.",
+          "description": "Title of the Page",
           "type": "string"
         }
       }
@@ -860,7 +934,7 @@ func init() {
       }
     },
     "HealthResponse": {
-      "description": "Response object for the health check endpoint.",
+      "description": "Response object for the health check endpoint",
       "type": "object",
       "required": [
         "status",
@@ -892,7 +966,7 @@ func init() {
       }
     },
     "ListDAGsResponse": {
-      "description": "Response object for listing all DAGs.",
+      "description": "Response object for listing all DAGs",
       "type": "object",
       "required": [
         "DAGs",
@@ -902,25 +976,25 @@ func init() {
       ],
       "properties": {
         "DAGs": {
-          "description": "List of DAGs with their status and metadata.",
+          "description": "List of DAGs with their status and metadata",
           "type": "array",
           "items": {
             "$ref": "#/definitions/DAGStatusFile"
           }
         },
         "Errors": {
-          "description": "List of errors encountered during the request.",
+          "description": "List of errors encountered during the request",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "HasError": {
-          "description": "Whether any errors were encountered.",
+          "description": "Whether any errors were encountered",
           "type": "boolean"
         },
         "PageCount": {
-          "description": "Total number of pages available.",
+          "description": "Total number of pages available",
           "type": "integer"
         }
       }
@@ -973,7 +1047,7 @@ func init() {
           "type": "string"
         },
         "FinishedAt": {
-          "description": "RFC 3339 timestamp when the step completed",
+          "description": "RFC3339 timestamp when the step finished",
           "type": "string"
         },
         "Log": {
@@ -985,7 +1059,7 @@ func init() {
           "type": "integer"
         },
         "StartedAt": {
-          "description": "RFC 3339 timestamp when the step started executing",
+          "description": "RFC3339 timestamp when the step started",
           "type": "string"
         },
         "Status": {
@@ -1002,14 +1076,14 @@ func init() {
       }
     },
     "PostDAGActionRequest": {
-      "description": "Request body for posting an action to a DAG.",
+      "description": "Request body for posting an action to a DAG",
       "type": "object",
       "required": [
         "action"
       ],
       "properties": {
         "action": {
-          "description": "Action to be performed on the DAG.",
+          "description": "Action to be performed on the DAG",
           "type": "string",
           "enum": [
             "start",
@@ -1023,29 +1097,29 @@ func init() {
           ]
         },
         "params": {
-          "description": "Additional parameters for the action.",
+          "description": "Additional parameters for the action in JSON format",
           "type": "string"
         },
         "requestId": {
-          "description": "Unique request ID for the action.",
+          "description": "Unique request ID for the action",
           "type": "string"
         },
         "step": {
-          "description": "Step name if the action targets a specific step.",
+          "description": "Step name if the action targets a specific step",
           "type": "string"
         },
         "value": {
-          "description": "Optional extra value for the action.",
+          "description": "Optional extra value for the action",
           "type": "string"
         }
       }
     },
     "PostDAGActionResponse": {
-      "description": "Response object for posting an action to a DAG.",
+      "description": "Response object for posting an action to a DAG",
       "type": "object",
       "properties": {
         "NewDagID": {
-          "description": "New DAG ID, if the action resulted in a new DAG.",
+          "description": "New DAG ID, if the action resulted in a new DAG",
           "type": "string"
         }
       }
@@ -1079,17 +1153,20 @@ func init() {
       }
     },
     "Schedule": {
+      "description": "Schedule configuration for DAG execution",
       "type": "object",
       "required": [
         "Expression"
       ],
       "properties": {
         "Expression": {
+          "description": "Cron expression or schedule pattern",
           "type": "string"
         }
       }
     },
     "SchedulerLog": {
+      "description": "Log information for the scheduler",
       "type": "object",
       "required": [
         "LogFile",
@@ -1097,28 +1174,35 @@ func init() {
       ],
       "properties": {
         "Content": {
+          "description": "Log content",
           "type": "string"
         },
         "LogFile": {
+          "description": "Path to the scheduler log file",
           "type": "string"
         }
       }
     },
     "SearchDAGsMatchItem": {
+      "description": "Details of a search match within a DAG",
       "type": "object",
       "properties": {
         "Line": {
+          "description": "Matching line content",
           "type": "string"
         },
         "LineNumber": {
+          "description": "Line number where match was found",
           "type": "integer"
         },
         "StartLine": {
+          "description": "Start line for context",
           "type": "integer"
         }
       }
     },
     "SearchDAGsResponse": {
+      "description": "Response object for searching DAGs",
       "type": "object",
       "required": [
         "Results",
@@ -1126,12 +1210,14 @@ func init() {
       ],
       "properties": {
         "Errors": {
+          "description": "Errors encountered during the search",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "Results": {
+          "description": "Search results matching the query",
           "type": "array",
           "items": {
             "$ref": "#/definitions/SearchDAGsResultItem"
@@ -1140,18 +1226,21 @@ func init() {
       }
     },
     "SearchDAGsResultItem": {
+      "description": "Individual search result item for a DAG",
       "type": "object",
       "properties": {
         "DAG": {
           "$ref": "#/definitions/DAG"
         },
         "Matches": {
+          "description": "Details of where matches were found",
           "type": "array",
           "items": {
             "$ref": "#/definitions/SearchDAGsMatchItem"
           }
         },
         "Name": {
+          "description": "Name of the matching DAG",
           "type": "string"
         }
       }
@@ -1219,7 +1308,7 @@ func init() {
           "type": "string"
         },
         "Params": {
-          "description": "Parameters to pass to the sub DAG",
+          "description": "Parameters to pass to the sub DAG in JSON format",
           "type": "string"
         },
         "Preconditions": {
@@ -1251,6 +1340,7 @@ func init() {
       }
     },
     "StepLog": {
+      "description": "Log information for a specific step",
       "type": "object",
       "required": [
         "Step",
@@ -1259,9 +1349,11 @@ func init() {
       ],
       "properties": {
         "Content": {
+          "description": "Log content",
           "type": "string"
         },
         "LogFile": {
+          "description": "Path to the log file",
           "type": "string"
         },
         "Step": {
@@ -1270,13 +1362,25 @@ func init() {
       }
     }
   },
+  "securityDefinitions": {
+    "basicAuth": {
+      "description": "Basic authentication with username and password when enabled",
+      "type": "basic"
+    },
+    "bearerAuth": {
+      "description": "API authentication using Bearer token format",
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header"
+    }
+  },
   "tags": [
     {
-      "description": "Operations about DAGs",
+      "description": "Operations for managing and executing DAGs (Directed Acyclic Graphs)",
       "name": "dags"
     },
     {
-      "description": "System operations",
+      "description": "System operations for monitoring and managing the Dagu server",
       "name": "system"
     }
   ]
@@ -1296,7 +1400,7 @@ func init() {
     "description": "REST API for Dagu - a compact, portable workflow engine for orchestrating  command execution across diverse environments including shell scripts,  Python commands, containerized operations, and remote commands.\n",
     "title": "Dagu",
     "contact": {
-      "name": "Dagu",
+      "name": "Dagu Developers",
       "url": "https://github.com/dagu-org/dagu"
     },
     "license": {
@@ -1310,7 +1414,7 @@ func init() {
   "paths": {
     "/dags": {
       "get": {
-        "description": "Returns a list of DAGs with optional pagination and search filters.",
+        "description": "Returns a list of DAGs with optional pagination and search filters",
         "tags": [
           "dags"
         ],
@@ -1319,38 +1423,46 @@ func init() {
         "parameters": [
           {
             "type": "integer",
-            "description": "Page number (for pagination).",
+            "default": 1,
+            "description": "Page number (for pagination)",
             "name": "page",
             "in": "query"
           },
           {
             "type": "integer",
-            "description": "Number of items to return per page.",
+            "default": 20,
+            "description": "Number of items to return per page",
             "name": "limit",
             "in": "query"
           },
           {
             "type": "string",
-            "description": "Filter DAGs by matching name.",
+            "description": "Filter DAGs by matching name",
             "name": "searchName",
             "in": "query"
           },
           {
             "type": "string",
-            "description": "Filter DAGs by matching tag.",
+            "description": "Filter DAGs by matching tag",
             "name": "searchTag",
             "in": "query"
           }
         ],
         "responses": {
           "200": {
-            "description": "A successful response.",
+            "description": "A successful response",
             "schema": {
               "$ref": "#/definitions/ListDAGsResponse"
             }
           },
+          "400": {
+            "description": "Invalid parameters provided",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
           "default": {
-            "description": "Generic error response.",
+            "description": "Generic error response",
             "schema": {
               "$ref": "#/definitions/Error"
             }
@@ -1358,7 +1470,7 @@ func init() {
         }
       },
       "post": {
-        "description": "Creates a new DAG.",
+        "description": "Creates a new DAG definition",
         "tags": [
           "dags"
         ],
@@ -1376,13 +1488,19 @@ func init() {
         ],
         "responses": {
           "200": {
-            "description": "A successful response.",
+            "description": "A successful response",
             "schema": {
               "$ref": "#/definitions/CreateDAGResponse"
             }
           },
+          "400": {
+            "description": "Invalid request body",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
           "default": {
-            "description": "Generic error response.",
+            "description": "Generic error response",
             "schema": {
               "$ref": "#/definitions/Error"
             }
@@ -1392,7 +1510,7 @@ func init() {
     },
     "/dags/{dagId}": {
       "get": {
-        "description": "Returns details of a DAG, including files, logs, etc.",
+        "description": "Returns details of a DAG, including files, logs, and execution status",
         "tags": [
           "dags"
         ],
@@ -1401,39 +1519,45 @@ func init() {
         "parameters": [
           {
             "type": "string",
-            "description": "The ID of the DAG.",
+            "description": "The ID of the DAG",
             "name": "dagId",
             "in": "path",
             "required": true
           },
           {
             "type": "string",
-            "description": "Tab name for UI navigation.",
+            "description": "Tab name for UI navigation",
             "name": "tab",
             "in": "query"
           },
           {
             "type": "string",
-            "description": "Specific file related to the DAG.",
+            "description": "Specific file related to the DAG",
             "name": "file",
             "in": "query"
           },
           {
             "type": "string",
-            "description": "Step name within the DAG.",
+            "description": "Step name within the DAG",
             "name": "step",
             "in": "query"
           }
         ],
         "responses": {
           "200": {
-            "description": "A successful response.",
+            "description": "A successful response",
             "schema": {
               "$ref": "#/definitions/GetDAGDetailsResponse"
             }
           },
+          "404": {
+            "description": "DAG not found",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
           "default": {
-            "description": "Generic error response.",
+            "description": "Generic error response",
             "schema": {
               "$ref": "#/definitions/Error"
             }
@@ -1441,7 +1565,7 @@ func init() {
         }
       },
       "post": {
-        "description": "Performs a specified action (e.g., start, stop) on the given DAG.",
+        "description": "Performs a specified action (e.g., start, stop) on the given DAG",
         "tags": [
           "dags"
         ],
@@ -1450,7 +1574,7 @@ func init() {
         "parameters": [
           {
             "type": "string",
-            "description": "The ID of the DAG.",
+            "description": "The ID of the DAG",
             "name": "dagId",
             "in": "path",
             "required": true
@@ -1466,13 +1590,25 @@ func init() {
         ],
         "responses": {
           "200": {
-            "description": "A successful response.",
+            "description": "A successful response",
             "schema": {
               "$ref": "#/definitions/PostDAGActionResponse"
             }
           },
+          "400": {
+            "description": "Invalid action requested",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "404": {
+            "description": "DAG not found",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
           "default": {
-            "description": "Generic error response.",
+            "description": "Generic error response",
             "schema": {
               "$ref": "#/definitions/Error"
             }
@@ -1480,7 +1616,7 @@ func init() {
         }
       },
       "delete": {
-        "description": "Deletes a DAG by its ID.",
+        "description": "Deletes a DAG by its ID",
         "tags": [
           "dags"
         ],
@@ -1489,7 +1625,7 @@ func init() {
         "parameters": [
           {
             "type": "string",
-            "description": "The ID of the DAG.",
+            "description": "The ID of the DAG",
             "name": "dagId",
             "in": "path",
             "required": true
@@ -1497,10 +1633,16 @@ func init() {
         ],
         "responses": {
           "200": {
-            "description": "A successful response."
+            "description": "DAG successfully deleted"
+          },
+          "404": {
+            "description": "DAG not found",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
           },
           "default": {
-            "description": "Generic error response.",
+            "description": "Generic error response",
             "schema": {
               "$ref": "#/definitions/Error"
             }
@@ -1540,7 +1682,7 @@ func init() {
     },
     "/search": {
       "get": {
-        "description": "Searches for DAGs based on a query string.",
+        "description": "Searches for DAGs based on a query string",
         "tags": [
           "dags"
         ],
@@ -1549,7 +1691,7 @@ func init() {
         "parameters": [
           {
             "type": "string",
-            "description": "A search query string.",
+            "description": "A search query string",
             "name": "q",
             "in": "query",
             "required": true
@@ -1557,13 +1699,19 @@ func init() {
         ],
         "responses": {
           "200": {
-            "description": "A successful response.",
+            "description": "A successful response",
             "schema": {
               "$ref": "#/definitions/SearchDAGsResponse"
             }
           },
+          "400": {
+            "description": "Invalid search query",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
           "default": {
-            "description": "Generic error response.",
+            "description": "Generic error response",
             "schema": {
               "$ref": "#/definitions/Error"
             }
@@ -1573,7 +1721,7 @@ func init() {
     },
     "/tags": {
       "get": {
-        "description": "Returns a list of tags used in DAGs.",
+        "description": "Returns a list of all tags used across DAGs",
         "tags": [
           "dags"
         ],
@@ -1581,13 +1729,13 @@ func init() {
         "operationId": "listTags",
         "responses": {
           "200": {
-            "description": "A successful response.",
+            "description": "A successful response",
             "schema": {
               "$ref": "#/definitions/ListTagResponse"
             }
           },
           "default": {
-            "description": "Generic error response.",
+            "description": "Generic error response",
             "schema": {
               "$ref": "#/definitions/Error"
             }
@@ -1598,7 +1746,7 @@ func init() {
   },
   "definitions": {
     "CreateDAGRequest": {
-      "description": "Request body for creating a DAG.",
+      "description": "Request body for creating a DAG",
       "type": "object",
       "required": [
         "action",
@@ -1606,22 +1754,24 @@ func init() {
       ],
       "properties": {
         "action": {
-          "description": "Action to perform upon creation (if any).",
+          "description": "Action to perform upon creation (if any)",
           "type": "string"
         },
         "value": {
-          "description": "Associated value for the action.",
+          "description": "Associated value for the action",
           "type": "string"
         }
       }
     },
     "CreateDAGResponse": {
+      "description": "Response object for creating a DAG",
       "type": "object",
       "required": [
         "DagID"
       ],
       "properties": {
         "DagID": {
+          "description": "ID of the newly created DAG",
           "type": "string"
         }
       }
@@ -1679,6 +1829,7 @@ func init() {
       }
     },
     "DAGDetails": {
+      "description": "Detailed DAG configuration information",
       "type": "object",
       "required": [
         "Location",
@@ -1783,6 +1934,7 @@ func init() {
       }
     },
     "DAGLogData": {
+      "description": "Aggregated log data for a DAG",
       "type": "object",
       "required": [
         "GridData",
@@ -1790,12 +1942,14 @@ func init() {
       ],
       "properties": {
         "GridData": {
+          "description": "Grid data for visualization",
           "type": "array",
           "items": {
             "$ref": "#/definitions/DAGLogGridItem"
           }
         },
         "Logs": {
+          "description": "Log data from executions",
           "type": "array",
           "items": {
             "$ref": "#/definitions/DAGLogStatusFile"
@@ -1804,6 +1958,7 @@ func init() {
       }
     },
     "DAGLogGridItem": {
+      "description": "Grid item for log visualization",
       "type": "object",
       "required": [
         "Name",
@@ -1811,9 +1966,11 @@ func init() {
       ],
       "properties": {
         "Name": {
+          "description": "Name of the data point",
           "type": "string"
         },
         "Vals": {
+          "description": "Values for the data point",
           "type": "array",
           "items": {
             "type": "integer"
@@ -1822,6 +1979,7 @@ func init() {
       }
     },
     "DAGLogStatusFile": {
+      "description": "Log status file information",
       "type": "object",
       "required": [
         "File",
@@ -1829,6 +1987,7 @@ func init() {
       ],
       "properties": {
         "File": {
+          "description": "Path to the log file",
           "type": "string"
         },
         "Status": {
@@ -1852,7 +2011,7 @@ func init() {
       ],
       "properties": {
         "FinishedAt": {
-          "description": "RFC 3339 timestamp when the DAG execution completed",
+          "description": "RFC 3339 timestamp when the DAG execution finished",
           "type": "string"
         },
         "Log": {
@@ -1890,6 +2049,7 @@ func init() {
       }
     },
     "DAGStatusDetails": {
+      "description": "Detailed status of DAG execution including child nodes",
       "type": "object",
       "required": [
         "RequestId",
@@ -1909,16 +2069,19 @@ func init() {
       ],
       "properties": {
         "FinishedAt": {
-          "description": "Timestamp when the DAG finished.",
+          "description": "RFC3339 timestamp when the DAG run finished",
           "type": "string"
         },
         "Log": {
+          "description": "Path to the log file",
           "type": "string"
         },
         "Name": {
+          "description": "Name of the DAG",
           "type": "string"
         },
         "Nodes": {
+          "description": "Status of individual steps within the DAG",
           "type": "array",
           "items": {
             "$ref": "#/definitions/Node"
@@ -1937,27 +2100,33 @@ func init() {
           "$ref": "#/definitions/Node"
         },
         "Params": {
+          "description": "Parameters in JSON format",
           "type": "string"
         },
         "Pid": {
+          "description": "Process ID of the DAG execution",
           "type": "integer"
         },
         "RequestId": {
+          "description": "Unique identifier for the execution request",
           "type": "string"
         },
         "StartedAt": {
-          "description": "Timestamp when the DAG started.",
+          "description": "RFC3339 timestamp when the DAG run started",
           "type": "string"
         },
         "Status": {
+          "description": "Numeric status code",
           "type": "integer"
         },
         "StatusText": {
+          "description": "Human-readable status description",
           "type": "string"
         }
       }
     },
     "DAGStatusFile": {
+      "description": "DAG file with its status information",
       "type": "object",
       "required": [
         "File",
@@ -1972,18 +2141,22 @@ func init() {
           "$ref": "#/definitions/DAG"
         },
         "Dir": {
+          "description": "Directory containing the DAG file",
           "type": "string"
         },
         "Error": {
+          "description": "Error message if any",
           "type": "string"
         },
         "File": {
+          "description": "Path to the DAG file",
           "type": "string"
         },
         "Status": {
           "$ref": "#/definitions/DAGStatus"
         },
         "Suspended": {
+          "description": "Whether the DAG is suspended",
           "type": "boolean"
         }
       }
@@ -2004,24 +2177,28 @@ func init() {
           "$ref": "#/definitions/DAGDetails"
         },
         "Dir": {
+          "description": "Directory containing the DAG file",
           "type": "string"
         },
         "Error": {
+          "description": "Error message if any",
           "type": "string"
         },
         "File": {
+          "description": "Path to the DAG file",
           "type": "string"
         },
         "Status": {
           "$ref": "#/definitions/DAGStatusDetails"
         },
         "Suspended": {
+          "description": "Whether the DAG is suspended",
           "type": "boolean"
         }
       }
     },
     "Error": {
-      "description": "Generic error response object.",
+      "description": "Generic error response object",
       "type": "object",
       "required": [
         "code",
@@ -2029,7 +2206,7 @@ func init() {
       ],
       "properties": {
         "code": {
-          "description": "Error code indicating the type of error.",
+          "description": "Error code indicating the type of error",
           "type": "string",
           "enum": [
             "validation_error",
@@ -2040,17 +2217,17 @@ func init() {
           ]
         },
         "details": {
-          "description": "Additional error details.",
+          "description": "Additional error details",
           "type": "object"
         },
         "message": {
-          "description": "Short error message.",
+          "description": "Short error message",
           "type": "string"
         }
       }
     },
     "GetDAGDetailsResponse": {
-      "description": "Response object for getting details of a DAG.",
+      "description": "Response object for getting details of a DAG",
       "type": "object",
       "required": [
         "Title",
@@ -2069,24 +2246,25 @@ func init() {
           "$ref": "#/definitions/DAGStatusFileDetails"
         },
         "Definition": {
-          "description": "DAG definition.",
+          "description": "DAG definition",
           "type": "string"
         },
         "Errors": {
-          "description": "List of errors encountered during the request.",
+          "description": "List of errors encountered during the request",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "Graph": {
-          "description": "Graph data for visualization.",
+          "description": "Graph data for visualization",
           "type": "string"
         },
         "LogData": {
           "$ref": "#/definitions/DAGLogData"
         },
         "LogUrl": {
+          "description": "URL to access logs directly",
           "type": "string"
         },
         "ScLog": {
@@ -2096,11 +2274,11 @@ func init() {
           "$ref": "#/definitions/StepLog"
         },
         "Tab": {
-          "description": "Tab name for UI navigation.",
+          "description": "Tab name for UI navigation",
           "type": "string"
         },
         "Title": {
-          "description": "Title of the Page.",
+          "description": "Title of the Page",
           "type": "string"
         }
       }
@@ -2124,7 +2302,7 @@ func init() {
       }
     },
     "HealthResponse": {
-      "description": "Response object for the health check endpoint.",
+      "description": "Response object for the health check endpoint",
       "type": "object",
       "required": [
         "status",
@@ -2156,7 +2334,7 @@ func init() {
       }
     },
     "ListDAGsResponse": {
-      "description": "Response object for listing all DAGs.",
+      "description": "Response object for listing all DAGs",
       "type": "object",
       "required": [
         "DAGs",
@@ -2166,25 +2344,25 @@ func init() {
       ],
       "properties": {
         "DAGs": {
-          "description": "List of DAGs with their status and metadata.",
+          "description": "List of DAGs with their status and metadata",
           "type": "array",
           "items": {
             "$ref": "#/definitions/DAGStatusFile"
           }
         },
         "Errors": {
-          "description": "List of errors encountered during the request.",
+          "description": "List of errors encountered during the request",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "HasError": {
-          "description": "Whether any errors were encountered.",
+          "description": "Whether any errors were encountered",
           "type": "boolean"
         },
         "PageCount": {
-          "description": "Total number of pages available.",
+          "description": "Total number of pages available",
           "type": "integer"
         }
       }
@@ -2237,7 +2415,7 @@ func init() {
           "type": "string"
         },
         "FinishedAt": {
-          "description": "RFC 3339 timestamp when the step completed",
+          "description": "RFC3339 timestamp when the step finished",
           "type": "string"
         },
         "Log": {
@@ -2249,7 +2427,7 @@ func init() {
           "type": "integer"
         },
         "StartedAt": {
-          "description": "RFC 3339 timestamp when the step started executing",
+          "description": "RFC3339 timestamp when the step started",
           "type": "string"
         },
         "Status": {
@@ -2266,14 +2444,14 @@ func init() {
       }
     },
     "PostDAGActionRequest": {
-      "description": "Request body for posting an action to a DAG.",
+      "description": "Request body for posting an action to a DAG",
       "type": "object",
       "required": [
         "action"
       ],
       "properties": {
         "action": {
-          "description": "Action to be performed on the DAG.",
+          "description": "Action to be performed on the DAG",
           "type": "string",
           "enum": [
             "start",
@@ -2287,29 +2465,29 @@ func init() {
           ]
         },
         "params": {
-          "description": "Additional parameters for the action.",
+          "description": "Additional parameters for the action in JSON format",
           "type": "string"
         },
         "requestId": {
-          "description": "Unique request ID for the action.",
+          "description": "Unique request ID for the action",
           "type": "string"
         },
         "step": {
-          "description": "Step name if the action targets a specific step.",
+          "description": "Step name if the action targets a specific step",
           "type": "string"
         },
         "value": {
-          "description": "Optional extra value for the action.",
+          "description": "Optional extra value for the action",
           "type": "string"
         }
       }
     },
     "PostDAGActionResponse": {
-      "description": "Response object for posting an action to a DAG.",
+      "description": "Response object for posting an action to a DAG",
       "type": "object",
       "properties": {
         "NewDagID": {
-          "description": "New DAG ID, if the action resulted in a new DAG.",
+          "description": "New DAG ID, if the action resulted in a new DAG",
           "type": "string"
         }
       }
@@ -2343,17 +2521,20 @@ func init() {
       }
     },
     "Schedule": {
+      "description": "Schedule configuration for DAG execution",
       "type": "object",
       "required": [
         "Expression"
       ],
       "properties": {
         "Expression": {
+          "description": "Cron expression or schedule pattern",
           "type": "string"
         }
       }
     },
     "SchedulerLog": {
+      "description": "Log information for the scheduler",
       "type": "object",
       "required": [
         "LogFile",
@@ -2361,28 +2542,35 @@ func init() {
       ],
       "properties": {
         "Content": {
+          "description": "Log content",
           "type": "string"
         },
         "LogFile": {
+          "description": "Path to the scheduler log file",
           "type": "string"
         }
       }
     },
     "SearchDAGsMatchItem": {
+      "description": "Details of a search match within a DAG",
       "type": "object",
       "properties": {
         "Line": {
+          "description": "Matching line content",
           "type": "string"
         },
         "LineNumber": {
+          "description": "Line number where match was found",
           "type": "integer"
         },
         "StartLine": {
+          "description": "Start line for context",
           "type": "integer"
         }
       }
     },
     "SearchDAGsResponse": {
+      "description": "Response object for searching DAGs",
       "type": "object",
       "required": [
         "Results",
@@ -2390,12 +2578,14 @@ func init() {
       ],
       "properties": {
         "Errors": {
+          "description": "Errors encountered during the search",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "Results": {
+          "description": "Search results matching the query",
           "type": "array",
           "items": {
             "$ref": "#/definitions/SearchDAGsResultItem"
@@ -2404,18 +2594,21 @@ func init() {
       }
     },
     "SearchDAGsResultItem": {
+      "description": "Individual search result item for a DAG",
       "type": "object",
       "properties": {
         "DAG": {
           "$ref": "#/definitions/DAG"
         },
         "Matches": {
+          "description": "Details of where matches were found",
           "type": "array",
           "items": {
             "$ref": "#/definitions/SearchDAGsMatchItem"
           }
         },
         "Name": {
+          "description": "Name of the matching DAG",
           "type": "string"
         }
       }
@@ -2483,7 +2676,7 @@ func init() {
           "type": "string"
         },
         "Params": {
-          "description": "Parameters to pass to the sub DAG",
+          "description": "Parameters to pass to the sub DAG in JSON format",
           "type": "string"
         },
         "Preconditions": {
@@ -2515,6 +2708,7 @@ func init() {
       }
     },
     "StepLog": {
+      "description": "Log information for a specific step",
       "type": "object",
       "required": [
         "Step",
@@ -2523,9 +2717,11 @@ func init() {
       ],
       "properties": {
         "Content": {
+          "description": "Log content",
           "type": "string"
         },
         "LogFile": {
+          "description": "Path to the log file",
           "type": "string"
         },
         "Step": {
@@ -2534,13 +2730,25 @@ func init() {
       }
     }
   },
+  "securityDefinitions": {
+    "basicAuth": {
+      "description": "Basic authentication with username and password when enabled",
+      "type": "basic"
+    },
+    "bearerAuth": {
+      "description": "API authentication using Bearer token format",
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header"
+    }
+  },
   "tags": [
     {
-      "description": "Operations about DAGs",
+      "description": "Operations for managing and executing DAGs (Directed Acyclic Graphs)",
       "name": "dags"
     },
     {
-      "description": "System operations",
+      "description": "System operations for monitoring and managing the Dagu server",
       "name": "system"
     }
   ]

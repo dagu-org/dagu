@@ -19,7 +19,7 @@ import (
 // swagger:model DAGStatus
 type DAGStatus struct {
 
-	// RFC 3339 timestamp when the DAG execution completed
+	// RFC 3339 timestamp when the DAG execution finished
 	// Required: true
 	FinishedAt *string `json:"FinishedAt"`
 
