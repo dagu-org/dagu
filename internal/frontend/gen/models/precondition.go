@@ -12,7 +12,7 @@ import (
 	"github.com/go-openapi/swag"
 )
 
-// Precondition Precondition that must be satisfied before execution
+// Precondition Precondition that must be satisfied before running a step or DAG
 //
 // swagger:model Precondition
 type Precondition struct {

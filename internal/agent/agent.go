@@ -45,7 +45,7 @@ type Agent struct {
 	logFile      string
 	rootDAG      digraph.RootDAG
 
-	// requestID is request ID to identify DAG execution uniquely.
+	// requestID is request ID to identify DAG run uniquely.
 	// The request ID can be used for history lookup, retry, etc.
 	requestID string
 	finished  atomic.Bool
@@ -103,7 +103,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		return fmt.Errorf("agent setup failed: %w", err)
 	}
 
-	// Create a new context for the DAG execution with all necessary information
+	// Create a new context for the DAG run with all necessary information
 	dbClient := newDBClient(a.historyStore, a.dagStore)
 	ctx = digraph.NewContext(ctx, a.dag, dbClient, a.rootDAG, a.requestID, a.logFile, a.dag.Params)
 
@@ -165,7 +165,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 	})
 
-	// Stop the socket server when finishing the DAG execution.
+	// Stop the socket server when finishing the DAG run.
 	defer func() {
 		if err := a.socketServer.Shutdown(ctx); err != nil {
 			logger.Error(ctx, "Failed to shutdown socket frontend", "err", err)
@@ -206,7 +206,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 	})
 
-	// Start the DAG execution.
+	// Start the DAG run.
 	logger.Debug(ctx, "DAG run started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
 	lastErr := a.scheduler.Schedule(ctx, a.graph, done)
 
@@ -226,7 +226,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Mark the agent finished.
 	a.finished.Store(true)
 
-	// Return the last error on the DAG execution.
+	// Return the last error on the DAG run.
 	return lastErr
 }
 
@@ -304,7 +304,7 @@ func (a *Agent) HandleHTTP(ctx context.Context) sock.HTTPHandlerFunc {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write(statusJSON)
 		case r.Method == http.MethodPost && stopRe.MatchString(r.URL.Path):
-			// Handle Stop request for the DAG execution.
+			// Handle Stop request for the DAG run.
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("OK"))
 			go func() {
@@ -320,7 +320,7 @@ func (a *Agent) HandleHTTP(ctx context.Context) sock.HTTPHandlerFunc {
 	}
 }
 
-// setup the agent instance for DAG execution.
+// setup the agent instance for DAG run.
 func (a *Agent) setup(ctx context.Context) error {
 	// Lock to prevent race condition.
 	a.lock.Lock()
@@ -351,7 +351,7 @@ func (a *Agent) setup(ctx context.Context) error {
 	return a.setupGraph(ctx)
 }
 
-// newScheduler creates a scheduler instance for the DAG execution.
+// newScheduler creates a scheduler instance for the DAG run.
 func (a *Agent) newScheduler() *scheduler.Scheduler {
 	cfg := &scheduler.Config{
 		LogDir:        a.logDir,

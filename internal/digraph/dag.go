@@ -156,7 +156,7 @@ func (d *DAG) SockAddr() string {
 }
 
 // SockAddrSub returns the unix socket address for a specific request ID.
-// This is used to control sub DAG executions.
+// This is used to control sub DAG runs.
 func (d *DAG) SockAddrSub(requestID string) string {
 	return SockAddr(d.GetName(), requestID)
 }

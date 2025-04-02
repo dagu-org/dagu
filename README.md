@@ -280,7 +280,7 @@ dagu status <file or DAG name>
 # Re-runs the specified DAG run
 dagu retry --request-id=<request-id> <file or DAG name>
 
-# Stops the DAG execution
+# Stops the DAG run
 dagu stop <file or DAG name>
 
 # Restarts the current running DAG
@@ -883,7 +883,7 @@ Search across all DAG definitions.
 
 ### Execution History
 
-Review past DAG executions and logs at a glance.
+Review past DAG runs and logs at a glance.
 
 ![History](assets/images/ui-history.webp?raw=true)
 

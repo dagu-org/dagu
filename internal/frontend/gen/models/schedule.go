@@ -14,7 +14,7 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// Schedule Schedule configuration for DAG execution
+// Schedule Schedule configuration for DAG run
 //
 // swagger:model Schedule
 type Schedule struct {

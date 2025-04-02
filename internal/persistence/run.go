@@ -1,6 +1,6 @@
 package persistence
 
-// Run represents metadata about a DAG execution run
+// Run represents metadata about a DAG run
 type Run struct {
 	File   string
 	Status Status

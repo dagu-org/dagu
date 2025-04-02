@@ -15,7 +15,7 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// DAGStatusDetails Detailed status of DAG execution including child nodes
+// DAGStatusDetails Detailed status of a DAG run including child nodes
 //
 // swagger:model DAGStatusDetails
 type DAGStatusDetails struct {
@@ -56,11 +56,11 @@ type DAGStatusDetails struct {
 	// Required: true
 	Params *string `json:"Params"`
 
-	// Process ID of the DAG execution
+	// Process ID of the DAG run
 	// Required: true
 	Pid *int64 `json:"Pid"`
 
-	// Unique identifier for the execution request
+	// Unique identifier for the run request
 	// Required: true
 	RequestID *string `json:"RequestId"`
 

@@ -142,7 +142,7 @@ func init() {
     },
     "/dags/{dagId}": {
       "get": {
-        "description": "Returns details of a DAG, including files, logs, and execution status",
+        "description": "Returns details of a DAG, including files, logs, and status",
         "tags": [
           "dags"
         ],
@@ -581,7 +581,7 @@ func init() {
           }
         },
         "Logs": {
-          "description": "Log data from executions",
+          "description": "Log data",
           "type": "array",
           "items": {
             "$ref": "#/definitions/DAGLogStatusFile"
@@ -628,7 +628,7 @@ func init() {
       }
     },
     "DAGStatus": {
-      "description": "Current execution status of a DAG instance",
+      "description": "Current status of a DAG run",
       "type": "object",
       "required": [
         "RequestId",
@@ -643,11 +643,11 @@ func init() {
       ],
       "properties": {
         "FinishedAt": {
-          "description": "RFC 3339 timestamp when the DAG execution finished",
+          "description": "RFC 3339 timestamp when the DAG run finished",
           "type": "string"
         },
         "Log": {
-          "description": "Path to the execution log file",
+          "description": "Path to the log file",
           "type": "string"
         },
         "Name": {
@@ -659,19 +659,19 @@ func init() {
           "type": "string"
         },
         "Pid": {
-          "description": "Process ID of the DAG execution",
+          "description": "Process ID of the DAG run",
           "type": "integer"
         },
         "RequestId": {
-          "description": "Unique identifier for the DAG execution request",
+          "description": "Unique identifier for the DAG run request",
           "type": "string"
         },
         "StartedAt": {
-          "description": "RFC 3339 timestamp when the DAG execution started",
+          "description": "RFC 3339 timestamp when the DAG run started",
           "type": "string"
         },
         "Status": {
-          "description": "Numeric status code indicating current execution state",
+          "description": "Numeric status code indicating current run state",
           "type": "integer"
         },
         "StatusText": {
@@ -681,7 +681,7 @@ func init() {
       }
     },
     "DAGStatusDetails": {
-      "description": "Detailed status of DAG execution including child nodes",
+      "description": "Detailed status of a DAG run including child nodes",
       "type": "object",
       "required": [
         "RequestId",
@@ -736,11 +736,11 @@ func init() {
           "type": "string"
         },
         "Pid": {
-          "description": "Process ID of the DAG execution",
+          "description": "Process ID of the DAG run",
           "type": "integer"
         },
         "RequestId": {
-          "description": "Unique identifier for the execution request",
+          "description": "Unique identifier for the run request",
           "type": "string"
         },
         "StartedAt": {
@@ -1024,7 +1024,7 @@ func init() {
       }
     },
     "Node": {
-      "description": "Execution status of an individual step within a DAG",
+      "description": "Status of an individual step within a DAG run",
       "type": "object",
       "required": [
         "Step",
@@ -1063,7 +1063,7 @@ func init() {
           "type": "string"
         },
         "Status": {
-          "description": "Numeric status code for the step execution",
+          "description": "Numeric status code for the step",
           "type": "integer"
         },
         "StatusText": {
@@ -1125,7 +1125,7 @@ func init() {
       }
     },
     "Precondition": {
-      "description": "Precondition that must be satisfied before execution",
+      "description": "Precondition that must be satisfied before running a step or DAG",
       "type": "object",
       "properties": {
         "Condition": {
@@ -1153,7 +1153,7 @@ func init() {
       }
     },
     "Schedule": {
-      "description": "Schedule configuration for DAG execution",
+      "description": "Schedule configuration for DAG run",
       "type": "object",
       "required": [
         "Expression"
@@ -1510,7 +1510,7 @@ func init() {
     },
     "/dags/{dagId}": {
       "get": {
-        "description": "Returns details of a DAG, including files, logs, and execution status",
+        "description": "Returns details of a DAG, including files, logs, and status",
         "tags": [
           "dags"
         ],
@@ -1949,7 +1949,7 @@ func init() {
           }
         },
         "Logs": {
-          "description": "Log data from executions",
+          "description": "Log data",
           "type": "array",
           "items": {
             "$ref": "#/definitions/DAGLogStatusFile"
@@ -1996,7 +1996,7 @@ func init() {
       }
     },
     "DAGStatus": {
-      "description": "Current execution status of a DAG instance",
+      "description": "Current status of a DAG run",
       "type": "object",
       "required": [
         "RequestId",
@@ -2011,11 +2011,11 @@ func init() {
       ],
       "properties": {
         "FinishedAt": {
-          "description": "RFC 3339 timestamp when the DAG execution finished",
+          "description": "RFC 3339 timestamp when the DAG run finished",
           "type": "string"
         },
         "Log": {
-          "description": "Path to the execution log file",
+          "description": "Path to the log file",
           "type": "string"
         },
         "Name": {
@@ -2027,19 +2027,19 @@ func init() {
           "type": "string"
         },
         "Pid": {
-          "description": "Process ID of the DAG execution",
+          "description": "Process ID of the DAG run",
           "type": "integer"
         },
         "RequestId": {
-          "description": "Unique identifier for the DAG execution request",
+          "description": "Unique identifier for the DAG run request",
           "type": "string"
         },
         "StartedAt": {
-          "description": "RFC 3339 timestamp when the DAG execution started",
+          "description": "RFC 3339 timestamp when the DAG run started",
           "type": "string"
         },
         "Status": {
-          "description": "Numeric status code indicating current execution state",
+          "description": "Numeric status code indicating current run state",
           "type": "integer"
         },
         "StatusText": {
@@ -2049,7 +2049,7 @@ func init() {
       }
     },
     "DAGStatusDetails": {
-      "description": "Detailed status of DAG execution including child nodes",
+      "description": "Detailed status of a DAG run including child nodes",
       "type": "object",
       "required": [
         "RequestId",
@@ -2104,11 +2104,11 @@ func init() {
           "type": "string"
         },
         "Pid": {
-          "description": "Process ID of the DAG execution",
+          "description": "Process ID of the DAG run",
           "type": "integer"
         },
         "RequestId": {
-          "description": "Unique identifier for the execution request",
+          "description": "Unique identifier for the run request",
           "type": "string"
         },
         "StartedAt": {
@@ -2392,7 +2392,7 @@ func init() {
       }
     },
     "Node": {
-      "description": "Execution status of an individual step within a DAG",
+      "description": "Status of an individual step within a DAG run",
       "type": "object",
       "required": [
         "Step",
@@ -2431,7 +2431,7 @@ func init() {
           "type": "string"
         },
         "Status": {
-          "description": "Numeric status code for the step execution",
+          "description": "Numeric status code for the step",
           "type": "integer"
         },
         "StatusText": {
@@ -2493,7 +2493,7 @@ func init() {
       }
     },
     "Precondition": {
-      "description": "Precondition that must be satisfied before execution",
+      "description": "Precondition that must be satisfied before running a step or DAG",
       "type": "object",
       "properties": {
         "Condition": {
@@ -2521,7 +2521,7 @@ func init() {
       }
     },
     "Schedule": {
-      "description": "Schedule configuration for DAG execution",
+      "description": "Schedule configuration for DAG run",
       "type": "object",
       "required": [
         "Expression"
