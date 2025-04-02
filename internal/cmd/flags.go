@@ -42,50 +42,50 @@ var (
 		bindViper:    true,
 	}
 
-	// Additional parameters to pass to the DAG execution.
+	// Additional parameters to pass to the DAG run.
 	// These parameters override the default values defined in the DAG.
 	// They can be specified either inline or following a "--" separator to distinguish them from other flags.
 	// Accepted formats include positional parameters and key=value pairs (e.g., "P1=foo P2=bar").
 	paramsFlag = commandLineFlag{
 		name:      "params",
 		shorthand: "p",
-		usage:     "Parameters to pass to the DAG execution (overrides DAG defaults; supports positional values and key=value pairs, e.g., P1=foo P2=bar)",
+		usage:     "Parameters to pass to the DAG run (overrides DAG defaults; supports positional values and key=value pairs, e.g., P1=foo P2=bar)",
 	}
 
-	// Unique request ID required for retrying a DAG execution.
+	// Unique request ID required for retrying a DAG run.
 	// This flag must be provided when using the retry command.
 	requestIDFlagRetry = commandLineFlag{
 		name:      "request-id",
 		shorthand: "r",
-		usage:     "Unique request ID for retrying a DAG execution (required)",
+		usage:     "Unique request ID for retrying a DAG run (required)",
 		required:  true,
 	}
 
-	// Unique request ID used for starting a new DAG execution.
+	// Unique request ID used for starting a new DAG run.
 	// This is used to track and identify the execution instance and its status.
 	requestIDFlagStart = commandLineFlag{
 		name:      "request-id",
 		shorthand: "r",
-		usage:     "Unique request ID for a DAG execution",
+		usage:     "Unique request ID for a DAG run",
 	}
 
-	// rootRequestIDFlag reads the root request ID for starting a sub-DAG execution
+	// rootRequestIDFlag reads the root request ID for starting a sub-DAG run
 	rootRequestIDFlag = commandLineFlag{
 		name:  "root-request-id",
-		usage: "Root request ID for a DAG execution",
+		usage: "Root request ID for a DAG run",
 	}
 
-	// rootDAGNameFlag reads the root DAG name for starting a sub-DAG execution.
+	// rootDAGNameFlag reads the root DAG name for starting a sub-DAG run.
 	rootDAGNameFlag = commandLineFlag{
 		name:  "root-dag-name",
-		usage: "Root DAG name for a DAG execution",
+		usage: "Root DAG name for a DAG run",
 	}
 
-	// Suppresses output during DAG execution (e.g., logs, status updates).
+	// Suppresses output during DAG run (e.g., logs, status updates).
 	quietFlag = commandLineFlag{
 		name:      "quiet",
 		shorthand: "q",
-		usage:     "Suppress output during DAG execution",
+		usage:     "Suppress output during DAG run",
 		isBool:    true,
 	}
 )

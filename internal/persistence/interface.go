@@ -30,7 +30,7 @@ type Record interface {
 	Open(ctx context.Context) error
 	Write(ctx context.Context, status Status) error
 	Close(ctx context.Context) error
-	ReadExecution(ctx context.Context) (*Execution, error)
+	ReadRun(ctx context.Context) (*Run, error)
 	ReadStatus(ctx context.Context) (*Status, error)
 }
 

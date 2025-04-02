@@ -26,7 +26,7 @@ import (
 
 // Agent is responsible for running the DAG and handling communication
 // via the unix socket. The agent performs the following tasks:
-// 1. Start the DAG execution.
+// 1. Start the DAG.
 // 2. Propagate a signal to the running processes.
 // 3. Handle the HTTP request via the unix socket.
 // 4. Write the log and status to the data store.
@@ -207,12 +207,12 @@ func (a *Agent) Run(ctx context.Context) error {
 	})
 
 	// Start the DAG execution.
-	logger.Debug(ctx, "DAG execution started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
+	logger.Debug(ctx, "DAG run started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
 	lastErr := a.scheduler.Schedule(ctx, a.graph, done)
 
 	// Update the finished status to the history database.
 	finishedStatus := a.Status()
-	logger.Info(ctx, "DAG execution finished", "status", finishedStatus.Status.String())
+	logger.Info(ctx, "DAG run finished", "status", finishedStatus.Status.String())
 	if err := historyRecord.Write(ctx, a.Status()); err != nil {
 		logger.Error(ctx, "Status write failed", "err", err)
 	}
@@ -327,7 +327,7 @@ func (a *Agent) setup(ctx context.Context) error {
 	defer a.lock.Unlock()
 
 	if a.rootDAG.RequestID != a.requestID {
-		logger.Debug(ctx, "Initiating sub-DAG execution", "rootDAG", a.rootDAG.Name, "rootRequestID", a.rootDAG.RequestID)
+		logger.Debug(ctx, "Initiating sub-DAG run", "rootDAG", a.rootDAG.Name, "rootRequestID", a.rootDAG.RequestID)
 		a.subExecution.Store(true)
 	}
 
@@ -464,7 +464,7 @@ func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 // from the retry node so that it runs the same DAG as the previous run.
 func (a *Agent) setupGraph(ctx context.Context) error {
 	if a.retryTarget != nil {
-		logger.Info(ctx, "Retry execution", "reqId", a.requestID)
+		logger.Info(ctx, "Retry run", "reqId", a.requestID)
 		return a.setupGraphForRetry(ctx)
 	}
 	graph, err := scheduler.NewExecutionGraph(a.dag.Steps...)

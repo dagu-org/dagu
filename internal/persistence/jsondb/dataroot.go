@@ -24,16 +24,16 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence"
 )
 
-// DataRoot manages the directory structure for a DAG's execution history.
-// It handles the organization of execution data in a hierarchical structure
+// DataRoot manages the directory structure for a DAG's run history.
+// It handles the organization of run data in a hierarchical structure
 // based on year, month, and day.
 type DataRoot struct {
-	baseDir       string           // Base directory for all DAGs
-	dagName       string           // Name of the DAG
-	prefix        string           // Sanitized prefix for directory names
-	executionsDir string           // Path to the executions directory
-	globPattern   string           // Pattern for finding execution directories
-	rootDAG       *digraph.RootDAG // Optional reference to the root DAG
+	baseDir     string           // Base directory for all DAGs
+	dagName     string           // Name of the DAG
+	prefix      string           // Sanitized prefix for directory names
+	runsDir     string           // Path to the runs directory
+	globPattern string           // Pattern for finding run directories
+	rootDAG     *digraph.RootDAG // Optional reference to the root DAG
 }
 
 // RootOption defines a functional option for configuring DataRoot.
@@ -47,7 +47,7 @@ func WithRootDAG(rootDAG *digraph.RootDAG) RootOption {
 	}
 }
 
-// NewDataRoot creates a new DataRoot instance for managing a DAG's execution history.
+// NewDataRoot creates a new DataRoot instance for managing a DAG's run history.
 // It sanitizes the DAG name to create a safe directory structure and applies any provided options.
 //
 // Parameters:
@@ -81,14 +81,14 @@ func NewDataRoot(baseDir, dagName string, opts ...RootOption) DataRoot {
 	}
 
 	root.prefix = prefix
-	root.executionsDir = filepath.Join(baseDir, root.prefix, "executions")
-	root.globPattern = filepath.Join(root.executionsDir, "*", "*", "*", "exec_*")
+	root.runsDir = filepath.Join(baseDir, root.prefix, "runs")
+	root.globPattern = filepath.Join(root.runsDir, "*", "*", "*", "run_*")
 
 	return root
 }
 
-// FindByRequestID locates an execution by its request ID.
-// It searches through all execution directories to find a match,
+// FindByRequestID locates an runs by its request ID.
+// It searches through all runs directories to find a match,
 // and returns the most recent one if multiple matches are found.
 //
 // Parameters:
@@ -97,7 +97,7 @@ func NewDataRoot(baseDir, dagName string, opts ...RootOption) DataRoot {
 //
 // Returns:
 //   - The matching Execution instance, or an error if not found
-func (dr *DataRoot) FindByRequestID(_ context.Context, requestID string) (*Execution, error) {
+func (dr *DataRoot) FindByRequestID(_ context.Context, requestID string) (*Run, error) {
 	// Find matching files
 	matches, err := filepath.Glob(dr.GlobPatternWithRequestID(requestID))
 	if err != nil {
@@ -111,49 +111,49 @@ func (dr *DataRoot) FindByRequestID(_ context.Context, requestID string) (*Execu
 	// Sort matches by timestamp (most recent first)
 	sort.Sort(sort.Reverse(sort.StringSlice(matches)))
 
-	return NewExecution(matches[0])
+	return NewRun(matches[0])
 }
 
-func (dr *DataRoot) Latest(ctx context.Context, itemLimit int) []*Execution {
-	executions, err := dr.listRecentExecutions(ctx, itemLimit)
+func (dr *DataRoot) Latest(ctx context.Context, itemLimit int) []*Run {
+	runs, err := dr.listRecentRuns(ctx, itemLimit)
 	if err != nil {
-		logger.Errorf(ctx, "failed to list recent executions: %v", err)
+		logger.Errorf(ctx, "failed to list recent runs: %v", err)
 		return nil
 	}
-	return executions
+	return runs
 }
 
-func (dr *DataRoot) LatestAfter(ctx context.Context, cutoff TimeInUTC) (*Execution, error) {
-	executions, err := dr.listRecentExecutions(ctx, 1)
+func (dr *DataRoot) LatestAfter(ctx context.Context, cutoff TimeInUTC) (*Run, error) {
+	runs, err := dr.listRecentRuns(ctx, 1)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list recent executions: %w", err)
+		return nil, fmt.Errorf("failed to list recent runs: %w", err)
 	}
-	if len(executions) == 0 {
+	if len(runs) == 0 {
 		return nil, persistence.ErrNoStatusData
 	}
-	if executions[0].timestamp.Before(cutoff.Time) {
+	if runs[0].timestamp.Before(cutoff.Time) {
 		return nil, persistence.ErrNoStatusData
 	}
-	return executions[0], nil
+	return runs[0], nil
 }
 
-func (dr *DataRoot) ListInRange(ctx context.Context, start, end TimeInUTC) []*Execution {
+func (dr *DataRoot) ListInRange(ctx context.Context, start, end TimeInUTC) []*Run {
 	return dr.listInRange(ctx, start, end)
 }
 
-func (dr *DataRoot) CreateExecution(timestamp TimeInUTC, reqID string) (*Execution, error) {
-	dirName := "exec_" + timestamp.Format(dateTimeFormatUTC) + "_" + reqID
-	dir := filepath.Join(dr.executionsDir, timestamp.Format("2006"), timestamp.Format("01"), timestamp.Format("02"), dirName)
+func (dr *DataRoot) CreateRun(timestamp TimeInUTC, reqID string) (*Run, error) {
+	dirName := "run_" + timestamp.Format(dateTimeFormatUTC) + "_" + reqID
+	dir := filepath.Join(dr.runsDir, timestamp.Format("2006"), timestamp.Format("01"), timestamp.Format("02"), dirName)
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
-	return NewExecution(dir)
+	return NewRun(dir)
 }
 
 func (dr DataRoot) GlobPatternWithRequestID(requestID string) string {
-	return filepath.Join(dr.executionsDir, "2*", "*", "*", "exec_*"+requestID+"*")
+	return filepath.Join(dr.runsDir, "2*", "*", "*", "run_*"+requestID+"*")
 }
 
 func (dr DataRoot) FilePath(timestamp TimeInUTC, requestID string) string {
@@ -161,12 +161,12 @@ func (dr DataRoot) FilePath(timestamp TimeInUTC, requestID string) string {
 	month := timestamp.Format("01")
 	date := timestamp.Format("02")
 	ts := timestamp.Format(dateTimeFormatUTC)
-	dirName := "exec_" + ts + "_" + requestID
-	return filepath.Join(dr.executionsDir, year, month, date, dirName, "status"+dataFileExtension)
+	dirName := "run_" + ts + "_" + requestID
+	return filepath.Join(dr.runsDir, year, month, date, dirName, "status"+dataFileExtension)
 }
 
 func (dr DataRoot) Exists() bool {
-	_, err := os.Stat(dr.executionsDir)
+	_, err := os.Stat(dr.runsDir)
 	return !os.IsNotExist(err)
 }
 
@@ -174,14 +174,14 @@ func (dr DataRoot) Create() error {
 	if dr.Exists() {
 		return nil
 	}
-	if err := os.MkdirAll(dr.executionsDir, 0750); err != nil {
-		return fmt.Errorf("failed to create directory %s: %w", dr.executionsDir, err)
+	if err := os.MkdirAll(dr.runsDir, 0750); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dr.runsDir, err)
 	}
 	return nil
 }
 
 func (dr DataRoot) IsEmpty() bool {
-	_, err := os.Stat(dr.executionsDir)
+	_, err := os.Stat(dr.runsDir)
 	if err != nil && os.IsNotExist(err) {
 		return true
 	}
@@ -196,8 +196,8 @@ func (dr DataRoot) IsEmpty() bool {
 }
 
 func (dr DataRoot) Remove() error {
-	if err := os.RemoveAll(dr.executionsDir); err != nil {
-		return fmt.Errorf("failed to remove directory %s: %w", dr.executionsDir, err)
+	if err := os.RemoveAll(dr.runsDir); err != nil {
+		return fmt.Errorf("failed to remove directory %s: %w", dr.runsDir, err)
 	}
 	return nil
 }
@@ -226,7 +226,7 @@ func (dr DataRoot) Rename(ctx context.Context, newRoot DataRoot) error {
 		day := filepath.Base(filepath.Dir(targetDir))
 		month := filepath.Base(filepath.Dir(filepath.Dir(targetDir)))
 		year := filepath.Base(filepath.Dir(filepath.Dir(filepath.Dir(targetDir))))
-		newDir := filepath.Join(newRoot.executionsDir, year, month, day, filepath.Base(targetDir))
+		newDir := filepath.Join(newRoot.runsDir, year, month, day, filepath.Base(targetDir))
 
 		// Make sure the new directory exists
 		if err := os.MkdirAll(filepath.Dir(newDir), 0750); err != nil {
@@ -259,21 +259,21 @@ func (dr DataRoot) Rename(ctx context.Context, newRoot DataRoot) error {
 
 func (dr DataRoot) RemoveOld(ctx context.Context, retentionDays int) error {
 	keepTime := NewUTC(time.Now().AddDate(0, 0, -retentionDays))
-	executions := dr.listInRange(ctx, TimeInUTC{}, keepTime)
+	runs := dr.listInRange(ctx, TimeInUTC{}, keepTime)
 
-	for _, exec := range executions {
-		lastUpdate, err := exec.LastUpdated(ctx)
+	for _, r := range runs {
+		lastUpdate, err := r.LastUpdated(ctx)
 		if err != nil {
-			logger.Errorf(ctx, "failed to get last update time for %s: %v", exec.baseDir, err)
+			logger.Errorf(ctx, "failed to get last update time for %s: %v", r.baseDir, err)
 			continue
 		}
 		if lastUpdate.After(keepTime.Time) {
 			continue
 		}
-		if err := exec.Remove(); err != nil {
-			logger.Errorf(ctx, "failed to remove execution %s: %v", exec.baseDir, err)
+		if err := r.Remove(); err != nil {
+			logger.Errorf(ctx, "failed to remove run %s: %v", r.baseDir, err)
 		}
-		dr.removeEmptyDir(ctx, filepath.Dir(exec.baseDir))
+		dr.removeEmptyDir(ctx, filepath.Dir(r.baseDir))
 	}
 	return nil
 }
@@ -301,8 +301,8 @@ func (dr DataRoot) removeEmptyDir(ctx context.Context, dayDir string) {
 	}
 }
 
-func (dr DataRoot) listInRange(ctx context.Context, start, end TimeInUTC) []*Execution {
-	var result []*Execution
+func (dr DataRoot) listInRange(ctx context.Context, start, end TimeInUTC) []*Run {
+	var result []*Run
 	var lock sync.Mutex
 
 	// If start time is after end time, return empty result
@@ -325,14 +325,14 @@ func (dr DataRoot) listInRange(ctx context.Context, start, end TimeInUTC) []*Exe
 		endDate = end.Time
 	}
 
-	years, err := listDirsSorted(dr.executionsDir, false, reYear)
+	years, err := listDirsSorted(dr.runsDir, false, reYear)
 	if err != nil {
 		return nil
 	}
 
 	for _, year := range years {
 		yearInt, _ := strconv.Atoi(year)
-		yearPath := filepath.Join(dr.executionsDir, year)
+		yearPath := filepath.Join(dr.runsDir, year)
 
 		// Skip years outside the range
 		if yearInt < startDate.Year() || yearInt > endDate.Year() {
@@ -372,22 +372,22 @@ func (dr DataRoot) listInRange(ctx context.Context, start, end TimeInUTC) []*Exe
 				}
 
 				// Find all status files for this day
-				files, err := filepath.Glob(filepath.Join(dayPath, "exec_*"))
+				files, err := filepath.Glob(filepath.Join(dayPath, "run_*"))
 				if err != nil {
 					continue
 				}
 
 				_ = processFilesParallel(ctx, files, func(filePath string) error {
-					exec, err := NewExecution(filePath)
+					run, err := NewRun(filePath)
 					if err != nil {
-						logger.Debugf(ctx, "Failed to create execution from file %s: %v", filePath)
+						logger.Debugf(ctx, "Failed to create run from file %s: %v", filePath)
 						return err
 					}
 					// Check if the timestamp is within the range
-					if (start.IsZero() || !exec.timestamp.Before(startDate)) &&
-						(end.IsZero() || exec.timestamp.Before(endDate)) {
+					if (start.IsZero() || !run.timestamp.Before(startDate)) &&
+						(end.IsZero() || run.timestamp.Before(endDate)) {
 						lock.Lock()
-						result = append(result, exec)
+						result = append(result, run)
 						lock.Unlock()
 					}
 					return nil
@@ -403,17 +403,17 @@ func (dr DataRoot) listInRange(ctx context.Context, start, end TimeInUTC) []*Exe
 	return result
 }
 
-func (dr DataRoot) listRecentExecutions(_ context.Context, itemLimit int) ([]*Execution, error) {
+func (dr DataRoot) listRecentRuns(_ context.Context, itemLimit int) ([]*Run, error) {
 	var founds []string
 
-	years, err := listDirsSorted(dr.executionsDir, true, reYear)
+	years, err := listDirsSorted(dr.runsDir, true, reYear)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list years: %w", err)
 	}
 
 YEAR_LOOP:
 	for _, year := range years {
-		yearPath := filepath.Join(dr.executionsDir, year)
+		yearPath := filepath.Join(dr.runsDir, year)
 		months, err := listDirsSorted(yearPath, true, reMonth)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list months: %w", err)
@@ -426,11 +426,11 @@ YEAR_LOOP:
 			}
 			for _, day := range days {
 				dayPath := filepath.Join(monthPath, day)
-				executions, err := filepath.Glob(filepath.Join(dayPath, "exec_*"))
+				runs, err := filepath.Glob(filepath.Join(dayPath, "run_*"))
 				if err != nil {
 					return nil, fmt.Errorf("failed to find matches for pattern %s: %w", dayPath, err)
 				}
-				founds = append(founds, executions...)
+				founds = append(founds, runs...)
 				if len(founds) >= itemLimit {
 					break YEAR_LOOP
 				}
@@ -444,13 +444,13 @@ YEAR_LOOP:
 		founds = founds[:itemLimit]
 	}
 
-	var result []*Execution
+	var result []*Run
 	for _, f := range founds {
-		exec, err := NewExecution(f)
+		run, err := NewRun(f)
 		if err != nil {
 			continue
 		}
-		result = append(result, exec)
+		result = append(result, run)
 	}
 
 	return result, nil
@@ -570,7 +570,7 @@ var (
 	reDay   = regexp.MustCompile(`^\d{2}$`) // Matches 2-digit day directories (e.g., "15" for the 15th day)
 )
 
-// dateTimeFormatUTC is the format for execution timestamps.
+// dateTimeFormatUTC is the format for run timestamps.
 var dateTimeFormatUTC = "20060102_150405_000Z"
 
 // dataFileExtension is the file extension for history record files.

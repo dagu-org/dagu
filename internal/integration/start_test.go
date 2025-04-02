@@ -76,7 +76,7 @@ steps:
 
 			th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
 				Args:        args,
-				ExpectedOut: []string{"DAG execution finished"},
+				ExpectedOut: []string{"DAG run finished"},
 			})
 
 			// Verify log directory and files

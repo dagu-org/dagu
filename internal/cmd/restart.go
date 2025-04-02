@@ -70,9 +70,9 @@ func handleRestartProcess(ctx *Context, dag *digraph.DAG, specFilePath string) e
 	waitForRestart(ctx, dag.RestartWait)
 
 	// Get previous parameters
-	status, err := getPreviousExecutionStatus(ctx, cli, dag)
+	status, err := getPreviousRunStatus(ctx, cli, dag)
 	if err != nil {
-		return fmt.Errorf("failed to get previous execution parameters: %w", err)
+		return fmt.Errorf("failed to get previous run parameters: %w", err)
 	}
 
 	loadOpts := []digraph.LoadOption{
@@ -139,7 +139,7 @@ func executeDAG(ctx *Context, cli client.Client, dag *digraph.DAG) error {
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
-			return fmt.Errorf("DAG execution failed: %w", err)
+			return fmt.Errorf("DAG run failed: %w", err)
 		}
 	}
 
@@ -188,7 +188,7 @@ func waitForRestart(ctx context.Context, restartWait time.Duration) {
 	}
 }
 
-func getPreviousExecutionStatus(ctx context.Context, cli client.Client, dag *digraph.DAG) (persistence.Status, error) {
+func getPreviousRunStatus(ctx context.Context, cli client.Client, dag *digraph.DAG) (persistence.Status, error) {
 	status, err := cli.GetLatestStatus(ctx, dag)
 	if err != nil {
 		return persistence.Status{}, fmt.Errorf("failed to get latest status: %w", err)

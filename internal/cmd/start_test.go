@@ -16,7 +16,7 @@ func TestStartCommand(t *testing.T) {
 		{
 			Name:        "StartDAG",
 			Args:        []string{"start", th.DAG(t, "cmd/start.yaml").Location},
-			ExpectedOut: []string{"Step execution started"},
+			ExpectedOut: []string{"Step started"},
 		},
 		{
 			Name:        "StartDAGWithDefaultParams",

@@ -247,17 +247,17 @@ handleError:
 	return persistence.NewStatusFactory(dag).Default(), err
 }
 
-func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []persistence.Execution {
+func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []persistence.Run {
 	records := e.historyStore.Recent(ctx, dag.Name, n)
 
-	var executions []persistence.Execution
+	var runs []persistence.Run
 	for _, record := range records {
-		if execution, err := record.ReadExecution(ctx); err == nil {
-			executions = append(executions, *execution)
+		if run, err := record.ReadRun(ctx); err == nil {
+			runs = append(runs, *run)
 		}
 	}
 
-	return executions
+	return runs
 }
 
 var errDAGIsRunning = errors.New("the DAG is running")
