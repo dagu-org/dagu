@@ -11,14 +11,17 @@ import (
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
+// StatusFactory creates Status objects for a specific DAG
 type StatusFactory struct {
-	dag *digraph.DAG
+	dag *digraph.DAG // The DAG for which to create status objects
 }
 
+// NewStatusFactory creates a new StatusFactory for the specified DAG
 func NewStatusFactory(dag *digraph.DAG) *StatusFactory {
 	return &StatusFactory{dag: dag}
 }
 
+// Default creates a default Status object for the DAG with initial values
 func (f *StatusFactory) Default() Status {
 	return Status{
 		Name:       f.dag.GetName(),
@@ -37,8 +40,10 @@ func (f *StatusFactory) Default() Status {
 	}
 }
 
+// StatusOption is a functional option pattern for configuring Status objects
 type StatusOption func(*Status)
 
+// WithRootDAG returns a StatusOption that sets the root DAG information
 func WithRootDAG(rootDAG digraph.RootDAG) StatusOption {
 	return func(s *Status) {
 		s.RootRequestID = rootDAG.RequestID
@@ -46,18 +51,21 @@ func WithRootDAG(rootDAG digraph.RootDAG) StatusOption {
 	}
 }
 
+// WithNodes returns a StatusOption that sets the node data for the status
 func WithNodes(nodes []scheduler.NodeData) StatusOption {
 	return func(s *Status) {
 		s.Nodes = FromNodes(nodes)
 	}
 }
 
+// WithFinishedAt returns a StatusOption that sets the finished time
 func WithFinishedAt(t time.Time) StatusOption {
 	return func(s *Status) {
 		s.FinishedAt = FormatTime(t)
 	}
 }
 
+// WithOnExitNode returns a StatusOption that sets the exit handler node
 func WithOnExitNode(node *scheduler.Node) StatusOption {
 	return func(s *Status) {
 		if node != nil {
@@ -66,6 +74,7 @@ func WithOnExitNode(node *scheduler.Node) StatusOption {
 	}
 }
 
+// WithOnSuccessNode returns a StatusOption that sets the success handler node
 func WithOnSuccessNode(node *scheduler.Node) StatusOption {
 	return func(s *Status) {
 		if node != nil {
@@ -74,6 +83,7 @@ func WithOnSuccessNode(node *scheduler.Node) StatusOption {
 	}
 }
 
+// WithOnFailureNode returns a StatusOption that sets the failure handler node
 func WithOnFailureNode(node *scheduler.Node) StatusOption {
 	return func(s *Status) {
 		if node != nil {
@@ -82,6 +92,7 @@ func WithOnFailureNode(node *scheduler.Node) StatusOption {
 	}
 }
 
+// WithOnCancelNode returns a StatusOption that sets the cancel handler node
 func WithOnCancelNode(node *scheduler.Node) StatusOption {
 	return func(s *Status) {
 		if node != nil {
@@ -90,12 +101,14 @@ func WithOnCancelNode(node *scheduler.Node) StatusOption {
 	}
 }
 
+// WithLogFilePath returns a StatusOption that sets the log file path
 func WithLogFilePath(logFilePath string) StatusOption {
 	return func(s *Status) {
 		s.Log = logFilePath
 	}
 }
 
+// Create builds a Status object for a DAG execution with the specified parameters
 func (f *StatusFactory) Create(
 	requestID string,
 	status scheduler.Status,
@@ -117,6 +130,7 @@ func (f *StatusFactory) Create(
 	return statusObj
 }
 
+// StatusFromJSON deserializes a JSON string into a Status object
 func StatusFromJSON(s string) (*Status, error) {
 	status := new(Status)
 	err := json.Unmarshal([]byte(s), status)
@@ -126,6 +140,7 @@ func StatusFromJSON(s string) (*Status, error) {
 	return status, err
 }
 
+// Status represents the complete execution state of a DAG run
 type Status struct {
 	RootDAGName   string           `json:"RootDAGName,omitempty"`
 	RootRequestID string           `json:"RootRequestId,omitempty"`
@@ -146,6 +161,7 @@ type Status struct {
 	ParamsList    []string         `json:"ParamsList,omitempty"`
 }
 
+// SetStatusToErrorIfRunning changes the status to Error if it is currently Running
 func (st *Status) SetStatusToErrorIfRunning() {
 	if st.Status == scheduler.StatusRunning {
 		st.Status = scheduler.StatusError
@@ -153,8 +169,10 @@ func (st *Status) SetStatusToErrorIfRunning() {
 	}
 }
 
+// PID represents a process ID for a running DAG execution
 type PID int
 
+// String returns the string representation of the PID, or an empty string if 0
 func (p PID) String() string {
 	if p <= 0 {
 		return ""
@@ -162,6 +180,7 @@ func (p PID) String() string {
 	return fmt.Sprintf("%d", p)
 }
 
+// FormatTime formats a time.Time or returns empty string if it's the zero value
 func FormatTime(val time.Time) string {
 	if val.IsZero() {
 		return ""
@@ -169,6 +188,7 @@ func FormatTime(val time.Time) string {
 	return stringutil.FormatTime(val)
 }
 
+// nodeOrNil creates a Node from a Step or returns nil if the step is nil
 func nodeOrNil(s *digraph.Step) *Node {
 	if s == nil {
 		return nil
