@@ -79,10 +79,10 @@ func (d DAGTest) Writer(t *testing.T, requestID string, startedAt time.Time) Wri
 	t.Helper()
 
 	root := NewDataRoot(d.th.tmpDir, d.Name)
-	execution, err := root.CreateExecution(NewUTC(startedAt), requestID)
+	run, err := root.CreateRun(NewUTC(startedAt), requestID)
 	require.NoError(t, err)
 
-	record, err := execution.CreateRecord(d.th.Context, NewUTC(startedAt), d.th.DB.cache, WithDAG(d.DAG))
+	record, err := run.CreateRecord(d.th.Context, NewUTC(startedAt), d.th.DB.cache, WithDAG(d.DAG))
 	require.NoError(t, err)
 
 	writer := NewWriter(record.file)

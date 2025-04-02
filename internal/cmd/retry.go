@@ -16,7 +16,7 @@ func CmdRetry() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "retry [flags] /path/to/spec.yaml",
-			Short: "Retry a DAG execution",
+			Short: "Retry a DAG run",
 			Long: `Re-execute a previously run DAG using its unique request ID.
 
 Example:
@@ -47,25 +47,25 @@ func runRetry(ctx *Context, args []string) error {
 
 	historyRecord, err := ctx.historyStore().FindByRequestID(ctx, absolutePath, requestID)
 	if err != nil {
-		logger.Error(ctx, "Failed to retrieve historical execution", "requestID", requestID, "err", err)
-		return fmt.Errorf("failed to retrieve historical execution for request ID %s: %w", requestID, err)
+		logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
+		return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
 	}
 
 	loadOpts := []digraph.LoadOption{
 		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
 	}
 
-	execution, err := historyRecord.ReadExecution(ctx)
+	run, err := historyRecord.ReadRun(ctx)
 	if err != nil {
 		logger.Error(ctx, "Failed to read status", "err", err)
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 
-	if execution.Status.Params != "" {
+	if run.Status.Params != "" {
 		// backward compatibility
-		loadOpts = append(loadOpts, digraph.WithParams(execution.Status.Params))
+		loadOpts = append(loadOpts, digraph.WithParams(run.Status.Params))
 	} else {
-		loadOpts = append(loadOpts, digraph.WithParams(execution.Status.ParamsList))
+		loadOpts = append(loadOpts, digraph.WithParams(run.Status.ParamsList))
 	}
 
 	dag, err := digraph.Load(ctx, absolutePath, loadOpts...)
@@ -73,11 +73,11 @@ func runRetry(ctx *Context, args []string) error {
 		logger.Error(ctx, "Failed to load DAG specification", "path", specFilePath, "err", err)
 		// nolint : staticcheck
 		return fmt.Errorf("failed to load DAG specification from %s with params %s: %w",
-			specFilePath, execution.Status.Params, err)
+			specFilePath, run.Status.Params, err)
 	}
 
 	// Execute DAG retry
-	if err := executeRetry(ctx, dag, execution); err != nil {
+	if err := executeRetry(ctx, dag, run); err != nil {
 		logger.Error(ctx, "Failed to execute retry", "path", specFilePath, "err", err)
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
@@ -85,7 +85,7 @@ func runRetry(ctx *Context, args []string) error {
 	return nil
 }
 
-func executeRetry(ctx *Context, dag *digraph.DAG, originalStatus *persistence.Execution) error {
+func executeRetry(ctx *Context, dag *digraph.DAG, originalStatus *persistence.Run) error {
 	const logPrefix = "retry_"
 
 	reqID := originalStatus.Status.RequestID

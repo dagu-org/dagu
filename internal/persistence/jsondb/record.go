@@ -46,7 +46,7 @@ type Record struct {
 type RecordOption func(*Record)
 
 // WithDAG sets the DAG associated with the record.
-// This allows the record to store DAG metadata alongside the execution data.
+// This allows the record to store DAG metadata alongside the run data.
 func WithDAG(dag *digraph.DAG) RecordOption {
 	return func(r *Record) {
 		r.dag = dag
@@ -306,16 +306,16 @@ func (r *Record) ReadStatus(ctx context.Context) (*persistence.Status, error) {
 		// Continue with operation
 	}
 
-	execution, err := r.ReadExecution(ctx)
+	run, err := r.ReadRun(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &execution.Status, nil
+	return &run.Status, nil
 }
 
-// ReadExecution returns the full status file information, including the file path.
+// ReadRun returns the full status file information, including the file path.
 // The context can be used to cancel the operation.
-func (r *Record) ReadExecution(ctx context.Context) (*persistence.Execution, error) {
+func (r *Record) ReadRun(ctx context.Context) (*persistence.Run, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -333,7 +333,7 @@ func (r *Record) ReadExecution(ctx context.Context) (*persistence.Execution, err
 		})
 
 		if cacheErr == nil {
-			return persistence.NewExecution(r.file, *status), nil
+			return persistence.NewRun(r.file, *status), nil
 		}
 	}
 
@@ -346,7 +346,7 @@ func (r *Record) ReadExecution(ctx context.Context) (*persistence.Execution, err
 		return nil, fmt.Errorf("failed to parse status file: %w", parseErr)
 	}
 
-	return persistence.NewExecution(r.file, *parsed), nil
+	return persistence.NewRun(r.file, *parsed), nil
 }
 
 // parseLocked reads the status file and returns the last valid status.

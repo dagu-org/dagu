@@ -1,4 +1,3 @@
-// Package jsondb provides a JSON-based database implementation for storing DAG execution history.
 package jsondb
 
 import (

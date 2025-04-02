@@ -1,6 +1,3 @@
-// Package jsondb provides a JSON-based persistence implementation for DAG execution history.
-// It manages the storage and retrieval of execution status data in a hierarchical directory
-// structure organized by date, with high-performance read/write operations and optional caching.
 package jsondb
 
 import (
@@ -117,7 +114,7 @@ func (db *JSONDB) Update(ctx context.Context, dagName, reqID string, status pers
 	return nil
 }
 
-// NewRecord creates a new history record for the specified DAG execution.
+// NewRecord creates a new history record for the specified DAG run.
 func (db *JSONDB) NewRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string) (persistence.Record, error) {
 	if reqID == "" {
 		return nil, ErrRequestIDEmpty
@@ -126,38 +123,36 @@ func (db *JSONDB) NewRecord(ctx context.Context, dag *digraph.DAG, timestamp tim
 	ts := NewUTC(timestamp)
 
 	dataRoot := NewDataRoot(db.baseDir, dag.Name)
-	exec, err := dataRoot.CreateExecution(ts, reqID)
+	run, err := dataRoot.CreateRun(ts, reqID)
 	if err != nil {
-		logger.Error(ctx, "Failed to create execution", "err", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to create run: %w", err)
 	}
 
-	record, err := exec.CreateRecord(ctx, ts, db.cache, WithDAG(dag))
+	record, err := run.CreateRecord(ctx, ts, db.cache, WithDAG(dag))
 	if err != nil {
-		logger.Error(ctx, "Failed to create record", "err", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to create record: %w", err)
 	}
 
 	return record, nil
 }
 
-// NewSubRecord creates a new history record for the specified sub-DAG execution.
+// NewSubRecord creates a new history record for the specified sub-workflow run.
 func (db *JSONDB) NewSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, rootDAG digraph.RootDAG) (persistence.Record, error) {
 	if reqID == "" {
 		return nil, ErrRequestIDEmpty
 	}
 	root := NewDataRoot(db.baseDir, rootDAG.Name)
-	rootExec, err := root.FindByRequestID(ctx, rootDAG.RequestID)
+	rootRun, err := root.FindByRequestID(ctx, rootDAG.RequestID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find root execution: %w", err)
+		return nil, fmt.Errorf("failed to find root run: %w", err)
 	}
 
-	exec, err := rootExec.CreateSubExecution(ctx, NewUTC(timestamp), reqID)
+	run, err := rootRun.CreateSubRun(ctx, NewUTC(timestamp), reqID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create sub execution: %w", err)
+		return nil, fmt.Errorf("failed to create sub run: %w", err)
 	}
 
-	record, err := exec.CreateRecord(ctx, NewUTC(timestamp), db.cache, WithDAG(dag))
+	record, err := run.CreateRecord(ctx, NewUTC(timestamp), db.cache, WithDAG(dag))
 	if err != nil {
 		logger.Error(ctx, "Failed to create record", "err", err)
 		return nil, err
@@ -217,21 +212,20 @@ func (db *JSONDB) Latest(ctx context.Context, dagName string) (persistence.Recor
 		startOfDayInUTC := NewUTC(startOfDay)
 
 		// Get the latest file for today
-		exec, err := root.LatestAfter(ctx, startOfDayInUTC)
+		run, err := root.LatestAfter(ctx, startOfDayInUTC)
 		if err != nil {
-			logger.Error(ctx, "Failed to get latest after", "err", err)
-			return nil, err
+			return nil, fmt.Errorf("failed to get latest after: %w", err)
 		}
 
-		return exec.LatestRecord(ctx, db.cache)
+		return run.LatestRecord(ctx, db.cache)
 	}
 
 	// Get the latest file
-	latestExec := root.Latest(ctx, 1)
-	if len(latestExec) == 0 {
+	latestRun := root.Latest(ctx, 1)
+	if len(latestRun) == 0 {
 		return nil, persistence.ErrNoStatusData
 	}
-	return latestExec[0].LatestRecord(ctx, db.cache)
+	return latestRun[0].LatestRecord(ctx, db.cache)
 }
 
 // FindByRequestID finds a history record by request ID.
@@ -249,13 +243,13 @@ func (db *JSONDB) FindByRequestID(ctx context.Context, dagName, reqID string) (p
 	}
 
 	root := NewDataRoot(db.baseDir, dagName)
-	exec, err := root.FindByRequestID(ctx, reqID)
+	run, err := root.FindByRequestID(ctx, reqID)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return exec.LatestRecord(ctx, db.cache)
+	return run.LatestRecord(ctx, db.cache)
 }
 
 // FindBySubRequestID finds a history record by request ID for a sub-DAG.
@@ -273,16 +267,16 @@ func (db *JSONDB) FindBySubRequestID(ctx context.Context, reqID string, rootDAG 
 	}
 
 	root := NewDataRoot(db.baseDir, rootDAG.Name)
-	exec, err := root.FindByRequestID(ctx, rootDAG.RequestID)
+	run, err := root.FindByRequestID(ctx, rootDAG.RequestID)
 	if err != nil {
 		return nil, err
 	}
 
-	subExec, err := exec.GetSubExecution(ctx, reqID)
+	subRun, err := run.GetSubRun(ctx, reqID)
 	if err != nil {
 		return nil, err
 	}
-	return subExec.LatestRecord(ctx, db.cache)
+	return subRun.LatestRecord(ctx, db.cache)
 }
 
 // RemoveOld removes history records older than retentionDays for the specified key.
