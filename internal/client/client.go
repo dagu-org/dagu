@@ -196,7 +196,7 @@ func (e *client) GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, req
 	}
 
 	// If the DAG is running, set the currentStatus to error if the request ID does not match
-	// Because the DAG execution must be stopped
+	// Because the DAG run must be stopped
 	// TODO: Handle different request IDs for the same DAG
 	currentStatus, _ := e.GetCurrentStatus(ctx, dag)
 	if currentStatus != nil && currentStatus.RequestID != requestID {

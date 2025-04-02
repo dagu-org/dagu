@@ -212,7 +212,7 @@ func (s *Context) historyStoreWithCache(cache *filecache.Cache[*persistence.Stat
 	)
 }
 
-// OpenLogFile creates and opens a log file for a given DAG execution.
+// OpenLogFile creates and opens a log file for a given DAG run.
 // It evaluates the log directory, validates settings, creates the log directory,
 // builds a filename using the current timestamp and request ID, and then opens the file.
 func (ctx *Context) OpenLogFile(

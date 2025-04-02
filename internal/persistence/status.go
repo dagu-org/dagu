@@ -108,7 +108,7 @@ func WithLogFilePath(logFilePath string) StatusOption {
 	}
 }
 
-// Create builds a Status object for a DAG execution with the specified parameters
+// Create builds a Status object for a DAG run with the specified parameters
 func (f *StatusFactory) Create(
 	requestID string,
 	status scheduler.Status,
@@ -169,7 +169,7 @@ func (st *Status) SetStatusToErrorIfRunning() {
 	}
 }
 
-// PID represents a process ID for a running DAG execution
+// PID represents a process ID for a running DAG run
 type PID int
 
 // String returns the string representation of the PID, or an empty string if 0

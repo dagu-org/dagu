@@ -14,7 +14,7 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// Node Execution status of an individual step within a DAG
+// Node Status of an individual step within a DAG run
 //
 // swagger:model Node
 type Node struct {
@@ -43,7 +43,7 @@ type Node struct {
 	// Required: true
 	StartedAt *string `json:"StartedAt"`
 
-	// Numeric status code for the step execution
+	// Numeric status code for the step
 	// Required: true
 	Status *int64 `json:"Status"`
 

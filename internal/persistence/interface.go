@@ -16,9 +16,9 @@ var (
 
 // HistoryStore manages execution history records for DAGs
 type HistoryStore interface {
-	// NewRecord creates a new history record for a DAG execution
+	// NewRecord creates a new history record for a DAG run
 	NewRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string) (Record, error)
-	// NewSubRecord creates a new history record for a sub-DAG execution
+	// NewSubRecord creates a new history record for a sub-DAG run
 	NewSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, rootDAG digraph.RootDAG) (Record, error)
 	// Update updates the status of an existing record identified by name and reqID
 	Update(ctx context.Context, name, reqID string, status Status) error
@@ -87,8 +87,8 @@ type DAGListPaginationArgs struct {
 // DagListPaginationResult contains the result of a paginated DAG listing operation
 type DagListPaginationResult struct {
 	DagList   []*digraph.DAG // The list of DAGs for the current page
-	Count     int           // Total count of DAGs matching the filter
-	ErrorList []string      // Any errors encountered during listing
+	Count     int            // Total count of DAGs matching the filter
+	ErrorList []string       // Any errors encountered during listing
 }
 
 // GrepResult represents the result of a pattern search within a DAG definition

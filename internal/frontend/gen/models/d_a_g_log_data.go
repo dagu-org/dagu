@@ -24,7 +24,7 @@ type DAGLogData struct {
 	// Required: true
 	GridData []*DAGLogGridItem `json:"GridData"`
 
-	// Log data from executions
+	// Log data
 	// Required: true
 	Logs []*DAGLogStatusFile `json:"Logs"`
 }

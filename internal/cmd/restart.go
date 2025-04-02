@@ -29,7 +29,7 @@ Flags:
 Example:
   dagu restart my_dag.yaml --request-id=abc123
 
-This command gracefully stops the active DAG execution before reinitiating it.
+This command gracefully stops the active DAG run before reinitiating it.
 `,
 			Args: cobra.ExactArgs(1),
 		}, restartFlags, runRestart,

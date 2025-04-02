@@ -34,7 +34,7 @@ func NewGetDAGDetails(ctx *middleware.Context, handler GetDAGDetailsHandler) *Ge
 
 # Get DAG details
 
-Returns details of a DAG, including files, logs, and execution status
+Returns details of a DAG, including files, logs, and status
 */
 type GetDAGDetails struct {
 	Context *middleware.Context
