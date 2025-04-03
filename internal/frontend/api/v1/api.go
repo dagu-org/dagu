@@ -9,6 +9,7 @@ import (
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/client"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/go-chi/chi/v5"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
@@ -24,10 +25,14 @@ func New(cli client.Client) *API {
 	return &API{client: cli}
 }
 
-func (a *API) ConfigureRoutes(r chi.Router) error {
+func (a *API) ConfigureRoutes(r chi.Router, url string) error {
 	swagger, err := api.GetSwagger()
 	if err != nil {
 		return fmt.Errorf("failed to get swagger: %w", err)
+	}
+
+	swagger.Servers = openapi3.Servers{
+		&openapi3.Server{URL: url},
 	}
 
 	// Create the oapi-codegen validator middleware
