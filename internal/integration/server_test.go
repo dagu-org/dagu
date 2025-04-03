@@ -48,7 +48,7 @@ basePath: "/dagu"
 	go func() {
 		th.RunCommand(t, cmd.CmdServer(), test.CmdTest{
 			Args:        []string{"server", "--config", configFile, "--port=" + port},
-			ExpectedOut: []string{"Serving"},
+			ExpectedOut: []string{"Server is starting"},
 		})
 	}()
 
