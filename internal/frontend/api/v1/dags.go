@@ -44,7 +44,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 		return nil, newInternalError(err)
 	}
 
-	hasErr := len(result.ErrorList) > 0
+	hasErr := len(result.Errors) > 0
 	for _, item := range result.Items {
 		if item.Error != nil {
 			hasErr = true
@@ -53,8 +53,8 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	}
 
 	resp := &api.ListDAGs200JSONResponse{
-		Errors:    ptr(result.ErrorList),
-		PageCount: result.PageCount,
+		Errors:    ptr(result.Errors),
+		PageCount: result.TotalPage,
 		HasError:  hasErr,
 	}
 

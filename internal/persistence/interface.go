@@ -56,10 +56,8 @@ type DAGStore interface {
 	Create(ctx context.Context, name string, spec []byte) (string, error)
 	// Delete removes a DAG definition by name
 	Delete(ctx context.Context, name string) error
-	// List returns all DAG definitions with any errors encountered during loading
-	List(ctx context.Context) (ret []*digraph.DAG, errs []string, err error)
-	// ListPagination returns a paginated list of DAG definitions with filtering options
-	ListPagination(ctx context.Context, params DAGListPaginationArgs) (*DagListPaginationResult, error)
+	// List returns a paginated list of DAG definitions with filtering options
+	List(ctx context.Context, params ListOptions) (*ListResult, error)
 	// GetMetadata retrieves only the metadata of a DAG definition (faster than full load)
 	GetMetadata(ctx context.Context, name string) (*digraph.DAG, error)
 	// GetDetails retrieves the complete DAG definition including all fields
@@ -76,19 +74,19 @@ type DAGStore interface {
 	TagList(ctx context.Context) ([]string, []string, error)
 }
 
-// DAGListPaginationArgs contains parameters for paginated DAG listing
-type DAGListPaginationArgs struct {
+// ListOptions contains parameters for paginated DAG listing
+type ListOptions struct {
 	Page  int    // Page number (1-based)
 	Limit int    // Maximum number of items per page
 	Name  string // Optional name filter
 	Tag   string // Optional tag filter
 }
 
-// DagListPaginationResult contains the result of a paginated DAG listing operation
-type DagListPaginationResult struct {
-	DAGs      []*digraph.DAG // The list of DAGs for the current page
-	Count     int            // Total count of DAGs matching the filter
-	ErrorList []string       // Any errors encountered during listing
+// ListResult contains the result of a paginated DAG listing operation
+type ListResult struct {
+	DAGs   []*digraph.DAG // The list of DAGs for the current page
+	Count  int            // Total count of DAGs matching the filter
+	Errors []string       // Any errors encountered during listing
 }
 
 // GrepResult represents the result of a pattern search within a DAG definition

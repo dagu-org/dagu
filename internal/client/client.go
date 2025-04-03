@@ -304,9 +304,9 @@ func (e *client) ListStatus(ctx context.Context, opts ...ListStatusOption) (
 		*options.Page = 1
 	}
 
-	result := &ListStatusResult{PageCount: 1}
+	result := &ListStatusResult{TotalPage: 1}
 
-	dagList, err := e.dagStore.ListPagination(ctx, persistence.DAGListPaginationArgs{
+	dagList, err := e.dagStore.List(ctx, persistence.ListOptions{
 		Page:  *options.Page,
 		Limit: *options.Limit,
 		Name:  fromPtr(options.Name),
@@ -319,14 +319,13 @@ func (e *client) ListStatus(ctx context.Context, opts ...ListStatusOption) (
 	for _, d := range dagList.DAGs {
 		status, err := e.readStatus(ctx, d)
 		if err != nil {
-			dagList.ErrorList = append(dagList.ErrorList, err.Error())
+			dagList.Errors = append(dagList.Errors, err.Error())
 		}
 		result.Items = append(result.Items, status)
 	}
 
-	pageCount := (dagList.Count-1) / *options.Limit + 1
-	result.PageCount = pageCount
-	result.ErrorList = dagList.ErrorList
+	result.TotalPage = (dagList.Count-1) / *options.Limit + 1
+	result.Errors = dagList.Errors
 
 	return result, nil
 }
