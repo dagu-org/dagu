@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path"
 	"runtime/debug"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -60,11 +62,18 @@ func (srv *Server) Serve(ctx context.Context) error {
 		AllowCredentials: true,
 	}))
 
-	r.Route("/api/v1", func(r chi.Router) {
+	basePath := path.Join(srv.config.Server.BasePath, "api/v1")
+	if !strings.HasPrefix(basePath, "/") {
+		basePath = "/" + basePath
+	}
+
+	r.Route(basePath, func(r chi.Router) {
 		if err := srv.api.ConfigureRoutes(r); err != nil {
 			logger.Error(ctx, "Failed to configure routes", "err", err)
 		}
 	})
+
+	logger.Info(ctx, "Configured routes", "basePath", basePath)
 
 	addr := net.JoinHostPort(srv.config.Server.Host, strconv.Itoa(srv.config.Server.Port))
 	srv.httpServer = &http.Server{

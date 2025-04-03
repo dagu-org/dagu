@@ -34,8 +34,8 @@ type Client interface {
 
 type ListStatusResult struct {
 	Items     []DAGStatus
-	PageCount int
-	ErrorList []string
+	TotalPage int
+	Errors    []string
 }
 
 type GetAllStatusOptions struct {

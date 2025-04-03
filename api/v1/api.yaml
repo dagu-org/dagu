@@ -11,7 +11,7 @@ info:
     url: "https://github.com/dagu-org/dagu/blob/main/LICENSE.md"
 
 servers:
-  - url: "{schema}://{host}:{port}/api/v1"
+  - url: "{schema}://{host}:{port}{basePath}api/v1"
     description: "Dagu API server"
     variables:
       schema:
@@ -23,6 +23,9 @@ servers:
       port:
         default: "8080"
         description: "Port number of the server"
+      basePath:
+        default: "/"
+        description: "Base path for the API"
 
 tags:
   - name: "dags"

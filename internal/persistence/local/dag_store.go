@@ -164,8 +164,8 @@ func (d *dagStoreImpl) ensureDirExist() error {
 	return nil
 }
 
-// ListPagination lists DAGs with pagination support.
-func (d *dagStoreImpl) ListPagination(ctx context.Context, params persistence.DAGListPaginationArgs) (*persistence.DagListPaginationResult, error) {
+// List lists DAGs with pagination support.
+func (d *dagStoreImpl) List(ctx context.Context, params persistence.ListOptions) (*persistence.ListResult, error) {
 	var (
 		dagList []*digraph.DAG
 		errList []string
@@ -214,44 +214,18 @@ func (d *dagStoreImpl) ListPagination(ctx context.Context, params persistence.DA
 
 		return nil
 	}); err != nil {
-		return &persistence.DagListPaginationResult{
-			DAGs:      dagList,
-			Count:     count,
-			ErrorList: append(errList, err.Error()),
+		return &persistence.ListResult{
+			DAGs:   dagList,
+			Count:  count,
+			Errors: append(errList, err.Error()),
 		}, err
 	}
 
-	return &persistence.DagListPaginationResult{
-		DAGs:      dagList,
-		Count:     count,
-		ErrorList: errList,
+	return &persistence.ListResult{
+		DAGs:   dagList,
+		Count:  count,
+		Errors: errList,
 	}, nil
-}
-
-// List lists all DAGs.
-func (d *dagStoreImpl) List(ctx context.Context) (ret []*digraph.DAG, errs []string, err error) {
-	if err = d.ensureDirExist(); err != nil {
-		errs = append(errs, err.Error())
-		return
-	}
-	entries, err := os.ReadDir(d.baseDir)
-	if err != nil {
-		errs = append(errs, err.Error())
-		return
-	}
-	for _, entry := range entries {
-		if fileutil.IsYAMLFile(entry.Name()) {
-			dat, err := d.GetMetadata(ctx, entry.Name())
-			if err == nil {
-				ret = append(ret, dat)
-			} else {
-				errs = append(errs, fmt.Sprintf(
-					"reading %s failed: %s", entry.Name(), err),
-				)
-			}
-		}
-	}
-	return ret, errs, nil
 }
 
 // Grep searches for a pattern in all DAGs.
