@@ -15,7 +15,6 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/frontend"
-	"github.com/dagu-org/dagu/internal/frontend/server"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
@@ -149,7 +148,7 @@ func (s *Context) Client(opts ...clientOption) (client.Client, error) {
 
 // server creates and returns a new web UI server.
 // It initializes in-memory caches for DAGs and history, and uses them in the client.
-func (ctx *Context) server() (*server.Server, error) {
+func (ctx *Context) server() (*frontend.Server, error) {
 	dagCache := filecache.New[*digraph.DAG](0, time.Hour*12)
 	dagCache.StartEviction(ctx)
 	dagStore := ctx.dagStoreWithCache(dagCache)

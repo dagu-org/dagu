@@ -3,11 +3,12 @@ package frontend
 import (
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/frontend/api/v1"
 	"github.com/dagu-org/dagu/internal/frontend/handlers"
 	"github.com/dagu-org/dagu/internal/frontend/server"
 )
 
-func New(cfg *config.Config, cli client.Client) *server.Server {
+func New(cfg *config.Config, cli client.Client) *Server {
 	var apiHandlers []server.Handler
 
 	dagAPIHandler := handlers.NewDAG(cli, cfg.UI.LogEncodingCharset, cfg.Server.RemoteNodes, cfg.Server.APIBasePath)
@@ -50,5 +51,5 @@ func New(cfg *config.Config, cli client.Client) *server.Server {
 		}
 	}
 
-	return server.New(serverParams)
+	return NewServer(api.New(), cfg)
 }
