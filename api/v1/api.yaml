@@ -92,18 +92,6 @@ paths:
           schema:
             type: "string"
           description: "Filter DAGs by tag"
-        - name: "searchName"
-          in: "query"
-          required: false
-          schema:
-            type: "string"
-          description: "Deprecated: Filter DAGs by matching name"
-        - name: "searchTag"
-          in: "query"
-          required: false
-          schema:
-            type: "string"
-          description: "Deprecated: Filter DAGs by matching tag"
       responses:
         "200":
           description: "A successful response"
