@@ -86,7 +86,7 @@ type DAGListPaginationArgs struct {
 
 // DagListPaginationResult contains the result of a paginated DAG listing operation
 type DagListPaginationResult struct {
-	DagList   []*digraph.DAG // The list of DAGs for the current page
+	DAGs      []*digraph.DAG // The list of DAGs for the current page
 	Count     int            // Total count of DAGs matching the filter
 	ErrorList []string       // Any errors encountered during listing
 }

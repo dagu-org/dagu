@@ -51,5 +51,5 @@ func New(cfg *config.Config, cli client.Client) *Server {
 		}
 	}
 
-	return NewServer(api.New(), cfg)
+	return NewServer(api.New(cli), cfg)
 }

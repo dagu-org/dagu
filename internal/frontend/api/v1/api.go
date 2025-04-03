@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 
 	"github.com/dagu-org/dagu/api/v1"
+	"github.com/dagu-org/dagu/internal/client"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/go-chi/chi/v5"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
@@ -15,10 +17,11 @@ import (
 var _ api.StrictServerInterface = (*API)(nil)
 
 type API struct {
+	client client.Client
 }
 
-func New() *API {
-	return &API{}
+func New(cli client.Client) *API {
+	return &API{client: cli}
 }
 
 func (a *API) ConfigureRoutes(r chi.Router) error {
@@ -41,7 +44,7 @@ func (a *API) ConfigureRoutes(r chi.Router) error {
 	r.Use(validator)
 
 	options := api.StrictHTTPServerOptions{
-		ResponseErrorHandlerFunc: a.errorHandler,
+		ResponseErrorHandlerFunc: a.handleError,
 	}
 
 	r.Group(func(r chi.Router) {
@@ -52,7 +55,7 @@ func (a *API) ConfigureRoutes(r chi.Router) error {
 	return nil
 }
 
-func (a *API) errorHandler(w http.ResponseWriter, r *http.Request, err error) {
+func (a *API) handleError(w http.ResponseWriter, _ *http.Request, err error) {
 	var apiErr *APIError
 	switch err := err.(type) {
 	case *APIError:
@@ -80,41 +83,18 @@ func (a *API) errorHandler(w http.ResponseWriter, r *http.Request, err error) {
 	_ = json.NewEncoder(w).Encode(response)
 }
 
-// CreateDAG implements api.StrictServerInterface.
-func (a *API) CreateDAG(ctx context.Context, request api.CreateDAGRequestObject) (api.CreateDAGResponseObject, error) {
-	panic("unimplemented")
-}
+func ptr[T any](v T) *T {
+	if reflect.ValueOf(v).IsZero() {
+		return nil
+	}
 
-// DeleteDAG implements api.StrictServerInterface.
-func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject) (api.DeleteDAGResponseObject, error) {
-	panic("unimplemented")
-}
-
-// GetDAGDetails implements api.StrictServerInterface.
-func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsRequestObject) (api.GetDAGDetailsResponseObject, error) {
-	panic("unimplemented")
-}
-
-// ListDAGs implements api.StrictServerInterface.
-func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (api.ListDAGsResponseObject, error) {
-	panic("unimplemented")
-}
-
-// ListTags implements api.StrictServerInterface.
-func (a *API) ListTags(ctx context.Context, request api.ListTagsRequestObject) (api.ListTagsResponseObject, error) {
-	panic("unimplemented")
-}
-
-// PostDAGAction implements api.StrictServerInterface.
-func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionRequestObject) (api.PostDAGActionResponseObject, error) {
-	panic("unimplemented")
-}
-
-// SearchDAGs implements api.StrictServerInterface.
-func (a *API) SearchDAGs(ctx context.Context, request api.SearchDAGsRequestObject) (api.SearchDAGsResponseObject, error) {
-	panic("unimplemented")
-}
-
-func toPtr[T any](v T) *T {
 	return &v
+}
+
+func value[T any](ptr *T) T {
+	if ptr == nil {
+		var zero T
+		return zero
+	}
+	return *ptr
 }
