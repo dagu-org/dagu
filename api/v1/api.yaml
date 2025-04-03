@@ -338,12 +338,6 @@ components:
         code:
           type: string
           description: "Error code indicating the type of error"
-          enum:
-            - "validation_error"
-            - "not_found"
-            - "internal_error"
-            - "unauthorized"
-            - "bad_gateway"
         message:
           type: string
           description: "Short error message"
