@@ -12,7 +12,7 @@ info:
 
 servers:
   - url: "{schema}://{host}:{port}/api/v1"
-    description: "Local server"
+    description: "Dagu API server"
     variables:
       schema:
         default: http

@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/dagu-org/dagu/api/v1"
-	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/go-chi/chi/v5"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
@@ -27,9 +26,6 @@ func (a *API) ConfigureRoutes(r chi.Router) error {
 	if err != nil {
 		return fmt.Errorf("failed to get swagger: %w", err)
 	}
-	// Override the server settings in the swagger spec. For more details, see:
-	// https://github.com/oapi-codegen/oapi-codegen/issues/1123
-	swagger.Servers = openapi3.Servers{&openapi3.Server{URL: "/api/v1"}}
 
 	// Create the oapi-codegen validator middleware
 	validator := oapimiddleware.OapiRequestValidatorWithOptions(
