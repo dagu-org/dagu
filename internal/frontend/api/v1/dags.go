@@ -38,12 +38,6 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	if request.Params.Tag != nil {
 		opts = append(opts, client.WithTag(*request.Params.Tag))
 	}
-	if request.Params.SearchName != nil {
-		opts = append(opts, client.WithName(*request.Params.SearchName))
-	}
-	if request.Params.SearchTag != nil {
-		opts = append(opts, client.WithTag(*request.Params.SearchTag))
-	}
 
 	dgs, result, err := a.client.GetAllStatus(ctx, opts...)
 	if err != nil {
