@@ -1,0 +1,1092 @@
+openapi: "3.0.0"
+info:
+  version: "0.0.1"
+  title: "Dagu"
+  contact:
+    name: "Yota Hamada"
+    url: "https://github.com/yottahmd"
+  description: API for controlling and monitoring Dagu server.
+  license:
+    name: "GPL-3.0"
+    url: "https://github.com/dagu-org/dagu/blob/main/LICENSE.md"
+
+servers:
+  - url: "{schema}://{host}:{port}/api/v1"
+    description: "Local server"
+    variables:
+      schema:
+        default: http
+        enum: [http, https]
+      host:
+        default: localhost
+        description: "Host name of the server"
+      port:
+        default: "8080"
+        description: "Port number of the server"
+
+tags:
+  - name: "legacy"
+    description: "Operations for managing and executing DAGs (Directed Acyclic Graphs)"
+  - name: "system"
+    description: "System operations for monitoring and managing the Dagu server"
+
+paths:
+  /health:
+    get:
+      summary: "Health check endpoint"
+      description: "Returns the health status of the server and its dependencies"
+      operationId: "getHealth"
+      tags:
+        - "system"
+      responses:
+        "200":
+          description: "Server is healthy"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: "Server is unhealthy"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags:
+    get:
+      summary: "List all DAGs"
+      description: "Returns a list of DAGs with optional pagination and search filters"
+      operationId: "listDAGs"
+      tags:
+        - "legacy"
+      parameters:
+        - name: "page"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            default: 1
+          description: "Page number (for pagination)"
+        - name: "limit"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            default: 20
+          description: "Number of items to return per page"
+        - name: "searchName"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter DAGs by matching name"
+        - name: "searchTag"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter DAGs by matching tag"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListDAGsResponse"
+        "400":
+          description: "Invalid parameters provided"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: "Create a new DAG"
+      description: "Creates a new DAG definition"
+      operationId: "createDAG"
+      tags:
+        - "legacy"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDAGRequest"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateDAGResponse"
+        "400":
+          description: "Invalid request body"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{dagId}:
+    get:
+      summary: "Get DAG details"
+      description: "Returns details of a DAG, including files, logs, and status"
+      operationId: "getDAGDetails"
+      tags:
+        - "legacy"
+      parameters:
+        - name: "dagId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "The ID of the DAG"
+        - name: "tab"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Tab name for UI navigation"
+        - name: "file"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Specific file related to the DAG"
+        - name: "step"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Step name within the DAG"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetDAGDetailsResponse"
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: "Perform an action on a DAG"
+      description: "Performs a specified action (e.g., start, stop) on the given DAG"
+      operationId: "postDAGAction"
+      tags:
+        - "legacy"
+      parameters:
+        - name: "dagId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "The ID of the DAG"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostDAGActionRequest"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostDAGActionResponse"
+        "400":
+          description: "Invalid action requested"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Delete a DAG"
+      description: "Deletes a DAG by its ID"
+      operationId: "deleteDAG"
+      tags:
+        - "legacy"
+      parameters:
+        - name: "dagId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "The ID of the DAG"
+      responses:
+        "200":
+          description: "DAG successfully deleted"
+          content:
+            application/json:
+              schema:
+                type: "object"
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /search:
+    get:
+      summary: "Search DAGs"
+      description: "Searches for DAGs based on a query string"
+      operationId: "searchDAGs"
+      tags:
+        - "legacy"
+      parameters:
+        - name: "q"
+          in: "query"
+          required: true
+          schema:
+            type: "string"
+          description: "A search query string"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchDAGsResponse"
+        "400":
+          description: "Invalid search query"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /tags:
+    get:
+      summary: "List all tags"
+      description: "Returns a list of all tags used across DAGs"
+      operationId: "listTags"
+      tags:
+        - "legacy"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListTagResponse"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  schemas:
+    Error:
+      type: object
+      description: "Generic error response object"
+      properties:
+        code:
+          type: string
+          description: "Error code indicating the type of error"
+          enum:
+            - "validation_error"
+            - "not_found"
+            - "internal_error"
+            - "unauthorized"
+            - "bad_gateway"
+        message:
+          type: string
+          description: "Short error message"
+        details:
+          type: object
+          description: "Additional error details"
+      required:
+        - code
+        - message
+
+    HealthResponse:
+      type: object
+      description: "Response object for the health check endpoint"
+      properties:
+        status:
+          type: string
+          enum: ["healthy", "unhealthy"]
+          description: "Overall health status of the server"
+        version:
+          type: string
+          description: "Current version of the server"
+        uptime:
+          type: integer
+          description: "Server uptime in seconds"
+        timestamp:
+          type: string
+          description: "Current server time"
+      required:
+        - status
+        - version
+        - uptime
+        - timestamp
+
+    CreateDAGRequest:
+      type: object
+      description: "Request body for creating a DAG"
+      properties:
+        action:
+          type: string
+          description: "Action to perform upon creation (if any)"
+        value:
+          type: string
+          description: "Associated value for the action"
+      required:
+        - action
+        - value
+
+    PostDAGActionRequest:
+      type: object
+      description: "Request body for posting an action to a DAG"
+      properties:
+        action:
+          type: string
+          enum:
+            - start
+            - suspend
+            - stop
+            - retry
+            - mark-success
+            - mark-failed
+            - save
+            - rename
+          description: "Action to be performed on the DAG"
+        value:
+          type: string
+          description: "Optional extra value for the action"
+        requestId:
+          type: string
+          description: "Unique request ID for the action"
+        step:
+          type: string
+          description: "Step name if the action targets a specific step"
+        params:
+          type: string
+          description: "Additional parameters for the action in JSON format"
+      required:
+        - action
+
+    ListDAGsResponse:
+      type: object
+      description: "Response object for listing all DAGs"
+      properties:
+        DAGs:
+          type: array
+          description: "List of DAGs with their status and metadata"
+          items:
+            $ref: "#/components/schemas/DAGStatusFile"
+        Errors:
+          type: array
+          description: "List of errors encountered during the request"
+          items:
+            type: string
+        HasError:
+          type: boolean
+          description: "Whether any errors were encountered"
+        PageCount:
+          type: integer
+          description: "Total number of pages available"
+      required:
+        - DAGs
+        - Errors
+        - HasError
+        - PageCount
+
+    CreateDAGResponse:
+      type: object
+      description: "Response object for creating a DAG"
+      properties:
+        DagID:
+          type: string
+          description: "ID of the newly created DAG"
+      required:
+        - DagID
+
+    GetDAGDetailsResponse:
+      type: object
+      description: "Response object for getting details of a DAG"
+      properties:
+        Title:
+          type: string
+          description: "Title of the Page"
+        DAG:
+          $ref: "#/components/schemas/DAGStatusFileDetails"
+        Tab:
+          type: string
+          description: "Tab name for UI navigation"
+        Graph:
+          type: string
+          description: "Graph data for visualization"
+        Definition:
+          type: string
+          description: "DAG definition"
+        LogData:
+          $ref: "#/components/schemas/DAGLogData"
+        LogUrl:
+          type: string
+          description: "URL to access logs directly"
+        StepLog:
+          $ref: "#/components/schemas/StepLog"
+        ScLog:
+          $ref: "#/components/schemas/SchedulerLog"
+        Errors:
+          type: array
+          description: "List of errors encountered during the request"
+          items:
+            type: string
+      required:
+        - Title
+        - DAG
+        - Tab
+        - Graph
+        - Definition
+        - LogData
+        - LogUrl
+        - StepLog
+        - ScLog
+        - Errors
+
+    PostDAGActionResponse:
+      type: object
+      description: "Response object for posting an action to a DAG"
+      properties:
+        NewDagID:
+          type: string
+          description: "New DAG ID, if the action resulted in a new DAG"
+
+    DAGStatusFile:
+      type: object
+      description: "DAG file with its status information"
+      properties:
+        File:
+          type: string
+          description: "Path to the DAG file"
+        Dir:
+          type: string
+          description: "Directory containing the DAG file"
+        DAG:
+          $ref: "#/components/schemas/DAG"
+        Status:
+          $ref: "#/components/schemas/DAGStatus"
+        Suspended:
+          type: boolean
+          description: "Whether the DAG is suspended"
+        Error:
+          type: string
+          description: "Error message if any"
+      required:
+        - File
+        - Dir
+        - DAG
+        - Status
+        - Suspended
+        - Error
+
+    DAG:
+      type: object
+      description: "Core DAG configuration containing workflow definition and metadata"
+      properties:
+        Group:
+          type: string
+          description: "Logical grouping of related DAGs for organizational purposes"
+        Name:
+          type: string
+          description: "Unique identifier for the DAG within its group"
+        Schedule:
+          type: array
+          description: "List of scheduling expressions defining when the DAG should run"
+          items:
+            $ref: "#/components/schemas/Schedule"
+        Description:
+          type: string
+          description: "Human-readable description of the DAG's purpose and behavior"
+        Params:
+          type: array
+          description: "List of parameter names that can be passed to the DAG at runtime"
+          items:
+            type: string
+        DefaultParams:
+          type: string
+          description: "Default parameter values in JSON format if not specified at runtime"
+        Tags:
+          type: array
+          description: "List of tags for categorizing and filtering DAGs"
+          items:
+            type: string
+      required:
+        - Group
+        - Name
+        - Schedule
+        - Description
+        - Params
+        - DefaultParams
+        - Tags
+
+    Schedule:
+      type: object
+      description: "Schedule configuration for DAG run"
+      properties:
+        Expression:
+          type: string
+          description: "Cron expression or schedule pattern"
+      required:
+        - Expression
+
+    DAGStatus:
+      type: object
+      description: "Current status of a DAG run"
+      properties:
+        RequestId:
+          type: string
+          description: "Unique identifier for the DAG run request"
+        Name:
+          type: string
+          description: "Name of the DAG being executed"
+        Status:
+          type: integer
+          description: "Numeric status code indicating current run state"
+        StatusText:
+          type: string
+          description: "Human-readable status description"
+        Pid:
+          type: integer
+          description: "Process ID of the DAG run"
+        StartedAt:
+          type: string
+          description: "RFC 3339 timestamp when the DAG run started"
+        FinishedAt:
+          type: string
+          description: "RFC 3339 timestamp when the DAG run finished"
+        Log:
+          type: string
+          description: "Path to the log file"
+        Params:
+          type: string
+          description: "Runtime parameters passed to the DAG in JSON format"
+      required:
+        - RequestId
+        - Name
+        - Status
+        - StatusText
+        - Pid
+        - StartedAt
+        - FinishedAt
+        - Log
+        - Params
+
+    DAGStatusFileDetails:
+      type: object
+      description: "Detailed status information for a DAG instance"
+      properties:
+        File:
+          type: string
+          description: "Path to the DAG file"
+        Dir:
+          type: string
+          description: "Directory containing the DAG file"
+        DAG:
+          $ref: "#/components/schemas/DAGDetails"
+        Status:
+          $ref: "#/components/schemas/DAGStatusDetails"
+        Suspended:
+          type: boolean
+          description: "Whether the DAG is suspended"
+        Error:
+          type: string
+          description: "Error message if any"
+      required:
+        - File
+        - Dir
+        - DAG
+        - Status
+        - Suspended
+        - Error
+
+    DAGDetails:
+      type: object
+      description: "Detailed DAG configuration information"
+      properties:
+        Location:
+          type: string
+          description: "Path to the DAG file"
+        Group:
+          type: string
+          description: "Logical grouping of related DAGs for organizational purposes"
+        Name:
+          type: string
+          description: "Unique identifier for the DAG within its group"
+        Schedule:
+          type: array
+          description: "List of scheduling expressions defining when the DAG should run"
+          items:
+            $ref: "#/components/schemas/Schedule"
+        Description:
+          type: string
+          description: "Human-readable description of the DAG's purpose and behavior"
+        Env:
+          type: array
+          description: "List of environment variables to set before executing"
+          items:
+            type: string
+        LogDir:
+          type: string
+          description: "Directory path for storing log files"
+        HandlerOn:
+          $ref: "#/components/schemas/HandlerOn"
+        Steps:
+          type: array
+          description: "List of steps to execute in the DAG"
+          items:
+            $ref: "#/components/schemas/Step"
+        Delay:
+          type: integer
+          description: "Time in seconds to wait before starting the DAG"
+        HistRetentionDays:
+          type: integer
+          description: "Number of days to retain historical logs"
+        Preconditions:
+          type: array
+          description: "Conditions that must be met before the DAG can start"
+          items:
+            $ref: "#/components/schemas/Precondition"
+        MaxActiveRuns:
+          type: integer
+          description: "Maximum number of concurrent steps to run"
+        Params:
+          type: array
+          description: "List of parameter names that can be passed to the DAG at runtime"
+          items:
+            type: string
+        DefaultParams:
+          type: string
+          description: "Default parameter values in JSON format if not specified at runtime"
+        Tags:
+          type: array
+          description: "List of tags for categorizing and filtering DAGs"
+          items:
+            type: string
+      required:
+        - Location
+        - Group
+        - Name
+        - Schedule
+        - Description
+        - Env
+        - LogDir
+        - HandlerOn
+        - Steps
+        - Delay
+        - HistRetentionDays
+        - Preconditions
+        - MaxActiveRuns
+        - Params
+        - DefaultParams
+        - Tags
+
+    HandlerOn:
+      type: object
+      description: "Configuration for event handlers in a DAG"
+      properties:
+        Failure:
+          $ref: "#/components/schemas/Step"
+        Success:
+          $ref: "#/components/schemas/Step"
+        Cancel:
+          $ref: "#/components/schemas/Step"
+        Exit:
+          $ref: "#/components/schemas/Step"
+
+    DAGStatusDetails:
+      type: object
+      description: "Detailed status of a DAG run including child nodes"
+      properties:
+        RequestId:
+          type: string
+          description: "Unique identifier for the run request"
+        Name:
+          type: string
+          description: "Name of the DAG"
+        Status:
+          type: integer
+          description: "Numeric status code"
+        StatusText:
+          type: string
+          description: "Human-readable status description"
+        Pid:
+          type: integer
+          description: "Process ID of the DAG run"
+        Nodes:
+          type: array
+          description: "Status of individual steps within the DAG"
+          items:
+            $ref: "#/components/schemas/Node"
+        OnExit:
+          $ref: "#/components/schemas/Node"
+        OnSuccess:
+          $ref: "#/components/schemas/Node"
+        OnFailure:
+          $ref: "#/components/schemas/Node"
+        OnCancel:
+          $ref: "#/components/schemas/Node"
+        StartedAt:
+          type: string
+          description: "RFC3339 timestamp when the DAG run started"
+        FinishedAt:
+          type: string
+          description: "RFC3339 timestamp when the DAG run finished"
+        Log:
+          type: string
+          description: "Path to the log file"
+        Params:
+          type: string
+          description: "Parameters in JSON format"
+      required:
+        - RequestId
+        - Name
+        - Status
+        - StatusText
+        - Pid
+        - Nodes
+        - OnExit
+        - OnSuccess
+        - OnFailure
+        - OnCancel
+        - StartedAt
+        - FinishedAt
+        - Log
+        - Params
+
+    Node:
+      type: object
+      description: "Status of an individual step within a DAG run"
+      properties:
+        Step:
+          $ref: "#/components/schemas/Step"
+        Log:
+          type: string
+          description: "Path to step-specific log file"
+        StartedAt:
+          type: string
+          description: "RFC3339 timestamp when the step started"
+        FinishedAt:
+          type: string
+          description: "RFC3339 timestamp when the step finished"
+        Status:
+          type: integer
+          description: "Numeric status code for the step"
+        RetryCount:
+          type: integer
+          description: "Number of retry attempts made for this step"
+        DoneCount:
+          type: integer
+          description: "Number of successful completions for repeating steps"
+        Error:
+          type: string
+          description: "Error message if the step failed"
+        StatusText:
+          type: string
+          description: "Human-readable status description"
+      required:
+        - Step
+        - Log
+        - StartedAt
+        - FinishedAt
+        - Status
+        - RetryCount
+        - DoneCount
+        - Error
+        - StatusText
+
+    Step:
+      type: object
+      description: "Individual task within a DAG that performs a specific operation"
+      properties:
+        Name:
+          type: string
+          description: "Unique identifier for the step within the DAG"
+        Description:
+          type: string
+          description: "Human-readable description of what the step does"
+        Dir:
+          type: string
+          description: "Working directory for executing the step's command"
+        CmdWithArgs:
+          type: string
+          description: "Complete command string including arguments to execute"
+        Command:
+          type: string
+          description: "Base command to execute without arguments"
+        Script:
+          type: string
+          description: "Script content if the step executes a script file"
+        Stdout:
+          type: string
+          description: "File path for capturing standard output"
+        Stderr:
+          type: string
+          description: "File path for capturing standard error"
+        Output:
+          type: string
+          description: "Variable name to store the step's output"
+        Args:
+          type: array
+          description: "List of arguments to pass to the command"
+          items:
+            type: string
+        Run:
+          type: string
+          description: "Sub DAG to run"
+        Params:
+          type: string
+          description: "Parameters to pass to the sub DAG in JSON format"
+        Depends:
+          type: array
+          description: "List of step names that must complete before this step can start"
+          items:
+            type: string
+        RepeatPolicy:
+          $ref: "#/components/schemas/RepeatPolicy"
+        MailOnError:
+          type: boolean
+          description: "Whether to send email notifications on step failure"
+        Preconditions:
+          type: array
+          description: "Conditions that must be met before the step can start"
+          items:
+            $ref: "#/components/schemas/Precondition"
+      required:
+        - Name
+        - Description
+        - Dir
+        - CmdWithArgs
+        - Command
+        - Script
+        - Stdout
+        - Stderr
+        - Output
+        - Args
+        - Depends
+        - RepeatPolicy
+        - MailOnError
+        - Preconditions
+
+    SearchDAGsResponse:
+      type: object
+      description: "Response object for searching DAGs"
+      properties:
+        Results:
+          type: array
+          description: "Search results matching the query"
+          items:
+            $ref: "#/components/schemas/SearchDAGsResultItem"
+        Errors:
+          type: array
+          description: "Errors encountered during the search"
+          items:
+            type: string
+      required:
+        - Results
+        - Errors
+
+    SearchDAGsResultItem:
+      type: object
+      description: "Individual search result item for a DAG"
+      properties:
+        Name:
+          type: string
+          description: "Name of the matching DAG"
+        DAG:
+          $ref: "#/components/schemas/DAG"
+        Matches:
+          type: array
+          description: "Details of where matches were found"
+          items:
+            $ref: "#/components/schemas/SearchDAGsMatchItem"
+
+    SearchDAGsMatchItem:
+      type: object
+      description: "Details of a search match within a DAG"
+      properties:
+        Line:
+          type: string
+          description: "Matching line content"
+        LineNumber:
+          type: integer
+          description: "Line number where match was found"
+        StartLine:
+          type: integer
+          description: "Start line for context"
+
+    StepLog:
+      type: object
+      description: "Log information for a specific step"
+      properties:
+        Step:
+          $ref: "#/components/schemas/Node"
+        LogFile:
+          type: string
+          description: "Path to the log file"
+        Content:
+          type: string
+          description: "Log content"
+      required:
+        - Step
+        - LogFile
+        - Content
+
+    SchedulerLog:
+      type: object
+      description: "Log information for the scheduler"
+      properties:
+        LogFile:
+          type: string
+          description: "Path to the scheduler log file"
+        Content:
+          type: string
+          description: "Log content"
+      required:
+        - LogFile
+        - Content
+
+    DAGLogData:
+      type: object
+      description: "Aggregated log data for a DAG"
+      properties:
+        GridData:
+          type: array
+          description: "Grid data for visualization"
+          items:
+            $ref: "#/components/schemas/DAGLogGridItem"
+        Logs:
+          type: array
+          description: "Log data"
+          items:
+            $ref: "#/components/schemas/DAGLogStatusFile"
+      required:
+        - GridData
+        - Logs
+
+    DAGLogGridItem:
+      type: object
+      description: "Grid item for log visualization"
+      properties:
+        Name:
+          type: string
+          description: "Name of the data point"
+        Vals:
+          type: array
+          description: "Values for the data point"
+          items:
+            type: integer
+      required:
+        - Name
+        - Vals
+
+    DAGLogStatusFile:
+      type: object
+      description: "Log status file information"
+      properties:
+        File:
+          type: string
+          description: "Path to the log file"
+        Status:
+          $ref: "#/components/schemas/DAGStatusDetails"
+      required:
+        - File
+        - Status
+
+    Precondition:
+      type: object
+      description: "Precondition that must be satisfied before running a step or DAG"
+      properties:
+        Condition:
+          type: string
+          description: "Expression or check to evaluate"
+        Expected:
+          type: string
+          description: "Expected result of the condition evaluation"
+
+    RepeatPolicy:
+      type: object
+      description: "Configuration for step retry behavior"
+      properties:
+        Repeat:
+          type: boolean
+          description: "Whether the step should be retried on failure"
+        Interval:
+          type: integer
+          description: "Time in seconds to wait between retry attempts"
+
+    ListTagResponse:
+      type: object
+      description: "Response object for listing all tags"
+      properties:
+        Tags:
+          type: array
+          description: "List of unique tags"
+          items:
+            type: string
+        Errors:
+          type: array
+          description: "List of errors encountered during the request"
+          items:
+            type: string
+      required:
+        - Tags
+        - Errors
