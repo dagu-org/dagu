@@ -157,7 +157,7 @@ api-validate:
 
 # api generates the swagger server code.
 .PHONY: swagger
-api: clean-swagger gen-swagger
+swagger: clean-swagger gen-swagger
 
 # certs generates the certificates to use in the development environment.
 .PHONY: certs
