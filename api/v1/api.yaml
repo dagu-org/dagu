@@ -110,7 +110,28 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListDAGsResponse"
+                type: object
+                properties:
+                  DAGs:
+                    type: array
+                    description: "List of DAGs with their status and metadata"
+                    items:
+                      $ref: "#/components/schemas/DAGStatusFile"
+                  Errors:
+                    type: array
+                    description: "List of errors encountered during the request"
+                    items:
+                      type: string
+                  HasError:
+                    type: boolean
+                    description: "Whether any errors were encountered"
+                  PageCount:
+                    type: integer
+                    description: "Total number of pages available"
+                required:
+                  - DAGs
+                  - HasError
+                  - PageCount
         "400":
           description: "Invalid parameters provided"
           content:
@@ -427,31 +448,6 @@ components:
           description: "Additional parameters for the action in JSON format"
       required:
         - action
-
-    ListDAGsResponse:
-      type: object
-      description: "Response object for listing all DAGs"
-      properties:
-        DAGs:
-          type: array
-          description: "List of DAGs with their status and metadata"
-          items:
-            $ref: "#/components/schemas/DAGStatusFile"
-        Errors:
-          type: array
-          description: "List of errors encountered during the request"
-          items:
-            type: string
-        HasError:
-          type: boolean
-          description: "Whether any errors were encountered"
-        PageCount:
-          type: integer
-          description: "Total number of pages available"
-      required:
-        - DAGs
-        - HasError
-        - PageCount
 
     CreateDAGResponse:
       type: object
