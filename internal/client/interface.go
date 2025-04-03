@@ -25,14 +25,15 @@ type Client interface {
 	UpdateStatus(ctx context.Context, dag *digraph.DAG, status persistence.Status) error
 	UpdateDAG(ctx context.Context, name string, spec string) error
 	DeleteDAG(ctx context.Context, name string) error
-	GetAllStatus(ctx context.Context, opts ...GetAllStatusOption) ([]DAGStatus, *DagListPaginationSummaryResult, error)
+	ListStatus(ctx context.Context, opts ...ListStatusOption) (*ListStatusResult, error)
 	GetStatus(ctx context.Context, dagLocation string) (DAGStatus, error)
 	IsSuspended(ctx context.Context, name string) bool
 	ToggleSuspend(ctx context.Context, name string, suspend bool) error
 	GetTagList(ctx context.Context) ([]string, []string, error)
 }
 
-type DagListPaginationSummaryResult struct {
+type ListStatusResult struct {
+	Items     []DAGStatus
 	PageCount int
 	ErrorList []string
 }
@@ -48,27 +49,27 @@ type GetAllStatusOptions struct {
 	Tag *string
 }
 
-type GetAllStatusOption func(*GetAllStatusOptions)
+type ListStatusOption func(*GetAllStatusOptions)
 
-func WithLimit(limit int) GetAllStatusOption {
+func WithLimit(limit int) ListStatusOption {
 	return func(opt *GetAllStatusOptions) {
 		opt.Limit = &limit
 	}
 }
 
-func WithPage(page int) GetAllStatusOption {
+func WithPage(page int) ListStatusOption {
 	return func(opt *GetAllStatusOptions) {
 		opt.Page = &page
 	}
 }
 
-func WithName(name string) GetAllStatusOption {
+func WithName(name string) ListStatusOption {
 	return func(opt *GetAllStatusOptions) {
 		opt.Name = &name
 	}
 }
 
-func WithTag(tag string) GetAllStatusOption {
+func WithTag(tag string) ListStatusOption {
 	return func(opt *GetAllStatusOptions) {
 		opt.Tag = &tag
 	}
