@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -67,8 +68,14 @@ func (srv *Server) Serve(ctx context.Context) error {
 		basePath = "/" + basePath
 	}
 
+	schema := "http"
+	if srv.config.Server.TLS != nil {
+		schema = "https"
+	}
+	url := fmt.Sprintf("%s://%s%s", schema, srv.config.Server.Host, basePath)
+
 	r.Route(basePath, func(r chi.Router) {
-		if err := srv.api.ConfigureRoutes(r); err != nil {
+		if err := srv.api.ConfigureRoutes(r, url); err != nil {
 			logger.Error(ctx, "Failed to configure routes", "err", err)
 		}
 	})
