@@ -37,7 +37,7 @@ func WithFileCache(cache *filecache.Cache[*digraph.DAG]) DAGStoreOption {
 
 // dagStoreImpl implements the DAGStore interface with local filesystem storage
 type dagStoreImpl struct {
-	baseDir   string                        // Base directory for DAG storage
+	baseDir   string                         // Base directory for DAG storage
 	fileCache *filecache.Cache[*digraph.DAG] // Optional cache for DAG objects
 }
 
@@ -215,14 +215,14 @@ func (d *dagStoreImpl) ListPagination(ctx context.Context, params persistence.DA
 		return nil
 	}); err != nil {
 		return &persistence.DagListPaginationResult{
-			DagList:   dagList,
+			DAGs:      dagList,
 			Count:     count,
 			ErrorList: append(errList, err.Error()),
 		}, err
 	}
 
 	return &persistence.DagListPaginationResult{
-		DagList:   dagList,
+		DAGs:      dagList,
 		Count:     count,
 		ErrorList: errList,
 	}, nil

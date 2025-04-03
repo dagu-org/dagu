@@ -25,7 +25,7 @@ servers:
         description: "Port number of the server"
 
 tags:
-  - name: "legacy"
+  - name: "dags"
     description: "Operations for managing and executing DAGs (Directed Acyclic Graphs)"
   - name: "system"
     description: "System operations for monitoring and managing the Dagu server"
@@ -64,7 +64,7 @@ paths:
       description: "Returns a list of DAGs with optional pagination and search filters"
       operationId: "listDAGs"
       tags:
-        - "legacy"
+        - "dags"
       parameters:
         - name: "page"
           in: "query"
@@ -80,18 +80,30 @@ paths:
             type: "integer"
             default: 20
           description: "Number of items to return per page"
+        - name: "name"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter DAGs by name"
+        - name: "tag"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter DAGs by tag"
         - name: "searchName"
           in: "query"
           required: false
           schema:
             type: "string"
-          description: "Filter DAGs by matching name"
+          description: "Deprecated: Filter DAGs by matching name"
         - name: "searchTag"
           in: "query"
           required: false
           schema:
             type: "string"
-          description: "Filter DAGs by matching tag"
+          description: "Deprecated: Filter DAGs by matching tag"
       responses:
         "200":
           description: "A successful response"
@@ -117,7 +129,7 @@ paths:
       description: "Creates a new DAG definition"
       operationId: "createDAG"
       tags:
-        - "legacy"
+        - "dags"
       requestBody:
         required: true
         content:
@@ -150,7 +162,7 @@ paths:
       description: "Returns details of a DAG, including files, logs, and status"
       operationId: "getDAGDetails"
       tags:
-        - "legacy"
+        - "dags"
       parameters:
         - name: "dagId"
           in: "path"
@@ -201,7 +213,7 @@ paths:
       description: "Performs a specified action (e.g., start, stop) on the given DAG"
       operationId: "postDAGAction"
       tags:
-        - "legacy"
+        - "dags"
       parameters:
         - name: "dagId"
           in: "path"
@@ -246,7 +258,7 @@ paths:
       description: "Deletes a DAG by its ID"
       operationId: "deleteDAG"
       tags:
-        - "legacy"
+        - "dags"
       parameters:
         - name: "dagId"
           in: "path"
@@ -280,7 +292,7 @@ paths:
       description: "Searches for DAGs based on a query string"
       operationId: "searchDAGs"
       tags:
-        - "legacy"
+        - "dags"
       parameters:
         - name: "q"
           in: "query"
@@ -314,7 +326,7 @@ paths:
       description: "Returns a list of all tags used across DAGs"
       operationId: "listTags"
       tags:
-        - "legacy"
+        - "dags"
       responses:
         "200":
           description: "A successful response"
@@ -438,7 +450,6 @@ components:
           description: "Total number of pages available"
       required:
         - DAGs
-        - Errors
         - HasError
         - PageCount
 
@@ -511,9 +522,6 @@ components:
         File:
           type: string
           description: "Path to the DAG file"
-        Dir:
-          type: string
-          description: "Directory containing the DAG file"
         DAG:
           $ref: "#/components/schemas/DAG"
         Status:
@@ -526,11 +534,9 @@ components:
           description: "Error message if any"
       required:
         - File
-        - Dir
         - DAG
         - Status
         - Suspended
-        - Error
 
     DAG:
       type: object
@@ -564,13 +570,8 @@ components:
           items:
             type: string
       required:
-        - Group
         - Name
-        - Schedule
         - Description
-        - Params
-        - DefaultParams
-        - Tags
 
     Schedule:
       type: object
@@ -593,11 +594,9 @@ components:
           type: string
           description: "Name of the DAG being executed"
         Status:
-          type: integer
-          description: "Numeric status code indicating current run state"
+          $ref: "#/components/schemas/RunStatus"
         StatusText:
-          type: string
-          description: "Human-readable status description"
+          $ref: "#/components/schemas/RunStatusText"
         Pid:
           type: integer
           description: "Process ID of the DAG run"
@@ -618,11 +617,29 @@ components:
         - Name
         - Status
         - StatusText
-        - Pid
         - StartedAt
         - FinishedAt
-        - Log
-        - Params
+
+    RunStatus:
+      type: integer
+      enum: [0, 1, 2, 3, 4]
+      description: |
+        Numeric status code indicating current run state:
+        0: "Not started"
+        1: "Running"
+        2: "Failed"
+        3: "Cancelled"
+        4: "Success"
+
+    RunStatusText:
+      type: string
+      description: "Human-readable status description for the DAG run"
+      enum:
+        - "not started"
+        - "running"
+        - "failed"
+        - "cancelled"
+        - "finished"
 
     DAGStatusFileDetails:
       type: object
@@ -936,7 +953,6 @@ components:
             type: string
       required:
         - Results
-        - Errors
 
     SearchDAGsResultItem:
       type: object

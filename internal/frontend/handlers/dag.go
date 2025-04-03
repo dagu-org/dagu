@@ -352,61 +352,64 @@ func (h *DAG) deleteDAG(ctx context.Context, params dags.DeleteDAGParams) *coded
 	return nil
 }
 
-func (h *DAG) getList(ctx context.Context, params dags.ListDAGsParams) (*models.ListDAGsResponse, *codedError) {
-	dgs, result, err := h.client.GetAllStatusPagination(ctx, params)
-	if err != nil {
-		return nil, newInternalError(err)
-	}
+func (h *DAG) getList(_ context.Context, _ dags.ListDAGsParams) (*models.ListDAGsResponse, *codedError) {
+	panic("not implemented")
+	/*
+		dgs, result, err := h.client.GetAllStatus(ctx, params)
+		if err != nil {
+			return nil, newInternalError(err)
+		}
 
-	hasErr := len(result.ErrorList) > 0
-	if !hasErr {
-		// Check if any DAG has an error
-		for _, d := range dgs {
-			if d.Error != nil {
-				hasErr = true
-				break
+		hasErr := len(result.ErrorList) > 0
+		if !hasErr {
+			// Check if any DAG has an error
+			for _, d := range dgs {
+				if d.Error != nil {
+					hasErr = true
+					break
+				}
 			}
 		}
-	}
 
-	resp := &models.ListDAGsResponse{
-		Errors:    result.ErrorList,
-		PageCount: swag.Int64(int64(result.PageCount)),
-		HasError:  swag.Bool(hasErr),
-	}
-
-	for _, dagStatus := range dgs {
-		s := dagStatus.Status
-
-		status := &models.DAGStatus{
-			Log:        swag.String(s.Log),
-			Name:       swag.String(s.Name),
-			Params:     swag.String(s.Params),
-			Pid:        swag.Int64(int64(s.PID)),
-			RequestID:  swag.String(s.RequestID),
-			StartedAt:  swag.String(s.StartedAt),
-			FinishedAt: swag.String(s.FinishedAt),
-			Status:     swag.Int64(int64(s.Status)),
-			StatusText: swag.String(s.StatusText),
+		resp := &models.ListDAGsResponse{
+			Errors:    result.ErrorList,
+			PageCount: swag.Int64(int64(result.PageCount)),
+			HasError:  swag.Bool(hasErr),
 		}
 
-		item := &models.DAGStatusFile{
-			Dir:       swag.String(dagStatus.Dir),
-			Error:     dagStatus.ErrorT,
-			File:      swag.String(dagStatus.File),
-			Status:    status,
-			Suspended: swag.Bool(dagStatus.Suspended),
-			DAG:       convertToDAG(dagStatus.DAG),
+		for _, dagStatus := range dgs {
+			s := dagStatus.Status
+
+			status := &models.DAGStatus{
+				Log:        swag.String(s.Log),
+				Name:       swag.String(s.Name),
+				Params:     swag.String(s.Params),
+				Pid:        swag.Int64(int64(s.PID)),
+				RequestID:  swag.String(s.RequestID),
+				StartedAt:  swag.String(s.StartedAt),
+				FinishedAt: swag.String(s.FinishedAt),
+				Status:     swag.Int64(int64(s.Status)),
+				StatusText: swag.String(s.StatusText),
+			}
+
+			item := &models.DAGStatusFile{
+				Dir:       swag.String(dagStatus.Dir),
+				Error:     dagStatus.ErrorT,
+				File:      swag.String(dagStatus.File),
+				Status:    status,
+				Suspended: swag.Bool(dagStatus.Suspended),
+				DAG:       convertToDAG(dagStatus.DAG),
+			}
+
+			if dagStatus.Error != nil {
+				item.Error = swag.String(dagStatus.Error.Error())
+			}
+
+			resp.DAGs = append(resp.DAGs, item)
 		}
 
-		if dagStatus.Error != nil {
-			item.Error = swag.String(dagStatus.Error.Error())
-		}
-
-		resp.DAGs = append(resp.DAGs, item)
-	}
-
-	return resp, nil
+		return resp, nil
+	*/
 }
 
 func (h *DAG) getDetail(
