@@ -25,7 +25,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 
 // ListDAGs implements api.StrictServerInterface.
 func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (api.ListDAGsResponseObject, error) {
-	var opts []client.GetAllStatusOption
+	var opts []client.ListStatusOption
 	if request.Params.Limit != nil {
 		opts = append(opts, client.WithLimit(*request.Params.Limit))
 	}
@@ -39,14 +39,14 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 		opts = append(opts, client.WithTag(*request.Params.Tag))
 	}
 
-	dgs, result, err := a.client.GetAllStatus(ctx, opts...)
+	result, err := a.client.ListStatus(ctx, opts...)
 	if err != nil {
 		return nil, newInternalError(err)
 	}
 
 	hasErr := len(result.ErrorList) > 0
-	for _, d := range dgs {
-		if d.Error != nil {
+	for _, item := range result.Items {
+		if item.Error != nil {
 			hasErr = true
 			break
 		}
@@ -58,32 +58,32 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 		HasError:  hasErr,
 	}
 
-	for _, d := range dgs {
+	for _, item := range result.Items {
 		status := api.DAGStatus{
-			Log:        ptr(d.Status.Log),
-			Name:       d.Status.Name,
-			Params:     ptr(d.Status.Params),
-			Pid:        ptr(int(d.Status.PID)),
-			RequestId:  d.Status.RequestID,
-			StartedAt:  d.Status.StartedAt,
-			FinishedAt: d.Status.FinishedAt,
-			Status:     api.RunStatus(d.Status.Status),
-			StatusText: api.RunStatusText(d.Status.StatusText),
+			Log:        ptr(item.Status.Log),
+			Name:       item.Status.Name,
+			Params:     ptr(item.Status.Params),
+			Pid:        ptr(int(item.Status.PID)),
+			RequestId:  item.Status.RequestID,
+			StartedAt:  item.Status.StartedAt,
+			FinishedAt: item.Status.FinishedAt,
+			Status:     api.RunStatus(item.Status.Status),
+			StatusText: api.RunStatusText(item.Status.StatusText),
 		}
 
-		item := api.DAGStatusFile{
-			Error:     d.ErrorT,
-			File:      d.File,
+		dag := api.DAGStatusFile{
+			Error:     item.ErrorT,
+			File:      item.File,
 			Status:    status,
-			Suspended: d.Suspended,
-			DAG:       convertToDAG(d.DAG),
+			Suspended: item.Suspended,
+			DAG:       convertToDAG(item.DAG),
 		}
 
-		if d.Error != nil {
-			item.Error = ptr(d.Error.Error())
+		if item.Error != nil {
+			dag.Error = ptr(item.Error.Error())
 		}
 
-		resp.DAGs = append(resp.DAGs, item)
+		resp.DAGs = append(resp.DAGs, dag)
 	}
 
 	return resp, nil
