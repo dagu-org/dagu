@@ -34,6 +34,11 @@ DOCKER_CMD := docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v
 GOTESTSUM_ARGS=--format=standard-quiet
 GO_TEST_FLAGS=-v --race
 
+# OpenAPI configuration
+OAPI_SPEC_DIR=./api/v1
+OAPI_SPEC_FILE=${OAPI_SPEC_DIR}/api.yaml
+OAPI_CONFIG_FILE=${OAPI_SPEC_DIR}/config.yaml
+
 # Frontend directories
 
 FE_DIR=./internal/frontend
@@ -55,6 +60,8 @@ PKG_golangci_lint=github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 PKG_gotestsum=gotest.tools/gotestsum
 PKG_addlicense=github.com/google/addlicense
 PKG_changelog-from-release=github.com/rhysd/changelog-from-release/v3@latest
+PKG_oapi_codegen=github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
+PKG_kin_openapi_validate=github.com/getkin/kin-openapi/cmd/validate
 
 # Certificates for the development environment
 
@@ -133,6 +140,20 @@ open-coverage:
 # lint runs the linter.
 .PHONY: lint
 lint: golangci-lint
+
+# api generates the server code from the OpenAPI specification.
+.PHONY: api
+api: api-validate
+	@echo "${COLOR_GREEN}Generating API...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_oapi_codegen}
+	@${LOCAL_BIN_DIR}/oapi-codegen --config=${OAPI_CONFIG_FILE} ${OAPI_SPEC_FILE}
+
+# api-validate validates the OpenAPI specification.
+.PHONY: api-validate
+api-validate:
+	@echo "${COLOR_GREEN}Validating API...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_kin_openapi_validate}
+	@${LOCAL_BIN_DIR}/validate ${OAPI_SPEC_FILE}
 
 # api generates the swagger server code.
 .PHONY: swagger
