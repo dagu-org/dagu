@@ -90,8 +90,15 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 }
 
 // ListTags implements api.StrictServerInterface.
-func (a *API) ListTags(ctx context.Context, request api.ListTagsRequestObject) (api.ListTagsResponseObject, error) {
-	panic("unimplemented")
+func (a *API) ListTags(ctx context.Context, _ api.ListTagsRequestObject) (api.ListTagsResponseObject, error) {
+	tags, errs, err := a.client.GetTagList(ctx)
+	if err != nil {
+		return nil, newInternalError(err)
+	}
+	return &api.ListTags200JSONResponse{
+		Tags:   tags,
+		Errors: errs,
+	}, nil
 }
 
 // PostDAGAction implements api.StrictServerInterface.

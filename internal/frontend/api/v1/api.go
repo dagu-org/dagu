@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"reflect"
 
 	"github.com/dagu-org/dagu/api/v1"
@@ -42,14 +43,42 @@ func New(
 	}
 }
 
-func (a *API) ConfigureRoutes(r chi.Router, url string) error {
+func (a *API) ConfigureRoutes(r chi.Router, baseURL string) error {
 	swagger, err := api.GetSwagger()
 	if err != nil {
 		return fmt.Errorf("failed to get swagger: %w", err)
 	}
 
-	swagger.Servers = openapi3.Servers{
-		&openapi3.Server{URL: url},
+	// Parse the baseURL to extract components
+	parsedURL, err := url.Parse(baseURL)
+	if err != nil {
+		return fmt.Errorf("failed to parse base URL: %w", err)
+	}
+
+	// Create a list of server URLs
+	serverURLs := []string{baseURL}
+
+	// Add localhost as an alternative if the host is 127.0.0.1
+	host := parsedURL.Hostname()
+	if host == "127.0.0.1" {
+		// Create a new URL with localhost instead of 127.0.0.1
+		localhostURL := *parsedURL
+		localhostURL.Host = fmt.Sprintf("localhost:%s", parsedURL.Port())
+		serverURLs = append(serverURLs, localhostURL.String())
+	}
+
+	// Add 127.0.0.1 as an alternative if the host is localhost
+	if host == "localhost" {
+		// Create a new URL with 127.0.0.1 instead of localhost
+		ipURL := *parsedURL
+		ipURL.Host = fmt.Sprintf("127.0.0.1:%s", parsedURL.Port())
+		serverURLs = append(serverURLs, ipURL.String())
+	}
+
+	// Set the server URLs in the swagger spec
+	swagger.Servers = make(openapi3.Servers, 0, len(serverURLs))
+	for _, url := range serverURLs {
+		swagger.Servers = append(swagger.Servers, &openapi3.Server{URL: url})
 	}
 
 	// Create the oapi-codegen validator middleware
