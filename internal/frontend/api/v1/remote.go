@@ -199,7 +199,7 @@ func (h *remoteNodeProxy) doRequest(body any, r *http.Request, node config.Remot
 		if len(respData) > 0 {
 			var remoteErr api.Error
 			if err := json.Unmarshal(respData, &remoteErr); err == nil && remoteErr.Code != "" {
-				return 0, nil, &APIError{
+				return 0, nil, &Error{
 					Code:       api.ErrorCodeBadGateway,
 					HTTPStatus: resp.StatusCode,
 					Message:    remoteErr.Message,
@@ -207,7 +207,7 @@ func (h *remoteNodeProxy) doRequest(body any, r *http.Request, node config.Remot
 			}
 		}
 		// If we can't decode a proper error or have no data, return a generic one
-		return 0, nil, &APIError{
+		return 0, nil, &Error{
 			Code:       api.ErrorCodeBadGateway,
 			HTTPStatus: resp.StatusCode,
 			Message:    fmt.Sprintf("remote node responded with status %d", resp.StatusCode),
