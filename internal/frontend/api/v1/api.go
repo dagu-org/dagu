@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -11,6 +12,7 @@ import (
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/go-chi/chi/v5"
@@ -108,6 +110,10 @@ func (a *API) ConfigureRoutes(r chi.Router, baseURL string) error {
 }
 
 func (a *API) handleError(w http.ResponseWriter, _ *http.Request, err error) {
+	code := api.ErrorCodeInternalError
+	message := "An unexpected error occurred"
+	httpStatusCode := http.StatusInternalServerError
+
 	var apiErr *Error
 	switch err := err.(type) {
 	case *Error:
@@ -116,23 +122,24 @@ func (a *API) handleError(w http.ResponseWriter, _ *http.Request, err error) {
 		apiErr = &err
 	}
 
-	var (
-		response = api.Error{
-			Code:    "internal_error",
-			Message: "An unexpected error occurred",
-		}
-		httpStatusCode = http.StatusInternalServerError
-	)
-
 	if apiErr != nil {
-		response.Code = apiErr.Code
-		response.Message = apiErr.Message
+		code = apiErr.Code
+		message = apiErr.Message
 		httpStatusCode = apiErr.HTTPStatus
+	}
+
+	switch {
+	case errors.Is(err, persistence.ErrRequestIDNotFound):
+		code = api.ErrorCodeNotFound
+		message = "Request ID not found"
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(httpStatusCode)
-	_ = json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(api.Error{
+		Code:    code,
+		Message: message,
+	})
 }
 
 func ptr[T any](v T) *T {

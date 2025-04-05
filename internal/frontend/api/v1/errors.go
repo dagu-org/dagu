@@ -7,6 +7,15 @@ import (
 	"github.com/dagu-org/dagu/api/v1"
 )
 
+// Predefined errors
+var (
+	ErrStepNameIsRequired = &Error{
+		Code:       api.ErrorCodeBadRequest,
+		HTTPStatus: http.StatusBadRequest,
+		Message:    "Step name is required",
+	}
+)
+
 func WriteErrorResponse(w http.ResponseWriter, err error) {
 	if apiErr, ok := err.(*Error); ok {
 		w.WriteHeader(apiErr.HTTPStatus)
