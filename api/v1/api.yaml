@@ -435,7 +435,6 @@ components:
     DAGDetailTab:
       type: string
       description: "Indicates which part of the DAG to retrieve"
-      default: status
       enum:
         - status
         - spec
