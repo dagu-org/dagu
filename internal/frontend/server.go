@@ -72,7 +72,7 @@ func (srv *Server) Serve(ctx context.Context) error {
 	if srv.config.Server.TLS != nil {
 		schema = "https"
 	}
-	url := fmt.Sprintf("%s://%s%s", schema, srv.config.Server.Host, basePath)
+	url := fmt.Sprintf("%s://%s:%d%s", schema, srv.config.Server.Host, srv.config.Server.Port, basePath)
 
 	r.Route(basePath, func(r chi.Router) {
 		if err := srv.api.ConfigureRoutes(r, url); err != nil {

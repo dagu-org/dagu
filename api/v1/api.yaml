@@ -357,8 +357,7 @@ components:
       description: "Generic error response object"
       properties:
         code:
-          type: string
-          description: "Error code indicating the type of error"
+          $ref: "#/components/schemas/ErrorCode"
         message:
           type: string
           description: "Short error message"
@@ -368,6 +367,17 @@ components:
       required:
         - code
         - message
+
+    ErrorCode:
+      type: string
+      description: "Error code indicating the type of error"
+      enum:
+        - "validation_error"
+        - "not_found"
+        - "internal_error"
+        - "unauthorized"
+        - "bad_gateway"
+        - "remote_node_error"
 
     HealthResponse:
       type: object
