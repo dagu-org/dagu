@@ -26,18 +26,32 @@ import (
 )
 
 type Server struct {
-	api        *api.API
-	config     *config.Config
-	httpServer *http.Server
+	api         *api.API
+	config      *config.Config
+	httpServer  *http.Server
+	funcsConfig funcsConfig
 }
 
 func NewServer(
 	api *api.API,
 	cfg *config.Config,
 ) *Server {
+	var remoteNodes []string
+	for _, node := range cfg.Server.RemoteNodes {
+		remoteNodes = append(remoteNodes, node.Name)
+	}
 	return &Server{
 		api:    api,
 		config: cfg,
+		funcsConfig: funcsConfig{
+			NavbarColor:           cfg.UI.NavbarColor,
+			NavbarTitle:           cfg.UI.NavbarTitle,
+			BasePath:              cfg.Server.BasePath,
+			APIBasePath:           cfg.Server.APIBasePath,
+			TZ:                    cfg.Global.TZ,
+			MaxDashboardPageLimit: cfg.UI.MaxDashboardPageLimit,
+			RemoteNodes:           remoteNodes,
+		},
 	}
 }
 
@@ -57,11 +71,13 @@ func (srv *Server) Serve(ctx context.Context) error {
 	r.Use(httplog.RequestLogger(requestLogger))
 	r.Use(withRecoverer)
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
+		AllowedOrigins:   []string{"*"}, // TODO: Update to specific origins
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"*"},
 		AllowCredentials: true,
 	}))
+
+	srv.routes(ctx, r)
 
 	basePath := path.Join(srv.config.Server.BasePath, "api/v1")
 	if !strings.HasPrefix(basePath, "/") {
@@ -98,6 +114,27 @@ func (srv *Server) Serve(ctx context.Context) error {
 
 	srv.gracefulShutdown(ctx)
 	return nil
+}
+
+func (srv *Server) routes(ctx context.Context, r *chi.Mux) {
+	// Always allow API routes to work
+	if srv.config.Server.Headless {
+		logger.Info(ctx, "Headless mode enabled: UI is disabled, but API remains active")
+
+		// Only register API routes, skip Web UI routes
+		return
+	}
+
+	// Serve assets (optional, remove if not needed)
+	r.Get("/assets/*", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "max-age=86400")
+		http.FileServer(http.FS(assetsFS)).ServeHTTP(w, r)
+	})
+
+	// Serve UI pages (disable when headless)
+	r.Get("/*", func(w http.ResponseWriter, _ *http.Request) {
+		srv.useTemplate(ctx, "index.gohtml", "index")(w, nil)
+	})
 }
 
 func (srv *Server) Shutdown(ctx context.Context) error {
