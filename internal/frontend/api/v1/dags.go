@@ -26,7 +26,14 @@ func (a *API) CreateDAG(ctx context.Context, request api.CreateDAGRequestObject)
 
 // DeleteDAG implements api.StrictServerInterface.
 func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject) (api.DeleteDAGResponseObject, error) {
-	panic("unimplemented")
+	_, err := a.client.GetStatus(ctx, request.Name)
+	if err != nil {
+		return nil, newNotFoundError(api.ErrorCodeNotFound, err)
+	}
+	if err := a.client.DeleteDAG(ctx, request.Name); err != nil {
+		return nil, newInternalError(err)
+	}
+	return &api.DeleteDAG200Response{}, nil
 }
 
 // GetDAGDetails implements api.StrictServerInterface.
