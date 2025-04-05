@@ -33,33 +33,40 @@ import (
 
 var setupLock sync.Mutex
 
-// TestHelperOption defines functional options for Helper
-type TestHelperOption func(*TestOptions)
+// HelperOption defines functional options for Helper
+type HelperOption func(*Options)
 
-type TestOptions struct {
+type Options struct {
 	CaptureLoggingOutput bool // CaptureLoggingOutput enables capturing of logging output
 	DAGsDir              string
+	ServerConfig         *config.Server
 }
 
 // WithCaptureLoggingOutput creates a logging capture option
-func WithCaptureLoggingOutput() TestHelperOption {
-	return func(opts *TestOptions) {
+func WithCaptureLoggingOutput() HelperOption {
+	return func(opts *Options) {
 		opts.CaptureLoggingOutput = true
 	}
 }
 
-func WithDAGsDir(dir string) TestHelperOption {
-	return func(opts *TestOptions) {
+func WithDAGsDir(dir string) HelperOption {
+	return func(opts *Options) {
 		opts.DAGsDir = dir
 	}
 }
 
+func WithServerConfig(cfg *config.Server) HelperOption {
+	return func(opts *Options) {
+		opts.ServerConfig = cfg
+	}
+}
+
 // Setup creates a new Helper instance for testing
-func Setup(t *testing.T, opts ...TestHelperOption) Helper {
+func Setup(t *testing.T, opts ...HelperOption) Helper {
 	setupLock.Lock()
 	defer setupLock.Unlock()
 
-	var options TestOptions
+	var options Options
 	for _, opt := range opts {
 		opt(&options)
 	}
@@ -79,6 +86,10 @@ func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 	cfg.Paths.LogDir = filepath.Join(tmpDir, "logs")
 	if options.DAGsDir != "" {
 		cfg.Paths.DAGsDir = options.DAGsDir
+	}
+
+	if options.ServerConfig != nil {
+		cfg.Server = *options.ServerConfig
 	}
 
 	dagStore := local.NewDAGStore(cfg.Paths.DAGsDir)

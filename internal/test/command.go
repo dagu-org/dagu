@@ -14,12 +14,12 @@ type CmdTest struct {
 	ExpectedOut []string // Expected output to be present in the standard output / error.
 }
 
-// CmdTestHelper is a helper struct to test commands.
-type CmdTestHelper struct {
+// Command is a helper struct to test commands.
+type Command struct {
 	Helper
 }
 
-func (th CmdTestHelper) RunCommand(t *testing.T, cmd *cobra.Command, testCase CmdTest) {
+func (th Command) RunCommand(t *testing.T, cmd *cobra.Command, testCase CmdTest) {
 	t.Helper()
 
 	cmdRoot := &cobra.Command{Use: "root"}
@@ -40,8 +40,9 @@ func (th CmdTestHelper) RunCommand(t *testing.T, cmd *cobra.Command, testCase Cm
 	}
 }
 
-func SetupCommand(t *testing.T) CmdTestHelper {
+func SetupCommand(t *testing.T, opts ...HelperOption) Command {
 	t.Helper()
 
-	return CmdTestHelper{Helper: Setup(t, WithCaptureLoggingOutput())}
+	opts = append(opts, WithCaptureLoggingOutput())
+	return Command{Helper: Setup(t, opts...)}
 }
