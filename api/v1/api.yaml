@@ -190,7 +190,7 @@ paths:
           required: true
           schema:
             type: "string"
-          description: "The ID of the DAG"
+          description: "The name of the DAG"
         - name: "tab"
           in: "query"
           required: false
@@ -269,13 +269,31 @@ paths:
           required: true
           schema:
             type: "string"
-          description: "The ID of the DAG"
+          description: "The name of the DAG"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/PostDAGActionRequest"
+              type: object
+              description: "Request body for posting an action to a DAG"
+              properties:
+                action:
+                  $ref: "#/components/schemas/DAGAction"
+                value:
+                  type: string
+                  description: "Optional extra value for the action"
+                requestId:
+                  type: string
+                  description: "Unique request ID for the action"
+                step:
+                  type: string
+                  description: "Step name if the action targets a specific step"
+                params:
+                  type: string
+                  description: "Additional parameters for the action in JSON format"
+              required:
+                - action
       responses:
         "200":
           description: "A successful response"
@@ -283,18 +301,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PostDAGActionResponse"
-        "400":
-          description: "Invalid action requested"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "404":
-          description: "DAG not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
         default:
           description: "Generic error response"
           content:
@@ -304,7 +310,7 @@ paths:
 
     delete:
       summary: "Delete a DAG"
-      description: "Deletes a DAG by its ID"
+      description: "Deletes a DAG by its name"
       operationId: "deleteDAG"
       tags:
         - "dags"
@@ -314,7 +320,7 @@ paths:
           required: true
           schema:
             type: "string"
-          description: "The ID of the DAG"
+          description: "The name of the DAG"
       responses:
         "204":
           description: "DAG successfully deleted"
@@ -414,6 +420,8 @@ components:
         - "unauthorized"
         - "bad_gateway"
         - "remote_node_error"
+        - "already_running"
+        - "not_running"
 
     DAGDetailTab:
       type: string
@@ -449,44 +457,35 @@ components:
         - uptime
         - timestamp
 
-    PostDAGActionRequest:
-      type: object
-      description: "Request body for posting an action to a DAG"
-      properties:
-        action:
-          type: string
-          enum:
-            - start
-            - suspend
-            - stop
-            - retry
-            - mark-success
-            - mark-failed
-            - save
-            - rename
-          description: "Action to be performed on the DAG"
-        value:
-          type: string
-          description: "Optional extra value for the action"
-        requestId:
-          type: string
-          description: "Unique request ID for the action"
-        step:
-          type: string
-          description: "Step name if the action targets a specific step"
-        params:
-          type: string
-          description: "Additional parameters for the action in JSON format"
-      required:
-        - action
+    DAGAction:
+      type: string
+      description: |
+        Action to be performed on the DAG. Possible values include:
+        - start: Start the DAG
+        - suspend: Suspend the DAG
+        - stop: Stop the DAG
+        - retry: Retry the last run
+        - mark-success: Mark the last run as successful
+        - mark-failed: Mark the last run as failed
+        - save: Save the current state of the DAG
+        - rename: Rename the DAG
+      enum:
+        - start
+        - suspend
+        - stop
+        - retry
+        - mark-success
+        - mark-failed
+        - save
+        - rename
 
     PostDAGActionResponse:
       type: object
       description: "Response object for posting an action to a DAG"
       properties:
-        NewDagID:
+        NewName:
           type: string
-          description: "New DAG ID, if the action resulted in a new DAG"
+          description: "New DAG name, if the action resulted in a new DAG"
 
     DAGStatusFile:
       type: object
