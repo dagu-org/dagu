@@ -74,6 +74,11 @@ type DAGStore interface {
 	TagList(ctx context.Context) ([]string, []string, error)
 }
 
+// Errors for DAGStore operations
+var (
+	ErrDAGAlreadyExists = fmt.Errorf("DAG already exists")
+)
+
 // ListOptions contains parameters for paginated DAG listing
 type ListOptions struct {
 	Page  int    // Page number (1-based)

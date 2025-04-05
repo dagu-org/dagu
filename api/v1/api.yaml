@@ -144,14 +144,26 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateDAGRequest"
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: "Name of the new DAG"
+              required:
+                - name
       responses:
-        "200":
+        "201":
           description: "A successful response"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CreateDAGResponse"
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: "Name of the newly created DAG"
+                required:
+                  - name
         "400":
           description: "Invalid request body"
           content:
@@ -372,7 +384,7 @@ components:
       type: string
       description: "Error code indicating the type of error"
       enum:
-        - "validation_error"
+        - "bad_request"
         - "not_found"
         - "internal_error"
         - "unauthorized"
@@ -401,20 +413,6 @@ components:
         - version
         - uptime
         - timestamp
-
-    CreateDAGRequest:
-      type: object
-      description: "Request body for creating a DAG"
-      properties:
-        action:
-          type: string
-          description: "Action to perform upon creation (if any)"
-        value:
-          type: string
-          description: "Associated value for the action"
-      required:
-        - action
-        - value
 
     PostDAGActionRequest:
       type: object
@@ -446,16 +444,6 @@ components:
           description: "Additional parameters for the action in JSON format"
       required:
         - action
-
-    CreateDAGResponse:
-      type: object
-      description: "Response object for creating a DAG"
-      properties:
-        DagID:
-          type: string
-          description: "ID of the newly created DAG"
-      required:
-        - DagID
 
     GetDAGDetailsResponse:
       type: object
