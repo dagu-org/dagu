@@ -2,15 +2,26 @@ package api
 
 import (
 	"context"
+	"errors"
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/persistence"
 )
 
 // CreateDAG implements api.StrictServerInterface.
 func (a *API) CreateDAG(ctx context.Context, request api.CreateDAGRequestObject) (api.CreateDAGResponseObject, error) {
-	panic("unimplemented")
+	name, err := a.client.CreateDAG(ctx, request.Body.Name)
+	if err != nil {
+		if errors.Is(err, persistence.ErrDAGAlreadyExists) {
+			return nil, newBadRequestError(api.ErrorCodeBadRequest, err)
+		}
+		return nil, newInternalError(err)
+	}
+	return &api.CreateDAG201JSONResponse{
+		Name: name,
+	}, nil
 }
 
 // DeleteDAG implements api.StrictServerInterface.

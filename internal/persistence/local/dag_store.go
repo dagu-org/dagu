@@ -118,9 +118,6 @@ func (d *dagStoreImpl) UpdateSpec(ctx context.Context, name string, spec []byte)
 	return nil
 }
 
-// errDAGFileAlreadyExists is returned when attempting to create a DAG with an ID that already exists
-var errDAGFileAlreadyExists = errors.New("the DAG file already exists")
-
 // Create creates a new DAG with the given name and specification.
 func (d *dagStoreImpl) Create(_ context.Context, name string, spec []byte) (string, error) {
 	if err := d.ensureDirExist(); err != nil {
@@ -128,7 +125,7 @@ func (d *dagStoreImpl) Create(_ context.Context, name string, spec []byte) (stri
 	}
 	filePath := d.generateFilePath(name)
 	if fileExists(filePath) {
-		return "", fmt.Errorf("%w: %s", errDAGFileAlreadyExists, filePath)
+		return "", persistence.ErrDAGAlreadyExists
 	}
 	if err := os.WriteFile(filePath, spec, defaultPerm); err != nil {
 		return "", fmt.Errorf("failed to write DAG %s: %w", name, err)
@@ -280,7 +277,7 @@ func (d *dagStoreImpl) Rename(_ context.Context, oldID, newID string) error {
 	}
 	newFilePath := d.generateFilePath(newID)
 	if fileExists(newFilePath) {
-		return fmt.Errorf("%w: %s", errDAGFileAlreadyExists, newFilePath)
+		return persistence.ErrDAGAlreadyExists
 	}
 	return os.Rename(oldFilePath, newFilePath)
 }
