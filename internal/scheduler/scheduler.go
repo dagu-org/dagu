@@ -135,7 +135,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 }
 
 func (s *Scheduler) start(ctx context.Context) {
-	t := now().Truncate(time.Minute)
+	t := Now().Truncate(time.Minute)
 	timer := time.NewTimer(0)
 
 	s.running.Store(true)
@@ -144,9 +144,9 @@ func (s *Scheduler) start(ctx context.Context) {
 		select {
 		case <-timer.C:
 			s.run(ctx, t)
-			t = s.nextTick(t)
+			t = s.NextTick(t)
 			_ = timer.Stop()
-			timer.Reset(t.Sub(now()))
+			timer.Reset(t.Sub(Now()))
 
 		case <-s.stopChan:
 			if !timer.Stop() {
@@ -205,7 +205,7 @@ func (s *Scheduler) run(ctx context.Context, now time.Time) {
 	}
 }
 
-func (*Scheduler) nextTick(now time.Time) time.Time {
+func (*Scheduler) NextTick(now time.Time) time.Time {
 	return now.Add(time.Minute).Truncate(time.Second * 60)
 }
 
@@ -228,16 +228,16 @@ var (
 	fixedTimeLock sync.RWMutex
 )
 
-// setFixedTime sets the fixed time for testing.
-func setFixedTime(t time.Time) {
+// SetFixedTime sets the fixed time for testing.
+func SetFixedTime(t time.Time) {
 	fixedTimeLock.Lock()
 	defer fixedTimeLock.Unlock()
 
 	fixedTime = t
 }
 
-// now returns the current time.
-func now() time.Time {
+// Now returns the current time.
+func Now() time.Time {
 	fixedTimeLock.RLock()
 	defer fixedTimeLock.RUnlock()
 
