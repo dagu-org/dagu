@@ -357,13 +357,22 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SearchDAGsResponse"
-        "400":
-          description: "Invalid search query"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
+                type: object
+                description: "Response object for searching DAGs"
+                properties:
+                  Results:
+                    type: array
+                    description: "Search results matching the query"
+                    items:
+                      $ref: "#/components/schemas/SearchDAGsResultItem"
+                  Errors:
+                    type: array
+                    description: "Errors encountered during the search"
+                    items:
+                      type: string
+                required:
+                  - Results
+                  - Errors
         default:
           description: "Generic error response"
           content:
@@ -888,23 +897,6 @@ components:
       required:
         - Name
 
-    SearchDAGsResponse:
-      type: object
-      description: "Response object for searching DAGs"
-      properties:
-        Results:
-          type: array
-          description: "Search results matching the query"
-          items:
-            $ref: "#/components/schemas/SearchDAGsResultItem"
-        Errors:
-          type: array
-          description: "Errors encountered during the search"
-          items:
-            type: string
-      required:
-        - Results
-
     SearchDAGsResultItem:
       type: object
       description: "Individual search result item for a DAG"
@@ -919,6 +911,10 @@ components:
           description: "Details of where matches were found"
           items:
             $ref: "#/components/schemas/SearchDAGsMatchItem"
+      required:
+        - Name
+        - DAG
+        - Matches
 
     SearchDAGsMatchItem:
       type: object
@@ -933,6 +929,10 @@ components:
         StartLine:
           type: integer
           description: "Start line for context"
+      required:
+        - Line
+        - LineNumber
+        - StartLine
 
     StepLog:
       type: object
