@@ -196,8 +196,8 @@ paths:
           required: false
           schema:
             $ref: "#/components/schemas/DAGDetailTab"
-          description: "Tab name for UI navigation"
-        - name: "file"
+          description: "Specific part of the DAG to retrieve"
+        - name: "reqId"
           in: "query"
           required: false
           schema:
@@ -223,16 +223,11 @@ paths:
                     description: "Title of the Page"
                   DAG:
                     $ref: "#/components/schemas/DAGStatusFileDetails"
-                  Tab:
-                    $ref: "#/components/schemas/DAGDetailTab"
-                  Graph:
-                    type: string
-                    description: "Graph data for visualization"
                   Definition:
                     type: string
                     description: "DAG definition"
-                  LogData:
-                    $ref: "#/components/schemas/DAGLogData"
+                  HistoryData:
+                    $ref: "#/components/schemas/DAGHistoryData"
                   LogUrl:
                     type: string
                     description: "URL to access logs directly"
@@ -248,13 +243,6 @@ paths:
                 required:
                   - Title
                   - DAG
-                  - Tab
-                  - Graph
-                  - Definition
-                  - LogData
-                  - LogUrl
-                  - StepLog
-                  - ScLog
                   - Errors
         "404":
           description: "DAG not found"
@@ -429,7 +417,8 @@ components:
 
     DAGDetailTab:
       type: string
-      description: "Tab name for UI navigation"
+      description: "Indicates which part of the DAG to retrieve"
+      default: status
       enum:
         - status
         - spec
@@ -555,7 +544,6 @@ components:
             type: string
       required:
         - Name
-        - Description
 
     Schedule:
       type: object
@@ -655,9 +643,6 @@ components:
         File:
           type: string
           description: "Path to the DAG file"
-        Dir:
-          type: string
-          description: "Directory containing the DAG file"
         DAG:
           $ref: "#/components/schemas/DAGDetails"
         Status:
@@ -670,11 +655,9 @@ components:
           description: "Error message if any"
       required:
         - File
-        - Dir
         - DAG
         - Status
         - Suspended
-        - Error
 
     DAGDetails:
       type: object
@@ -740,22 +723,7 @@ components:
           items:
             type: string
       required:
-        - Location
-        - Group
         - Name
-        - Schedule
-        - Description
-        - Env
-        - LogDir
-        - HandlerOn
-        - Steps
-        - Delay
-        - HistRetentionDays
-        - Preconditions
-        - MaxActiveRuns
-        - Params
-        - DefaultParams
-        - Tags
 
     HandlerOn:
       type: object
@@ -819,14 +787,9 @@ components:
         - StatusText
         - Pid
         - Nodes
-        - OnExit
-        - OnSuccess
-        - OnFailure
-        - OnCancel
         - StartedAt
         - FinishedAt
         - Log
-        - Params
 
     Node:
       type: object
@@ -865,7 +828,6 @@ components:
         - StatusText
         - RetryCount
         - DoneCount
-        - Error
 
     Step:
       type: object
@@ -926,19 +888,6 @@ components:
             $ref: "#/components/schemas/Precondition"
       required:
         - Name
-        - Description
-        - Dir
-        - CmdWithArgs
-        - Command
-        - Script
-        - Stdout
-        - Stderr
-        - Output
-        - Args
-        - Depends
-        - RepeatPolicy
-        - MailOnError
-        - Preconditions
 
     SearchDAGsResponse:
       type: object
@@ -1017,23 +966,23 @@ components:
         - LogFile
         - Content
 
-    DAGLogData:
+    DAGHistoryData:
       type: object
-      description: "Aggregated log data for a DAG"
+      description: "Historical run data for a DAG"
       properties:
         GridData:
           type: array
           description: "Grid data for visualization"
           items:
             $ref: "#/components/schemas/DAGLogGridItem"
-        Logs:
+        StatusDetails:
           type: array
-          description: "Log data"
+          description: "Detailed status information for each run"
           items:
-            $ref: "#/components/schemas/DAGLogStatusFile"
+            $ref: "#/components/schemas/DAGStatusDetails"
       required:
         - GridData
-        - Logs
+        - StatusDetails
 
     DAGLogGridItem:
       type: object
@@ -1041,28 +990,15 @@ components:
       properties:
         Name:
           type: string
-          description: "Name of the data point"
-        Vals:
+          description: "Name of the step"
+        History:
           type: array
-          description: "Values for the data point"
+          description: "Status of the step ordered by time"
           items:
-            type: integer
+            $ref: "#/components/schemas/NodeStatus"
       required:
         - Name
-        - Vals
-
-    DAGLogStatusFile:
-      type: object
-      description: "Log status file information"
-      properties:
-        File:
-          type: string
-          description: "Path to the log file"
-        Status:
-          $ref: "#/components/schemas/DAGStatusDetails"
-      required:
-        - File
-        - Status
+        - History
 
     Precondition:
       type: object
