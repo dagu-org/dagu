@@ -33,7 +33,7 @@ func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject)
 	if err := a.client.DeleteDAG(ctx, request.Name); err != nil {
 		return nil, newInternalError(err)
 	}
-	return &api.DeleteDAG200Response{}, nil
+	return &api.DeleteDAG204Response{}, nil
 }
 
 // GetDAGDetails implements api.StrictServerInterface.

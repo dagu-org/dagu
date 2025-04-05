@@ -108,11 +108,11 @@ func (a *API) ConfigureRoutes(r chi.Router, baseURL string) error {
 }
 
 func (a *API) handleError(w http.ResponseWriter, _ *http.Request, err error) {
-	var apiErr *APIError
+	var apiErr *Error
 	switch err := err.(type) {
-	case *APIError:
+	case *Error:
 		apiErr = err
-	case APIError:
+	case Error:
 		apiErr = &err
 	}
 

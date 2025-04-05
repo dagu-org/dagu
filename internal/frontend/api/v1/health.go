@@ -11,7 +11,7 @@ import (
 )
 
 // GetHealth implements api.StrictServerInterface.
-func (a *API) GetHealth(_ context.Context, request api.GetHealthRequestObject) (api.GetHealthResponseObject, error) {
+func (a *API) GetHealth(_ context.Context, _ api.GetHealthRequestObject) (api.GetHealthResponseObject, error) {
 	return &api.GetHealth200JSONResponse{
 		Status:    api.HealthResponseStatusHealthy,
 		Version:   build.Version,

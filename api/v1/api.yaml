@@ -288,7 +288,7 @@ paths:
             type: "string"
           description: "The ID of the DAG"
       responses:
-        "200":
+        "204":
           description: "DAG successfully deleted"
         "404":
           description: "DAG not found"

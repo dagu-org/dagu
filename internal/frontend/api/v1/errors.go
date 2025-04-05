@@ -8,7 +8,7 @@ import (
 )
 
 func WriteErrorResponse(w http.ResponseWriter, err error) {
-	if apiErr, ok := err.(*APIError); ok {
+	if apiErr, ok := err.(*Error); ok {
 		w.WriteHeader(apiErr.HTTPStatus)
 		if apiErr.Message != "" {
 			fmt.Fprintf(w, `{"error": "%s"}`, apiErr.Message)
@@ -23,8 +23,8 @@ func WriteErrorResponse(w http.ResponseWriter, err error) {
 	fmt.Fprintf(w, `{"error": "%s"}`, apiErr.Message)
 }
 
-// APIError is an error that has an associated HTTP status code.
-type APIError struct {
+// Error is an error that has an associated HTTP status code.
+type Error struct {
 	// Code is the error code to return.
 	Code api.ErrorCode
 	// HTTPStatus is the HTTP status code to return.
@@ -34,15 +34,15 @@ type APIError struct {
 }
 
 // Error returns the error message.
-func (e APIError) Error() string {
+func (e Error) Error() string {
 	if e.Message == "" {
 		return string(e.Code)
 	}
 	return fmt.Sprintf("%s: %s", e.Code, e.Message)
 }
 
-func NewAPIError(httpCode int, code api.ErrorCode, err error) *APIError {
-	apiErr := &APIError{
+func NewAPIError(httpCode int, code api.ErrorCode, err error) *Error {
+	apiErr := &Error{
 		Code:       code,
 		HTTPStatus: httpCode,
 	}
@@ -52,16 +52,16 @@ func NewAPIError(httpCode int, code api.ErrorCode, err error) *APIError {
 	return apiErr
 }
 
-func newInternalError(err error) *APIError {
-	return &APIError{
+func newInternalError(err error) *Error {
+	return &Error{
 		Code:       api.ErrorCodeInternalError,
 		HTTPStatus: 500,
 		Message:    "An internal error occurred",
 	}
 }
 
-func newNotFoundError(code api.ErrorCode, err error) *APIError {
-	apiErr := &APIError{
+func newNotFoundError(code api.ErrorCode, err error) *Error {
+	apiErr := &Error{
 		Code:       "not_found",
 		HTTPStatus: 404,
 	}
@@ -71,8 +71,8 @@ func newNotFoundError(code api.ErrorCode, err error) *APIError {
 	return apiErr
 }
 
-func newBadRequestError(code api.ErrorCode, err error) *APIError {
-	apiErr := &APIError{
+func newBadRequestError(code api.ErrorCode, err error) *Error {
+	apiErr := &Error{
 		Code:       code,
 		HTTPStatus: 400,
 	}
