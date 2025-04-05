@@ -177,7 +177,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{dagId}:
+  /dags/{name}:
     get:
       summary: "Get DAG details"
       description: "Returns details of a DAG, including files, logs, and status"
@@ -185,7 +185,7 @@ paths:
       tags:
         - "dags"
       parameters:
-        - name: "dagId"
+        - name: "name"
           in: "path"
           required: true
           schema:
@@ -236,7 +236,7 @@ paths:
       tags:
         - "dags"
       parameters:
-        - name: "dagId"
+        - name: "name"
           in: "path"
           required: true
           schema:
@@ -281,7 +281,7 @@ paths:
       tags:
         - "dags"
       parameters:
-        - name: "dagId"
+        - name: "name"
           in: "path"
           required: true
           schema:
@@ -290,10 +290,6 @@ paths:
       responses:
         "200":
           description: "DAG successfully deleted"
-          content:
-            application/json:
-              schema:
-                type: "object"
         "404":
           description: "DAG not found"
           content:
