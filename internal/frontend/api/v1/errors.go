@@ -2,12 +2,31 @@ package api
 
 import (
 	"fmt"
+	"net/http"
+
+	"github.com/dagu-org/dagu/api/v1"
 )
+
+func WriteErrorResponse(w http.ResponseWriter, err error) {
+	if apiErr, ok := err.(*APIError); ok {
+		w.WriteHeader(apiErr.HTTPStatus)
+		if apiErr.Message != "" {
+			fmt.Fprintf(w, `{"error": "%s"}`, apiErr.Message)
+		} else {
+			fmt.Fprintf(w, `{"error": "%s"}`, apiErr.Code)
+		}
+		return
+	}
+
+	apiErr := newInternalError(err)
+	w.WriteHeader(apiErr.HTTPStatus)
+	fmt.Fprintf(w, `{"error": "%s"}`, apiErr.Message)
+}
 
 // APIError is an error that has an associated HTTP status code.
 type APIError struct {
 	// Code is the error code to return.
-	Code string
+	Code api.ErrorCode
 	// HTTPStatus is the HTTP status code to return.
 	HTTPStatus int
 	// Message is the error message to return.
@@ -16,37 +35,49 @@ type APIError struct {
 
 // Error returns the error message.
 func (e APIError) Error() string {
+	if e.Message == "" {
+		return string(e.Code)
+	}
 	return fmt.Sprintf("%s: %s", e.Code, e.Message)
+}
+
+func NewAPIError(httpCode int, code api.ErrorCode, err error) *APIError {
+	apiErr := &APIError{
+		Code:       code,
+		HTTPStatus: httpCode,
+	}
+	if err != nil {
+		apiErr.Message = err.Error()
+	}
+	return apiErr
 }
 
 func newInternalError(err error) *APIError {
 	return &APIError{
-		Code:       "internal_error",
+		Code:       api.ErrorCodeInternalError,
 		HTTPStatus: 500,
 		Message:    "An internal error occurred",
 	}
 }
 
-func newNotFoundError(err error) *APIError {
-	return &APIError{
+func newNotFoundError(code api.ErrorCode, err error) *APIError {
+	apiErr := &APIError{
 		Code:       "not_found",
 		HTTPStatus: 404,
-		Message:    err.Error(),
 	}
+	if err != nil {
+		apiErr.Message = err.Error()
+	}
+	return apiErr
 }
 
-func newBadRequestError(err error) *APIError {
-	return &APIError{
-		Code:       "validation_error",
-		HTTPStatus: 400,
-		Message:    err.Error(),
-	}
-}
-
-func newError(httpCode int, code string, message *string) *APIError {
-	return &APIError{
+func newBadRequestError(code api.ErrorCode, err error) *APIError {
+	apiErr := &APIError{
 		Code:       code,
-		HTTPStatus: httpCode,
-		Message:    *message,
+		HTTPStatus: 400,
 	}
+	if err != nil {
+		apiErr.Message = err.Error()
+	}
+	return apiErr
 }

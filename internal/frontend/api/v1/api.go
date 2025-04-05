@@ -9,6 +9,7 @@ import (
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/client"
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/go-chi/chi/v5"
@@ -18,11 +19,27 @@ import (
 var _ api.StrictServerInterface = (*API)(nil)
 
 type API struct {
-	client client.Client
+	client             client.Client
+	remoteNodes        map[string]config.RemoteNode
+	apiBasePath        string
+	logEncodingCharset string
 }
 
-func New(cli client.Client) *API {
-	return &API{client: cli}
+func New(
+	cli client.Client,
+	cfg *config.Config,
+) *API {
+	remoteNodes := make(map[string]config.RemoteNode)
+	for _, n := range cfg.Server.RemoteNodes {
+		remoteNodes[n.Name] = n
+	}
+
+	return &API{
+		client:             cli,
+		logEncodingCharset: cfg.UI.LogEncodingCharset,
+		remoteNodes:        remoteNodes,
+		apiBasePath:        cfg.Server.APIBasePath,
+	}
 }
 
 func (a *API) ConfigureRoutes(r chi.Router, url string) error {
@@ -54,6 +71,7 @@ func (a *API) ConfigureRoutes(r chi.Router, url string) error {
 
 	r.Group(func(r chi.Router) {
 		handler := api.NewStrictHandlerWithOptions(a, nil, options)
+		r.Use(WithRemoteNode(a.remoteNodes, a.apiBasePath))
 		r.Mount("/", api.Handler(handler))
 	})
 

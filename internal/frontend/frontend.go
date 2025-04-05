@@ -50,6 +50,6 @@ func New(cfg *config.Config, cli client.Client) *Server {
 			Password: cfg.Server.Auth.Basic.Password,
 		}
 	}
-
-	return NewServer(api.New(cli), cfg)
+	a := api.New(cli, cfg)
+	return NewServer(a, cfg)
 }
