@@ -195,7 +195,7 @@ paths:
           in: "query"
           required: false
           schema:
-            type: "string"
+            $ref: "#/components/schemas/DAGDetailTab"
           description: "Tab name for UI navigation"
         - name: "file"
           in: "query"
@@ -215,7 +215,47 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/GetDAGDetailsResponse"
+                type: object
+                description: "Response object for getting details of a DAG"
+                properties:
+                  Title:
+                    type: string
+                    description: "Title of the Page"
+                  DAG:
+                    $ref: "#/components/schemas/DAGStatusFileDetails"
+                  Tab:
+                    $ref: "#/components/schemas/DAGDetailTab"
+                  Graph:
+                    type: string
+                    description: "Graph data for visualization"
+                  Definition:
+                    type: string
+                    description: "DAG definition"
+                  LogData:
+                    $ref: "#/components/schemas/DAGLogData"
+                  LogUrl:
+                    type: string
+                    description: "URL to access logs directly"
+                  StepLog:
+                    $ref: "#/components/schemas/StepLog"
+                  ScLog:
+                    $ref: "#/components/schemas/SchedulerLog"
+                  Errors:
+                    type: array
+                    description: "List of errors encountered during the request"
+                    items:
+                      type: string
+                required:
+                  - Title
+                  - DAG
+                  - Tab
+                  - Graph
+                  - Definition
+                  - LogData
+                  - LogUrl
+                  - StepLog
+                  - ScLog
+                  - Errors
         "404":
           description: "DAG not found"
           content:
@@ -387,6 +427,16 @@ components:
         - "bad_gateway"
         - "remote_node_error"
 
+    DAGDetailTab:
+      type: string
+      description: "Tab name for UI navigation"
+      enum:
+        - status
+        - spec
+        - history
+        - log
+        - scheduler-log
+
     HealthResponse:
       type: object
       description: "Response object for the health check endpoint"
@@ -440,50 +490,6 @@ components:
           description: "Additional parameters for the action in JSON format"
       required:
         - action
-
-    GetDAGDetailsResponse:
-      type: object
-      description: "Response object for getting details of a DAG"
-      properties:
-        Title:
-          type: string
-          description: "Title of the Page"
-        DAG:
-          $ref: "#/components/schemas/DAGStatusFileDetails"
-        Tab:
-          type: string
-          description: "Tab name for UI navigation"
-        Graph:
-          type: string
-          description: "Graph data for visualization"
-        Definition:
-          type: string
-          description: "DAG definition"
-        LogData:
-          $ref: "#/components/schemas/DAGLogData"
-        LogUrl:
-          type: string
-          description: "URL to access logs directly"
-        StepLog:
-          $ref: "#/components/schemas/StepLog"
-        ScLog:
-          $ref: "#/components/schemas/SchedulerLog"
-        Errors:
-          type: array
-          description: "List of errors encountered during the request"
-          items:
-            type: string
-      required:
-        - Title
-        - DAG
-        - Tab
-        - Graph
-        - Definition
-        - LogData
-        - LogUrl
-        - StepLog
-        - ScLog
-        - Errors
 
     PostDAGActionResponse:
       type: object
@@ -619,6 +625,29 @@ components:
         - "cancelled"
         - "finished"
 
+    NodeStatus:
+      type: integer
+      enum: [0, 1, 2, 3, 4, 5]
+      description: |
+        Numeric status code indicating current node state:
+        0: "Not started"
+        1: "Running"
+        2: "Failed"
+        3: "Cancelled"
+        4: "Success"
+        5: "Skipped"
+
+    NodeStatusText:
+      type: string
+      description: "Human-readable status description for the node"
+      enum:
+        - "not started"
+        - "running"
+        - "failed"
+        - "canceled"
+        - "finished"
+        - "skipped"
+
     DAGStatusFileDetails:
       type: object
       description: "Detailed status information for a DAG instance"
@@ -752,11 +781,9 @@ components:
           type: string
           description: "Name of the DAG"
         Status:
-          type: integer
-          description: "Numeric status code"
+          $ref: "#/components/schemas/RunStatus"
         StatusText:
-          type: string
-          description: "Human-readable status description"
+          $ref: "#/components/schemas/RunStatusText"
         Pid:
           type: integer
           description: "Process ID of the DAG run"
@@ -817,8 +844,9 @@ components:
           type: string
           description: "RFC3339 timestamp when the step finished"
         Status:
-          type: integer
-          description: "Numeric status code for the step"
+          $ref: "#/components/schemas/NodeStatus"
+        StatusText:
+          $ref: "#/components/schemas/NodeStatusText"
         RetryCount:
           type: integer
           description: "Number of retry attempts made for this step"
@@ -828,19 +856,16 @@ components:
         Error:
           type: string
           description: "Error message if the step failed"
-        StatusText:
-          type: string
-          description: "Human-readable status description"
       required:
         - Step
         - Log
         - StartedAt
         - FinishedAt
         - Status
+        - StatusText
         - RetryCount
         - DoneCount
         - Error
-        - StatusText
 
     Step:
       type: object
