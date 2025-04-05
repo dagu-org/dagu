@@ -634,7 +634,42 @@ func (a *API) updateStatus(
 
 // SearchDAGs implements api.StrictServerInterface.
 func (a *API) SearchDAGs(ctx context.Context, request api.SearchDAGsRequestObject) (api.SearchDAGsResponseObject, error) {
-	panic("unimplemented")
+	query := request.Params.Q
+	if query == "" {
+		return nil, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "query is required",
+		}
+	}
+
+	ret, errs, err := a.client.Grep(ctx, query)
+	if err != nil {
+		return nil, newInternalError(err)
+	}
+
+	var results []api.SearchDAGsResultItem
+	for _, item := range ret {
+		var matches []api.SearchDAGsMatchItem
+		for _, match := range item.Matches {
+			matches = append(matches, api.SearchDAGsMatchItem{
+				Line:       match.Line,
+				LineNumber: match.LineNumber,
+				StartLine:  match.StartLine,
+			})
+		}
+
+		results = append(results, api.SearchDAGsResultItem{
+			Name:    item.Name,
+			DAG:     toDAG(item.DAG),
+			Matches: matches,
+		})
+	}
+
+	return &api.SearchDAGs200JSONResponse{
+		Results: results,
+		Errors:  errs,
+	}, nil
 }
 
 func toDAG(dag *digraph.DAG) api.DAG {

@@ -251,6 +251,9 @@ func (d *dagStoreImpl) Grep(ctx context.Context, pattern string) (
 			}
 			matches, err := grep.Grep(dat, fmt.Sprintf("(?i)%s", pattern), grep.DefaultOptions)
 			if err != nil {
+				if errors.Is(err, grep.ErrNoMatch) {
+					continue
+				}
 				errs = append(errs, fmt.Sprintf("grep %s failed: %s", entry.Name(), err))
 				continue
 			}
