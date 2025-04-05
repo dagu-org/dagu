@@ -111,11 +111,7 @@ func (e *docker) Run(ctx context.Context) error {
 		args = append(args, val)
 	}
 
-	// If image is not set or execConfig is set, use exec instead of creating a new container
-	if e.image == "" || e.execConfig != nil {
-		if e.containerName == "" {
-			return fmt.Errorf("containerName must be set in exec mode")
-		}
+	if e.image == "" {
 		return e.execInContainer(ctx, cli, args)
 	}
 
@@ -133,9 +129,7 @@ func (e *docker) Run(ctx context.Context) error {
 
 	containerConfig := *e.containerConfig
 	containerConfig.Cmd = append([]string{e.step.Command}, args...)
-	if e.image != "" {
-		containerConfig.Image = e.image
-	}
+	containerConfig.Image = e.image
 
 	env := make([]string, len(containerConfig.Env))
 	for i, e := range containerConfig.Env {
@@ -386,7 +380,27 @@ func newDocker(
 		}
 	}
 
+	platform := ""
+	if value, ok := execCfg.Config["platform"].(string); ok {
+		var err error
+		platform, err = digraph.EvalString(ctx, value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate platform: %w", err)
+		}
+	}
+
+	containerName := ""
+	if value, ok := execCfg.Config["containerName"].(string); ok {
+		var err error
+		containerName, err = digraph.EvalString(ctx, value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate containerName: %w", err)
+		}
+	}
+
 	exec := &docker{
+		platform:        platform,
+		containerName:   containerName,
 		pull:            pull,
 		step:            step,
 		stdout:          os.Stdout,
@@ -397,17 +411,7 @@ func newDocker(
 		autoRemove:      autoRemove,
 	}
 
-	// Check for existing container name first
-	if containerName, ok := execCfg.Config["containerName"].(string); ok {
-		value, err := digraph.EvalString(ctx, containerName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate containerName: %w", err)
-		}
-		exec.containerName = value
-		return exec, nil
-	}
-
-	// Fall back to image if no container name is provided
+	// If image is provided, we don't care about containerName and will create a new container
 	if img, ok := execCfg.Config["image"].(string); ok {
 		value, err := digraph.EvalString(ctx, img)
 		if err != nil {
@@ -417,7 +421,12 @@ func newDocker(
 		return exec, nil
 	}
 
-	return nil, errors.New("either containerName or image must be specified")
+	// If image is not provided, containerName must be provided so we can use it in exec mode
+	if exec.containerName == "" {
+		return nil, errors.New("at least containerName or image must be specified")
+	} else {
+		return exec, nil
+	}
 }
 
 func init() {
