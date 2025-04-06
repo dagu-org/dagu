@@ -24,10 +24,13 @@ function Dashboard() {
   const [metrics, setMetrics] = React.useState<metrics>(defaultMetrics);
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
+  const searchParams = new URLSearchParams();
+  searchParams.set('limit', config.maxDashboardPageLimit.toString() || '200');
+  if (appBarContext.selectedRemoteNode) {
+    searchParams.set('remoteNode', appBarContext.selectedRemoteNode);
+  }
   const { data } = useSWR<ListWorkflowsResponse>(
-    `/dags?limit=${config.maxDashboardPageLimit}&remoteNode=${
-      appBarContext.selectedRemoteNode || 'local'
-    }`,
+    `/dags?${searchParams.toString()}`,
     null,
     {
       refreshInterval: 10000,

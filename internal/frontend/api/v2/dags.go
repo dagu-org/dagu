@@ -11,12 +11,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dagu-org/dagu/api/v1"
+	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/dagu-org/dagu/internal/persistence/jsondb"
 	"github.com/samber/lo"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/japanese"
@@ -25,7 +24,7 @@ import (
 
 // CreateDAG implements api.StrictServerInterface.
 func (a *API) CreateDAG(ctx context.Context, request api.CreateDAGRequestObject) (api.CreateDAGResponseObject, error) {
-	name, err := a.client.CreateDAG(ctx, request.Body.Value)
+	name, err := a.client.CreateDAG(ctx, request.Body.Name)
 	if err != nil {
 		if errors.Is(err, persistence.ErrDAGAlreadyExists) {
 			return nil, newBadRequestError(api.ErrorCodeBadRequest, err)
@@ -33,7 +32,7 @@ func (a *API) CreateDAG(ctx context.Context, request api.CreateDAGRequestObject)
 		return nil, newInternalError(err)
 	}
 	return &api.CreateDAG201JSONResponse{
-		DagID: name,
+		Name: name,
 	}, nil
 }
 
@@ -150,7 +149,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 
 	case api.DAGDetailTabHistory:
 		historyData := a.readHistoryData(ctx, status.DAG)
-		resp.LogData = &historyData
+		resp.HistoryData = &historyData
 
 	case api.DAGDetailTabLog:
 		if request.Params.Step == nil {
@@ -161,14 +160,14 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 			}
 		}
 
-		l, err := a.readStepLog(ctx, dag, *request.Params.Step, value(request.Params.File))
+		l, err := a.readStepLog(ctx, dag, *request.Params.Step, value(request.Params.ReqId))
 		if err != nil {
 			return nil, err
 		}
 		resp.StepLog = l
 
 	case api.DAGDetailTabSchedulerLog:
-		l, err := a.readLog(ctx, dag, value(request.Params.File))
+		l, err := a.readLog(ctx, dag, value(request.Params.ReqId))
 		if err != nil {
 			return nil, err
 		}
@@ -216,8 +215,8 @@ func (a *API) readHistoryData(
 			history = append(history, api.NodeStatus(s))
 		}
 		grid = append(grid, api.DAGLogGridItem{
-			Name: node,
-			Vals: history,
+			Name:    node,
+			History: history,
 		})
 	}
 
@@ -254,53 +253,38 @@ func (a *API) readHistoryData(
 				history = append(history, api.NodeStatus(status))
 			}
 			grid = append(grid, api.DAGLogGridItem{
-				Name: handlerType.String(),
-				Vals: history,
+				Name:    handlerType.String(),
+				History: history,
 			})
 		}
 	}
 
-	var statusList []api.DAGLogStatusFile
+	var statusList []api.DAGStatusDetails
 	for _, log := range logs {
-		statusFile := api.DAGLogStatusFile{
-			File:   log.File,
-			Status: toStatus(log.Status),
-		}
-		statusList = append(statusList, statusFile)
+		statusList = append(statusList, toStatus(log.Status))
 	}
 
 	return api.DAGHistoryData{
-		GridData: grid,
-		Logs:     lo.Reverse(statusList),
+		GridData:      grid,
+		StatusDetails: lo.Reverse(statusList),
 	}
 }
 
 func (a *API) readLog(
 	ctx context.Context,
 	dag *digraph.DAG,
-	statusFile string,
+	reqID string,
 ) (*api.SchedulerLog, error) {
-	var logFile string
-
-	if statusFile != "" {
-		status, err := jsondb.ParseStatusFile(statusFile)
-		if err != nil {
-			return nil, err
-		}
-		logFile = status.Log
+	status, err := a.readStatus(ctx, dag, reqID)
+	if err != nil {
+		return nil, err
 	}
 
-	if logFile == "" {
-		lastStatus, err := a.client.GetLatestStatus(ctx, dag)
-		if err != nil {
-			return nil, newInternalError(err)
-		}
-		logFile = lastStatus.Log
-	}
+	logFile := status.Log
 
 	content, err := readFileContent(logFile, nil)
 	if err != nil {
-		return nil, newInternalError(err)
+		return nil, fmt.Errorf("error reading %s: %w", logFile, err)
 	}
 
 	return &api.SchedulerLog{
@@ -313,24 +297,11 @@ func (a *API) readStepLog(
 	ctx context.Context,
 	dag *digraph.DAG,
 	stepName string,
-	statusFile string,
+	reqID string,
 ) (*api.StepLog, error) {
-	var status *persistence.Status
-
-	if statusFile != "" {
-		parsedStatus, err := jsondb.ParseStatusFile(statusFile)
-		if err != nil {
-			return nil, err
-		}
-		status = parsedStatus
-	}
-
-	if status == nil {
-		latestStatus, err := a.client.GetLatestStatus(ctx, dag)
-		if err != nil {
-			return nil, newInternalError(err)
-		}
-		status = &latestStatus
+	status, err := a.readStatus(ctx, dag, reqID)
+	if err != nil {
+		return nil, err
 	}
 
 	// Find the step in the status to get the log file.
@@ -417,11 +388,11 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	if request.Params.Page != nil {
 		opts = append(opts, client.WithPage(*request.Params.Page))
 	}
-	if request.Params.SearchName != nil {
-		opts = append(opts, client.WithName(*request.Params.SearchName))
+	if request.Params.Name != nil {
+		opts = append(opts, client.WithName(*request.Params.Name))
 	}
-	if request.Params.SearchTag != nil {
-		opts = append(opts, client.WithTag(*request.Params.SearchTag))
+	if request.Params.Tag != nil {
+		opts = append(opts, client.WithTag(*request.Params.Tag))
 	}
 
 	result, err := a.client.ListStatus(ctx, opts...)

@@ -51,23 +51,23 @@ export type Condition = {
 };
 
 export type DAG = {
-  Location: string;
+  Location?: string;
   Name: string;
-  Schedule: Schedule[];
-  Group: string;
-  Tags: string[];
-  Description: string;
-  Env: string[];
-  LogDir: string;
-  HandlerOn: HandlerOn;
+  Schedule?: Schedule[];
+  Group?: string;
+  Tags?: string[];
+  Description?: string;
+  Env?: string[];
+  LogDir?: string;
+  HandlerOn?: HandlerOn;
   Steps?: Step[];
-  HistRetentionDays: number;
-  Preconditions: Condition[] | null;
-  MaxActiveRuns: number;
-  Params: string[];
+  HistRetentionDays?: number;
+  Preconditions?: Condition[] | null;
+  MaxActiveRuns?: number;
+  Params?: string[];
   DefaultParams?: string;
-  Delay: number;
-  MaxCleanUpTime: number;
+  Delay?: number;
+  MaxCleanUpTime?: number;
 };
 
 export type Schedule = {
@@ -207,23 +207,23 @@ export type StatusFile = {
 
 export type Step = {
   Name: string;
-  Description: string;
-  Variables: string[];
-  Dir: string;
-  CmdWithArgs: string;
-  Command: string;
-  Script: string;
-  Stdout: string;
-  Output: string;
-  Args: string[];
-  Depends: string[];
-  ContinueOn: ContinueOn;
+  Description?: string;
+  Variables?: string[];
+  Dir?: string;
+  CmdWithArgs?: string;
+  Command?: string;
+  Script?: string;
+  Stdout?: string;
+  Output?: string;
+  Args?: string[];
+  Depends?: string[];
+  ContinueOn?: ContinueOn;
   RetryPolicy?: RetryPolicy;
-  RepeatPolicy: RepeatPolicy;
-  MailOnError: boolean;
-  Preconditions: Condition[] | null;
-  Run: string;
-  Params: string;
+  RepeatPolicy?: RepeatPolicy;
+  MailOnError?: boolean;
+  Preconditions?: Condition[] | null;
+  Run?: string;
+  Params?: string;
 };
 
 export type RetryPolicy = {

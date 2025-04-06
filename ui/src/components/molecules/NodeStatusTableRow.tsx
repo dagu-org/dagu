@@ -22,7 +22,16 @@ function NodeStatusTableRow({
   file,
   onRequireModal,
 }: Props) {
-  const url = `/dags/${name}/log?file=${file}&step=${encodeURIComponent(node.Step.Name)}`;
+  const searchParams = new URLSearchParams();
+  searchParams.set('remoteNode', 'local');
+  if (node.Step) {
+    searchParams.set('step', node.Step.Name);
+  }
+  if (file) {
+    searchParams.set('file', file);
+  }
+
+  const url = `/dags/${name}/log?${searchParams.toString()}`;
   const buttonStyle = {
     margin: '0px',
     padding: '0px',
@@ -33,7 +42,9 @@ function NodeStatusTableRow({
   let args = '';
   if (node.Step.Args) {
     // Use uninterpolated args to avoid render issues with very long params
-    args = node.Step.CmdWithArgs.replace(node.Step.Command, '').trimStart();
+    args =
+      node.Step.CmdWithArgs?.replace(node.Step.Command || '', '').trimStart() ||
+      '';
   }
   return (
     <StyledTableRow>

@@ -35,6 +35,10 @@ GOTESTSUM_ARGS=--format=standard-quiet
 GO_TEST_FLAGS=-v --race
 
 # OpenAPI configuration
+OAPI_SPEC_DIR_V2=./api/v2
+OAPI_SPEC_FILE_V2=${OAPI_SPEC_DIR_V2}/api.yaml
+OAPI_CONFIG_FILE_V2=${OAPI_SPEC_DIR_V2}/config.yaml
+
 OAPI_SPEC_DIR_V1=./api/v1
 OAPI_SPEC_FILE_V1=${OAPI_SPEC_DIR_V1}/api.yaml
 OAPI_CONFIG_FILE_V1=${OAPI_SPEC_DIR_V1}/config.yaml
@@ -142,13 +146,27 @@ open-coverage:
 lint: golangci-lint
 
 # api generates the server code from the OpenAPI specification.
+.PHONY: api
+api: api-validate
+	@echo "${COLOR_GREEN}Generating API...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_oapi_codegen}
+	@${LOCAL_BIN_DIR}/oapi-codegen --config=${OAPI_CONFIG_FILE_V2} ${OAPI_SPEC_FILE_V2}
+
+# api-validate validates the OpenAPI specification.
+.PHONY: api-validate
+api-validate:
+	@echo "${COLOR_GREEN}Validating API...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_kin_openapi_validate}
+	@${LOCAL_BIN_DIR}/validate ${OAPI_SPEC_FILE_V2}
+
+# api-v1 generates the server code from the OpenAPI specification.
 .PHONY: api-v1
 api-v1: api-validate-v1
 	@echo "${COLOR_GREEN}Generating API...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_oapi_codegen}
 	@${LOCAL_BIN_DIR}/oapi-codegen --config=${OAPI_CONFIG_FILE_V1} ${OAPI_SPEC_FILE_V1}
 
-# api-validate validates the OpenAPI specification.
+# api-validate-v1 validates the OpenAPI specification.
 .PHONY: api-validate-v1
 api-validate-v1:
 	@echo "${COLOR_GREEN}Validating API...${COLOR_RESET}"

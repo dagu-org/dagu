@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/dagu-org/dagu/api/v1"
+	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -14,7 +14,7 @@ func TestDAG(t *testing.T) {
 
 	// Create a new DAG
 	_ = server.Client().Post("/api/v1/dags", api.CreateDAGJSONRequestBody{
-		Value: "test_dag",
+		Name: "test_dag",
 	}).ExpectStatus(http.StatusCreated).Send(t)
 
 	// Fetch the created DAG with the list endpoint

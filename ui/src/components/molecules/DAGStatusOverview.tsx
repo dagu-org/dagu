@@ -12,7 +12,11 @@ type Props = {
 };
 
 function DAGStatusOverview({ status, name, file = '' }: Props) {
-  const url = `/dags/${name}/scheduler-log?&file=${encodeURI(file)}`;
+  const searchParams = new URLSearchParams();
+  if (file) {
+    searchParams.set('file', file);
+  }
+  const url = `/dags/${name}/scheduler-log?${searchParams.toString()}`;
   if (!status) {
     return null;
   }

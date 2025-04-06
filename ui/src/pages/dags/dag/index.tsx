@@ -30,14 +30,16 @@ function DAGDetails() {
   const { pathname } = useLocation();
 
   const baseUrl = `/dags/${encodeURI(params.name!)}`;
+  const searchParams = new URLSearchParams(window.location.search);
+  searchParams.set('remoteNode', appBarContext.selectedRemoteNode || 'local');
+  if (params.tab) {
+    searchParams.set('tab', params.tab);
+  }
+
   const { data, isValidating, mutate } = useSWR<GetDAGResponse>(
-    `/dags/${params.name}?tab=${params.tab ?? ''}&${new URLSearchParams(
-      window.location.search
-    ).toString()}&remoteNode=${appBarContext.selectedRemoteNode || 'local'}`,
+    `/dags/${params.name}?${searchParams.toString()}`,
     null,
-    {
-      refreshInterval: 2000,
-    }
+    { refreshInterval: 2000 }
   );
   const [status, setStatus] = React.useState<Status | undefined>();
 

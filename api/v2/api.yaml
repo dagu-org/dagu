@@ -1,6 +1,6 @@
 openapi: "3.0.0"
 info:
-  version: "1.0.0"
+  version: "2.0.0"
   title: "Dagu"
   contact:
     name: "Yota Hamada"
@@ -11,7 +11,7 @@ info:
     url: "https://github.com/dagu-org/dagu/blob/main/LICENSE.md"
 
 servers:
-  - url: "{schema}://{host}:{port}/api/v1"
+  - url: "{schema}://{host}:{port}/api/v2"
     description: "Dagu API server"
     variables:
       schema:
@@ -80,13 +80,13 @@ paths:
             type: "integer"
             default: 20
           description: "Number of items to return per page"
-        - name: "searchName"
+        - name: "name"
           in: "query"
           required: false
           schema:
             type: "string"
           description: "Filter DAGs by name"
-        - name: "searchTag"
+        - name: "tag"
           in: "query"
           required: false
           schema:
@@ -146,15 +146,11 @@ paths:
             schema:
               type: object
               properties:
-                action:
+                name:
                   type: string
-                  description: "Action to perform upon creation (if any)"
-                value:
-                  type: string
-                  description: "Associated value for the action"
+                  description: "Name of the new DAG"
               required:
-                - action
-                - value
+                - name
       responses:
         "201":
           description: "A successful response"
@@ -163,11 +159,11 @@ paths:
               schema:
                 type: object
                 properties:
-                  DagID:
+                  name:
                     type: string
                     description: "Name of the newly created DAG"
                 required:
-                  - DagID
+                  - name
         "400":
           description: "Invalid request body"
           content:
@@ -201,11 +197,12 @@ paths:
           schema:
             $ref: "#/components/schemas/DAGDetailTab"
           description: "Specific part of the DAG to retrieve"
-        - name: "file"
+        - name: "reqId"
           in: "query"
           required: false
           schema:
             type: "string"
+          description: "Specific file related to the DAG"
         - name: "step"
           in: "query"
           required: false
@@ -229,7 +226,7 @@ paths:
                   Definition:
                     type: string
                     description: "DAG definition"
-                  LogData:
+                  HistoryData:
                     $ref: "#/components/schemas/DAGHistoryData"
                   LogUrl:
                     type: string
@@ -985,27 +982,14 @@ components:
           description: "Grid data for visualization"
           items:
             $ref: "#/components/schemas/DAGLogGridItem"
-        Logs:
+        StatusDetails:
           type: array
           description: "Detailed status information for each run"
           items:
-            $ref: "#/components/schemas/DAGLogStatusFile"
+            $ref: "#/components/schemas/DAGStatusDetails"
       required:
         - GridData
-        - Logs
-
-    DAGLogStatusFile:
-      type: object
-      description: "Log status file information"
-      properties:
-        File:
-          type: string
-          description: "Path to the log file"
-        Status:
-          $ref: "#/components/schemas/DAGStatusDetails"
-      required:
-        - File
-        - Status
+        - StatusDetails
 
     DAGLogGridItem:
       type: object
@@ -1014,14 +998,14 @@ components:
         Name:
           type: string
           description: "Name of the step"
-        Vals:
+        History:
           type: array
           description: "Status of the step ordered by time"
           items:
             $ref: "#/components/schemas/NodeStatus"
       required:
         - Name
-        - Vals
+        - History
 
     Precondition:
       type: object

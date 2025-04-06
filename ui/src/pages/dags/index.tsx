@@ -35,14 +35,21 @@ function DAGs() {
     updatePreference('pageLimit', newLimit);
   };
 
-  const { cache, mutate } = useSWRConfig();
-  const endPoint = `/dags?${new URLSearchParams({
+  const searchParams = new URLSearchParams({
     page: page.toString(),
     limit: preferences.pageLimit.toString(),
-    searchName: apiSearchText,
-    searchTag: apiSearchTag,
     remoteNode: appBarContext.selectedRemoteNode || 'local',
-  }).toString()}`;
+  });
+
+  if (apiSearchText) {
+    searchParams.set('searchName', apiSearchText);
+  }
+  if (apiSearchTag) {
+    searchParams.set('searchTag', apiSearchTag);
+  }
+
+  const { cache, mutate } = useSWRConfig();
+  const endPoint = `/dags?${searchParams.toString()}`;
   const { data } = useSWR<ListWorkflowsResponse>(endPoint, null, {
     refreshInterval: 10000,
     revalidateIfStale: false,
