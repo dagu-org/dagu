@@ -402,6 +402,15 @@ paths:
                 $ref: "#/components/schemas/Error"
 
 components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+    apiToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+
   schemas:
     Error:
       type: object
@@ -1037,3 +1046,9 @@ components:
       required:
         - Tags
         - Errors
+
+# Apply security requirements globally
+security:
+  - apiToken: []
+  - basicAuth: []
+  - {}
