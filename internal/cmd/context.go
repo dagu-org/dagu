@@ -161,7 +161,7 @@ func (ctx *Context) server() (*frontend.Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client: %w", err)
 	}
-	return frontend.New(ctx.cfg, cli), nil
+	return frontend.NewServer(ctx.cfg, cli), nil
 }
 
 // scheduler creates a new scheduler instance using the default client.

@@ -12,6 +12,7 @@ import (
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/frontend/auth"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
@@ -26,6 +27,7 @@ type API struct {
 	remoteNodes        map[string]config.RemoteNode
 	apiBasePath        string
 	logEncodingCharset string
+	config             *config.Config
 }
 
 func New(
@@ -42,6 +44,7 @@ func New(
 		logEncodingCharset: cfg.UI.LogEncodingCharset,
 		remoteNodes:        remoteNodes,
 		apiBasePath:        cfg.Server.APIBasePath,
+		config:             cfg,
 	}
 }
 
@@ -101,8 +104,17 @@ func (a *API) ConfigureRoutes(r chi.Router, baseURL string) error {
 	}
 
 	r.Group(func(r chi.Router) {
-		handler := api.NewStrictHandlerWithOptions(a, nil, options)
+		if a.config.Server.Auth.Token.Enabled {
+			r.Use(auth.Token("restricted", a.config.Server.Auth.Token.Value))
+		}
+		if a.config.Server.Auth.Basic.Enabled {
+			r.Use(auth.Basic("restricted", map[string]string{
+				a.config.Server.Auth.Basic.Username: a.config.Server.Auth.Basic.Password,
+			}))
+		}
 		r.Use(WithRemoteNode(a.remoteNodes, a.apiBasePath))
+
+		handler := api.NewStrictHandlerWithOptions(a, nil, options)
 		r.Mount("/", api.Handler(handler))
 	})
 

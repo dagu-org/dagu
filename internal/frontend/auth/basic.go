@@ -1,23 +1,17 @@
-package middleware
+package auth
 
 import (
 	"crypto/subtle"
 	"fmt"
 	"net/http"
-	"strings"
 )
 
-const (
-	authHeaderKey = "Authorization"
-)
-
-func BasicAuth(realm string, creds map[string]string) func(
+func Basic(realm string, creds map[string]string) func(
 	next http.Handler,
 ) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			authHeader := strings.Split(r.Header.Get(authHeaderKey), " ")
-			if skipBasicAuth(authHeader) {
+			if isAuthenticated(r.Context()) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -39,13 +33,6 @@ func BasicAuth(realm string, creds map[string]string) func(
 			next.ServeHTTP(w, r.WithContext(withAuthenticated(r.Context())))
 		})
 	}
-}
-
-// skipBasicAuth skips basic auth middleware when the auth token is set
-func skipBasicAuth(authHeader []string) bool {
-	return authToken != nil &&
-		len(authHeader) >= 2 &&
-		authHeader[0] == "Bearer"
 }
 
 func basicAuthFailed(w http.ResponseWriter, realm string) {

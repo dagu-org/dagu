@@ -17,9 +17,6 @@ import (
 	"github.com/jessevdk/go-flags"
 
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations"
-	pkgmiddleware "github.com/dagu-org/dagu/internal/frontend/middleware"
-
-	"github.com/go-chi/chi/v5"
 )
 
 type Server struct {
@@ -103,24 +100,24 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 	loggerInstance := logger.FromContext(ctx)
 
 	// Setup middleware & routes
-	middlewareOptions := &pkgmiddleware.Options{
-		Handler:  svr.defaultRoutes(ctx, chi.NewRouter()), // API remains active
-		BasePath: svr.funcsConfig.BasePath,
-		Logger:   loggerInstance,
-	}
+	// middlewareOptions := &pkgmiddleware.Options{
+	// 	Handler:  svr.defaultRoutes(ctx, chi.NewRouter()), // API remains active
+	// 	BasePath: svr.funcsConfig.BasePath,
+	// 	Logger:   loggerInstance,
+	// }
 
-	if svr.authToken != nil {
-		middlewareOptions.AuthToken = &pkgmiddleware.AuthToken{
-			Token: svr.authToken.Token,
-		}
-	}
-	if svr.basicAuth != nil {
-		middlewareOptions.AuthBasic = &pkgmiddleware.AuthBasic{
-			Username: svr.basicAuth.Username,
-			Password: svr.basicAuth.Password,
-		}
-	}
-	pkgmiddleware.Setup(middlewareOptions)
+	// if svr.authToken != nil {
+	// 	middlewareOptions.AuthToken = &pkgmiddleware.AuthToken{
+	// 		Token: svr.authToken.Token,
+	// 	}
+	// }
+	// if svr.basicAuth != nil {
+	// 	middlewareOptions.AuthBasic = &pkgmiddleware.AuthBasic{
+	// 		Username: svr.basicAuth.Username,
+	// 		Password: svr.basicAuth.Password,
+	// 	}
+	// }
+	// pkgmiddleware.Setup(middlewareOptions)
 
 	// Load API spec (Always required)
 	swaggerSpec, err := loads.Analyzed(restapi.SwaggerJSON, "")

@@ -47,7 +47,7 @@ func SetupServer(t *testing.T, opts ...HelperOption) Server {
 func (srv *Server) runServer(t *testing.T) {
 	t.Helper()
 
-	server := frontend.New(srv.Config, srv.Helper.Client)
+	server := frontend.NewServer(srv.Config, srv.Helper.Client)
 	err := server.Serve(srv.Helper.Context)
 	require.NoError(t, err, "failed to start server")
 }
