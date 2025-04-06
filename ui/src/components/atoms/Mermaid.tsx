@@ -1,12 +1,11 @@
 import React, { CSSProperties } from 'react';
 import mermaid from 'mermaid';
 import '@fortawesome/fontawesome-free/css/all.min.css';
-import { ToggleButton, ToggleButtonGroup } from '@mui/material';
-import { ZoomIn, ZoomOut, RestartAlt } from '@mui/icons-material';
 
 type Props = {
   def: string;
   style?: CSSProperties;
+  scale: number;
 };
 
 // Mermaidの初期設定
@@ -25,12 +24,11 @@ mermaid.initialize({
   logLevel: 4, // ERROR
 });
 
-function Mermaid({ def, style = {} }: Props) {
+function Mermaid({ def, style = {}, scale }: Props) {
   const ref = React.useRef<HTMLDivElement>(null);
   const [uniqueId] = React.useState(
     () => `mermaid-${Math.random().toString(36).substr(2, 9)}`
   );
-  const [scale, setScale] = React.useState(1);
 
   const mStyle = {
     ...style,
@@ -40,25 +38,6 @@ function Mermaid({ def, style = {} }: Props) {
     overflowX: 'auto',
     padding: '2em',
     position: 'relative',
-  };
-
-  const controlsStyle: CSSProperties = {
-    position: 'absolute',
-    top: '1em',
-    right: '2em',
-    zIndex: 1,
-  };
-
-  const zoomIn = () => {
-    setScale((prevScale) => Math.min(prevScale + 0.1, 2));
-  };
-
-  const zoomOut = () => {
-    setScale((prevScale) => Math.max(prevScale - 0.1, 0.5));
-  };
-
-  const resetZoom = () => {
-    setScale(1);
   };
 
   const render = async () => {
@@ -99,19 +78,8 @@ function Mermaid({ def, style = {} }: Props) {
     }
   };
 
-  const renderWithRetry = () => {
-    try {
-      render();
-    } catch (error) {
-      console.error('error rendering mermaid, retrying, error:');
-      console.error(error);
-      console.error(def);
-      setTimeout(renderWithRetry, 1);
-    }
-  };
-
   React.useEffect(() => {
-    renderWithRetry();
+    render();
   }, [def]);
 
   React.useEffect(() => {
@@ -126,34 +94,6 @@ function Mermaid({ def, style = {} }: Props) {
 
   return (
     <div style={dStyle}>
-      <div style={controlsStyle}>
-        <ToggleButtonGroup
-          size="small"
-          sx={{
-            backgroundColor: 'white',
-            '& .MuiToggleButton-root': {
-              border: '1px solid rgba(0, 0, 0, 0.12)',
-              borderRadius: '4px !important',
-              marginRight: '8px',
-              padding: '4px 8px',
-              color: 'rgba(0, 0, 0, 0.54)',
-              '&:hover': {
-                backgroundColor: 'rgba(0, 0, 0, 0.04)',
-              },
-            },
-          }}
-        >
-          <ToggleButton value="zoomin" onClick={zoomIn}>
-            <ZoomIn fontSize="small" />
-          </ToggleButton>
-          <ToggleButton value="zoomout" onClick={zoomOut}>
-            <ZoomOut fontSize="small" />
-          </ToggleButton>
-          <ToggleButton value="reset" onClick={resetZoom}>
-            <RestartAlt fontSize="small" />
-          </ToggleButton>
-        </ToggleButtonGroup>
-      </div>
       <div
         className="mermaid"
         ref={ref}
@@ -169,5 +109,5 @@ function Mermaid({ def, style = {} }: Props) {
 
 // メモ化の条件を維持
 export default React.memo(Mermaid, (prev, next) => {
-  return prev.def === next.def;
+  return prev.def === next.def && prev.scale === next.scale;
 });
