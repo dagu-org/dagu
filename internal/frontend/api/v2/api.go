@@ -104,14 +104,16 @@ func (a *API) ConfigureRoutes(r chi.Router, baseURL string) error {
 	}
 
 	r.Group(func(r chi.Router) {
-		if a.config.Server.Auth.Token.Enabled {
-			r.Use(auth.Token("restricted", a.config.Server.Auth.Token.Value))
-		}
-		if a.config.Server.Auth.Basic.Enabled {
-			r.Use(auth.Basic("restricted", map[string]string{
+		authOptions := auth.Options{
+			Realm:            "restricted",
+			APITokenEnabled:  a.config.Server.Auth.Token.Enabled,
+			APIToken:         a.config.Server.Auth.Token.Value,
+			BasicAuthEnabled: a.config.Server.Auth.Basic.Enabled,
+			Creds: map[string]string{
 				a.config.Server.Auth.Basic.Username: a.config.Server.Auth.Basic.Password,
-			}))
+			},
 		}
+		r.Use(auth.Middleware(authOptions))
 		r.Use(WithRemoteNode(a.remoteNodes, a.apiBasePath))
 
 		handler := api.NewStrictHandlerWithOptions(a, nil, options)

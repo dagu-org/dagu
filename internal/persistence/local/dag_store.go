@@ -42,14 +42,14 @@ type dagStoreImpl struct {
 }
 
 // NewDAGStore creates a new DAG store implementation using the local filesystem
-func NewDAGStore(dir string, opts ...DAGStoreOption) persistence.DAGStore {
+func NewDAGStore(baseDir string, opts ...DAGStoreOption) persistence.DAGStore {
 	options := &DAGStoreOptions{}
 	for _, opt := range opts {
 		opt(options)
 	}
 
 	return &dagStoreImpl{
-		baseDir:   dir,
+		baseDir:   baseDir,
 		fileCache: options.FileCache,
 	}
 }
