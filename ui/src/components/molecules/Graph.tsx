@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Node, NodeStatus } from '../../models';
 import { Step } from '../../models';
 import Mermaid from '../atoms/Mermaid';
+import { ToggleButton, ToggleButtonGroup } from '@mui/material';
+import { ZoomIn, ZoomOut, RestartAlt } from '@mui/icons-material';
 
 type onClickNode = (name: string) => void;
 export type FlowchartType = 'TD' | 'LR';
@@ -29,6 +31,20 @@ const Graph: React.FC<Props> = ({
   showIcons = true,
   animate = true,
 }) => {
+  const [scale, setScale] = useState(1);
+
+  const zoomIn = () => {
+    setScale((prevScale) => Math.min(prevScale + 0.1, 2));
+  };
+
+  const zoomOut = () => {
+    setScale((prevScale) => Math.max(prevScale - 0.1, 0.5));
+  };
+
+  const resetZoom = () => {
+    setScale(1);
+  };
+
   // Calculate width based on flowchart type and graph breadth
   const width = React.useMemo(() => {
     if (!steps) return '100%';
@@ -57,6 +73,17 @@ const Graph: React.FC<Props> = ({
       linear-gradient(180deg, #f8fafc 1px, transparent 1px)
     `,
     backgroundSize: '20px 20px',
+  };
+
+  const containerStyle = {
+    position: 'relative' as const,
+  };
+
+  const toggleButtonStyle = {
+    position: 'absolute' as const,
+    top: '10px',
+    right: '10px',
+    zIndex: 1,
   };
 
   // Define FontAwesome icons for each status with colors and animations
@@ -171,7 +198,38 @@ const Graph: React.FC<Props> = ({
     return dat.join('\n');
   }, [steps, onClickNode, flowchart, showIcons]);
 
-  return <Mermaid style={mermaidStyle} def={graph} />;
+  return (
+    <div style={containerStyle}>
+      <ToggleButtonGroup
+        size="small"
+        sx={{
+          ...toggleButtonStyle,
+          backgroundColor: 'white',
+          '& .MuiToggleButton-root': {
+            border: '1px solid rgba(0, 0, 0, 0.12)',
+            borderRadius: '4px !important',
+            marginRight: '8px',
+            padding: '4px 8px',
+            color: 'rgba(0, 0, 0, 0.54)',
+            '&:hover': {
+              backgroundColor: 'rgba(0, 0, 0, 0.04)',
+            },
+          },
+        }}
+      >
+        <ToggleButton value="zoomin" onClick={zoomIn}>
+          <ZoomIn fontSize="small" />
+        </ToggleButton>
+        <ToggleButton value="zoomout" onClick={zoomOut}>
+          <ZoomOut fontSize="small" />
+        </ToggleButton>
+        <ToggleButton value="reset" onClick={resetZoom}>
+          <RestartAlt fontSize="small" />
+        </ToggleButton>
+      </ToggleButtonGroup>
+      <Mermaid style={mermaidStyle} def={graph} scale={scale} />
+    </div>
+  );
 };
 
 // Function to calculate the maximum breadth of the graph
