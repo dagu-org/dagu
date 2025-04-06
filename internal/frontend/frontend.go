@@ -3,19 +3,11 @@ package frontend
 import (
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/frontend/api/v1"
-	"github.com/dagu-org/dagu/internal/frontend/handlers"
 	"github.com/dagu-org/dagu/internal/frontend/server"
 )
 
 func New(cfg *config.Config, cli client.Client) *Server {
 	var apiHandlers []server.Handler
-
-	dagAPIHandler := handlers.NewDAG(cli, cfg.UI.LogEncodingCharset, cfg.Server.RemoteNodes, cfg.Server.APIBasePath)
-	apiHandlers = append(apiHandlers, dagAPIHandler)
-
-	systemAPIHandler := handlers.NewSystem()
-	apiHandlers = append(apiHandlers, systemAPIHandler)
 
 	var remoteNodes []string
 	for _, n := range cfg.Server.RemoteNodes {
@@ -50,6 +42,6 @@ func New(cfg *config.Config, cli client.Client) *Server {
 			Password: cfg.Server.Auth.Basic.Password,
 		}
 	}
-	a := api.New(cli, cfg)
-	return NewServer(a, cfg)
+
+	return NewServer(cli, cfg)
 }

@@ -15,8 +15,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/frontend/api/v1"
+	apiv1 "github.com/dagu-org/dagu/internal/frontend/api/v1"
+	apiv2 "github.com/dagu-org/dagu/internal/frontend/api/v2"
 	"github.com/dagu-org/dagu/internal/frontend/metrics"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/go-chi/chi/v5"
@@ -26,22 +28,21 @@ import (
 )
 
 type Server struct {
-	api         *api.API
+	apiV1       *apiv1.API
+	apiV2       *apiv2.API
 	config      *config.Config
 	httpServer  *http.Server
 	funcsConfig funcsConfig
 }
 
-func NewServer(
-	api *api.API,
-	cfg *config.Config,
-) *Server {
+func NewServer(cli client.Client, cfg *config.Config) *Server {
 	var remoteNodes []string
 	for _, node := range cfg.Server.RemoteNodes {
 		remoteNodes = append(remoteNodes, node.Name)
 	}
 	return &Server{
-		api:    api,
+		apiV1:  apiv1.New(cli, cfg),
+		apiV2:  apiv2.New(cli, cfg),
 		config: cfg,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,
@@ -79,19 +80,31 @@ func (srv *Server) Serve(ctx context.Context) error {
 
 	srv.routes(ctx, r)
 
-	basePath := path.Join(srv.config.Server.BasePath, "api/v1")
-	if !strings.HasPrefix(basePath, "/") {
-		basePath = "/" + basePath
+	apiV1BasePath := path.Join(srv.config.Server.BasePath, "api/v1")
+	if !strings.HasPrefix(apiV1BasePath, "/") {
+		apiV1BasePath = "/" + apiV1BasePath
+	}
+
+	apiV2BasePath := path.Join(srv.config.Server.BasePath, "api/v2")
+	if !strings.HasPrefix(apiV2BasePath, "/") {
+		apiV2BasePath = "/" + apiV2BasePath
 	}
 
 	schema := "http"
 	if srv.config.Server.TLS != nil {
 		schema = "https"
 	}
-	url := fmt.Sprintf("%s://%s:%d%s", schema, srv.config.Server.Host, srv.config.Server.Port, basePath)
 
-	r.Route(basePath, func(r chi.Router) {
-		if err := srv.api.ConfigureRoutes(r, url); err != nil {
+	r.Route(apiV1BasePath, func(r chi.Router) {
+		url := fmt.Sprintf("%s://%s:%d%s", schema, srv.config.Server.Host, srv.config.Server.Port, apiV1BasePath)
+		if err := srv.apiV1.ConfigureRoutes(r, url); err != nil {
+			logger.Error(ctx, "Failed to configure routes", "err", err)
+		}
+	})
+
+	r.Route(apiV2BasePath, func(r chi.Router) {
+		url := fmt.Sprintf("%s://%s:%d%s", schema, srv.config.Server.Host, srv.config.Server.Port, apiV2BasePath)
+		if err := srv.apiV2.ConfigureRoutes(r, url); err != nil {
 			logger.Error(ctx, "Failed to configure routes", "err", err)
 		}
 	})
