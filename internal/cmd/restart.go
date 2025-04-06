@@ -12,7 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/spf13/cobra"
 )
 
@@ -118,6 +118,8 @@ func executeDAG(ctx *Context, cli client.Client, dag *digraph.DAG) error {
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
+	rootDAG := digraph.NewRootDAG(dag.Name, requestID)
+
 	agentInstance := agent.New(
 		requestID,
 		dag,
@@ -126,6 +128,7 @@ func executeDAG(ctx *Context, cli client.Client, dag *digraph.DAG) error {
 		cli,
 		dagStore,
 		ctx.historyStore(),
+		rootDAG,
 		agent.Options{Dry: false})
 
 	listenSignals(ctx, agentInstance)
@@ -183,10 +186,10 @@ func waitForRestart(ctx context.Context, restartWait time.Duration) {
 	}
 }
 
-func getPreviousExecutionStatus(ctx context.Context, cli client.Client, dag *digraph.DAG) (model.Status, error) {
+func getPreviousExecutionStatus(ctx context.Context, cli client.Client, dag *digraph.DAG) (persistence.Status, error) {
 	status, err := cli.GetLatestStatus(ctx, dag)
 	if err != nil {
-		return model.Status{}, fmt.Errorf("failed to get latest status: %w", err)
+		return persistence.Status{}, fmt.Errorf("failed to get latest status: %w", err)
 	}
 	return status, nil
 }

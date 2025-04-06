@@ -104,8 +104,6 @@ type commandConfig struct {
 }
 
 func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.Cmd, error) {
-	stepContext := digraph.GetStepContext(ctx)
-
 	var cmd *exec.Cmd
 	switch {
 	case cfg.Command != "" && scriptFile != "":
@@ -133,7 +131,7 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 
 	}
 
-	cmd.Env = append(cmd.Env, stepContext.AllEnvs()...)
+	cmd.Env = append(cmd.Env, digraph.AllEnvs(ctx)...)
 	cmd.Dir = cfg.Dir
 	cmd.Stdout = cfg.Stdout
 	cmd.Stderr = cfg.Stderr
@@ -212,8 +210,7 @@ func setupScript(ctx context.Context, step digraph.Step) (string, error) {
 		_ = file.Close()
 	}()
 
-	stepContext := digraph.GetStepContext(ctx)
-	script, err := stepContext.EvalString(ctx, step.Script, cmdutil.OnlyReplaceVars())
+	script, err := digraph.EvalString(ctx, step.Script, cmdutil.OnlyReplaceVars())
 	if err != nil {
 		return "", fmt.Errorf("failed to evaluate script: %w", err)
 	}

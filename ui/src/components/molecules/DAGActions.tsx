@@ -157,7 +157,7 @@ function DAGActions({
         }}
       >
         <Stack direction="column">
-          <Box>Do you really want to rerun the last execution?</Box>
+          <Box>Do you really want to rerun the following execution?</Box>
           <LabeledItem label="Request-ID">{null}</LabeledItem>
           <Box>{status?.RequestId}</Box>
         </Stack>

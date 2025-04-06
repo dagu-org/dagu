@@ -1,0 +1,10 @@
+steps:
+  - name: child
+    run: nested_child
+    params: "PARAM=123"
+    output: CHILD_OUTPUT
+  - name: output
+    command: "echo ${CHILD_OUTPUT.outputs.OUTPUT}"
+    output: OUT1
+    depends:
+      - child

@@ -44,7 +44,7 @@ func runStatus(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to retrieve current status: %w", err)
 	}
 
-	logger.Info(ctx, "Current status", "pid", status.PID, "status", status.Status)
+	logger.Info(ctx, "Current status", "pid", status.PID, "status", status.Status.String())
 
 	return nil
 }

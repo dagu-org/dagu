@@ -173,13 +173,7 @@ func loadDAG(ctx BuildContext, dag string) (*DAG, error) {
 		return nil, err
 	}
 
-	// Set the name if not set.
-	if dest.Name == "" {
-		dest.Name = defaultName(filePath)
-	}
-
-	// Set defaults
-	dest.setup()
+	dest.initializeDefaults()
 
 	return dest, nil
 }

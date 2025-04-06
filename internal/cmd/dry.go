@@ -76,6 +76,8 @@ func runDry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
 
+	rootDAG := digraph.NewRootDAG(dag.Name, requestID)
+
 	agentInstance := agent.New(
 		requestID,
 		dag,
@@ -84,6 +86,7 @@ func runDry(ctx *Context, args []string) error {
 		cli,
 		dagStore,
 		ctx.historyStore(),
+		rootDAG,
 		agent.Options{Dry: true},
 	)
 

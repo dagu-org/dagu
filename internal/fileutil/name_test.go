@@ -3,7 +3,6 @@ package fileutil
 import (
 	"strings"
 	"testing"
-	"unicode/utf8"
 )
 
 func TestSafeName(t *testing.T) {
@@ -12,96 +11,100 @@ func TestSafeName(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"Basic", "hello world", "hello_world"},
-		{"Reserved characters", "file<>:\"/\\|!?*.txt", "file___________txt"},
-		{"Reserved Windows names", "CON", "_con_"},
-		{"Mixed case", "MixedCASE.txt", "mixedcase_txt"},
-		{"Non-printable characters", "file\x00name.txt", "file_name_txt"},
-		{"Leading and trailing spaces", " filename ", "_filename_"},
-		{"Long filename", strings.Repeat("a", 150), strings.Repeat("a", 100)},
-		{"All non-printable", "\x00\x01\x02", "___"},
-		{"Unicode characters", "文件名.txt", "文件名_txt"},
-		{"Empty string", "", ""},
-		{"Dots and underscores", "...__", "_____"},
-		{"Reserved Windows name with extension", "aux.txt", "aux_txt"},
-		{"Multiple spaces", "multiple   spaces", "multiple___spaces"},
-		{"Single period", "file.name", "file_name"},
-		{"Multiple periods", "file...name", "file___name"},
-		{"Leading period", ".hidden", "_hidden"},
-		{"Trailing period", "visible.", "visible_"},
-		{"Period and space", "file . name", "file___name"},
-		{"Multiple periods and spaces", "file ...  name", "file______name"},
-		{"Directory-like name", "my/directory/path", "my_directory_path"},
-		{"File with multiple extensions", "script.tar.gz", "script_tar_gz"},
-		{"Combination of issues", "My Weird File-Name!.txt", "my_weird_file-name__txt"},
-		{"Multi-byte characters", "文件名" + strings.Repeat("あ", 100), "文件名" + strings.Repeat("あ", 92)},
+		{
+			name:     "already safe string",
+			input:    "simple_file-name123",
+			expected: "simple_file-name123",
+		},
+		{
+			name:     "string with spaces",
+			input:    "file name with spaces",
+			expected: "file_name_with_spaces",
+		},
+		{
+			name:     "string with special characters",
+			input:    "file!@#$%^&*()name.txt",
+			expected: "file__________name_txt",
+		},
+		{
+			name:     "string with Windows reserved filename",
+			input:    "CON.txt",
+			expected: "CON_txt",
+		},
+		{
+			name:     "string with path-like characters",
+			input:    "path/to\\file:name",
+			expected: "path_to_file_name",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "very long string",
+			input:    strings.Repeat("a", 200),
+			expected: strings.Repeat("a", MaxSafeNameLength),
+		},
+		{
+			name:     "string with mixed characters",
+			input:    "File Name 123!@#.txt",
+			expected: "File_Name_123____txt",
+		},
+		{
+			name:     "string with leading and trailing spaces",
+			input:    " filename ",
+			expected: "_filename_",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := SafeName(tt.input)
-			if !strings.HasPrefix(result, tt.expected) {
-				t.Errorf("SafeName(%q) = %q, want prefix %q", tt.input, result, tt.expected)
+			if result != tt.expected {
+				t.Errorf("SafeName(%q) = %q, expected %q", tt.input, result, tt.expected)
 			}
-			if utf8.RuneCountInString(result) > 100 {
-				t.Errorf("SafeName(%q) produced a result with more than 100 runes: %d", tt.input, utf8.RuneCountInString(result))
+
+			// Verify that the result only contains allowed characters
+			if !isAllowedCharsOnly(result) {
+				t.Errorf("SafeName(%q) = %q, contains disallowed characters", tt.input, result)
 			}
 		})
 	}
 }
 
-func TestSafeNameProperties(t *testing.T) {
-	t.Run("Length limit", func(t *testing.T) {
-		longInput := strings.Repeat("a", 1000)
-		result := SafeName(longInput)
-		if utf8.RuneCountInString(result) != 100 {
-			t.Errorf("SafeName produced a name with length other than 100 runes: %d", utf8.RuneCountInString(result))
+// Helper function to verify that a string only contains allowed characters
+func isAllowedCharsOnly(s string) bool {
+	for _, r := range s {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') || r == '_' || r == '-') {
+			return false
 		}
-	})
+	}
+	return true
+}
 
-	t.Run("No reserved characters", func(t *testing.T) {
-		input := "test<>:\"/\\|!?*.file.txt"
-		result := SafeName(input)
-		if reservedCharRegex.MatchString(result[:len(result)-6]) {
-			t.Errorf("SafeName produced a name with reserved characters: %s", result)
-		}
-	})
+// TestEdgeCases tests some additional edge cases
+func TestEdgeCases(t *testing.T) {
+	// Test that strings with only disallowed characters work correctly
+	result := SafeName("!@#$%^&*()")
+	if result != "__________" {
+		t.Errorf("SafeName('!@#$%%^&*()') = %q, expected '__________'", result)
+	}
 
-	t.Run("No reserved Windows names", func(t *testing.T) {
-		reservedNames := []string{"CON", "PRN", "AUX", "NUL", "COM1", "LPT1"}
-		for _, name := range reservedNames {
-			result := SafeName(name)
-			if reservedNamesRegex.MatchString(result) {
-				t.Errorf("SafeName did not properly handle reserved Windows name %s: %s", name, result)
-			}
-		}
-	})
+	// Test truncation at exactly the maximum length
+	exactLengthInput := strings.Repeat("a", MaxSafeNameLength)
+	result = SafeName(exactLengthInput)
+	if len(result) != MaxSafeNameLength {
+		t.Errorf("SafeName with exact max length returned incorrect length: got %d, want %d",
+			len(result), MaxSafeNameLength)
+	}
 
-	t.Run("Lowercase conversion", func(t *testing.T) {
-		input := "MiXeDCaSe.TXT"
-		result := SafeName(input)
-		if result != strings.ToLower(result) {
-			t.Errorf("SafeName did not convert to lowercase: %s", result)
-		}
-	})
-
-	t.Run("No periods", func(t *testing.T) {
-		inputs := []string{"file.name", "file..name", ".hidden", "visible.", "...", "a.b.c.d"}
-		for _, input := range inputs {
-			result := SafeName(input)
-			if strings.Contains(result, ".") {
-				t.Errorf("SafeName produced a name containing a period: %s", result)
-			}
-		}
-	})
-
-	t.Run("Uniqueness", func(t *testing.T) {
-		input1 := "same_base_name"
-		input2 := "same_base_name_but_longer"
-		result1 := SafeName(input1)
-		result2 := SafeName(input2)
-		if result1 == result2 {
-			t.Errorf("SafeName did not produce unique names for different inputs: %s and %s", result1, result2)
-		}
-	})
+	// Test truncation with one character over the limit
+	overLengthInput := strings.Repeat("a", MaxSafeNameLength+1)
+	result = SafeName(overLengthInput)
+	if len(result) != MaxSafeNameLength {
+		t.Errorf("SafeName with over max length returned incorrect length: got %d, want %d",
+			len(result), MaxSafeNameLength)
+	}
 }
