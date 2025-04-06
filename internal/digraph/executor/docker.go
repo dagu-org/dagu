@@ -7,9 +7,11 @@ import (
 	"os"
 	"sync"
 
+	"github.com/containerd/platforms"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
@@ -113,6 +115,37 @@ func (e *docker) Run(ctx context.Context) error {
 
 	if e.image == "" {
 		return e.execInContainer(ctx, cli, args)
+	}
+
+	// If platform is not provided, imageReference will be set to the input image name
+	// else, it will be set to the locally available imageId whose platform matches the input platform
+	// or an empty string to signify that we don't have the right image locally.
+	imageReference := ""
+	if e.platform != "" {
+		spec, err := platforms.Parse(e.platform)
+		if err != nil {
+			return fmt.Errorf("failed to parse platform %s: %w", e.platform, err)
+		}
+
+		filters := filters.Args{}
+		filters.Add("reference", e.image)
+
+		images, err := cli.ImageList(ctx, image.ListOptions{Filters: filters})
+		if err != nil {
+			return fmt.Errorf("failed to list local images %s: %w", e.image, err)
+		}
+
+		for _, summary := range images {
+			inspect, err := cli.ImageInspect(ctx, summary.ID)
+			if err != nil {
+				return fmt.Errorf("failed to inspect image %s: %w", summary.ID, err)
+			}
+			if (spec.OS == inspect.Os) && (spec.Architecture == inspect.Architecture) && (spec.Variant == inspect.Variant) {
+				imageReference = inspect.ID
+			}
+		}
+	} else {
+		imageReference = e.image
 	}
 
 	// New container creation logic
