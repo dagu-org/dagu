@@ -120,7 +120,18 @@ func (srv *Server) Serve(ctx context.Context) error {
 
 	go func() {
 		logger.Info(ctx, "Server is starting", "addr", addr)
-		if err := srv.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+
+		var err error
+		if srv.config.Server.TLS != nil {
+			// Use TLS configuration
+			logger.Info(ctx, "Starting TLS server", "cert", srv.config.Server.TLS.CertFile, "key", srv.config.Server.TLS.KeyFile)
+			err = srv.httpServer.ListenAndServeTLS(srv.config.Server.TLS.CertFile, srv.config.Server.TLS.KeyFile)
+		} else {
+			// Use standard HTTP
+			err = srv.httpServer.ListenAndServe()
+		}
+
+		if err != nil && err != http.ErrServerClosed {
 			logger.Error(ctx, "Failed to start server", "err", err)
 		}
 	}()
