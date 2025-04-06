@@ -1,4 +1,4 @@
-package middleware
+package auth
 
 import (
 	"crypto/subtle"
@@ -7,14 +7,14 @@ import (
 	"strings"
 )
 
-// TokenAuth implements a similar middleware handler like go-chi's BasicAuth
+// Token implements a similar middleware handler like go-chi's BasicAuth
 // middleware but for bearer tokens
-func TokenAuth(
+func Token(
 	realm string, token string,
 ) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if skipTokenAuth(*r) {
+			if isAuthenticated(r.Context()) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -36,13 +36,9 @@ func TokenAuth(
 				return
 			}
 
-			next.ServeHTTP(w, r)
+			next.ServeHTTP(w, r.WithContext(withAuthenticated(r.Context())))
 		})
 	}
-}
-
-func skipTokenAuth(r http.Request) bool {
-	return isAuthenticated(r.Context())
 }
 
 func tokenAuthFailed(w http.ResponseWriter, realm string) {

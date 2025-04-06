@@ -35,10 +35,10 @@ type Server struct {
 	funcsConfig funcsConfig
 }
 
-func NewServer(cli client.Client, cfg *config.Config) *Server {
+func NewServer(cfg *config.Config, cli client.Client) *Server {
 	var remoteNodes []string
-	for _, node := range cfg.Server.RemoteNodes {
-		remoteNodes = append(remoteNodes, node.Name)
+	for _, n := range cfg.Server.RemoteNodes {
+		remoteNodes = append(remoteNodes, n.Name)
 	}
 	return &Server{
 		apiV1:  apiv1.New(cli, cfg),
