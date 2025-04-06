@@ -53,7 +53,7 @@ type docker struct {
 	image         string
 	platform      string
 	containerName string
-	pull          bool
+	pull          string
 	autoRemove    bool
 	step          digraph.Step
 	stdout        io.Writer
@@ -121,35 +121,39 @@ func (e *docker) Run(ctx context.Context) error {
 	// else, it will be set to the locally available imageId whose platform matches the input platform
 	// or an empty string to signify that we don't have the right image locally.
 	imageReference := ""
-	if e.platform != "" {
-		spec, err := platforms.Parse(e.platform)
-		if err != nil {
-			return fmt.Errorf("failed to parse platform %s: %w", e.platform, err)
-		}
 
-		filters := filters.Args{}
-		filters.Add("reference", e.image)
-
-		images, err := cli.ImageList(ctx, image.ListOptions{Filters: filters})
-		if err != nil {
-			return fmt.Errorf("failed to list local images %s: %w", e.image, err)
-		}
-
-		for _, summary := range images {
-			inspect, err := cli.ImageInspect(ctx, summary.ID)
+	// Only inspect image if pull mode is not always
+	if e.pull != "always" {
+		if e.platform != "" {
+			spec, err := platforms.Parse(e.platform)
 			if err != nil {
-				return fmt.Errorf("failed to inspect image %s: %w", summary.ID, err)
+				return fmt.Errorf("failed to parse platform %s: %w", e.platform, err)
 			}
-			if (spec.OS == inspect.Os) && (spec.Architecture == inspect.Architecture) && (spec.Variant == inspect.Variant) {
-				imageReference = inspect.ID
+
+			filters := filters.Args{}
+			filters.Add("reference", e.image)
+
+			images, err := cli.ImageList(ctx, image.ListOptions{Filters: filters})
+			if err != nil {
+				return fmt.Errorf("failed to list local images %s: %w", e.image, err)
 			}
+
+			for _, summary := range images {
+				inspect, err := cli.ImageInspect(ctx, summary.ID)
+				if err != nil {
+					return fmt.Errorf("failed to inspect image %s: %w", summary.ID, err)
+				}
+				if (spec.OS == inspect.Os) && (spec.Architecture == inspect.Architecture) && (spec.Variant == inspect.Variant) {
+					imageReference = inspect.ID
+				}
+			}
+		} else {
+			imageReference = e.image
 		}
-	} else {
-		imageReference = e.image
 	}
 
-	// New container creation logic
-	if e.pull {
+	// Pull new image if pull mode is always or pull mode is not never and imageReference is empty which means we don't have that image locally.
+	if (e.pull == "always") || (e.pull != "never" && imageReference == "") {
 		reader, err := cli.ImagePull(ctx, e.image, image.PullOptions{Platform: e.platform})
 		if err != nil {
 			return err
@@ -158,11 +162,16 @@ func (e *docker) Run(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		imageReference = e.image
+	}
+
+	if imageReference != "" {
+		return fmt.Errorf("failed to find image %s locally", e.image)
 	}
 
 	containerConfig := *e.containerConfig
 	containerConfig.Cmd = append([]string{e.step.Command}, args...)
-	containerConfig.Image = e.image
+	containerConfig.Image = imageReference
 
 	env := make([]string, len(containerConfig.Env))
 	for i, e := range containerConfig.Env {
@@ -404,12 +413,12 @@ func newDocker(
 		}
 	}
 
-	pull := true
-	if p, ok := execCfg.Config["pull"]; ok {
+	pull := ""
+	if value, ok := execCfg.Config["pull"].(string); ok {
 		var err error
-		pull, err = digraph.EvalBool(ctx, p)
+		pull, err = digraph.EvalString(ctx, value)
 		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate pull value: %w", err)
+			return nil, fmt.Errorf("failed to evaluate pull: %w", err)
 		}
 	}
 
