@@ -5,6 +5,7 @@ import '@fortawesome/fontawesome-free/css/all.min.css';
 type Props = {
   def: string;
   style?: CSSProperties;
+  scale: number;
 };
 
 // Mermaidの初期設定
@@ -23,7 +24,7 @@ mermaid.initialize({
   logLevel: 4, // ERROR
 });
 
-function Mermaid({ def, style = {} }: Props) {
+function Mermaid({ def, style = {}, scale }: Props) {
   const ref = React.useRef<HTMLDivElement>(null);
   const [uniqueId] = React.useState(
     () => `mermaid-${Math.random().toString(36).substr(2, 9)}`
@@ -36,6 +37,7 @@ function Mermaid({ def, style = {} }: Props) {
   const dStyle: CSSProperties = {
     overflowX: 'auto',
     padding: '2em',
+    position: 'relative',
   };
 
   const render = async () => {
@@ -76,29 +78,36 @@ function Mermaid({ def, style = {} }: Props) {
     }
   };
 
-  const renderWithRetry = () => {
-    try {
-      render();
-    } catch (error) {
-      console.error('error rendering mermaid, retrying, error:');
-      console.error(error);
-      console.error(def);
-      setTimeout(renderWithRetry, 1);
-    }
-  };
+  React.useEffect(() => {
+    render();
+  }, [def]);
 
   React.useEffect(() => {
-    renderWithRetry();
-  }, [def]);
+    if (ref.current) {
+      const svg = ref.current.querySelector('svg');
+      if (svg) {
+        svg.style.transform = `scale(${scale})`;
+        svg.style.transformOrigin = 'top left';
+      }
+    }
+  }, [scale]);
 
   return (
     <div style={dStyle}>
-      <div className="mermaid" ref={ref} style={mStyle} />
+      <div
+        className="mermaid"
+        ref={ref}
+        style={{
+          ...mStyle,
+          overflow: 'auto',
+          maxHeight: '80vh',
+        }}
+      />
     </div>
   );
 }
 
 // メモ化の条件を維持
 export default React.memo(Mermaid, (prev, next) => {
-  return prev.def === next.def;
+  return prev.def === next.def && prev.scale === next.scale;
 });
