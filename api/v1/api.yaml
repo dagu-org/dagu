@@ -1,6 +1,6 @@
 openapi: "3.0.0"
 info:
-  version: "0.0.1"
+  version: "1.0.0"
   title: "Dagu"
   contact:
     name: "Yota Hamada"
