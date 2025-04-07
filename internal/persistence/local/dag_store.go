@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -85,7 +86,7 @@ func (d *dagStoreImpl) GetDetails(ctx context.Context, name string) (*digraph.DA
 func (d *dagStoreImpl) GetSpec(_ context.Context, name string) (string, error) {
 	filePath, err := d.locateDAG(name)
 	if err != nil {
-		return "", fmt.Errorf("failed to locate DAG %s: %w", name, err)
+		return "", persistence.ErrDAGNotFound
 	}
 	dat, err := os.ReadFile(filePath)
 	if err != nil {
@@ -97,6 +98,12 @@ func (d *dagStoreImpl) GetSpec(_ context.Context, name string) (string, error) {
 // FileMode used for newly created DAG files
 // TODO: Consider using more restrictive permissions (0600) for security
 const defaultPerm os.FileMode = 0744
+
+func (d *dagStoreImpl) LoadSpec(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error) {
+	// Validate the spec before saving it.
+	opts = append(slices.Clone(opts), digraph.WithoutEval())
+	return digraph.LoadYAML(ctx, spec, opts...)
+}
 
 // UpdateSpec updates the specification of a DAG by its name.
 func (d *dagStoreImpl) UpdateSpec(ctx context.Context, name string, spec []byte) error {

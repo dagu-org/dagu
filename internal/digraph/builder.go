@@ -49,6 +49,8 @@ type BuildOpts struct {
 	ParametersList []string
 	// NoEval specifies whether to evaluate dynamic fields.
 	NoEval bool
+	// Name of the DAG if it's not defined in the spec
+	Name string
 }
 
 var builderRegistry = []builderEntry{
@@ -56,6 +58,7 @@ var builderRegistry = []builderEntry{
 	{metadata: true, name: "schedule", fn: buildSchedule},
 	{metadata: true, name: "skipIfSuccessful", fn: skipIfSuccessful},
 	{metadata: true, name: "params", fn: buildParams},
+	{metadata: true, name: "name", fn: buildName},
 	{name: "dotenv", fn: buildDotenv},
 	{name: "mailOn", fn: buildMailOn},
 	{name: "steps", fn: buildSteps},
@@ -290,6 +293,16 @@ func buildMailOn(_ BuildContext, spec *definition, dag *DAG) error {
 		Failure: spec.MailOn.Failure,
 		Success: spec.MailOn.Success,
 	}
+	return nil
+}
+
+// buildName set the name if name is specified by the option but if Name is defined
+// it does not override
+func buildName(ctx BuildContext, spec *definition, dag *DAG) error {
+	if spec.Name != "" {
+		return nil
+	}
+	dag.Name = ctx.opts.Name
 	return nil
 }
 

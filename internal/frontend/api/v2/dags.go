@@ -48,6 +48,27 @@ func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject)
 	return &api.DeleteDAG204Response{}, nil
 }
 
+// GetDAGSpec implements api.StrictServerInterface.
+func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObject) (api.GetDAGSpecResponseObject, error) {
+	spec, err := a.client.GetDAGSpec(ctx, request.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	// Validate the spec
+	_, loadErr := a.client.LoadYAML(ctx, []byte(spec), digraph.WithName(request.Name))
+
+	var errs []string
+	if loadErr != nil {
+		errs = append(errs, loadErr.Error())
+	}
+
+	return &api.GetDAGSpec200JSONResponse{
+		Spec:   spec,
+		Errors: errs,
+	}, nil
+}
+
 // GetDAGDetails implements api.StrictServerInterface.
 func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsRequestObject) (api.GetDAGDetailsResponseObject, error) {
 	name := request.Name
@@ -406,7 +427,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	}
 
 	for _, item := range result.Items {
-		status := api.DAGStatus{
+		status := api.StatusDetails{
 			Log:        ptr(item.Status.Log),
 			Name:       item.Status.Name,
 			Params:     ptr(item.Status.Params),
@@ -414,8 +435,8 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 			RequestId:  item.Status.RequestID,
 			StartedAt:  item.Status.StartedAt,
 			FinishedAt: item.Status.FinishedAt,
-			Status:     api.RunStatus(item.Status.Status),
-			StatusText: api.RunStatusText(item.Status.StatusText),
+			Status:     api.Status(item.Status.Status),
+			StatusText: api.StatusText(item.Status.StatusText),
 		}
 
 		dag := api.DAGFile{
@@ -729,8 +750,8 @@ func toStatus(s persistence.Status) api.DAGStatusDetails {
 		RequestId:  s.RequestID,
 		StartedAt:  s.StartedAt,
 		FinishedAt: s.FinishedAt,
-		Status:     api.RunStatus(s.Status),
-		StatusText: api.RunStatusText(s.StatusText),
+		Status:     api.Status(s.Status),
+		StatusText: api.StatusText(s.StatusText),
 	}
 	for _, n := range s.Nodes {
 		status.Nodes = append(status.Nodes, toNode(n))

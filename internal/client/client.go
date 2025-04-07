@@ -53,6 +53,10 @@ var (
 `)
 )
 
+func (e *client) LoadYAML(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error) {
+	return e.dagStore.LoadSpec(ctx, spec, opts...)
+}
+
 func (e *client) GetDAGSpec(ctx context.Context, id string) (string, error) {
 	return e.dagStore.GetSpec(ctx, id)
 }

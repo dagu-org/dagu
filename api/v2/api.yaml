@@ -91,12 +91,6 @@ paths:
                   - dags
                   - errors
                   - pagination
-        "400":
-          description: "Invalid parameters provided"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
         default:
           description: "Generic error response"
           content:
@@ -134,19 +128,12 @@ paths:
                     description: "Name of the newly created DAG"
                 required:
                   - name
-        "400":
-          description: "Invalid request body"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
         default:
           description: "Generic error response"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-
   /dags/{name}:
     get:
       summary: "Get DAG details"
@@ -214,12 +201,6 @@ paths:
                   - Title
                   - DAG
                   - Errors
-        "404":
-          description: "DAG not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
         default:
           description: "Generic error response"
           content:
@@ -307,7 +288,47 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /search:
+  /dags/{name}/spec:
+    get:
+      summary: "Get DAG Spec"
+      description: "Returns the spec of the DAG"
+      operationId: "getDAGSpec"
+      tags:
+        - "dags"
+      parameters:
+        - name: "name"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "The name of the DAG"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  spec:
+                    type: string
+                    description: "The DAG spec"
+                  errors:
+                    type: array
+                    description: "List of errors in the spec"
+                    items:
+                      type: string
+                required:
+                  - spec
+                  - errors
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/search:
     get:
       summary: "Search DAGs"
       description: "Searches for DAGs based on a query string"
@@ -350,7 +371,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /tags:
+  /dags/tags:
     get:
       summary: "List all tags"
       description: "Returns a list of all tags used across DAGs"
@@ -537,7 +558,7 @@ components:
         DAG:
           $ref: "#/components/schemas/DAG"
         Status:
-          $ref: "#/components/schemas/DAGStatus"
+          $ref: "#/components/schemas/StatusDetails"
         Suspended:
           type: boolean
           description: "Whether the DAG is suspended"
@@ -594,7 +615,7 @@ components:
       required:
         - Expression
 
-    DAGStatus:
+    StatusDetails:
       type: object
       description: "Current status of a DAG run"
       properties:
@@ -605,9 +626,9 @@ components:
           type: string
           description: "Name of the DAG being executed"
         Status:
-          $ref: "#/components/schemas/RunStatus"
+          $ref: "#/components/schemas/Status"
         StatusText:
-          $ref: "#/components/schemas/RunStatusText"
+          $ref: "#/components/schemas/StatusText"
         Pid:
           type: integer
           description: "Process ID of the DAG run"
@@ -631,7 +652,7 @@ components:
         - StartedAt
         - FinishedAt
 
-    RunStatus:
+    Status:
       type: integer
       enum: [0, 1, 2, 3, 4]
       description: |
@@ -642,7 +663,7 @@ components:
         3: "Cancelled"
         4: "Success"
 
-    RunStatusText:
+    StatusText:
       type: string
       description: "Human-readable status description for the DAG run"
       enum:
@@ -788,9 +809,9 @@ components:
           type: string
           description: "Name of the DAG"
         Status:
-          $ref: "#/components/schemas/RunStatus"
+          $ref: "#/components/schemas/Status"
         StatusText:
-          $ref: "#/components/schemas/RunStatusText"
+          $ref: "#/components/schemas/StatusText"
         Pid:
           type: integer
           description: "Process ID of the DAG run"

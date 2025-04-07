@@ -85,22 +85,22 @@ const (
 	NodeStatusTextSkipped    NodeStatusText = "skipped"
 )
 
-// Defines values for RunStatus.
+// Defines values for Status.
 const (
-	RunStatusN0 RunStatus = 0
-	RunStatusN1 RunStatus = 1
-	RunStatusN2 RunStatus = 2
-	RunStatusN3 RunStatus = 3
-	RunStatusN4 RunStatus = 4
+	StatusN0 Status = 0
+	StatusN1 Status = 1
+	StatusN2 Status = 2
+	StatusN3 Status = 3
+	StatusN4 Status = 4
 )
 
-// Defines values for RunStatusText.
+// Defines values for StatusText.
 const (
-	RunStatusTextCancelled  RunStatusText = "cancelled"
-	RunStatusTextFailed     RunStatusText = "failed"
-	RunStatusTextFinished   RunStatusText = "finished"
-	RunStatusTextNotStarted RunStatusText = "not started"
-	RunStatusTextRunning    RunStatusText = "running"
+	StatusTextCancelled  StatusText = "cancelled"
+	StatusTextFailed     StatusText = "failed"
+	StatusTextFinished   StatusText = "finished"
+	StatusTextNotStarted StatusText = "not started"
+	StatusTextRunning    StatusText = "running"
 )
 
 // DAG Core DAG configuration containing workflow definition and metadata
@@ -204,7 +204,7 @@ type DAGFile struct {
 	File string `json:"File"`
 
 	// Status Current status of a DAG run
-	Status DAGStatus `json:"Status"`
+	Status StatusDetails `json:"Status"`
 
 	// Suspended Whether the DAG is suspended
 	Suspended bool `json:"Suspended"`
@@ -230,41 +230,6 @@ type DAGLogGridItem struct {
 
 // DAGName Name of the DAG, must be unique
 type DAGName = string
-
-// DAGStatus Current status of a DAG run
-type DAGStatus struct {
-	// FinishedAt RFC 3339 timestamp when the DAG run finished
-	FinishedAt string `json:"FinishedAt"`
-
-	// Log Path to the log file
-	Log *string `json:"Log,omitempty"`
-
-	// Name Name of the DAG being executed
-	Name string `json:"Name"`
-
-	// Params Runtime parameters passed to the DAG in JSON format
-	Params *string `json:"Params,omitempty"`
-
-	// Pid Process ID of the DAG run
-	Pid *int `json:"Pid,omitempty"`
-
-	// RequestId Unique identifier for the DAG run request
-	RequestId string `json:"RequestId"`
-
-	// StartedAt RFC 3339 timestamp when the DAG run started
-	StartedAt string `json:"StartedAt"`
-
-	// Status Numeric status code indicating current run state:
-	// 0: "Not started"
-	// 1: "Running"
-	// 2: "Failed"
-	// 3: "Cancelled"
-	// 4: "Success"
-	Status RunStatus `json:"Status"`
-
-	// StatusText Human-readable status description for the DAG run
-	StatusText RunStatusText `json:"StatusText"`
-}
 
 // DAGStatusDetails Detailed status of a DAG run including child nodes
 type DAGStatusDetails struct {
@@ -310,10 +275,10 @@ type DAGStatusDetails struct {
 	// 2: "Failed"
 	// 3: "Cancelled"
 	// 4: "Success"
-	Status RunStatus `json:"Status"`
+	Status Status `json:"Status"`
 
 	// StatusText Human-readable status description for the DAG run
-	StatusText RunStatusText `json:"StatusText"`
+	StatusText StatusText `json:"StatusText"`
 }
 
 // DAGStatusFileDetails Detailed status information for a DAG instance
@@ -481,17 +446,6 @@ type RepeatPolicy struct {
 	Repeat *bool `json:"Repeat,omitempty"`
 }
 
-// RunStatus Numeric status code indicating current run state:
-// 0: "Not started"
-// 1: "Running"
-// 2: "Failed"
-// 3: "Cancelled"
-// 4: "Success"
-type RunStatus int
-
-// RunStatusText Human-readable status description for the DAG run
-type RunStatusText string
-
 // Schedule Schedule configuration for DAG run
 type Schedule struct {
 	// Expression Cron expression or schedule pattern
@@ -530,6 +484,52 @@ type SearchDAGsResultItem struct {
 	// Name Name of the matching DAG
 	Name string `json:"Name"`
 }
+
+// Status Numeric status code indicating current run state:
+// 0: "Not started"
+// 1: "Running"
+// 2: "Failed"
+// 3: "Cancelled"
+// 4: "Success"
+type Status int
+
+// StatusDetails Current status of a DAG run
+type StatusDetails struct {
+	// FinishedAt RFC 3339 timestamp when the DAG run finished
+	FinishedAt string `json:"FinishedAt"`
+
+	// Log Path to the log file
+	Log *string `json:"Log,omitempty"`
+
+	// Name Name of the DAG being executed
+	Name string `json:"Name"`
+
+	// Params Runtime parameters passed to the DAG in JSON format
+	Params *string `json:"Params,omitempty"`
+
+	// Pid Process ID of the DAG run
+	Pid *int `json:"Pid,omitempty"`
+
+	// RequestId Unique identifier for the DAG run request
+	RequestId string `json:"RequestId"`
+
+	// StartedAt RFC 3339 timestamp when the DAG run started
+	StartedAt string `json:"StartedAt"`
+
+	// Status Numeric status code indicating current run state:
+	// 0: "Not started"
+	// 1: "Running"
+	// 2: "Failed"
+	// 3: "Cancelled"
+	// 4: "Success"
+	Status Status `json:"Status"`
+
+	// StatusText Human-readable status description for the DAG run
+	StatusText StatusText `json:"StatusText"`
+}
+
+// StatusText Human-readable status description for the DAG run
+type StatusText string
 
 // Step Individual task within a DAG that performs a specific operation
 type Step struct {
@@ -621,6 +621,12 @@ type CreateDAGJSONBody struct {
 	Name DAGName `json:"name"`
 }
 
+// SearchDAGsParams defines parameters for SearchDAGs.
+type SearchDAGsParams struct {
+	// Q A search query string
+	Q string `form:"q" json:"q"`
+}
+
 // GetDAGDetailsParams defines parameters for GetDAGDetails.
 type GetDAGDetailsParams struct {
 	// Tab Specific part of the DAG to retrieve
@@ -659,12 +665,6 @@ type PostDAGActionJSONBody struct {
 	Value *string `json:"value,omitempty"`
 }
 
-// SearchDAGsParams defines parameters for SearchDAGs.
-type SearchDAGsParams struct {
-	// Q A search query string
-	Q string `form:"q" json:"q"`
-}
-
 // CreateDAGJSONRequestBody defines body for CreateDAG for application/json ContentType.
 type CreateDAGJSONRequestBody CreateDAGJSONBody
 
@@ -679,6 +679,12 @@ type ServerInterface interface {
 	// Create a new DAG
 	// (POST /dags)
 	CreateDAG(w http.ResponseWriter, r *http.Request)
+	// Search DAGs
+	// (GET /dags/search)
+	SearchDAGs(w http.ResponseWriter, r *http.Request, params SearchDAGsParams)
+	// List all tags
+	// (GET /dags/tags)
+	ListTags(w http.ResponseWriter, r *http.Request)
 	// Delete a DAG
 	// (DELETE /dags/{name})
 	DeleteDAG(w http.ResponseWriter, r *http.Request, name string)
@@ -688,15 +694,12 @@ type ServerInterface interface {
 	// Perform an action on a DAG
 	// (POST /dags/{name})
 	PostDAGAction(w http.ResponseWriter, r *http.Request, name string)
+	// Get DAG Spec
+	// (GET /dags/{name}/spec)
+	GetDAGSpec(w http.ResponseWriter, r *http.Request, name string)
 	// Health check endpoint
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
-	// Search DAGs
-	// (GET /search)
-	SearchDAGs(w http.ResponseWriter, r *http.Request, params SearchDAGsParams)
-	// List all tags
-	// (GET /tags)
-	ListTags(w http.ResponseWriter, r *http.Request)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -712,6 +715,18 @@ func (_ Unimplemented) ListDAGs(w http.ResponseWriter, r *http.Request, params L
 // Create a new DAG
 // (POST /dags)
 func (_ Unimplemented) CreateDAG(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Search DAGs
+// (GET /dags/search)
+func (_ Unimplemented) SearchDAGs(w http.ResponseWriter, r *http.Request, params SearchDAGsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List all tags
+// (GET /dags/tags)
+func (_ Unimplemented) ListTags(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -733,21 +748,15 @@ func (_ Unimplemented) PostDAGAction(w http.ResponseWriter, r *http.Request, nam
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// Get DAG Spec
+// (GET /dags/{name}/spec)
+func (_ Unimplemented) GetDAGSpec(w http.ResponseWriter, r *http.Request, name string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // Health check endpoint
 // (GET /health)
 func (_ Unimplemented) GetHealth(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Search DAGs
-// (GET /search)
-func (_ Unimplemented) SearchDAGs(w http.ResponseWriter, r *http.Request, params SearchDAGsParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// List all tags
-// (GET /tags)
-func (_ Unimplemented) ListTags(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -832,6 +841,70 @@ func (siw *ServerInterfaceWrapper) CreateDAG(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateDAG(w, r)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SearchDAGs operation middleware
+func (siw *ServerInterfaceWrapper) SearchDAGs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SearchDAGsParams
+
+	// ------------- Required query parameter "q" -------------
+
+	if paramValue := r.URL.Query().Get("q"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "q", r.URL.Query(), &params.Q)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SearchDAGs(w, r, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListTags operation middleware
+func (siw *ServerInterfaceWrapper) ListTags(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTags(w, r)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -967,6 +1040,39 @@ func (siw *ServerInterfaceWrapper) PostDAGAction(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// GetDAGSpec operation middleware
+func (siw *ServerInterfaceWrapper) GetDAGSpec(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDAGSpec(w, r, name)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetHealth operation middleware
 func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Request) {
 
@@ -980,70 +1086,6 @@ func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetHealth(w, r)
-	}))
-
-	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
-		handler = siw.HandlerMiddlewares[i](handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// SearchDAGs operation middleware
-func (siw *ServerInterfaceWrapper) SearchDAGs(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params SearchDAGsParams
-
-	// ------------- Required query parameter "q" -------------
-
-	if paramValue := r.URL.Query().Get("q"); paramValue != "" {
-
-	} else {
-		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
-		return
-	}
-
-	err = runtime.BindQueryParameter("form", true, true, "q", r.URL.Query(), &params.Q)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.SearchDAGs(w, r, params)
-	}))
-
-	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
-		handler = siw.HandlerMiddlewares[i](handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ListTags operation middleware
-func (siw *ServerInterfaceWrapper) ListTags(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListTags(w, r)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1173,6 +1215,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/dags", wrapper.CreateDAG)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/dags/search", wrapper.SearchDAGs)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/dags/tags", wrapper.ListTags)
+	})
+	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/dags/{name}", wrapper.DeleteDAG)
 	})
 	r.Group(func(r chi.Router) {
@@ -1182,13 +1230,10 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/dags/{name}", wrapper.PostDAGAction)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/dags/{name}/spec", wrapper.GetDAGSpec)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/health", wrapper.GetHealth)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/search", wrapper.SearchDAGs)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/tags", wrapper.ListTags)
 	})
 
 	return r
@@ -1214,15 +1259,6 @@ type ListDAGs200JSONResponse struct {
 func (response ListDAGs200JSONResponse) VisitListDAGsResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type ListDAGs400JSONResponse Error
-
-func (response ListDAGs400JSONResponse) VisitListDAGsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -1259,21 +1295,75 @@ func (response CreateDAG201JSONResponse) VisitCreateDAGResponse(w http.ResponseW
 	return json.NewEncoder(w).Encode(response)
 }
 
-type CreateDAG400JSONResponse Error
-
-func (response CreateDAG400JSONResponse) VisitCreateDAGResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(400)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
 type CreateDAGdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
 func (response CreateDAGdefaultJSONResponse) VisitCreateDAGResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type SearchDAGsRequestObject struct {
+	Params SearchDAGsParams
+}
+
+type SearchDAGsResponseObject interface {
+	VisitSearchDAGsResponse(w http.ResponseWriter) error
+}
+
+type SearchDAGs200JSONResponse struct {
+	// Errors Errors encountered during the search
+	Errors []string `json:"Errors"`
+
+	// Results Search results matching the query
+	Results []SearchDAGsResultItem `json:"Results"`
+}
+
+func (response SearchDAGs200JSONResponse) VisitSearchDAGsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SearchDAGsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response SearchDAGsdefaultJSONResponse) VisitSearchDAGsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type ListTagsRequestObject struct {
+}
+
+type ListTagsResponseObject interface {
+	VisitListTagsResponse(w http.ResponseWriter) error
+}
+
+type ListTags200JSONResponse ListTagResponse
+
+func (response ListTags200JSONResponse) VisitListTagsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListTagsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListTagsdefaultJSONResponse) VisitListTagsResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
@@ -1359,15 +1449,6 @@ func (response GetDAGDetails200JSONResponse) VisitGetDAGDetailsResponse(w http.R
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetDAGDetails404JSONResponse Error
-
-func (response GetDAGDetails404JSONResponse) VisitGetDAGDetailsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
 type GetDAGDetailsdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
@@ -1410,6 +1491,41 @@ func (response PostDAGActiondefaultJSONResponse) VisitPostDAGActionResponse(w ht
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
+type GetDAGSpecRequestObject struct {
+	Name string `json:"name"`
+}
+
+type GetDAGSpecResponseObject interface {
+	VisitGetDAGSpecResponse(w http.ResponseWriter) error
+}
+
+type GetDAGSpec200JSONResponse struct {
+	// Errors List of errors in the spec
+	Errors []string `json:"errors"`
+
+	// Spec The DAG spec
+	Spec string `json:"spec"`
+}
+
+func (response GetDAGSpec200JSONResponse) VisitGetDAGSpecResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetDAGSpecdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetDAGSpecdefaultJSONResponse) VisitGetDAGSpecResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
 type GetHealthRequestObject struct {
 }
 
@@ -1435,69 +1551,6 @@ func (response GetHealthdefaultResponse) VisitGetHealthResponse(w http.ResponseW
 	return nil
 }
 
-type SearchDAGsRequestObject struct {
-	Params SearchDAGsParams
-}
-
-type SearchDAGsResponseObject interface {
-	VisitSearchDAGsResponse(w http.ResponseWriter) error
-}
-
-type SearchDAGs200JSONResponse struct {
-	// Errors Errors encountered during the search
-	Errors []string `json:"Errors"`
-
-	// Results Search results matching the query
-	Results []SearchDAGsResultItem `json:"Results"`
-}
-
-func (response SearchDAGs200JSONResponse) VisitSearchDAGsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type SearchDAGsdefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response SearchDAGsdefaultJSONResponse) VisitSearchDAGsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-
-	return json.NewEncoder(w).Encode(response.Body)
-}
-
-type ListTagsRequestObject struct {
-}
-
-type ListTagsResponseObject interface {
-	VisitListTagsResponse(w http.ResponseWriter) error
-}
-
-type ListTags200JSONResponse ListTagResponse
-
-func (response ListTags200JSONResponse) VisitListTagsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type ListTagsdefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response ListTagsdefaultJSONResponse) VisitListTagsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-
-	return json.NewEncoder(w).Encode(response.Body)
-}
-
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// List DAGs
@@ -1506,6 +1559,12 @@ type StrictServerInterface interface {
 	// Create a new DAG
 	// (POST /dags)
 	CreateDAG(ctx context.Context, request CreateDAGRequestObject) (CreateDAGResponseObject, error)
+	// Search DAGs
+	// (GET /dags/search)
+	SearchDAGs(ctx context.Context, request SearchDAGsRequestObject) (SearchDAGsResponseObject, error)
+	// List all tags
+	// (GET /dags/tags)
+	ListTags(ctx context.Context, request ListTagsRequestObject) (ListTagsResponseObject, error)
 	// Delete a DAG
 	// (DELETE /dags/{name})
 	DeleteDAG(ctx context.Context, request DeleteDAGRequestObject) (DeleteDAGResponseObject, error)
@@ -1515,15 +1574,12 @@ type StrictServerInterface interface {
 	// Perform an action on a DAG
 	// (POST /dags/{name})
 	PostDAGAction(ctx context.Context, request PostDAGActionRequestObject) (PostDAGActionResponseObject, error)
+	// Get DAG Spec
+	// (GET /dags/{name}/spec)
+	GetDAGSpec(ctx context.Context, request GetDAGSpecRequestObject) (GetDAGSpecResponseObject, error)
 	// Health check endpoint
 	// (GET /health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
-	// Search DAGs
-	// (GET /search)
-	SearchDAGs(ctx context.Context, request SearchDAGsRequestObject) (SearchDAGsResponseObject, error)
-	// List all tags
-	// (GET /tags)
-	ListTags(ctx context.Context, request ListTagsRequestObject) (ListTagsResponseObject, error)
 }
 
 type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
@@ -1605,6 +1661,56 @@ func (sh *strictHandler) CreateDAG(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateDAGResponseObject); ok {
 		if err := validResponse.VisitCreateDAGResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SearchDAGs operation middleware
+func (sh *strictHandler) SearchDAGs(w http.ResponseWriter, r *http.Request, params SearchDAGsParams) {
+	var request SearchDAGsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SearchDAGs(ctx, request.(SearchDAGsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SearchDAGs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SearchDAGsResponseObject); ok {
+		if err := validResponse.VisitSearchDAGsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListTags operation middleware
+func (sh *strictHandler) ListTags(w http.ResponseWriter, r *http.Request) {
+	var request ListTagsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListTags(ctx, request.(ListTagsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListTags")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListTagsResponseObject); ok {
+		if err := validResponse.VisitListTagsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1698,6 +1804,32 @@ func (sh *strictHandler) PostDAGAction(w http.ResponseWriter, r *http.Request, n
 	}
 }
 
+// GetDAGSpec operation middleware
+func (sh *strictHandler) GetDAGSpec(w http.ResponseWriter, r *http.Request, name string) {
+	var request GetDAGSpecRequestObject
+
+	request.Name = name
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDAGSpec(ctx, request.(GetDAGSpecRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDAGSpec")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDAGSpecResponseObject); ok {
+		if err := validResponse.VisitGetDAGSpecResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetHealth operation middleware
 func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 	var request GetHealthRequestObject
@@ -1722,136 +1854,86 @@ func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// SearchDAGs operation middleware
-func (sh *strictHandler) SearchDAGs(w http.ResponseWriter, r *http.Request, params SearchDAGsParams) {
-	var request SearchDAGsRequestObject
-
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.SearchDAGs(ctx, request.(SearchDAGsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "SearchDAGs")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(SearchDAGsResponseObject); ok {
-		if err := validResponse.VisitSearchDAGsResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// ListTags operation middleware
-func (sh *strictHandler) ListTags(w http.ResponseWriter, r *http.Request) {
-	var request ListTagsRequestObject
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ListTags(ctx, request.(ListTagsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListTags")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ListTagsResponseObject); ok {
-		if err := validResponse.VisitListTagsResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"xHm3+/f3/x8AAP//9jvG9EpaAAA=",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
