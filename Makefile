@@ -160,15 +160,15 @@ api-validate:
 	@${LOCAL_BIN_DIR}/validate ${OAPI_SPEC_FILE_V2}
 
 # api-v1 generates the server code from the OpenAPI specification.
-.PHONY: api-v1
-api-v1: api-validate-v1
+.PHONY: apiv1
+apiv1: apiv1-validate
 	@echo "${COLOR_GREEN}Generating API...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_oapi_codegen}
 	@${LOCAL_BIN_DIR}/oapi-codegen --config=${OAPI_CONFIG_FILE_V1} ${OAPI_SPEC_FILE_V1}
 
 # api-validate-v1 validates the OpenAPI specification.
-.PHONY: api-validate-v1
-api-validate-v1:
+.PHONY: apiv1-validate
+apiv1-validate:
 	@echo "${COLOR_GREEN}Validating API...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_kin_openapi_validate}
 	@${LOCAL_BIN_DIR}/validate ${OAPI_SPEC_FILE_V1}
