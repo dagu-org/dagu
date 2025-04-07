@@ -156,7 +156,10 @@ func (srv *Server) routes(ctx context.Context, r *chi.Mux) {
 	})
 
 	// Serve UI pages (disable when headless)
-	r.Get("/*", func(w http.ResponseWriter, _ *http.Request) {
+	r.Get("/", func(w http.ResponseWriter, _ *http.Request) {
+		srv.useTemplate(ctx, "index.gohtml", "index")(w, nil)
+	})
+	r.Get("/index.html", func(w http.ResponseWriter, _ *http.Request) {
 		srv.useTemplate(ctx, "index.gohtml", "index")(w, nil)
 	})
 }

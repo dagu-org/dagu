@@ -14,6 +14,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/test"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -59,20 +60,20 @@ basePath: "/dagu"
 	// should be available at "/dagu/api/v1/health" and NOT at "/api/v1/health".
 
 	// 1. Request without the base path should return 404.
-	resp, err := http.Get("http://127.0.0.1:" + port + "/api/v1/health")
+	resp, err := http.Get("http://127.0.0.1:" + port + "/api/v2/health")
 	require.NoError(t, err)
 	defer func() {
 		_ = resp.Body.Close()
 	}()
-	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 
 	// 2. Request with the base path should return 200.
-	resp, err = http.Get("http://127.0.0.1:" + port + "/dagu/api/v1/health")
+	resp, err = http.Get("http://127.0.0.1:" + port + "/dagu/api/v2/health")
 	require.NoError(t, err)
 	defer func() {
 		_ = resp.Body.Close()
 	}()
-	require.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Decode the JSON response to check for expected health status.
 	body, err := io.ReadAll(resp.Body)
