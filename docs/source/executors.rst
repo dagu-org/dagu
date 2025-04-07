@@ -45,7 +45,7 @@ By default, Dagu will try to pull the Docker image. For images built locally thi
           type: docker
           config:
             image: alpine
-            pull: false
+            pull: never
             autoRemove: true
         command: echo "hello"
 
@@ -62,7 +62,7 @@ For example:
           type: docker
           config:
             image: alpine
-            pull: false
+            pull: never
             host:
               binds:
                 - /app:/app
@@ -82,7 +82,7 @@ The container's network can be configured as well.
           type: docker
           config:
             image: alpine
-            pull: false
+            pull: never
             network:
               EndpointsConfig:
                 my-network:
@@ -103,7 +103,7 @@ Note that the environment variables of the host (where `dagu` is running) will n
           type: docker
           config:
             image: alpine
-            pull: false
+            pull: never
             container:
               env:
                 - TEST_ENV=${TEST_ENV}
@@ -114,8 +114,11 @@ Available creating container configuration options:
 
 - `image`: Name or ID of the image to create the container (required)
 - `containerName`: Name of the newly created container (optional)
-- `pull`: Pull the `image` from remote registry, default `true` (optional)
-- `platform`: Pull `image` for a specific platform instead of the current one. If you set `pull` to `false`, it will not have any effect.
+- `pull`:
+  - `always`: Always pull the image from the internet
+  - `auto`: Only pull the image if it is not available locally (default)
+  - `never`: Never pull any image
+- `platform`: Pull `image` for a specific platform instead of the current one. If you set `pull` to `never`, it will not have any effect.
 
 For further customizing the newly created container, check the Docker's API document:
 
