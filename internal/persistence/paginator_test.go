@@ -51,14 +51,14 @@ func TestNewResult(t *testing.T) {
 	type testItem struct{ ID int }
 	tests := []struct {
 		name      string
-		items     []*testItem
+		items     []testItem
 		total     int
 		paginator Paginator
 		want      PaginatedResult[testItem]
 	}{
 		{
 			name:      "First page",
-			items:     []*testItem{{1}, {2}, {3}},
+			items:     []testItem{{1}, {2}, {3}},
 			total:     10,
 			paginator: NewPaginator(1, 3),
 			want: PaginatedResult[testItem]{
@@ -75,7 +75,7 @@ func TestNewResult(t *testing.T) {
 		},
 		{
 			name:      "Last page",
-			items:     []*testItem{{9}, {10}},
+			items:     []testItem{{9}, {10}},
 			total:     10,
 			paginator: NewPaginator(4, 3),
 			want: PaginatedResult[testItem]{
@@ -92,7 +92,7 @@ func TestNewResult(t *testing.T) {
 		},
 		{
 			name:      "Empty result",
-			items:     []*testItem{},
+			items:     []testItem{},
 			total:     0,
 			paginator: NewPaginator(1, 10),
 			want: PaginatedResult[testItem]{

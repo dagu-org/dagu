@@ -11,7 +11,7 @@ import (
 
 func TestHealthCheck(t *testing.T) {
 	server := test.SetupServer(t)
-	resp := server.Client().Get("/api/v1/health").ExpectStatus(http.StatusOK).Send(t)
+	resp := server.Client().Get("/api/v2/health").ExpectStatus(http.StatusOK).Send(t)
 
 	var healthResp api.HealthResponse
 	resp.Unmarshal(t, &healthResp)
