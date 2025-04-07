@@ -9,11 +9,6 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/grep"
 )
 
-var (
-	ErrRequestIDNotFound = fmt.Errorf("request id not found")
-	ErrNoStatusData      = fmt.Errorf("no status data")
-)
-
 // HistoryStore manages execution history records for DAGs
 type HistoryStore interface {
 	// NewRecord creates a new history record for a DAG run
@@ -70,6 +65,8 @@ type DAGStore interface {
 	GetSpec(ctx context.Context, name string) (string, error)
 	// UpdateSpec modifies the specification of an existing DAG
 	UpdateSpec(ctx context.Context, name string, spec []byte) error
+	// LoadSpec loads a DAG from a YAML file and returns the DAG object
+	LoadSpec(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error)
 	// TagList returns all unique tags across all DAGs with any errors encountered
 	TagList(ctx context.Context) ([]string, []string, error)
 }

@@ -20,6 +20,7 @@ import (
 
 // LoadOptions contains options for loading a DAG.
 type LoadOptions struct {
+	name         string   // Name of the DAG.
 	baseConfig   string   // Path to the base DAG configuration file.
 	params       string   // Parameters to override default parameters in the DAG.
 	paramsList   []string // List of parameters to override default parameters in the DAG.
@@ -65,6 +66,13 @@ func OnlyMetadata() LoadOption {
 	}
 }
 
+// WithName sets the name of the DAG.
+func WithName(name string) LoadOption {
+	return func(o *LoadOptions) {
+		o.name = name
+	}
+}
+
 // Load loads the DAG from the given file with the specified options.
 func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
 	var options LoadOptions
@@ -79,6 +87,7 @@ func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
 			ParametersList: options.paramsList,
 			OnlyMetadata:   options.onlyMetadata,
 			NoEval:         options.noEval,
+			Name:           options.name,
 		},
 	}
 	return loadDAG(buildContext, dag)
@@ -96,6 +105,7 @@ func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*DAG, error
 		ParametersList: options.paramsList,
 		OnlyMetadata:   options.onlyMetadata,
 		NoEval:         options.noEval,
+		Name:           options.name,
 	})
 }
 

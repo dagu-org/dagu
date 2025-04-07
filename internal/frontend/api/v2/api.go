@@ -118,9 +118,14 @@ func (a *API) handleError(w http.ResponseWriter, _ *http.Request, err error) {
 	}
 
 	switch {
+	case errors.Is(err, persistence.ErrDAGNotFound):
+		code = api.ErrorCodeNotFound
+		message = "DAG not found"
+
 	case errors.Is(err, persistence.ErrRequestIDNotFound):
 		code = api.ErrorCodeNotFound
 		message = "Request ID not found"
+
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -15,6 +15,14 @@ import (
 func TestLoad(t *testing.T) {
 	t.Parallel()
 
+	t.Run(("WithName"), func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := test.TestdataPath(t, filepath.Join("digraph", "loader_test"))
+		dag, err := digraph.Load(context.Background(), testDAG, digraph.WithName("testDAG"))
+		require.NoError(t, err)
+		require.Equal(t, "testDAG", dag.Name)
+	})
 	t.Run(("WithExt"), func(t *testing.T) {
 		t.Parallel()
 
@@ -117,7 +125,6 @@ func TestLoadBaseConfig(t *testing.T) {
 
 func TestLoadYAML(t *testing.T) {
 	t.Parallel()
-
 	const testDAG = `
 name: test DAG
 steps:
@@ -129,11 +136,11 @@ steps:
 
 		ret, err := digraph.LoadYAMLWithOpts(context.Background(), []byte(testDAG), digraph.BuildOpts{})
 		require.NoError(t, err)
-		require.Equal(t, ret.Name, "test DAG")
+		require.Equal(t, "test DAG", ret.Name)
 
 		step := ret.Steps[0]
-		require.Equal(t, step.Name, "1")
-		require.Equal(t, step.Command, "true")
+		require.Equal(t, "1", step.Name)
+		require.Equal(t, "true", step.Command)
 	})
 	t.Run("InvalidYAMLData", func(t *testing.T) {
 		t.Parallel()
@@ -141,4 +148,23 @@ steps:
 		_, err := digraph.LoadYAMLWithOpts(context.Background(), []byte(`invalid`), digraph.BuildOpts{})
 		require.Error(t, err)
 	})
+}
+
+func TestLoadYAMLWithNameOption(t *testing.T) {
+	t.Parallel()
+	const testDAG = `
+steps:
+  - name: "1"
+    command: "true"
+`
+
+	ret, err := digraph.LoadYAMLWithOpts(context.Background(), []byte(testDAG), digraph.BuildOpts{
+		Name: "testDAG",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "testDAG", ret.Name)
+
+	step := ret.Steps[0]
+	require.Equal(t, "1", step.Name)
+	require.Equal(t, "true", step.Command)
 }
