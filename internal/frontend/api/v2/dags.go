@@ -117,7 +117,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 
 	statusDetails := api.DAGStatusFileDetails{
 		DAG:       details,
-		Error:     status.ErrorT,
+		Error:     ptr(status.ErrorAsString()),
 		File:      status.File,
 		Status:    toStatus(status.Status),
 		Suspended: status.Suspended,
@@ -382,8 +382,8 @@ func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
 // ListDAGs implements api.StrictServerInterface.
 func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (api.ListDAGsResponseObject, error) {
 	var opts []client.ListStatusOption
-	if request.Params.Limit != nil {
-		opts = append(opts, client.WithLimit(*request.Params.Limit))
+	if request.Params.PerPage != nil {
+		opts = append(opts, client.WithLimit(*request.Params.PerPage))
 	}
 	if request.Params.Page != nil {
 		opts = append(opts, client.WithPage(*request.Params.Page))
@@ -395,23 +395,14 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 		opts = append(opts, client.WithTag(*request.Params.Tag))
 	}
 
-	result, err := a.client.ListStatus(ctx, opts...)
+	result, errList, err := a.client.ListStatus(ctx, opts...)
 	if err != nil {
 		return nil, newInternalError(err)
 	}
 
-	hasErr := len(result.Errors) > 0
-	for _, item := range result.Items {
-		if item.Error != nil {
-			hasErr = true
-			break
-		}
-	}
-
 	resp := &api.ListDAGs200JSONResponse{
-		Errors:    ptr(result.Errors),
-		PageCount: result.TotalPage,
-		HasError:  hasErr,
+		Errors:     errList,
+		Pagination: toPagination(*result),
 	}
 
 	for _, item := range result.Items {
@@ -427,8 +418,8 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 			StatusText: api.RunStatusText(item.Status.StatusText),
 		}
 
-		dag := api.DAGStatusFile{
-			Error:     item.ErrorT,
+		dag := api.DAGFile{
+			Error:     ptr(item.ErrorAsString()),
 			File:      item.File,
 			Status:    status,
 			Suspended: item.Suspended,
@@ -439,7 +430,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 			dag.Error = ptr(item.Error.Error())
 		}
 
-		resp.DAGs = append(resp.DAGs, dag)
+		resp.Dags = append(resp.Dags, dag)
 	}
 
 	return resp, nil

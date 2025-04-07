@@ -25,17 +25,11 @@ type Client interface {
 	UpdateStatus(ctx context.Context, dag *digraph.DAG, status persistence.Status) error
 	UpdateDAG(ctx context.Context, name string, spec string) error
 	DeleteDAG(ctx context.Context, name string) error
-	ListStatus(ctx context.Context, opts ...ListStatusOption) (*ListStatusResult, error)
+	ListStatus(ctx context.Context, opts ...ListStatusOption) (*persistence.PaginatedResult[DAGStatus], []string, error)
 	GetStatus(ctx context.Context, dagLocation string) (DAGStatus, error)
 	IsSuspended(ctx context.Context, name string) bool
 	ToggleSuspend(ctx context.Context, name string, suspend bool) error
 	GetTagList(ctx context.Context) ([]string, []string, error)
-}
-
-type ListStatusResult struct {
-	Items     []DAGStatus
-	TotalPage int
-	Errors    []string
 }
 
 type GetAllStatusOptions struct {
@@ -91,13 +85,20 @@ type DAGStatus struct {
 	Status    persistence.Status
 	Suspended bool
 	Error     error
-	ErrorT    *string
+}
+
+// ErrorAsString converts the error to a string if it exists, otherwise returns an empty string.
+func (s DAGStatus) ErrorAsString() string {
+	if s.Error == nil {
+		return ""
+	}
+	return s.Error.Error()
 }
 
 func newDAGStatus(
 	dag *digraph.DAG, status persistence.Status, suspended bool, err error,
 ) DAGStatus {
-	ret := DAGStatus{
+	return DAGStatus{
 		File:      filepath.Base(dag.Location),
 		Dir:       filepath.Dir(dag.Location),
 		DAG:       dag,
@@ -105,9 +106,4 @@ func newDAGStatus(
 		Suspended: suspended,
 		Error:     err,
 	}
-	if err != nil {
-		errT := err.Error()
-		ret.ErrorT = &errT
-	}
-	return ret
 }

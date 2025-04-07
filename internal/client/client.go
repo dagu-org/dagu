@@ -288,9 +288,7 @@ func (e *client) DeleteDAG(ctx context.Context, name string) error {
 	return e.dagStore.Delete(ctx, name)
 }
 
-func (e *client) ListStatus(ctx context.Context, opts ...ListStatusOption) (
-	*ListStatusResult, error,
-) {
+func (e *client) ListStatus(ctx context.Context, opts ...ListStatusOption) (*persistence.PaginatedResult[DAGStatus], []string, error) {
 	var options GetAllStatusOptions
 	for _, opt := range opts {
 		opt(&options)
@@ -304,30 +302,28 @@ func (e *client) ListStatus(ctx context.Context, opts ...ListStatusOption) (
 		*options.Page = 1
 	}
 
-	result := &ListStatusResult{TotalPage: 1}
+	pg := persistence.NewPaginator(*options.Page, *options.Limit)
 
-	dagList, err := e.dagStore.List(ctx, persistence.ListOptions{
-		Page:  *options.Page,
-		Limit: *options.Limit,
-		Name:  fromPtr(options.Name),
-		Tag:   fromPtr(options.Tag),
+	dags, errList, err := e.dagStore.List(ctx, persistence.ListOptions{
+		Paginator: &pg,
+		Name:      fromPtr(options.Name),
+		Tag:       fromPtr(options.Tag),
 	})
 	if err != nil {
-		return result, err
+		return nil, errList, err
 	}
 
-	for _, d := range dagList.DAGs {
+	var items []DAGStatus
+	for _, d := range dags.Items {
 		status, err := e.readStatus(ctx, d)
 		if err != nil {
-			dagList.Errors = append(dagList.Errors, err.Error())
+			errList = append(errList, err.Error())
 		}
-		result.Items = append(result.Items, status)
+		items = append(items, status)
 	}
 
-	result.TotalPage = (dagList.Count-1) / *options.Limit + 1
-	result.Errors = dagList.Errors
-
-	return result, nil
+	r := persistence.NewPaginatedResult(items, dags.TotalCount, pg)
+	return &r, errList, nil
 }
 
 func (e *client) getDAG(ctx context.Context, name string) (*digraph.DAG, error) {

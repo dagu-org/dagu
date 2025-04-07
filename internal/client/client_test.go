@@ -305,8 +305,9 @@ func TestClient_ReadHistory(t *testing.T) {
 		require.NoError(t, err)
 
 		// Get all statuses.
-		result, err := cli.ListStatus(ctx)
+		result, errList, err := cli.ListStatus(ctx)
 		require.NoError(t, err)
+		require.Empty(t, errList)
 		require.Equal(t, 2, len(result.Items))
 	})
 }

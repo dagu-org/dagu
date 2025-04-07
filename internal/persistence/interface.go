@@ -57,7 +57,7 @@ type DAGStore interface {
 	// Delete removes a DAG definition by name
 	Delete(ctx context.Context, name string) error
 	// List returns a paginated list of DAG definitions with filtering options
-	List(ctx context.Context, params ListOptions) (*ListResult, error)
+	List(ctx context.Context, params ListOptions) (PaginatedResult[*digraph.DAG], []string, error)
 	// GetMetadata retrieves only the metadata of a DAG definition (faster than full load)
 	GetMetadata(ctx context.Context, name string) (*digraph.DAG, error)
 	// GetDetails retrieves the complete DAG definition including all fields
@@ -81,10 +81,9 @@ var (
 
 // ListOptions contains parameters for paginated DAG listing
 type ListOptions struct {
-	Page  int    // Page number (1-based)
-	Limit int    // Maximum number of items per page
-	Name  string // Optional name filter
-	Tag   string // Optional tag filter
+	Paginator *Paginator
+	Name      string // Optional name filter
+	Tag       string // Optional tag filter
 }
 
 // ListResult contains the result of a paginated DAG listing operation
