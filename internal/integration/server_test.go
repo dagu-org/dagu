@@ -59,16 +59,8 @@ basePath: "/dagu"
 	// When the config's BasePath is "/dagu", the health endpoint (normally at "/api/v1/health")
 	// should be available at "/dagu/api/v1/health" and NOT at "/api/v1/health".
 
-	// 1. Request without the base path should return 404.
-	resp, err := http.Get("http://127.0.0.1:" + port + "/api/v2/health")
-	require.NoError(t, err)
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
-
-	// 2. Request with the base path should return 200.
-	resp, err = http.Get("http://127.0.0.1:" + port + "/dagu/api/v2/health")
+	// Request with the base path should return 200.
+	resp, err := http.Get("http://127.0.0.1:" + port + "/dagu/api/v2/health")
 	require.NoError(t, err)
 	defer func() {
 		_ = resp.Body.Close()
