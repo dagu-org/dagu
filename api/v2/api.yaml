@@ -40,46 +40,24 @@ paths:
         - "system"
       responses:
         "200":
-          description: "Server is healthy"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HealthResponse"
-        "503":
-          description: "Server is unhealthy"
+          description: "A successful response"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
         default:
           description: "Unexpected error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
 
   /dags:
     get:
-      summary: "List all DAGs"
+      summary: "List DAGs"
       description: "Returns a list of DAGs with optional pagination and search filters"
       operationId: "listDAGs"
       tags:
         - "dags"
       parameters:
-        - name: "page"
-          in: "query"
-          required: false
-          schema:
-            type: "integer"
-            default: 1
-          description: "Page number (for pagination)"
-        - name: "limit"
-          in: "query"
-          required: false
-          schema:
-            type: "integer"
-            default: 20
-          description: "Number of items to return per page"
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/perPage"
         - name: "name"
           in: "query"
           required: false
@@ -100,26 +78,22 @@ paths:
               schema:
                 type: object
                 properties:
-                  DAGs:
+                  dags:
                     type: array
                     description: "List of DAGs with their status and metadata"
                     items:
-                      $ref: "#/components/schemas/DAGStatusFile"
-                  Errors:
+                      $ref: "#/components/schemas/DAGFile"
+                  errors:
                     type: array
                     description: "List of errors encountered during the request"
                     items:
                       type: string
-                  HasError:
-                    type: boolean
-                    description: "Whether any errors were encountered"
-                  PageCount:
-                    type: integer
-                    description: "Total number of pages available"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
                 required:
-                  - DAGs
-                  - HasError
-                  - PageCount
+                  - dags
+                  - errors
+                  - pagination
         "400":
           description: "Invalid parameters provided"
           content:
@@ -147,8 +121,7 @@ paths:
               type: object
               properties:
                 name:
-                  type: string
-                  description: "Name of the new DAG"
+                  $ref: "#/components/schemas/DAGName"
               required:
                 - name
       responses:
@@ -411,6 +384,27 @@ components:
       scheme: bearer
       bearerFormat: opaque
 
+  parameters:
+    page:
+      name: page
+      in: query
+      description: page number of items to fetch (default is 1)
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    perPage:
+      name: perPage
+      in: query
+      description: number of items per page (default is 30, max is 100)
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 50
+
   schemas:
     Error:
       type: object
@@ -440,6 +434,38 @@ components:
         - "remote_node_error"
         - "already_running"
         - "not_running"
+
+    DAGName:
+      type: string
+      # only allows alphanumeric characters, underscores, and hyphens
+      format: "regex"
+      pattern: "^[a-zA-Z0-9_-]+$"
+      description: "Name of the DAG, must be unique"
+
+    Pagination:
+      type: object
+      properties:
+        totalRecords:
+          type: integer
+          description: total number of records
+        currentPage:
+          type: integer
+          description: current page number
+        totalPages:
+          type: integer
+          description: total number of pages
+        nextPage:
+          type: integer
+          description: next page number
+        prevPage:
+          type: integer
+          description: previous page number
+      required:
+        - totalRecords
+        - currentPage
+        - totalPages
+        - nextPage
+        - prevPage
 
     DAGDetailTab:
       type: string
@@ -504,7 +530,7 @@ components:
           type: string
           description: "New DAG name, if the action resulted in a new DAG"
 
-    DAGStatusFile:
+    DAGFile:
       type: object
       description: "DAG file with its status information"
       properties:

@@ -22,7 +22,7 @@ func TestDAG(t *testing.T) {
 	var apiResp api.ListDAGs200JSONResponse
 	resp.Unmarshal(t, &apiResp)
 
-	require.Len(t, apiResp.DAGs, 1, "expected one DAG")
+	require.Len(t, apiResp.Dags, 1, "expected one DAG")
 
 	// Delete the created DAG
 	_ = server.Client().Delete("/api/v1/dags/test_dag").ExpectStatus(http.StatusNoContent).Send(t)

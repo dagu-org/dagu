@@ -162,14 +162,17 @@ func (d *dagStoreImpl) ensureDirExist() error {
 }
 
 // List lists DAGs with pagination support.
-func (d *dagStoreImpl) List(ctx context.Context, params persistence.ListOptions) (*persistence.ListResult, error) {
-	var (
-		dagList []*digraph.DAG
-		errList []string
-		count   int
-	)
+func (d *dagStoreImpl) List(ctx context.Context, opts persistence.ListOptions) (persistence.PaginatedResult[*digraph.DAG], []string, error) {
+	var dags []*digraph.DAG
+	var errList []string
+	var totalCount int
 
-	if err := filepath.WalkDir(d.baseDir, func(_ string, entry fs.DirEntry, err error) error {
+	if opts.Paginator == nil {
+		p := persistence.DefaultPaginator()
+		opts.Paginator = &p
+	}
+
+	err := filepath.WalkDir(d.baseDir, func(_ string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -180,49 +183,46 @@ func (d *dagStoreImpl) List(ctx context.Context, params persistence.ListOptions)
 
 		baseName := path.Base(entry.Name())
 		dagName := strings.TrimSuffix(baseName, path.Ext(baseName))
-		if params.Name != "" && params.Tag == "" {
+		if opts.Name != "" && opts.Tag == "" {
 			// If tag is not provided, check before reading the file to avoid
 			// unnecessary file read and parsing.
-			if !containsSearchText(dagName, params.Name) {
+			if !containsSearchText(dagName, opts.Name) {
 				// Return early if the name does not match the search text.
 				return nil
 			}
 		}
 
 		// Read the file and parse the DAG.
-		parsedDAG, err := d.GetMetadata(ctx, dagName)
+		dag, err := d.GetMetadata(ctx, dagName)
 		if err != nil {
 			errList = append(errList, fmt.Sprintf("reading %s failed: %s", dagName, err))
 			return nil
 		}
 
-		if params.Name != "" && !containsSearchText(dagName, params.Name) {
+		if opts.Name != "" && !containsSearchText(dagName, opts.Name) {
 			return nil
 		}
 
-		if params.Tag != "" && !containsTag(parsedDAG.Tags, params.Tag) {
+		if opts.Tag != "" && !containsTag(dag.Tags, opts.Tag) {
 			return nil
 		}
 
-		count++
-		if count > (params.Page-1)*params.Limit && len(dagList) < params.Limit {
-			dagList = append(dagList, parsedDAG)
+		totalCount++
+		if totalCount > opts.Paginator.Offset() && len(dags) < opts.Paginator.Limit() {
+			dags = append(dags, dag)
 		}
 
 		return nil
-	}); err != nil {
-		return &persistence.ListResult{
-			DAGs:   dagList,
-			Count:  count,
-			Errors: append(errList, err.Error()),
-		}, err
+	})
+
+	result := persistence.NewPaginatedResult(
+		dags, totalCount, *opts.Paginator,
+	)
+	if err != nil {
+		errList = append(errList, err.Error())
 	}
 
-	return &persistence.ListResult{
-		DAGs:   dagList,
-		Count:  count,
-		Errors: errList,
-	}, nil
+	return result, errList, err
 }
 
 // Grep searches for a pattern in all DAGs.

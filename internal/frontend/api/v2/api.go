@@ -171,3 +171,14 @@ func value[T any](ptr *T) T {
 	}
 	return *ptr
 }
+
+// toPagination converts a paginated result to an API pagination object.
+func toPagination[T any](paginatedResult persistence.PaginatedResult[T]) api.Pagination {
+	return api.Pagination{
+		CurrentPage:  paginatedResult.CurrentPage,
+		NextPage:     paginatedResult.NextPage,
+		PrevPage:     paginatedResult.PrevPage,
+		TotalPages:   paginatedResult.TotalPages,
+		TotalRecords: paginatedResult.TotalCount,
+	}
+}

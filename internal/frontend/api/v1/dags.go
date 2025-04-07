@@ -118,7 +118,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 
 	statusDetails := api.DAGStatusFileDetails{
 		DAG:       details,
-		Error:     status.ErrorT,
+		Error:     ptr(status.ErrorAsString()),
 		File:      status.File,
 		Status:    toStatus(status.Status),
 		Suspended: status.Suspended,
@@ -424,12 +424,12 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 		opts = append(opts, client.WithTag(*request.Params.SearchTag))
 	}
 
-	result, err := a.client.ListStatus(ctx, opts...)
+	result, errList, err := a.client.ListStatus(ctx, opts...)
 	if err != nil {
 		return nil, newInternalError(err)
 	}
 
-	hasErr := len(result.Errors) > 0
+	hasErr := len(errList) > 0
 	for _, item := range result.Items {
 		if item.Error != nil {
 			hasErr = true
@@ -438,8 +438,8 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	}
 
 	resp := &api.ListDAGs200JSONResponse{
-		Errors:    ptr(result.Errors),
-		PageCount: result.TotalPage,
+		Errors:    ptr(errList),
+		PageCount: result.TotalPages,
 		HasError:  hasErr,
 	}
 
@@ -457,7 +457,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 		}
 
 		dag := api.DAGStatusFile{
-			Error:     item.ErrorT,
+			Error:     ptr(item.ErrorAsString()),
 			File:      item.File,
 			Status:    status,
 			Suspended: item.Suspended,
