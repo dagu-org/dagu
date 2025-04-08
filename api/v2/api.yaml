@@ -24,6 +24,8 @@ servers:
 tags:
   - name: "dags"
     description: "Operations for managing and executing DAGs (Directed Acyclic Graphs)"
+  - name: "history"
+    description: "Operations for retrieving historical data and logs of DAG runs"
   - name: "system"
     description: "System operations for monitoring and managing the Dagu server"
 
@@ -281,6 +283,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{name}/runs:
+    get:
+      summary: "Get history of DAG runs"
+      description: "Returns the history of runs for a specific DAG"
+      operationId: "getDAGRuns"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/DAGName"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Runs:
+                    type: array
+                    description: "List of historical runs for the DAG"
+                    items:
+                      $ref: "#/components/schemas/DAGStatusDetails"
+                  Errors:
+                    type: array
+                    description: "List of errors encountered during the request"
+                    items:
+                      type: string
+                required:
+                  - Runs
+                  - Errors
         default:
           description: "Generic error response"
           content:
