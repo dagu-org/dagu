@@ -28,9 +28,12 @@ func (a *API) CreateDAG(ctx context.Context, request api.CreateDAGRequestObject)
 	name, err := a.client.CreateDAG(ctx, request.Body.Value)
 	if err != nil {
 		if errors.Is(err, persistence.ErrDAGAlreadyExists) {
-			return nil, newBadRequestError(api.ErrorCodeBadRequest, err)
+			return nil, &Error{
+				HTTPStatus: http.StatusConflict,
+				Code:       api.ErrorCodeAlreadyExists,
+			}
 		}
-		return nil, newInternalError(err)
+		return nil, fmt.Errorf("error creating DAG: %w", err)
 	}
 	return &api.CreateDAG201JSONResponse{
 		DagID: name,
@@ -41,10 +44,14 @@ func (a *API) CreateDAG(ctx context.Context, request api.CreateDAGRequestObject)
 func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject) (api.DeleteDAGResponseObject, error) {
 	_, err := a.client.GetStatus(ctx, request.Name)
 	if err != nil {
-		return nil, newNotFoundError(api.ErrorCodeNotFound, err)
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("DAG %s not found", request.Name),
+		}
 	}
 	if err := a.client.DeleteDAG(ctx, request.Name); err != nil {
-		return nil, newInternalError(err)
+		return nil, fmt.Errorf("error deleting DAG: %w", err)
 	}
 	return &api.DeleteDAG204Response{}, nil
 }
@@ -60,7 +67,11 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 
 	status, err := a.client.GetStatus(ctx, name)
 	if err != nil {
-		return nil, newNotFoundError(api.ErrorCodeNotFound, err)
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("DAG %s not found", name),
+		}
 	}
 
 	var steps []api.Step
@@ -144,7 +155,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 	case api.DAGDetailTabSpec:
 		spec, err := a.client.GetDAGSpec(ctx, name)
 		if err != nil {
-			return nil, newInternalError(err)
+			return nil, fmt.Errorf("error getting DAG spec: %w", err)
 		}
 		resp.Definition = ptr(spec)
 
@@ -293,14 +304,14 @@ func (a *API) readLog(
 	if logFile == "" {
 		lastStatus, err := a.client.GetLatestStatus(ctx, dag)
 		if err != nil {
-			return nil, newInternalError(err)
+			return nil, fmt.Errorf("error getting latest status: %w", err)
 		}
 		logFile = lastStatus.Log
 	}
 
 	content, err := readFileContent(logFile, nil)
 	if err != nil {
-		return nil, newInternalError(err)
+		return nil, fmt.Errorf("error reading log file %s: %w", logFile, err)
 	}
 
 	return &api.SchedulerLog{
@@ -328,7 +339,7 @@ func (a *API) readStepLog(
 	if status == nil {
 		latestStatus, err := a.client.GetLatestStatus(ctx, dag)
 		if err != nil {
-			return nil, newInternalError(err)
+			return nil, fmt.Errorf("error getting latest status: %w", err)
 		}
 		status = &latestStatus
 	}
@@ -357,7 +368,11 @@ func (a *API) readStepLog(
 	}
 
 	if node == nil {
-		return nil, newNotFoundError(api.ErrorCodeNotFound, fmt.Errorf("step %s not found", stepName))
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("step %s not found", stepName),
+		}
 	}
 
 	var decoder *encoding.Decoder
@@ -367,7 +382,7 @@ func (a *API) readStepLog(
 
 	logContent, err := readFileContent(node.Log, decoder)
 	if err != nil {
-		return nil, newInternalError(err)
+		return nil, fmt.Errorf("error reading log file %s: %w", node.Log, err)
 	}
 
 	return &api.StepLog{
@@ -375,20 +390,6 @@ func (a *API) readStepLog(
 		Step:    toNode(node),
 		Content: string(logContent),
 	}, nil
-}
-
-func (a *API) readStatus(ctx context.Context, dag *digraph.DAG, reqID string) (*persistence.Status, error) {
-	// If a request ID is provided, fetch the status by request ID.
-	if reqID != "" {
-		return a.client.GetStatusByRequestID(ctx, dag, reqID)
-	}
-
-	// If no request ID is provided, fetch the latest status.
-	status, err := a.client.GetLatestStatus(ctx, dag)
-	if err != nil {
-		return nil, err
-	}
-	return &status, nil
 }
 
 func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
@@ -426,7 +427,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 
 	result, errList, err := a.client.ListStatus(ctx, opts...)
 	if err != nil {
-		return nil, newInternalError(err)
+		return nil, fmt.Errorf("error listing DAGs: %w", err)
 	}
 
 	hasErr := len(errList) > 0
@@ -478,7 +479,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 func (a *API) ListTags(ctx context.Context, _ api.ListTagsRequestObject) (api.ListTagsResponseObject, error) {
 	tags, errs, err := a.client.GetTagList(ctx)
 	if err != nil {
-		return nil, newInternalError(err)
+		return nil, fmt.Errorf("error getting tags: %w", err)
 	}
 	return &api.ListTags200JSONResponse{
 		Tags:   tags,
@@ -615,7 +616,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 
 		newName := *request.Body.Value
 		if err := a.client.Rename(ctx, request.Name, newName); err != nil {
-			return nil, newInternalError(err)
+			return nil, fmt.Errorf("error renaming DAG: %w", err)
 		}
 
 		return api.PostDAGAction200JSONResponse{
@@ -637,7 +638,7 @@ func (a *API) updateStatus(
 ) error {
 	status, err := a.client.GetStatusByRequestID(ctx, dagStatus.DAG, reqID)
 	if err != nil {
-		return newInternalError(err)
+		return fmt.Errorf("error getting status: %w", err)
 	}
 
 	idxToUpdate := -1
@@ -648,7 +649,11 @@ func (a *API) updateStatus(
 		}
 	}
 	if idxToUpdate < 0 {
-		return newNotFoundError(api.ErrorCodeNotFound, fmt.Errorf("step %s not found", step))
+		return &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("step %s not found", step),
+		}
 	}
 
 	status.Nodes[idxToUpdate].Status = to
@@ -674,7 +679,7 @@ func (a *API) SearchDAGs(ctx context.Context, request api.SearchDAGsRequestObjec
 
 	ret, errs, err := a.client.Grep(ctx, query)
 	if err != nil {
-		return nil, newInternalError(err)
+		return nil, fmt.Errorf("error searching DAGs: %w", err)
 	}
 
 	var results []api.SearchDAGsResultItem

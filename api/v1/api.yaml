@@ -440,6 +440,7 @@ components:
         - "remote_node_error"
         - "already_running"
         - "not_running"
+        - "already_exists"
 
     DAGDetailTab:
       type: string
