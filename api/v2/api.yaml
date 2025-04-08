@@ -740,7 +740,7 @@ components:
         dag:
           $ref: "#/components/schemas/DAGDetails"
         latestRun:
-          $ref: "#/components/schemas/Run"
+          $ref: "#/components/schemas/RunDetails"
         suspended:
           type: boolean
           description: "Whether the DAG is suspended"
@@ -833,6 +833,44 @@ components:
           $ref: "#/components/schemas/Step"
 
     Run:
+      type: object
+      description: "Current status of a DAG run"
+      properties:
+        requestId:
+          type: string
+          description: "Unique identifier for the DAG run request"
+        name:
+          type: string
+          description: "Name of the DAG being executed"
+        status:
+          $ref: "#/components/schemas/Status"
+        statusText:
+          $ref: "#/components/schemas/StatusText"
+        pid:
+          type: integer
+          description: "Process ID of the DAG run"
+        startedAt:
+          type: string
+          description: "RFC 3339 timestamp when the DAG run started"
+        finishedAt:
+          type: string
+          description: "RFC 3339 timestamp when the DAG run finished"
+        log:
+          type: string
+          description: "Path to the log file"
+        params:
+          type: string
+          description: "Runtime parameters passed to the DAG in JSON format"
+      required:
+        - requestId
+        - name
+        - status
+        - statusText
+        - startedAt
+        - finishedAt
+        - log
+
+    RunDetails:
       type: object
       description: "Detailed status of a DAG run including child nodes"
       properties:
@@ -1063,7 +1101,7 @@ components:
           type: array
           description: "Detailed status information for each run"
           items:
-            $ref: "#/components/schemas/Run"
+            $ref: "#/components/schemas/RunDetails"
       required:
         - gridData
         - runs
