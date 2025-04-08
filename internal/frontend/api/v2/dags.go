@@ -110,6 +110,11 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 	return api.UpdateDAGSpec200Response{}, nil
 }
 
+// GetDAGRuns implements api.StrictServerInterface.
+func (a *API) GetDAGRuns(ctx context.Context, request api.GetDAGRunsRequestObject) (api.GetDAGRunsResponseObject, error) {
+	panic("unimplemented")
+}
+
 // GetDAGDetails implements api.StrictServerInterface.
 func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsRequestObject) (api.GetDAGDetailsResponseObject, error) {
 	name := request.Name
