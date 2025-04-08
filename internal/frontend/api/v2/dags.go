@@ -201,7 +201,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 
 	resp := &api.GetDAGDetails200JSONResponse{
 		Title: status.DAG.Name,
-		DAG:   statusDetails,
+		Dag:   statusDetails,
 	}
 
 	if err := status.DAG.Validate(); err != nil {
@@ -731,7 +731,7 @@ func (a *API) SearchDAGs(ctx context.Context, request api.SearchDAGsRequestObjec
 
 		results = append(results, api.SearchDAGsResultItem{
 			Name:    item.Name,
-			DAG:     toDAG(item.DAG),
+			Dag:     toDAG(item.DAG),
 			Matches: matches,
 		})
 	}
