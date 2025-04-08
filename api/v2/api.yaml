@@ -177,32 +177,32 @@ paths:
                 type: object
                 description: "Response object for getting details of a DAG"
                 properties:
-                  Title:
+                  title:
                     type: string
                     description: "Title of the Page"
-                  DAG:
+                  dag:
                     $ref: "#/components/schemas/DAGStatusFileDetails"
-                  Definition:
+                  definition:
                     type: string
                     description: "DAG definition"
-                  HistoryData:
+                  historyData:
                     $ref: "#/components/schemas/DAGHistoryData"
-                  LogUrl:
+                  logUrl:
                     type: string
                     description: "URL to access logs directly"
-                  StepLog:
+                  stepLog:
                     $ref: "#/components/schemas/StepLog"
-                  ScLog:
+                  scLog:
                     $ref: "#/components/schemas/SchedulerLog"
-                  Errors:
+                  errors:
                     type: array
                     description: "List of errors encountered during the request"
                     items:
                       type: string
                 required:
-                  - Title
-                  - DAG
-                  - Errors
+                  - title
+                  - dag
+                  - errors
         default:
           description: "Generic error response"
           content:
@@ -414,19 +414,19 @@ paths:
                 type: object
                 description: "Response object for searching DAGs"
                 properties:
-                  Results:
+                  results:
                     type: array
                     description: "Search results matching the query"
                     items:
                       $ref: "#/components/schemas/SearchDAGsResultItem"
-                  Errors:
+                  errors:
                     type: array
                     description: "Errors encountered during the search"
                     items:
                       type: string
                 required:
-                  - Results
-                  - Errors
+                  - results
+                  - errors
         default:
           description: "Generic error response"
           content:
@@ -646,45 +646,45 @@ components:
       type: object
       description: "Core DAG configuration containing workflow definition and metadata"
       properties:
-        Group:
+        group:
           type: string
           description: "Logical grouping of related DAGs for organizational purposes"
-        Name:
+        name:
           type: string
           description: "Unique identifier for the DAG within its group"
-        Schedule:
+        schedule:
           type: array
           description: "List of scheduling expressions defining when the DAG should run"
           items:
             $ref: "#/components/schemas/Schedule"
-        Description:
+        description:
           type: string
           description: "Human-readable description of the DAG's purpose and behavior"
-        Params:
+        params:
           type: array
           description: "List of parameter names that can be passed to the DAG at runtime"
           items:
             type: string
-        DefaultParams:
+        defaultParams:
           type: string
           description: "Default parameter values in JSON format if not specified at runtime"
-        Tags:
+        tags:
           type: array
           description: "List of tags for categorizing and filtering DAGs"
           items:
             type: string
       required:
-        - Name
+        - name
 
     Schedule:
       type: object
       description: "Schedule configuration for DAG run"
       properties:
-        Expression:
+        expression:
           type: string
           description: "Cron expression or schedule pattern"
       required:
-        - Expression
+        - expression
 
     Status:
       type: integer
@@ -757,79 +757,79 @@ components:
       type: object
       description: "Detailed DAG configuration information"
       properties:
-        Location:
+        location:
           type: string
           description: "Path to the DAG file"
-        Group:
+        group:
           type: string
           description: "Logical grouping of related DAGs for organizational purposes"
-        Name:
+        name:
           type: string
           description: "Unique identifier for the DAG within its group"
-        Schedule:
+        schedule:
           type: array
           description: "List of scheduling expressions defining when the DAG should run"
           items:
             $ref: "#/components/schemas/Schedule"
-        Description:
+        description:
           type: string
           description: "Human-readable description of the DAG's purpose and behavior"
-        Env:
+        env:
           type: array
           description: "List of environment variables to set before executing"
           items:
             type: string
-        LogDir:
+        logDir:
           type: string
           description: "Directory path for storing log files"
-        HandlerOn:
+        handlerOn:
           $ref: "#/components/schemas/HandlerOn"
-        Steps:
+        steps:
           type: array
           description: "List of steps to execute in the DAG"
           items:
             $ref: "#/components/schemas/Step"
-        Delay:
+        delay:
           type: integer
           description: "Time in seconds to wait before starting the DAG"
-        HistRetentionDays:
+        histRetentionDays:
           type: integer
           description: "Number of days to retain historical logs"
-        Preconditions:
+        preconditions:
           type: array
           description: "Conditions that must be met before the DAG can start"
           items:
             $ref: "#/components/schemas/Precondition"
-        MaxActiveRuns:
+        maxActiveRuns:
           type: integer
           description: "Maximum number of concurrent steps to run"
-        Params:
+        params:
           type: array
           description: "List of parameter names that can be passed to the DAG at runtime"
           items:
             type: string
-        DefaultParams:
+        defaultParams:
           type: string
           description: "Default parameter values in JSON format if not specified at runtime"
-        Tags:
+        tags:
           type: array
           description: "List of tags for categorizing and filtering DAGs"
           items:
             type: string
       required:
-        - Name
+        - name
 
     HandlerOn:
       type: object
       description: "Configuration for event handlers in a DAG"
       properties:
-        Failure:
+        failure:
           $ref: "#/components/schemas/Step"
-        Success:
+        success:
           $ref: "#/components/schemas/Step"
-        Cancel:
+        cancel:
           $ref: "#/components/schemas/Step"
-        Exit:
+        exit:
           $ref: "#/components/schemas/Step"
 
     Run:
@@ -926,167 +926,167 @@ components:
       type: object
       description: "Status of an individual step within a DAG run"
       properties:
-        Step:
+        step:
           $ref: "#/components/schemas/Step"
-        Log:
+        log:
           type: string
           description: "Path to step-specific log file"
-        StartedAt:
+        startedAt:
           type: string
           description: "RFC3339 timestamp when the step started"
-        FinishedAt:
+        finishedAt:
           type: string
           description: "RFC3339 timestamp when the step finished"
-        Status:
+        status:
           $ref: "#/components/schemas/NodeStatus"
-        StatusText:
+        statusText:
           $ref: "#/components/schemas/NodeStatusText"
-        RetryCount:
+        retryCount:
           type: integer
           description: "Number of retry attempts made for this step"
-        DoneCount:
+        doneCount:
           type: integer
           description: "Number of successful completions for repeating steps"
-        Error:
+        error:
           type: string
           description: "Error message if the step failed"
       required:
-        - Step
-        - Log
-        - StartedAt
-        - FinishedAt
-        - Status
-        - StatusText
-        - RetryCount
-        - DoneCount
+        - step
+        - log
+        - startedAt
+        - finishedAt
+        - status
+        - statusText
+        - retryCount
+        - doneCount
 
     Step:
       type: object
       description: "Individual task within a DAG that performs a specific operation"
       properties:
-        Name:
+        name:
           type: string
           description: "Unique identifier for the step within the DAG"
-        Description:
+        description:
           type: string
           description: "Human-readable description of what the step does"
-        Dir:
+        dir:
           type: string
           description: "Working directory for executing the step's command"
-        CmdWithArgs:
+        cmdWithArgs:
           type: string
           description: "Complete command string including arguments to execute"
-        Command:
+        command:
           type: string
           description: "Base command to execute without arguments"
-        Script:
+        script:
           type: string
           description: "Script content if the step executes a script file"
-        Stdout:
+        stdout:
           type: string
           description: "File path for capturing standard output"
-        Stderr:
+        stderr:
           type: string
           description: "File path for capturing standard error"
-        Output:
+        output:
           type: string
           description: "Variable name to store the step's output"
-        Args:
+        args:
           type: array
           description: "List of arguments to pass to the command"
           items:
             type: string
-        Run:
+        run:
           type: string
           description: "Sub DAG to run"
-        Params:
+        params:
           type: string
           description: "Parameters to pass to the sub DAG in JSON format"
-        Depends:
+        depends:
           type: array
           description: "List of step names that must complete before this step can start"
           items:
             type: string
-        RepeatPolicy:
+        repeatPolicy:
           $ref: "#/components/schemas/RepeatPolicy"
-        MailOnError:
+        mailOnError:
           type: boolean
           description: "Whether to send email notifications on step failure"
-        Preconditions:
+        preconditions:
           type: array
           description: "Conditions that must be met before the step can start"
           items:
             $ref: "#/components/schemas/Precondition"
       required:
-        - Name
+        - name
 
     SearchDAGsResultItem:
       type: object
       description: "Individual search result item for a DAG"
       properties:
-        Name:
+        name:
           type: string
           description: "Name of the matching DAG"
-        DAG:
+        dag:
           $ref: "#/components/schemas/DAG"
-        Matches:
+        matches:
           type: array
           description: "Details of where matches were found"
           items:
             $ref: "#/components/schemas/SearchDAGsMatchItem"
       required:
-        - Name
-        - DAG
-        - Matches
+        - name
+        - dag
+        - matches
 
     SearchDAGsMatchItem:
       type: object
       description: "Details of a search match within a DAG"
       properties:
-        Line:
+        line:
           type: string
           description: "Matching line content"
-        LineNumber:
+        lineNumber:
           type: integer
           description: "Line number where match was found"
-        StartLine:
+        startLine:
           type: integer
           description: "Start line for context"
       required:
-        - Line
-        - LineNumber
-        - StartLine
+        - line
+        - lineNumber
+        - startLine
 
     StepLog:
       type: object
       description: "Log information for a specific step"
       properties:
-        Step:
+        step:
           $ref: "#/components/schemas/Node"
-        LogFile:
+        logFile:
           type: string
           description: "Path to the log file"
-        Content:
+        content:
           type: string
           description: "Log content"
       required:
-        - Step
-        - LogFile
-        - Content
+        - step
+        - logFile
+        - content
 
     SchedulerLog:
       type: object
       description: "Log information for the scheduler"
       properties:
-        LogFile:
+        logFile:
           type: string
           description: "Path to the scheduler log file"
-        Content:
+        content:
           type: string
           description: "Log content"
       required:
-        - LogFile
-        - Content
+        - logFile
+        - content
 
     DAGHistoryData:
       type: object
@@ -1110,26 +1110,26 @@ components:
       type: object
       description: "Grid item for log visualization"
       properties:
-        Name:
+        name:
           type: string
           description: "Name of the step"
-        History:
+        history:
           type: array
           description: "Status of the step ordered by time"
           items:
             $ref: "#/components/schemas/NodeStatus"
       required:
-        - Name
-        - History
+        - name
+        - history
 
     Precondition:
       type: object
       description: "Precondition that must be satisfied before running a step or DAG"
       properties:
-        Condition:
+        condition:
           type: string
           description: "Expression or check to evaluate"
-        Expected:
+        expected:
           type: string
           description: "Expected result of the condition evaluation"
 
@@ -1137,10 +1137,10 @@ components:
       type: object
       description: "Configuration for step retry behavior"
       properties:
-        Repeat:
+        repeat:
           type: boolean
           description: "Whether the step should be retried on failure"
-        Interval:
+        interval:
           type: integer
           description: "Time in seconds to wait between retry attempts"
 
@@ -1148,19 +1148,19 @@ components:
       type: object
       description: "Response object for listing all tags"
       properties:
-        Tags:
+        tags:
           type: array
           description: "List of unique tags"
           items:
             type: string
-        Errors:
+        errors:
           type: array
           description: "List of errors encountered during the request"
           items:
             type: string
       required:
-        - Tags
-        - Errors
+        - tags
+        - errors
 
 # Apply security requirements globally
 security:
