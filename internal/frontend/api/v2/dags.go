@@ -191,7 +191,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 		Dag:       details,
 		Error:     ptr(status.ErrorAsString()),
 		File:      status.File,
-		LatestRun: toRun(status.Status),
+		LatestRun: toRunDetails(status.Status),
 		Suspended: status.Suspended,
 	}
 
@@ -331,9 +331,9 @@ func (a *API) readHistoryData(
 		}
 	}
 
-	var runs []api.Run
+	var runs []api.RunDetails
 	for _, log := range logs {
-		runs = append(runs, toRun(log.Status))
+		runs = append(runs, toRunDetails(log.Status))
 	}
 
 	return api.DAGHistoryData{
@@ -799,8 +799,8 @@ func toPrecondition(obj digraph.Condition) api.Precondition {
 	}
 }
 
-func toRun(s persistence.Status) api.Run {
-	status := api.Run{
+func toRunDetails(s persistence.Status) api.RunDetails {
+	status := api.RunDetails{
 		Log:        s.Log,
 		Name:       s.Name,
 		Params:     ptr(s.Params),
