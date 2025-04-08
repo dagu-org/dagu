@@ -56,17 +56,47 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 	}
 
 	// Validate the spec
-	_, loadErr := a.client.LoadYAML(ctx, []byte(spec), digraph.WithName(request.Name))
-
+	_, err = a.client.LoadYAML(ctx, []byte(spec), digraph.WithName(request.Name))
 	var errs []string
-	if loadErr != nil {
-		errs = append(errs, loadErr.Error())
+
+	var loadErrs digraph.ErrorList
+	if errors.As(err, &loadErrs) {
+		errs = loadErrs.ToStringList()
+	} else {
+		return nil, err
 	}
 
 	return &api.GetDAGSpec200JSONResponse{
 		Spec:   spec,
 		Errors: errs,
 	}, nil
+}
+
+// UpdateDAGSpec implements api.StrictServerInterface.
+func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecRequestObject) (api.UpdateDAGSpecResponseObject, error) {
+	// Check the DAG exists
+	_, err := a.client.GetStatus(ctx, request.Name)
+	if err != nil {
+		return nil, newNotFoundError(api.ErrorCodeNotFound, err)
+	}
+
+	err = a.client.UpdateDAG(ctx, request.Name, request.Body.Spec)
+	var errs []string
+
+	var loadErrs digraph.ErrorList
+	if errors.As(err, &loadErrs) {
+		errs = loadErrs.ToStringList()
+	} else {
+		return nil, err
+	}
+
+	if len(errs) > 0 {
+		return &api.UpdateDAGSpec400JSONResponse{
+			Errors: errs,
+		}, nil
+	}
+
+	return api.UpdateDAGSpec200Response{}, nil
 }
 
 // GetDAGDetails implements api.StrictServerInterface.

@@ -113,12 +113,12 @@ func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*DAG, error
 func LoadYAMLWithOpts(ctx context.Context, data []byte, opts BuildOpts) (*DAG, error) {
 	raw, err := unmarshalData(data)
 	if err != nil {
-		return nil, err
+		return nil, ErrorList{err}
 	}
 
 	def, err := decode(raw)
 	if err != nil {
-		return nil, err
+		return nil, ErrorList{err}
 	}
 
 	return build(BuildContext{ctx: ctx, opts: opts}, def)
@@ -141,7 +141,7 @@ func LoadBaseConfig(ctx BuildContext, file string) (*DAG, error) {
 	// Decode the raw data into a config definition.
 	def, err := decode(raw)
 	if err != nil {
-		return nil, err
+		return nil, ErrorList{err}
 	}
 
 	ctx = ctx.WithOpts(BuildOpts{NoEval: ctx.opts.NoEval}).WithFile(file)
