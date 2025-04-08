@@ -86,7 +86,7 @@ func (h *remoteNodeProxy) proxy(r *http.Request) (int, []byte, error) {
 				return 0, nil, &Error{
 					Code:       api.ErrorCodeBadRequest,
 					HTTPStatus: http.StatusBadRequest,
-					Message:    fmt.Sprintf("failed to unmarshal request body: %w", err),
+					Message:    fmt.Sprintf("Failed to unmarshal request body: %s", err),
 				}
 			}
 		}
