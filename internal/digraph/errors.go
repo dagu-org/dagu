@@ -80,12 +80,33 @@ func (e *ErrorList) Add(err error) {
 	}
 }
 
-// Error implements the error interface.
-// It returns a string with all the errors separated by a semicolon.
-func (e *ErrorList) Error() string {
+// ToStringList returns the list of errors as a slice of strings.
+func (e *ErrorList) ToStringList() []string {
 	errStrings := make([]string, len(*e))
 	for i, err := range *e {
 		errStrings[i] = err.Error()
 	}
+	return errStrings
+}
+
+// Error implements the error interface.
+// It returns a string with all the errors separated by a semicolon.
+func (e ErrorList) Error() string {
+	errStrings := make([]string, len(e))
+	for i, err := range e {
+		errStrings[i] = err.Error()
+	}
 	return strings.Join(errStrings, "; ")
+}
+
+// Unwrap implements the errors.Unwrap interface.
+func (e ErrorList) Unwrap() []error {
+	// If the list is empty, return nil
+	if len(e) == 0 {
+		return nil
+	}
+
+	// Return a copy of the underlying error slice
+	// This allows errors.Is to check against each error in the list
+	return e
 }

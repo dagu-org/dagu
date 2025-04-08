@@ -131,7 +131,7 @@ func build(ctx BuildContext, spec *definition) (*DAG, error) {
 	}
 
 	if len(errs) > 0 {
-		return nil, &errs
+		return nil, errs
 	}
 
 	return dag, nil

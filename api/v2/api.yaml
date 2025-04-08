@@ -53,8 +53,8 @@ paths:
       tags:
         - "dags"
       parameters:
-        - $ref: "#/components/parameters/page"
-        - $ref: "#/components/parameters/perPage"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
         - name: "name"
           in: "query"
           required: false
@@ -296,12 +296,7 @@ paths:
       tags:
         - "dags"
       parameters:
-        - name: "name"
-          in: "path"
-          required: true
-          schema:
-            type: "string"
-          description: "The name of the DAG"
+        - $ref: "#/components/parameters/DAGName"
       responses:
         "200":
           description: "A successful response"
@@ -321,6 +316,50 @@ paths:
                 required:
                   - spec
                   - errors
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      summary: "Update DAG Spec"
+      description: "Updates the spec of the DAG"
+      operationId: "updateDAGSpec"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/DAGName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                spec:
+                  type: string
+                  description: "The new DAG spec"
+              required:
+                - spec
+      responses:
+        "200":
+          description: "A successful response"
+        "400":
+          description: "Invalid spec"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: array
+                    description: "List of errors in the spec"
+                    items:
+                      type: string
+                required:
+                  - errors
+
         default:
           description: "Generic error response"
           content:
@@ -403,7 +442,7 @@ components:
       bearerFormat: opaque
 
   parameters:
-    page:
+    Page:
       name: page
       in: query
       description: page number of items to fetch (default is 1)
@@ -412,7 +451,7 @@ components:
         type: integer
         minimum: 1
         default: 1
-    perPage:
+    PerPage:
       name: perPage
       in: query
       description: number of items per page (default is 30, max is 100)
@@ -422,6 +461,13 @@ components:
         minimum: 1
         maximum: 1000
         default: 50
+    DAGName:
+      name: name
+      in: path
+      description: name of the DAG
+      required: true
+      schema:
+        $ref: "#/components/schemas/DAGName"
 
   schemas:
     Error:
