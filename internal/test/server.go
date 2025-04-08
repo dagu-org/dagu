@@ -48,7 +48,7 @@ func (srv *Server) runServer(t *testing.T) {
 	t.Helper()
 
 	server := frontend.NewServer(srv.Config, srv.Helper.Client)
-	err := server.Serve(srv.Helper.Context)
+	err := server.Serve(srv.Context)
 	require.NoError(t, err, "failed to start server")
 }
 
@@ -77,7 +77,7 @@ type Request struct {
 	client         *APIClient
 	method         string
 	path           string
-	body           interface{}
+	body           any
 	expectedStatus int
 }
 
@@ -91,7 +91,7 @@ func (c *APIClient) Get(path string) *Request {
 }
 
 // Post prepares a POST request with the given body
-func (c *APIClient) Post(path string, body interface{}) *Request {
+func (c *APIClient) Post(path string, body any) *Request {
 	return &Request{
 		client: c,
 		method: http.MethodPost,
@@ -161,7 +161,7 @@ type Response struct {
 }
 
 // Unmarshal parses the response body into the provided value
-func (r *Response) Unmarshal(t *testing.T, v interface{}) {
+func (r *Response) Unmarshal(t *testing.T, v any) {
 	t.Helper()
 	err := json.Unmarshal([]byte(r.Body), v)
 	require.NoError(t, err, "failed to unmarshal response body")
@@ -172,7 +172,9 @@ func findAvailablePort(t *testing.T) int {
 	t.Helper()
 	listener, err := net.Listen("tcp", ":0") // nolint:gosec
 	require.NoError(t, err, "failed to find available port")
-	defer listener.Close()
+	defer func() {
+		_ = listener.Close()
+	}()
 
 	return listener.Addr().(*net.TCPAddr).Port
 }
@@ -189,7 +191,7 @@ func waitForServerStart(t *testing.T, addr string) {
 	for i := 0; i < maxRetries; i++ {
 		conn, err := net.Dial("tcp", addr)
 		if err == nil {
-			conn.Close()
+			_ = conn.Close()
 			return
 		}
 		time.Sleep(retryDelay)

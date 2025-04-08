@@ -11,8 +11,6 @@ import (
 	"strings"
 	"text/template"
 
-	_ "embed"
-
 	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/logger"
 )

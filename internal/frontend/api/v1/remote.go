@@ -30,8 +30,11 @@ func WithRemoteNode(remoteNodes map[string]config.RemoteNode, apiBasePath string
 			remoteNode, ok := remoteNodes[remoteNodeName]
 			if !ok {
 				// remote node not found, return bad request
-				apiErr := newBadRequestError(api.ErrorCodeRemoteNodeError, fmt.Errorf("remote node %s not found", remoteNodeName))
-				WriteErrorResponse(w, apiErr)
+				WriteErrorResponse(w, &Error{
+					Code:       api.ErrorCodeBadRequest,
+					HTTPStatus: http.StatusBadRequest,
+					Message:    fmt.Sprintf("remote node %s not found", remoteNodeName),
+				})
 				return
 			}
 			// If the parameter is present, we need to handle the request differently
@@ -56,7 +59,6 @@ func WithRemoteNode(remoteNodes map[string]config.RemoteNode, apiBasePath string
 					logger.Error(r.Context(), "failed to write response", "err", err)
 				}
 			}
-			return
 		}
 
 		return http.HandlerFunc(fn)
@@ -77,11 +79,15 @@ func (h *remoteNodeProxy) proxy(r *http.Request) (int, []byte, error) {
 	if r.Body != nil {
 		data, err := io.ReadAll(r.Body)
 		if err != nil {
-			return 0, nil, newInternalError(fmt.Errorf("failed to read request body: %w", err))
+			return 0, nil, fmt.Errorf("failed to read request body: %w", err)
 		}
 		if len(data) > 0 {
 			if err := json.Unmarshal(data, &body); err != nil {
-				return 0, nil, newBadRequestError(api.ErrorCodeRemoteNodeError, fmt.Errorf("failed to unmarshal request body: %w", err))
+				return 0, nil, &Error{
+					Code:       api.ErrorCodeBadRequest,
+					HTTPStatus: http.StatusBadRequest,
+					Message:    fmt.Sprintf("failed to unmarshal request body: %w", err),
+				}
 			}
 		}
 	}
@@ -99,7 +105,11 @@ func (h *remoteNodeProxy) doRequest(body any, r *http.Request, node config.Remot
 	// Build the new remote URL
 	urlComponents := strings.Split(r.URL.Path, h.apiBasePath)
 	if len(urlComponents) < 2 {
-		return 0, nil, newBadRequestError(api.ErrorCodeRemoteNodeError, fmt.Errorf("invalid API path: %s", r.URL.Path))
+		return 0, nil, &Error{
+			Code:       api.ErrorCodeBadRequest,
+			HTTPStatus: http.StatusBadRequest,
+			Message:    fmt.Sprintf("invalid URL path: %s", r.URL.Path),
+		}
 	}
 	remoteURL := fmt.Sprintf("%s%s?%s", strings.TrimSuffix(node.APIBaseURL, "/"), urlComponents[1], q.Encode())
 
@@ -108,14 +118,14 @@ func (h *remoteNodeProxy) doRequest(body any, r *http.Request, node config.Remot
 	if body != nil {
 		data, err := json.Marshal(body)
 		if err != nil {
-			return 0, nil, newInternalError(fmt.Errorf("failed to marshal request body: %w", err))
+			return 0, nil, fmt.Errorf("failed to marshal request body: %w", err)
 		}
 		bodyJSON = strings.NewReader(string(data))
 	}
 
 	req, err := http.NewRequest(method, remoteURL, bodyJSON)
 	if err != nil {
-		return 0, nil, newInternalError(fmt.Errorf("failed to create new request: %w", err))
+		return 0, nil, fmt.Errorf("failed to create new request: %w", err)
 	}
 
 	// Copy headers from the original request if needed
@@ -154,11 +164,11 @@ func (h *remoteNodeProxy) doRequest(body any, r *http.Request, node config.Remot
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return 0, nil, newInternalError(fmt.Errorf("failed to send request to remote node: %w", err))
+		return 0, nil, fmt.Errorf("failed to send request to remote node: %w", err)
 	}
 
 	if resp == nil {
-		return 0, nil, newInternalError(fmt.Errorf("received nil response from remote node"))
+		return 0, nil, fmt.Errorf("received nil response from remote node")
 	}
 
 	defer func() {
@@ -172,9 +182,11 @@ func (h *remoteNodeProxy) doRequest(body any, r *http.Request, node config.Remot
 	case "gzip":
 		gzReader, err := gzip.NewReader(resp.Body)
 		if err != nil {
-			return 0, nil, newInternalError(fmt.Errorf("failed to create gzip reader: %w", err))
+			return 0, nil, fmt.Errorf("failed to create gzip reader: %w", err)
 		}
-		defer gzReader.Close()
+		defer func() {
+			_ = gzReader.Close()
+		}()
 		reader = gzReader
 	case "deflate":
 		reader = flate.NewReader(resp.Body)

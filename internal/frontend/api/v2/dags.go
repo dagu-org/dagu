@@ -27,9 +27,12 @@ func (a *API) CreateDAG(ctx context.Context, request api.CreateDAGRequestObject)
 	name, err := a.client.CreateDAG(ctx, request.Body.Name)
 	if err != nil {
 		if errors.Is(err, persistence.ErrDAGAlreadyExists) {
-			return nil, newBadRequestError(api.ErrorCodeBadRequest, err)
+			return nil, &Error{
+				HTTPStatus: http.StatusConflict,
+				Code:       api.ErrorCodeAlreadyExists,
+			}
 		}
-		return nil, newInternalError(err)
+		return nil, fmt.Errorf("error creating DAG: %w", err)
 	}
 	return &api.CreateDAG201JSONResponse{
 		Name: name,
@@ -40,10 +43,14 @@ func (a *API) CreateDAG(ctx context.Context, request api.CreateDAGRequestObject)
 func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject) (api.DeleteDAGResponseObject, error) {
 	_, err := a.client.GetStatus(ctx, request.Name)
 	if err != nil {
-		return nil, newNotFoundError(api.ErrorCodeNotFound, err)
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("DAG %s not found", request.Name),
+		}
 	}
 	if err := a.client.DeleteDAG(ctx, request.Name); err != nil {
-		return nil, newInternalError(err)
+		return nil, fmt.Errorf("error deleting DAG: %w", err)
 	}
 	return &api.DeleteDAG204Response{}, nil
 }
@@ -77,7 +84,11 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 	// Check the DAG exists
 	_, err := a.client.GetStatus(ctx, request.Name)
 	if err != nil {
-		return nil, newNotFoundError(api.ErrorCodeNotFound, err)
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("DAG %s not found", request.Name),
+		}
 	}
 
 	err = a.client.UpdateDAG(ctx, request.Name, request.Body.Spec)
@@ -110,7 +121,11 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 
 	status, err := a.client.GetStatus(ctx, name)
 	if err != nil {
-		return nil, newNotFoundError(api.ErrorCodeNotFound, err)
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("DAG %s not found", name),
+		}
 	}
 
 	var steps []api.Step
@@ -194,7 +209,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 	case api.DAGDetailTabSpec:
 		spec, err := a.client.GetDAGSpec(ctx, name)
 		if err != nil {
-			return nil, newInternalError(err)
+			return nil, fmt.Errorf("error getting DAG spec: %w", err)
 		}
 		resp.Definition = ptr(spec)
 
@@ -379,7 +394,7 @@ func (a *API) readStepLog(
 	}
 
 	if node == nil {
-		return nil, newNotFoundError(api.ErrorCodeNotFound, fmt.Errorf("step %s not found", stepName))
+		return nil, fmt.Errorf("step %s not found in status", stepName)
 	}
 
 	var decoder *encoding.Decoder
@@ -389,7 +404,7 @@ func (a *API) readStepLog(
 
 	logContent, err := readFileContent(node.Log, decoder)
 	if err != nil {
-		return nil, newInternalError(err)
+		return nil, fmt.Errorf("error reading %s: %w", node.Log, err)
 	}
 
 	return &api.StepLog{
@@ -448,7 +463,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 
 	result, errList, err := a.client.ListStatus(ctx, opts...)
 	if err != nil {
-		return nil, newInternalError(err)
+		return nil, fmt.Errorf("error listing DAGs: %w", err)
 	}
 
 	resp := &api.ListDAGs200JSONResponse{
@@ -491,7 +506,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 func (a *API) ListTags(ctx context.Context, _ api.ListTagsRequestObject) (api.ListTagsResponseObject, error) {
 	tags, errs, err := a.client.GetTagList(ctx)
 	if err != nil {
-		return nil, newInternalError(err)
+		return nil, fmt.Errorf("error getting tags: %w", err)
 	}
 	return &api.ListTags200JSONResponse{
 		Tags:   tags,
@@ -532,7 +547,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 			return nil, &Error{
 				HTTPStatus: http.StatusBadRequest,
 				Code:       api.ErrorCodeBadRequest,
-				Message:    "invalid value for suspend, must be true or false",
+				Message:    "Invalid value for suspend, must be true or false",
 			}
 		}
 		if err := a.client.ToggleSuspend(ctx, request.Name, b); err != nil {
@@ -558,7 +573,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 			return nil, &Error{
 				HTTPStatus: http.StatusBadRequest,
 				Code:       api.ErrorCodeBadRequest,
-				Message:    "requestId is required for retry action",
+				Message:    "RequestId is required for retry action",
 			}
 		}
 		if err := a.client.Retry(ctx, status.DAG, *request.Body.RequestId); err != nil {
@@ -574,21 +589,21 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 			return nil, &Error{
 				HTTPStatus: http.StatusBadRequest,
 				Code:       api.ErrorCodeBadRequest,
-				Message:    "cannot change status of running DAG",
+				Message:    "Cannot change status of running DAG",
 			}
 		}
 		if request.Body.RequestId == nil {
 			return nil, &Error{
 				HTTPStatus: http.StatusBadRequest,
 				Code:       api.ErrorCodeBadRequest,
-				Message:    "requestId is required for mark-success action",
+				Message:    "RequestId is required for mark-success action",
 			}
 		}
 		if request.Body.Step == nil {
 			return nil, &Error{
 				HTTPStatus: http.StatusBadRequest,
 				Code:       api.ErrorCodeBadRequest,
-				Message:    "step is required for mark-success action",
+				Message:    "Step is required for mark-success action",
 			}
 		}
 		toStatus := scheduler.NodeStatusSuccess
@@ -607,7 +622,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 			return nil, &Error{
 				HTTPStatus: http.StatusBadRequest,
 				Code:       api.ErrorCodeBadRequest,
-				Message:    "value is required for save action (DAG spec)",
+				Message:    "Value is required for save action (DAG spec)",
 			}
 		}
 
@@ -622,13 +637,13 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 			return nil, &Error{
 				HTTPStatus: http.StatusBadRequest,
 				Code:       api.ErrorCodeBadRequest,
-				Message:    "value is required for rename action (new name)",
+				Message:    "Value is required for rename action (new name)",
 			}
 		}
 
 		newName := *request.Body.Value
 		if err := a.client.Rename(ctx, request.Name, newName); err != nil {
-			return nil, newInternalError(err)
+			return nil, fmt.Errorf("error renaming DAG: %w", err)
 		}
 
 		return api.PostDAGAction200JSONResponse{
@@ -650,7 +665,7 @@ func (a *API) updateStatus(
 ) error {
 	status, err := a.client.GetStatusByRequestID(ctx, dagStatus.DAG, reqID)
 	if err != nil {
-		return newInternalError(err)
+		return fmt.Errorf("error getting status: %w", err)
 	}
 
 	idxToUpdate := -1
@@ -661,7 +676,11 @@ func (a *API) updateStatus(
 		}
 	}
 	if idxToUpdate < 0 {
-		return newNotFoundError(api.ErrorCodeNotFound, fmt.Errorf("step %s not found", step))
+		return &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("Step %s not found in status", step),
+		}
 	}
 
 	status.Nodes[idxToUpdate].Status = to
@@ -681,13 +700,13 @@ func (a *API) SearchDAGs(ctx context.Context, request api.SearchDAGsRequestObjec
 		return nil, &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeBadRequest,
-			Message:    "query is required",
+			Message:    "Query is required",
 		}
 	}
 
 	ret, errs, err := a.client.Grep(ctx, query)
 	if err != nil {
-		return nil, newInternalError(err)
+		return nil, fmt.Errorf("error searching DAGs: %w", err)
 	}
 
 	var results []api.SearchDAGsResultItem
