@@ -197,7 +197,7 @@ func (a *API) readHistoryData(
 	dag *digraph.DAG,
 ) api.DAGHistoryData {
 	defaultHistoryLimit := 30
-	logs := a.client.GetRecentHistory(ctx, dag, defaultHistoryLimit)
+	logs := a.client.GetRecentHistory(ctx, dag.Name, defaultHistoryLimit)
 
 	data := map[string][]scheduler.NodeStatus{}
 
