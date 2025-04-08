@@ -156,7 +156,7 @@ paths:
           schema:
             $ref: "#/components/schemas/DAGDetailTab"
           description: "Specific part of the DAG to retrieve"
-        - name: "reqId"
+        - name: "requestId"
           in: "query"
           required: false
           schema:
@@ -290,11 +290,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{name}/runs:
+  /dags/{name}/history:
     get:
       summary: "Get history of DAG runs"
       description: "Returns the history of runs for a specific DAG"
-      operationId: "getDAGRuns"
+      operationId: "getDAGRunHistory"
       tags:
         - "dags"
       parameters:
@@ -305,28 +305,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  Runs:
-                    type: array
-                    description: "List of historical runs for the DAG"
-                    items:
-                      $ref: "#/components/schemas/DAGStatusDetails"
-                  Errors:
-                    type: array
-                    description: "List of errors encountered during the request"
-                    items:
-                      type: string
-                required:
-                  - Runs
-                  - Errors
+                $ref: "#/components/schemas/DAGHistoryData"
         default:
           description: "Generic error response"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-
   /dags/{name}/spec:
     get:
       summary: "Get DAG Spec"
@@ -638,24 +623,24 @@ components:
       type: object
       description: "DAG file with its status information"
       properties:
-        File:
-          type: string
-          description: "Path to the DAG file"
-        DAG:
+        dag:
           $ref: "#/components/schemas/DAG"
-        Status:
-          $ref: "#/components/schemas/StatusDetails"
-        Suspended:
+        latestRun:
+          $ref: "#/components/schemas/Run"
+        suspended:
           type: boolean
           description: "Whether the DAG is suspended"
-        Error:
-          type: string
-          description: "Error message if any"
+        errors:
+          type: array
+          description: "List of errors encountered during the request"
+          items:
+            type: string
       required:
-        - File
-        - DAG
-        - Status
-        - Suspended
+        - file
+        - dag
+        - latestRun
+        - suspended
+        - errors
 
     DAG:
       type: object
@@ -700,43 +685,6 @@ components:
           description: "Cron expression or schedule pattern"
       required:
         - Expression
-
-    StatusDetails:
-      type: object
-      description: "Current status of a DAG run"
-      properties:
-        RequestId:
-          type: string
-          description: "Unique identifier for the DAG run request"
-        Name:
-          type: string
-          description: "Name of the DAG being executed"
-        Status:
-          $ref: "#/components/schemas/Status"
-        StatusText:
-          $ref: "#/components/schemas/StatusText"
-        Pid:
-          type: integer
-          description: "Process ID of the DAG run"
-        StartedAt:
-          type: string
-          description: "RFC 3339 timestamp when the DAG run started"
-        FinishedAt:
-          type: string
-          description: "RFC 3339 timestamp when the DAG run finished"
-        Log:
-          type: string
-          description: "Path to the log file"
-        Params:
-          type: string
-          description: "Runtime parameters passed to the DAG in JSON format"
-      required:
-        - RequestId
-        - Name
-        - Status
-        - StatusText
-        - StartedAt
-        - FinishedAt
 
     Status:
       type: integer
@@ -786,24 +734,24 @@ components:
       type: object
       description: "Detailed status information for a DAG instance"
       properties:
-        File:
+        file:
           type: string
           description: "Path to the DAG file"
-        DAG:
+        dag:
           $ref: "#/components/schemas/DAGDetails"
-        Status:
-          $ref: "#/components/schemas/DAGStatusDetails"
-        Suspended:
+        latestRun:
+          $ref: "#/components/schemas/Run"
+        suspended:
           type: boolean
           description: "Whether the DAG is suspended"
-        Error:
+        error:
           type: string
-          description: "Error message if any"
+          description: "Error message if the DAG failed to start"
       required:
-        - File
-        - DAG
-        - Status
-        - Suspended
+        - file
+        - dag
+        - latestRun
+        - suspended
 
     DAGDetails:
       type: object
@@ -884,58 +832,57 @@ components:
         Exit:
           $ref: "#/components/schemas/Step"
 
-    DAGStatusDetails:
+    Run:
       type: object
       description: "Detailed status of a DAG run including child nodes"
       properties:
-        RequestId:
+        requestId:
           type: string
           description: "Unique identifier for the run request"
-        Name:
+        name:
           type: string
           description: "Name of the DAG"
-        Status:
+        status:
           $ref: "#/components/schemas/Status"
-        StatusText:
+        statusText:
           $ref: "#/components/schemas/StatusText"
-        Pid:
+        pid:
           type: integer
           description: "Process ID of the DAG run"
-        Nodes:
+        nodes:
           type: array
           description: "Status of individual steps within the DAG"
           items:
             $ref: "#/components/schemas/Node"
-        OnExit:
+        onExit:
           $ref: "#/components/schemas/Node"
-        OnSuccess:
+        onSuccess:
           $ref: "#/components/schemas/Node"
-        OnFailure:
+        onFailure:
           $ref: "#/components/schemas/Node"
-        OnCancel:
+        onCancel:
           $ref: "#/components/schemas/Node"
-        StartedAt:
+        startedAt:
           type: string
           description: "RFC3339 timestamp when the DAG run started"
-        FinishedAt:
+        finishedAt:
           type: string
           description: "RFC3339 timestamp when the DAG run finished"
-        Log:
+        log:
           type: string
           description: "Path to the log file"
-        Params:
+        params:
           type: string
           description: "Parameters in JSON format"
       required:
-        - RequestId
-        - Name
-        - Status
-        - StatusText
-        - Pid
-        - Nodes
-        - StartedAt
-        - FinishedAt
-        - Log
+        - requestId
+        - name
+        - status
+        - statusText
+        - nodes
+        - startedAt
+        - finishedAt
+        - log
 
     Node:
       type: object
@@ -1107,19 +1054,19 @@ components:
       type: object
       description: "Historical run data for a DAG"
       properties:
-        GridData:
+        gridData:
           type: array
           description: "Grid data for visualization"
           items:
             $ref: "#/components/schemas/DAGLogGridItem"
-        StatusDetails:
+        runs:
           type: array
           description: "Detailed status information for each run"
           items:
-            $ref: "#/components/schemas/DAGStatusDetails"
+            $ref: "#/components/schemas/Run"
       required:
-        - GridData
-        - StatusDetails
+        - gridData
+        - runs
 
     DAGLogGridItem:
       type: object

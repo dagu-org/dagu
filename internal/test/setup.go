@@ -202,7 +202,7 @@ func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
 
 	// the +1 to the limit is needed to ensure that the number of the history
 	// entries is exactly the expected number
-	history := d.Client.GetRecentHistory(d.Context, d.DAG, expected+1)
+	history := d.Client.GetRecentHistory(d.Context, d.DAG.Name, expected+1)
 	require.Len(t, history, expected)
 }
 

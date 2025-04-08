@@ -250,8 +250,8 @@ handleError:
 	return persistence.NewStatusFactory(dag).Default(), err
 }
 
-func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []persistence.Run {
-	records := e.historyStore.Recent(ctx, dag.Name, n)
+func (e *client) GetRecentHistory(ctx context.Context, name string, n int) []persistence.Run {
+	records := e.historyStore.Recent(ctx, name, n)
 
 	var runs []persistence.Run
 	for _, record := range records {
