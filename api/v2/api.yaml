@@ -626,7 +626,7 @@ components:
         dag:
           $ref: "#/components/schemas/DAG"
         latestRun:
-          $ref: "#/components/schemas/Run"
+          $ref: "#/components/schemas/RunSummary"
         suspended:
           type: boolean
           description: "Whether the DAG is suspended"
@@ -832,7 +832,7 @@ components:
         exit:
           $ref: "#/components/schemas/Step"
 
-    Run:
+    RunSummary:
       type: object
       description: "Current status of a DAG run"
       properties:
@@ -873,54 +873,26 @@ components:
     RunDetails:
       type: object
       description: "Detailed status of a DAG run including child nodes"
-      properties:
-        requestId:
-          type: string
-          description: "Unique identifier for the run request"
-        name:
-          type: string
-          description: "Name of the DAG"
-        status:
-          $ref: "#/components/schemas/Status"
-        statusText:
-          $ref: "#/components/schemas/StatusText"
-        pid:
-          type: integer
-          description: "Process ID of the DAG run"
-        nodes:
-          type: array
-          description: "Status of individual steps within the DAG"
-          items:
-            $ref: "#/components/schemas/Node"
-        onExit:
-          $ref: "#/components/schemas/Node"
-        onSuccess:
-          $ref: "#/components/schemas/Node"
-        onFailure:
-          $ref: "#/components/schemas/Node"
-        onCancel:
-          $ref: "#/components/schemas/Node"
-        startedAt:
-          type: string
-          description: "RFC3339 timestamp when the DAG run started"
-        finishedAt:
-          type: string
-          description: "RFC3339 timestamp when the DAG run finished"
-        log:
-          type: string
-          description: "Path to the log file"
-        params:
-          type: string
-          description: "Parameters in JSON format"
-      required:
-        - requestId
-        - name
-        - status
-        - statusText
-        - nodes
-        - startedAt
-        - finishedAt
-        - log
+      allOf:
+        - $ref: "#/components/schemas/RunSummary"
+        - type: object
+          description: "Detailed status information for the steps within a DAG run."
+          properties:
+            nodes:
+              type: array
+              description: "Status of individual steps within the DAG"
+              items:
+                $ref: "#/components/schemas/Node"
+            onExit:
+              $ref: "#/components/schemas/Node"
+            onSuccess:
+              $ref: "#/components/schemas/Node"
+            onFailure:
+              $ref: "#/components/schemas/Node"
+            onCancel:
+              $ref: "#/components/schemas/Node"
+          required:
+            - nodes
 
     Node:
       type: object
