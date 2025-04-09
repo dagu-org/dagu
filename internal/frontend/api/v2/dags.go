@@ -478,7 +478,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	}
 
 	for _, item := range result.Items {
-		run := api.Run{
+		run := api.RunSummary{
 			Log:        item.Status.Log,
 			Name:       item.Status.Name,
 			Params:     ptr(item.Status.Params),
