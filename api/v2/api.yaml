@@ -290,7 +290,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{name}/history:
+  /dags/{name}/runs:
     get:
       summary: "Get history of DAG runs"
       description: "Returns the history of runs for a specific DAG"
@@ -305,13 +305,67 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DAGHistoryData"
+                type: object
+                properties:
+                  runs:
+                    type: array
+                    description: "List of historical runs for the DAG"
+                    items:
+                      $ref: "#/components/schemas/RunDetails"
+                  gridData:
+                    type: array
+                    description: "Grid data for visualization"
+                    items:
+                      $ref: "#/components/schemas/DAGLogGridItem"
+                required:
+                  - runs
+                  - gridData
         default:
           description: "Generic error response"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+
+  /dags/{name}/runs/{requestId}:
+    get:
+      summary: "Get latest run status"
+      description: "Returns the status of the latest run for a specific DAG"
+      tags:
+        - "dags"
+      operationId: "getDAGRunStatus"
+      parameters:
+        - name: "name"
+          in: "path"
+          required: true
+          schema:
+            $ref: "#/components/schemas/DAGName"
+          description: "The name of the DAG"
+        - name: "requestId"
+          in: "path"
+          required: true
+          schema:
+            $ref: "#/components/schemas/RequestId"
+          description: "The request ID of the DAG run or latest run if specified as 'latest'"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  run:
+                    $ref: "#/components/schemas/RunDetails"
+                required:
+                  - run
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dags/{name}/spec:
     get:
       summary: "Get DAG Spec"
@@ -475,6 +529,7 @@ components:
         type: integer
         minimum: 1
         default: 1
+
     PerPage:
       name: perPage
       in: query
@@ -485,6 +540,7 @@ components:
         minimum: 1
         maximum: 1000
         default: 50
+
     DAGName:
       name: name
       in: path
@@ -555,6 +611,12 @@ components:
         - totalPages
         - nextPage
         - prevPage
+
+    RequestId:
+      type: string
+      description: "Unique identifier for the request"
+      example: "latest"
+      pattern: "^[a-zA-Z0-9_-]+$"
 
     DAGDetailTab:
       type: string
@@ -837,11 +899,9 @@ components:
       description: "Current status of a DAG run"
       properties:
         requestId:
-          type: string
-          description: "Unique identifier for the DAG run request"
+          $ref: "#/components/schemas/RequestId"
         name:
-          type: string
-          description: "Name of the DAG being executed"
+          $ref: "#/components/schemas/DAGName"
         status:
           $ref: "#/components/schemas/Status"
         statusText:

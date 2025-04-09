@@ -113,7 +113,10 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 // GetDAGRuns implements api.StrictServerInterface.
 func (a *API) GetDAGRunHistory(ctx context.Context, request api.GetDAGRunHistoryRequestObject) (api.GetDAGRunHistoryResponseObject, error) {
 	historyData := a.readHistoryData(ctx, request.Name)
-	return api.GetDAGRunHistory200JSONResponse(historyData), nil
+	return api.GetDAGRunHistory200JSONResponse{
+		Runs:     historyData.Runs,
+		GridData: historyData.GridData,
+	}, nil
 }
 
 // GetDAGDetails implements api.StrictServerInterface.
@@ -257,7 +260,7 @@ func (a *API) readHistoryData(
 	dagName string,
 ) api.DAGHistoryData {
 	defaultHistoryLimit := 30
-	logs := a.client.GetRecentHistory(ctx, dagName, defaultHistoryLimit)
+	recentRuns := a.client.GetRecentHistory(ctx, dagName, defaultHistoryLimit)
 
 	data := map[string][]scheduler.NodeStatus{}
 
@@ -274,9 +277,9 @@ func (a *API) readHistoryData(
 		data[nodeName][logIdx] = status
 	}
 
-	for idx, log := range logs {
-		for _, node := range log.Status.Nodes {
-			addStatusFn(data, len(logs), idx, node.Step.Name, node.Status)
+	for idx, run := range recentRuns {
+		for _, node := range run.Status.Nodes {
+			addStatusFn(data, len(recentRuns), idx, node.Step.Name, node.Status)
 		}
 	}
 
@@ -297,19 +300,19 @@ func (a *API) readHistoryData(
 	})
 
 	handlers := map[string][]scheduler.NodeStatus{}
-	for idx, log := range logs {
+	for idx, log := range recentRuns {
 		if n := log.Status.OnSuccess; n != nil {
-			addStatusFn(handlers, len(logs), idx, n.Step.Name, n.Status)
+			addStatusFn(handlers, len(recentRuns), idx, n.Step.Name, n.Status)
 		}
 		if n := log.Status.OnFailure; n != nil {
-			addStatusFn(handlers, len(logs), idx, n.Step.Name, n.Status)
+			addStatusFn(handlers, len(recentRuns), idx, n.Step.Name, n.Status)
 		}
 		if n := log.Status.OnCancel; n != nil {
 			n := log.Status.OnCancel
-			addStatusFn(handlers, len(logs), idx, n.Step.Name, n.Status)
+			addStatusFn(handlers, len(recentRuns), idx, n.Step.Name, n.Status)
 		}
 		if n := log.Status.OnExit; n != nil {
-			addStatusFn(handlers, len(logs), idx, n.Step.Name, n.Status)
+			addStatusFn(handlers, len(recentRuns), idx, n.Step.Name, n.Status)
 		}
 	}
 
@@ -332,7 +335,7 @@ func (a *API) readHistoryData(
 	}
 
 	var runs []api.RunDetails
-	for _, log := range logs {
+	for _, log := range recentRuns {
 		runs = append(runs, toRunDetails(log.Status))
 	}
 
@@ -520,6 +523,32 @@ func (a *API) ListTags(ctx context.Context, _ api.ListTagsRequestObject) (api.Li
 	return &api.ListTags200JSONResponse{
 		Tags:   tags,
 		Errors: errs,
+	}, nil
+}
+
+// GetDAGRunStatus implements api.StrictServerInterface.
+func (a *API) GetDAGRunStatus(ctx context.Context, request api.GetDAGRunStatusRequestObject) (api.GetDAGRunStatusResponseObject, error) {
+	dagName := request.Name
+	requestId := request.RequestId
+
+	dagWithStatus, err := a.client.GetStatus(ctx, dagName)
+	if err != nil {
+		return nil, fmt.Errorf("error getting latest status: %w", err)
+	}
+
+	if requestId == "latest" {
+		return &api.GetDAGRunStatus200JSONResponse{
+			Run: toRunDetails(dagWithStatus.Status),
+		}, nil
+	}
+
+	run, err := a.client.GetStatusByRequestID(ctx, dagWithStatus.DAG, requestId)
+	if err != nil {
+		return nil, fmt.Errorf("error getting status by request ID: %w", err)
+	}
+
+	return &api.GetDAGRunStatus200JSONResponse{
+		Run: toRunDetails(*run),
 	}, nil
 }
 
