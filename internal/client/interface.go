@@ -27,7 +27,7 @@ type Client interface {
 	UpdateDAG(ctx context.Context, name string, spec string) error
 	DeleteDAG(ctx context.Context, name string) error
 	ListStatus(ctx context.Context, opts ...ListStatusOption) (*persistence.PaginatedResult[DAGStatus], []string, error)
-	GetStatus(ctx context.Context, dagLocation string) (DAGStatus, error)
+	GetStatus(ctx context.Context, name string) (DAGStatus, error)
 	IsSuspended(ctx context.Context, name string) bool
 	ToggleSuspend(ctx context.Context, name string, suspend bool) error
 	GetTagList(ctx context.Context) ([]string, []string, error)
