@@ -11,7 +11,8 @@
     "prettier": "prettier --write src/**/*.ts[x]",
     "typecheck": "tsc",
     "typecheck:watch": "tsc -w",
-    "profile": "webpack --profile --config webpack.prod.js --json=compilation-stats.json && webpack-bundle-analyzer ./compilation-stats.json"
+    "profile": "webpack --profile --config webpack.prod.js --json=compilation-stats.json && webpack-bundle-analyzer ./compilation-stats.json",
+    "gen:openapi": "openapi-typescript ../api/v2/api.yaml -o src/api/v2/schema.d.ts"
   },
   "repository": {
     "type": "git",
