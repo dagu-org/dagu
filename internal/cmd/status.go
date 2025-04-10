@@ -13,7 +13,7 @@ func CmdStatus() *cobra.Command {
 		&cobra.Command{
 			Use:   "status [flags] /path/to/spec.yaml",
 			Short: "Display the current status of a DAG",
-			Long: `Show real-time status information for a specified DAG execution.
+			Long: `Show real-time status information for a specified DAG run.
 
 Example:
   dagu status my_dag.yaml

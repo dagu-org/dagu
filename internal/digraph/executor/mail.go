@@ -74,15 +74,7 @@ message: %s
 `
 
 func (e *mail) Run(ctx context.Context) error {
-	_, _ = e.stdout.Write(
-		[]byte(fmt.Sprintf(
-			mailLogTemplate,
-			e.cfg.From,
-			e.cfg.To,
-			e.cfg.Subject,
-			e.cfg.Message,
-		)),
-	)
+	_, _ = fmt.Fprintf(e.stdout, mailLogTemplate, e.cfg.From, e.cfg.To, e.cfg.Subject, e.cfg.Message)
 	err := e.mailer.Send(
 		ctx,
 		e.cfg.From,

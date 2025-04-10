@@ -76,6 +76,7 @@ func TestSafeName(t *testing.T) {
 // Helper function to verify that a string only contains allowed characters
 func isAllowedCharsOnly(s string) bool {
 	for _, r := range s {
+		// nolint:staticcheck
 		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
 			(r >= '0' && r <= '9') || r == '_' || r == '-') {
 			return false

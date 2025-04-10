@@ -11,6 +11,7 @@ import (
 	"golang.org/x/exp/rand"
 )
 
+// Entry represents a single cached item with metadata and expiration information
 type Entry[T any] struct {
 	Data         T
 	Size         int64
@@ -18,7 +19,9 @@ type Entry[T any] struct {
 	ExpiresAt    time.Time
 }
 
-// TODO: Consider replacing this with golang-lru:
+// Cache implements a generic file caching mechanism with TTL-based expiration.
+// It stores entries with metadata like size and modification time to detect changes.
+// TODO: Consider replacing this with hashicorp/golang-lru for better performance
 // https://github.com/hashicorp/golang-lru
 type Cache[T any] struct {
 	entries  sync.Map
@@ -28,6 +31,7 @@ type Cache[T any] struct {
 	stopCh   chan struct{}
 }
 
+// New creates a new cache with the specified capacity and time-to-live duration
 func New[T any](cap int, ttl time.Duration) *Cache[T] {
 	return &Cache[T]{
 		capacity: cap,
@@ -36,10 +40,12 @@ func New[T any](cap int, ttl time.Duration) *Cache[T] {
 	}
 }
 
+// Stop halts the cache eviction process
 func (c *Cache[T]) Stop() {
 	close(c.stopCh)
 }
 
+// StartEviction begins the background process of removing expired items
 func (c *Cache[T]) StartEviction(ctx context.Context) {
 	go func() {
 		timer := time.NewTimer(time.Minute)
@@ -57,6 +63,7 @@ func (c *Cache[T]) StartEviction(ctx context.Context) {
 	}()
 }
 
+// evict removes expired and excess entries from the cache
 func (c *Cache[T]) evict() {
 	c.entries.Range(func(key, value any) bool {
 		entry := value.(Entry[T])
@@ -75,21 +82,25 @@ func (c *Cache[T]) evict() {
 	}
 }
 
+// StopEviction signals the eviction goroutine to stop
 func (c *Cache[T]) StopEviction() {
 	c.stopCh <- struct{}{}
 }
 
+// Store adds or updates an item in the cache with metadata from the file
 func (c *Cache[T]) Store(fileName string, data T, fi os.FileInfo) {
 	c.items.Add(1)
 	c.entries.Store(
 		fileName, newEntry(data, fi.Size(), fi.ModTime().Unix(), c.ttl))
 }
 
+// Invalidate removes an item from the cache
 func (c *Cache[T]) Invalidate(fileName string) {
 	c.items.Add(-1)
 	c.entries.Delete(fileName)
 }
 
+// LoadLatest gets the latest version of an item, loading it if stale or missing
 func (c *Cache[T]) LoadLatest(
 	filePath string, loader func() (T, error),
 ) (T, error) {
@@ -112,6 +123,7 @@ func (c *Cache[T]) LoadLatest(
 	return entry.Data, nil
 }
 
+// Entry returns the cached entry for a file, or an empty entry if not found
 func (c *Cache[T]) Entry(fileName string) Entry[T] {
 	item, ok := c.entries.Load(fileName)
 	if !ok {
@@ -120,6 +132,7 @@ func (c *Cache[T]) Entry(fileName string) Entry[T] {
 	return item.(Entry[T])
 }
 
+// Load retrieves an item from the cache if it exists
 func (c *Cache[T]) Load(fileName string) (T, bool) {
 	item, ok := c.entries.Load(fileName)
 	if !ok {
@@ -130,6 +143,8 @@ func (c *Cache[T]) Load(fileName string) (T, bool) {
 	return entry.Data, true
 }
 
+// IsStale checks if a cached entry is stale compared to the file on disk
+// by comparing modification time and size
 func (*Cache[T]) IsStale(
 	fileName string, entry Entry[T],
 ) (bool, os.FileInfo, error) {
@@ -141,6 +156,8 @@ func (*Cache[T]) IsStale(
 	return entry.LastModified < t || entry.Size != fi.Size(), fi, nil
 }
 
+// newEntry creates a new cache entry with the provided data and metadata
+// It adds random jitter to expiration time to prevent a thundering herd problem
 func newEntry[T any](
 	data T, size int64, lastModified int64, ttl time.Duration,
 ) Entry[T] {

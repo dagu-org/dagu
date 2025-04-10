@@ -12,7 +12,7 @@ func CmdServer() *cobra.Command {
 		&cobra.Command{
 			Use:   "server [flags]",
 			Short: "Start the web server",
-			Long: `Launch the Dagu web server, providing a real-time graphical interface for monitoring and managing DAG executions.
+			Long: `Launch the Dagu web server, providing a real-time graphical interface for monitoring and managing DAG runs.
 
 Example:
   dagu server --host=0.0.0.0 --port=8080 --dags=/path/to/dags

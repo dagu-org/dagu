@@ -237,17 +237,17 @@ function getHandlers(dag?: DAG) {
     return r;
   }
   const h = dag.HandlerOn;
-  if (h.Success) {
+  if (h?.Success) {
     r.push(h.Success);
   }
-  if (h.Failure) {
-    r.push(h.Failure);
+  if (h?.Failure) {
+    r.push(h?.Failure);
   }
-  if (h.Cancel) {
-    r.push(h.Cancel);
+  if (h?.Cancel) {
+    r.push(h?.Cancel);
   }
-  if (h.Exit) {
-    r.push(h.Exit);
+  if (h?.Exit) {
+    r.push(h?.Exit);
   }
   return r;
 }

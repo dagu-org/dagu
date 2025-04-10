@@ -146,7 +146,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 
 			wg.Add(1)
 
-			logger.Info(ctx, "Step execution started", "step", node.Name())
+			logger.Info(ctx, "Step started", "step", node.Name())
 			node.SetStatus(NodeStatusRunning)
 			go func(ctx context.Context, node *Node) {
 				nodeCtx, nodeCancel := context.WithCancel(ctx)
@@ -235,7 +235,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 							// do nothing
 
 						case sc.isTimeout(graph.startedAt):
-							logger.Info(ctx, "Step execution deadline exceeded", "step", node.Name(), "error", execErr)
+							logger.Info(ctx, "Step deadline exceeded", "step", node.Name(), "error", execErr)
 							node.SetStatus(NodeStatusCancel)
 							sc.setLastError(execErr)
 
@@ -245,7 +245,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 						case node.retryPolicy.Limit > node.GetRetryCount():
 							// retry
 							node.IncRetryCount()
-							logger.Info(ctx, "Step execution failed. Retrying...", "step", node.Name(), "error", execErr, "retry", node.GetRetryCount())
+							logger.Info(ctx, "Step failed. Retrying...", "step", node.Name(), "error", execErr, "retry", node.GetRetryCount())
 							time.Sleep(node.retryPolicy.Interval)
 							node.SetRetriedAt(time.Now())
 							node.SetStatus(NodeStatusNone)
@@ -315,7 +315,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 	sc.metrics.totalExecutionTime = time.Since(sc.metrics.startTime)
 
 	// Log execution summary
-	logger.Info(ctx, "DAG execution completed",
+	logger.Info(ctx, "DAG run completed",
 		"requestID", sc.requestID,
 		"status", sc.Status(graph).String(),
 		"totalTime", sc.metrics.totalExecutionTime/time.Second,
@@ -581,7 +581,7 @@ func (sc *Scheduler) setup(ctx context.Context) (err error) {
 	digraph.ApplyEnvs(ctx)
 
 	if !sc.dry {
-		if err = os.MkdirAll(sc.logDir, 0755); err != nil {
+		if err = os.MkdirAll(sc.logDir, 0750); err != nil {
 			err = fmt.Errorf("failed to create log directory: %w", err)
 			return err
 		}

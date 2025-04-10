@@ -12,7 +12,7 @@ import (
 
 var (
 	// ErrNoMatch is returned when no match is found.
-	ErrNoMatch = errors.New("no matched")
+	ErrNoMatch = errors.New("no match found")
 	// ErrEmptyPattern is returned when pattern is empty.
 	ErrEmptyPattern = errors.New("empty pattern")
 )

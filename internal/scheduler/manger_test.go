@@ -1,10 +1,11 @@
-package scheduler
+package scheduler_test
 
 import (
 	"context"
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/stretchr/testify/require"
 )
 
@@ -13,7 +14,7 @@ func TestReadEntries(t *testing.T) {
 	now := expectedNext.Add(-time.Second)
 
 	t.Run("InvalidDirectory", func(t *testing.T) {
-		manager := NewDAGJobManager("invalid_directory", nil, "", "")
+		manager := scheduler.NewDAGJobManager("invalid_directory", nil, "", "")
 		jobs, err := manager.Next(context.Background(), expectedNext)
 		require.NoError(t, err)
 		require.Len(t, jobs, 0)
@@ -51,7 +52,7 @@ func TestReadEntries(t *testing.T) {
 
 		// find the job and suspend it
 		job := findJobByName(t, beforeSuspend, "scheduled_job").Job
-		dagJob, ok := job.(*dagJob)
+		dagJob, ok := job.(*scheduler.DAG)
 		require.True(t, ok)
 		dag := dagJob.DAG
 		err = th.client.ToggleSuspend(ctx, dag.Name, true)
@@ -64,11 +65,11 @@ func TestReadEntries(t *testing.T) {
 	})
 }
 
-func findJobByName(t *testing.T, jobs []*ScheduledJob, name string) *ScheduledJob {
+func findJobByName(t *testing.T, jobs []*scheduler.ScheduledJob, name string) *scheduler.ScheduledJob {
 	t.Helper()
 
 	for _, job := range jobs {
-		dagJob, ok := job.Job.(*dagJob)
+		dagJob, ok := job.Job.(*scheduler.DAG)
 		if ok && dagJob.DAG.Name == name {
 			return job
 		}

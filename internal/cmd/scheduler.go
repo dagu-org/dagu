@@ -12,7 +12,7 @@ func CmdScheduler() *cobra.Command {
 		&cobra.Command{
 			Use:   "scheduler [flags]",
 			Short: "Start the scheduler process",
-			Long: `Launch the scheduler process that monitors and triggers DAG executions based on cron schedules.
+			Long: `Launch the scheduler process that monitors and triggers DAG runs based on cron schedules.
 
 Example:
   dagu scheduler --dags=/path/to/dags

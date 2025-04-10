@@ -13,8 +13,6 @@
             "args": [
                 "server",
                 "--port=8080",
-                "-s",
-                "localhost"
             ]
         },
         {

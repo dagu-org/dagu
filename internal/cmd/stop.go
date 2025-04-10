@@ -13,7 +13,7 @@ func CmdStop() *cobra.Command {
 		&cobra.Command{
 			Use:   "stop [flags] /path/to/spec.yaml",
 			Short: "Stop a running DAG",
-			Long: `Gracefully terminate an active DAG execution.
+			Long: `Gracefully terminate an active DAG run.
 
 This command stops all running tasks of the specified DAG, ensuring resources are properly released.
 

@@ -1,4 +1,4 @@
-package scheduler
+package scheduler_test
 
 import (
 	"os"
@@ -12,6 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/jsondb"
 	"github.com/dagu-org/dagu/internal/persistence/local"
 	"github.com/dagu-org/dagu/internal/persistence/local/storage"
+	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
@@ -35,7 +36,7 @@ func TestMain(m *testing.M) {
 }
 
 type testHelper struct {
-	manager JobManager
+	manager scheduler.JobManager
 	client  client.Client
 	config  *config.Config
 }
@@ -68,7 +69,7 @@ func setupTest(t *testing.T) testHelper {
 	historyStore := jsondb.New(cfg.Paths.DataDir)
 	flagStore := local.NewFlagStore(storage.NewStorage(cfg.Paths.SuspendFlagsDir))
 	cli := client.New(dagStore, historyStore, flagStore, "", cfg.Global.WorkDir)
-	jobManager := NewDAGJobManager(testdataDir, cli, "", "")
+	jobManager := scheduler.NewDAGJobManager(testdataDir, cli, "", "")
 
 	return testHelper{
 		manager: jobManager,

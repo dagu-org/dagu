@@ -13,7 +13,6 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/sock"
@@ -53,6 +52,10 @@ var (
     command: echo hello
 `)
 )
+
+func (e *client) LoadYAML(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error) {
+	return e.dagStore.LoadSpec(ctx, spec, opts...)
+}
 
 func (e *client) GetDAGSpec(ctx context.Context, id string) (string, error) {
 	return e.dagStore.GetSpec(ctx, id)
@@ -196,7 +199,7 @@ func (e *client) GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, req
 	}
 
 	// If the DAG is running, set the currentStatus to error if the request ID does not match
-	// Because the DAG execution must be stopped
+	// Because the DAG run must be stopped
 	// TODO: Handle different request IDs for the same DAG
 	currentStatus, _ := e.GetCurrentStatus(ctx, dag)
 	if currentStatus != nil && currentStatus.RequestID != requestID {
@@ -247,17 +250,17 @@ handleError:
 	return persistence.NewStatusFactory(dag).Default(), err
 }
 
-func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []persistence.Execution {
-	records := e.historyStore.Recent(ctx, dag.Name, n)
+func (e *client) GetRecentHistory(ctx context.Context, name string, n int) []persistence.Run {
+	records := e.historyStore.Recent(ctx, name, n)
 
-	var executions []persistence.Execution
+	var runs []persistence.Run
 	for _, record := range records {
-		if execution, err := record.ReadExecution(ctx); err == nil {
-			executions = append(executions, *execution)
+		if run, err := record.ReadRun(ctx); err == nil {
+			runs = append(runs, *run)
 		}
 	}
 
-	return executions
+	return runs
 }
 
 var errDAGIsRunning = errors.New("the DAG is running")
@@ -289,67 +292,42 @@ func (e *client) DeleteDAG(ctx context.Context, name string) error {
 	return e.dagStore.Delete(ctx, name)
 }
 
-func (e *client) GetAllStatus(ctx context.Context) (
-	statuses []DAGStatus, errs []string, err error,
-) {
-	dagList, errs, err := e.dagStore.List(ctx)
+func (e *client) ListStatus(ctx context.Context, opts ...ListStatusOption) (*persistence.PaginatedResult[DAGStatus], []string, error) {
+	var options GetAllStatusOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+	if options.Limit == nil {
+		options.Limit = new(int)
+		*options.Limit = 100
+	}
+	if options.Page == nil {
+		options.Page = new(int)
+		*options.Page = 1
+	}
 
-	var ret []DAGStatus
-	for _, d := range dagList {
+	pg := persistence.NewPaginator(*options.Page, *options.Limit)
+
+	dags, errList, err := e.dagStore.List(ctx, persistence.ListOptions{
+		Paginator: &pg,
+		Name:      fromPtr(options.Name),
+		Tag:       fromPtr(options.Tag),
+	})
+	if err != nil {
+		return nil, errList, err
+	}
+
+	var items []DAGStatus
+	for _, d := range dags.Items {
 		status, err := e.readStatus(ctx, d)
 		if err != nil {
-			errs = append(errs, err.Error())
+			errList = append(errList, err.Error())
 		}
-		ret = append(ret, status)
+		items = append(items, status)
 	}
 
-	return ret, errs, err
-}
-
-func (e *client) getPageCount(total int, limit int) int {
-	return (total-1)/(limit) + 1
-}
-
-func (e *client) GetAllStatusPagination(ctx context.Context, params dags.ListDAGsParams) ([]DAGStatus, *DagListPaginationSummaryResult, error) {
-	var (
-		dagListPaginationResult *persistence.DagListPaginationResult
-		err                     error
-		dagStatusList           = make([]DAGStatus, 0)
-	)
-
-	page := 1
-	if params.Page != nil {
-		page = int(*params.Page)
-	}
-	limit := 100
-	if params.Limit != nil {
-		limit = int(*params.Limit)
-	}
-
-	if dagListPaginationResult, err = e.dagStore.ListPagination(ctx, persistence.DAGListPaginationArgs{
-		Page:  page,
-		Limit: limit,
-		Name:  fromPtr(params.SearchName),
-		Tag:   fromPtr(params.SearchTag),
-	}); err != nil {
-		return dagStatusList, &DagListPaginationSummaryResult{PageCount: 1}, err
-	}
-
-	for _, currentDag := range dagListPaginationResult.DagList {
-		var (
-			currentStatus DAGStatus
-			err           error
-		)
-		if currentStatus, err = e.readStatus(ctx, currentDag); err != nil {
-			dagListPaginationResult.ErrorList = append(dagListPaginationResult.ErrorList, err.Error())
-		}
-		dagStatusList = append(dagStatusList, currentStatus)
-	}
-
-	return dagStatusList, &DagListPaginationSummaryResult{
-		PageCount: e.getPageCount(dagListPaginationResult.Count, limit),
-		ErrorList: dagListPaginationResult.ErrorList,
-	}, nil
+	r := persistence.NewPaginatedResult(items, dags.TotalCount, pg)
+	return &r, errList, nil
 }
 
 func (e *client) getDAG(ctx context.Context, name string) (*digraph.DAG, error) {
@@ -404,11 +382,12 @@ func escapeArg(input string) string {
 	escaped := strings.Builder{}
 
 	for _, char := range input {
-		if char == '\r' {
+		switch char {
+		case '\r':
 			_, _ = escaped.WriteString("\\r")
-		} else if char == '\n' {
+		case '\n':
 			_, _ = escaped.WriteString("\\n")
-		} else {
+		default:
 			_, _ = escaped.WriteRune(char)
 		}
 	}

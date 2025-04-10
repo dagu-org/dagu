@@ -11,10 +11,12 @@ import (
 
 func TestEvalStringFields(t *testing.T) {
 	// Set up test environment variables
-	os.Setenv("TEST_VAR", "test_value")
-	os.Setenv("NESTED_VAR", "nested_value")
-	defer os.Unsetenv("TEST_VAR")
-	defer os.Unsetenv("NESTED_VAR")
+	_ = os.Setenv("TEST_VAR", "test_value")
+	_ = os.Setenv("NESTED_VAR", "nested_value")
+	defer func() {
+		_ = os.Unsetenv("TEST_VAR")
+		_ = os.Unsetenv("NESTED_VAR")
+	}()
 
 	type Nested struct {
 		NestedField   string
@@ -137,10 +139,12 @@ func TestEvalStringFields_NestedStructs(t *testing.T) {
 	}
 
 	// Set up environment
-	os.Setenv("TEST_VAR", "test_value")
-	os.Setenv("NESTED_VAR", "deep_nested_value")
-	defer os.Unsetenv("TEST_VAR")
-	defer os.Unsetenv("NESTED_VAR")
+	_ = os.Setenv("TEST_VAR", "test_value")
+	_ = os.Setenv("NESTED_VAR", "deep_nested_value")
+	defer func() {
+		_ = os.Unsetenv("TEST_VAR")
+		_ = os.Unsetenv("NESTED_VAR")
+	}()
 
 	want := Root{
 		Field: "test_value",
@@ -328,7 +332,7 @@ func TestExpandReferences(t *testing.T) {
 		},
 	}
 
-	os.Setenv("TEST_JSON_VAR", `{"bar": "World"}`)
+	_ = os.Setenv("TEST_JSON_VAR", `{"bar": "World"}`)
 	t.Cleanup(func() {
 		_ = os.Unsetenv("TEST_JSON_VAR")
 	})

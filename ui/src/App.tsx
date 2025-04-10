@@ -11,6 +11,8 @@ import Search from './pages/search';
 import { UserPreferencesProvider } from './contexts/UserPreference';
 import { Config, ConfigContext } from './contexts/ConfigContext';
 import moment from 'moment-timezone';
+// Load all timezone data for moment-timezone to handle dynamic timezones
+import 'moment-timezone/builds/moment-timezone-with-data.js';
 
 type Props = {
   config: Config;

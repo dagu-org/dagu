@@ -183,7 +183,7 @@ func addAttachments(attachments []string) []byte {
 }
 
 func readFile(fileName string) (data []byte, err error) {
-	data, err = os.ReadFile(fileName)
+	data, err = os.ReadFile(fileName) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}

@@ -1,13 +1,13 @@
 import React from 'react';
 
 type Props = {
-  children: string;
+  children?: string;
 };
 
 function MultilineText({ children }: Props) {
   return (
     <React.Fragment>
-      {children.split('\n').map((l, i) => (
+      {children?.split('\n').map((l, i) => (
         <span key={i}>
           {l}
           <br></br>

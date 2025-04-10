@@ -322,11 +322,11 @@
           "properties": {
             "failure": {
               "type": "boolean",
-              "description": "Continue DAG execution even if this step fails"
+              "description": "Continue DAG run even if this step fails"
             },
             "skipped": {
               "type": "boolean",
-              "description": "Continue DAG execution even if this step is skipped due to preconditions"
+              "description": "Continue DAG run even if this step is skipped due to preconditions"
             },
             "exitCode": {
               "oneOf": [

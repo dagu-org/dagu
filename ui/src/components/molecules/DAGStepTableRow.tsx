@@ -25,7 +25,7 @@ function DAGStepTableRow({ step }: Props) {
       <TableCell> {step.Command} </TableCell>
       <TableCell> {step.Args ? step.Args.join(' ') : ''} </TableCell>
       <TableCell> {step.Dir} </TableCell>
-      <TableCell> {step.RepeatPolicy.Repeat ? 'Repeat' : '-'} </TableCell>
+      <TableCell> {step.RepeatPolicy?.Repeat ? 'Repeat' : '-'} </TableCell>
       <TableCell>
         <ul> {preconditions} </ul>
       </TableCell>

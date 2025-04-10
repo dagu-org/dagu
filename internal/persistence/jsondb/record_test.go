@@ -75,7 +75,7 @@ func TestHistoryRecord_Read(t *testing.T) {
 	status2 := createTestStatus(scheduler.StatusSuccess)
 
 	// Create file directory if it doesn't exist
-	err := os.MkdirAll(filepath.Dir(file), 0755)
+	err := os.MkdirAll(filepath.Dir(file), 0750)
 	require.NoError(t, err)
 
 	// Create test file with two status entries
@@ -99,9 +99,9 @@ func TestHistoryRecord_Read(t *testing.T) {
 	hr := NewRecord(file, nil)
 
 	// Read status - should get the last entry (test2)
-	execution, err := hr.ReadExecution(context.Background())
+	run, err := hr.ReadRun(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, scheduler.StatusSuccess.String(), execution.Status.Status.String())
+	assert.Equal(t, scheduler.StatusSuccess.String(), run.Status.Status.String())
 
 	// Read using ReadStatus
 	latestStatus, err := hr.ReadStatus(context.Background())
@@ -136,7 +136,7 @@ func TestHistoryRecord_Compact(t *testing.T) {
 
 			_, err = f.Write(append(data, '\n'))
 			require.NoError(t, err)
-			f.Close()
+			_ = f.Close()
 		}
 	}
 
@@ -223,7 +223,7 @@ func TestHistoryRecord_EmptyFile(t *testing.T) {
 	// Create an empty file
 	f, err := os.Create(file)
 	require.NoError(t, err)
-	f.Close()
+	_ = f.Close()
 
 	hr := NewRecord(file, nil)
 
@@ -269,7 +269,9 @@ func TestReadLineFrom(t *testing.T) {
 
 	f, err := os.Open(file)
 	require.NoError(t, err)
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 
 	// Read first line
 	line1, offset, err := readLineFrom(f, 0)
@@ -331,7 +333,7 @@ func createTempDir(t *testing.T) string {
 	dir, err := os.MkdirTemp("", "history_record_test_")
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
 	})
 	return dir
 }

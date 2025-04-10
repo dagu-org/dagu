@@ -96,7 +96,9 @@ func (e *docker) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer cli.Close()
+	defer func() {
+		_ = cli.Close()
+	}()
 
 	// Evaluate args
 	var args []string
