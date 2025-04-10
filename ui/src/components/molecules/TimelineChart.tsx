@@ -41,7 +41,7 @@ function TimelineChart({ status }: Props) {
       });
     return ret.join('\n');
   }, [status]);
-  return <Mermaid def={graph} />;
+  return <Mermaid def={graph} scale={1.0} />;
 }
 
 export default TimelineChart;
