@@ -1,14 +1,13 @@
 import React from 'react';
-import { ListWorkflowsResponse } from '../models/api';
 import { Box, Grid } from '@mui/material';
 import { SchedulerStatus } from '../models';
 import { statusColorMapping } from '../consts';
 import DashboardMetric from '../components/molecules/DashboardMetric';
-import DashboardTimechart from '../components/molecules/DashboardTimechart';
+import DashboardTimeChart from '../components/molecules/DashboardTimechart';
 import Title from '../components/atoms/Title';
 import { AppBarContext } from '../contexts/AppBarContext';
-import useSWR from 'swr';
 import { useConfig } from '../contexts/ConfigContext';
+import { useQuery } from '../hooks/api';
 
 type metrics = Record<SchedulerStatus, number>;
 
@@ -21,7 +20,6 @@ for (const value in SchedulerStatus) {
 }
 
 function Dashboard() {
-  const [metrics, setMetrics] = React.useState<metrics>(defaultMetrics);
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
   const searchParams = new URLSearchParams();
@@ -29,27 +27,21 @@ function Dashboard() {
   if (appBarContext.selectedRemoteNode) {
     searchParams.set('remoteNode', appBarContext.selectedRemoteNode);
   }
-  const { data } = useSWR<ListWorkflowsResponse>(
-    `/dags?${searchParams.toString()}`,
-    null,
-    {
-      refreshInterval: 10000,
-    }
-  );
+  const queryParams = {
+    perPage: config.maxDashboardPageLimit || 200,
+    remoteNode: undefined as string | undefined,
+  };
+  if (appBarContext.selectedRemoteNode) {
+    queryParams.remoteNode = appBarContext.selectedRemoteNode;
+  }
+  const { data } = useQuery('/dags', {
+    params: { query: queryParams },
+  });
 
-  React.useEffect(() => {
-    if (!data) {
-      return;
-    }
-    const m = { ...defaultMetrics };
-    data.DAGs?.forEach((wf) => {
-      if (wf.Status && wf.Status.Status) {
-        const status = wf.Status.Status;
-        m[status] += 1;
-      }
-    });
-    setMetrics(m as metrics);
-  }, [data]);
+  const metrics = { ...defaultMetrics };
+  data?.dags.forEach((dag) => {
+    metrics[dag.latestRun.status] += 1;
+  });
 
   React.useEffect(() => {
     appBarContext.setTitle('Dashboard');
@@ -76,7 +68,7 @@ function Dashboard() {
           >
             <DashboardMetric
               title={label}
-              color={statusColorMapping[status].backgroundColor}
+              color={statusColorMapping[status]?.backgroundColor}
               value={metrics[status]}
             />
           </Box>
@@ -91,7 +83,7 @@ function Dashboard() {
           }}
         >
           <Title>{`Timeline in ${config.tz}`}</Title>
-          <DashboardTimechart data={data?.DAGs || []} />
+          <DashboardTimeChart data={data?.dags || []} />
         </Box>
       </Grid>
     </Grid>
