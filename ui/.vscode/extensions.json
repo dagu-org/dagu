@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    // Javascript
+    "dbaeumer.vscode-eslint",
+    // Prettier
+    "esbenp.prettier-vscode",
+  ]
+}
