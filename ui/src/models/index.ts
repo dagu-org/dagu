@@ -1,6 +1,7 @@
 import cronParser from 'cron-parser';
 import moment from 'moment-timezone';
 import { WorkflowListItem } from './api';
+import { components } from '../api/v2/schema';
 
 export enum SchedulerStatus {
   None = 0,
@@ -114,7 +115,7 @@ export function getFirstTag(data?: DAGItem): string {
   }
   if (data.Type == DAGDataType.DAG) {
     const tags = data.DAGStatus.DAG.Tags;
-    return tags ? tags[0] : '';
+    return tags ? tags[0] || '' : '';
   }
   return '';
 }
@@ -146,17 +147,19 @@ export function getStatusField(
   return '';
 }
 
-export function getNextSchedule(data: WorkflowListItem): number {
-  const schedules = data.DAG.Schedule;
-  if (!schedules || schedules.length == 0 || data.Suspended) {
+export function getNextSchedule(
+  data: components['schemas']['DAGFile']
+): number {
+  const schedules = data.dag.schedule;
+  if (!schedules || schedules.length == 0 || data.suspended) {
     return Number.MAX_SAFE_INTEGER;
   }
   const tz = getConfig().tz || moment.tz.guess();
-  const datesToRun = schedules.map((s) => {
-    const cronTzMatch = s.Expression.match(/(?<=CRON_TZ=)[^\s]+/);
+  const datesToRun = schedules.map((schedule) => {
+    const cronTzMatch = schedule.expression.match(/(?<=CRON_TZ=)[^\s]+/);
     if (cronTzMatch) {
       const cronTz = cronTzMatch[0];
-      const expressionTextWithOutCronTz = s.Expression.replace(
+      const expressionTextWithOutCronTz = schedule.expression.replace(
         `CRON_TZ=${cronTz}`,
         ''
       );
@@ -168,15 +171,18 @@ export function getNextSchedule(data: WorkflowListItem): number {
         .next();
     }
     const expression = tz
-      ? cronParser.parseExpression(s.Expression, {
+      ? cronParser.parseExpression(schedule.expression, {
           currentDate: new Date(),
           tz,
         })
-      : cronParser.parseExpression(s.Expression);
+      : cronParser.parseExpression(schedule.expression);
     return expression.next();
   });
   const sorted = datesToRun.sort((a, b) => a.getTime() - b.getTime());
-  return sorted[0].getTime() / 1000;
+  if (!sorted || sorted.length == 0 || sorted[0] == null) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  return sorted[0]?.getTime() / 1000;
 }
 
 export enum NodeStatus {

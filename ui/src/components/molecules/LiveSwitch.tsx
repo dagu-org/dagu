@@ -1,17 +1,17 @@
 import { Switch } from '@mui/material';
 import React from 'react';
-import { WorkflowListItem } from '../../models/api';
 import { AppBarContext } from '../../contexts/AppBarContext';
+import { components } from '../../api/v2/schema';
 
 type Props = {
   inputProps?: React.HTMLProps<HTMLInputElement>;
-  DAG: WorkflowListItem;
+  dag: components['schemas']['DAGFile'];
   refresh?: () => void;
 };
 
-function LiveSwitch({ DAG, refresh, inputProps }: Props) {
+function LiveSwitch({ dag, refresh, inputProps }: Props) {
   const appBarContext = React.useContext(AppBarContext);
-  const [checked, setChecked] = React.useState(!DAG.Suspended);
+  const [checked, setChecked] = React.useState(!dag.suspended);
   const onSubmit = React.useCallback(
     async (params: { name: string; action: string; value: string }) => {
       const url = `${getConfig().apiURL}/dags/${params.name}?remoteNode=${
@@ -44,11 +44,11 @@ function LiveSwitch({ DAG, refresh, inputProps }: Props) {
     const enabled = !checked;
     setChecked(enabled);
     onSubmit({
-      name: DAG.File.replace(/.yaml$/, ''),
+      name: dag.dag.name,
       action: 'suspend',
       value: enabled ? 'false' : 'true',
     });
-  }, [DAG, checked]);
+  }, [dag, checked]);
   return (
     <Switch checked={checked} onChange={onChange} inputProps={inputProps} />
   );

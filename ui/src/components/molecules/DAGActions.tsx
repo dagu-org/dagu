@@ -11,6 +11,7 @@ import ConfirmModal from './ConfirmModal';
 import LabeledItem from '../atoms/LabeledItem';
 import { Workflow, WorkflowStatus } from '../../models/api';
 import { AppBarContext } from '../../contexts/AppBarContext';
+import { components } from '../../api/v2/schema';
 
 type LabelProps = {
   show: boolean;
@@ -19,8 +20,9 @@ type LabelProps = {
 
 type Props = {
   status?: Status | WorkflowStatus;
+  // status?: components['schemas']['RunSummary'] | Status | WorkflowStatus;
   name: string;
-  dag: DAG | Workflow | undefined;
+  dag: components['schemas']['DAG'] | DAG | Workflow | undefined;
   label?: boolean;
   redirectTo?: string;
   refresh?: () => void;
@@ -162,7 +164,7 @@ function DAGActions({
           <Box>{status?.RequestId}</Box>
         </Stack>
       </ConfirmModal>
-      {dag && (
+      {/* {dag && (
         <StartDAGModal
           dag={dag}
           visible={isStartModal}
@@ -174,7 +176,7 @@ function DAGActions({
             setIsStartModal(false);
           }}
         />
-      )}
+      )} */}
     </Stack>
   );
 }
