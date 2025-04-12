@@ -22,14 +22,9 @@ for (const value in SchedulerStatus) {
 function Dashboard() {
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
-  const searchParams = new URLSearchParams();
-  searchParams.set('limit', config.maxDashboardPageLimit.toString() || '200');
-  if (appBarContext.selectedRemoteNode) {
-    searchParams.set('remoteNode', appBarContext.selectedRemoteNode);
-  }
   const queryParams = {
     perPage: config.maxDashboardPageLimit || 200,
-    remoteNode: undefined as string | undefined,
+    remoteNode: appBarContext.selectedRemoteNode || 'local',
   };
   if (appBarContext.selectedRemoteNode) {
     queryParams.remoteNode = appBarContext.selectedRemoteNode;

@@ -5,18 +5,16 @@ import CreateDAGButton from '../../components/molecules/CreateDAGButton';
 import WithLoading from '../../components/atoms/WithLoading';
 import DAGTable from '../../components/molecules/DAGTable';
 import Title from '../../components/atoms/Title';
-import { DAGItem, DAGDataType } from '../../models';
 import { useLocation } from 'react-router-dom';
-import { ListWorkflowsResponse } from '../../models/api';
 import { AppBarContext } from '../../contexts/AppBarContext';
-import useSWR, { useSWRConfig } from 'swr';
 import DAGPagination from '../../components/molecules/DAGPagination';
 import { debounce } from 'lodash';
 import { useUserPreferences } from '../../contexts/UserPreference';
+import { useQuery } from '../../hooks/api';
+import { components } from '../../api/v2/schema';
 
 function DAGs() {
-  const useQuery = () => new URLSearchParams(useLocation().search);
-  const query = useQuery();
+  const query = new URLSearchParams(useLocation().search);
   const group = query.get('group') || '';
   const appBarContext = React.useContext(AppBarContext);
   const [searchText, setSearchText] = React.useState(query.get('search') || '');
@@ -28,32 +26,28 @@ function DAGs() {
   const [apiSearchTag, setAPISearchTag] = React.useState(
     query.get('tag') || ''
   );
-
   const { preferences, updatePreference } = useUserPreferences();
   // Use preferences.pageLimit instead of local state
   const handlePageLimitChange = (newLimit: number) => {
     updatePreference('pageLimit', newLimit);
   };
-
-  const searchParams = new URLSearchParams({
-    page: page.toString(),
-    limit: preferences.pageLimit.toString(),
+  const queryParams = {
+    page,
+    perPage: preferences.pageLimit || 200,
     remoteNode: appBarContext.selectedRemoteNode || 'local',
-  });
-
-  if (apiSearchText) {
-    searchParams.set('searchName', apiSearchText);
-  }
-  if (apiSearchTag) {
-    searchParams.set('searchTag', apiSearchTag);
-  }
-
-  const { cache, mutate } = useSWRConfig();
-  const endPoint = `/dags?${searchParams.toString()}`;
-  const { data } = useSWR<ListWorkflowsResponse>(endPoint, null, {
-    refreshInterval: 10000,
-    revalidateIfStale: false,
-  });
+    name: apiSearchText ? apiSearchText : undefined,
+    tag: apiSearchTag ? apiSearchTag : undefined,
+  };
+  const { data, mutate, isLoading } = useQuery(
+    '/dags',
+    {
+      params: { query: queryParams },
+    },
+    {
+      refreshInterval: 10000,
+      revalidateIfStale: false,
+    }
+  );
 
   const addSearchParam = (key: string, value: string) => {
     const locationQuery = new URLSearchParams(window.location.search);
@@ -66,27 +60,30 @@ function DAGs() {
   };
 
   const refreshFn = React.useCallback(() => {
-    setTimeout(() => mutate(endPoint), 500);
-  }, [mutate, cache]);
+    setTimeout(() => mutate(), 500);
+  }, [mutate]);
 
   React.useEffect(() => {
     appBarContext.setTitle('DAGs');
   }, [appBarContext]);
 
-  const merged = React.useMemo(() => {
-    const ret: DAGItem[] = [];
-    if (data && data.DAGs) {
-      for (const val of data.DAGs) {
-        if (!val.Error) {
-          ret.push({
-            Type: DAGDataType.DAG,
-            Name: val.DAG.Name,
-            DAGStatus: val,
-          });
+  const { dagFiles, errorCount } = React.useMemo(() => {
+    const dagFiles: components['schemas']['DAGFile'][] = [];
+
+    let errorCount = 0;
+    if (data) {
+      for (const val of data.dags) {
+        if (!val.errors?.length) {
+          dagFiles.push(val);
+        } else {
+          errorCount += 1;
         }
       }
     }
-    return ret;
+    return {
+      dagFiles,
+      errorCount,
+    };
   }, [data]);
 
   const pageChange = (page: number) => {
@@ -146,16 +143,16 @@ function DAGs() {
         <CreateDAGButton />
       </Box>
       <Box>
-        <WithLoading loaded={!!data && !!merged}>
+        <WithLoading loaded={!isLoading}>
           {data && (
             <React.Fragment>
               <DAGErrors
-                DAGs={data.DAGs || []}
-                errors={data.Errors || []}
-                hasError={data.HasError}
+                dags={data.dags || []}
+                errors={data.errors || []}
+                hasError={errorCount > 0 || data.errors?.length > 0}
               ></DAGErrors>
               <DAGTable
-                DAGs={merged}
+                dags={dagFiles}
                 group={group}
                 refreshFn={refreshFn}
                 searchText={searchText}
@@ -164,7 +161,7 @@ function DAGs() {
                 handleSearchTagChange={searchTagChange}
               ></DAGTable>
               <DAGPagination
-                totalPages={data.PageCount}
+                totalPages={data.pagination.totalPages}
                 page={page}
                 pageChange={pageChange}
                 onPageLimitChange={handlePageLimitChange}
