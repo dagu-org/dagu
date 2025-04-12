@@ -1,6 +1,5 @@
 import { Box, Stack } from '@mui/material';
 import React from 'react';
-import { DAG, SchedulerStatus, Status } from '../../models';
 import ActionButton from '../atoms/ActionButton';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -9,7 +8,6 @@ import VisuallyHidden from '../atoms/VisuallyHidden';
 import StartDAGModal from './StartDAGModal';
 import ConfirmModal from './ConfirmModal';
 import LabeledItem from '../atoms/LabeledItem';
-import { Workflow, WorkflowStatus } from '../../models/api';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { components } from '../../api/v2/schema';
 
@@ -19,10 +17,14 @@ type LabelProps = {
 };
 
 type Props = {
-  status?: Status | WorkflowStatus;
-  // status?: components['schemas']['RunSummary'] | Status | WorkflowStatus;
+  status?:
+    | components['schemas']['RunSummary']
+    | components['schemas']['RunDetails'];
   name: string;
-  dag: components['schemas']['DAG'] | DAG | Workflow | undefined;
+  dag:
+    | components['schemas']['DAG']
+    | components['schemas']['DAGDetails']
+    | undefined;
   label?: boolean;
   redirectTo?: string;
   refresh?: () => void;
@@ -81,9 +83,9 @@ function DAGActions({
   );
 
   const buttonState = {
-    start: status?.Status != SchedulerStatus.Running,
-    stop: status?.Status == SchedulerStatus.Running,
-    retry: status?.Status != SchedulerStatus.Running && status?.RequestId != '',
+    start: status?.status != 1,
+    stop: status?.status == 1,
+    retry: status?.status != 1 && status?.requestId != '',
   };
   return (
     <Stack direction="row" spacing={2}>
@@ -154,17 +156,17 @@ function DAGActions({
           onSubmit({
             name: name,
             action: 'retry',
-            requestId: status?.RequestId,
+            requestId: status?.requestId,
           });
         }}
       >
         <Stack direction="column">
           <Box>Do you really want to rerun the following execution?</Box>
           <LabeledItem label="Request-ID">{null}</LabeledItem>
-          <Box>{status?.RequestId}</Box>
+          <Box>{status?.requestId}</Box>
         </Stack>
       </ConfirmModal>
-      {/* {dag && (
+      {dag && (
         <StartDAGModal
           dag={dag}
           visible={isStartModal}
@@ -176,7 +178,7 @@ function DAGActions({
             setIsStartModal(false);
           }}
         />
-      )} */}
+      )}
     </Stack>
   );
 }

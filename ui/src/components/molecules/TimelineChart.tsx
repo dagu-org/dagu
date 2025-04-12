@@ -1,19 +1,16 @@
 import moment from 'moment';
 import React from 'react';
-import { SchedulerStatus, Status } from '../../models';
 import Mermaid from '../atoms/Mermaid';
+import { components, Status } from '../../api/v2/schema';
 
 type Props = {
-  status: Status;
+  status: components['schemas']['RunDetails'];
 };
 
 const timeFormat = 'YYYY-MM-DD HH:mm:ss';
 
 function TimelineChart({ status }: Props) {
-  if (
-    status.Status == SchedulerStatus.None ||
-    status.Status == SchedulerStatus.Running
-  ) {
+  if (status.status == Status.NotStarted || status.status == Status.Running) {
     return null;
   }
   const graph = React.useMemo(() => {
@@ -23,20 +20,20 @@ function TimelineChart({ status }: Props) {
       'axisFormat %H:%M:%S',
       'todayMarker off',
     ];
-    [...status.Nodes]
+    [...status.nodes]
       .sort((a, b) => {
-        return a.StartedAt.localeCompare(b.StartedAt);
+        return a.startedAt.localeCompare(b.startedAt);
       })
       .forEach((step) => {
-        if (!step.StartedAt || step.StartedAt == '-') {
+        if (!step.startedAt || step.startedAt == '-') {
           return;
         }
         ret.push(
-          step.Step.Name +
+          step.step.name +
             ' : ' +
-            moment(step.StartedAt).format(timeFormat) +
+            moment(step.startedAt).format(timeFormat) +
             ',' +
-            moment(step.FinishedAt).format(timeFormat)
+            moment(step.finishedAt).format(timeFormat)
         );
       });
     return ret.join('\n');

@@ -1,31 +1,31 @@
 import React from 'react';
-import { Step } from '../../models';
 import { TableCell } from '@mui/material';
 import StyledTableRow from '../atoms/StyledTableRow';
 import MultilineText from '../atoms/MultilineText';
+import { components } from '../../api/v2/schema';
 
 type Props = {
-  step: Step;
+  step: components['schemas']['Step'];
 };
 
 function DAGStepTableRow({ step }: Props) {
-  const preconditions = step.Preconditions?.map((c) => (
+  const preconditions = step.preconditions?.map((c) => (
     <li>
-      {c.Condition}
+      {c.condition}
       {' => '}
-      {c.Expected}
+      {c.expected}
     </li>
   ));
   return (
     <StyledTableRow>
-      <TableCell className="has-text-weight-semibold"> {step.Name} </TableCell>
+      <TableCell className="has-text-weight-semibold"> {step.name} </TableCell>
       <TableCell>
-        <MultilineText>{step.Description}</MultilineText>
+        <MultilineText>{step.description}</MultilineText>
       </TableCell>
-      <TableCell> {step.Command} </TableCell>
-      <TableCell> {step.Args ? step.Args.join(' ') : ''} </TableCell>
-      <TableCell> {step.Dir} </TableCell>
-      <TableCell> {step.RepeatPolicy?.Repeat ? 'Repeat' : '-'} </TableCell>
+      <TableCell> {step.command} </TableCell>
+      <TableCell> {step.args ? step.args.join(' ') : ''} </TableCell>
+      <TableCell> {step.dir} </TableCell>
+      <TableCell> {step.repeatPolicy?.repeat ? 'Repeat' : '-'} </TableCell>
       <TableCell>
         <ul> {preconditions} </ul>
       </TableCell>

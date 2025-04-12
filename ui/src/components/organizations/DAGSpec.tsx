@@ -1,8 +1,6 @@
 import { Box, Button, Stack } from '@mui/material';
-import React from 'react';
-import { GetDAGResponse } from '../../models/api';
+import React, { useEffect } from 'react';
 import { DAGContext } from '../../contexts/DAGContext';
-import { DAG, Step } from '../../models';
 import DAGEditor from '../atoms/DAGEditor';
 import DAGAttributes from '../molecules/DAGAttributes';
 import DAGDefinition from '../molecules/DAGDefinition';
@@ -11,6 +9,7 @@ import DAGStepTable from '../molecules/DAGStepTable';
 import BorderedBox from '../atoms/BorderedBox';
 import SubTitle from '../atoms/SubTitle';
 import FlowchartSwitch from '../molecules/FlowchartSwitch';
+import createClient from 'openapi-fetch';
 import { useCookies } from 'react-cookie';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -19,16 +18,20 @@ import {
   faPenToSquare,
 } from '@fortawesome/free-solid-svg-icons';
 import { AppBarContext } from '../../contexts/AppBarContext';
+import { useMutate, useQuery } from '../../hooks/api';
+import LoadingIndicator from '../atoms/LoadingIndicator';
+import { components, paths } from '../../api/v2/schema';
 
 type Props = {
-  data: GetDAGResponse;
+  name: string;
 };
 
-function DAGSpec({ data }: Props) {
+const client = createClient<paths>({ baseUrl: getConfig().apiURL });
+
+function DAGSpec({ name }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const [editing, setEditing] = React.useState(false);
-  const [currentValue, setCurrentValue] = React.useState(data.Definition);
-  const handlers = getHandlers(data.DAG?.DAG);
+  const [currentValue, setCurrentValue] = React.useState<string | undefined>();
   const [cookie, setCookie] = useCookies(['flowchart']);
   const [flowchart, setFlowchart] = React.useState(cookie['flowchart']);
   const onChangeFlowchart = React.useCallback(
@@ -38,13 +41,34 @@ function DAGSpec({ data }: Props) {
     },
     [setCookie, flowchart, setFlowchart]
   );
-  if (data.DAG?.DAG == null) {
-    return null;
+  const { data, isLoading, mutate } = useQuery(
+    '/dags/{name}/spec',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
+        path: {
+          name,
+        },
+      },
+    },
+    { refreshInterval: 2000 }
+  );
+  useEffect(() => {
+    if (data) {
+      setCurrentValue(data.spec);
+    }
+  }, [data]);
+
+  const handlers = getHandlers(data?.dag);
+  if (isLoading) {
+    return <LoadingIndicator />;
   }
   return (
     <DAGContext.Consumer>
       {(props) =>
-        data?.DAG?.DAG && (
+        data?.dag && (
           <React.Fragment>
             <Box>
               <Stack direction="row" justifyContent="space-between">
@@ -70,7 +94,7 @@ function DAGSpec({ data }: Props) {
                   }}
                 >
                   <Graph
-                    steps={data.DAG.DAG.Steps}
+                    steps={data.dag.steps}
                     type="config"
                     flowchart={flowchart}
                     showIcons={false}
@@ -81,13 +105,13 @@ function DAGSpec({ data }: Props) {
 
             <Box sx={{ mt: 3 }}>
               <Box sx={{ mt: 2 }}>
-                <DAGAttributes dag={data.DAG.DAG!}></DAGAttributes>
+                <DAGAttributes dag={data.dag!}></DAGAttributes>
               </Box>
             </Box>
             <Box sx={{ mt: 3 }}>
               <Box sx={{ mt: 2 }}>
                 <SubTitle>Steps</SubTitle>
-                {data.DAG.Error ? (
+                {data.errors?.length ? (
                   <BorderedBox
                     sx={{
                       mt: 2,
@@ -99,11 +123,15 @@ function DAGSpec({ data }: Props) {
                       color: 'error.contrastText',
                     }}
                   >
-                    {data.DAG.Error}
+                    {data.errors.map((e, i) => (
+                      <Box key={i} sx={{ mb: 1 }}>
+                        {e}
+                      </Box>
+                    ))}
                   </BorderedBox>
                 ) : null}
-                {data.DAG.DAG.Steps ? (
-                  <DAGStepTable steps={data.DAG.DAG.Steps}></DAGStepTable>
+                {data.dag.steps ? (
+                  <DAGStepTable steps={data.dag.steps}></DAGStepTable>
                 ) : null}
               </Box>
             </Box>
@@ -137,7 +165,7 @@ function DAGSpec({ data }: Props) {
                       color: 'grey.600',
                     }}
                   >
-                    {data.DAG.DAG.Location}
+                    {data.dag.location}
                   </Box>
                   {editing ? (
                     <Stack direction="row">
@@ -151,28 +179,34 @@ function DAGSpec({ data }: Props) {
                           </span>
                         }
                         onClick={async () => {
-                          const url = `${getConfig().apiURL}/dags/${
-                            props.name
-                          }?remoteNode=${
-                            appBarContext.selectedRemoteNode || 'local'
-                          }`;
-                          const resp = await fetch(url, {
-                            method: 'POST',
-                            headers: {
-                              'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                              action: 'save',
-                              value: currentValue,
-                            }),
-                          });
-                          if (resp.ok) {
-                            setEditing(false);
-                            props.refresh();
-                          } else {
-                            const e = await resp.text();
-                            alert(e);
+                          if (!currentValue) {
+                            alert('No changes to save');
+                            return;
                           }
+                          const { error } = await client.PUT(
+                            '/dags/{name}/spec',
+                            {
+                              params: {
+                                path: {
+                                  name: props.name,
+                                },
+                                query: {
+                                  remoteNode:
+                                    appBarContext.selectedRemoteNode || 'local',
+                                },
+                              },
+                              body: {
+                                spec: currentValue,
+                              },
+                            }
+                          );
+                          if (error) {
+                            alert(error);
+                            return;
+                          }
+                          setEditing(false);
+                          mutate();
+                          props.refresh();
                         }}
                       >
                         Save
@@ -212,14 +246,14 @@ function DAGSpec({ data }: Props) {
                 {editing ? (
                   <Box sx={{ mt: 2 }}>
                     <DAGEditor
-                      value={data.Definition}
+                      value={data.spec}
                       onChange={(newValue) => {
                         setCurrentValue(newValue || '');
                       }}
                     ></DAGEditor>
                   </Box>
                 ) : (
-                  <DAGDefinition value={data.Definition} lineNumbers />
+                  <DAGDefinition value={data.spec} lineNumbers />
                 )}
               </BorderedBox>
             </Box>
@@ -231,23 +265,25 @@ function DAGSpec({ data }: Props) {
 }
 export default DAGSpec;
 
-function getHandlers(dag?: DAG) {
-  const r: Step[] = [];
+function getHandlers(
+  dag?: components['schemas']['DAGDetails']
+): components['schemas']['Step'][] {
+  const steps: components['schemas']['Step'][] = [];
   if (!dag) {
-    return r;
+    return steps;
   }
-  const h = dag.HandlerOn;
-  if (h?.Success) {
-    r.push(h.Success);
+  const h = dag.handlerOn;
+  if (h?.success) {
+    steps.push(h.success);
   }
-  if (h?.Failure) {
-    r.push(h?.Failure);
+  if (h?.failure) {
+    steps.push(h?.failure);
   }
-  if (h?.Cancel) {
-    r.push(h?.Cancel);
+  if (h?.cancel) {
+    steps.push(h?.cancel);
   }
-  if (h?.Exit) {
-    r.push(h?.Exit);
+  if (h?.exit) {
+    steps.push(h?.exit);
   }
-  return r;
+  return steps;
 }

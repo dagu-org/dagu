@@ -196,7 +196,7 @@ export interface components {
          * @description Error code indicating the type of error
          * @enum {string}
          */
-        ErrorCode: "bad_request" | "not_found" | "internal_error" | "unauthorized" | "bad_gateway" | "remote_node_error" | "already_running" | "not_running" | "already_exists";
+        ErrorCode: ErrorCode;
         /**
          * Format: regex
          * @description Name of the DAG, must be unique
@@ -219,18 +219,13 @@ export interface components {
          * @example latest
          */
         RequestId: string;
-        /**
-         * @description Indicates which part of the DAG to retrieve
-         * @enum {string}
-         */
-        DAGDetailTab: "status" | "spec" | "history" | "log" | "scheduler-log";
         /** @description Response object for the health check endpoint */
         HealthResponse: {
             /**
              * @description Overall health status of the server
              * @enum {string}
              */
-            status: "healthy" | "unhealthy";
+            status: HealthResponseStatus;
             /** @description Current version of the server */
             version: string;
             /** @description Server uptime in seconds */
@@ -251,7 +246,7 @@ export interface components {
          *
          * @enum {string}
          */
-        DAGAction: "start" | "suspend" | "stop" | "retry" | "mark-success" | "mark-failed" | "save" | "rename";
+        DAGAction: DAGAction;
         /** @description Response object for posting an action to a DAG */
         PostDAGActionResponse: {
             /** @description New DAG name, if the action resulted in a new DAG */
@@ -298,12 +293,12 @@ export interface components {
          *
          * @enum {integer}
          */
-        Status: 0 | 1 | 2 | 3 | 4;
+        Status: Status;
         /**
          * @description Human-readable status description for the DAG run
          * @enum {string}
          */
-        StatusText: "not started" | "running" | "failed" | "cancelled" | "finished";
+        StatusText: StatusText;
         /**
          * @description Numeric status code indicating current node state:
          *     0: "Not started"
@@ -315,23 +310,12 @@ export interface components {
          *
          * @enum {integer}
          */
-        NodeStatus: 0 | 1 | 2 | 3 | 4 | 5;
+        NodeStatus: NodeStatus;
         /**
          * @description Human-readable status description for the node
          * @enum {string}
          */
-        NodeStatusText: "not started" | "running" | "failed" | "canceled" | "finished" | "skipped";
-        /** @description Detailed status information for a DAG instance */
-        DAGStatusFileDetails: {
-            /** @description Path to the DAG file */
-            file: string;
-            dag: components["schemas"]["DAGDetails"];
-            latestRun: components["schemas"]["RunDetails"];
-            /** @description Whether the DAG is suspended */
-            suspended: boolean;
-            /** @description Error message if the DAG failed to start */
-            error?: string;
-        };
+        NodeStatusText: NodeStatusText;
         /** @description Detailed DAG configuration information */
         DAGDetails: {
             /** @description Path to the DAG file */
@@ -468,28 +452,6 @@ export interface components {
             /** @description Start line for context */
             startLine: number;
         };
-        /** @description Log information for a specific step */
-        StepLog: {
-            step: components["schemas"]["Node"];
-            /** @description Path to the log file */
-            logFile: string;
-            /** @description Log content */
-            content: string;
-        };
-        /** @description Log information for the scheduler */
-        SchedulerLog: {
-            /** @description Path to the scheduler log file */
-            logFile: string;
-            /** @description Log content */
-            content: string;
-        };
-        /** @description Historical run data for a DAG */
-        DAGHistoryData: {
-            /** @description Grid data for visualization */
-            gridData: components["schemas"]["DAGLogGridItem"][];
-            /** @description Detailed status information for each run */
-            runs: components["schemas"]["RunDetails"][];
-        };
         /** @description Grid item for log visualization */
         DAGLogGridItem: {
             /** @description Name of the step */
@@ -527,6 +489,8 @@ export interface components {
         PerPage: number;
         /** @description name of the DAG */
         DAGName: components["schemas"]["DAGName"];
+        /** @description name of the remote node */
+        RemoteNode: string;
     };
     requestBodies: never;
     headers: never;
@@ -568,6 +532,8 @@ export interface operations {
                 page?: components["parameters"]["Page"];
                 /** @description number of items per page (default is 30, max is 100) */
                 perPage?: components["parameters"]["PerPage"];
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description Filter DAGs by name */
                 name?: string;
                 /** @description Filter DAGs by tag */
@@ -607,7 +573,10 @@ export interface operations {
     };
     createDAG: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -646,17 +615,13 @@ export interface operations {
     getDAGDetails: {
         parameters: {
             query?: {
-                /** @description Specific part of the DAG to retrieve */
-                tab?: components["schemas"]["DAGDetailTab"];
-                /** @description Specific file related to the DAG */
-                requestId?: string;
-                /** @description Step name within the DAG */
-                step?: string;
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
             };
             header?: never;
             path: {
-                /** @description The name of the DAG */
-                name: string;
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
             };
             cookie?: never;
         };
@@ -669,16 +634,10 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        /** @description Title of the Page */
-                        title: string;
-                        dag: components["schemas"]["DAGStatusFileDetails"];
-                        /** @description DAG definition */
-                        definition?: string;
-                        historyData?: components["schemas"]["DAGHistoryData"];
-                        /** @description URL to access logs directly */
-                        logUrl?: string;
-                        stepLog?: components["schemas"]["StepLog"];
-                        scLog?: components["schemas"]["SchedulerLog"];
+                        dag?: components["schemas"]["DAGDetails"];
+                        latestRun: components["schemas"]["RunDetails"];
+                        /** @description Whether the DAG is suspended */
+                        suspended: boolean;
                         /** @description List of errors encountered during the request */
                         errors: string[];
                     };
@@ -697,7 +656,10 @@ export interface operations {
     };
     postDAGAction: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path: {
                 /** @description The name of the DAG */
@@ -743,7 +705,10 @@ export interface operations {
     };
     deleteDAG: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path: {
                 /** @description The name of the DAG */
@@ -782,7 +747,10 @@ export interface operations {
     };
     getDAGRunHistory: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path: {
                 /** @description name of the DAG */
@@ -819,7 +787,10 @@ export interface operations {
     };
     getDAGRunStatus: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path: {
                 /** @description The name of the DAG */
@@ -855,7 +826,10 @@ export interface operations {
     };
     getDAGSpec: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path: {
                 /** @description name of the DAG */
@@ -872,6 +846,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        dag?: components["schemas"]["DAGDetails"];
                         /** @description The DAG spec */
                         spec: string;
                         /** @description List of errors in the spec */
@@ -892,7 +867,10 @@ export interface operations {
     };
     updateDAGSpec: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path: {
                 /** @description name of the DAG */
@@ -942,6 +920,8 @@ export interface operations {
     searchDAGs: {
         parameters: {
             query: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description A search query string */
                 q: string;
             };
@@ -978,7 +958,10 @@ export interface operations {
     };
     listTags: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1005,4 +988,59 @@ export interface operations {
             };
         };
     };
+}
+export enum ErrorCode {
+    bad_request = "bad_request",
+    not_found = "not_found",
+    internal_error = "internal_error",
+    unauthorized = "unauthorized",
+    bad_gateway = "bad_gateway",
+    remote_node_error = "remote_node_error",
+    already_running = "already_running",
+    not_running = "not_running",
+    already_exists = "already_exists"
+}
+export enum HealthResponseStatus {
+    healthy = "healthy",
+    unhealthy = "unhealthy"
+}
+export enum DAGAction {
+    start = "start",
+    suspend = "suspend",
+    stop = "stop",
+    retry = "retry",
+    mark_success = "mark-success",
+    mark_failed = "mark-failed",
+    save = "save",
+    rename = "rename"
+}
+export enum Status {
+    NotStarted = 0,
+    Running = 1,
+    Failed = 2,
+    Cancelled = 3,
+    Success = 4
+}
+export enum StatusText {
+    not_started = "not started",
+    running = "running",
+    failed = "failed",
+    cancelled = "cancelled",
+    finished = "finished"
+}
+export enum NodeStatus {
+    NotStarted = 0,
+    Running = 1,
+    Failed = 2,
+    Cancelled = 3,
+    Success = 4,
+    Skipped = 5
+}
+export enum NodeStatusText {
+    not_started = "not started",
+    running = "running",
+    failed = "failed",
+    canceled = "canceled",
+    finished = "finished",
+    skipped = "skipped"
 }

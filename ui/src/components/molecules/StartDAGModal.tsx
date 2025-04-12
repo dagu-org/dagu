@@ -8,12 +8,11 @@ import {
 } from '@mui/material';
 import React from 'react';
 import { Parameter, parseParams, stringifyParams } from '../../lib/parseParams';
-import { DAG } from '../../models';
-import { Workflow } from '../../models/api';
+import { components } from '../../api/v2/schema';
 
 type Props = {
   visible: boolean;
-  dag: DAG | Workflow;
+  dag: components['schemas']['DAG'] | components['schemas']['DAGDetails'];
   dismissModal: () => void;
   onSubmit: (params: string) => void;
 };
@@ -47,11 +46,11 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
   const ref = React.useRef<HTMLInputElement>(null);
 
   const parsedParams = React.useMemo(() => {
-    if (!dag.DefaultParams) {
+    if (!dag.defaultParams) {
       return [];
     }
-    return parseParams(dag.DefaultParams);
-  }, [dag.DefaultParams]);
+    return parseParams(dag.defaultParams);
+  }, [dag.defaultParams]);
 
   const [params, setParams] = React.useState<Parameter[]>([]);
 

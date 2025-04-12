@@ -1,12 +1,12 @@
 import { Box, Button, Modal, Stack, Typography } from '@mui/material';
 import React from 'react';
-import { Step } from '../../models';
+import { components } from '../../api/v2/schema';
 
 type Props = {
   visible: boolean;
   dismissModal: () => void;
-  step?: Step;
-  onSubmit: (step: Step, action: string) => void;
+  step?: components['schemas']['Step'];
+  onSubmit: (step: components['schemas']['Step'], action: string) => void;
 };
 
 const style = {
@@ -41,7 +41,7 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
     <Modal open={visible} onClose={dismissModal}>
       <Box sx={style}>
         <Stack direction="row" alignContent="center" justifyContent="center">
-          <Typography variant="h6">Update status of "{step.Name}"</Typography>
+          <Typography variant="h6">Update status of "{step.name}"</Typography>
         </Stack>
         <Stack
           direction="column"

@@ -1,18 +1,18 @@
 import React from 'react';
-import { Node, Step } from '../../models';
 import MultilineText from '../atoms/MultilineText';
 import NodeStatusChip from '../molecules/NodeStatusChip';
 import { TableCell } from '@mui/material';
 import StyledTableRow from '../atoms/StyledTableRow';
 import { OpenInNew } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
+import { components } from '../../api/v2/schema';
 
 type Props = {
   rownum: number;
-  node: Node;
+  node: components['schemas']['Node'];
   file: string;
   name: string;
-  onRequireModal: (step: Step) => void;
+  onRequireModal: (step: components['schemas']['Step']) => void;
 };
 
 function NodeStatusTableRow({
@@ -24,8 +24,8 @@ function NodeStatusTableRow({
 }: Props) {
   const searchParams = new URLSearchParams();
   searchParams.set('remoteNode', 'local');
-  if (node.Step) {
-    searchParams.set('step', node.Step.Name);
+  if (node.step) {
+    searchParams.set('step', node.step.name);
   }
   if (file) {
     searchParams.set('file', file);
@@ -40,33 +40,33 @@ function NodeStatusTableRow({
     outline: 'none',
   };
   let args = '';
-  if (node.Step.Args) {
+  if (node.step.args) {
     // Use uninterpolated args to avoid render issues with very long params
     args =
-      node.Step.CmdWithArgs?.replace(node.Step.Command || '', '').trimStart() ||
+      node.step.cmdWithArgs?.replace(node.step.command || '', '').trimStart() ||
       '';
   }
   return (
     <StyledTableRow>
       <TableCell> {rownum} </TableCell>
-      <TableCell> {node.Step.Name} </TableCell>
+      <TableCell> {node.step.name} </TableCell>
       <TableCell>
-        <MultilineText>{node.Step.Description}</MultilineText>
+        <MultilineText>{node.step.description}</MultilineText>
       </TableCell>
-      <TableCell> {node.Step.Command} </TableCell>
+      <TableCell> {node.step.command} </TableCell>
       <TableCell> {args} </TableCell>
-      <TableCell> {node.StartedAt} </TableCell>
-      <TableCell> {node.FinishedAt} </TableCell>
+      <TableCell> {node.startedAt} </TableCell>
+      <TableCell> {node.finishedAt} </TableCell>
       <TableCell>
-        <button style={buttonStyle} onClick={() => onRequireModal(node.Step)}>
-          <NodeStatusChip status={node.Status}>
-            {node.StatusText}
+        <button style={buttonStyle} onClick={() => onRequireModal(node.step)}>
+          <NodeStatusChip status={node.status}>
+            {node.statusText}
           </NodeStatusChip>
         </button>
       </TableCell>
-      <TableCell> {node.Error} </TableCell>
+      <TableCell> {node.error} </TableCell>
       <TableCell>
-        {node.Log ? (
+        {node.log ? (
           <Link to={url}>
             <OpenInNew />
           </Link>

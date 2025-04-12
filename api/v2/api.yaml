@@ -57,6 +57,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/RemoteNode"
         - name: "name"
           in: "query"
           required: false
@@ -106,6 +107,8 @@ paths:
       operationId: "createDAG"
       tags:
         - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
       requestBody:
         required: true
         content:
@@ -144,30 +147,8 @@ paths:
       tags:
         - "dags"
       parameters:
-        - name: "name"
-          in: "path"
-          required: true
-          schema:
-            type: "string"
-          description: "The name of the DAG"
-        - name: "tab"
-          in: "query"
-          required: false
-          schema:
-            $ref: "#/components/schemas/DAGDetailTab"
-          description: "Specific part of the DAG to retrieve"
-        - name: "requestId"
-          in: "query"
-          required: false
-          schema:
-            type: "string"
-          description: "Specific file related to the DAG"
-        - name: "step"
-          in: "query"
-          required: false
-          schema:
-            type: "string"
-          description: "Step name within the DAG"
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
       responses:
         "200":
           description: "A successful response"
@@ -177,31 +158,21 @@ paths:
                 type: object
                 description: "Response object for getting details of a DAG"
                 properties:
-                  title:
-                    type: string
-                    description: "Title of the Page"
                   dag:
-                    $ref: "#/components/schemas/DAGStatusFileDetails"
-                  definition:
-                    type: string
-                    description: "DAG definition"
-                  historyData:
-                    $ref: "#/components/schemas/DAGHistoryData"
-                  logUrl:
-                    type: string
-                    description: "URL to access logs directly"
-                  stepLog:
-                    $ref: "#/components/schemas/StepLog"
-                  scLog:
-                    $ref: "#/components/schemas/SchedulerLog"
+                    $ref: "#/components/schemas/DAGDetails"
+                  latestRun:
+                    $ref: "#/components/schemas/RunDetails"
+                  suspended:
+                    type: boolean
+                    description: "Whether the DAG is suspended"
                   errors:
                     type: array
                     description: "List of errors encountered during the request"
                     items:
                       type: string
                 required:
-                  - title
-                  - dag
+                  - latestRun
+                  - suspended
                   - errors
         default:
           description: "Generic error response"
@@ -217,6 +188,7 @@ paths:
       tags:
         - "dags"
       parameters:
+        - $ref: "#/components/parameters/RemoteNode"
         - name: "name"
           in: "path"
           required: true
@@ -268,6 +240,7 @@ paths:
       tags:
         - "dags"
       parameters:
+        - $ref: "#/components/parameters/RemoteNode"
         - name: "name"
           in: "path"
           required: true
@@ -298,6 +271,7 @@ paths:
       tags:
         - "dags"
       parameters:
+        - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
       responses:
         "200":
@@ -335,6 +309,7 @@ paths:
         - "dags"
       operationId: "getDAGRunStatus"
       parameters:
+        - $ref: "#/components/parameters/RemoteNode"
         - name: "name"
           in: "path"
           required: true
@@ -374,6 +349,7 @@ paths:
       tags:
         - "dags"
       parameters:
+        - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
       responses:
         "200":
@@ -383,6 +359,8 @@ paths:
               schema:
                 type: object
                 properties:
+                  dag:
+                    $ref: "#/components/schemas/DAGDetails"
                   spec:
                     type: string
                     description: "The DAG spec"
@@ -407,6 +385,7 @@ paths:
       tags:
         - "dags"
       parameters:
+        - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
       requestBody:
         required: true
@@ -453,6 +432,7 @@ paths:
       tags:
         - "dags"
       parameters:
+        - $ref: "#/components/parameters/RemoteNode"
         - name: "q"
           in: "query"
           required: true
@@ -495,6 +475,8 @@ paths:
       operationId: "listTags"
       tags:
         - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
       responses:
         "200":
           description: "A successful response"
@@ -548,6 +530,15 @@ components:
       required: true
       schema:
         $ref: "#/components/schemas/DAGName"
+
+    RemoteNode:
+      name: remoteNode
+      in: query
+      description: name of the remote node
+      required: false
+      schema:
+        type: string
+        default: "local"
 
   schemas:
     Error:
@@ -618,15 +609,15 @@ components:
       example: "latest"
       pattern: "^[a-zA-Z0-9_-]+$"
 
-    DAGDetailTab:
-      type: string
-      description: "Indicates which part of the DAG to retrieve"
-      enum:
-        - status
-        - spec
-        - history
-        - log
-        - scheduler-log
+    # DAGDetailTab:
+    #   type: string
+    #   description: "Indicates which part of the DAG to retrieve"
+    #   enum:
+    #     - status
+    #     - spec
+    #     - history
+    #     - log
+    #     - scheduler-log
 
     HealthResponse:
       type: object
@@ -751,6 +742,12 @@ components:
     Status:
       type: integer
       enum: [0, 1, 2, 3, 4]
+      x-enum-varnames:
+        - "NotStarted"
+        - "Running"
+        - "Failed"
+        - "Cancelled"
+        - "Success"
       description: |
         Numeric status code indicating current run state:
         0: "Not started"
@@ -772,6 +769,13 @@ components:
     NodeStatus:
       type: integer
       enum: [0, 1, 2, 3, 4, 5]
+      x-enum-varnames:
+        - "NotStarted"
+        - "Running"
+        - "Failed"
+        - "Cancelled"
+        - "Success"
+        - "Skipped"
       description: |
         Numeric status code indicating current node state:
         0: "Not started"
@@ -792,28 +796,28 @@ components:
         - "finished"
         - "skipped"
 
-    DAGStatusFileDetails:
-      type: object
-      description: "Detailed status information for a DAG instance"
-      properties:
-        file:
-          type: string
-          description: "Path to the DAG file"
-        dag:
-          $ref: "#/components/schemas/DAGDetails"
-        latestRun:
-          $ref: "#/components/schemas/RunDetails"
-        suspended:
-          type: boolean
-          description: "Whether the DAG is suspended"
-        error:
-          type: string
-          description: "Error message if the DAG failed to start"
-      required:
-        - file
-        - dag
-        - latestRun
-        - suspended
+    # DAGStatusFileDetails:
+    #   type: object
+    #   description: "Detailed status information for a DAG instance"
+    #   properties:
+    #     file:
+    #       type: string
+    #       description: "Path to the DAG file"
+    #     dag:
+    #       $ref: "#/components/schemas/DAGDetails"
+    #     latestRun:
+    #       $ref: "#/components/schemas/RunDetails"
+    #     suspended:
+    #       type: boolean
+    #       description: "Whether the DAG is suspended"
+    #     error:
+    #       type: string
+    #       description: "Error message if the DAG failed to start"
+    #   required:
+    #     - file
+    #     - dag
+    #     - latestRun
+    #     - suspended
 
     DAGDetails:
       type: object
@@ -1089,54 +1093,54 @@ components:
         - lineNumber
         - startLine
 
-    StepLog:
-      type: object
-      description: "Log information for a specific step"
-      properties:
-        step:
-          $ref: "#/components/schemas/Node"
-        logFile:
-          type: string
-          description: "Path to the log file"
-        content:
-          type: string
-          description: "Log content"
-      required:
-        - step
-        - logFile
-        - content
+    # StepLog:
+    #   type: object
+    #   description: "Log information for a specific step"
+    #   properties:
+    #     step:
+    #       $ref: "#/components/schemas/Node"
+    #     logFile:
+    #       type: string
+    #       description: "Path to the log file"
+    #     content:
+    #       type: string
+    #       description: "Log content"
+    #   required:
+    #     - step
+    #     - logFile
+    #     - content
 
-    SchedulerLog:
-      type: object
-      description: "Log information for the scheduler"
-      properties:
-        logFile:
-          type: string
-          description: "Path to the scheduler log file"
-        content:
-          type: string
-          description: "Log content"
-      required:
-        - logFile
-        - content
+    # SchedulerLog:
+    #   type: object
+    #   description: "Log information for the scheduler"
+    #   properties:
+    #     logFile:
+    #       type: string
+    #       description: "Path to the scheduler log file"
+    #     content:
+    #       type: string
+    #       description: "Log content"
+    #   required:
+    #     - logFile
+    #     - content
 
-    DAGHistoryData:
-      type: object
-      description: "Historical run data for a DAG"
-      properties:
-        gridData:
-          type: array
-          description: "Grid data for visualization"
-          items:
-            $ref: "#/components/schemas/DAGLogGridItem"
-        runs:
-          type: array
-          description: "Detailed status information for each run"
-          items:
-            $ref: "#/components/schemas/RunDetails"
-      required:
-        - gridData
-        - runs
+    # DAGHistoryData:
+    #   type: object
+    #   description: "Historical run data for a DAG"
+    #   properties:
+    #     gridData:
+    #       type: array
+    #       description: "Grid data for visualization"
+    #       items:
+    #         $ref: "#/components/schemas/DAGLogGridItem"
+    #     runs:
+    #       type: array
+    #       description: "Detailed status information for each run"
+    #       items:
+    #         $ref: "#/components/schemas/RunDetails"
+    #   required:
+    #     - gridData
+    #     - runs
 
     DAGLogGridItem:
       type: object

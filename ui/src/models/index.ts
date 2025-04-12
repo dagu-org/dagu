@@ -3,19 +3,10 @@ import moment from 'moment-timezone';
 import { WorkflowListItem } from './api';
 import { components } from '../api/v2/schema';
 
-export enum SchedulerStatus {
-  None = 0,
-  Running,
-  Error,
-  Cancel,
-  Success,
-  Skipped_Unused,
-}
-
 export type Status = {
   RequestId: string;
   Name: string;
-  Status: SchedulerStatus;
+  Status: number;
   StatusText: string;
   Pid: number;
   Nodes: Node[];
@@ -29,21 +20,21 @@ export type Status = {
   Params: string;
 };
 
-export function Handlers(s: Status) {
-  const r = [];
-  if (s.OnSuccess) {
-    r.push(s.OnSuccess);
+export function getEventHandlers(s: components['schemas']['RunDetails']) {
+  const ret = [];
+  if (s.onSuccess) {
+    ret.push(s.onSuccess);
   }
-  if (s.OnFailure) {
-    r.push(s.OnFailure);
+  if (s.onFailure) {
+    ret.push(s.onFailure);
   }
-  if (s.OnCancel) {
-    r.push(s.OnCancel);
+  if (s.onCancel) {
+    ret.push(s.onCancel);
   }
-  if (s.OnExit) {
-    r.push(s.OnExit);
+  if (s.onExit) {
+    ret.push(s.onExit);
   }
-  return r;
+  return ret;
 }
 
 export type Condition = {
@@ -120,15 +111,15 @@ export function getFirstTag(data?: DAGItem): string {
   return '';
 }
 
-export function getStatus(data?: DAGItem): SchedulerStatus {
-  if (!data) {
-    return SchedulerStatus.None;
-  }
-  if (data.Type == DAGDataType.DAG) {
-    return data.DAGStatus.Status?.Status || SchedulerStatus.None;
-  }
-  return SchedulerStatus.None;
-}
+// export function getStatus(data?: DAGItem): SchedulerStatus {
+//   if (!data) {
+//     return SchedulerStatus.None;
+//   }
+//   if (data.Type == DAGDataType.DAG) {
+//     return data.DAGStatus.Status?.Status || SchedulerStatus.None;
+//   }
+//   return SchedulerStatus.None;
+// }
 
 type KeysMatching<T extends object, V> = {
   [K in keyof T]-?: T[K] extends V ? K : never;
@@ -185,21 +176,12 @@ export function getNextSchedule(
   return sorted[0]?.getTime() / 1000;
 }
 
-export enum NodeStatus {
-  None = 0,
-  Running,
-  Error,
-  Cancel,
-  Success,
-  Skipped,
-}
-
 export type Node = {
   Step: Step;
   Log: string;
   StartedAt: string;
   FinishedAt: string;
-  Status: NodeStatus;
+  Status: number;
   RetryCount: number;
   DoneCount: number;
   Error: string;
