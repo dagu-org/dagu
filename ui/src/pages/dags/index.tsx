@@ -31,17 +31,18 @@ function DAGs() {
   const handlePageLimitChange = (newLimit: number) => {
     updatePreference('pageLimit', newLimit);
   };
-  const queryParams = {
-    page,
-    perPage: preferences.pageLimit || 200,
-    remoteNode: appBarContext.selectedRemoteNode || 'local',
-    name: apiSearchText ? apiSearchText : undefined,
-    tag: apiSearchTag ? apiSearchTag : undefined,
-  };
   const { data, mutate, isLoading } = useQuery(
     '/dags',
     {
-      params: { query: queryParams },
+      params: {
+        query: {
+          page,
+          perPage: preferences.pageLimit || 200,
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+          name: apiSearchText ? apiSearchText : undefined,
+          tag: apiSearchTag ? apiSearchTag : undefined,
+        },
+      },
     },
     {
       refreshInterval: 10000,

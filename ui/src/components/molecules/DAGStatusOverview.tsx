@@ -1,12 +1,12 @@
 import React from 'react';
-import { Status } from '../../models';
 import StatusChip from '../atoms/StatusChip';
 import { Stack } from '@mui/material';
 import LabeledItem from '../atoms/LabeledItem';
 import { Link } from 'react-router-dom';
+import { components } from '../../api/v2/schema';
 
 type Props = {
-  status?: Status;
+  status?: components['schemas']['RunDetails'];
   name: string;
   file?: string;
 };
@@ -23,16 +23,16 @@ function DAGStatusOverview({ status, name, file = '' }: Props) {
   return (
     <Stack direction="column" spacing={1}>
       <LabeledItem label="Status">
-        <StatusChip status={status.Status}>{status.StatusText}</StatusChip>
+        <StatusChip status={status.status}>{status.statusText}</StatusChip>
       </LabeledItem>
-      <LabeledItem label="Request ID">{status.RequestId}</LabeledItem>
+      <LabeledItem label="Request ID">{status.requestId}</LabeledItem>
       <Stack direction="row" sx={{ alignItems: 'center' }} spacing={2}>
-        <LabeledItem label="Started At">{status.StartedAt}</LabeledItem>
-        <LabeledItem label="Finished At">{status.FinishedAt}</LabeledItem>
+        <LabeledItem label="Started At">{status.startedAt}</LabeledItem>
+        <LabeledItem label="Finished At">{status.finishedAt}</LabeledItem>
       </Stack>
-      <LabeledItem label="Params">{status.Params}</LabeledItem>
+      <LabeledItem label="Params">{status.params}</LabeledItem>
       <LabeledItem label="Scheduler Log">
-        <Link to={url}>{status.Log}</Link>
+        <Link to={url}>{status.log}</Link>
       </LabeledItem>
     </Stack>
   );

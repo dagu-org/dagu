@@ -1,23 +1,20 @@
 import React, { useMemo } from 'react';
 import { Link, useParams, useLocation } from 'react-router-dom';
-import { GetDAGResponse } from '../../../models/api';
 import DAGStatus from '../../../components/organizations/DAGStatus';
 import { DAGContext } from '../../../contexts/DAGContext';
 import DAGSpec from '../../../components/organizations/DAGSpec';
-import ExecutionHistory from '../../../components/organizations/ExecutionHistory';
-import ExecutionLog from '../../../components/organizations/ExecutionLog';
 import { Box, Stack, Tab, Tabs } from '@mui/material';
 import Title from '../../../components/atoms/Title';
 import DAGActions from '../../../components/molecules/DAGActions';
 import DAGEditButtons from '../../../components/molecules/DAGEditButtons';
 import LoadingIndicator from '../../../components/atoms/LoadingIndicator';
 import { AppBarContext } from '../../../contexts/AppBarContext';
-import useSWR from 'swr';
 import StatusChip from '../../../components/atoms/StatusChip';
 import { CalendarToday, TimerSharp } from '@mui/icons-material';
 import moment from 'moment-timezone';
-import { SchedulerStatus, Status } from '../../../models';
-import { DAGStatusContext } from '../../../contexts/DAGStatusContext';
+import { RunDetailsContext } from '../../../contexts/DAGStatusContext';
+import { useQuery } from '../../../hooks/api';
+import { components, Status } from '../../../api/v2/schema';
 
 type Params = {
   name: string;
@@ -28,20 +25,24 @@ function DAGDetails() {
   const params = useParams<Params>();
   const appBarContext = React.useContext(AppBarContext);
   const { pathname } = useLocation();
-
-  const baseUrl = `/dags/${encodeURI(params.name!)}`;
-  const searchParams = new URLSearchParams(window.location.search);
-  searchParams.set('remoteNode', appBarContext.selectedRemoteNode || 'local');
-  if (params.tab) {
-    searchParams.set('tab', params.tab);
-  }
-
-  const { data, isValidating, mutate } = useSWR<GetDAGResponse>(
-    `/dags/${params.name}?${searchParams.toString()}`,
-    null,
+  const { data, isLoading, mutate } = useQuery(
+    '/dags/{name}',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
+        path: {
+          name: params.name || '',
+        },
+      },
+    },
     { refreshInterval: 2000 }
   );
-  const [status, setStatus] = React.useState<Status | undefined>();
+  const baseUrl = `/dags/${params.name}`;
+  const [currentRun, setCurrentRun] = React.useState<
+    components['schemas']['RunDetails'] | undefined
+  >();
 
   const refreshFn = React.useCallback(() => {
     setTimeout(() => mutate(), 500);
@@ -49,29 +50,14 @@ function DAGDetails() {
 
   React.useEffect(() => {
     if (data) {
-      appBarContext.setTitle(data.Title);
-      setStatus(data.DAG?.Status);
+      appBarContext.setTitle(data.dag?.name || '');
+      setCurrentRun(data.latestRun);
     }
   }, [data, appBarContext]);
 
   const tab = useMemo(() => {
     return params.tab || 'status';
   }, [params]);
-
-  if (!params.name || !data || !data.DAG) {
-    return <LoadingIndicator />;
-  }
-
-  const ctx = {
-    data: data,
-    refresh: refreshFn,
-    name: params.name,
-  };
-
-  const statusCtx = {
-    data: status,
-    setData: setStatus,
-  };
 
   const formatDuration = (startDate: string, endDate: string) => {
     if (!startDate || !endDate) return '--';
@@ -88,9 +74,25 @@ function DAGDetails() {
     return `${seconds}s`;
   };
 
+  if (!params.name || isLoading || !data) {
+    return <LoadingIndicator />;
+  }
+
   return (
-    <DAGContext.Provider value={ctx}>
-      <DAGStatusContext.Provider value={statusCtx}>
+    <DAGContext.Provider
+      value={{
+        refresh: refreshFn,
+        name: data.dag?.name || '',
+      }}
+    >
+      <RunDetailsContext.Provider
+        value={{
+          data: currentRun,
+          setData: (status: components['schemas']['RunDetails']) => {
+            setCurrentRun(status);
+          },
+        }}
+      >
         <Stack
           sx={{
             width: '100%',
@@ -106,29 +108,29 @@ function DAGDetails() {
               justifyContent: 'space-between',
             }}
           >
-            <Title>{data.Title}</Title>
-            <DAGStatusContext.Consumer>
+            <Title>{data.dag?.name}</Title>
+            <RunDetailsContext.Consumer>
               {(status) => (
                 <DAGActions
                   status={status.data}
-                  dag={data?.DAG?.DAG}
+                  dag={data.dag}
                   name={params.name!}
                   refresh={refreshFn}
                   redirectTo={`${baseUrl}`}
                 />
               )}
-            </DAGStatusContext.Consumer>
+            </RunDetailsContext.Consumer>
           </Box>
 
-          {data.DAG?.Status?.Status != SchedulerStatus.None ? (
+          {data.latestRun.status != Status.NotStarted ? (
             <Stack
               direction="row"
               spacing={2}
               sx={{ mx: 4, alignItems: 'center' }}
             >
-              {data.DAG?.Status?.Status ? (
-                <StatusChip status={data.DAG.Status.Status}>
-                  {data.DAG.Status.StatusText || ''}
+              {data.latestRun.status ? (
+                <StatusChip status={data.latestRun.status}>
+                  {data.latestRun.statusText || ''}
                 </StatusChip>
               ) : null}
 
@@ -138,8 +140,8 @@ function DAGDetails() {
                 sx={{ alignItems: 'center', ml: 1 }}
               >
                 <CalendarToday sx={{ mr: 0.5 }} />
-                {data?.DAG?.Status?.FinishedAt
-                  ? moment(data.DAG.Status.FinishedAt).format(
+                {data.latestRun?.finishedAt
+                  ? moment(data.latestRun.finishedAt).format(
                       'MMM D, YYYY HH:mm:ss Z'
                     )
                   : '--'}
@@ -151,14 +153,14 @@ function DAGDetails() {
                 sx={{ alignItems: 'center', ml: 1 }}
               >
                 <TimerSharp sx={{ mr: 0.5 }} />
-                {data?.DAG?.Status?.FinishedAt
+                {data.latestRun.finishedAt
                   ? formatDuration(
-                      data?.DAG?.Status?.StartedAt,
-                      data?.DAG?.Status?.FinishedAt
+                      data.latestRun.startedAt,
+                      data.latestRun.finishedAt
                     )
-                  : data?.DAG?.Status?.StartedAt
+                  : data.latestRun.startedAt
                   ? formatDuration(
-                      data?.DAG?.Status?.StartedAt,
+                      data.latestRun.startedAt,
                       moment().toISOString()
                     )
                   : '--'}
@@ -184,30 +186,30 @@ function DAGDetails() {
               ) : null}
             </Tabs>
             {pathname == `${baseUrl}/spec` ? (
-              <DAGEditButtons name={params.name} />
+              <DAGEditButtons name={data.dag?.name || ''} />
             ) : null}
           </Stack>
 
           <Box sx={{ mx: 4, flex: 1 }}>
             {tab == 'status' ? (
               <DAGStatus
-                DAG={data.DAG}
-                name={params.name}
+                run={data.latestRun}
+                name={data.dag?.name || ''}
                 refresh={refreshFn}
               />
             ) : null}
-            {tab == 'spec' ? <DAGSpec data={data} /> : null}
-            {tab == 'history' ? (
+            {tab == 'spec' ? <DAGSpec name={params.name} /> : null}
+            {/* {tab == 'history' ? (
               <ExecutionHistory
                 logData={data.LogData}
                 isLoading={isValidating}
               />
-            ) : null}
-            {tab == 'scheduler-log' ? <ExecutionLog log={data.ScLog} /> : null}
-            {tab == 'log' ? <ExecutionLog log={data.StepLog} /> : null}
+            ) : null} */}
+            {/* {tab == 'scheduler-log' ? <ExecutionLog log={data.ScLog} /> : null}
+            {tab == 'log' ? <ExecutionLog log={data.StepLog} /> : null} */}
           </Box>
         </Stack>
-      </DAGStatusContext.Provider>
+      </RunDetailsContext.Provider>
     </DAGContext.Provider>
   );
 }

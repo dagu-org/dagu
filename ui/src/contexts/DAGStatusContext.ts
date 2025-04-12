@@ -1,13 +1,13 @@
 import React from 'react';
-import { Status } from '../models';
+import { components } from '../api/v2/schema';
 
-type DAGStatusContextType = {
-  data: Status | undefined;
-  setData(val: Status): void;
+type RunDetailsContextType = {
+  data: components['schemas']['RunDetails'] | undefined;
+  setData(runDetails: components['schemas']['RunDetails']): void;
 };
 
-export const DAGStatusContext = React.createContext<DAGStatusContextType>({
-  data: undefined as Status | undefined,
+export const RunDetailsContext = React.createContext<RunDetailsContextType>({
+  data: undefined as components['schemas']['RunDetails'] | undefined,
   setData: () => {
     return;
   },

@@ -2,13 +2,13 @@ import { Box } from '@mui/material';
 import React from 'react';
 import { GridData, LogData } from '../../models/api';
 import { DAGContext } from '../../contexts/DAGContext';
-import { Handlers, Node, StatusFile } from '../../models';
+import { getEventHandlers, Node, StatusFile } from '../../models';
 import NodeStatusTable from '../molecules/NodeStatusTable';
 import DAGStatusOverview from '../molecules/DAGStatusOverview';
 import SubTitle from '../atoms/SubTitle';
 import LoadingIndicator from '../atoms/LoadingIndicator';
 import HistoryTable from '../molecules/HistoryTable';
-import { DAGStatusContext } from '../../contexts/DAGStatusContext';
+import { RunDetailsContext } from '../../contexts/DAGStatusContext';
 
 type Props = {
   logData: LogData;
@@ -32,76 +32,78 @@ type HistoryTableProps = {
 
 function DAGHistoryTable({ GridData, Logs }: HistoryTableProps) {
   const [idx, setIdx] = React.useState(Logs ? Logs.length - 1 : 0);
-  const dagStatusContext = React.useContext(DAGStatusContext);
+  const dagStatusContext = React.useContext(RunDetailsContext);
 
-  let handlers: Node[] | null = null;
-  if (Logs && Logs.length > idx) {
-    handlers = Handlers(Logs[idx].Status);
-  }
+  // let handlers: Node[] | null = null;
+  // if (Logs && Logs.length > idx) {
+  //   handlers = getEventHandlers(Logs[idx].Status);
+  // }
 
-  React.useEffect(() => {
-    if (Logs && Logs[idx]) {
-      dagStatusContext.setData(Logs[idx].Status);
-    }
-  }, [idx]);
+  // React.useEffect(() => {
+  //   if (Logs && Logs[idx]) {
+  //     dagStatusContext.setData(Logs[idx].Status);
+  //   }
+  // }, [idx]);
 
-  return (
-    <DAGContext.Consumer>
-      {(props) => (
-        <React.Fragment>
-          <Box>
-            <SubTitle>Execution History</SubTitle>
-            <HistoryTable
-              logs={Logs || []}
-              gridData={GridData || []}
-              onSelect={setIdx}
-              idx={idx}
-            />
-          </Box>
+  // return (
+  //   <DAGContext.Consumer>
+  //     {(props) => (
+  //       <React.Fragment>
+  //         <Box>
+  //           <SubTitle>Execution History</SubTitle>
+  //           <HistoryTable
+  //             logs={Logs || []}
+  //             gridData={GridData || []}
+  //             onSelect={setIdx}
+  //             idx={idx}
+  //           />
+  //         </Box>
 
-          {Logs && Logs[idx] ? (
-            <React.Fragment>
-              <Box sx={{ mt: 3 }}>
-                <SubTitle>Status</SubTitle>
-                <Box sx={{ mt: 2 }}>
-                  <DAGStatusOverview
-                    status={Logs[idx].Status}
-                    file={Logs[idx].File}
-                    {...props}
-                  />
-                </Box>
-              </Box>
-              <Box sx={{ mt: 3 }}>
-                <SubTitle>Steps</SubTitle>
-                <Box sx={{ mt: 2 }}>
-                  <NodeStatusTable
-                    nodes={Logs[idx].Status.Nodes}
-                    status={Logs[idx].Status}
-                    file={Logs[idx].File}
-                    {...props}
-                  />
-                </Box>
-              </Box>
+  //         {Logs && Logs[idx] ? (
+  //           <React.Fragment>
+  //             <Box sx={{ mt: 3 }}>
+  //               <SubTitle>Status</SubTitle>
+  //               <Box sx={{ mt: 2 }}>
+  //                 <DAGStatusOverview
+  //                   status={Logs[idx].Status}
+  //                   file={Logs[idx].File}
+  //                   {...props}
+  //                 />
+  //               </Box>
+  //             </Box>
+  //             <Box sx={{ mt: 3 }}>
+  //               <SubTitle>Steps</SubTitle>
+  //               <Box sx={{ mt: 2 }}>
+  //                 <NodeStatusTable
+  //                   nodes={Logs[idx].Status.Nodes}
+  //                   status={Logs[idx].Status}
+  //                   file={Logs[idx].File}
+  //                   {...props}
+  //                 />
+  //               </Box>
+  //             </Box>
 
-              {handlers && handlers.length ? (
-                <Box sx={{ mt: 3 }}>
-                  <SubTitle>Lifecycle Hooks</SubTitle>
-                  <Box sx={{ mt: 2 }}>
-                    <NodeStatusTable
-                      nodes={Handlers(Logs[idx].Status)}
-                      file={Logs[idx].File}
-                      status={Logs[idx].Status}
-                      {...props}
-                    />
-                  </Box>
-                </Box>
-              ) : null}
-            </React.Fragment>
-          ) : null}
-        </React.Fragment>
-      )}
-    </DAGContext.Consumer>
-  );
+  //             {handlers && handlers.length ? (
+  //               <Box sx={{ mt: 3 }}>
+  //                 <SubTitle>Lifecycle Hooks</SubTitle>
+  //                 <Box sx={{ mt: 2 }}>
+  //                   <NodeStatusTable
+  //                     nodes={getEventHandlers(Logs[idx].Status)}
+  //                     file={Logs[idx].File}
+  //                     status={Logs[idx].Status}
+  //                     {...props}
+  //                   />
+  //                 </Box>
+  //               </Box>
+  //             ) : null}
+  //           </React.Fragment>
+  //         ) : null}
+  //       </React.Fragment>
+  //     )}
+  //   </DAGContext.Consumer>
+  // );
+
+  return null;
 }
 
 export default DAGHistory;

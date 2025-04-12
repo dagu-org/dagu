@@ -1,49 +1,54 @@
 import React from 'react';
 import { Stack, Box, Chip } from '@mui/material';
 import LabeledItem from '../atoms/LabeledItem';
-import { DAG } from '../../models';
+import { components } from '../../api/v2/schema';
 
 type Props = {
-  dag: DAG;
+  dag: components['schemas']['DAGDetails'];
 };
 
-function DAGAttributes({ dag: config }: Props) {
-  const preconditions = config.Preconditions?.map((c) => (
+function DAGAttributes({ dag }: Props) {
+  const preconditions = dag.preconditions?.map((c) => (
     <li>
-      {c.Condition}
+      {c.condition}
       {' => '}
-      {c.Expected}
+      {c.expected}
     </li>
   ));
   return (
     <Stack direction="column" spacing={1}>
-      <LabeledItem label="Name">{config.Name}</LabeledItem>
+      <LabeledItem label="Name">{dag.name}</LabeledItem>
       <LabeledItem label="Schedule">
+        {!dag.schedule?.length && 'No schedule'}
         <Stack direction={'row'}>
-          {config.Schedule?.map((s) => (
+          {dag.schedule?.map((schedule) => (
             <Chip
-              key={s.Expression}
+              key={schedule.expression}
               sx={{
                 fontWeight: 'semibold',
                 marginRight: 1,
               }}
               size="small"
-              label={s.Expression}
+              label={schedule.expression}
             />
           ))}
         </Stack>
       </LabeledItem>
-      <LabeledItem label="Description">{config.Description}</LabeledItem>
-      <LabeledItem label="Max Active Runs">{config.MaxActiveRuns}</LabeledItem>
-      <LabeledItem label="Params">{config.Params?.join(' ')}</LabeledItem>
-      <Stack direction={'column'}>
-        <React.Fragment>
-          <LabeledItem label="Preconditions">{null}</LabeledItem>
-          <Box sx={{ pl: 2 }}>
-            <ul>{preconditions}</ul>
-          </Box>
-        </React.Fragment>
-      </Stack>
+      <LabeledItem label="Description">{dag.description}</LabeledItem>
+      {dag.maxActiveRuns ? (
+        <LabeledItem label="Max Active Runs">{dag.maxActiveRuns}</LabeledItem>
+      ) : null}
+      <LabeledItem label="Params">{dag.params?.join(' ')}</LabeledItem>
+      {preconditions?.length ? (
+        <Stack direction={'column'}>
+          <React.Fragment>
+            <LabeledItem label="Preconditions">{null}</LabeledItem>
+            <Box sx={{ pl: 2 }}>
+              <ul>{preconditions}</ul>
+            </Box>
+          </React.Fragment>
+        </Stack>
+      ) : null}
     </Stack>
   );
 }

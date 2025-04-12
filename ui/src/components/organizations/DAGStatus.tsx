@@ -1,14 +1,13 @@
 import React from 'react';
 import { DAGContext } from '../../contexts/DAGContext';
 import { DAGStatus } from '../../models';
-import { Handlers, SchedulerStatus } from '../../models';
+import { getEventHandlers } from '../../models';
 import Graph, { FlowchartType } from '../molecules/Graph';
 import NodeStatusTable from '../molecules/NodeStatusTable';
 import DAGStatusOverview from '../molecules/DAGStatusOverview';
 import TimelineChart from '../molecules/TimelineChart';
 import { useDAGPostAPI } from '../../hooks/useDAGPostAPI';
 import StatusUpdateModal from '../molecules/StatusUpdateModal';
-import { Step } from '../../models';
 import { Box, Stack, Tab, Tabs } from '@mui/material';
 import SubTitle from '../atoms/SubTitle';
 import BorderedBox from '../atoms/BorderedBox';
@@ -16,45 +15,47 @@ import { useCookies } from 'react-cookie';
 import FlowchartSwitch from '../molecules/FlowchartSwitch';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChartGantt, faShareNodes } from '@fortawesome/free-solid-svg-icons';
+import { components, Status } from '../../api/v2/schema';
 
 type Props = {
-  DAG: DAGStatus;
+  run: components['schemas']['RunDetails'];
   name: string;
   refresh: () => void;
 };
 
-function DAGStatus({ DAG, name, refresh }: Props) {
+function DAGStatus({ run, name, refresh }: Props) {
   const [modal, setModal] = React.useState(false);
   const [sub, setSub] = React.useState('0');
-  const [selectedStep, setSelectedStep] = React.useState<Step | undefined>(
-    undefined
-  );
+  const [selectedStep, setSelectedStep] = React.useState<
+    components['schemas']['Step'] | undefined
+  >(undefined);
   const { doPost } = useDAGPostAPI({
     name,
     onSuccess: refresh,
-    requestId: DAG.Status?.RequestId,
+    requestId: run.requestId,
   });
   const dismissModal = () => setModal(false);
-  const onUpdateStatus = async (step: Step, action: string) => {
-    doPost(action, step.Name);
+  const onUpdateStatus = async (
+    step: components['schemas']['Step'],
+    action: string
+  ) => {
+    doPost(action, step.name);
     dismissModal();
   };
   const onSelectStepOnGraph = React.useCallback(
     async (id: string) => {
-      const status = DAG.Status?.Status;
-      if (status == SchedulerStatus.Running || status == SchedulerStatus.None) {
+      const status = run.status;
+      if (status == Status.Running || status == Status.NotStarted) {
         return;
       }
       // find the clicked step
-      const n = DAG.Status?.Nodes.find(
-        (n) => n.Step.Name.replace(/\s/g, '_') == id
-      );
+      const n = run.nodes.find((n) => n.step.name.replace(/\s/g, '_') == id);
       if (n) {
-        setSelectedStep(n.Step);
+        setSelectedStep(n.step);
         setModal(true);
       }
     },
-    [DAG]
+    [run]
   );
   const [cookie, setCookie] = useCookies(['flowchart']);
   const [flowchart, setFlowchart] = React.useState(cookie['flowchart']);
@@ -63,10 +64,10 @@ function DAGStatus({ DAG, name, refresh }: Props) {
     setFlowchart(value);
   };
 
-  if (!DAG.Status) {
+  if (!run.status) {
     return null;
   }
-  const handlers = Handlers(DAG.Status);
+  const handlers = getEventHandlers(run);
 
   return (
     <React.Fragment>
@@ -115,15 +116,15 @@ function DAGStatus({ DAG, name, refresh }: Props) {
           >
             {sub == '0' ? (
               <Graph
-                steps={DAG.Status.Nodes}
+                steps={run.nodes}
                 type="status"
                 flowchart={flowchart}
                 onClickNode={onSelectStepOnGraph}
-                showIcons={DAG.Status.Status != SchedulerStatus.None}
-                animate={DAG.Status.Status == SchedulerStatus.Running}
+                showIcons={run.status > Status.NotStarted}
+                animate={run.status == Status.Running}
               ></Graph>
             ) : (
-              <TimelineChart status={DAG.Status}></TimelineChart>
+              <TimelineChart status={run}></TimelineChart>
             )}
           </Box>
         </BorderedBox>
@@ -136,7 +137,7 @@ function DAGStatus({ DAG, name, refresh }: Props) {
               <Box sx={{ mt: 3 }}>
                 <Box sx={{ mt: 2 }}>
                   <DAGStatusOverview
-                    status={DAG.Status}
+                    status={run}
                     {...props}
                   ></DAGStatusOverview>
                 </Box>
@@ -146,8 +147,8 @@ function DAGStatus({ DAG, name, refresh }: Props) {
                 <SubTitle>Steps</SubTitle>
                 <Box sx={{ mt: 2 }}>
                   <NodeStatusTable
-                    nodes={DAG.Status!.Nodes}
-                    status={DAG.Status!}
+                    nodes={run.nodes}
+                    status={run}
                     {...props}
                   ></NodeStatusTable>
                 </Box>
@@ -159,7 +160,7 @@ function DAGStatus({ DAG, name, refresh }: Props) {
                   <Box sx={{ mt: 2 }}>
                     <NodeStatusTable
                       nodes={handlers}
-                      status={DAG.Status!}
+                      status={run}
                       {...props}
                     ></NodeStatusTable>
                   </Box>

@@ -1,6 +1,5 @@
 import React from 'react';
 import { Box, Grid } from '@mui/material';
-import { SchedulerStatus } from '../models';
 import { statusColorMapping } from '../consts';
 import DashboardMetric from '../components/molecules/DashboardMetric';
 import DashboardTimeChart from '../components/molecules/DashboardTimechart';
@@ -8,13 +7,14 @@ import Title from '../components/atoms/Title';
 import { AppBarContext } from '../contexts/AppBarContext';
 import { useConfig } from '../contexts/ConfigContext';
 import { useQuery } from '../hooks/api';
+import { Status } from '../api/v2/schema';
 
-type metrics = Record<SchedulerStatus, number>;
+type metrics = Record<Status, number>;
 
 const defaultMetrics: metrics = {} as metrics;
-for (const value in SchedulerStatus) {
+for (const value in Status) {
   if (!isNaN(Number(value))) {
-    const status = Number(value) as SchedulerStatus;
+    const status = Number(value) as Status;
     defaultMetrics[status] = 0;
   }
 }
@@ -22,20 +22,18 @@ for (const value in SchedulerStatus) {
 function Dashboard() {
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
-  const queryParams = {
-    perPage: config.maxDashboardPageLimit || 200,
-    remoteNode: appBarContext.selectedRemoteNode || 'local',
-  };
-  if (appBarContext.selectedRemoteNode) {
-    queryParams.remoteNode = appBarContext.selectedRemoteNode;
-  }
   const { data } = useQuery('/dags', {
-    params: { query: queryParams },
+    params: {
+      query: {
+        perPage: config.maxDashboardPageLimit || 200,
+        remoteNode: appBarContext.selectedRemoteNode || 'local',
+      },
+    },
   });
 
   const metrics = { ...defaultMetrics };
   data?.dags.forEach((dag) => {
-    metrics[dag.latestRun.status] += 1;
+    metrics[dag.latestRun.status]! += 1;
   });
 
   React.useEffect(() => {
@@ -46,11 +44,11 @@ function Dashboard() {
     <Grid container spacing={3} sx={{ mx: 2, width: '100%' }}>
       {(
         [
-          [SchedulerStatus.Success, 'Successful'],
-          [SchedulerStatus.Error, 'Failed'],
-          [SchedulerStatus.Running, 'Running'],
-          [SchedulerStatus.Cancel, 'Canceled'],
-        ] as Array<[SchedulerStatus, string]>
+          [Status.Success, 'Successful'],
+          [Status.Failed, 'Failed'],
+          [Status.Running, 'Running'],
+          [Status.Cancelled, 'Canceled'],
+        ] as Array<[Status, string]>
       ).map(([status, label]) => (
         <Grid item xs={12} md={4} lg={3} key={label}>
           <Box

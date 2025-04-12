@@ -1,9 +1,6 @@
 import React, { CSSProperties } from 'react';
 import { stepTabColStyles } from '../../consts';
 import { useDAGPostAPI } from '../../hooks/useDAGPostAPI';
-import { Node } from '../../models';
-import { SchedulerStatus, Status } from '../../models';
-import { Step } from '../../models';
 import NodeStatusTableRow from './NodeStatusTableRow';
 import StatusUpdateModal from './StatusUpdateModal';
 import {
@@ -14,35 +11,41 @@ import {
   TableRow,
 } from '@mui/material';
 import BorderedBox from '../atoms/BorderedBox';
+import { components, Status } from '../../api/v2/schema';
 
 type Props = {
-  nodes?: Node[];
+  nodes?: components['schemas']['Node'][];
   file?: string;
-  status: Status;
+  status: components['schemas']['RunDetails'];
   name: string;
   refresh: () => void;
 };
 
 function NodeStatusTable({ nodes, status, name, refresh, file = '' }: Props) {
   const [modal, setModal] = React.useState(false);
-  const [current, setCurrent] = React.useState<Step | undefined>(undefined);
+  const [current, setCurrent] = React.useState<
+    components['schemas']['Step'] | undefined
+  >(undefined);
   const { doPost } = useDAGPostAPI({
     name,
     onSuccess: refresh,
-    requestId: status.RequestId,
+    requestId: status.requestId,
   });
-  const requireModal = (step: Step) => {
+  const requireModal = (step: components['schemas']['Step']) => {
     if (
-      status?.Status != SchedulerStatus.Running &&
-      status?.Status != SchedulerStatus.None
+      status?.status != Status.Running &&
+      status?.status != Status.NotStarted
     ) {
       setCurrent(step);
       setModal(true);
     }
   };
   const dismissModal = () => setModal(false);
-  const onUpdateStatus = async (step: Step, action: string) => {
-    doPost(action, step.Name);
+  const onUpdateStatus = async (
+    step: components['schemas']['Step'],
+    action: string
+  ) => {
+    doPost(action, step.name);
     dismissModal();
     refresh();
   };
@@ -72,7 +75,7 @@ function NodeStatusTable({ nodes, status, name, refresh, file = '' }: Props) {
           <TableBody>
             {nodes.map((n, idx) => (
               <NodeStatusTableRow
-                key={n.Step.Name}
+                key={n.step.name}
                 rownum={idx + 1}
                 node={n}
                 file={file}
