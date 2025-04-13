@@ -29,7 +29,7 @@ func TestClient_GetStatus(t *testing.T) {
 
 		requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
 		socketServer, _ := sock.NewServer(
-			dag.SockAddr(),
+			dag.SockAddr(requestID),
 			func(w http.ResponseWriter, _ *http.Request) {
 				status := persistence.NewStatusFactory(dag.DAG).Create(
 					requestID, scheduler.StatusRunning, 0, time.Now(),

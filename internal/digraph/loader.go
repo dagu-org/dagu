@@ -145,7 +145,12 @@ func LoadBaseConfig(ctx BuildContext, file string) (*DAG, error) {
 	}
 
 	ctx = ctx.WithOpts(BuildOpts{NoEval: ctx.opts.NoEval}).WithFile(file)
-	return build(ctx, def)
+	dag, err := build(ctx, def)
+
+	if err != nil {
+		return nil, ErrorList{err}
+	}
+	return dag, nil
 }
 
 // loadDAG loads the DAG from the given file.
@@ -178,6 +183,7 @@ func loadDAG(ctx BuildContext, dag string) (*DAG, error) {
 	}
 
 	// Merge the target DAG into the dest DAG.
+	dest.Location = "" // No need to set the location for the base config.
 	err = merge(dest, target)
 	if err != nil {
 		return nil, err
@@ -191,6 +197,9 @@ func loadDAG(ctx BuildContext, dag string) (*DAG, error) {
 // defaultName returns the default name for the given file.
 // The default name is the filename without the extension.
 func defaultName(file string) string {
+	if file == "" {
+		return ""
+	}
 	return strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 }
 

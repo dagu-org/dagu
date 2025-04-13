@@ -35,15 +35,15 @@ func (a *API) CreateDAG(ctx context.Context, request api.CreateDAGRequestObject)
 
 // DeleteDAG implements api.StrictServerInterface.
 func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject) (api.DeleteDAGResponseObject, error) {
-	_, err := a.client.GetStatus(ctx, request.Name)
+	_, err := a.client.GetStatus(ctx, request.DagName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
 			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("DAG %s not found", request.Name),
+			Message:    fmt.Sprintf("DAG %s not found", request.DagName),
 		}
 	}
-	if err := a.client.DeleteDAG(ctx, request.Name); err != nil {
+	if err := a.client.DeleteDAG(ctx, request.DagName); err != nil {
 		return nil, fmt.Errorf("error deleting DAG: %w", err)
 	}
 	return &api.DeleteDAG204Response{}, nil
@@ -51,13 +51,13 @@ func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject)
 
 // GetDAGSpec implements api.StrictServerInterface.
 func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObject) (api.GetDAGSpecResponseObject, error) {
-	spec, err := a.client.GetDAGSpec(ctx, request.Name)
+	spec, err := a.client.GetDAGSpec(ctx, request.DagName)
 	if err != nil {
 		return nil, err
 	}
 
 	// Validate the spec
-	dag, err := a.client.LoadYAML(ctx, []byte(spec), digraph.WithName(request.Name))
+	dag, err := a.client.LoadYAML(ctx, []byte(spec), digraph.WithName(request.DagName))
 	var errs []string
 
 	var loadErrs digraph.ErrorList
@@ -76,16 +76,16 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 
 // UpdateDAGSpec implements api.StrictServerInterface.
 func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecRequestObject) (api.UpdateDAGSpecResponseObject, error) {
-	_, err := a.client.GetStatus(ctx, request.Name)
+	_, err := a.client.GetStatus(ctx, request.DagName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
 			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("DAG %s not found", request.Name),
+			Message:    fmt.Sprintf("DAG %s not found", request.DagName),
 		}
 	}
 
-	err = a.client.UpdateDAG(ctx, request.Name, request.Body.Spec)
+	err = a.client.UpdateDAG(ctx, request.DagName, request.Body.Spec)
 	var errs []string
 
 	var loadErrs digraph.ErrorList
@@ -107,7 +107,7 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 // GetDAGRuns implements api.StrictServerInterface.
 func (a *API) GetDAGRunHistory(ctx context.Context, request api.GetDAGRunHistoryRequestObject) (api.GetDAGRunHistoryResponseObject, error) {
 	defaultHistoryLimit := 30
-	recentRuns := a.client.GetRecentHistory(ctx, request.Name, defaultHistoryLimit)
+	recentRuns := a.client.GetRecentHistory(ctx, request.DagName, defaultHistoryLimit)
 
 	var runs []api.RunDetails
 	for _, log := range recentRuns {
@@ -123,7 +123,7 @@ func (a *API) GetDAGRunHistory(ctx context.Context, request api.GetDAGRunHistory
 
 // GetDAGDetails implements api.StrictServerInterface.
 func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsRequestObject) (api.GetDAGDetailsResponseObject, error) {
-	name := request.Name
+	name := request.DagName
 
 	status, err := a.client.GetStatus(ctx, name)
 	if err != nil {
@@ -229,31 +229,6 @@ func (a *API) readHistoryData(
 }
 
 /*
-func (a *API) readLog(
-	ctx context.Context,
-	dag *digraph.DAG,
-	reqID string,
-) (*api.SchedulerLog, error) {
-	status, err := a.readStatus(ctx, dag, reqID)
-	if err != nil {
-		return nil, err
-	}
-
-	logFile := status.Log
-
-	content, err := readFileContent(logFile, nil)
-	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %w", logFile, err)
-	}
-
-	return &api.SchedulerLog{
-		LogFile: logFile,
-		Content: string(content),
-	}, nil
-}
-*/
-
-/*
 func (a *API) readStepLog(
 	ctx context.Context,
 	dag *digraph.DAG,
@@ -321,23 +296,6 @@ func (a *API) readStatus(ctx context.Context, dag *digraph.DAG, reqID string) (*
 		return nil, err
 	}
 	return &status, nil
-}
-
-func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
-	if decoder == nil {
-		return os.ReadFile(f) //nolint:gosec
-	}
-
-	r, err := os.Open(f) //nolint:gosec
-	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %w", f, err)
-	}
-	defer func() {
-		_ = r.Close()
-	}()
-	tr := transform.NewReader(r, decoder)
-	ret, err := io.ReadAll(tr)
-	return ret, err
 }
 
 */
@@ -416,7 +374,7 @@ func (a *API) ListTags(ctx context.Context, _ api.ListTagsRequestObject) (api.Li
 
 // GetDAGRunStatus implements api.StrictServerInterface.
 func (a *API) GetDAGRunStatus(ctx context.Context, request api.GetDAGRunStatusRequestObject) (api.GetDAGRunStatusResponseObject, error) {
-	dagName := request.Name
+	dagName := request.DagName
 	requestId := request.RequestId
 
 	dagWithStatus, err := a.client.GetStatus(ctx, dagName)
@@ -446,7 +404,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 
 	var status client.DAGStatus
 	if action != api.DAGActionSave {
-		s, err := a.client.GetStatus(ctx, request.Name)
+		s, err := a.client.GetStatus(ctx, request.DagName)
 		if err != nil {
 			return nil, err
 		}
@@ -476,7 +434,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "Invalid value for suspend, must be true or false",
 			}
 		}
-		if err := a.client.ToggleSuspend(ctx, request.Name, b); err != nil {
+		if err := a.client.ToggleSuspend(ctx, request.DagName, b); err != nil {
 			return nil, fmt.Errorf("error toggling suspend: %w", err)
 		}
 		return api.PostDAGAction200JSONResponse{}, nil
@@ -552,7 +510,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 			}
 		}
 
-		if err := a.client.UpdateDAG(ctx, request.Name, *request.Body.Value); err != nil {
+		if err := a.client.UpdateDAG(ctx, request.DagName, *request.Body.Value); err != nil {
 			return nil, err
 		}
 
@@ -568,7 +526,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 		}
 
 		newName := *request.Body.Value
-		if err := a.client.Rename(ctx, request.Name, newName); err != nil {
+		if err := a.client.Rename(ctx, request.DagName, newName); err != nil {
 			return nil, fmt.Errorf("error renaming DAG: %w", err)
 		}
 
