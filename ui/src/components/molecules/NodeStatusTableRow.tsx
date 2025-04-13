@@ -10,7 +10,7 @@ import { components } from '../../api/v2/schema';
 type Props = {
   rownum: number;
   node: components['schemas']['Node'];
-  file: string;
+  requestId?: string;
   name: string;
   onRequireModal: (step: components['schemas']['Step']) => void;
 };
@@ -19,7 +19,7 @@ function NodeStatusTableRow({
   name,
   rownum,
   node,
-  file,
+  requestId,
   onRequireModal,
 }: Props) {
   const searchParams = new URLSearchParams();
@@ -27,8 +27,8 @@ function NodeStatusTableRow({
   if (node.step) {
     searchParams.set('step', node.step.name);
   }
-  if (file) {
-    searchParams.set('file', file);
+  if (requestId) {
+    searchParams.set('requestId', requestId);
   }
 
   const url = `/dags/${name}/log?${searchParams.toString()}`;

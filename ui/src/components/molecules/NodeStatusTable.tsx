@@ -15,13 +15,12 @@ import { components, Status } from '../../api/v2/schema';
 
 type Props = {
   nodes?: components['schemas']['Node'][];
-  file?: string;
   status: components['schemas']['RunDetails'];
   name: string;
   refresh: () => void;
 };
 
-function NodeStatusTable({ nodes, status, name, refresh, file = '' }: Props) {
+function NodeStatusTable({ nodes, status, name, refresh }: Props) {
   const [modal, setModal] = React.useState(false);
   const [current, setCurrent] = React.useState<
     components['schemas']['Step'] | undefined
@@ -78,7 +77,7 @@ function NodeStatusTable({ nodes, status, name, refresh, file = '' }: Props) {
                 key={n.step.name}
                 rownum={idx + 1}
                 node={n}
-                file={file}
+                requestId={status.requestId}
                 name={name}
                 onRequireModal={requireModal}
               ></NodeStatusTableRow>

@@ -126,6 +126,10 @@ func (a *API) handleError(w http.ResponseWriter, _ *http.Request, err error) {
 		code = api.ErrorCodeNotFound
 		message = "Request ID not found"
 
+	case errors.Is(err, persistence.ErrDAGAlreadyExists):
+		code = api.ErrorCodeAlreadyExists
+		message = "DAG already exists"
+
 	}
 
 	w.Header().Set("Content-Type", "application/json")

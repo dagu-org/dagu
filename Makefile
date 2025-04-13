@@ -265,7 +265,7 @@ build-ui:
 golangci-lint:
 	@echo "${COLOR_GREEN}Running linter...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_golangci_lint)
-	@${LOCAL_BIN_DIR}/golangci-lint run ./...
+	@${LOCAL_BIN_DIR}/golangci-lint run --fix ./...
 
 # clean-swagger removes generated go files for swagger.
 .PHONY: clean-swagger

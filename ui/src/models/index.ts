@@ -1,6 +1,5 @@
 import cronParser from 'cron-parser';
 import moment from 'moment-timezone';
-import { WorkflowListItem } from './api';
 import { components } from '../api/v2/schema';
 
 export type Status = {
@@ -21,7 +20,7 @@ export type Status = {
 };
 
 export function getEventHandlers(s: components['schemas']['RunDetails']) {
-  const ret = [];
+  const ret: components['schemas']['Node'][] = [];
   if (s.onSuccess) {
     ret.push(s.onSuccess);
   }
@@ -87,29 +86,10 @@ export enum DAGDataType {
   Group,
 }
 
-export type DAGItem = DAGData | DAGGroup;
-
-export type DAGData = {
-  Type: DAGDataType.DAG;
-  Name: string;
-  DAGStatus: WorkflowListItem;
-};
-
 export type DAGGroup = {
   Type: DAGDataType.Group;
   Name: string;
 };
-
-export function getFirstTag(data?: DAGItem): string {
-  if (!data) {
-    return '';
-  }
-  if (data.Type == DAGDataType.DAG) {
-    const tags = data.DAGStatus.DAG.Tags;
-    return tags ? tags[0] || '' : '';
-  }
-  return '';
-}
 
 // export function getStatus(data?: DAGItem): SchedulerStatus {
 //   if (!data) {
@@ -120,23 +100,6 @@ export function getFirstTag(data?: DAGItem): string {
 //   }
 //   return SchedulerStatus.None;
 // }
-
-type KeysMatching<T extends object, V> = {
-  [K in keyof T]-?: T[K] extends V ? K : never;
-}[keyof T];
-
-export function getStatusField(
-  field: KeysMatching<Status, string>,
-  data?: DAGItem
-): string {
-  if (!data) {
-    return '';
-  }
-  if (data.Type == DAGDataType.DAG) {
-    return data.DAGStatus.Status?.[field] || '';
-  }
-  return '';
-}
 
 export function getNextSchedule(
   data: components['schemas']['DAGFile']

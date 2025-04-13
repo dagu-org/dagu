@@ -8,13 +8,13 @@ import { components } from '../../api/v2/schema';
 type Props = {
   status?: components['schemas']['RunDetails'];
   name: string;
-  file?: string;
+  requestId?: string;
 };
 
-function DAGStatusOverview({ status, name, file = '' }: Props) {
+function DAGStatusOverview({ status, name, requestId = '' }: Props) {
   const searchParams = new URLSearchParams();
-  if (file) {
-    searchParams.set('file', file);
+  if (requestId) {
+    searchParams.set('requestId', requestId);
   }
   const url = `/dags/${name}/scheduler-log?${searchParams.toString()}`;
   if (!status) {

@@ -4,9 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -16,8 +14,6 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence"
-	"golang.org/x/text/encoding"
-	"golang.org/x/text/transform"
 )
 
 // CreateDAG implements api.StrictServerInterface.
@@ -154,7 +150,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 }
 
 func (a *API) readHistoryData(
-	ctx context.Context,
+	_ context.Context,
 	recentRuns []persistence.Run,
 ) []api.DAGLogGridItem {
 	data := map[string][]scheduler.NodeStatus{}
@@ -312,7 +308,6 @@ func (a *API) readStepLog(
 		Content: string(logContent),
 	}, nil
 }
-*/
 
 func (a *API) readStatus(ctx context.Context, dag *digraph.DAG, reqID string) (*persistence.Status, error) {
 	// If a request ID is provided, fetch the status by request ID.
@@ -344,6 +339,8 @@ func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
 	ret, err := io.ReadAll(tr)
 	return ret, err
 }
+
+*/
 
 // ListDAGs implements api.StrictServerInterface.
 func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (api.ListDAGsResponseObject, error) {
