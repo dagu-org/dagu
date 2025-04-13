@@ -95,7 +95,7 @@ func (e *client) Rename(ctx context.Context, oldID, newID string) error {
 
 func (e *client) Stop(ctx context.Context, dag *digraph.DAG) error {
 	logger.Info(ctx, "Stopping", "name", dag.Name)
-	addr := dag.SockAddr()
+	addr := dag.SockAddr("") // FIXME: Should handle the case of dynamic DAG
 	if !fileutil.FileExists(addr) {
 		logger.Info(ctx, "The DAG is not running", "name", dag.Name)
 		return nil
@@ -173,7 +173,8 @@ func (e *client) Retry(_ context.Context, dag *digraph.DAG, requestID string) er
 }
 
 func (*client) GetCurrentStatus(_ context.Context, dag *digraph.DAG) (*persistence.Status, error) {
-	client := sock.NewClient(dag.SockAddr())
+	// FIXME: Should handle the case of dynamic DAG
+	client := sock.NewClient(dag.SockAddr(""))
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
@@ -210,7 +211,8 @@ func (e *client) GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, req
 }
 
 func (*client) currentStatus(_ context.Context, dag *digraph.DAG) (*persistence.Status, error) {
-	client := sock.NewClient(dag.SockAddr())
+	// FIXME: Should handle the case of dynamic DAG
+	client := sock.NewClient(dag.SockAddr(""))
 	statusJSON, err := client.Request("GET", "/status")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get status: %w", err)
@@ -266,7 +268,8 @@ func (e *client) GetRecentHistory(ctx context.Context, name string, n int) []per
 var errDAGIsRunning = errors.New("the DAG is running")
 
 func (e *client) UpdateStatus(ctx context.Context, dag *digraph.DAG, status persistence.Status) error {
-	client := sock.NewClient(dag.SockAddr())
+	// FIXME: Should handle the case of dynamic DAG
+	client := sock.NewClient(dag.SockAddr(""))
 
 	res, err := client.Request("GET", "/status")
 	if err != nil {

@@ -99,9 +99,17 @@ func (s DAGStatus) ErrorAsString() string {
 func newDAGStatus(
 	dag *digraph.DAG, status persistence.Status, suspended bool, err error,
 ) DAGStatus {
+	var (
+		file string
+		dir  string
+	)
+	if dag.Location != "" {
+		file = dag.Location
+		dir = filepath.Dir(dag.Location)
+	}
 	return DAGStatus{
-		File:      filepath.Base(dag.Location),
-		Dir:       filepath.Dir(dag.Location),
+		File:      file,
+		Dir:       dir,
 		DAG:       dag,
 		Status:    status,
 		Suspended: suspended,

@@ -24,7 +24,7 @@ servers:
 tags:
   - name: "dags"
     description: "Operations for managing and executing DAGs (Directed Acyclic Graphs)"
-  - name: "history"
+  - name: "runs"
     description: "Operations for retrieving historical data and logs of DAG runs"
   - name: "system"
     description: "System operations for monitoring and managing the Dagu server"
@@ -139,7 +139,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-  /dags/{name}:
+  /dags/{dagName}:
     get:
       summary: "Get DAG details"
       description: "Returns details of a DAG, including files, logs, and status"
@@ -189,12 +189,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - name: "name"
-          in: "path"
-          required: true
-          schema:
-            type: "string"
-          description: "The name of the DAG"
+        - $ref: "#/components/parameters/DAGName"
       requestBody:
         required: true
         content:
@@ -241,12 +236,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - name: "name"
-          in: "path"
-          required: true
-          schema:
-            type: "string"
-          description: "The name of the DAG"
+        - $ref: "#/components/parameters/DAGName"
       responses:
         "204":
           description: "DAG successfully deleted"
@@ -263,7 +253,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{name}/runs:
+  /dags/{dagName}/runs:
     get:
       summary: "Get history of DAG runs"
       description: "Returns the history of runs for a specific DAG"
@@ -301,7 +291,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{name}/runs/{requestId}:
+  /dags/{dagName}/runs/{requestId}:
     get:
       summary: "Get latest run status"
       description: "Returns the status of the latest run for a specific DAG"
@@ -310,18 +300,8 @@ paths:
       operationId: "getDAGRunStatus"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - name: "name"
-          in: "path"
-          required: true
-          schema:
-            $ref: "#/components/schemas/DAGName"
-          description: "The name of the DAG"
-        - name: "requestId"
-          in: "path"
-          required: true
-          schema:
-            $ref: "#/components/schemas/RequestId"
-          description: "The request ID of the DAG run or latest run if specified as 'latest'"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/RequestId"
       responses:
         "200":
           description: "A successful response"
@@ -341,7 +321,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{name}/spec:
+  /dags/{dagName}/spec:
     get:
       summary: "Get DAG Spec"
       description: "Returns the spec of the DAG"
@@ -491,6 +471,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /runs/{dagName}/{requestId}/log:
+    get:
+      summary: "Get content of a log file"
+      description: "Returns the content of a log file for a specific run"
+      operationId: "getRunLog"
+      tags:
+        - "runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Log"
+        "404":
+          description: "Log file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   securitySchemes:
     basicAuth:
@@ -524,7 +535,7 @@ components:
         default: 50
 
     DAGName:
-      name: name
+      name: dagName
       in: path
       description: name of the DAG
       required: true
@@ -539,6 +550,14 @@ components:
       schema:
         type: string
         default: "local"
+
+    RequestId:
+      name: requestId
+      in: path
+      description: request ID of the DAG run or latest run if specified as 'latest'
+      required: true
+      schema:
+        $ref: "#/components/schemas/RequestId"
 
   schemas:
     Error:
@@ -1110,19 +1129,15 @@ components:
     #     - logFile
     #     - content
 
-    # SchedulerLog:
-    #   type: object
-    #   description: "Log information for the scheduler"
-    #   properties:
-    #     logFile:
-    #       type: string
-    #       description: "Path to the scheduler log file"
-    #     content:
-    #       type: string
-    #       description: "Log content"
-    #   required:
-    #     - logFile
-    #     - content
+    Log:
+      type: object
+      description: "Log information for the scheduler"
+      properties:
+        content:
+          type: string
+          description: "Log content"
+      required:
+        - content
 
     # DAGHistoryData:
     #   type: object

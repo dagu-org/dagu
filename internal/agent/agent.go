@@ -509,7 +509,7 @@ func (a *Agent) setupSocketServer(ctx context.Context) error {
 		// Use separate socket address for sub-DAGs to allow them run concurrently.
 		socketAddr = a.dag.SockAddrSub(a.requestID)
 	} else {
-		socketAddr = a.dag.SockAddr()
+		socketAddr = a.dag.SockAddr(a.requestID)
 	}
 	socketServer, err := sock.NewServer(socketAddr, a.HandleHTTP(ctx))
 	if err != nil {
@@ -544,7 +544,7 @@ func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
 		return err
 	}
 	if status.Status != scheduler.StatusNone {
-		return fmt.Errorf("the DAG is already running. status=%s, socket=%s", status.Status, a.dag.SockAddr())
+		return fmt.Errorf("the DAG is already running. status=%s, socket=%s", status.Status, a.dag.SockAddr(a.requestID))
 	}
 	return nil
 }
