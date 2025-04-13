@@ -1,7 +1,5 @@
 import moment from 'moment';
 import React, { CSSProperties } from 'react';
-import { GridData } from '../../models/api';
-import { StatusFile } from '../../models';
 import HistoryTableRow from './HistoryTableRow';
 import {
   Table,
@@ -11,32 +9,32 @@ import {
   TableRow,
 } from '@mui/material';
 import BorderedBox from '../atoms/BorderedBox';
+import { components } from '../../api/v2/schema';
 
 type Props = {
-  logs: StatusFile[];
-  gridData: GridData[];
+  runs: components['schemas']['RunDetails'][];
+  gridData: components['schemas']['DAGLogGridItem'][];
   onSelect: (idx: number) => void;
   idx: number;
 };
 
-function HistoryTable({ logs, gridData, onSelect, idx }: Props) {
+function HistoryTable({ runs, gridData, onSelect, idx }: Props) {
   return (
     <BorderedBox>
       <Table size="small" sx={tableStyle}>
         <TableHead>
           <TableRow>
             <TableCell></TableCell>
-            {logs.map((_, i) => {
+            {runs.map((_, i) => {
               let date;
-              const startedAt = logs[i].Status.StartedAt;
+              const startedAt = runs[i].startedAt;
               if (startedAt && startedAt != '-') {
                 date = moment(startedAt).format('M/D');
               } else {
                 date = moment().format('M/D');
               }
               const flag =
-                i == 0 ||
-                moment(logs[i - 1].Status.StartedAt).format('M/D') != date;
+                i == 0 || moment(runs[i - 1].startedAt).format('M/D') != date;
               return (
                 <TableCell
                   key={`date-${i}`}
@@ -55,7 +53,7 @@ function HistoryTable({ logs, gridData, onSelect, idx }: Props) {
           {gridData.map((data) => {
             return (
               <HistoryTableRow
-                key={data.Name}
+                key={data.name}
                 data={data}
                 onSelect={onSelect}
                 idx={idx}

@@ -9,7 +9,6 @@ import DAGStepTable from '../molecules/DAGStepTable';
 import BorderedBox from '../atoms/BorderedBox';
 import SubTitle from '../atoms/SubTitle';
 import FlowchartSwitch from '../molecules/FlowchartSwitch';
-import createClient from 'openapi-fetch';
 import { useCookies } from 'react-cookie';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -18,18 +17,18 @@ import {
   faPenToSquare,
 } from '@fortawesome/free-solid-svg-icons';
 import { AppBarContext } from '../../contexts/AppBarContext';
-import { useMutate, useQuery } from '../../hooks/api';
+import { useQuery } from '../../hooks/api';
 import LoadingIndicator from '../atoms/LoadingIndicator';
-import { components, paths } from '../../api/v2/schema';
+import { components } from '../../api/v2/schema';
+import { useClient } from '../../hooks/api';
 
 type Props = {
   name: string;
 };
 
-const client = createClient<paths>({ baseUrl: getConfig().apiURL });
-
 function DAGSpec({ name }: Props) {
   const appBarContext = React.useContext(AppBarContext);
+  const client = useClient();
   const [editing, setEditing] = React.useState(false);
   const [currentValue, setCurrentValue] = React.useState<string | undefined>();
   const [cookie, setCookie] = useCookies(['flowchart']);
@@ -183,7 +182,7 @@ function DAGSpec({ name }: Props) {
                             alert('No changes to save');
                             return;
                           }
-                          const { error } = await client.PUT(
+                          const { error, response } = await client.PUT(
                             '/dags/{name}/spec',
                             {
                               params: {
@@ -200,9 +199,18 @@ function DAGSpec({ name }: Props) {
                               },
                             }
                           );
-                          if (error) {
-                            alert(error);
+                          if (response.status == 400) {
+                            type ValidationError = { errors: string[] };
+                            const validationError = error as ValidationError;
+                            alert(
+                              validationError.errors
+                                .map((e) => e.replace('spec.', ''))
+                                .join('\n')
+                            );
                             return;
+                          }
+                          if (response.status != 200) {
+                            alert(error || 'Failed to save spec');
                           }
                           setEditing(false);
                           mutate();

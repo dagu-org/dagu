@@ -15,6 +15,7 @@ import moment from 'moment-timezone';
 import { RunDetailsContext } from '../../../contexts/DAGStatusContext';
 import { useQuery } from '../../../hooks/api';
 import { components, Status } from '../../../api/v2/schema';
+import DAGExecutionHistory from '../../../components/organizations/DAGExecutionHistory';
 
 type Params = {
   name: string;
@@ -199,12 +200,9 @@ function DAGDetails() {
               />
             ) : null}
             {tab == 'spec' ? <DAGSpec name={params.name} /> : null}
-            {/* {tab == 'history' ? (
-              <ExecutionHistory
-                logData={data.LogData}
-                isLoading={isValidating}
-              />
-            ) : null} */}
+            {tab == 'history' ? (
+              <DAGExecutionHistory name={data.dag?.name || ''} />
+            ) : null}
             {/* {tab == 'scheduler-log' ? <ExecutionLog log={data.ScLog} /> : null}
             {tab == 'log' ? <ExecutionLog log={data.StepLog} /> : null} */}
           </Box>
