@@ -253,6 +253,36 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dags/{dagLocation}/start:
+    post:
+      summary: "Start a DAG"
+      description: "Starts a specific DAG by its location"
+      operationId: "startDAG"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGLocation"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                params:
+                  type: string
+                  description: "Parameters to pass to the DAG in JSON format"
+      responses:
+        "200":
+          description: "A successful response"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dags/{dagLocation}/runs:
     get:
       summary: "Get history of DAG runs"
