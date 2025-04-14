@@ -22,7 +22,7 @@ func TestOpenLogFile(t *testing.T) {
 			Paths: config.PathsConfig{LogDir: tempDir},
 		})
 
-		file, err := setup.OpenLogFile("test_", &digraph.DAG{
+		file, err := setup.OpenLogFile(&digraph.DAG{
 			Name:   "test_dag",
 			LogDir: "",
 		}, "12345678")
@@ -34,7 +34,6 @@ func TestOpenLogFile(t *testing.T) {
 		assert.NotNil(t, file)
 		assert.True(t, filepath.IsAbs(file.Name()))
 		assert.Contains(t, file.Name(), "test_dag")
-		assert.Contains(t, file.Name(), "test_")
 		assert.Contains(t, file.Name(), "12345678")
 	})
 }
@@ -98,14 +97,12 @@ func TestSetupLogDirectory(t *testing.T) {
 func TestBuildLogFilename(t *testing.T) {
 	t.Run("filename format", func(t *testing.T) {
 		config := cmd.LogFileSettings{
-			Prefix:    "test_",
 			DAGName:   "test dag",
 			RequestID: "12345678901234", // Longer than 8 chars to test truncation
 		}
 
 		filename := cmd.BuildLogFilename(config)
 
-		assert.Contains(t, filename, "test_")
 		assert.Contains(t, filename, "test_dag")
 		assert.Contains(t, filename, time.Now().Format("20060102"))
 		assert.Contains(t, filename, "12345678")  // Should be truncated

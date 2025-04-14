@@ -1,7 +1,7 @@
 import React from 'react';
 import { Chip } from '@mui/material';
 import { nodeStatusColorMapping } from '../../consts';
-import { NodeStatus } from '../../models';
+import { NodeStatus } from '../../api/v2/schema';
 
 type Props = {
   status: NodeStatus;
