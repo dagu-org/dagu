@@ -509,9 +509,11 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "DAG is already running",
 			}
 		}
-		a.client.StartAsync(ctx, status.DAG, client.StartOptions{
+		if err := a.client.Start(ctx, status.DAG, client.StartOptions{
 			Params: value(request.Body.Params),
-		})
+		}); err != nil {
+			return nil, fmt.Errorf("error starting DAG: %w", err)
+		}
 		return api.PostDAGAction200JSONResponse{}, nil
 
 	case api.DAGActionSuspend:

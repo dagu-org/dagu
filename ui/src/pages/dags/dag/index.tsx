@@ -125,7 +125,6 @@ function DAGDetails() {
                   dag={data.dag}
                   location={params.location!}
                   refresh={refreshFn}
-                  redirectTo={`${baseUrl}`}
                 />
               )}
             </RunDetailsContext.Consumer>

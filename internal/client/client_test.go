@@ -140,11 +140,12 @@ func TestClient_RunDAG(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "stop.yaml"))
 		ctx := th.Context
 
-		th.Client.StartAsync(ctx, dag.DAG, client.StartOptions{})
+		err := th.Client.Start(ctx, dag.DAG, client.StartOptions{})
+		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusRunning)
 
-		err := th.Client.Stop(ctx, dag.DAG)
+		err = th.Client.Stop(ctx, dag.DAG)
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusCancel)

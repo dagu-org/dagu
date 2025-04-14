@@ -1,14 +1,12 @@
 import { Box, Stack } from '@mui/material';
 import React from 'react';
 import ActionButton from '../atoms/ActionButton';
-import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlay, faStop, faReply } from '@fortawesome/free-solid-svg-icons';
 import VisuallyHidden from '../atoms/VisuallyHidden';
 import StartDAGModal from './StartDAGModal';
 import ConfirmModal from './ConfirmModal';
 import LabeledItem from '../atoms/LabeledItem';
-import { AppBarContext } from '../../contexts/AppBarContext';
 import { components } from '../../api/v2/schema';
 import { useClient, useMutate } from '../../hooks/api';
 
@@ -24,7 +22,6 @@ type Props = {
   location: string;
   dag?: components['schemas']['DAG'] | components['schemas']['DAGDetails'];
   label?: boolean;
-  redirectTo?: string;
   refresh?: () => void;
 };
 
@@ -33,17 +30,7 @@ function Label({ show, children }: LabelProps): JSX.Element {
   return <VisuallyHidden>{children}</VisuallyHidden>;
 }
 
-function DAGActions({
-  status,
-  location,
-  dag,
-  refresh,
-  redirectTo,
-  label = true,
-}: Props) {
-  const nav = useNavigate();
-  const appBarContext = React.useContext(AppBarContext);
-
+function DAGActions({ status, location, dag, refresh, label = true }: Props) {
   const [isStartModal, setIsStartModal] = React.useState(false);
   const [isStopModal, setIsStopModal] = React.useState(false);
   const [isRetryModal, setIsRetryModal] = React.useState(false);
@@ -52,41 +39,9 @@ function DAGActions({
   const mutate = useMutate();
   const reloadData = () => {
     mutate(['/dags/{dagLocation}']);
-    mutate(['/dags']);
+    mutate(['/dags/{dagLocation}/runs']);
     refresh && refresh();
   };
-
-  const onSubmit = React.useCallback(
-    async (params: {
-      name: string;
-      action: string;
-      requestId?: string;
-      params?: string;
-    }) => {
-      const url = `${getConfig().apiURL}/dags/${params.name}?remoteNode=${
-        appBarContext.selectedRemoteNode || 'local'
-      }`;
-      const ret = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors',
-        body: JSON.stringify(params),
-      });
-      if (redirectTo) {
-        nav(redirectTo);
-        refresh && refresh();
-        return;
-      }
-      if (!ret.ok) {
-        const e = await ret.text();
-        alert(e || 'Failed to submit');
-      }
-      refresh && refresh();
-    },
-    [refresh]
-  );
 
   const buttonState = {
     start: status?.status != 1,
@@ -172,13 +127,22 @@ function DAGActions({
         buttonText="Rerun"
         visible={isRetryModal}
         dismissModal={() => setIsRetryModal(false)}
-        onSubmit={() => {
+        onSubmit={async () => {
           setIsRetryModal(false);
-          onSubmit({
-            name: location,
-            action: 'retry',
-            requestId: status?.requestId,
+          const { error } = await client.POST('/dags/{dagLocation}/retry', {
+            params: {
+              path: {
+                dagLocation: location,
+              },
+            },
+            body: {
+              requestId: status?.requestId || '',
+            },
           });
+          if (error) {
+            alert(error.message);
+          }
+          reloadData();
         }}
       >
         <Stack direction="column">

@@ -11,6 +11,8 @@ import (
 
 // HistoryStore manages execution history records for DAGs
 type HistoryStore interface {
+	// NewRetryRecord creates a new history record for a retry of a DAG run
+	NewRetryRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string) (Record, error)
 	// NewRecord creates a new history record for a DAG run
 	NewRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string) (Record, error)
 	// NewSubRecord creates a new history record for a sub-DAG run

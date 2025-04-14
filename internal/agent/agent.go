@@ -499,6 +499,10 @@ func (a *Agent) setupHistoryRecord(ctx context.Context) (persistence.Record, err
 		return a.historyStore.NewSubRecord(ctx, a.dag, time.Now(), a.requestID, a.rootDAG)
 	}
 
+	if a.retryTarget != nil {
+		return a.historyStore.NewRetryRecord(ctx, a.dag, time.Now(), a.requestID)
+	}
+
 	return a.historyStore.NewRecord(ctx, a.dag, time.Now(), a.requestID)
 }
 

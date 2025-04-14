@@ -12,6 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/frontend/auth"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
@@ -98,7 +99,7 @@ func (a *API) ConfigureRoutes(r chi.Router, baseURL string) error {
 	return nil
 }
 
-func (a *API) handleError(w http.ResponseWriter, _ *http.Request, err error) {
+func (a *API) handleError(w http.ResponseWriter, r *http.Request, err error) {
 	code := api.ErrorCodeInternalError
 	message := "An unexpected error occurred"
 	httpStatusCode := http.StatusInternalServerError
@@ -130,6 +131,9 @@ func (a *API) handleError(w http.ResponseWriter, _ *http.Request, err error) {
 		code = api.ErrorCodeAlreadyExists
 		message = "DAG already exists"
 
+	}
+	if httpStatusCode == http.StatusInternalServerError {
+		logger.Errorf(r.Context(), "Internal server error: %v", err)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -105,14 +105,6 @@ func (e *client) Stop(ctx context.Context, dag *digraph.DAG) error {
 	return err
 }
 
-func (e *client) StartAsync(ctx context.Context, dag *digraph.DAG, opts StartOptions) {
-	go func() {
-		if err := e.Start(ctx, dag, opts); err != nil {
-			logger.Error(ctx, "DAG start operation failed", "err", err)
-		}
-	}()
-}
-
 func (e *client) Start(_ context.Context, dag *digraph.DAG, opts StartOptions) error {
 	args := []string{"start"}
 	if opts.Params != "" {
@@ -131,11 +123,7 @@ func (e *client) Start(_ context.Context, dag *digraph.DAG, opts StartOptions) e
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	err := cmd.Start()
-	if err != nil {
-		return err
-	}
-	return cmd.Wait()
+	return cmd.Start()
 }
 
 func (e *client) Restart(_ context.Context, dag *digraph.DAG, opts RestartOptions) error {
@@ -149,11 +137,7 @@ func (e *client) Restart(_ context.Context, dag *digraph.DAG, opts RestartOption
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	cmd.Dir = e.workDir
 	cmd.Env = os.Environ()
-	err := cmd.Start()
-	if err != nil {
-		return err
-	}
-	return cmd.Wait()
+	return cmd.Start()
 }
 
 func (e *client) Retry(_ context.Context, dag *digraph.DAG, requestID string) error {
@@ -165,11 +149,7 @@ func (e *client) Retry(_ context.Context, dag *digraph.DAG, requestID string) er
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	cmd.Dir = e.workDir
 	cmd.Env = os.Environ()
-	err := cmd.Start()
-	if err != nil {
-		return err
-	}
-	return cmd.Wait()
+	return cmd.Start()
 }
 
 func (*client) GetCurrentStatus(_ context.Context, dag *digraph.DAG) (*persistence.Status, error) {
