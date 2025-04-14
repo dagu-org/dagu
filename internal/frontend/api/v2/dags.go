@@ -106,8 +106,17 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 
 // GetDAGRuns implements api.StrictServerInterface.
 func (a *API) GetDAGRunHistory(ctx context.Context, request api.GetDAGRunHistoryRequestObject) (api.GetDAGRunHistoryResponseObject, error) {
+	status, err := a.client.GetStatus(ctx, request.DagName)
+	if err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("DAG %s not found", request.DagName),
+		}
+	}
+
 	defaultHistoryLimit := 30
-	recentRuns := a.client.GetRecentHistory(ctx, request.DagName, defaultHistoryLimit)
+	recentRuns := a.client.GetRecentHistory(ctx, status.DAG.Name, defaultHistoryLimit)
 
 	var runs []api.RunDetails
 	for _, log := range recentRuns {
@@ -625,6 +634,7 @@ func toDAG(dag *digraph.DAG) api.DAG {
 
 	return api.DAG{
 		Name:          dag.Name,
+		Location:      dag.GetLocation(),
 		Group:         ptr(dag.Group),
 		Description:   ptr(dag.Description),
 		Params:        ptr(dag.Params),
@@ -759,6 +769,7 @@ func toDAGDetails(dag *digraph.DAG) *api.DAGDetails {
 
 	return &api.DAGDetails{
 		Name:              dag.Name,
+		Location:          dag.GetLocation(),
 		Description:       ptr(dag.Description),
 		DefaultParams:     ptr(dag.DefaultParams),
 		Delay:             ptr(int(dag.Delay.Seconds())),
@@ -766,7 +777,6 @@ func toDAGDetails(dag *digraph.DAG) *api.DAGDetails {
 		Group:             ptr(dag.Group),
 		HandlerOn:         ptr(handlerOn),
 		HistRetentionDays: ptr(dag.HistRetentionDays),
-		Location:          ptr(dag.Location),
 		LogDir:            ptr(dag.LogDir),
 		MaxActiveRuns:     ptr(dag.MaxActiveRuns),
 		Params:            ptr(dag.Params),

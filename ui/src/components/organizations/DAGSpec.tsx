@@ -23,10 +23,10 @@ import { components } from '../../api/v2/schema';
 import { useClient } from '../../hooks/api';
 
 type Props = {
-  name: string;
+  location: string;
 };
 
-function DAGSpec({ name }: Props) {
+function DAGSpec({ location }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
   const [editing, setEditing] = React.useState(false);
@@ -42,14 +42,14 @@ function DAGSpec({ name }: Props) {
     [setCookie, flowchart, setFlowchart]
   );
   const { data, isLoading } = useQuery(
-    '/dags/{dagName}/spec',
+    '/dags/{dagLocation}/spec',
     {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          dagName: name,
+          dagLocation: location,
         },
       },
     },
@@ -184,11 +184,11 @@ function DAGSpec({ name }: Props) {
                             return;
                           }
                           const { error, response } = await client.PUT(
-                            '/dags/{dagName}/spec',
+                            '/dags/{dagLocation}/spec',
                             {
                               params: {
                                 path: {
-                                  dagName: props.name,
+                                  dagLocation: props.location,
                                 },
                                 query: {
                                   remoteNode:
@@ -214,7 +214,7 @@ function DAGSpec({ name }: Props) {
                             alert(error || 'Failed to save spec');
                           }
                           setEditing(false);
-                          mutate(['/dags/{dagName}/spec']);
+                          mutate(['/dags/{dagLocation}/spec']);
                           mutate(['/dags']);
                           props.refresh();
                         }}

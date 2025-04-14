@@ -13,20 +13,20 @@ import { useQuery } from '../../hooks/api';
 import { AppBarContext } from '../../contexts/AppBarContext';
 
 type Props = {
-  name: string;
+  location: string;
 };
 
-function DAGExecutionHistory({ name }: Props) {
+function DAGExecutionHistory({ location }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const { data } = useQuery(
-    '/dags/{dagName}/runs',
+    '/dags/{dagLocation}/runs',
     {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          dagName: name,
+          dagLocation: location,
         },
       },
     },

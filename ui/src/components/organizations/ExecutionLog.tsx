@@ -9,7 +9,7 @@ import { AppBarContext } from '../../contexts/AppBarContext';
 import { components } from '../../api/v2/schema';
 
 type Props = {
-  name: string;
+  location: string;
   requestId: string;
   node?: components['schemas']['Node'];
 };
@@ -20,7 +20,7 @@ const ANSI_CODES_REGEX = [
   '(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-nq-uy=><~]))',
 ].join('|');
 
-function ExecutionLog({ name, requestId, node }: Props) {
+function ExecutionLog({ location, requestId, node }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const { data } = useQuery(
     '/runs/{dagName}/{requestId}/log',
@@ -30,7 +30,7 @@ function ExecutionLog({ name, requestId, node }: Props) {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          dagName: name,
+          dagName: location,
           requestId,
         },
       },

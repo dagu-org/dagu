@@ -125,8 +125,7 @@ const defaultColumns = [
       if (data.kind == ItemKind.Group) {
         return getValue();
       } else {
-        const name = data.dag.dag.name.replace(/.y[a]{0,1}ml$/, '');
-        const url = `/dags/${encodeURI(name)}`;
+        const url = `/dags/${data.dag.dag.location}`;
         return (
           <div
             style={{

@@ -7,16 +7,16 @@ import { components } from '../../api/v2/schema';
 
 type Props = {
   status?: components['schemas']['RunDetails'];
-  name: string;
+  location: string;
   requestId?: string;
 };
 
-function DAGStatusOverview({ status, name, requestId = '' }: Props) {
+function DAGStatusOverview({ status, location, requestId = '' }: Props) {
   const searchParams = new URLSearchParams();
   if (requestId) {
     searchParams.set('requestId', requestId);
   }
-  const url = `/dags/${name}/scheduler-log?${searchParams.toString()}`;
+  const url = `/dags/${location}/scheduler-log?${searchParams.toString()}`;
   if (!status) {
     return null;
   }
