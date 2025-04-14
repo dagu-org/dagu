@@ -96,6 +96,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dags/{dagLocation}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop a DAG
+         * @description Stops a specific DAG by its location
+         */
+        post: operations["stopDAG"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dags/{dagLocation}/runs": {
         parameters: {
             query?: never;
@@ -844,6 +864,39 @@ export interface operations {
                 };
             };
         };
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    stopDAG: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description location of the DAG file */
+                dagLocation: components["parameters"]["DAGLocation"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description A successful response */
             200: {
