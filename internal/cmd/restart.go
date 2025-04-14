@@ -95,14 +95,12 @@ func handleRestartProcess(ctx *Context, dag *digraph.DAG, specFilePath string) e
 }
 
 func executeDAG(ctx *Context, cli client.Client, dag *digraph.DAG) error {
-
 	requestID, err := generateRequestID()
 	if err != nil {
 		return fmt.Errorf("failed to generate request ID: %w", err)
 	}
 
-	const logPrefix = "restart_"
-	logFile, err := ctx.OpenLogFile(logPrefix, dag, requestID)
+	logFile, err := ctx.OpenLogFile(dag, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file: %w", err)
 	}

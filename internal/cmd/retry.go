@@ -86,12 +86,10 @@ func runRetry(ctx *Context, args []string) error {
 }
 
 func executeRetry(ctx *Context, dag *digraph.DAG, originalStatus *persistence.Run) error {
-	const logPrefix = "retry_"
-
 	reqID := originalStatus.Status.RequestID
 	logFile, err := CreateLogFile(originalStatus.Status.Log)
 	if err != nil {
-		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
+		return fmt.Errorf("failed to open log file: %w", err)
 	}
 	defer func() {
 		_ = logFile.Close()

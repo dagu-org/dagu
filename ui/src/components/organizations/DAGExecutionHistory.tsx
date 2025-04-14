@@ -19,14 +19,14 @@ type Props = {
 function DAGExecutionHistory({ name }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const { data } = useQuery(
-    '/dags/{name}/runs',
+    '/dags/{dagName}/runs',
     {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          name,
+          dagName: name,
         },
       },
     },
@@ -51,7 +51,7 @@ function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
   const dagStatusContext = React.useContext(RunDetailsContext);
 
   let handlers: components['schemas']['Node'][] | null = null;
-  if (runs && runs.length > idx) {
+  if (runs && idx < runs.length && runs[idx]) {
     handlers = getEventHandlers(runs[idx]);
   }
   const reversedRuns = useMemo(() => {

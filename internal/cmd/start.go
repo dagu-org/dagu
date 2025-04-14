@@ -83,8 +83,7 @@ func executeDag(ctx *Context, specPath string, loadOpts []digraph.LoadOption, re
 		}
 	}
 
-	const logPrefix = "start_"
-	logFile, err := ctx.OpenLogFile(logPrefix, dag, requestID)
+	logFile, err := ctx.OpenLogFile(dag, requestID)
 	if err != nil {
 		logger.Error(ctx, "failed to initialize log file", "DAG", dag.Name, "err", err)
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)

@@ -17,7 +17,7 @@ import {
   faPenToSquare,
 } from '@fortawesome/free-solid-svg-icons';
 import { AppBarContext } from '../../contexts/AppBarContext';
-import { useQuery } from '../../hooks/api';
+import { useMutate, useQuery } from '../../hooks/api';
 import LoadingIndicator from '../atoms/LoadingIndicator';
 import { components } from '../../api/v2/schema';
 import { useClient } from '../../hooks/api';
@@ -33,6 +33,7 @@ function DAGSpec({ name }: Props) {
   const [currentValue, setCurrentValue] = React.useState<string | undefined>();
   const [cookie, setCookie] = useCookies(['flowchart']);
   const [flowchart, setFlowchart] = React.useState(cookie['flowchart']);
+  const mutate = useMutate();
   const onChangeFlowchart = React.useCallback(
     (value: FlowchartType) => {
       setCookie('flowchart', value, { path: '/' });
@@ -40,15 +41,15 @@ function DAGSpec({ name }: Props) {
     },
     [setCookie, flowchart, setFlowchart]
   );
-  const { data, isLoading, mutate } = useQuery(
-    '/dags/{name}/spec',
+  const { data, isLoading } = useQuery(
+    '/dags/{dagName}/spec',
     {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          name,
+          dagName: name,
         },
       },
     },
@@ -183,11 +184,11 @@ function DAGSpec({ name }: Props) {
                             return;
                           }
                           const { error, response } = await client.PUT(
-                            '/dags/{name}/spec',
+                            '/dags/{dagName}/spec',
                             {
                               params: {
                                 path: {
-                                  name: props.name,
+                                  dagName: props.name,
                                 },
                                 query: {
                                   remoteNode:
@@ -213,7 +214,8 @@ function DAGSpec({ name }: Props) {
                             alert(error || 'Failed to save spec');
                           }
                           setEditing(false);
-                          mutate();
+                          mutate(['/dags/{dagName}/spec']);
+                          mutate(['/dags']);
                           props.refresh();
                         }}
                       >

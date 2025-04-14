@@ -23,7 +23,10 @@ function DAGStatusOverview({ status, name, requestId = '' }: Props) {
   return (
     <Stack direction="column" spacing={1}>
       <LabeledItem label="Status">
-        <StatusChip status={status.status}>{status.statusText}</StatusChip>
+        <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+          <StatusChip status={status.status}>{status.statusText}</StatusChip>
+          <Link to={url}>View Log</Link>
+        </Stack>
       </LabeledItem>
       <LabeledItem label="Request ID">{status.requestId}</LabeledItem>
       <Stack direction="row" sx={{ alignItems: 'center' }} spacing={2}>
@@ -31,9 +34,6 @@ function DAGStatusOverview({ status, name, requestId = '' }: Props) {
         <LabeledItem label="Finished At">{status.finishedAt}</LabeledItem>
       </Stack>
       <LabeledItem label="Params">{status.params}</LabeledItem>
-      <LabeledItem label="Scheduler Log">
-        <Link to={url}>{status.log}</Link>
-      </LabeledItem>
     </Stack>
   );
 }

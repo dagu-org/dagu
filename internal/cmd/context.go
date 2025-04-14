@@ -215,7 +215,6 @@ func (s *Context) historyStoreWithCache(cache *filecache.Cache[*persistence.Stat
 // It evaluates the log directory, validates settings, creates the log directory,
 // builds a filename using the current timestamp and request ID, and then opens the file.
 func (ctx *Context) OpenLogFile(
-	prefix string,
 	dag *digraph.DAG,
 	requestID string,
 ) (*os.File, error) {
@@ -229,7 +228,6 @@ func (ctx *Context) OpenLogFile(
 	}
 
 	config := LogFileSettings{
-		Prefix:    prefix,
 		LogDir:    logDir,
 		DAGLogDir: dagLogDir,
 		DAGName:   dag.Name,
@@ -350,7 +348,6 @@ func listenSignals(ctx context.Context, listener signalListener) {
 
 // LogFileSettings defines configuration for log file creation.
 type LogFileSettings struct {
-	Prefix    string // Prefix for the log filename (e.g. "start_", "retry_").
 	LogDir    string // Base directory for logs.
 	DAGLogDir string // Optional alternative log directory specified by the DAG.
 	DAGName   string // Name of the DAG; used for generating a safe directory name.
@@ -395,8 +392,7 @@ func BuildLogFilename(config LogFileSettings) string {
 	truncatedRequestID := stringutil.TruncString(config.RequestID, 8)
 	safeDagName := fileutil.SafeName(config.DAGName)
 
-	return fmt.Sprintf("%s%s.%s.%s.log",
-		config.Prefix,
+	return fmt.Sprintf("%s.%s.%s.log",
 		safeDagName,
 		timestamp,
 		truncatedRequestID,

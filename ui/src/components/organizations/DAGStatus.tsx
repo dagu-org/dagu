@@ -64,9 +64,6 @@ function DAGStatus({ run, name, refresh }: Props) {
     setFlowchart(value);
   };
 
-  if (!run.status) {
-    return null;
-  }
   const handlers = getEventHandlers(run);
 
   return (

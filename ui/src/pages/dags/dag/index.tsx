@@ -16,6 +16,7 @@ import { RunDetailsContext } from '../../../contexts/DAGStatusContext';
 import { useQuery } from '../../../hooks/api';
 import { components, Status } from '../../../api/v2/schema';
 import DAGExecutionHistory from '../../../components/organizations/DAGExecutionHistory';
+import ExecutionLog from '../../../components/organizations/ExecutionLog';
 
 type Params = {
   name: string;
@@ -27,14 +28,14 @@ function DAGDetails() {
   const appBarContext = React.useContext(AppBarContext);
   const { pathname } = useLocation();
   const { data, isLoading, mutate } = useQuery(
-    '/dags/{name}',
+    '/dags/{dagName}',
     {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          name: params.name || '',
+          dagName: params.name || '',
         },
       },
     },
@@ -83,7 +84,7 @@ function DAGDetails() {
     <DAGContext.Provider
       value={{
         refresh: refreshFn,
-        name: data.dag?.name || '',
+        name: params.name || '',
       }}
     >
       <RunDetailsContext.Provider
@@ -122,7 +123,6 @@ function DAGDetails() {
               )}
             </RunDetailsContext.Consumer>
           </Box>
-
           {data.latestRun.status != Status.NotStarted ? (
             <Stack
               direction="row"
@@ -168,7 +168,6 @@ function DAGDetails() {
               </Stack>
             </Stack>
           ) : null}
-
           <Stack
             sx={{
               mx: 4,
@@ -190,7 +189,6 @@ function DAGDetails() {
               <DAGEditButtons name={data.dag?.name || ''} />
             ) : null}
           </Stack>
-
           <Box sx={{ mx: 4, flex: 1 }}>
             {tab == 'status' ? (
               <DAGStatus
@@ -203,8 +201,13 @@ function DAGDetails() {
             {tab == 'history' ? (
               <DAGExecutionHistory name={data.dag?.name || ''} />
             ) : null}
-            {/* {tab == 'scheduler-log' ? <ExecutionLog log={data.ScLog} /> : null}
-            {tab == 'log' ? <ExecutionLog log={data.StepLog} /> : null} */}
+            {tab == 'scheduler-log' ? (
+              <ExecutionLog
+                name={data.dag?.name || ''}
+                requestId={data.latestRun.requestId}
+              />
+            ) : null}
+            {/* {tab == 'log' ? <ExecutionLog log={data.StepLog} /> : null} */}
           </Box>
         </Stack>
       </RunDetailsContext.Provider>

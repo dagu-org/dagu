@@ -101,7 +101,7 @@ port: %s
 basePath: "%s"
 remoteNodes:
   - name: "dev"
-    apiBaseUrl: "http://127.0.0.1:%s%s/api/v1"
+    apiBaseUrl: "http://127.0.0.1:%s%s/api/v2"
 `, port, tc.basePath, port, tc.basePath)
 			require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0644))
 
@@ -127,15 +127,16 @@ remoteNodes:
 			time.Sleep(500 * time.Millisecond)
 
 			// 2. Request with the base path should return 200.
-			resp, err := http.Get("http://127.0.0.1:" + port + tc.basePath + "/api/v1/health?remoteNode=dev")
+			resp, err := http.Get("http://127.0.0.1:" + port + tc.basePath + "/api/v2/health?remoteNode=dev")
 			require.NoError(t, err)
 			defer func() {
 				_ = resp.Body.Close()
 			}()
-			require.Equal(t, http.StatusOK, resp.StatusCode)
+			body, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, resp.StatusCode, "Response: %s", string(body))
 
 			// Decode the JSON response to check for expected health status.
-			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			var healthResp struct {
 				Status string `json:"status"`
