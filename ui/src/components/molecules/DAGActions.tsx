@@ -10,6 +10,7 @@ import ConfirmModal from './ConfirmModal';
 import LabeledItem from '../atoms/LabeledItem';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { components } from '../../api/v2/schema';
+import { useClient, useMutate } from '../../hooks/api';
 
 type LabelProps = {
   show: boolean;
@@ -21,10 +22,7 @@ type Props = {
     | components['schemas']['RunSummary']
     | components['schemas']['RunDetails'];
   location: string;
-  dag:
-    | components['schemas']['DAG']
-    | components['schemas']['DAGDetails']
-    | undefined;
+  dag?: components['schemas']['DAG'] | components['schemas']['DAGDetails'];
   label?: boolean;
   redirectTo?: string;
   refresh?: () => void;
@@ -49,6 +47,14 @@ function DAGActions({
   const [isStartModal, setIsStartModal] = React.useState(false);
   const [isStopModal, setIsStopModal] = React.useState(false);
   const [isRetryModal, setIsRetryModal] = React.useState(false);
+
+  const client = useClient();
+  const mutate = useMutate();
+  const reloadData = () => {
+    mutate(['/dags/{dagLocation}']);
+    mutate(['/dags']);
+    refresh && refresh();
+  };
 
   const onSubmit = React.useCallback(
     async (params: {
@@ -87,6 +93,11 @@ function DAGActions({
     stop: status?.status == 1,
     retry: status?.status != 1 && status?.requestId != '',
   };
+
+  if (!dag) {
+    return <></>;
+  }
+
   return (
     <Stack direction="row" spacing={2}>
       <ActionButton
@@ -166,20 +177,32 @@ function DAGActions({
           <Box>{status?.requestId}</Box>
         </Stack>
       </ConfirmModal>
-      {dag && (
-        <StartDAGModal
-          dag={dag}
-          visible={isStartModal}
-          onSubmit={(params) => {
-            setIsStartModal(false);
-            onSubmit({ name: location, action: 'start', params: params });
-          }}
-          dismissModal={() => {
-            setIsStartModal(false);
-          }}
-        />
-      )}
+      <StartDAGModal
+        dag={dag}
+        visible={isStartModal}
+        onSubmit={async (params) => {
+          setIsStartModal(false);
+          const { error } = await client.POST('/dags/{dagLocation}/start', {
+            params: {
+              path: {
+                dagLocation: location,
+              },
+            },
+            body: {
+              params: params,
+            },
+          });
+          if (error) {
+            alert(error.message);
+          }
+          reloadData();
+        }}
+        dismissModal={() => {
+          setIsStartModal(false);
+        }}
+      />
     </Stack>
   );
 }
+
 export default DAGActions;

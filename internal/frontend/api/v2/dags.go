@@ -407,6 +407,29 @@ func (a *API) GetDAGRunStatus(ctx context.Context, request api.GetDAGRunStatusRe
 	}, nil
 }
 
+// StartDAG implements api.StrictServerInterface.
+func (a *API) StartDAG(ctx context.Context, request api.StartDAGRequestObject) (api.StartDAGResponseObject, error) {
+	status, err := a.client.GetDAGStatus(ctx, request.DagLocation)
+	if err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("DAG %s not found", request.DagLocation),
+		}
+	}
+	if status.Status.Status == scheduler.StatusRunning {
+		return nil, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeAlreadyRunning,
+			Message:    "DAG is already running",
+		}
+	}
+	a.client.StartAsync(ctx, status.DAG, client.StartOptions{
+		Params: value(request.Body.Params),
+	})
+	return api.StartDAG200Response{}, nil
+}
+
 // PostDAGAction implements api.StrictServerInterface.
 func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionRequestObject) (api.PostDAGActionResponseObject, error) {
 	action := request.Body.Action
