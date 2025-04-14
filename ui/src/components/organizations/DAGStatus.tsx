@@ -19,18 +19,18 @@ import { components, Status } from '../../api/v2/schema';
 
 type Props = {
   run: components['schemas']['RunDetails'];
-  name: string;
+  location: string;
   refresh: () => void;
 };
 
-function DAGStatus({ run, name, refresh }: Props) {
+function DAGStatus({ run, location, refresh }: Props) {
   const [modal, setModal] = React.useState(false);
   const [sub, setSub] = React.useState('0');
   const [selectedStep, setSelectedStep] = React.useState<
     components['schemas']['Step'] | undefined
   >(undefined);
   const { doPost } = useDAGPostAPI({
-    name,
+    name: location,
     onSuccess: refresh,
     requestId: run.requestId,
   });
@@ -135,7 +135,7 @@ function DAGStatus({ run, name, refresh }: Props) {
                 <Box sx={{ mt: 2 }}>
                   <DAGStatusOverview
                     status={run}
-                    {...props}
+                    location={location}
                   ></DAGStatusOverview>
                 </Box>
               </Box>

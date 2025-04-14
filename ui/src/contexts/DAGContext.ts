@@ -5,4 +5,5 @@ export const DAGContext = React.createContext({
     return;
   },
   name: '',
+  location: '',
 });

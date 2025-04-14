@@ -75,6 +75,15 @@ type DAG struct {
 	HistRetentionDays int `json:"HistRetentionDays,omitempty"`
 }
 
+// GetLocation returns location that is used to show on the API
+func (d *DAG) GetLocation() string {
+	if d.Location == "" {
+		return ""
+	}
+	b := filepath.Base(d.Location)
+	return fileutil.TrimYAMLFileExtension(b)
+}
+
 // Schedule contains the cron expression and the parsed cron schedule.
 type Schedule struct {
 	// Expression is the cron expression.

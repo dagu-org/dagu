@@ -105,6 +105,23 @@ func IsYAMLFile(filename string) bool {
 	return slices.Contains(ValidYAMLExtensions, filepath.Ext(filename))
 }
 
+// TrimYAMLFileExtension trims the .yml or .yaml extension from a filename.
+func TrimYAMLFileExtension(filename string) string {
+	if filename == "" {
+		return ""
+	}
+
+	ext := filepath.Ext(filename)
+	switch ext {
+	case ymlExtension:
+		return strings.TrimSuffix(filename, ymlExtension) + yamlExtension
+	case yamlExtension:
+		return strings.TrimSuffix(filename, yamlExtension)
+	default:
+		return filename
+	}
+}
+
 // IsFileWithExtension is a more generic function that checks if a file
 // has any of the provided extensions.
 func IsFileWithExtension(filename string, validExtensions []string) bool {

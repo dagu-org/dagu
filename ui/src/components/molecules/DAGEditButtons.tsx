@@ -3,10 +3,10 @@ import { Button, Stack } from '@mui/material';
 import { AppBarContext } from '../../contexts/AppBarContext';
 
 type Props = {
-  name: string;
+  location: string;
 };
 
-function DAGEditButtons({ name }: Props) {
+function DAGEditButtons({ location }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   return (
     <Stack direction="row" spacing={1}>
@@ -20,7 +20,7 @@ function DAGEditButtons({ name }: Props) {
             alert('DAG name cannot contain space');
             return;
           }
-          const url = `${getConfig().apiURL}/dags/${name}?remoteNode=${
+          const url = `${getConfig().apiURL}/dags/${location}?remoteNode=${
             appBarContext.selectedRemoteNode || 'local'
           }`;
           const resp = await fetch(url, {
@@ -48,7 +48,7 @@ function DAGEditButtons({ name }: Props) {
           if (!confirm('Are you sure to delete the DAG?')) {
             return;
           }
-          const url = `${getConfig().apiURL}/dags/${name}`;
+          const url = `${getConfig().apiURL}/dags/${location}`;
           const resp = await fetch(url, {
             method: 'DELETE',
             headers: {

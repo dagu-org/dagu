@@ -48,7 +48,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/dags/{dagName}": {
+    "/dags/{dagLocation}": {
         parameters: {
             query?: never;
             header?: never;
@@ -76,7 +76,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/dags/{dagName}/runs": {
+    "/dags/{dagLocation}/runs": {
         parameters: {
             query?: never;
             header?: never;
@@ -96,7 +96,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/dags/{dagName}/runs/{requestId}": {
+    "/dags/{dagLocation}/runs/{requestId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -116,7 +116,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/dags/{dagName}/spec": {
+    "/dags/{dagLocation}/spec": {
         parameters: {
             query?: never;
             header?: never;
@@ -219,7 +219,12 @@ export interface components {
         ErrorCode: ErrorCode;
         /**
          * Format: regex
-         * @description Name of the DAG, must be unique
+         * @description location of the DAG file
+         */
+        DAGLocation: string;
+        /**
+         * Format: regex
+         * @description Name of the DAG
          */
         DAGName: string;
         Pagination: {
@@ -285,8 +290,10 @@ export interface components {
         DAG: {
             /** @description Logical grouping of related DAGs for organizational purposes */
             group?: string;
-            /** @description Unique identifier for the DAG within its group */
+            /** @description Logical name of the DAG */
             name: string;
+            /** @description Physical name of the DAG file */
+            location: string;
             /** @description List of scheduling expressions defining when the DAG should run */
             schedule?: components["schemas"]["Schedule"][];
             /** @description Human-readable description of the DAG's purpose and behavior */
@@ -339,7 +346,7 @@ export interface components {
         /** @description Detailed DAG configuration information */
         DAGDetails: {
             /** @description Path to the DAG file */
-            location?: string;
+            location: string;
             /** @description Logical grouping of related DAGs for organizational purposes */
             group?: string;
             /** @description Unique identifier for the DAG within its group */
@@ -512,6 +519,8 @@ export interface components {
         Page: number;
         /** @description number of items per page (default is 30, max is 100) */
         PerPage: number;
+        /** @description location of the DAG file */
+        DAGLocation: components["schemas"]["DAGLocation"];
         /** @description name of the DAG */
         DAGName: components["schemas"]["DAGName"];
         /** @description name of the remote node */
@@ -647,8 +656,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description name of the DAG */
-                dagName: components["parameters"]["DAGName"];
+                /** @description location of the DAG file */
+                dagLocation: components["parameters"]["DAGLocation"];
             };
             cookie?: never;
         };
@@ -689,8 +698,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description name of the DAG */
-                dagName: components["parameters"]["DAGName"];
+                /** @description location of the DAG file */
+                dagLocation: components["parameters"]["DAGLocation"];
             };
             cookie?: never;
         };
@@ -738,8 +747,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description name of the DAG */
-                dagName: components["parameters"]["DAGName"];
+                /** @description location of the DAG file */
+                dagLocation: components["parameters"]["DAGLocation"];
             };
             cookie?: never;
         };
@@ -780,8 +789,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description name of the DAG */
-                dagName: components["parameters"]["DAGName"];
+                /** @description location of the DAG file */
+                dagLocation: components["parameters"]["DAGLocation"];
             };
             cookie?: never;
         };
@@ -820,8 +829,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description name of the DAG */
-                dagName: components["parameters"]["DAGName"];
+                /** @description location of the DAG file */
+                dagLocation: components["parameters"]["DAGLocation"];
                 /** @description request ID of the DAG run or latest run if specified as 'latest' */
                 requestId: components["parameters"]["RequestId"];
             };
@@ -859,8 +868,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description name of the DAG */
-                dagName: components["parameters"]["DAGName"];
+                /** @description location of the DAG file */
+                dagLocation: components["parameters"]["DAGLocation"];
             };
             cookie?: never;
         };
@@ -900,8 +909,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description name of the DAG */
-                dagName: components["parameters"]["DAGName"];
+                /** @description location of the DAG file */
+                dagLocation: components["parameters"]["DAGLocation"];
             };
             cookie?: never;
         };

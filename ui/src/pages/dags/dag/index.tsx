@@ -19,6 +19,7 @@ import DAGExecutionHistory from '../../../components/organizations/DAGExecutionH
 import ExecutionLog from '../../../components/organizations/ExecutionLog';
 
 type Params = {
+  location: string;
   name: string;
   tab?: string;
 };
@@ -28,27 +29,31 @@ function DAGDetails() {
   const appBarContext = React.useContext(AppBarContext);
   const { pathname } = useLocation();
   const { data, isLoading, mutate } = useQuery(
-    '/dags/{dagName}',
+    '/dags/{dagLocation}',
     {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          dagName: params.name || '',
+          dagLocation: params.location || '',
         },
       },
     },
     { refreshInterval: 2000 }
   );
-  const baseUrl = `/dags/${params.name}`;
+  const baseUrl = `/dags/${params.location}`;
   const [currentRun, setCurrentRun] = React.useState<
     components['schemas']['RunDetails'] | undefined
   >();
+  // get requestId from url query
+  const query = new URLSearchParams(window.location.search);
+  const requestIdFromUrl = query.get('requestId');
+  const requestId = requestIdFromUrl || data?.latestRun.requestId || 'latest';
 
   const refreshFn = React.useCallback(() => {
     setTimeout(() => mutate(), 500);
-  }, [mutate, params.name]);
+  }, [mutate, params.location]);
 
   React.useEffect(() => {
     if (data) {
@@ -76,7 +81,7 @@ function DAGDetails() {
     return `${seconds}s`;
   };
 
-  if (!params.name || isLoading || !data) {
+  if (!params.location || isLoading || !data) {
     return <LoadingIndicator />;
   }
 
@@ -84,7 +89,8 @@ function DAGDetails() {
     <DAGContext.Provider
       value={{
         refresh: refreshFn,
-        name: params.name || '',
+        location: params.location || '',
+        name: data.dag?.name || '',
       }}
     >
       <RunDetailsContext.Provider
@@ -116,7 +122,7 @@ function DAGDetails() {
                 <DAGActions
                   status={status.data}
                   dag={data.dag}
-                  name={params.name!}
+                  name={params.location!}
                   refresh={refreshFn}
                   redirectTo={`${baseUrl}`}
                 />
@@ -186,25 +192,25 @@ function DAGDetails() {
               ) : null}
             </Tabs>
             {pathname == `${baseUrl}/spec` ? (
-              <DAGEditButtons name={data.dag?.name || ''} />
+              <DAGEditButtons location={data.dag?.location || ''} />
             ) : null}
           </Stack>
           <Box sx={{ mx: 4, flex: 1 }}>
             {tab == 'status' ? (
               <DAGStatus
                 run={data.latestRun}
-                name={data.dag?.name || ''}
+                location={data.dag?.location || ''}
                 refresh={refreshFn}
               />
             ) : null}
-            {tab == 'spec' ? <DAGSpec name={params.name} /> : null}
+            {tab == 'spec' ? <DAGSpec location={params.location} /> : null}
             {tab == 'history' ? (
-              <DAGExecutionHistory name={data.dag?.name || ''} />
+              <DAGExecutionHistory location={data.dag?.location || ''} />
             ) : null}
             {tab == 'scheduler-log' ? (
               <ExecutionLog
-                name={data.dag?.name || ''}
-                requestId={data.latestRun.requestId}
+                location={data.dag?.location || ''}
+                requestId={requestId}
               />
             ) : null}
             {/* {tab == 'log' ? <ExecutionLog log={data.StepLog} /> : null} */}

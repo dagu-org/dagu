@@ -26,6 +26,9 @@ function HistoryTable({ runs, gridData, onSelect, idx }: Props) {
           <TableRow>
             <TableCell></TableCell>
             {runs.map((_, i) => {
+              if (!runs || i >= runs.length || !runs[i]) {
+                return null;
+              }
               let date;
               const startedAt = runs[i].startedAt;
               if (startedAt && startedAt != '-') {
@@ -33,8 +36,13 @@ function HistoryTable({ runs, gridData, onSelect, idx }: Props) {
               } else {
                 date = moment().format('M/D');
               }
-              const flag =
-                i == 0 || moment(runs[i - 1].startedAt).format('M/D') != date;
+              let flag = false;
+              if (i == 0) {
+                flag = true;
+              }
+              if (i > 0 && runs[i - 1]) {
+                flag = moment(runs[i - 1]!.startedAt).format('M/D') != date;
+              }
               return (
                 <TableCell
                   key={`date-${i}`}

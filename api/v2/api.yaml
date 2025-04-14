@@ -139,7 +139,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-  /dags/{dagName}:
+  /dags/{dagLocation}:
     get:
       summary: "Get DAG details"
       description: "Returns details of a DAG, including files, logs, and status"
@@ -148,7 +148,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGLocation"
       responses:
         "200":
           description: "A successful response"
@@ -189,7 +189,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGLocation"
       requestBody:
         required: true
         content:
@@ -236,7 +236,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGLocation"
       responses:
         "204":
           description: "DAG successfully deleted"
@@ -253,7 +253,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{dagName}/runs:
+  /dags/{dagLocation}/runs:
     get:
       summary: "Get history of DAG runs"
       description: "Returns the history of runs for a specific DAG"
@@ -262,7 +262,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGLocation"
       responses:
         "200":
           description: "A successful response"
@@ -291,7 +291,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{dagName}/runs/{requestId}:
+  /dags/{dagLocation}/runs/{requestId}:
     get:
       summary: "Get latest run status"
       description: "Returns the status of the latest run for a specific DAG"
@@ -300,7 +300,7 @@ paths:
       operationId: "getDAGRunStatus"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGLocation"
         - $ref: "#/components/parameters/RequestId"
       responses:
         "200":
@@ -321,7 +321,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{dagName}/spec:
+  /dags/{dagLocation}/spec:
     get:
       summary: "Get DAG Spec"
       description: "Returns the spec of the DAG"
@@ -330,7 +330,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGLocation"
       responses:
         "200":
           description: "A successful response"
@@ -366,7 +366,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGLocation"
       requestBody:
         required: true
         content:
@@ -534,6 +534,14 @@ components:
         maximum: 1000
         default: 50
 
+    DAGLocation:
+      name: dagLocation
+      in: path
+      description: location of the DAG file
+      required: true
+      schema:
+        $ref: "#/components/schemas/DAGLocation"
+
     DAGName:
       name: dagName
       in: path
@@ -590,12 +598,19 @@ components:
         - "not_running"
         - "already_exists"
 
+    DAGLocation:
+      type: string
+      # only allows alphanumeric characters, underscores, and hyphens
+      format: "regex"
+      pattern: "^[a-zA-Z0-9_-]+$"
+      description: "location of the DAG file"
+
     DAGName:
       type: string
       # only allows alphanumeric characters, underscores, and hyphens
       format: "regex"
       pattern: "^[a-zA-Z0-9_-]+$"
-      description: "Name of the DAG, must be unique"
+      description: "Name of the DAG"
 
     Pagination:
       type: object
@@ -723,7 +738,10 @@ components:
           description: "Logical grouping of related DAGs for organizational purposes"
         name:
           type: string
-          description: "Unique identifier for the DAG within its group"
+          description: "Logical name of the DAG"
+        location:
+          type: string
+          description: "Physical name of the DAG file"
         schedule:
           type: array
           description: "List of scheduling expressions defining when the DAG should run"
@@ -747,6 +765,7 @@ components:
             type: string
       required:
         - name
+        - location
 
     Schedule:
       type: object
@@ -903,6 +922,7 @@ components:
             type: string
       required:
         - name
+        - location
 
     HandlerOn:
       type: object
