@@ -150,9 +150,19 @@ function DAGActions({
         buttonText="Stop"
         visible={isStopModal}
         dismissModal={() => setIsStopModal(false)}
-        onSubmit={() => {
+        onSubmit={async () => {
           setIsStopModal(false);
-          onSubmit({ name: location, action: 'stop' });
+          const { error } = await client.POST('/dags/{dagLocation}/stop', {
+            params: {
+              path: {
+                dagLocation: location,
+              },
+            },
+          });
+          if (error) {
+            alert(error.message);
+          }
+          reloadData();
         }}
       >
         <Box>Do you really want to cancel the DAG?</Box>

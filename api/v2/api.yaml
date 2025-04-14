@@ -283,6 +283,26 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dags/{dagLocation}/stop:
+    post:
+      summary: "Stop a DAG"
+      description: "Stops a specific DAG by its location"
+      operationId: "stopDAG"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGLocation"
+      responses:
+        "200":
+          description: "A successful response"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dags/{dagLocation}/runs:
     get:
       summary: "Get history of DAG runs"
