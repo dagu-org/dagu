@@ -1,12 +1,9 @@
-import { Box, Stack } from '@mui/material';
+import { Box } from '@mui/material';
 import React from 'react';
 import BorderedBox from '../atoms/BorderedBox';
-import LabeledItem from '../atoms/LabeledItem';
 import LoadingIndicator from '../atoms/LoadingIndicator';
-import NodeStatusChip from '../molecules/NodeStatusChip';
 import { useQuery } from '../../hooks/api';
 import { AppBarContext } from '../../contexts/AppBarContext';
-import { components } from '../../api/v2/schema';
 
 type Props = {
   dagName: string;

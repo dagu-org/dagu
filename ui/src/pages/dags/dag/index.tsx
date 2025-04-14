@@ -123,7 +123,7 @@ function DAGDetails() {
                 <DAGActions
                   status={status.data}
                   dag={data.dag}
-                  name={params.location!}
+                  location={params.location!}
                   refresh={refreshFn}
                   redirectTo={`${baseUrl}`}
                 />
