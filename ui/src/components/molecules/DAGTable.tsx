@@ -377,18 +377,15 @@ const defaultColumns = [
         return null;
       }
 
-      const name = data.dag.dag.name;
-      return <div>TODO: {name}</div>;
-
-      // return (
-      //   <DAGActions
-      //     dag={data.dag.dag}
-      //     status={data.dag.latestRun}
-      //     name={name}
-      //     label={false}
-      //     refresh={props.table.options.meta?.refreshFn}
-      //   />
-      // );
+      return (
+        <DAGActions
+          dag={data.dag.dag}
+          status={data.dag.latestRun}
+          location={data.dag.dag.location}
+          label={false}
+          refresh={props.table.options.meta?.refreshFn}
+        />
+      );
     },
   }),
 ];

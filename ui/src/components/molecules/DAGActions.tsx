@@ -20,7 +20,7 @@ type Props = {
   status?:
     | components['schemas']['RunSummary']
     | components['schemas']['RunDetails'];
-  name: string;
+  location: string;
   dag:
     | components['schemas']['DAG']
     | components['schemas']['DAGDetails']
@@ -37,7 +37,7 @@ function Label({ show, children }: LabelProps): JSX.Element {
 
 function DAGActions({
   status,
-  name,
+  location,
   dag,
   refresh,
   redirectTo,
@@ -141,7 +141,7 @@ function DAGActions({
         dismissModal={() => setIsStopModal(false)}
         onSubmit={() => {
           setIsStopModal(false);
-          onSubmit({ name: name, action: 'stop' });
+          onSubmit({ name: location, action: 'stop' });
         }}
       >
         <Box>Do you really want to cancel the DAG?</Box>
@@ -154,7 +154,7 @@ function DAGActions({
         onSubmit={() => {
           setIsRetryModal(false);
           onSubmit({
-            name: name,
+            name: location,
             action: 'retry',
             requestId: status?.requestId,
           });
@@ -172,7 +172,7 @@ function DAGActions({
           visible={isStartModal}
           onSubmit={(params) => {
             setIsStartModal(false);
-            onSubmit({ name: name, action: 'start', params: params });
+            onSubmit({ name: location, action: 'start', params: params });
           }}
           dismissModal={() => {
             setIsStartModal(false);
