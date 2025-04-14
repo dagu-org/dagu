@@ -17,6 +17,7 @@ import { useQuery } from '../../../hooks/api';
 import { components, Status } from '../../../api/v2/schema';
 import DAGExecutionHistory from '../../../components/organizations/DAGExecutionHistory';
 import ExecutionLog from '../../../components/organizations/ExecutionLog';
+import StepLog from '../../../components/organizations/StepLog';
 
 type Params = {
   location: string;
@@ -46,10 +47,10 @@ function DAGDetails() {
   const [currentRun, setCurrentRun] = React.useState<
     components['schemas']['RunDetails'] | undefined
   >();
-  // get requestId from url query
   const query = new URLSearchParams(window.location.search);
-  const requestIdFromUrl = query.get('requestId');
-  const requestId = requestIdFromUrl || data?.latestRun.requestId || 'latest';
+  const requestId =
+    query.get('requestId') || data?.latestRun.requestId || 'latest';
+  const stepName = query.get('step');
 
   const refreshFn = React.useCallback(() => {
     setTimeout(() => mutate(), 500);
@@ -208,12 +209,15 @@ function DAGDetails() {
               <DAGExecutionHistory location={data.dag?.location || ''} />
             ) : null}
             {tab == 'scheduler-log' ? (
-              <ExecutionLog
-                location={data.dag?.location || ''}
+              <ExecutionLog name={data.dag?.name || ''} requestId={requestId} />
+            ) : null}
+            {tab == 'log' && stepName ? (
+              <StepLog
+                dagName={data.dag?.name || ''}
                 requestId={requestId}
+                stepName={stepName}
               />
             ) : null}
-            {/* {tab == 'log' ? <ExecutionLog log={data.StepLog} /> : null} */}
           </Box>
         </Stack>
       </RunDetailsContext.Provider>

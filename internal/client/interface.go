@@ -8,11 +8,12 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence"
 )
 
+// FIXME: Separate DAG client interface and Runs client interface
 type Client interface {
-	CreateDAG(ctx context.Context, name string) (string, error)
-	GetDAGSpec(ctx context.Context, name string) (string, error)
+	CreateDAG(ctx context.Context, loc string) (string, error)
+	GetDAGSpec(ctx context.Context, loc string) (string, error)
 	Grep(ctx context.Context, pattern string) ([]*persistence.GrepResult, []string, error)
-	Rename(ctx context.Context, oldID, newID string) error
+	Move(ctx context.Context, oldLoc, newLoc string) error
 	Stop(ctx context.Context, dag *digraph.DAG) error
 	StartAsync(ctx context.Context, dag *digraph.DAG, opts StartOptions)
 	Start(ctx context.Context, dag *digraph.DAG, opts StartOptions) error
@@ -22,14 +23,15 @@ type Client interface {
 	GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, requestID string) (*persistence.Status, error)
 	GetLatestStatus(ctx context.Context, dag *digraph.DAG) (persistence.Status, error)
 	GetRecentHistory(ctx context.Context, name string, n int) []persistence.Run
+	GetStatus(ctx context.Context, name string, requestID string) (*persistence.Status, error)
 	UpdateStatus(ctx context.Context, dag *digraph.DAG, status persistence.Status) error
 	LoadYAML(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error)
-	UpdateDAG(ctx context.Context, name string, spec string) error
-	DeleteDAG(ctx context.Context, name string) error
+	UpdateDAG(ctx context.Context, loc string, spec string) error
+	DeleteDAG(ctx context.Context, loc string) error
 	ListStatus(ctx context.Context, opts ...ListStatusOption) (*persistence.PaginatedResult[DAGStatus], []string, error)
-	GetStatus(ctx context.Context, name string) (DAGStatus, error)
-	IsSuspended(ctx context.Context, name string) bool
-	ToggleSuspend(ctx context.Context, name string, suspend bool) error
+	GetDAGStatus(ctx context.Context, loc string) (DAGStatus, error)
+	IsSuspended(ctx context.Context, loc string) bool
+	ToggleSuspend(ctx context.Context, loc string, suspend bool) error
 	GetTagList(ctx context.Context) ([]string, []string, error)
 }
 

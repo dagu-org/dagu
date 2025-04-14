@@ -75,20 +75,20 @@ func (e *client) Grep(ctx context.Context, pattern string) (
 	return e.dagStore.Grep(ctx, pattern)
 }
 
-func (e *client) Rename(ctx context.Context, oldID, newID string) error {
-	oldDAG, err := e.dagStore.GetMetadata(ctx, oldID)
+func (e *client) Move(ctx context.Context, oldLoc, newLoc string) error {
+	oldDAG, err := e.dagStore.GetMetadata(ctx, oldLoc)
 	if err != nil {
-		return fmt.Errorf("failed to get metadata for %s: %w", oldID, err)
+		return fmt.Errorf("failed to get metadata for %s: %w", oldLoc, err)
 	}
-	if err := e.dagStore.Rename(ctx, oldID, newID); err != nil {
+	if err := e.dagStore.Rename(ctx, oldLoc, newLoc); err != nil {
 		return err
 	}
-	newDAG, err := e.dagStore.GetMetadata(ctx, newID)
+	newDAG, err := e.dagStore.GetMetadata(ctx, newLoc)
 	if err != nil {
-		return fmt.Errorf("failed to get metadata for %s: %w", newID, err)
+		return fmt.Errorf("failed to get metadata for %s: %w", newLoc, err)
 	}
 	if err := e.historyStore.Rename(ctx, oldDAG.Name, newDAG.Name); err != nil {
-		return fmt.Errorf("failed to rename history for %s: %w", oldID, err)
+		return fmt.Errorf("failed to rename history for %s: %w", oldLoc, err)
 	}
 	return nil
 }
@@ -185,6 +185,18 @@ func (*client) GetCurrentStatus(_ context.Context, dag *digraph.DAG) (*persisten
 		return &status, nil
 	}
 	return persistence.StatusFromJSON(ret)
+}
+
+func (e *client) GetStatus(ctx context.Context, name string, requestID string) (*persistence.Status, error) {
+	record, err := e.historyStore.FindByRequestID(ctx, name, requestID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find status by request id: %w", err)
+	}
+	latestStatus, err := record.ReadStatus(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read status: %w", err)
+	}
+	return latestStatus, nil
 }
 
 func (e *client) GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, requestID string) (
@@ -333,16 +345,16 @@ func (e *client) ListStatus(ctx context.Context, opts ...ListStatusOption) (*per
 	return &r, errList, nil
 }
 
-func (e *client) getDAG(ctx context.Context, name string) (*digraph.DAG, error) {
-	dagDetail, err := e.dagStore.GetDetails(ctx, name)
-	return e.emptyDAGIfNil(dagDetail, name), err
+func (e *client) getDAG(ctx context.Context, loc string) (*digraph.DAG, error) {
+	dagDetail, err := e.dagStore.GetDetails(ctx, loc)
+	return e.emptyDAGIfNil(dagDetail, loc), err
 }
 
-func (e *client) GetStatus(ctx context.Context, name string) (DAGStatus, error) {
-	dag, err := e.getDAG(ctx, name)
+func (e *client) GetDAGStatus(ctx context.Context, loc string) (DAGStatus, error) {
+	dag, err := e.getDAG(ctx, loc)
 	if dag == nil {
 		// TODO: fix not to use location
-		dag = &digraph.DAG{Name: name, Location: name}
+		dag = &digraph.DAG{Name: loc, Location: loc}
 	}
 	if err == nil {
 		// check the dag is correct in terms of graph
@@ -350,12 +362,12 @@ func (e *client) GetStatus(ctx context.Context, name string) (DAGStatus, error) 
 	}
 	latestStatus, _ := e.GetLatestStatus(ctx, dag)
 	return newDAGStatus(
-		dag, latestStatus, e.IsSuspended(ctx, name), err,
+		dag, latestStatus, e.IsSuspended(ctx, loc), err,
 	), err
 }
 
-func (e *client) ToggleSuspend(_ context.Context, name string, suspend bool) error {
-	return e.flagStore.ToggleSuspend(name, suspend)
+func (e *client) ToggleSuspend(_ context.Context, loc string, suspend bool) error {
+	return e.flagStore.ToggleSuspend(loc, suspend)
 }
 
 func (e *client) readStatus(ctx context.Context, dag *digraph.DAG) (DAGStatus, error) {

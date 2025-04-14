@@ -16,17 +16,17 @@ import { components, Status } from '../../api/v2/schema';
 type Props = {
   nodes?: components['schemas']['Node'][];
   status: components['schemas']['RunDetails'];
-  name: string;
+  location: string;
   refresh: () => void;
 };
 
-function NodeStatusTable({ nodes, status, name, refresh }: Props) {
+function NodeStatusTable({ nodes, status, location, refresh }: Props) {
   const [modal, setModal] = React.useState(false);
   const [current, setCurrent] = React.useState<
     components['schemas']['Step'] | undefined
   >(undefined);
   const { doPost } = useDAGPostAPI({
-    name,
+    name: location,
     onSuccess: refresh,
     requestId: status.requestId,
   });
@@ -78,7 +78,7 @@ function NodeStatusTable({ nodes, status, name, refresh }: Props) {
                 rownum={idx + 1}
                 node={n}
                 requestId={status.requestId}
-                name={name}
+                name={location}
                 onRequireModal={requireModal}
               ></NodeStatusTableRow>
             ))}

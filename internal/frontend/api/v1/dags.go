@@ -42,7 +42,7 @@ func (a *API) CreateDAG(ctx context.Context, request api.CreateDAGRequestObject)
 
 // DeleteDAG implements api.StrictServerInterface.
 func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject) (api.DeleteDAGResponseObject, error) {
-	_, err := a.client.GetStatus(ctx, request.Name)
+	_, err := a.client.GetDAGStatus(ctx, request.Name)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -65,7 +65,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 		tab = *request.Params.Tab
 	}
 
-	status, err := a.client.GetStatus(ctx, name)
+	status, err := a.client.GetDAGStatus(ctx, name)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -493,7 +493,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 
 	var status client.DAGStatus
 	if action != api.DAGActionSave {
-		s, err := a.client.GetStatus(ctx, request.Name)
+		s, err := a.client.GetDAGStatus(ctx, request.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -615,7 +615,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 		}
 
 		newName := *request.Body.Value
-		if err := a.client.Rename(ctx, request.Name, newName); err != nil {
+		if err := a.client.Move(ctx, request.Name, newName); err != nil {
 			return nil, fmt.Errorf("error renaming DAG: %w", err)
 		}
 
