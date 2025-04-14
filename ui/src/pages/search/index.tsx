@@ -1,23 +1,30 @@
 import React, { useEffect, useRef } from 'react';
 import { Box, Button, Grid, Stack, TextField, Typography } from '@mui/material';
-import useSWR from 'swr';
 import { useSearchParams } from 'react-router-dom';
 import Title from '../../components/atoms/Title';
-import { GetSearchResponse } from '../../models/api';
 import SearchResult from '../../components/molecules/SearchResult';
 import LoadingIndicator from '../../components/atoms/LoadingIndicator';
 import { AppBarContext } from '../../contexts/AppBarContext';
+import { useQuery } from '../../hooks/api';
 
 function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchVal, setSearchVal] = React.useState(searchParams.get('q') || '');
   const appBarContext = React.useContext(AppBarContext);
 
-  const { data, error } = useSWR<GetSearchResponse>(
-    `/search?q=${searchParams.get('q') || ''}&remoteNode=${
-      appBarContext.selectedRemoteNode || 'local'
-    }`
+  const { data, isLoading } = useQuery(
+    '/dags/search',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+          q: searchParams.get('q') || '',
+        },
+      },
+    },
+    { refreshInterval: 2000 }
   );
+
   const ref = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -29,6 +36,10 @@ function Search() {
       q: value,
     });
   }, []);
+
+  if (isLoading) {
+    return <LoadingIndicator />;
+  }
 
   return (
     <Grid container sx={{ mx: 4, width: '100%' }}>
@@ -74,24 +85,20 @@ function Search() {
 
         <Box mt={2}>
           {(() => {
-            if (!data && !error) {
-              return <LoadingIndicator />;
-            }
-
-            if (data && data.Results && data.Results.length > 0) {
+            if (data && data.results && data.results.length > 0) {
               return (
                 <Box>
                   <Typography variant="h6" style={{ fontStyle: 'bolder' }}>
-                    {data.Results.length} results found
+                    {data.results.length} results found
                   </Typography>
-                  <SearchResult results={data?.Results} />
+                  <SearchResult results={data.results} />
                 </Box>
               );
             }
 
             if (
-              (data && !data.Results) ||
-              (data && data.Results && data.Results.length === 0)
+              (data && !data.results) ||
+              (data && data.results && data.results.length === 0)
             ) {
               return <Box>No results found</Box>;
             }
