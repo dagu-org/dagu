@@ -303,6 +303,38 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dags/{dagLocation}/retry:
+    post:
+      summary: "Retry a DAG"
+      description: "Retries the last run of a specific DAG"
+      operationId: "retryDAG"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGLocation"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                requestId:
+                  type: string
+                  description: "Request ID of the DAG run to retry"
+              required:
+                - requestId
+      responses:
+        "200":
+          description: "A successful response"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dags/{dagLocation}/runs:
     get:
       summary: "Get history of DAG runs"

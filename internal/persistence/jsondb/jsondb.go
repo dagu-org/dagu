@@ -136,6 +136,27 @@ func (db *JSONDB) NewRecord(ctx context.Context, dag *digraph.DAG, timestamp tim
 	return record, nil
 }
 
+func (db *JSONDB) NewRetryRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string) (persistence.Record, error) {
+	if reqID == "" {
+		return nil, ErrRequestIDEmpty
+	}
+
+	ts := NewUTC(timestamp)
+
+	dataRoot := NewDataRoot(db.baseDir, dag.Name)
+	run, err := dataRoot.FindByRequestID(ctx, reqID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find run: %w", err)
+	}
+
+	record, err := run.CreateRecord(ctx, ts, db.cache, WithDAG(dag))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create record: %w", err)
+	}
+
+	return record, nil
+}
+
 // NewSubRecord creates a new history record for the specified sub-workflow run.
 func (db *JSONDB) NewSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, rootDAG digraph.RootDAG) (persistence.Record, error) {
 	if reqID == "" {

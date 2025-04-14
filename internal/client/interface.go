@@ -15,7 +15,6 @@ type Client interface {
 	Grep(ctx context.Context, pattern string) ([]*persistence.GrepResult, []string, error)
 	Move(ctx context.Context, oldLoc, newLoc string) error
 	Stop(ctx context.Context, dag *digraph.DAG) error
-	StartAsync(ctx context.Context, dag *digraph.DAG, opts StartOptions)
 	Start(ctx context.Context, dag *digraph.DAG, opts StartOptions) error
 	Restart(ctx context.Context, dag *digraph.DAG, opts RestartOptions) error
 	Retry(ctx context.Context, dag *digraph.DAG, requestID string) error

@@ -11,6 +11,7 @@ import { RunDetailsContext } from '../../contexts/DAGStatusContext';
 import { components } from '../../api/v2/schema';
 import { useQuery } from '../../hooks/api';
 import { AppBarContext } from '../../contexts/AppBarContext';
+import DAGGraph from '../molecules/DAGGraph';
 
 type Props = {
   location: string;
@@ -47,8 +48,21 @@ type HistoryTableProps = {
 };
 
 function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
-  const [idx, setIdx] = React.useState(runs ? runs.length - 1 : 0);
+  const idxParam = new URLSearchParams(window.location.search).get('idx');
+  const [idx, setIdx] = React.useState(
+    idxParam ? parseInt(idxParam) : runs && runs.length ? runs.length - 1 : 0
+  );
   const dagStatusContext = React.useContext(RunDetailsContext);
+  const updateIdx = (newIdx: number) => {
+    setIdx(newIdx);
+    const params = new URLSearchParams(window.location.search);
+    params.set('idx', newIdx.toString());
+    window.history.replaceState(
+      {},
+      '',
+      `${window.location.pathname}?${params}`
+    );
+  };
 
   let handlers: components['schemas']['Node'][] | null = null;
   if (runs && idx < runs.length && runs[idx]) {
@@ -73,7 +87,7 @@ function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
             <HistoryTable
               runs={reversedRuns || []}
               gridData={gridData || []}
-              onSelect={setIdx}
+              onSelect={updateIdx}
               idx={idx}
             />
           </Box>
@@ -81,8 +95,9 @@ function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
           {reversedRuns && reversedRuns[idx] ? (
             <React.Fragment>
               <Box sx={{ mt: 3 }}>
-                <SubTitle>Status</SubTitle>
+                <DAGGraph run={reversedRuns[idx]} />
                 <Box sx={{ mt: 2 }}>
+                  <SubTitle>Status</SubTitle>
                   <DAGStatusOverview
                     status={reversedRuns[idx]}
                     requestId={reversedRuns[idx].requestId}

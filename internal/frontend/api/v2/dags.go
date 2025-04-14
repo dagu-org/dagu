@@ -424,9 +424,11 @@ func (a *API) StartDAG(ctx context.Context, request api.StartDAGRequestObject) (
 			Message:    "DAG is already running",
 		}
 	}
-	a.client.StartAsync(ctx, status.DAG, client.StartOptions{
+	if err := a.client.Start(ctx, status.DAG, client.StartOptions{
 		Params: value(request.Body.Params),
-	})
+	}); err != nil {
+		return nil, fmt.Errorf("error starting DAG: %w", err)
+	}
 	return api.StartDAG200Response{}, nil
 }
 
@@ -451,6 +453,31 @@ func (a *API) StopDAG(ctx context.Context, request api.StopDAGRequestObject) (ap
 	return api.StopDAG200Response{}, nil
 }
 
+// RetryDAG implements api.StrictServerInterface.
+func (a *API) RetryDAG(ctx context.Context, request api.RetryDAGRequestObject) (api.RetryDAGResponseObject, error) {
+	status, err := a.client.GetDAGStatus(ctx, request.DagLocation)
+	if err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("DAG %s not found", request.DagLocation),
+		}
+	}
+	if status.Status.Status == scheduler.StatusRunning {
+		return nil, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeAlreadyRunning,
+			Message:    "DAG is already running",
+		}
+	}
+
+	if err := a.client.Retry(ctx, status.DAG, request.Body.RequestId); err != nil {
+		return nil, fmt.Errorf("error retrying DAG: %w", err)
+	}
+
+	return api.RetryDAG200Response{}, nil
+}
+
 // PostDAGAction implements api.StrictServerInterface.
 func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionRequestObject) (api.PostDAGActionResponseObject, error) {
 	action := request.Body.Action
@@ -473,9 +500,12 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "DAG is already running",
 			}
 		}
-		a.client.StartAsync(ctx, status.DAG, client.StartOptions{
+		err := a.client.Start(ctx, status.DAG, client.StartOptions{
 			Params: value(request.Body.Params),
 		})
+		if err != nil {
+			return nil, fmt.Errorf("error starting DAG: %w", err)
+		}
 		return api.PostDAGAction200JSONResponse{}, nil
 
 	case api.DAGActionSuspend:

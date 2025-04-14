@@ -116,6 +116,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dags/{dagLocation}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry a DAG
+         * @description Retries the last run of a specific DAG
+         */
+        post: operations["retryDAG"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dags/{dagLocation}/runs": {
         parameters: {
             query?: never;
@@ -897,6 +917,46 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    retryDAG: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description location of the DAG file */
+                dagLocation: components["parameters"]["DAGLocation"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Request ID of the DAG run to retry */
+                    requestId: string;
+                };
+            };
+        };
         responses: {
             /** @description A successful response */
             200: {
