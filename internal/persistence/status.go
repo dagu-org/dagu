@@ -169,6 +169,16 @@ func (st *Status) SetStatusToErrorIfRunning() {
 	}
 }
 
+// NodesByName returns a slice of nodes with the specified name
+func (st *Status) NodeByName(name string) (*Node, error) {
+	for _, node := range st.Nodes {
+		if node.Step.Name == name {
+			return node, nil
+		}
+	}
+	return nil, fmt.Errorf("node %s not found", name)
+}
+
 // PID represents a process ID for a running DAG run
 type PID int
 

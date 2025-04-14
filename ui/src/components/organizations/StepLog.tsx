@@ -1,13 +1,17 @@
-import { Box } from '@mui/material';
+import { Box, Stack } from '@mui/material';
 import React from 'react';
 import BorderedBox from '../atoms/BorderedBox';
+import LabeledItem from '../atoms/LabeledItem';
 import LoadingIndicator from '../atoms/LoadingIndicator';
+import NodeStatusChip from '../molecules/NodeStatusChip';
 import { useQuery } from '../../hooks/api';
 import { AppBarContext } from '../../contexts/AppBarContext';
+import { components } from '../../api/v2/schema';
 
 type Props = {
-  name: string;
+  dagName: string;
   requestId: string;
+  stepName: string;
 };
 
 // Credit: https://github.com/chalk/ansi-regex/commit/02fa893d619d3da85411acc8fd4e2eea0e95a9d9 under MIT license
@@ -16,17 +20,18 @@ const ANSI_CODES_REGEX = [
   '(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-nq-uy=><~]))',
 ].join('|');
 
-function ExecutionLog({ name, requestId }: Props) {
+function StepLog({ dagName: location, requestId, stepName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const { data } = useQuery(
-    '/runs/{dagName}/{requestId}/log',
+    '/runs/{dagName}/{requestId}/{stepName}/log',
     {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          dagName: name,
+          dagName: location,
+          stepName,
           requestId,
         },
       },
@@ -65,4 +70,4 @@ function ExecutionLog({ name, requestId }: Props) {
   );
 }
 
-export default ExecutionLog;
+export default StepLog;

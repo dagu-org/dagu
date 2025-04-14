@@ -199,6 +199,9 @@ type DAGFile struct {
 	Suspended bool `json:"suspended"`
 }
 
+// DAGLocation location of the DAG file
+type DAGLocation = string
+
 // DAGLogGridItem Grid item for log visualization
 type DAGLogGridItem struct {
 	// History Status of the step ordered by time
@@ -208,7 +211,7 @@ type DAGLogGridItem struct {
 	Name string `json:"name"`
 }
 
-// DAGName Name of the DAG, must be unique
+// DAGName Name of the DAG
 type DAGName = string
 
 // Error Generic error response object
@@ -375,7 +378,7 @@ type RunDetails struct {
 	// Log Path to the log file
 	Log string `json:"log"`
 
-	// Name Name of the DAG, must be unique
+	// Name Name of the DAG
 	Name DAGName `json:"name"`
 
 	// Nodes Status of individual steps within the DAG
@@ -425,7 +428,7 @@ type RunSummary struct {
 	// Log Path to the log file
 	Log string `json:"log"`
 
-	// Name Name of the DAG, must be unique
+	// Name Name of the DAG
 	Name DAGName `json:"name"`
 
 	// Params Runtime parameters passed to the DAG in JSON format
@@ -553,6 +556,9 @@ type PerPage = int
 // RemoteNode defines model for RemoteNode.
 type RemoteNode = string
 
+// StepName defines model for StepName.
+type StepName = string
+
 // ListDAGsParams defines parameters for ListDAGs.
 type ListDAGsParams struct {
 	// Page page number of items to fetch (default is 1)
@@ -573,7 +579,7 @@ type ListDAGsParams struct {
 
 // CreateDAGJSONBody defines parameters for CreateDAG.
 type CreateDAGJSONBody struct {
-	// Name Name of the DAG, must be unique
+	// Name Name of the DAG
 	Name DAGName `json:"name"`
 }
 
@@ -678,6 +684,12 @@ type GetRunLogParams struct {
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
+// GetStepLogParams defines parameters for GetStepLog.
+type GetStepLogParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
 // CreateDAGJSONRequestBody defines body for CreateDAG for application/json ContentType.
 type CreateDAGJSONRequestBody CreateDAGJSONBody
 
@@ -702,32 +714,35 @@ type ServerInterface interface {
 	// (GET /dags/tags)
 	ListTags(w http.ResponseWriter, r *http.Request, params ListTagsParams)
 	// Delete a DAG
-	// (DELETE /dags/{dagName})
-	DeleteDAG(w http.ResponseWriter, r *http.Request, dagName DAGName, params DeleteDAGParams)
+	// (DELETE /dags/{dagLocation})
+	DeleteDAG(w http.ResponseWriter, r *http.Request, dagLocation DAGLocation, params DeleteDAGParams)
 	// Get DAG details
-	// (GET /dags/{dagName})
-	GetDAGDetails(w http.ResponseWriter, r *http.Request, dagName DAGName, params GetDAGDetailsParams)
+	// (GET /dags/{dagLocation})
+	GetDAGDetails(w http.ResponseWriter, r *http.Request, dagLocation DAGLocation, params GetDAGDetailsParams)
 	// Perform an action on a DAG
-	// (POST /dags/{dagName})
-	PostDAGAction(w http.ResponseWriter, r *http.Request, dagName DAGName, params PostDAGActionParams)
+	// (POST /dags/{dagLocation})
+	PostDAGAction(w http.ResponseWriter, r *http.Request, dagLocation DAGLocation, params PostDAGActionParams)
 	// Get history of DAG runs
-	// (GET /dags/{dagName}/runs)
-	GetDAGRunHistory(w http.ResponseWriter, r *http.Request, dagName DAGName, params GetDAGRunHistoryParams)
+	// (GET /dags/{dagLocation}/runs)
+	GetDAGRunHistory(w http.ResponseWriter, r *http.Request, dagLocation DAGLocation, params GetDAGRunHistoryParams)
 	// Get latest run status
-	// (GET /dags/{dagName}/runs/{requestId})
-	GetDAGRunStatus(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, params GetDAGRunStatusParams)
+	// (GET /dags/{dagLocation}/runs/{requestId})
+	GetDAGRunStatus(w http.ResponseWriter, r *http.Request, dagLocation DAGLocation, requestId RequestId, params GetDAGRunStatusParams)
 	// Get DAG Spec
-	// (GET /dags/{dagName}/spec)
-	GetDAGSpec(w http.ResponseWriter, r *http.Request, dagName DAGName, params GetDAGSpecParams)
+	// (GET /dags/{dagLocation}/spec)
+	GetDAGSpec(w http.ResponseWriter, r *http.Request, dagLocation DAGLocation, params GetDAGSpecParams)
 	// Update DAG Spec
-	// (PUT /dags/{dagName}/spec)
-	UpdateDAGSpec(w http.ResponseWriter, r *http.Request, dagName DAGName, params UpdateDAGSpecParams)
+	// (PUT /dags/{dagLocation}/spec)
+	UpdateDAGSpec(w http.ResponseWriter, r *http.Request, dagLocation DAGLocation, params UpdateDAGSpecParams)
 	// Health check endpoint
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
 	// Get content of a log file
 	// (GET /runs/{dagName}/{requestId}/log)
 	GetRunLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, params GetRunLogParams)
+	// Get content of a step log file
+	// (GET /runs/{dagName}/{requestId}/{stepName}/log)
+	GetStepLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, stepName StepName, params GetStepLogParams)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -759,44 +774,44 @@ func (_ Unimplemented) ListTags(w http.ResponseWriter, r *http.Request, params L
 }
 
 // Delete a DAG
-// (DELETE /dags/{dagName})
-func (_ Unimplemented) DeleteDAG(w http.ResponseWriter, r *http.Request, dagName DAGName, params DeleteDAGParams) {
+// (DELETE /dags/{dagLocation})
+func (_ Unimplemented) DeleteDAG(w http.ResponseWriter, r *http.Request, dagLocation DAGLocation, params DeleteDAGParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Get DAG details
-// (GET /dags/{dagName})
-func (_ Unimplemented) GetDAGDetails(w http.ResponseWriter, r *http.Request, dagName DAGName, params GetDAGDetailsParams) {
+// (GET /dags/{dagLocation})
+func (_ Unimplemented) GetDAGDetails(w http.ResponseWriter, r *http.Request, dagLocation DAGLocation, params GetDAGDetailsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Perform an action on a DAG
-// (POST /dags/{dagName})
-func (_ Unimplemented) PostDAGAction(w http.ResponseWriter, r *http.Request, dagName DAGName, params PostDAGActionParams) {
+// (POST /dags/{dagLocation})
+func (_ Unimplemented) PostDAGAction(w http.ResponseWriter, r *http.Request, dagLocation DAGLocation, params PostDAGActionParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Get history of DAG runs
-// (GET /dags/{dagName}/runs)
-func (_ Unimplemented) GetDAGRunHistory(w http.ResponseWriter, r *http.Request, dagName DAGName, params GetDAGRunHistoryParams) {
+// (GET /dags/{dagLocation}/runs)
+func (_ Unimplemented) GetDAGRunHistory(w http.ResponseWriter, r *http.Request, dagLocation DAGLocation, params GetDAGRunHistoryParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Get latest run status
-// (GET /dags/{dagName}/runs/{requestId})
-func (_ Unimplemented) GetDAGRunStatus(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, params GetDAGRunStatusParams) {
+// (GET /dags/{dagLocation}/runs/{requestId})
+func (_ Unimplemented) GetDAGRunStatus(w http.ResponseWriter, r *http.Request, dagLocation DAGLocation, requestId RequestId, params GetDAGRunStatusParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Get DAG Spec
-// (GET /dags/{dagName}/spec)
-func (_ Unimplemented) GetDAGSpec(w http.ResponseWriter, r *http.Request, dagName DAGName, params GetDAGSpecParams) {
+// (GET /dags/{dagLocation}/spec)
+func (_ Unimplemented) GetDAGSpec(w http.ResponseWriter, r *http.Request, dagLocation DAGLocation, params GetDAGSpecParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Update DAG Spec
-// (PUT /dags/{dagName}/spec)
-func (_ Unimplemented) UpdateDAGSpec(w http.ResponseWriter, r *http.Request, dagName DAGName, params UpdateDAGSpecParams) {
+// (PUT /dags/{dagLocation}/spec)
+func (_ Unimplemented) UpdateDAGSpec(w http.ResponseWriter, r *http.Request, dagLocation DAGLocation, params UpdateDAGSpecParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -809,6 +824,12 @@ func (_ Unimplemented) GetHealth(w http.ResponseWriter, r *http.Request) {
 // Get content of a log file
 // (GET /runs/{dagName}/{requestId}/log)
 func (_ Unimplemented) GetRunLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, params GetRunLogParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get content of a step log file
+// (GET /runs/{dagName}/{requestId}/{stepName}/log)
+func (_ Unimplemented) GetStepLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, stepName StepName, params GetStepLogParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1013,12 +1034,12 @@ func (siw *ServerInterfaceWrapper) DeleteDAG(w http.ResponseWriter, r *http.Requ
 
 	var err error
 
-	// ------------- Path parameter "dagName" -------------
-	var dagName DAGName
+	// ------------- Path parameter "dagLocation" -------------
+	var dagLocation DAGLocation
 
-	err = runtime.BindStyledParameterWithOptions("simple", "dagName", chi.URLParam(r, "dagName"), &dagName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "dagLocation", chi.URLParam(r, "dagLocation"), &dagLocation, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagName", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagLocation", Err: err})
 		return
 	}
 
@@ -1042,7 +1063,7 @@ func (siw *ServerInterfaceWrapper) DeleteDAG(w http.ResponseWriter, r *http.Requ
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteDAG(w, r, dagName, params)
+		siw.Handler.DeleteDAG(w, r, dagLocation, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1057,12 +1078,12 @@ func (siw *ServerInterfaceWrapper) GetDAGDetails(w http.ResponseWriter, r *http.
 
 	var err error
 
-	// ------------- Path parameter "dagName" -------------
-	var dagName DAGName
+	// ------------- Path parameter "dagLocation" -------------
+	var dagLocation DAGLocation
 
-	err = runtime.BindStyledParameterWithOptions("simple", "dagName", chi.URLParam(r, "dagName"), &dagName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "dagLocation", chi.URLParam(r, "dagLocation"), &dagLocation, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagName", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagLocation", Err: err})
 		return
 	}
 
@@ -1086,7 +1107,7 @@ func (siw *ServerInterfaceWrapper) GetDAGDetails(w http.ResponseWriter, r *http.
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDAGDetails(w, r, dagName, params)
+		siw.Handler.GetDAGDetails(w, r, dagLocation, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1101,12 +1122,12 @@ func (siw *ServerInterfaceWrapper) PostDAGAction(w http.ResponseWriter, r *http.
 
 	var err error
 
-	// ------------- Path parameter "dagName" -------------
-	var dagName DAGName
+	// ------------- Path parameter "dagLocation" -------------
+	var dagLocation DAGLocation
 
-	err = runtime.BindStyledParameterWithOptions("simple", "dagName", chi.URLParam(r, "dagName"), &dagName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "dagLocation", chi.URLParam(r, "dagLocation"), &dagLocation, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagName", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagLocation", Err: err})
 		return
 	}
 
@@ -1130,7 +1151,7 @@ func (siw *ServerInterfaceWrapper) PostDAGAction(w http.ResponseWriter, r *http.
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostDAGAction(w, r, dagName, params)
+		siw.Handler.PostDAGAction(w, r, dagLocation, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1145,12 +1166,12 @@ func (siw *ServerInterfaceWrapper) GetDAGRunHistory(w http.ResponseWriter, r *ht
 
 	var err error
 
-	// ------------- Path parameter "dagName" -------------
-	var dagName DAGName
+	// ------------- Path parameter "dagLocation" -------------
+	var dagLocation DAGLocation
 
-	err = runtime.BindStyledParameterWithOptions("simple", "dagName", chi.URLParam(r, "dagName"), &dagName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "dagLocation", chi.URLParam(r, "dagLocation"), &dagLocation, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagName", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagLocation", Err: err})
 		return
 	}
 
@@ -1174,7 +1195,7 @@ func (siw *ServerInterfaceWrapper) GetDAGRunHistory(w http.ResponseWriter, r *ht
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDAGRunHistory(w, r, dagName, params)
+		siw.Handler.GetDAGRunHistory(w, r, dagLocation, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1189,12 +1210,12 @@ func (siw *ServerInterfaceWrapper) GetDAGRunStatus(w http.ResponseWriter, r *htt
 
 	var err error
 
-	// ------------- Path parameter "dagName" -------------
-	var dagName DAGName
+	// ------------- Path parameter "dagLocation" -------------
+	var dagLocation DAGLocation
 
-	err = runtime.BindStyledParameterWithOptions("simple", "dagName", chi.URLParam(r, "dagName"), &dagName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "dagLocation", chi.URLParam(r, "dagLocation"), &dagLocation, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagName", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagLocation", Err: err})
 		return
 	}
 
@@ -1227,7 +1248,7 @@ func (siw *ServerInterfaceWrapper) GetDAGRunStatus(w http.ResponseWriter, r *htt
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDAGRunStatus(w, r, dagName, requestId, params)
+		siw.Handler.GetDAGRunStatus(w, r, dagLocation, requestId, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1242,12 +1263,12 @@ func (siw *ServerInterfaceWrapper) GetDAGSpec(w http.ResponseWriter, r *http.Req
 
 	var err error
 
-	// ------------- Path parameter "dagName" -------------
-	var dagName DAGName
+	// ------------- Path parameter "dagLocation" -------------
+	var dagLocation DAGLocation
 
-	err = runtime.BindStyledParameterWithOptions("simple", "dagName", chi.URLParam(r, "dagName"), &dagName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "dagLocation", chi.URLParam(r, "dagLocation"), &dagLocation, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagName", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagLocation", Err: err})
 		return
 	}
 
@@ -1271,7 +1292,7 @@ func (siw *ServerInterfaceWrapper) GetDAGSpec(w http.ResponseWriter, r *http.Req
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDAGSpec(w, r, dagName, params)
+		siw.Handler.GetDAGSpec(w, r, dagLocation, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1286,12 +1307,12 @@ func (siw *ServerInterfaceWrapper) UpdateDAGSpec(w http.ResponseWriter, r *http.
 
 	var err error
 
-	// ------------- Path parameter "dagName" -------------
-	var dagName DAGName
+	// ------------- Path parameter "dagLocation" -------------
+	var dagLocation DAGLocation
 
-	err = runtime.BindStyledParameterWithOptions("simple", "dagName", chi.URLParam(r, "dagName"), &dagName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "dagLocation", chi.URLParam(r, "dagLocation"), &dagLocation, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagName", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagLocation", Err: err})
 		return
 	}
 
@@ -1315,7 +1336,7 @@ func (siw *ServerInterfaceWrapper) UpdateDAGSpec(w http.ResponseWriter, r *http.
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateDAGSpec(w, r, dagName, params)
+		siw.Handler.UpdateDAGSpec(w, r, dagLocation, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1391,6 +1412,68 @@ func (siw *ServerInterfaceWrapper) GetRunLog(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetRunLog(w, r, dagName, requestId, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetStepLog operation middleware
+func (siw *ServerInterfaceWrapper) GetStepLog(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "dagName" -------------
+	var dagName DAGName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagName", chi.URLParam(r, "dagName"), &dagName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "requestId" -------------
+	var requestId RequestId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "requestId", chi.URLParam(r, "requestId"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "requestId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "stepName" -------------
+	var stepName StepName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "stepName", chi.URLParam(r, "stepName"), &stepName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "stepName", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetStepLogParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetStepLog(w, r, dagName, requestId, stepName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1526,31 +1609,34 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/dags/tags", wrapper.ListTags)
 	})
 	r.Group(func(r chi.Router) {
-		r.Delete(options.BaseURL+"/dags/{dagName}", wrapper.DeleteDAG)
+		r.Delete(options.BaseURL+"/dags/{dagLocation}", wrapper.DeleteDAG)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dags/{dagName}", wrapper.GetDAGDetails)
+		r.Get(options.BaseURL+"/dags/{dagLocation}", wrapper.GetDAGDetails)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/dags/{dagName}", wrapper.PostDAGAction)
+		r.Post(options.BaseURL+"/dags/{dagLocation}", wrapper.PostDAGAction)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dags/{dagName}/runs", wrapper.GetDAGRunHistory)
+		r.Get(options.BaseURL+"/dags/{dagLocation}/runs", wrapper.GetDAGRunHistory)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dags/{dagName}/runs/{requestId}", wrapper.GetDAGRunStatus)
+		r.Get(options.BaseURL+"/dags/{dagLocation}/runs/{requestId}", wrapper.GetDAGRunStatus)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dags/{dagName}/spec", wrapper.GetDAGSpec)
+		r.Get(options.BaseURL+"/dags/{dagLocation}/spec", wrapper.GetDAGSpec)
 	})
 	r.Group(func(r chi.Router) {
-		r.Put(options.BaseURL+"/dags/{dagName}/spec", wrapper.UpdateDAGSpec)
+		r.Put(options.BaseURL+"/dags/{dagLocation}/spec", wrapper.UpdateDAGSpec)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/health", wrapper.GetHealth)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/runs/{dagName}/{requestId}/log", wrapper.GetRunLog)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/runs/{dagName}/{requestId}/{stepName}/log", wrapper.GetStepLog)
 	})
 
 	return r
@@ -1690,8 +1776,8 @@ func (response ListTagsdefaultJSONResponse) VisitListTagsResponse(w http.Respons
 }
 
 type DeleteDAGRequestObject struct {
-	DagName DAGName `json:"dagName"`
-	Params  DeleteDAGParams
+	DagLocation DAGLocation `json:"dagLocation"`
+	Params      DeleteDAGParams
 }
 
 type DeleteDAGResponseObject interface {
@@ -1728,8 +1814,8 @@ func (response DeleteDAGdefaultJSONResponse) VisitDeleteDAGResponse(w http.Respo
 }
 
 type GetDAGDetailsRequestObject struct {
-	DagName DAGName `json:"dagName"`
-	Params  GetDAGDetailsParams
+	DagLocation DAGLocation `json:"dagLocation"`
+	Params      GetDAGDetailsParams
 }
 
 type GetDAGDetailsResponseObject interface {
@@ -1770,9 +1856,9 @@ func (response GetDAGDetailsdefaultJSONResponse) VisitGetDAGDetailsResponse(w ht
 }
 
 type PostDAGActionRequestObject struct {
-	DagName DAGName `json:"dagName"`
-	Params  PostDAGActionParams
-	Body    *PostDAGActionJSONRequestBody
+	DagLocation DAGLocation `json:"dagLocation"`
+	Params      PostDAGActionParams
+	Body        *PostDAGActionJSONRequestBody
 }
 
 type PostDAGActionResponseObject interface {
@@ -1801,8 +1887,8 @@ func (response PostDAGActiondefaultJSONResponse) VisitPostDAGActionResponse(w ht
 }
 
 type GetDAGRunHistoryRequestObject struct {
-	DagName DAGName `json:"dagName"`
-	Params  GetDAGRunHistoryParams
+	DagLocation DAGLocation `json:"dagLocation"`
+	Params      GetDAGRunHistoryParams
 }
 
 type GetDAGRunHistoryResponseObject interface {
@@ -1837,9 +1923,9 @@ func (response GetDAGRunHistorydefaultJSONResponse) VisitGetDAGRunHistoryRespons
 }
 
 type GetDAGRunStatusRequestObject struct {
-	DagName   DAGName   `json:"dagName"`
-	RequestId RequestId `json:"requestId"`
-	Params    GetDAGRunStatusParams
+	DagLocation DAGLocation `json:"dagLocation"`
+	RequestId   RequestId   `json:"requestId"`
+	Params      GetDAGRunStatusParams
 }
 
 type GetDAGRunStatusResponseObject interface {
@@ -1871,8 +1957,8 @@ func (response GetDAGRunStatusdefaultJSONResponse) VisitGetDAGRunStatusResponse(
 }
 
 type GetDAGSpecRequestObject struct {
-	DagName DAGName `json:"dagName"`
-	Params  GetDAGSpecParams
+	DagLocation DAGLocation `json:"dagLocation"`
+	Params      GetDAGSpecParams
 }
 
 type GetDAGSpecResponseObject interface {
@@ -1910,9 +1996,9 @@ func (response GetDAGSpecdefaultJSONResponse) VisitGetDAGSpecResponse(w http.Res
 }
 
 type UpdateDAGSpecRequestObject struct {
-	DagName DAGName `json:"dagName"`
-	Params  UpdateDAGSpecParams
-	Body    *UpdateDAGSpecJSONRequestBody
+	DagLocation DAGLocation `json:"dagLocation"`
+	Params      UpdateDAGSpecParams
+	Body        *UpdateDAGSpecJSONRequestBody
 }
 
 type UpdateDAGSpecResponseObject interface {
@@ -2016,6 +2102,47 @@ func (response GetRunLogdefaultJSONResponse) VisitGetRunLogResponse(w http.Respo
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
+type GetStepLogRequestObject struct {
+	DagName   DAGName   `json:"dagName"`
+	RequestId RequestId `json:"requestId"`
+	StepName  StepName  `json:"stepName"`
+	Params    GetStepLogParams
+}
+
+type GetStepLogResponseObject interface {
+	VisitGetStepLogResponse(w http.ResponseWriter) error
+}
+
+type GetStepLog200JSONResponse Log
+
+func (response GetStepLog200JSONResponse) VisitGetStepLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetStepLog404JSONResponse Error
+
+func (response GetStepLog404JSONResponse) VisitGetStepLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetStepLogdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetStepLogdefaultJSONResponse) VisitGetStepLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// List DAGs
@@ -2031,25 +2158,25 @@ type StrictServerInterface interface {
 	// (GET /dags/tags)
 	ListTags(ctx context.Context, request ListTagsRequestObject) (ListTagsResponseObject, error)
 	// Delete a DAG
-	// (DELETE /dags/{dagName})
+	// (DELETE /dags/{dagLocation})
 	DeleteDAG(ctx context.Context, request DeleteDAGRequestObject) (DeleteDAGResponseObject, error)
 	// Get DAG details
-	// (GET /dags/{dagName})
+	// (GET /dags/{dagLocation})
 	GetDAGDetails(ctx context.Context, request GetDAGDetailsRequestObject) (GetDAGDetailsResponseObject, error)
 	// Perform an action on a DAG
-	// (POST /dags/{dagName})
+	// (POST /dags/{dagLocation})
 	PostDAGAction(ctx context.Context, request PostDAGActionRequestObject) (PostDAGActionResponseObject, error)
 	// Get history of DAG runs
-	// (GET /dags/{dagName}/runs)
+	// (GET /dags/{dagLocation}/runs)
 	GetDAGRunHistory(ctx context.Context, request GetDAGRunHistoryRequestObject) (GetDAGRunHistoryResponseObject, error)
 	// Get latest run status
-	// (GET /dags/{dagName}/runs/{requestId})
+	// (GET /dags/{dagLocation}/runs/{requestId})
 	GetDAGRunStatus(ctx context.Context, request GetDAGRunStatusRequestObject) (GetDAGRunStatusResponseObject, error)
 	// Get DAG Spec
-	// (GET /dags/{dagName}/spec)
+	// (GET /dags/{dagLocation}/spec)
 	GetDAGSpec(ctx context.Context, request GetDAGSpecRequestObject) (GetDAGSpecResponseObject, error)
 	// Update DAG Spec
-	// (PUT /dags/{dagName}/spec)
+	// (PUT /dags/{dagLocation}/spec)
 	UpdateDAGSpec(ctx context.Context, request UpdateDAGSpecRequestObject) (UpdateDAGSpecResponseObject, error)
 	// Health check endpoint
 	// (GET /health)
@@ -2057,6 +2184,9 @@ type StrictServerInterface interface {
 	// Get content of a log file
 	// (GET /runs/{dagName}/{requestId}/log)
 	GetRunLog(ctx context.Context, request GetRunLogRequestObject) (GetRunLogResponseObject, error)
+	// Get content of a step log file
+	// (GET /runs/{dagName}/{requestId}/{stepName}/log)
+	GetStepLog(ctx context.Context, request GetStepLogRequestObject) (GetStepLogResponseObject, error)
 }
 
 type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
@@ -2200,10 +2330,10 @@ func (sh *strictHandler) ListTags(w http.ResponseWriter, r *http.Request, params
 }
 
 // DeleteDAG operation middleware
-func (sh *strictHandler) DeleteDAG(w http.ResponseWriter, r *http.Request, dagName DAGName, params DeleteDAGParams) {
+func (sh *strictHandler) DeleteDAG(w http.ResponseWriter, r *http.Request, dagLocation DAGLocation, params DeleteDAGParams) {
 	var request DeleteDAGRequestObject
 
-	request.DagName = dagName
+	request.DagLocation = dagLocation
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
@@ -2227,10 +2357,10 @@ func (sh *strictHandler) DeleteDAG(w http.ResponseWriter, r *http.Request, dagNa
 }
 
 // GetDAGDetails operation middleware
-func (sh *strictHandler) GetDAGDetails(w http.ResponseWriter, r *http.Request, dagName DAGName, params GetDAGDetailsParams) {
+func (sh *strictHandler) GetDAGDetails(w http.ResponseWriter, r *http.Request, dagLocation DAGLocation, params GetDAGDetailsParams) {
 	var request GetDAGDetailsRequestObject
 
-	request.DagName = dagName
+	request.DagLocation = dagLocation
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
@@ -2254,10 +2384,10 @@ func (sh *strictHandler) GetDAGDetails(w http.ResponseWriter, r *http.Request, d
 }
 
 // PostDAGAction operation middleware
-func (sh *strictHandler) PostDAGAction(w http.ResponseWriter, r *http.Request, dagName DAGName, params PostDAGActionParams) {
+func (sh *strictHandler) PostDAGAction(w http.ResponseWriter, r *http.Request, dagLocation DAGLocation, params PostDAGActionParams) {
 	var request PostDAGActionRequestObject
 
-	request.DagName = dagName
+	request.DagLocation = dagLocation
 	request.Params = params
 
 	var body PostDAGActionJSONRequestBody
@@ -2288,10 +2418,10 @@ func (sh *strictHandler) PostDAGAction(w http.ResponseWriter, r *http.Request, d
 }
 
 // GetDAGRunHistory operation middleware
-func (sh *strictHandler) GetDAGRunHistory(w http.ResponseWriter, r *http.Request, dagName DAGName, params GetDAGRunHistoryParams) {
+func (sh *strictHandler) GetDAGRunHistory(w http.ResponseWriter, r *http.Request, dagLocation DAGLocation, params GetDAGRunHistoryParams) {
 	var request GetDAGRunHistoryRequestObject
 
-	request.DagName = dagName
+	request.DagLocation = dagLocation
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
@@ -2315,10 +2445,10 @@ func (sh *strictHandler) GetDAGRunHistory(w http.ResponseWriter, r *http.Request
 }
 
 // GetDAGRunStatus operation middleware
-func (sh *strictHandler) GetDAGRunStatus(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, params GetDAGRunStatusParams) {
+func (sh *strictHandler) GetDAGRunStatus(w http.ResponseWriter, r *http.Request, dagLocation DAGLocation, requestId RequestId, params GetDAGRunStatusParams) {
 	var request GetDAGRunStatusRequestObject
 
-	request.DagName = dagName
+	request.DagLocation = dagLocation
 	request.RequestId = requestId
 	request.Params = params
 
@@ -2343,10 +2473,10 @@ func (sh *strictHandler) GetDAGRunStatus(w http.ResponseWriter, r *http.Request,
 }
 
 // GetDAGSpec operation middleware
-func (sh *strictHandler) GetDAGSpec(w http.ResponseWriter, r *http.Request, dagName DAGName, params GetDAGSpecParams) {
+func (sh *strictHandler) GetDAGSpec(w http.ResponseWriter, r *http.Request, dagLocation DAGLocation, params GetDAGSpecParams) {
 	var request GetDAGSpecRequestObject
 
-	request.DagName = dagName
+	request.DagLocation = dagLocation
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
@@ -2370,10 +2500,10 @@ func (sh *strictHandler) GetDAGSpec(w http.ResponseWriter, r *http.Request, dagN
 }
 
 // UpdateDAGSpec operation middleware
-func (sh *strictHandler) UpdateDAGSpec(w http.ResponseWriter, r *http.Request, dagName DAGName, params UpdateDAGSpecParams) {
+func (sh *strictHandler) UpdateDAGSpec(w http.ResponseWriter, r *http.Request, dagLocation DAGLocation, params UpdateDAGSpecParams) {
 	var request UpdateDAGSpecRequestObject
 
-	request.DagName = dagName
+	request.DagLocation = dagLocation
 	request.Params = params
 
 	var body UpdateDAGSpecJSONRequestBody
@@ -2455,89 +2585,119 @@ func (sh *strictHandler) GetRunLog(w http.ResponseWriter, r *http.Request, dagNa
 	}
 }
 
+// GetStepLog operation middleware
+func (sh *strictHandler) GetStepLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, stepName StepName, params GetStepLogParams) {
+	var request GetStepLogRequestObject
+
+	request.DagName = dagName
+	request.RequestId = requestId
+	request.StepName = stepName
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetStepLog(ctx, request.(GetStepLogRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetStepLog")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetStepLogResponseObject); ok {
+		if err := validResponse.VisitGetStepLogResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"AAD//6aKHPPlYQAA",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

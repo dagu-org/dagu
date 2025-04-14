@@ -502,6 +502,38 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /runs/{dagName}/{requestId}/{stepName}/log:
+    get:
+      summary: "Get content of a step log file"
+      description: "Returns the content of a log file for a specific step in a run"
+      operationId: "getStepLog"
+      tags:
+        - "runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/RequestId"
+        - $ref: "#/components/parameters/StepName"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Log"
+        "404":
+          description: "Log file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   securitySchemes:
     basicAuth:
@@ -549,6 +581,14 @@ components:
       required: true
       schema:
         $ref: "#/components/schemas/DAGName"
+
+    StepName:
+      name: stepName
+      in: path
+      description: name of the step
+      required: true
+      schema:
+        type: string
 
     RemoteNode:
       name: remoteNode

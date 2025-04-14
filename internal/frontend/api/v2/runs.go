@@ -16,19 +16,12 @@ func (a *API) GetRunLog(ctx context.Context, request api.GetRunLogRequestObject)
 	dagName := request.DagName
 	requestId := request.RequestId
 
-	// FIXME: Load DAG from the runs database
-	dagWithStatus, err := a.client.GetStatus(ctx, dagName)
+	status, err := a.client.GetStatus(ctx, dagName, requestId)
 	if err != nil {
-		return nil, fmt.Errorf("error getting latest status: %w", err)
-	}
-
-	status := dagWithStatus.Status
-	if requestId != "latest" {
-		s, err := a.client.GetStatusByRequestID(ctx, dagWithStatus.DAG, requestId)
-		if err != nil {
-			return nil, fmt.Errorf("error getting status by request ID: %w", err)
-		}
-		status = *s
+		return api.GetRunLog404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("request ID %s not found for DAG %s", requestId, dagName),
+		}, nil
 	}
 
 	content, err := a.readFileContent(ctx, status.Log, nil)
@@ -37,6 +30,37 @@ func (a *API) GetRunLog(ctx context.Context, request api.GetRunLogRequestObject)
 	}
 
 	return api.GetRunLog200JSONResponse{
+		Content: string(content),
+	}, nil
+}
+
+// GetStepLog implements api.StrictServerInterface.
+func (a *API) GetStepLog(ctx context.Context, request api.GetStepLogRequestObject) (api.GetStepLogResponseObject, error) {
+	dagName := request.DagName
+	requestId := request.RequestId
+
+	status, err := a.client.GetStatus(ctx, dagName, requestId)
+	if err != nil {
+		return api.GetStepLog404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("request ID %s not found for DAG %s", requestId, dagName),
+		}, nil
+	}
+
+	node, err := status.NodeByName(request.StepName)
+	if err != nil {
+		return api.GetStepLog404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, dagName),
+		}, nil
+	}
+
+	content, err := a.readFileContent(ctx, node.Log, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error reading %s: %w", status.Log, err)
+	}
+
+	return api.GetStepLog200JSONResponse{
 		Content: string(content),
 	}, nil
 }

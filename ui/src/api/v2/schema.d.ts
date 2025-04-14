@@ -200,6 +200,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/runs/{dagName}/{requestId}/{stepName}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get content of a step log file
+         * @description Returns the content of a log file for a specific step in a run
+         */
+        get: operations["getStepLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -523,6 +543,8 @@ export interface components {
         DAGLocation: components["schemas"]["DAGLocation"];
         /** @description name of the DAG */
         DAGName: components["schemas"]["DAGName"];
+        /** @description name of the step */
+        StepName: string;
         /** @description name of the remote node */
         RemoteNode: string;
         /** @description request ID of the DAG run or latest run if specified as 'latest' */
@@ -1036,6 +1058,54 @@ export interface operations {
                 dagName: components["parameters"]["DAGName"];
                 /** @description request ID of the DAG run or latest run if specified as 'latest' */
                 requestId: components["parameters"]["RequestId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Log"];
+                };
+            };
+            /** @description Log file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getStepLog: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                dagName: components["parameters"]["DAGName"];
+                /** @description request ID of the DAG run or latest run if specified as 'latest' */
+                requestId: components["parameters"]["RequestId"];
+                /** @description name of the step */
+                stepName: components["parameters"]["StepName"];
             };
             cookie?: never;
         };

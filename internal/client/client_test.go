@@ -59,7 +59,7 @@ func TestClient_GetStatus(t *testing.T) {
 		ctx := th.Context
 		cli := th.Client
 
-		dagStatus, err := cli.GetStatus(ctx, "invalid-dag-name")
+		dagStatus, err := cli.GetDAGStatus(ctx, "invalid-dag-name")
 		require.Error(t, err)
 		require.NotNil(t, dagStatus)
 
@@ -126,7 +126,7 @@ func TestClient_RunDAG(t *testing.T) {
 
 	t.Run("RunDAG", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "run_dag.yaml"))
-		dagStatus, err := th.Client.GetStatus(th.Context, dag.Location)
+		dagStatus, err := th.Client.GetDAGStatus(th.Context, dag.Location)
 		require.NoError(t, err)
 
 		err = th.Client.Start(th.Context, dagStatus.DAG, client.StartOptions{})
@@ -268,11 +268,11 @@ steps:
 		// Create a DAG to rename.
 		id, err := cli.CreateDAG(ctx, "old_name")
 		require.NoError(t, err)
-		_, err = cli.GetStatus(ctx, filepath.Join(th.Config.Paths.DAGsDir, id+".yaml"))
+		_, err = cli.GetDAGStatus(ctx, filepath.Join(th.Config.Paths.DAGsDir, id+".yaml"))
 		require.NoError(t, err)
 
 		// Rename the file.
-		err = cli.Rename(ctx, id, id+"_renamed")
+		err = cli.Move(ctx, id, id+"_renamed")
 
 		// Check if the file is renamed.
 		require.NoError(t, err)
@@ -290,7 +290,7 @@ func TestClient_ReadHistory(t *testing.T) {
 		cli := th.Client
 		dag := th.DAG(t, filepath.Join("client", "empty_status.yaml"))
 
-		_, err := cli.GetStatus(ctx, dag.Location)
+		_, err := cli.GetDAGStatus(ctx, dag.Location)
 		require.NoError(t, err)
 	})
 	t.Run("TestClient_All", func(t *testing.T) {
