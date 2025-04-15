@@ -14,33 +14,35 @@ function DAGEditButtons({ location }: Props) {
     <Stack direction="row" spacing={1}>
       <Button
         onClick={async () => {
-          const val = window.prompt('Please input the new DAG name', '');
-          if (!val) {
+          const newLocation = window.prompt(
+            'Please input the new DAG name',
+            ''
+          );
+          if (!newLocation) {
             return;
           }
-          if (val.indexOf(' ') != -1) {
+          if (newLocation.indexOf(' ') != -1) {
             alert('DAG name cannot contain space');
             return;
           }
-          const url = `${getConfig().apiURL}/dags/${location}?remoteNode=${
-            appBarContext.selectedRemoteNode || 'local'
-          }`;
-          const resp = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
+          const { error } = await client.POST('/dags/{dagLocation}/move', {
+            params: {
+              path: {
+                dagLocation: location,
+              },
             },
-            body: JSON.stringify({
-              action: 'rename',
-              value: val,
-            }),
+            query: {
+              remoteNode: appBarContext.selectedRemoteNode || 'local',
+            },
+            body: {
+              newLocation: newLocation,
+            },
           });
-          if (resp.ok) {
-            window.location.href = `${getConfig().basePath}/dags/${val}`;
-          } else {
-            const e = await resp.text();
-            alert(e);
+          if (error) {
+            alert(error.message || 'An error occurred');
+            return;
           }
+          window.location.href = `${getConfig().basePath}/dags/${newLocation}`;
         }}
       >
         Rename

@@ -12,12 +12,12 @@ import (
 type Client interface {
 	CreateDAG(ctx context.Context, loc string) (string, error)
 	GetDAGSpec(ctx context.Context, loc string) (string, error)
-	Grep(ctx context.Context, pattern string) ([]*persistence.GrepResult, []string, error)
-	Move(ctx context.Context, oldLoc, newLoc string) error
-	Stop(ctx context.Context, dag *digraph.DAG) error
-	Start(ctx context.Context, dag *digraph.DAG, opts StartOptions) error
-	Restart(ctx context.Context, dag *digraph.DAG, opts RestartOptions) error
-	Retry(ctx context.Context, dag *digraph.DAG, requestID string) error
+	GrepDAG(ctx context.Context, pattern string) ([]*persistence.GrepResult, []string, error)
+	MoveDAG(ctx context.Context, oldLoc, newLoc string) error
+	StopDAG(ctx context.Context, dag *digraph.DAG) error
+	StartDAG(ctx context.Context, dag *digraph.DAG, opts StartOptions) error
+	RestartDAG(ctx context.Context, dag *digraph.DAG, opts RestartOptions) error
+	RetryDAG(ctx context.Context, dag *digraph.DAG, requestID string) error
 	GetCurrentStatus(ctx context.Context, dag *digraph.DAG) (*persistence.Status, error)
 	GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, requestID string) (*persistence.Status, error)
 	GetLatestStatus(ctx context.Context, dag *digraph.DAG) (persistence.Status, error)

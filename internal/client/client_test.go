@@ -129,7 +129,7 @@ func TestClient_RunDAG(t *testing.T) {
 		dagStatus, err := th.Client.GetDAGStatus(th.Context, dag.Location)
 		require.NoError(t, err)
 
-		err = th.Client.Start(th.Context, dagStatus.DAG, client.StartOptions{})
+		err = th.Client.StartDAG(th.Context, dagStatus.DAG, client.StartOptions{})
 		require.NoError(t, err)
 
 		status, err := th.Client.GetLatestStatus(th.Context, dagStatus.DAG)
@@ -140,12 +140,12 @@ func TestClient_RunDAG(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "stop.yaml"))
 		ctx := th.Context
 
-		err := th.Client.Start(ctx, dag.DAG, client.StartOptions{})
+		err := th.Client.StartDAG(ctx, dag.DAG, client.StartOptions{})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusRunning)
 
-		err = th.Client.Stop(ctx, dag.DAG)
+		err = th.Client.StopDAG(ctx, dag.DAG)
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusCancel)
@@ -154,7 +154,7 @@ func TestClient_RunDAG(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "restart.yaml"))
 		ctx := th.Context
 
-		err := th.Client.Restart(ctx, dag.DAG, client.RestartOptions{})
+		err := th.Client.RestartDAG(ctx, dag.DAG, client.RestartOptions{})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
@@ -164,7 +164,7 @@ func TestClient_RunDAG(t *testing.T) {
 		ctx := th.Context
 		cli := th.Client
 
-		err := cli.Start(ctx, dag.DAG, client.StartOptions{Params: "x y z"})
+		err := cli.StartDAG(ctx, dag.DAG, client.StartOptions{Params: "x y z"})
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish
@@ -179,7 +179,7 @@ func TestClient_RunDAG(t *testing.T) {
 
 		time.Sleep(1 * time.Second)
 
-		err = cli.Retry(ctx, dag.DAG, previousRequestID)
+		err = cli.RetryDAG(ctx, dag.DAG, previousRequestID)
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish
@@ -273,7 +273,7 @@ steps:
 		require.NoError(t, err)
 
 		// Rename the file.
-		err = cli.Move(ctx, id, id+"_renamed")
+		err = cli.MoveDAG(ctx, id, id+"_renamed")
 
 		// Check if the file is renamed.
 		require.NoError(t, err)
