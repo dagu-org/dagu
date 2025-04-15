@@ -48,7 +48,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/dags/{dagLocation}": {
+    "/dags/{fileId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -66,13 +66,13 @@ export interface paths {
          * Delete an existing DAG
          * @description Permanently removes a DAG definition from the system
          */
-        delete: operations["deleteDAGByLocation"];
+        delete: operations["deleteDAGByFileId"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/dags/{dagLocation}/start": {
+    "/dags/{fileId}/start": {
         parameters: {
             query?: never;
             header?: never;
@@ -92,7 +92,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/dags/{dagLocation}/stop": {
+    "/dags/{fileId}/stop": {
         parameters: {
             query?: never;
             header?: never;
@@ -112,7 +112,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/dags/{dagLocation}/retry": {
+    "/dags/{fileId}/retry": {
         parameters: {
             query?: never;
             header?: never;
@@ -132,7 +132,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/dags/{dagLocation}/runs": {
+    "/dags/{fileId}/runs": {
         parameters: {
             query?: never;
             header?: never;
@@ -152,7 +152,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/dags/{dagLocation}/runs/{requestId}": {
+    "/dags/{fileId}/runs/{requestId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -172,7 +172,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/dags/{dagLocation}/spec": {
+    "/dags/{fileId}/spec": {
         parameters: {
             query?: never;
             header?: never;
@@ -196,7 +196,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/dags/{dagLocation}/suspend": {
+    "/dags/{fileId}/suspend": {
         parameters: {
             query?: never;
             header?: never;
@@ -216,7 +216,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/dags/{dagLocation}/move": {
+    "/dags/{fileId}/rename": {
         parameters: {
             query?: never;
             header?: never;
@@ -226,10 +226,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Rename or relocate a DAG
-         * @description Changes the location or name of an existing DAG
+         * Change DAG file ID
+         * @description Changes the file ID of the DAG
          */
-        post: operations["moveDAGLocation"];
+        post: operations["renameDAG"];
         delete?: never;
         options?: never;
         head?: never;
@@ -357,7 +357,7 @@ export interface components {
          * Format: regex
          * @description location of the DAG file
          */
-        DAGLocation: string;
+        DAGFileId: string;
         /**
          * Format: regex
          * @description Name of the DAG
@@ -396,6 +396,8 @@ export interface components {
         };
         /** @description DAG file with its status information */
         DAGFile: {
+            /** @description File ID of the DAG file */
+            fileId: string;
             dag: components["schemas"]["DAG"];
             latestRun: components["schemas"]["RunSummary"];
             /** @description Whether the DAG is suspended */
@@ -636,8 +638,8 @@ export interface components {
         Page: number;
         /** @description number of items per page (default is 30, max is 100) */
         PerPage: number;
-        /** @description location of the DAG file */
-        DAGLocation: components["schemas"]["DAGLocation"];
+        /** @description File Id of the DAG file */
+        DAGFileId: components["schemas"]["DAGFileId"];
         /** @description name of the DAG */
         DAGName: components["schemas"]["DAGName"];
         /** @description name of the step */
@@ -775,8 +777,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description location of the DAG file */
-                dagLocation: components["parameters"]["DAGLocation"];
+                /** @description File Id of the DAG file */
+                fileId: components["parameters"]["DAGFileId"];
             };
             cookie?: never;
         };
@@ -809,7 +811,7 @@ export interface operations {
             };
         };
     };
-    deleteDAGByLocation: {
+    deleteDAGByFileId: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -817,8 +819,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description location of the DAG file */
-                dagLocation: components["parameters"]["DAGLocation"];
+                /** @description File Id of the DAG file */
+                fileId: components["parameters"]["DAGFileId"];
             };
             cookie?: never;
         };
@@ -859,8 +861,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description location of the DAG file */
-                dagLocation: components["parameters"]["DAGLocation"];
+                /** @description File Id of the DAG file */
+                fileId: components["parameters"]["DAGFileId"];
             };
             cookie?: never;
         };
@@ -899,8 +901,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description location of the DAG file */
-                dagLocation: components["parameters"]["DAGLocation"];
+                /** @description File Id of the DAG file */
+                fileId: components["parameters"]["DAGFileId"];
             };
             cookie?: never;
         };
@@ -932,8 +934,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description location of the DAG file */
-                dagLocation: components["parameters"]["DAGLocation"];
+                /** @description File Id of the DAG file */
+                fileId: components["parameters"]["DAGFileId"];
             };
             cookie?: never;
         };
@@ -972,8 +974,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description location of the DAG file */
-                dagLocation: components["parameters"]["DAGLocation"];
+                /** @description File Id of the DAG file */
+                fileId: components["parameters"]["DAGFileId"];
             };
             cookie?: never;
         };
@@ -1012,8 +1014,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description location of the DAG file */
-                dagLocation: components["parameters"]["DAGLocation"];
+                /** @description File Id of the DAG file */
+                fileId: components["parameters"]["DAGFileId"];
                 /** @description request ID of the DAG run or latest run if specified as 'latest' */
                 requestId: components["parameters"]["RequestId"];
             };
@@ -1051,8 +1053,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description location of the DAG file */
-                dagLocation: components["parameters"]["DAGLocation"];
+                /** @description File Id of the DAG file */
+                fileId: components["parameters"]["DAGFileId"];
             };
             cookie?: never;
         };
@@ -1092,8 +1094,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description location of the DAG file */
-                dagLocation: components["parameters"]["DAGLocation"];
+                /** @description File Id of the DAG file */
+                fileId: components["parameters"]["DAGFileId"];
             };
             cookie?: never;
         };
@@ -1137,8 +1139,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description location of the DAG file */
-                dagLocation: components["parameters"]["DAGLocation"];
+                /** @description File Id of the DAG file */
+                fileId: components["parameters"]["DAGFileId"];
             };
             cookie?: never;
         };
@@ -1178,7 +1180,7 @@ export interface operations {
             };
         };
     };
-    moveDAGLocation: {
+    renameDAG: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -1186,16 +1188,16 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description location of the DAG file */
-                dagLocation: components["parameters"]["DAGLocation"];
+                /** @description File Id of the DAG file */
+                fileId: components["parameters"]["DAGFileId"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description New location of the DAG */
-                    newLocation: string;
+                    /** @description New file ID for the DAG */
+                    newFileId: string;
                 };
             };
         };

@@ -14,35 +14,35 @@ function DAGEditButtons({ location }: Props) {
     <Stack direction="row" spacing={1}>
       <Button
         onClick={async () => {
-          const newLocation = window.prompt(
-            'Please input the new DAG name',
+          const newFileId = window.prompt(
+            'Please input the new DAG file ID',
             ''
           );
-          if (!newLocation) {
+          if (!newFileId) {
             return;
           }
-          if (newLocation.indexOf(' ') != -1) {
-            alert('DAG name cannot contain space');
+          if (newFileId.indexOf(' ') != -1) {
+            alert('DAG file ID cannot contain space');
             return;
           }
-          const { error } = await client.POST('/dags/{dagLocation}/move', {
+          const { error } = await client.POST('/dags/{fileId}/rename', {
             params: {
               path: {
-                dagLocation: location,
+                fileId: location,
               },
             },
             query: {
               remoteNode: appBarContext.selectedRemoteNode || 'local',
             },
             body: {
-              newLocation: newLocation,
+              newFileId: newFileId,
             },
           });
           if (error) {
             alert(error.message || 'An error occurred');
             return;
           }
-          window.location.href = `${getConfig().basePath}/dags/${newLocation}`;
+          window.location.href = `${getConfig().basePath}/dags/${newFileId}`;
         }}
       >
         Rename
@@ -52,10 +52,10 @@ function DAGEditButtons({ location }: Props) {
           if (!confirm('Are you sure to delete the DAG?')) {
             return;
           }
-          const { error } = await client.DELETE('/dags/{dagLocation}', {
+          const { error } = await client.DELETE('/dags/{fileId}', {
             params: {
               path: {
-                dagLocation: location,
+                fileId: location,
               },
               query: {
                 remoteNode: appBarContext.selectedRemoteNode || 'local',

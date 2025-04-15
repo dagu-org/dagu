@@ -15,10 +15,10 @@ function LiveSwitch({ dag, refresh, inputProps }: Props) {
   const [checked, setChecked] = React.useState(!dag.suspended);
   const onSubmit = React.useCallback(
     async (suspend: boolean) => {
-      const { error } = await client.POST('/dags/{dagLocation}/suspend', {
+      const { error } = await client.POST('/dags/{fileId}/suspend', {
         params: {
           path: {
-            dagLocation: dag.dag.location,
+            fileId: dag.dag.location,
           },
         },
         body: {
@@ -29,7 +29,7 @@ function LiveSwitch({ dag, refresh, inputProps }: Props) {
         alert(error.message || 'Error occurred');
         return;
       }
-      mutate(['/dags/{dagLocation}']);
+      mutate(['/dags/{fileId}']);
     },
     [refresh]
   );

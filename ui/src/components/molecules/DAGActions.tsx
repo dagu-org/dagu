@@ -40,8 +40,8 @@ function DAGActions({ status, location, dag, refresh, label = true }: Props) {
   const client = useClient();
   const mutate = useMutate();
   const reloadData = () => {
-    mutate(['/dags/{dagLocation}']);
-    mutate(['/dags/{dagLocation}/runs']);
+    mutate(['/dags/{fileId}']);
+    mutate(['/dags/{fileId}/runs']);
     refresh && refresh();
   };
 
@@ -109,13 +109,13 @@ function DAGActions({ status, location, dag, refresh, label = true }: Props) {
         dismissModal={() => setIsStopModal(false)}
         onSubmit={async () => {
           setIsStopModal(false);
-          const { error } = await client.POST('/dags/{dagLocation}/stop', {
+          const { error } = await client.POST('/dags/{fileId}/stop', {
             params: {
               query: {
                 remoteNode: appBarContext.selectedRemoteNode || 'local',
               },
               path: {
-                dagLocation: location,
+                fileId: location,
               },
             },
           });
@@ -135,10 +135,10 @@ function DAGActions({ status, location, dag, refresh, label = true }: Props) {
         dismissModal={() => setIsRetryModal(false)}
         onSubmit={async () => {
           setIsRetryModal(false);
-          const { error } = await client.POST('/dags/{dagLocation}/retry', {
+          const { error } = await client.POST('/dags/{fileId}/retry', {
             params: {
               path: {
-                dagLocation: location,
+                fileId: location,
               },
               query: {
                 remoteNode: appBarContext.selectedRemoteNode || 'local',
@@ -166,10 +166,10 @@ function DAGActions({ status, location, dag, refresh, label = true }: Props) {
         visible={isStartModal}
         onSubmit={async (params) => {
           setIsStartModal(false);
-          const { error } = await client.POST('/dags/{dagLocation}/start', {
+          const { error } = await client.POST('/dags/{fileId}/start', {
             params: {
               path: {
-                dagLocation: location,
+                fileId: location,
               },
               query: {
                 remoteNode: appBarContext.selectedRemoteNode || 'local',

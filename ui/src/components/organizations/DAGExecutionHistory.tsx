@@ -21,14 +21,14 @@ type Props = {
 function DAGExecutionHistory({ location }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const { data } = useQuery(
-    '/dags/{dagLocation}/runs',
+    '/dags/{fileId}/runs',
     {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          dagLocation: location,
+          fileId: location,
         },
       },
     },
@@ -117,8 +117,8 @@ function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
       alert(error.message || 'An error occurred');
       return;
     }
-    mutate(['/dags/{dagLocation}']);
-    mutate(['/dags/{dagLocation}/runs']);
+    mutate(['/dags/{fileId}']);
+    mutate(['/dags/{fileId}/runs']);
     dismissModal();
   };
 

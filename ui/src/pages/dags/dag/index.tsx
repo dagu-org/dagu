@@ -30,14 +30,14 @@ function DAGDetails() {
   const appBarContext = React.useContext(AppBarContext);
   const { pathname } = useLocation();
   const { data, isLoading, mutate } = useQuery(
-    '/dags/{dagLocation}',
+    '/dags/{fileId}',
     {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          dagLocation: params.location || '',
+          fileId: params.location || '',
         },
       },
     },

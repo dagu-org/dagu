@@ -42,14 +42,14 @@ function DAGSpec({ location }: Props) {
     [setCookie, flowchart, setFlowchart]
   );
   const { data, isLoading } = useQuery(
-    '/dags/{dagLocation}/spec',
+    '/dags/{fileId}/spec',
     {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          dagLocation: location,
+          fileId: location,
         },
       },
     },
@@ -184,11 +184,11 @@ function DAGSpec({ location }: Props) {
                             return;
                           }
                           const { data, error } = await client.PUT(
-                            '/dags/{dagLocation}/spec',
+                            '/dags/{fileId}/spec',
                             {
                               params: {
                                 path: {
-                                  dagLocation: props.location,
+                                  fileId: props.location,
                                 },
                                 query: {
                                   remoteNode:
@@ -209,7 +209,7 @@ function DAGSpec({ location }: Props) {
                             return;
                           }
                           setEditing(false);
-                          mutate(['/dags/{dagLocation}/spec']);
+                          mutate(['/dags/{fileId}/spec']);
                           mutate(['/dags']);
                           props.refresh();
                         }}
