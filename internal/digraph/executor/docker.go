@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"sync"
 
 	"github.com/containerd/platforms"
@@ -47,13 +48,35 @@ steps:
 ```
 */
 
+type PullPolicy int
+
+const (
+	Always PullPolicy = iota
+	Never
+	Newer
+	Missing
+)
+
+func ParsePullPolicy(s string) PullPolicy {
+	switch s {
+	case "always":
+		return Always
+	case "never":
+		return Never
+	case "newer":
+		return Newer
+	default:
+		return Missing
+	}
+}
+
 var _ Executor = (*docker)(nil)
 
 type docker struct {
 	image         string
 	platform      string
 	containerName string
-	pull          string
+	pull          PullPolicy
 	autoRemove    bool
 	step          digraph.Step
 	stdout        io.Writer
@@ -413,12 +436,20 @@ func newDocker(
 		}
 	}
 
-	pull := ""
+	pull := Missing
 	if value, ok := execCfg.Config["pull"].(string); ok {
-		var err error
-		pull, err = digraph.EvalString(ctx, value)
+		value, err := digraph.EvalString(ctx, value)
 		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate pull: %w", err)
+			return nil, fmt.Errorf("failed to evaluate pull policy: %w", err)
+		}
+
+		boolPull, err := strconv.ParseBool(value)
+		if err != nil {
+			pull = ParsePullPolicy(value)
+		} else if boolPull {
+			pull = Always
+		} else {
+			pull = Never
 		}
 	}
 
