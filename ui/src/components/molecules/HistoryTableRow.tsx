@@ -1,11 +1,11 @@
 import { TableCell } from '@mui/material';
 import React, { CSSProperties } from 'react';
-import { GridData } from '../../models/api';
 import { statusColorMapping } from '../../consts';
 import StyledTableRow from '../atoms/StyledTableRow';
+import { components } from '../../api/v2/schema';
 
 type Props = {
-  data: GridData;
+  data: components['schemas']['DAGGridItem'];
   onSelect: (idx: number) => void;
   idx: number;
 };
@@ -13,16 +13,16 @@ type Props = {
 function HistoryTableRow({ data, onSelect, idx }: Props) {
   return (
     <StyledTableRow>
-      <TableCell>{data.Name}</TableCell>
-      {[...data.Vals].reverse().map((status, i) => {
+      <TableCell>{data.name}</TableCell>
+      {[...data.history].reverse().map((status, i) => {
         const style: CSSProperties = { ...circleStyle };
         const tdStyle: CSSProperties = { maxWidth: '22px' };
         if (i == idx) {
           tdStyle.backgroundColor = '#FFDDAD';
         }
         if (status != 0) {
-          style.backgroundColor = statusColorMapping[status].backgroundColor;
-          style.color = statusColorMapping[status].color;
+          style.backgroundColor = statusColorMapping[status]?.backgroundColor;
+          style.color = statusColorMapping[status]?.color;
         }
         return (
           <TableCell

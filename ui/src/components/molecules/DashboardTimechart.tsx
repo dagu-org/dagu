@@ -4,11 +4,10 @@ import moment, { MomentInput } from 'moment-timezone';
 import { Timeline, DataSet } from 'vis-timeline/standalone';
 import 'vis-timeline/styles/vis-timeline-graph2d.css';
 import { statusColorMapping } from '../../consts';
-import { DAGStatus } from '../../models';
-import { WorkflowListItem } from '../../models/api';
 import { useConfig } from '../../contexts/ConfigContext';
+import { components } from '../../api/v2/schema';
 
-type Props = { data: DAGStatus[] | WorkflowListItem[] };
+type Props = { data: components['schemas']['DAGFile'][] };
 
 type TimelineItem = {
   id: string;
@@ -19,7 +18,7 @@ type TimelineItem = {
   className: string;
 };
 
-function DashboardTimechart({ data: input }: Props) {
+function DashboardTimeChart({ data: input }: Props) {
   const timelineRef = useRef<HTMLDivElement>(null);
   const timelineInstance = useRef<Timeline | null>(null);
   const config = useConfig();
@@ -31,23 +30,22 @@ function DashboardTimechart({ data: input }: Props) {
     const now = moment();
     const startOfDay = moment().startOf('day');
 
-    input.forEach((wf) => {
-      const status = wf.Status;
-      const start = status?.StartedAt;
+    input.forEach((item) => {
+      const dag = item.dag;
+      const run = item.latestRun;
+      const status = run.status;
+      const start = run.startedAt;
       if (start && start !== '-') {
         const startMoment = moment(start);
-        const end =
-          status.FinishedAt && status.FinishedAt !== '-'
-            ? moment(status.FinishedAt)
-            : now;
+        const end = run.finishedAt !== '-' ? moment(run.finishedAt) : now;
 
         items.push({
-          id: status.Name + `_${status.RequestId}`,
-          content: status.Name,
+          id: dag.name + `_${run.requestId}`,
+          content: dag.name,
           start: startMoment.tz(config.tz).toDate(),
           end: end.tz(config.tz).toDate(),
           group: 'main',
-          className: `status-${status.Status}`,
+          className: `status-${status}`,
         });
       }
     });
@@ -160,4 +158,4 @@ function TimelineWrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default DashboardTimechart;
+export default DashboardTimeChart;

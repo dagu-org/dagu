@@ -1,25 +1,4 @@
-import {
-  DAG,
-  DAGStatus,
-  Node,
-  NodeStatus,
-  Schedule,
-  SchedulerStatus,
-  StatusFile,
-} from './index';
-
-export type GetDAGResponse = {
-  Title: string;
-  Charset: string;
-  DAG?: DAGStatus;
-  Graph: string;
-  Definition: string;
-  LogData: LogData;
-  LogUrl: string;
-  StepLog?: LogFile;
-  ScLog?: LogFile;
-  Errors: string[];
-};
+import { DAG, Schedule } from './index';
 
 export type GetSearchResponse = {
   Errors: string[];
@@ -38,38 +17,6 @@ export type Match = {
   StartLine: number;
 };
 
-export type LogData = {
-  GridData: GridData[];
-  Logs: StatusFile[];
-};
-
-export type LogFile = {
-  Step?: Node;
-  LogFile: string;
-  Content: string;
-};
-
-export type GridData = {
-  Name: string;
-  Vals: NodeStatus[];
-};
-
-export type ListWorkflowsResponse = {
-  DAGs?: WorkflowListItem[];
-  Errors?: string[];
-  HasError: boolean;
-  PageCount: number;
-};
-
-export type WorkflowListItem = {
-  File: string;
-  Dir: string;
-  Status?: WorkflowStatus;
-  Suspended: boolean;
-  Error: string;
-  DAG: Workflow;
-};
-
 export type Workflow = {
   Name: string;
   Group: string;
@@ -78,16 +25,4 @@ export type Workflow = {
   Params: string[];
   DefaultParams?: string;
   Schedule: Schedule[];
-};
-
-export type WorkflowStatus = {
-  RequestId: string;
-  Name: string;
-  Status: SchedulerStatus;
-  StatusText: string;
-  Pid: number;
-  StartedAt: string;
-  FinishedAt: string;
-  Log: string;
-  Params: string;
 };

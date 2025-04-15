@@ -1,11 +1,6 @@
 import React, { CSSProperties } from 'react';
 import { stepTabColStyles } from '../../consts';
-import { useDAGPostAPI } from '../../hooks/useDAGPostAPI';
-import { Node } from '../../models';
-import { SchedulerStatus, Status } from '../../models';
-import { Step } from '../../models';
 import NodeStatusTableRow from './NodeStatusTableRow';
-import StatusUpdateModal from './StatusUpdateModal';
 import {
   Table,
   TableBody,
@@ -14,38 +9,15 @@ import {
   TableRow,
 } from '@mui/material';
 import BorderedBox from '../atoms/BorderedBox';
+import { components } from '../../api/v2/schema';
 
 type Props = {
-  nodes?: Node[];
-  file?: string;
-  status: Status;
-  name: string;
-  refresh: () => void;
+  nodes?: components['schemas']['Node'][];
+  status: components['schemas']['RunDetails'];
+  fileId: string;
 };
 
-function NodeStatusTable({ nodes, status, name, refresh, file = '' }: Props) {
-  const [modal, setModal] = React.useState(false);
-  const [current, setCurrent] = React.useState<Step | undefined>(undefined);
-  const { doPost } = useDAGPostAPI({
-    name,
-    onSuccess: refresh,
-    requestId: status.RequestId,
-  });
-  const requireModal = (step: Step) => {
-    if (
-      status?.Status != SchedulerStatus.Running &&
-      status?.Status != SchedulerStatus.None
-    ) {
-      setCurrent(step);
-      setModal(true);
-    }
-  };
-  const dismissModal = () => setModal(false);
-  const onUpdateStatus = async (step: Step, action: string) => {
-    doPost(action, step.Name);
-    dismissModal();
-    refresh();
-  };
+function NodeStatusTable({ nodes, status, fileId }: Props) {
   const styles = stepTabColStyles;
   let i = 0;
   if (!nodes || !nodes.length) {
@@ -72,23 +44,16 @@ function NodeStatusTable({ nodes, status, name, refresh, file = '' }: Props) {
           <TableBody>
             {nodes.map((n, idx) => (
               <NodeStatusTableRow
-                key={n.Step.Name}
+                key={n.step.name}
                 rownum={idx + 1}
                 node={n}
-                file={file}
-                name={name}
-                onRequireModal={requireModal}
+                requestId={status.requestId}
+                name={fileId}
               ></NodeStatusTableRow>
             ))}
           </TableBody>
         </Table>
       </BorderedBox>
-      <StatusUpdateModal
-        visible={modal}
-        step={current}
-        dismissModal={dismissModal}
-        onSubmit={onUpdateStatus}
-      />
     </React.Fragment>
   );
 }

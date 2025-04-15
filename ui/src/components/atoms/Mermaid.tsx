@@ -8,7 +8,6 @@ type Props = {
   scale: number;
 };
 
-// Mermaidの初期設定
 mermaid.initialize({
   securityLevel: 'loose',
   startOnLoad: false,
@@ -107,7 +106,6 @@ function Mermaid({ def, style = {}, scale }: Props) {
   );
 }
 
-// メモ化の条件を維持
 export default React.memo(Mermaid, (prev, next) => {
   return prev.def === next.def && prev.scale === next.scale;
 });

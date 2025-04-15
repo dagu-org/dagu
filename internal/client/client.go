@@ -13,7 +13,6 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/sock"
@@ -54,6 +53,10 @@ var (
 `)
 )
 
+func (e *client) LoadYAML(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error) {
+	return e.dagStore.LoadSpec(ctx, spec, opts...)
+}
+
 func (e *client) GetDAGSpec(ctx context.Context, id string) (string, error) {
 	return e.dagStore.GetSpec(ctx, id)
 }
@@ -66,33 +69,33 @@ func (e *client) CreateDAG(ctx context.Context, name string) (string, error) {
 	return id, nil
 }
 
-func (e *client) Grep(ctx context.Context, pattern string) (
+func (e *client) GrepDAG(ctx context.Context, pattern string) (
 	[]*persistence.GrepResult, []string, error,
 ) {
 	return e.dagStore.Grep(ctx, pattern)
 }
 
-func (e *client) Rename(ctx context.Context, oldID, newID string) error {
-	oldDAG, err := e.dagStore.GetMetadata(ctx, oldID)
+func (e *client) MoveDAG(ctx context.Context, oldLoc, newLoc string) error {
+	oldDAG, err := e.dagStore.GetMetadata(ctx, oldLoc)
 	if err != nil {
-		return fmt.Errorf("failed to get metadata for %s: %w", oldID, err)
+		return fmt.Errorf("failed to get metadata for %s: %w", oldLoc, err)
 	}
-	if err := e.dagStore.Rename(ctx, oldID, newID); err != nil {
+	if err := e.dagStore.Rename(ctx, oldLoc, newLoc); err != nil {
 		return err
 	}
-	newDAG, err := e.dagStore.GetMetadata(ctx, newID)
+	newDAG, err := e.dagStore.GetMetadata(ctx, newLoc)
 	if err != nil {
-		return fmt.Errorf("failed to get metadata for %s: %w", newID, err)
+		return fmt.Errorf("failed to get metadata for %s: %w", newLoc, err)
 	}
 	if err := e.historyStore.Rename(ctx, oldDAG.Name, newDAG.Name); err != nil {
-		return fmt.Errorf("failed to rename history for %s: %w", oldID, err)
+		return fmt.Errorf("failed to rename history for %s: %w", oldLoc, err)
 	}
 	return nil
 }
 
-func (e *client) Stop(ctx context.Context, dag *digraph.DAG) error {
+func (e *client) StopDAG(ctx context.Context, dag *digraph.DAG) error {
 	logger.Info(ctx, "Stopping", "name", dag.Name)
-	addr := dag.SockAddr()
+	addr := dag.SockAddr("") // FIXME: Should handle the case of dynamic DAG
 	if !fileutil.FileExists(addr) {
 		logger.Info(ctx, "The DAG is not running", "name", dag.Name)
 		return nil
@@ -102,15 +105,7 @@ func (e *client) Stop(ctx context.Context, dag *digraph.DAG) error {
 	return err
 }
 
-func (e *client) StartAsync(ctx context.Context, dag *digraph.DAG, opts StartOptions) {
-	go func() {
-		if err := e.Start(ctx, dag, opts); err != nil {
-			logger.Error(ctx, "DAG start operation failed", "err", err)
-		}
-	}()
-}
-
-func (e *client) Start(_ context.Context, dag *digraph.DAG, opts StartOptions) error {
+func (e *client) StartDAG(_ context.Context, dag *digraph.DAG, opts StartOptions) error {
 	args := []string{"start"}
 	if opts.Params != "" {
 		args = append(args, "-p")
@@ -128,14 +123,10 @@ func (e *client) Start(_ context.Context, dag *digraph.DAG, opts StartOptions) e
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	err := cmd.Start()
-	if err != nil {
-		return err
-	}
-	return cmd.Wait()
+	return cmd.Start()
 }
 
-func (e *client) Restart(_ context.Context, dag *digraph.DAG, opts RestartOptions) error {
+func (e *client) RestartDAG(_ context.Context, dag *digraph.DAG, opts RestartOptions) error {
 	args := []string{"restart"}
 	if opts.Quiet {
 		args = append(args, "-q")
@@ -146,14 +137,10 @@ func (e *client) Restart(_ context.Context, dag *digraph.DAG, opts RestartOption
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	cmd.Dir = e.workDir
 	cmd.Env = os.Environ()
-	err := cmd.Start()
-	if err != nil {
-		return err
-	}
-	return cmd.Wait()
+	return cmd.Start()
 }
 
-func (e *client) Retry(_ context.Context, dag *digraph.DAG, requestID string) error {
+func (e *client) RetryDAG(_ context.Context, dag *digraph.DAG, requestID string) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--request-id=%s", requestID))
 	args = append(args, dag.Location)
@@ -162,15 +149,12 @@ func (e *client) Retry(_ context.Context, dag *digraph.DAG, requestID string) er
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	cmd.Dir = e.workDir
 	cmd.Env = os.Environ()
-	err := cmd.Start()
-	if err != nil {
-		return err
-	}
-	return cmd.Wait()
+	return cmd.Start()
 }
 
 func (*client) GetCurrentStatus(_ context.Context, dag *digraph.DAG) (*persistence.Status, error) {
-	client := sock.NewClient(dag.SockAddr())
+	// FIXME: Should handle the case of dynamic DAG
+	client := sock.NewClient(dag.SockAddr(""))
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
@@ -181,6 +165,18 @@ func (*client) GetCurrentStatus(_ context.Context, dag *digraph.DAG) (*persisten
 		return &status, nil
 	}
 	return persistence.StatusFromJSON(ret)
+}
+
+func (e *client) GetStatus(ctx context.Context, name string, requestID string) (*persistence.Status, error) {
+	record, err := e.historyStore.FindByRequestID(ctx, name, requestID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find status by request id: %w", err)
+	}
+	latestStatus, err := record.ReadStatus(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read status: %w", err)
+	}
+	return latestStatus, nil
 }
 
 func (e *client) GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, requestID string) (
@@ -196,7 +192,7 @@ func (e *client) GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, req
 	}
 
 	// If the DAG is running, set the currentStatus to error if the request ID does not match
-	// Because the DAG execution must be stopped
+	// Because the DAG run must be stopped
 	// TODO: Handle different request IDs for the same DAG
 	currentStatus, _ := e.GetCurrentStatus(ctx, dag)
 	if currentStatus != nil && currentStatus.RequestID != requestID {
@@ -207,7 +203,8 @@ func (e *client) GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, req
 }
 
 func (*client) currentStatus(_ context.Context, dag *digraph.DAG) (*persistence.Status, error) {
-	client := sock.NewClient(dag.SockAddr())
+	// FIXME: Should handle the case of dynamic DAG
+	client := sock.NewClient(dag.SockAddr(""))
 	statusJSON, err := client.Request("GET", "/status")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get status: %w", err)
@@ -247,38 +244,21 @@ handleError:
 	return persistence.NewStatusFactory(dag).Default(), err
 }
 
-func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []persistence.Execution {
-	records := e.historyStore.Recent(ctx, dag.Name, n)
+func (e *client) GetRecentHistory(ctx context.Context, name string, n int) []persistence.Run {
+	records := e.historyStore.Recent(ctx, name, n)
 
-	var executions []persistence.Execution
+	var runs []persistence.Run
 	for _, record := range records {
-		if execution, err := record.ReadExecution(ctx); err == nil {
-			executions = append(executions, *execution)
+		if run, err := record.ReadRun(ctx); err == nil {
+			runs = append(runs, *run)
 		}
 	}
 
-	return executions
+	return runs
 }
 
-var errDAGIsRunning = errors.New("the DAG is running")
-
-func (e *client) UpdateStatus(ctx context.Context, dag *digraph.DAG, status persistence.Status) error {
-	client := sock.NewClient(dag.SockAddr())
-
-	res, err := client.Request("GET", "/status")
-	if err != nil {
-		if errors.Is(err, sock.ErrTimeout) {
-			return err
-		}
-	} else {
-		unmarshalled, _ := persistence.StatusFromJSON(res)
-		if unmarshalled != nil && unmarshalled.RequestID == status.RequestID &&
-			unmarshalled.Status == scheduler.StatusRunning {
-			return errDAGIsRunning
-		}
-	}
-
-	return e.historyStore.Update(ctx, dag.Name, status.RequestID, status)
+func (e *client) UpdateStatus(ctx context.Context, name string, status persistence.Status) error {
+	return e.historyStore.Update(ctx, name, status.RequestID, status)
 }
 
 func (e *client) UpdateDAG(ctx context.Context, id string, spec string) error {
@@ -289,79 +269,54 @@ func (e *client) DeleteDAG(ctx context.Context, name string) error {
 	return e.dagStore.Delete(ctx, name)
 }
 
-func (e *client) GetAllStatus(ctx context.Context) (
-	statuses []DAGStatus, errs []string, err error,
-) {
-	dagList, errs, err := e.dagStore.List(ctx)
+func (e *client) ListStatus(ctx context.Context, opts ...ListStatusOption) (*persistence.PaginatedResult[DAGStatus], []string, error) {
+	var options GetAllStatusOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+	if options.Limit == nil {
+		options.Limit = new(int)
+		*options.Limit = 100
+	}
+	if options.Page == nil {
+		options.Page = new(int)
+		*options.Page = 1
+	}
 
-	var ret []DAGStatus
-	for _, d := range dagList {
+	pg := persistence.NewPaginator(*options.Page, *options.Limit)
+
+	dags, errList, err := e.dagStore.List(ctx, persistence.ListOptions{
+		Paginator: &pg,
+		Name:      fromPtr(options.Name),
+		Tag:       fromPtr(options.Tag),
+	})
+	if err != nil {
+		return nil, errList, err
+	}
+
+	var items []DAGStatus
+	for _, d := range dags.Items {
 		status, err := e.readStatus(ctx, d)
 		if err != nil {
-			errs = append(errs, err.Error())
+			errList = append(errList, err.Error())
 		}
-		ret = append(ret, status)
+		items = append(items, status)
 	}
 
-	return ret, errs, err
+	r := persistence.NewPaginatedResult(items, dags.TotalCount, pg)
+	return &r, errList, nil
 }
 
-func (e *client) getPageCount(total int, limit int) int {
-	return (total-1)/(limit) + 1
+func (e *client) getDAG(ctx context.Context, loc string) (*digraph.DAG, error) {
+	dagDetail, err := e.dagStore.GetDetails(ctx, loc)
+	return e.emptyDAGIfNil(dagDetail, loc), err
 }
 
-func (e *client) GetAllStatusPagination(ctx context.Context, params dags.ListDAGsParams) ([]DAGStatus, *DagListPaginationSummaryResult, error) {
-	var (
-		dagListPaginationResult *persistence.DagListPaginationResult
-		err                     error
-		dagStatusList           = make([]DAGStatus, 0)
-	)
-
-	page := 1
-	if params.Page != nil {
-		page = int(*params.Page)
-	}
-	limit := 100
-	if params.Limit != nil {
-		limit = int(*params.Limit)
-	}
-
-	if dagListPaginationResult, err = e.dagStore.ListPagination(ctx, persistence.DAGListPaginationArgs{
-		Page:  page,
-		Limit: limit,
-		Name:  fromPtr(params.SearchName),
-		Tag:   fromPtr(params.SearchTag),
-	}); err != nil {
-		return dagStatusList, &DagListPaginationSummaryResult{PageCount: 1}, err
-	}
-
-	for _, currentDag := range dagListPaginationResult.DagList {
-		var (
-			currentStatus DAGStatus
-			err           error
-		)
-		if currentStatus, err = e.readStatus(ctx, currentDag); err != nil {
-			dagListPaginationResult.ErrorList = append(dagListPaginationResult.ErrorList, err.Error())
-		}
-		dagStatusList = append(dagStatusList, currentStatus)
-	}
-
-	return dagStatusList, &DagListPaginationSummaryResult{
-		PageCount: e.getPageCount(dagListPaginationResult.Count, limit),
-		ErrorList: dagListPaginationResult.ErrorList,
-	}, nil
-}
-
-func (e *client) getDAG(ctx context.Context, name string) (*digraph.DAG, error) {
-	dagDetail, err := e.dagStore.GetDetails(ctx, name)
-	return e.emptyDAGIfNil(dagDetail, name), err
-}
-
-func (e *client) GetStatus(ctx context.Context, name string) (DAGStatus, error) {
-	dag, err := e.getDAG(ctx, name)
+func (e *client) GetDAGStatus(ctx context.Context, loc string) (DAGStatus, error) {
+	dag, err := e.getDAG(ctx, loc)
 	if dag == nil {
 		// TODO: fix not to use location
-		dag = &digraph.DAG{Name: name, Location: name}
+		dag = &digraph.DAG{Name: loc, Location: loc}
 	}
 	if err == nil {
 		// check the dag is correct in terms of graph
@@ -369,12 +324,12 @@ func (e *client) GetStatus(ctx context.Context, name string) (DAGStatus, error) 
 	}
 	latestStatus, _ := e.GetLatestStatus(ctx, dag)
 	return newDAGStatus(
-		dag, latestStatus, e.IsSuspended(ctx, name), err,
+		dag, latestStatus, e.IsSuspended(ctx, loc), err,
 	), err
 }
 
-func (e *client) ToggleSuspend(_ context.Context, name string, suspend bool) error {
-	return e.flagStore.ToggleSuspend(name, suspend)
+func (e *client) ToggleSuspend(_ context.Context, loc string, suspend bool) error {
+	return e.flagStore.ToggleSuspend(loc, suspend)
 }
 
 func (e *client) readStatus(ctx context.Context, dag *digraph.DAG) (DAGStatus, error) {
@@ -404,11 +359,12 @@ func escapeArg(input string) string {
 	escaped := strings.Builder{}
 
 	for _, char := range input {
-		if char == '\r' {
+		switch char {
+		case '\r':
 			_, _ = escaped.WriteString("\\r")
-		} else if char == '\n' {
+		case '\n':
 			_, _ = escaped.WriteString("\\n")
-		} else {
+		default:
 			_, _ = escaped.WriteRune(char)
 		}
 	}

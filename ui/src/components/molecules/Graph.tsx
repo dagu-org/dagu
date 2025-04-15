@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
-import { Node, NodeStatus } from '../../models';
-import { Step } from '../../models';
 import Mermaid from '../atoms/Mermaid';
 import { ToggleButton, ToggleButtonGroup } from '@mui/material';
 import { ZoomIn, ZoomOut, RestartAlt } from '@mui/icons-material';
+import { components, NodeStatus } from '../../api/v2/schema';
 
 type onClickNode = (name: string) => void;
 export type FlowchartType = 'TD' | 'LR';
 
+type Steps = components['schemas']['Step'][] | components['schemas']['Node'][];
+
 type Props = {
   type: 'status' | 'config';
   flowchart?: FlowchartType;
-  steps?: Step[] | Node[];
+  steps?: Steps;
   onClickNode?: onClickNode;
   showIcons?: boolean;
   animate?: boolean;
@@ -87,14 +88,14 @@ const Graph: React.FC<Props> = ({
   };
 
   // Define FontAwesome icons for each status with colors and animations
-  const statusIcons: { [key: number]: string } = {
-    [NodeStatus.None]:
+  const statusIcons: Record<string, string> = {
+    [NodeStatus.NotStarted]:
       "<i class='fas fa-circle-notch' style='color: #3b82f6; animation: spin 2s linear infinite;'></i>",
     [NodeStatus.Running]:
       "<i class='fas fa-spinner' style='color: #22c55e; animation: spin 1s linear infinite;'></i>",
-    [NodeStatus.Error]:
+    [NodeStatus.Failed]:
       "<i class='fas fa-exclamation-circle' style='color: #ef4444'></i>",
-    [NodeStatus.Cancel]: "<i class='fas fa-ban' style='color: #ec4899'></i>",
+    [NodeStatus.Cancelled]: "<i class='fas fa-ban' style='color: #ec4899'></i>",
     [NodeStatus.Success]:
       "<i class='fas fa-check-circle' style='color: #16a34a'></i>",
     [NodeStatus.Skipped]:
@@ -103,7 +104,11 @@ const Graph: React.FC<Props> = ({
   if (!animate) {
     // Remove animations if disabled
     Object.keys(statusIcons).forEach((key: string) => {
-      statusIcons[+key] = statusIcons[+key].replace(/animation:.*?;/g, '');
+      const value = statusIcons[key];
+      if (value) {
+        statusIcons[key as unknown as NodeStatus] =
+          value.replace(/animation:.*?;/g, '') || '';
+      }
     });
   }
 
@@ -121,22 +126,22 @@ const Graph: React.FC<Props> = ({
     let linkIndex = 0;
     const linkStyles: string[] = [];
 
-    const addNodeFn = (step: Step, status: NodeStatus) => {
-      const id = step.Name.replace(/\s/g, '_');
-      const c = graphStatusMap[status] || '';
+    const addNodeFn = (step: components['schemas']['Step'], status: number) => {
+      const id = step.name.replace(/\s/g, '_');
+      const c = graphStatusMap[status as keyof typeof graphStatusMap];
 
       // Construct node label with icon if enabled
       const icon = showIcons ? statusIcons[status] || '' : '';
-      const label = `${icon} &nbsp; ${step.Name}`;
+      const label = `${icon} &nbsp; ${step.name}`;
 
       // Add node definition
       dat.push(`${id}[${label}]${c};`);
 
       // Process dependencies and add connections
-      if (step.Depends) {
-        step.Depends.forEach((d) => {
-          const depId = d.replace(/\s/g, '_');
-          if (status === NodeStatus.Error) {
+      if (step.depends) {
+        step.depends.forEach((dep) => {
+          const depId = dep.replace(/\s/g, '_');
+          if (status === NodeStatus.Failed) {
             // Dashed line for error state
             dat.push(`${depId} -.- ${id};`);
             linkStyles.push(
@@ -167,9 +172,13 @@ const Graph: React.FC<Props> = ({
 
     // Process nodes based on type
     if (type === 'status') {
-      (steps as Node[]).forEach((s) => addNodeFn(s.Step, s.Status));
+      (steps as components['schemas']['Node'][]).forEach((step) =>
+        addNodeFn(step.step, step.status)
+      );
     } else {
-      (steps as Step[]).forEach((s) => addNodeFn(s, NodeStatus.None));
+      (steps as components['schemas']['Step'][]).forEach((step) =>
+        addNodeFn(step, 0)
+      );
     }
 
     // Define node styles for different states with refined colors
@@ -233,20 +242,20 @@ const Graph: React.FC<Props> = ({
 };
 
 // Function to calculate the maximum breadth of the graph
-const calculateGraphBreadth = (steps: Step[] | Node[]) => {
+const calculateGraphBreadth = (steps: Steps) => {
   // Create a map of nodes and their dependencies
   const nodeMap = new Map<string, string[]>();
   const parentMap = new Map<string, string[]>();
 
   // Initialize maps
   steps.forEach((node) => {
-    const step = 'Step' in node ? node.Step : node;
-    nodeMap.set(step.Name, step.Depends || []);
-    step.Depends?.forEach((dep) => {
+    const step = 'step' in node ? node.step : node;
+    nodeMap.set(step.name, step.depends || []);
+    step.depends?.forEach((dep) => {
       if (!parentMap.has(dep)) {
         parentMap.set(dep, []);
       }
-      parentMap.get(dep)?.push(step.Name);
+      parentMap.get(dep)?.push(step.name);
     });
   });
 
@@ -267,9 +276,9 @@ const calculateGraphBreadth = (steps: Step[] | Node[]) => {
 
   // Start from nodes with no dependencies
   steps.forEach((node) => {
-    const step = 'Step' in node ? node.Step : node;
-    if (!step.Depends || step.Depends.length === 0) {
-      calculateLevel(step.Name);
+    const step = 'step' in node ? node.step : node;
+    if (!step.depends || step.depends.length === 0) {
+      calculateLevel(step.name);
     }
   });
 
@@ -292,10 +301,10 @@ export default Graph;
 
 // Map node status to CSS classes for styling
 const graphStatusMap = {
-  [NodeStatus.None]: ':::none',
-  [NodeStatus.Running]: ':::running',
-  [NodeStatus.Error]: ':::error',
-  [NodeStatus.Cancel]: ':::cancel',
-  [NodeStatus.Success]: ':::done',
-  [NodeStatus.Skipped]: ':::skipped',
+  [0]: ':::none',
+  [1]: ':::running',
+  [2]: ':::error',
+  [3]: ':::cancel',
+  [4]: ':::done',
+  [5]: ':::skipped',
 };

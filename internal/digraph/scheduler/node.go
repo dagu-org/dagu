@@ -352,7 +352,7 @@ func (n *Node) Setup(ctx context.Context, logDir string, requestID string) error
 	postfix := stringutil.TruncString(requestID, 8)
 	logFilename := fmt.Sprintf("%s.%s.%s.log", safeName, timestamp, postfix)
 	if !fileutil.FileExists(logDir) {
-		if err := os.MkdirAll(logDir, 0755); err != nil {
+		if err := os.MkdirAll(logDir, 0750); err != nil {
 			return fmt.Errorf("failed to create log directory %q: %w", logDir, err)
 		}
 	}
@@ -404,14 +404,16 @@ func (n *Node) LogContainsPattern(ctx context.Context, patterns []string) (bool,
 	}
 
 	// Open the log file
-	file, err := os.Open(logFilename)
+	file, err := os.Open(logFilename) //nolint:gosec
 	if err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
 		}
 		return false, fmt.Errorf("failed to open log file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	// Create a buffered reader with optimal buffer size
 	reader := bufio.NewReaderSize(file, 64*1024)

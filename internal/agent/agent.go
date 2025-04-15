@@ -26,7 +26,7 @@ import (
 
 // Agent is responsible for running the DAG and handling communication
 // via the unix socket. The agent performs the following tasks:
-// 1. Start the DAG execution.
+// 1. Start the DAG.
 // 2. Propagate a signal to the running processes.
 // 3. Handle the HTTP request via the unix socket.
 // 4. Write the log and status to the data store.
@@ -45,7 +45,7 @@ type Agent struct {
 	logFile      string
 	rootDAG      digraph.RootDAG
 
-	// requestID is request ID to identify DAG execution uniquely.
+	// requestID is request ID to identify DAG run uniquely.
 	// The request ID can be used for history lookup, retry, etc.
 	requestID string
 	finished  atomic.Bool
@@ -103,7 +103,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		return fmt.Errorf("agent setup failed: %w", err)
 	}
 
-	// Create a new context for the DAG execution with all necessary information
+	// Create a new context for the DAG run with all necessary information
 	dbClient := newDBClient(a.historyStore, a.dagStore)
 	ctx = digraph.NewContext(ctx, a.dag, dbClient, a.rootDAG, a.requestID, a.logFile, a.dag.Params)
 
@@ -165,7 +165,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 	})
 
-	// Stop the socket server when finishing the DAG execution.
+	// Stop the socket server when finishing the DAG run.
 	defer func() {
 		if err := a.socketServer.Shutdown(ctx); err != nil {
 			logger.Error(ctx, "Failed to shutdown socket frontend", "err", err)
@@ -206,13 +206,13 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 	})
 
-	// Start the DAG execution.
-	logger.Debug(ctx, "DAG execution started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
+	// Start the DAG run.
+	logger.Debug(ctx, "DAG run started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
 	lastErr := a.scheduler.Schedule(ctx, a.graph, done)
 
 	// Update the finished status to the history database.
 	finishedStatus := a.Status()
-	logger.Info(ctx, "DAG execution finished", "status", finishedStatus.Status.String())
+	logger.Info(ctx, "DAG run finished", "status", finishedStatus.Status.String())
 	if err := historyRecord.Write(ctx, a.Status()); err != nil {
 		logger.Error(ctx, "Status write failed", "err", err)
 	}
@@ -226,7 +226,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Mark the agent finished.
 	a.finished.Store(true)
 
-	// Return the last error on the DAG execution.
+	// Return the last error on the DAG run.
 	return lastErr
 }
 
@@ -304,7 +304,7 @@ func (a *Agent) HandleHTTP(ctx context.Context) sock.HTTPHandlerFunc {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write(statusJSON)
 		case r.Method == http.MethodPost && stopRe.MatchString(r.URL.Path):
-			// Handle Stop request for the DAG execution.
+			// Handle Stop request for the DAG run.
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("OK"))
 			go func() {
@@ -320,14 +320,14 @@ func (a *Agent) HandleHTTP(ctx context.Context) sock.HTTPHandlerFunc {
 	}
 }
 
-// setup the agent instance for DAG execution.
+// setup the agent instance for DAG run.
 func (a *Agent) setup(ctx context.Context) error {
 	// Lock to prevent race condition.
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
 	if a.rootDAG.RequestID != a.requestID {
-		logger.Debug(ctx, "Initiating sub-DAG execution", "rootDAG", a.rootDAG.Name, "rootRequestID", a.rootDAG.RequestID)
+		logger.Debug(ctx, "Initiating sub-DAG run", "rootDAG", a.rootDAG.Name, "rootRequestID", a.rootDAG.RequestID)
 		a.subExecution.Store(true)
 	}
 
@@ -351,7 +351,7 @@ func (a *Agent) setup(ctx context.Context) error {
 	return a.setupGraph(ctx)
 }
 
-// newScheduler creates a scheduler instance for the DAG execution.
+// newScheduler creates a scheduler instance for the DAG run.
 func (a *Agent) newScheduler() *scheduler.Scheduler {
 	cfg := &scheduler.Config{
 		LogDir:        a.logDir,
@@ -464,7 +464,7 @@ func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 // from the retry node so that it runs the same DAG as the previous run.
 func (a *Agent) setupGraph(ctx context.Context) error {
 	if a.retryTarget != nil {
-		logger.Info(ctx, "Retry execution", "reqId", a.requestID)
+		logger.Info(ctx, "Retry run", "reqId", a.requestID)
 		return a.setupGraphForRetry(ctx)
 	}
 	graph, err := scheduler.NewExecutionGraph(a.dag.Steps...)
@@ -499,6 +499,10 @@ func (a *Agent) setupHistoryRecord(ctx context.Context) (persistence.Record, err
 		return a.historyStore.NewSubRecord(ctx, a.dag, time.Now(), a.requestID, a.rootDAG)
 	}
 
+	if a.retryTarget != nil {
+		return a.historyStore.NewRetryRecord(ctx, a.dag, time.Now(), a.requestID)
+	}
+
 	return a.historyStore.NewRecord(ctx, a.dag, time.Now(), a.requestID)
 }
 
@@ -509,7 +513,7 @@ func (a *Agent) setupSocketServer(ctx context.Context) error {
 		// Use separate socket address for sub-DAGs to allow them run concurrently.
 		socketAddr = a.dag.SockAddrSub(a.requestID)
 	} else {
-		socketAddr = a.dag.SockAddr()
+		socketAddr = a.dag.SockAddr(a.requestID)
 	}
 	socketServer, err := sock.NewServer(socketAddr, a.HandleHTTP(ctx))
 	if err != nil {
@@ -544,7 +548,7 @@ func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
 		return err
 	}
 	if status.Status != scheduler.StatusNone {
-		return fmt.Errorf("the DAG is already running. status=%s, socket=%s", status.Status, a.dag.SockAddr())
+		return fmt.Errorf("the DAG is already running. status=%s, socket=%s", status.Status, a.dag.SockAddr(a.requestID))
 	}
 	return nil
 }

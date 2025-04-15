@@ -58,8 +58,10 @@ steps:
 		t.Run(tc.name, func(t *testing.T) {
 			// Setup test case
 			configFile, tempDir := tc.setupFunc(t)
-			os.Setenv(tc.envVarName, tempDir)
-			defer os.Unsetenv(tc.envVarName)
+			_ = os.Setenv(tc.envVarName, tempDir)
+			defer func() {
+				_ = os.Unsetenv(tc.envVarName)
+			}()
 
 			// Get DAG path
 			dagPath := tc.dagPath(t, tempDir)
@@ -74,7 +76,7 @@ steps:
 
 			th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
 				Args:        args,
-				ExpectedOut: []string{"DAG execution finished"},
+				ExpectedOut: []string{"DAG run finished"},
 			})
 
 			// Verify log directory and files
@@ -96,7 +98,7 @@ func verifyLogs(t *testing.T, tempDir string) {
 	// Look for a log file that matches the expected pattern
 	logFileFound := false
 	for _, file := range files {
-		if strings.HasPrefix(file.Name(), "start_basic.") && strings.HasSuffix(file.Name(), ".log") {
+		if strings.HasPrefix(file.Name(), "basic.") && strings.HasSuffix(file.Name(), ".log") {
 			logFileFound = true
 			break
 		}

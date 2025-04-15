@@ -20,6 +20,7 @@ import (
 
 // LoadOptions contains options for loading a DAG.
 type LoadOptions struct {
+	name         string   // Name of the DAG.
 	baseConfig   string   // Path to the base DAG configuration file.
 	params       string   // Parameters to override default parameters in the DAG.
 	paramsList   []string // List of parameters to override default parameters in the DAG.
@@ -65,6 +66,13 @@ func OnlyMetadata() LoadOption {
 	}
 }
 
+// WithName sets the name of the DAG.
+func WithName(name string) LoadOption {
+	return func(o *LoadOptions) {
+		o.name = name
+	}
+}
+
 // Load loads the DAG from the given file with the specified options.
 func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
 	var options LoadOptions
@@ -79,6 +87,7 @@ func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
 			ParametersList: options.paramsList,
 			OnlyMetadata:   options.onlyMetadata,
 			NoEval:         options.noEval,
+			Name:           options.name,
 		},
 	}
 	return loadDAG(buildContext, dag)
@@ -96,6 +105,7 @@ func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*DAG, error
 		ParametersList: options.paramsList,
 		OnlyMetadata:   options.onlyMetadata,
 		NoEval:         options.noEval,
+		Name:           options.name,
 	})
 }
 
@@ -103,12 +113,12 @@ func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*DAG, error
 func LoadYAMLWithOpts(ctx context.Context, data []byte, opts BuildOpts) (*DAG, error) {
 	raw, err := unmarshalData(data)
 	if err != nil {
-		return nil, err
+		return nil, ErrorList{err}
 	}
 
 	def, err := decode(raw)
 	if err != nil {
-		return nil, err
+		return nil, ErrorList{err}
 	}
 
 	return build(BuildContext{ctx: ctx, opts: opts}, def)
@@ -131,11 +141,16 @@ func LoadBaseConfig(ctx BuildContext, file string) (*DAG, error) {
 	// Decode the raw data into a config definition.
 	def, err := decode(raw)
 	if err != nil {
-		return nil, err
+		return nil, ErrorList{err}
 	}
 
 	ctx = ctx.WithOpts(BuildOpts{NoEval: ctx.opts.NoEval}).WithFile(file)
-	return build(ctx, def)
+	dag, err := build(ctx, def)
+
+	if err != nil {
+		return nil, ErrorList{err}
+	}
+	return dag, nil
 }
 
 // loadDAG loads the DAG from the given file.
@@ -168,6 +183,7 @@ func loadDAG(ctx BuildContext, dag string) (*DAG, error) {
 	}
 
 	// Merge the target DAG into the dest DAG.
+	dest.Location = "" // No need to set the location for the base config.
 	err = merge(dest, target)
 	if err != nil {
 		return nil, err
@@ -181,6 +197,9 @@ func loadDAG(ctx BuildContext, dag string) (*DAG, error) {
 // defaultName returns the default name for the given file.
 // The default name is the filename without the extension.
 func defaultName(file string) string {
+	if file == "" {
+		return ""
+	}
 	return strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 }
 
@@ -242,7 +261,7 @@ func (*mergeTransformer) Transformer(
 
 // readFile reads the contents of the file into a map.
 func readFile(file string) (cfg map[string]any, err error) {
-	data, err := os.ReadFile(file)
+	data, err := os.ReadFile(file) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %q: %v", file, err)
 	}

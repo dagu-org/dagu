@@ -54,7 +54,7 @@ func OpenOrCreateFile(file string) (*os.File, error) {
 
 // openFile opens file.
 func openFile(file string) (*os.File, error) {
-	outfile, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0755)
+	outfile, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0750) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func openFile(file string) (*os.File, error) {
 
 // createFile creates file.
 func createFile(file string) (*os.File, error) {
-	outfile, err := os.Create(file)
+	outfile, err := os.Create(file) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}
@@ -103,6 +103,23 @@ func IsYAMLFile(filename string) bool {
 		return false
 	}
 	return slices.Contains(ValidYAMLExtensions, filepath.Ext(filename))
+}
+
+// TrimYAMLFileExtension trims the .yml or .yaml extension from a filename.
+func TrimYAMLFileExtension(filename string) string {
+	if filename == "" {
+		return ""
+	}
+
+	ext := filepath.Ext(filename)
+	switch ext {
+	case ymlExtension:
+		return strings.TrimSuffix(filename, ymlExtension) + yamlExtension
+	case yamlExtension:
+		return strings.TrimSuffix(filename, yamlExtension)
+	default:
+		return filename
+	}
 }
 
 // IsFileWithExtension is a more generic function that checks if a file

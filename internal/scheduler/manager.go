@@ -107,7 +107,7 @@ func (m *dagJobManager) Next(ctx context.Context, now time.Time) ([]*ScheduledJo
 }
 
 func (m *dagJobManager) createJob(dag *digraph.DAG, next time.Time, schedule cron.Schedule) Job {
-	return &dagJob{
+	return &DAG{
 		DAG:        dag,
 		Executable: m.executable,
 		WorkDir:    m.workDir,

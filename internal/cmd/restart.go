@@ -29,7 +29,7 @@ Flags:
 Example:
   dagu restart my_dag.yaml --request-id=abc123
 
-This command gracefully stops the active DAG execution before reinitiating it.
+This command gracefully stops the active DAG run before reinitiating it.
 `,
 			Args: cobra.ExactArgs(1),
 		}, restartFlags, runRestart,
@@ -70,9 +70,9 @@ func handleRestartProcess(ctx *Context, dag *digraph.DAG, specFilePath string) e
 	waitForRestart(ctx, dag.RestartWait)
 
 	// Get previous parameters
-	status, err := getPreviousExecutionStatus(ctx, cli, dag)
+	status, err := getPreviousRunStatus(ctx, cli, dag)
 	if err != nil {
-		return fmt.Errorf("failed to get previous execution parameters: %w", err)
+		return fmt.Errorf("failed to get previous run parameters: %w", err)
 	}
 
 	loadOpts := []digraph.LoadOption{
@@ -95,18 +95,18 @@ func handleRestartProcess(ctx *Context, dag *digraph.DAG, specFilePath string) e
 }
 
 func executeDAG(ctx *Context, cli client.Client, dag *digraph.DAG) error {
-
 	requestID, err := generateRequestID()
 	if err != nil {
 		return fmt.Errorf("failed to generate request ID: %w", err)
 	}
 
-	const logPrefix = "restart_"
-	logFile, err := ctx.OpenLogFile(logPrefix, dag, requestID)
+	logFile, err := ctx.OpenLogFile(dag, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file: %w", err)
 	}
-	defer logFile.Close()
+	defer func() {
+		_ = logFile.Close()
+	}()
 
 	ctx.LogToFile(logFile)
 
@@ -137,7 +137,7 @@ func executeDAG(ctx *Context, cli client.Client, dag *digraph.DAG) error {
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
-			return fmt.Errorf("DAG execution failed: %w", err)
+			return fmt.Errorf("DAG run failed: %w", err)
 		}
 	}
 
@@ -171,7 +171,7 @@ func stopRunningDAG(ctx context.Context, cli client.Client, dag *digraph.DAG) er
 			return nil
 		}
 
-		if err := cli.Stop(ctx, dag); err != nil {
+		if err := cli.StopDAG(ctx, dag); err != nil {
 			return fmt.Errorf("failed to stop DAG: %w", err)
 		}
 
@@ -186,7 +186,7 @@ func waitForRestart(ctx context.Context, restartWait time.Duration) {
 	}
 }
 
-func getPreviousExecutionStatus(ctx context.Context, cli client.Client, dag *digraph.DAG) (persistence.Status, error) {
+func getPreviousRunStatus(ctx context.Context, cli client.Client, dag *digraph.DAG) (persistence.Status, error) {
 	status, err := cli.GetLatestStatus(ctx, dag)
 	if err != nil {
 		return persistence.Status{}, fmt.Errorf("failed to get latest status: %w", err)

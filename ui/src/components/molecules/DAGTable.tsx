@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   flexRender,
   useReactTable,
@@ -28,14 +28,7 @@ import {
   TextField,
 } from '@mui/material';
 import { Link } from 'react-router-dom';
-import {
-  getFirstTag,
-  getStatus,
-  getStatusField,
-  DAGItem,
-  DAGDataType,
-  getNextSchedule,
-} from '../../models';
+import { getNextSchedule } from '../../models';
 import StyledTableRow from '../atoms/StyledTableRow';
 import {
   ArrowDownward,
@@ -48,9 +41,10 @@ import 'moment-duration-format';
 import Ticker from '../atoms/Ticker';
 import VisuallyHidden from '../atoms/VisuallyHidden';
 import moment from 'moment-timezone';
+import { components } from '../../api/v2/schema';
 
 type Props = {
-  DAGs: DAGItem[];
+  dags: components['schemas']['DAGFile'][];
   group: string;
   refreshFn: () => void;
   searchText: string;
@@ -59,7 +53,21 @@ type Props = {
   handleSearchTagChange: (tag: string) => void;
 };
 
-type DAGRow = DAGItem & { subRows?: DAGItem[] };
+type RowItem = DAGRow | GroupRow;
+type DAGRow = {
+  kind: ItemKind;
+  name: string;
+  dag: components['schemas']['DAGFile'];
+};
+type GroupRow = {
+  kind: ItemKind.Group;
+  name: string;
+};
+enum ItemKind {
+  DAG = 0,
+  Group,
+}
+type Data = RowItem & { subRows?: RowItem[] };
 
 const durFormatSec = 'd[d]h[h]m[m]s[s]';
 const durFormatMin = 'd[d]h[h]m[m]';
@@ -73,10 +81,10 @@ declare module '@tanstack/react-table' {
   }
 }
 
-const columnHelper = createColumnHelper<DAGRow>();
+const columnHelper = createColumnHelper<Data>();
 
 const defaultColumns = [
-  columnHelper.accessor('Name', {
+  columnHelper.accessor('name', {
     id: 'Expand',
     header: ({ table }) => {
       return (
@@ -110,15 +118,14 @@ const defaultColumns = [
     },
     enableSorting: false,
   }),
-  columnHelper.accessor('Name', {
+  columnHelper.accessor('name', {
     id: 'Name',
     cell: ({ row, getValue }) => {
       const data = row.original!;
-      if (data.Type == DAGDataType.Group) {
+      if (data.kind == ItemKind.Group) {
         return getValue();
       } else {
-        const name = data.DAGStatus.File.replace(/.y[a]{0,1}ml$/, '');
-        const url = `/dags/${encodeURI(name)}`;
+        const url = `/dags/${data.dag.fileId}`;
         return (
           <div
             style={{
@@ -132,35 +139,35 @@ const defaultColumns = [
     },
     filterFn: (props, _, filter) => {
       const data = props.original!;
-      if (data.Type == DAGDataType.Group) {
+      if (data.kind == ItemKind.Group) {
         return true;
-      } else if (data.Type == DAGDataType.DAG) {
-        const value = data.DAGStatus.DAG.Name;
+      } else if (data.kind == ItemKind.DAG) {
+        const value = data.dag.dag.name;
         return value.toLowerCase().includes(filter.toLowerCase());
       }
       return false;
     },
     sortingFn: (a, b) => {
-      const ta = a.original!.Type;
-      const tb = b.original!.Type;
+      const ta = a.original!.kind;
+      const tb = b.original!.kind;
       if (ta == tb) {
-        const dataA = a.original!.Name.toLowerCase();
-        const dataB = b.original!.Name.toLowerCase();
+        const dataA = a.original!.name.toLowerCase();
+        const dataB = b.original!.name.toLowerCase();
         return dataA.localeCompare(dataB);
       }
-      if (ta == DAGDataType.Group) {
+      if (ta == ItemKind.Group) {
         return 1;
       }
       return -1;
     },
   }),
-  columnHelper.accessor('Type', {
+  columnHelper.accessor('kind', {
     id: 'Tags',
     header: 'Tags',
     cell: (props) => {
       const data = props.row.original!;
-      if (data.Type == DAGDataType.DAG) {
-        const tags = data.DAGStatus.DAG.Tags;
+      if (data.kind == ItemKind.DAG) {
+        const tags = data.dag.dag.tags;
         return (
           <Stack direction="row" spacing={1}>
             {tags?.map((tag) => (
@@ -180,10 +187,10 @@ const defaultColumns = [
     },
     filterFn: (props, _, filter) => {
       const data = props.original!;
-      if (data.Type != DAGDataType.DAG) {
+      if (data.kind != ItemKind.DAG) {
         return true;
       }
-      const tags = data.DAGStatus.DAG.Tags;
+      const tags = data.dag.dag.tags;
       const ret = tags?.some((tag) => tag == filter) || false;
       return ret;
     },
@@ -193,15 +200,15 @@ const defaultColumns = [
       return valA.localeCompare(valB);
     },
   }),
-  columnHelper.accessor('Type', {
+  columnHelper.accessor('kind', {
     id: 'Status',
     header: 'Status',
     cell: (props) => {
       const data = props.row.original!;
-      if (data.Type == DAGDataType.DAG) {
+      if (data.kind == ItemKind.DAG) {
         return (
-          <StatusChip status={data.DAGStatus.Status?.Status}>
-            {data.DAGStatus.Status?.StatusText || ''}
+          <StatusChip status={data.dag.latestRun.status}>
+            {data.dag.latestRun?.statusText}
           </StatusChip>
         );
       }
@@ -213,62 +220,62 @@ const defaultColumns = [
       return valA < valB ? -1 : 1;
     },
   }),
-  columnHelper.accessor('Type', {
+  columnHelper.accessor('kind', {
     id: 'Started At',
     header: 'Started At',
     cell: (props) => {
       const data = props.row.original!;
-      if (data.Type == DAGDataType.DAG) {
-        return data.DAGStatus.Status?.StartedAt;
+      if (data.kind == ItemKind.DAG) {
+        return data.dag.latestRun.startedAt;
       }
       return null;
     },
     sortingFn: (a, b) => {
       const dataA = a.original!;
       const dataB = b.original!;
-      const valA = getStatusField('StartedAt', dataA);
-      const valB = getStatusField('StartedAt', dataB);
+      const valA = getStatusField('startedAt', dataA);
+      const valB = getStatusField('startedAt', dataB);
       return valA.localeCompare(valB);
     },
   }),
-  columnHelper.accessor('Type', {
+  columnHelper.accessor('kind', {
     id: 'Finished At',
     header: 'Finished At',
     cell: (props) => {
       const data = props.row.original!;
-      if (data.Type == DAGDataType.DAG) {
-        return data.DAGStatus.Status?.FinishedAt;
+      if (data.kind == ItemKind.DAG) {
+        return data.dag.latestRun.finishedAt;
       }
       return null;
     },
     sortingFn: (a, b) => {
       const dataA = a.original!;
       const dataB = b.original!;
-      const valA = getStatusField('FinishedAt', dataA);
-      const valB = getStatusField('FinishedAt', dataB);
+      const valA = getStatusField('finishedAt', dataA);
+      const valB = getStatusField('finishedAt', dataB);
       return valA.localeCompare(valB);
     },
   }),
-  columnHelper.accessor('Type', {
+  columnHelper.accessor('kind', {
     id: 'Schedule',
     header: `Schedule in ${getConfig().tz || moment.tz.guess()}`,
     enableSorting: true,
     cell: (props) => {
       const data = props.row.original!;
-      if (data.Type == DAGDataType.DAG) {
-        const schedules = data.DAGStatus.DAG.Schedule;
+      if (data.kind == ItemKind.DAG) {
+        const schedules = data.dag.dag.schedule;
         if (schedules) {
           return (
             <React.Fragment>
-              {schedules.map((s) => (
+              {schedules.map((schedule) => (
                 <Chip
-                  key={s.Expression}
+                  key={schedule.expression}
                   sx={{
                     fontWeight: 'semibold',
                     marginRight: 1,
                   }}
                   size="small"
-                  label={s.Expression}
+                  label={schedule.expression}
                 />
               ))}
             </React.Fragment>
@@ -280,30 +287,28 @@ const defaultColumns = [
     sortingFn: (a, b) => {
       const dataA = a.original!;
       const dataB = b.original!;
-      if (dataA.Type != DAGDataType.DAG || dataB.Type != DAGDataType.DAG) {
-        return dataA!.Type - dataB!.Type;
+      if (dataA.kind != ItemKind.DAG || dataB.kind != ItemKind.DAG) {
+        return dataA!.kind - dataB!.kind;
       }
-      return (
-        getNextSchedule(dataA.DAGStatus) - getNextSchedule(dataB.DAGStatus)
-      );
+      return getNextSchedule(dataA.dag) - getNextSchedule(dataB.dag);
     },
   }),
-  columnHelper.accessor('Type', {
+  columnHelper.accessor('kind', {
     id: 'NextRun',
     header: 'Next Run',
     enableSorting: true,
     cell: (props) => {
       const data = props.row.original!;
-      if (data.Type == DAGDataType.DAG) {
-        const schedules = data.DAGStatus.DAG.Schedule;
-        if (schedules && schedules.length && !data.DAGStatus.Suspended) {
+      if (data.kind == ItemKind.DAG) {
+        const schedules = data.dag.dag.schedule;
+        if (schedules && schedules.length && !data.dag.suspended) {
           return (
             <React.Fragment>
               in{' '}
               <Ticker intervalMs={1000}>
                 {() => {
                   const ms = moment
-                    .unix(getNextSchedule(data.DAGStatus))
+                    .unix(getNextSchedule(data.dag))
                     .diff(moment.now());
                   const format = ms / 1000 > 60 ? durFormatMin : durFormatSec;
                   return (
@@ -326,40 +331,38 @@ const defaultColumns = [
     sortingFn: (a, b) => {
       const dataA = a.original!;
       const dataB = b.original!;
-      if (dataA.Type != DAGDataType.DAG || dataB.Type != DAGDataType.DAG) {
-        return dataA!.Type - dataB!.Type;
+      if (dataA.kind != ItemKind.DAG || dataB.kind != ItemKind.DAG) {
+        return dataA!.kind - dataB!.kind;
       }
-      return (
-        getNextSchedule(dataA.DAGStatus) - getNextSchedule(dataB.DAGStatus)
-      );
+      return getNextSchedule(dataA.dag) - getNextSchedule(dataB.dag);
     },
   }),
-  columnHelper.accessor('Type', {
+  columnHelper.accessor('kind', {
     id: 'Config',
     header: 'Description',
     enableSorting: false,
     cell: (props) => {
       const data = props.row.original!;
-      if (data.Type == DAGDataType.DAG) {
-        return data.DAGStatus.DAG.Description;
+      if (data.kind == ItemKind.DAG) {
+        return data.dag.dag.description;
       }
       return null;
     },
   }),
-  columnHelper.accessor('Type', {
+  columnHelper.accessor('kind', {
     id: 'Live',
     header: 'Live',
     cell: (props) => {
       const data = props.row.original!;
-      if (data.Type != DAGDataType.DAG) {
+      if (data.kind != ItemKind.DAG) {
         return false;
       }
       return (
         <LiveSwitch
-          DAG={data.DAGStatus}
+          dag={data.dag}
           refresh={props.table.options.meta?.refreshFn}
           inputProps={{
-            'aria-label': `Toggle ${data.Name}`,
+            'aria-label': `Toggle ${data.name}`,
           }}
         />
       );
@@ -370,17 +373,15 @@ const defaultColumns = [
     header: 'Actions',
     cell: (props) => {
       const data = props.row.original!;
-      if (data.Type == DAGDataType.Group) {
+      if (data.kind == ItemKind.Group) {
         return null;
       }
 
-      const name = data.DAGStatus.File.replace(/.yaml$/, '');
-
       return (
         <DAGActions
-          dag={data.DAGStatus.DAG}
-          status={data.DAGStatus.Status}
-          name={name}
+          dag={data.dag.dag}
+          status={data.dag.latestRun}
+          fileId={data.dag.fileId}
           label={false}
           refresh={props.table.options.meta?.refreshFn}
         />
@@ -390,7 +391,7 @@ const defaultColumns = [
 ];
 
 function DAGTable({
-  DAGs = [],
+  dags = [],
   group = '',
   refreshFn,
   searchText,
@@ -414,42 +415,45 @@ function DAGTable({
 
   const [expanded, setExpanded] = React.useState<ExpandedState>({});
 
-  const data = React.useMemo(() => {
-    const groups: {
-      [key: string]: DAGRow;
-    } = {};
-    DAGs.forEach((dag) => {
-      if (dag.Type == DAGDataType.DAG) {
-        const g = dag.DAGStatus.DAG.Group;
-        if (g != '') {
-          if (!groups[g]) {
-            groups[g] = {
-              Type: DAGDataType.Group,
-              Name: g,
-              subRows: [],
-            };
-          }
-          groups[g].subRows!.push(dag);
+  const data = useMemo(() => {
+    const groups: { [key: string]: Data } = {};
+    dags.forEach((dag) => {
+      const group = dag.dag.group;
+      if (group) {
+        if (!groups[group]) {
+          groups[group] = {
+            kind: ItemKind.Group,
+            name: group,
+            subRows: [],
+          };
         }
+        groups[group].subRows!.push({
+          kind: ItemKind.DAG,
+          name: dag.dag.name,
+          dag: dag,
+        });
       }
     });
-    const ret: DAGRow[] = [];
+    const data: Data[] = [];
     const groupKeys = Object.keys(groups);
     groupKeys.forEach((key) => {
-      ret.push(groups[key]);
+      if (groups[key]) {
+        data.push(groups[key]);
+      }
     });
-    return [
-      ...ret,
-      ...DAGs.filter(
-        (dag) =>
-          dag.Type == DAGDataType.DAG &&
-          dag.DAGStatus.DAG.Group == '' &&
-          dag.DAGStatus.DAG.Group == group
-      ),
-    ];
-  }, [DAGs, group]);
+    dags
+      .filter((dag) => !dag.dag.group)
+      .forEach((dag) => {
+        data.push({
+          kind: ItemKind.DAG,
+          name: dag.dag.name,
+          dag: dag,
+        });
+      });
+    return data;
+  }, [dags, group]);
 
-  const instance = useReactTable<DAGRow>({
+  const instance = useReactTable<Data>({
     data,
     columns,
     getSubRows: (row) => row.subRows,
@@ -491,13 +495,15 @@ function DAGTable({
           label="Search Text"
           size="small"
           variant="filled"
-          InputProps={{
-            value: searchText,
-            onChange: (e) => {
-              const value = e.target.value || '';
-              handleSearchTextChange(value);
+          slotProps={{
+            htmlInput: {
+              value: searchText,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                const value = e.target.value || '';
+                handleSearchTextChange(value);
+              },
+              type: 'search',
             },
-            type: 'search',
           }}
         />
         <Autocomplete<string, false, false, true>
@@ -505,16 +511,14 @@ function DAGTable({
           limitTags={1}
           value={searchTag}
           freeSolo
-          options={DAGs.reduce<string[]>((acc, dag) => {
-            if (dag.Type == DAGDataType.DAG) {
-              const tags = dag.DAGStatus.DAG.Tags;
-              if (tags) {
-                tags.forEach((tag) => {
-                  if (!acc.includes(tag)) {
-                    acc.push(tag);
-                  }
-                });
-              }
+          options={dags.reduce<string[]>((acc, dag) => {
+            const tags = dag.dag.tags;
+            if (tags) {
+              tags.forEach((tag) => {
+                if (!acc.includes(tag)) {
+                  acc.push(tag);
+                }
+              });
             }
             return acc;
           }, [])}
@@ -615,7 +619,7 @@ function DAGTable({
                           ? '6px 4px'
                           : '6px 16px',
                       backgroundColor:
-                        row.original!.Type == DAGDataType.Group
+                        row.original!.kind == ItemKind.Group
                           ? '#d4daed'
                           : undefined,
                     }}
@@ -633,3 +637,34 @@ function DAGTable({
   );
 }
 export default DAGTable;
+
+export function getFirstTag(data?: Data): string {
+  if (!data || data.kind != ItemKind.DAG) {
+    return '';
+  }
+  if (!data.dag.dag.tags || !data.dag.dag.tags.length) {
+    return '';
+  }
+  return data.dag.dag.tags[0] || '';
+}
+
+export function getStatus(data: RowItem): components['schemas']['Status'] {
+  if (data.kind == ItemKind.DAG) {
+    return data.dag.latestRun.status;
+  }
+  return 0;
+}
+
+type KeysMatching<T extends object, V> = {
+  [K in keyof T]-?: T[K] extends V ? K : never;
+}[keyof T];
+
+export function getStatusField(
+  field: KeysMatching<components['schemas']['RunSummary'], string>,
+  dag: RowItem
+): string {
+  if (dag?.kind == ItemKind.DAG) {
+    return dag.dag.latestRun[field] || '';
+  }
+  return '';
+}

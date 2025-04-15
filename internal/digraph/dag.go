@@ -75,6 +75,14 @@ type DAG struct {
 	HistRetentionDays int `json:"HistRetentionDays,omitempty"`
 }
 
+// FileID returns the file ID of the local DAG file.
+func (d *DAG) FileID() string {
+	if d.Location == "" {
+		return ""
+	}
+	return fileutil.TrimYAMLFileExtension(filepath.Base(d.Location))
+}
+
 // Schedule contains the cron expression and the parsed cron schedule.
 type Schedule struct {
 	// Expression is the cron expression.
@@ -151,12 +159,15 @@ func (d *DAG) HasTag(tag string) bool {
 
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
-func (d *DAG) SockAddr() string {
-	return SockAddr(d.Location, "")
+func (d *DAG) SockAddr(requestID string) string {
+	if d.Location != "" {
+		return SockAddr(d.Location, "")
+	}
+	return SockAddr(d.Name, requestID)
 }
 
 // SockAddrSub returns the unix socket address for a specific request ID.
-// This is used to control sub DAG executions.
+// This is used to control sub DAG runs.
 func (d *DAG) SockAddrSub(requestID string) string {
 	return SockAddr(d.GetName(), requestID)
 }
@@ -228,9 +239,9 @@ func (d *DAG) initializeDefaults() {
 	}
 
 	// Ensure we have a valid working directory
-	workDir := filepath.Dir(d.Location)
-	if workDir == "" {
-		workDir = "."
+	var workDir = "."
+	if d.Location != "" {
+		workDir = filepath.Dir(d.Location)
 	}
 
 	// Setup steps and handlers with the working directory
@@ -263,13 +274,13 @@ func (d *DAG) setupHandlers(workDir string) {
 
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
-func SockAddr(name, key string) string {
+func SockAddr(name, requestId string) string {
 	maxSocketNameLength := 50 // Maximum length for socket name
 	name = fileutil.SafeName(name)
-	key = fileutil.SafeName(key)
+	requestId = fileutil.SafeName(requestId)
 
 	// Create MD5 hash of the combined name and requestID and take first 8 chars
-	combined := name + key
+	combined := name + requestId
 	hashLength := 6
 	hash := fmt.Sprintf("%x", md5.Sum([]byte(combined)))[:hashLength] // nolint:gosec
 

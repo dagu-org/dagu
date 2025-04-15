@@ -1,35 +1,39 @@
 import React from 'react';
-import { Status } from '../../models';
 import StatusChip from '../atoms/StatusChip';
 import { Stack } from '@mui/material';
 import LabeledItem from '../atoms/LabeledItem';
 import { Link } from 'react-router-dom';
+import { components } from '../../api/v2/schema';
 
 type Props = {
-  status?: Status;
-  name: string;
-  file?: string;
+  status?: components['schemas']['RunDetails'];
+  fileId: string;
+  requestId?: string;
 };
 
-function DAGStatusOverview({ status, name, file = '' }: Props) {
-  const url = `/dags/${name}/scheduler-log?&file=${encodeURI(file)}`;
+function DAGStatusOverview({ status, fileId, requestId = '' }: Props) {
+  const searchParams = new URLSearchParams();
+  if (requestId) {
+    searchParams.set('requestId', requestId);
+  }
+  const url = `/dags/${fileId}/scheduler-log?${searchParams.toString()}`;
   if (!status) {
     return null;
   }
   return (
     <Stack direction="column" spacing={1}>
       <LabeledItem label="Status">
-        <StatusChip status={status.Status}>{status.StatusText}</StatusChip>
+        <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+          <StatusChip status={status.status}>{status.statusText}</StatusChip>
+          <Link to={url}>View Log</Link>
+        </Stack>
       </LabeledItem>
-      <LabeledItem label="Request ID">{status.RequestId}</LabeledItem>
+      <LabeledItem label="Request ID">{status.requestId}</LabeledItem>
       <Stack direction="row" sx={{ alignItems: 'center' }} spacing={2}>
-        <LabeledItem label="Started At">{status.StartedAt}</LabeledItem>
-        <LabeledItem label="Finished At">{status.FinishedAt}</LabeledItem>
+        <LabeledItem label="Started At">{status.startedAt}</LabeledItem>
+        <LabeledItem label="Finished At">{status.finishedAt}</LabeledItem>
       </Stack>
-      <LabeledItem label="Params">{status.Params}</LabeledItem>
-      <LabeledItem label="Scheduler Log">
-        <Link to={url}>{status.Log}</Link>
-      </LabeledItem>
+      <LabeledItem label="Params">{status.params}</LabeledItem>
     </Stack>
   );
 }

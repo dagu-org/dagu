@@ -1,20 +1,11 @@
 import cronParser from 'cron-parser';
 import moment from 'moment-timezone';
-import { WorkflowListItem } from './api';
-
-export enum SchedulerStatus {
-  None = 0,
-  Running,
-  Error,
-  Cancel,
-  Success,
-  Skipped_Unused,
-}
+import { components } from '../api/v2/schema';
 
 export type Status = {
   RequestId: string;
   Name: string;
-  Status: SchedulerStatus;
+  Status: number;
   StatusText: string;
   Pid: number;
   Nodes: Node[];
@@ -28,21 +19,21 @@ export type Status = {
   Params: string;
 };
 
-export function Handlers(s: Status) {
-  const r = [];
-  if (s.OnSuccess) {
-    r.push(s.OnSuccess);
+export function getEventHandlers(s: components['schemas']['RunDetails']) {
+  const ret: components['schemas']['Node'][] = [];
+  if (s.onSuccess) {
+    ret.push(s.onSuccess);
   }
-  if (s.OnFailure) {
-    r.push(s.OnFailure);
+  if (s.onFailure) {
+    ret.push(s.onFailure);
   }
-  if (s.OnCancel) {
-    r.push(s.OnCancel);
+  if (s.onCancel) {
+    ret.push(s.onCancel);
   }
-  if (s.OnExit) {
-    r.push(s.OnExit);
+  if (s.onExit) {
+    ret.push(s.onExit);
   }
-  return r;
+  return ret;
 }
 
 export type Condition = {
@@ -51,23 +42,23 @@ export type Condition = {
 };
 
 export type DAG = {
-  Location: string;
+  fileId?: string;
   Name: string;
-  Schedule: Schedule[];
-  Group: string;
-  Tags: string[];
-  Description: string;
-  Env: string[];
-  LogDir: string;
-  HandlerOn: HandlerOn;
+  Schedule?: Schedule[];
+  Group?: string;
+  Tags?: string[];
+  Description?: string;
+  Env?: string[];
+  LogDir?: string;
+  HandlerOn?: HandlerOn;
   Steps?: Step[];
-  HistRetentionDays: number;
-  Preconditions: Condition[] | null;
-  MaxActiveRuns: number;
-  Params: string[];
+  HistRetentionDays?: number;
+  Preconditions?: Condition[] | null;
+  MaxActiveRuns?: number;
+  Params?: string[];
   DefaultParams?: string;
-  Delay: number;
-  MaxCleanUpTime: number;
+  Delay?: number;
+  MaxCleanUpTime?: number;
 };
 
 export type Schedule = {
@@ -95,68 +86,34 @@ export enum DAGDataType {
   Group,
 }
 
-export type DAGItem = DAGData | DAGGroup;
-
-export type DAGData = {
-  Type: DAGDataType.DAG;
-  Name: string;
-  DAGStatus: WorkflowListItem;
-};
-
 export type DAGGroup = {
   Type: DAGDataType.Group;
   Name: string;
 };
 
-export function getFirstTag(data?: DAGItem): string {
-  if (!data) {
-    return '';
-  }
-  if (data.Type == DAGDataType.DAG) {
-    const tags = data.DAGStatus.DAG.Tags;
-    return tags ? tags[0] : '';
-  }
-  return '';
-}
+// export function getStatus(data?: DAGItem): SchedulerStatus {
+//   if (!data) {
+//     return SchedulerStatus.None;
+//   }
+//   if (data.Type == DAGDataType.DAG) {
+//     return data.DAGStatus.Status?.Status || SchedulerStatus.None;
+//   }
+//   return SchedulerStatus.None;
+// }
 
-export function getStatus(data?: DAGItem): SchedulerStatus {
-  if (!data) {
-    return SchedulerStatus.None;
-  }
-  if (data.Type == DAGDataType.DAG) {
-    return data.DAGStatus.Status?.Status || SchedulerStatus.None;
-  }
-  return SchedulerStatus.None;
-}
-
-type KeysMatching<T extends object, V> = {
-  [K in keyof T]-?: T[K] extends V ? K : never;
-}[keyof T];
-
-export function getStatusField(
-  field: KeysMatching<Status, string>,
-  data?: DAGItem
-): string {
-  if (!data) {
-    return '';
-  }
-  if (data.Type == DAGDataType.DAG) {
-    return data.DAGStatus.Status?.[field] || '';
-  }
-  return '';
-}
-
-export function getNextSchedule(data: WorkflowListItem): number {
-  const schedules = data.DAG.Schedule;
-  if (!schedules || schedules.length == 0 || data.Suspended) {
+export function getNextSchedule(
+  data: components['schemas']['DAGFile']
+): number {
+  const schedules = data.dag.schedule;
+  if (!schedules || schedules.length == 0 || data.suspended) {
     return Number.MAX_SAFE_INTEGER;
   }
   const tz = getConfig().tz || moment.tz.guess();
-  const datesToRun = schedules.map((s) => {
-    const cronTzMatch = s.Expression.match(/(?<=CRON_TZ=)[^\s]+/);
+  const datesToRun = schedules.map((schedule) => {
+    const cronTzMatch = schedule.expression.match(/(?<=CRON_TZ=)[^\s]+/);
     if (cronTzMatch) {
       const cronTz = cronTzMatch[0];
-      const expressionTextWithOutCronTz = s.Expression.replace(
+      const expressionTextWithOutCronTz = schedule.expression.replace(
         `CRON_TZ=${cronTz}`,
         ''
       );
@@ -168,24 +125,18 @@ export function getNextSchedule(data: WorkflowListItem): number {
         .next();
     }
     const expression = tz
-      ? cronParser.parseExpression(s.Expression, {
+      ? cronParser.parseExpression(schedule.expression, {
           currentDate: new Date(),
           tz,
         })
-      : cronParser.parseExpression(s.Expression);
+      : cronParser.parseExpression(schedule.expression);
     return expression.next();
   });
   const sorted = datesToRun.sort((a, b) => a.getTime() - b.getTime());
-  return sorted[0].getTime() / 1000;
-}
-
-export enum NodeStatus {
-  None = 0,
-  Running,
-  Error,
-  Cancel,
-  Success,
-  Skipped,
+  if (!sorted || sorted.length == 0 || sorted[0] == null) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  return sorted[0]?.getTime() / 1000;
 }
 
 export type Node = {
@@ -193,7 +144,7 @@ export type Node = {
   Log: string;
   StartedAt: string;
   FinishedAt: string;
-  Status: NodeStatus;
+  Status: number;
   RetryCount: number;
   DoneCount: number;
   Error: string;
@@ -207,23 +158,23 @@ export type StatusFile = {
 
 export type Step = {
   Name: string;
-  Description: string;
-  Variables: string[];
-  Dir: string;
-  CmdWithArgs: string;
-  Command: string;
-  Script: string;
-  Stdout: string;
-  Output: string;
-  Args: string[];
-  Depends: string[];
-  ContinueOn: ContinueOn;
+  Description?: string;
+  Variables?: string[];
+  Dir?: string;
+  CmdWithArgs?: string;
+  Command?: string;
+  Script?: string;
+  Stdout?: string;
+  Output?: string;
+  Args?: string[];
+  Depends?: string[];
+  ContinueOn?: ContinueOn;
   RetryPolicy?: RetryPolicy;
-  RepeatPolicy: RepeatPolicy;
-  MailOnError: boolean;
-  Preconditions: Condition[] | null;
-  Run: string;
-  Params: string;
+  RepeatPolicy?: RepeatPolicy;
+  MailOnError?: boolean;
+  Preconditions?: Condition[] | null;
+  Run?: string;
+  Params?: string;
 };
 
 export type RetryPolicy = {

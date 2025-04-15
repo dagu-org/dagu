@@ -1,14 +1,14 @@
 import React from 'react';
-import { WorkflowListItem } from '../../models/api';
+import { components } from '../../api/v2/schema';
 
 type Props = {
-  DAGs: WorkflowListItem[];
+  dags: components['schemas']['DAGFile'][];
   errors: string[];
   hasError: boolean;
 };
 
-function DAGErrors({ DAGs, errors, hasError }: Props) {
-  if (!DAGs || !hasError) {
+function DAGErrors({ dags, errors, hasError }: Props) {
+  if (!dags || !hasError) {
     return <div></div>;
   }
   return (
@@ -16,14 +16,17 @@ function DAGErrors({ DAGs, errors, hasError }: Props) {
       <div>Please check the below errors!</div>
       <div className="content">
         <ul>
-          {DAGs.filter((w) => w.Error).map((w) => {
-            const url = encodeURI(w.File);
-            return (
-              <li>
-                <a href={url}>{w.File}</a>: {w.Error}{' '}
-              </li>
-            );
-          })}
+          {dags
+            .filter((dag) => dag.errors.length > 0)
+            .map((dag) => {
+              const url = encodeURI(dag.dag.name);
+              return dag.errors.map((err) => (
+                <li key={err}>
+                  {' '}
+                  <a href={url}>{dag.dag.name}</a>: {err}{' '}
+                </li>
+              ));
+            })}
           {errors.map((e) => (
             <li>{e}</li>
           ))}

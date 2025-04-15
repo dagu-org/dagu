@@ -11,6 +11,8 @@ import Search from './pages/search';
 import { UserPreferencesProvider } from './contexts/UserPreference';
 import { Config, ConfigContext } from './contexts/ConfigContext';
 import moment from 'moment-timezone';
+// Load all timezone data for moment-timezone to handle dynamic timezones
+import 'moment-timezone/builds/moment-timezone-with-data.js';
 
 type Props = {
   config: Config;
@@ -55,8 +57,8 @@ function App({ config }: Props) {
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/dags/" element={<DAGs />} />
-                  <Route path="/dags/:name/:tab" element={<DAGDetails />} />
-                  <Route path="/dags/:name/" element={<DAGDetails />} />
+                  <Route path="/dags/:fileId/:tab" element={<DAGDetails />} />
+                  <Route path="/dags/:fileId/" element={<DAGDetails />} />
                   <Route path="/search/" element={<Search />} />
                 </Routes>
               </Layout>

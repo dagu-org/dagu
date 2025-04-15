@@ -46,7 +46,9 @@ func (th JSONDBTest) CreateRecord(t *testing.T, ts time.Time, requestID string, 
 	err = record.Open(th.Context)
 	require.NoError(t, err)
 
-	defer record.Close(th.Context)
+	defer func() {
+		_ = record.Close(th.Context)
+	}()
 
 	status := persistence.NewStatusFactory(dag.DAG).Default()
 	status.RequestID = requestID
@@ -76,11 +78,11 @@ type DAGTest struct {
 func (d DAGTest) Writer(t *testing.T, requestID string, startedAt time.Time) WriterTest {
 	t.Helper()
 
-	root := NewDataRoot(d.th.tmpDir, d.DAG.Name)
-	execution, err := root.CreateExecution(NewUTC(startedAt), requestID)
+	root := NewDataRoot(d.th.tmpDir, d.Name)
+	run, err := root.CreateRun(NewUTC(startedAt), requestID)
 	require.NoError(t, err)
 
-	record, err := execution.CreateRecord(d.th.Context, NewUTC(startedAt), d.th.DB.cache, WithDAG(d.DAG))
+	record, err := run.CreateRecord(d.th.Context, NewUTC(startedAt), d.th.DB.cache, WithDAG(d.DAG))
 	require.NoError(t, err)
 
 	writer := NewWriter(record.file)

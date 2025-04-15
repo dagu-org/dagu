@@ -1,44 +1,48 @@
 import React from 'react';
 import { Button, Stack } from '@mui/material';
 import { AppBarContext } from '../../contexts/AppBarContext';
+import { useClient } from '../../hooks/api';
 
 type Props = {
-  name: string;
+  fileId: string;
 };
 
-function DAGEditButtons({ name }: Props) {
+function DAGEditButtons({ fileId }: Props) {
   const appBarContext = React.useContext(AppBarContext);
+  const client = useClient();
   return (
     <Stack direction="row" spacing={1}>
       <Button
         onClick={async () => {
-          const val = window.prompt('Please input the new DAG name', '');
-          if (!val) {
+          const newFileId = window.prompt(
+            'Please input the new DAG file ID',
+            ''
+          );
+          if (!newFileId) {
             return;
           }
-          if (val.indexOf(' ') != -1) {
-            alert('DAG name cannot contain space');
+          if (newFileId.indexOf(' ') != -1) {
+            alert('DAG file ID cannot contain space');
             return;
           }
-          const url = `${getConfig().apiURL}/dags/${name}?remoteNode=${
-            appBarContext.selectedRemoteNode || 'local'
-          }`;
-          const resp = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
+          const { error } = await client.POST('/dags/{fileId}/rename', {
+            params: {
+              path: {
+                fileId: fileId,
+              },
             },
-            body: JSON.stringify({
-              action: 'rename',
-              value: val,
-            }),
+            query: {
+              remoteNode: appBarContext.selectedRemoteNode || 'local',
+            },
+            body: {
+              newFileId: newFileId,
+            },
           });
-          if (resp.ok) {
-            window.location.href = `${getConfig().basePath}/dags/${val}`;
-          } else {
-            const e = await resp.text();
-            alert(e);
+          if (error) {
+            alert(error.message || 'An error occurred');
+            return;
           }
+          window.location.href = `${getConfig().basePath}/dags/${newFileId}`;
         }}
       >
         Rename
@@ -48,19 +52,21 @@ function DAGEditButtons({ name }: Props) {
           if (!confirm('Are you sure to delete the DAG?')) {
             return;
           }
-          const url = `${getConfig().apiURL}/dags/${name}`;
-          const resp = await fetch(url, {
-            method: 'DELETE',
-            headers: {
-              'Content-Type': 'application/json',
+          const { error } = await client.DELETE('/dags/{fileId}', {
+            params: {
+              path: {
+                fileId: fileId,
+              },
+              query: {
+                remoteNode: appBarContext.selectedRemoteNode || 'local',
+              },
             },
           });
-          if (resp.ok) {
-            window.location.href = `${getConfig().basePath}/dags/`;
-          } else {
-            const e = await resp.text();
-            alert(e);
+          if (error) {
+            alert(error.message || 'An error occurred');
+            return;
           }
+          window.location.href = `${getConfig().basePath}/dags/`;
         }}
       >
         Delete

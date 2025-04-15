@@ -34,6 +34,15 @@ DOCKER_CMD := docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v
 GOTESTSUM_ARGS=--format=standard-quiet
 GO_TEST_FLAGS=-v --race
 
+# OpenAPI configuration
+OAPI_SPEC_DIR_V2=./api/v2
+OAPI_SPEC_FILE_V2=${OAPI_SPEC_DIR_V2}/api.yaml
+OAPI_CONFIG_FILE_V2=${OAPI_SPEC_DIR_V2}/config.yaml
+
+OAPI_SPEC_DIR_V1=./api/v1
+OAPI_SPEC_FILE_V1=${OAPI_SPEC_DIR_V1}/api.yaml
+OAPI_CONFIG_FILE_V1=${OAPI_SPEC_DIR_V1}/config.yaml
+
 # Frontend directories
 
 FE_DIR=./internal/frontend
@@ -51,10 +60,12 @@ COLOR_RED=\033[0;31m
 # Go packages for the tools
 
 PKG_swagger=github.com/go-swagger/go-swagger/cmd/swagger
-PKG_golangci_lint=github.com/golangci/golangci-lint/cmd/golangci-lint
+PKG_golangci_lint=github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 PKG_gotestsum=gotest.tools/gotestsum
 PKG_addlicense=github.com/google/addlicense
 PKG_changelog-from-release=github.com/rhysd/changelog-from-release/v3@latest
+PKG_oapi_codegen=github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
+PKG_kin_openapi_validate=github.com/getkin/kin-openapi/cmd/validate
 
 # Certificates for the development environment
 
@@ -134,9 +145,37 @@ open-coverage:
 .PHONY: lint
 lint: golangci-lint
 
+# api generates the server code from the OpenAPI specification.
+.PHONY: api
+api: api-validate
+	@echo "${COLOR_GREEN}Generating API...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_oapi_codegen}
+	@${LOCAL_BIN_DIR}/oapi-codegen --config=${OAPI_CONFIG_FILE_V2} ${OAPI_SPEC_FILE_V2}
+
+# api-validate validates the OpenAPI specification.
+.PHONY: api-validate
+api-validate:
+	@echo "${COLOR_GREEN}Validating API...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_kin_openapi_validate}
+	@${LOCAL_BIN_DIR}/validate ${OAPI_SPEC_FILE_V2}
+
+# api-v1 generates the server code from the OpenAPI specification.
+.PHONY: apiv1
+apiv1: apiv1-validate
+	@echo "${COLOR_GREEN}Generating API...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_oapi_codegen}
+	@${LOCAL_BIN_DIR}/oapi-codegen --config=${OAPI_CONFIG_FILE_V1} ${OAPI_SPEC_FILE_V1}
+
+# api-validate-v1 validates the OpenAPI specification.
+.PHONY: apiv1-validate
+apiv1-validate:
+	@echo "${COLOR_GREEN}Validating API...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_kin_openapi_validate}
+	@${LOCAL_BIN_DIR}/validate ${OAPI_SPEC_FILE_V1}
+
 # api generates the swagger server code.
 .PHONY: swagger
-api: clean-swagger gen-swagger
+swagger: clean-swagger gen-swagger
 
 # certs generates the certificates to use in the development environment.
 .PHONY: certs
@@ -226,7 +265,7 @@ build-ui:
 golangci-lint:
 	@echo "${COLOR_GREEN}Running linter...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_golangci_lint)
-	@${LOCAL_BIN_DIR}/golangci-lint run ./...
+	@${LOCAL_BIN_DIR}/golangci-lint run --fix ./...
 
 # clean-swagger removes generated go files for swagger.
 .PHONY: clean-swagger

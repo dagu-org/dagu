@@ -29,7 +29,7 @@ func TestClient_GetStatus(t *testing.T) {
 
 		requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
 		socketServer, _ := sock.NewServer(
-			dag.SockAddr(),
+			dag.SockAddr(requestID),
 			func(w http.ResponseWriter, _ *http.Request) {
 				status := persistence.NewStatusFactory(dag.DAG).Create(
 					requestID, scheduler.StatusRunning, 0, time.Now(),
@@ -59,7 +59,7 @@ func TestClient_GetStatus(t *testing.T) {
 		ctx := th.Context
 		cli := th.Client
 
-		dagStatus, err := cli.GetStatus(ctx, "invalid-dag-name")
+		dagStatus, err := cli.GetDAGStatus(ctx, "invalid-dag-name")
 		require.Error(t, err)
 		require.NotNil(t, dagStatus)
 
@@ -96,7 +96,7 @@ func TestClient_GetStatus(t *testing.T) {
 		newStatus := scheduler.NodeStatusError
 		status.Nodes[0].Status = newStatus
 
-		err = cli.UpdateStatus(ctx, dag.DAG, status)
+		err = cli.UpdateStatus(ctx, dag.Name, status)
 		require.NoError(t, err)
 
 		statusByRequestID, err := cli.GetStatusByRequestID(ctx, dag.DAG, requestID)
@@ -116,7 +116,7 @@ func TestClient_GetStatus(t *testing.T) {
 			scheduler.NodeStatusError)
 
 		// Check if the update fails.
-		err := cli.UpdateStatus(ctx, dag.DAG, status)
+		err := cli.UpdateStatus(ctx, dag.Name, status)
 		require.Error(t, err)
 	})
 }
@@ -126,11 +126,13 @@ func TestClient_RunDAG(t *testing.T) {
 
 	t.Run("RunDAG", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "run_dag.yaml"))
-		dagStatus, err := th.Client.GetStatus(th.Context, dag.Location)
+		dagStatus, err := th.Client.GetDAGStatus(th.Context, dag.Location)
 		require.NoError(t, err)
 
-		err = th.Client.Start(th.Context, dagStatus.DAG, client.StartOptions{})
+		err = th.Client.StartDAG(th.Context, dagStatus.DAG, client.StartOptions{})
 		require.NoError(t, err)
+
+		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
 
 		status, err := th.Client.GetLatestStatus(th.Context, dagStatus.DAG)
 		require.NoError(t, err)
@@ -140,11 +142,12 @@ func TestClient_RunDAG(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "stop.yaml"))
 		ctx := th.Context
 
-		th.Client.StartAsync(ctx, dag.DAG, client.StartOptions{})
+		err := th.Client.StartDAG(ctx, dag.DAG, client.StartOptions{})
+		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusRunning)
 
-		err := th.Client.Stop(ctx, dag.DAG)
+		err = th.Client.StopDAG(ctx, dag.DAG)
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusCancel)
@@ -153,7 +156,7 @@ func TestClient_RunDAG(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "restart.yaml"))
 		ctx := th.Context
 
-		err := th.Client.Restart(ctx, dag.DAG, client.RestartOptions{})
+		err := th.Client.RestartDAG(ctx, dag.DAG, client.RestartOptions{})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
@@ -163,7 +166,7 @@ func TestClient_RunDAG(t *testing.T) {
 		ctx := th.Context
 		cli := th.Client
 
-		err := cli.Start(ctx, dag.DAG, client.StartOptions{Params: "x y z"})
+		err := cli.StartDAG(ctx, dag.DAG, client.StartOptions{Params: "x y z"})
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish
@@ -178,7 +181,7 @@ func TestClient_RunDAG(t *testing.T) {
 
 		time.Sleep(1 * time.Second)
 
-		err = cli.Retry(ctx, dag.DAG, previousRequestID)
+		err = cli.RetryDAG(ctx, dag.DAG, previousRequestID)
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish
@@ -268,11 +271,11 @@ steps:
 		// Create a DAG to rename.
 		id, err := cli.CreateDAG(ctx, "old_name")
 		require.NoError(t, err)
-		_, err = cli.GetStatus(ctx, filepath.Join(th.Config.Paths.DAGsDir, id+".yaml"))
+		_, err = cli.GetDAGStatus(ctx, filepath.Join(th.Config.Paths.DAGsDir, id+".yaml"))
 		require.NoError(t, err)
 
 		// Rename the file.
-		err = cli.Rename(ctx, id, id+"_renamed")
+		err = cli.MoveDAG(ctx, id, id+"_renamed")
 
 		// Check if the file is renamed.
 		require.NoError(t, err)
@@ -290,7 +293,7 @@ func TestClient_ReadHistory(t *testing.T) {
 		cli := th.Client
 		dag := th.DAG(t, filepath.Join("client", "empty_status.yaml"))
 
-		_, err := cli.GetStatus(ctx, dag.Location)
+		_, err := cli.GetDAGStatus(ctx, dag.Location)
 		require.NoError(t, err)
 	})
 	t.Run("TestClient_All", func(t *testing.T) {
@@ -305,9 +308,10 @@ func TestClient_ReadHistory(t *testing.T) {
 		require.NoError(t, err)
 
 		// Get all statuses.
-		allDagStatus, _, err := cli.GetAllStatus(ctx)
+		result, errList, err := cli.ListStatus(ctx)
 		require.NoError(t, err)
-		require.Equal(t, 2, len(allDagStatus))
+		require.Empty(t, errList)
+		require.Equal(t, 2, len(result.Items))
 	})
 }
 

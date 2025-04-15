@@ -46,7 +46,7 @@ type Record struct {
 type RecordOption func(*Record)
 
 // WithDAG sets the DAG associated with the record.
-// This allows the record to store DAG metadata alongside the execution data.
+// This allows the record to store DAG metadata alongside the run data.
 func WithDAG(dag *digraph.DAG) RecordOption {
 	return func(r *Record) {
 		r.dag = dag
@@ -98,7 +98,7 @@ func (r *Record) Open(ctx context.Context) error {
 
 	// Ensure the directory exists
 	dir := filepath.Dir(r.file)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
@@ -306,16 +306,16 @@ func (r *Record) ReadStatus(ctx context.Context) (*persistence.Status, error) {
 		// Continue with operation
 	}
 
-	execution, err := r.ReadExecution(ctx)
+	run, err := r.ReadRun(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &execution.Status, nil
+	return &run.Status, nil
 }
 
-// ReadExecution returns the full status file information, including the file path.
+// ReadRun returns the full status file information, including the file path.
 // The context can be used to cancel the operation.
-func (r *Record) ReadExecution(ctx context.Context) (*persistence.Execution, error) {
+func (r *Record) ReadRun(ctx context.Context) (*persistence.Run, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -333,7 +333,7 @@ func (r *Record) ReadExecution(ctx context.Context) (*persistence.Execution, err
 		})
 
 		if cacheErr == nil {
-			return persistence.NewExecution(r.file, *status), nil
+			return persistence.NewRun(r.file, *status), nil
 		}
 	}
 
@@ -346,7 +346,7 @@ func (r *Record) ReadExecution(ctx context.Context) (*persistence.Execution, err
 		return nil, fmt.Errorf("failed to parse status file: %w", parseErr)
 	}
 
-	return persistence.NewExecution(r.file, *parsed), nil
+	return persistence.NewRun(r.file, *parsed), nil
 }
 
 // parseLocked reads the status file and returns the last valid status.
@@ -358,11 +358,13 @@ func (r *Record) parseLocked() (*persistence.Status, error) {
 // ParseStatusFile reads the status file and returns the last valid status.
 // The bufferSize parameter controls the size of the read buffer.
 func ParseStatusFile(file string) (*persistence.Status, error) {
-	f, err := os.Open(file)
+	f, err := os.Open(file) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrReadFailed, err)
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 
 	var (
 		offset int64

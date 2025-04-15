@@ -9,6 +9,7 @@ import (
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
+// FromSteps converts a list of DAG steps to persistence Node objects
 func FromSteps(steps []digraph.Step) []*Node {
 	var ret []*Node
 	for _, s := range steps {
@@ -17,6 +18,7 @@ func FromSteps(steps []digraph.Step) []*Node {
 	return ret
 }
 
+// FromNodes converts scheduler NodeData objects to persistence Node objects
 func FromNodes(nodes []scheduler.NodeData) []*Node {
 	var ret []*Node
 	for _, node := range nodes {
@@ -25,6 +27,7 @@ func FromNodes(nodes []scheduler.NodeData) []*Node {
 	return ret
 }
 
+// FromNode converts a single scheduler NodeData to a persistence Node
 func FromNode(node scheduler.NodeData) *Node {
 	return &Node{
 		Step:       node.Step,
@@ -40,6 +43,7 @@ func FromNode(node scheduler.NodeData) *Node {
 	}
 }
 
+// Node represents a DAG step with its execution state for persistence
 type Node struct {
 	Step       digraph.Step         `json:"Step"`
 	Log        string               `json:"Log"`
@@ -53,6 +57,7 @@ type Node struct {
 	StatusText string               `json:"StatusText"`
 }
 
+// ToNode converts a persistence Node back to a scheduler Node
 func (n *Node) ToNode() *scheduler.Node {
 	startedAt, _ := stringutil.ParseTime(n.StartedAt)
 	finishedAt, _ := stringutil.ParseTime(n.FinishedAt)
@@ -69,6 +74,7 @@ func (n *Node) ToNode() *scheduler.Node {
 	})
 }
 
+// NewNode creates a new Node with default status values for the given step
 func NewNode(step digraph.Step) *Node {
 	return &Node{
 		Step:       step,
@@ -81,6 +87,7 @@ func NewNode(step digraph.Step) *Node {
 
 var errNodeProcessing = errors.New("node processing error")
 
+// errFromText converts an error string to an error, wrapped with errNodeProcessing
 func errFromText(err string) error {
 	if err == "" {
 		return nil
@@ -88,6 +95,7 @@ func errFromText(err string) error {
 	return fmt.Errorf("%w: %s", errNodeProcessing, err)
 }
 
+// errText extracts the error message from an error or returns empty string if nil
 func errText(err error) string {
 	if err == nil {
 		return ""

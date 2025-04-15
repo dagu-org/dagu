@@ -1,41 +1,35 @@
 import { Switch } from '@mui/material';
 import React from 'react';
-import { WorkflowListItem } from '../../models/api';
-import { AppBarContext } from '../../contexts/AppBarContext';
+import { components } from '../../api/v2/schema';
+import { useClient, useMutate } from '../../hooks/api';
 
 type Props = {
   inputProps?: React.HTMLProps<HTMLInputElement>;
-  DAG: WorkflowListItem;
+  dag: components['schemas']['DAGFile'];
   refresh?: () => void;
 };
 
-function LiveSwitch({ DAG, refresh, inputProps }: Props) {
-  const appBarContext = React.useContext(AppBarContext);
-  const [checked, setChecked] = React.useState(!DAG.Suspended);
+function LiveSwitch({ dag, refresh, inputProps }: Props) {
+  const client = useClient();
+  const mutate = useMutate();
+  const [checked, setChecked] = React.useState(!dag.suspended);
   const onSubmit = React.useCallback(
-    async (params: { name: string; action: string; value: string }) => {
-      const url = `${getConfig().apiURL}/dags/${params.name}?remoteNode=${
-        appBarContext.selectedRemoteNode || 'local'
-      }`;
-      const ret = await fetch(url, {
-        method: 'POST',
-        mode: 'cors',
-        headers: {
-          'Content-Type': 'application/json',
+    async (suspend: boolean) => {
+      const { error } = await client.POST('/dags/{fileId}/suspend', {
+        params: {
+          path: {
+            fileId: dag.fileId,
+          },
         },
-        body: JSON.stringify({
-          action: params.action,
-          value: params.value,
-        }),
+        body: {
+          suspend,
+        },
       });
-      if (ret.ok) {
-        if (refresh) {
-          refresh();
-        }
-      } else {
-        const e = await ret.text();
-        alert(e);
+      if (error) {
+        alert(error.message || 'Error occurred');
+        return;
       }
+      mutate(['/dags/{fileId}']);
     },
     [refresh]
   );
@@ -43,12 +37,8 @@ function LiveSwitch({ DAG, refresh, inputProps }: Props) {
   const onChange = React.useCallback(() => {
     const enabled = !checked;
     setChecked(enabled);
-    onSubmit({
-      name: DAG.File.replace(/.yaml$/, ''),
-      action: 'suspend',
-      value: enabled ? 'false' : 'true',
-    });
-  }, [DAG, checked]);
+    onSubmit(!enabled);
+  }, [dag, checked]);
   return (
     <Switch checked={checked} onChange={onChange} inputProps={inputProps} />
   );

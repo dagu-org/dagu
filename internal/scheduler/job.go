@@ -23,9 +23,9 @@ var (
 	ErrJobSuccess      = errors.New("job already successful")
 )
 
-var _ Job = (*dagJob)(nil)
+var _ Job = (*DAG)(nil)
 
-type dagJob struct {
+type DAG struct {
 	DAG        *digraph.DAG
 	Executable string
 	WorkDir    string
@@ -35,12 +35,12 @@ type dagJob struct {
 }
 
 // GetDAG returns the DAG associated with this job.
-func (job *dagJob) GetDAG(_ context.Context) *digraph.DAG {
+func (job *DAG) GetDAG(_ context.Context) *digraph.DAG {
 	return job.DAG
 }
 
 // Start attempts to run the job if it is not already running and is ready.
-func (job *dagJob) Start(ctx context.Context) error {
+func (job *DAG) Start(ctx context.Context) error {
 	latestStatus, err := job.Client.GetLatestStatus(ctx, job.DAG)
 	if err != nil {
 		return err
@@ -52,16 +52,16 @@ func (job *dagJob) Start(ctx context.Context) error {
 	}
 
 	// Check if the job is ready to start.
-	if err := job.ready(ctx, latestStatus); err != nil {
+	if err := job.Ready(ctx, latestStatus); err != nil {
 		return err
 	}
 
 	// Job is ready; proceed to start.
-	return job.Client.Start(ctx, job.DAG, client.StartOptions{Quiet: true})
+	return job.Client.StartDAG(ctx, job.DAG, client.StartOptions{Quiet: true})
 }
 
-// ready checks whether the job can be safely started based on the latest status.
-func (job *dagJob) ready(ctx context.Context, latestStatus persistence.Status) error {
+// Ready checks whether the job can be safely started based on the latest status.
+func (job *DAG) Ready(ctx context.Context, latestStatus persistence.Status) error {
 	// Prevent starting if it's already running.
 	if latestStatus.Status == scheduler.StatusRunning {
 		return ErrJobRunning
@@ -86,13 +86,13 @@ func (job *dagJob) ready(ctx context.Context, latestStatus persistence.Status) e
 
 // skipIfSuccessful checks if the DAG has already run successfully in the window since the last scheduled time.
 // If so, the current run is skipped.
-func (job *dagJob) skipIfSuccessful(ctx context.Context, latestStatus persistence.Status, latestStartedAt time.Time) error {
+func (job *DAG) skipIfSuccessful(ctx context.Context, latestStatus persistence.Status, latestStartedAt time.Time) error {
 	// If skip is not configured, or the DAG is not currently successful, do nothing.
 	if !job.DAG.SkipIfSuccessful || latestStatus.Status != scheduler.StatusSuccess {
 		return nil
 	}
 
-	prevExecTime := job.prevExecTime(ctx)
+	prevExecTime := job.PrevExecTime(ctx)
 	if (latestStartedAt.After(prevExecTime) || latestStartedAt.Equal(prevExecTime)) &&
 		latestStartedAt.Before(job.Next) {
 		logger.Infof(ctx, "skipping the job because it has already run successfully at %s", latestStartedAt)
@@ -101,16 +101,16 @@ func (job *dagJob) skipIfSuccessful(ctx context.Context, latestStatus persistenc
 	return nil
 }
 
-// prevExecTime calculates the previous schedule time from 'Next' by subtracting
+// PrevExecTime calculates the previous schedule time from 'Next' by subtracting
 // the schedule duration between runs.
-func (job *dagJob) prevExecTime(_ context.Context) time.Time {
+func (job *DAG) PrevExecTime(_ context.Context) time.Time {
 	nextNextRunTime := job.Schedule.Next(job.Next.Add(time.Second))
 	duration := nextNextRunTime.Sub(job.Next)
 	return job.Next.Add(-duration)
 }
 
 // Stop halts a running job if it's currently running.
-func (job *dagJob) Stop(ctx context.Context) error {
+func (job *DAG) Stop(ctx context.Context) error {
 	latestStatus, err := job.Client.GetLatestStatus(ctx, job.DAG)
 	if err != nil {
 		return err
@@ -118,15 +118,15 @@ func (job *dagJob) Stop(ctx context.Context) error {
 	if latestStatus.Status != scheduler.StatusRunning {
 		return ErrJobIsNotRunning
 	}
-	return job.Client.Stop(ctx, job.DAG)
+	return job.Client.StopDAG(ctx, job.DAG)
 }
 
 // Restart restarts the job unconditionally (quiet mode).
-func (job *dagJob) Restart(ctx context.Context) error {
-	return job.Client.Restart(ctx, job.DAG, client.RestartOptions{Quiet: true})
+func (job *DAG) Restart(ctx context.Context) error {
+	return job.Client.RestartDAG(ctx, job.DAG, client.RestartOptions{Quiet: true})
 }
 
 // String returns a string representation of the job, which is the DAG's name.
-func (job *dagJob) String() string {
+func (job *DAG) String() string {
 	return job.DAG.Name
 }

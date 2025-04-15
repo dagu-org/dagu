@@ -35,7 +35,7 @@ func (r *reporter) reportStep(
 ) error {
 	nodeStatus := node.State().Status
 	if nodeStatus != scheduler.NodeStatusNone {
-		logger.Info(ctx, "Step execution finished", "step", node.NodeData().Step.Name, "status", nodeStatus)
+		logger.Info(ctx, "Step finished", "step", node.NodeData().Step.Name, "status", nodeStatus)
 	}
 	if nodeStatus == scheduler.NodeStatusError && node.NodeData().Step.MailOnError && dag.ErrorMail != nil {
 		fromAddress := dag.ErrorMail.From

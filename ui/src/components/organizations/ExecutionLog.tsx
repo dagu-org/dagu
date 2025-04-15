@@ -1,13 +1,13 @@
-import { Box, Stack } from '@mui/material';
+import { Box } from '@mui/material';
 import React from 'react';
-import { LogFile } from '../../models/api';
 import BorderedBox from '../atoms/BorderedBox';
-import LabeledItem from '../atoms/LabeledItem';
 import LoadingIndicator from '../atoms/LoadingIndicator';
-import NodeStatusChip from '../molecules/NodeStatusChip';
+import { useQuery } from '../../hooks/api';
+import { AppBarContext } from '../../contexts/AppBarContext';
 
 type Props = {
-  log?: LogFile;
+  name: string;
+  requestId: string;
 };
 
 // Credit: https://github.com/chalk/ansi-regex/commit/02fa893d619d3da85411acc8fd4e2eea0e95a9d9 under MIT license
@@ -16,32 +16,31 @@ const ANSI_CODES_REGEX = [
   '(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-nq-uy=><~]))',
 ].join('|');
 
-function ExecutionLog({ log }: Props) {
-  if (!log) {
+function ExecutionLog({ name, requestId }: Props) {
+  const appBarContext = React.useContext(AppBarContext);
+  const { data } = useQuery(
+    '/runs/{dagName}/{requestId}/log',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
+        path: {
+          dagName: name,
+          requestId,
+        },
+      },
+    },
+    { refreshInterval: 30000 }
+  );
+
+  if (!data) {
     return <LoadingIndicator />;
   }
-  log.Content = log.Content.replace(new RegExp(ANSI_CODES_REGEX, 'g'), '');
+
+  const content = data.content.replace(new RegExp(ANSI_CODES_REGEX, 'g'), '');
   return (
     <Box>
-      <Stack spacing={1} direction="column" sx={{ width: '100%' }}>
-        <LabeledItem label="Log File">{log.LogFile}</LabeledItem>
-        {log.Step ? (
-          <React.Fragment>
-            <LabeledItem label="Step Name">{log.Step.Step.Name}</LabeledItem>
-            <Stack spacing={2} direction="row" sx={{ alignItems: 'center' }}>
-              <LabeledItem label="Started At">{log.Step.StartedAt}</LabeledItem>
-              <LabeledItem label="Finished At">
-                {log.Step.FinishedAt}
-              </LabeledItem>
-            </Stack>
-            <LabeledItem label="Status">
-              <NodeStatusChip status={log.Step.Status}>
-                {log.Step.StatusText}
-              </NodeStatusChip>
-            </LabeledItem>
-          </React.Fragment>
-        ) : null}
-      </Stack>
       <BorderedBox
         sx={{
           mt: 2,
@@ -59,7 +58,7 @@ function ExecutionLog({ log }: Props) {
             fontFamily: 'Courier New, Courier, monospace',
           }}
         >
-          {log.Content || '<No log output>'}
+          {content || '<No log output>'}
         </pre>
       </BorderedBox>
     </Box>

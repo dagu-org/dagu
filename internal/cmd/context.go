@@ -15,7 +15,6 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/frontend"
-	"github.com/dagu-org/dagu/internal/frontend/server"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
@@ -149,7 +148,7 @@ func (s *Context) Client(opts ...clientOption) (client.Client, error) {
 
 // server creates and returns a new web UI server.
 // It initializes in-memory caches for DAGs and history, and uses them in the client.
-func (ctx *Context) server() (*server.Server, error) {
+func (ctx *Context) server() (*frontend.Server, error) {
 	dagCache := filecache.New[*digraph.DAG](0, time.Hour*12)
 	dagCache.StartEviction(ctx)
 	dagStore := ctx.dagStoreWithCache(dagCache)
@@ -162,7 +161,7 @@ func (ctx *Context) server() (*server.Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client: %w", err)
 	}
-	return frontend.New(ctx.cfg, cli), nil
+	return frontend.NewServer(ctx.cfg, cli), nil
 }
 
 // scheduler creates a new scheduler instance using the default client.
@@ -183,7 +182,7 @@ func (s *Context) dagStore() (persistence.DAGStore, error) {
 	baseDir := s.cfg.Paths.DAGsDir
 	_, err := os.Stat(baseDir)
 	if os.IsNotExist(err) {
-		if err := os.MkdirAll(baseDir, 0755); err != nil {
+		if err := os.MkdirAll(baseDir, 0750); err != nil {
 			return nil, fmt.Errorf("failed to initialize directory %s: %w", baseDir, err)
 		}
 	}
@@ -212,11 +211,10 @@ func (s *Context) historyStoreWithCache(cache *filecache.Cache[*persistence.Stat
 	)
 }
 
-// OpenLogFile creates and opens a log file for a given DAG execution.
+// OpenLogFile creates and opens a log file for a given DAG run.
 // It evaluates the log directory, validates settings, creates the log directory,
 // builds a filename using the current timestamp and request ID, and then opens the file.
 func (ctx *Context) OpenLogFile(
-	prefix string,
 	dag *digraph.DAG,
 	requestID string,
 ) (*os.File, error) {
@@ -230,7 +228,6 @@ func (ctx *Context) OpenLogFile(
 	}
 
 	config := LogFileSettings{
-		Prefix:    prefix,
 		LogDir:    logDir,
 		DAGLogDir: dagLogDir,
 		DAGName:   dag.Name,
@@ -351,7 +348,6 @@ func listenSignals(ctx context.Context, listener signalListener) {
 
 // LogFileSettings defines configuration for log file creation.
 type LogFileSettings struct {
-	Prefix    string // Prefix for the log filename (e.g. "start_", "retry_").
 	LogDir    string // Base directory for logs.
 	DAGLogDir string // Optional alternative log directory specified by the DAG.
 	DAGName   string // Name of the DAG; used for generating a safe directory name.
@@ -382,7 +378,7 @@ func SetupLogDirectory(config LogFileSettings) (string, error) {
 	}
 
 	logDir := filepath.Join(baseDir, safeName)
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if err := os.MkdirAll(logDir, 0750); err != nil {
 		return "", fmt.Errorf("failed to initialize directory %s: %w", logDir, err)
 	}
 
@@ -396,8 +392,7 @@ func BuildLogFilename(config LogFileSettings) string {
 	truncatedRequestID := stringutil.TruncString(config.RequestID, 8)
 	safeDagName := fileutil.SafeName(config.DAGName)
 
-	return fmt.Sprintf("%s%s.%s.%s.log",
-		config.Prefix,
+	return fmt.Sprintf("%s.%s.%s.log",
 		safeDagName,
 		timestamp,
 		truncatedRequestID,
@@ -410,7 +405,7 @@ func CreateLogFile(filepath string) (*os.File, error) {
 	flags := os.O_CREATE | os.O_WRONLY | os.O_APPEND | os.O_SYNC
 	permissions := os.FileMode(0644)
 
-	file, err := os.OpenFile(filepath, flags, permissions)
+	file, err := os.OpenFile(filepath, flags, permissions) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("failed to create/open log file %s: %w", filepath, err)
 	}

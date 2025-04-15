@@ -57,12 +57,13 @@ func runDry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to generate request ID: %w", err)
 	}
 
-	const logPrefix = "dry_"
-	logFile, err := ctx.OpenLogFile(logPrefix, dag, requestID)
+	logFile, err := ctx.OpenLogFile(dag, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
-	defer logFile.Close()
+	defer func() {
+		_ = logFile.Close()
+	}()
 
 	ctx.LogToFile(logFile)
 

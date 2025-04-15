@@ -1,5 +1,4 @@
 import React, { CSSProperties } from 'react';
-import { Step } from '../../models';
 import DAGStepTableRow from './DAGStepTableRow';
 import {
   Table,
@@ -9,9 +8,10 @@ import {
   TableRow,
 } from '@mui/material';
 import BorderedBox from '../atoms/BorderedBox';
+import { components } from '../../api/v2/schema';
 
 type Props = {
-  steps: Step[];
+  steps: components['schemas']['Step'][];
 };
 
 function DAGStepTable({ steps }: Props) {

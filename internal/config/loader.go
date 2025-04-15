@@ -322,7 +322,7 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	viper.SetDefault("port", 8080)
 	viper.SetDefault("debug", false)
 	viper.SetDefault("basePath", "")
-	viper.SetDefault("apiBasePath", "/api/v1")
+	viper.SetDefault("apiBasePath", "/api/v2")
 	viper.SetDefault("latestStatusToday", false)
 
 	// UI settings

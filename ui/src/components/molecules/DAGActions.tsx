@@ -1,15 +1,14 @@
 import { Box, Stack } from '@mui/material';
 import React from 'react';
-import { DAG, SchedulerStatus, Status } from '../../models';
 import ActionButton from '../atoms/ActionButton';
-import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlay, faStop, faReply } from '@fortawesome/free-solid-svg-icons';
 import VisuallyHidden from '../atoms/VisuallyHidden';
 import StartDAGModal from './StartDAGModal';
 import ConfirmModal from './ConfirmModal';
 import LabeledItem from '../atoms/LabeledItem';
-import { Workflow, WorkflowStatus } from '../../models/api';
+import { components } from '../../api/v2/schema';
+import { useClient, useMutate } from '../../hooks/api';
 import { AppBarContext } from '../../contexts/AppBarContext';
 
 type LabelProps = {
@@ -18,11 +17,12 @@ type LabelProps = {
 };
 
 type Props = {
-  status?: Status | WorkflowStatus;
-  name: string;
-  dag: DAG | Workflow | undefined;
+  status?:
+    | components['schemas']['RunSummary']
+    | components['schemas']['RunDetails'];
+  fileId: string;
+  dag?: components['schemas']['DAG'] | components['schemas']['DAGDetails'];
   label?: boolean;
-  redirectTo?: string;
   refresh?: () => void;
 };
 
@@ -31,58 +31,30 @@ function Label({ show, children }: LabelProps): JSX.Element {
   return <VisuallyHidden>{children}</VisuallyHidden>;
 }
 
-function DAGActions({
-  status,
-  name,
-  dag,
-  refresh,
-  redirectTo,
-  label = true,
-}: Props) {
-  const nav = useNavigate();
+function DAGActions({ status, fileId, dag, refresh, label = true }: Props) {
   const appBarContext = React.useContext(AppBarContext);
-
   const [isStartModal, setIsStartModal] = React.useState(false);
   const [isStopModal, setIsStopModal] = React.useState(false);
   const [isRetryModal, setIsRetryModal] = React.useState(false);
 
-  const onSubmit = React.useCallback(
-    async (params: {
-      name: string;
-      action: string;
-      requestId?: string;
-      params?: string;
-    }) => {
-      const url = `${getConfig().apiURL}/dags/${params.name}?remoteNode=${
-        appBarContext.selectedRemoteNode || 'local'
-      }`;
-      const ret = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors',
-        body: JSON.stringify(params),
-      });
-      if (redirectTo) {
-        nav(redirectTo);
-        refresh && refresh();
-        return;
-      }
-      if (!ret.ok) {
-        const e = await ret.text();
-        alert(e || 'Failed to submit');
-      }
-      refresh && refresh();
-    },
-    [refresh]
-  );
+  const client = useClient();
+  const mutate = useMutate();
+  const reloadData = () => {
+    mutate(['/dags/{fileId}']);
+    mutate(['/dags/{fileId}/runs']);
+    refresh && refresh();
+  };
 
   const buttonState = {
-    start: status?.Status != SchedulerStatus.Running,
-    stop: status?.Status == SchedulerStatus.Running,
-    retry: status?.Status != SchedulerStatus.Running && status?.RequestId != '',
+    start: status?.status != 1,
+    stop: status?.status == 1,
+    retry: status?.status != 1 && status?.requestId != '',
   };
+
+  if (!dag) {
+    return <></>;
+  }
+
   return (
     <Stack direction="row" spacing={2}>
       <ActionButton
@@ -135,9 +107,23 @@ function DAGActions({
         buttonText="Stop"
         visible={isStopModal}
         dismissModal={() => setIsStopModal(false)}
-        onSubmit={() => {
+        onSubmit={async () => {
           setIsStopModal(false);
-          onSubmit({ name: name, action: 'stop' });
+          const { error } = await client.POST('/dags/{fileId}/stop', {
+            params: {
+              query: {
+                remoteNode: appBarContext.selectedRemoteNode || 'local',
+              },
+              path: {
+                fileId: fileId,
+              },
+            },
+          });
+          if (error) {
+            alert(error.message || 'An error occurred');
+            return;
+          }
+          reloadData();
         }}
       >
         <Box>Do you really want to cancel the DAG?</Box>
@@ -147,35 +133,64 @@ function DAGActions({
         buttonText="Rerun"
         visible={isRetryModal}
         dismissModal={() => setIsRetryModal(false)}
-        onSubmit={() => {
+        onSubmit={async () => {
           setIsRetryModal(false);
-          onSubmit({
-            name: name,
-            action: 'retry',
-            requestId: status?.RequestId,
+          const { error } = await client.POST('/dags/{fileId}/retry', {
+            params: {
+              path: {
+                fileId: fileId,
+              },
+              query: {
+                remoteNode: appBarContext.selectedRemoteNode || 'local',
+              },
+            },
+            body: {
+              requestId: status?.requestId || '',
+            },
           });
+          if (error) {
+            alert(error.message || 'An error occurred');
+            return;
+          }
+          reloadData();
         }}
       >
         <Stack direction="column">
           <Box>Do you really want to rerun the following execution?</Box>
           <LabeledItem label="Request-ID">{null}</LabeledItem>
-          <Box>{status?.RequestId}</Box>
+          <Box>{status?.requestId}</Box>
         </Stack>
       </ConfirmModal>
-      {dag && (
-        <StartDAGModal
-          dag={dag}
-          visible={isStartModal}
-          onSubmit={(params) => {
-            setIsStartModal(false);
-            onSubmit({ name: name, action: 'start', params: params });
-          }}
-          dismissModal={() => {
-            setIsStartModal(false);
-          }}
-        />
-      )}
+      <StartDAGModal
+        dag={dag}
+        visible={isStartModal}
+        onSubmit={async (params) => {
+          setIsStartModal(false);
+          const { error } = await client.POST('/dags/{fileId}/start', {
+            params: {
+              path: {
+                fileId: fileId,
+              },
+              query: {
+                remoteNode: appBarContext.selectedRemoteNode || 'local',
+              },
+            },
+            body: {
+              params: params,
+            },
+          });
+          if (error) {
+            alert(error.message || 'An error occurred');
+            return;
+          }
+          reloadData();
+        }}
+        dismissModal={() => {
+          setIsStartModal(false);
+        }}
+      />
     </Stack>
   );
 }
+
 export default DAGActions;

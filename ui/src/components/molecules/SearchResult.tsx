@@ -4,9 +4,10 @@ import { Link } from 'react-router-dom';
 import { SearchResult } from '../../models/api';
 import DAGDefinition from './DAGDefinition';
 import Prism from '../../assets/js/prism';
+import { components } from '../../api/v2/schema';
 
 type Props = {
-  results: SearchResult[];
+  results: components['schemas']['SearchResultItem'][];
 };
 
 function SearchResult({ results }: Props) {
@@ -14,20 +15,20 @@ function SearchResult({ results }: Props) {
     () =>
       results.map((result, i) => {
         const ret = [] as ReactElement[];
-        result.Matches.forEach((m, j) => {
+        result.matches.forEach((m, j) => {
           ret.push(
-            <ListItem key={`${result.Name}-${m.LineNumber}`}>
+            <ListItem key={`${result.name}-${m.lineNumber}`}>
               <Stack direction="column" spacing={1} style={{ width: '100%' }}>
                 {j == 0 ? (
-                  <Link to={`/dags/${encodeURI(result.Name)}/spec`}>
-                    <Typography variant="h6">{result.Name}</Typography>
+                  <Link to={`/dags/${encodeURI(result.name)}/spec`}>
+                    <Typography variant="h6">{result.name}</Typography>
                   </Link>
                 ) : null}
                 <DAGDefinition
-                  value={m.Line}
+                  value={m.line}
                   lineNumbers
-                  startLine={m.StartLine}
-                  highlightLine={m.LineNumber - m.StartLine}
+                  startLine={m.startLine}
+                  highlightLine={m.lineNumber - m.startLine}
                   noHighlight
                 />
               </Stack>
@@ -35,7 +36,7 @@ function SearchResult({ results }: Props) {
           );
         });
         if (i < results.length - 1) {
-          ret.push(<Divider key={`${result.Name}-divider`} />);
+          ret.push(<Divider key={`${result.name}-divider`} />);
         }
         return ret;
       }),
