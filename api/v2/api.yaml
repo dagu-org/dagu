@@ -486,6 +486,44 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dags/{dagLocation}/suspend:
+    patch:
+      summary: "Update suspend status of a DAG"
+      description: "Updates the suspend status of a specific DAG"
+      operationId: "UpdateDAGSuspendStatus"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGLocation"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                suspend:
+                  type: boolean
+                  description: "Suspend status to set for the DAG"
+              required:
+                - suspend
+      responses:
+        "200":
+          description: "A successful response"
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dags/search:
     get:
       summary: "Search DAGs"
@@ -605,6 +643,51 @@ paths:
                 $ref: "#/components/schemas/Log"
         "404":
           description: "Log file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /runs/{dagName}/{requestId}/{stepName}/status:
+    patch:
+      summary: "Update the status of a step"
+      description: "Updates the status of a specific step in a run"
+      operationId: "updateStepStatus"
+      tags:
+        - "runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/RequestId"
+        - $ref: "#/components/parameters/StepName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  $ref: "#/components/schemas/NodeStatus"
+              required:
+                - status
+      responses:
+        "200":
+          description: "A successful response"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Run or step not found"
           content:
             application/json:
               schema:

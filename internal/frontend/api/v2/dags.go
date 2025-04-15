@@ -132,14 +132,14 @@ func (a *API) GetDAGRunHistory(ctx context.Context, request api.GetDAGRunHistory
 
 // GetDAGDetails implements api.StrictServerInterface.
 func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsRequestObject) (api.GetDAGDetailsResponseObject, error) {
-	name := request.DagLocation
+	location := request.DagLocation
 
-	status, err := a.client.GetDAGStatus(ctx, name)
+	status, err := a.client.GetDAGStatus(ctx, location)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
 			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("DAG %s not found", name),
+			Message:    fmt.Sprintf("DAG %s not found", location),
 		}
 	}
 
@@ -476,6 +476,23 @@ func (a *API) RetryDAG(ctx context.Context, request api.RetryDAGRequestObject) (
 	}
 
 	return api.RetryDAG200Response{}, nil
+}
+
+// UpdateDAGSuspendStatus implements api.StrictServerInterface.
+func (a *API) UpdateDAGSuspendStatus(ctx context.Context, request api.UpdateDAGSuspendStatusRequestObject) (api.UpdateDAGSuspendStatusResponseObject, error) {
+	_, err := a.client.GetDAGStatus(ctx, request.DagLocation)
+	if err != nil {
+		return &api.UpdateDAGSuspendStatus404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("DAG %s not found", request.DagLocation),
+		}, nil
+	}
+
+	if err := a.client.ToggleSuspend(ctx, request.DagLocation, request.Body.Suspend); err != nil {
+		return nil, fmt.Errorf("error toggling suspend: %w", err)
+	}
+
+	return api.UpdateDAGSuspendStatus200Response{}, nil
 }
 
 // PostDAGAction implements api.StrictServerInterface.

@@ -12,16 +12,9 @@ type Props = {
   node: components['schemas']['Node'];
   requestId?: string;
   name: string;
-  onRequireModal: (step: components['schemas']['Step']) => void;
 };
 
-function NodeStatusTableRow({
-  name,
-  rownum,
-  node,
-  requestId,
-  onRequireModal,
-}: Props) {
+function NodeStatusTableRow({ name, rownum, node, requestId }: Props) {
   const searchParams = new URLSearchParams();
   searchParams.set('remoteNode', 'local');
   if (node.step) {
@@ -32,13 +25,6 @@ function NodeStatusTableRow({
   }
 
   const url = `/dags/${name}/log?${searchParams.toString()}`;
-  const buttonStyle = {
-    margin: '0px',
-    padding: '0px',
-    border: '0px',
-    background: 'none',
-    outline: 'none',
-  };
   let args = '';
   if (node.step.args) {
     // Use uninterpolated args to avoid render issues with very long params
@@ -58,11 +44,7 @@ function NodeStatusTableRow({
       <TableCell> {node.startedAt} </TableCell>
       <TableCell> {node.finishedAt} </TableCell>
       <TableCell>
-        <button style={buttonStyle} onClick={() => onRequireModal(node.step)}>
-          <NodeStatusChip status={node.status}>
-            {node.statusText}
-          </NodeStatusChip>
-        </button>
+        <NodeStatusChip status={node.status}>{node.statusText}</NodeStatusChip>
       </TableCell>
       <TableCell> {node.error} </TableCell>
       <TableCell>

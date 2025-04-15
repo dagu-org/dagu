@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/dagu-org/dagu/api/v2"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/transform"
 )
@@ -65,6 +66,46 @@ func (a *API) GetStepLog(ctx context.Context, request api.GetStepLogRequestObjec
 	}, nil
 }
 
+// UpdateStepStatus implements api.StrictServerInterface.
+func (a *API) UpdateStepStatus(ctx context.Context, request api.UpdateStepStatusRequestObject) (api.UpdateStepStatusResponseObject, error) {
+	status, err := a.client.GetStatus(ctx, request.DagName, request.RequestId)
+	if err != nil {
+		return &api.UpdateStepStatus404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("request ID %s not found for DAG %s", request.RequestId, request.DagName),
+		}, nil
+	}
+	if status.Status == scheduler.StatusRunning {
+		return &api.UpdateStepStatus400JSONResponse{
+			Code:    api.ErrorCodeBadRequest,
+			Message: fmt.Sprintf("request ID %s for DAG %s is still running", request.RequestId, request.DagName),
+		}, nil
+	}
+
+	idxToUpdate := -1
+
+	for idx, n := range status.Nodes {
+		if n.Step.Name == request.StepName {
+			idxToUpdate = idx
+		}
+	}
+	if idxToUpdate < 0 {
+		return &api.UpdateStepStatus404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, request.DagName),
+		}, nil
+	}
+
+	status.Nodes[idxToUpdate].Status = nodeStatusMapping[request.Body.Status]
+	status.Nodes[idxToUpdate].StatusText = nodeStatusMapping[request.Body.Status].String()
+
+	if err := a.client.UpdateRunStatus(ctx, request.DagName, request.RequestId, *status); err != nil {
+		return nil, fmt.Errorf("error updating status: %w", err)
+	}
+
+	return &api.UpdateStepStatus200Response{}, nil
+}
+
 func (a *API) readFileContent(ctx context.Context, f string, d *encoding.Decoder) ([]byte, error) {
 	if d == nil {
 		return os.ReadFile(f) //nolint:gosec
@@ -80,4 +121,13 @@ func (a *API) readFileContent(ctx context.Context, f string, d *encoding.Decoder
 	tr := transform.NewReader(r, d)
 	ret, err := io.ReadAll(tr)
 	return ret, err
+}
+
+var nodeStatusMapping = map[api.NodeStatus]scheduler.NodeStatus{
+	api.NodeStatusNotStarted: scheduler.NodeStatusNone,
+	api.NodeStatusRunning:    scheduler.NodeStatusRunning,
+	api.NodeStatusFailed:     scheduler.NodeStatusError,
+	api.NodeStatusCancelled:  scheduler.NodeStatusCancel,
+	api.NodeStatusSuccess:    scheduler.NodeStatusSuccess,
+	api.NodeStatusSkipped:    scheduler.NodeStatusSkipped,
 }

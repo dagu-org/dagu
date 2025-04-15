@@ -115,7 +115,8 @@ function DAGActions({ status, location, dag, refresh, label = true }: Props) {
             },
           });
           if (error) {
-            alert(error.message);
+            alert(error.message || 'An error occurred');
+            return;
           }
           reloadData();
         }}
@@ -140,7 +141,8 @@ function DAGActions({ status, location, dag, refresh, label = true }: Props) {
             },
           });
           if (error) {
-            alert(error.message);
+            alert(error.message || 'An error occurred');
+            return;
           }
           reloadData();
         }}
@@ -167,7 +169,8 @@ function DAGActions({ status, location, dag, refresh, label = true }: Props) {
             },
           });
           if (error) {
-            alert(error.message);
+            alert(error.message || 'An error occurred');
+            return;
           }
           reloadData();
         }}

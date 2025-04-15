@@ -1,12 +1,12 @@
 import { Box, Button, Modal, Stack, Typography } from '@mui/material';
 import React from 'react';
-import { components } from '../../api/v2/schema';
+import { components, NodeStatus } from '../../api/v2/schema';
 
 type Props = {
   visible: boolean;
   dismissModal: () => void;
   step?: components['schemas']['Step'];
-  onSubmit: (step: components['schemas']['Step'], action: string) => void;
+  onSubmit: (step: components['schemas']['Step'], status: NodeStatus) => void;
 };
 
 const style = {
@@ -58,13 +58,13 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
           >
             <Button
               variant="outlined"
-              onClick={() => onSubmit(step, 'mark-success')}
+              onClick={() => onSubmit(step, NodeStatus.Success)}
             >
               Mark Success
             </Button>
             <Button
               variant="outlined"
-              onClick={() => onSubmit(step, 'mark-failed')}
+              onClick={() => onSubmit(step, NodeStatus.Failed)}
             >
               Mark Failed
             </Button>

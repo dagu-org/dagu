@@ -200,7 +200,6 @@ function DAGDetails() {
               <DAGStatus
                 run={data.latestRun}
                 location={data.dag?.location || ''}
-                refresh={refreshFn}
               />
             ) : null}
             {tab == 'spec' ? <DAGSpec location={params.location} /> : null}

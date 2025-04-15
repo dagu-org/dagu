@@ -259,6 +259,10 @@ func (e *client) GetRecentHistory(ctx context.Context, name string, n int) []per
 
 var errDAGIsRunning = errors.New("the DAG is running")
 
+func (e *client) UpdateRunStatus(ctx context.Context, name, requestID string, status persistence.Status) error {
+	return e.historyStore.Update(ctx, name, status.RequestID, status)
+}
+
 func (e *client) UpdateStatus(ctx context.Context, dag *digraph.DAG, status persistence.Status) error {
 	// FIXME: Should handle the case of dynamic DAG
 	client := sock.NewClient(dag.SockAddr(""))

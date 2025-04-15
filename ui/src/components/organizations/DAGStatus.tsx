@@ -4,35 +4,51 @@ import { DAGStatus } from '../../models';
 import { getEventHandlers } from '../../models';
 import NodeStatusTable from '../molecules/NodeStatusTable';
 import DAGStatusOverview from '../molecules/DAGStatusOverview';
-import { useDAGPostAPI } from '../../hooks/useDAGPostAPI';
 import StatusUpdateModal from '../molecules/StatusUpdateModal';
 import { Box } from '@mui/material';
 import SubTitle from '../atoms/SubTitle';
-import { components, Status } from '../../api/v2/schema';
+import { components, NodeStatus, Status } from '../../api/v2/schema';
 import DAGGraph from '../molecules/DAGGraph';
+import { useClient, useMutate } from '../../hooks/api';
 
 type Props = {
   run: components['schemas']['RunDetails'];
   location: string;
-  refresh: () => void;
 };
 
-function DAGStatus({ run, location, refresh }: Props) {
+function DAGStatus({ run, location }: Props) {
   const [modal, setModal] = React.useState(false);
   const [selectedStep, setSelectedStep] = React.useState<
     components['schemas']['Step'] | undefined
   >(undefined);
-  const { doPost } = useDAGPostAPI({
-    name: location,
-    onSuccess: refresh,
-    requestId: run.requestId,
-  });
+  const client = useClient();
+  const mutate = useMutate();
   const dismissModal = () => setModal(false);
   const onUpdateStatus = async (
     step: components['schemas']['Step'],
-    action: string
+    status: NodeStatus
   ) => {
-    doPost(action, step.name);
+    const { error } = await client.PATCH(
+      '/runs/{dagName}/{requestId}/{stepName}/status',
+      {
+        params: {
+          path: {
+            dagName: run.name,
+            requestId: run.requestId,
+            stepName: step.name,
+          },
+        },
+        body: {
+          status,
+        },
+      }
+    );
+    if (error) {
+      alert(error.message || 'An error occurred');
+      return;
+    }
+    mutate(['/dags/{dagLocation}']);
+    mutate(['/dags/{dagLocation}/runs']);
     dismissModal();
   };
   const onSelectStepOnGraph = React.useCallback(
