@@ -258,9 +258,9 @@ paths:
 
   /dags/{dagLocation}/retry:
     post:
-      summary: "Retry failed DAG execution"
-      description: "Reruns a previously failed DAG execution"
-      operationId: "retryFailedDAGExecution"
+      summary: "Retry DAG execution"
+      description: "Reruns a DAG execution"
+      operationId: "retryDAGExecution"
       tags:
         - "dags"
       parameters:

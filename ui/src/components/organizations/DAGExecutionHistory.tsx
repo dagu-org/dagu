@@ -44,7 +44,7 @@ function DAGExecutionHistory({ location }: Props) {
 }
 
 type HistoryTableProps = {
-  gridData: components['schemas']['DAGLogGridItem'][] | null;
+  gridData: components['schemas']['DAGGridItem'][] | null;
   runs: components['schemas']['RunDetails'][] | null;
 };
 

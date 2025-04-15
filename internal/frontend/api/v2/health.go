@@ -10,9 +10,8 @@ import (
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
-// GetHealth implements api.StrictServerInterface.
-func (a *API) GetHealth(_ context.Context, _ api.GetHealthRequestObject) (api.GetHealthResponseObject, error) {
-	return &api.GetHealth200JSONResponse{
+func (a *API) GetHealthStatus(_ context.Context, _ api.GetHealthStatusRequestObject) (api.GetHealthStatusResponseObject, error) {
+	return &api.GetHealthStatus200JSONResponse{
 		Status:    api.HealthResponseStatusHealthy,
 		Version:   build.Version,
 		Uptime:    int(metrics.GetUptime()),
