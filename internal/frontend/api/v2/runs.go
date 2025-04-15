@@ -103,7 +103,7 @@ func (a *API) UpdateDAGStepStatus(ctx context.Context, request api.UpdateDAGStep
 	return &api.UpdateDAGStepStatus200Response{}, nil
 }
 
-func (a *API) readFileContent(ctx context.Context, f string, d *encoding.Decoder) ([]byte, error) {
+func (a *API) readFileContent(_ context.Context, f string, d *encoding.Decoder) ([]byte, error) {
 	if d == nil {
 		return os.ReadFile(f) //nolint:gosec
 	}
