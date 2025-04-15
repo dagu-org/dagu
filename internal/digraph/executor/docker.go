@@ -18,6 +18,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/go-viper/mapstructure/v2"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
 
@@ -111,6 +112,60 @@ func (e *docker) Kill(_ os.Signal) error {
 	return nil
 }
 
+func (e *docker) getPlatform(ctx context.Context, cli *client.Client) (specs.Platform, error) {
+	// Extract platform from the current input and fallback to the current docker host platform.
+	var platform specs.Platform
+	if e.platform != "" {
+		var err error
+		platform, err = platforms.Parse(e.platform)
+		if err != nil {
+			return platform, fmt.Errorf("failed to parse platform %s: %w", e.platform, err)
+		}
+	} else {
+		info, err := cli.Info(ctx)
+		if err != nil {
+			return platform, fmt.Errorf("failed to get current docker host info: %w", err)
+		}
+		platform.Architecture = info.Architecture
+		platform.OS = info.OSType
+		platform = platforms.Normalize(platform)
+	}
+	return platform, nil
+}
+
+func (e *docker) shouldPullImage(ctx context.Context, cli *client.Client, platform *specs.Platform) (bool, error) {
+	if e.pull == Always {
+		return true, nil
+	}
+	if e.pull == Never {
+		return false, nil
+	}
+
+	// Loop through all locally available images that have the same reference with
+	// the input image to check if we have the correct platform.
+	filters := filters.Args{}
+	filters.Add("reference", e.image)
+
+	images, err := cli.ImageList(ctx, image.ListOptions{Filters: filters})
+	if err != nil {
+		return false, fmt.Errorf("failed to list local images %s: %w", e.image, err)
+	}
+
+	for _, summary := range images {
+		inspect, err := cli.ImageInspect(ctx, summary.ID)
+		if err != nil {
+			return false, fmt.Errorf("failed to inspect image %s: %w", summary.ID, err)
+		}
+		if (platform.OS == inspect.Os) && (platform.Architecture == inspect.Architecture) && (platform.Variant == inspect.Variant) {
+			// We have the correct image locally, no need to pull
+			return false, nil
+		}
+	}
+
+	// We don't have the correct image
+	return true, nil
+}
+
 func (e *docker) Run(ctx context.Context) error {
 	ctx, cancelFunc := context.WithCancel(ctx)
 	e.context = ctx
@@ -140,44 +195,17 @@ func (e *docker) Run(ctx context.Context) error {
 		return e.execInContainer(ctx, cli, args)
 	}
 
-	// If platform is not provided, imageReference will be set to the input image name
-	// else, it will be set to the locally available imageId whose platform matches the input platform
-	// or an empty string to signify that we don't have the right image locally.
-	imageReference := ""
-
-	// Only inspect image if pull mode is not always
-	if e.pull != "always" {
-		if e.platform != "" {
-			spec, err := platforms.Parse(e.platform)
-			if err != nil {
-				return fmt.Errorf("failed to parse platform %s: %w", e.platform, err)
-			}
-
-			filters := filters.Args{}
-			filters.Add("reference", e.image)
-
-			images, err := cli.ImageList(ctx, image.ListOptions{Filters: filters})
-			if err != nil {
-				return fmt.Errorf("failed to list local images %s: %w", e.image, err)
-			}
-
-			for _, summary := range images {
-				inspect, err := cli.ImageInspect(ctx, summary.ID)
-				if err != nil {
-					return fmt.Errorf("failed to inspect image %s: %w", summary.ID, err)
-				}
-				if (spec.OS == inspect.Os) && (spec.Architecture == inspect.Architecture) && (spec.Variant == inspect.Variant) {
-					imageReference = inspect.ID
-				}
-			}
-		} else {
-			imageReference = e.image
-		}
+	platform, err := e.getPlatform(ctx, cli)
+	if err != nil {
+		return err
 	}
 
-	// Pull new image if pull mode is always or pull mode is not never and imageReference is empty which means we don't have that image locally.
-	if (e.pull == "always") || (e.pull != "never" && imageReference == "") {
-		reader, err := cli.ImagePull(ctx, e.image, image.PullOptions{Platform: e.platform})
+	pull, err := e.shouldPullImage(ctx, cli, &platform)
+	if err != nil {
+		return err
+	}
+	if pull {
+		reader, err := cli.ImagePull(ctx, e.image, image.PullOptions{Platform: platforms.Format(platform)})
 		if err != nil {
 			return err
 		}
@@ -185,16 +213,11 @@ func (e *docker) Run(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		imageReference = e.image
-	}
-
-	if imageReference != "" {
-		return fmt.Errorf("failed to find image %s locally", e.image)
 	}
 
 	containerConfig := *e.containerConfig
 	containerConfig.Cmd = append([]string{e.step.Command}, args...)
-	containerConfig.Image = imageReference
+	containerConfig.Image = e.image
 
 	env := make([]string, len(containerConfig.Env))
 	for i, e := range containerConfig.Env {
@@ -206,7 +229,7 @@ func (e *docker) Run(ctx context.Context) error {
 	containerConfig.Env = env
 
 	resp, err := cli.ContainerCreate(
-		ctx, &containerConfig, e.hostConfig, e.networkConfig, nil, e.containerName,
+		ctx, &containerConfig, e.hostConfig, e.networkConfig, &platform, e.containerName,
 	)
 	if err != nil {
 		return err
