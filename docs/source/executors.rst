@@ -116,9 +116,11 @@ Available creating container configuration options:
 - `containerName`: Name of the newly created container (optional)
 - `pull`:
   - `always`: Always pull the image from the internet
-  - `auto`: Only pull the image if it is not available locally (default)
+  - `missing`: Only pull the image if it is not available locally (default)
   - `never`: Never pull any image
-- `platform`: Pull `image` for a specific platform instead of the current one. If you set `pull` to `never`, it will not have any effect.
+  - `true`: Same effect as `always` and only kept for backward compatibility.
+  - `false`: Same effect as `never` and only kept for backward compatibility.
+- `platform`: Create and run a container on specific platform, default to the platform of the current docker host
 
 For further customizing the newly created container, check the Docker's API document:
 
