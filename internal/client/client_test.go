@@ -96,7 +96,7 @@ func TestClient_GetStatus(t *testing.T) {
 		newStatus := scheduler.NodeStatusError
 		status.Nodes[0].Status = newStatus
 
-		err = cli.UpdateStatus(ctx, dag.DAG, status)
+		err = cli.UpdateStatus(ctx, dag.DAG.Name, status)
 		require.NoError(t, err)
 
 		statusByRequestID, err := cli.GetStatusByRequestID(ctx, dag.DAG, requestID)
@@ -116,7 +116,7 @@ func TestClient_GetStatus(t *testing.T) {
 			scheduler.NodeStatusError)
 
 		// Check if the update fails.
-		err := cli.UpdateStatus(ctx, dag.DAG, status)
+		err := cli.UpdateStatus(ctx, dag.DAG.Name, status)
 		require.Error(t, err)
 	})
 }

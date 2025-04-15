@@ -23,8 +23,7 @@ type Client interface {
 	GetLatestStatus(ctx context.Context, dag *digraph.DAG) (persistence.Status, error)
 	GetRecentHistory(ctx context.Context, name string, n int) []persistence.Run
 	GetStatus(ctx context.Context, name string, requestID string) (*persistence.Status, error)
-	UpdateStatus(ctx context.Context, dag *digraph.DAG, status persistence.Status) error
-	UpdateRunStatus(ctx context.Context, name, requestID string, status persistence.Status) error
+	UpdateStatus(ctx context.Context, name string, status persistence.Status) error
 	LoadYAML(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error)
 	UpdateDAG(ctx context.Context, loc string, spec string) error
 	DeleteDAG(ctx context.Context, loc string) error
