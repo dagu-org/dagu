@@ -132,6 +132,8 @@ func TestClient_RunDAG(t *testing.T) {
 		err = th.Client.StartDAG(th.Context, dagStatus.DAG, client.StartOptions{})
 		require.NoError(t, err)
 
+		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+
 		status, err := th.Client.GetLatestStatus(th.Context, dagStatus.DAG)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusSuccess.String(), status.Status.String())

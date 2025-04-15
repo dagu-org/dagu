@@ -293,10 +293,6 @@ func WithAgentOptions(options agent.Options) AgentOption {
 }
 
 func (d *DAG) Agent(opts ...AgentOption) *Agent {
-	requestID := genRequestID()
-	logDir := d.Config.Paths.LogDir
-	logFile := filepath.Join(d.Config.Paths.LogDir, requestID+".log")
-
 	helper := &Agent{
 		Helper: d.Helper,
 		DAG:    d.DAG,
@@ -306,6 +302,15 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		opt(helper)
 	}
 
+	var requestID string
+	if helper.opts.RetryTarget != nil {
+		requestID = helper.opts.RetryTarget.RequestID
+	} else {
+		requestID = genRequestID()
+	}
+
+	logDir := d.Config.Paths.LogDir
+	logFile := filepath.Join(d.Config.Paths.LogDir, requestID+".log")
 	rootDAG := digraph.NewRootDAG(d.Name, requestID)
 
 	helper.Agent = agent.New(

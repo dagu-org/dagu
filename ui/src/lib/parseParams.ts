@@ -12,9 +12,9 @@ export function parseParams(input: string): Parameter[] {
     const [, name, value] = match;
 
     const param: Parameter = {
-      Value: value.startsWith('"')
+      Value: value?.startsWith('"')
         ? value.slice(1, -1).replace(/\\"/g, '"')
-        : value,
+        : value || '',
     };
 
     if (name) {

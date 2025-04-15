@@ -13,7 +13,7 @@ import { components } from '../../api/v2/schema';
 
 type Props = {
   runs: components['schemas']['RunDetails'][];
-  gridData: components['schemas']['DAGLogGridItem'][];
+  gridData: components['schemas']['DAGGridItem'][];
   onSelect: (idx: number) => void;
   idx: number;
 };

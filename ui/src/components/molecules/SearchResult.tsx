@@ -7,7 +7,7 @@ import Prism from '../../assets/js/prism';
 import { components } from '../../api/v2/schema';
 
 type Props = {
-  results: components['schemas']['SearchDAGsResultItem'][];
+  results: components['schemas']['SearchResultItem'][];
 };
 
 function SearchResult({ results }: Props) {

@@ -1,12 +1,11 @@
 import { Button } from '@mui/material';
 import React from 'react';
 import { AppBarContext } from '../../contexts/AppBarContext';
-import { useClient, useMutate } from '../../hooks/api';
+import { useClient } from '../../hooks/api';
 
 function CreateDAGButton() {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
-  const mutate = useMutate();
   return (
     <Button
       variant="outlined"
