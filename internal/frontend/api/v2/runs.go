@@ -12,14 +12,13 @@ import (
 	"golang.org/x/text/transform"
 )
 
-// GetRunLog implements api.StrictServerInterface.
-func (a *API) GetRunLog(ctx context.Context, request api.GetRunLogRequestObject) (api.GetRunLogResponseObject, error) {
+func (a *API) GetDAGRunLog(ctx context.Context, request api.GetDAGRunLogRequestObject) (api.GetDAGRunLogResponseObject, error) {
 	dagName := request.DagName
 	requestId := request.RequestId
 
 	status, err := a.client.GetStatus(ctx, dagName, requestId)
 	if err != nil {
-		return api.GetRunLog404JSONResponse{
+		return api.GetDAGRunLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
 			Message: fmt.Sprintf("request ID %s not found for DAG %s", requestId, dagName),
 		}, nil
@@ -30,19 +29,18 @@ func (a *API) GetRunLog(ctx context.Context, request api.GetRunLogRequestObject)
 		return nil, fmt.Errorf("error reading %s: %w", status.Log, err)
 	}
 
-	return api.GetRunLog200JSONResponse{
+	return api.GetDAGRunLog200JSONResponse{
 		Content: string(content),
 	}, nil
 }
 
-// GetStepLog implements api.StrictServerInterface.
-func (a *API) GetStepLog(ctx context.Context, request api.GetStepLogRequestObject) (api.GetStepLogResponseObject, error) {
+func (a *API) GetDAGStepLog(ctx context.Context, request api.GetDAGStepLogRequestObject) (api.GetDAGStepLogResponseObject, error) {
 	dagName := request.DagName
 	requestId := request.RequestId
 
 	status, err := a.client.GetStatus(ctx, dagName, requestId)
 	if err != nil {
-		return api.GetStepLog404JSONResponse{
+		return api.GetDAGStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
 			Message: fmt.Sprintf("request ID %s not found for DAG %s", requestId, dagName),
 		}, nil
@@ -50,7 +48,7 @@ func (a *API) GetStepLog(ctx context.Context, request api.GetStepLogRequestObjec
 
 	node, err := status.NodeByName(request.StepName)
 	if err != nil {
-		return api.GetStepLog404JSONResponse{
+		return api.GetDAGStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
 			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, dagName),
 		}, nil
@@ -61,22 +59,21 @@ func (a *API) GetStepLog(ctx context.Context, request api.GetStepLogRequestObjec
 		return nil, fmt.Errorf("error reading %s: %w", status.Log, err)
 	}
 
-	return api.GetStepLog200JSONResponse{
+	return api.GetDAGStepLog200JSONResponse{
 		Content: string(content),
 	}, nil
 }
 
-// UpdateStepStatus implements api.StrictServerInterface.
-func (a *API) UpdateStepStatus(ctx context.Context, request api.UpdateStepStatusRequestObject) (api.UpdateStepStatusResponseObject, error) {
+func (a *API) UpdateDAGStepStatus(ctx context.Context, request api.UpdateDAGStepStatusRequestObject) (api.UpdateDAGStepStatusResponseObject, error) {
 	status, err := a.client.GetStatus(ctx, request.DagName, request.RequestId)
 	if err != nil {
-		return &api.UpdateStepStatus404JSONResponse{
+		return &api.UpdateDAGStepStatus404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
 			Message: fmt.Sprintf("request ID %s not found for DAG %s", request.RequestId, request.DagName),
 		}, nil
 	}
 	if status.Status == scheduler.StatusRunning {
-		return &api.UpdateStepStatus400JSONResponse{
+		return &api.UpdateDAGStepStatus400JSONResponse{
 			Code:    api.ErrorCodeBadRequest,
 			Message: fmt.Sprintf("request ID %s for DAG %s is still running", request.RequestId, request.DagName),
 		}, nil
@@ -90,7 +87,7 @@ func (a *API) UpdateStepStatus(ctx context.Context, request api.UpdateStepStatus
 		}
 	}
 	if idxToUpdate < 0 {
-		return &api.UpdateStepStatus404JSONResponse{
+		return &api.UpdateDAGStepStatus404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
 			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, request.DagName),
 		}, nil
@@ -103,7 +100,7 @@ func (a *API) UpdateStepStatus(ctx context.Context, request api.UpdateStepStatus
 		return nil, fmt.Errorf("error updating status: %w", err)
 	}
 
-	return &api.UpdateStepStatus200Response{}, nil
+	return &api.UpdateDAGStepStatus200Response{}, nil
 }
 
 func (a *API) readFileContent(ctx context.Context, f string, d *encoding.Decoder) ([]byte, error) {

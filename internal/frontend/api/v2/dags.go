@@ -15,8 +15,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence"
 )
 
-// CreateDAG implements api.StrictServerInterface.
-func (a *API) CreateDAG(ctx context.Context, request api.CreateDAGRequestObject) (api.CreateDAGResponseObject, error) {
+func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestObject) (api.CreateNewDAGResponseObject, error) {
 	name, err := a.client.CreateDAG(ctx, request.Body.Name)
 	if err != nil {
 		if errors.Is(err, persistence.ErrDAGAlreadyExists) {
@@ -27,13 +26,12 @@ func (a *API) CreateDAG(ctx context.Context, request api.CreateDAGRequestObject)
 		}
 		return nil, fmt.Errorf("error creating DAG: %w", err)
 	}
-	return &api.CreateDAG201JSONResponse{
+	return &api.CreateNewDAG201JSONResponse{
 		Name: name,
 	}, nil
 }
 
-// DeleteDAG implements api.StrictServerInterface.
-func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject) (api.DeleteDAGResponseObject, error) {
+func (a *API) DeleteDAGByLocation(ctx context.Context, request api.DeleteDAGByLocationRequestObject) (api.DeleteDAGByLocationResponseObject, error) {
 	_, err := a.client.GetDAGStatus(ctx, request.DagLocation)
 	if err != nil {
 		return nil, &Error{
@@ -45,11 +43,10 @@ func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject)
 	if err := a.client.DeleteDAG(ctx, request.DagLocation); err != nil {
 		return nil, fmt.Errorf("error deleting DAG: %w", err)
 	}
-	return &api.DeleteDAG204Response{}, nil
+	return &api.DeleteDAGByLocation204Response{}, nil
 }
 
-// GetDAGSpec implements api.StrictServerInterface.
-func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObject) (api.GetDAGSpecResponseObject, error) {
+func (a *API) GetDAGDefinition(ctx context.Context, request api.GetDAGDefinitionRequestObject) (api.GetDAGDefinitionResponseObject, error) {
 	spec, err := a.client.GetDAGSpec(ctx, request.DagLocation)
 	if err != nil {
 		return nil, err
@@ -66,15 +63,14 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 		return nil, err
 	}
 
-	return &api.GetDAGSpec200JSONResponse{
+	return &api.GetDAGDefinition200JSONResponse{
 		Dag:    toDAGDetails(dag),
 		Spec:   spec,
 		Errors: errs,
 	}, nil
 }
 
-// UpdateDAGSpec implements api.StrictServerInterface.
-func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecRequestObject) (api.UpdateDAGSpecResponseObject, error) {
+func (a *API) UpdateDAGDefinition(ctx context.Context, request api.UpdateDAGDefinitionRequestObject) (api.UpdateDAGDefinitionResponseObject, error) {
 	_, err := a.client.GetDAGStatus(ctx, request.DagLocation)
 	if err != nil {
 		return nil, &Error{
@@ -94,13 +90,12 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 		return nil, err
 	}
 
-	return api.UpdateDAGSpec200JSONResponse{
+	return api.UpdateDAGDefinition200JSONResponse{
 		Errors: errs,
 	}, nil
 }
 
-// MoveDAG implements api.StrictServerInterface.
-func (a *API) MoveDAG(ctx context.Context, request api.MoveDAGRequestObject) (api.MoveDAGResponseObject, error) {
+func (a *API) MoveDAGLocation(ctx context.Context, request api.MoveDAGLocationRequestObject) (api.MoveDAGLocationResponseObject, error) {
 	status, err := a.client.GetDAGStatus(ctx, request.DagLocation)
 	if err != nil {
 		return nil, &Error{
@@ -119,11 +114,10 @@ func (a *API) MoveDAG(ctx context.Context, request api.MoveDAGRequestObject) (ap
 	if err := a.client.MoveDAG(ctx, request.DagLocation, request.Body.NewLocation); err != nil {
 		return nil, fmt.Errorf("failed to move DAG: %w", err)
 	}
-	return api.MoveDAG200Response{}, nil
+	return api.MoveDAGLocation200Response{}, nil
 }
 
-// GetDAGRuns implements api.StrictServerInterface.
-func (a *API) GetDAGRunHistory(ctx context.Context, request api.GetDAGRunHistoryRequestObject) (api.GetDAGRunHistoryResponseObject, error) {
+func (a *API) GetDAGExecutionHistory(ctx context.Context, request api.GetDAGExecutionHistoryRequestObject) (api.GetDAGExecutionHistoryResponseObject, error) {
 	status, err := a.client.GetDAGStatus(ctx, request.DagLocation)
 	if err != nil {
 		return nil, &Error{
@@ -142,13 +136,12 @@ func (a *API) GetDAGRunHistory(ctx context.Context, request api.GetDAGRunHistory
 	}
 
 	gridData := a.readHistoryData(ctx, recentRuns)
-	return api.GetDAGRunHistory200JSONResponse{
+	return api.GetDAGExecutionHistory200JSONResponse{
 		Runs:     runs,
 		GridData: gridData,
 	}, nil
 }
 
-// GetDAGDetails implements api.StrictServerInterface.
 func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsRequestObject) (api.GetDAGDetailsResponseObject, error) {
 	location := request.DagLocation
 
@@ -255,8 +248,7 @@ func (a *API) readHistoryData(
 	return grid
 }
 
-// ListDAGs implements api.StrictServerInterface.
-func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (api.ListDAGsResponseObject, error) {
+func (a *API) ListAllDAGs(ctx context.Context, request api.ListAllDAGsRequestObject) (api.ListAllDAGsResponseObject, error) {
 	var opts []client.ListStatusOption
 	if request.Params.PerPage != nil {
 		opts = append(opts, client.WithLimit(*request.Params.PerPage))
@@ -276,7 +268,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 		return nil, fmt.Errorf("error listing DAGs: %w", err)
 	}
 
-	resp := &api.ListDAGs200JSONResponse{
+	resp := &api.ListAllDAGs200JSONResponse{
 		Errors:     errList,
 		Pagination: toPagination(*result),
 	}
@@ -315,20 +307,18 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	return resp, nil
 }
 
-// ListTags implements api.StrictServerInterface.
-func (a *API) ListTags(ctx context.Context, _ api.ListTagsRequestObject) (api.ListTagsResponseObject, error) {
+func (a *API) GetAllDAGTags(ctx context.Context, _ api.GetAllDAGTagsRequestObject) (api.GetAllDAGTagsResponseObject, error) {
 	tags, errs, err := a.client.GetTagList(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error getting tags: %w", err)
 	}
-	return &api.ListTags200JSONResponse{
+	return &api.GetAllDAGTags200JSONResponse{
 		Tags:   tags,
 		Errors: errs,
 	}, nil
 }
 
-// GetDAGRunStatus implements api.StrictServerInterface.
-func (a *API) GetDAGRunStatus(ctx context.Context, request api.GetDAGRunStatusRequestObject) (api.GetDAGRunStatusResponseObject, error) {
+func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetailsRequestObject) (api.GetDAGRunDetailsResponseObject, error) {
 	dagLocation := request.DagLocation
 	requestId := request.RequestId
 
@@ -338,7 +328,7 @@ func (a *API) GetDAGRunStatus(ctx context.Context, request api.GetDAGRunStatusRe
 	}
 
 	if requestId == "latest" {
-		return &api.GetDAGRunStatus200JSONResponse{
+		return &api.GetDAGRunDetails200JSONResponse{
 			Run: toRunDetails(dagWithStatus.Status),
 		}, nil
 	}
@@ -348,13 +338,12 @@ func (a *API) GetDAGRunStatus(ctx context.Context, request api.GetDAGRunStatusRe
 		return nil, fmt.Errorf("error getting status by request ID: %w", err)
 	}
 
-	return &api.GetDAGRunStatus200JSONResponse{
+	return &api.GetDAGRunDetails200JSONResponse{
 		Run: toRunDetails(*run),
 	}, nil
 }
 
-// StartDAG implements api.StrictServerInterface.
-func (a *API) StartDAG(ctx context.Context, request api.StartDAGRequestObject) (api.StartDAGResponseObject, error) {
+func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObject) (api.ExecuteDAGResponseObject, error) {
 	status, err := a.client.GetDAGStatus(ctx, request.DagLocation)
 	if err != nil {
 		return nil, &Error{
@@ -375,11 +364,10 @@ func (a *API) StartDAG(ctx context.Context, request api.StartDAGRequestObject) (
 	}); err != nil {
 		return nil, fmt.Errorf("error starting DAG: %w", err)
 	}
-	return api.StartDAG200Response{}, nil
+	return api.ExecuteDAG200Response{}, nil
 }
 
-// StopDAG implements api.StrictServerInterface.
-func (a *API) StopDAG(ctx context.Context, request api.StopDAGRequestObject) (api.StopDAGResponseObject, error) {
+func (a *API) TerminateDAGExecution(ctx context.Context, request api.TerminateDAGExecutionRequestObject) (api.TerminateDAGExecutionResponseObject, error) {
 	status, err := a.client.GetDAGStatus(ctx, request.DagLocation)
 	if err != nil {
 		return nil, &Error{
@@ -396,11 +384,10 @@ func (a *API) StopDAG(ctx context.Context, request api.StopDAGRequestObject) (ap
 		}
 	}
 	a.client.StopDAG(ctx, status.DAG)
-	return api.StopDAG200Response{}, nil
+	return api.TerminateDAGExecution200Response{}, nil
 }
 
-// RetryDAG implements api.StrictServerInterface.
-func (a *API) RetryDAG(ctx context.Context, request api.RetryDAGRequestObject) (api.RetryDAGResponseObject, error) {
+func (a *API) RetryDAGExecution(ctx context.Context, request api.RetryDAGExecutionRequestObject) (api.RetryDAGExecutionResponseObject, error) {
 	status, err := a.client.GetDAGStatus(ctx, request.DagLocation)
 	if err != nil {
 		return nil, &Error{
@@ -421,14 +408,13 @@ func (a *API) RetryDAG(ctx context.Context, request api.RetryDAGRequestObject) (
 		return nil, fmt.Errorf("error retrying DAG: %w", err)
 	}
 
-	return api.RetryDAG200Response{}, nil
+	return api.RetryDAGExecution200Response{}, nil
 }
 
-// UpdateDAGSuspendStatus implements api.StrictServerInterface.
-func (a *API) UpdateDAGSuspendStatus(ctx context.Context, request api.UpdateDAGSuspendStatusRequestObject) (api.UpdateDAGSuspendStatusResponseObject, error) {
+func (a *API) UpdateDAGSuspensionState(ctx context.Context, request api.UpdateDAGSuspensionStateRequestObject) (api.UpdateDAGSuspensionStateResponseObject, error) {
 	_, err := a.client.GetDAGStatus(ctx, request.DagLocation)
 	if err != nil {
-		return &api.UpdateDAGSuspendStatus404JSONResponse{
+		return &api.UpdateDAGSuspensionState404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
 			Message: fmt.Sprintf("DAG %s not found", request.DagLocation),
 		}, nil
@@ -438,11 +424,10 @@ func (a *API) UpdateDAGSuspendStatus(ctx context.Context, request api.UpdateDAGS
 		return nil, fmt.Errorf("error toggling suspend: %w", err)
 	}
 
-	return api.UpdateDAGSuspendStatus200Response{}, nil
+	return api.UpdateDAGSuspensionState200Response{}, nil
 }
 
-// SearchDAGs implements api.StrictServerInterface.
-func (a *API) SearchDAGs(ctx context.Context, request api.SearchDAGsRequestObject) (api.SearchDAGsResponseObject, error) {
+func (a *API) SearchDAGDefinitions(ctx context.Context, request api.SearchDAGDefinitionsRequestObject) (api.SearchDAGDefinitionsResponseObject, error) {
 	query := request.Params.Q
 	if query == "" {
 		return nil, &Error{
@@ -475,7 +460,7 @@ func (a *API) SearchDAGs(ctx context.Context, request api.SearchDAGsRequestObjec
 		})
 	}
 
-	return &api.SearchDAGs200JSONResponse{
+	return &api.SearchDAGDefinitions200JSONResponse{
 		Results: results,
 		Errors:  errs,
 	}, nil

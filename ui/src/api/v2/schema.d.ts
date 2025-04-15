@@ -12,10 +12,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Health check endpoint
-         * @description Returns the health status of the server and its dependencies
+         * Check server health status
+         * @description Returns health information about the Dagu server
          */
-        get: operations["getHealth"];
+        get: operations["getHealthStatus"];
         put?: never;
         post?: never;
         delete?: never;
@@ -32,16 +32,16 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List DAGs
-         * @description Returns a list of DAGs with optional pagination and search filters
+         * List all available DAGs
+         * @description Retrieves DAGs with optional filtering by name and tags
          */
-        get: operations["listDAGs"];
+        get: operations["listAllDAGs"];
         put?: never;
         /**
-         * Create a new DAG
-         * @description Creates a new DAG definition
+         * Create a new DAG definition
+         * @description Creates a new empty DAG file with the specified name
          */
-        post: operations["createDAG"];
+        post: operations["createNewDAG"];
         delete?: never;
         options?: never;
         head?: never;
@@ -56,17 +56,17 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get DAG details
-         * @description Returns details of a DAG, including files, logs, and status
+         * Retrieve comprehensive DAG information
+         * @description Fetches detailed information about a specific DAG
          */
         get: operations["getDAGDetails"];
         put?: never;
         post?: never;
         /**
-         * Delete a DAG
-         * @description Deletes a DAG by its name
+         * Delete an existing DAG
+         * @description Permanently removes a DAG definition from the system
          */
-        delete: operations["deleteDAG"];
+        delete: operations["deleteDAGByLocation"];
         options?: never;
         head?: never;
         patch?: never;
@@ -82,10 +82,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Start a DAG
-         * @description Starts a specific DAG by its location
+         * Initiate DAG execution
+         * @description Starts execution of a DAG with optional parameters
          */
-        post: operations["startDAG"];
+        post: operations["executeDAG"];
         delete?: never;
         options?: never;
         head?: never;
@@ -102,10 +102,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Stop a DAG
-         * @description Stops a specific DAG by its location
+         * Terminate running DAG execution
+         * @description Forcefully stops a running DAG workflow
          */
-        post: operations["stopDAG"];
+        post: operations["terminateDAGExecution"];
         delete?: never;
         options?: never;
         head?: never;
@@ -122,10 +122,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Retry a DAG
-         * @description Retries the last run of a specific DAG
+         * Retry DAG execution
+         * @description Reruns a DAG execution
          */
-        post: operations["retryDAG"];
+        post: operations["retryDAGExecution"];
         delete?: never;
         options?: never;
         head?: never;
@@ -140,10 +140,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get history of DAG runs
-         * @description Returns the history of runs for a specific DAG
+         * Retrieve execution history of a DAG
+         * @description Fetches execution history of a DAG
          */
-        get: operations["getDAGRunHistory"];
+        get: operations["getDAGExecutionHistory"];
         put?: never;
         post?: never;
         delete?: never;
@@ -160,10 +160,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get latest run status
-         * @description Returns the status of the latest run for a specific DAG
+         * Get detailed status of a specific DAG run
+         * @description Retrieves status information about a particular DAG execution
          */
-        get: operations["getDAGRunStatus"];
+        get: operations["getDAGRunDetails"];
         put?: never;
         post?: never;
         delete?: never;
@@ -180,15 +180,15 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get DAG Spec
-         * @description Returns the spec of the DAG
+         * Retrieve DAG definition
+         * @description Fetches the YAML definition of a DAG
          */
-        get: operations["getDAGSpec"];
+        get: operations["getDAGDefinition"];
         /**
-         * Update DAG Spec
-         * @description Updates the spec of the DAG
+         * Update DAG definition
+         * @description Modifies the YAML definition of a DAG
          */
-        put: operations["updateDAGSpec"];
+        put: operations["updateDAGDefinition"];
         post?: never;
         delete?: never;
         options?: never;
@@ -206,10 +206,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Update suspend status of a DAG
-         * @description Updates the suspend status of a specific DAG
+         * Toggle DAG suspension state
+         * @description Controls whether the scheduler should execute this DAG according to its defined cron schedule
          */
-        post: operations["UpdateDAGSuspendStatus"];
+        post: operations["updateDAGSuspensionState"];
         delete?: never;
         options?: never;
         head?: never;
@@ -226,10 +226,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Move location of DAG
-         * @description Move a location of a specified DAG
+         * Rename or relocate a DAG
+         * @description Changes the location or name of an existing DAG
          */
-        post: operations["MoveDAG"];
+        post: operations["moveDAGLocation"];
         delete?: never;
         options?: never;
         head?: never;
@@ -244,10 +244,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Search DAGs
-         * @description Searches for DAGs based on a query string
+         * Search across all DAG definitions
+         * @description Performs a full-text search across all DAG definitions
          */
-        get: operations["searchDAGs"];
+        get: operations["searchDAGDefinitions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -264,10 +264,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List all tags
-         * @description Returns a list of all tags used across DAGs
+         * List all available DAG tags
+         * @description Retrieves all unique tags used across DAG definitions
          */
-        get: operations["listTags"];
+        get: operations["getAllDAGTags"];
         put?: never;
         post?: never;
         delete?: never;
@@ -284,10 +284,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get content of a log file
-         * @description Returns the content of a log file for a specific run
+         * Retrieve full execution log of a DAG run
+         * @description Fetches the execution log for a DAG run
          */
-        get: operations["getRunLog"];
+        get: operations["getDAGRunLog"];
         put?: never;
         post?: never;
         delete?: never;
@@ -304,10 +304,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get content of a step log file
-         * @description Returns the content of a log file for a specific step in a run
+         * Retrieve log for a specific step in a DAG run
+         * @description Fetches the log for an individual step in a DAG run
          */
-        get: operations["getStepLog"];
+        get: operations["getDAGStepLog"];
         put?: never;
         post?: never;
         delete?: never;
@@ -330,10 +330,10 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Update the status of a step
-         * @description Updates the status of a specific step in a run
+         * Manually update a step's execution status
+         * @description Changes the status of a specific step within a DAG run
          */
-        patch: operations["updateStepStatus"];
+        patch: operations["updateDAGStepStatus"];
         trace?: never;
     };
 }
@@ -393,25 +393,6 @@ export interface components {
             uptime: number;
             /** @description Current server time */
             timestamp: string;
-        };
-        /**
-         * @description Action to be performed on the DAG. Possible values include:
-         *     - start: Start the DAG
-         *     - suspend: Suspend the DAG
-         *     - stop: Stop the DAG
-         *     - retry: Retry the last run
-         *     - mark-success: Mark the last run as successful
-         *     - mark-failed: Mark the last run as failed
-         *     - save: Save the current state of the DAG
-         *     - rename: Rename the DAG
-         *
-         * @enum {string}
-         */
-        DAGAction: DAGAction;
-        /** @description Response object for posting an action to a DAG */
-        PostDAGActionResponse: {
-            /** @description New DAG name, if the action resulted in a new DAG */
-            NewName?: string;
         };
         /** @description DAG file with its status information */
         DAGFile: {
@@ -599,7 +580,7 @@ export interface components {
             preconditions?: components["schemas"]["Precondition"][];
         };
         /** @description Individual search result item for a DAG */
-        SearchDAGsResultItem: {
+        SearchResultItem: {
             /** @description Name of the matching DAG */
             name: string;
             dag: components["schemas"]["DAG"];
@@ -621,7 +602,7 @@ export interface components {
             content: string;
         };
         /** @description Grid item for log visualization */
-        DAGLogGridItem: {
+        DAGGridItem: {
             /** @description Name of the step */
             name: string;
             /** @description Status of the step ordered by time */
@@ -672,7 +653,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    getHealth: {
+    getHealthStatus: {
         parameters: {
             query?: never;
             header?: never;
@@ -699,7 +680,7 @@ export interface operations {
             };
         };
     };
-    listDAGs: {
+    listAllDAGs: {
         parameters: {
             query?: {
                 /** @description page number of items to fetch (default is 1) */
@@ -745,7 +726,7 @@ export interface operations {
             };
         };
     };
-    createDAG: {
+    createNewDAG: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -828,7 +809,7 @@ export interface operations {
             };
         };
     };
-    deleteDAG: {
+    deleteDAGByLocation: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -870,7 +851,7 @@ export interface operations {
             };
         };
     };
-    startDAG: {
+    executeDAG: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -910,7 +891,7 @@ export interface operations {
             };
         };
     };
-    stopDAG: {
+    terminateDAGExecution: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -943,7 +924,7 @@ export interface operations {
             };
         };
     };
-    retryDAG: {
+    retryDAGExecution: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -983,7 +964,7 @@ export interface operations {
             };
         };
     };
-    getDAGRunHistory: {
+    getDAGExecutionHistory: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -1008,7 +989,7 @@ export interface operations {
                         /** @description List of historical runs for the DAG */
                         runs: components["schemas"]["RunDetails"][];
                         /** @description Grid data for visualization */
-                        gridData: components["schemas"]["DAGLogGridItem"][];
+                        gridData: components["schemas"]["DAGGridItem"][];
                     };
                 };
             };
@@ -1023,7 +1004,7 @@ export interface operations {
             };
         };
     };
-    getDAGRunStatus: {
+    getDAGRunDetails: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -1062,7 +1043,7 @@ export interface operations {
             };
         };
     };
-    getDAGSpec: {
+    getDAGDefinition: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -1103,7 +1084,7 @@ export interface operations {
             };
         };
     };
-    updateDAGSpec: {
+    updateDAGDefinition: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -1148,7 +1129,7 @@ export interface operations {
             };
         };
     };
-    UpdateDAGSuspendStatus: {
+    updateDAGSuspensionState: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -1197,7 +1178,7 @@ export interface operations {
             };
         };
     };
-    MoveDAG: {
+    moveDAGLocation: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -1255,7 +1236,7 @@ export interface operations {
             };
         };
     };
-    searchDAGs: {
+    searchDAGDefinitions: {
         parameters: {
             query: {
                 /** @description name of the remote node */
@@ -1277,7 +1258,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         /** @description Search results matching the query */
-                        results: components["schemas"]["SearchDAGsResultItem"][];
+                        results: components["schemas"]["SearchResultItem"][];
                         /** @description Errors encountered during the search */
                         errors: string[];
                     };
@@ -1294,7 +1275,7 @@ export interface operations {
             };
         };
     };
-    listTags: {
+    getAllDAGTags: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -1326,7 +1307,7 @@ export interface operations {
             };
         };
     };
-    getRunLog: {
+    getDAGRunLog: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -1372,7 +1353,7 @@ export interface operations {
             };
         };
     };
-    getStepLog: {
+    getDAGStepLog: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -1420,7 +1401,7 @@ export interface operations {
             };
         };
     };
-    updateStepStatus: {
+    updateDAGStepStatus: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -1496,16 +1477,6 @@ export enum ErrorCode {
 export enum HealthResponseStatus {
     healthy = "healthy",
     unhealthy = "unhealthy"
-}
-export enum DAGAction {
-    start = "start",
-    suspend = "suspend",
-    stop = "stop",
-    retry = "retry",
-    mark_success = "mark-success",
-    mark_failed = "mark-failed",
-    save = "save",
-    rename = "rename"
 }
 export enum Status {
     NotStarted = 0,
