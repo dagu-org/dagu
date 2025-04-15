@@ -96,7 +96,7 @@ func (a *API) UpdateDAGStepStatus(ctx context.Context, request api.UpdateDAGStep
 	status.Nodes[idxToUpdate].Status = nodeStatusMapping[request.Body.Status]
 	status.Nodes[idxToUpdate].StatusText = nodeStatusMapping[request.Body.Status].String()
 
-	if err := a.client.UpdateRunStatus(ctx, request.DagName, request.RequestId, *status); err != nil {
+	if err := a.client.UpdateStatus(ctx, request.DagName, *status); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
 	}
 

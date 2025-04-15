@@ -383,7 +383,9 @@ func (a *API) TerminateDAGExecution(ctx context.Context, request api.TerminateDA
 			Message:    "DAG is not running",
 		}
 	}
-	a.client.StopDAG(ctx, status.DAG)
+	if err := a.client.StopDAG(ctx, status.DAG); err != nil {
+		return nil, fmt.Errorf("error stopping DAG: %w", err)
+	}
 	return api.TerminateDAGExecution200Response{}, nil
 }
 

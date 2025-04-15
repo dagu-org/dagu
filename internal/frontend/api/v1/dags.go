@@ -661,7 +661,7 @@ func (a *API) updateStatus(
 	status.Nodes[idxToUpdate].Status = to
 	status.Nodes[idxToUpdate].StatusText = to.String()
 
-	if err := a.client.UpdateStatus(ctx, dagStatus.DAG, *status); err != nil {
+	if err := a.client.UpdateStatus(ctx, dagStatus.DAG.Name, *status); err != nil {
 		return fmt.Errorf("error updating status: %w", err)
 	}
 
