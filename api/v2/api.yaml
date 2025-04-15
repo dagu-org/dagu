@@ -32,9 +32,9 @@ tags:
 paths:
   /health:
     get:
-      summary: "Health check endpoint"
-      description: "Returns the health status of the server and its dependencies"
-      operationId: "getHealth"
+      summary: "Check server health status"
+      description: "Returns health information about the Dagu server"
+      operationId: "getHealthStatus"
       tags:
         - "system"
       responses:
@@ -49,9 +49,9 @@ paths:
 
   /dags:
     get:
-      summary: "List DAGs"
-      description: "Returns a list of DAGs with optional pagination and search filters"
-      operationId: "listDAGs"
+      summary: "List all available DAGs"
+      description: "Retrieves DAGs with optional filtering by name and tags"
+      operationId: "listAllDAGs"
       tags:
         - "dags"
       parameters:
@@ -102,9 +102,9 @@ paths:
                 $ref: "#/components/schemas/Error"
 
     post:
-      summary: "Create a new DAG"
-      description: "Creates a new DAG definition"
-      operationId: "createDAG"
+      summary: "Create a new DAG definition"
+      description: "Creates a new empty DAG file with the specified name"
+      operationId: "createNewDAG"
       tags:
         - "dags"
       parameters:
@@ -141,8 +141,8 @@ paths:
                 $ref: "#/components/schemas/Error"
   /dags/{dagLocation}:
     get:
-      summary: "Get DAG details"
-      description: "Returns details of a DAG, including files, logs, and status"
+      summary: "Retrieve comprehensive DAG information"
+      description: "Fetches detailed information about a specific DAG"
       operationId: "getDAGDetails"
       tags:
         - "dags"
@@ -182,9 +182,9 @@ paths:
                 $ref: "#/components/schemas/Error"
 
     delete:
-      summary: "Delete a DAG"
-      description: "Deletes a DAG by its name"
-      operationId: "deleteDAG"
+      summary: "Delete an existing DAG"
+      description: "Permanently removes a DAG definition from the system"
+      operationId: "deleteDAGByLocation"
       tags:
         - "dags"
       parameters:
@@ -208,9 +208,9 @@ paths:
 
   /dags/{dagLocation}/start:
     post:
-      summary: "Start a DAG"
-      description: "Starts a specific DAG by its location"
-      operationId: "startDAG"
+      summary: "Initiate DAG execution"
+      description: "Starts execution of a DAG with optional parameters"
+      operationId: "executeDAG"
       tags:
         - "dags"
       parameters:
@@ -238,9 +238,9 @@ paths:
 
   /dags/{dagLocation}/stop:
     post:
-      summary: "Stop a DAG"
-      description: "Stops a specific DAG by its location"
-      operationId: "stopDAG"
+      summary: "Terminate running DAG execution"
+      description: "Forcefully stops a running DAG workflow"
+      operationId: "terminateDAGExecution"
       tags:
         - "dags"
       parameters:
@@ -258,9 +258,9 @@ paths:
 
   /dags/{dagLocation}/retry:
     post:
-      summary: "Retry a DAG"
-      description: "Retries the last run of a specific DAG"
-      operationId: "retryDAG"
+      summary: "Retry failed DAG execution"
+      description: "Reruns a previously failed DAG execution"
+      operationId: "retryFailedDAGExecution"
       tags:
         - "dags"
       parameters:
@@ -290,9 +290,9 @@ paths:
 
   /dags/{dagLocation}/runs:
     get:
-      summary: "Get history of DAG runs"
-      description: "Returns the history of runs for a specific DAG"
-      operationId: "getDAGRunHistory"
+      summary: "Retrieve execution history of a DAG"
+      description: "Fetches execution history of a DAG"
+      operationId: "getDAGExecutionHistory"
       tags:
         - "dags"
       parameters:
@@ -328,11 +328,11 @@ paths:
 
   /dags/{dagLocation}/runs/{requestId}:
     get:
-      summary: "Get latest run status"
-      description: "Returns the status of the latest run for a specific DAG"
+      summary: "Get detailed status of a specific DAG run"
+      description: "Retrieves status information about a particular DAG execution"
       tags:
         - "dags"
-      operationId: "getDAGRunStatus"
+      operationId: "getDAGRunDetails"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGLocation"
@@ -358,9 +358,9 @@ paths:
 
   /dags/{dagLocation}/spec:
     get:
-      summary: "Get DAG Spec"
-      description: "Returns the spec of the DAG"
-      operationId: "getDAGSpec"
+      summary: "Retrieve DAG definition"
+      description: "Fetches the YAML definition of a DAG"
+      operationId: "getDAGDefinition"
       tags:
         - "dags"
       parameters:
@@ -394,9 +394,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
     put:
-      summary: "Update DAG Spec"
-      description: "Updates the spec of the DAG"
-      operationId: "updateDAGSpec"
+      summary: "Update DAG definition"
+      description: "Modifies the YAML definition of a DAG"
+      operationId: "updateDAGDefinition"
       tags:
         - "dags"
       parameters:
@@ -439,9 +439,9 @@ paths:
 
   /dags/{dagLocation}/suspend:
     post:
-      summary: "Update suspend status of a DAG"
-      description: "Updates the suspend status of a specific DAG"
-      operationId: "UpdateDAGSuspendStatus"
+      summary: "Toggle DAG suspension state"
+      description: "Controls whether the scheduler should execute this DAG according to its defined cron schedule"
+      operationId: "updateDAGSuspensionState"
       tags:
         - "dags"
       parameters:
@@ -477,9 +477,9 @@ paths:
 
   /dags/{dagLocation}/move:
     post:
-      summary: "Move location of DAG"
-      description: "Move a location of a specified DAG"
-      operationId: "MoveDAG"
+      summary: "Rename or relocate a DAG"
+      description: "Changes the location or name of an existing DAG"
+      operationId: "moveDAGLocation"
       tags:
         - "dags"
       parameters:
@@ -521,9 +521,9 @@ paths:
 
   /dags/search:
     get:
-      summary: "Search DAGs"
-      description: "Searches for DAGs based on a query string"
-      operationId: "searchDAGs"
+      summary: "Search across all DAG definitions"
+      description: "Performs a full-text search across all DAG definitions"
+      operationId: "searchDAGDefinitions"
       tags:
         - "dags"
       parameters:
@@ -565,9 +565,9 @@ paths:
 
   /dags/tags:
     get:
-      summary: "List all tags"
-      description: "Returns a list of all tags used across DAGs"
-      operationId: "listTags"
+      summary: "List all available DAG tags"
+      description: "Retrieves all unique tags used across DAG definitions"
+      operationId: "getAllDAGTags"
       tags:
         - "dags"
       parameters:
@@ -588,9 +588,9 @@ paths:
 
   /runs/{dagName}/{requestId}/log:
     get:
-      summary: "Get content of a log file"
-      description: "Returns the content of a log file for a specific run"
-      operationId: "getRunLog"
+      summary: "Retrieve full execution log of a DAG run"
+      description: "Fetches the execution log for a DAG run"
+      operationId: "getDAGRunLog"
       tags:
         - "runs"
       parameters:
@@ -619,9 +619,9 @@ paths:
 
   /runs/{dagName}/{requestId}/{stepName}/log:
     get:
-      summary: "Get content of a step log file"
-      description: "Returns the content of a log file for a specific step in a run"
-      operationId: "getStepLog"
+      summary: "Retrieve log for a specific step in a DAG run"
+      description: "Fetches the log for an individual step in a DAG run"
+      operationId: "getDAGStepLog"
       tags:
         - "runs"
       parameters:
@@ -651,9 +651,9 @@ paths:
 
   /runs/{dagName}/{requestId}/{stepName}/status:
     patch:
-      summary: "Update the status of a step"
-      description: "Updates the status of a specific step in a run"
-      operationId: "updateStepStatus"
+      summary: "Manually update a step's execution status"
+      description: "Changes the status of a specific step within a DAG run"
+      operationId: "updateDAGStepStatus"
       tags:
         - "runs"
       parameters:
