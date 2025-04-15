@@ -315,7 +315,7 @@ paths:
                     type: array
                     description: "Grid data for visualization"
                     items:
-                      $ref: "#/components/schemas/DAGLogGridItem"
+                      $ref: "#/components/schemas/DAGGridItem"
                 required:
                   - runs
                   - gridData
@@ -547,7 +547,7 @@ paths:
                     type: array
                     description: "Search results matching the query"
                     items:
-                      $ref: "#/components/schemas/SearchDAGsResultItem"
+                      $ref: "#/components/schemas/SearchResultItem"
                   errors:
                     type: array
                     description: "Errors encountered during the search"
@@ -843,16 +843,6 @@ components:
       example: "latest"
       pattern: "^[a-zA-Z0-9_-]+$"
 
-    # DAGDetailTab:
-    #   type: string
-    #   description: "Indicates which part of the DAG to retrieve"
-    #   enum:
-    #     - status
-    #     - spec
-    #     - history
-    #     - log
-    #     - scheduler-log
-
     HealthResponse:
       type: object
       description: "Response object for the health check endpoint"
@@ -875,36 +865,6 @@ components:
         - version
         - uptime
         - timestamp
-
-    DAGAction:
-      type: string
-      description: |
-        Action to be performed on the DAG. Possible values include:
-        - start: Start the DAG
-        - suspend: Suspend the DAG
-        - stop: Stop the DAG
-        - retry: Retry the last run
-        - mark-success: Mark the last run as successful
-        - mark-failed: Mark the last run as failed
-        - save: Save the current state of the DAG
-        - rename: Rename the DAG
-      enum:
-        - start
-        - suspend
-        - stop
-        - retry
-        - mark-success
-        - mark-failed
-        - save
-        - rename
-
-    PostDAGActionResponse:
-      type: object
-      description: "Response object for posting an action to a DAG"
-      properties:
-        NewName:
-          type: string
-          description: "New DAG name, if the action resulted in a new DAG"
 
     DAGFile:
       type: object
@@ -1033,29 +993,6 @@ components:
         - "canceled"
         - "finished"
         - "skipped"
-
-    # DAGStatusFileDetails:
-    #   type: object
-    #   description: "Detailed status information for a DAG instance"
-    #   properties:
-    #     file:
-    #       type: string
-    #       description: "Path to the DAG file"
-    #     dag:
-    #       $ref: "#/components/schemas/DAGDetails"
-    #     latestRun:
-    #       $ref: "#/components/schemas/RunDetails"
-    #     suspended:
-    #       type: boolean
-    #       description: "Whether the DAG is suspended"
-    #     error:
-    #       type: string
-    #       description: "Error message if the DAG failed to start"
-    #   required:
-    #     - file
-    #     - dag
-    #     - latestRun
-    #     - suspended
 
     DAGDetails:
       type: object
@@ -1295,7 +1232,7 @@ components:
       required:
         - name
 
-    SearchDAGsResultItem:
+    SearchResultItem:
       type: object
       description: "Individual search result item for a DAG"
       properties:
@@ -1332,23 +1269,6 @@ components:
         - lineNumber
         - startLine
 
-    # StepLog:
-    #   type: object
-    #   description: "Log information for a specific step"
-    #   properties:
-    #     step:
-    #       $ref: "#/components/schemas/Node"
-    #     logFile:
-    #       type: string
-    #       description: "Path to the log file"
-    #     content:
-    #       type: string
-    #       description: "Log content"
-    #   required:
-    #     - step
-    #     - logFile
-    #     - content
-
     Log:
       type: object
       description: "Log information for the scheduler"
@@ -1359,25 +1279,7 @@ components:
       required:
         - content
 
-    # DAGHistoryData:
-    #   type: object
-    #   description: "Historical run data for a DAG"
-    #   properties:
-    #     gridData:
-    #       type: array
-    #       description: "Grid data for visualization"
-    #       items:
-    #         $ref: "#/components/schemas/DAGLogGridItem"
-    #     runs:
-    #       type: array
-    #       description: "Detailed status information for each run"
-    #       items:
-    #         $ref: "#/components/schemas/RunDetails"
-    #   required:
-    #     - gridData
-    #     - runs
-
-    DAGLogGridItem:
+    DAGGridItem:
       type: object
       description: "Grid item for log visualization"
       properties:

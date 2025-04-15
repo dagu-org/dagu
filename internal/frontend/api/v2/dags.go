@@ -179,7 +179,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 func (a *API) readHistoryData(
 	_ context.Context,
 	recentRuns []persistence.Run,
-) []api.DAGLogGridItem {
+) []api.DAGGridItem {
 	data := map[string][]scheduler.NodeStatus{}
 
 	addStatusFn := func(
@@ -201,13 +201,13 @@ func (a *API) readHistoryData(
 		}
 	}
 
-	var grid []api.DAGLogGridItem
+	var grid []api.DAGGridItem
 	for node, statusList := range data {
 		var history []api.NodeStatus
 		for _, s := range statusList {
 			history = append(history, api.NodeStatus(s))
 		}
-		grid = append(grid, api.DAGLogGridItem{
+		grid = append(grid, api.DAGGridItem{
 			Name:    node,
 			History: history,
 		})
@@ -245,7 +245,7 @@ func (a *API) readHistoryData(
 			for _, status := range statusList {
 				history = append(history, api.NodeStatus(status))
 			}
-			grid = append(grid, api.DAGLogGridItem{
+			grid = append(grid, api.DAGGridItem{
 				Name:    handlerType.String(),
 				History: history,
 			})
@@ -254,78 +254,6 @@ func (a *API) readHistoryData(
 
 	return grid
 }
-
-/*
-func (a *API) readStepLog(
-	ctx context.Context,
-	dag *digraph.DAG,
-	stepName string,
-	reqID string,
-) (*api.StepLog, error) {
-	status, err := a.readStatus(ctx, dag, reqID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Find the step in the status to get the log file.
-	var node *persistence.Node
-	for _, n := range status.Nodes {
-		if n.Step.Name == stepName {
-			node = n
-		}
-	}
-
-	if node == nil {
-		if status.OnSuccess != nil && status.OnSuccess.Step.Name == stepName {
-			node = status.OnSuccess
-		}
-		if status.OnFailure != nil && status.OnFailure.Step.Name == stepName {
-			node = status.OnFailure
-		}
-		if status.OnCancel != nil && status.OnCancel.Step.Name == stepName {
-			node = status.OnCancel
-		}
-		if status.OnExit != nil && status.OnExit.Step.Name == stepName {
-			node = status.OnExit
-		}
-	}
-
-	if node == nil {
-		return nil, fmt.Errorf("step %s not found in status", stepName)
-	}
-
-	var decoder *encoding.Decoder
-	if strings.ToLower(a.logEncodingCharset) == "euc-jp" {
-		decoder = japanese.EUCJP.NewDecoder()
-	}
-
-	logContent, err := readFileContent(node.Log, decoder)
-	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %w", node.Log, err)
-	}
-
-	return &api.StepLog{
-		LogFile: node.Log,
-		Step:    toNode(node),
-		Content: string(logContent),
-	}, nil
-}
-
-func (a *API) readStatus(ctx context.Context, dag *digraph.DAG, reqID string) (*persistence.Status, error) {
-	// If a request ID is provided, fetch the status by request ID.
-	if reqID != "" {
-		return a.client.GetStatusByRequestID(ctx, dag, reqID)
-	}
-
-	// If no request ID is provided, fetch the latest status.
-	status, err := a.client.GetLatestStatus(ctx, dag)
-	if err != nil {
-		return nil, err
-	}
-	return &status, nil
-}
-
-*/
 
 // ListDAGs implements api.StrictServerInterface.
 func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (api.ListDAGsResponseObject, error) {
@@ -529,7 +457,7 @@ func (a *API) SearchDAGs(ctx context.Context, request api.SearchDAGsRequestObjec
 		return nil, fmt.Errorf("error searching DAGs: %w", err)
 	}
 
-	var results []api.SearchDAGsResultItem
+	var results []api.SearchResultItem
 	for _, item := range ret {
 		var matches []api.SearchDAGsMatchItem
 		for _, match := range item.Matches {
@@ -540,7 +468,7 @@ func (a *API) SearchDAGs(ctx context.Context, request api.SearchDAGsRequestObjec
 			})
 		}
 
-		results = append(results, api.SearchDAGsResultItem{
+		results = append(results, api.SearchResultItem{
 			Name:    item.Name,
 			Dag:     toDAG(item.DAG),
 			Matches: matches,
