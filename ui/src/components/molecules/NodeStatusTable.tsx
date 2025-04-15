@@ -1,8 +1,6 @@
 import React, { CSSProperties } from 'react';
 import { stepTabColStyles } from '../../consts';
-import { useDAGPostAPI } from '../../hooks/useDAGPostAPI';
 import NodeStatusTableRow from './NodeStatusTableRow';
-import StatusUpdateModal from './StatusUpdateModal';
 import {
   Table,
   TableBody,
@@ -11,43 +9,15 @@ import {
   TableRow,
 } from '@mui/material';
 import BorderedBox from '../atoms/BorderedBox';
-import { components, Status } from '../../api/v2/schema';
+import { components } from '../../api/v2/schema';
 
 type Props = {
   nodes?: components['schemas']['Node'][];
   status: components['schemas']['RunDetails'];
   location: string;
-  refresh: () => void;
 };
 
-function NodeStatusTable({ nodes, status, location, refresh }: Props) {
-  const [modal, setModal] = React.useState(false);
-  const [current, setCurrent] = React.useState<
-    components['schemas']['Step'] | undefined
-  >(undefined);
-  const { doPost } = useDAGPostAPI({
-    name: location,
-    onSuccess: refresh,
-    requestId: status.requestId,
-  });
-  const requireModal = (step: components['schemas']['Step']) => {
-    if (
-      status?.status != Status.Running &&
-      status?.status != Status.NotStarted
-    ) {
-      setCurrent(step);
-      setModal(true);
-    }
-  };
-  const dismissModal = () => setModal(false);
-  const onUpdateStatus = async (
-    step: components['schemas']['Step'],
-    action: string
-  ) => {
-    doPost(action, step.name);
-    dismissModal();
-    refresh();
-  };
+function NodeStatusTable({ nodes, status, location }: Props) {
   const styles = stepTabColStyles;
   let i = 0;
   if (!nodes || !nodes.length) {
@@ -79,18 +49,11 @@ function NodeStatusTable({ nodes, status, location, refresh }: Props) {
                 node={n}
                 requestId={status.requestId}
                 name={location}
-                onRequireModal={requireModal}
               ></NodeStatusTableRow>
             ))}
           </TableBody>
         </Table>
       </BorderedBox>
-      <StatusUpdateModal
-        visible={modal}
-        step={current}
-        dismissModal={dismissModal}
-        onSubmit={onUpdateStatus}
-      />
     </React.Fragment>
   );
 }

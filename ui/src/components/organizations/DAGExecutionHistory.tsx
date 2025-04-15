@@ -8,10 +8,11 @@ import SubTitle from '../atoms/SubTitle';
 import LoadingIndicator from '../atoms/LoadingIndicator';
 import HistoryTable from '../molecules/HistoryTable';
 import { RunDetailsContext } from '../../contexts/DAGStatusContext';
-import { components } from '../../api/v2/schema';
-import { useQuery } from '../../hooks/api';
+import { components, NodeStatus, Status } from '../../api/v2/schema';
+import { useClient, useMutate, useQuery } from '../../hooks/api';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import DAGGraph from '../molecules/DAGGraph';
+import StatusUpdateModal from '../molecules/StatusUpdateModal';
 
 type Props = {
   location: string;
@@ -48,6 +49,9 @@ type HistoryTableProps = {
 };
 
 function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
+  const client = useClient();
+  const mutate = useMutate();
+  const [modal, setModal] = React.useState(false);
   const idxParam = new URLSearchParams(window.location.search).get('idx');
   const [idx, setIdx] = React.useState(
     idxParam ? parseInt(idxParam) : runs && runs.length ? runs.length - 1 : 0
@@ -72,11 +76,72 @@ function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
     return [...(runs || [])].reverse();
   }, [runs]);
 
+  const [selectedStep, setSelectedStep] = React.useState<
+    components['schemas']['Step'] | undefined
+  >(undefined);
+
+  const dismissModal = () => setModal(false);
+
+  const onUpdateStatus = async (
+    step: components['schemas']['Step'],
+    status: NodeStatus
+  ) => {
+    if (
+      !selectedStep ||
+      !reversedRuns ||
+      idx >= reversedRuns.length ||
+      !reversedRuns[idx]
+    ) {
+      return;
+    }
+    const { error } = await client.PATCH(
+      '/runs/{dagName}/{requestId}/{stepName}/status',
+      {
+        params: {
+          path: {
+            dagName: reversedRuns[idx].name,
+            requestId: reversedRuns[idx].requestId,
+            stepName: selectedStep.name,
+          },
+        },
+        body: {
+          status,
+        },
+      }
+    );
+    if (error) {
+      alert(error.message || 'An error occurred');
+      return;
+    }
+    mutate(['/dags/{dagLocation}']);
+    mutate(['/dags/{dagLocation}/runs']);
+    dismissModal();
+  };
+
   React.useEffect(() => {
     if (reversedRuns && reversedRuns[idx]) {
       dagStatusContext.setData(reversedRuns[idx]);
     }
   }, [reversedRuns, idx]);
+
+  const onSelectStepOnGraph = React.useCallback(
+    async (id: string) => {
+      const run = reversedRuns[idx];
+      if (!run) {
+        return;
+      }
+      if (run.status == Status.Running || run.status == Status.NotStarted) {
+        return;
+      }
+      // find the clicked step
+      const n = run.nodes.find((n) => n.step.name.replace(/\s/g, '_') == id);
+      if (n) {
+        setSelectedStep(n.step);
+        setModal(true);
+      }
+    },
+    [reversedRuns, idx]
+  );
 
   return (
     <DAGContext.Consumer>
@@ -95,7 +160,10 @@ function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
           {reversedRuns && reversedRuns[idx] ? (
             <React.Fragment>
               <Box sx={{ mt: 3 }}>
-                <DAGGraph run={reversedRuns[idx]} />
+                <DAGGraph
+                  run={reversedRuns[idx]}
+                  onSelectStep={onSelectStepOnGraph}
+                />
                 <Box sx={{ mt: 2 }}>
                   <SubTitle>Status</SubTitle>
                   <DAGStatusOverview
@@ -130,6 +198,13 @@ function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
               ) : null}
             </React.Fragment>
           ) : null}
+
+          <StatusUpdateModal
+            visible={modal}
+            step={setSelectedStep}
+            dismissModal={dismissModal}
+            onSubmit={onUpdateStatus}
+          />
         </React.Fragment>
       )}
     </DAGContext.Consumer>

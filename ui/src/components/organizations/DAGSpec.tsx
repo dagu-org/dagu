@@ -212,6 +212,7 @@ function DAGSpec({ location }: Props) {
                           }
                           if (response.status != 200) {
                             alert(error || 'Failed to save spec');
+                            return;
                           }
                           setEditing(false);
                           mutate(['/dags/{dagLocation}/spec']);
