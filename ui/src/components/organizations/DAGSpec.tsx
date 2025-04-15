@@ -29,11 +29,11 @@ type Props = {
 function DAGSpec({ location }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
+  const mutate = useMutate();
   const [editing, setEditing] = React.useState(false);
   const [currentValue, setCurrentValue] = React.useState<string | undefined>();
   const [cookie, setCookie] = useCookies(['flowchart']);
   const [flowchart, setFlowchart] = React.useState(cookie['flowchart']);
-  const mutate = useMutate();
   const onChangeFlowchart = React.useCallback(
     (value: FlowchartType) => {
       setCookie('flowchart', value, { path: '/' });
@@ -183,7 +183,7 @@ function DAGSpec({ location }: Props) {
                             alert('No changes to save');
                             return;
                           }
-                          const { error, response } = await client.PUT(
+                          const { data, error } = await client.PUT(
                             '/dags/{dagLocation}/spec',
                             {
                               params: {
@@ -200,18 +200,12 @@ function DAGSpec({ location }: Props) {
                               },
                             }
                           );
-                          if (response.status == 400) {
-                            type ValidationError = { errors: string[] };
-                            const validationError = error as ValidationError;
-                            alert(
-                              validationError.errors
-                                .map((e) => e.replace('spec.', ''))
-                                .join('\n')
-                            );
+                          if (error) {
+                            alert(error.message || 'Failed to save spec');
                             return;
                           }
-                          if (response.status != 200) {
-                            alert(error || 'Failed to save spec');
+                          if (data.errors) {
+                            alert(data.errors.join('\n'));
                             return;
                           }
                           setEditing(false);

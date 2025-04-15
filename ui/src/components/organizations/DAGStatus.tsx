@@ -10,6 +10,7 @@ import SubTitle from '../atoms/SubTitle';
 import { components, NodeStatus, Status } from '../../api/v2/schema';
 import DAGGraph from '../molecules/DAGGraph';
 import { useClient, useMutate } from '../../hooks/api';
+import { AppBarContext } from '../../contexts/AppBarContext';
 
 type Props = {
   run: components['schemas']['RunDetails'];
@@ -17,6 +18,7 @@ type Props = {
 };
 
 function DAGStatus({ run, location }: Props) {
+  const appBarContext = React.useContext(AppBarContext);
   const [modal, setModal] = React.useState(false);
   const [selectedStep, setSelectedStep] = React.useState<
     components['schemas']['Step'] | undefined
@@ -36,6 +38,9 @@ function DAGStatus({ run, location }: Props) {
             dagName: run.name,
             requestId: run.requestId,
             stepName: step.name,
+          },
+          query: {
+            remoteNode: appBarContext.selectedRemoteNode || 'local',
           },
         },
         body: {

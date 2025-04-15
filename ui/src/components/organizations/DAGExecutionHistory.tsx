@@ -49,6 +49,7 @@ type HistoryTableProps = {
 };
 
 function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
+  const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
   const mutate = useMutate();
   const [modal, setModal] = React.useState(false);
@@ -102,6 +103,9 @@ function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
             dagName: reversedRuns[idx].name,
             requestId: reversedRuns[idx].requestId,
             stepName: selectedStep.name,
+          },
+          query: {
+            remoteNode: appBarContext.selectedRemoteNode || 'local',
           },
         },
         body: {

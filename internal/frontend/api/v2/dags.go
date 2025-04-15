@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/dagu-org/dagu/api/v2"
@@ -95,13 +94,9 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 		return nil, err
 	}
 
-	if len(errs) > 0 {
-		return &api.UpdateDAGSpec400JSONResponse{
-			Errors: errs,
-		}, nil
-	}
-
-	return api.UpdateDAGSpec200Response{}, nil
+	return api.UpdateDAGSpec200JSONResponse{
+		Errors: errs,
+	}, nil
 }
 
 // GetDAGRuns implements api.StrictServerInterface.
@@ -495,150 +490,150 @@ func (a *API) UpdateDAGSuspendStatus(ctx context.Context, request api.UpdateDAGS
 	return api.UpdateDAGSuspendStatus200Response{}, nil
 }
 
-// PostDAGAction implements api.StrictServerInterface.
-func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionRequestObject) (api.PostDAGActionResponseObject, error) {
-	action := request.Body.Action
+// // PostDAGAction implements api.StrictServerInterface.
+// func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionRequestObject) (api.PostDAGActionResponseObject, error) {
+// 	action := request.Body.Action
 
-	var status client.DAGStatus
-	if action != api.DAGActionSave {
-		s, err := a.client.GetDAGStatus(ctx, request.DagLocation)
-		if err != nil {
-			return nil, err
-		}
-		status = s
-	}
+// 	var status client.DAGStatus
+// 	if action != api.DAGActionSave {
+// 		s, err := a.client.GetDAGStatus(ctx, request.DagLocation)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		status = s
+// 	}
 
-	switch request.Body.Action {
-	case api.DAGActionStart:
-		if status.Status.Status == scheduler.StatusRunning {
-			return nil, &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeAlreadyRunning,
-				Message:    "DAG is already running",
-			}
-		}
-		err := a.client.Start(ctx, status.DAG, client.StartOptions{
-			Params: value(request.Body.Params),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("error starting DAG: %w", err)
-		}
-		return api.PostDAGAction200JSONResponse{}, nil
+// 	switch request.Body.Action {
+// 	case api.DAGActionStart:
+// 		if status.Status.Status == scheduler.StatusRunning {
+// 			return nil, &Error{
+// 				HTTPStatus: http.StatusBadRequest,
+// 				Code:       api.ErrorCodeAlreadyRunning,
+// 				Message:    "DAG is already running",
+// 			}
+// 		}
+// 		err := a.client.Start(ctx, status.DAG, client.StartOptions{
+// 			Params: value(request.Body.Params),
+// 		})
+// 		if err != nil {
+// 			return nil, fmt.Errorf("error starting DAG: %w", err)
+// 		}
+// 		return api.PostDAGAction200JSONResponse{}, nil
 
-	case api.DAGActionSuspend:
-		b, err := strconv.ParseBool(value(request.Body.Value))
-		if err != nil {
-			return nil, &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    "Invalid value for suspend, must be true or false",
-			}
-		}
-		if err := a.client.ToggleSuspend(ctx, request.DagLocation, b); err != nil {
-			return nil, fmt.Errorf("error toggling suspend: %w", err)
-		}
-		return api.PostDAGAction200JSONResponse{}, nil
+// 	case api.DAGActionSuspend:
+// 		b, err := strconv.ParseBool(value(request.Body.Value))
+// 		if err != nil {
+// 			return nil, &Error{
+// 				HTTPStatus: http.StatusBadRequest,
+// 				Code:       api.ErrorCodeBadRequest,
+// 				Message:    "Invalid value for suspend, must be true or false",
+// 			}
+// 		}
+// 		if err := a.client.ToggleSuspend(ctx, request.DagLocation, b); err != nil {
+// 			return nil, fmt.Errorf("error toggling suspend: %w", err)
+// 		}
+// 		return api.PostDAGAction200JSONResponse{}, nil
 
-	case api.DAGActionStop:
-		if status.Status.Status != scheduler.StatusRunning {
-			return nil, &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeNotRunning,
-				Message:    "DAG is not running",
-			}
-		}
-		if err := a.client.Stop(ctx, status.DAG); err != nil {
-			return nil, fmt.Errorf("error stopping DAG: %w", err)
-		}
-		return api.PostDAGAction200JSONResponse{}, nil
+// 	case api.DAGActionStop:
+// 		if status.Status.Status != scheduler.StatusRunning {
+// 			return nil, &Error{
+// 				HTTPStatus: http.StatusBadRequest,
+// 				Code:       api.ErrorCodeNotRunning,
+// 				Message:    "DAG is not running",
+// 			}
+// 		}
+// 		if err := a.client.Stop(ctx, status.DAG); err != nil {
+// 			return nil, fmt.Errorf("error stopping DAG: %w", err)
+// 		}
+// 		return api.PostDAGAction200JSONResponse{}, nil
 
-	case api.DAGActionRetry:
-		if request.Body.RequestId == nil {
-			return nil, &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    "RequestId is required for retry action",
-			}
-		}
-		if err := a.client.Retry(ctx, status.DAG, *request.Body.RequestId); err != nil {
-			return nil, fmt.Errorf("error retrying DAG: %w", err)
-		}
-		return api.PostDAGAction200JSONResponse{}, nil
+// 	case api.DAGActionRetry:
+// 		if request.Body.RequestId == nil {
+// 			return nil, &Error{
+// 				HTTPStatus: http.StatusBadRequest,
+// 				Code:       api.ErrorCodeBadRequest,
+// 				Message:    "RequestId is required for retry action",
+// 			}
+// 		}
+// 		if err := a.client.Retry(ctx, status.DAG, *request.Body.RequestId); err != nil {
+// 			return nil, fmt.Errorf("error retrying DAG: %w", err)
+// 		}
+// 		return api.PostDAGAction200JSONResponse{}, nil
 
-	case api.DAGActionMarkSuccess:
-		fallthrough
+// 	case api.DAGActionMarkSuccess:
+// 		fallthrough
 
-	case api.DAGActionMarkFailed:
-		if status.Status.Status == scheduler.StatusRunning {
-			return nil, &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    "Cannot change status of running DAG",
-			}
-		}
-		if request.Body.RequestId == nil {
-			return nil, &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    "RequestId is required for mark-success action",
-			}
-		}
-		if request.Body.Step == nil {
-			return nil, &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    "Step is required for mark-success action",
-			}
-		}
-		toStatus := scheduler.NodeStatusSuccess
-		if action == api.DAGActionMarkFailed {
-			toStatus = scheduler.NodeStatusError
-		}
+// 	case api.DAGActionMarkFailed:
+// 		if status.Status.Status == scheduler.StatusRunning {
+// 			return nil, &Error{
+// 				HTTPStatus: http.StatusBadRequest,
+// 				Code:       api.ErrorCodeBadRequest,
+// 				Message:    "Cannot change status of running DAG",
+// 			}
+// 		}
+// 		if request.Body.RequestId == nil {
+// 			return nil, &Error{
+// 				HTTPStatus: http.StatusBadRequest,
+// 				Code:       api.ErrorCodeBadRequest,
+// 				Message:    "RequestId is required for mark-success action",
+// 			}
+// 		}
+// 		if request.Body.Step == nil {
+// 			return nil, &Error{
+// 				HTTPStatus: http.StatusBadRequest,
+// 				Code:       api.ErrorCodeBadRequest,
+// 				Message:    "Step is required for mark-success action",
+// 			}
+// 		}
+// 		toStatus := scheduler.NodeStatusSuccess
+// 		if action == api.DAGActionMarkFailed {
+// 			toStatus = scheduler.NodeStatusError
+// 		}
 
-		if err := a.updateStatus(ctx, *request.Body.RequestId, *request.Body.Step, status, toStatus); err != nil {
-			return nil, fmt.Errorf("error marking DAG as success: %w", err)
-		}
+// 		if err := a.updateStatus(ctx, *request.Body.RequestId, *request.Body.Step, status, toStatus); err != nil {
+// 			return nil, fmt.Errorf("error marking DAG as success: %w", err)
+// 		}
 
-		return api.PostDAGAction200JSONResponse{}, nil
+// 		return api.PostDAGAction200JSONResponse{}, nil
 
-	case api.DAGActionSave:
-		if request.Body.Value == nil {
-			return nil, &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    "Value is required for save action (DAG spec)",
-			}
-		}
+// 	case api.DAGActionSave:
+// 		if request.Body.Value == nil {
+// 			return nil, &Error{
+// 				HTTPStatus: http.StatusBadRequest,
+// 				Code:       api.ErrorCodeBadRequest,
+// 				Message:    "Value is required for save action (DAG spec)",
+// 			}
+// 		}
 
-		if err := a.client.UpdateDAG(ctx, request.DagLocation, *request.Body.Value); err != nil {
-			return nil, err
-		}
+// 		if err := a.client.UpdateDAG(ctx, request.DagLocation, *request.Body.Value); err != nil {
+// 			return nil, err
+// 		}
 
-		return api.PostDAGAction200JSONResponse{}, nil
+// 		return api.PostDAGAction200JSONResponse{}, nil
 
-	case api.DAGActionRename:
-		if request.Body.Value == nil {
-			return nil, &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    "Value is required for rename action (new name)",
-			}
-		}
+// 	case api.DAGActionRename:
+// 		if request.Body.Value == nil {
+// 			return nil, &Error{
+// 				HTTPStatus: http.StatusBadRequest,
+// 				Code:       api.ErrorCodeBadRequest,
+// 				Message:    "Value is required for rename action (new name)",
+// 			}
+// 		}
 
-		newName := *request.Body.Value
-		if err := a.client.Move(ctx, request.DagLocation, newName); err != nil {
-			return nil, fmt.Errorf("error renaming DAG: %w", err)
-		}
+// 		newName := *request.Body.Value
+// 		if err := a.client.Move(ctx, request.DagLocation, newName); err != nil {
+// 			return nil, fmt.Errorf("error renaming DAG: %w", err)
+// 		}
 
-		return api.PostDAGAction200JSONResponse{
-			NewName: ptr(newName),
-		}, nil
+// 		return api.PostDAGAction200JSONResponse{
+// 			NewName: ptr(newName),
+// 		}, nil
 
-	default:
-		// Unreachable
-		return nil, fmt.Errorf("unknown action: %s", action)
-	}
-}
+// 	default:
+// 		// Unreachable
+// 		return nil, fmt.Errorf("unknown action: %s", action)
+// 	}
+// }
 
 func (a *API) updateStatus(
 	ctx context.Context,

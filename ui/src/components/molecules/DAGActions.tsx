@@ -9,6 +9,7 @@ import ConfirmModal from './ConfirmModal';
 import LabeledItem from '../atoms/LabeledItem';
 import { components } from '../../api/v2/schema';
 import { useClient, useMutate } from '../../hooks/api';
+import { AppBarContext } from '../../contexts/AppBarContext';
 
 type LabelProps = {
   show: boolean;
@@ -31,6 +32,7 @@ function Label({ show, children }: LabelProps): JSX.Element {
 }
 
 function DAGActions({ status, location, dag, refresh, label = true }: Props) {
+  const appBarContext = React.useContext(AppBarContext);
   const [isStartModal, setIsStartModal] = React.useState(false);
   const [isStopModal, setIsStopModal] = React.useState(false);
   const [isRetryModal, setIsRetryModal] = React.useState(false);
@@ -109,6 +111,9 @@ function DAGActions({ status, location, dag, refresh, label = true }: Props) {
           setIsStopModal(false);
           const { error } = await client.POST('/dags/{dagLocation}/stop', {
             params: {
+              query: {
+                remoteNode: appBarContext.selectedRemoteNode || 'local',
+              },
               path: {
                 dagLocation: location,
               },
@@ -134,6 +139,9 @@ function DAGActions({ status, location, dag, refresh, label = true }: Props) {
             params: {
               path: {
                 dagLocation: location,
+              },
+              query: {
+                remoteNode: appBarContext.selectedRemoteNode || 'local',
               },
             },
             body: {
@@ -162,6 +170,9 @@ function DAGActions({ status, location, dag, refresh, label = true }: Props) {
             params: {
               path: {
                 dagLocation: location,
+              },
+              query: {
+                remoteNode: appBarContext.selectedRemoteNode || 'local',
               },
             },
             body: {

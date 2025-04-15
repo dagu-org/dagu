@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button, Stack } from '@mui/material';
 import { AppBarContext } from '../../contexts/AppBarContext';
+import { useClient } from '../../hooks/api';
 
 type Props = {
   location: string;
@@ -8,6 +9,7 @@ type Props = {
 
 function DAGEditButtons({ location }: Props) {
   const appBarContext = React.useContext(AppBarContext);
+  const client = useClient();
   return (
     <Stack direction="row" spacing={1}>
       <Button
@@ -48,19 +50,21 @@ function DAGEditButtons({ location }: Props) {
           if (!confirm('Are you sure to delete the DAG?')) {
             return;
           }
-          const url = `${getConfig().apiURL}/dags/${location}`;
-          const resp = await fetch(url, {
-            method: 'DELETE',
-            headers: {
-              'Content-Type': 'application/json',
+          const { error } = await client.DELETE('/dags/{dagLocation}', {
+            params: {
+              path: {
+                dagLocation: location,
+              },
+              query: {
+                remoteNode: appBarContext.selectedRemoteNode || 'local',
+              },
             },
           });
-          if (resp.ok) {
-            window.location.href = `${getConfig().basePath}/dags/`;
-          } else {
-            const e = await resp.text();
-            alert(e);
+          if (error) {
+            alert(error.message || 'An error occurred');
+            return;
           }
+          window.location.href = `${getConfig().basePath}/dags/`;
         }}
       >
         Delete

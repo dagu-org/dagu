@@ -181,53 +181,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-    post:
-      summary: "Perform an action on a DAG"
-      description: "Performs a specified action (e.g., start, stop) on the given DAG"
-      operationId: "postDAGAction"
-      tags:
-        - "dags"
-      parameters:
-        - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGLocation"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              description: "Request body for posting an action to a DAG"
-              properties:
-                action:
-                  $ref: "#/components/schemas/DAGAction"
-                value:
-                  type: string
-                  description: "Optional extra value for the action"
-                requestId:
-                  type: string
-                  description: "Unique request ID for the action"
-                step:
-                  type: string
-                  description: "Step name if the action targets a specific step"
-                params:
-                  type: string
-                  description: "Additional parameters for the action in JSON format"
-              required:
-                - action
-      responses:
-        "200":
-          description: "A successful response"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PostDAGActionResponse"
-        default:
-          description: "Generic error response"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
     delete:
       summary: "Delete a DAG"
       description: "Deletes a DAG by its name"
@@ -464,8 +417,6 @@ paths:
       responses:
         "200":
           description: "A successful response"
-        "400":
-          description: "Invalid spec"
           content:
             application/json:
               schema:
