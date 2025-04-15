@@ -69,13 +69,13 @@ func (e *client) CreateDAG(ctx context.Context, name string) (string, error) {
 	return id, nil
 }
 
-func (e *client) Grep(ctx context.Context, pattern string) (
+func (e *client) GrepDAG(ctx context.Context, pattern string) (
 	[]*persistence.GrepResult, []string, error,
 ) {
 	return e.dagStore.Grep(ctx, pattern)
 }
 
-func (e *client) Move(ctx context.Context, oldLoc, newLoc string) error {
+func (e *client) MoveDAG(ctx context.Context, oldLoc, newLoc string) error {
 	oldDAG, err := e.dagStore.GetMetadata(ctx, oldLoc)
 	if err != nil {
 		return fmt.Errorf("failed to get metadata for %s: %w", oldLoc, err)
@@ -93,7 +93,7 @@ func (e *client) Move(ctx context.Context, oldLoc, newLoc string) error {
 	return nil
 }
 
-func (e *client) Stop(ctx context.Context, dag *digraph.DAG) error {
+func (e *client) StopDAG(ctx context.Context, dag *digraph.DAG) error {
 	logger.Info(ctx, "Stopping", "name", dag.Name)
 	addr := dag.SockAddr("") // FIXME: Should handle the case of dynamic DAG
 	if !fileutil.FileExists(addr) {
@@ -105,7 +105,7 @@ func (e *client) Stop(ctx context.Context, dag *digraph.DAG) error {
 	return err
 }
 
-func (e *client) Start(_ context.Context, dag *digraph.DAG, opts StartOptions) error {
+func (e *client) StartDAG(_ context.Context, dag *digraph.DAG, opts StartOptions) error {
 	args := []string{"start"}
 	if opts.Params != "" {
 		args = append(args, "-p")
@@ -126,7 +126,7 @@ func (e *client) Start(_ context.Context, dag *digraph.DAG, opts StartOptions) e
 	return cmd.Start()
 }
 
-func (e *client) Restart(_ context.Context, dag *digraph.DAG, opts RestartOptions) error {
+func (e *client) RestartDAG(_ context.Context, dag *digraph.DAG, opts RestartOptions) error {
 	args := []string{"restart"}
 	if opts.Quiet {
 		args = append(args, "-q")
@@ -140,7 +140,7 @@ func (e *client) Restart(_ context.Context, dag *digraph.DAG, opts RestartOption
 	return cmd.Start()
 }
 
-func (e *client) Retry(_ context.Context, dag *digraph.DAG, requestID string) error {
+func (e *client) RetryDAG(_ context.Context, dag *digraph.DAG, requestID string) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--request-id=%s", requestID))
 	args = append(args, dag.Location)

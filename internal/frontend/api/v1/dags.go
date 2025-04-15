@@ -509,7 +509,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "DAG is already running",
 			}
 		}
-		if err := a.client.Start(ctx, status.DAG, client.StartOptions{
+		if err := a.client.StartDAG(ctx, status.DAG, client.StartOptions{
 			Params: value(request.Body.Params),
 		}); err != nil {
 			return nil, fmt.Errorf("error starting DAG: %w", err)
@@ -538,7 +538,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "DAG is not running",
 			}
 		}
-		if err := a.client.Stop(ctx, status.DAG); err != nil {
+		if err := a.client.StopDAG(ctx, status.DAG); err != nil {
 			return nil, fmt.Errorf("error stopping DAG: %w", err)
 		}
 		return api.PostDAGAction200JSONResponse{}, nil
@@ -551,7 +551,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "requestId is required for retry action",
 			}
 		}
-		if err := a.client.Retry(ctx, status.DAG, *request.Body.RequestId); err != nil {
+		if err := a.client.RetryDAG(ctx, status.DAG, *request.Body.RequestId); err != nil {
 			return nil, fmt.Errorf("error retrying DAG: %w", err)
 		}
 		return api.PostDAGAction200JSONResponse{}, nil
@@ -617,7 +617,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 		}
 
 		newName := *request.Body.Value
-		if err := a.client.Move(ctx, request.Name, newName); err != nil {
+		if err := a.client.MoveDAG(ctx, request.Name, newName); err != nil {
 			return nil, fmt.Errorf("error renaming DAG: %w", err)
 		}
 
@@ -679,7 +679,7 @@ func (a *API) SearchDAGs(ctx context.Context, request api.SearchDAGsRequestObjec
 		}
 	}
 
-	ret, errs, err := a.client.Grep(ctx, query)
+	ret, errs, err := a.client.GrepDAG(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("error searching DAGs: %w", err)
 	}

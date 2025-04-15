@@ -171,7 +171,7 @@ func stopRunningDAG(ctx context.Context, cli client.Client, dag *digraph.DAG) er
 			return nil
 		}
 
-		if err := cli.Stop(ctx, dag); err != nil {
+		if err := cli.StopDAG(ctx, dag); err != nil {
 			return fmt.Errorf("failed to stop DAG: %w", err)
 		}
 

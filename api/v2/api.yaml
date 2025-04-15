@@ -438,7 +438,7 @@ paths:
                 $ref: "#/components/schemas/Error"
 
   /dags/{dagLocation}/suspend:
-    patch:
+    post:
       summary: "Update suspend status of a DAG"
       description: "Updates the suspend status of a specific DAG"
       operationId: "UpdateDAGSuspendStatus"
@@ -462,6 +462,50 @@ paths:
       responses:
         "200":
           description: "A successful response"
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{dagLocation}/move:
+    post:
+      summary: "Move location of DAG"
+      description: "Move a location of a specified DAG"
+      operationId: "MoveDAG"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGLocation"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                newLocation:
+                  type: string
+                  description: "New location of the DAG"
+              required:
+                - newLocation
+      responses:
+        "200":
+          description: "A successful response"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "404":
           description: "DAG not found"
           content:

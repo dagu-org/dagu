@@ -57,7 +57,7 @@ func (job *DAG) Start(ctx context.Context) error {
 	}
 
 	// Job is ready; proceed to start.
-	return job.Client.Start(ctx, job.DAG, client.StartOptions{Quiet: true})
+	return job.Client.StartDAG(ctx, job.DAG, client.StartOptions{Quiet: true})
 }
 
 // Ready checks whether the job can be safely started based on the latest status.
@@ -118,12 +118,12 @@ func (job *DAG) Stop(ctx context.Context) error {
 	if latestStatus.Status != scheduler.StatusRunning {
 		return ErrJobIsNotRunning
 	}
-	return job.Client.Stop(ctx, job.DAG)
+	return job.Client.StopDAG(ctx, job.DAG)
 }
 
 // Restart restarts the job unconditionally (quiet mode).
 func (job *DAG) Restart(ctx context.Context) error {
-	return job.Client.Restart(ctx, job.DAG, client.RestartOptions{Quiet: true})
+	return job.Client.RestartDAG(ctx, job.DAG, client.RestartOptions{Quiet: true})
 }
 
 // String returns a string representation of the job, which is the DAG's name.

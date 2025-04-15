@@ -15,7 +15,7 @@ function LiveSwitch({ dag, refresh, inputProps }: Props) {
   const [checked, setChecked] = React.useState(!dag.suspended);
   const onSubmit = React.useCallback(
     async (suspend: boolean) => {
-      const { error } = await client.PATCH('/dags/{dagLocation}/suspend', {
+      const { error } = await client.POST('/dags/{dagLocation}/suspend', {
         params: {
           path: {
             dagLocation: dag.dag.location,
