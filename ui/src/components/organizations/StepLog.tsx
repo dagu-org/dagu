@@ -17,7 +17,7 @@ const ANSI_CODES_REGEX = [
   '(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-nq-uy=><~]))',
 ].join('|');
 
-function StepLog({ dagName: location, requestId, stepName }: Props) {
+function StepLog({ dagName: fileId, requestId, stepName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const { data } = useQuery(
     '/runs/{dagName}/{requestId}/{stepName}/log',
@@ -27,7 +27,7 @@ function StepLog({ dagName: location, requestId, stepName }: Props) {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          dagName: location,
+          dagName: fileId,
           stepName,
           requestId,
         },

@@ -14,10 +14,10 @@ import { AppBarContext } from '../../contexts/AppBarContext';
 
 type Props = {
   run: components['schemas']['RunDetails'];
-  location: string;
+  fileId: string;
 };
 
-function DAGStatus({ run, location }: Props) {
+function DAGStatus({ run, fileId }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const [modal, setModal] = React.useState(false);
   const [selectedStep, setSelectedStep] = React.useState<
@@ -86,7 +86,7 @@ function DAGStatus({ run, location }: Props) {
                 <Box sx={{ mt: 2 }}>
                   <DAGStatusOverview
                     status={run}
-                    location={location}
+                    fileId={fileId}
                   ></DAGStatusOverview>
                 </Box>
               </Box>

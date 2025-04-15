@@ -21,13 +21,15 @@ import { useMutate, useQuery } from '../../hooks/api';
 import LoadingIndicator from '../atoms/LoadingIndicator';
 import { components } from '../../api/v2/schema';
 import { useClient } from '../../hooks/api';
+import { useParams } from 'react-router-dom';
 
 type Props = {
-  location: string;
+  fileId: string;
 };
 
-function DAGSpec({ location }: Props) {
+function DAGSpec({ fileId }: Props) {
   const appBarContext = React.useContext(AppBarContext);
+  const params = useParams();
   const client = useClient();
   const mutate = useMutate();
   const [editing, setEditing] = React.useState(false);
@@ -49,7 +51,7 @@ function DAGSpec({ location }: Props) {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          fileId: location,
+          fileId: fileId,
         },
       },
     },
@@ -123,7 +125,7 @@ function DAGSpec({ location }: Props) {
                       color: 'error.contrastText',
                     }}
                   >
-                    {data.errors.map((e, i) => (
+                    {data.errors?.map((e, i) => (
                       <Box key={i} sx={{ mb: 1 }}>
                         {e}
                       </Box>
@@ -165,7 +167,7 @@ function DAGSpec({ location }: Props) {
                       color: 'grey.600',
                     }}
                   >
-                    {data.dag.location}
+                    {params.fileId}
                   </Box>
                   {editing ? (
                     <Stack direction="row">
@@ -188,7 +190,7 @@ function DAGSpec({ location }: Props) {
                             {
                               params: {
                                 path: {
-                                  fileId: props.location,
+                                  fileId: props.fileId,
                                 },
                                 query: {
                                   remoteNode:
@@ -204,7 +206,7 @@ function DAGSpec({ location }: Props) {
                             alert(error.message || 'Failed to save spec');
                             return;
                           }
-                          if (data.errors) {
+                          if (data?.errors) {
                             alert(data.errors.join('\n'));
                             return;
                           }

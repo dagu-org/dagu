@@ -18,7 +18,7 @@ function LiveSwitch({ dag, refresh, inputProps }: Props) {
       const { error } = await client.POST('/dags/{fileId}/suspend', {
         params: {
           path: {
-            fileId: dag.dag.location,
+            fileId: dag.fileId,
           },
         },
         body: {

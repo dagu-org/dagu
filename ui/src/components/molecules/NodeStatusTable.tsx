@@ -14,10 +14,10 @@ import { components } from '../../api/v2/schema';
 type Props = {
   nodes?: components['schemas']['Node'][];
   status: components['schemas']['RunDetails'];
-  location: string;
+  fileId: string;
 };
 
-function NodeStatusTable({ nodes, status, location }: Props) {
+function NodeStatusTable({ nodes, status, fileId }: Props) {
   const styles = stepTabColStyles;
   let i = 0;
   if (!nodes || !nodes.length) {
@@ -48,7 +48,7 @@ function NodeStatusTable({ nodes, status, location }: Props) {
                 rownum={idx + 1}
                 node={n}
                 requestId={status.requestId}
-                name={location}
+                name={fileId}
               ></NodeStatusTableRow>
             ))}
           </TableBody>

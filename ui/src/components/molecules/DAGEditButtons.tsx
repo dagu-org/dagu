@@ -4,10 +4,10 @@ import { AppBarContext } from '../../contexts/AppBarContext';
 import { useClient } from '../../hooks/api';
 
 type Props = {
-  location: string;
+  fileId: string;
 };
 
-function DAGEditButtons({ location }: Props) {
+function DAGEditButtons({ fileId }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
   return (
@@ -28,7 +28,7 @@ function DAGEditButtons({ location }: Props) {
           const { error } = await client.POST('/dags/{fileId}/rename', {
             params: {
               path: {
-                fileId: location,
+                fileId: fileId,
               },
             },
             query: {
@@ -55,7 +55,7 @@ function DAGEditButtons({ location }: Props) {
           const { error } = await client.DELETE('/dags/{fileId}', {
             params: {
               path: {
-                fileId: location,
+                fileId: fileId,
               },
               query: {
                 remoteNode: appBarContext.selectedRemoteNode || 'local',

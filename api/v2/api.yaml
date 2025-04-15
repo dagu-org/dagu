@@ -902,9 +902,6 @@ components:
         name:
           type: string
           description: "Logical name of the DAG"
-        location:
-          type: string
-          description: "Physical name of the DAG file"
         schedule:
           type: array
           description: "List of scheduling expressions defining when the DAG should run"
@@ -1001,9 +998,6 @@ components:
       type: object
       description: "Detailed DAG configuration information"
       properties:
-        location:
-          type: string
-          description: "Path to the DAG file"
         group:
           type: string
           description: "Logical grouping of related DAGs for organizational purposes"

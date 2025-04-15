@@ -31,7 +31,7 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 	}, nil
 }
 
-func (a *API) DeleteDAGByLocation(ctx context.Context, request api.DeleteDAGByFileIdRequestObject) (api.DeleteDAGByFileIdResponseObject, error) {
+func (a *API) DeleteDAGByFileId(ctx context.Context, request api.DeleteDAGByFileIdRequestObject) (api.DeleteDAGByFileIdResponseObject, error) {
 	_, err := a.client.GetDAGStatus(ctx, request.FileId)
 	if err != nil {
 		return nil, &Error{
@@ -477,7 +477,6 @@ func toDAG(dag *digraph.DAG) api.DAG {
 
 	return api.DAG{
 		Name:          dag.Name,
-		Location:      dag.FileID(),
 		Group:         ptr(dag.Group),
 		Description:   ptr(dag.Description),
 		Params:        ptr(dag.Params),
@@ -612,7 +611,6 @@ func toDAGDetails(dag *digraph.DAG) *api.DAGDetails {
 
 	return &api.DAGDetails{
 		Name:              dag.Name,
-		Location:          dag.FileID(),
 		Description:       ptr(dag.Description),
 		DefaultParams:     ptr(dag.DefaultParams),
 		Delay:             ptr(int(dag.Delay.Seconds())),

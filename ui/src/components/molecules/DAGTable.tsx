@@ -125,7 +125,7 @@ const defaultColumns = [
       if (data.kind == ItemKind.Group) {
         return getValue();
       } else {
-        const url = `/dags/${data.dag.dag.location}`;
+        const url = `/dags/${data.dag.fileId}`;
         return (
           <div
             style={{
@@ -381,7 +381,7 @@ const defaultColumns = [
         <DAGActions
           dag={data.dag.dag}
           status={data.dag.latestRun}
-          location={data.dag.dag.location}
+          fileId={data.dag.fileId}
           label={false}
           refresh={props.table.options.meta?.refreshFn}
         />

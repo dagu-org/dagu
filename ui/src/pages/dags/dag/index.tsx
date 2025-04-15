@@ -20,7 +20,7 @@ import ExecutionLog from '../../../components/organizations/ExecutionLog';
 import StepLog from '../../../components/organizations/StepLog';
 
 type Params = {
-  location: string;
+  fileId: string;
   name: string;
   tab?: string;
 };
@@ -37,13 +37,13 @@ function DAGDetails() {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          fileId: params.location || '',
+          fileId: params.fileId || '',
         },
       },
     },
     { refreshInterval: 2000 }
   );
-  const baseUrl = `/dags/${params.location}`;
+  const baseUrl = `/dags/${params.fileId}`;
   const [currentRun, setCurrentRun] = React.useState<
     components['schemas']['RunDetails'] | undefined
   >();
@@ -54,7 +54,7 @@ function DAGDetails() {
 
   const refreshFn = React.useCallback(() => {
     setTimeout(() => mutate(), 500);
-  }, [mutate, params.location]);
+  }, [mutate, params.fileId]);
 
   React.useEffect(() => {
     if (data) {
@@ -82,7 +82,7 @@ function DAGDetails() {
     return `${seconds}s`;
   };
 
-  if (!params.location || isLoading || !data) {
+  if (!params.fileId || isLoading || !data) {
     return <LoadingIndicator />;
   }
 
@@ -90,7 +90,7 @@ function DAGDetails() {
     <DAGContext.Provider
       value={{
         refresh: refreshFn,
-        location: params.location || '',
+        fileId: params.fileId || '',
         name: data.dag?.name || '',
       }}
     >
@@ -123,7 +123,7 @@ function DAGDetails() {
                 <DAGActions
                   status={status.data}
                   dag={data.dag}
-                  location={params.location!}
+                  fileId={params.fileId!}
                   refresh={refreshFn}
                 />
               )}
@@ -192,19 +192,16 @@ function DAGDetails() {
               ) : null}
             </Tabs>
             {pathname == `${baseUrl}/spec` ? (
-              <DAGEditButtons location={data.dag?.location || ''} />
+              <DAGEditButtons fileId={params.fileId || ''} />
             ) : null}
           </Stack>
           <Box sx={{ mx: 4, flex: 1 }}>
             {tab == 'status' ? (
-              <DAGStatus
-                run={data.latestRun}
-                location={data.dag?.location || ''}
-              />
+              <DAGStatus run={data.latestRun} fileId={params.fileId || ''} />
             ) : null}
-            {tab == 'spec' ? <DAGSpec location={params.location} /> : null}
+            {tab == 'spec' ? <DAGSpec fileId={params.fileId} /> : null}
             {tab == 'history' ? (
-              <DAGExecutionHistory location={data.dag?.location || ''} />
+              <DAGExecutionHistory fileId={params.fileId || ''} />
             ) : null}
             {tab == 'scheduler-log' ? (
               <ExecutionLog name={data.dag?.name || ''} requestId={requestId} />

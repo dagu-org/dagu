@@ -42,7 +42,7 @@ export type Condition = {
 };
 
 export type DAG = {
-  Location?: string;
+  fileId?: string;
   Name: string;
   Schedule?: Schedule[];
   Group?: string;

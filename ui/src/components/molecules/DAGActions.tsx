@@ -20,7 +20,7 @@ type Props = {
   status?:
     | components['schemas']['RunSummary']
     | components['schemas']['RunDetails'];
-  location: string;
+  fileId: string;
   dag?: components['schemas']['DAG'] | components['schemas']['DAGDetails'];
   label?: boolean;
   refresh?: () => void;
@@ -31,7 +31,7 @@ function Label({ show, children }: LabelProps): JSX.Element {
   return <VisuallyHidden>{children}</VisuallyHidden>;
 }
 
-function DAGActions({ status, location, dag, refresh, label = true }: Props) {
+function DAGActions({ status, fileId, dag, refresh, label = true }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const [isStartModal, setIsStartModal] = React.useState(false);
   const [isStopModal, setIsStopModal] = React.useState(false);
@@ -115,7 +115,7 @@ function DAGActions({ status, location, dag, refresh, label = true }: Props) {
                 remoteNode: appBarContext.selectedRemoteNode || 'local',
               },
               path: {
-                fileId: location,
+                fileId: fileId,
               },
             },
           });
@@ -138,7 +138,7 @@ function DAGActions({ status, location, dag, refresh, label = true }: Props) {
           const { error } = await client.POST('/dags/{fileId}/retry', {
             params: {
               path: {
-                fileId: location,
+                fileId: fileId,
               },
               query: {
                 remoteNode: appBarContext.selectedRemoteNode || 'local',
@@ -169,7 +169,7 @@ function DAGActions({ status, location, dag, refresh, label = true }: Props) {
           const { error } = await client.POST('/dags/{fileId}/start', {
             params: {
               path: {
-                fileId: location,
+                fileId: fileId,
               },
               query: {
                 remoteNode: appBarContext.selectedRemoteNode || 'local',

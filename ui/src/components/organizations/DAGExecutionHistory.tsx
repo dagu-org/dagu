@@ -15,10 +15,10 @@ import DAGGraph from '../molecules/DAGGraph';
 import StatusUpdateModal from '../molecules/StatusUpdateModal';
 
 type Props = {
-  location: string;
+  fileId: string;
 };
 
-function DAGExecutionHistory({ location }: Props) {
+function DAGExecutionHistory({ fileId }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const { data } = useQuery(
     '/dags/{fileId}/runs',
@@ -28,7 +28,7 @@ function DAGExecutionHistory({ location }: Props) {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          fileId: location,
+          fileId: fileId,
         },
       },
     },
