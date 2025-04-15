@@ -54,7 +54,6 @@ type PullPolicy int
 const (
 	Always PullPolicy = iota
 	Never
-	Newer
 	Missing
 )
 
@@ -64,8 +63,6 @@ func ParsePullPolicy(s string) PullPolicy {
 		return Always
 	case "never":
 		return Never
-	case "newer":
-		return Newer
 	default:
 		return Missing
 	}
