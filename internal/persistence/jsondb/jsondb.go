@@ -141,14 +141,13 @@ func (db *JSONDB) NewRetryRecord(ctx context.Context, dag *digraph.DAG, timestam
 		return nil, ErrRequestIDEmpty
 	}
 
-	ts := NewUTC(timestamp)
-
 	dataRoot := NewDataRoot(db.baseDir, dag.Name)
 	run, err := dataRoot.FindByRequestID(ctx, reqID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find run: %w", err)
 	}
 
+	ts := NewUTC(timestamp)
 	record, err := run.CreateRecord(ctx, ts, db.cache, WithDAG(dag))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create record: %w", err)

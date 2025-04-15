@@ -5,7 +5,7 @@ import StyledTableRow from '../atoms/StyledTableRow';
 import { components } from '../../api/v2/schema';
 
 type Props = {
-  data: components['schemas']['DAGLogGridItem'];
+  data: components['schemas']['DAGGridItem'];
   onSelect: (idx: number) => void;
   idx: number;
 };
@@ -21,8 +21,8 @@ function HistoryTableRow({ data, onSelect, idx }: Props) {
           tdStyle.backgroundColor = '#FFDDAD';
         }
         if (status != 0) {
-          style.backgroundColor = statusColorMapping[status].backgroundColor;
-          style.color = statusColorMapping[status].color;
+          style.backgroundColor = statusColorMapping[status]?.backgroundColor;
+          style.color = statusColorMapping[status]?.color;
         }
         return (
           <TableCell
