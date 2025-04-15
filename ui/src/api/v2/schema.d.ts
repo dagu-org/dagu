@@ -61,11 +61,7 @@ export interface paths {
          */
         get: operations["getDAGDetails"];
         put?: never;
-        /**
-         * Perform an action on a DAG
-         * @description Performs a specified action (e.g., start, stop) on the given DAG
-         */
-        post: operations["postDAGAction"];
+        post?: never;
         /**
          * Delete a DAG
          * @description Deletes a DAG by its name
@@ -812,55 +808,6 @@ export interface operations {
             };
         };
     };
-    postDAGAction: {
-        parameters: {
-            query?: {
-                /** @description name of the remote node */
-                remoteNode?: components["parameters"]["RemoteNode"];
-            };
-            header?: never;
-            path: {
-                /** @description location of the DAG file */
-                dagLocation: components["parameters"]["DAGLocation"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    action: components["schemas"]["DAGAction"];
-                    /** @description Optional extra value for the action */
-                    value?: string;
-                    /** @description Unique request ID for the action */
-                    requestId?: string;
-                    /** @description Step name if the action targets a specific step */
-                    step?: string;
-                    /** @description Additional parameters for the action in JSON format */
-                    params?: string;
-                };
-            };
-        };
-        responses: {
-            /** @description A successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PostDAGActionResponse"];
-                };
-            };
-            /** @description Generic error response */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
     deleteDAG: {
         parameters: {
             query?: {
@@ -1160,13 +1107,6 @@ export interface operations {
         responses: {
             /** @description A successful response */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Invalid spec */
-            400: {
                 headers: {
                     [name: string]: unknown;
                 };

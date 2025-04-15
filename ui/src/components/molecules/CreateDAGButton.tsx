@@ -1,9 +1,12 @@
 import { Button } from '@mui/material';
 import React from 'react';
 import { AppBarContext } from '../../contexts/AppBarContext';
+import { useClient, useMutate } from '../../hooks/api';
 
 function CreateDAGButton() {
   const appBarContext = React.useContext(AppBarContext);
+  const client = useClient();
+  const mutate = useMutate();
   return (
     <Button
       variant="outlined"
@@ -24,29 +27,21 @@ function CreateDAGButton() {
           alert('File name cannot contain space');
           return;
         }
-        const resp = await fetch(
-          `${getConfig().apiURL}/dags?remoteNode=${
-            appBarContext.selectedRemoteNode || 'local'
-          }`,
-          {
-            method: 'POST',
-            mode: 'cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'new',
-              value: name,
-            }),
-          }
-        );
-        if (resp.ok) {
-          window.location.href = `${getConfig().basePath}/dags/${name.replace(
-            /.yaml$/,
-            ''
-          )}/spec`;
-        } else {
-          const e = await resp.text();
-          alert(e);
+        const { error } = await client.POST('/dags', {
+          params: {
+            query: {
+              remoteNode: appBarContext.selectedRemoteNode || 'local',
+            },
+          },
+          body: {
+            name,
+          },
+        });
+        if (error) {
+          alert(error.message || 'An error occurred');
+          return;
         }
+        window.location.href = `${getConfig().basePath}/dags/${name}/spec`;
       }}
     >
       New
