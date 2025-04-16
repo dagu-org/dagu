@@ -14,7 +14,15 @@ module.exports = merge(common, {
           },
         ],
         include: path.resolve(__dirname, 'src'),
-        exclude: path.resolve(__dirname, 'node_modules'),
+        exclude: [
+          path.resolve(__dirname, 'node_modules'),
+          /\.d\.ts$/, // Exclude declaration files from ts-loader
+        ],
+      },
+      {
+        // Handle .d.ts files - tell webpack to ignore them
+        test: /\.d\.ts$/,
+        use: 'null-loader',
       },
     ],
   },

@@ -1,9 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { Box, Button, Grid, Stack, TextField, Typography } from '@mui/material';
 import { useSearchParams } from 'react-router-dom';
-import Title from '../../components/atoms/Title';
-import SearchResult from '../../components/molecules/SearchResult';
-import LoadingIndicator from '../../components/atoms/LoadingIndicator';
+import Title from '../../ui/Title';
+import SearchResult from '../../features/search/components/SearchResult';
+import LoadingIndicator from '../../ui/LoadingIndicator';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useQuery } from '../../hooks/api';
 

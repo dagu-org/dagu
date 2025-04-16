@@ -1,9 +1,9 @@
 import React from 'react';
 import { Box, Grid } from '@mui/material';
 import { statusColorMapping } from '../consts';
-import DashboardMetric from '../components/molecules/DashboardMetric';
-import DashboardTimeChart from '../components/molecules/DashboardTimechart';
-import Title from '../components/atoms/Title';
+import DashboardMetric from '../features/dashboard/components/DashboardMetric';
+import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
+import Title from '../ui/Title';
 import { AppBarContext } from '../contexts/AppBarContext';
 import { useConfig } from '../contexts/ConfigContext';
 import { useQuery } from '../hooks/api';

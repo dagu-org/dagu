@@ -1,23 +1,23 @@
 import React, { useMemo } from 'react';
 import { Link, useParams, useLocation } from 'react-router-dom';
-import DAGStatus from '../../../components/organizations/DAGStatus';
-import { DAGContext } from '../../../contexts/DAGContext';
-import DAGSpec from '../../../components/organizations/DAGSpec';
+import DAGStatus from '../../../features/dags/components/DAGStatus';
+import { DAGContext } from '../../../features/dags/contexts/DAGContext';
+import DAGSpec from '../../../features/dags/components/DAGSpec';
 import { Box, Stack, Tab, Tabs } from '@mui/material';
-import Title from '../../../components/atoms/Title';
-import DAGActions from '../../../components/molecules/DAGActions';
-import DAGEditButtons from '../../../components/molecules/DAGEditButtons';
-import LoadingIndicator from '../../../components/atoms/LoadingIndicator';
+import Title from '../../../ui/Title';
+import DAGActions from '../../../features/dags/components/DAGActions';
+import DAGEditButtons from '../../../features/dags/components/DAGEditButtons';
+import LoadingIndicator from '../../../ui/LoadingIndicator';
 import { AppBarContext } from '../../../contexts/AppBarContext';
-import StatusChip from '../../../components/atoms/StatusChip';
+import StatusChip from '../../../ui/StatusChip';
 import { CalendarToday, TimerSharp } from '@mui/icons-material';
 import moment from 'moment-timezone';
-import { RunDetailsContext } from '../../../contexts/DAGStatusContext';
+import { RunDetailsContext } from '../../../features/dags/contexts/DAGStatusContext';
 import { useQuery } from '../../../hooks/api';
 import { components, Status } from '../../../api/v2/schema';
-import DAGExecutionHistory from '../../../components/organizations/DAGExecutionHistory';
-import ExecutionLog from '../../../components/organizations/ExecutionLog';
-import StepLog from '../../../components/organizations/StepLog';
+import DAGExecutionHistory from '../../../features/dags/components/DAGExecutionHistory';
+import ExecutionLog from '../../../features/dags/components/ExecutionLog';
+import StepLog from '../../../features/dags/components/StepLog';
 
 type Params = {
   fileId: string;
