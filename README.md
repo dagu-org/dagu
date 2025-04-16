@@ -161,7 +161,7 @@ Make sure you have the following installed on your system:
 
 - [Go 1.23 or later](https://go.dev/doc/install)
 - [Node.js (Latest LTS or Current)](https://nodejs.org/en/download/)
-- [Yarn](https://yarnpkg.com/)
+- [pnpm](https://pnpm.io/installation)
 
 ### Steps to Build Locally
 
@@ -174,19 +174,8 @@ Make sure you have the following installed on your system:
   ```
 
 #### 2. Build the UI
-- Navigate to the `ui` directory.
-  ```sh
-  cd ui
-  ```
-- Install / Update Dependencies
-  ```sh
-  yarn
-  ```
-- Go back to the root directory.
-  ```sh
-  cd ..
-  ```
-- Build the UI
+
+- Build the UI assets. This step is necessary to generate frontend files and copy them to the `internal/frontend/assets` directory.
   ```sh
   make build-ui
   ```

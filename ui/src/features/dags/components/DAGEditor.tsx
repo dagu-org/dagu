@@ -12,7 +12,7 @@ configureMonacoYaml(monaco, {
   format: true,
   schemas: [
     {
-      uri: 'https://raw.githubusercontent.com/daguflow/dagu/main/schemas/dag.schema.json',
+      uri: 'https://raw.githubusercontent.com/dagu-org/dagu/main/schemas/dag.schema.json',
       fileMatch: ['*'], // Match all YAML files
     },
   ],

@@ -1,4 +1,8 @@
-# dagu UI
+# UI
+
+## Prerequisites
+- Node.js (latest stable version)
+- pnpm
 
 ## Development Instructions
 
@@ -20,8 +24,8 @@ Once the backend server is up and running, you can start the Webpack dev server 
 
 ```bash
 cd ui/
-yarn install
-yarn start
+pnpm install
+pnpm start
 ```
 
 This command will start the Webpack dev server at `127.0.0.1:8081`. You can access the UI by opening your web browser and navigating to http://localhost:8081.
@@ -31,7 +35,7 @@ This command will start the Webpack dev server at `127.0.0.1:8081`. You can acce
 If you need to build the `bundle.js` file, which contains all the necessary frontend assets, you can do so using the following command:
 
 ```
-cd dagu
+cd ../
 make build-ui
 ```
 
