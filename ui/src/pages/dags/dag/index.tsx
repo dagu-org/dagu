@@ -1,23 +1,23 @@
 import React, { useMemo } from 'react';
 import { Link, useParams, useLocation } from 'react-router-dom';
-import DAGStatus from '../../../features/dags/components/DAGStatus';
+import { DAGStatus } from '../../../features/dags/components';
 import { DAGContext } from '../../../features/dags/contexts/DAGContext';
-import DAGSpec from '../../../features/dags/components/DAGSpec';
+import { DAGSpec } from '../../../features/dags/components/dag-editor';
 import { Box, Stack, Tab, Tabs } from '@mui/material';
-import Title from '../../../ui/Title';
-import DAGActions from '../../../features/dags/components/DAGActions';
-import DAGEditButtons from '../../../features/dags/components/DAGEditButtons';
+import { LinkTab } from '../../../features/dags/components/common';
+import { DAGEditButtons } from '../../../features/dags/components/dag-editor';
 import LoadingIndicator from '../../../ui/LoadingIndicator';
 import { AppBarContext } from '../../../contexts/AppBarContext';
-import StatusChip from '../../../ui/StatusChip';
-import { CalendarToday, TimerSharp } from '@mui/icons-material';
 import moment from 'moment-timezone';
 import { RunDetailsContext } from '../../../features/dags/contexts/DAGStatusContext';
 import { useQuery } from '../../../hooks/api';
 import { components, Status } from '../../../api/v2/schema';
-import DAGExecutionHistory from '../../../features/dags/components/DAGExecutionHistory';
-import ExecutionLog from '../../../features/dags/components/ExecutionLog';
-import StepLog from '../../../features/dags/components/StepLog';
+import {
+  DAGExecutionHistory,
+  ExecutionLog,
+  StepLog,
+} from '../../../features/dags/components/dag-execution';
+import { DAGHeader } from '../../../features/dags/components/dag-details';
 
 type Params = {
   fileId: string;
@@ -108,72 +108,13 @@ function DAGDetails() {
             direction: 'column',
           }}
         >
-          <Box
-            sx={{
-              mx: 4,
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <Title>{data.dag?.name}</Title>
-            <RunDetailsContext.Consumer>
-              {(status) => (
-                <DAGActions
-                  status={status.data}
-                  dag={data.dag}
-                  fileId={params.fileId!}
-                  refresh={refreshFn}
-                />
-              )}
-            </RunDetailsContext.Consumer>
-          </Box>
-          {data.latestRun.status != Status.NotStarted ? (
-            <Stack
-              direction="row"
-              spacing={2}
-              sx={{ mx: 4, alignItems: 'center' }}
-            >
-              {data.latestRun.status ? (
-                <StatusChip status={data.latestRun.status}>
-                  {data.latestRun.statusText || ''}
-                </StatusChip>
-              ) : null}
-
-              <Stack
-                direction="row"
-                color={'text.secondary'}
-                sx={{ alignItems: 'center', ml: 1 }}
-              >
-                <CalendarToday sx={{ mr: 0.5 }} />
-                {data.latestRun?.finishedAt
-                  ? moment(data.latestRun.finishedAt).format(
-                      'MMM D, YYYY HH:mm:ss Z'
-                    )
-                  : '--'}
-              </Stack>
-
-              <Stack
-                direction="row"
-                color={'text.secondary'}
-                sx={{ alignItems: 'center', ml: 1 }}
-              >
-                <TimerSharp sx={{ mr: 0.5 }} />
-                {data.latestRun.finishedAt
-                  ? formatDuration(
-                      data.latestRun.startedAt,
-                      data.latestRun.finishedAt
-                    )
-                  : data.latestRun.startedAt
-                  ? formatDuration(
-                      data.latestRun.startedAt,
-                      moment().toISOString()
-                    )
-                  : '--'}
-              </Stack>
-            </Stack>
-          ) : null}
+          <DAGHeader
+            dag={data.dag}
+            latestRun={data.latestRun}
+            fileId={params.fileId || ''}
+            refreshFn={refreshFn}
+            formatDuration={formatDuration}
+          />
           <Stack
             sx={{
               mx: 4,
@@ -220,16 +161,3 @@ function DAGDetails() {
   );
 }
 export default DAGDetails;
-
-interface LinkTabProps {
-  label?: string;
-  value: string;
-}
-
-function LinkTab({ value, ...props }: LinkTabProps) {
-  return (
-    <Link to={value}>
-      <Tab value={value} {...props} />
-    </Link>
-  );
-}

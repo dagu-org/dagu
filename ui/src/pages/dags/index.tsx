@@ -1,13 +1,12 @@
 import React from 'react';
-import DAGErrors from '../../features/dags/components/DAGErrors';
+import { DAGErrors } from '../../features/dags/components/dag-editor';
 import Box from '@mui/material/Box';
-import CreateDAGButton from '../../features/dags/components/CreateDAGButton';
+import { DAGPagination } from '../../features/dags/components/common';
 import WithLoading from '../../ui/WithLoading';
-import DAGTable from '../../features/dags/components/DAGTable';
-import Title from '../../ui/Title';
+import { DAGTable } from '../../features/dags/components/dag-list';
+import DAGListHeader from '../../features/dags/components/dag-list/DAGListHeader';
 import { useLocation } from 'react-router-dom';
 import { AppBarContext } from '../../contexts/AppBarContext';
-import DAGPagination from '../../features/dags/components/DAGPagination';
 import { debounce } from 'lodash';
 import { useUserPreferences } from '../../contexts/UserPreference';
 import { useQuery } from '../../hooks/api';
@@ -132,17 +131,7 @@ function DAGs() {
         width: '100%',
       }}
     >
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <Title>DAGs</Title>
-        <CreateDAGButton />
-      </Box>
+      <DAGListHeader />
       <Box>
         <WithLoading loaded={!isLoading}>
           {data && (

@@ -2,13 +2,12 @@ import React from 'react';
 import { DAGContext } from '../contexts/DAGContext';
 import { DAGStatus } from '../../../models';
 import { getEventHandlers } from '../../../models';
-import NodeStatusTable from './NodeStatusTable';
-import DAGStatusOverview from './DAGStatusOverview';
-import StatusUpdateModal from './StatusUpdateModal';
+import { NodeStatusTable, DAGStatusOverview } from './dag-details';
+import { StatusUpdateModal } from './dag-execution';
 import { Box } from '@mui/material';
 import SubTitle from '../../../ui/SubTitle';
 import { components, NodeStatus, Status } from '../../../api/v2/schema';
-import DAGGraph from './DAGGraph';
+import { DAGGraph } from './visualization';
 import { useClient, useMutate } from '../../../hooks/api';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 
