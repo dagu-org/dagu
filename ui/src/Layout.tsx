@@ -1,212 +1,133 @@
 import * as React from 'react';
-import { styled, createTheme, ThemeProvider } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
-import MuiDrawer from '@mui/material/Drawer';
-import Box from '@mui/material/Box';
-import MuiAppBar, { AppBarProps as MuiAppBarProps } from '@mui/material/AppBar';
-import Toolbar from '@mui/material/Toolbar';
-import List from '@mui/material/List';
-import Typography from '@mui/material/Typography';
-import { mainListItems } from './menu';
-import { Grid, MenuItem, Select } from '@mui/material';
+import { cn } from '@/lib/utils'; // Assuming shadcn/ui setup includes this utility
+import { mainListItems } from './menu'; // Assuming this renders compatible elements
 import { AppBarContext } from './contexts/AppBarContext';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'; // Import shadcn Select
 
-const drawerWidthClosed = 64;
-const drawerWidth = 240;
+// Constants (can be adjusted or moved to Tailwind config if preferred)
+const drawerWidthClosed = 'w-16'; // Equivalent to 64px
 
-interface AppBarProps extends MuiAppBarProps {
-  open?: boolean;
-}
-
-const AppBar = styled(MuiAppBar, {
-  shouldForwardProp: (prop) => prop !== 'open',
-})<AppBarProps>(({ theme, open }) => ({
-  zIndex: theme.zIndex.drawer - 1,
-  transition: theme.transitions.create(['width', 'margin', 'border'], {
-    easing: theme.transitions.easing.sharp,
-    duration: theme.transitions.duration.leavingScreen,
-  }),
-  width: '100%',
-  ...(open && {
-    transition: theme.transitions.create(['width', 'margin', 'border'], {
-      easing: theme.transitions.easing.sharp,
-      duration: theme.transitions.duration.enteringScreen,
-    }),
-  }),
-}));
-
-const Drawer = styled(MuiDrawer, {
-  shouldForwardProp: (prop) => prop !== 'open',
-})(({ theme, open }) => ({
-  '& .MuiDrawer-paper': {
-    position: 'relative',
-    whiteSpace: 'nowrap',
-    width: drawerWidth,
-    transition: theme.transitions.create('width', {
-      easing: theme.transitions.easing.sharp,
-      duration: theme.transitions.duration.enteringScreen,
-    }),
-    boxSizing: 'border-box',
-    ...(!open && {
-      overflowX: 'hidden',
-      transition: theme.transitions.create('width', {
-        easing: theme.transitions.easing.sharp,
-        duration: theme.transitions.duration.leavingScreen,
-      }),
-      width: drawerWidthClosed,
-      [theme.breakpoints.up('sm')]: {
-        width: theme.spacing(9),
-      },
-    }),
-  },
-}));
-
-const mdTheme = createTheme({
-  typography: {
-    fontFamily: 'Inter',
-  },
-});
-
-type DashboardContentProps = {
+type LayoutProps = {
   title: string;
-  navbarColor: string;
-  version: string;
+  navbarColor: string; // Keep prop, but might be used differently or removed if not needed with Tailwind
+  version: string; // Keep prop, might be used elsewhere or in footer later
   children?: React.ReactElement | React.ReactElement[];
 };
 
-function Content({ title, navbarColor, children }: DashboardContentProps) {
+function Content({ title, navbarColor, children }: LayoutProps) {
   const [scrolled, setScrolled] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const gradientColor = navbarColor || '#485fc7';
+  // Use navbarColor for gradient, default if not provided
+  const gradientColor = navbarColor || '#485fc7'; // Example default, adjust as needed
+
+  const handleScroll = () => {
+    const container = containerRef.current;
+    if (container) {
+      setScrolled(container.scrollTop > 54); // Keep scroll logic
+    }
+  };
 
   return (
-    <ThemeProvider theme={mdTheme}>
-      <Box sx={{ display: 'flex', flexDirection: 'row', width: '100vw' }}>
-        <CssBaseline />
-        <Drawer variant="permanent" open={false}>
-          <Box
-            sx={{
-              background: `linear-gradient(0deg, #fff 0%, ${gradientColor} 70%, ${gradientColor} 100%);`,
-              height: '100%',
-            }}
-          >
-            <List component="nav" sx={{ pl: '6px' }}>
-              {mainListItems}
-            </List>
-          </Box>
-        </Drawer>
-        <Box
-          component="main"
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            backgroundColor: 'white',
-            height: '100vh',
-            width: '100%',
-            maxWidth: '100%',
-            overflow: 'auto',
+    // No ThemeProvider needed for Tailwind
+    <div className="flex flex-row w-screen h-screen">
+      {/* Drawer */}
+      <div
+        className={cn(
+          'relative h-full overflow-hidden',
+          drawerWidthClosed // Fixed closed width as per original logic open={false}
+        )}
+      >
+        <div
+          className="h-full"
+          style={{
+            background: `linear-gradient(0deg, #fff 0%, ${gradientColor} 70%, ${gradientColor} 100%)`,
           }}
         >
-          <AppBar
-            open={false}
-            elevation={0}
-            sx={{
-              width: '100%',
-              backgroundColor: '#F2F4F8',
-              borderBottom: scrolled ? 1 : 0,
-              borderColor: 'grey.300',
-              pr: 3,
-              position: 'relative',
-              display: 'block',
-            }}
-          >
-            <Toolbar
-              sx={{
-                width: '100%',
-                display: 'flex',
-                direction: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flex: 1,
-              }}
-            >
+          <nav className="pl-1.5 pt-2">{mainListItems}</nav>{' '}
+          {/* Adjust padding as needed */}
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex flex-col flex-1 h-full max-w-full overflow-hidden bg-white">
+        {/* AppBar */}
+        <header
+          className={cn(
+            'relative w-full bg-gray-100 px-6 transition-shadow duration-200', // Use Tailwind bg color, padding
+            scrolled
+              ? 'shadow-md border-b border-gray-300'
+              : 'border-b border-transparent' // Conditional border/shadow
+          )}
+        >
+          <div className="flex items-center justify-between w-full h-16">
+            {' '}
+            {/* Use Tailwind flex for Toolbar */}
+            {/* Left side title (conditionally visible) */}
+            <AppBarContext.Consumer>
+              {(context) => (
+                <NavBarTitleText visible={scrolled}>
+                  {context.title}
+                </NavBarTitleText>
+              )}
+            </AppBarContext.Consumer>
+            {/* Right side content */}
+            <div className="flex items-center space-x-4">
+              {' '}
+              {/* Use Tailwind flex and spacing */}
+              <NavBarTitleText>{title || 'Dagu'}</NavBarTitleText>
               <AppBarContext.Consumer>
-                {(context) => (
-                  <NavBarTitleText visible={scrolled}>
-                    {context.title}
-                  </NavBarTitleText>
-                )}
-              </AppBarContext.Consumer>
-              <Box
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'flex-end',
-                }}
-              >
-                <NavBarTitleText>{title || 'Dagu'}</NavBarTitleText>
-                <AppBarContext.Consumer>
-                  {(context) => {
-                    if (
-                      !context.remoteNodes ||
-                      context.remoteNodes.length === 0
-                    ) {
-                      return null;
-                    }
-                    return (
-                      <Select
-                        sx={{
-                          backgroundColor: 'white',
-                          color: 'black',
-                          borderRadius: '5px',
-                          border: '1px solid #ccc',
-                          marginLeft: '10px',
-                          height: '30px',
-                          width: '150px',
-                          marginBottom: '5px',
-                        }}
-                        value={context.selectedRemoteNode}
-                        onChange={(e) => {
-                          context.selectRemoteNode(e.target.value);
-                        }}
-                      >
+                {(context) => {
+                  if (
+                    !context.remoteNodes ||
+                    context.remoteNodes.length === 0
+                  ) {
+                    return null;
+                  }
+                  return (
+                    <Select
+                      value={context.selectedRemoteNode}
+                      onValueChange={(value: string) => {
+                        context.selectRemoteNode(value);
+                      }}
+                    >
+                      <SelectTrigger className="w-[150px] h-8 bg-white border border-gray-300 rounded text-black text-sm focus:ring-offset-0 focus:ring-0">
+                        <SelectValue placeholder="Select Node" />
+                      </SelectTrigger>
+                      <SelectContent>
                         {context.remoteNodes.map((node) => (
-                          <MenuItem key={node} value={node}>
+                          <SelectItem key={node} value={node}>
                             {node}
-                          </MenuItem>
+                          </SelectItem>
                         ))}
-                      </Select>
-                    );
-                  }}
-                </AppBarContext.Consumer>
-              </Box>
-            </Toolbar>
-          </AppBar>
-          <Grid
-            container
-            ref={containerRef}
-            sx={{
-              flex: 1,
-              pb: 4,
-              overflow: 'auto',
-              backgroundColor: '#F2F4F8',
-            }}
-            onScroll={() => {
-              const curr = containerRef.current;
-              if (curr) {
-                setScrolled(curr.scrollTop > 54);
-              }
-            }}
-          >
-            {children}
-          </Grid>
-        </Box>
-      </Box>
-    </ThemeProvider>
+                      </SelectContent>
+                    </Select>
+                  );
+                }}
+              </AppBarContext.Consumer>
+            </div>
+          </div>
+        </header>
+
+        {/* Scrollable Content */}
+        <main
+          ref={containerRef}
+          className="flex-1 overflow-auto bg-gray-100 pb-4" // Use Tailwind bg color, padding
+          onScroll={handleScroll}
+        >
+          {children}
+        </main>
+      </div>
+    </div>
   );
 }
 
+// Refactored NavBarTitleText using Tailwind
 type NavBarTitleTextProps = {
   children: string;
   visible?: boolean;
@@ -216,23 +137,17 @@ const NavBarTitleText = ({
   children,
   visible = true,
 }: NavBarTitleTextProps) => (
-  <Typography
-    component="h1"
-    variant="h6"
-    gutterBottom
-    sx={{
-      fontWeight: '800',
-      color: '#404040',
-      opacity: visible ? 1 : 0,
-      transition: 'opacity 0.2s',
-    }}
+  <h1
+    className={cn(
+      'text-lg font-extrabold text-gray-700 transition-opacity duration-200', // Tailwind typography and transition
+      visible ? 'opacity-100' : 'opacity-0' // Conditional opacity
+    )}
   >
     {children}
-  </Typography>
+  </h1>
 );
 
-type DashboardProps = DashboardContentProps;
-
-export default function Layout({ children, ...props }: DashboardProps) {
+// Export the Layout component
+export default function Layout({ children, ...props }: LayoutProps) {
   return <Content {...props}>{children}</Content>;
 }

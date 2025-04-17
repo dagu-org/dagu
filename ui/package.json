@@ -78,6 +78,7 @@
     "@mui/icons-material": "^7.0.2",
     "@mui/material": "^7.0.2",
     "@mui/system": "^7.0.2",
+    "@radix-ui/react-select": "^2.1.7",
     "@radix-ui/react-slot": "^1.2.0",
     "@tanstack/react-table": "^8.21.3",
     "@types/lodash": "^4.17.16",
@@ -109,7 +110,5 @@
     "vis-data": "^7.1.9",
     "vis-timeline": "^7.7.3"
   },
-  "overrides": {
-    "autoprefixer": "10.4.5"
-  }
+  "overrides": {}
 }
