@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Layout from './Layout';
+import Layout from './layouts/Layout';
 import Dashboard from './pages';
 import DAGDetails from './pages/dags/dag';
 import DAGs from './pages/dags';
