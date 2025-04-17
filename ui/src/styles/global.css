@@ -121,3 +121,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+a {
+  color: #485fc7;
+  cursor: pointer;
+  text-decoration: none;
+}
