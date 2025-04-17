@@ -76,10 +76,13 @@
     "@tanstack/react-table": "^8.5.11",
     "@types/lodash": "^4.17.16",
     "@types/node": "^22.14.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "cron-parser": "^4.5.0",
     "fontsource-roboto": "^4.0.0",
     "lodash": "^4.17.21",
     "lodash-es": "^4.17.21",
+    "lucide-react": "^0.488.0",
     "mermaid": "^11.4.1",
     "moment": "^2.30.1",
     "moment-duration-format": "^2.3.2",
@@ -96,6 +99,8 @@
     "recharts": "^2.13.0",
     "swr": "^2.3.3",
     "swr-openapi": "^5.1.4",
+    "tailwind-merge": "^3.2.0",
+    "tw-animate-css": "^1.2.5",
     "vis-data": "^7.1.9",
     "vis-timeline": "^7.7.3"
   }
