@@ -1,6 +1,7 @@
 const { merge } = require('webpack-merge');
 const common = require('./webpack.common.js');
 const path = require('path');
+const TerserPlugin = require('terser-webpack-plugin');
 
 module.exports = merge(common, {
   mode: 'production',
@@ -14,20 +15,12 @@ module.exports = merge(common, {
           },
         ],
         include: path.resolve(__dirname, 'src'),
-        exclude: [
-          path.resolve(__dirname, 'node_modules'),
-          /\.d\.ts$/, // Exclude declaration files from ts-loader
-        ],
-      },
-      {
-        // Handle .d.ts files - tell webpack to ignore them
-        test: /\.d\.ts$/,
-        use: 'null-loader',
+        exclude: [path.resolve(__dirname, 'node_modules')],
       },
     ],
   },
   output: {
-    filename: 'bundle.js',
+    filename: 'bundle.js?v=0.0.0', // Add version query to prevent caching issues
     path: path.resolve(__dirname, 'dist'),
     publicPath: 'auto',
     clean: true,

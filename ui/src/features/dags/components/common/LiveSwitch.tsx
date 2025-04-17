@@ -3,8 +3,8 @@
  *
  * @module features/dags/components/common
  */
-import { Switch } from '@mui/material';
 import React from 'react';
+import { Switch } from '@/components/ui/switch'; // Import Shadcn Switch
 import { components } from '../../../../api/v2/schema';
 import { useClient, useMutate } from '../../../../hooks/api';
 
@@ -12,12 +12,12 @@ import { useClient, useMutate } from '../../../../hooks/api';
  * Props for the LiveSwitch component
  */
 type Props = {
-  /** Additional props to pass to the input element */
-  inputProps?: React.HTMLProps<HTMLInputElement>;
   /** DAG file information */
   dag: components['schemas']['DAGFile'];
   /** Function to refresh data after toggling */
   refresh?: () => void;
+  /** Aria label for accessibility */
+  'aria-label'?: string;
 };
 
 /**
@@ -25,7 +25,7 @@ type Props = {
  * When enabled (checked), the DAG is active and can be scheduled
  * When disabled (unchecked), the DAG is suspended and won't be scheduled
  */
-function LiveSwitch({ dag, refresh, inputProps }: Props) {
+function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
   const client = useClient();
   const mutate = useMutate();
 
@@ -62,14 +62,25 @@ function LiveSwitch({ dag, refresh, inputProps }: Props) {
   /**
    * Handle switch toggle
    */
-  const onChange = React.useCallback(() => {
-    const enabled = !checked;
-    setChecked(enabled);
-    onSubmit(!enabled);
-  }, [checked, onSubmit]);
+  /**
+   * Handle switch toggle using onCheckedChange
+   */
+  const handleCheckedChange = React.useCallback(
+    (newCheckedState: boolean) => {
+      setChecked(newCheckedState);
+      onSubmit(!newCheckedState); // onSubmit expects the 'suspend' value
+    },
+    [onSubmit] // checked is implicitly handled by newCheckedState
+  );
 
   return (
-    <Switch checked={checked} onChange={onChange} inputProps={inputProps} />
+    <Switch
+      checked={checked}
+      onCheckedChange={handleCheckedChange}
+      aria-label={ariaLabel} // Pass aria-label directly
+      // Add custom styling for unchecked state visibility
+      className="data-[state=unchecked]:bg-gray-300 dark:data-[state=unchecked]:bg-gray-700"
+    />
   );
 }
 

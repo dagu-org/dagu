@@ -1,10 +1,15 @@
-/**
- * DAGPagination component provides pagination controls for DAG lists.
- *
- * @module features/dags/components/common
- */
-import { Box, Pagination, TextField } from '@mui/material';
 import React from 'react';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination'; // Import shadcn Pagination components
+import { Input } from '@/components/ui/input'; // Import shadcn Input
+import { Label } from '@/components/ui/label'; // Import shadcn Label
 
 /**
  * Props for the DAGPagination component
@@ -20,6 +25,145 @@ type DAGPaginationProps = {
   pageChange: (page: number) => void;
   /** Callback for page limit change */
   onPageLimitChange: (pageLimit: number) => void;
+};
+
+/**
+ * Helper function to generate pagination items with ellipsis
+ */
+const generatePaginationItems = (
+  currentPage: number,
+  totalPages: number,
+  onPageChange: (page: number) => void
+) => {
+  const items = [];
+  const maxPagesToShow = 5; // Adjust number of page links shown
+  const halfMaxPages = Math.floor(maxPagesToShow / 2);
+
+  // Always show Previous button
+  items.push(
+    <PaginationItem key="prev">
+      <PaginationPrevious
+        href="#" // Use href="#" for non-navigation links or handle appropriately
+        onClick={(e) => {
+          e.preventDefault();
+          if (currentPage > 1) onPageChange(currentPage - 1);
+        }}
+        aria-disabled={currentPage <= 1}
+        className={currentPage <= 1 ? 'pointer-events-none opacity-50' : ''}
+      />
+    </PaginationItem>
+  );
+
+  // Logic to show page numbers and ellipsis
+  if (totalPages <= maxPagesToShow + 2) {
+    // Show all pages if not too many
+    for (let i = 1; i <= totalPages; i++) {
+      items.push(
+        <PaginationItem key={i}>
+          <PaginationLink
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              onPageChange(i);
+            }}
+            isActive={i === currentPage}
+          >
+            {i}
+          </PaginationLink>
+        </PaginationItem>
+      );
+    }
+  } else {
+    // Show first page
+    items.push(
+      <PaginationItem key={1}>
+        <PaginationLink
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            onPageChange(1);
+          }}
+          isActive={1 === currentPage}
+        >
+          1
+        </PaginationLink>
+      </PaginationItem>
+    );
+
+    // Ellipsis after first page?
+    if (currentPage > halfMaxPages + 2) {
+      items.push(
+        <PaginationItem key="ellipsis-start">
+          <PaginationEllipsis />
+        </PaginationItem>
+      );
+    }
+
+    // Middle pages
+    const startPage = Math.max(2, currentPage - halfMaxPages);
+    const endPage = Math.min(totalPages - 1, currentPage + halfMaxPages);
+
+    for (let i = startPage; i <= endPage; i++) {
+      items.push(
+        <PaginationItem key={i}>
+          <PaginationLink
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              onPageChange(i);
+            }}
+            isActive={i === currentPage}
+          >
+            {i}
+          </PaginationLink>
+        </PaginationItem>
+      );
+    }
+
+    // Ellipsis before last page?
+    if (currentPage < totalPages - halfMaxPages - 1) {
+      items.push(
+        <PaginationItem key="ellipsis-end">
+          <PaginationEllipsis />
+        </PaginationItem>
+      );
+    }
+
+    // Show last page
+    items.push(
+      <PaginationItem key={totalPages}>
+        <PaginationLink
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            onPageChange(totalPages);
+          }}
+          isActive={totalPages === currentPage}
+        >
+          {totalPages}
+        </PaginationLink>
+      </PaginationItem>
+    );
+  }
+
+  // Always show Next button
+  items.push(
+    <PaginationItem key="next">
+      <PaginationNext
+        href="#"
+        onClick={(e) => {
+          e.preventDefault();
+          if (currentPage < totalPages) onPageChange(currentPage + 1);
+        }}
+        aria-disabled={currentPage >= totalPages}
+        className={
+          currentPage >= totalPages ? 'pointer-events-none opacity-50' : ''
+        }
+      />
+    </PaginationItem>
+  );
+
+  return items;
 };
 
 /**
@@ -39,13 +183,6 @@ const DAGPagination = ({
   React.useEffect(() => {
     setInputValue(pageLimit.toString());
   }, [pageLimit]);
-
-  /**
-   * Handle page change from pagination component
-   */
-  const handleChange = (event: React.ChangeEvent<unknown>, value: number) => {
-    pageChange(value);
-  };
 
   /**
    * Handle input change for page limit
@@ -80,34 +217,36 @@ const DAGPagination = ({
   };
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 3,
-        mt: 2,
-      }}
-    >
-      <TextField
-        size="small"
-        label="Items per page"
-        value={inputValue}
-        onChange={handleLimitChange}
-        onBlur={commitChange}
-        onKeyDown={handleKeyDown}
-        inputProps={{
-          type: 'number',
-          min: '1',
-          style: {
-            width: '100px',
-            textAlign: 'left',
-          },
-        }}
-      />
-      <Pagination count={totalPages} page={page} onChange={handleChange} />
-    </Box>
+    // Replace MUI Box with div and Tailwind classes
+    <div className="flex flex-row items-center justify-center gap-4 mt-2">
+      {' '}
+      {/* Use gap-4 for spacing */}
+      {/* Items per page input */}
+      <div className="flex items-center gap-2">
+        <Label
+          htmlFor="itemsPerPage"
+          className="whitespace-nowrap text-sm text-muted-foreground"
+        >
+          Items per page:
+        </Label>
+        <Input
+          id="itemsPerPage"
+          type="number"
+          min="1"
+          className="h-8 w-[70px]" // Adjust size
+          value={inputValue}
+          onChange={handleLimitChange}
+          onBlur={commitChange} // Commit on blur
+          onKeyDown={handleKeyDown} // Commit on Enter
+        />
+      </div>
+      {/* Pagination controls */}
+      <Pagination>
+        <PaginationContent>
+          {generatePaginationItems(page, totalPages, pageChange)}
+        </PaginationContent>
+      </Pagination>
+    </div>
   );
 };
 

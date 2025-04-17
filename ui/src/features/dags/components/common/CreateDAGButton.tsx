@@ -3,8 +3,9 @@
  *
  * @module features/dags/components/common
  */
-import { Button } from '@mui/material';
 import React from 'react';
+import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useClient } from '../../../../hooks/api';
 
@@ -18,11 +19,8 @@ function CreateDAGButton() {
 
   return (
     <Button
-      variant="outlined"
-      size="small"
-      sx={{
-        width: '100px',
-      }}
+      aria-label="Create new DAG"
+      className="flex items-center gap-2 bg-primary text-white font-semibold px-5 py-2 rounded-md shadow hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition"
       onClick={async () => {
         // Prompt for the new DAG name
         const name = window.prompt('Please input the new DAG name', '');
@@ -63,7 +61,8 @@ function CreateDAGButton() {
         window.location.href = `${basePath}/dags/${name}/spec`;
       }}
     >
-      New
+      <Plus className="w-4 h-4" aria-hidden="true" />
+      New DAG
     </Button>
   );
 }

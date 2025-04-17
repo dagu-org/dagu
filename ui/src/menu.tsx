@@ -67,10 +67,10 @@ function NavItem({ to, icon, text, isOpen }: NavItemProps) {
     <Link
       to={to}
       className={cn(
-        'flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors duration-150 group whitespace-nowrap overflow-hidden', // Added whitespace-nowrap and overflow-hidden
+        'flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors duration-150 group whitespace-nowrap overflow-hidden',
         isActive
-          ? 'bg-gray-200 text-gray-900' // Active state: background and text color
-          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' // Default & Hover state: text and background color
+          ? 'bg-white bg-opacity-20 text-white font-bold' // Active: semi-transparent white bg, bold white text
+          : 'text-white/80 hover:bg-white hover:bg-opacity-10 hover:text-white' // Inactive: semi-transparent white, lighter on hover
       )}
       aria-current={isActive ? 'page' : undefined}
     >

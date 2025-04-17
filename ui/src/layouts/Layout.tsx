@@ -12,6 +12,59 @@ import {
 } from '@/components/ui/select';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'; // Import panel icons
 
+// Utility: Get contrast color (black or white) for a given background color (hex, rgb, or named)
+function getContrastColor(input?: string): string {
+  if (!input) return '#000'; // Default to black if undefined or empty
+
+  let hex = input.trim();
+
+  // If it's a named color or rgb(a), convert to hex using a dummy element
+  if (!/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)) {
+    if (typeof window !== 'undefined') {
+      const temp = document.createElement('div');
+      temp.style.color = hex;
+      document.body.appendChild(temp);
+      const computed = getComputedStyle(temp).color;
+      document.body.removeChild(temp);
+
+      // computed is in format "rgb(r, g, b)" or "rgba(r, g, b, a)"
+      const rgbMatch = computed.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      if (rgbMatch && rgbMatch[1] && rgbMatch[2] && rgbMatch[3]) {
+        const r = parseInt(rgbMatch[1], 10);
+        const g = parseInt(rgbMatch[2], 10);
+        const b = parseInt(rgbMatch[3], 10);
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        return luminance > 0.4 ? '#000' : '#fff';
+      }
+    }
+    // Fallback if not in browser or can't parse
+    return '#fff';
+  }
+
+  // Remove hash if present
+  hex = hex.replace('#', '');
+  let r = 0,
+    g = 0,
+    b = 0;
+  if (hex.length === 3) {
+    if (hex[0] && hex[1] && hex[2]) {
+      r = parseInt(hex[0] + hex[0], 16);
+      g = parseInt(hex[1] + hex[1], 16);
+      b = parseInt(hex[2] + hex[2], 16);
+    } else {
+      return '#000';
+    }
+  } else if (hex.length === 6) {
+    r = parseInt(hex.substring(0, 2), 16);
+    g = parseInt(hex.substring(2, 4), 16);
+    b = parseInt(hex.substring(4, 6), 16);
+  } else {
+    return '#000';
+  }
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.4 ? '#000' : '#fff';
+}
+
 // Constants
 const drawerWidthClosed = 'w-16'; // 64px
 const drawerWidthOpen = 'w-60'; // 240px
@@ -26,11 +79,17 @@ type LayoutProps = {
 
 // Main Content component including Sidebar and AppBar logic
 function Content({ title, navbarColor, children }: LayoutProps) {
+  // Debug: log the navbarColor prop
+  // eslint-disable-next-line no-console
+  console.log('navbarColor:', navbarColor);
   const [scrolled, setScrolled] = React.useState(false);
   // Local state for current visual status, default closed before hydration
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
   const { preferences, updatePreference } = useUserPreferences(); // Use the context
   const containerRef = React.useRef<HTMLDivElement>(null);
+
+  // Use the config value for the sidebar color
+  const sidebarColor = navbarColor || '#4D6744';
 
   // Effect to set initial state based on preference and screen size (desktop only)
   React.useEffect(() => {
@@ -44,50 +103,41 @@ function Content({ title, navbarColor, children }: LayoutProps) {
     }
     // Run only once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array means run once on mount
+  }, []);
 
-  const toggleSidebar = () => {
-    const nextState = !isSidebarOpen;
-    setIsSidebarOpen(nextState); // Update visual state
-
-    // If on desktop, update the preference
+  // Effect to update preference when sidebar state changes (desktop only)
+  React.useEffect(() => {
     const isDesktop = window.innerWidth >= 768;
     if (isDesktop) {
-      updatePreference('isSidebarOpenDesktop', nextState);
+      updatePreference('isSidebarOpenDesktop', isSidebarOpen);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSidebarOpen]);
 
-  const handleScroll = () => {
-    const container = containerRef.current;
-    if (container) {
-      setScrolled(container.scrollTop > 54);
-    }
-  };
+  // Effect to handle scroll shadow on AppBar
+  React.useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 0);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   return (
-    // Root container using flexbox
-    <div className="flex flex-row w-screen h-screen">
-      {/* Overlay for mobile sidebar */}
-      {isSidebarOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-black/50 md:hidden"
-          onClick={toggleSidebar}
-          aria-hidden="true"
-        />
-      )}
-
+    <div className="flex h-screen w-screen overflow-hidden bg-white">
       {/* Sidebar */}
       <div
         className={cn(
           // Base styles: border, background
           'h-full overflow-hidden bg-white border-r border-gray-200',
-          // Mobile (<md): absolute overlay, slide transition
-          'fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0',
+          // Always fixed for slide-in effect
+          'fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-in-out',
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full',
-          // Desktop (md+): width based on state (no width transition)
-          'md:block',
-          isSidebarOpen ? drawerWidthOpen : drawerWidthClosed
+          isSidebarOpen ? drawerWidthOpen : 'w-0'
         )}
+        onMouseLeave={() => {
+          if (window.innerWidth >= 768) setIsSidebarOpen(false);
+        }}
       >
         {/* Wrap nav and button in a flex column to push button to bottom */}
         <div className="flex flex-col justify-between h-full">
@@ -95,21 +145,17 @@ function Content({ title, navbarColor, children }: LayoutProps) {
             <MainListItems isOpen={isSidebarOpen} />
           </nav>
           {/* Desktop Toggle Button (Bottom Left) */}
-          {/* Changed justify-center to justify-start */}
-          <div className="hidden md:flex justify-start p-4 border-t border-gray-200">
-            <button
-              onClick={toggleSidebar}
-              className="p-2 text-gray-500 rounded-md hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-gray-400"
-              aria-label={isSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-            >
-              {/* Replaced Chevrons with Panel icons */}
-              {isSidebarOpen ? (
-                <PanelLeftClose size={20} />
-              ) : (
-                <PanelLeftOpen size={20} />
-              )}
-            </button>
-          </div>
+          <button
+            className="m-3 p-2 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-0 focus-visible:outline-none"
+            onClick={() => setIsSidebarOpen((open) => !open)}
+            aria-label="Toggle sidebar"
+          >
+            {isSidebarOpen ? (
+              <PanelLeftClose className="w-6 h-6" />
+            ) : (
+              <PanelLeftOpen className="w-6 h-6" />
+            )}
+          </button>
         </div>
       </div>
 
@@ -118,39 +164,61 @@ function Content({ title, navbarColor, children }: LayoutProps) {
         {/* AppBar */}
         <header
           className={cn(
-            'relative w-full bg-gray-100 px-6 transition-shadow duration-200',
+            'relative w-full px-6 transition-shadow duration-200',
             scrolled
               ? 'shadow-md border-b border-gray-300'
               : 'border-b border-transparent'
           )}
+          style={{
+            backgroundColor:
+              navbarColor && navbarColor.trim() !== ''
+                ? navbarColor
+                : '#4D6744',
+            color: getContrastColor(
+              navbarColor && navbarColor.trim() !== '' ? navbarColor : '#4D6744'
+            ),
+          }}
         >
           <div className="flex items-center justify-between w-full h-16">
             {/* Left side content: Toggle Button + Title */}
             <div className="flex items-center space-x-4">
-              {/* Mobile Toggle Button (Hamburger in Header) */}
               <button
-                onClick={toggleSidebar}
-                className="p-2 text-gray-600 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-gray-500 md:hidden" // Hide on medium screens and up
-                aria-label="Toggle sidebar"
+                className="p-2 rounded-md hover:bg-white/10 focus:outline-none focus:ring-0 focus-visible:outline-none"
+                style={{
+                  color: getContrastColor(
+                    navbarColor && navbarColor.trim() !== ''
+                      ? navbarColor
+                      : '#4D6744'
+                  ),
+                }}
+                aria-label="Open sidebar"
+                onClick={() => setIsSidebarOpen(true)}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
-                  strokeWidth={1.5}
                   stroke="currentColor"
                   className="w-6 h-6"
                 >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
+                    strokeWidth={2}
                     d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
                   />
                 </svg>
               </button>
               <AppBarContext.Consumer>
                 {(context) => (
-                  <NavBarTitleText visible={scrolled}>
+                  <NavBarTitleText
+                    visible={scrolled}
+                    color={getContrastColor(
+                      navbarColor && navbarColor.trim() !== ''
+                        ? navbarColor
+                        : '#4D6744'
+                    )}
+                  >
                     {context.title}
                   </NavBarTitleText>
                 )}
@@ -159,7 +227,15 @@ function Content({ title, navbarColor, children }: LayoutProps) {
 
             {/* Right side content */}
             <div className="flex items-center space-x-4">
-              <NavBarTitleText>{title || 'Dagu'}</NavBarTitleText>
+              <NavBarTitleText
+                color={getContrastColor(
+                  navbarColor && navbarColor.trim() !== ''
+                    ? navbarColor
+                    : '#4D6744'
+                )}
+              >
+                {title || 'Dagu'}
+              </NavBarTitleText>
               <AppBarContext.Consumer>
                 {(context) => {
                   if (
@@ -171,12 +247,10 @@ function Content({ title, navbarColor, children }: LayoutProps) {
                   return (
                     <Select
                       value={context.selectedRemoteNode}
-                      onValueChange={(value: string) => {
-                        context.selectRemoteNode(value);
-                      }}
+                      onValueChange={context.selectRemoteNode}
                     >
-                      <SelectTrigger className="w-[150px] h-8 bg-white border border-gray-300 rounded text-black text-sm focus:ring-offset-0 focus:ring-0">
-                        <SelectValue placeholder="Select Node" />
+                      <SelectTrigger className="w-32 bg-white text-gray-900 border border-gray-300 focus:ring-2 focus:ring-brand-green">
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         {context.remoteNodes.map((node) => (
@@ -196,8 +270,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
         {/* Scrollable Content */}
         <main
           ref={containerRef}
-          className="flex-1 overflow-auto pb-4"
-          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto overflow-x-hidden p-6"
         >
           {children}
         </main>
@@ -210,21 +283,29 @@ function Content({ title, navbarColor, children }: LayoutProps) {
 type NavBarTitleTextProps = {
   children: string;
   visible?: boolean;
+  color?: string;
 };
 
 const NavBarTitleText = ({
   children,
   visible = true,
-}: NavBarTitleTextProps) => (
-  <h1
-    className={cn(
-      'text-lg font-extrabold text-gray-700 transition-opacity duration-200 whitespace-nowrap',
-      visible ? 'opacity-100' : 'opacity-0'
-    )}
-  >
-    {children}
-  </h1>
-);
+  color = 'white',
+}: NavBarTitleTextProps) => {
+  // Debug: log the color prop
+  // eslint-disable-next-line no-console
+  console.log('NavBarTitleText color:', color);
+  return (
+    <h1
+      className={cn(
+        'text-lg font-extrabold transition-opacity duration-200 whitespace-nowrap',
+        visible ? 'opacity-100' : 'opacity-0'
+      )}
+      style={{ color }}
+    >
+      {children}
+    </h1>
+  );
+};
 
 // Default export Layout component
 export default function Layout({ children, ...props }: LayoutProps) {

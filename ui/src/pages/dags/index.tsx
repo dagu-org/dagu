@@ -1,8 +1,7 @@
 import React from 'react';
 import { DAGErrors } from '../../features/dags/components/dag-editor';
-import Box from '@mui/material/Box';
-import { DAGPagination } from '../../features/dags/components/common';
 import WithLoading from '../../ui/WithLoading';
+import { DAGPagination } from '../../features/dags/components/common';
 import { DAGTable } from '../../features/dags/components/dag-list';
 import DAGListHeader from '../../features/dags/components/dag-list/DAGListHeader';
 import { useLocation } from 'react-router-dom';
@@ -26,10 +25,11 @@ function DAGs() {
     query.get('tag') || ''
   );
   const { preferences, updatePreference } = useUserPreferences();
-  // Use preferences.pageLimit instead of local state
+
   const handlePageLimitChange = (newLimit: number) => {
     updatePreference('pageLimit', newLimit);
   };
+
   const { data, mutate, isLoading } = useQuery(
     '/dags',
     {
@@ -69,7 +69,6 @@ function DAGs() {
 
   const { dagFiles, errorCount } = React.useMemo(() => {
     const dagFiles: components['schemas']['DAGFile'][] = [];
-
     let errorCount = 0;
     if (data) {
       for (const val of data.dags) {
@@ -122,25 +121,17 @@ function DAGs() {
   };
 
   return (
-    <Box
-      sx={{
-        px: 2,
-        mx: 4,
-        display: 'flex',
-        flexDirection: 'column',
-        width: '100%',
-      }}
-    >
+    <div className="px-2 mx-4 flex flex-col">
       <DAGListHeader />
-      <Box>
+      <div>
         <WithLoading loaded={!isLoading}>
           {data && (
-            <React.Fragment>
+            <>
               <DAGErrors
                 dags={data.dags || []}
                 errors={data.errors || []}
                 hasError={errorCount > 0 || data.errors?.length > 0}
-              ></DAGErrors>
+              />
               <DAGTable
                 dags={dagFiles}
                 group={group}
@@ -149,19 +140,25 @@ function DAGs() {
                 handleSearchTextChange={searchTextChange}
                 searchTag={searchTag}
                 handleSearchTagChange={searchTagChange}
-              ></DAGTable>
-              <DAGPagination
-                totalPages={data.pagination.totalPages}
-                page={page}
-                pageChange={pageChange}
-                onPageLimitChange={handlePageLimitChange}
-                pageLimit={preferences.pageLimit}
               />
-            </React.Fragment>
+              <div className="flex justify-end mt-4">
+                <div>
+                  {/* ページネーションもMUI排除済み */}
+                  <DAGPagination
+                    totalPages={data.pagination.totalPages}
+                    page={page}
+                    pageChange={pageChange}
+                    onPageLimitChange={handlePageLimitChange}
+                    pageLimit={preferences.pageLimit}
+                  />
+                </div>
+              </div>
+            </>
           )}
         </WithLoading>
-      </Box>
-    </Box>
+      </div>
+    </div>
   );
 }
+
 export default DAGs;

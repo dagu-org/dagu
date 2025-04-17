@@ -3,7 +3,7 @@
  *
  * @module features/dags/components/dag-execution
  */
-import moment from 'moment';
+import moment from 'moment-timezone';
 import React, { CSSProperties } from 'react';
 import HistoryTableRow from './HistoryTableRow';
 import {

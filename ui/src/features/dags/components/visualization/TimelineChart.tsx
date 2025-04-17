@@ -3,7 +3,7 @@
  *
  * @module features/dags/components/visualization
  */
-import moment from 'moment';
+import moment from 'moment-timezone';
 import React from 'react';
 import Mermaid from '../../../../ui/Mermaid';
 import { components, Status } from '../../../../api/v2/schema';

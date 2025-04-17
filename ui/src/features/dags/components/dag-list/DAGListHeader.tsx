@@ -1,20 +1,15 @@
 import React from 'react';
-import Box from '@mui/material/Box';
 import Title from '../../../../ui/Title';
 import { CreateDAGButton } from '../common';
 
 const DAGListHeader: React.FC = () => (
-  <Box
-    sx={{
-      display: 'flex',
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    }}
-  >
+  // Replace MUI Box with div and Tailwind classes
+  <div className="flex flex-row items-center justify-between mb-4">
+    {' '}
+    {/* Added margin-bottom for spacing */}
     <Title>DAGs</Title>
     <CreateDAGButton />
-  </Box>
+  </div>
 );
 
 export default DAGListHeader;
