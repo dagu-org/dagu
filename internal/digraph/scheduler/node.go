@@ -471,13 +471,15 @@ func (n *Node) Init() {
 }
 
 type RetryPolicy struct {
-	Limit    int
-	Interval time.Duration
+	Limit     int
+	Interval  time.Duration
+	ExitCodes []int
 }
 
 func (n *Node) setupRetryPolicy(ctx context.Context) error {
 	var limit int
 	var interval time.Duration
+	var exitCodes []int
 
 	step := n.data.Step()
 	if step.RetryPolicy.Limit > 0 {
@@ -486,6 +488,10 @@ func (n *Node) setupRetryPolicy(ctx context.Context) error {
 
 	if step.RetryPolicy.Interval > 0 {
 		interval = step.RetryPolicy.Interval
+	}
+
+	if len(step.RetryPolicy.ExitCodes) > 0 {
+		exitCodes = step.RetryPolicy.ExitCodes
 	}
 
 	// Evaluate the configuration if it's configured as a string
@@ -509,8 +515,9 @@ func (n *Node) setupRetryPolicy(ctx context.Context) error {
 	}
 
 	n.retryPolicy = RetryPolicy{
-		Limit:    limit,
-		Interval: interval,
+		Limit:     limit,
+		Interval:  interval,
+		ExitCodes: exitCodes,
 	}
 
 	return nil
