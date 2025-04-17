@@ -4,6 +4,7 @@ import App from './App';
 import { CookiesProvider } from 'react-cookie';
 import './styles/styles.css';
 import './styles/prism.css';
+import './styles/global.css';
 
 import '@fontsource/inter';
 import '@fontsource/inter/300.css';
