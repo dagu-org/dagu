@@ -75,6 +75,7 @@
     "@mui/icons-material": "^7.0.2",
     "@mui/material": "^7.0.2",
     "@mui/system": "^7.0.2",
+    "@radix-ui/react-slot": "^1.2.0",
     "@tanstack/react-table": "^8.21.3",
     "@types/lodash": "^4.17.16",
     "@types/node": "^22.14.1",

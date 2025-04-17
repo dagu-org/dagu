@@ -9,6 +9,7 @@ import { AppBarContext } from '../contexts/AppBarContext';
 import { useConfig } from '../contexts/ConfigContext';
 import { useQuery } from '../hooks/api';
 import { Status } from '../api/v2/schema';
+import { Button } from '@/components/ui/button';
 
 type metrics = Record<Status, number>;
 
@@ -68,6 +69,8 @@ function Dashboard() {
           </Box>
         </Grid>
       ))}
+
+      <Button variant="outline">Button</Button>
 
       <Grid {...{ item: true, xs: 12 }}>
         <Box
