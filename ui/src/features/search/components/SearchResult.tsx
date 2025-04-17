@@ -1,7 +1,6 @@
 import { Divider, List, ListItem, Stack, Typography } from '@mui/material';
 import React, { ReactElement, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { SearchResult } from '../../../models/api';
 import { DAGDefinition } from '../../dags/components/dag-editor';
 import Prism from '../../../assets/js/prism';
 import { components } from '../../../api/v2/schema';

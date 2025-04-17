@@ -1,5 +1,6 @@
 import React from 'react';
-import { Box, Grid } from '@mui/material';
+import { Box } from '@mui/material';
+import Grid from '@mui/material/Grid';
 import { statusColorMapping } from '../consts';
 import DashboardMetric from '../features/dashboard/components/DashboardMetric';
 import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
@@ -50,7 +51,7 @@ function Dashboard() {
           [Status.Cancelled, 'Canceled'],
         ] as Array<[Status, string]>
       ).map(([status, label]) => (
-        <Grid item xs={12} md={4} lg={3} key={label}>
+        <Grid {...{ item: true, xs: 12, md: 4, lg: 3, key: label }}>
           <Box
             sx={{
               px: 2,
@@ -68,7 +69,7 @@ function Dashboard() {
         </Grid>
       ))}
 
-      <Grid item xs={12}>
+      <Grid {...{ item: true, xs: 12 }}>
         <Box
           sx={{
             p: 2,

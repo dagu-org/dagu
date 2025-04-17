@@ -6,7 +6,7 @@
 import { Box } from '@mui/material';
 import React, { useMemo } from 'react';
 import { DAGContext } from '../../contexts/DAGContext';
-import { getEventHandlers } from '../../../../models';
+import { getEventHandlers } from '../../lib/getEventHandlers';
 import SubTitle from '../../../../ui/SubTitle';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { RunDetailsContext } from '../../contexts/DAGStatusContext';

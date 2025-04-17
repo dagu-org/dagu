@@ -1,7 +1,6 @@
 import React from 'react';
 import { DAGContext } from '../contexts/DAGContext';
-import { DAGStatus } from '../../../models';
-import { getEventHandlers } from '../../../models';
+import { getEventHandlers } from '../lib/getEventHandlers';
 import { NodeStatusTable, DAGStatusOverview } from './dag-details';
 import { StatusUpdateModal } from './dag-execution';
 import { Box } from '@mui/material';

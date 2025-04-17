@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Link, useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import { DAGStatus } from '../../../features/dags/components';
 import { DAGContext } from '../../../features/dags/contexts/DAGContext';
 import { DAGSpec } from '../../../features/dags/components/dag-editor';

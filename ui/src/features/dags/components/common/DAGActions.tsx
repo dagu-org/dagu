@@ -47,7 +47,7 @@ type Props = {
 /**
  * Helper component to handle accessibility for button labels
  */
-function Label({ show, children }: LabelProps): JSX.Element {
+function Label({ show, children }: LabelProps): React.JSX.Element {
   if (show) return <>{children}</>;
   return <VisuallyHidden>{children}</VisuallyHidden>;
 }

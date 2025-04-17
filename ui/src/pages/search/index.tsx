@@ -43,7 +43,7 @@ function Search() {
 
   return (
     <Grid container sx={{ mx: 4, width: '100%' }}>
-      <Grid item xs={12}>
+      <Grid {...{ item: true, xs: 12 }}>
         <Title>Search</Title>
         <Stack spacing={2} direction="row">
           <TextField

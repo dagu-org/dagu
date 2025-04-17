@@ -17,6 +17,7 @@ import {
   createColumnHelper,
   RowData,
 } from '@tanstack/react-table';
+import cronParser from 'cron-parser';
 import DAGActions from '../common/DAGActions';
 import StatusChip from '../../../../ui/StatusChip';
 import {
@@ -33,7 +34,6 @@ import {
   TextField,
 } from '@mui/material';
 import { Link } from 'react-router-dom';
-import { getNextSchedule } from '../../../../models';
 import StyledTableRow from '../../../../ui/StyledTableRow';
 import {
   ArrowDownward,
@@ -677,3 +677,39 @@ function getConfig() {
 }
 
 export default DAGTable;
+
+function getNextSchedule(data: components['schemas']['DAGFile']): number {
+  const schedules = data.dag.schedule;
+  if (!schedules || schedules.length == 0 || data.suspended) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  const tz = getConfig().tz || moment.tz.guess();
+  const datesToRun = schedules.map((schedule) => {
+    const cronTzMatch = schedule.expression.match(/(?<=CRON_TZ=)[^\s]+/);
+    if (cronTzMatch) {
+      const cronTz = cronTzMatch[0];
+      const expressionTextWithOutCronTz = schedule.expression.replace(
+        `CRON_TZ=${cronTz}`,
+        ''
+      );
+      return cronParser
+        .parse(expressionTextWithOutCronTz, {
+          currentDate: new Date(),
+          tz: cronTz,
+        })
+        .next();
+    }
+    const expression = tz
+      ? cronParser.parse(schedule.expression, {
+          currentDate: new Date(),
+          tz,
+        })
+      : cronParser.parse(schedule.expression);
+    return expression.next();
+  });
+  const sorted = datesToRun.sort((a, b) => a.getTime() - b.getTime());
+  if (!sorted || sorted.length == 0 || sorted[0] == null) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  return sorted[0]?.getTime() / 1000;
+}
