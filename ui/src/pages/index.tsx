@@ -70,8 +70,6 @@ function Dashboard() {
         </Grid>
       ))}
 
-      <Button variant="outline">Button</Button>
-
       <Grid {...{ item: true, xs: 12 }}>
         <Box
           sx={{
