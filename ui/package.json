@@ -9,7 +9,7 @@
   "scripts": {
     "build": "webpack --config webpack.prod.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "webpack-dev-server --config webpack.dev.js",
+    "dev": "webpack-dev-server --config webpack.dev.js",
     "lint": "eslint --fix --ext .ts,.tsx .",
     "prettier": "prettier --write src/**/*.ts[x]",
     "typecheck": "tsc",

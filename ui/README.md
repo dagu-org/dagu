@@ -1,6 +1,7 @@
 # UI
 
 ## Prerequisites
+
 - Node.js (latest stable version)
 - pnpm
 
@@ -25,7 +26,7 @@ Once the backend server is up and running, you can start the Webpack dev server 
 ```bash
 cd ui/
 pnpm install
-pnpm start
+pnpm dev
 ```
 
 This command will start the Webpack dev server at `127.0.0.1:8081`. You can access the UI by opening your web browser and navigating to http://localhost:8081.
