@@ -31,22 +31,53 @@ export const mainListItems = React.forwardRef<
   HTMLDivElement,
   MainListItemsProps
 >(({ isOpen = false }, ref) => (
-  <div ref={ref} className="flex flex-col space-y-1">
-    {' '}
-    {/* Vertical layout with spacing */}
-    <NavItem
-      to="/dashboard"
-      text="Dashboard"
-      icon={faChartGantt}
-      isOpen={isOpen}
-    />
-    <NavItem to="/dags" text="DAGs" icon={faTableList} isOpen={isOpen} />
-    <NavItem
-      to="/search"
-      text="Search"
-      icon={faMagnifyingGlass}
-      isOpen={isOpen}
-    />
+  <div ref={ref} className="flex flex-col h-full">
+    {/* Sidebar Header */}
+    <div className="flex items-center gap-3 px-4 py-6 border-b border-gray-200 bg-white/80">
+      {/* SVG Logo */}
+      <span className="flex items-center justify-center w-12 h-12">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 100 100"
+          width="40"
+          height="40"
+        >
+          {/* Main circle with dark green color */}
+          <circle cx="50" cy="50" r="45" fill="#4a6741" />
+          {/* Inner ring with slightly lighter color and a gap */}
+          <path
+            d="M50 20
+                   A30 30 0 1 1 20 50
+                   A30 30 0 1 1 80 50"
+            stroke="white"
+            strokeWidth="6"
+            fill="none"
+            strokeLinecap="round"
+          />
+        </svg>
+      </span>
+      <span className="text-lg font-bold text-[#4D6744] tracking-wide select-none">
+        Dagu
+      </span>
+    </div>
+    {/* Navigation */}
+    <nav className="flex-1 flex flex-col gap-1 py-4 px-2 bg-transparent">
+      <NavItem
+        to="/dashboard"
+        text="Dashboard"
+        icon={faChartGantt}
+        isOpen={isOpen}
+      />
+      <NavItem to="/dags" text="DAGs" icon={faTableList} isOpen={isOpen} />
+      <NavItem
+        to="/search"
+        text="Search"
+        icon={faMagnifyingGlass}
+        isOpen={isOpen}
+      />
+    </nav>
+    {/* Optional: Sidebar Footer */}
+    {/* Footer removed as per user request */}
   </div>
 ));
 mainListItems.displayName = 'MainListItems'; // Add display name for DevTools

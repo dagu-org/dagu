@@ -121,7 +121,7 @@ function DAGs() {
   };
 
   return (
-    <div className="px-2 mx-4 flex flex-col">
+    <div className="flex flex-col">
       <DAGListHeader />
       <div>
         <WithLoading loaded={!isLoading}>

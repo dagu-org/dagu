@@ -769,7 +769,7 @@ function DAGTable({
       {/* Table */}
       {/* Add overflow-x-auto, max-w-full, min-w-0, shadow, and padding for card look */}
       <div
-        className="rounded-xl border bg-card w-full max-w-full min-w-0 shadow-sm p-2 overflow-x-auto"
+        className="rounded-xl border bg-card w-full max-w-full min-w-0 shadow-sm overflow-x-auto"
         style={{
           fontFamily:
             'ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"',

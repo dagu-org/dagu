@@ -123,6 +123,20 @@ function Content({ title, navbarColor, children }: LayoutProps) {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Effect to show sidebar when mouse is near the left edge (desktop only)
+  React.useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      // Only on desktop
+      if (window.innerWidth < 768) return;
+      // If mouse is within 24px of the left edge and sidebar is closed, open it
+      if (e.clientX <= 24 && !isSidebarOpen) {
+        setIsSidebarOpen(true);
+      }
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, [isSidebarOpen]);
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-white">
       {/* Sidebar */}
@@ -145,17 +159,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
             <MainListItems isOpen={isSidebarOpen} />
           </nav>
           {/* Desktop Toggle Button (Bottom Left) */}
-          <button
-            className="m-3 p-2 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-0 focus-visible:outline-none"
-            onClick={() => setIsSidebarOpen((open) => !open)}
-            aria-label="Toggle sidebar"
-          >
-            {isSidebarOpen ? (
-              <PanelLeftClose className="w-6 h-6" />
-            ) : (
-              <PanelLeftOpen className="w-6 h-6" />
-            )}
-          </button>
+          {/* Toggle button removed as per user request */}
         </div>
       </div>
 
@@ -270,7 +274,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
         {/* Scrollable Content */}
         <main
           ref={containerRef}
-          className="flex-1 overflow-y-auto overflow-x-hidden p-6"
+          className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-6"
         >
           {children}
         </main>
