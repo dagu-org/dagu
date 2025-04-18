@@ -216,7 +216,12 @@ build-bin:
 build-ui:
 	@echo "${COLOR_GREEN}Building UI...${COLOR_RESET}"
 	@cd ui; \
-		yarn && yarn build
+		rm -rf node_modules; \
+		rm -rf .cache; \
+		yarn cache clean; \
+		NODE_OPTIONS="--max-old-space-size=8192" yarn webpack --config webpack.dev.js; \
+		yarn install; \
+		yarn webpack --config webpack.dev.js
 	@echo "${COLOR_GREEN}Copying UI assets...${COLOR_RESET}"
 	@rm -f ${FE_ASSETS_DIR}/*
 	@cp ${FE_BUILD_DIR}/* ${FE_ASSETS_DIR}
