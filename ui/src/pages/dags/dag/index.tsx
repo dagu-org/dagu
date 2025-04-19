@@ -3,8 +3,8 @@ import { useParams, useLocation } from 'react-router-dom';
 import { DAGStatus } from '../../../features/dags/components';
 import { DAGContext } from '../../../features/dags/contexts/DAGContext';
 import { DAGSpec } from '../../../features/dags/components/dag-editor';
-import { Box, Stack, Tab, Tabs } from '@mui/material';
 import { LinkTab } from '../../../features/dags/components/common';
+import { Tabs } from '@/components/ui/tabs';
 import { DAGEditButtons } from '../../../features/dags/components/dag-editor';
 import LoadingIndicator from '../../../ui/LoadingIndicator';
 import { AppBarContext } from '../../../contexts/AppBarContext';
@@ -102,12 +102,7 @@ function DAGDetails() {
           },
         }}
       >
-        <Stack
-          sx={{
-            width: '100%',
-            direction: 'column',
-          }}
-        >
+        <div className="w-full flex flex-col">
           <DAGHeader
             dag={data.dag}
             latestRun={data.latestRun}
@@ -115,28 +110,33 @@ function DAGDetails() {
             refreshFn={refreshFn}
             formatDuration={formatDuration}
           />
-          <Stack
-            sx={{
-              mx: 4,
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <Tabs value={`${pathname}`}>
-              <LinkTab label="Status" value={`${baseUrl}`} />
-              <LinkTab label="Spec" value={`${baseUrl}/spec`} />
-              <LinkTab label="History" value={`${baseUrl}/history`} />
-              {pathname == `${baseUrl}/log` ||
-              pathname == `${baseUrl}/scheduler-log` ? (
-                <Tab label="Log" value={pathname} />
+          <div className="mx-4 my-2 flex flex-row justify-between items-center">
+            <Tabs value={pathname} className="bg-transparent p-0">
+              <LinkTab
+                label="Status"
+                value={`${baseUrl}`}
+                isActive={pathname === `${baseUrl}`}
+              />
+              <LinkTab
+                label="Spec"
+                value={`${baseUrl}/spec`}
+                isActive={pathname === `${baseUrl}/spec`}
+              />
+              <LinkTab
+                label="History"
+                value={`${baseUrl}/history`}
+                isActive={pathname === `${baseUrl}/history`}
+              />
+              {pathname === `${baseUrl}/log` ||
+              pathname === `${baseUrl}/scheduler-log` ? (
+                <LinkTab label="Log" value={pathname} isActive={true} />
               ) : null}
             </Tabs>
-            {pathname == `${baseUrl}/spec` ? (
+            {pathname === `${baseUrl}/spec` ? (
               <DAGEditButtons fileId={params.fileId || ''} />
             ) : null}
-          </Stack>
-          <Box sx={{ mx: 4, flex: 1 }}>
+          </div>
+          <div className="mx-4 flex-1">
             {tab == 'status' ? (
               <DAGStatus run={data.latestRun} fileId={params.fileId || ''} />
             ) : null}
@@ -154,8 +154,8 @@ function DAGDetails() {
                 stepName={stepName}
               />
             ) : null}
-          </Box>
-        </Stack>
+          </div>
+        </div>
       </RunDetailsContext.Provider>
     </DAGContext.Provider>
   );

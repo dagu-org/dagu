@@ -204,16 +204,12 @@ function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
     <DAGContext.Consumer>
       {(props) => (
         <React.Fragment>
-          <div>
-            <SubTitle>Execution History</SubTitle>
-            <HistoryTable
-              runs={reversedRuns || []}
-              gridData={gridData || []}
-              onSelect={updateIdx}
-              idx={idx}
-            />
-          </div>
-
+          <HistoryTable
+            runs={reversedRuns || []}
+            gridData={gridData || []}
+            onSelect={updateIdx}
+            idx={idx}
+          />
           {reversedRuns && reversedRuns[idx] ? (
             <React.Fragment>
               <div className="mt-6">

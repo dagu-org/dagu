@@ -19,6 +19,7 @@ import { Graph, FlowchartType, FlowchartSwitch } from '../visualization';
 import { DAGStepTable } from '../dag-details';
 import { Button } from '../../../../components/ui/button';
 import { Save, X, Edit, AlertTriangle } from 'lucide-react';
+import SubTitle from '@/ui/SubTitle';
 
 /**
  * Props for the DAGSpec component
@@ -133,12 +134,23 @@ function DAGSpec({ fileId }: Props) {
               </div>
             ) : null}
 
-            {data.dag.steps ? <DAGStepTable steps={data.dag.steps} /> : null}
+            {data.dag.steps ? (
+              <div className="mt-4">
+                <SubTitle>Steps</SubTitle>
+                <DAGStepTable steps={data.dag.steps} />
+              </div>
+            ) : null}
 
-            {handlers?.length ? <DAGStepTable steps={handlers} /> : null}
+            {handlers?.length ? (
+              <div className="mt-4">
+                <SubTitle>Lifecycle hooks</SubTitle>
+                <DAGStepTable steps={handlers} />
+              </div>
+            ) : null}
 
-            <div className="mb-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md p-4">
-              <div className="flex justify-end items-center mb-4">
+            <div className="mt-4 mb-2">
+              <div className="flex justify-between items-end">
+                <SubTitle className="mb-0">Spec</SubTitle>
                 {editing ? (
                   <div className="flex gap-2">
                     <Button
@@ -203,19 +215,19 @@ function DAGSpec({ fileId }: Props) {
                   </Button>
                 )}
               </div>
+            </div>
 
-              <div>
-                {editing ? (
-                  <DAGEditor
-                    value={data.spec}
-                    onChange={(newValue) => {
-                      setCurrentValue(newValue || '');
-                    }}
-                  />
-                ) : (
-                  <DAGDefinition value={data.spec} lineNumbers />
-                )}
-              </div>
+            <div>
+              {editing ? (
+                <DAGEditor
+                  value={data.spec}
+                  onChange={(newValue) => {
+                    setCurrentValue(newValue || '');
+                  }}
+                />
+              ) : (
+                <DAGDefinition value={data.spec} lineNumbers />
+              )}
             </div>
           </React.Fragment>
         )

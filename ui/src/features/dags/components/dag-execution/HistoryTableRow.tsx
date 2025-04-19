@@ -91,7 +91,7 @@ function HistoryTableRow({ data, onSelect, idx }: Props) {
             {status !== 0 && (
               <div
                 className={cn(
-                  'w-[16px] h-[16px] rounded-full border-2 shadow-md transition-all duration-200',
+                  'w-[12px] h-[12px] rounded-full border-2 transition-all duration-200',
                   bgColorClass,
                   borderColorClass,
                   pulseAnimation
