@@ -1,32 +1,29 @@
-import { Stack, Typography } from '@mui/material';
 import React, { ReactNode } from 'react';
+import { cn } from '@/lib/utils';
 
-type LabeldItemProps = {
+type LabeledItemProps = {
   label: string;
   children: string | ReactNode;
+  className?: string;
 };
 
-export default function LabeledItem({ label, children }: LabeldItemProps) {
+export default function LabeledItem({
+  label,
+  children,
+  className,
+}: LabeledItemProps) {
   return (
-    <Stack
-      direction="row"
-      sx={{
-        alignItems: 'center',
-        justifyContent: 'flex-start',
-      }}
-    >
-      <Typography
-        sx={{
-          fontWeight: 800,
-        }}
-      >
+    <div className={cn('flex flex-row items-center', className)}>
+      <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
         {label}:&nbsp;
-      </Typography>
+      </span>
       {typeof children === 'string' ? (
-        <Typography>{children}</Typography>
+        <span className="text-sm text-slate-600 dark:text-slate-400">
+          {children}
+        </span>
       ) : (
         children
       )}
-    </Stack>
+    </div>
   );
 }

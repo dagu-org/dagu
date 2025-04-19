@@ -5,18 +5,19 @@
  */
 import React, { useState, useEffect } from 'react';
 import MultilineText from '../../../../ui/MultilineText';
-import { TableCell, Tooltip, Box, Stack, Typography } from '@mui/material';
+import { TableCell } from '@/components/ui/table';
 import StyledTableRow from '../../../../ui/StyledTableRow';
-import {
-  ArticleOutlined,
-  ErrorOutline,
-  Code,
-  DescriptionOutlined,
-} from '@mui/icons-material';
+import { FileText, AlertTriangle, Code, FileCode } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { components } from '../../../../api/v2/schema';
 import { NodeStatusChip } from '../common';
 import { NodeStatus } from '../../../../api/v2/schema';
+import { cn } from '@/lib/utils';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 /**
  * Props for the NodeStatusTableRow component
@@ -132,150 +133,99 @@ function NodeStatusTableRow({ name, rownum, node, requestId }: Props) {
   const getRowHighlight = () => {
     switch (node.status) {
       case NodeStatus.Running:
-        return 'rgba(0, 255, 0, 0.05)';
+        return 'bg-lime-50 dark:bg-lime-900/10';
       case NodeStatus.Failed:
-        return 'rgba(255, 0, 0, 0.05)';
+        return 'bg-red-50 dark:bg-red-900/10';
       default:
-        return undefined;
+        return '';
     }
   };
 
   return (
-    <StyledTableRow sx={{ backgroundColor: getRowHighlight() }}>
-      <TableCell align="center">
-        <Box sx={{ fontWeight: 600 }}>{rownum}</Box>
+    <StyledTableRow
+      className={cn(
+        'hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-200',
+        getRowHighlight()
+      )}
+    >
+      <TableCell className="text-center">
+        <span className="font-semibold text-slate-700 dark:text-slate-300">
+          {rownum}
+        </span>
       </TableCell>
 
       {/* Combined Step Name & Description */}
       <TableCell>
-        <Stack spacing={0.5}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+        <div className="space-y-1">
+          <div className="text-base font-semibold text-slate-800 dark:text-slate-200 text-wrap break-all">
             {node.step.name}
-          </Typography>
+          </div>
           {node.step.description && (
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ fontSize: '0.85rem' }}
-            >
+            <div className="text-sm text-slate-500 dark:text-slate-400">
               {node.step.description}
-            </Typography>
+            </div>
           )}
-        </Stack>
+        </div>
       </TableCell>
 
       {/* Combined Command & Args */}
       <TableCell>
-        <Stack spacing={0.5}>
+        <div className="space-y-2">
           {!node.step.command && node.step.cmdWithArgs ? (
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                fontWeight: 500,
-                fontSize: '0.85rem',
-              }}
-            >
-              <Code fontSize="small" color="primary" />
-              <Box
-                component="span"
-                sx={{
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                  borderRadius: '4px',
-                  padding: '2px 4px',
-                }}
-              >
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Code className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+              <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-2 py-1 text-slate-700 dark:text-slate-300">
                 {node.step.cmdWithArgs}
-              </Box>
-            </Box>
+              </span>
+            </div>
           ) : null}
 
           {node.step.command && (
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                fontWeight: 500,
-                fontSize: '0.85rem',
-              }}
-            >
-              <Code fontSize="small" color="primary" />
-              <Box
-                component="span"
-                sx={{
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                  borderRadius: '4px',
-                  padding: '2px 4px',
-                }}
-              >
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Code className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+              <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-2 py-1 text-slate-700 dark:text-slate-300">
                 {node.step.command}
-              </Box>
-            </Box>
+              </span>
+            </div>
           )}
 
           {args && (
-            <Box
-              sx={{
-                fontWeight: 500,
-                fontSize: '0.85rem',
-                pl: 3,
-                maxWidth: '100%',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                color: 'text.secondary',
-              }}
-            >
-              {args}
-            </Box>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="pl-6 text-sm font-medium text-slate-500 dark:text-slate-400 truncate">
+                  {args}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <span className="max-w-[400px] break-all">{args}</span>
+              </TooltipContent>
+            </Tooltip>
           )}
-        </Stack>
+        </div>
       </TableCell>
 
       {/* Last Run & Duration */}
       <TableCell>
-        <Stack spacing={0.5}>
-          <Box sx={{ fontWeight: 500 }}>{formatTimestamp(node.startedAt)}</Box>
+        <div className="space-y-1">
+          <div className="font-medium text-slate-700 dark:text-slate-300">
+            {formatTimestamp(node.startedAt)}
+          </div>
           {node.startedAt && (
-            <Box
-              sx={{
-                fontSize: '0.85rem',
-                color: 'text.secondary',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 0.5,
-              }}
-            >
-              <Box
-                component="span"
-                sx={{ fontWeight: 500, display: 'flex', alignItems: 'center' }}
-              >
+            <div className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <span className="font-medium flex items-center">
                 Duration:
                 {node.status === NodeStatus.Running && (
-                  <Box
-                    component="span"
-                    sx={{
-                      display: 'inline-block',
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      backgroundColor: 'lime',
-                      ml: 0.5,
-                      animation: 'pulse 1.5s infinite',
-                    }}
-                  />
+                  <span className="inline-block w-2 h-2 rounded-full bg-lime-500 ml-1.5 animate-pulse" />
                 )}
-              </Box>
+              </span>
               {currentDuration}
-            </Box>
+            </div>
           )}
-        </Stack>
+        </div>
       </TableCell>
 
       {/* Status */}
-      <TableCell style={{ textAlign: 'center' }}>
+      <TableCell className="text-center">
         <NodeStatusChip status={node.status} size="sm">
           {node.statusText}
         </NodeStatusChip>
@@ -284,45 +234,21 @@ function NodeStatusTableRow({ name, rownum, node, requestId }: Props) {
       {/* Error */}
       <TableCell>
         {node.error && (
-          <Box
-            sx={{
-              fontSize: '0.85rem',
-              backgroundColor: 'rgba(255, 0, 0, 0.05)',
-              border: '1px solid rgba(255, 0, 0, 0.1)',
-              borderRadius: '4px',
-              padding: '4px 8px',
-              maxHeight: '80px',
-              overflowY: 'auto',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-            }}
-          >
+          <div className="text-sm bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800 rounded-md p-2 max-h-[80px] overflow-y-auto whitespace-pre-wrap break-words text-red-600 dark:text-red-400">
             {node.error}
-          </Box>
+          </div>
         )}
       </TableCell>
 
       {/* Log */}
-      <TableCell align="center">
+      <TableCell className="text-center">
         {node.log ? (
-          <Link to={url} style={{ textDecoration: 'none' }}>
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '6px 12px',
-                transition: 'all 0.2s',
-                textDecoration: 'none',
-                borderRadius: '4px',
-                color: 'rgba(0, 0, 0, 0.7)',
-                fontWeight: 500,
-              }}
-            >
-              <Tooltip title="View Log">
-                <DescriptionOutlined fontSize="small" />
-              </Tooltip>
-            </Box>
+          <Link
+            to={url}
+            className="inline-flex items-center justify-center p-2 transition-colors duration-200 rounded-md text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            <span className="sr-only">View Log</span>
+            <FileText className="h-4 w-4" />
           </Link>
         ) : null}
       </TableCell>

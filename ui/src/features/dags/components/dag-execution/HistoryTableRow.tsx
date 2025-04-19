@@ -69,8 +69,8 @@ function getStatusStyling(status: number) {
  */
 function HistoryTableRow({ data, onSelect, idx }: Props) {
   return (
-    <StyledTableRow>
-      <TableCell>{data.name}</TableCell>
+    <StyledTableRow className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-200">
+      <TableCell className="font-medium text-sm">{data.name}</TableCell>
       {[...data.history].reverse().map((status, i) => {
         // Determine if this cell should be highlighted
         const isSelected = i === idx;
@@ -84,14 +84,16 @@ function HistoryTableRow({ data, onSelect, idx }: Props) {
               onSelect(i);
             }}
             className={cn(
-              'max-w-[22px] min-w-[22px] p-2',
-              isSelected && 'bg-[#FFDDAD]'
+              'max-w-[22px] min-w-[22px] p-2 text-center cursor-pointer',
+              'hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-200',
+              isSelected && 'bg-slate-200 dark:bg-slate-700'
             )}
           >
             {status !== 0 && (
               <div
                 className={cn(
-                  'w-[12px] h-[12px] rounded-full border-2 transition-all duration-200',
+                  'w-[12px] h-[12px] rounded-full border-[1.5px] transition-all duration-300 mx-auto',
+                  'shadow-sm hover:scale-110',
                   bgColorClass,
                   borderColorClass,
                   pulseAnimation

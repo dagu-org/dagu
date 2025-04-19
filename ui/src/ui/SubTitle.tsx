@@ -8,7 +8,12 @@ interface SubTitleProps {
 
 export default function SubTitle({ children, className }: SubTitleProps) {
   return (
-    <h3 className={cn('text-lg font-bold text-[#404040] mb-2', className)}>
+    <h3
+      className={cn(
+        'text-xl font-semibold text-slate-700 dark:text-slate-300 mb-3',
+        className
+      )}
+    >
       {children}
     </h3>
   );

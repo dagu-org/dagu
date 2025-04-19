@@ -1,11 +1,12 @@
 import React, { useEffect, useRef } from 'react';
-import { Box, Button, Grid, Stack, TextField, Typography } from '@mui/material';
 import { useSearchParams } from 'react-router-dom';
 import Title from '../../ui/Title';
 import SearchResult from '../../features/search/components/SearchResult';
 import LoadingIndicator from '../../ui/LoadingIndicator';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useQuery } from '../../hooks/api';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -42,24 +43,19 @@ function Search() {
   }
 
   return (
-    <Grid container sx={{ mx: 4, width: '100%' }}>
-      <Grid {...{ item: true, xs: 12 }}>
+    <div className="w-full">
+      <div className="w-full">
         <Title>Search</Title>
-        <Stack spacing={2} direction="row">
-          <TextField
-            label="Search Text"
-            variant="outlined"
-            style={{
-              flex: 0.5,
+        <div className="flex space-x-4 items-center">
+          <Input
+            placeholder="Search Text"
+            className="flex-1"
+            ref={ref}
+            value={searchVal}
+            onChange={(e) => {
+              setSearchVal(e.target.value);
             }}
-            inputRef={ref}
-            InputProps={{
-              value: searchVal,
-              onChange: (e) => {
-                setSearchVal(e.target.value);
-              },
-              type: 'search',
-            }}
+            type="search"
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 if (searchVal) {
@@ -70,29 +66,26 @@ function Search() {
           />
           <Button
             disabled={!searchVal}
-            variant="outlined"
-            sx={{
-              width: '100px',
-              border: 0,
-            }}
+            variant="outline"
+            className="w-24"
             onClick={async () => {
               onSubmit(searchVal);
             }}
           >
             Search
           </Button>
-        </Stack>
+        </div>
 
-        <Box mt={2}>
+        <div className="mt-4">
           {(() => {
             if (data && data.results && data.results.length > 0) {
               return (
-                <Box>
-                  <Typography variant="h6" style={{ fontStyle: 'bolder' }}>
+                <div>
+                  <h2 className="text-lg font-semibold mb-2">
                     {data.results.length} results found
-                  </Typography>
+                  </h2>
                   <SearchResult results={data.results} />
-                </Box>
+                </div>
               );
             }
 
@@ -100,14 +93,14 @@ function Search() {
               (data && !data.results) ||
               (data && data.results && data.results.length === 0)
             ) {
-              return <Box>No results found</Box>;
+              return <div>No results found</div>;
             }
 
             return null;
           })()}
-        </Box>
-      </Grid>
-    </Grid>
+        </div>
+      </div>
+    </div>
   );
 }
 export default Search;

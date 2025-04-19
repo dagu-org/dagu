@@ -5,13 +5,13 @@
  */
 import React from 'react';
 import { Graph, FlowchartType, TimelineChart } from './';
-import { Box, Stack, Tab, Tabs } from '@mui/material';
 import BorderedBox from '../../../../ui/BorderedBox';
 import { useCookies } from 'react-cookie';
 import { FlowchartSwitch } from './';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChartGantt, faShareNodes } from '@fortawesome/free-solid-svg-icons';
+import { GitGraph, GanttChart } from 'lucide-react';
 import { components, Status } from '../../../../api/v2/schema';
+import { Tabs, Tab } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
 
 /**
  * Props for the DAGGraph component
@@ -47,49 +47,41 @@ function DAGGraph({ run, onSelectStep }: Props) {
   };
 
   return (
-    <Box>
-      <Stack direction="row" justifyContent="start" mb={2}>
-        <FlowchartSwitch value={flowchart} onChange={onChangeFlowchart} />
-      </Stack>
-      <BorderedBox
-        sx={{
-          mt: 2,
-          py: 2,
-          px: 2,
-          display: 'flex',
-          flexDirection: 'column',
-          overflowX: 'auto',
-        }}
-      >
-        <Tabs
-          value={sub}
-          onChange={(_, v) => setSub(v)}
-          TabIndicatorProps={{
-            style: {
-              display: 'none',
-            },
-          }}
-        >
+    <div>
+      <div className="flex justify-between items-start mb-4">
+        <Tabs value={sub} className="w-auto">
           <Tab
             value="0"
-            icon={<FontAwesomeIcon icon={faShareNodes} />}
-            label="Graph"
-            sx={{ minHeight: '40px', fontSize: '0.8rem' }}
-          />
+            isActive={sub === '0'}
+            onClick={() => setSub('0')}
+            className={cn(
+              'flex items-center gap-2 text-sm h-10',
+              sub === '0' && 'bg-primary text-primary-foreground font-medium'
+            )}
+          >
+            <GitGraph className="h-4 w-4" />
+            Graph
+          </Tab>
           <Tab
             value="1"
-            icon={<FontAwesomeIcon icon={faChartGantt} />}
-            label="Timeline"
-            sx={{ minHeight: '40px', fontSize: '0.8rem' }}
-          />
+            isActive={sub === '1'}
+            onClick={() => setSub('1')}
+            className={cn(
+              'flex items-center gap-2 text-sm h-10',
+              sub === '1' && 'bg-primary text-primary-foreground font-medium'
+            )}
+          >
+            <GanttChart className="h-4 w-4" />
+            Timeline
+          </Tab>
         </Tabs>
 
-        <Box
-          sx={{
-            overflowX: 'auto',
-          }}
-        >
-          {sub == '0' ? (
+        <FlowchartSwitch value={flowchart} onChange={onChangeFlowchart} />
+      </div>
+
+      <BorderedBox className="py-4 px-4 flex flex-col overflow-x-auto">
+        <div className="overflow-x-auto">
+          {sub === '0' ? (
             <Graph
               steps={run.nodes}
               type="status"
@@ -101,9 +93,9 @@ function DAGGraph({ run, onSelectStep }: Props) {
           ) : (
             <TimelineChart status={run} />
           )}
-        </Box>
+        </div>
       </BorderedBox>
-    </Box>
+    </div>
   );
 }
 

@@ -5,8 +5,8 @@
  */
 import React, { useState } from 'react';
 import Mermaid from '../../../../ui/Mermaid';
-import { ToggleButton, ToggleButtonGroup } from '@mui/material';
-import { ZoomIn, ZoomOut, RestartAlt } from '@mui/icons-material';
+import { ToggleGroup, ToggleButton } from '@/components/ui/toggle-group';
+import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { components, NodeStatus } from '../../../../api/v2/schema';
 
 /** Callback type for node click events */
@@ -97,17 +97,6 @@ const Graph: React.FC<Props> = ({
       linear-gradient(180deg, #f8fafc 1px, transparent 1px)
     `,
     backgroundSize: '20px 20px',
-  };
-
-  const containerStyle = {
-    position: 'relative' as const,
-  };
-
-  const toggleButtonStyle = {
-    position: 'absolute' as const,
-    top: '10px',
-    right: '10px',
-    zIndex: 1,
   };
 
   const graph = React.useMemo(() => {
@@ -206,34 +195,35 @@ const Graph: React.FC<Props> = ({
   }, [steps, onClickNode, flowchart, showIcons]);
 
   return (
-    <div style={containerStyle}>
-      <ToggleButtonGroup
-        size="small"
-        sx={{
-          ...toggleButtonStyle,
-          backgroundColor: 'white',
-          '& .MuiToggleButton-root': {
-            border: '1px solid rgba(0, 0, 0, 0.12)',
-            borderRadius: '4px !important',
-            marginRight: '8px',
-            padding: '4px 8px',
-            color: 'rgba(0, 0, 0, 0.54)',
-            '&:hover': {
-              backgroundColor: 'rgba(0, 0, 0, 0.04)',
-            },
-          },
-        }}
-      >
-        <ToggleButton value="zoomin" onClick={zoomIn}>
-          <ZoomIn fontSize="small" />
-        </ToggleButton>
-        <ToggleButton value="zoomout" onClick={zoomOut}>
-          <ZoomOut fontSize="small" />
-        </ToggleButton>
-        <ToggleButton value="reset" onClick={resetZoom}>
-          <RestartAlt fontSize="small" />
-        </ToggleButton>
-      </ToggleButtonGroup>
+    <div className="relative">
+      <div className="absolute right-2 top-2 z-10 bg-white">
+        <ToggleGroup value="" onChange={() => {}} aria-label="Zoom controls">
+          <ToggleButton
+            value="zoomin"
+            onClick={() => zoomIn()}
+            aria-label="Zoom in"
+            position="first"
+          >
+            <ZoomIn className="h-4 w-4" />
+          </ToggleButton>
+          <ToggleButton
+            value="zoomout"
+            onClick={() => zoomOut()}
+            aria-label="Zoom out"
+            position="middle"
+          >
+            <ZoomOut className="h-4 w-4" />
+          </ToggleButton>
+          <ToggleButton
+            value="reset"
+            onClick={() => resetZoom()}
+            aria-label="Reset zoom"
+            position="last"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </ToggleButton>
+        </ToggleGroup>
+      </div>
       <Mermaid style={mermaidStyle} def={graph} scale={scale} />
     </div>
   );

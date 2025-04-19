@@ -3,14 +3,6 @@
  *
  * @module features/dags/components/dag-execution
  */
-import {
-  Box,
-  Button,
-  Modal,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
 import React from 'react';
 import {
   Parameter,
@@ -18,6 +10,9 @@ import {
   stringifyParams,
 } from '../../../../lib/parseParams';
 import { components } from '../../../../api/v2/schema';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 /**
  * Props for the StartDAGModal component
@@ -31,18 +26,6 @@ type Props = {
   dismissModal: () => void;
   /** Function called when the user submits the form */
   onSubmit: (params: string) => void;
-};
-
-const style = {
-  position: 'absolute',
-  top: '50%',
-  left: '50%',
-  transform: 'translate(-50%, -50%)',
-  width: 400,
-  bgcolor: 'background.paper',
-  border: '2px solid #000',
-  boxShadow: 24,
-  p: 4,
 };
 
 /**
@@ -80,70 +63,34 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
     setParams(parsedParams);
   }, [parsedParams]);
 
+  // Don't render if modal is not visible
+  if (!visible) {
+    return null;
+  }
+
   return (
-    <Modal open={visible} onClose={dismissModal}>
-      <Box sx={style}>
-        <Stack direction="row" alignContent="center" justifyContent="center">
-          <Typography variant="h6">Start the DAG</Typography>
-        </Stack>
-        <Stack
-          direction="column"
-          alignContent="center"
-          justifyContent="center"
-          spacing={2}
-          mt={2}
-        >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="w-full max-w-md rounded-lg border-2 border-black bg-white p-6 shadow-xl">
+        <div className="flex items-center justify-center">
+          <h2 className="text-xl font-semibold">Start the DAG</h2>
+        </div>
+
+        <div className="mt-4 flex flex-col space-y-4">
           {parsedParams.map((p, i) => {
             if (p.Name != undefined) {
               return (
-                <React.Fragment key={i}>
-                  <TextField
-                    label={p.Name}
+                <div key={i} className="space-y-2">
+                  <Label htmlFor={`param-${i}`}>{p.Name}</Label>
+                  <Input
+                    id={`param-${i}`}
                     placeholder={p.Value}
-                    variant="outlined"
-                    style={{
-                      flex: 0.5,
-                    }}
-                    inputRef={ref}
-                    InputProps={{
-                      value: params.find((pp) => pp.Name == p.Name)?.Value,
-                      onChange: (e) => {
-                        if (p.Name) {
-                          setParams(
-                            params.map((pp) => {
-                              if (pp.Name == p.Name) {
-                                return {
-                                  ...pp,
-                                  Value: e.target.value,
-                                };
-                              } else {
-                                return pp;
-                              }
-                            })
-                          );
-                        }
-                      },
-                    }}
-                  />
-                </React.Fragment>
-              );
-            } else {
-              return (
-                <React.Fragment key={i}>
-                  <TextField
-                    label={`Parameter ${i + 1}`}
-                    placeholder={p.Value}
-                    variant="outlined"
-                    style={{
-                      flex: 0.5,
-                    }}
-                    inputRef={ref}
-                    InputProps={{
-                      value: params.find((_, j) => i == j)?.Value,
-                      onChange: (e) => {
+                    ref={i === 0 ? ref : undefined}
+                    value={params.find((pp) => pp.Name == p.Name)?.Value || ''}
+                    onChange={(e) => {
+                      if (p.Name) {
                         setParams(
-                          params.map((pp, j) => {
-                            if (j == i) {
+                          params.map((pp) => {
+                            if (pp.Name == p.Name) {
                               return {
                                 ...pp,
                                 Value: e.target.value,
@@ -153,27 +100,59 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
                             }
                           })
                         );
-                      },
+                      }
                     }}
                   />
-                </React.Fragment>
+                </div>
+              );
+            } else {
+              return (
+                <div key={i} className="space-y-2">
+                  <Label htmlFor={`param-${i}`}>{`Parameter ${i + 1}`}</Label>
+                  <Input
+                    id={`param-${i}`}
+                    placeholder={p.Value}
+                    ref={i === 0 ? ref : undefined}
+                    value={params.find((_, j) => i == j)?.Value || ''}
+                    onChange={(e) => {
+                      setParams(
+                        params.map((pp, j) => {
+                          if (j == i) {
+                            return {
+                              ...pp,
+                              Value: e.target.value,
+                            };
+                          } else {
+                            return pp;
+                          }
+                        })
+                      );
+                    }}
+                  />
+                </div>
               );
             }
           })}
+
           <Button
-            variant="outlined"
+            variant="outline"
             onClick={() => {
               onSubmit(stringifyParams(params));
             }}
           >
             Start
           </Button>
-          <Button variant="outlined" color="error" onClick={dismissModal}>
+
+          <Button
+            variant="outline"
+            className="text-destructive hover:bg-destructive/10"
+            onClick={dismissModal}
+          >
             Cancel
           </Button>
-        </Stack>
-      </Box>
-    </Modal>
+        </div>
+      </div>
+    </div>
   );
 }
 

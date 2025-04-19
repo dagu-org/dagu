@@ -203,50 +203,53 @@ function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
   return (
     <DAGContext.Consumer>
       {(props) => (
-        <React.Fragment>
-          <HistoryTable
-            runs={reversedRuns || []}
-            gridData={gridData || []}
-            onSelect={updateIdx}
-            idx={idx}
-          />
+        <div className="space-y-4">
+          <div className="mb-2">
+            <HistoryTable
+              runs={reversedRuns || []}
+              gridData={gridData || []}
+              onSelect={updateIdx}
+              idx={idx}
+            />
+          </div>
+
           {reversedRuns && reversedRuns[idx] ? (
             <React.Fragment>
-              <div className="mt-6">
-                <DAGGraph
-                  run={reversedRuns[idx]}
-                  onSelectStep={onSelectStepOnGraph}
-                />
-                <div className="mt-4">
-                  <SubTitle>Status</SubTitle>
-                  <DAGStatusOverview
-                    status={reversedRuns[idx]}
-                    requestId={reversedRuns[idx].requestId}
-                    {...props}
-                  />
-                </div>
-              </div>
-              <div className="mt-6">
-                <SubTitle>Steps</SubTitle>
-                <div className="mt-4">
-                  <NodeStatusTable
-                    nodes={reversedRuns[idx].nodes}
-                    status={reversedRuns[idx]}
-                    {...props}
+              <div className="space-y-6 pt-2">
+                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-4 overflow-hidden">
+                  <DAGGraph
+                    run={reversedRuns[idx]}
+                    onSelectStep={onSelectStepOnGraph}
                   />
                 </div>
               </div>
 
+              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-4 overflow-hidden">
+                <SubTitle className="mb-4">Status</SubTitle>
+                <DAGStatusOverview
+                  status={reversedRuns[idx]}
+                  requestId={reversedRuns[idx].requestId}
+                  {...props}
+                />
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-4 overflow-hidden">
+                <SubTitle className="mb-4">Steps</SubTitle>
+                <NodeStatusTable
+                  nodes={reversedRuns[idx].nodes}
+                  status={reversedRuns[idx]}
+                  {...props}
+                />
+              </div>
+
               {handlers && handlers.length ? (
-                <div className="mt-6">
-                  <SubTitle>Lifecycle Hooks</SubTitle>
-                  <div className="mt-4">
-                    <NodeStatusTable
-                      nodes={getEventHandlers(reversedRuns[idx])}
-                      status={reversedRuns[idx]}
-                      {...props}
-                    />
-                  </div>
+                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-4 overflow-hidden">
+                  <SubTitle className="mb-4">Lifecycle Hooks</SubTitle>
+                  <NodeStatusTable
+                    nodes={getEventHandlers(reversedRuns[idx])}
+                    status={reversedRuns[idx]}
+                    {...props}
+                  />
                 </div>
               ) : null}
             </React.Fragment>
@@ -258,7 +261,7 @@ function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
             dismissModal={dismissModal}
             onSubmit={onUpdateStatus}
           />
-        </React.Fragment>
+        </div>
       )}
     </DAGContext.Consumer>
   );

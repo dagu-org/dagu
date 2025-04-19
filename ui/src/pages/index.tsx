@@ -120,7 +120,7 @@ function Dashboard(): React.ReactElement | null {
 
   // --- Render the dashboard UI ---
   return (
-    <div className="flex flex-col space-y-6 p-4 md:p-6 w-full">
+    <div className="flex flex-col space-y-6 w-full">
       {/* Metric Cards Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {metricCards.map((card) => (

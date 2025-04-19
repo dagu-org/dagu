@@ -3,8 +3,16 @@
  *
  * @module features/dags/components/dag-editor
  */
-import { Alert, AlertTitle, Box, Snackbar } from '@mui/material';
 import React from 'react';
+import {
+  ToastProvider,
+  Toast,
+  ToastClose,
+  ToastTitle,
+  ToastDescription,
+} from '@/components/ui/toast';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { X } from 'lucide-react';
 
 /**
  * Props for the DAGErrorSnackBar component
@@ -30,62 +38,39 @@ const DAGErrorSnackBar = ({ open, setOpen, errors }: DAGErrorSnackBarProps) => {
     setOpen(false);
   };
 
+  // If not open, don't render anything
+  if (!open) return null;
+
   return (
-    <Snackbar
-      anchorOrigin={{
-        vertical: 'top',
-        horizontal: 'center',
-      }}
-      security="error"
-      open={open}
-      autoHideDuration={6000}
-      onClose={handleClose}
-    >
-      <Alert
-        severity="error"
-        sx={{
-          width: '20vw',
-        }}
-        onClose={handleClose}
-      >
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-          }}
-        >
-          <AlertTitle
-            sx={{
-              color: '#FF4D4D',
-              fontSize: '1.5rem',
-            }}
-          >
-            Error Detected
-          </AlertTitle>
-          <Box
-            sx={{
-              color: '#FC7E7E',
-              fontSize: '1.2rem',
-            }}
-          >
-            Please check the following errors:
-          </Box>
-          {errors.map((error, index) => (
-            <Box
-              key={index}
-              sx={{
-                color: '#FC7E7E',
-                fontSize: '1rem',
-                margin: '2px',
-              }}
-            >
-              {error}
-            </Box>
-          ))}
-        </Box>
-      </Alert>
-    </Snackbar>
+    <ToastProvider>
+      <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 w-[20vw] max-w-md">
+        <Toast variant="destructive" className="bg-white border-red-500">
+          <div className="flex flex-col items-center w-full">
+            <ToastTitle className="text-red-500 text-xl font-bold">
+              Error Detected
+            </ToastTitle>
+
+            <ToastDescription className="text-red-400 text-lg mt-1">
+              Please check the following errors:
+            </ToastDescription>
+
+            <div className="w-full mt-2">
+              {errors.map((error, index) => (
+                <Alert
+                  key={index}
+                  variant="destructive"
+                  className="mb-2 bg-red-50 text-red-400 text-sm py-2"
+                >
+                  {error}
+                </Alert>
+              ))}
+            </div>
+          </div>
+
+          <ToastClose onClick={handleClose} />
+        </Toast>
+      </div>
+    </ToastProvider>
   );
 };
 

@@ -1,11 +1,10 @@
 import React from 'react';
-import { CircularProgress, Container } from '@mui/material';
 
 function LoadingIndicator() {
   return (
-    <Container sx={{ width: '100%', textAlign: 'center', margin: 'auto' }}>
-      <CircularProgress />
-    </Container>
+    <div className="w-full text-center mx-auto flex items-center justify-center p-4">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+    </div>
   );
 }
 

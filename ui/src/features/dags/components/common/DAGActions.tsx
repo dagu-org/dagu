@@ -3,7 +3,6 @@
  *
  * @module features/dags/components/common
  */
-import { Box } from '@mui/material'; // Keep Box for modal content if needed
 import React from 'react';
 import { Play, Square, RefreshCw } from 'lucide-react'; // Import lucide icons
 import { StartDAGModal } from '../dag-execution';
@@ -32,17 +31,24 @@ type Props = {
   fileId: string;
   /** DAG definition */
   dag?: components['schemas']['DAG'] | components['schemas']['DAGDetails'];
-  /** Whether to show text labels on buttons (ignored, always icon buttons now) */
-  label?: boolean; // Kept for prop compatibility, but visually ignored
+  /** Whether to show text labels on buttons */
+  label?: boolean;
   /** Function to refresh data after actions */
   refresh?: () => void;
+  /** Display mode: 'compact' for icon-only, 'full' for text+icon buttons */
+  displayMode?: 'compact' | 'full';
 };
 
 /**
  * DAGActions component provides buttons to start, stop, and retry DAG executions
  */
-function DAGActions({ status, fileId, dag, refresh }: Props) {
-  // Removed label from destructuring
+function DAGActions({
+  status,
+  fileId,
+  dag,
+  refresh,
+  displayMode = 'compact',
+}: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const [isStartModal, setIsStartModal] = React.useState(false);
   const [isStopModal, setIsStopModal] = React.useState(false);
@@ -70,61 +76,102 @@ function DAGActions({ status, fileId, dag, refresh }: Props) {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="flex items-center space-x-1">
-        {' '}
-        {/* Use flexbox and tighter spacing */}
+      <div
+        className={`flex items-center ${displayMode === 'compact' ? 'space-x-1' : 'space-x-2'}`}
+      >
         {/* Start Button */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              disabled={!buttonState['start']}
-              onClick={() => setIsStartModal(true)}
-              className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600" // Change color when disabled
-            >
-              <Play className="h-4 w-4" />
-              <span className="sr-only">Start</span> {/* Screen reader text */}
-            </Button>
+            {displayMode === 'compact' ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={!buttonState['start']}
+                onClick={() => setIsStartModal(true)}
+                className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600"
+              >
+                <Play className="h-4 w-4" />
+                <span className="sr-only">Start</span>
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!buttonState['start']}
+                onClick={() => setIsStartModal(true)}
+                className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600"
+              >
+                <Play className="mr-2 h-4 w-4" />
+                Start
+              </Button>
+            )}
           </TooltipTrigger>
           <TooltipContent>
-            <p>Start</p>
+            <p>Start DAG execution</p>
           </TooltipContent>
         </Tooltip>
+
         {/* Stop Button */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              disabled={!buttonState['stop']}
-              onClick={() => setIsStopModal(true)}
-              className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600" // Change color when disabled
-            >
-              <Square className="h-4 w-4" />
-              <span className="sr-only">Stop</span>
-            </Button>
+            {displayMode === 'compact' ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={!buttonState['stop']}
+                onClick={() => setIsStopModal(true)}
+                className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600"
+              >
+                <Square className="h-4 w-4" />
+                <span className="sr-only">Stop</span>
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!buttonState['stop']}
+                onClick={() => setIsStopModal(true)}
+                className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600"
+              >
+                <Square className="mr-2 h-4 w-4" />
+                Stop
+              </Button>
+            )}
           </TooltipTrigger>
           <TooltipContent>
-            <p>Stop</p>
+            <p>Stop DAG execution</p>
           </TooltipContent>
         </Tooltip>
+
         {/* Retry Button */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              disabled={!buttonState['retry']}
-              onClick={() => setIsRetryModal(true)}
-              className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600" // Change color when disabled
-            >
-              <RefreshCw className="h-4 w-4" />
-              <span className="sr-only">Retry</span>
-            </Button>
+            {displayMode === 'compact' ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={!buttonState['retry']}
+                onClick={() => setIsRetryModal(true)}
+                className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600"
+              >
+                <RefreshCw className="h-4 w-4" />
+                <span className="sr-only">Retry</span>
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!buttonState['retry']}
+                onClick={() => setIsRetryModal(true)}
+                className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Retry
+              </Button>
+            )}
           </TooltipTrigger>
           <TooltipContent>
-            <p>Retry</p>
+            <p>Retry DAG execution</p>
           </TooltipContent>
         </Tooltip>
         <ConfirmModal
@@ -151,7 +198,7 @@ function DAGActions({ status, fileId, dag, refresh }: Props) {
             reloadData();
           }}
         >
-          <Box>Do you really want to cancel the DAG?</Box>
+          <div>Do you really want to cancel the DAG?</div>
         </ConfirmModal>
         <ConfirmModal
           title="Confirmation"

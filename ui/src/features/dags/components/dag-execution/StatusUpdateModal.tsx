@@ -3,9 +3,9 @@
  *
  * @module features/dags/components/dag-execution
  */
-import { Box, Button, Modal, Stack, Typography } from '@mui/material';
 import React from 'react';
 import { components, NodeStatus } from '../../../../api/v2/schema';
+import { Button } from '@/components/ui/button';
 
 /**
  * Props for the StatusUpdateModal component
@@ -19,21 +19,6 @@ type Props = {
   step?: components['schemas']['Step'];
   /** Function called when the user submits the status update */
   onSubmit: (step: components['schemas']['Step'], status: NodeStatus) => void;
-};
-
-/**
- * Modal style
- */
-const style = {
-  position: 'absolute',
-  top: '50%',
-  left: '50%',
-  transform: 'translate(-50%, -50%)',
-  width: 400,
-  bgcolor: 'background.paper',
-  border: '2px solid #000',
-  boxShadow: 24,
-  p: 4,
 };
 
 /**
@@ -54,51 +39,48 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
     };
   }, [dismissModal]);
 
-  // Don't render if no step is provided
-  if (!step) {
+  // Don't render if no step is provided or modal is not visible
+  if (!step || !visible) {
     return null;
   }
 
   return (
-    <Modal open={visible} onClose={dismissModal}>
-      <Box sx={style}>
-        <Stack direction="row" alignContent="center" justifyContent="center">
-          <Typography variant="h6">Update status of "{step.name}"</Typography>
-        </Stack>
-        <Stack
-          direction="column"
-          alignContent="center"
-          justifyContent="center"
-          spacing={2}
-          mt={2}
-        >
-          <Stack
-            direction="row"
-            alignContent="center"
-            justifyContent="center"
-            spacing={2}
-          >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="w-full max-w-md rounded-lg border-2 border-black bg-white p-6 shadow-xl">
+        <div className="flex items-center justify-center">
+          <h2 className="text-xl font-semibold">
+            Update status of "{step.name}"
+          </h2>
+        </div>
+
+        <div className="mt-4 flex flex-col space-y-4">
+          <div className="flex justify-center space-x-4">
             <Button
-              variant="outlined"
+              variant="outline"
               onClick={() => onSubmit(step, NodeStatus.Success)}
             >
               Mark Success
             </Button>
             <Button
-              variant="outlined"
+              variant="outline"
               onClick={() => onSubmit(step, NodeStatus.Failed)}
             >
               Mark Failed
             </Button>
-          </Stack>
-          <Stack direction="row" alignContent="center" justifyContent="center">
-            <Button variant="outlined" color="error" onClick={dismissModal}>
+          </div>
+
+          <div className="flex justify-center">
+            <Button
+              variant="outline"
+              className="text-destructive hover:bg-destructive/10"
+              onClick={dismissModal}
+            >
               Cancel
             </Button>
-          </Stack>
-        </Stack>
-      </Box>
-    </Modal>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

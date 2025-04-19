@@ -3,12 +3,12 @@ import { DAGContext } from '../contexts/DAGContext';
 import { getEventHandlers } from '../lib/getEventHandlers';
 import { NodeStatusTable, DAGStatusOverview } from './dag-details';
 import { StatusUpdateModal } from './dag-execution';
-import { Box } from '@mui/material';
 import SubTitle from '../../../ui/SubTitle';
 import { components, NodeStatus, Status } from '../../../api/v2/schema';
 import { DAGGraph } from './visualization';
 import { useClient } from '../../../hooks/api';
 import { AppBarContext } from '../../../contexts/AppBarContext';
+import { cn } from '@/lib/utils';
 
 type Props = {
   run: components['schemas']['RunDetails'];
@@ -70,48 +70,33 @@ function DAGStatus({ run, fileId }: Props) {
   const handlers = getEventHandlers(run);
 
   return (
-    <React.Fragment>
-      <DAGGraph run={run} onSelectStep={onSelectStepOnGraph} />
-      <Box>
-        <DAGContext.Consumer>
-          {(props) => (
-            <React.Fragment>
-              <Box sx={{ mt: 3 }}>
-                <Box sx={{ mt: 2 }}>
-                  <DAGStatusOverview
-                    status={run}
-                    fileId={fileId}
-                  ></DAGStatusOverview>
-                </Box>
-              </Box>
+    <div className="space-y-4">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
+        <DAGGraph run={run} onSelectStep={onSelectStepOnGraph} />
+      </div>
 
-              <Box sx={{ mt: 3 }}>
-                <SubTitle>Steps</SubTitle>
-                <Box sx={{ mt: 2 }}>
-                  <NodeStatusTable
-                    nodes={run.nodes}
-                    status={run}
-                    {...props}
-                  ></NodeStatusTable>
-                </Box>
-              </Box>
+      <DAGContext.Consumer>
+        {(props) => (
+          <React.Fragment>
+            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
+              <SubTitle className="mb-4">Status</SubTitle>
+              <DAGStatusOverview status={run} fileId={fileId} />
+            </div>
 
-              {handlers?.length ? (
-                <Box sx={{ mt: 3 }}>
-                  <SubTitle>Lifecycle Hooks</SubTitle>
-                  <Box sx={{ mt: 2 }}>
-                    <NodeStatusTable
-                      nodes={handlers}
-                      status={run}
-                      {...props}
-                    ></NodeStatusTable>
-                  </Box>
-                </Box>
-              ) : null}
-            </React.Fragment>
-          )}
-        </DAGContext.Consumer>
-      </Box>
+            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
+              <SubTitle className="mb-4">Steps</SubTitle>
+              <NodeStatusTable nodes={run.nodes} status={run} {...props} />
+            </div>
+
+            {handlers?.length ? (
+              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
+                <SubTitle className="mb-4">Lifecycle Hooks</SubTitle>
+                <NodeStatusTable nodes={handlers} status={run} {...props} />
+              </div>
+            ) : null}
+          </React.Fragment>
+        )}
+      </DAGContext.Consumer>
 
       <StatusUpdateModal
         visible={modal}
@@ -119,7 +104,7 @@ function DAGStatus({ run, fileId }: Props) {
         dismissModal={dismissModal}
         onSubmit={onUpdateStatus}
       />
-    </React.Fragment>
+    </div>
   );
 }
 

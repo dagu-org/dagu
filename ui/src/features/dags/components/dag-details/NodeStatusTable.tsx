@@ -3,18 +3,18 @@
  *
  * @module features/dags/components/dag-details
  */
-import React, { CSSProperties } from 'react';
+import React from 'react';
 import NodeStatusTableRow from './NodeStatusTableRow';
 import {
   Table,
   TableBody,
   TableCell,
   TableHead,
+  TableHeader,
   TableRow,
-  Paper,
-  Box,
-} from '@mui/material';
+} from '@/components/ui/table';
 import { components } from '../../../../api/v2/schema';
+import { cn } from '@/lib/utils';
 
 /**
  * Props for the NodeStatusTable component
@@ -29,14 +29,6 @@ type Props = {
 };
 
 /**
- * Table style for fixed layout and word wrapping
- */
-const tableStyle: CSSProperties = {
-  tableLayout: 'fixed',
-  wordWrap: 'break-word',
-};
-
-/**
  * NodeStatusTable displays execution status information for all nodes in a DAG run
  */
 function NodeStatusTable({ nodes, status, fileId }: Props) {
@@ -46,105 +38,46 @@ function NodeStatusTable({ nodes, status, fileId }: Props) {
   }
 
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        borderRadius: 2,
-        border: '1px solid rgba(0, 0, 0, 0.12)',
-        overflow: 'hidden',
-        transition: 'all 0.2s ease-in-out',
-        '&:hover': {
-          boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.05)',
-        },
-        mb: 3,
-      }}
-    >
-      <Box sx={{ overflowX: 'auto' }}>
-        <Table
-          size="small"
-          sx={{
-            ...tableStyle,
-            '& .MuiTableCell-head': {
-              fontWeight: 600,
-            },
-          }}
-        >
-          <TableHead>
-            <TableRow>
-              <TableCell
-                style={{
-                  width: '5%',
-                  maxWidth: '50px',
-                }}
-              >
-                No
-              </TableCell>
-              <TableCell
-                style={{
-                  width: '20%',
-                  maxWidth: '200px',
-                }}
-              >
-                Step Name
-              </TableCell>
-              <TableCell
-                style={{
-                  width: '20%',
-                  maxWidth: '200px',
-                }}
-              >
-                Command
-              </TableCell>
-              <TableCell
-                style={{
-                  width: '20%',
-                  maxWidth: '200px',
-                }}
-              >
-                Last Run
-              </TableCell>
-              <TableCell
-                style={{
-                  width: '20%',
-                  maxWidth: '200px',
-                  textAlign: 'center',
-                }}
-              >
-                Status
-              </TableCell>
-              <TableCell
-                style={{
-                  width: '20%',
-                  maxWidth: '200px',
-                }}
-              >
-                Error
-              </TableCell>
-              <TableCell
-                style={{
-                  width: '20%',
-                  maxWidth: '200px',
-                  textAlign: 'center',
-                }}
-              >
-                Log
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {nodes.map((n, idx) => (
-              <NodeStatusTableRow
-                key={n.step.name}
-                rownum={idx + 1}
-                node={n}
-                requestId={status.requestId}
-                name={fileId}
-              />
-            ))}
-          </TableBody>
-        </Table>
-      </Box>
-    </Paper>
+    <div className="w-full overflow-x-auto">
+      <Table className="table-fixed w-full">
+        <TableHeader className="bg-slate-50 dark:bg-slate-800">
+          <TableRow className="border-b border-slate-200 dark:border-slate-700">
+            <TableHead className="w-[5%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              No
+            </TableHead>
+            <TableHead className="w-[20%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Step Name
+            </TableHead>
+            <TableHead className="w-[20%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Command
+            </TableHead>
+            <TableHead className="w-[30%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Last Run
+            </TableHead>
+            <TableHead className="w-[10%] py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Status
+            </TableHead>
+            <TableHead className="w-[20%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Error
+            </TableHead>
+            <TableHead className="w-[20%] py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Log
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {nodes.map((n, idx) => (
+            <NodeStatusTableRow
+              key={n.step.name}
+              rownum={idx + 1}
+              node={n}
+              requestId={status.requestId}
+              name={fileId}
+            />
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 

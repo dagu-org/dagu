@@ -10,7 +10,7 @@ import DAGAttributes from './DAGAttributes';
 import DAGDefinition from './DAGDefinition';
 import { useCookies } from 'react-cookie';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
-import { useQuery } from '../../../../hooks/api';
+import { useMutate, useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { components } from '../../../../api/v2/schema';
 import { useClient } from '../../../../hooks/api';
@@ -20,6 +20,7 @@ import { DAGStepTable } from '../dag-details';
 import { Button } from '../../../../components/ui/button';
 import { Save, X, Edit, AlertTriangle } from 'lucide-react';
 import SubTitle from '@/ui/SubTitle';
+import BorderedBox from '@/ui/BorderedBox';
 
 /**
  * Props for the DAGSpec component
@@ -35,8 +36,8 @@ type Props = {
  */
 function DAGSpec({ fileId }: Props) {
   const appBarContext = React.useContext(AppBarContext);
-  const params = useParams();
   const client = useClient();
+  const mutate = useMutate();
 
   // State for editing mode and current YAML value
   const [editing, setEditing] = React.useState(false);
@@ -96,138 +97,143 @@ function DAGSpec({ fileId }: Props) {
       {(props) =>
         data?.dag && (
           <React.Fragment>
-            <div className="flex justify-between items-center mb-4">
-              <FlowchartSwitch
-                value={cookie['flowchart']}
-                onChange={onChangeFlowchart}
-              />
-            </div>
-
-            <div className="mb-6 overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-4">
-              <Graph
-                steps={data.dag.steps}
-                type="config"
-                flowchart={flowchart}
-                showIcons={false}
-              />
-            </div>
-
-            <DAGAttributes dag={data.dag!} />
-
-            {data.errors?.length ? (
-              <div className="mb-6 border border-red-200 dark:border-red-800 bg-white dark:bg-slate-900 rounded-md p-6">
-                <div className="flex items-center gap-2 mb-3 text-red-600 dark:text-red-400">
-                  <AlertTriangle className="h-5 w-5" />
-                  <h3 className="font-semibold">Configuration Errors</h3>
+            <div className="space-y-4">
+              <div className="overflow-x-auto rounded-xl shadow-md bg-white dark:bg-slate-900 p-6">
+                <div className="flex justify-end items-center mb-4">
+                  <FlowchartSwitch
+                    value={cookie['flowchart']}
+                    onChange={onChangeFlowchart}
+                  />
                 </div>
+                <BorderedBox className="mt-4 py-4 px-4 flex flex-col overflow-x-auto">
+                  <Graph
+                    steps={data.dag.steps}
+                    type="config"
+                    flowchart={flowchart}
+                    showIcons={false}
+                  />
+                </BorderedBox>
+              </div>
 
-                <div className="space-y-2">
-                  {data.errors?.map((e, i) => (
-                    <div
-                      key={i}
-                      className="p-2 border-l-2 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 font-mono text-sm"
-                    >
-                      {e}
-                    </div>
-                  ))}
+              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
+                <SubTitle className="mb-4">Attributes</SubTitle>
+                <DAGAttributes dag={data.dag!} />
+              </div>
+
+              {data.errors?.length ? (
+                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 border-l-4 border-red-500 dark:border-red-700">
+                  <div className="flex items-center gap-2 mb-4 text-red-600 dark:text-red-400">
+                    <AlertTriangle className="h-5 w-5" />
+                    <h3 className="font-semibold">Configuration Errors</h3>
+                  </div>
+
+                  <div className="space-y-3">
+                    {data.errors?.map((e, i) => (
+                      <div
+                        key={i}
+                        className="p-3 bg-red-50 dark:bg-red-900/20 rounded-md text-red-600 dark:text-red-400 font-mono text-sm"
+                      >
+                        {e}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {data.dag.steps ? (
-              <div className="mt-4">
-                <SubTitle>Steps</SubTitle>
-                <DAGStepTable steps={data.dag.steps} />
-              </div>
-            ) : null}
+              {data.dag.steps ? (
+                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
+                  <SubTitle className="mb-4">Steps</SubTitle>
+                  <DAGStepTable steps={data.dag.steps} />
+                </div>
+              ) : null}
 
-            {handlers?.length ? (
-              <div className="mt-4">
-                <SubTitle>Lifecycle hooks</SubTitle>
-                <DAGStepTable steps={handlers} />
-              </div>
-            ) : null}
+              {handlers?.length ? (
+                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
+                  <SubTitle className="mb-4">Lifecycle Hooks</SubTitle>
+                  <DAGStepTable steps={handlers} />
+                </div>
+              ) : null}
 
-            <div className="mt-4 mb-2">
-              <div className="flex justify-between items-end">
-                <SubTitle className="mb-0">Spec</SubTitle>
-                {editing ? (
-                  <div className="flex gap-2">
-                    <Button
-                      id="save-config"
-                      variant="default"
-                      size="sm"
-                      onClick={async () => {
-                        if (!currentValue) {
-                          alert('No changes to save');
-                          return;
-                        }
-                        const { data, error } = await client.PUT(
-                          '/dags/{fileId}/spec',
-                          {
-                            params: {
-                              path: {
-                                fileId: props.fileId,
-                              },
-                              query: {
-                                remoteNode:
-                                  appBarContext.selectedRemoteNode || 'local',
-                              },
-                            },
-                            body: {
-                              spec: currentValue,
-                            },
+              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
+                <div className="flex justify-between items-center mb-4">
+                  <SubTitle className="mb-0">Spec</SubTitle>
+                  {editing ? (
+                    <div className="flex gap-2">
+                      <Button
+                        id="save-config"
+                        variant="default"
+                        size="sm"
+                        onClick={async () => {
+                          if (!currentValue) {
+                            alert('No changes to save');
+                            return;
                           }
-                        );
-                        if (error) {
-                          alert(error.message || 'Failed to save spec');
-                          return;
-                        }
-                        if (data?.errors) {
-                          alert(data.errors.join('\n'));
-                          return;
-                        }
-                        setEditing(false);
-                        props.refresh();
-                      }}
-                    >
-                      <Save className="h-4 w-4 mr-1" />
-                      Save Changes
-                    </Button>
+                          const { data, error } = await client.PUT(
+                            '/dags/{fileId}/spec',
+                            {
+                              params: {
+                                path: {
+                                  fileId: props.fileId,
+                                },
+                                query: {
+                                  remoteNode:
+                                    appBarContext.selectedRemoteNode || 'local',
+                                },
+                              },
+                              body: {
+                                spec: currentValue,
+                              },
+                            }
+                          );
+                          if (error) {
+                            alert(error.message || 'Failed to save spec');
+                            return;
+                          }
+                          if (data?.errors) {
+                            alert(data.errors.join('\n'));
+                            return;
+                          }
+                          mutate(['/dags/{fileId}/spec']);
+                          setEditing(false);
+                          props.refresh();
+                        }}
+                      >
+                        <Save className="h-4 w-4 mr-1" />
+                        Save Changes
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditing(false)}
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
                     <Button
+                      id="edit-config"
                       variant="outline"
                       size="sm"
-                      onClick={() => setEditing(false)}
+                      onClick={() => setEditing(true)}
                     >
-                      <X className="h-4 w-4 mr-1" />
-                      Cancel
+                      <Edit className="h-4 w-4 mr-1" />
+                      Edit
                     </Button>
-                  </div>
+                  )}
+                </div>
+
+                {editing ? (
+                  <DAGEditor
+                    value={data.spec}
+                    onChange={(newValue) => {
+                      setCurrentValue(newValue || '');
+                    }}
+                  />
                 ) : (
-                  <Button
-                    id="edit-config"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setEditing(true)}
-                  >
-                    <Edit className="h-4 w-4 mr-1" />
-                    Edit
-                  </Button>
+                  <DAGDefinition value={data.spec} lineNumbers />
                 )}
               </div>
-            </div>
-
-            <div>
-              {editing ? (
-                <DAGEditor
-                  value={data.spec}
-                  onChange={(newValue) => {
-                    setCurrentValue(newValue || '');
-                  }}
-                />
-              ) : (
-                <DAGDefinition value={data.spec} lineNumbers />
-              )}
             </div>
           </React.Fragment>
         )

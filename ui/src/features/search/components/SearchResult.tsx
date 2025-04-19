@@ -1,4 +1,3 @@
-import { Divider, List, ListItem, Stack, Typography } from '@mui/material';
 import React, { ReactElement, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { DAGDefinition } from '../../dags/components/dag-editor';
@@ -16,11 +15,13 @@ function SearchResult({ results }: Props) {
         const ret = [] as ReactElement[];
         result.matches.forEach((m, j) => {
           ret.push(
-            <ListItem key={`${result.name}-${m.lineNumber}`}>
-              <Stack direction="column" spacing={1} style={{ width: '100%' }}>
+            <li key={`${result.name}-${m.lineNumber}`} className="py-3 px-4">
+              <div className="flex flex-col space-y-2 w-full">
                 {j == 0 ? (
                   <Link to={`/dags/${encodeURI(result.name)}/spec`}>
-                    <Typography variant="h6">{result.name}</Typography>
+                    <h3 className="text-lg font-semibold text-primary">
+                      {result.name}
+                    </h3>
                   </Link>
                 ) : null}
                 <DAGDefinition
@@ -30,18 +31,28 @@ function SearchResult({ results }: Props) {
                   highlightLine={m.lineNumber - m.startLine}
                   noHighlight
                 />
-              </Stack>
-            </ListItem>
+              </div>
+            </li>
           );
         });
         if (i < results.length - 1) {
-          ret.push(<Divider key={`${result.name}-divider`} />);
+          ret.push(
+            <div
+              key={`${result.name}-divider`}
+              className="h-px bg-gray-200 my-2"
+            />
+          );
         }
         return ret;
       }),
     [results]
   );
+
   useEffect(() => Prism.highlightAll(), [elements]);
-  return <List>{elements}</List>;
+
+  return (
+    <ul className="divide-y divide-gray-100 rounded-md border">{elements}</ul>
+  );
 }
+
 export default SearchResult;

@@ -111,7 +111,7 @@ function DAGDetails() {
             refreshFn={refreshFn}
             formatDuration={formatDuration}
           />
-          <div className="mx-4 my-4 flex flex-row justify-between items-center">
+          <div className="my-4 flex flex-row justify-between items-center">
             <Tabs
               value={pathname}
               className="bg-white p-1.5 rounded-lg shadow-sm border border-gray-100/80"
@@ -148,7 +148,7 @@ function DAGDetails() {
               <DAGEditButtons fileId={params.fileId || ''} />
             ) : null}
           </div>
-          <div className="mx-4 flex-1">
+          <div className="flex-1">
             {tab == 'status' ? (
               <DAGStatus run={data.latestRun} fileId={params.fileId || ''} />
             ) : null}

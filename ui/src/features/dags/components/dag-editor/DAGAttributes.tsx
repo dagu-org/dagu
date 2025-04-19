@@ -23,32 +23,36 @@ type Props = {
  */
 function DAGAttributes({ dag }: Props) {
   return (
-    <div className="mb-6 border border-slate-200 dark:border-slate-700 rounded-md p-4 bg-white dark:bg-slate-900">
-      <h2 className="text-xl font-semibold mb-4">{dag.name}</h2>
+    <div>
+      <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-200 mb-4">
+        {dag.name}
+      </h2>
 
       {dag.description && (
-        <p className="text-slate-600 dark:text-slate-300 mb-4">
+        <p className="text-slate-600 dark:text-slate-300 mb-6">
           {dag.description}
         </p>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Schedule */}
         <div className="space-y-1">
-          <div className="flex items-center gap-1.5 text-sm text-slate-500">
+          <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
             <Calendar className="h-4 w-4" />
             <span>Schedule</span>
           </div>
 
           {!dag.schedule?.length ? (
-            <div className="text-sm text-slate-500">No schedule defined</div>
+            <div className="text-sm text-slate-500 italic">
+              No schedule defined
+            </div>
           ) : (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {dag.schedule?.map((schedule) => (
                 <Badge
                   key={schedule.expression}
                   variant="outline"
-                  className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800"
+                  className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 px-2.5 py-1"
                 >
                   {schedule.expression}
                 </Badge>
@@ -60,17 +64,17 @@ function DAGAttributes({ dag }: Props) {
         {/* Parameters */}
         {dag.params && dag.params.length > 0 && (
           <div className="space-y-1">
-            <div className="flex items-center gap-1.5 text-sm text-slate-500">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
               <Tag className="h-4 w-4" />
               <span>Parameters</span>
             </div>
 
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {dag.params.map((param) => (
                 <Badge
                   key={param}
                   variant="outline"
-                  className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                  className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-1"
                 >
                   {param}
                 </Badge>
@@ -82,32 +86,38 @@ function DAGAttributes({ dag }: Props) {
         {/* Max Active Runs */}
         {dag.maxActiveRuns && (
           <div className="space-y-1">
-            <div className="flex items-center gap-1.5 text-sm text-slate-500">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
               <Settings className="h-4 w-4" />
               <span>Max Active Runs</span>
             </div>
 
-            <div className="font-medium">{dag.maxActiveRuns}</div>
+            <div className="font-medium text-slate-800 dark:text-slate-200">
+              {dag.maxActiveRuns}
+            </div>
           </div>
         )}
 
         {/* Preconditions */}
         {dag.preconditions && dag.preconditions.length > 0 && (
           <div className="space-y-1">
-            <div className="flex items-center gap-1.5 text-sm text-slate-500">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
               <CheckSquare className="h-4 w-4" />
               <span>Preconditions</span>
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-2">
               {dag.preconditions.map((c, index) => (
                 <div
                   key={index}
-                  className="flex items-center gap-1 text-xs bg-slate-100 dark:bg-slate-800 rounded p-1"
+                  className="flex items-center gap-2 text-xs bg-slate-100 dark:bg-slate-800 rounded-md p-2"
                 >
-                  <span className="font-medium">{c.condition}</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                    {c.condition}
+                  </span>
                   <span className="text-slate-500">=&gt;</span>
-                  <span>{c.expected}</span>
+                  <span className="text-slate-700 dark:text-slate-300">
+                    {c.expected}
+                  </span>
                 </div>
               ))}
             </div>

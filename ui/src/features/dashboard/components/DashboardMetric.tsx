@@ -1,4 +1,3 @@
-import { Box, Typography } from '@mui/material';
 import React from 'react';
 import Title from '../../../ui/Title';
 
@@ -12,18 +11,11 @@ function DashboardMetric({ title, color, value }: Props) {
   return (
     <React.Fragment>
       <Title>{title}</Title>
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          flexGrow: 1,
-        }}
-      >
-        <Typography component="p" variant="h2" color={color}>
+      <div className="flex justify-center items-center flex-grow">
+        <p className="text-4xl font-semibold" style={{ color: color }}>
           {value}
-        </Typography>
-      </Box>
+        </p>
+      </div>
     </React.Fragment>
   );
 }

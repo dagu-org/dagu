@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   flexRender,
   useReactTable,
@@ -317,7 +318,7 @@ const defaultColumns = [
       if (data.kind === ItemKind.DAG) {
         // Use the updated StatusChip component
         return (
-          <StatusChip status={data.dag.latestRun.status}>
+          <StatusChip status={data.dag.latestRun.status} size="sm">
             {data.dag.latestRun?.statusText}
           </StatusChip>
         );
@@ -609,6 +610,7 @@ function DAGTable({
   searchTag,
   handleSearchTagChange,
 }: Props) {
+  const navigate = useNavigate();
   const [columns] = React.useState(() => [...defaultColumns]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
@@ -838,7 +840,7 @@ function DAGTable({
                     style={{ fontSize: '0.9375rem' }} // Ensure row font size matches container
                     onClick={() => {
                       if (isDAGRow && navigateTo) {
-                        window.location.href = navigateTo;
+                        navigate(navigateTo);
                       }
                     }}
                   >

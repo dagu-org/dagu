@@ -3,9 +3,9 @@
  *
  * @module features/dags/components/visualization
  */
-import { AccountTreeOutlined } from '@mui/icons-material';
-import { ToggleButton, ToggleButtonGroup } from '@mui/material';
+import { ArrowRightLeft, ArrowDownUp } from 'lucide-react';
 import React from 'react';
+import { ToggleGroup, ToggleButton } from '@/components/ui/toggle-group';
 import { FlowchartType } from './';
 
 /**
@@ -23,26 +23,46 @@ type Props = {
  * horizontal (LR) and vertical (TD) flowchart layouts
  */
 function FlowchartSwitch({ value = 'TD', onChange }: Props) {
+  const handleChange = (newValue: string) => {
+    onChange(newValue as FlowchartType);
+  };
+
   return (
-    <ToggleButtonGroup
-      value={value}
-      exclusive
-      onChange={(_, value) => {
-        onChange(value as FlowchartType);
-      }}
-      aria-label="flowchart direction"
-    >
-      <ToggleButton value="LR" aria-label="horizontal layout">
-        <AccountTreeOutlined />
-      </ToggleButton>
-      <ToggleButton value="TD" aria-label="vertical layout">
-        <AccountTreeOutlined
-          style={{
-            transform: 'rotate(90deg)',
-          }}
-        />
-      </ToggleButton>
-    </ToggleButtonGroup>
+    <div className="flex flex-col items-start">
+      <ToggleGroup
+        value={value}
+        onChange={handleChange}
+        aria-label="flowchart direction"
+      >
+        <ToggleButton
+          value="LR"
+          groupValue={value}
+          onClick={() => handleChange('LR')}
+          aria-label="horizontal layout"
+          className="px-2 py-1 w-18"
+          position="first"
+        >
+          <div className="flex flex-col items-center">
+            <ArrowRightLeft className="h-4 w-4" />
+            <span className="text-xs mt-1">Horizontal</span>
+          </div>
+        </ToggleButton>
+
+        <ToggleButton
+          value="TD"
+          groupValue={value}
+          onClick={() => handleChange('TD')}
+          aria-label="vertical layout"
+          className="px-2 py-1 w-18"
+          position="last"
+        >
+          <div className="flex flex-col items-center">
+            <ArrowDownUp className="h-4 w-4" />
+            <span className="text-xs mt-1">Vertical</span>
+          </div>
+        </ToggleButton>
+      </ToggleGroup>
+    </div>
   );
 }
 

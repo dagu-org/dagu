@@ -1,22 +1,20 @@
 import * as React from 'react';
-import Typography from '@mui/material/Typography';
+import { cn } from '@/lib/utils';
 
 interface TitleProps {
   children?: React.ReactNode;
+  className?: string;
 }
 
-export default function Title(props: TitleProps) {
+export default function Title({ children, className }: TitleProps) {
   return (
-    <Typography
-      component="h2"
-      variant="h4"
-      gutterBottom
-      sx={{
-        fontWeight: '800',
-        color: '#404040',
-      }}
+    <h2
+      className={cn(
+        'text-2xl font-bold text-slate-800 dark:text-slate-100 mb-4',
+        className
+      )}
     >
-      {props.children}
-    </Typography>
+      {children}
+    </h2>
   );
 }

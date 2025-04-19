@@ -1,5 +1,6 @@
 import React from 'react';
 import { Status } from '../api/v2/schema';
+import { cn } from '@/lib/utils';
 
 type Props = {
   status?: Status;
@@ -73,21 +74,27 @@ function StatusChip({ status, children, size = 'md' }: Props) {
   // Render a pill-shaped badge with icon and text
   return (
     <div
-      className={`
-        inline-flex items-center rounded-full
-        ${bgColorClass} ${borderColorClass} ${textColorClass}
-        border transition-all duration-200 ease-in-out
-        shadow-sm hover:shadow ${sizeClasses[size]}
-      `}
+      className={cn(
+        'inline-flex items-center rounded-full border',
+        bgColorClass,
+        borderColorClass,
+        textColorClass,
+        'transition-all duration-200 ease-in-out',
+        'shadow-sm hover:shadow',
+        sizeClasses[size]
+      )}
     >
       <span
-        className={`mr-1.5 inline-flex ${pulseAnimation} ${textColorClass}`}
+        className={cn('mr-1.5 inline-flex', pulseAnimation, textColorClass)}
         aria-hidden="true"
       >
         {statusIcon}
       </span>
       <span
-        className={`font-medium ${textColorClass} break-keep text-nowrap whitespace-nowrap`}
+        className={cn(
+          'font-medium break-keep text-nowrap whitespace-nowrap',
+          textColorClass
+        )}
       >
         {displayChildren}
       </span>

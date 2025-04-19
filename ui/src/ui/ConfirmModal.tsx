@@ -1,5 +1,5 @@
-import { Box, Button, Modal, Stack, Typography } from '@mui/material';
-import React from 'react';
+import React, { useEffect } from 'react';
+import { Button } from '@/components/ui/button';
 
 type Props = {
   title: string;
@@ -10,18 +10,6 @@ type Props = {
   onSubmit: () => void;
 };
 
-const style = {
-  position: 'absolute',
-  top: '50%',
-  left: '50%',
-  transform: 'translate(-50%, -50%)',
-  width: 400,
-  bgcolor: 'background.paper',
-  border: '2px solid #000',
-  boxShadow: 24,
-  p: 4,
-};
-
 function ConfirmModal({
   children,
   title,
@@ -30,7 +18,7 @@ function ConfirmModal({
   dismissModal,
   onSubmit,
 }: Props) {
-  React.useEffect(() => {
+  useEffect(() => {
     const callback = (event: KeyboardEvent) => {
       const e = event || window.event;
       if (e.key == 'Escape' || e.key == 'Esc') {
@@ -43,29 +31,32 @@ function ConfirmModal({
     };
   }, [dismissModal]);
 
+  if (!visible) return null;
+
   return (
-    <Modal open={visible} onClose={dismissModal}>
-      <Box sx={style}>
-        <Stack direction="row" alignContent="center" justifyContent="center">
-          <Typography variant="h6">{title}</Typography>
-        </Stack>
-        <Stack
-          direction="column"
-          alignContent="center"
-          justifyContent="center"
-          spacing={2}
-          mt={2}
-        >
-          <Box>{children}</Box>
-          <Button variant="outlined" onClick={() => onSubmit()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="w-full max-w-md rounded-lg border-2 border-black bg-white p-6 shadow-xl">
+        <div className="flex items-center justify-center">
+          <h2 className="text-xl font-semibold">{title}</h2>
+        </div>
+
+        <div className="mt-4 flex flex-col space-y-4">
+          <div>{children}</div>
+
+          <Button variant="outline" onClick={() => onSubmit()}>
             {buttonText}
           </Button>
-          <Button variant="outlined" color="error" onClick={dismissModal}>
+
+          <Button
+            variant="outline"
+            className="text-destructive hover:bg-destructive/10"
+            onClick={dismissModal}
+          >
             Cancel
           </Button>
-        </Stack>
-      </Box>
-    </Modal>
+        </div>
+      </div>
+    </div>
   );
 }
 

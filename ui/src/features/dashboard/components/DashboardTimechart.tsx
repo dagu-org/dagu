@@ -1,5 +1,4 @@
 import React, { useEffect, useRef } from 'react';
-import { Box } from '@mui/material';
 import moment, { MomentInput } from 'moment-timezone';
 import { Timeline, DataSet } from 'vis-timeline/standalone';
 import 'vis-timeline/styles/vis-timeline-graph2d.css';
@@ -144,17 +143,9 @@ function DashboardTimeChart({ data: input }: Props) {
 
 function TimelineWrapper({ children }: { children: React.ReactNode }) {
   return (
-    <Box
-      sx={{
-        width: '95%',
-        maxWidth: '95%',
-        height: '60vh',
-        overflow: 'auto',
-        backgroundColor: 'lightgray',
-      }}
-    >
+    <div className="w-[95%] max-w-[95%] h-[60vh] overflow-auto bg-gray-200">
       {children}
-    </Box>
+    </div>
   );
 }
 

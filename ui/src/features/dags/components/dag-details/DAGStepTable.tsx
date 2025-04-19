@@ -35,26 +35,36 @@ function DAGStepTable({ steps, title }: Props) {
   }
 
   return (
-    <div className="mb-6 border border-slate-200 dark:border-slate-700 rounded-md overflow-hidden bg-white dark:bg-slate-900">
-      <div className="w-full overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[5%]">No</TableHead>
-              <TableHead className="w-[20%]">Step Details</TableHead>
-              <TableHead className="w-[25%]">Execution</TableHead>
-              <TableHead className="w-[15%]">Dependencies</TableHead>
-              <TableHead className="w-[15%]">Configuration</TableHead>
-              <TableHead className="w-[20%]">Conditions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {steps.map((step, idx) => (
-              <DAGStepTableRow key={idx} step={step} index={idx} />
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+    <div className="w-full overflow-x-auto">
+      <Table>
+        <TableHeader className="bg-slate-50 dark:bg-slate-800">
+          <TableRow className="border-b border-slate-200 dark:border-slate-700">
+            <TableHead className="w-[4%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              No
+            </TableHead>
+            <TableHead className="w-[20%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Step Details
+            </TableHead>
+            <TableHead className="w-[22%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Execution
+            </TableHead>
+            <TableHead className="w-[18%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Dependencies
+            </TableHead>
+            <TableHead className="w-[18%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Configuration
+            </TableHead>
+            <TableHead className="w-[18%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Conditions
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {steps.map((step, idx) => (
+            <DAGStepTableRow key={idx} step={step} index={idx} />
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

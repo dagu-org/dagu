@@ -38,11 +38,11 @@ type Props = {
  */
 function HistoryTable({ runs, gridData, onSelect, idx }: Props) {
   return (
-    <div className="rounded-lg bg-white overflow-hidden shadow-sm">
+    <div className="rounded-xl bg-white overflow-hidden shadow-md dark:bg-slate-900 dark:border dark:border-slate-800">
       <Table className="select-none border-collapse">
-        <TableHeader>
-          <TableRow>
-            <TableHead></TableHead>
+        <TableHeader className="bg-slate-50 dark:bg-slate-800">
+          <TableRow className="border-b border-slate-200 dark:border-slate-700">
+            <TableHead className="py-3"></TableHead>
             {runs.map((_, i) => {
               if (!runs || i >= runs.length || !runs[i]) {
                 return null;
@@ -71,7 +71,8 @@ function HistoryTable({ runs, gridData, onSelect, idx }: Props) {
                   key={`date-${i}`}
                   className={cn(
                     'max-w-[22px] min-w-[22px] text-left p-2 cursor-pointer text-xs font-medium',
-                    'hover:bg-slate-50 transition-colors duration-200'
+                    'hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors duration-200',
+                    i === idx && 'bg-slate-100 dark:bg-slate-700'
                   )}
                   onClick={() => {
                     onSelect(i);

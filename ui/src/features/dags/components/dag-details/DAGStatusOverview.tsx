@@ -5,11 +5,11 @@
  */
 import React from 'react';
 import StatusChip from '../../../../ui/StatusChip';
-import { Stack, Paper, Box, Divider, Typography } from '@mui/material';
 import LabeledItem from '../../../../ui/LabeledItem';
 import { Link } from 'react-router-dom';
-import { DescriptionOutlined } from '@mui/icons-material';
+import { FileText } from 'lucide-react';
 import { components } from '../../../../api/v2/schema';
+import { cn } from '@/lib/utils';
 
 /**
  * Props for the DAGStatusOverview component
@@ -52,126 +52,61 @@ function DAGStatusOverview({ status, fileId, requestId = '' }: Props) {
   };
 
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        p: 2,
-        borderRadius: 2,
-        border: '1px solid rgba(0, 0, 0, 0.12)',
-        transition: 'all 0.2s ease-in-out',
-        '&:hover': {
-          boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.05)',
-        },
-      }}
-    >
-      <Box sx={{ mb: 2 }}>
-        <Stack
-          direction="row"
-          spacing={2}
-          sx={{ alignItems: 'center', justifyContent: 'space-between' }}
-        >
+    <div>
+      <div className="mb-4">
+        <div className="flex items-center justify-between">
           <StatusChip status={status.status} size="lg">
             {status.statusText}
           </StatusChip>
-        </Stack>
-      </Box>
+        </div>
+      </div>
 
-      <Divider sx={{ my: 1.5 }} />
+      <div className="h-px w-full bg-slate-200 dark:bg-slate-700 my-4"></div>
 
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
-          gap: 2,
-        }}
-      >
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {status.requestId && (
-          <LabeledItem label="Request ID">
-            <Box
-              sx={{
-                p: 1,
-                bgcolor: 'rgba(0, 0, 0, 0.04)',
-                borderRadius: 1,
-                fontFamily: 'inherit',
-                fontWeight: 500,
-                fontSize: '0.875rem',
-              }}
-            >
-              {status.requestId}
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Link
-                to={url}
-                style={{
-                  textDecoration: 'none',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '6px 12px',
-                  borderRadius: '4px',
-                  color: 'rgba(0, 0, 0, 0.7)',
-                  transition: 'all 0.2s ease',
-                  fontWeight: 500,
-                }}
-              >
-                <Box
-                  component="span"
-                  sx={{
-                    mr: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
+          <div className="space-y-2">
+            <LabeledItem label="Request ID">
+              <div className="flex flex-row gap-2">
+                <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-md font-medium text-sm text-slate-700 dark:text-slate-300">
+                  {status.requestId}
+                </div>
+                <Link
+                  to={url}
+                  className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors duration-200"
                 >
-                  <DescriptionOutlined fontSize="small" />
-                </Box>
-              </Link>
-            </Box>
-          </LabeledItem>
+                  <FileText className="h-4 w-4" />
+                </Link>
+              </div>
+            </LabeledItem>
+          </div>
         )}
-      </Box>
+      </div>
 
-      <Box
-        sx={{
-          mt: 2,
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
-          gap: 2,
-        }}
-      >
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         <LabeledItem label="Started At">
-          <Box sx={{ fontFamily: 'inherit', fontWeight: 500 }}>
+          <span className="font-medium text-slate-700 dark:text-slate-300">
             {formatTimestamp(status.startedAt)}
-          </Box>
+          </span>
         </LabeledItem>
 
         <LabeledItem label="Finished At">
-          <Box sx={{ fontFamily: 'inherit', fontWeight: 500 }}>
+          <span className="font-medium text-slate-700 dark:text-slate-300">
             {formatTimestamp(status.finishedAt)}
-          </Box>
+          </span>
         </LabeledItem>
-      </Box>
+      </div>
 
       {status.params && (
-        <Box sx={{ mt: 2 }}>
-          <LabeledItem label="Parameters">
-            <Box
-              sx={{
-                p: 1.5,
-                bgcolor: 'rgba(0, 0, 0, 0.04)',
-                borderRadius: 1,
-                fontFamily: 'inherit',
-                fontWeight: 500,
-                fontSize: '0.875rem',
-                maxHeight: '120px',
-                overflowY: 'auto',
-              }}
-            >
+        <div className="mt-4">
+          <LabeledItem label="Parameters" className="items-start">
+            <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-md font-medium text-sm text-slate-700 dark:text-slate-300 font-mono max-h-[120px] overflow-y-auto w-full">
               {status.params}
-            </Box>
+            </div>
           </LabeledItem>
-        </Box>
+        </div>
       )}
-    </Paper>
+    </div>
   );
 }
 

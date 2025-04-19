@@ -57,7 +57,11 @@ function DAGDefinition({
   const className = classes.join(' ');
 
   return (
-    <pre data-start={startLine || 1} data-line={highlightLine}>
+    <pre
+      data-start={startLine || 1}
+      data-line={highlightLine}
+      className="rounded-sm"
+    >
       <code className={className}>{value}</code>
     </pre>
   );
