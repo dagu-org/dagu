@@ -136,6 +136,7 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
 
           <Button
             variant="outline"
+            className="cursor-pointer"
             onClick={() => {
               onSubmit(stringifyParams(params));
             }}
@@ -145,7 +146,7 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
 
           <Button
             variant="outline"
-            className="text-destructive hover:bg-destructive/10"
+            className="text-destructive hover:bg-destructive/10 cursor-pointer"
             onClick={dismissModal}
           >
             Cancel

@@ -97,7 +97,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
       <div
         className={cn(
           // Modern base styles with dark background
-          'h-full overflow-hidden bg-[#1E293B] text-white',
+          'h-full overflow-hidden bg-[#1D292B] text-white',
           // Shadow effect
           'shadow-lg',
           // Always visible, not fixed
@@ -143,6 +143,15 @@ function Content({ title, navbarColor, children }: LayoutProps) {
           <div className="flex items-center justify-between w-full h-10">
             {/* Left side content: Title */}
             <div className="flex items-center space-x-2">
+              <NavBarTitleText
+                color={getContrastColor(
+                  navbarColor && navbarColor.trim() !== ''
+                    ? navbarColor
+                    : '#4D6744'
+                )}
+              >
+                {title || ''}
+              </NavBarTitleText>
               <AppBarContext.Consumer>
                 {(context) => (
                   <NavBarTitleText
@@ -161,15 +170,6 @@ function Content({ title, navbarColor, children }: LayoutProps) {
 
             {/* Right side content */}
             <div className="flex items-center space-x-4">
-              <NavBarTitleText
-                color={getContrastColor(
-                  navbarColor && navbarColor.trim() !== ''
-                    ? navbarColor
-                    : '#4D6744'
-                )}
-              >
-                {title || 'Dagu'}
-              </NavBarTitleText>
               <AppBarContext.Consumer>
                 {(context) => {
                   if (

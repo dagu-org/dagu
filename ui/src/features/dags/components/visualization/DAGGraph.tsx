@@ -55,7 +55,7 @@ function DAGGraph({ run, onSelectStep }: Props) {
             isActive={sub === '0'}
             onClick={() => setSub('0')}
             className={cn(
-              'flex items-center gap-2 text-sm h-10',
+              'flex items-center gap-2 text-sm h-10 cursor-pointer',
               sub === '0' && 'bg-primary text-primary-foreground font-medium'
             )}
           >
@@ -67,7 +67,7 @@ function DAGGraph({ run, onSelectStep }: Props) {
             isActive={sub === '1'}
             onClick={() => setSub('1')}
             className={cn(
-              'flex items-center gap-2 text-sm h-10',
+              'flex items-center gap-2 text-sm h-10 cursor-pointer',
               sub === '1' && 'bg-primary text-primary-foreground font-medium'
             )}
           >

@@ -20,13 +20,13 @@ const LinkTab: React.FC<LinkTabProps> = ({
   icon: Icon,
   ...props
 }) => (
-  <Link to={value} className="focus:outline-none">
+  <Link to={value} className="focus:outline-none cursor-pointer">
     <Tab
       value={value}
       isActive={isActive}
       className={cn(
         'group relative rounded-md px-4 py-2 transition-all duration-200 ease-in-out',
-        'flex items-center gap-2 text-sm font-medium',
+        'flex items-center gap-2 text-sm font-medium cursor-pointer',
         isActive
           ? 'bg-primary/10 text-primary border border-primary/30 shadow-sm font-semibold'
           : 'hover:bg-primary/5 hover:text-primary border border-transparent',

@@ -99,7 +99,8 @@ function DAGSpec({ fileId }: Props) {
           <React.Fragment>
             <div className="space-y-4">
               <div className="overflow-x-auto rounded-xl shadow-md bg-white dark:bg-slate-900 p-6">
-                <div className="flex justify-end items-center mb-4">
+                <div className="flex justify-between items-center mb-4">
+                  <SubTitle className="mb-0">Graph</SubTitle>
                   <FlowchartSwitch
                     value={cookie['flowchart']}
                     onChange={onChangeFlowchart}
@@ -163,6 +164,7 @@ function DAGSpec({ fileId }: Props) {
                         id="save-config"
                         variant="default"
                         size="sm"
+                        className="cursor-pointer"
                         onClick={async () => {
                           if (!currentValue) {
                             alert('No changes to save');
@@ -204,6 +206,7 @@ function DAGSpec({ fileId }: Props) {
                       <Button
                         variant="outline"
                         size="sm"
+                        className="cursor-pointer"
                         onClick={() => setEditing(false)}
                       >
                         <X className="h-4 w-4 mr-1" />
@@ -215,6 +218,7 @@ function DAGSpec({ fileId }: Props) {
                       id="edit-config"
                       variant="outline"
                       size="sm"
+                      className="cursor-pointer"
                       onClick={() => setEditing(true)}
                     >
                       <Edit className="h-4 w-4 mr-1" />

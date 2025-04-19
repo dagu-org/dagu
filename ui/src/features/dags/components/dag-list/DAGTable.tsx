@@ -772,21 +772,28 @@ function DAGTable({
               handleSearchTagChange(value === 'all' ? '' : value)
             }
           >
-            <SelectTrigger className="w-[200px] h-10 bg-background border-muted hover:border-muted-foreground/30 focus:ring-1 focus:ring-primary/30 focus:border-primary/50 transition-all duration-200 rounded-md">
+            <SelectTrigger className="w-[200px] h-10 bg-background border-muted hover:border-muted-foreground/30 focus:ring-1 focus:ring-primary/30 focus:border-primary/50 transition-all duration-200 rounded-md cursor-pointer">
               <div className="flex items-center gap-2 text-sm">
                 <Filter className="h-3.5 w-3.5 text-muted-foreground/70" />
                 <SelectValue placeholder="Filter by tag" />
               </div>
             </SelectTrigger>
             <SelectContent className="max-h-[280px] overflow-y-auto">
-              <SelectItem value="all" className="flex items-center">
+              <SelectItem
+                value="all"
+                className="flex items-center cursor-pointer"
+              >
                 <span className="font-medium">All Tags</span>
               </SelectItem>
 
               <div className="my-1 h-px bg-muted"></div>
 
               {uniqueTags?.tags?.map((tag) => (
-                <SelectItem key={tag} value={tag} className="flex items-center">
+                <SelectItem
+                  key={tag}
+                  value={tag}
+                  className="flex items-center cursor-pointer"
+                >
                   <div className="flex items-center gap-2">
                     <span>{tag}</span>
                   </div>

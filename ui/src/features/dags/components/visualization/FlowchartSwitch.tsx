@@ -39,7 +39,7 @@ function FlowchartSwitch({ value = 'TD', onChange }: Props) {
           groupValue={value}
           onClick={() => handleChange('LR')}
           aria-label="horizontal layout"
-          className="px-2 py-1 w-18"
+          className="px-2 py-1 w-18 cursor-pointer"
           position="first"
         >
           <div className="flex flex-col items-center">
@@ -53,7 +53,7 @@ function FlowchartSwitch({ value = 'TD', onChange }: Props) {
           groupValue={value}
           onClick={() => handleChange('TD')}
           aria-label="vertical layout"
-          className="px-2 py-1 w-18"
+          className="px-2 py-1 w-18 cursor-pointer"
           position="last"
         >
           <div className="flex flex-col items-center">

@@ -73,7 +73,7 @@ function DAGStatusOverview({ status, fileId, requestId = '' }: Props) {
                 </div>
                 <Link
                   to={url}
-                  className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors duration-200"
+                  className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors duration-200 cursor-pointer"
                 >
                   <FileText className="h-4 w-4" />
                 </Link>

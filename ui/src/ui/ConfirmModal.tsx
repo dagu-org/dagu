@@ -43,13 +43,17 @@ function ConfirmModal({
         <div className="mt-4 flex flex-col space-y-4">
           <div>{children}</div>
 
-          <Button variant="outline" onClick={() => onSubmit()}>
+          <Button
+            variant="outline"
+            className="cursor-pointer"
+            onClick={() => onSubmit()}
+          >
             {buttonText}
           </Button>
 
           <Button
             variant="outline"
-            className="text-destructive hover:bg-destructive/10"
+            className="text-destructive hover:bg-destructive/10 cursor-pointer"
             onClick={dismissModal}
           >
             Cancel

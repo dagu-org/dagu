@@ -67,7 +67,7 @@ function Search() {
           <Button
             disabled={!searchVal}
             variant="outline"
-            className="w-24"
+            className="w-24 cursor-pointer"
             onClick={async () => {
               onSubmit(searchVal);
             }}

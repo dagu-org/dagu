@@ -29,6 +29,7 @@ function DAGEditButtons({ fileId }: Props) {
       <Button
         variant="outline"
         size="sm"
+        className="cursor-pointer"
         onClick={async () => {
           const newFileId = window.prompt(
             'Please input the new DAG file ID',
@@ -70,7 +71,7 @@ function DAGEditButtons({ fileId }: Props) {
       <Button
         variant="outline"
         size="sm"
-        className="text-red-600 hover:text-red-600 border-red-200 hover:border-red-300 hover:bg-red-50 dark:text-red-500 dark:hover:text-red-400 dark:border-red-900 dark:hover:border-red-800 dark:hover:bg-red-950"
+        className="text-red-600 hover:text-red-600 border-red-200 hover:border-red-300 hover:bg-red-50 dark:text-red-500 dark:hover:text-red-400 dark:border-red-900 dark:hover:border-red-800 dark:hover:bg-red-950 cursor-pointer"
         onClick={async () => {
           if (!confirm('Are you sure to delete the DAG?')) {
             return;

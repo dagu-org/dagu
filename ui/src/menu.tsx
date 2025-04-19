@@ -137,7 +137,7 @@ function NavItem({ to, icon, text, isOpen, onClick }: NavItemProps) {
     );
   } else {
     return (
-      <div className="flex justify-center my-1">
+      <div className="flex justify-center">
         <Link
           to={to}
           onClick={onClick}

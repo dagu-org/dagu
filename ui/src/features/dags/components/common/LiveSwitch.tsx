@@ -77,7 +77,7 @@ function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
       onCheckedChange={handleCheckedChange}
       aria-label={ariaLabel} // Pass aria-label directly
       // Add custom styling for unchecked state visibility
-      className="data-[state=unchecked]:bg-gray-300 dark:data-[state=unchecked]:bg-gray-700"
+      className="data-[state=unchecked]:bg-gray-300 dark:data-[state=unchecked]:bg-gray-700 cursor-pointer"
     />
   );
 }

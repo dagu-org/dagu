@@ -98,7 +98,7 @@ function DAGStepTableRow({ step, index }: Props) {
               {step.args && step.args.length > 0 && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="pl-6 text-xs text-slate-500 dark:text-slate-400 font-mono truncate">
+                    <div className="pl-6 text-xs text-slate-500 dark:text-slate-400 font-mono truncate cursor-pointer">
                       {step.args.join(' ')}
                     </div>
                   </TooltipTrigger>
@@ -212,7 +212,7 @@ function DAGStepTableRow({ step, index }: Props) {
           {step.params && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 rounded-md p-2 truncate">
+                <div className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 rounded-md p-2 truncate cursor-pointer">
                   <span className="font-medium">Params:</span>{' '}
                   <span className="font-mono">{step.params}</span>
                 </div>

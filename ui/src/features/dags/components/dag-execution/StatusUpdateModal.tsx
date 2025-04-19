@@ -57,12 +57,14 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
           <div className="flex justify-center space-x-4">
             <Button
               variant="outline"
+              className="cursor-pointer"
               onClick={() => onSubmit(step, NodeStatus.Success)}
             >
               Mark Success
             </Button>
             <Button
               variant="outline"
+              className="cursor-pointer"
               onClick={() => onSubmit(step, NodeStatus.Failed)}
             >
               Mark Failed
@@ -72,7 +74,7 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
           <div className="flex justify-center">
             <Button
               variant="outline"
-              className="text-destructive hover:bg-destructive/10"
+              className="text-destructive hover:bg-destructive/10 cursor-pointer"
               onClick={dismissModal}
             >
               Cancel
