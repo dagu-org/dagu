@@ -77,7 +77,6 @@ function DAGStatus({ run, fileId }: Props) {
   return (
     <React.Fragment>
       <DAGGraph run={run} onSelectStep={onSelectStepOnGraph} />
-
       <Box>
         <DAGContext.Consumer>
           {(props) => (
