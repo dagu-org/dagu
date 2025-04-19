@@ -128,10 +128,12 @@ function Content({ title, navbarColor, children }: LayoutProps) {
       {/* Sidebar */}
       <div
         className={cn(
-          // Base styles: border, background
-          'h-full overflow-hidden bg-white border-r border-gray-200',
+          // Modern base styles with dark background
+          'h-full overflow-hidden bg-[#1E293B] text-white',
+          // Glass-like effect with subtle shadow
+          'backdrop-blur-sm shadow-lg',
           // Always fixed for slide-in effect
-          'fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-in-out',
+          'fixed inset-y-0 left-0 z-40 transform transition-all duration-300 ease-in-out',
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full',
           isSidebarOpen ? drawerWidthOpen : 'w-0'
         )}
@@ -145,13 +147,25 @@ function Content({ title, navbarColor, children }: LayoutProps) {
           }
         }}
       >
-        {/* Wrap nav and button in a flex column to push button to bottom */}
-        <div className="flex flex-col justify-between h-full">
-          <nav className="p-3 pt-4">
-            <MainListItems isOpen={isSidebarOpen} />
+        {/* Simplified flex column layout */}
+        <div className="flex flex-col h-full">
+          <nav className="flex-1">
+            <MainListItems
+              isOpen={isSidebarOpen}
+              onNavItemClick={() => setIsSidebarOpen(false)}
+            />
           </nav>
-          {/* Desktop Toggle Button (Bottom Left) */}
-          {/* Toggle button removed as per user request */}
+
+          {/* Modern toggle button at the bottom */}
+          <div className="p-4 flex justify-center">
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="text-white/70 hover:text-white transition-colors duration-200"
+              aria-label="Close sidebar"
+            >
+              <PanelLeftClose size={20} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -179,7 +193,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
             {/* Left side content: Toggle Button + Title */}
             <div className="flex items-center space-x-4">
               <button
-                className="p-2 rounded-md hover:bg-white/10 focus:outline-none focus:ring-0 focus-visible:outline-none"
+                className="p-2 rounded-md hover:bg-white/10 focus:outline-none focus:ring-0 focus-visible:outline-none transition-all duration-200"
                 style={{
                   color: getContrastColor(
                     navbarColor && navbarColor.trim() !== ''
@@ -190,20 +204,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
                 aria-label="Open sidebar"
                 onClick={() => setIsSidebarOpen(true)}
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  className="w-6 h-6"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-                  />
-                </svg>
+                <PanelLeftOpen size={20} />
               </button>
               <AppBarContext.Consumer>
                 {(context) => (

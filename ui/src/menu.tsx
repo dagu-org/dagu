@@ -1,46 +1,49 @@
 import * as React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faChartGantt,
-  faMagnifyingGlass,
-  faTableList,
-} from '@fortawesome/free-solid-svg-icons';
-import { IconProp } from '@fortawesome/fontawesome-svg-core';
+import { BarChart2, Search, List } from 'lucide-react';
 import { cn } from '@/lib/utils'; // Assuming cn utility is available
 
-// Reusable Icon component (minor style adjustments for Tailwind context)
-function Icon({ icon }: { icon: IconProp }) {
+// Reusable Icon component using Lucide React
+function Icon({
+  children,
+  isActive,
+}: {
+  children: React.ReactNode;
+  isActive?: boolean;
+}) {
   return (
-    <span className="flex items-center justify-center w-5 h-5">
-      {' '}
-      {/* Tailwind for centering and size */}
-      <FontAwesomeIcon icon={icon} className="text-inherit" />{' '}
-      {/* Inherit color */}
+    <span
+      className={cn(
+        'flex items-center justify-center w-5 h-5',
+        isActive ? 'text-white' : 'text-[#7EB36A]' // Match text color
+      )}
+    >
+      {children}
     </span>
   );
 }
 
-// Define props for mainListItems to accept isOpen
+// Define props for mainListItems to accept isOpen and onNavItemClick
 type MainListItemsProps = {
   isOpen?: boolean;
+  onNavItemClick?: () => void;
 };
 
 // Main navigation items structure - now accepts isOpen prop
 export const mainListItems = React.forwardRef<
   HTMLDivElement,
   MainListItemsProps
->(({ isOpen = false }, ref) => (
+>(({ isOpen = false, onNavItemClick }, ref) => (
   <div ref={ref} className="flex flex-col h-full">
-    {/* Sidebar Header */}
-    <div className="flex items-center gap-3 px-4 py-6 border-b border-gray-200 bg-white/80 align-middle">
-      {/* SVG Logo */}
-      <span className="flex items-center justify-center w-12 h-12">
+    {/* Modern Sidebar Header */}
+    <div className="flex items-center gap-2 px-4 py-4 mb-2">
+      {/* Simplified SVG Logo */}
+      <span className="flex items-center justify-center w-8 h-8">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 100 100"
-          width="40"
-          height="40"
+          width="32"
+          height="32"
         >
           {/* Main circle with dark green color */}
           <circle cx="50" cy="50" r="45" fill="#4a6741" />
@@ -56,24 +59,37 @@ export const mainListItems = React.forwardRef<
           />
         </svg>
       </span>
-      <span className="text-4xl font-bold text-[#4D6744] tracking-wide select-none">
+      <span
+        className={cn(
+          'font-bold tracking-wide select-none transition-opacity duration-200',
+          isOpen ? 'text-2xl text-white opacity-100' : 'opacity-0 text-lg'
+        )}
+      >
         Dagu
       </span>
     </div>
-    {/* Navigation */}
-    <nav className="flex-1 flex flex-col gap-1 py-4 px-2 bg-transparent">
+    {/* Modern Navigation */}
+    <nav className="flex-1 flex flex-col gap-2 py-2 px-3">
       <NavItem
         to="/dashboard"
         text="Dashboard"
-        icon={faChartGantt}
+        icon={<BarChart2 size={18} />}
         isOpen={isOpen}
+        onClick={onNavItemClick}
       />
-      <NavItem to="/dags" text="DAGs" icon={faTableList} isOpen={isOpen} />
+      <NavItem
+        to="/dags"
+        text="DAGs"
+        icon={<List size={18} />}
+        isOpen={isOpen}
+        onClick={onNavItemClick}
+      />
       <NavItem
         to="/search"
         text="Search"
-        icon={faMagnifyingGlass}
+        icon={<Search size={18} />}
         isOpen={isOpen}
+        onClick={onNavItemClick}
       />
     </nav>
     {/* Optional: Sidebar Footer */}
@@ -85,34 +101,44 @@ mainListItems.displayName = 'MainListItems'; // Add display name for DevTools
 // Refactored NavItem component using Tailwind
 type NavItemProps = {
   to: string;
-  icon: IconProp;
+  icon: React.ReactNode;
   text: string;
-  isOpen: boolean; // Add isOpen prop
+  isOpen: boolean;
+  onClick?: () => void; // Add onClick prop
 };
 
-function NavItem({ to, icon, text, isOpen }: NavItemProps) {
+function NavItem({ to, icon, text, isOpen, onClick }: NavItemProps) {
   const location = useLocation();
-  const isActive = location.pathname.startsWith(to); // Simple active state check
+  const isActive = location.pathname.startsWith(to);
 
   return (
     <Link
       to={to}
+      onClick={onClick}
       className={cn(
-        'flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors duration-150 group whitespace-nowrap overflow-hidden',
+        'flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 group whitespace-nowrap overflow-hidden relative',
         isActive
-          ? 'bg-white bg-opacity-20 text-white font-bold' // Active: semi-transparent white bg, bold white text
-          : 'text-white/80 hover:bg-white hover:bg-opacity-10 hover:text-white' // Inactive: semi-transparent white, lighter on hover
+          ? 'text-white bg-white/10' // Active: subtle background
+          : 'text-[#7EB36A] hover:text-white hover:bg-white/5' // Inactive: lighter green for better contrast on dark background
       )}
       aria-current={isActive ? 'page' : undefined}
     >
-      <Icon icon={icon} />
-      {/* Conditionally render text based on isOpen state with transition */}
+      {/* Active indicator - left border */}
+      {isActive && (
+        <span className="absolute left-0 top-0 bottom-0 w-0.5 bg-white rounded-full" />
+      )}
+
+      <Icon isActive={isActive}>{icon}</Icon>
+
+      {/* Text with improved transition */}
       <span
         className={cn(
-          'ml-3 transition-opacity duration-200 ease-in-out',
-          isOpen ? 'opacity-100' : 'opacity-0' // Fade in/out text
+          'ml-3 transition-all duration-300 ease-in-out font-medium text-white',
+          isOpen
+            ? 'opacity-100 translate-x-0'
+            : 'opacity-0 -translate-x-4 absolute' // Slide and fade
         )}
-        aria-hidden={!isOpen} // Hide from screen readers when collapsed
+        aria-hidden={!isOpen}
       >
         {text}
       </span>
