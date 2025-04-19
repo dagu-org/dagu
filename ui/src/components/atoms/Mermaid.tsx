@@ -62,12 +62,19 @@ function Mermaid({ def, style = {}, scale }: Props) {
       if (mermaidRef.current) {
         mermaidRef.current.innerHTML = svg;
 
-        // Restore scroll position *after* SVG is rendered
-        if (scrollContainerRef.current) {
-            scrollContainerRef.current.scrollTop = scrollPosRef.current.top;
-            scrollContainerRef.current.scrollLeft = scrollPosRef.current.left;
+        // Apply scale transform immediately after SVG is rendered
+        const svgEl = mermaidRef.current.querySelector('svg');
+        if (svgEl) {
+          svgEl.style.overflow = 'visible';
+          svgEl.style.transform = `scale(${scale})`;
+          svgEl.style.transformOrigin = 'top left';
         }
 
+        // Restore scroll position *after* SVG is rendered
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = scrollPosRef.current.top;
+          scrollContainerRef.current.scrollLeft = scrollPosRef.current.left;
+        }
 
         // Bind event handlers
         // Consider if this timeout is still necessary or can be reduced
@@ -92,10 +99,10 @@ function Mermaid({ def, style = {}, scale }: Props) {
   React.useEffect(() => {
     // Save scroll position before re-rendering
     if (scrollContainerRef.current) {
-        scrollPosRef.current = {
-            top: scrollContainerRef.current.scrollTop,
-            left: scrollContainerRef.current.scrollLeft,
-        };
+      scrollPosRef.current = {
+        top: scrollContainerRef.current.scrollTop,
+        left: scrollContainerRef.current.scrollLeft,
+      };
     }
     render();
   }, [def]); // Only trigger re-render on definition change
