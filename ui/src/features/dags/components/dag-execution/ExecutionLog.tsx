@@ -3,9 +3,7 @@
  *
  * @module features/dags/components/dag-execution
  */
-import { Box } from '@mui/material';
 import React from 'react';
-import BorderedBox from '../../../../ui/BorderedBox';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { useQuery } from '../../../../hooks/api';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
@@ -62,28 +60,13 @@ function ExecutionLog({ name, requestId }: Props) {
   const content = data.content.replace(new RegExp(ANSI_CODES_REGEX, 'g'), '');
 
   return (
-    <Box>
-      <BorderedBox
-        sx={{
-          mt: 2,
-          py: 2,
-          px: 2,
-          height: '60vh',
-          overflow: 'auto',
-          backgroundColor: 'black',
-        }}
-      >
-        <pre
-          style={{
-            color: 'white',
-            height: '100%',
-            fontFamily: 'Courier New, Courier, monospace',
-          }}
-        >
+    <div className="mt-4">
+      <div className="h-[60vh] overflow-auto rounded-lg bg-zinc-900 p-4 shadow-md">
+        <pre className="h-full font-mono text-white">
           {content || '<No log output>'}
         </pre>
-      </BorderedBox>
-    </Box>
+      </div>
+    </div>
   );
 }
 

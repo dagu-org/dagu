@@ -38,7 +38,7 @@ type Props = {
  */
 function HistoryTable({ runs, gridData, onSelect, idx }: Props) {
   return (
-    <BorderedBox className="overflow-hidden">
+    <div className="rounded-lg bg-white overflow-hidden shadow-sm">
       <Table className="select-none border-collapse">
         <TableHeader>
           <TableRow>
@@ -96,7 +96,7 @@ function HistoryTable({ runs, gridData, onSelect, idx }: Props) {
           })}
         </TableBody>
       </Table>
-    </BorderedBox>
+    </div>
   );
 }
 

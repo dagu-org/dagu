@@ -18,6 +18,7 @@ import {
   StepLog,
 } from '../../../features/dags/components/dag-execution';
 import { DAGHeader } from '../../../features/dags/components/dag-details';
+import { ActivitySquare, FileCode, History, ScrollText } from 'lucide-react';
 
 type Params = {
   fileId: string;
@@ -110,26 +111,37 @@ function DAGDetails() {
             refreshFn={refreshFn}
             formatDuration={formatDuration}
           />
-          <div className="mx-4 my-2 flex flex-row justify-between items-center">
-            <Tabs value={pathname} className="bg-transparent p-0">
+          <div className="mx-4 my-4 flex flex-row justify-between items-center">
+            <Tabs
+              value={pathname}
+              className="bg-white p-1.5 rounded-lg shadow-sm border border-gray-100/80"
+            >
               <LinkTab
                 label="Status"
                 value={`${baseUrl}`}
                 isActive={pathname === `${baseUrl}`}
+                icon={ActivitySquare}
               />
               <LinkTab
                 label="Spec"
                 value={`${baseUrl}/spec`}
                 isActive={pathname === `${baseUrl}/spec`}
+                icon={FileCode}
               />
               <LinkTab
                 label="History"
                 value={`${baseUrl}/history`}
                 isActive={pathname === `${baseUrl}/history`}
+                icon={History}
               />
               {pathname === `${baseUrl}/log` ||
               pathname === `${baseUrl}/scheduler-log` ? (
-                <LinkTab label="Log" value={pathname} isActive={true} />
+                <LinkTab
+                  label="Log"
+                  value={pathname}
+                  isActive={true}
+                  icon={ScrollText}
+                />
               ) : null}
             </Tabs>
             {pathname === `${baseUrl}/spec` ? (

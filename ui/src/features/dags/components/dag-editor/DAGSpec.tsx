@@ -96,7 +96,7 @@ function DAGSpec({ fileId }: Props) {
       {(props) =>
         data?.dag && (
           <React.Fragment>
-            <div className="flex justify-between items-center my-4">
+            <div className="flex justify-between items-center mb-4">
               <FlowchartSwitch
                 value={cookie['flowchart']}
                 onChange={onChangeFlowchart}

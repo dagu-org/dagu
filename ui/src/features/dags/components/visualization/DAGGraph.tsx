@@ -48,7 +48,7 @@ function DAGGraph({ run, onSelectStep }: Props) {
 
   return (
     <Box>
-      <Stack direction="row" justifyContent="start" my={2}>
+      <Stack direction="row" justifyContent="start" mb={2}>
         <FlowchartSwitch value={flowchart} onChange={onChangeFlowchart} />
       </Stack>
       <BorderedBox
