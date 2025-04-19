@@ -11,7 +11,7 @@ import SubTitle from '../../../../ui/SubTitle';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { RunDetailsContext } from '../../contexts/DAGStatusContext';
 import { components, NodeStatus, Status } from '../../../../api/v2/schema';
-import { useClient, useMutate, useQuery } from '../../../../hooks/api';
+import { useClient, useQuery } from '../../../../hooks/api';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { DAGGraph } from '../visualization';
 import { NodeStatusTable } from '../dag-details';
@@ -79,7 +79,6 @@ type HistoryTableProps = {
 function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
-  const mutate = useMutate();
   const [modal, setModal] = React.useState(false);
 
   // Get the selected run index from URL parameters
@@ -166,9 +165,6 @@ function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
       return;
     }
 
-    // Refresh data after update
-    mutate(['/dags/{fileId}']);
-    mutate(['/dags/{fileId}/runs']);
     dismissModal();
   };
 

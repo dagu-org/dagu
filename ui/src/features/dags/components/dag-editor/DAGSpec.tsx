@@ -19,7 +19,7 @@ import {
   faPenToSquare,
 } from '@fortawesome/free-solid-svg-icons';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
-import { useMutate, useQuery } from '../../../../hooks/api';
+import { useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { components } from '../../../../api/v2/schema';
 import { useClient } from '../../../../hooks/api';
@@ -43,7 +43,6 @@ function DAGSpec({ fileId }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const params = useParams();
   const client = useClient();
-  const mutate = useMutate();
 
   // State for editing mode and current YAML value
   const [editing, setEditing] = React.useState(false);
@@ -239,8 +238,6 @@ function DAGSpec({ fileId }: Props) {
                             return;
                           }
                           setEditing(false);
-                          mutate(['/dags/{fileId}/spec']);
-                          mutate(['/dags']);
                           props.refresh();
                         }}
                       >

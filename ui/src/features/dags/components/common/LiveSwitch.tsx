@@ -6,7 +6,7 @@
 import React from 'react';
 import { Switch } from '@/components/ui/switch'; // Import Shadcn Switch
 import { components } from '../../../../api/v2/schema';
-import { useClient, useMutate } from '../../../../hooks/api';
+import { useClient } from '../../../../hooks/api';
 
 /**
  * Props for the LiveSwitch component
@@ -27,7 +27,6 @@ type Props = {
  */
 function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
   const client = useClient();
-  const mutate = useMutate();
 
   // Initialize state based on DAG suspension state
   const [checked, setChecked] = React.useState(!dag.suspended);
@@ -51,12 +50,11 @@ function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
         alert(error.message || 'Error occurred');
         return;
       }
-      mutate(['/dags/{fileId}']);
       if (refresh) {
         refresh();
       }
     },
-    [client, dag.fileId, mutate, refresh]
+    [client, dag.fileId, refresh]
   );
 
   /**

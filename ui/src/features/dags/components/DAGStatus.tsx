@@ -7,7 +7,7 @@ import { Box } from '@mui/material';
 import SubTitle from '../../../ui/SubTitle';
 import { components, NodeStatus, Status } from '../../../api/v2/schema';
 import { DAGGraph } from './visualization';
-import { useClient, useMutate } from '../../../hooks/api';
+import { useClient } from '../../../hooks/api';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 
 type Props = {
@@ -22,7 +22,6 @@ function DAGStatus({ run, fileId }: Props) {
     components['schemas']['Step'] | undefined
   >(undefined);
   const client = useClient();
-  const mutate = useMutate();
   const dismissModal = () => setModal(false);
   const onUpdateStatus = async (
     step: components['schemas']['Step'],

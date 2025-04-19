@@ -10,7 +10,7 @@ import { StartDAGModal } from '../dag-execution';
 import ConfirmModal from '../../../../ui/ConfirmModal';
 import LabeledItem from '../../../../ui/LabeledItem';
 import { components } from '../../../../api/v2/schema';
-import { useClient, useMutate } from '../../../../hooks/api';
+import { useClient } from '../../../../hooks/api';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { Button } from '@/components/ui/button'; // Import Shadcn Button
 import {
@@ -49,14 +49,11 @@ function DAGActions({ status, fileId, dag, refresh }: Props) {
   const [isRetryModal, setIsRetryModal] = React.useState(false);
 
   const client = useClient();
-  const mutate = useMutate();
 
   /**
    * Reload DAG data after an action is performed
    */
   const reloadData = () => {
-    mutate(['/dags/{fileId}']);
-    mutate(['/dags/{fileId}/runs']);
     refresh && refresh();
   };
 
