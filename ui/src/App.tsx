@@ -28,8 +28,44 @@ function App({ config }: Props) {
   if (!remoteNodes.includes('local')) {
     remoteNodes.unshift('local');
   }
+  const localStorageKey = 'dagu-selected-remote-node';
+
+  // Read initial value from localStorage or default to 'local'
+  const getInitialNode = () => {
+    const storedNode = localStorage.getItem(localStorageKey);
+    // Ensure the stored node is actually in the available nodes list
+    if (storedNode && remoteNodes.includes(storedNode)) {
+      return storedNode;
+    }
+    return 'local'; // Default
+  };
+
   const [selectedRemoteNode, setSelectedRemoteNode] =
-    React.useState<string>('local');
+    React.useState<string>(getInitialNode);
+
+  // Function to update state and localStorage
+  const handleSelectRemoteNode = (node: string) => {
+    if (remoteNodes.includes(node)) {
+      setSelectedRemoteNode(node);
+      localStorage.setItem(localStorageKey, node);
+    } else {
+      console.warn(`Attempted to select invalid remote node: ${node}`);
+      // Optionally reset to default or handle error
+      setSelectedRemoteNode('local');
+      localStorage.setItem(localStorageKey, 'local');
+    }
+  };
+
+  // Effect to update state if remoteNodes list changes and current selection is invalid
+  React.useEffect(() => {
+    if (!remoteNodes.includes(selectedRemoteNode)) {
+      handleSelectRemoteNode('local'); // Reset to default if current selection is no longer valid
+    }
+    // We only want this effect to run if remoteNodes changes,
+    // or selectedRemoteNode becomes invalid relative to remoteNodes.
+    // Adding handleSelectRemoteNode to deps would cause unnecessary runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remoteNodes, selectedRemoteNode]);
 
   return (
     <SWRConfig
@@ -46,7 +82,7 @@ function App({ config }: Props) {
           setTitle,
           remoteNodes,
           selectedRemoteNode,
-          selectRemoteNode: setSelectedRemoteNode,
+          selectRemoteNode: handleSelectRemoteNode,
         }}
       >
         <ConfigContext.Provider value={config}>

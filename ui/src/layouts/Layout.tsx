@@ -295,13 +295,10 @@ const NavBarTitleText = ({
   visible = true,
   color = 'white',
 }: NavBarTitleTextProps) => {
-  // Debug: log the color prop
-  // eslint-disable-next-line no-console
-  console.log('NavBarTitleText color:', color);
   return (
     <h1
       className={cn(
-        'text-lg font-extrabold transition-opacity duration-200 whitespace-nowrap',
+        'text-2xlg font-extrabold transition-opacity duration-200 whitespace-nowrap',
         visible ? 'opacity-100' : 'opacity-0'
       )}
       style={{ color }}

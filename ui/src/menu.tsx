@@ -33,7 +33,7 @@ export const mainListItems = React.forwardRef<
 >(({ isOpen = false }, ref) => (
   <div ref={ref} className="flex flex-col h-full">
     {/* Sidebar Header */}
-    <div className="flex items-center gap-3 px-4 py-6 border-b border-gray-200 bg-white/80">
+    <div className="flex items-center gap-3 px-4 py-6 border-b border-gray-200 bg-white/80 align-middle">
       {/* SVG Logo */}
       <span className="flex items-center justify-center w-12 h-12">
         <svg
@@ -56,7 +56,7 @@ export const mainListItems = React.forwardRef<
           />
         </svg>
       </span>
-      <span className="text-lg font-bold text-[#4D6744] tracking-wide select-none">
+      <span className="text-4xl font-bold text-[#4D6744] tracking-wide select-none">
         Dagu
       </span>
     </div>

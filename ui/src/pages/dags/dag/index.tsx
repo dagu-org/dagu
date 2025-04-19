@@ -49,7 +49,7 @@ function DAGDetails() {
   >();
   const query = new URLSearchParams(window.location.search);
   const requestId =
-    query.get('requestId') || data?.latestRun.requestId || 'latest';
+    query.get('requestId') || data?.latestRun?.requestId || 'latest';
   const stepName = query.get('step');
 
   const refreshFn = React.useCallback(() => {
@@ -82,7 +82,7 @@ function DAGDetails() {
     return `${seconds}s`;
   };
 
-  if (!params.fileId || isLoading || !data) {
+  if (!params.fileId || isLoading || !data || !data.latestRun) {
     return <LoadingIndicator />;
   }
 
