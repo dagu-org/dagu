@@ -1,6 +1,5 @@
 import React, { CSSProperties } from 'react';
 import mermaid from 'mermaid';
-import '@fortawesome/fontawesome-free/css/all.min.css';
 
 type Props = {
   def: string;

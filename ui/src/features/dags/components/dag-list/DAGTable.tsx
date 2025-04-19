@@ -160,7 +160,7 @@ const defaultColumns = [
         variant="ghost"
         size="icon"
         onClick={table.getToggleAllRowsExpandedHandler()}
-        className="text-muted-foreground" // Use Tailwind for color
+        className="text-muted-foreground cursor-pointer" // Use Tailwind for color
       >
         {table.getIsAllRowsExpanded() ? (
           <>
@@ -182,7 +182,7 @@ const defaultColumns = [
             variant="ghost"
             size="icon"
             onClick={row.getToggleExpandedHandler()}
-            className="text-muted-foreground"
+            className="text-muted-foreground cursor-pointer"
           >
             {row.getIsExpanded() ? (
               <ChevronUp className="h-4 w-4" />
@@ -238,14 +238,12 @@ const defaultColumns = [
             )}
 
             {tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1.5">
-                {' '}
-                {/* Adjust tag spacing */}
+              <div className="flex flex-wrap gap-1.5 mt-2">
                 {tags.map((tag) => (
                   <Badge
                     key={tag}
-                    variant="secondary"
-                    className="text-xs px-1.5 py-0.5 cursor-pointer hover:bg-muted font-normal"
+                    variant="outline"
+                    className="text-xs px-2 py-0 h-5 rounded-md border-primary/20 bg-primary/5 text-primary/90 hover:bg-primary/10 hover:text-primary transition-colors duration-200 cursor-pointer font-normal"
                     onClick={(e) => {
                       e.stopPropagation(); // Prevent row click
                       e.preventDefault();
@@ -255,6 +253,7 @@ const defaultColumns = [
                       if (handleTagClick) handleTagClick(tag);
                     }}
                   >
+                    <div className="h-1.5 w-1.5 rounded-full bg-primary/70 mr-1.5"></div>
                     {tag}
                   </Badge>
                 ))}
@@ -589,7 +588,7 @@ const SortableHeader = ({
     <Button
       variant="ghost"
       onClick={column.getToggleSortingHandler()}
-      className="-ml-4 h-8" // Adjust spacing
+      className="-ml-4 h-8 cursor-pointer" // Adjust spacing
     >
       {children}
       {sort === 'asc' && <ArrowUp className="ml-2 h-4 w-4" />}
@@ -728,44 +727,89 @@ function DAGTable({
       {' '}
       {/* Add spacing */}
       {/* Filter Controls */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:w-[260px]">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+      <div className="flex flex-wrap items-center gap-3 pb-1">
+        {/* Search Input - Enhanced with animation and better styling */}
+        <div className="relative w-full sm:w-[280px] group">
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/70 transition-all duration-200 group-focus-within:text-primary">
+            <Search className="h-4 w-4" />
+          </div>
           <Input
             type="search"
             placeholder="Search DAGs by name..."
             value={searchText}
             onChange={(e) => handleSearchTextChange(e.target.value)}
-            className="pl-8 w-full"
+            className="pl-9 pr-3 py-2 h-10 bg-background border-muted hover:border-muted-foreground/30 focus-visible:ring-1 focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-all duration-200 rounded-md"
           />
+          {searchText && (
+            <button
+              onClick={() => handleSearchTextChange('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/70 hover:text-muted-foreground transition-colors"
+              aria-label="Clear search"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          )}
         </div>
-        <Select
-          value={searchTag}
-          onValueChange={(value) =>
-            handleSearchTagChange(value === 'all' ? '' : value)
-          } // Handle 'all' value
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by tag" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Tags</SelectItem>
-            {uniqueTags?.tags?.map((tag) => (
-              <SelectItem key={tag} value={tag}>
-                {tag}
+
+        {/* Tag Filter - Enhanced with modern styling */}
+        <div className="relative">
+          <Select
+            value={searchTag}
+            onValueChange={(value) =>
+              handleSearchTagChange(value === 'all' ? '' : value)
+            }
+          >
+            <SelectTrigger className="w-[200px] h-10 bg-background border-muted hover:border-muted-foreground/30 focus:ring-1 focus:ring-primary/30 focus:border-primary/50 transition-all duration-200 rounded-md">
+              <div className="flex items-center gap-2 text-sm">
+                <Filter className="h-3.5 w-3.5 text-muted-foreground/70" />
+                <SelectValue placeholder="Filter by tag" />
+              </div>
+            </SelectTrigger>
+            <SelectContent className="max-h-[280px] overflow-y-auto">
+              <SelectItem value="all" className="flex items-center">
+                <span className="font-medium">All Tags</span>
               </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {/* Add other filters/buttons here if needed */}
+
+              <div className="my-1 h-px bg-muted"></div>
+
+              {uniqueTags?.tags?.map((tag) => (
+                <SelectItem key={tag} value={tag} className="flex items-center">
+                  <div className="flex items-center gap-2">
+                    <span>{tag}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Badge removed as per user request */}
+        </div>
       </div>
       {/* Table */}
-      {/* Add overflow-x-auto, max-w-full, min-w-0, shadow, and padding for card look */}
       <div
-        className="rounded-xl border bg-card w-full max-w-full min-w-0 shadow-sm overflow-x-auto"
+        className="rounded-xl w-full max-w-full min-w-0 overflow-x-auto transition-all duration-300"
         style={{
           fontFamily:
             'ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"',
+          boxShadow:
+            '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03)',
+          background:
+            'linear-gradient(to bottom, var(--background) 0%, var(--background) 100%)',
+          border: '1px solid var(--border)',
+          borderRadius: '0.75rem',
         }}
       >
         <Table className="w-full">

@@ -88,7 +88,7 @@ function DAGActions({
                 size="icon"
                 disabled={!buttonState['start']}
                 onClick={() => setIsStartModal(true)}
-                className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600"
+                className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
               >
                 <Play className="h-4 w-4" />
                 <span className="sr-only">Start</span>
@@ -99,7 +99,7 @@ function DAGActions({
                 size="sm"
                 disabled={!buttonState['start']}
                 onClick={() => setIsStartModal(true)}
-                className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600"
+                className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
               >
                 <Play className="mr-2 h-4 w-4" />
                 Start
@@ -120,7 +120,7 @@ function DAGActions({
                 size="icon"
                 disabled={!buttonState['stop']}
                 onClick={() => setIsStopModal(true)}
-                className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600"
+                className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
               >
                 <Square className="h-4 w-4" />
                 <span className="sr-only">Stop</span>
@@ -131,7 +131,7 @@ function DAGActions({
                 size="sm"
                 disabled={!buttonState['stop']}
                 onClick={() => setIsStopModal(true)}
-                className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600"
+                className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
               >
                 <Square className="mr-2 h-4 w-4" />
                 Stop
@@ -152,7 +152,7 @@ function DAGActions({
                 size="icon"
                 disabled={!buttonState['retry']}
                 onClick={() => setIsRetryModal(true)}
-                className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600"
+                className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
               >
                 <RefreshCw className="h-4 w-4" />
                 <span className="sr-only">Retry</span>
@@ -163,7 +163,7 @@ function DAGActions({
                 size="sm"
                 disabled={!buttonState['retry']}
                 onClick={() => setIsRetryModal(true)}
-                className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600"
+                className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
               >
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Retry

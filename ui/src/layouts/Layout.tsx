@@ -66,8 +66,7 @@ function getContrastColor(input?: string): string {
 }
 
 // Constants
-const drawerWidthOpen = 'w-60'; // 240px
-// Removed margin constants as they are no longer needed
+const sidebarWidthCollapsed = 'w-12'; // 48px for icon-only sidebar
 
 type LayoutProps = {
   title: string;
@@ -79,10 +78,9 @@ type LayoutProps = {
 // Main Content component including Sidebar and AppBar logic
 function Content({ title, navbarColor, children }: LayoutProps) {
   const [scrolled, setScrolled] = React.useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+  // Sidebar is always visible in collapsed state by default
+  const [isSidebarExpanded, setIsSidebarExpanded] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const mouseInSidebarAreaRef = React.useRef(false);
-  const mouseInContentRef = React.useRef(false);
 
   // Effect to handle scroll shadow on AppBar
   React.useEffect(() => {
@@ -93,84 +91,37 @@ function Content({ title, navbarColor, children }: LayoutProps) {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Effect to show sidebar when mouse is near the left edge (desktop only)
-  React.useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      // Only on desktop
-      if (window.innerWidth < 768) return;
-
-      // Track if mouse is in the sidebar trigger area (left 24px)
-      mouseInSidebarAreaRef.current = e.clientX <= 24;
-
-      // Open sidebar if mouse is in trigger area and sidebar is closed
-      if (mouseInSidebarAreaRef.current && !isSidebarOpen) {
-        setIsSidebarOpen(true);
-      }
-
-      // Close sidebar if mouse is not in trigger area, not in content area, and sidebar is open
-      if (
-        !mouseInSidebarAreaRef.current &&
-        !mouseInContentRef.current &&
-        isSidebarOpen
-      ) {
-        setIsSidebarOpen(false);
-      }
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-    };
-  }, [isSidebarOpen]);
-
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-white">
-      {/* Sidebar */}
+      {/* Sidebar - Always visible in collapsed state */}
       <div
         className={cn(
           // Modern base styles with dark background
           'h-full overflow-hidden bg-[#1E293B] text-white',
-          // Glass-like effect with subtle shadow
-          'backdrop-blur-sm shadow-lg',
-          // Always fixed for slide-in effect
-          'fixed inset-y-0 left-0 z-40 transform transition-all duration-300 ease-in-out',
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full',
-          isSidebarOpen ? drawerWidthOpen : 'w-0'
+          // Shadow effect
+          'shadow-lg',
+          // Always visible, not fixed
+          'z-40 transition-all duration-300 ease-in-out',
+          isSidebarExpanded ? 'w-60' : sidebarWidthCollapsed
         )}
-        onMouseEnter={() => {
-          mouseInContentRef.current = true;
-        }}
-        onMouseLeave={() => {
-          mouseInContentRef.current = false;
-          if (window.innerWidth >= 768 && !mouseInSidebarAreaRef.current) {
-            setIsSidebarOpen(false);
-          }
-        }}
+        onMouseEnter={() => setIsSidebarExpanded(true)}
+        onMouseLeave={() => setIsSidebarExpanded(false)}
       >
         {/* Simplified flex column layout */}
         <div className="flex flex-col h-full">
           <nav className="flex-1">
             <MainListItems
-              isOpen={isSidebarOpen}
-              onNavItemClick={() => setIsSidebarOpen(false)}
+              isOpen={isSidebarExpanded}
+              onNavItemClick={() => setIsSidebarExpanded(false)}
             />
           </nav>
 
-          {/* Modern toggle button at the bottom */}
-          <div className="p-4 flex justify-center">
-            <button
-              onClick={() => setIsSidebarOpen(false)}
-              className="text-white/70 hover:text-white transition-colors duration-200"
-              aria-label="Close sidebar"
-            >
-              <PanelLeftClose size={20} />
-            </button>
-          </div>
+          {/* No bottom icon needed */}
         </div>
       </div>
 
-      {/* Main Content Area - Now relies on flex-1 to fill space */}
-      <div className="flex flex-col flex-1 h-full max-w-full overflow-hidden bg-gray-100">
+      {/* Main Content Area */}
+      <div className="flex flex-col flex-1 h-full overflow-hidden bg-gray-100">
         {/* AppBar */}
         <header
           className={cn(
@@ -189,23 +140,9 @@ function Content({ title, navbarColor, children }: LayoutProps) {
             ),
           }}
         >
-          <div className="flex items-center justify-between w-full h-16">
-            {/* Left side content: Toggle Button + Title */}
-            <div className="flex items-center space-x-4">
-              <button
-                className="p-2 rounded-md hover:bg-white/10 focus:outline-none focus:ring-0 focus-visible:outline-none transition-all duration-200"
-                style={{
-                  color: getContrastColor(
-                    navbarColor && navbarColor.trim() !== ''
-                      ? navbarColor
-                      : '#4D6744'
-                  ),
-                }}
-                aria-label="Open sidebar"
-                onClick={() => setIsSidebarOpen(true)}
-              >
-                <PanelLeftOpen size={20} />
-              </button>
+          <div className="flex items-center justify-between w-full h-10">
+            {/* Left side content: Title */}
+            <div className="flex items-center space-x-2">
               <AppBarContext.Consumer>
                 {(context) => (
                   <NavBarTitleText
@@ -246,12 +183,16 @@ function Content({ title, navbarColor, children }: LayoutProps) {
                       value={context.selectedRemoteNode}
                       onValueChange={context.selectRemoteNode}
                     >
-                      <SelectTrigger className="w-32 bg-white text-gray-900 border border-gray-300 focus:ring-2 focus:ring-brand-green">
+                      <SelectTrigger className="h-6 text-base bg-transparent text-white border-0 hover:bg-white/10 focus:ring-0 focus:outline-none focus:border-0 focus-visible:ring-0 focus-visible:outline-none focus-visible:border-0 focus-visible:shadow-none active:border-0 px-2 py-0 flex items-center min-h-0 gap-1 rounded-md transition-colors duration-200 [&_svg]:!text-white [&_svg]:!opacity-100 shadow-none cursor-pointer">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="text-base rounded-md overflow-hidden p-1 bg-gray-800 border-0 shadow-lg outline-none ring-0 focus:outline-none focus:ring-0 focus:border-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0 text-white">
                         {context.remoteNodes.map((node) => (
-                          <SelectItem key={node} value={node}>
+                          <SelectItem
+                            key={node}
+                            value={node}
+                            className="text-base py-1 px-2 min-h-0 h-8 text-white hover:bg-white/10 focus:bg-white/10 focus:outline-none focus:ring-0 focus:border-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0 data-[highlighted]:bg-white/10 data-[highlighted]:text-white data-[selected]:text-white data-[selected]:bg-white/20 cursor-pointer"
+                          >
                             {node}
                           </SelectItem>
                         ))}
@@ -268,15 +209,6 @@ function Content({ title, navbarColor, children }: LayoutProps) {
         <main
           ref={containerRef}
           className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-6"
-          onMouseEnter={() => {
-            mouseInContentRef.current = true;
-          }}
-          onMouseLeave={() => {
-            mouseInContentRef.current = false;
-            if (window.innerWidth >= 768 && !mouseInSidebarAreaRef.current) {
-              setIsSidebarOpen(false);
-            }
-          }}
         >
           {children}
         </main>
@@ -290,17 +222,20 @@ type NavBarTitleTextProps = {
   children: string;
   visible?: boolean;
   color?: string;
+  size?: 'sm' | 'base';
 };
 
 const NavBarTitleText = ({
   children,
   visible = true,
   color = 'white',
+  size = 'base',
 }: NavBarTitleTextProps) => {
   return (
     <h1
       className={cn(
-        'text-2xlg font-extrabold transition-opacity duration-200 whitespace-nowrap',
+        'font-medium transition-opacity duration-200 whitespace-nowrap',
+        size === 'sm' ? 'text-sm' : 'text-base',
         visible ? 'opacity-100' : 'opacity-0'
       )}
       style={{ color }}

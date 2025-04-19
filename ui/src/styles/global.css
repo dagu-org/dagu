@@ -3,6 +3,47 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Override focus styles for select components */
+[data-slot='select-trigger'],
+[data-slot='select-content'],
+[data-slot='select-item'] {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* Fix for tag filter select in DAG list page */
+.dag-list-tag-filter [data-slot='select-content'],
+.dag-list-tag-filter [data-slot='select-item'],
+.dag-list-tag-filter [data-slot='select-item'][data-highlighted],
+.dag-list-tag-filter [data-slot='select-item'][data-selected],
+.dag-list-tag-filter [data-slot='select-value'],
+.dag-list-tag-filter [data-slot='select-trigger'] {
+  color: var(--muted-foreground);
+}
+
+/* Style for highlighted/selected items */
+.dag-list-tag-filter [data-slot='select-item'][data-highlighted],
+.dag-list-tag-filter [data-slot='select-item'][data-selected] {
+  color: var(--foreground);
+}
+
+/* Ensure placeholder text is visible but slightly muted */
+.dag-list-tag-filter [data-placeholder] {
+  color: var(--muted-foreground);
+}
+
+[data-slot='select-item'][data-highlighted],
+[data-slot='select-item'][data-selected] {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Make the checkmark icon visible */
+[data-slot='select-item-indicator'] svg {
+  color: white !important;
+  opacity: 1 !important;
+}
 @import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
