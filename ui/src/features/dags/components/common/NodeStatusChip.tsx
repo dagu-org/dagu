@@ -14,44 +14,76 @@ type Props = {
   status: NodeStatus;
   /** Text to display in the chip */
   children: React.ReactNode; // Allow ReactNode for flexibility
+  /** Size variant of the chip */
+  size?: 'sm' | 'md' | 'lg';
 };
 
 /**
  * NodeStatusChip displays a styled badge based on the node status
  */
-function NodeStatusChip({ status, children }: Props) {
-  // Determine the background color class for the circle based on status
-  let circleColorClass = '';
+function NodeStatusChip({ status, children, size = 'md' }: Props) {
+  // Determine the colors and icon based on status
+  let bgColorClass = '';
   let textColorClass = '';
+  let borderColorClass = '';
+  let pulseAnimation = '';
+  let statusIcon = '';
+
   switch (status) {
     case NodeStatus.Success: // done -> green
-      circleColorClass = 'bg-[green] dark:bg-[darkgreen]';
+      bgColorClass = 'bg-[rgba(0,128,0,0.1)] dark:bg-[rgba(0,100,0,0.2)]';
+      borderColorClass = 'border-[green] dark:border-[darkgreen]';
       textColorClass = 'text-[green] dark:text-[lightgreen]';
+      statusIcon = '✓'; // Checkmark
       break;
     case NodeStatus.Failed: // error -> red
-      circleColorClass = 'bg-[red] dark:bg-[darkred]';
-      textColorClass = 'text-[red] dark:text-[lightcoral]'; // Use lightcoral for dark mode text
+      bgColorClass = 'bg-[rgba(255,0,0,0.1)] dark:bg-[rgba(139,0,0,0.2)]';
+      borderColorClass = 'border-[red] dark:border-[darkred]';
+      textColorClass = 'text-[red] dark:text-[lightcoral]';
+      statusIcon = '✕'; // X mark
       break;
     case NodeStatus.Running: // running -> lime
-      circleColorClass = 'bg-[lime] dark:bg-[limegreen]';
-      textColorClass = 'text-[limegreen] dark:text-[lime]'; // Use limegreen/lime for text
+      bgColorClass = 'bg-[rgba(0,255,0,0.1)] dark:bg-[rgba(50,205,50,0.2)]';
+      borderColorClass = 'border-[lime] dark:border-[limegreen]';
+      textColorClass = 'text-[limegreen] dark:text-[lime]';
+      pulseAnimation = 'animate-pulse';
+      statusIcon = '●'; // Dot
       break;
     case NodeStatus.Cancelled: // cancel -> pink
-      circleColorClass = 'bg-[pink] dark:bg-[deeppink]';
-      textColorClass = 'text-[deeppink] dark:text-[pink]'; // Use deeppink/pink for text
+      bgColorClass =
+        'bg-[rgba(255,192,203,0.1)] dark:bg-[rgba(255,20,147,0.2)]';
+      borderColorClass = 'border-[pink] dark:border-[deeppink]';
+      textColorClass = 'text-[deeppink] dark:text-[pink]';
+      statusIcon = '■'; // Square
       break;
     case NodeStatus.Skipped: // skipped -> gray
-      circleColorClass = 'bg-[gray] dark:bg-[darkgray]';
+      bgColorClass =
+        'bg-[rgba(128,128,128,0.1)] dark:bg-[rgba(169,169,169,0.2)]';
+      borderColorClass = 'border-[gray] dark:border-[darkgray]';
       textColorClass = 'text-[gray] dark:text-[lightgray]';
+      statusIcon = '▫'; // White small square
       break;
     case NodeStatus.NotStarted: // none -> lightblue
-      circleColorClass = 'bg-[lightblue] dark:bg-[steelblue]';
-      textColorClass = 'text-[steelblue] dark:text-[lightblue]'; // Use steelblue/lightblue for text
+      bgColorClass =
+        'bg-[rgba(173,216,230,0.1)] dark:bg-[rgba(70,130,180,0.2)]';
+      borderColorClass = 'border-[lightblue] dark:border-[steelblue]';
+      textColorClass = 'text-[steelblue] dark:text-[lightblue]';
+      statusIcon = '○'; // Circle
       break;
     default: // Fallback to gray
-      circleColorClass = 'bg-[gray] dark:bg-[darkgray]';
+      bgColorClass =
+        'bg-[rgba(128,128,128,0.1)] dark:bg-[rgba(169,169,169,0.2)]';
+      borderColorClass = 'border-[gray] dark:border-[darkgray]';
       textColorClass = 'text-[gray] dark:text-[lightgray]';
+      statusIcon = '○'; // Circle
   }
+
+  // Size classes
+  const sizeClasses = {
+    sm: 'text-xs py-0.5 px-2',
+    md: 'text-sm py-1 px-3',
+    lg: 'text-base py-1.5 px-4',
+  };
 
   // Capitalize first letter if children is a string
   const displayChildren =
@@ -59,17 +91,23 @@ function NodeStatusChip({ status, children }: Props) {
       ? children.charAt(0).toUpperCase() + children.slice(1)
       : children;
 
-  // Render a div with a colored circle and the text
+  // Render a pill-shaped badge with icon and text
   return (
-    <div className="inline-flex items-center">
+    <div
+      className={`
+        inline-flex items-center rounded-full
+        ${bgColorClass} ${borderColorClass} ${textColorClass}
+        border transition-all duration-200 ease-in-out
+        shadow-sm hover:shadow ${sizeClasses[size]}
+      `}
+    >
       <span
-        className={`inline-block h-2.5 w-2.5 rounded-full mr-2 ${circleColorClass}`} // Increased size and margin
+        className={`mr-1.5 inline-flex ${pulseAnimation} ${textColorClass}`}
         aria-hidden="true"
-      ></span>
-      <span className={`text-xs font-medium ${textColorClass}`}>
-        {displayChildren}
-      </span>{' '}
-      {/* Added text color */}
+      >
+        {statusIcon}
+      </span>
+      <span className={`font-medium ${textColorClass}`}>{displayChildren}</span>
     </div>
   );
 }
