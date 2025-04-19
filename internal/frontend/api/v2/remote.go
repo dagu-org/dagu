@@ -115,10 +115,6 @@ func WithRemoteNode(remoteNodes map[string]config.RemoteNode, apiBasePath string
 				return
 			}
 
-			println(fmt.Sprintf("remote node %s responded with status %d", remoteNodeName, resp.StatusCode))
-			println(fmt.Sprintf("remote node %s responded with content type %s", remoteNodeName, resp.Header.Get("Content-Type")))
-			println(fmt.Sprintf("data content: %s", string(respData)))
-
 			// If the status code is not 200, write the error response
 			w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
 			if resp != nil {
