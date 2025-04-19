@@ -107,7 +107,11 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
       >
         {statusIcon}
       </span>
-      <span className={`font-medium ${textColorClass}`}>{displayChildren}</span>
+      <span
+        className={`font-medium ${textColorClass} break-keep text-nowrap whitespace-nowrap`}
+      >
+        {displayChildren}
+      </span>
     </div>
   );
 }

@@ -79,9 +79,6 @@ type LayoutProps = {
 
 // Main Content component including Sidebar and AppBar logic
 function Content({ title, navbarColor, children }: LayoutProps) {
-  // Debug: log the navbarColor prop
-  // eslint-disable-next-line no-console
-  console.log('navbarColor:', navbarColor);
   const [scrolled, setScrolled] = React.useState(false);
   // Local state for current visual status, default closed before hydration
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);

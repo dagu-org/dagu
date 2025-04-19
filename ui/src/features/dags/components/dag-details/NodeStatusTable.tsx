@@ -4,7 +4,6 @@
  * @module features/dags/components/dag-details
  */
 import React, { CSSProperties } from 'react';
-import { stepTabColStyles } from '../../../../consts';
 import NodeStatusTableRow from './NodeStatusTableRow';
 import {
   Table,
@@ -12,8 +11,9 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  Paper,
+  Box,
 } from '@mui/material';
-import BorderedBox from '../../../../ui/BorderedBox';
 import { components } from '../../../../api/v2/schema';
 
 /**
@@ -40,30 +40,96 @@ const tableStyle: CSSProperties = {
  * NodeStatusTable displays execution status information for all nodes in a DAG run
  */
 function NodeStatusTable({ nodes, status, fileId }: Props) {
-  const styles = stepTabColStyles;
-  let i = 0;
-
   // Don't render if there are no nodes
   if (!nodes || !nodes.length) {
     return null;
   }
 
   return (
-    <React.Fragment>
-      <BorderedBox>
-        <Table size="small" sx={tableStyle}>
+    <Paper
+      elevation={0}
+      sx={{
+        borderRadius: 2,
+        border: '1px solid rgba(0, 0, 0, 0.12)',
+        overflow: 'hidden',
+        transition: 'all 0.2s ease-in-out',
+        '&:hover': {
+          boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.05)',
+        },
+        mb: 3,
+      }}
+    >
+      <Box sx={{ overflowX: 'auto' }}>
+        <Table
+          size="small"
+          sx={{
+            ...tableStyle,
+            '& .MuiTableCell-head': {
+              backgroundColor: 'rgba(0, 0, 0, 0.04)',
+              fontWeight: 600,
+            },
+          }}
+        >
           <TableHead>
             <TableRow>
-              <TableCell style={styles[i++]}>No</TableCell>
-              <TableCell style={styles[i++]}>Step Name</TableCell>
-              <TableCell style={styles[i++]}>Description</TableCell>
-              <TableCell style={styles[i++]}>Command</TableCell>
-              <TableCell style={styles[i++]}>Args</TableCell>
-              <TableCell style={styles[i++]}>Started At</TableCell>
-              <TableCell style={styles[i++]}>Finished At</TableCell>
-              <TableCell style={styles[i++]}>Status</TableCell>
-              <TableCell style={styles[i++]}>Error</TableCell>
-              <TableCell style={styles[i++]}>Log</TableCell>
+              <TableCell
+                style={{
+                  width: '5%',
+                  maxWidth: '50px',
+                }}
+              >
+                No
+              </TableCell>
+              <TableCell
+                style={{
+                  width: '20%',
+                  maxWidth: '200px',
+                }}
+              >
+                Step Name
+              </TableCell>
+              <TableCell
+                style={{
+                  width: '20%',
+                  maxWidth: '200px',
+                }}
+              >
+                Command
+              </TableCell>
+              <TableCell
+                style={{
+                  width: '20%',
+                  maxWidth: '200px',
+                }}
+              >
+                Last Run
+              </TableCell>
+              <TableCell
+                style={{
+                  width: '20%',
+                  maxWidth: '200px',
+                  textAlign: 'center',
+                }}
+              >
+                Status
+              </TableCell>
+              <TableCell
+                style={{
+                  width: '20%',
+                  maxWidth: '200px',
+                }}
+              >
+                Error
+              </TableCell>
+              <TableCell
+                style={{
+                  width: '20%',
+                  maxWidth: '200px',
+                  textAlign: 'center',
+                }}
+              >
+                Log
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -78,8 +144,8 @@ function NodeStatusTable({ nodes, status, fileId }: Props) {
             ))}
           </TableBody>
         </Table>
-      </BorderedBox>
-    </React.Fragment>
+      </Box>
+    </Paper>
   );
 }
 

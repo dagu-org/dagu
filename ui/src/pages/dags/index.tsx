@@ -67,10 +67,6 @@ function DAGs() {
     appBarContext.setTitle('DAGs');
   }, [appBarContext]);
 
-  console.log({
-    data,
-  });
-
   const { dagFiles, errorCount } = React.useMemo(() => {
     const dagFiles: components['schemas']['DAGFile'][] = [];
     let errorCount = 0;
