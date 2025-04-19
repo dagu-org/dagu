@@ -11,12 +11,11 @@ import {
   getExpandedRowModel,
   createColumnHelper,
   RowData,
-  Column, // Import Column type
+  Column,
 } from '@tanstack/react-table';
 import cronParser, { CronDate } from 'cron-parser';
 import DAGActions from '../common/DAGActions';
 import StatusChip from '../../../../ui/StatusChip'; // Re-add StatusChip import
-import { Link } from 'react-router-dom';
 import {
   ArrowDown, // Use lucide-react icons
   ArrowUp,
@@ -51,6 +50,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'; // Use shadcn Select
+import { useClient, useQuery } from '@/hooks/api';
+import { AppBarContext } from '@/contexts/AppBarContext';
 
 /**
  * Props for the DAGTable component
@@ -138,16 +139,6 @@ function getNextSchedule(
     console.error('Error parsing cron expression:', e);
     return;
   }
-}
-
-function getFirstTag(data?: Data): string {
-  // Explicitly check array existence and non-emptiness
-  const tags = data?.kind === ItemKind.DAG ? data.dag?.dag?.tags : undefined;
-  if (tags && tags.length > 0 && typeof tags[0] === 'string') {
-    // Now tags[0] is confirmed to be a string
-    return tags[0].toLowerCase();
-  }
-  return '';
 }
 
 // Allow returning number for group sorting placeholder
@@ -721,14 +712,14 @@ function DAGTable({
     },
   });
 
-  // Extract unique tags for the Select dropdown
-  const uniqueTags = useMemo(() => {
-    const tagsSet = new Set<string>();
-    dags.forEach((dag) => {
-      dag.dag.tags?.forEach((tag) => tagsSet.add(tag));
-    });
-    return Array.from(tagsSet).sort();
-  }, [dags]);
+  const appBarContext = React.useContext(AppBarContext);
+  const { data: uniqueTags } = useQuery('/dags/tags', {
+    params: {
+      query: {
+        remoteNode: appBarContext.selectedRemoteNode || 'local',
+      },
+    },
+  });
 
   return (
     <div className="space-y-4">
@@ -757,7 +748,7 @@ function DAGTable({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Tags</SelectItem>
-            {uniqueTags.map((tag) => (
+            {uniqueTags?.tags?.map((tag) => (
               <SelectItem key={tag} value={tag}>
                 {tag}
               </SelectItem>
