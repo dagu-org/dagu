@@ -25,7 +25,9 @@ mermaid.initialize({
 });
 
 function Mermaid({ def, style = {}, scale }: Props) {
-  const ref = React.useRef<HTMLDivElement>(null);
+  const mermaidRef = React.useRef<HTMLDivElement>(null); // Ref for the inner div holding the SVG
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null); // Ref for the outer scrollable div
+  const scrollPosRef = React.useRef({ top: 0, left: 0 }); // Ref to store scroll position
   const [uniqueId] = React.useState(
     () => `mermaid-${Math.random().toString(36).substr(2, 9)}`
   );
@@ -35,13 +37,14 @@ function Mermaid({ def, style = {}, scale }: Props) {
   };
 
   const dStyle: CSSProperties = {
-    overflowX: 'auto',
+    overflow: 'auto', // Use 'auto' for both directions if needed
     padding: '2em',
     position: 'relative',
+    maxHeight: '80vh', // Keep max height if desired
   };
 
   const render = async () => {
-    if (!ref.current) {
+    if (!mermaidRef.current) {
       return;
     }
     if (def.startsWith('<')) {
@@ -51,27 +54,42 @@ function Mermaid({ def, style = {}, scale }: Props) {
 
     try {
       // Clear previous content
-      ref.current.innerHTML = '';
+      mermaidRef.current.innerHTML = '';
 
       // Generate SVG
       const { svg, bindFunctions } = await mermaid.render(uniqueId, def);
 
-      if (ref.current) {
-        ref.current.innerHTML = svg;
+      if (mermaidRef.current) {
+        mermaidRef.current.innerHTML = svg;
+
+        // Apply scale transform immediately after SVG is rendered
+        const svgEl = mermaidRef.current.querySelector('svg');
+        if (svgEl) {
+          svgEl.style.overflow = 'visible';
+          svgEl.style.transform = `scale(${scale})`;
+          svgEl.style.transformOrigin = 'top left';
+        }
+
+        // Restore scroll position *after* SVG is rendered
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = scrollPosRef.current.top;
+          scrollContainerRef.current.scrollLeft = scrollPosRef.current.left;
+        }
 
         // Bind event handlers
+        // Consider if this timeout is still necessary or can be reduced
         setTimeout(() => {
-          if (ref.current && bindFunctions) {
-            bindFunctions(ref.current);
+          if (mermaidRef.current && bindFunctions) {
+            bindFunctions(mermaidRef.current);
           }
-        }, 500);
+        }, 100); // Reduced timeout slightly
       }
     } catch (error: unknown) {
       console.error('Mermaid render error:', error);
-      if (ref.current) {
-        ref.current.innerHTML = `
-          <div style="color: red; padding: 10px;">
-            Error rendering diagram: ${error}
+      if (mermaidRef.current) {
+        mermaidRef.current.innerHTML = `
+          <div style="color: red; padding: 10px; white-space: pre-wrap;">
+            Error rendering diagram: ${String(error)}
           </div>
         `;
       }
@@ -79,28 +97,40 @@ function Mermaid({ def, style = {}, scale }: Props) {
   };
 
   React.useEffect(() => {
+    // Save scroll position before re-rendering
+    if (scrollContainerRef.current) {
+      scrollPosRef.current = {
+        top: scrollContainerRef.current.scrollTop,
+        left: scrollContainerRef.current.scrollLeft,
+      };
+    }
     render();
-  }, [def]);
+  }, [def]); // Only trigger re-render on definition change
 
   React.useEffect(() => {
-    if (ref.current) {
-      const svg = ref.current.querySelector('svg');
+    // Apply scale transformation when scale prop changes
+    if (mermaidRef.current) {
+      const svg = mermaidRef.current.querySelector('svg');
       if (svg) {
+        // Ensure the SVG itself doesn't cause overflow issues conflicting with the container
+        svg.style.overflow = 'visible';
         svg.style.transform = `scale(${scale})`;
-        svg.style.transformOrigin = 'top left';
+        svg.style.transformOrigin = 'top left'; // Keep origin consistent
       }
     }
-  }, [scale]);
+  }, [scale]); // Apply scale separately
 
   return (
-    <div style={dStyle}>
+    // Attach ref to the scrollable container
+    <div ref={scrollContainerRef} style={dStyle}>
       <div
         className="mermaid"
-        ref={ref}
+        ref={mermaidRef} // Keep ref for mermaid rendering target
         style={{
           ...mStyle,
-          overflow: 'auto',
-          maxHeight: '80vh',
+          // Remove overflow from inner div, let outer div handle it
+          // overflow: 'auto',
+          // maxHeight: '80vh', // Max height is now on the outer div
         }}
       />
     </div>

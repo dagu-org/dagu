@@ -29,7 +29,6 @@ const Graph: React.FC<Props> = ({
   type = 'status',
   onClickNode,
   showIcons = true,
-  animate = true,
 }) => {
   const [scale, setScale] = useState(1);
 
@@ -86,27 +85,6 @@ const Graph: React.FC<Props> = ({
     zIndex: 1,
   };
 
-  // Define FontAwesome icons for each status with colors and animations
-  const statusIcons: { [key: number]: string } = {
-    [NodeStatus.None]:
-      "<i class='fas fa-circle-notch' style='color: #3b82f6; animation: spin 2s linear infinite;'></i>",
-    [NodeStatus.Running]:
-      "<i class='fas fa-spinner' style='color: #22c55e; animation: spin 1s linear infinite;'></i>",
-    [NodeStatus.Error]:
-      "<i class='fas fa-exclamation-circle' style='color: #ef4444'></i>",
-    [NodeStatus.Cancel]: "<i class='fas fa-ban' style='color: #ec4899'></i>",
-    [NodeStatus.Success]:
-      "<i class='fas fa-check-circle' style='color: #16a34a'></i>",
-    [NodeStatus.Skipped]:
-      "<i class='fas fa-forward' style='color: #64748b'></i>",
-  };
-  if (!animate) {
-    // Remove animations if disabled
-    Object.keys(statusIcons).forEach((key: string) => {
-      statusIcons[+key] = statusIcons[+key].replace(/animation:.*?;/g, '');
-    });
-  }
-
   const graph = React.useMemo(() => {
     if (!steps) return '';
 
@@ -124,10 +102,7 @@ const Graph: React.FC<Props> = ({
     const addNodeFn = (step: Step, status: NodeStatus) => {
       const id = step.Name.replace(/\s/g, '_');
       const c = graphStatusMap[status] || '';
-
-      // Construct node label with icon if enabled
-      const icon = showIcons ? statusIcons[status] || '' : '';
-      const label = `${icon} &nbsp; ${step.Name}`;
+      const label = `${step.Name}`;
 
       // Add node definition
       dat.push(`${id}[${label}]${c};`);
@@ -174,22 +149,22 @@ const Graph: React.FC<Props> = ({
 
     // Define node styles for different states with refined colors
     dat.push(
-      'classDef none fill:#f0f9ff,stroke:#93c5fd,color:#1e40af,stroke-width:1.2px,white-space:nowrap'
+      'classDef none color:#333,fill:white,stroke:lightblue,stroke-width:1.2px'
     );
     dat.push(
-      'classDef running fill:#f0fdf4,stroke:#86efac,color:#166534,stroke-width:1.2px,white-space:nowrap'
+      'classDef running color:#333,fill:white,stroke:lime,stroke-width:1.2px'
     );
     dat.push(
-      'classDef error fill:#fef2f2,stroke:#fca5a5,color:#aa1010,stroke-width:1.2px,white-space:nowrap'
+      'classDef error color:#333,fill:white,stroke:red,stroke-width:1.2px'
     );
     dat.push(
-      'classDef cancel fill:#fdf2f8,stroke:#f9a8d4,color:#9d174d,stroke-width:1.2px,white-space:nowrap'
+      'classDef cancel color:#333,fill:white,stroke:pink,stroke-width:1.2px'
     );
     dat.push(
-      'classDef done fill:#f0fdf4,stroke:#86efac,color:#166534,stroke-width:1.2px,white-space:nowrap'
+      'classDef done color:#333,fill:white,stroke:green,stroke-width:1.2px'
     );
     dat.push(
-      'classDef skipped fill:#f8fafc,stroke:#cbd5e1,color:#475569,stroke-width:1.2px,white-space:nowrap'
+      'classDef skipped color:#333,fill:white,stroke:gray,stroke-width:1.2px'
     );
 
     // Add custom link styles
