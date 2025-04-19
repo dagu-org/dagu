@@ -4,17 +4,19 @@
  * @module features/dags/components/dag-execution
  */
 import moment from 'moment-timezone';
-import React, { CSSProperties } from 'react';
+import React from 'react';
 import HistoryTableRow from './HistoryTableRow';
 import {
   Table,
   TableBody,
   TableCell,
   TableHead,
+  TableHeader,
   TableRow,
-} from '@mui/material';
+} from '@/components/ui/table';
 import BorderedBox from '../../../../ui/BorderedBox';
 import { components } from '../../../../api/v2/schema';
+import { cn } from '@/lib/utils';
 
 /**
  * Props for the HistoryTable component
@@ -31,32 +33,16 @@ type Props = {
 };
 
 /**
- * Style for table cells
- */
-const colStyle: CSSProperties = {
-  maxWidth: '22px',
-  minWidth: '22px',
-  textAlign: 'left',
-};
-
-/**
- * Style for the table
- */
-const tableStyle: CSSProperties = {
-  userSelect: 'none',
-};
-
-/**
  * HistoryTable displays a grid of execution history for a DAG
  * with dates as column headers and steps as rows
  */
 function HistoryTable({ runs, gridData, onSelect, idx }: Props) {
   return (
-    <BorderedBox>
-      <Table size="small" sx={tableStyle}>
-        <TableHead>
+    <BorderedBox className="overflow-hidden">
+      <Table className="select-none border-collapse">
+        <TableHeader>
           <TableRow>
-            <TableCell></TableCell>
+            <TableHead></TableHead>
             {runs.map((_, i) => {
               if (!runs || i >= runs.length || !runs[i]) {
                 return null;
@@ -81,19 +67,22 @@ function HistoryTable({ runs, gridData, onSelect, idx }: Props) {
               }
 
               return (
-                <TableCell
+                <TableHead
                   key={`date-${i}`}
-                  style={colStyle}
+                  className={cn(
+                    'max-w-[22px] min-w-[22px] text-left p-2 cursor-pointer text-xs font-medium',
+                    'hover:bg-slate-50 transition-colors duration-200'
+                  )}
                   onClick={() => {
                     onSelect(i);
                   }}
                 >
                   {flag ? date : ''}
-                </TableCell>
+                </TableHead>
               );
             })}
           </TableRow>
-        </TableHead>
+        </TableHeader>
         <TableBody>
           {gridData.map((data) => {
             return (

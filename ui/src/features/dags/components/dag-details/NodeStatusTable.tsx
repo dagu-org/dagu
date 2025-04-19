@@ -65,7 +65,6 @@ function NodeStatusTable({ nodes, status, fileId }: Props) {
           sx={{
             ...tableStyle,
             '& .MuiTableCell-head': {
-              backgroundColor: 'rgba(0, 0, 0, 0.04)',
               fontWeight: 600,
             },
           }}

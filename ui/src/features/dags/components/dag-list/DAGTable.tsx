@@ -447,7 +447,7 @@ const defaultColumns = [
         );
 
         // Display next run information
-        let nextRunContent = null;
+        let nextRunContent: React.ReactNode | null = null;
         if (!data.dag.suspended && schedules.length > 0) {
           const nextRun = getNextSchedule(data.dag);
           if (nextRun) {

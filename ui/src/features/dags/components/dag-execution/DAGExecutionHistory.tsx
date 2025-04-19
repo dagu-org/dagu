@@ -3,7 +3,6 @@
  *
  * @module features/dags/components/dag-execution
  */
-import { Box } from '@mui/material';
 import React, { useMemo } from 'react';
 import { DAGContext } from '../../contexts/DAGContext';
 import { getEventHandlers } from '../../lib/getEventHandlers';
@@ -18,6 +17,7 @@ import { NodeStatusTable } from '../dag-details';
 import { DAGStatusOverview } from '../dag-details';
 import { HistoryTable } from './';
 import { StatusUpdateModal } from './';
+import { cn } from '@/lib/utils';
 
 /**
  * Props for the DAGExecutionHistory component
@@ -57,7 +57,7 @@ function DAGExecutionHistory({ fileId }: Props) {
 
   // Show message if no execution history is found
   if (!data.runs?.length) {
-    return <Box>Execution history was not found.</Box>;
+    return <div>Execution history was not found.</div>;
   }
 
   return <DAGHistoryTable runs={data.runs} gridData={data.gridData} />;
@@ -204,7 +204,7 @@ function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
     <DAGContext.Consumer>
       {(props) => (
         <React.Fragment>
-          <Box>
+          <div>
             <SubTitle>Execution History</SubTitle>
             <HistoryTable
               runs={reversedRuns || []}
@@ -212,46 +212,46 @@ function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
               onSelect={updateIdx}
               idx={idx}
             />
-          </Box>
+          </div>
 
           {reversedRuns && reversedRuns[idx] ? (
             <React.Fragment>
-              <Box sx={{ mt: 3 }}>
+              <div className="mt-6">
                 <DAGGraph
                   run={reversedRuns[idx]}
                   onSelectStep={onSelectStepOnGraph}
                 />
-                <Box sx={{ mt: 2 }}>
+                <div className="mt-4">
                   <SubTitle>Status</SubTitle>
                   <DAGStatusOverview
                     status={reversedRuns[idx]}
                     requestId={reversedRuns[idx].requestId}
                     {...props}
                   />
-                </Box>
-              </Box>
-              <Box sx={{ mt: 3 }}>
+                </div>
+              </div>
+              <div className="mt-6">
                 <SubTitle>Steps</SubTitle>
-                <Box sx={{ mt: 2 }}>
+                <div className="mt-4">
                   <NodeStatusTable
                     nodes={reversedRuns[idx].nodes}
                     status={reversedRuns[idx]}
                     {...props}
                   />
-                </Box>
-              </Box>
+                </div>
+              </div>
 
               {handlers && handlers.length ? (
-                <Box sx={{ mt: 3 }}>
+                <div className="mt-6">
                   <SubTitle>Lifecycle Hooks</SubTitle>
-                  <Box sx={{ mt: 2 }}>
+                  <div className="mt-4">
                     <NodeStatusTable
                       nodes={getEventHandlers(reversedRuns[idx])}
                       status={reversedRuns[idx]}
                       {...props}
                     />
-                  </Box>
-                </Box>
+                  </div>
+                </div>
               ) : null}
             </React.Fragment>
           ) : null}

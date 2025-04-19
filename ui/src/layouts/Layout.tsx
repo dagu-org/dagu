@@ -66,7 +66,6 @@ function getContrastColor(input?: string): string {
 }
 
 // Constants
-const drawerWidthClosed = 'w-16'; // 64px
 const drawerWidthOpen = 'w-60'; // 240px
 // Removed margin constants as they are no longer needed
 
@@ -80,36 +79,10 @@ type LayoutProps = {
 // Main Content component including Sidebar and AppBar logic
 function Content({ title, navbarColor, children }: LayoutProps) {
   const [scrolled, setScrolled] = React.useState(false);
-  // Local state for current visual status, default closed before hydration
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
-  const { preferences, updatePreference } = useUserPreferences(); // Use the context
   const containerRef = React.useRef<HTMLDivElement>(null);
-
-  // Use the config value for the sidebar color
-  const sidebarColor = navbarColor || '#4D6744';
-
-  // Effect to set initial state based on preference and screen size (desktop only)
-  React.useEffect(() => {
-    const isDesktop = window.innerWidth >= 768; // Tailwind's md breakpoint
-    if (isDesktop) {
-      // On desktop, set initial state from preference (defaulting to true if unset)
-      setIsSidebarOpen(preferences.isSidebarOpenDesktop ?? true);
-    } else {
-      // On mobile, always start closed
-      setIsSidebarOpen(false);
-    }
-    // Run only once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Effect to update preference when sidebar state changes (desktop only)
-  React.useEffect(() => {
-    const isDesktop = window.innerWidth >= 768;
-    if (isDesktop) {
-      updatePreference('isSidebarOpenDesktop', isSidebarOpen);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSidebarOpen]);
+  const mouseInSidebarAreaRef = React.useRef(false);
+  const mouseInContentRef = React.useRef(false);
 
   // Effect to handle scroll shadow on AppBar
   React.useEffect(() => {
@@ -125,13 +98,29 @@ function Content({ title, navbarColor, children }: LayoutProps) {
     const handleMouseMove = (e: MouseEvent) => {
       // Only on desktop
       if (window.innerWidth < 768) return;
-      // If mouse is within 24px of the left edge and sidebar is closed, open it
-      if (e.clientX <= 24 && !isSidebarOpen) {
+
+      // Track if mouse is in the sidebar trigger area (left 24px)
+      mouseInSidebarAreaRef.current = e.clientX <= 24;
+
+      // Open sidebar if mouse is in trigger area and sidebar is closed
+      if (mouseInSidebarAreaRef.current && !isSidebarOpen) {
         setIsSidebarOpen(true);
       }
+
+      // Close sidebar if mouse is not in trigger area, not in content area, and sidebar is open
+      if (
+        !mouseInSidebarAreaRef.current &&
+        !mouseInContentRef.current &&
+        isSidebarOpen
+      ) {
+        setIsSidebarOpen(false);
+      }
     };
+
     window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
   }, [isSidebarOpen]);
 
   return (
@@ -146,8 +135,14 @@ function Content({ title, navbarColor, children }: LayoutProps) {
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full',
           isSidebarOpen ? drawerWidthOpen : 'w-0'
         )}
+        onMouseEnter={() => {
+          mouseInContentRef.current = true;
+        }}
         onMouseLeave={() => {
-          if (window.innerWidth >= 768) setIsSidebarOpen(false);
+          mouseInContentRef.current = false;
+          if (window.innerWidth >= 768 && !mouseInSidebarAreaRef.current) {
+            setIsSidebarOpen(false);
+          }
         }}
       >
         {/* Wrap nav and button in a flex column to push button to bottom */}
@@ -272,6 +267,15 @@ function Content({ title, navbarColor, children }: LayoutProps) {
         <main
           ref={containerRef}
           className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-6"
+          onMouseEnter={() => {
+            mouseInContentRef.current = true;
+          }}
+          onMouseLeave={() => {
+            mouseInContentRef.current = false;
+            if (window.innerWidth >= 768 && !mouseInSidebarAreaRef.current) {
+              setIsSidebarOpen(false);
+            }
+          }}
         >
           {children}
         </main>

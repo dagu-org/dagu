@@ -4,9 +4,10 @@
  * @module features/dags/components/dag-editor
  */
 import React from 'react';
-import { Button, Stack } from '@mui/material';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useClient } from '../../../../hooks/api';
+import { Button } from '@/components/ui/button';
+import { PencilLine, Trash2 } from 'lucide-react';
 
 /**
  * Props for the DAGEditButtons component
@@ -22,9 +23,12 @@ type Props = {
 function DAGEditButtons({ fileId }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
+
   return (
-    <Stack direction="row" spacing={1}>
+    <div className="flex items-center gap-2">
       <Button
+        variant="outline"
+        size="sm"
         onClick={async () => {
           const newFileId = window.prompt(
             'Please input the new DAG file ID',
@@ -59,9 +63,14 @@ function DAGEditButtons({ fileId }: Props) {
           window.location.href = `${basePath}/dags/${newFileId}`;
         }}
       >
+        <PencilLine className="h-4 w-4 mr-2" />
         Rename
       </Button>
+
       <Button
+        variant="outline"
+        size="sm"
+        className="text-red-600 hover:text-red-600 border-red-200 hover:border-red-300 hover:bg-red-50 dark:text-red-500 dark:hover:text-red-400 dark:border-red-900 dark:hover:border-red-800 dark:hover:bg-red-950"
         onClick={async () => {
           if (!confirm('Are you sure to delete the DAG?')) {
             return;
@@ -85,9 +94,10 @@ function DAGEditButtons({ fileId }: Props) {
           window.location.href = `${basePath}/dags/`;
         }}
       >
+        <Trash2 className="h-4 w-4 mr-2" />
         Delete
       </Button>
-    </Stack>
+    </div>
   );
 }
 

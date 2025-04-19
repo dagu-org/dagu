@@ -1,22 +1,15 @@
 import * as React from 'react';
-import Typography from '@mui/material/Typography';
+import { cn } from '@/lib/utils';
 
 interface SubTitleProps {
   children?: React.ReactNode;
+  className?: string;
 }
 
-export default function SubTitle(props: SubTitleProps) {
+export default function SubTitle({ children, className }: SubTitleProps) {
   return (
-    <Typography
-      component="h3"
-      variant="h6"
-      gutterBottom
-      sx={{
-        fontWeight: '800',
-        color: '#404040',
-      }}
-    >
-      {props.children}
-    </Typography>
+    <h3 className={cn('text-lg font-bold text-[#404040] mb-2', className)}>
+      {children}
+    </h3>
   );
 }

@@ -49,8 +49,6 @@ function DAGStatus({ run, fileId }: Props) {
       alert(error.message || 'An error occurred');
       return;
     }
-    mutate(['/dags/{fileId}']);
-    mutate(['/dags/{fileId}/runs']);
     dismissModal();
   };
   const onSelectStepOnGraph = React.useCallback(

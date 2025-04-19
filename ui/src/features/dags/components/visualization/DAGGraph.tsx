@@ -6,7 +6,6 @@
 import React from 'react';
 import { Graph, FlowchartType, TimelineChart } from './';
 import { Box, Stack, Tab, Tabs } from '@mui/material';
-import SubTitle from '../../../../ui/SubTitle';
 import BorderedBox from '../../../../ui/BorderedBox';
 import { useCookies } from 'react-cookie';
 import { FlowchartSwitch } from './';
@@ -40,14 +39,16 @@ function DAGGraph({ run, onSelectStep }: Props) {
    * Handle flowchart direction change and save preference to cookie
    */
   const onChangeFlowchart = (value: FlowchartType) => {
+    if (!value) {
+      return;
+    }
     setCookie('flowchart', value, { path: '/' });
     setFlowchart(value);
   };
 
   return (
     <Box>
-      <Stack direction="row" justifyContent="space-between">
-        <SubTitle>Overview</SubTitle>
+      <Stack direction="row" justifyContent="start" my={2}>
         <FlowchartSwitch value={flowchart} onChange={onChangeFlowchart} />
       </Stack>
       <BorderedBox

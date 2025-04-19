@@ -3,11 +3,11 @@
  *
  * @module features/dags/components/dag-execution
  */
-import { TableCell } from '@mui/material';
-import React, { CSSProperties } from 'react';
-import { statusColorMapping } from '../../../../consts';
+import React from 'react';
+import { TableCell } from '@/components/ui/table';
 import StyledTableRow from '../../../../ui/StyledTableRow';
-import { components } from '../../../../api/v2/schema';
+import { components, NodeStatus } from '../../../../api/v2/schema';
+import { cn } from '@/lib/utils';
 
 /**
  * Props for the HistoryTableRow component
@@ -22,14 +22,46 @@ type Props = {
 };
 
 /**
- * Style for the status circles
+ * Get status styling based on node status
  */
-const circleStyle = {
-  width: '14px',
-  height: '14px',
-  borderRadius: '50%',
-  backgroundColor: '#000000',
-};
+function getStatusStyling(status: number) {
+  let bgColorClass = '';
+  let borderColorClass = '';
+  let pulseAnimation = '';
+
+  switch (status) {
+    case NodeStatus.Success: // done -> green
+      bgColorClass = 'bg-green-600 dark:bg-green-700';
+      borderColorClass = 'border-green-700 dark:border-green-800';
+      break;
+    case NodeStatus.Failed: // error -> red
+      bgColorClass = 'bg-red-600 dark:bg-red-700';
+      borderColorClass = 'border-red-700 dark:border-red-800';
+      break;
+    case NodeStatus.Running: // running -> lime
+      bgColorClass = 'bg-lime-500 dark:bg-lime-600';
+      borderColorClass = 'border-lime-600 dark:border-lime-700';
+      pulseAnimation = 'animate-pulse';
+      break;
+    case NodeStatus.Cancelled: // cancel -> pink
+      bgColorClass = 'bg-pink-500 dark:bg-pink-600';
+      borderColorClass = 'border-pink-600 dark:border-pink-700';
+      break;
+    case NodeStatus.Skipped: // skipped -> gray
+      bgColorClass = 'bg-gray-500 dark:bg-gray-600';
+      borderColorClass = 'border-gray-600 dark:border-gray-700';
+      break;
+    case NodeStatus.NotStarted: // none -> lightblue
+      bgColorClass = 'bg-blue-400 dark:bg-blue-500';
+      borderColorClass = 'border-blue-500 dark:border-blue-600';
+      break;
+    default: // Fallback to gray
+      bgColorClass = 'bg-gray-500 dark:bg-gray-600';
+      borderColorClass = 'border-gray-600 dark:border-gray-700';
+  }
+
+  return { bgColorClass, borderColorClass, pulseAnimation };
+}
 
 /**
  * HistoryTableRow displays a row in the execution history table
@@ -40,19 +72,10 @@ function HistoryTableRow({ data, onSelect, idx }: Props) {
     <StyledTableRow>
       <TableCell>{data.name}</TableCell>
       {[...data.history].reverse().map((status, i) => {
-        const style: CSSProperties = { ...circleStyle };
-        const tdStyle: CSSProperties = { maxWidth: '22px' };
-
-        // Highlight the selected cell
-        if (i == idx) {
-          tdStyle.backgroundColor = '#FFDDAD';
-        }
-
-        // Set the color based on status
-        if (status != 0) {
-          style.backgroundColor = statusColorMapping[status]?.backgroundColor;
-          style.color = statusColorMapping[status]?.color;
-        }
+        // Determine if this cell should be highlighted
+        const isSelected = i === idx;
+        const { bgColorClass, borderColorClass, pulseAnimation } =
+          getStatusStyling(status);
 
         return (
           <TableCell
@@ -60,9 +83,21 @@ function HistoryTableRow({ data, onSelect, idx }: Props) {
             onClick={() => {
               onSelect(i);
             }}
-            style={tdStyle}
+            className={cn(
+              'max-w-[22px] min-w-[22px] p-2',
+              isSelected && 'bg-[#FFDDAD]'
+            )}
           >
-            {status != 0 ? <div style={style}></div> : ''}
+            {status !== 0 && (
+              <div
+                className={cn(
+                  'w-[16px] h-[16px] rounded-full border-2 shadow-md transition-all duration-200',
+                  bgColorClass,
+                  borderColorClass,
+                  pulseAnimation
+                )}
+              />
+            )}
           </TableCell>
         );
       })}

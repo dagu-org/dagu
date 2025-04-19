@@ -3,21 +3,12 @@
  *
  * @module features/dags/components/dag-editor
  */
-import { Box, Button, Stack } from '@mui/material';
 import React, { useEffect } from 'react';
 import { DAGContext } from '../../contexts/DAGContext';
 import DAGEditor from './DAGEditor';
 import DAGAttributes from './DAGAttributes';
 import DAGDefinition from './DAGDefinition';
-import BorderedBox from '../../../../ui/BorderedBox';
-import SubTitle from '../../../../ui/SubTitle';
 import { useCookies } from 'react-cookie';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faFloppyDisk,
-  faXmark,
-  faPenToSquare,
-} from '@fortawesome/free-solid-svg-icons';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
@@ -26,6 +17,8 @@ import { useClient } from '../../../../hooks/api';
 import { useParams } from 'react-router-dom';
 import { Graph, FlowchartType, FlowchartSwitch } from '../visualization';
 import { DAGStepTable } from '../dag-details';
+import { Button } from '../../../../components/ui/button';
+import { Save, X, Edit, AlertTriangle } from 'lucide-react';
 
 /**
  * Props for the DAGSpec component
@@ -57,6 +50,9 @@ function DAGSpec({ fileId }: Props) {
    */
   const onChangeFlowchart = React.useCallback(
     (value: FlowchartType) => {
+      if (!value) {
+        return;
+      }
       setCookie('flowchart', value, { path: '/' });
       setFlowchart(value);
     },
@@ -99,196 +95,128 @@ function DAGSpec({ fileId }: Props) {
       {(props) =>
         data?.dag && (
           <React.Fragment>
-            <Box>
-              <Stack direction="row" justifyContent="space-between">
-                <SubTitle>Overview</SubTitle>
-                <FlowchartSwitch
-                  value={cookie['flowchart']}
-                  onChange={onChangeFlowchart}
-                />
-              </Stack>
-              <BorderedBox
-                sx={{
-                  mt: 2,
-                  py: 2,
-                  px: 2,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  overflowX: 'auto',
-                }}
-              >
-                <Box
-                  sx={{
-                    overflowX: 'auto',
-                  }}
-                >
-                  <Graph
-                    steps={data.dag.steps}
-                    type="config"
-                    flowchart={flowchart}
-                    showIcons={false}
-                  />
-                </Box>
-              </BorderedBox>
-            </Box>
+            <div className="flex justify-between items-center my-4">
+              <FlowchartSwitch
+                value={cookie['flowchart']}
+                onChange={onChangeFlowchart}
+              />
+            </div>
 
-            <Box sx={{ mt: 3 }}>
-              <Box sx={{ mt: 2 }}>
-                <DAGAttributes dag={data.dag!} />
-              </Box>
-            </Box>
-            <Box sx={{ mt: 3 }}>
-              <Box sx={{ mt: 2 }}>
-                <SubTitle>Steps</SubTitle>
-                {data.errors?.length ? (
-                  <BorderedBox
-                    sx={{
-                      mt: 2,
-                      px: 2,
-                      py: 1,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      backgroundColor: 'error.light',
-                      color: 'error.contrastText',
-                    }}
-                  >
-                    {data.errors?.map((e, i) => (
-                      <Box key={i} sx={{ mb: 1 }}>
-                        {e}
-                      </Box>
-                    ))}
-                  </BorderedBox>
-                ) : null}
-                {data.dag.steps ? (
-                  <DAGStepTable steps={data.dag.steps} />
-                ) : null}
-              </Box>
-            </Box>
-            {handlers?.length ? (
-              <Box sx={{ mt: 3 }}>
-                <SubTitle>Lifecycle Hooks</SubTitle>
-                <Box sx={{ mt: 2 }}>
-                  <DAGStepTable steps={handlers} />
-                </Box>
-              </Box>
+            <div className="mb-6 overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-4">
+              <Graph
+                steps={data.dag.steps}
+                type="config"
+                flowchart={flowchart}
+                showIcons={false}
+              />
+            </div>
+
+            <DAGAttributes dag={data.dag!} />
+
+            {data.errors?.length ? (
+              <div className="mb-6 border border-red-200 dark:border-red-800 bg-white dark:bg-slate-900 rounded-md p-6">
+                <div className="flex items-center gap-2 mb-3 text-red-600 dark:text-red-400">
+                  <AlertTriangle className="h-5 w-5" />
+                  <h3 className="font-semibold">Configuration Errors</h3>
+                </div>
+
+                <div className="space-y-2">
+                  {data.errors?.map((e, i) => (
+                    <div
+                      key={i}
+                      className="p-2 border-l-2 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 font-mono text-sm"
+                    >
+                      {e}
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : null}
 
-            <Box sx={{ mt: 3 }}>
-              <SubTitle>Spec</SubTitle>
-              <BorderedBox
-                sx={{
-                  mt: 2,
-                  px: 2,
-                  py: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                }}
-              >
-                <Stack
-                  direction="row"
-                  justifyContent="space-between"
-                  alignItems="center"
-                >
-                  <Box
-                    sx={{
-                      color: 'grey.600',
-                    }}
-                  >
-                    {params.fileId}
-                  </Box>
-                  {editing ? (
-                    <Stack direction="row">
-                      <Button
-                        id="save-config"
-                        color="primary"
-                        variant="outlined"
-                        startIcon={
-                          <span className="icon">
-                            <FontAwesomeIcon icon={faFloppyDisk} />
-                          </span>
-                        }
-                        onClick={async () => {
-                          if (!currentValue) {
-                            alert('No changes to save');
-                            return;
-                          }
-                          const { data, error } = await client.PUT(
-                            '/dags/{fileId}/spec',
-                            {
-                              params: {
-                                path: {
-                                  fileId: props.fileId,
-                                },
-                                query: {
-                                  remoteNode:
-                                    appBarContext.selectedRemoteNode || 'local',
-                                },
-                              },
-                              body: {
-                                spec: currentValue,
-                              },
-                            }
-                          );
-                          if (error) {
-                            alert(error.message || 'Failed to save spec');
-                            return;
-                          }
-                          if (data?.errors) {
-                            alert(data.errors.join('\n'));
-                            return;
-                          }
-                          setEditing(false);
-                          props.refresh();
-                        }}
-                      >
-                        Save
-                      </Button>
-                      <Button
-                        color="error"
-                        variant="outlined"
-                        onClick={() => setEditing(false)}
-                        sx={{ ml: 2 }}
-                        startIcon={
-                          <span className="icon">
-                            <FontAwesomeIcon icon={faXmark} />
-                          </span>
-                        }
-                      >
-                        Cancel
-                      </Button>
-                    </Stack>
-                  ) : (
-                    <Stack direction="row">
-                      <Button
-                        id="edit-config"
-                        variant="outlined"
-                        color="primary"
-                        onClick={() => setEditing(true)}
-                        startIcon={
-                          <span className="icon">
-                            <FontAwesomeIcon icon={faPenToSquare} />
-                          </span>
-                        }
-                      >
-                        Edit
-                      </Button>
-                    </Stack>
-                  )}
-                </Stack>
+            {data.dag.steps ? <DAGStepTable steps={data.dag.steps} /> : null}
+
+            {handlers?.length ? <DAGStepTable steps={handlers} /> : null}
+
+            <div className="mb-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md p-4">
+              <div className="flex justify-end items-center mb-4">
                 {editing ? (
-                  <Box sx={{ mt: 2 }}>
-                    <DAGEditor
-                      value={data.spec}
-                      onChange={(newValue) => {
-                        setCurrentValue(newValue || '');
+                  <div className="flex gap-2">
+                    <Button
+                      id="save-config"
+                      variant="default"
+                      size="sm"
+                      onClick={async () => {
+                        if (!currentValue) {
+                          alert('No changes to save');
+                          return;
+                        }
+                        const { data, error } = await client.PUT(
+                          '/dags/{fileId}/spec',
+                          {
+                            params: {
+                              path: {
+                                fileId: props.fileId,
+                              },
+                              query: {
+                                remoteNode:
+                                  appBarContext.selectedRemoteNode || 'local',
+                              },
+                            },
+                            body: {
+                              spec: currentValue,
+                            },
+                          }
+                        );
+                        if (error) {
+                          alert(error.message || 'Failed to save spec');
+                          return;
+                        }
+                        if (data?.errors) {
+                          alert(data.errors.join('\n'));
+                          return;
+                        }
+                        setEditing(false);
+                        props.refresh();
                       }}
-                    />
-                  </Box>
+                    >
+                      <Save className="h-4 w-4 mr-1" />
+                      Save Changes
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditing(false)}
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    id="edit-config"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditing(true)}
+                  >
+                    <Edit className="h-4 w-4 mr-1" />
+                    Edit
+                  </Button>
+                )}
+              </div>
+
+              <div>
+                {editing ? (
+                  <DAGEditor
+                    value={data.spec}
+                    onChange={(newValue) => {
+                      setCurrentValue(newValue || '');
+                    }}
+                  />
                 ) : (
                   <DAGDefinition value={data.spec} lineNumbers />
                 )}
-              </BorderedBox>
-            </Box>
+              </div>
+            </div>
           </React.Fragment>
         )
       }

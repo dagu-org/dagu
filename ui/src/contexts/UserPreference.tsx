@@ -2,7 +2,6 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 
 export type UserPreferences = {
   pageLimit: number;
-  isSidebarOpenDesktop?: boolean; // Add preference for desktop sidebar state
 };
 
 const UserPreferencesContext = createContext<{
@@ -23,14 +22,12 @@ export function UserPreferencesProvider({
       const saved = localStorage.getItem('user_preferences');
       const defaultPrefs = {
         pageLimit: 50,
-        isSidebarOpenDesktop: true,
       };
       return saved ? { ...defaultPrefs, ...JSON.parse(saved) } : defaultPrefs;
     } catch {
       // Fallback to defaults if parsing fails
       return {
         pageLimit: 50,
-        isSidebarOpenDesktop: true,
       };
     }
   });
