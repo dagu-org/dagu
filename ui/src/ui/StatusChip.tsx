@@ -5,7 +5,7 @@ import { Status } from '../api/v2/schema';
 type Props = {
   status?: Status;
   children: React.ReactNode; // Allow ReactNode for flexibility, though we expect string
-  size?: 'sm' | 'md' | 'lg'; // Size variants
+  size?: 'xs' | 'sm' | 'md' | 'lg'; // Size variants
 };
 
 function StatusChip({ status, children, size = 'md' }: Props) {
@@ -60,6 +60,7 @@ function StatusChip({ status, children, size = 'md' }: Props) {
 
   // Size classes
   const sizeClasses = {
+    xs: 'text-[10px] py-0 px-1.5',
     sm: 'text-xs py-0.5 px-2',
     md: 'text-sm py-1 px-3',
     lg: 'text-base py-1.5 px-4',
@@ -85,7 +86,12 @@ function StatusChip({ status, children, size = 'md' }: Props) {
       )}
     >
       <span
-        className={cn('mr-1.5 inline-flex', pulseAnimation, textColorClass)}
+        className={cn(
+          size === 'xs' ? 'mr-1 text-[8px]' : 'mr-1.5',
+          'inline-flex',
+          pulseAnimation,
+          textColorClass
+        )}
         aria-hidden="true"
       >
         {statusIcon}
