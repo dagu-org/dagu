@@ -238,27 +238,23 @@ const defaultColumns = [
             style={{ paddingLeft: `${row.depth * 1.5}rem` }}
             className="space-y-1"
           >
-            <div className="font-medium text-gray-800 dark:text-gray-200 tracking-tight">
-              {' '}
-              {/* Medium weight, darker color name */}
+            <div className="font-medium text-gray-800 dark:text-gray-200 tracking-tight text-sm">
               {getValue()}
             </div>
 
             {description && (
-              <div className="text-xs text-muted-foreground mt-0.5 whitespace-normal">
-                {' '}
-                {/* Allow wrapping */} {/* Keep description small */}
+              <div className="text-xs text-muted-foreground mt-0.5 whitespace-normal leading-tight">
                 {description}
               </div>
             )}
 
             {tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
+              <div className="flex flex-wrap gap-1 mt-1">
                 {tags.map((tag) => (
                   <Badge
                     key={tag}
                     variant="outline"
-                    className="text-xs px-2 py-0 h-5 rounded-md border-primary/20 bg-primary/5 text-primary/90 hover:bg-primary/10 hover:text-primary transition-colors duration-200 cursor-pointer font-normal"
+                    className="text-xs px-1.5 py-0 h-4 rounded-md border-primary/20 bg-primary/5 text-primary/90 hover:bg-primary/10 hover:text-primary transition-colors duration-200 cursor-pointer font-normal"
                     onClick={(e) => {
                       e.stopPropagation(); // Prevent row click
                       e.preventDefault();
@@ -268,7 +264,7 @@ const defaultColumns = [
                       if (handleTagClick) handleTagClick(tag);
                     }}
                   >
-                    <div className="h-1.5 w-1.5 rounded-full bg-primary/70 mr-1.5"></div>
+                    <div className="h-1 w-1 rounded-full bg-primary/70 mr-1"></div>
                     {tag}
                   </Badge>
                 ))}
@@ -319,8 +315,8 @@ const defaultColumns = [
   columnHelper.accessor('kind', {
     id: 'Status',
     header: () => (
-      <div className="flex flex-col py-4">
-        <span>Status</span>
+      <div className="flex flex-col py-2">
+        <span className="text-sm">Status</span>
         <span className="text-xs font-normal text-muted-foreground mt-0.5">
           Current state
         </span>
@@ -350,8 +346,8 @@ const defaultColumns = [
   columnHelper.accessor('kind', {
     id: 'LastRun',
     header: () => (
-      <div className="flex flex-col py-4">
-        <span>Last Run</span>
+      <div className="flex flex-col py-2">
+        <span className="text-sm">Last Run</span>
         <span className="text-xs font-normal text-muted-foreground mt-0.5">
           {getConfig().tz || 'Local Timezone'}
         </span>
@@ -395,9 +391,7 @@ const defaultColumns = [
 
       return (
         <div>
-          <span className="font-normal text-gray-700 dark:text-gray-300">
-            {' '}
-            {/* Match DAG name color */}
+          <span className="font-normal text-gray-700 dark:text-gray-300 text-sm">
             {formattedStartedAt}
           </span>
           {durationContent}
@@ -427,8 +421,8 @@ const defaultColumns = [
   columnHelper.accessor('kind', {
     id: 'ScheduleAndNextRun',
     header: () => (
-      <div className="flex flex-col">
-        <span>Schedule</span>
+      <div className="flex flex-col py-2">
+        <span className="text-sm">Schedule</span>
         <span className="text-xs font-normal text-muted-foreground mt-0.5">
           Next execution
         </span>
@@ -446,12 +440,12 @@ const defaultColumns = [
 
         // Display schedule expressions
         const scheduleContent = (
-          <div className="flex flex-wrap gap-1 mb-1.5">
+          <div className="flex flex-wrap gap-1 mb-1">
             {schedules.map((schedule) => (
               <Badge
                 key={schedule.expression}
                 variant="outline"
-                className="text-xs font-normal px-1.5 py-0.5"
+                className="text-xs font-normal px-1 py-0 h-4"
               >
                 {schedule.expression}
               </Badge>
@@ -465,7 +459,7 @@ const defaultColumns = [
           const nextRun = getNextSchedule(data.dag);
           if (nextRun) {
             nextRunContent = (
-              <div className="text-xs text-muted-foreground font-normal">
+              <div className="text-xs text-muted-foreground font-normal leading-tight">
                 <Ticker intervalMs={1000}>
                   {() => {
                     const ms = nextRun.getTime() - new Date().getTime();
@@ -477,7 +471,7 @@ const defaultColumns = [
           }
         } else if (data.dag.suspended) {
           nextRunContent = (
-            <div className="text-xs text-muted-foreground font-normal">
+            <div className="text-xs text-muted-foreground font-normal leading-tight">
               Suspended
             </div>
           );
@@ -982,7 +976,7 @@ function DAGTable({
                             'dag' in row.original &&
                             selectedDAGId ===
                               (row.original as DAGRow).dag.fileId
-                          ? 'cursor-pointer bg-primary/10 hover:bg-primary/15 border-l-4 border-primary' // Highlight selected DAG
+                          ? 'cursor-pointer bg-primary/10 hover:bg-primary/15 border-l-4 border-primary border-b-0' // Highlight selected DAG
                           : 'cursor-pointer hover:bg-muted/50'
                     }
                     style={{ fontSize: '0.9375rem' }} // Ensure row font size matches container

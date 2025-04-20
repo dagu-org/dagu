@@ -142,24 +142,24 @@ function NodeStatusTableRow({ name, rownum, node, requestId }: Props) {
   return (
     <StyledTableRow
       className={cn(
-        'hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-200',
+        'hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-200 h-auto',
         getRowHighlight()
       )}
     >
-      <TableCell className="text-center">
-        <span className="font-semibold text-slate-700 dark:text-slate-300">
+      <TableCell className="text-center py-2">
+        <span className="font-semibold text-slate-700 dark:text-slate-300 text-xs">
           {rownum}
         </span>
       </TableCell>
 
       {/* Combined Step Name & Description */}
       <TableCell>
-        <div className="space-y-1">
-          <div className="text-base font-semibold text-slate-800 dark:text-slate-200 text-wrap break-all">
+        <div className="space-y-0.5">
+          <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 text-wrap break-all">
             {node.step.name}
           </div>
           {node.step.description && (
-            <div className="text-sm text-slate-500 dark:text-slate-400">
+            <div className="text-xs text-slate-500 dark:text-slate-400 leading-tight">
               {node.step.description}
             </div>
           )}
@@ -168,20 +168,20 @@ function NodeStatusTableRow({ name, rownum, node, requestId }: Props) {
 
       {/* Combined Command & Args */}
       <TableCell>
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {!node.step.command && node.step.cmdWithArgs ? (
-            <div className="flex items-center gap-2 text-sm font-medium">
+            <div className="flex items-center gap-1.5 text-xs font-medium">
               <Code className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-              <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-2 py-1 text-slate-700 dark:text-slate-300">
+              <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-1.5 py-0.5 text-slate-700 dark:text-slate-300">
                 {node.step.cmdWithArgs}
               </span>
             </div>
           ) : null}
 
           {node.step.command && (
-            <div className="flex items-center gap-2 text-sm font-medium">
+            <div className="flex items-center gap-1.5 text-xs font-medium">
               <Code className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-              <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-2 py-1 text-slate-700 dark:text-slate-300">
+              <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-1.5 py-0.5 text-slate-700 dark:text-slate-300">
                 {node.step.command}
               </span>
             </div>
@@ -190,12 +190,12 @@ function NodeStatusTableRow({ name, rownum, node, requestId }: Props) {
           {args && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="pl-6 text-sm font-medium text-slate-500 dark:text-slate-400 truncate cursor-pointer">
+                <div className="pl-5 text-xs font-medium text-slate-500 dark:text-slate-400 truncate cursor-pointer leading-tight">
                   {args}
                 </div>
               </TooltipTrigger>
               <TooltipContent>
-                <span className="max-w-[400px] break-all">{args}</span>
+                <span className="max-w-[400px] break-all text-xs">{args}</span>
               </TooltipContent>
             </Tooltip>
           )}
@@ -204,12 +204,12 @@ function NodeStatusTableRow({ name, rownum, node, requestId }: Props) {
 
       {/* Last Run & Duration */}
       <TableCell>
-        <div className="space-y-1">
-          <div className="font-medium text-slate-700 dark:text-slate-300">
+        <div className="space-y-0.5">
+          <div className="font-medium text-slate-700 dark:text-slate-300 text-sm">
             {formatTimestamp(node.startedAt)}
           </div>
           {node.startedAt && (
-            <div className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+            <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 leading-tight">
               <span className="font-medium flex items-center">
                 Duration:
                 {node.status === NodeStatus.Running && (
@@ -232,7 +232,7 @@ function NodeStatusTableRow({ name, rownum, node, requestId }: Props) {
       {/* Error */}
       <TableCell>
         {node.error && (
-          <div className="text-sm bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800 rounded-md p-2 max-h-[80px] overflow-y-auto whitespace-pre-wrap break-words text-red-600 dark:text-red-400">
+          <div className="text-xs bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800 rounded-md p-1.5 max-h-[80px] overflow-y-auto whitespace-pre-wrap break-words text-red-600 dark:text-red-400 leading-tight">
             {node.error}
           </div>
         )}

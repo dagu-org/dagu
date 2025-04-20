@@ -51,22 +51,22 @@ function DAGStatusOverview({ status, fileId, requestId = '' }: Props) {
 
   return (
     <div>
-      <div className="mb-4">
+      <div className="mb-3">
         <div className="flex items-center justify-between">
-          <StatusChip status={status.status} size="lg">
+          <StatusChip status={status.status} size="md">
             {status.statusText}
           </StatusChip>
         </div>
       </div>
 
-      <div className="h-px w-full bg-slate-200 dark:bg-slate-700 my-4"></div>
+      <div className="h-px w-full bg-slate-200 dark:bg-slate-700 my-3"></div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {status.requestId && (
           <div className="space-y-2">
             <LabeledItem label="Request ID">
               <div className="flex flex-row gap-2">
-                <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-md font-medium text-sm text-slate-700 dark:text-slate-300">
+                <div className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded-md font-medium text-xs text-slate-700 dark:text-slate-300">
                   {status.requestId}
                 </div>
                 <Link
@@ -81,24 +81,24 @@ function DAGStatusOverview({ status, fileId, requestId = '' }: Props) {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
         <LabeledItem label="Started At">
-          <span className="font-medium text-slate-700 dark:text-slate-300">
+          <span className="font-medium text-slate-700 dark:text-slate-300 text-sm">
             {formatTimestamp(status.startedAt)}
           </span>
         </LabeledItem>
 
         <LabeledItem label="Finished At">
-          <span className="font-medium text-slate-700 dark:text-slate-300">
+          <span className="font-medium text-slate-700 dark:text-slate-300 text-sm">
             {formatTimestamp(status.finishedAt)}
           </span>
         </LabeledItem>
       </div>
 
       {status.params && (
-        <div className="mt-4">
+        <div className="mt-3">
           <LabeledItem label="Parameters" className="items-start">
-            <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-md font-medium text-sm text-slate-700 dark:text-slate-300 font-mono max-h-[120px] overflow-y-auto w-full">
+            <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-md font-medium text-xs text-slate-700 dark:text-slate-300 font-mono max-h-[120px] overflow-y-auto w-full">
               {status.params}
             </div>
           </LabeledItem>
