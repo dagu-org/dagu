@@ -3,14 +3,6 @@
  *
  * @module features/dags/components/common
  */
-import React from 'react';
-import { Play, Square, RefreshCw } from 'lucide-react'; // Import lucide icons
-import { StartDAGModal } from '../dag-execution';
-import ConfirmModal from '../../../../ui/ConfirmModal';
-import LabeledItem from '../../../../ui/LabeledItem';
-import { components } from '../../../../api/v2/schema';
-import { useClient } from '../../../../hooks/api';
-import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { Button } from '@/components/ui/button'; // Import Shadcn Button
 import {
   Tooltip,
@@ -18,6 +10,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'; // Import Shadcn Tooltip
+import { Play, RefreshCw, Square } from 'lucide-react'; // Import lucide icons
+import React from 'react';
+import { components } from '../../../../api/v2/schema';
+import { AppBarContext } from '../../../../contexts/AppBarContext';
+import { useClient } from '../../../../hooks/api';
+import ConfirmModal from '../../../../ui/ConfirmModal';
+import LabeledItem from '../../../../ui/LabeledItem';
+import { StartDAGModal } from '../dag-execution';
 
 /**
  * Props for the DAGActions component

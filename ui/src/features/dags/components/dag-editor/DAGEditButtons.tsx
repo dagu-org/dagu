@@ -3,11 +3,11 @@
  *
  * @module features/dags/components/dag-editor
  */
+import { Button } from '@/components/ui/button';
+import { PencilLine, Trash2 } from 'lucide-react';
 import React from 'react';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useClient } from '../../../../hooks/api';
-import { Button } from '@/components/ui/button';
-import { PencilLine, Trash2 } from 'lucide-react';
 
 /**
  * Props for the DAGEditButtons component

@@ -3,11 +3,9 @@
  *
  * @module features/dags/components/dag-editor
  */
-import React from 'react';
+import { Calendar, CheckSquare, Settings, Tag } from 'lucide-react';
 import { components } from '../../../../api/v2/schema';
 import { Badge } from '../../../../components/ui/badge';
-import { cn } from '../../../../lib/utils';
-import { Calendar, Tag, Settings, CheckSquare } from 'lucide-react';
 
 /**
  * Props for the DAGAttributes component

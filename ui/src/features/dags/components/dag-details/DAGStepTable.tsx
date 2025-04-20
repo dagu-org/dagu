@@ -3,8 +3,6 @@
  *
  * @module features/dags/components/dag-details
  */
-import React from 'react';
-import DAGStepTableRow from './DAGStepTableRow';
 import { components } from '../../../../api/v2/schema';
 import {
   Table,
@@ -13,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../../../components/ui/table';
-import { cn } from '../../../../lib/utils';
+import DAGStepTableRow from './DAGStepTableRow';
 
 /**
  * Props for the DAGStepTable component

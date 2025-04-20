@@ -1,17 +1,15 @@
+import { Button } from '@/components/ui/button';
+import { Maximize2, X } from 'lucide-react';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Maximize2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { components } from '../../../../api/v2/schema';
-import { useQuery } from '../../../../hooks/api';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
+import { useQuery } from '../../../../hooks/api';
+import dayjs from '../../../../lib/dayjs';
+import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
 import { RunDetailsContext } from '../../contexts/DAGStatusContext';
-import LoadingIndicator from '../../../../ui/LoadingIndicator';
-import dayjs from '../../../../lib/dayjs';
 import DAGDetailsContent from './DAGDetailsContent';
-import { DAGStatus } from '../../components';
-import { DAGHeader } from './';
 
 type DAGDetailsModalProps = {
   fileId: string;

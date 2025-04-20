@@ -3,18 +3,15 @@
  *
  * @module features/dags/components/dag-details
  */
-import React from 'react';
-import NodeStatusTableRow from './NodeStatusTableRow';
 import {
   Table,
   TableBody,
-  TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
 import { components } from '../../../../api/v2/schema';
-import { cn } from '@/lib/utils';
+import NodeStatusTableRow from './NodeStatusTableRow';
 
 /**
  * Props for the NodeStatusTable component

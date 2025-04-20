@@ -1,10 +1,10 @@
 import React, { useEffect, useRef } from 'react';
-import dayjs from '../../../lib/dayjs';
-import { Timeline, DataSet } from 'vis-timeline/standalone';
+import { DataSet, Timeline } from 'vis-timeline/standalone';
 import 'vis-timeline/styles/vis-timeline-graph2d.css';
+import { components } from '../../../api/v2/schema';
 import { statusColorMapping } from '../../../consts';
 import { useConfig } from '../../../contexts/ConfigContext';
-import { components } from '../../../api/v2/schema';
+import dayjs from '../../../lib/dayjs';
 
 type Props = { data: components['schemas']['DAGFile'][] };
 

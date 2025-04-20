@@ -1,6 +1,6 @@
-import React from 'react';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import React from 'react';
 
 interface BorderedBoxProps extends React.ComponentProps<typeof Card> {
   children?: React.ReactNode;

@@ -1,5 +1,5 @@
-import React, { CSSProperties } from 'react';
 import mermaid from 'mermaid';
+import React, { CSSProperties } from 'react';
 
 type Props = {
   def: string;

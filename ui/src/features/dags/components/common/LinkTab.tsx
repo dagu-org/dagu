@@ -1,8 +1,8 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
 import { Tab } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { LucideIcon } from 'lucide-react';
+import React from 'react';
+import { Link } from 'react-router-dom';
 
 export interface LinkTabProps {
   label?: string;

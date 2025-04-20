@@ -1,8 +1,8 @@
 import React, { ReactElement, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { DAGDefinition } from '../../dags/components/dag-editor';
-import Prism from '../../../assets/js/prism';
 import { components } from '../../../api/v2/schema';
+import Prism from '../../../assets/js/prism';
+import { DAGDefinition } from '../../dags/components/dag-editor';
 
 type Props = {
   results: components['schemas']['SearchResultItem'][];

@@ -1,11 +1,11 @@
-import React from 'react';
-import Title from '../../../../ui/Title';
-import { DAGActions } from '../common';
-import StatusChip from '../../../../ui/StatusChip';
 import { Calendar, Timer } from 'lucide-react';
-import dayjs from '../../../../lib/dayjs';
-import { RunDetailsContext } from '../../contexts/DAGStatusContext';
+import React from 'react';
 import { components, Status } from '../../../../api/v2/schema';
+import dayjs from '../../../../lib/dayjs';
+import StatusChip from '../../../../ui/StatusChip';
+import Title from '../../../../ui/Title';
+import { RunDetailsContext } from '../../contexts/DAGStatusContext';
+import { DAGActions } from '../common';
 
 interface DAGHeaderProps {
   dag: any;

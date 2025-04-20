@@ -1,12 +1,12 @@
 import React from 'react';
 // Assuming the path alias is correct and the component exists
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ListChecks, Play, CheckCircle, XCircle } from 'lucide-react';
-import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
-import Title from '../ui/Title';
+import { CheckCircle, ListChecks, Play, XCircle } from 'lucide-react';
 import { AppBarContext } from '../contexts/AppBarContext';
 import { useConfig } from '../contexts/ConfigContext';
+import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
 import { useQuery } from '../hooks/api';
+import Title from '../ui/Title';
 // Import the main 'components' type and Status enum
 import type { components } from '../api/v2/schema'; // Import the main components interface
 import { Status } from '../api/v2/schema'; // Import the Status enum

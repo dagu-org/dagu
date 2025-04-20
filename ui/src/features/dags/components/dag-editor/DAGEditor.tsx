@@ -3,10 +3,10 @@
  *
  * @module features/dags/components/dag-editor
  */
-import React, { useEffect, useRef } from 'react';
 import MonacoEditor, { loader } from '@monaco-editor/react';
 import * as monaco from 'monaco-editor';
 import { configureMonacoYaml } from 'monaco-yaml';
+import { useEffect, useRef } from 'react';
 
 // Configure schema at module level (before editor initialization)
 configureMonacoYaml(monaco, {

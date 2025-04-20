@@ -1,37 +1,36 @@
-import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
-  flexRender,
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  SortingState,
-  getFilteredRowModel,
-  ColumnFiltersState,
-  ExpandedState,
-  getExpandedRowModel,
-  createColumnHelper,
-  RowData,
   Column,
+  ColumnFiltersState,
+  createColumnHelper,
+  ExpandedState,
+  flexRender,
+  getCoreRowModel,
+  getExpandedRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  RowData,
+  SortingState,
+  useReactTable,
 } from '@tanstack/react-table';
 import cronParser, { CronDate } from 'cron-parser';
-import DAGActions from '../common/DAGActions';
-import StatusChip from '../../../../ui/StatusChip'; // Re-add StatusChip import
 import {
   ArrowDown, // Use lucide-react icons
   ArrowUp,
   ChevronDown,
-  ChevronUp,
-  Search, // Icon for search input
-  Filter, // Icon for filter button (if needed later)
-  Maximize2, // Icon for fullscreen button
+  ChevronUp, // Icon for search input
+  Filter,
+  Search,
 } from 'lucide-react';
-import { DAGDetailsModal } from '../../components/dag-details';
-import LiveSwitch from '../common/LiveSwitch';
+import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { components } from '../../../../api/v2/schema';
+import dayjs from '../../../../lib/dayjs';
+import StatusChip from '../../../../ui/StatusChip'; // Re-add StatusChip import
 import Ticker from '../../../../ui/Ticker';
 import VisuallyHidden from '../../../../ui/VisuallyHidden';
-import dayjs from '../../../../lib/dayjs';
-import { components } from '../../../../api/v2/schema';
+import { DAGDetailsModal } from '../../components/dag-details';
+import DAGActions from '../common/DAGActions';
+import LiveSwitch from '../common/LiveSwitch';
 
 // Helper to format milliseconds into d/h/m/s
 function formatMs(ms: number): string {
@@ -49,6 +48,16 @@ function formatMs(ms: number): string {
 }
 
 // Import shadcn/ui components
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'; // Use shadcn Select
 import {
   Table,
   TableBody,
@@ -57,18 +66,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'; // Use shadcn Select
-import { useClient, useQuery } from '@/hooks/api';
 import { AppBarContext } from '@/contexts/AppBarContext';
+import { useQuery } from '@/hooks/api';
 
 /**
  * Props for the DAGTable component

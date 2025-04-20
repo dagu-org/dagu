@@ -4,20 +4,17 @@
  * @module features/dags/components/dag-execution
  */
 import React, { useMemo } from 'react';
-import { DAGContext } from '../../contexts/DAGContext';
-import { getEventHandlers } from '../../lib/getEventHandlers';
-import SubTitle from '../../../../ui/SubTitle';
-import LoadingIndicator from '../../../../ui/LoadingIndicator';
-import { RunDetailsContext } from '../../contexts/DAGStatusContext';
 import { components, NodeStatus, Status } from '../../../../api/v2/schema';
-import { useClient, useQuery } from '../../../../hooks/api';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
+import { useClient, useQuery } from '../../../../hooks/api';
+import LoadingIndicator from '../../../../ui/LoadingIndicator';
+import SubTitle from '../../../../ui/SubTitle';
+import { DAGContext } from '../../contexts/DAGContext';
+import { RunDetailsContext } from '../../contexts/DAGStatusContext';
+import { getEventHandlers } from '../../lib/getEventHandlers';
+import { DAGStatusOverview, NodeStatusTable } from '../dag-details';
 import { DAGGraph } from '../visualization';
-import { NodeStatusTable } from '../dag-details';
-import { DAGStatusOverview } from '../dag-details';
-import { HistoryTable } from './';
-import { StatusUpdateModal } from './';
-import { cn } from '@/lib/utils';
+import { HistoryTable, StatusUpdateModal } from './';
 
 /**
  * Props for the DAGExecutionHistory component
@@ -89,10 +86,36 @@ function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
 
   const dagStatusContext = React.useContext(RunDetailsContext);
 
+  // Ensure index is valid when runs change (e.g., when switching DAGs)
+  React.useEffect(() => {
+    if (!runs || runs.length === 0) return;
+
+    // Clamp the index to be within valid range
+    const maxIdx = runs.length - 1;
+    const validIdx = Math.max(0, Math.min(idx, maxIdx));
+
+    // Only update if the index needs adjustment
+    if (validIdx !== idx) {
+      const params = new URLSearchParams(window.location.search);
+      params.set('idx', validIdx.toString());
+      window.history.replaceState(
+        {},
+        '',
+        `${window.location.pathname}?${params}`
+      );
+      setIdx(validIdx);
+    }
+  }, [runs, idx]);
+
   /**
    * Update the selected run index and update URL parameters
    */
   const updateIdx = (newIdx: number) => {
+    // Ensure newIdx is within valid range
+    if (newIdx < 0 || !runs || newIdx >= runs.length) {
+      return;
+    }
+
     setIdx(newIdx);
     const params = new URLSearchParams(window.location.search);
     params.set('idx', newIdx.toString());
@@ -102,6 +125,30 @@ function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
       `${window.location.pathname}?${params}`
     );
   };
+
+  /**
+   * Handle keyboard navigation with arrow keys
+   */
+  const handleKeyDown = React.useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key === 'ArrowLeft') {
+        // Navigate to previous history item
+        updateIdx(idx - 1);
+      } else if (event.key === 'ArrowRight') {
+        // Navigate to next history item
+        updateIdx(idx + 1);
+      }
+    },
+    [idx, runs]
+  );
+
+  // Add and remove keyboard event listener
+  React.useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleKeyDown]);
 
   // Get event handlers for the selected run
   let handlers: components['schemas']['Node'][] | null = null;

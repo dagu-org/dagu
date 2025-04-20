@@ -1,14 +1,13 @@
 import React from 'react';
+import { components, NodeStatus, Status } from '../../../api/v2/schema';
+import { AppBarContext } from '../../../contexts/AppBarContext';
+import { useClient } from '../../../hooks/api';
+import SubTitle from '../../../ui/SubTitle';
 import { DAGContext } from '../contexts/DAGContext';
 import { getEventHandlers } from '../lib/getEventHandlers';
-import { NodeStatusTable, DAGStatusOverview } from './dag-details';
+import { DAGStatusOverview, NodeStatusTable } from './dag-details';
 import { StatusUpdateModal } from './dag-execution';
-import SubTitle from '../../../ui/SubTitle';
-import { components, NodeStatus, Status } from '../../../api/v2/schema';
 import { DAGGraph } from './visualization';
-import { useClient } from '../../../hooks/api';
-import { AppBarContext } from '../../../contexts/AppBarContext';
-import { cn } from '@/lib/utils';
 
 type Props = {
   run: components['schemas']['RunDetails'];

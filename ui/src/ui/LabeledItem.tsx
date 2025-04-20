@@ -1,5 +1,5 @@
-import React, { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { ReactNode } from 'react';
 
 type LabeledItemProps = {
   label: string;

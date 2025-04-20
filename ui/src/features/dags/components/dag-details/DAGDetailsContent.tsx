@@ -1,16 +1,15 @@
+import { Tabs } from '@/components/ui/tabs';
+import { ActivitySquare, FileCode, History, ScrollText } from 'lucide-react';
 import React from 'react';
+import { components } from '../../../../api/v2/schema';
+import { DAGStatus } from '../../components';
 import { DAGContext } from '../../contexts/DAGContext';
 import { RunDetailsContext } from '../../contexts/DAGStatusContext';
-import { DAGStatus } from '../../components';
-import { DAGHeader } from './';
-import { Tabs } from '@/components/ui/tabs';
 import { LinkTab } from '../common';
 import ModalLinkTab from '../common/ModalLinkTab';
-import { DAGSpec } from '../dag-editor';
+import { DAGEditButtons, DAGSpec } from '../dag-editor';
 import { DAGExecutionHistory, ExecutionLog, StepLog } from '../dag-execution';
-import { DAGEditButtons } from '../dag-editor';
-import { ActivitySquare, FileCode, History, ScrollText } from 'lucide-react';
-import { components } from '../../../../api/v2/schema';
+import { DAGHeader } from './';
 
 type DAGDetailsContentProps = {
   fileId: string;

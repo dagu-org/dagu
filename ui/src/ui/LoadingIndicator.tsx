@@ -1,5 +1,3 @@
-import React from 'react';
-
 function LoadingIndicator() {
   return (
     <div className="w-full text-center mx-auto flex items-center justify-center p-4">

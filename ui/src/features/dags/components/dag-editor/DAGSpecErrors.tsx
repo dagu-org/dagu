@@ -3,7 +3,6 @@
  *
  * @module features/dags/components/dag-editor
  */
-import React from 'react';
 
 /**
  * Props for the DAGSpecErrors component

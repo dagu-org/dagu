@@ -1,12 +1,12 @@
-import React, { useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import Title from '../../ui/Title';
-import SearchResult from '../../features/search/components/SearchResult';
-import LoadingIndicator from '../../ui/LoadingIndicator';
-import { AppBarContext } from '../../contexts/AppBarContext';
-import { useQuery } from '../../hooks/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import React, { useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { AppBarContext } from '../../contexts/AppBarContext';
+import SearchResult from '../../features/search/components/SearchResult';
+import { useQuery } from '../../hooks/api';
+import LoadingIndicator from '../../ui/LoadingIndicator';
+import Title from '../../ui/Title';
 
 function Search() {
   const [searchParams, setSearchParams] = useSearchParams();

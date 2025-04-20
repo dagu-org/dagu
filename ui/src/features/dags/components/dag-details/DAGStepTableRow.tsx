@@ -3,27 +3,23 @@
  *
  * @module features/dags/components/dag-details
  */
-import React from 'react';
-import { TableCell, TableRow } from '../../../../components/ui/table';
-import { components } from '../../../../api/v2/schema';
-import { Badge } from '../../../../components/ui/badge';
-import { cn } from '../../../../lib/utils';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Code,
-  Folder,
-  RefreshCw,
-  FileCheck,
   ArrowRight,
-  Mail,
   FileText,
-  Terminal,
+  Folder,
   GitBranch,
+  Mail,
+  RefreshCw,
+  Terminal,
 } from 'lucide-react';
+import { components } from '../../../../api/v2/schema';
+import { Badge } from '../../../../components/ui/badge';
+import { TableCell, TableRow } from '../../../../components/ui/table';
 
 /**
  * Props for the DAGStepTableRow component

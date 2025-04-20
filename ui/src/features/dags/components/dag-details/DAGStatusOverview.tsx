@@ -3,13 +3,11 @@
  *
  * @module features/dags/components/dag-details
  */
-import React from 'react';
-import StatusChip from '../../../../ui/StatusChip';
-import LabeledItem from '../../../../ui/LabeledItem';
-import { Link } from 'react-router-dom';
 import { FileText } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { components } from '../../../../api/v2/schema';
-import { cn } from '@/lib/utils';
+import LabeledItem from '../../../../ui/LabeledItem';
+import StatusChip from '../../../../ui/StatusChip';
 
 /**
  * Props for the DAGStatusOverview component

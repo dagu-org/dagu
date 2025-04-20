@@ -3,24 +3,22 @@
  *
  * @module features/dags/components/dag-editor
  */
+import BorderedBox from '@/ui/BorderedBox';
+import SubTitle from '@/ui/SubTitle';
+import { AlertTriangle, Edit, Save, X } from 'lucide-react';
 import React, { useEffect } from 'react';
+import { useCookies } from 'react-cookie';
+import { components } from '../../../../api/v2/schema';
+import { Button } from '../../../../components/ui/button';
+import { AppBarContext } from '../../../../contexts/AppBarContext';
+import { useClient, useMutate, useQuery } from '../../../../hooks/api';
+import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
-import DAGEditor from './DAGEditor';
+import { DAGStepTable } from '../dag-details';
+import { FlowchartSwitch, FlowchartType, Graph } from '../visualization';
 import DAGAttributes from './DAGAttributes';
 import DAGDefinition from './DAGDefinition';
-import { useCookies } from 'react-cookie';
-import { AppBarContext } from '../../../../contexts/AppBarContext';
-import { useMutate, useQuery } from '../../../../hooks/api';
-import LoadingIndicator from '../../../../ui/LoadingIndicator';
-import { components } from '../../../../api/v2/schema';
-import { useClient } from '../../../../hooks/api';
-import { useParams } from 'react-router-dom';
-import { Graph, FlowchartType, FlowchartSwitch } from '../visualization';
-import { DAGStepTable } from '../dag-details';
-import { Button } from '../../../../components/ui/button';
-import { Save, X, Edit, AlertTriangle } from 'lucide-react';
-import SubTitle from '@/ui/SubTitle';
-import BorderedBox from '@/ui/BorderedBox';
+import DAGEditor from './DAGEditor';
 
 /**
  * Props for the DAGSpec component

@@ -3,21 +3,19 @@
  *
  * @module features/dags/components/dag-details
  */
-import React, { useState, useEffect } from 'react';
-import MultilineText from '../../../../ui/MultilineText';
 import { TableCell } from '@/components/ui/table';
-import StyledTableRow from '../../../../ui/StyledTableRow';
-import { FileText, AlertTriangle, Code, FileCode } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { components } from '../../../../api/v2/schema';
-import { NodeStatusChip } from '../common';
-import { NodeStatus } from '../../../../api/v2/schema';
-import { cn } from '@/lib/utils';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
+import { Code, FileText } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { components, NodeStatus } from '../../../../api/v2/schema';
+import StyledTableRow from '../../../../ui/StyledTableRow';
+import { NodeStatusChip } from '../common';
 
 /**
  * Props for the NodeStatusTableRow component

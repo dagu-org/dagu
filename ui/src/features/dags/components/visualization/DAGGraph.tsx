@@ -3,15 +3,14 @@
  *
  * @module features/dags/components/visualization
  */
-import React from 'react';
-import { Graph, FlowchartType, TimelineChart } from './';
-import BorderedBox from '../../../../ui/BorderedBox';
-import { useCookies } from 'react-cookie';
-import { FlowchartSwitch } from './';
-import { GitGraph, GanttChart } from 'lucide-react';
-import { components, Status } from '../../../../api/v2/schema';
-import { Tabs, Tab } from '@/components/ui/tabs';
+import { Tab, Tabs } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { GanttChart, GitGraph } from 'lucide-react';
+import React from 'react';
+import { useCookies } from 'react-cookie';
+import { components, Status } from '../../../../api/v2/schema';
+import BorderedBox from '../../../../ui/BorderedBox';
+import { FlowchartSwitch, FlowchartType, Graph, TimelineChart } from './';
 
 /**
  * Props for the DAGGraph component

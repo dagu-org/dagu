@@ -1,27 +1,13 @@
 import React, { useMemo } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
+import { components } from '../../../api/v2/schema';
+import { AppBarContext } from '../../../contexts/AppBarContext';
+import { DAGDetailsContent } from '../../../features/dags/components/dag-details';
 import { DAGContext } from '../../../features/dags/contexts/DAGContext';
 import { RunDetailsContext } from '../../../features/dags/contexts/DAGStatusContext';
-import LoadingIndicator from '../../../ui/LoadingIndicator';
-import { AppBarContext } from '../../../contexts/AppBarContext';
-import dayjs from '../../../lib/dayjs';
 import { useQuery } from '../../../hooks/api';
-import { components } from '../../../api/v2/schema';
-import {
-  DAGDetailsContent,
-  DAGHeader,
-} from '../../../features/dags/components/dag-details';
-import { DAGStatus } from '../../../features/dags/components';
-import { DAGSpec } from '../../../features/dags/components/dag-editor';
-import { DAGEditButtons } from '../../../features/dags/components/dag-editor';
-import { LinkTab } from '../../../features/dags/components/common';
-import { Tabs } from '@/components/ui/tabs';
-import { ActivitySquare, FileCode, History, ScrollText } from 'lucide-react';
-import {
-  DAGExecutionHistory,
-  ExecutionLog,
-  StepLog,
-} from '../../../features/dags/components/dag-execution';
+import dayjs from '../../../lib/dayjs';
+import LoadingIndicator from '../../../ui/LoadingIndicator';
 
 type Params = {
   fileId: string;
@@ -47,7 +33,6 @@ function DAGDetails() {
     },
     { refreshInterval: 2000 }
   );
-  const baseUrl = `/dags/${params.fileId}`;
   const [currentRun, setCurrentRun] = React.useState<
     components['schemas']['RunDetails'] | undefined
   >();

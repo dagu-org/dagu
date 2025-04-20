@@ -1,4 +1,5 @@
-import React from 'react';
+import { Input } from '@/components/ui/input'; // Import shadcn Input
+import { Label } from '@/components/ui/label'; // Import shadcn Label
 import {
   Pagination,
   PaginationContent,
@@ -8,8 +9,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination'; // Import shadcn Pagination components
-import { Input } from '@/components/ui/input'; // Import shadcn Input
-import { Label } from '@/components/ui/label'; // Import shadcn Label
+import React from 'react';
 
 /**
  * Props for the DAGPagination component

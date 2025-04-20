@@ -1,15 +1,15 @@
+import { debounce } from 'lodash';
 import React from 'react';
-import { DAGErrors } from '../../features/dags/components/dag-editor';
-import WithLoading from '../../ui/WithLoading';
+import { useLocation } from 'react-router-dom';
+import { components } from '../../api/v2/schema';
+import { AppBarContext } from '../../contexts/AppBarContext';
+import { useUserPreferences } from '../../contexts/UserPreference';
 import { DAGPagination } from '../../features/dags/components/common';
+import { DAGErrors } from '../../features/dags/components/dag-editor';
 import { DAGTable } from '../../features/dags/components/dag-list';
 import DAGListHeader from '../../features/dags/components/dag-list/DAGListHeader';
-import { useLocation } from 'react-router-dom';
-import { AppBarContext } from '../../contexts/AppBarContext';
-import { debounce } from 'lodash';
-import { useUserPreferences } from '../../contexts/UserPreference';
 import { useQuery } from '../../hooks/api';
-import { components } from '../../api/v2/schema';
+import WithLoading from '../../ui/WithLoading';
 
 function DAGs() {
   const query = new URLSearchParams(useLocation().search);

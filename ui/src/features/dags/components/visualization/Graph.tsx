@@ -3,11 +3,11 @@
  *
  * @module features/dags/components/visualization
  */
+import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
+import { RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 import React, { useState } from 'react';
-import Mermaid from '../../../../ui/Mermaid';
-import { ToggleGroup, ToggleButton } from '@/components/ui/toggle-group';
-import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { components, NodeStatus } from '../../../../api/v2/schema';
+import Mermaid from '../../../../ui/Mermaid';
 
 /** Callback type for node click events */
 type onClickNode = (name: string) => void;

@@ -3,9 +3,8 @@
  *
  * @module features/dags/components/visualization
  */
-import { ArrowRightLeft, ArrowDownUp } from 'lucide-react';
-import React from 'react';
-import { ToggleGroup, ToggleButton } from '@/components/ui/toggle-group';
+import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
+import { ArrowDownUp, ArrowRightLeft } from 'lucide-react';
 import { FlowchartType } from './';
 
 /**

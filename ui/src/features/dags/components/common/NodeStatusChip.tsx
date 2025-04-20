@@ -3,9 +3,9 @@
  *
  * @module features/dags/components/common
  */
+import { cn } from '@/lib/utils';
 import React from 'react';
 import { NodeStatus } from '../../../../api/v2/schema';
-import { cn } from '@/lib/utils';
 
 /**
  * Props for the NodeStatusChip component

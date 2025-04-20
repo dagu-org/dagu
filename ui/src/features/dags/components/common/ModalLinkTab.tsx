@@ -1,7 +1,7 @@
-import React from 'react';
 import { Tab } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { LucideIcon } from 'lucide-react';
+import React from 'react';
 
 export interface ModalLinkTabProps {
   label?: string;

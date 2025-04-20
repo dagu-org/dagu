@@ -3,16 +3,14 @@
  *
  * @module features/dags/components/dag-editor
  */
-import React from 'react';
+import { Alert } from '@/components/ui/alert';
 import {
-  ToastProvider,
   Toast,
   ToastClose,
-  ToastTitle,
   ToastDescription,
+  ToastProvider,
+  ToastTitle,
 } from '@/components/ui/toast';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { X } from 'lucide-react';
 
 /**
  * Props for the DAGErrorSnackBar component

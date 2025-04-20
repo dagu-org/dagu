@@ -3,10 +3,10 @@
  *
  * @module features/dags/components/visualization
  */
-import dayjs from '../../../../lib/dayjs';
 import React from 'react';
-import Mermaid from '../../../../ui/Mermaid';
 import { components, Status } from '../../../../api/v2/schema';
+import dayjs from '../../../../lib/dayjs';
+import Mermaid from '../../../../ui/Mermaid';
 
 /**
  * Props for the TimelineChart component

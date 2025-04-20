@@ -1,6 +1,6 @@
+import { cn } from '@/lib/utils';
 import React from 'react';
 import { Status } from '../api/v2/schema';
-import { cn } from '@/lib/utils';
 
 type Props = {
   status?: Status;
