@@ -89,7 +89,7 @@ function DAGStatusOverview({
   const isRunning = status.status === Status.Running;
 
   // Count nodes by status
-  const nodeStats = status.nodes.reduce(
+  const nodeStats = status.nodes?.reduce(
     (acc, node) => {
       const statusKey = node.statusText.toLowerCase().replace(' ', '_');
       acc[statusKey] = (acc[statusKey] || 0) + 1;
@@ -99,7 +99,7 @@ function DAGStatusOverview({
   );
 
   // Calculate total nodes
-  const totalNodes = status.nodes.length;
+  const totalNodes = status.nodes?.length;
 
   return (
     <div className="space-y-3">

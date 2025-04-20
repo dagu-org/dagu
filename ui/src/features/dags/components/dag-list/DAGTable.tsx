@@ -228,7 +228,14 @@ const defaultColumns = [
   }),
   columnHelper.accessor('name', {
     id: 'Name',
-    header: 'Name', // Simple header text
+    header: () => (
+      <div className="flex flex-col py-1">
+        <span className="text-xs">Name</span>
+        <span className="text-[10px] font-normal text-muted-foreground">
+          Description
+        </span>
+      </div>
+    ),
     cell: ({ row, getValue, table }) => {
       const data = row.original!;
 
@@ -745,18 +752,27 @@ function DAGTable({
   }, [dags]); // Removed 'group' dependency as it's handled by filtering
 
   // Add keyboard navigation between DAGs when modal is open
+  // Create a ref to store the table instance
+  const tableInstanceRef = React.useRef<ReturnType<
+    typeof useReactTable
+  > | null>(null);
+
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!isModalOpen || !selectedDAGId) return;
+      if (!isModalOpen || !selectedDAGId || !tableInstanceRef.current) return;
 
-      // Get all DAG rows (not groups)
-      const dagRows = data.filter(
-        (item) => item.kind === ItemKind.DAG
-      ) as DAGRow[];
+      // Get all DAG rows from the sorted table rows (not groups)
+      const sortedRows = tableInstanceRef.current.getRowModel().rows;
+      const dagRows = sortedRows
+        .filter((row) => (row.original as Data)?.kind === ItemKind.DAG)
+        .map((row) => ({
+          fileId: (row.original as DAGRow).dag.fileId,
+          row: row.original as DAGRow,
+        }));
 
       // Find current index
       const currentIndex = dagRows.findIndex(
-        (row) => row.dag.fileId === selectedDAGId
+        (item) => item.fileId === selectedDAGId
       );
       if (currentIndex === -1) return;
 
@@ -764,14 +780,14 @@ function DAGTable({
       if (event.key === 'ArrowDown' && currentIndex < dagRows.length - 1) {
         // Move to next DAG
         const nextDAG = dagRows[currentIndex + 1];
-        if (nextDAG && nextDAG.dag) {
-          setSelectedDAGId(nextDAG.dag.fileId);
+        if (nextDAG) {
+          setSelectedDAGId(nextDAG.fileId);
         }
       } else if (event.key === 'ArrowUp' && currentIndex > 0) {
         // Move to previous DAG
         const prevDAG = dagRows[currentIndex - 1];
-        if (prevDAG && prevDAG.dag) {
-          setSelectedDAGId(prevDAG.dag.fileId);
+        if (prevDAG) {
+          setSelectedDAGId(prevDAG.fileId);
         }
       }
     };
@@ -780,17 +796,17 @@ function DAGTable({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isModalOpen, selectedDAGId, data]);
+  }, [isModalOpen, selectedDAGId, sorting]); // Include sorting in dependencies
 
   const instance = useReactTable<Data>({
     data,
     columns,
     getSubRows: (row) => row.subRows,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
+    getCoreRowModel: getCoreRowModel<Data>(),
+    getSortedRowModel: getSortedRowModel<Data>(),
+    getFilteredRowModel: getFilteredRowModel<Data>(),
     onColumnFiltersChange: setColumnFilters, // Let table manage internal filter state
-    getExpandedRowModel: getExpandedRowModel(),
+    getExpandedRowModel: getExpandedRowModel<Data>(),
     autoResetExpanded: false, // Keep expanded state on data change
     state: {
       sorting,
@@ -806,6 +822,9 @@ function DAGTable({
       handleSearchTagChange, // Pass tag handler
     },
   });
+
+  // Store the table instance in the ref with type assertion
+  tableInstanceRef.current = instance as any;
 
   const appBarContext = React.useContext(AppBarContext);
   const { data: uniqueTags } = useQuery('/dags/tags', {
@@ -965,12 +984,13 @@ function DAGTable({
                         {' '}
                         {/* Wrap header content */}
                         {header.column.getCanSort() ? (
-                          <SortableHeader column={header.column}>
-                            {flexRender(
+                          <SortableHeader
+                            column={header.column}
+                            children={flexRender(
                               header.column.columnDef.header,
                               header.getContext()
                             )}
-                          </SortableHeader>
+                          ></SortableHeader>
                         ) : (
                           flexRender(
                             header.column.columnDef.header,
@@ -1001,7 +1021,7 @@ function DAGTable({
                     data-state={row.getIsSelected() && 'selected'}
                     className={
                       row.original?.kind === ItemKind.Group
-                        ? 'bg-muted/50 font-semibold' // Keep group rows semi-bold
+                        ? 'bg-muted/50 font-semibold cursor-pointer hover:bg-muted/70' // Make group rows clickable
                         : isDAGRow &&
                             'dag' in row.original &&
                             selectedDAGId ===
@@ -1011,7 +1031,12 @@ function DAGTable({
                     }
                     style={{ fontSize: '0.8125rem' }} // Smaller font size for more density
                     onClick={(e) => {
-                      if (isDAGRow && 'dag' in row.original) {
+                      // Handle group row clicks - toggle expanded state
+                      if ((row.original as Data)?.kind === ItemKind.Group) {
+                        row.toggleExpanded();
+                      }
+                      // Handle DAG row clicks - open modal or new tab
+                      else if (isDAGRow && 'dag' in row.original) {
                         const dagRow = row.original as DAGRow;
                         const fileId = dagRow.dag.fileId;
 

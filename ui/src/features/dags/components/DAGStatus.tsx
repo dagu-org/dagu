@@ -65,7 +65,7 @@ function DAGStatus({ run, fileId }: Props) {
         return;
       }
       // find the clicked step
-      const n = run.nodes.find((n) => n.step.name.replace(/\s/g, '_') == id);
+      const n = run.nodes?.find((n) => n.step.name.replace(/\s/g, '_') == id);
       if (n) {
         setSelectedStep(n.step);
         setModal(true);

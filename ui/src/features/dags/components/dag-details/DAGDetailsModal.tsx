@@ -51,11 +51,19 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
   }, [mutate]);
 
   const handleFullscreenClick = (e?: React.MouseEvent) => {
+    // Determine the URL path based on the active tab
+    let url = `/dags/${fileId}`;
+
+    // Add the tab to the URL if it's not the default 'status' tab
+    if (activeTab !== 'status') {
+      url = `${url}/${activeTab}`;
+    }
+
     // If Cmd (Mac) or Ctrl (Windows/Linux) key is pressed, open in new tab
     if (e && (e.metaKey || e.ctrlKey)) {
-      window.open(`/dags/${fileId}`, '_blank');
+      window.open(url, '_blank');
     } else {
-      navigate(`/dags/${fileId}`);
+      navigate(url);
     }
   };
 
