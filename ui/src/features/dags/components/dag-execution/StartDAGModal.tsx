@@ -3,16 +3,23 @@
  *
  * @module features/dags/components/dag-execution
  */
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/ui/CustomDialog';
 import React from 'react';
+import { components } from '../../../../api/v2/schema';
 import {
   Parameter,
   parseParams,
   stringifyParams,
 } from '../../../../lib/parseParams';
-import { components } from '../../../../api/v2/schema';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
 /**
  * Props for the StartDAGModal component
@@ -32,20 +39,6 @@ type Props = {
  * Modal dialog for starting a DAG with parameters
  */
 function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
-  // Handle ESC key to close the modal
-  React.useEffect(() => {
-    const callback = (event: KeyboardEvent) => {
-      const e = event || window.event;
-      if (e.key == 'Escape' || e.key == 'Esc') {
-        dismissModal();
-      }
-    };
-    document.addEventListener('keydown', callback);
-    return () => {
-      document.removeEventListener('keydown', callback);
-    };
-  }, [dismissModal]);
-
   const ref = React.useRef<HTMLInputElement>(null);
 
   // Parse default parameters from the DAG definition
@@ -63,19 +56,63 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
     setParams(parsedParams);
   }, [parsedParams]);
 
-  // Don't render if modal is not visible
-  if (!visible) {
-    return null;
-  }
+  // Create refs for the buttons
+  const cancelButtonRef = React.useRef<HTMLButtonElement>(null);
+  const submitButtonRef = React.useRef<HTMLButtonElement>(null);
+
+  // Handle keyboard events
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle events when modal is visible
+      if (!visible) return;
+
+      // Handle Enter key
+      if (e.key === 'Enter') {
+        // Get the active element
+        const activeElement = document.activeElement;
+
+        // Don't do anything if focus is on an input element
+        const isInputFocused =
+          activeElement instanceof HTMLInputElement ||
+          activeElement instanceof HTMLTextAreaElement ||
+          activeElement instanceof HTMLSelectElement;
+
+        if (isInputFocused) {
+          return;
+        }
+
+        // If Cancel button is focused, trigger cancel
+        if (activeElement === cancelButtonRef.current) {
+          e.preventDefault();
+          dismissModal();
+          return;
+        }
+
+        // If any other button is focused, let it handle the event naturally
+        if (activeElement instanceof HTMLButtonElement) {
+          return;
+        }
+
+        // If no specific element is focused, trigger the primary action
+        e.preventDefault();
+        onSubmit(stringifyParams(params));
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [visible, params, onSubmit, dismissModal]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-md rounded-lg border-2 border-black bg-white p-6 shadow-xl">
-        <div className="flex items-center justify-center">
-          <h2 className="text-xl font-semibold">Start the DAG</h2>
-        </div>
+    <Dialog open={visible} onOpenChange={(open) => !open && dismissModal()}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Start the DAG</DialogTitle>
+        </DialogHeader>
 
-        <div className="mt-4 flex flex-col space-y-4">
+        <div className="py-4 space-y-4">
           {parsedParams.map((p, i) => {
             if (p.Name != undefined) {
               return (
@@ -133,27 +170,27 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
               );
             }
           })}
+        </div>
 
+        <DialogFooter>
           <Button
+            ref={cancelButtonRef}
             variant="outline"
-            className="cursor-pointer"
+            onClick={dismissModal}
+          >
+            Cancel
+          </Button>
+          <Button
+            ref={submitButtonRef}
             onClick={() => {
               onSubmit(stringifyParams(params));
             }}
           >
             Start
           </Button>
-
-          <Button
-            variant="outline"
-            className="text-destructive hover:bg-destructive/10 cursor-pointer"
-            onClick={dismissModal}
-          >
-            Cancel
-          </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

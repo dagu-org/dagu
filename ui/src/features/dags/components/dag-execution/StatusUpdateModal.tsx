@@ -3,9 +3,16 @@
  *
  * @module features/dags/components/dag-execution
  */
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/ui/CustomDialog';
 import React from 'react';
 import { components, NodeStatus } from '../../../../api/v2/schema';
-import { Button } from '@/components/ui/button';
 
 /**
  * Props for the StatusUpdateModal component
@@ -25,64 +32,114 @@ type Props = {
  * StatusUpdateModal allows manually setting a step's status to success or failure
  */
 function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
-  // Handle ESC key to close the modal
-  React.useEffect(() => {
-    const callback = (event: KeyboardEvent) => {
-      const e = event || window.event;
-      if (e.key == 'Escape' || e.key == 'Esc') {
-        dismissModal();
-      }
-    };
-    document.addEventListener('keydown', callback);
-    return () => {
-      document.removeEventListener('keydown', callback);
-    };
-  }, [dismissModal]);
-
-  // Don't render if no step is provided or modal is not visible
-  if (!step || !visible) {
+  // Don't render if no step is provided
+  if (!step) {
     return null;
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-md rounded-lg border-2 border-black bg-white p-6 shadow-xl">
-        <div className="flex items-center justify-center">
-          <h2 className="text-xl font-semibold">
-            Update status of "{step.name}"
-          </h2>
-        </div>
+  // Create refs for the buttons
+  const cancelButtonRef = React.useRef<HTMLButtonElement>(null);
+  const successButtonRef = React.useRef<HTMLButtonElement>(null);
+  const failedButtonRef = React.useRef<HTMLButtonElement>(null);
 
-        <div className="mt-4 flex flex-col space-y-4">
+  // Handle keyboard events
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle events when modal is visible
+      if (!visible || !step) return;
+
+      // Handle Enter key
+      if (e.key === 'Enter') {
+        // Get the active element
+        const activeElement = document.activeElement;
+
+        // Don't do anything if focus is on an input element
+        const isInputFocused =
+          activeElement instanceof HTMLInputElement ||
+          activeElement instanceof HTMLTextAreaElement ||
+          activeElement instanceof HTMLSelectElement;
+
+        if (isInputFocused) {
+          return;
+        }
+
+        // If Cancel button is focused, trigger cancel
+        if (activeElement === cancelButtonRef.current) {
+          e.preventDefault();
+          dismissModal();
+          return;
+        }
+
+        // If Success button is focused, trigger success
+        if (activeElement === successButtonRef.current) {
+          e.preventDefault();
+          onSubmit(step, NodeStatus.Success);
+          return;
+        }
+
+        // If Failed button is focused, trigger failed
+        if (activeElement === failedButtonRef.current) {
+          e.preventDefault();
+          onSubmit(step, NodeStatus.Failed);
+          return;
+        }
+
+        // If any other button is focused, let it handle the event naturally
+        if (activeElement instanceof HTMLButtonElement) {
+          return;
+        }
+
+        // If no specific element is focused, trigger the success action as default
+        e.preventDefault();
+        onSubmit(step, NodeStatus.Success);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [visible, step, onSubmit, dismissModal]);
+
+  return (
+    <Dialog open={visible} onOpenChange={(open) => !open && dismissModal()}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Update status of "{step.name}"</DialogTitle>
+        </DialogHeader>
+
+        <div className="py-4">
           <div className="flex justify-center space-x-4">
             <Button
-              variant="outline"
-              className="cursor-pointer"
+              ref={successButtonRef}
+              variant="default"
+              className="bg-green-600 hover:bg-green-700"
               onClick={() => onSubmit(step, NodeStatus.Success)}
             >
               Mark Success
             </Button>
             <Button
-              variant="outline"
-              className="cursor-pointer"
+              ref={failedButtonRef}
+              variant="default"
+              className="bg-red-600 hover:bg-red-700"
               onClick={() => onSubmit(step, NodeStatus.Failed)}
             >
               Mark Failed
             </Button>
           </div>
-
-          <div className="flex justify-center">
-            <Button
-              variant="outline"
-              className="text-destructive hover:bg-destructive/10 cursor-pointer"
-              onClick={dismissModal}
-            >
-              Cancel
-            </Button>
-          </div>
         </div>
-      </div>
-    </div>
+
+        <DialogFooter>
+          <Button
+            ref={cancelButtonRef}
+            variant="outline"
+            onClick={dismissModal}
+          >
+            Cancel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

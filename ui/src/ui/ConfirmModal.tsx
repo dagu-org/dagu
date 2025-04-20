@@ -1,5 +1,12 @@
 import { Button } from '@/components/ui/button';
-import React, { useEffect } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/ui/CustomDialog';
+import React from 'react';
 
 type Props = {
   title: string;
@@ -18,49 +25,84 @@ function ConfirmModal({
   dismissModal,
   onSubmit,
 }: Props) {
-  useEffect(() => {
-    const callback = (event: KeyboardEvent) => {
-      const e = event || window.event;
-      if (e.key == 'Escape' || e.key == 'Esc') {
-        dismissModal();
+  // Create refs for the buttons
+  const cancelButtonRef = React.useRef<HTMLButtonElement>(null);
+  const submitButtonRef = React.useRef<HTMLButtonElement>(null);
+
+  // Handle keyboard events
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle events when modal is visible
+      if (!visible) return;
+
+      // Handle Enter key
+      if (e.key === 'Enter') {
+        // Get the active element
+        const activeElement = document.activeElement;
+
+        // Don't do anything if focus is on an input element
+        const isInputFocused =
+          activeElement instanceof HTMLInputElement ||
+          activeElement instanceof HTMLTextAreaElement ||
+          activeElement instanceof HTMLSelectElement;
+
+        if (isInputFocused) {
+          return;
+        }
+
+        // If Cancel button is focused, trigger cancel
+        if (activeElement === cancelButtonRef.current) {
+          e.preventDefault();
+          dismissModal();
+          return;
+        }
+
+        // If Submit button is focused, trigger submit
+        if (activeElement === submitButtonRef.current) {
+          e.preventDefault();
+          onSubmit();
+          return;
+        }
+
+        // If any other button is focused, let it handle the event naturally
+        if (activeElement instanceof HTMLButtonElement) {
+          return;
+        }
+
+        // If no specific element is focused, trigger the submit action as default
+        e.preventDefault();
+        onSubmit();
       }
     };
-    document.addEventListener('keydown', callback);
+
+    document.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.removeEventListener('keydown', callback);
+      document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [dismissModal]);
-
-  if (!visible) return null;
-
+  }, [visible, onSubmit, dismissModal]);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-md rounded-lg border-2 border-black bg-white p-6 shadow-xl">
-        <div className="flex items-center justify-center">
-          <h2 className="text-xl font-semibold">{title}</h2>
-        </div>
+    <Dialog open={visible} onOpenChange={(open) => !open && dismissModal()}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
 
-        <div className="mt-4 flex flex-col space-y-4">
-          <div>{children}</div>
+        <div className="py-4">{children}</div>
 
+        <DialogFooter>
           <Button
+            ref={cancelButtonRef}
             variant="outline"
-            className="cursor-pointer"
-            onClick={() => onSubmit()}
-          >
-            {buttonText}
-          </Button>
-
-          <Button
-            variant="outline"
-            className="text-destructive hover:bg-destructive/10 cursor-pointer"
             onClick={dismissModal}
           >
             Cancel
           </Button>
-        </div>
-      </div>
-    </div>
+          <Button ref={submitButtonRef} onClick={onSubmit}>
+            {buttonText}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
