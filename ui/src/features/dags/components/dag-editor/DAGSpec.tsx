@@ -5,19 +5,18 @@
  */
 import BorderedBox from '@/ui/BorderedBox';
 import SubTitle from '@/ui/SubTitle';
-import { AlertTriangle, Edit, Save, X } from 'lucide-react';
+import { AlertTriangle, Code, Edit, Eye, Save, X } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useCookies } from 'react-cookie';
 import { components } from '../../../../api/v2/schema';
 import { Button } from '../../../../components/ui/button';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
-import { useClient, useMutate, useQuery } from '../../../../hooks/api';
+import { useClient, useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
 import { DAGStepTable } from '../dag-details';
 import { FlowchartSwitch, FlowchartType, Graph } from '../visualization';
 import DAGAttributes from './DAGAttributes';
-import DAGDefinition from './DAGDefinition';
 import DAGEditor from './DAGEditor';
 
 /**
@@ -35,7 +34,6 @@ type Props = {
 function DAGSpec({ fileId }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
-  const mutate = useMutate();
 
   // State for editing mode and current YAML value
   const [editing, setEditing] = React.useState(false);
@@ -153,16 +151,44 @@ function DAGSpec({ fileId }: Props) {
                 </div>
               ) : null}
 
-              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
+              <div
+                className={`rounded-xl shadow-md p-6 overflow-hidden transition-all duration-300 ${
+                  editing
+                    ? 'bg-white dark:bg-slate-900 border-2 border-blue-400 dark:border-blue-600'
+                    : 'bg-white dark:bg-slate-900'
+                }`}
+              >
                 <div className="flex justify-between items-center mb-4">
-                  <SubTitle className="mb-0">Spec</SubTitle>
+                  <div className="flex items-center">
+                    <SubTitle className="mb-0 mr-2">Spec</SubTitle>
+                    <div
+                      className={`text-xs font-medium px-2 py-1 rounded-full transition-all duration-300 ${
+                        editing
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
+                          : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                      }`}
+                    >
+                      {editing ? (
+                        <div className="flex items-center">
+                          <Code className="h-3 w-3 mr-1" />
+                          <span>Editing</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center">
+                          <Eye className="h-3 w-3 mr-1" />
+                          <span>Viewing</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   {editing ? (
                     <div className="flex gap-2">
                       <Button
                         id="save-config"
                         variant="default"
                         size="sm"
-                        className="cursor-pointer"
+                        className="cursor-pointer shadow-sm hover:shadow-md transition-shadow duration-200"
                         onClick={async () => {
                           if (!currentValue) {
                             alert('No changes to save');
@@ -193,7 +219,6 @@ function DAGSpec({ fileId }: Props) {
                             alert(data.errors.join('\n'));
                             return;
                           }
-                          mutate(['/dags/{fileId}/spec']);
                           setEditing(false);
                           props.refresh();
                         }}
@@ -204,7 +229,7 @@ function DAGSpec({ fileId }: Props) {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="cursor-pointer"
+                        className="cursor-pointer hover:bg-red-50 hover:text-red-600 hover:border-red-200 dark:hover:bg-red-900/20 dark:hover:text-red-400 dark:hover:border-red-800 transition-colors duration-200"
                         onClick={() => setEditing(false)}
                       >
                         <X className="h-4 w-4 mr-1" />
@@ -216,7 +241,7 @@ function DAGSpec({ fileId }: Props) {
                       id="edit-config"
                       variant="outline"
                       size="sm"
-                      className="cursor-pointer"
+                      className="cursor-pointer hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 dark:hover:bg-blue-900/20 dark:hover:text-blue-400 dark:hover:border-blue-800 transition-colors duration-200"
                       onClick={() => setEditing(true)}
                     >
                       <Edit className="h-4 w-4 mr-1" />
@@ -225,16 +250,19 @@ function DAGSpec({ fileId }: Props) {
                   )}
                 </div>
 
-                {editing ? (
-                  <DAGEditor
-                    value={data.spec}
-                    onChange={(newValue) => {
-                      setCurrentValue(newValue || '');
-                    }}
-                  />
-                ) : (
-                  <DAGDefinition value={data.spec} lineNumbers />
-                )}
+                <DAGEditor
+                  value={data.spec}
+                  readOnly={!editing}
+                  lineNumbers={true}
+                  className="mt-2"
+                  onChange={
+                    editing
+                      ? (newValue) => {
+                          setCurrentValue(newValue || '');
+                        }
+                      : undefined
+                  }
+                />
               </div>
             </div>
           </React.Fragment>

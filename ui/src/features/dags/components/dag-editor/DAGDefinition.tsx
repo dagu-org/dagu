@@ -60,9 +60,12 @@ function DAGDefinition({
     <pre
       data-start={startLine || 1}
       data-line={highlightLine}
-      className="rounded-sm"
+      className="rounded-sm text-sm"
+      style={{ fontSize: '0.75rem' }}
     >
-      <code className={className}>{value}</code>
+      <code className={className} style={{ fontSize: '0.75rem' }}>
+        {value}
+      </code>
     </pre>
   );
 }
