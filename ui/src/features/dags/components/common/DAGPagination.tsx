@@ -4,7 +4,6 @@ import {
   Pagination,
   PaginationContent,
   PaginationItem,
-  PaginationLink,
 } from '@/components/ui/pagination'; // Import shadcn Pagination components
 import React from 'react';
 
@@ -42,7 +41,7 @@ const generatePaginationItems = (
       <Button
         variant="ghost"
         size="icon"
-        className={`h-8 w-8 rounded-md ${currentPage <= 1 ? 'pointer-events-none opacity-50' : 'hover:bg-muted'} transition-colors`}
+        className={`h-8 w-8 rounded-md ${currentPage <= 1 ? 'pointer-events-none opacity-50' : 'text-muted-foreground hover:bg-muted hover:text-foreground'} transition-colors`}
         disabled={currentPage <= 1}
         onClick={(e) => {
           e.preventDefault();
@@ -76,7 +75,7 @@ const generatePaginationItems = (
           <Button
             variant="ghost"
             size="icon"
-            className={`h-7 w-7 rounded-md text-sm font-medium hover:bg-muted transition-colors ${i === currentPage ? 'bg-primary/10 hover:bg-primary/15 text-primary' : ''}`}
+            className={`h-7 w-7 rounded-md text-sm hover:bg-muted transition-colors ${i === currentPage ? 'bg-primary/10 hover:bg-primary/15 text-primary font-medium' : 'text-muted-foreground font-normal'}`}
             onClick={(e) => {
               e.preventDefault();
               onPageChange(i);
@@ -92,16 +91,17 @@ const generatePaginationItems = (
     // Show first page
     items.push(
       <PaginationItem key={1}>
-        <PaginationLink
-          href="#"
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`h-7 w-7 rounded-md text-sm hover:bg-muted transition-colors ${1 === currentPage ? 'bg-primary/10 hover:bg-primary/15 text-primary font-medium' : 'text-muted-foreground font-normal'}`}
           onClick={(e) => {
             e.preventDefault();
             onPageChange(1);
           }}
-          isActive={1 === currentPage}
         >
-          1
-        </PaginationLink>
+          1<span className="sr-only">Page 1</span>
+        </Button>
       </PaginationItem>
     );
 
@@ -123,16 +123,18 @@ const generatePaginationItems = (
     for (let i = startPage; i <= endPage; i++) {
       items.push(
         <PaginationItem key={i}>
-          <PaginationLink
-            href="#"
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-7 w-7 rounded-md text-sm hover:bg-muted transition-colors ${i === currentPage ? 'bg-primary/10 hover:bg-primary/15 text-primary font-medium' : 'text-muted-foreground font-normal'}`}
             onClick={(e) => {
               e.preventDefault();
               onPageChange(i);
             }}
-            isActive={i === currentPage}
           >
             {i}
-          </PaginationLink>
+            <span className="sr-only">Page {i}</span>
+          </Button>
         </PaginationItem>
       );
     }
@@ -151,16 +153,18 @@ const generatePaginationItems = (
     // Show last page
     items.push(
       <PaginationItem key={totalPages}>
-        <PaginationLink
-          href="#"
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`h-7 w-7 rounded-md text-sm hover:bg-muted transition-colors ${totalPages === currentPage ? 'bg-primary/10 hover:bg-primary/15 text-primary font-medium' : 'text-muted-foreground font-normal'}`}
           onClick={(e) => {
             e.preventDefault();
             onPageChange(totalPages);
           }}
-          isActive={totalPages === currentPage}
         >
           {totalPages}
-        </PaginationLink>
+          <span className="sr-only">Page {totalPages}</span>
+        </Button>
       </PaginationItem>
     );
   }
@@ -171,7 +175,7 @@ const generatePaginationItems = (
       <Button
         variant="ghost"
         size="icon"
-        className={`h-8 w-8 rounded-md ${currentPage >= totalPages ? 'pointer-events-none opacity-50' : 'hover:bg-muted'} transition-colors`}
+        className={`h-8 w-8 rounded-md ${currentPage >= totalPages ? 'pointer-events-none opacity-50' : 'text-muted-foreground hover:bg-muted hover:text-foreground'} transition-colors`}
         disabled={currentPage >= totalPages}
         onClick={(e) => {
           e.preventDefault();
