@@ -10,6 +10,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'; // Import Shadcn Tooltip
+import dayjs from '@/lib/dayjs';
+import StatusChip from '@/ui/StatusChip';
 import { Play, RefreshCw, Square } from 'lucide-react'; // Import lucide icons
 import React from 'react';
 import { components } from '../../../../api/v2/schema';
@@ -53,6 +55,7 @@ function DAGActions({
   const [isStartModal, setIsStartModal] = React.useState(false);
   const [isStopModal, setIsStopModal] = React.useState(false);
   const [isRetryModal, setIsRetryModal] = React.useState(false);
+  const [retryRequestId, setRetryRequestId] = React.useState<string>('');
 
   const client = useClient();
 
@@ -151,7 +154,61 @@ function DAGActions({
                 variant="ghost"
                 size="icon"
                 disabled={!buttonState['retry']}
-                onClick={() => setIsRetryModal(true)}
+                onClick={async () => {
+                  // Get the current URL parameters
+                  const urlParams = new URLSearchParams(window.location.search);
+                  const idxParam = urlParams.get('idx');
+
+                  // Default to current status requestId
+                  let requestIdToUse = status?.requestId || '';
+
+                  // If we're in the history page with a specific run selected
+                  if (
+                    window.location.pathname.includes('/history') &&
+                    idxParam !== null
+                  ) {
+                    try {
+                      // Get all runs for this DAG to find the correct requestId
+                      const { data } = await client.GET('/dags/{fileId}/runs', {
+                        params: {
+                          path: {
+                            fileId: fileId,
+                          },
+                          query: {
+                            remoteNode:
+                              appBarContext.selectedRemoteNode || 'local',
+                          },
+                        },
+                      });
+
+                      if (data?.runs && data.runs.length > 0) {
+                        // Convert idx to integer
+                        const selectedIdx = parseInt(idxParam);
+
+                        // Get the run at the selected index (reversed order)
+                        const selectedRun = [...data.runs].reverse()[
+                          selectedIdx
+                        ];
+
+                        if (selectedRun && selectedRun.requestId) {
+                          requestIdToUse = selectedRun.requestId;
+                          console.log(
+                            'Using selected run requestId:',
+                            requestIdToUse
+                          );
+                        }
+                      }
+                    } catch (err) {
+                      console.error('Error fetching runs for retry:', err);
+                    }
+                  }
+
+                  // Set the requestId to use for retry
+                  setRetryRequestId(requestIdToUse);
+
+                  // Show the modal
+                  setIsRetryModal(true);
+                }}
                 className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
               >
                 <RefreshCw className="h-4 w-4" />
@@ -162,7 +219,61 @@ function DAGActions({
                 variant="outline"
                 size="sm"
                 disabled={!buttonState['retry']}
-                onClick={() => setIsRetryModal(true)}
+                onClick={async () => {
+                  // Get the current URL parameters
+                  const urlParams = new URLSearchParams(window.location.search);
+                  const idxParam = urlParams.get('idx');
+
+                  // Default to current status requestId
+                  let requestIdToUse = status?.requestId || '';
+
+                  // If we're in the history page with a specific run selected
+                  if (
+                    window.location.pathname.includes('/history') &&
+                    idxParam !== null
+                  ) {
+                    try {
+                      // Get all runs for this DAG to find the correct requestId
+                      const { data } = await client.GET('/dags/{fileId}/runs', {
+                        params: {
+                          path: {
+                            fileId: fileId,
+                          },
+                          query: {
+                            remoteNode:
+                              appBarContext.selectedRemoteNode || 'local',
+                          },
+                        },
+                      });
+
+                      if (data?.runs && data.runs.length > 0) {
+                        // Convert idx to integer
+                        const selectedIdx = parseInt(idxParam);
+
+                        // Get the run at the selected index (reversed order)
+                        const selectedRun = [...data.runs].reverse()[
+                          selectedIdx
+                        ];
+
+                        if (selectedRun && selectedRun.requestId) {
+                          requestIdToUse = selectedRun.requestId;
+                          console.log(
+                            'Using selected run requestId:',
+                            requestIdToUse
+                          );
+                        }
+                      }
+                    } catch (err) {
+                      console.error('Error fetching runs for retry:', err);
+                    }
+                  }
+
+                  // Set the requestId to use for retry
+                  setRetryRequestId(requestIdToUse);
+
+                  // Show the modal
+                  setIsRetryModal(true);
+                }}
                 className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
               >
                 <RefreshCw className="mr-2 h-4 w-4" />
@@ -207,6 +318,10 @@ function DAGActions({
           dismissModal={() => setIsRetryModal(false)}
           onSubmit={async () => {
             setIsRetryModal(false);
+
+            // Use the requestId that was set when the button was clicked
+            console.log('Retrying with requestId:', retryRequestId);
+
             const { error } = await client.POST('/dags/{fileId}/retry', {
               params: {
                 path: {
@@ -217,7 +332,7 @@ function DAGActions({
                 },
               },
               body: {
-                requestId: status?.requestId || '',
+                requestId: retryRequestId,
               },
             });
             if (error) {
@@ -234,9 +349,23 @@ function DAGActions({
             </p>
             <LabeledItem label="Request-ID">
               <span className="font-mono text-sm">
-                {status?.requestId || 'N/A'}
+                {retryRequestId || status?.requestId || 'N/A'}
               </span>
             </LabeledItem>
+            {status?.startedAt && (
+              <LabeledItem label="Started At">
+                <span className="text-sm">
+                  {dayjs(status.startedAt).format('YYYY-MM-DD HH:mm:ss Z')}
+                </span>
+              </LabeledItem>
+            )}
+            {status?.status !== undefined && (
+              <LabeledItem label="Status">
+                <StatusChip status={status.status} size="sm">
+                  {status.statusText || ''}
+                </StatusChip>
+              </LabeledItem>
+            )}
           </div>
         </ConfirmModal>
         <StartDAGModal
