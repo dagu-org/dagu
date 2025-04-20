@@ -9,6 +9,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import dayjs from '@/lib/dayjs';
 import { cn } from '@/lib/utils';
 import { Code, FileText } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -38,8 +39,7 @@ type Props = {
 const formatTimestamp = (timestamp: string | undefined) => {
   if (!timestamp || timestamp == '-') return '-';
   try {
-    const date = new Date(timestamp);
-    return date.toLocaleString();
+    return dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss Z');
   } catch (e) {
     return timestamp;
   }

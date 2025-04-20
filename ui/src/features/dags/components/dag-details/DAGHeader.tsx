@@ -50,8 +50,8 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
         <div className="flex flex-row items-center text-slate-600 dark:text-slate-400">
           <Calendar className="mr-1.5 h-4 w-4" />
           <span className="text-sm">
-            {latestRun?.finishedAt
-              ? dayjs(latestRun.finishedAt).format('MMM D, YYYY HH:mm:ss Z')
+            {latestRun?.startedAt
+              ? dayjs(latestRun.startedAt).format('YYYY-MM-DD HH:mm:ss Z')
               : '--'}
           </span>
         </div>

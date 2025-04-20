@@ -3,6 +3,7 @@
  *
  * @module features/dags/components/dag-details
  */
+import dayjs from '@/lib/dayjs';
 import { FileText } from 'lucide-react';
 import { components } from '../../../../api/v2/schema';
 import LabeledItem from '../../../../ui/LabeledItem';
@@ -48,8 +49,7 @@ function DAGStatusOverview({
   const formatTimestamp = (timestamp: string | undefined) => {
     if (!timestamp || timestamp == '-') return '-';
     try {
-      const date = new Date(timestamp);
-      return date.toLocaleString();
+      return dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss Z');
     } catch (e) {
       return timestamp;
     }
