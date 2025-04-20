@@ -90,6 +90,7 @@ const Graph: React.FC<Props> = ({
     width: width,
     minWidth: '100%',
     minHeight: '200px',
+    maxHeight: '300px',
     padding: '2em',
     borderRadius: '0.5em',
     background: `

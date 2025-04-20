@@ -41,10 +41,6 @@ function DAGDetails() {
     query.get('requestId') || data?.latestRun?.requestId || 'latest';
   const stepName = query.get('step');
 
-  const refreshFn = React.useCallback(() => {
-    setTimeout(() => mutate(), 500);
-  }, [mutate, params.fileId]);
-
   React.useEffect(() => {
     if (data) {
       appBarContext.setTitle(data.dag?.name || '');
@@ -78,7 +74,7 @@ function DAGDetails() {
   return (
     <DAGContext.Provider
       value={{
-        refresh: refreshFn,
+        refresh: () => {},
         fileId: params.fileId || '',
         name: data.dag?.name || '',
       }}
@@ -97,7 +93,7 @@ function DAGDetails() {
               fileId={params.fileId || ''}
               dag={data.dag}
               latestRun={data.latestRun}
-              refreshFn={refreshFn}
+              refreshFn={() => {}}
               formatDuration={formatDuration}
               activeTab={tab}
               requestId={requestId}
