@@ -41,7 +41,7 @@ const generatePaginationItems = (
       <Button
         variant="ghost"
         size="icon"
-        className={`h-8 w-8 rounded-md ${currentPage <= 1 ? 'pointer-events-none opacity-50' : 'text-muted-foreground hover:bg-muted hover:text-foreground'} transition-colors`}
+        className={`h-6 w-6 rounded-md flex items-center justify-center cursor-pointer ${currentPage <= 1 ? 'pointer-events-none opacity-50' : 'text-muted-foreground hover:bg-muted hover:text-foreground'} transition-colors`}
         disabled={currentPage <= 1}
         onClick={(e) => {
           e.preventDefault();
@@ -50,8 +50,8 @@ const generatePaginationItems = (
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
+          width="14"
+          height="14"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -75,7 +75,7 @@ const generatePaginationItems = (
           <Button
             variant="ghost"
             size="icon"
-            className={`h-7 w-7 rounded-md text-sm hover:bg-muted transition-colors ${i === currentPage ? 'bg-primary/10 hover:bg-primary/15 text-primary font-medium' : 'text-muted-foreground font-normal'}`}
+            className={`h-6 w-6 rounded-md text-xs flex items-center justify-center hover:bg-muted transition-colors cursor-pointer ${i === currentPage ? 'bg-primary/10 hover:bg-primary/15 text-primary font-medium' : 'text-muted-foreground font-normal'}`}
             onClick={(e) => {
               e.preventDefault();
               onPageChange(i);
@@ -94,7 +94,7 @@ const generatePaginationItems = (
         <Button
           variant="ghost"
           size="icon"
-          className={`h-7 w-7 rounded-md text-sm hover:bg-muted transition-colors ${1 === currentPage ? 'bg-primary/10 hover:bg-primary/15 text-primary font-medium' : 'text-muted-foreground font-normal'}`}
+          className={`h-6 w-6 rounded-md text-xs flex items-center justify-center hover:bg-muted transition-colors cursor-pointer ${1 === currentPage ? 'bg-primary/10 hover:bg-primary/15 text-primary font-medium' : 'text-muted-foreground font-normal'}`}
           onClick={(e) => {
             e.preventDefault();
             onPageChange(1);
@@ -109,7 +109,7 @@ const generatePaginationItems = (
     if (currentPage > halfMaxPages + 2) {
       items.push(
         <PaginationItem key="ellipsis-start">
-          <div className="h-7 w-7 flex items-center justify-center text-muted-foreground">
+          <div className="h-6 w-6 flex items-center justify-center text-muted-foreground">
             <span className="text-xs">•••</span>
           </div>
         </PaginationItem>
@@ -126,7 +126,7 @@ const generatePaginationItems = (
           <Button
             variant="ghost"
             size="icon"
-            className={`h-7 w-7 rounded-md text-sm hover:bg-muted transition-colors ${i === currentPage ? 'bg-primary/10 hover:bg-primary/15 text-primary font-medium' : 'text-muted-foreground font-normal'}`}
+            className={`h-6 w-6 rounded-md text-xs flex items-center justify-center hover:bg-muted transition-colors cursor-pointer ${i === currentPage ? 'bg-primary/10 hover:bg-primary/15 text-primary font-medium' : 'text-muted-foreground font-normal'}`}
             onClick={(e) => {
               e.preventDefault();
               onPageChange(i);
@@ -143,7 +143,7 @@ const generatePaginationItems = (
     if (currentPage < totalPages - halfMaxPages - 1) {
       items.push(
         <PaginationItem key="ellipsis-end">
-          <div className="h-7 w-7 flex items-center justify-center text-muted-foreground">
+          <div className="h-6 w-6 flex items-center justify-center text-muted-foreground">
             <span className="text-xs">•••</span>
           </div>
         </PaginationItem>
@@ -156,7 +156,7 @@ const generatePaginationItems = (
         <Button
           variant="ghost"
           size="icon"
-          className={`h-7 w-7 rounded-md text-sm hover:bg-muted transition-colors ${totalPages === currentPage ? 'bg-primary/10 hover:bg-primary/15 text-primary font-medium' : 'text-muted-foreground font-normal'}`}
+          className={`h-6 w-6 rounded-md text-xs flex items-center justify-center hover:bg-muted transition-colors cursor-pointer ${totalPages === currentPage ? 'bg-primary/10 hover:bg-primary/15 text-primary font-medium' : 'text-muted-foreground font-normal'}`}
           onClick={(e) => {
             e.preventDefault();
             onPageChange(totalPages);
@@ -175,7 +175,7 @@ const generatePaginationItems = (
       <Button
         variant="ghost"
         size="icon"
-        className={`h-8 w-8 rounded-md ${currentPage >= totalPages ? 'pointer-events-none opacity-50' : 'text-muted-foreground hover:bg-muted hover:text-foreground'} transition-colors`}
+        className={`h-6 w-6 rounded-md flex items-center justify-center cursor-pointer ${currentPage >= totalPages ? 'pointer-events-none opacity-50' : 'text-muted-foreground hover:bg-muted hover:text-foreground'} transition-colors`}
         disabled={currentPage >= totalPages}
         onClick={(e) => {
           e.preventDefault();
@@ -184,8 +184,8 @@ const generatePaginationItems = (
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
+          width="14"
+          height="14"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -254,22 +254,22 @@ const DAGPagination = ({
   };
 
   return (
-    <div className="flex flex-row items-center justify-between gap-2">
-      {/* Modern compact pagination controls */}
+    <div className="flex items-center gap-2">
+      {/* Pagination controls */}
       <Pagination>
-        <PaginationContent>
+        <PaginationContent className="flex items-center space-x-1">
           {generatePaginationItems(page, totalPages, pageChange)}
         </PaginationContent>
       </Pagination>
 
-      {/* Compact items per page selector */}
+      {/* Items per page selector */}
       <div className="flex items-center gap-1">
-        <div className="text-xs text-muted-foreground">{pageLimit}</div>
+        <span className="text-xs text-muted-foreground">{pageLimit}</span>
         <div className="relative group">
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 rounded-md hover:bg-muted"
+            className="h-6 w-6 rounded-md hover:bg-muted flex items-center justify-center cursor-pointer"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

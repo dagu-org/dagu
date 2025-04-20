@@ -3,6 +3,8 @@
  *
  * @module features/dags/components/dag-editor
  */
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 import { components } from '../../../../api/v2/schema';
 
 /**
@@ -23,30 +25,36 @@ type Props = {
  */
 function DAGErrors({ dags, errors, hasError }: Props) {
   if (!dags || !hasError) {
-    return <div></div>;
+    return null;
   }
 
   return (
-    <div className="notification is-danger mt-0 mb-0">
-      <div>Please check the below errors!</div>
-      <div className="content">
-        <ul>
+    <Alert variant="destructive" className="py-2 mb-2">
+      <AlertCircle className="h-4 w-4" />
+      <AlertTitle className="text-sm font-medium">Error</AlertTitle>
+      <AlertDescription className="text-xs mt-1">
+        <ul className="list-disc pl-4 space-y-0.5">
           {dags
             .filter((dag) => dag.errors.length > 0)
             .map((dag) => {
               const url = encodeURI(dag.dag.name);
               return dag.errors.map((err, index) => (
-                <li key={`${dag.dag.name}-${index}`}>
-                  <a href={url}>{dag.dag.name}</a>: {err}
+                <li key={`${dag.dag.name}-${index}`} className="text-xs">
+                  <a href={url} className="font-medium underline">
+                    {dag.dag.name}
+                  </a>
+                  : {err}
                 </li>
               ));
             })}
           {errors.map((e, index) => (
-            <li key={`general-${index}`}>{e}</li>
+            <li key={`general-${index}`} className="text-xs">
+              {e}
+            </li>
           ))}
         </ul>
-      </div>
-    </div>
+      </AlertDescription>
+    </Alert>
   );
 }
 

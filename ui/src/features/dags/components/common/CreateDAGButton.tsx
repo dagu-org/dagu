@@ -20,7 +20,7 @@ function CreateDAGButton() {
   return (
     <Button
       aria-label="Create new DAG"
-      className="flex items-center gap-2 bg-primary text-white font-semibold px-5 py-2 rounded-md shadow hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition cursor-pointer"
+      className="flex items-center gap-1.5 bg-primary text-white font-medium px-3 py-1 text-sm rounded-md shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-1 focus:ring-primary focus:ring-offset-1 transition cursor-pointer h-8"
       onClick={async () => {
         // Prompt for the new DAG name
         const name = window.prompt('Please input the new DAG name', '');
@@ -61,8 +61,8 @@ function CreateDAGButton() {
         window.location.href = `${basePath}/dags/${name}/spec`;
       }}
     >
-      <Plus className="w-4 h-4" aria-hidden="true" />
-      New DAG
+      <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+      <span>New</span>
     </Button>
   );
 }

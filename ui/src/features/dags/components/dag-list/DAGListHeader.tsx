@@ -3,11 +3,8 @@ import Title from '../../../../ui/Title';
 import { CreateDAGButton } from '../common';
 
 const DAGListHeader: React.FC = () => (
-  // Replace MUI Box with div and Tailwind classes
-  <div className="flex flex-row items-center justify-between mb-4">
-    {' '}
-    {/* Added margin-bottom for spacing */}
-    <Title>DAGs</Title>
+  <div className="flex flex-row items-center justify-between mb-2">
+    <Title className="text-xl mb-0">DAGs</Title>
     <CreateDAGButton />
   </div>
 );
