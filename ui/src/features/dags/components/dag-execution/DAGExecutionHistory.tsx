@@ -3,7 +3,7 @@
  *
  * @module features/dags/components/dag-execution
  */
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { components, NodeStatus, Status } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useClient, useQuery } from '../../../../hooks/api';
@@ -14,7 +14,7 @@ import { RunDetailsContext } from '../../contexts/DAGStatusContext';
 import { getEventHandlers } from '../../lib/getEventHandlers';
 import { DAGStatusOverview, NodeStatusTable } from '../dag-details';
 import { DAGGraph } from '../visualization';
-import { HistoryTable, StatusUpdateModal } from './';
+import { HistoryTable, LogViewer, StatusUpdateModal } from './';
 
 /**
  * Props for the DAGExecutionHistory component
@@ -77,6 +77,14 @@ function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
   const [modal, setModal] = React.useState(false);
+
+  // State for log viewer
+  const [logViewer, setLogViewer] = useState({
+    isOpen: false,
+    logType: 'step' as 'execution' | 'step',
+    stepName: '',
+    requestId: '',
+  });
 
   // Get the selected run index from URL parameters
   const idxParam = new URLSearchParams(window.location.search).get('idx');
@@ -277,6 +285,14 @@ function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
                   status={reversedRuns[idx]}
                   requestId={reversedRuns[idx].requestId}
                   {...props}
+                  onViewLog={(requestId) => {
+                    setLogViewer({
+                      isOpen: true,
+                      logType: 'execution',
+                      stepName: '',
+                      requestId,
+                    });
+                  }}
                 />
               </div>
 
@@ -286,6 +302,15 @@ function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
                   nodes={reversedRuns[idx].nodes}
                   status={reversedRuns[idx]}
                   {...props}
+                  onViewLog={(stepName, requestId) => {
+                    setLogViewer({
+                      isOpen: true,
+                      logType: 'step',
+                      stepName,
+                      requestId:
+                        requestId || reversedRuns[idx]?.requestId || '',
+                    });
+                  }}
                 />
               </div>
 
@@ -296,6 +321,31 @@ function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
                     nodes={getEventHandlers(reversedRuns[idx])}
                     status={reversedRuns[idx]}
                     {...props}
+                    onViewLog={(stepName, requestId) => {
+                      setLogViewer({
+                        isOpen: true,
+                        logType: 'step',
+                        stepName,
+                        requestId:
+                          requestId || reversedRuns[idx]?.requestId || '',
+                      });
+                    }}
+                  />
+
+                  {/* Log viewer modal */}
+                  <LogViewer
+                    isOpen={logViewer.isOpen}
+                    onClose={() =>
+                      setLogViewer((prev) => ({ ...prev, isOpen: false }))
+                    }
+                    logType={logViewer.logType}
+                    dagName={
+                      reversedRuns && reversedRuns[idx]
+                        ? reversedRuns[idx].name
+                        : ''
+                    }
+                    requestId={logViewer.requestId}
+                    stepName={logViewer.stepName}
                   />
                 </div>
               ) : null}

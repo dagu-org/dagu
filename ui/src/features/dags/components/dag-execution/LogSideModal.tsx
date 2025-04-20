@@ -1,0 +1,157 @@
+import { Button } from '@/components/ui/button';
+import { ExternalLink, Maximize2, Minimize2, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+
+type LogSideModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+  isInModal?: boolean;
+  dagName?: string;
+  requestId?: string;
+  stepName?: string;
+  logType?: 'execution' | 'step';
+};
+
+/**
+ * LogSideModal displays log content in a side panel that appears from the right
+ * This creates a developer-friendly experience for viewing logs without hiding the DAG details
+ */
+const LogSideModal: React.FC<LogSideModalProps> = ({
+  isOpen,
+  onClose,
+  title,
+  children,
+  isInModal = false,
+  dagName = '',
+  requestId = '',
+  stepName = '',
+  logType = 'execution',
+}) => {
+  // State to track whether the modal is expanded
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Add keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Close modal with Escape key
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  // Calculate z-index and positioning based on whether it's in a modal or not
+  const zIndex = isInModal ? 60 : 50; // Higher z-index when in modal
+
+  // Determine width based on expanded state
+  const width = isExpanded ? 'w-full' : isInModal ? 'w-1/2' : 'w-2/5';
+
+  // Handle clicks outside the modal
+  const handleOutsideClick = (e: React.MouseEvent) => {
+    // Stop propagation to prevent closing the parent modal
+    e.stopPropagation();
+    onClose();
+  };
+
+  // Toggle expanded state
+  const toggleExpand = () => {
+    setIsExpanded(!isExpanded);
+  };
+
+  // Generate URL for opening log in new tab
+  const getLogUrl = () => {
+    const baseUrl = `/dags/${dagName}`;
+    const searchParams = new URLSearchParams();
+
+    if (requestId) {
+      searchParams.set('requestId', requestId);
+    }
+
+    if (logType === 'step' && stepName) {
+      searchParams.set('step', stepName);
+      return `${baseUrl}/log?${searchParams.toString()}`;
+    } else {
+      return `${baseUrl}/scheduler-log?${searchParams.toString()}`;
+    }
+  };
+
+  // Open log in new tab
+  const openInNewTab = () => {
+    window.open(getLogUrl(), '_blank');
+  };
+
+  return (
+    <>
+      {/* Invisible backdrop for capturing clicks outside the modal - always present */}
+      <div
+        className={`fixed inset-0 h-screen w-screen ${!isInModal ? 'bg-black/20' : 'bg-transparent'}`}
+        style={{ zIndex: zIndex }}
+        onClick={handleOutsideClick}
+      />
+
+      {/* Side Modal */}
+      <div
+        className={`fixed top-0 bottom-0 right-0 ${width} h-screen bg-background border-l border-border shadow-xl overflow-hidden flex flex-col slide-in-from-right`}
+        style={{ zIndex: zIndex + 1 }} // Make sure modal is above backdrop
+        onClick={(e) => e.stopPropagation()} // Prevent clicks inside the modal from closing it
+      >
+        <div className="flex justify-between items-center p-4 border-b">
+          <h2 className="text-lg font-semibold">{title}</h2>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={toggleExpand}
+              title={isExpanded ? 'Minimize' : 'Expand'}
+              className="relative group"
+            >
+              {isExpanded ? (
+                <Minimize2 className="h-4 w-4" />
+              ) : (
+                <Maximize2 className="h-4 w-4" />
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={openInNewTab}
+              title="Open in new tab"
+              className="relative group"
+            >
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onClose}
+              title="Close (Esc)"
+              className="relative group"
+            >
+              <X className="h-4 w-4" />
+              <span className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-[10px] font-medium px-1 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                Esc
+              </span>
+            </Button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto p-4">{children}</div>
+      </div>
+
+      {/* Animation is handled via CSS classes in global.css */}
+    </>
+  );
+};
+
+export default LogSideModal;

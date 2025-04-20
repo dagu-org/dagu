@@ -50,8 +50,13 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
     setTimeout(() => mutate(), 500);
   }, [mutate]);
 
-  const handleFullscreenClick = () => {
-    navigate(`/dags/${fileId}`);
+  const handleFullscreenClick = (e?: React.MouseEvent) => {
+    // If Cmd (Mac) or Ctrl (Windows/Linux) key is pressed, open in new tab
+    if (e && (e.metaKey || e.ctrlKey)) {
+      window.open(`/dags/${fileId}`, '_blank');
+    } else {
+      navigate(`/dags/${fileId}`);
+    }
   };
 
   React.useEffect(() => {
@@ -150,7 +155,7 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
                     variant="outline"
                     size="icon"
                     onClick={handleFullscreenClick}
-                    title="Open in fullscreen (F)"
+                    title="Open in fullscreen (F) - Cmd/Ctrl+Click to open in new tab"
                     className="relative group"
                   >
                     <Maximize2 className="h-4 w-4" />

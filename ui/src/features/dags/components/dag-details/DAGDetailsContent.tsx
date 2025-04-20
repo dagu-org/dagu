@@ -1,6 +1,6 @@
 import { Tabs } from '@/components/ui/tabs';
 import { ActivitySquare, FileCode, History, ScrollText } from 'lucide-react';
-import React from 'react';
+import React, { useState } from 'react';
 import { components } from '../../../../api/v2/schema';
 import { DAGStatus } from '../../components';
 import { DAGContext } from '../../contexts/DAGContext';
@@ -8,7 +8,12 @@ import { RunDetailsContext } from '../../contexts/DAGStatusContext';
 import { LinkTab } from '../common';
 import ModalLinkTab from '../common/ModalLinkTab';
 import { DAGEditButtons, DAGSpec } from '../dag-editor';
-import { DAGExecutionHistory, ExecutionLog, StepLog } from '../dag-execution';
+import {
+  DAGExecutionHistory,
+  ExecutionLog,
+  LogViewer,
+  StepLog,
+} from '../dag-execution';
 import { DAGHeader } from './';
 
 type DAGDetailsContentProps = {
@@ -24,6 +29,12 @@ type DAGDetailsContentProps = {
   isModal?: boolean;
 };
 
+type LogViewerState = {
+  isOpen: boolean;
+  logType: 'execution' | 'step';
+  stepName?: string;
+};
+
 const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   fileId,
   dag,
@@ -37,11 +48,34 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   isModal = false,
 }) => {
   const baseUrl = isModal ? '#' : `/dags/${fileId}`;
+  const [logViewer, setLogViewer] = useState<LogViewerState>({
+    isOpen: false,
+    logType: 'execution',
+    stepName: undefined,
+  });
 
   const handleTabClick = (tab: string) => {
     if (onTabChange) {
       onTabChange(tab);
     }
+
+    // Open log viewer when clicking on log tabs
+    if (tab === 'scheduler-log') {
+      setLogViewer({
+        isOpen: true,
+        logType: 'execution',
+      });
+    } else if (tab === 'log' && stepName) {
+      setLogViewer({
+        isOpen: true,
+        logType: 'step',
+        stepName,
+      });
+    }
+  };
+
+  const closeLogViewer = () => {
+    setLogViewer((prev) => ({ ...prev, isOpen: false }));
   };
 
   return (
@@ -162,6 +196,17 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                 stepName={stepName}
               />
             ) : null}
+
+            {/* Log viewer modal */}
+            <LogViewer
+              isOpen={logViewer.isOpen}
+              onClose={closeLogViewer}
+              logType={logViewer.logType}
+              dagName={dag?.name || ''}
+              requestId={requestId}
+              stepName={logViewer.stepName}
+              isInModal={isModal}
+            />
           </div>
         </div>
       </RunDetailsContext.Provider>

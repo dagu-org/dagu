@@ -4,7 +4,6 @@
  * @module features/dags/components/dag-details
  */
 import { FileText } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { components } from '../../../../api/v2/schema';
 import LabeledItem from '../../../../ui/LabeledItem';
 import StatusChip from '../../../../ui/StatusChip';
@@ -19,13 +18,20 @@ type Props = {
   fileId: string;
   /** Request ID of the execution */
   requestId?: string;
+  /** Function to open log viewer */
+  onViewLog?: (requestId: string) => void;
 };
 
 /**
  * DAGStatusOverview displays summary information about a DAG run
  * including status, request ID, timestamps, and parameters
  */
-function DAGStatusOverview({ status, fileId, requestId = '' }: Props) {
+function DAGStatusOverview({
+  status,
+  fileId,
+  requestId = '',
+  onViewLog,
+}: Props) {
   // Build URL for log viewing
   const searchParams = new URLSearchParams();
   if (requestId) {
@@ -69,12 +75,21 @@ function DAGStatusOverview({ status, fileId, requestId = '' }: Props) {
                 <div className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded-md font-medium text-xs text-slate-700 dark:text-slate-300">
                   {status.requestId}
                 </div>
-                <Link
-                  to={url}
+                <a
+                  href={url}
+                  onClick={(e) => {
+                    // If Cmd (Mac) or Ctrl (Windows/Linux) key is pressed, let the default behavior happen
+                    // which will open the link in a new tab
+                    if (!(e.metaKey || e.ctrlKey) && onViewLog) {
+                      e.preventDefault();
+                      onViewLog(status.requestId);
+                    }
+                  }}
                   className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors duration-200 cursor-pointer"
+                  title="Click to view log (Cmd/Ctrl+Click to open in new tab)"
                 >
                   <FileText className="h-4 w-4" />
-                </Link>
+                </a>
               </div>
             </LabeledItem>
           </div>

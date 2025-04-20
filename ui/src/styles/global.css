@@ -196,3 +196,16 @@ a {
     transform: scale(0.8);
   }
 }
+
+@keyframes slideInFromRight {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.slide-in-from-right {
+  animation: slideInFromRight 0.1s cubic-bezier(0.16, 1, 0.3, 1);
+}

@@ -12,7 +12,6 @@ import {
 import { cn } from '@/lib/utils';
 import { Code, FileText } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { components, NodeStatus } from '../../../../api/v2/schema';
 import StyledTableRow from '../../../../ui/StyledTableRow';
 import { NodeStatusChip } from '../common';
@@ -29,6 +28,8 @@ type Props = {
   requestId?: string;
   /** DAG name/fileId */
   name: string;
+  /** Function to open log viewer */
+  onViewLog?: (stepName: string, requestId: string) => void;
 };
 
 /**
@@ -84,7 +85,13 @@ const calculateDuration = (
 /**
  * NodeStatusTableRow displays information about a single node's execution status
  */
-function NodeStatusTableRow({ name, rownum, node, requestId }: Props) {
+function NodeStatusTableRow({
+  name,
+  rownum,
+  node,
+  requestId,
+  onViewLog,
+}: Props) {
   // State to store the current duration for running tasks
   const [currentDuration, setCurrentDuration] = useState<string>('-');
 
@@ -241,13 +248,22 @@ function NodeStatusTableRow({ name, rownum, node, requestId }: Props) {
       {/* Log */}
       <TableCell className="text-center">
         {node.log ? (
-          <Link
-            to={url}
+          <a
+            href={url}
+            onClick={(e) => {
+              // If Cmd (Mac) or Ctrl (Windows/Linux) key is pressed, let the default behavior happen
+              // which will open the link in a new tab
+              if (!(e.metaKey || e.ctrlKey) && onViewLog) {
+                e.preventDefault();
+                onViewLog(node.step.name, requestId || '');
+              }
+            }}
             className="inline-flex items-center justify-center p-2 transition-colors duration-200 rounded-md text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+            title="Click to view log (Cmd/Ctrl+Click to open in new tab)"
           >
             <span className="sr-only">View Log</span>
             <FileText className="h-4 w-4" />
-          </Link>
+          </a>
         ) : null}
       </TableCell>
     </StyledTableRow>

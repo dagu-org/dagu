@@ -23,12 +23,14 @@ type Props = {
   status: components['schemas']['RunDetails'];
   /** DAG file ID */
   fileId: string;
+  /** Function to open log viewer */
+  onViewLog?: (stepName: string, requestId: string) => void;
 };
 
 /**
  * NodeStatusTable displays execution status information for all nodes in a DAG run
  */
-function NodeStatusTable({ nodes, status, fileId }: Props) {
+function NodeStatusTable({ nodes, status, fileId, onViewLog }: Props) {
   // Don't render if there are no nodes
   if (!nodes || !nodes.length) {
     return null;
@@ -70,6 +72,7 @@ function NodeStatusTable({ nodes, status, fileId }: Props) {
               node={n}
               requestId={status.requestId}
               name={fileId}
+              onViewLog={onViewLog}
             />
           ))}
         </TableBody>

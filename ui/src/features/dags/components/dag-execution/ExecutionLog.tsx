@@ -4,9 +4,9 @@
  * @module features/dags/components/dag-execution
  */
 import React from 'react';
-import LoadingIndicator from '../../../../ui/LoadingIndicator';
-import { useQuery } from '../../../../hooks/api';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
+import { useQuery } from '../../../../hooks/api';
+import LoadingIndicator from '../../../../ui/LoadingIndicator';
 
 /**
  * Props for the ExecutionLog component
@@ -59,11 +59,26 @@ function ExecutionLog({ name, requestId }: Props) {
   // Remove ANSI color codes from log content
   const content = data.content.replace(new RegExp(ANSI_CODES_REGEX, 'g'), '');
 
+  // Split content into lines for better rendering
+  const lines = content ? content.split('\n') : ['<No log output>'];
+
   return (
-    <div className="mt-4">
-      <div className="h-[60vh] overflow-auto rounded-lg bg-zinc-900 p-4 shadow-md">
-        <pre className="h-full font-mono text-white">
-          {content || '<No log output>'}
+    <div className="w-full h-full">
+      <div className="h-full overflow-auto rounded-lg bg-zinc-900 p-4 shadow-md">
+        <pre className="h-full font-mono text-sm text-white">
+          {lines.map((line, index) => (
+            <div
+              key={index}
+              className="flex hover:bg-zinc-800 px-2 py-0.5 rounded"
+            >
+              <span className="text-zinc-500 mr-4 select-none w-8 text-right">
+                {index + 1}
+              </span>
+              <span className="whitespace-pre-wrap break-all">
+                {line || ' '}
+              </span>
+            </div>
+          ))}
         </pre>
       </div>
     </div>

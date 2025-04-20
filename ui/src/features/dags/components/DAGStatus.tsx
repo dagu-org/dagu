@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { components, NodeStatus, Status } from '../../../api/v2/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { useClient } from '../../../hooks/api';
@@ -6,7 +6,7 @@ import SubTitle from '../../../ui/SubTitle';
 import { DAGContext } from '../contexts/DAGContext';
 import { getEventHandlers } from '../lib/getEventHandlers';
 import { DAGStatusOverview, NodeStatusTable } from './dag-details';
-import { StatusUpdateModal } from './dag-execution';
+import { LogViewer, StatusUpdateModal } from './dag-execution';
 import { DAGGraph } from './visualization';
 
 type Props = {
@@ -16,10 +16,18 @@ type Props = {
 
 function DAGStatus({ run, fileId }: Props) {
   const appBarContext = React.useContext(AppBarContext);
-  const [modal, setModal] = React.useState(false);
-  const [selectedStep, setSelectedStep] = React.useState<
+  const [modal, setModal] = useState(false);
+  const [selectedStep, setSelectedStep] = useState<
     components['schemas']['Step'] | undefined
   >(undefined);
+
+  // State for log viewer
+  const [logViewer, setLogViewer] = useState({
+    isOpen: false,
+    logType: 'step' as 'execution' | 'step',
+    stepName: '',
+    requestId: '',
+  });
   const client = useClient();
   const dismissModal = () => setModal(false);
   const onUpdateStatus = async (
@@ -68,6 +76,16 @@ function DAGStatus({ run, fileId }: Props) {
 
   const handlers = getEventHandlers(run);
 
+  // Handler for opening log viewer
+  const handleViewLog = (stepName: string, requestId: string) => {
+    setLogViewer({
+      isOpen: true,
+      logType: 'step',
+      stepName,
+      requestId: requestId || run.requestId,
+    });
+  };
+
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
@@ -79,18 +97,39 @@ function DAGStatus({ run, fileId }: Props) {
           <React.Fragment>
             <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
               <SubTitle className="mb-4">Status</SubTitle>
-              <DAGStatusOverview status={run} fileId={fileId} />
+              <DAGStatusOverview
+                status={run}
+                fileId={fileId}
+                onViewLog={(requestId) => {
+                  setLogViewer({
+                    isOpen: true,
+                    logType: 'execution',
+                    stepName: '',
+                    requestId,
+                  });
+                }}
+              />
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
               <SubTitle className="mb-4">Steps</SubTitle>
-              <NodeStatusTable nodes={run.nodes} status={run} {...props} />
+              <NodeStatusTable
+                nodes={run.nodes}
+                status={run}
+                {...props}
+                onViewLog={handleViewLog}
+              />
             </div>
 
             {handlers?.length ? (
               <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
                 <SubTitle className="mb-4">Lifecycle Hooks</SubTitle>
-                <NodeStatusTable nodes={handlers} status={run} {...props} />
+                <NodeStatusTable
+                  nodes={handlers}
+                  status={run}
+                  {...props}
+                  onViewLog={handleViewLog}
+                />
               </div>
             ) : null}
           </React.Fragment>
@@ -102,6 +141,16 @@ function DAGStatus({ run, fileId }: Props) {
         step={selectedStep}
         dismissModal={dismissModal}
         onSubmit={onUpdateStatus}
+      />
+
+      {/* Log viewer modal */}
+      <LogViewer
+        isOpen={logViewer.isOpen}
+        onClose={() => setLogViewer((prev) => ({ ...prev, isOpen: false }))}
+        logType={logViewer.logType}
+        dagName={run.name}
+        requestId={logViewer.requestId}
+        stepName={logViewer.stepName}
       />
     </div>
   );

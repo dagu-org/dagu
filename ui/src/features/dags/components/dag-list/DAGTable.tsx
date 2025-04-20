@@ -1010,10 +1010,19 @@ function DAGTable({
                           : 'cursor-pointer hover:bg-muted/50'
                     }
                     style={{ fontSize: '0.8125rem' }} // Smaller font size for more density
-                    onClick={() => {
+                    onClick={(e) => {
                       if (isDAGRow && 'dag' in row.original) {
                         const dagRow = row.original as DAGRow;
-                        openModal(dagRow.dag.fileId);
+                        const fileId = dagRow.dag.fileId;
+
+                        // If Cmd (Mac) or Ctrl (Windows/Linux) key is pressed, open in new tab
+                        if (e.metaKey || e.ctrlKey) {
+                          // Open in new tab
+                          window.open(`/dags/${fileId}`, '_blank');
+                        } else {
+                          // Normal click behavior
+                          openModal(fileId);
+                        }
                       }
                     }}
                   >
