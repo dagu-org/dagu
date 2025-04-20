@@ -10,9 +10,7 @@ import fetchJson from './lib/fetchJson';
 import Search from './pages/search';
 import { UserPreferencesProvider } from './contexts/UserPreference';
 import { Config, ConfigContext } from './contexts/ConfigContext';
-import moment from 'moment-timezone';
-// Load all timezone data for moment-timezone to handle dynamic timezones
-import 'moment-timezone/builds/moment-timezone-with-data.js';
+import dayjs from './lib/dayjs';
 
 type Props = {
   config: Config;
@@ -20,7 +18,7 @@ type Props = {
 
 function App({ config }: Props) {
   const [title, setTitle] = React.useState<string>('');
-  config.tz ||= moment.tz.guess();
+  config.tz ||= dayjs.tz.guess();
   const remoteNodes = config.remoteNodes
     .split(',')
     .filter(Boolean)

@@ -3,7 +3,7 @@ import Title from '../../../../ui/Title';
 import { DAGActions } from '../common';
 import StatusChip from '../../../../ui/StatusChip';
 import { Calendar, Timer } from 'lucide-react';
-import moment from 'moment-timezone';
+import dayjs from '../../../../lib/dayjs';
 import { RunDetailsContext } from '../../contexts/DAGStatusContext';
 import { components, Status } from '../../../../api/v2/schema';
 
@@ -51,7 +51,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
           <Calendar className="mr-1.5 h-4 w-4" />
           <span className="text-sm">
             {latestRun?.finishedAt
-              ? moment(latestRun.finishedAt).format('MMM D, YYYY HH:mm:ss Z')
+              ? dayjs(latestRun.finishedAt).format('MMM D, YYYY HH:mm:ss Z')
               : '--'}
           </span>
         </div>
@@ -62,7 +62,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
             {latestRun.finishedAt
               ? formatDuration(latestRun.startedAt, latestRun.finishedAt)
               : latestRun.startedAt
-                ? formatDuration(latestRun.startedAt, moment().toISOString())
+                ? formatDuration(latestRun.startedAt, dayjs().toISOString())
                 : '--'}
           </span>
         </div>

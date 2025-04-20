@@ -3,7 +3,7 @@
  *
  * @module features/dags/components/dag-execution
  */
-import moment from 'moment-timezone';
+import dayjs from '../../../../lib/dayjs';
 import React from 'react';
 import HistoryTableRow from './HistoryTableRow';
 import {
@@ -52,9 +52,9 @@ function HistoryTable({ runs, gridData, onSelect, idx }: Props) {
               let date;
               const startedAt = runs[i].startedAt;
               if (startedAt && startedAt != '-') {
-                date = moment(startedAt).format('M/D');
+                date = dayjs(startedAt).format('M/D');
               } else {
-                date = moment().format('M/D');
+                date = dayjs().format('M/D');
               }
 
               // Only show the date if it's different from the previous column
@@ -63,7 +63,7 @@ function HistoryTable({ runs, gridData, onSelect, idx }: Props) {
                 flag = true;
               }
               if (i > 0 && runs[i - 1]) {
-                flag = moment(runs[i - 1]!.startedAt).format('M/D') != date;
+                flag = dayjs(runs[i - 1]!.startedAt).format('M/D') != date;
               }
 
               return (

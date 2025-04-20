@@ -3,7 +3,7 @@
  *
  * @module features/dags/components/visualization
  */
-import moment from 'moment-timezone';
+import dayjs from '../../../../lib/dayjs';
 import React from 'react';
 import Mermaid from '../../../../ui/Mermaid';
 import { components, Status } from '../../../../api/v2/schema';
@@ -55,9 +55,9 @@ function TimelineChart({ status }: Props) {
         ret.push(
           step.step.name +
             ' : ' +
-            moment(step.startedAt).format(timeFormat) +
+            dayjs(step.startedAt).format(timeFormat) +
             ',' +
-            moment(step.finishedAt).format(timeFormat)
+            dayjs(step.finishedAt).format(timeFormat)
         );
       });
 

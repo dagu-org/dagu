@@ -26,11 +26,25 @@ import {
   Filter, // Icon for filter button (if needed later)
 } from 'lucide-react';
 import LiveSwitch from '../common/LiveSwitch';
-import 'moment-duration-format';
 import Ticker from '../../../../ui/Ticker';
 import VisuallyHidden from '../../../../ui/VisuallyHidden';
-import moment from 'moment-timezone';
+import dayjs from '../../../../lib/dayjs';
 import { components } from '../../../../api/v2/schema';
+
+// Helper to format milliseconds into d/h/m/s
+function formatMs(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  parts.push(`${secs}s`);
+  return parts.join(' ');
+}
 
 // Import shadcn/ui components
 import {
@@ -109,7 +123,7 @@ const columnHelper = createColumnHelper<Data>();
 // --- Helper Functions (moved from bottom for clarity) ---
 function getConfig() {
   // Assuming getConfig is defined elsewhere or replace with actual config access
-  return { tz: moment.tz.guess() };
+  return { tz: dayjs.tz.guess() };
 }
 
 function getNextSchedule(
@@ -355,16 +369,14 @@ const defaultColumns = [
         return <span className="font-normal text-muted-foreground">-</span>;
       }
 
-      const formattedStartedAt = moment(startedAt).format(
-        'YYYY-MM-DD HH:mm:ss'
-      );
+      const formattedStartedAt = dayjs(startedAt).format('YYYY-MM-DD HH:mm:ss');
       let durationContent = null;
 
       if (finishedAt && finishedAt !== '-') {
-        const durationMs = moment(finishedAt).diff(moment(startedAt));
+        const durationMs = dayjs(finishedAt).diff(dayjs(startedAt));
         // Choose format based on duration length
         const format = durationMs >= 1000 * 60 ? 'd[d] h[h] m[m]' : 's[s]';
-        const formattedDuration = moment.duration(durationMs).format(format);
+        const formattedDuration = dayjs.duration(durationMs).format(format);
         if (durationMs > 0) {
           // Only show duration if positive
           durationContent = (
@@ -406,8 +418,8 @@ const defaultColumns = [
       if (!startedAtA) return 1; // A is null, should come after B
       if (!startedAtB) return -1; // B is null, should come after A
 
-      // Compare valid dates using moment's diff for accurate comparison
-      return moment(startedAtA).diff(moment(startedAtB));
+      // Compare valid dates using dayjs's diff for accurate comparison
+      return dayjs(startedAtA).diff(dayjs(startedAtB));
     },
     size: 200, // Adjust size as needed
   }),
@@ -456,13 +468,7 @@ const defaultColumns = [
                 <Ticker intervalMs={1000}>
                   {() => {
                     const ms = nextRun.getTime() - new Date().getTime();
-                    const durFormat =
-                      ms > 1000 * 60 * 60 ? 'd[d]h[h]m[m]' : 'd[d]h[h]m[m]s[s]';
-                    return (
-                      <span>
-                        Run in {moment.duration(ms).format(durFormat)}
-                      </span>
-                    );
+                    return <span>Run in {formatMs(ms)}</span>;
                   }}
                 </Ticker>
               </div>

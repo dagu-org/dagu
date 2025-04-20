@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import moment, { MomentInput } from 'moment-timezone';
+import dayjs from '../../../lib/dayjs';
 import { Timeline, DataSet } from 'vis-timeline/standalone';
 import 'vis-timeline/styles/vis-timeline-graph2d.css';
 import { statusColorMapping } from '../../../consts';
@@ -26,8 +26,8 @@ function DashboardTimeChart({ data: input }: Props) {
     if (!timelineRef.current) return;
 
     const items: TimelineItem[] = [];
-    const now = moment();
-    const startOfDay = moment().startOf('day');
+    const now = dayjs();
+    const startOfDay = dayjs().startOf('day');
 
     input.forEach((item) => {
       const dag = item.dag;
@@ -35,8 +35,8 @@ function DashboardTimeChart({ data: input }: Props) {
       const status = run.status;
       const start = run.startedAt;
       if (start && start !== '-') {
-        const startMoment = moment(start);
-        const end = run.finishedAt !== '-' ? moment(run.finishedAt) : now;
+        const startMoment = dayjs(start);
+        const end = run.finishedAt !== '-' ? dayjs(run.finishedAt) : now;
 
         items.push({
           id: dag.name + `_${run.requestId}`,
@@ -52,8 +52,8 @@ function DashboardTimeChart({ data: input }: Props) {
     const dataset = new DataSet(items);
 
     if (!timelineInstance.current) {
+      // For vis-timeline, we need to use the Timeline constructor with options
       timelineInstance.current = new Timeline(timelineRef.current, dataset, {
-        moment: (date: MomentInput) => moment(date).tz(config.tz),
         start: startOfDay.toDate(),
         end: now.endOf('day').toDate(),
         orientation: 'top',
@@ -88,7 +88,7 @@ function DashboardTimeChart({ data: input }: Props) {
         timelineInstance.current = null;
       }
     };
-  }, [input]);
+  }, [input, config.tz]);
 
   return (
     <TimelineWrapper>

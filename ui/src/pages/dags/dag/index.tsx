@@ -8,7 +8,7 @@ import { Tabs } from '@/components/ui/tabs';
 import { DAGEditButtons } from '../../../features/dags/components/dag-editor';
 import LoadingIndicator from '../../../ui/LoadingIndicator';
 import { AppBarContext } from '../../../contexts/AppBarContext';
-import moment from 'moment-timezone';
+import dayjs from '../../../lib/dayjs';
 import { RunDetailsContext } from '../../../features/dags/contexts/DAGStatusContext';
 import { useQuery } from '../../../hooks/api';
 import { components, Status } from '../../../api/v2/schema';
@@ -70,7 +70,7 @@ function DAGDetails() {
 
   const formatDuration = (startDate: string, endDate: string) => {
     if (!startDate || !endDate) return '--';
-    const duration = moment.duration(moment(endDate).diff(moment(startDate)));
+    const duration = dayjs.duration(dayjs(endDate).diff(dayjs(startDate)));
     const hours = Math.floor(duration.asHours());
     const minutes = duration.minutes();
     const seconds = duration.seconds();
