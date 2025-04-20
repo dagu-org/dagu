@@ -1,24 +1,27 @@
 import React, { useMemo } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
-import { DAGStatus } from '../../../features/dags/components';
 import { DAGContext } from '../../../features/dags/contexts/DAGContext';
-import { DAGSpec } from '../../../features/dags/components/dag-editor';
-import { LinkTab } from '../../../features/dags/components/common';
-import { Tabs } from '@/components/ui/tabs';
-import { DAGEditButtons } from '../../../features/dags/components/dag-editor';
+import { RunDetailsContext } from '../../../features/dags/contexts/DAGStatusContext';
 import LoadingIndicator from '../../../ui/LoadingIndicator';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import dayjs from '../../../lib/dayjs';
-import { RunDetailsContext } from '../../../features/dags/contexts/DAGStatusContext';
 import { useQuery } from '../../../hooks/api';
-import { components, Status } from '../../../api/v2/schema';
+import { components } from '../../../api/v2/schema';
+import {
+  DAGDetailsContent,
+  DAGHeader,
+} from '../../../features/dags/components/dag-details';
+import { DAGStatus } from '../../../features/dags/components';
+import { DAGSpec } from '../../../features/dags/components/dag-editor';
+import { DAGEditButtons } from '../../../features/dags/components/dag-editor';
+import { LinkTab } from '../../../features/dags/components/common';
+import { Tabs } from '@/components/ui/tabs';
+import { ActivitySquare, FileCode, History, ScrollText } from 'lucide-react';
 import {
   DAGExecutionHistory,
   ExecutionLog,
   StepLog,
 } from '../../../features/dags/components/dag-execution';
-import { DAGHeader } from '../../../features/dags/components/dag-details';
-import { ActivitySquare, FileCode, History, ScrollText } from 'lucide-react';
 
 type Params = {
   fileId: string;
@@ -104,69 +107,19 @@ function DAGDetails() {
         }}
       >
         <div className="w-full flex flex-col">
-          <DAGHeader
-            dag={data.dag}
-            latestRun={data.latestRun}
-            fileId={params.fileId || ''}
-            refreshFn={refreshFn}
-            formatDuration={formatDuration}
-          />
-          <div className="my-4 flex flex-row justify-between items-center">
-            <Tabs
-              value={pathname}
-              className="bg-white p-1.5 rounded-lg shadow-sm border border-gray-100/80"
-            >
-              <LinkTab
-                label="Status"
-                value={`${baseUrl}`}
-                isActive={pathname === `${baseUrl}`}
-                icon={ActivitySquare}
-              />
-              <LinkTab
-                label="Spec"
-                value={`${baseUrl}/spec`}
-                isActive={pathname === `${baseUrl}/spec`}
-                icon={FileCode}
-              />
-              <LinkTab
-                label="History"
-                value={`${baseUrl}/history`}
-                isActive={pathname === `${baseUrl}/history`}
-                icon={History}
-              />
-              {pathname === `${baseUrl}/log` ||
-              pathname === `${baseUrl}/scheduler-log` ? (
-                <LinkTab
-                  label="Log"
-                  value={pathname}
-                  isActive={true}
-                  icon={ScrollText}
-                />
-              ) : null}
-            </Tabs>
-            {pathname === `${baseUrl}/spec` ? (
-              <DAGEditButtons fileId={params.fileId || ''} />
-            ) : null}
-          </div>
-          <div className="flex-1">
-            {tab == 'status' ? (
-              <DAGStatus run={data.latestRun} fileId={params.fileId || ''} />
-            ) : null}
-            {tab == 'spec' ? <DAGSpec fileId={params.fileId} /> : null}
-            {tab == 'history' ? (
-              <DAGExecutionHistory fileId={params.fileId || ''} />
-            ) : null}
-            {tab == 'scheduler-log' ? (
-              <ExecutionLog name={data.dag?.name || ''} requestId={requestId} />
-            ) : null}
-            {tab == 'log' && stepName ? (
-              <StepLog
-                dagName={data.dag?.name || ''}
-                requestId={requestId}
-                stepName={stepName}
-              />
-            ) : null}
-          </div>
+          {data.dag && (
+            <DAGDetailsContent
+              fileId={params.fileId || ''}
+              dag={data.dag}
+              latestRun={data.latestRun}
+              refreshFn={refreshFn}
+              formatDuration={formatDuration}
+              activeTab={tab}
+              requestId={requestId}
+              stepName={stepName}
+              isModal={false}
+            />
+          )}
         </div>
       </RunDetailsContext.Provider>
     </DAGContext.Provider>

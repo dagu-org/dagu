@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   flexRender,
@@ -24,7 +24,9 @@ import {
   ChevronUp,
   Search, // Icon for search input
   Filter, // Icon for filter button (if needed later)
+  Maximize2, // Icon for fullscreen button
 } from 'lucide-react';
+import { DAGDetailsModal } from '../../components/dag-details';
 import LiveSwitch from '../common/LiveSwitch';
 import Ticker from '../../../../ui/Ticker';
 import VisuallyHidden from '../../../../ui/VisuallyHidden';
@@ -625,6 +627,46 @@ function DAGTable({
   ]);
   const [expanded, setExpanded] = React.useState<ExpandedState>({});
 
+  // State for the side modal
+  const [selectedDAGId, setSelectedDAGId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Handlers for the modal
+  const openModal = (fileId: string) => {
+    // Check if screen is small (less than 768px width)
+    const isSmallScreen = window.innerWidth < 768;
+
+    if (isSmallScreen) {
+      // For small screens, navigate directly to the DAG details page
+      navigate(`/dags/${fileId}`);
+    } else {
+      // For larger screens, open the side modal
+      setSelectedDAGId(fileId);
+      setIsModalOpen(true);
+    }
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+  };
+
+  // Close modal and navigate to full page on window resize if screen becomes small
+  React.useEffect(() => {
+    const handleResize = () => {
+      if (isModalOpen && selectedDAGId && window.innerWidth < 768) {
+        // Close the modal
+        setIsModalOpen(false);
+        // Navigate to the full page
+        navigate(`/dags/${selectedDAGId}`);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [isModalOpen, selectedDAGId, navigate]);
+
   // Update column filters based on external search props
   React.useEffect(() => {
     const nameFilter = columnFilters.find((f) => f.id === 'Name');
@@ -694,6 +736,44 @@ function DAGTable({
     return hierarchicalData;
   }, [dags]); // Removed 'group' dependency as it's handled by filtering
 
+  // Add keyboard navigation between DAGs when modal is open
+  React.useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isModalOpen || !selectedDAGId) return;
+
+      // Get all DAG rows (not groups)
+      const dagRows = data.filter(
+        (item) => item.kind === ItemKind.DAG
+      ) as DAGRow[];
+
+      // Find current index
+      const currentIndex = dagRows.findIndex(
+        (row) => row.dag.fileId === selectedDAGId
+      );
+      if (currentIndex === -1) return;
+
+      // Navigate with arrow keys
+      if (event.key === 'ArrowDown' && currentIndex < dagRows.length - 1) {
+        // Move to next DAG
+        const nextDAG = dagRows[currentIndex + 1];
+        if (nextDAG && nextDAG.dag) {
+          setSelectedDAGId(nextDAG.dag.fileId);
+        }
+      } else if (event.key === 'ArrowUp' && currentIndex > 0) {
+        // Move to previous DAG
+        const prevDAG = dagRows[currentIndex - 1];
+        if (prevDAG && prevDAG.dag) {
+          setSelectedDAGId(prevDAG.dag.fileId);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isModalOpen, selectedDAGId, data]);
+
   const instance = useReactTable<Data>({
     data,
     columns,
@@ -730,8 +810,15 @@ function DAGTable({
 
   return (
     <div className="space-y-4">
-      {' '}
-      {/* Add spacing */}
+      {/* Side Modal for DAG Details */}
+      {selectedDAGId && (
+        <DAGDetailsModal
+          fileId={selectedDAGId}
+          isOpen={isModalOpen}
+          onClose={closeModal}
+        />
+      )}
+
       {/* Filter Controls */}
       <div className="flex flex-wrap items-center gap-3 pb-1">
         {/* Search Input - Enhanced with animation and better styling */}
@@ -892,12 +979,18 @@ function DAGTable({
                     className={
                       row.original?.kind === ItemKind.Group
                         ? 'bg-muted/50 font-semibold' // Keep group rows semi-bold
-                        : 'cursor-pointer hover:bg-muted/50'
+                        : isDAGRow &&
+                            'dag' in row.original &&
+                            selectedDAGId ===
+                              (row.original as DAGRow).dag.fileId
+                          ? 'cursor-pointer bg-primary/10 hover:bg-primary/15 border-l-4 border-primary' // Highlight selected DAG
+                          : 'cursor-pointer hover:bg-muted/50'
                     }
                     style={{ fontSize: '0.9375rem' }} // Ensure row font size matches container
                     onClick={() => {
-                      if (isDAGRow && navigateTo) {
-                        navigate(navigateTo);
+                      if (isDAGRow && 'dag' in row.original) {
+                        const dagRow = row.original as DAGRow;
+                        openModal(dagRow.dag.fileId);
                       }
                     }}
                   >
