@@ -4,7 +4,6 @@ import { useLocation } from 'react-router-dom';
 import { components } from '../../api/v2/schema';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useUserPreferences } from '../../contexts/UserPreference';
-import { DAGPagination } from '../../features/dags/components/common';
 import { DAGErrors } from '../../features/dags/components/dag-editor';
 import { DAGTable } from '../../features/dags/components/dag-list';
 import DAGListHeader from '../../features/dags/components/dag-list/DAGListHeader';
@@ -140,19 +139,15 @@ function DAGs() {
                 handleSearchTextChange={searchTextChange}
                 searchTag={searchTag}
                 handleSearchTagChange={searchTagChange}
+                // Pass pagination props to DAGTable
+                pagination={{
+                  totalPages: data.pagination.totalPages,
+                  page: page,
+                  pageChange: pageChange,
+                  onPageLimitChange: handlePageLimitChange,
+                  pageLimit: preferences.pageLimit,
+                }}
               />
-              <div className="flex justify-end mt-4">
-                <div>
-                  {/* ページネーションもMUI排除済み */}
-                  <DAGPagination
-                    totalPages={data.pagination.totalPages}
-                    page={page}
-                    pageChange={pageChange}
-                    onPageLimitChange={handlePageLimitChange}
-                    pageLimit={preferences.pageLimit}
-                  />
-                </div>
-              </div>
             </>
           )}
         </WithLoading>

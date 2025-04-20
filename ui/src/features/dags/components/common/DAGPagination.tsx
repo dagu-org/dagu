@@ -1,13 +1,10 @@
+import { Button } from '@/components/ui/button'; // Import shadcn Button
 import { Input } from '@/components/ui/input'; // Import shadcn Input
-import { Label } from '@/components/ui/label'; // Import shadcn Label
 import {
   Pagination,
   PaginationContent,
-  PaginationEllipsis,
   PaginationItem,
   PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
 } from '@/components/ui/pagination'; // Import shadcn Pagination components
 import React from 'react';
 
@@ -39,18 +36,34 @@ const generatePaginationItems = (
   const maxPagesToShow = 5; // Adjust number of page links shown
   const halfMaxPages = Math.floor(maxPagesToShow / 2);
 
-  // Always show Previous button
+  // Always show Previous button (icon only)
   items.push(
     <PaginationItem key="prev">
-      <PaginationPrevious
-        href="#" // Use href="#" for non-navigation links or handle appropriately
+      <Button
+        variant="ghost"
+        size="icon"
+        className={`h-8 w-8 rounded-md ${currentPage <= 1 ? 'pointer-events-none opacity-50' : 'hover:bg-muted'} transition-colors`}
+        disabled={currentPage <= 1}
         onClick={(e) => {
           e.preventDefault();
           if (currentPage > 1) onPageChange(currentPage - 1);
         }}
-        aria-disabled={currentPage <= 1}
-        className={currentPage <= 1 ? 'pointer-events-none opacity-50' : ''}
-      />
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="m15 18-6-6 6-6" />
+        </svg>
+        <span className="sr-only">Previous page</span>
+      </Button>
     </PaginationItem>
   );
 
@@ -60,16 +73,18 @@ const generatePaginationItems = (
     for (let i = 1; i <= totalPages; i++) {
       items.push(
         <PaginationItem key={i}>
-          <PaginationLink
-            href="#"
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-7 w-7 rounded-md text-sm font-medium hover:bg-muted transition-colors ${i === currentPage ? 'bg-primary/10 hover:bg-primary/15 text-primary' : ''}`}
             onClick={(e) => {
               e.preventDefault();
               onPageChange(i);
             }}
-            isActive={i === currentPage}
           >
             {i}
-          </PaginationLink>
+            <span className="sr-only">Page {i}</span>
+          </Button>
         </PaginationItem>
       );
     }
@@ -94,7 +109,9 @@ const generatePaginationItems = (
     if (currentPage > halfMaxPages + 2) {
       items.push(
         <PaginationItem key="ellipsis-start">
-          <PaginationEllipsis />
+          <div className="h-7 w-7 flex items-center justify-center text-muted-foreground">
+            <span className="text-xs">•••</span>
+          </div>
         </PaginationItem>
       );
     }
@@ -124,7 +141,9 @@ const generatePaginationItems = (
     if (currentPage < totalPages - halfMaxPages - 1) {
       items.push(
         <PaginationItem key="ellipsis-end">
-          <PaginationEllipsis />
+          <div className="h-7 w-7 flex items-center justify-center text-muted-foreground">
+            <span className="text-xs">•••</span>
+          </div>
         </PaginationItem>
       );
     }
@@ -146,20 +165,34 @@ const generatePaginationItems = (
     );
   }
 
-  // Always show Next button
+  // Always show Next button (icon only)
   items.push(
     <PaginationItem key="next">
-      <PaginationNext
-        href="#"
+      <Button
+        variant="ghost"
+        size="icon"
+        className={`h-8 w-8 rounded-md ${currentPage >= totalPages ? 'pointer-events-none opacity-50' : 'hover:bg-muted'} transition-colors`}
+        disabled={currentPage >= totalPages}
         onClick={(e) => {
           e.preventDefault();
           if (currentPage < totalPages) onPageChange(currentPage + 1);
         }}
-        aria-disabled={currentPage >= totalPages}
-        className={
-          currentPage >= totalPages ? 'pointer-events-none opacity-50' : ''
-        }
-      />
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="m9 18 6-6-6-6" />
+        </svg>
+        <span className="sr-only">Next page</span>
+      </Button>
     </PaginationItem>
   );
 
@@ -217,35 +250,65 @@ const DAGPagination = ({
   };
 
   return (
-    // Replace MUI Box with div and Tailwind classes
-    <div className="flex flex-row items-center justify-center gap-4 mt-2">
-      {' '}
-      {/* Use gap-4 for spacing */}
-      {/* Items per page input */}
-      <div className="flex items-center gap-2">
-        <Label
-          htmlFor="itemsPerPage"
-          className="whitespace-nowrap text-sm text-muted-foreground"
-        >
-          Items per page:
-        </Label>
-        <Input
-          id="itemsPerPage"
-          type="number"
-          min="1"
-          className="h-8 w-[70px]" // Adjust size
-          value={inputValue}
-          onChange={handleLimitChange}
-          onBlur={commitChange} // Commit on blur
-          onKeyDown={handleKeyDown} // Commit on Enter
-        />
-      </div>
-      {/* Pagination controls */}
+    <div className="flex flex-row items-center justify-between gap-2">
+      {/* Modern compact pagination controls */}
       <Pagination>
         <PaginationContent>
           {generatePaginationItems(page, totalPages, pageChange)}
         </PaginationContent>
       </Pagination>
+
+      {/* Compact items per page selector */}
+      <div className="flex items-center gap-1">
+        <div className="text-xs text-muted-foreground">{pageLimit}</div>
+        <div className="relative group">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 rounded-md hover:bg-muted"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-muted-foreground"
+            >
+              <circle cx="12" cy="12" r="1" />
+              <circle cx="12" cy="5" r="1" />
+              <circle cx="12" cy="19" r="1" />
+            </svg>
+          </Button>
+          <div className="absolute right-0 mt-1 w-[100px] bg-background border border-border rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+            {[10, 25, 50, 100, 200].map((limit) => (
+              <div
+                key={limit}
+                className={`px-2 py-1 text-xs cursor-pointer hover:bg-muted transition-colors ${pageLimit === limit ? 'bg-primary/10 text-primary font-medium' : ''}`}
+                onClick={() => onPageLimitChange(limit)}
+              >
+                {limit}
+              </div>
+            ))}
+            <div className="px-2 py-1 border-t border-border">
+              <Input
+                type="number"
+                min="1"
+                className="h-6 text-xs"
+                value={inputValue}
+                onChange={handleLimitChange}
+                onBlur={commitChange}
+                onKeyDown={handleKeyDown}
+                placeholder="Custom"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

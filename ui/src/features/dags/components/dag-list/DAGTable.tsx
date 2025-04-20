@@ -29,6 +29,7 @@ import StatusChip from '../../../../ui/StatusChip'; // Re-add StatusChip import
 import Ticker from '../../../../ui/Ticker';
 import VisuallyHidden from '../../../../ui/VisuallyHidden';
 import { DAGDetailsModal } from '../../components/dag-details';
+import { DAGPagination } from '../common';
 import DAGActions from '../common/DAGActions';
 import LiveSwitch from '../common/LiveSwitch';
 
@@ -87,6 +88,19 @@ type Props = {
   searchTag: string;
   /** Handler for tag filter changes */
   handleSearchTagChange: (tag: string) => void;
+  /** Pagination props */
+  pagination?: {
+    /** Total number of pages */
+    totalPages: number;
+    /** Current page number */
+    page: number;
+    /** Number of items per page */
+    pageLimit: number;
+    /** Callback for page change */
+    pageChange: (page: number) => void;
+    /** Callback for page limit change */
+    onPageLimitChange: (pageLimit: number) => void;
+  };
 };
 
 /**
@@ -609,6 +623,7 @@ function DAGTable({
   handleSearchTextChange,
   searchTag,
   handleSearchTagChange,
+  pagination,
 }: Props) {
   const navigate = useNavigate();
   const [columns] = React.useState(() => [...defaultColumns]);
@@ -812,85 +827,102 @@ function DAGTable({
         />
       )}
 
-      {/* Filter Controls */}
-      <div className="flex flex-wrap items-center gap-3 pb-1">
-        {/* Search Input - Enhanced with animation and better styling */}
-        <div className="relative w-full sm:w-[280px] group">
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/70 transition-all duration-200 group-focus-within:text-primary">
-            <Search className="h-4 w-4" />
-          </div>
-          <Input
-            type="search"
-            placeholder="Search DAGs by name..."
-            value={searchText}
-            onChange={(e) => handleSearchTextChange(e.target.value)}
-            className="pl-9 pr-3 py-2 h-10 bg-background border-muted hover:border-muted-foreground/30 focus-visible:ring-1 focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-all duration-200 rounded-md"
-          />
-          {searchText && (
-            <button
-              onClick={() => handleSearchTextChange('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/70 hover:text-muted-foreground transition-colors"
-              aria-label="Clear search"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+      {/* Modern Filter and Pagination Controls */}
+      <div className="p-3 border border-border rounded-lg bg-card mb-3 shadow-sm">
+        <div className="flex flex-col sm:flex-row gap-3">
+          {/* Top row with search and filters */}
+          <div className="flex-1 flex flex-wrap items-center gap-2">
+            {/* Minimal Search Input */}
+            <div className="relative w-[200px]">
+              <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground/70 transition-all duration-200 group-focus-within:text-primary">
+                <Search className="h-3.5 w-3.5" />
+              </div>
+              <Input
+                type="search"
+                placeholder="Search DAGs..."
+                value={searchText}
+                onChange={(e) => handleSearchTextChange(e.target.value)}
+                className="pl-7 pr-7 py-1 h-7 text-sm bg-background border-muted hover:border-muted-foreground/30 focus-visible:ring-1 focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-all duration-200 rounded-md w-full"
+              />
+              {searchText && (
+                <button
+                  onClick={() => handleSearchTextChange('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/70 hover:text-muted-foreground transition-colors"
+                  aria-label="Clear search"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Minimal Tag Filter */}
+            <div className="relative">
+              <Select
+                value={searchTag}
+                onValueChange={(value) =>
+                  handleSearchTagChange(value === 'all' ? '' : value)
+                }
               >
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
+                <SelectTrigger className="w-[140px] h-7 bg-background border-muted hover:border-muted-foreground/30 focus:ring-1 focus:ring-primary/30 focus:border-primary/50 transition-all duration-200 rounded-md cursor-pointer text-sm">
+                  <div className="flex items-center gap-1.5">
+                    <Filter className="h-3 w-3 text-muted-foreground/70" />
+                    <SelectValue placeholder="Filter by tag" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent className="max-h-[280px] overflow-y-auto">
+                  <SelectItem
+                    value="all"
+                    className="flex items-center cursor-pointer"
+                  >
+                    <span className="font-medium">All Tags</span>
+                  </SelectItem>
+
+                  <div className="my-1 h-px bg-muted"></div>
+
+                  {uniqueTags?.tags?.map((tag) => (
+                    <SelectItem
+                      key={tag}
+                      value={tag}
+                      className="flex items-center cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>{tag}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Pagination Controls - Integrated with search controls */}
+          {pagination && (
+            <div className="flex items-center">
+              <DAGPagination
+                totalPages={pagination.totalPages}
+                page={pagination.page}
+                pageChange={pagination.pageChange}
+                onPageLimitChange={pagination.onPageLimitChange}
+                pageLimit={pagination.pageLimit}
+              />
+            </div>
           )}
         </div>
-
-        {/* Tag Filter - Enhanced with modern styling */}
-        <div className="relative">
-          <Select
-            value={searchTag}
-            onValueChange={(value) =>
-              handleSearchTagChange(value === 'all' ? '' : value)
-            }
-          >
-            <SelectTrigger className="w-[200px] h-10 bg-background border-muted hover:border-muted-foreground/30 focus:ring-1 focus:ring-primary/30 focus:border-primary/50 transition-all duration-200 rounded-md cursor-pointer">
-              <div className="flex items-center gap-2 text-sm">
-                <Filter className="h-3.5 w-3.5 text-muted-foreground/70" />
-                <SelectValue placeholder="Filter by tag" />
-              </div>
-            </SelectTrigger>
-            <SelectContent className="max-h-[280px] overflow-y-auto">
-              <SelectItem
-                value="all"
-                className="flex items-center cursor-pointer"
-              >
-                <span className="font-medium">All Tags</span>
-              </SelectItem>
-
-              <div className="my-1 h-px bg-muted"></div>
-
-              {uniqueTags?.tags?.map((tag) => (
-                <SelectItem
-                  key={tag}
-                  value={tag}
-                  className="flex items-center cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <span>{tag}</span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Badge removed as per user request */}
-        </div>
       </div>
+
       {/* Table */}
       <div
         className="rounded-xl w-full max-w-full min-w-0 overflow-x-auto transition-all duration-300"
