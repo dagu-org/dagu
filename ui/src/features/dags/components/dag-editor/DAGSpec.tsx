@@ -10,6 +10,7 @@ import React, { useEffect } from 'react';
 import { useCookies } from 'react-cookie';
 import { components } from '../../../../api/v2/schema';
 import { Button } from '../../../../components/ui/button';
+import { useSimpleToast } from '../../../../components/ui/simple-toast';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useClient, useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
@@ -34,14 +35,19 @@ type Props = {
 function DAGSpec({ fileId }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
+  const { showToast } = useSimpleToast();
 
   // State for editing mode and current YAML value
   const [editing, setEditing] = React.useState(false);
   const [currentValue, setCurrentValue] = React.useState<string | undefined>();
+  const [scrollPosition, setScrollPosition] = React.useState(0);
 
   // Flowchart direction preference stored in cookies
   const [cookie, setCookie] = useCookies(['flowchart']);
   const [flowchart, setFlowchart] = React.useState(cookie['flowchart']);
+
+  // Reference to the main container div
+  const containerRef = React.useRef<HTMLDivElement>(null);
 
   /**
    * Handle flowchart direction change and save preference to cookie
@@ -80,6 +86,28 @@ function DAGSpec({ fileId }: Props) {
     }
   }, [data]);
 
+  // Save scroll position before saving
+  const saveScrollPosition = React.useCallback(() => {
+    if (containerRef.current) {
+      setScrollPosition(window.scrollY);
+    }
+  }, []);
+
+  // Restore scroll position after render
+  useEffect(() => {
+    if (scrollPosition > 0) {
+      // Use a small timeout to ensure the DOM has updated before scrolling
+      const timer = setTimeout(() => {
+        window.scrollTo({
+          top: scrollPosition,
+          behavior: 'auto', // Use 'auto' instead of 'smooth' to avoid animation
+        });
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [scrollPosition, editing]);
+
   // Get lifecycle handlers from DAG definition
   const handlers = getHandlers(data?.dag);
 
@@ -93,7 +121,7 @@ function DAGSpec({ fileId }: Props) {
       {(props) =>
         data?.dag && (
           <React.Fragment>
-            <div className="space-y-4">
+            <div className="space-y-4" ref={containerRef}>
               <div className="overflow-x-auto rounded-xl shadow-md bg-white dark:bg-slate-900 p-6">
                 <div className="flex justify-between items-center mb-4">
                   <SubTitle className="mb-0">Graph</SubTitle>
@@ -194,6 +222,8 @@ function DAGSpec({ fileId }: Props) {
                             alert('No changes to save');
                             return;
                           }
+                          // Save current scroll position before any operations that might cause re-render
+                          saveScrollPosition();
                           const { data, error } = await client.PUT(
                             '/dags/{fileId}/spec',
                             {
@@ -219,6 +249,9 @@ function DAGSpec({ fileId }: Props) {
                             alert(data.errors.join('\n'));
                             return;
                           }
+                          // Show success toast notification
+                          showToast('Changes saved successfully');
+
                           setEditing(false);
                           props.refresh();
                         }}
@@ -230,7 +263,10 @@ function DAGSpec({ fileId }: Props) {
                         variant="outline"
                         size="sm"
                         className="cursor-pointer hover:bg-red-50 hover:text-red-600 hover:border-red-200 dark:hover:bg-red-900/20 dark:hover:text-red-400 dark:hover:border-red-800 transition-colors duration-200"
-                        onClick={() => setEditing(false)}
+                        onClick={() => {
+                          saveScrollPosition();
+                          setEditing(false);
+                        }}
                       >
                         <X className="h-4 w-4 mr-1" />
                         Cancel
@@ -242,7 +278,10 @@ function DAGSpec({ fileId }: Props) {
                       variant="outline"
                       size="sm"
                       className="cursor-pointer hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 dark:hover:bg-blue-900/20 dark:hover:text-blue-400 dark:hover:border-blue-800 transition-colors duration-200"
-                      onClick={() => setEditing(true)}
+                      onClick={() => {
+                        saveScrollPosition();
+                        setEditing(true);
+                      }}
                     >
                       <Edit className="h-4 w-4 mr-1" />
                       Edit

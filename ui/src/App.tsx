@@ -1,16 +1,17 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Layout from './layouts/Layout';
-import Dashboard from './pages';
-import DAGDetails from './pages/dags/dag';
-import DAGs from './pages/dags';
-import { AppBarContext } from './contexts/AppBarContext';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { SWRConfig } from 'swr';
-import fetchJson from './lib/fetchJson';
-import Search from './pages/search';
-import { UserPreferencesProvider } from './contexts/UserPreference';
+import { ToastProvider } from './components/ui/simple-toast';
+import { AppBarContext } from './contexts/AppBarContext';
 import { Config, ConfigContext } from './contexts/ConfigContext';
+import { UserPreferencesProvider } from './contexts/UserPreference';
+import Layout from './layouts/Layout';
 import dayjs from './lib/dayjs';
+import fetchJson from './lib/fetchJson';
+import Dashboard from './pages';
+import DAGs from './pages/dags';
+import DAGDetails from './pages/dags/dag';
+import Search from './pages/search';
 
 type Props = {
   config: Config;
@@ -85,18 +86,20 @@ function App({ config }: Props) {
       >
         <ConfigContext.Provider value={config}>
           <UserPreferencesProvider>
-            <BrowserRouter basename={config.basePath}>
-              <Layout {...config}>
-                <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/dags/" element={<DAGs />} />
-                  <Route path="/dags/:fileId/:tab" element={<DAGDetails />} />
-                  <Route path="/dags/:fileId/" element={<DAGDetails />} />
-                  <Route path="/search/" element={<Search />} />
-                </Routes>
-              </Layout>
-            </BrowserRouter>
+            <ToastProvider>
+              <BrowserRouter basename={config.basePath}>
+                <Layout {...config}>
+                  <Routes>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/dags/" element={<DAGs />} />
+                    <Route path="/dags/:fileId/:tab" element={<DAGDetails />} />
+                    <Route path="/dags/:fileId/" element={<DAGDetails />} />
+                    <Route path="/search/" element={<Search />} />
+                  </Routes>
+                </Layout>
+              </BrowserRouter>
+            </ToastProvider>
           </UserPreferencesProvider>
         </ConfigContext.Provider>
       </AppBarContext.Provider>

@@ -1,25 +1,26 @@
-import * as React from 'react';
-import { X } from 'lucide-react';
 import { cva, type VariantProps } from 'class-variance-authority';
+import { X } from 'lucide-react';
+import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
 const ToastProvider = ({ children }: { children: React.ReactNode }) => {
   return (
-    <div className="fixed top-0 z-[100] flex w-full flex-col items-center">
+    <div className="fixed bottom-4 right-4 z-[100] flex flex-col items-end gap-2">
       {children}
     </div>
   );
 };
 
 const toastVariants = cva(
-  'group pointer-events-auto relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-md border p-6 pr-8 shadow-lg transition-all data-[swipe=cancel]:translate-x-0 data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)] data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=move]:transition-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[swipe=end]:animate-out data-[state=closed]:fade-out-80 data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-top-full',
+  'group pointer-events-auto relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-md border shadow-md transition-all data-[swipe=cancel]:translate-x-0 data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)] data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=move]:transition-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[swipe=end]:animate-out data-[state=closed]:fade-out-80 data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-top-full',
   {
     variants: {
       variant: {
-        default: 'border bg-background text-foreground',
+        default:
+          'border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800 text-green-800 dark:text-green-300',
         destructive:
-          'destructive group border-destructive bg-destructive text-destructive-foreground',
+          'border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 text-red-800 dark:text-red-300',
       },
     },
     defaultVariants: {
@@ -85,4 +86,4 @@ const ToastDescription = React.forwardRef<
 ));
 ToastDescription.displayName = 'ToastDescription';
 
-export { ToastProvider, Toast, ToastClose, ToastTitle, ToastDescription };
+export { Toast, ToastClose, ToastDescription, ToastProvider, ToastTitle };
