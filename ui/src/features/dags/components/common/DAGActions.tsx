@@ -162,9 +162,30 @@ function DAGActions({
                   // Default to current status requestId
                   let requestIdToUse = status?.requestId || '';
 
-                  // If we're in the history page with a specific run selected
+                  // If we're in the history page or modal history tab with a specific run selected
+                  const isInHistoryPage =
+                    window.location.pathname.includes('/history');
+                  const isInModalHistoryTab =
+                    document.querySelector(
+                      '.dag-modal-content [data-tab="history"]'
+                    ) !== null;
+
+                  console.log(
+                    'Retry check - isInHistoryPage:',
+                    isInHistoryPage
+                  );
+                  console.log(
+                    'Retry check - isInModalHistoryTab:',
+                    isInModalHistoryTab
+                  );
+                  console.log('Retry check - idxParam:', idxParam);
+                  console.log(
+                    'Retry check - current status requestId:',
+                    status?.requestId
+                  );
+
                   if (
-                    window.location.pathname.includes('/history') &&
+                    (isInHistoryPage || isInModalHistoryTab) &&
                     idxParam !== null
                   ) {
                     try {
@@ -190,8 +211,18 @@ function DAGActions({
                           selectedIdx
                         ];
 
+                        console.log('Selected run:', selectedRun);
+                        console.log(
+                          'Selected run requestId:',
+                          selectedRun?.requestId
+                        );
+
                         if (selectedRun && selectedRun.requestId) {
                           requestIdToUse = selectedRun.requestId;
+                          console.log(
+                            'Using requestId from selected run:',
+                            requestIdToUse
+                          );
                         }
                       }
                     } catch (err) {
@@ -223,9 +254,30 @@ function DAGActions({
                   // Default to current status requestId
                   let requestIdToUse = status?.requestId || '';
 
-                  // If we're in the history page with a specific run selected
+                  // If we're in the history page or modal history tab with a specific run selected
+                  const isInHistoryPage =
+                    window.location.pathname.includes('/history');
+                  const isInModalHistoryTab =
+                    document.querySelector(
+                      '.dag-modal-content [data-tab="history"]'
+                    ) !== null;
+
+                  console.log(
+                    'Retry check (full) - isInHistoryPage:',
+                    isInHistoryPage
+                  );
+                  console.log(
+                    'Retry check (full) - isInModalHistoryTab:',
+                    isInModalHistoryTab
+                  );
+                  console.log('Retry check (full) - idxParam:', idxParam);
+                  console.log(
+                    'Retry check (full) - current status requestId:',
+                    status?.requestId
+                  );
+
                   if (
-                    window.location.pathname.includes('/history') &&
+                    (isInHistoryPage || isInModalHistoryTab) &&
                     idxParam !== null
                   ) {
                     try {
@@ -251,8 +303,18 @@ function DAGActions({
                           selectedIdx
                         ];
 
+                        console.log('Selected run (full):', selectedRun);
+                        console.log(
+                          'Selected run requestId (full):',
+                          selectedRun?.requestId
+                        );
+
                         if (selectedRun && selectedRun.requestId) {
                           requestIdToUse = selectedRun.requestId;
+                          console.log(
+                            'Using requestId from selected run (full):',
+                            requestIdToUse
+                          );
                         }
                       }
                     } catch (err) {
@@ -295,9 +357,11 @@ function DAGActions({
               },
             });
             if (error) {
+              console.error('Retry API error:', error);
               alert(error.message || 'An error occurred');
               return;
             }
+            console.log('Retry successful');
             reloadData();
           }}
         >
@@ -310,6 +374,8 @@ function DAGActions({
           dismissModal={() => setIsRetryModal(false)}
           onSubmit={async () => {
             setIsRetryModal(false);
+
+            console.log('Submitting retry with requestId:', retryRequestId);
 
             const { error } = await client.POST('/dags/{fileId}/retry', {
               params: {

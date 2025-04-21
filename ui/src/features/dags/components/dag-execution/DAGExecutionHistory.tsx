@@ -22,13 +22,17 @@ import { HistoryTable, LogViewer, StatusUpdateModal } from './';
 type Props = {
   /** DAG file ID */
   fileId: string;
+  /** Whether the component is rendered in a modal */
+  isInModal?: boolean;
+  /** The active tab in the parent component */
+  activeTab?: string;
 };
 
 /**
  * DAGExecutionHistory displays the execution history of a DAG
  * including a history table, graph visualization, and status details
  */
-function DAGExecutionHistory({ fileId }: Props) {
+function DAGExecutionHistory({ fileId, isInModal, activeTab }: Props) {
   const appBarContext = React.useContext(AppBarContext);
 
   // Fetch execution history data

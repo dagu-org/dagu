@@ -184,7 +184,13 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             ) : null}
             {activeTab === 'spec' ? <DAGSpec fileId={fileId} /> : null}
             {activeTab === 'history' ? (
-              <DAGExecutionHistory fileId={fileId || ''} />
+              <div data-tab="history">
+                <DAGExecutionHistory
+                  fileId={fileId || ''}
+                  isInModal={isModal}
+                  activeTab={activeTab}
+                />
+              </div>
             ) : null}
             {activeTab === 'scheduler-log' ? (
               <ExecutionLog name={dag?.name || ''} requestId={requestId} />
