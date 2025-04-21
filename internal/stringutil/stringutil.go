@@ -6,12 +6,13 @@ import (
 
 const (
 	legacyTimeFormat = "2006-01-02 15:04:05"
+	timeEmpty        = "-"
 )
 
 // FormatTime returns formatted time.
 func FormatTime(t time.Time) string {
 	if t.IsZero() {
-		return ""
+		return timeEmpty
 	}
 
 	return t.Format(time.RFC3339)
@@ -19,7 +20,7 @@ func FormatTime(t time.Time) string {
 
 // ParseTime parses time string.
 func ParseTime(val string) (time.Time, error) {
-	if val == "" || val == "-" {
+	if val == timeEmpty {
 		return time.Time{}, nil
 	}
 	if t, err := time.ParseInLocation(time.RFC3339, val, time.Local); err == nil {

@@ -70,7 +70,7 @@ jobs:
 
       - name: Build
         run: |
-          make bin
+          make build-bin
 
       - name: Test
         run: |

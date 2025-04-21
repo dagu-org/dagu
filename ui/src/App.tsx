@@ -1,16 +1,18 @@
 import React from 'react';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
-import { SWRConfig } from 'swr';
-import { ToastProvider } from './components/ui/simple-toast';
-import { AppBarContext } from './contexts/AppBarContext';
-import { Config, ConfigContext } from './contexts/ConfigContext';
-import { UserPreferencesProvider } from './contexts/UserPreference';
-import Layout from './layouts/Layout';
-import fetchJson from './lib/fetchJson';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Layout from './Layout';
 import Dashboard from './pages';
-import DAGs from './pages/dags';
 import DAGDetails from './pages/dags/dag';
+import DAGs from './pages/dags';
+import { AppBarContext } from './contexts/AppBarContext';
+import { SWRConfig } from 'swr';
+import fetchJson from './lib/fetchJson';
 import Search from './pages/search';
+import { UserPreferencesProvider } from './contexts/UserPreference';
+import { Config, ConfigContext } from './contexts/ConfigContext';
+import moment from 'moment-timezone';
+// Load all timezone data for moment-timezone to handle dynamic timezones
+import 'moment-timezone/builds/moment-timezone-with-data.js';
 
 type Props = {
   config: Config;
@@ -18,7 +20,7 @@ type Props = {
 
 function App({ config }: Props) {
   const [title, setTitle] = React.useState<string>('');
-
+  config.tz ||= moment.tz.guess();
   const remoteNodes = config.remoteNodes
     .split(',')
     .filter(Boolean)
@@ -26,44 +28,8 @@ function App({ config }: Props) {
   if (!remoteNodes.includes('local')) {
     remoteNodes.unshift('local');
   }
-  const localStorageKey = 'dagu-selected-remote-node';
-
-  // Read initial value from localStorage or default to 'local'
-  const getInitialNode = () => {
-    const storedNode = localStorage.getItem(localStorageKey);
-    // Ensure the stored node is actually in the available nodes list
-    if (storedNode && remoteNodes.includes(storedNode)) {
-      return storedNode;
-    }
-    return 'local'; // Default
-  };
-
   const [selectedRemoteNode, setSelectedRemoteNode] =
-    React.useState<string>(getInitialNode);
-
-  // Function to update state and localStorage
-  const handleSelectRemoteNode = (node: string) => {
-    if (remoteNodes.includes(node)) {
-      setSelectedRemoteNode(node);
-      localStorage.setItem(localStorageKey, node);
-    } else {
-      console.warn(`Attempted to select invalid remote node: ${node}`);
-      // Optionally reset to default or handle error
-      setSelectedRemoteNode('local');
-      localStorage.setItem(localStorageKey, 'local');
-    }
-  };
-
-  // Effect to update state if remoteNodes list changes and current selection is invalid
-  React.useEffect(() => {
-    if (!remoteNodes.includes(selectedRemoteNode)) {
-      handleSelectRemoteNode('local'); // Reset to default if current selection is no longer valid
-    }
-    // We only want this effect to run if remoteNodes changes,
-    // or selectedRemoteNode becomes invalid relative to remoteNodes.
-    // Adding handleSelectRemoteNode to deps would cause unnecessary runs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remoteNodes, selectedRemoteNode]);
+    React.useState<string>('local');
 
   return (
     <SWRConfig
@@ -80,25 +46,23 @@ function App({ config }: Props) {
           setTitle,
           remoteNodes,
           selectedRemoteNode,
-          selectRemoteNode: handleSelectRemoteNode,
+          selectRemoteNode: setSelectedRemoteNode,
         }}
       >
         <ConfigContext.Provider value={config}>
           <UserPreferencesProvider>
-            <ToastProvider>
-              <BrowserRouter basename={config.basePath}>
-                <Layout {...config}>
-                  <Routes>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/dags/" element={<DAGs />} />
-                    <Route path="/dags/:fileId/:tab" element={<DAGDetails />} />
-                    <Route path="/dags/:fileId/" element={<DAGDetails />} />
-                    <Route path="/search/" element={<Search />} />
-                  </Routes>
-                </Layout>
-              </BrowserRouter>
-            </ToastProvider>
+            <BrowserRouter basename={config.basePath}>
+              <Layout {...config}>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/dags/" element={<DAGs />} />
+                  <Route path="/dags/:fileId/:tab" element={<DAGDetails />} />
+                  <Route path="/dags/:fileId/" element={<DAGDetails />} />
+                  <Route path="/search/" element={<Search />} />
+                </Routes>
+              </Layout>
+            </BrowserRouter>
           </UserPreferencesProvider>
         </ConfigContext.Provider>
       </AppBarContext.Provider>

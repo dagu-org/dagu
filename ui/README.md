@@ -1,9 +1,4 @@
-# UI
-
-## Prerequisites
-
-- Node.js (latest stable version)
-- pnpm
+# dagu UI
 
 ## Development Instructions
 
@@ -25,8 +20,8 @@ Once the backend server is up and running, you can start the Webpack dev server 
 
 ```bash
 cd ui/
-pnpm install
-pnpm dev
+yarn install
+yarn start
 ```
 
 This command will start the Webpack dev server at `127.0.0.1:8081`. You can access the UI by opening your web browser and navigating to http://localhost:8081.
@@ -36,8 +31,8 @@ This command will start the Webpack dev server at `127.0.0.1:8081`. You can acce
 If you need to build the `bundle.js` file, which contains all the necessary frontend assets, you can do so using the following command:
 
 ```
-cd ../
-make ui
+cd dagu
+make build-ui
 ```
 
 This command will build the `bundle.js` file and copy it to dagu/frontend/assets/js/bundle.js. This is necessary for the Go backend to include the JavaScript within the binary.

@@ -6,7 +6,7 @@ export type Config = {
   title: string;
   navbarColor: string;
   tz: string;
-  version: string;
+  version: string;  
   maxDashboardPageLimit: number;
   remoteNodes: string;
 };

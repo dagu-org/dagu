@@ -1,14 +1,17 @@
-import { debounce } from 'lodash';
 import React from 'react';
+import DAGErrors from '../../components/molecules/DAGErrors';
+import Box from '@mui/material/Box';
+import CreateDAGButton from '../../components/molecules/CreateDAGButton';
+import WithLoading from '../../components/atoms/WithLoading';
+import DAGTable from '../../components/molecules/DAGTable';
+import Title from '../../components/atoms/Title';
 import { useLocation } from 'react-router-dom';
-import { components } from '../../api/v2/schema';
 import { AppBarContext } from '../../contexts/AppBarContext';
+import DAGPagination from '../../components/molecules/DAGPagination';
+import { debounce } from 'lodash';
 import { useUserPreferences } from '../../contexts/UserPreference';
-import { DAGErrors } from '../../features/dags/components/dag-editor';
-import { DAGTable } from '../../features/dags/components/dag-list';
-import DAGListHeader from '../../features/dags/components/dag-list/DAGListHeader';
 import { useQuery } from '../../hooks/api';
-import WithLoading from '../../ui/WithLoading';
+import { components } from '../../api/v2/schema';
 
 function DAGs() {
   const query = new URLSearchParams(useLocation().search);
@@ -24,11 +27,10 @@ function DAGs() {
     query.get('tag') || ''
   );
   const { preferences, updatePreference } = useUserPreferences();
-
+  // Use preferences.pageLimit instead of local state
   const handlePageLimitChange = (newLimit: number) => {
     updatePreference('pageLimit', newLimit);
   };
-
   const { data, mutate, isLoading } = useQuery(
     '/dags',
     {
@@ -68,8 +70,9 @@ function DAGs() {
 
   const { dagFiles, errorCount } = React.useMemo(() => {
     const dagFiles: components['schemas']['DAGFile'][] = [];
+
     let errorCount = 0;
-    if (data && data.dags) {
+    if (data) {
       for (const val of data.dags) {
         if (!val.errors?.length) {
           dagFiles.push(val);
@@ -120,17 +123,35 @@ function DAGs() {
   };
 
   return (
-    <div className="flex flex-col">
-      <DAGListHeader />
-      <div>
+    <Box
+      sx={{
+        px: 2,
+        mx: 4,
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100%',
+      }}
+    >
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <Title>DAGs</Title>
+        <CreateDAGButton />
+      </Box>
+      <Box>
         <WithLoading loaded={!isLoading}>
           {data && (
-            <>
+            <React.Fragment>
               <DAGErrors
                 dags={data.dags || []}
                 errors={data.errors || []}
                 hasError={errorCount > 0 || data.errors?.length > 0}
-              />
+              ></DAGErrors>
               <DAGTable
                 dags={dagFiles}
                 group={group}
@@ -139,21 +160,19 @@ function DAGs() {
                 handleSearchTextChange={searchTextChange}
                 searchTag={searchTag}
                 handleSearchTagChange={searchTagChange}
-                // Pass pagination props to DAGTable
-                pagination={{
-                  totalPages: data.pagination.totalPages,
-                  page: page,
-                  pageChange: pageChange,
-                  onPageLimitChange: handlePageLimitChange,
-                  pageLimit: preferences.pageLimit,
-                }}
+              ></DAGTable>
+              <DAGPagination
+                totalPages={data.pagination.totalPages}
+                page={page}
+                pageChange={pageChange}
+                onPageLimitChange={handlePageLimitChange}
+                pageLimit={preferences.pageLimit}
               />
-            </>
+            </React.Fragment>
           )}
         </WithLoading>
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }
-
 export default DAGs;

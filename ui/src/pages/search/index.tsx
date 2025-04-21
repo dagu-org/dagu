@@ -1,36 +1,28 @@
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import React, { useEffect, useRef } from 'react';
+import { Box, Button, Grid, Stack, TextField, Typography } from '@mui/material';
 import { useSearchParams } from 'react-router-dom';
+import Title from '../../components/atoms/Title';
+import SearchResult from '../../components/molecules/SearchResult';
+import LoadingIndicator from '../../components/atoms/LoadingIndicator';
 import { AppBarContext } from '../../contexts/AppBarContext';
-import SearchResult from '../../features/search/components/SearchResult';
 import { useQuery } from '../../hooks/api';
-import LoadingIndicator from '../../ui/LoadingIndicator';
-import Title from '../../ui/Title';
 
 function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchVal, setSearchVal] = React.useState(searchParams.get('q') || '');
   const appBarContext = React.useContext(AppBarContext);
 
-  const q = searchParams.get('q') || '';
-  // Use a conditional key pattern - this is a standard SWR pattern for conditional fetching
-  // When q is empty, we pass undefined for the first parameter, which tells SWR not to fetch
   const { data, isLoading } = useQuery(
-    q ? '/dags/search' : (undefined as any),
-    q
-      ? {
-          params: {
-            query: {
-              remoteNode: appBarContext.selectedRemoteNode || 'local',
-              q,
-            },
-          },
-        }
-      : {},
+    '/dags/search',
     {
-      refreshInterval: q ? 2000 : 0,
-    }
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+          q: searchParams.get('q') || '',
+        },
+      },
+    },
+    { refreshInterval: 2000 }
   );
 
   const ref = useRef<HTMLInputElement>(null);
@@ -45,24 +37,29 @@ function Search() {
     });
   }, []);
 
-  if (q && isLoading) {
+  if (isLoading) {
     return <LoadingIndicator />;
   }
 
   return (
-    <div className="w-full">
-      <div className="w-full">
+    <Grid container sx={{ mx: 4, width: '100%' }}>
+      <Grid item xs={12}>
         <Title>Search</Title>
-        <div className="flex space-x-4 items-center">
-          <Input
-            placeholder="Search Text"
-            className="flex-1"
-            ref={ref}
-            value={searchVal}
-            onChange={(e) => {
-              setSearchVal(e.target.value);
+        <Stack spacing={2} direction="row">
+          <TextField
+            label="Search Text"
+            variant="outlined"
+            style={{
+              flex: 0.5,
             }}
-            type="search"
+            inputRef={ref}
+            InputProps={{
+              value: searchVal,
+              onChange: (e) => {
+                setSearchVal(e.target.value);
+              },
+              type: 'search',
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 if (searchVal) {
@@ -73,34 +70,29 @@ function Search() {
           />
           <Button
             disabled={!searchVal}
-            variant="outline"
-            className="w-24 cursor-pointer"
+            variant="outlined"
+            sx={{
+              width: '100px',
+              border: 0,
+            }}
             onClick={async () => {
               onSubmit(searchVal);
             }}
           >
             Search
           </Button>
-        </div>
+        </Stack>
 
-        <div className="mt-4">
+        <Box mt={2}>
           {(() => {
-            if (!q) {
-              return (
-                <div className="text-sm text-gray-500 italic">
-                  Enter a search term and press Enter or click Search
-                </div>
-              );
-            }
-
             if (data && data.results && data.results.length > 0) {
               return (
-                <div>
-                  <h2 className="text-lg font-semibold mb-2">
+                <Box>
+                  <Typography variant="h6" style={{ fontStyle: 'bolder' }}>
                     {data.results.length} results found
-                  </h2>
+                  </Typography>
                   <SearchResult results={data.results} />
-                </div>
+                </Box>
               );
             }
 
@@ -108,18 +100,14 @@ function Search() {
               (data && !data.results) ||
               (data && data.results && data.results.length === 0)
             ) {
-              return (
-                <div className="text-sm text-gray-500 italic">
-                  No results found
-                </div>
-              );
+              return <Box>No results found</Box>;
             }
 
             return null;
           })()}
-        </div>
-      </div>
-    </div>
+        </Box>
+      </Grid>
+    </Grid>
   );
 }
 export default Search;

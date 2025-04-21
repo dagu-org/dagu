@@ -20,3 +20,16 @@ export const nodeStatusColorMapping = {
   [NodeStatus.Success]: statusColorMapping[Status.Success],
   [NodeStatus.Skipped]: { backgroundColor: 'gray', color: 'white' },
 };
+
+export const stepTabColStyles = [
+  { maxWidth: '60px' },
+  { maxWidth: '200px' },
+  { maxWidth: '150px' },
+  { maxWidth: '150px' },
+  { maxWidth: '150px' },
+  { maxWidth: '130px' },
+  { maxWidth: '130px' },
+  { maxWidth: '100px' },
+  { maxWidth: '100px' },
+  {},
+];

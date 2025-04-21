@@ -176,18 +176,6 @@ func (st *Status) NodeByName(name string) (*Node, error) {
 			return node, nil
 		}
 	}
-	if st.OnExit != nil && st.OnExit.Step.Name == name {
-		return st.OnExit, nil
-	}
-	if st.OnSuccess != nil && st.OnSuccess.Step.Name == name {
-		return st.OnSuccess, nil
-	}
-	if st.OnFailure != nil && st.OnFailure.Step.Name == name {
-		return st.OnFailure, nil
-	}
-	if st.OnCancel != nil && st.OnCancel.Step.Name == name {
-		return st.OnCancel, nil
-	}
 	return nil, fmt.Errorf("node %s not found", name)
 }
 

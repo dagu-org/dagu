@@ -213,10 +213,7 @@ func (d *DAG) Validate() error {
 	for _, step := range d.Steps {
 		for _, dep := range step.Depends {
 			if !stepMap[dep] {
-				var errList error = ErrorList{
-					wrapError("depends", dep, fmt.Errorf("step %s depends on non-existent step", step.Name)),
-				}
-				return errList
+				return fmt.Errorf("step %s depends on non-existent step %s", step.Name, dep)
 			}
 		}
 	}

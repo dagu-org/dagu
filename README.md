@@ -161,7 +161,7 @@ Make sure you have the following installed on your system:
 
 - [Go 1.23 or later](https://go.dev/doc/install)
 - [Node.js (Latest LTS or Current)](https://nodejs.org/en/download/)
-- [pnpm](https://pnpm.io/installation)
+- [Yarn](https://yarnpkg.com/)
 
 ### Steps to Build Locally
 
@@ -174,16 +174,27 @@ Make sure you have the following installed on your system:
   ```
 
 #### 2. Build the UI
-
-- Build the UI assets. This step is necessary to generate frontend files and copy them to the `internal/frontend/assets` directory.
+- Navigate to the `ui` directory.
   ```sh
-  make ui
+  cd ui
+  ```
+- Install / Update Dependencies
+  ```sh
+  yarn
+  ```
+- Go back to the root directory.
+  ```sh
+  cd ..
+  ```
+- Build the UI
+  ```sh
+  make build-ui
   ```
 
 #### 3. Build the Binary
 - Build the binary
   ```sh
-  make bin
+  make build-bin
   ```
   This produces the `dagu` binary in the `.local/bin` directory.
 

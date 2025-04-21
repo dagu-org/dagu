@@ -27,15 +27,15 @@ jobs:
         with:
           node-version: 20
 
-      - name: Set up pnpm
-        run: npm install --global pnpm
+      - name: Set up yarn
+        run: npm install --global yarn
 
-      - name: pnpm install
-        run: pnpm install
+      - name: Yarn install
+        run: yarn install
         working-directory: ui
 
       - name: Build web UI
-        run: pnpm build
+        run: yarn build
         working-directory: ui
 
       - name: Copy web assets

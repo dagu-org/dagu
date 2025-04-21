@@ -19,14 +19,14 @@ func Test_FormatTime(t *testing.T) {
 		require.Equal(t, tm, parsed)
 
 		// Test empty time
-		require.Equal(t, "", stringutil.FormatTime(time.Time{}))
+		require.Equal(t, "-", stringutil.FormatTime(time.Time{}))
 		parsed, err = stringutil.ParseTime("-")
 		require.NoError(t, err)
 		require.Equal(t, time.Time{}, parsed)
 	})
 	t.Run("Empty", func(t *testing.T) {
 		// Test empty time
-		require.Equal(t, "", stringutil.FormatTime(time.Time{}))
+		require.Equal(t, "-", stringutil.FormatTime(time.Time{}))
 	})
 }
 

@@ -1,6 +1,6 @@
 [codespell]
 # Ref: https://github.com/codespell-project/codespell#using-a-config-file
-skip = .git,*.svg,go.mod,go.sum,*.gen.go,pnpm-lock.yaml,*.lock,*.css,.codespellrc,CHANGELOG.md
+skip = .git,*.svg,go.mod,go.sum,*.gen.go,*.lock,*.css,.codespellrc,CHANGELOG.md
 check-hidden = true
 # ignore-regex = 
 # short variables close to typos are often used
