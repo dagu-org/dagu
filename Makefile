@@ -270,7 +270,7 @@ build-ui:
 cp-assets:
 	@echo "${COLOR_GREEN}Copying UI assets...${COLOR_RESET}"
 	@rm -f ${FE_ASSETS_DIR}/*
-	cp ${FE_BUILD_DIR}/* ${FE_ASSETS_DIR}
+	@cp ${FE_BUILD_DIR}/* ${FE_ASSETS_DIR}
 
 # clean-ui removes the UI build cache.
 .PHONY: clean-ui
