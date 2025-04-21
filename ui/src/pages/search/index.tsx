@@ -13,17 +13,24 @@ function Search() {
   const [searchVal, setSearchVal] = React.useState(searchParams.get('q') || '');
   const appBarContext = React.useContext(AppBarContext);
 
+  const q = searchParams.get('q') || '';
+  // Use a conditional key pattern - this is a standard SWR pattern for conditional fetching
+  // When q is empty, we pass undefined for the first parameter, which tells SWR not to fetch
   const { data, isLoading } = useQuery(
-    '/dags/search',
+    q ? '/dags/search' : (undefined as any),
+    q
+      ? {
+          params: {
+            query: {
+              remoteNode: appBarContext.selectedRemoteNode || 'local',
+              q,
+            },
+          },
+        }
+      : {},
     {
-      params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-          q: searchParams.get('q') || '',
-        },
-      },
-    },
-    { refreshInterval: 2000 }
+      refreshInterval: q ? 2000 : 0,
+    }
   );
 
   const ref = useRef<HTMLInputElement>(null);
@@ -38,7 +45,7 @@ function Search() {
     });
   }, []);
 
-  if (isLoading) {
+  if (q && isLoading) {
     return <LoadingIndicator />;
   }
 
@@ -78,6 +85,14 @@ function Search() {
 
         <div className="mt-4">
           {(() => {
+            if (!q) {
+              return (
+                <div className="text-sm text-gray-500 italic">
+                  Enter a search term and press Enter or click Search
+                </div>
+              );
+            }
+
             if (data && data.results && data.results.length > 0) {
               return (
                 <div>
@@ -93,7 +108,11 @@ function Search() {
               (data && !data.results) ||
               (data && data.results && data.results.length === 0)
             ) {
-              return <div>No results found</div>;
+              return (
+                <div className="text-sm text-gray-500 italic">
+                  No results found
+                </div>
+              );
             }
 
             return null;
