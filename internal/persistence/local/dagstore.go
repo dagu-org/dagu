@@ -108,8 +108,11 @@ func (d *dagStoreImpl) LoadSpec(ctx context.Context, spec []byte, opts ...digrap
 // UpdateSpec updates the specification of a DAG by its name.
 func (d *dagStoreImpl) UpdateSpec(ctx context.Context, name string, spec []byte) error {
 	// Validate the spec before saving it.
-	_, err := digraph.LoadYAML(ctx, spec, digraph.WithoutEval())
+	dag, err := digraph.LoadYAML(ctx, spec, digraph.WithoutEval())
 	if err != nil {
+		return err
+	}
+	if err := dag.Validate(); err != nil {
 		return err
 	}
 	filePath, err := d.locateDAG(name)
@@ -236,6 +239,10 @@ func (d *dagStoreImpl) List(ctx context.Context, opts persistence.ListOptions) (
 func (d *dagStoreImpl) Grep(ctx context.Context, pattern string) (
 	ret []*persistence.GrepResult, errs []string, err error,
 ) {
+	if pattern == "" {
+		// return empty result if pattern is empty
+		return nil, nil, nil
+	}
 	if err = d.ensureDirExist(); err != nil {
 		errs = append(
 			errs, fmt.Sprintf("failed to create DAGs directory %s", d.baseDir),
