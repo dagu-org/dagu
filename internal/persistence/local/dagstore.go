@@ -239,6 +239,10 @@ func (d *dagStoreImpl) List(ctx context.Context, opts persistence.ListOptions) (
 func (d *dagStoreImpl) Grep(ctx context.Context, pattern string) (
 	ret []*persistence.GrepResult, errs []string, err error,
 ) {
+	if pattern == "" {
+		// return empty result if pattern is empty
+		return nil, nil, nil
+	}
 	if err = d.ensureDirExist(); err != nil {
 		errs = append(
 			errs, fmt.Sprintf("failed to create DAGs directory %s", d.baseDir),
