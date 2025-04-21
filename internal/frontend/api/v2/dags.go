@@ -431,16 +431,7 @@ func (a *API) UpdateDAGSuspensionState(ctx context.Context, request api.UpdateDA
 }
 
 func (a *API) SearchDAGDefinitions(ctx context.Context, request api.SearchDAGDefinitionsRequestObject) (api.SearchDAGDefinitionsResponseObject, error) {
-	query := request.Params.Q
-	if query == "" {
-		return nil, &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeBadRequest,
-			Message:    "Query is required",
-		}
-	}
-
-	ret, errs, err := a.client.GrepDAG(ctx, query)
+	ret, errs, err := a.client.GrepDAG(ctx, request.Params.Q)
 	if err != nil {
 		return nil, fmt.Errorf("error searching DAGs: %w", err)
 	}

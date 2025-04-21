@@ -1,0 +1,23 @@
+# Project Guidelines
+
+## Migrate MUI to shadcn/ui
+
+- Use the shadcn/ui components instead of MUI components.
+- When you encounter a MUI component, migrate it to the corresponding shadcn/ui component.
+
+## Migrate fontawesome to lucide
+
+- Use the lucide icons instead of fontawesome icons.
+- When you encounter a fontawesome icon, migrate it to the corresponding lucide icon.
+
+## Styling
+
+- Design should be modern and clean, but simple.
+- Pay attention to details and ensure that the design is consistent throughout the application.
+- For example use the same font size, color, and spacing for similar elements.
+- Pay attention to the spacing between elements and ensure that it is consistent throughout the application.
+
+## Components
+
+- When you encounter a component with a misleading name, rename it to a more appropriate name.
+- When you encounter a component that is not reusable, refactor it to be reusable.

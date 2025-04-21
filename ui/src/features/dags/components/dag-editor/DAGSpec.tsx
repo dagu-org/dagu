@@ -1,0 +1,340 @@
+/**
+ * DAGSpec component displays and allows editing of a DAG specification.
+ *
+ * @module features/dags/components/dag-editor
+ */
+import BorderedBox from '@/ui/BorderedBox';
+import SubTitle from '@/ui/SubTitle';
+import { AlertTriangle, Code, Edit, Eye, Save, X } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { useCookies } from 'react-cookie';
+import { components } from '../../../../api/v2/schema';
+import { Button } from '../../../../components/ui/button';
+import { useSimpleToast } from '../../../../components/ui/simple-toast';
+import { AppBarContext } from '../../../../contexts/AppBarContext';
+import { useClient, useQuery } from '../../../../hooks/api';
+import LoadingIndicator from '../../../../ui/LoadingIndicator';
+import { DAGContext } from '../../contexts/DAGContext';
+import { DAGStepTable } from '../dag-details';
+import { FlowchartSwitch, FlowchartType, Graph } from '../visualization';
+import DAGAttributes from './DAGAttributes';
+import DAGEditor from './DAGEditor';
+
+/**
+ * Props for the DAGSpec component
+ */
+type Props = {
+  /** DAG file ID */
+  fileId: string;
+};
+
+/**
+ * DAGSpec displays and allows editing of a DAG specification
+ * including visualization, attributes, steps, and YAML definition
+ */
+function DAGSpec({ fileId }: Props) {
+  const appBarContext = React.useContext(AppBarContext);
+  const client = useClient();
+  const { showToast } = useSimpleToast();
+
+  // State for editing mode and current YAML value
+  const [editing, setEditing] = React.useState(false);
+  const [currentValue, setCurrentValue] = React.useState<string | undefined>();
+  const [scrollPosition, setScrollPosition] = React.useState(0);
+
+  // Flowchart direction preference stored in cookies
+  const [cookie, setCookie] = useCookies(['flowchart']);
+  const [flowchart, setFlowchart] = React.useState(cookie['flowchart']);
+
+  // Reference to the main container div
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  /**
+   * Handle flowchart direction change and save preference to cookie
+   */
+  const onChangeFlowchart = React.useCallback(
+    (value: FlowchartType) => {
+      if (!value) {
+        return;
+      }
+      setCookie('flowchart', value, { path: '/' });
+      setFlowchart(value);
+    },
+    [setCookie, flowchart, setFlowchart]
+  );
+
+  // Fetch DAG specification data
+  const { data, isLoading } = useQuery(
+    '/dags/{fileId}/spec',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
+        path: {
+          fileId: fileId,
+        },
+      },
+    },
+    { refreshInterval: 2000 } // Refresh every 2 seconds
+  );
+
+  // Update current value when data changes
+  useEffect(() => {
+    if (data) {
+      setCurrentValue(data.spec);
+    }
+  }, [data]);
+
+  // Save scroll position before saving
+  const saveScrollPosition = React.useCallback(() => {
+    if (containerRef.current) {
+      setScrollPosition(window.scrollY);
+    }
+  }, []);
+
+  // Restore scroll position after render
+  useEffect(() => {
+    if (scrollPosition > 0) {
+      // Use a small timeout to ensure the DOM has updated before scrolling
+      const timer = setTimeout(() => {
+        window.scrollTo({
+          top: scrollPosition,
+          behavior: 'auto', // Use 'auto' instead of 'smooth' to avoid animation
+        });
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [scrollPosition, editing]);
+
+  // Get lifecycle handlers from DAG definition
+  const handlers = getHandlers(data?.dag);
+
+  // Show loading indicator while fetching data
+  if (isLoading) {
+    return <LoadingIndicator />;
+  }
+
+  return (
+    <DAGContext.Consumer>
+      {(props) =>
+        data?.dag && (
+          <React.Fragment>
+            <div className="space-y-4" ref={containerRef}>
+              <div className="overflow-x-auto rounded-xl shadow-md bg-white dark:bg-slate-900 p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <SubTitle className="mb-0">Graph</SubTitle>
+                  <FlowchartSwitch
+                    value={cookie['flowchart']}
+                    onChange={onChangeFlowchart}
+                  />
+                </div>
+                <BorderedBox className="mt-4 py-4 px-4 flex flex-col overflow-x-auto">
+                  <Graph
+                    steps={data.dag.steps}
+                    type="config"
+                    flowchart={flowchart}
+                    showIcons={false}
+                  />
+                </BorderedBox>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
+                <SubTitle className="mb-4">Attributes</SubTitle>
+                <DAGAttributes dag={data.dag!} />
+              </div>
+
+              {data.errors?.length ? (
+                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 border-l-4 border-red-500 dark:border-red-700">
+                  <div className="flex items-center gap-2 mb-4 text-red-600 dark:text-red-400">
+                    <AlertTriangle className="h-5 w-5" />
+                    <h3 className="font-semibold">Configuration Errors</h3>
+                  </div>
+
+                  <div className="space-y-3">
+                    {data.errors?.map((e, i) => (
+                      <div
+                        key={i}
+                        className="p-3 bg-red-50 dark:bg-red-900/20 rounded-md text-red-600 dark:text-red-400 font-mono text-sm"
+                      >
+                        {e}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {data.dag.steps ? (
+                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
+                  <SubTitle className="mb-4">Steps</SubTitle>
+                  <DAGStepTable steps={data.dag.steps} />
+                </div>
+              ) : null}
+
+              {handlers?.length ? (
+                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
+                  <SubTitle className="mb-4">Lifecycle Hooks</SubTitle>
+                  <DAGStepTable steps={handlers} />
+                </div>
+              ) : null}
+
+              <div
+                className={`rounded-xl shadow-md p-6 overflow-hidden transition-all duration-300 ${
+                  editing
+                    ? 'bg-white dark:bg-slate-900 border-2 border-blue-400 dark:border-blue-600'
+                    : 'bg-white dark:bg-slate-900'
+                }`}
+              >
+                <div className="flex justify-between items-center mb-4">
+                  <div className="flex items-center">
+                    <SubTitle className="mb-0 mr-2">Spec</SubTitle>
+                    <div
+                      className={`text-xs font-medium px-2 py-1 rounded-full transition-all duration-300 ${
+                        editing
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
+                          : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                      }`}
+                    >
+                      {editing ? (
+                        <div className="flex items-center">
+                          <Code className="h-3 w-3 mr-1" />
+                          <span>Editing</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center">
+                          <Eye className="h-3 w-3 mr-1" />
+                          <span>Viewing</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {editing ? (
+                    <div className="flex gap-2">
+                      <Button
+                        id="save-config"
+                        variant="default"
+                        size="sm"
+                        className="cursor-pointer shadow-sm hover:shadow-md transition-shadow duration-200"
+                        onClick={async () => {
+                          if (!currentValue) {
+                            alert('No changes to save');
+                            return;
+                          }
+                          // Save current scroll position before any operations that might cause re-render
+                          saveScrollPosition();
+                          const { data, error } = await client.PUT(
+                            '/dags/{fileId}/spec',
+                            {
+                              params: {
+                                path: {
+                                  fileId: props.fileId,
+                                },
+                                query: {
+                                  remoteNode:
+                                    appBarContext.selectedRemoteNode || 'local',
+                                },
+                              },
+                              body: {
+                                spec: currentValue,
+                              },
+                            }
+                          );
+                          if (error) {
+                            alert(error.message || 'Failed to save spec');
+                            return;
+                          }
+                          if (data?.errors) {
+                            alert(data.errors.join('\n'));
+                            return;
+                          }
+                          // Show success toast notification
+                          showToast('Changes saved successfully');
+
+                          setEditing(false);
+                          props.refresh();
+                        }}
+                      >
+                        <Save className="h-4 w-4 mr-1" />
+                        Save Changes
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="cursor-pointer hover:bg-red-50 hover:text-red-600 hover:border-red-200 dark:hover:bg-red-900/20 dark:hover:text-red-400 dark:hover:border-red-800 transition-colors duration-200"
+                        onClick={() => {
+                          saveScrollPosition();
+                          setEditing(false);
+                        }}
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      id="edit-config"
+                      variant="outline"
+                      size="sm"
+                      className="cursor-pointer hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 dark:hover:bg-blue-900/20 dark:hover:text-blue-400 dark:hover:border-blue-800 transition-colors duration-200"
+                      onClick={() => {
+                        saveScrollPosition();
+                        setEditing(true);
+                      }}
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
+                  )}
+                </div>
+
+                <DAGEditor
+                  value={data.spec}
+                  readOnly={!editing}
+                  lineNumbers={true}
+                  className="mt-2"
+                  onChange={
+                    editing
+                      ? (newValue) => {
+                          setCurrentValue(newValue || '');
+                        }
+                      : undefined
+                  }
+                />
+              </div>
+            </div>
+          </React.Fragment>
+        )
+      }
+    </DAGContext.Consumer>
+  );
+}
+
+/**
+ * Extract lifecycle handlers from DAG definition
+ */
+function getHandlers(
+  dag?: components['schemas']['DAGDetails']
+): components['schemas']['Step'][] {
+  const steps: components['schemas']['Step'][] = [];
+  if (!dag) {
+    return steps;
+  }
+  const h = dag.handlerOn;
+  if (h?.success) {
+    steps.push(h.success);
+  }
+  if (h?.failure) {
+    steps.push(h?.failure);
+  }
+  if (h?.cancel) {
+    steps.push(h?.cancel);
+  }
+  if (h?.exit) {
+    steps.push(h?.exit);
+  }
+  return steps;
+}
+
+export default DAGSpec;
