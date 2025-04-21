@@ -6,7 +6,6 @@ import { AppBarContext } from './contexts/AppBarContext';
 import { Config, ConfigContext } from './contexts/ConfigContext';
 import { UserPreferencesProvider } from './contexts/UserPreference';
 import Layout from './layouts/Layout';
-import dayjs from './lib/dayjs';
 import fetchJson from './lib/fetchJson';
 import Dashboard from './pages';
 import DAGs from './pages/dags';
@@ -19,7 +18,7 @@ type Props = {
 
 function App({ config }: Props) {
   const [title, setTitle] = React.useState<string>('');
-  config.tz ||= dayjs.tz.guess();
+
   const remoteNodes = config.remoteNodes
     .split(',')
     .filter(Boolean)

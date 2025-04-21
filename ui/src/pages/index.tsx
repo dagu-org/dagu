@@ -89,8 +89,6 @@ function Dashboard(): React.ReactElement | null {
     if (dagFile.latestRun && metrics.hasOwnProperty(dagFile.latestRun.status)) {
       const statusKey = dagFile.latestRun.status as Status;
       metrics[statusKey]! += 1;
-    } else {
-      // metrics[Status.NotStarted]! += 1; // Example
     }
   });
 
@@ -118,6 +116,11 @@ function Dashboard(): React.ReactElement | null {
     },
   ];
 
+  let title = 'Timeline';
+  if (config.tz) {
+    title = `Timeline in ${config.tz}`;
+  }
+
   // --- Render the dashboard UI ---
   return (
     <div className="flex flex-col space-y-6 w-full">
@@ -141,7 +144,7 @@ function Dashboard(): React.ReactElement | null {
 
       {/* Timeline Chart Section */}
       <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4 md:p-6">
-        <Title>{`Timeline in ${config.tz}`}</Title>
+        <Title>{title}</Title>
         {/* Remove fixed height (h-[300px]) to allow vertical expansion */}
         {/* Add overflow-x-auto to allow horizontal scrolling if chart is too wide */}
         <div className="mt-4 overflow-x-auto">

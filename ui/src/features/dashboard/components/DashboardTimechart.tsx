@@ -22,8 +22,31 @@ function DashboardTimeChart({ data: input }: Props) {
   const timelineInstance = useRef<Timeline | null>(null);
   const config = useConfig();
 
+  // Helper function to ensure we have a valid IANA timezone
+  const getValidTimezone = React.useCallback((tz: string): string => {
+    // If it's already a valid timezone, return it
+    try {
+      // Test if the timezone is valid
+      dayjs().tz(tz);
+      return tz;
+    } catch (e) {
+      // If it's an offset format like UTC+9, convert to a valid IANA timezone
+      if (tz.startsWith('UTC+') || tz.startsWith('UTC-')) {
+        // Default to a common timezone in that offset
+        return (
+          'Etc/GMT' + (tz.startsWith('UTC+') ? '-' : '+') + tz.substring(4)
+        );
+      }
+      // Fall back to the browser's timezone
+      return dayjs.tz.guess();
+    }
+  }, []);
+
   useEffect(() => {
     if (!timelineRef.current) return;
+
+    // Get a valid timezone
+    const validTimezone = getValidTimezone(config.tz);
 
     const items: TimelineItem[] = [];
     const now = dayjs();
@@ -41,8 +64,8 @@ function DashboardTimeChart({ data: input }: Props) {
         items.push({
           id: dag.name + `_${run.requestId}`,
           content: dag.name,
-          start: startMoment.tz(config.tz).toDate(),
-          end: end.tz(config.tz).toDate(),
+          start: startMoment.tz(validTimezone).toDate(),
+          end: end.tz(validTimezone).toDate(),
           group: 'main',
           className: `status-${status}`,
         });
@@ -88,7 +111,7 @@ function DashboardTimeChart({ data: input }: Props) {
         timelineInstance.current = null;
       }
     };
-  }, [input, config.tz]);
+  }, [input, config.tz, getValidTimezone]);
 
   return (
     <TimelineWrapper>

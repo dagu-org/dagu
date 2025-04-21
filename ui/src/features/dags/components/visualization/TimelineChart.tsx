@@ -3,10 +3,11 @@
  *
  * @module features/dags/components/visualization
  */
+import dayjs from '@/lib/dayjs';
+import Mermaid from '@/ui/Mermaid';
 import React from 'react';
 import { components, Status } from '../../../../api/v2/schema';
-import dayjs from '../../../../lib/dayjs';
-import Mermaid from '../../../../ui/Mermaid';
+import { useConfig } from '../../../../contexts/ConfigContext';
 
 /**
  * Props for the TimelineChart component
@@ -24,14 +25,13 @@ const timeFormat = 'YYYY-MM-DD HH:mm:ss';
  * Only renders for completed DAG runs (not shown for running or not started DAGs)
  */
 function TimelineChart({ status }: Props) {
+  // Get the config
+  const config = useConfig();
   // Don't render timeline for DAGs that haven't completed yet
   if (status.status == Status.NotStarted || status.status == Status.Running) {
     return null;
   }
 
-  /**
-   * Generate the Mermaid Gantt chart definition
-   */
   const graph = React.useMemo(() => {
     const ret = [
       'gantt',
@@ -62,7 +62,7 @@ function TimelineChart({ status }: Props) {
       });
 
     return ret.join('\n');
-  }, [status]);
+  }, [status, config.tz]);
 
   return <Mermaid def={graph} scale={1.0} />;
 }

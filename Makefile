@@ -255,14 +255,20 @@ build-bin:
 build-ui:
 	@echo "${COLOR_GREEN}Building UI...${COLOR_RESET}"
 	@cd ui; \
-		rm -rf node_modules; \
-		rm -rf .cache; \
-		NODE_OPTIONS="--max-old-space-size=8192" pnpm webpack --config webpack.dev.js; \
 		pnpm install; \
+		NODE_OPTIONS="--max-old-space-size=8192" pnpm webpack --config webpack.dev.js; \
 		pnpm webpack --config webpack.dev.js
 	@echo "${COLOR_GREEN}Copying UI assets...${COLOR_RESET}"
 	@rm -f ${FE_ASSETS_DIR}/*
 	@cp ${FE_BUILD_DIR}/* ${FE_ASSETS_DIR}
+
+# clean-ui removes the UI build cache.
+.PHONY: clean-ui
+clean-ui:
+	@echo "${COLOR_GREEN}Cleaning UI build cache...${COLOR_RESET}"
+	@cd ui; \
+		rm -rf node_modules; \
+		rm -rf .cache;
 
 # golangci-lint run linting tool.
 .PHONY: golangci-lint

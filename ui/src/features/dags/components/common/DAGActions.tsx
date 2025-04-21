@@ -192,10 +192,6 @@ function DAGActions({
 
                         if (selectedRun && selectedRun.requestId) {
                           requestIdToUse = selectedRun.requestId;
-                          console.log(
-                            'Using selected run requestId:',
-                            requestIdToUse
-                          );
                         }
                       }
                     } catch (err) {
@@ -257,10 +253,6 @@ function DAGActions({
 
                         if (selectedRun && selectedRun.requestId) {
                           requestIdToUse = selectedRun.requestId;
-                          console.log(
-                            'Using selected run requestId:',
-                            requestIdToUse
-                          );
                         }
                       }
                     } catch (err) {
@@ -318,9 +310,6 @@ function DAGActions({
           dismissModal={() => setIsRetryModal(false)}
           onSubmit={async () => {
             setIsRetryModal(false);
-
-            // Use the requestId that was set when the button was clicked
-            console.log('Retrying with requestId:', retryRequestId);
 
             const { error } = await client.POST('/dags/{fileId}/retry', {
               params: {
