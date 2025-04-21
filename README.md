@@ -177,13 +177,13 @@ Make sure you have the following installed on your system:
 
 - Build the UI assets. This step is necessary to generate frontend files and copy them to the `internal/frontend/assets` directory.
   ```sh
-  make build-ui
+  make ui
   ```
 
 #### 3. Build the Binary
 - Build the binary
   ```sh
-  make build-bin
+  make bin
   ```
   This produces the `dagu` binary in the `.local/bin` directory.
 

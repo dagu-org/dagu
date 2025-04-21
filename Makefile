@@ -98,20 +98,20 @@ run: ${FE_BUNDLE_JS}
 
 # server build the binary and start the server.
 .PHONY: run-server
-run-server: golangci-lint build-bin
+run-server: golangci-lint bin
 	@echo "${COLOR_GREEN}Starting the server...${COLOR_RESET}"
 	${LOCAL_BIN_DIR}/${APP_NAME} server
 
 # scheduler build the binary and start the scheduler.
 .PHONY: run-scheduler
-run-scheduler: golangci-lint build-bin
+run-scheduler: golangci-lint bin
 	@echo "${COLOR_GREEN}Starting the scheduler...${COLOR_RESET}"
 	${LOCAL_BIN_DIR}/${APP_NAME} scheduler
 
 # check if the frontend assets are built.
 ${FE_BUNDLE_JS}:
 	@echo "${COLOR_RED}Error: frontend assets are not built.${COLOR_RESET}"
-	@echo "${COLOR_RED}Please run 'make build-ui' before starting the server.${COLOR_RESET}"
+	@echo "${COLOR_RED}Please run 'make ui' before starting the server.${COLOR_RESET}"
 
 # https starts the server with the HTTPS protocol.
 .PHONY: run-server-https
@@ -123,7 +123,7 @@ run-server-https: ${SERVER_CERT_FILE} ${SERVER_KEY_FILE}
 
 # test runs all tests.
 .PHONY: test
-test: build-bin
+test: bin
 	@echo "${COLOR_GREEN}Running tests...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
 	@go clean -testcache
@@ -183,7 +183,7 @@ certs: ${CERTS_DIR} ${SERVER_CERT_FILE} ${CLIENT_CERT_FILE} certs-check
 
 # build build the binary.
 .PHONY: build
-build: build-ui build-bin
+build: ui bin
 
 # build-image build the docker image and push to the registry.
 # VERSION should be set via the argument as follows:
@@ -243,12 +243,16 @@ addlicense:
 # Internal targets
 ##############################################################################
 
-# build-bin builds the go application.
-.PHONY: build-bin
-build-bin:
+# bin builds the go application.
+.PHONY: bin
+bin:
 	@echo "${COLOR_GREEN}Building the binary...${COLOR_RESET}"
 	@mkdir -p ${BIN_DIR}
 	@go build -ldflags="$(LDFLAGS)" -o ${BIN_DIR}/${APP_NAME} ./cmd
+
+.PHONY: ui
+# ui builds the frontend codes.
+ui: clean-ui build-ui cp-assets
 
 # build-ui builds the frontend codes.
 .PHONY: build-ui
@@ -257,10 +261,16 @@ build-ui:
 	@cd ui; \
 		pnpm install; \
 		NODE_OPTIONS="--max-old-space-size=8192" pnpm webpack --config webpack.dev.js; \
-		pnpm webpack --config webpack.dev.js
+		pnpm webpack --config webpack.prod.js
+	@echo "${COLOR_GREEN}Waiting for the build to finish...${COLOR_RESET}"
+	@sleep 3 # wait for the build to finish
+
+# build-ui-prod builds the frontend codes for production.
+.PHONY: cp-assets
+cp-assets:
 	@echo "${COLOR_GREEN}Copying UI assets...${COLOR_RESET}"
 	@rm -f ${FE_ASSETS_DIR}/*
-	@cp ${FE_BUILD_DIR}/* ${FE_ASSETS_DIR}
+	cp ${FE_BUILD_DIR}/* ${FE_ASSETS_DIR}
 
 # clean-ui removes the UI build cache.
 .PHONY: clean-ui
