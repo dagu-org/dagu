@@ -52,22 +52,22 @@ steps:
 type PullPolicy int
 
 const (
-	Always PullPolicy = iota
-	Never
-	Missing
+	PullPolicyAlways PullPolicy = iota
+	PullPolicyNever
+	PullPolicyMissing
 )
 
 var pullPolicyMap = map[string]PullPolicy{
-	"always":  Always,
-	"missing": Missing,
-	"never":   Never,
+	"always":  PullPolicyAlways,
+	"missing": PullPolicyMissing,
+	"never":   PullPolicyNever,
 }
 
 func boolToPullPolicy(b bool) PullPolicy {
 	if b {
-		return Always
+		return PullPolicyAlways
 	}
-	return Never
+	return PullPolicyNever
 }
 
 func parsePullPolicy(ctx context.Context, raw any) (PullPolicy, error) {
@@ -75,7 +75,7 @@ func parsePullPolicy(ctx context.Context, raw any) (PullPolicy, error) {
 	case string:
 		value, err := digraph.EvalString(ctx, value)
 		if err != nil {
-			return Missing, fmt.Errorf("failed to evaluate pull policy: %w", err)
+			return PullPolicyMissing, fmt.Errorf("failed to evaluate pull policy: %w", err)
 		}
 
 		// Try to parse the string as a pull policy
@@ -87,13 +87,13 @@ func parsePullPolicy(ctx context.Context, raw any) (PullPolicy, error) {
 		// If the string is not a valid pull policy, try to parse it as a boolean
 		b, err := strconv.ParseBool(value)
 		if err != nil {
-			return Missing, fmt.Errorf("failed to parse pull policy as boolean: %w", err)
+			return PullPolicyMissing, fmt.Errorf("failed to parse pull policy as boolean: %w", err)
 		}
 		return boolToPullPolicy(b), nil
 	case bool:
 		return boolToPullPolicy(value), nil
 	default:
-		return Missing, fmt.Errorf("invalid pull policy type: %T", raw)
+		return PullPolicyMissing, fmt.Errorf("invalid pull policy type: %T", raw)
 	}
 }
 
@@ -160,10 +160,10 @@ func (e *docker) getPlatform(ctx context.Context, cli *client.Client) (specs.Pla
 }
 
 func (e *docker) shouldPullImage(ctx context.Context, cli *client.Client, platform *specs.Platform) (bool, error) {
-	if e.pull == Always {
+	if e.pull == PullPolicyAlways {
 		return true, nil
 	}
-	if e.pull == Never {
+	if e.pull == PullPolicyNever {
 		return false, nil
 	}
 
@@ -485,7 +485,7 @@ func newDocker(
 		}
 	}
 
-	pull := Missing
+	pull := PullPolicyMissing
 	if raw, ok := execCfg.Config["pull"]; ok {
 		var err error
 		pull, err = parsePullPolicy(ctx, raw)

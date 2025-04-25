@@ -26,7 +26,7 @@ func TestPullPolicy(t *testing.T) {
 						"image": "testimage",
 					},
 				}},
-			pull:        Missing,
+			pull:        PullPolicyMissing,
 			expectError: false,
 		},
 		{
@@ -40,7 +40,7 @@ func TestPullPolicy(t *testing.T) {
 						"pull":  true,
 					},
 				}},
-			pull:        Always,
+			pull:        PullPolicyAlways,
 			expectError: false,
 		},
 		{
@@ -54,7 +54,7 @@ func TestPullPolicy(t *testing.T) {
 						"pull":  "true",
 					},
 				}},
-			pull:        Always,
+			pull:        PullPolicyAlways,
 			expectError: false,
 		},
 		{
@@ -68,7 +68,7 @@ func TestPullPolicy(t *testing.T) {
 						"pull":  false,
 					},
 				}},
-			pull:        Never,
+			pull:        PullPolicyNever,
 			expectError: false,
 		},
 		{
@@ -82,7 +82,7 @@ func TestPullPolicy(t *testing.T) {
 						"pull":  "false",
 					},
 				}},
-			pull:        Never,
+			pull:        PullPolicyNever,
 			expectError: false,
 		},
 		{
@@ -96,7 +96,7 @@ func TestPullPolicy(t *testing.T) {
 						"pull":  "missing",
 					},
 				}},
-			pull:        Missing,
+			pull:        PullPolicyMissing,
 			expectError: false,
 		},
 		{
@@ -110,7 +110,7 @@ func TestPullPolicy(t *testing.T) {
 						"pull":  "always",
 					},
 				}},
-			pull:        Always,
+			pull:        PullPolicyAlways,
 			expectError: false,
 		},
 		{
@@ -124,7 +124,7 @@ func TestPullPolicy(t *testing.T) {
 						"pull":  "never",
 					},
 				}},
-			pull:        Never,
+			pull:        PullPolicyNever,
 			expectError: false,
 		},
 		{
@@ -138,7 +138,7 @@ func TestPullPolicy(t *testing.T) {
 						"pull":  "random pull policy should not exist",
 					},
 				}},
-			pull:        Missing,
+			pull:        PullPolicyMissing,
 			expectError: true,
 		},
 	}
