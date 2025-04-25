@@ -57,7 +57,7 @@ const (
 	Missing
 )
 
-func ParsePullPolicy(s string) PullPolicy {
+func parsePullPolicy(s string) PullPolicy {
 	switch s {
 	case "always":
 		return Always
@@ -66,6 +66,13 @@ func ParsePullPolicy(s string) PullPolicy {
 	default:
 		return Missing
 	}
+}
+
+func boolToPullPolicy(b bool) PullPolicy {
+	if b {
+		return Always
+	}
+	return Never
 }
 
 var _ Executor = (*docker)(nil)
@@ -457,19 +464,26 @@ func newDocker(
 	}
 
 	pull := Missing
-	if value, ok := execCfg.Config["pull"].(string); ok {
-		value, err := digraph.EvalString(ctx, value)
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate pull policy: %w", err)
-		}
-
-		boolPull, err := strconv.ParseBool(value)
-		if err != nil {
-			pull = ParsePullPolicy(value)
-		} else if boolPull {
-			pull = Always
+	if raw, ok := execCfg.Config["pull"]; ok {
+		value, ok := raw.(string)
+		if !ok {
+			boolPull, err := digraph.EvalBool(ctx, raw)
+			if err != nil {
+				return nil, fmt.Errorf("failed to evaluate pull policy: %w", err)
+			}
+			pull = boolToPullPolicy(boolPull)
 		} else {
-			pull = Never
+			value, err := digraph.EvalString(ctx, value)
+			if err != nil {
+				return nil, fmt.Errorf("failed to evaluate pull policy: %w", err)
+			}
+
+			boolPull, err := strconv.ParseBool(value)
+			if err != nil {
+				pull = parsePullPolicy(value)
+			} else {
+				pull = boolToPullPolicy(boolPull)
+			}
 		}
 	}
 
