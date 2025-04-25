@@ -11,9 +11,10 @@ import (
 
 func TestPullPolicy(t *testing.T) {
 	tests := []struct {
-		name string
-		step digraph.Step
-		pull PullPolicy
+		name        string
+		step        digraph.Step
+		pull        PullPolicy
+		expectError bool
 	}{
 		{
 			name: "Missing",
@@ -25,7 +26,8 @@ func TestPullPolicy(t *testing.T) {
 						"image": "testimage",
 					},
 				}},
-			pull: Missing,
+			pull:        Missing,
+			expectError: false,
 		},
 		{
 			name: "TrueBool",
@@ -38,7 +40,8 @@ func TestPullPolicy(t *testing.T) {
 						"pull":  true,
 					},
 				}},
-			pull: Always,
+			pull:        Always,
+			expectError: false,
 		},
 		{
 			name: "TrueString",
@@ -51,7 +54,8 @@ func TestPullPolicy(t *testing.T) {
 						"pull":  "true",
 					},
 				}},
-			pull: Always,
+			pull:        Always,
+			expectError: false,
 		},
 		{
 			name: "FalseBool",
@@ -64,7 +68,8 @@ func TestPullPolicy(t *testing.T) {
 						"pull":  false,
 					},
 				}},
-			pull: Never,
+			pull:        Never,
+			expectError: false,
 		},
 		{
 			name: "FalseString",
@@ -77,7 +82,8 @@ func TestPullPolicy(t *testing.T) {
 						"pull":  "false",
 					},
 				}},
-			pull: Never,
+			pull:        Never,
+			expectError: false,
 		},
 		{
 			name: "MissingString",
@@ -90,7 +96,8 @@ func TestPullPolicy(t *testing.T) {
 						"pull":  "missing",
 					},
 				}},
-			pull: Missing,
+			pull:        Missing,
+			expectError: false,
 		},
 		{
 			name: "AlwaysString",
@@ -103,7 +110,8 @@ func TestPullPolicy(t *testing.T) {
 						"pull":  "always",
 					},
 				}},
-			pull: Always,
+			pull:        Always,
+			expectError: false,
 		},
 		{
 			name: "NeverString",
@@ -116,10 +124,11 @@ func TestPullPolicy(t *testing.T) {
 						"pull":  "never",
 					},
 				}},
-			pull: Never,
+			pull:        Never,
+			expectError: false,
 		},
 		{
-			name: "FallbackString",
+			name: "Error",
 			step: digraph.Step{
 				Name: "docker-exec",
 				ExecutorConfig: digraph.ExecutorConfig{
@@ -129,14 +138,24 @@ func TestPullPolicy(t *testing.T) {
 						"pull":  "random pull policy should not exist",
 					},
 				}},
-			pull: Missing,
+			pull:        Missing,
+			expectError: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			exec, err := newDocker(context.Background(), tt.step)
-			require.NoError(t, err)
+
+			// Check error expectation
+			if (err != nil) != tt.expectError {
+				t.Errorf("error = %v, expectError %v", err, tt.expectError)
+				return
+			}
+
+			if tt.expectError {
+				return // No need to check the result if we expected an error
+			}
 
 			dockerExec, ok := exec.(*docker)
 			require.True(t, ok)

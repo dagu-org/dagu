@@ -57,15 +57,10 @@ const (
 	Missing
 )
 
-func parsePullPolicy(s string) PullPolicy {
-	switch s {
-	case "always":
-		return Always
-	case "never":
-		return Never
-	default:
-		return Missing
-	}
+var pullPolicyMap = map[string]PullPolicy{
+	"always":  Always,
+	"missing": Missing,
+	"never":   Never,
 }
 
 func boolToPullPolicy(b bool) PullPolicy {
@@ -73,6 +68,33 @@ func boolToPullPolicy(b bool) PullPolicy {
 		return Always
 	}
 	return Never
+}
+
+func parsePullPolicy(ctx context.Context, raw any) (PullPolicy, error) {
+	switch value := raw.(type) {
+	case string:
+		value, err := digraph.EvalString(ctx, value)
+		if err != nil {
+			return Missing, fmt.Errorf("failed to evaluate pull policy: %w", err)
+		}
+
+		// Try to parse the string as a pull policy
+		pull, ok := pullPolicyMap[value]
+		if ok {
+			return pull, nil
+		}
+
+		// If the string is not a valid pull policy, try to parse it as a boolean
+		b, err := strconv.ParseBool(value)
+		if err != nil {
+			return Missing, fmt.Errorf("failed to parse pull policy as boolean: %w", err)
+		}
+		return boolToPullPolicy(b), nil
+	case bool:
+		return boolToPullPolicy(value), nil
+	default:
+		return Missing, fmt.Errorf("invalid pull policy type: %T", raw)
+	}
 }
 
 var _ Executor = (*docker)(nil)
@@ -465,25 +487,10 @@ func newDocker(
 
 	pull := Missing
 	if raw, ok := execCfg.Config["pull"]; ok {
-		value, ok := raw.(string)
-		if !ok {
-			boolPull, err := digraph.EvalBool(ctx, raw)
-			if err != nil {
-				return nil, fmt.Errorf("failed to evaluate pull policy: %w", err)
-			}
-			pull = boolToPullPolicy(boolPull)
-		} else {
-			value, err := digraph.EvalString(ctx, value)
-			if err != nil {
-				return nil, fmt.Errorf("failed to evaluate pull policy: %w", err)
-			}
-
-			boolPull, err := strconv.ParseBool(value)
-			if err != nil {
-				pull = parsePullPolicy(value)
-			} else {
-				pull = boolToPullPolicy(boolPull)
-			}
+		var err error
+		pull, err = parsePullPolicy(ctx, raw)
+		if err != nil {
+			return nil, err
 		}
 	}
 
