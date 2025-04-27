@@ -115,17 +115,33 @@ func (db *JSONDB) Update(ctx context.Context, dagName, reqID string, status pers
 }
 
 // NewRecord creates a new history record for the specified DAG run.
-func (db *JSONDB) NewRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string) (persistence.Record, error) {
+// If opts.Root is not nil, it creates a sub-record for the specified root DAG.
+// If opts.Retry is true, it creates a retry record for the specified request ID.
+func (db *JSONDB) NewRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts persistence.NewRecordOptions) (persistence.Record, error) {
 	if reqID == "" {
 		return nil, ErrRequestIDEmpty
 	}
 
-	ts := NewUTC(timestamp)
+	if opts.Root != nil {
+		return db.newSubRecord(ctx, dag, timestamp, reqID, opts)
+	}
 
 	dataRoot := NewDataRoot(db.baseDir, dag.Name)
-	run, err := dataRoot.CreateRun(ts, reqID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create run: %w", err)
+	ts := NewUTC(timestamp)
+
+	var run *Run
+	if opts.Retry {
+		r, err := dataRoot.FindByRequestID(ctx, reqID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find run: %w", err)
+		}
+		run = r
+	} else {
+		r, err := dataRoot.CreateRun(ts, reqID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create run: %w", err)
+		}
+		run = r
 	}
 
 	record, err := run.CreateRecord(ctx, ts, db.cache, WithDAG(dag))
@@ -136,43 +152,32 @@ func (db *JSONDB) NewRecord(ctx context.Context, dag *digraph.DAG, timestamp tim
 	return record, nil
 }
 
-func (db *JSONDB) NewRetryRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string) (persistence.Record, error) {
-	if reqID == "" {
-		return nil, ErrRequestIDEmpty
-	}
-
-	dataRoot := NewDataRoot(db.baseDir, dag.Name)
-	run, err := dataRoot.FindByRequestID(ctx, reqID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find run: %w", err)
-	}
-
-	ts := NewUTC(timestamp)
-	record, err := run.CreateRecord(ctx, ts, db.cache, WithDAG(dag))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create record: %w", err)
-	}
-
-	return record, nil
-}
-
-// NewSubRecord creates a new history record for the specified sub-workflow run.
-func (db *JSONDB) NewSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, rootDAG digraph.RootDAG) (persistence.Record, error) {
-	if reqID == "" {
-		return nil, ErrRequestIDEmpty
-	}
-	root := NewDataRoot(db.baseDir, rootDAG.Name)
-	rootRun, err := root.FindByRequestID(ctx, rootDAG.RequestID)
+// NewSubRecord creates a new history record for the specified sub-run.
+func (db *JSONDB) newSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts persistence.NewRecordOptions) (persistence.Record, error) {
+	dataRoot := NewDataRoot(db.baseDir, opts.Root.Name)
+	rootRun, err := dataRoot.FindByRequestID(ctx, opts.Root.RequestID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find root run: %w", err)
 	}
 
-	run, err := rootRun.CreateSubRun(ctx, NewUTC(timestamp), reqID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create sub run: %w", err)
+	ts := NewUTC(timestamp)
+
+	var run *Run
+	if opts.Retry {
+		r, err := rootRun.FindSubRun(ctx, reqID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find run: %w", err)
+		}
+		run = r
+	} else {
+		r, err := rootRun.CreateSubRun(ctx, reqID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create sub run: %w", err)
+		}
+		run = r
 	}
 
-	record, err := run.CreateRecord(ctx, NewUTC(timestamp), db.cache, WithDAG(dag))
+	record, err := run.CreateRecord(ctx, ts, db.cache, WithDAG(dag))
 	if err != nil {
 		logger.Error(ctx, "Failed to create record", "err", err)
 		return nil, err
@@ -292,7 +297,7 @@ func (db *JSONDB) FindBySubRequestID(ctx context.Context, reqID string, rootDAG 
 		return nil, err
 	}
 
-	subRun, err := run.GetSubRun(ctx, reqID)
+	subRun, err := run.FindSubRun(ctx, reqID)
 	if err != nil {
 		return nil, err
 	}

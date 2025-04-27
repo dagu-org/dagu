@@ -167,7 +167,9 @@ func TestJSONDB(t *testing.T) {
 		// Create a sub record
 		rootDAG := digraph.NewRootDAG("test_DAG", "parent-id")
 		subDAG := th.DAG("sub_dag")
-		record, err := th.DB.NewSubRecord(th.Context, subDAG.DAG, ts, "sub-id", rootDAG)
+		record, err := th.DB.NewRecord(th.Context, subDAG.DAG, ts, "sub-id", persistence.NewRecordOptions{
+			Root: &rootDAG,
+		})
 		require.NoError(t, err)
 
 		// Write the status
@@ -189,5 +191,63 @@ func TestJSONDB(t *testing.T) {
 		status, err := existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)
 		assert.Equal(t, "sub-id", status.RequestID)
+	})
+	t.Run("SubRecord_Retry", func(t *testing.T) {
+		th := setupTestJSONDB(t)
+
+		// Create a timestamp for the parent record
+		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+
+		// Create a parent record
+		_ = th.CreateRecord(t, ts, "parent-id", scheduler.StatusRunning)
+
+		// Create a sub record
+		rootDAG := digraph.NewRootDAG("test_DAG", "parent-id")
+		subDAG := th.DAG("sub_dag")
+		record, err := th.DB.NewRecord(th.Context, subDAG.DAG, ts, "sub-id", persistence.NewRecordOptions{
+			Root: &rootDAG,
+		})
+		require.NoError(t, err)
+
+		// Write the status
+		err = record.Open(th.Context)
+		require.NoError(t, err)
+		defer func() {
+			_ = record.Close(th.Context)
+		}()
+
+		statusToWrite := persistence.NewStatusFactory(subDAG.DAG).Default()
+		statusToWrite.RequestID = "sub-id"
+		statusToWrite.Status = scheduler.StatusRunning
+		err = record.Write(th.Context, statusToWrite)
+		require.NoError(t, err)
+
+		// Find the sub run by request ID
+		ts = time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
+		existingRecord, err := th.DB.FindBySubRequestID(th.Context, "sub-id", rootDAG)
+		require.NoError(t, err)
+		existingRecordStatus, err := existingRecord.ReadStatus(th.Context)
+		require.NoError(t, err)
+		assert.Equal(t, "sub-id", existingRecordStatus.RequestID)
+		assert.Equal(t, scheduler.StatusRunning.String(), existingRecordStatus.Status.String())
+
+		// Create a retry record and write different status
+		retryRecord, err := th.DB.NewRecord(th.Context, subDAG.DAG, ts, "sub-id", persistence.NewRecordOptions{
+			Root:  &rootDAG,
+			Retry: true,
+		})
+		require.NoError(t, err)
+		statusToWrite.Status = scheduler.StatusSuccess
+		_ = retryRecord.Open(th.Context)
+		retryRecord.Write(th.Context, statusToWrite)
+		_ = retryRecord.Close(th.Context)
+
+		// Verify the retry record is created
+		existingRecord, err = th.DB.FindBySubRequestID(th.Context, "sub-id", rootDAG)
+		require.NoError(t, err)
+		existingRecordStatus, err = existingRecord.ReadStatus(th.Context)
+		require.NoError(t, err)
+		assert.Equal(t, "sub-id", existingRecordStatus.RequestID)
+		assert.Equal(t, scheduler.StatusSuccess.String(), existingRecordStatus.Status.String())
 	})
 }
