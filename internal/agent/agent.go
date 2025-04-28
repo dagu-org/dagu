@@ -495,12 +495,9 @@ func (a *Agent) setupHistoryRecord(ctx context.Context) (persistence.Record, err
 		logger.Error(ctx, "History data cleanup failed", "err", err)
 	}
 
-	opts := persistence.NewRecordOptions{}
+	opts := persistence.NewRecordOptions{Retry: a.retryTarget != nil}
 	if a.subExecution.Load() {
 		opts.Root = &a.rootDAG
-	}
-	if a.retryTarget != nil {
-		opts.Retry = true
 	}
 
 	return a.historyStore.NewRecord(ctx, a.dag, time.Now(), a.requestID, opts)

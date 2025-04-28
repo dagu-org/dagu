@@ -45,10 +45,23 @@ func TestWriter(t *testing.T) {
 		writer.AssertContent(t, "test_append_to_existing", requestID, scheduler.StatusCancel)
 
 		// Append to existing file
-		writer = dag.Writer(t, requestID, startedAt)
+		dataRoot := NewDataRoot(th.tmpDir, dag.Name)
+		run, err := dataRoot.FindByRequestID(th.Context, requestID)
+		require.NoError(t, err)
+
+		record, err := run.LatestRecord(th.Context, nil)
+		require.NoError(t, err)
+
+		err = record.Open(th.Context)
+		require.NoError(t, err)
+		defer func() {
+			_ = record.Close(th.Context)
+		}()
+
+		// Append new status
 		status.Status = scheduler.StatusSuccess
-		writer.Write(t, status)
-		writer.Close(t)
+		err = record.Write(th.Context, status)
+		require.NoError(t, err)
 
 		// Verify appended data
 		writer.AssertContent(t, "test_append_to_existing", requestID, scheduler.StatusSuccess)

@@ -55,6 +55,7 @@ type Node struct {
 	DoneCount  int                  `json:"DoneCount,omitempty"`
 	Error      string               `json:"Error,omitempty"`
 	StatusText string               `json:"StatusText"`
+	RequestID  string               `json:"RequestID,omitempty"` // Request ID for the sub-DAG
 }
 
 // ToNode converts a persistence Node back to a scheduler Node

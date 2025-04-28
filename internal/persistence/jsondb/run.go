@@ -46,7 +46,7 @@ func NewRun(dir string) (*Run, error) {
 	if len(matches) != 3 {
 		return nil, ErrInvalidRunDir
 	}
-	ts, err := parseFileTimestamp(matches[1])
+	ts, err := parseRunTimestamp(matches[1])
 	if err != nil {
 		return nil, err
 	}
@@ -59,8 +59,8 @@ func NewRun(dir string) (*Run, error) {
 
 // CreateRecord creates a new record for this run with the given timestamp.
 // It creates a new attempt directory and initializes a record within it.
-func (e Run) CreateRecord(_ context.Context, timestamp TimeInUTC, cache *filecache.Cache[*persistence.Status], opts ...RecordOption) (*Record, error) {
-	dirName := "attempt_" + timestamp.Format(dateTimeFormatUTC)
+func (e Run) CreateRecord(_ context.Context, ts TimeInUTC, cache *filecache.Cache[*persistence.Status], opts ...RecordOption) (*Record, error) {
+	dirName := "attempt_" + formatAttemptTimestamp(ts)
 	dir := filepath.Join(e.baseDir, dirName)
 	// Error if the directory already exists
 	if _, err := os.Stat(dir); err == nil {
@@ -132,16 +132,38 @@ func (e Run) Remove() error {
 }
 
 // Regular expressions for parsing directory names
-var reRun = regexp.MustCompile(`^run_(\d{8}_\d{6}_\d{3}Z)_(.*)$`)    // Matches runs directory names
+var reRun = regexp.MustCompile(`^run_(\d{8}_\d{6}Z)_(.*)$`)          // Matches runs directory names
 var reAttempt = regexp.MustCompile(`^attempt_(\d{8}_\d{6}_\d{3}Z)$`) // Matches attempt directory names
 var reRunSub = regexp.MustCompile(`^sub_(.*)$`)                      // Matches sub-run directory names
 
-// parseFileTimestamp converts a timestamp string from a filename into a time.Time.
+// formatRunTimestamp formats a TimeInUTC instance into a string representation (without milliseconds).
+// The format is "YYYYMMDD_HHMMSSZ".
+// This is used for generating 'run' directory names.
+func formatRunTimestamp(t TimeInUTC) string {
+	return t.Time.Format(dateTimeFormatUTC)
+}
+
+// parseRunTimestamp converts a timestamp string from a filename into a time.Time.
 // The timestamp format is expected to match dateTimeFormatUTC.
-func parseFileTimestamp(s string) (time.Time, error) {
+func parseRunTimestamp(s string) (time.Time, error) {
 	t, err := time.Parse(dateTimeFormatUTC, s)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to parse UTC timestamp %s: %w", s, err)
 	}
 	return t, nil
 }
+
+// dateTimeFormatUTC is the format for run timestamps.
+const dateTimeFormatUTC = "20060102_150405Z"
+
+// formatAttemptTimestamp formats a TimeInUTC instance into a string representation with milliseconds.
+// The format is "YYYYMMDD_HHMMSS_mmmZ" where "mmm" is the milliseconds part.
+// This is used for generating 'attempt' directory names.
+func formatAttemptTimestamp(t TimeInUTC) string {
+	const format = "20060102_150405"
+	mill := t.Time.UnixMilli()
+	return t.Time.Format(format) + "_" + fmt.Sprintf("%03d", mill%1000) + "Z"
+}
+
+// dataFileExtension is the file extension for history record files.
+const dataFileExtension = ".dat"

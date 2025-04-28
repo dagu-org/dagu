@@ -15,9 +15,9 @@ import (
 	"github.com/google/uuid"
 )
 
-var _ Executor = (*subWorkflow)(nil)
+var _ Executor = (*subDAG)(nil)
 
-type subWorkflow struct {
+type subDAG struct {
 	subDAG    string
 	cmd       *exec.Cmd
 	lock      sync.Mutex
@@ -27,7 +27,7 @@ type subWorkflow struct {
 
 var ErrWorkingDirNotExist = fmt.Errorf("working directory does not exist")
 
-func newSubWorkflow(
+func newSubDAG(
 	ctx context.Context, step digraph.Step,
 ) (Executor, error) {
 	executable, err := executablePath()
@@ -48,10 +48,10 @@ func newSubWorkflow(
 		return nil, fmt.Errorf("failed to substitute string fields: %w", err)
 	}
 
-	subDAG, err := digraph.GetDAGByName(ctx, config.Name)
+	sub, err := digraph.GetDAGByName(ctx, config.Name)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed to find subworkflow %q: %w", config.Name, err,
+			"failed to find sub DAG %q: %w", config.Name, err,
 		)
 	}
 
@@ -66,7 +66,7 @@ func newSubWorkflow(
 		fmt.Sprintf("--root-dag-name=%s", c.RootDAG().Name),
 		fmt.Sprintf("--root-request-id=%s", c.RootDAG().RequestID),
 		"--quiet",
-		subDAG.Location,
+		sub.Location,
 	}
 
 	if config.Params != "" {
@@ -86,14 +86,14 @@ func newSubWorkflow(
 		Pgid:    0,
 	}
 
-	return &subWorkflow{
+	return &subDAG{
 		cmd:       cmd,
 		requestID: requestID,
-		subDAG:    subDAG.Location,
+		subDAG:    sub.Location,
 	}, nil
 }
 
-func (e *subWorkflow) Run(ctx context.Context) error {
+func (e *subDAG) Run(ctx context.Context) error {
 	e.lock.Lock()
 	err := e.cmd.Start()
 	e.lock.Unlock()
@@ -104,7 +104,7 @@ func (e *subWorkflow) Run(ctx context.Context) error {
 		return err
 	}
 
-	// get results from the subworkflow
+	// get results from the sub-DAG
 	result, err := digraph.GetSubResult(ctx, e.requestID)
 	if err != nil {
 		return fmt.Errorf("failed to collect result: %w", err)
@@ -122,16 +122,16 @@ func (e *subWorkflow) Run(ctx context.Context) error {
 	return nil
 }
 
-func (e *subWorkflow) SetStdout(out io.Writer) {
+func (e *subDAG) SetStdout(out io.Writer) {
 	e.cmd.Stdout = out
 	e.writer = out
 }
 
-func (e *subWorkflow) SetStderr(out io.Writer) {
+func (e *subDAG) SetStderr(out io.Writer) {
 	e.cmd.Stderr = out
 }
 
-func (e *subWorkflow) Kill(sig os.Signal) error {
+func (e *subDAG) Kill(sig os.Signal) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	if e.cmd == nil || e.cmd.Process == nil {
@@ -141,7 +141,8 @@ func (e *subWorkflow) Kill(sig os.Signal) error {
 }
 
 func init() {
-	Register(digraph.ExecutorTypeSubWorkflow, newSubWorkflow)
+	Register(digraph.ExecutorTypeSubLegacy, newSubDAG)
+	Register(digraph.ExecutorTypeSub, newSubDAG)
 }
 
 // generateRequestID generates a new request ID.

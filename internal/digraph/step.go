@@ -94,9 +94,10 @@ type SubWorkflow struct {
 	Params string `json:"Params,omitempty"`
 }
 
-// ExecutorTypeSubWorkflow is defined here in order to parse
+// ExecutorTypeSubLegacy is defined here in order to parse
 // the `run` field in the DAG file.
-const ExecutorTypeSubWorkflow = "subworkflow"
+const ExecutorTypeSubLegacy = "subworkflow"
+const ExecutorTypeSub = "sub"
 
 // ExecutorConfig contains the configuration for the executor.
 type ExecutorConfig struct {
