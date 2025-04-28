@@ -244,7 +244,7 @@ func (ctx *Context) OpenLogFile(
 	}
 
 	filename := BuildLogFilename(config)
-	return CreateLogFile(filepath.Join(outputDir, filename))
+	return OpenOrCreateLogFile(filepath.Join(outputDir, filename))
 }
 
 // NewCommand creates a new command instance with the given cobra command and run function.
@@ -410,9 +410,9 @@ func BuildLogFilename(config LogFileSettings) string {
 	)
 }
 
-// CreateLogFile opens (or creates) the log file with flags for creation, write-only access,
+// OpenOrCreateLogFile opens (or creates) the log file with flags for creation, write-only access,
 // appending, and synchronous I/O. It sets file permissions to 0644.
-func CreateLogFile(filepath string) (*os.File, error) {
+func OpenOrCreateLogFile(filepath string) (*os.File, error) {
 	flags := os.O_CREATE | os.O_WRONLY | os.O_APPEND | os.O_SYNC
 	permissions := os.FileMode(0644)
 

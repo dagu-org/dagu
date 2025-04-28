@@ -45,29 +45,30 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to resolve absolute path for %s: %w", specFilePath, err)
 	}
 
+	// Retrieve the previous run's history record for the specified request ID.
 	historyRecord, err := ctx.historyStore().FindByRequestID(ctx, absolutePath, requestID)
 	if err != nil {
 		logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
 		return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
 	}
 
-	loadOpts := []digraph.LoadOption{
-		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
-	}
-
+	// Read the detailed status of the previous run.
 	run, err := historyRecord.ReadRun(ctx)
 	if err != nil {
 		logger.Error(ctx, "Failed to read status", "err", err)
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 
+	loadOpts := []digraph.LoadOption{digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig)}
 	if run.Status.Params != "" {
-		// backward compatibility
+		// If the 'Params' field is not empty, use it instead of 'ParamsList' for backward compatibility.
 		loadOpts = append(loadOpts, digraph.WithParams(run.Status.Params))
 	} else {
 		loadOpts = append(loadOpts, digraph.WithParams(run.Status.ParamsList))
 	}
 
+	// Load the DAG from the local file.
+	// TODO: Read the DAG from the history record instead of the local file.
 	dag, err := digraph.Load(ctx, absolutePath, loadOpts...)
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG specification", "path", specFilePath, "err", err)
@@ -76,8 +77,11 @@ func runRetry(ctx *Context, args []string) error {
 			specFilePath, run.Status.Params, err)
 	}
 
-	// Execute DAG retry
-	if err := executeRetry(ctx, dag, run); err != nil {
+	// The retry command is currently only supported for root DAGs.
+	// Therefore we use the request ID as the root DAG request ID here.
+	rootDAG := digraph.NewRootDAG(dag.Name, run.Status.RequestID)
+
+	if err := executeRetry(ctx, dag, run, rootDAG); err != nil {
 		logger.Error(ctx, "Failed to execute retry", "path", specFilePath, "err", err)
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
@@ -85,9 +89,9 @@ func runRetry(ctx *Context, args []string) error {
 	return nil
 }
 
-func executeRetry(ctx *Context, dag *digraph.DAG, originalStatus *persistence.Run) error {
-	reqID := originalStatus.Status.RequestID
-	logFile, err := CreateLogFile(originalStatus.Status.Log)
+func executeRetry(ctx *Context, dag *digraph.DAG, run *persistence.Run, rootDAG digraph.RootDAG) error {
+	// We use the same log file for the retry as the original run.
+	logFile, err := OpenOrCreateLogFile(run.Status.Log)
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %w", err)
 	}
@@ -95,8 +99,9 @@ func executeRetry(ctx *Context, dag *digraph.DAG, originalStatus *persistence.Ru
 		_ = logFile.Close()
 	}()
 
-	logger.Info(ctx, "DAG retry initiated", "DAG", dag.Name, "requestID", originalStatus.Status.RequestID, "logFile", logFile.Name())
+	logger.Info(ctx, "DAG retry initiated", "DAG", dag.Name, "requestID", run.Status.RequestID, "logFile", logFile.Name())
 
+	// Update the context with the log file
 	ctx.LogToFile(logFile)
 
 	dagStore, err := ctx.dagStore()
@@ -111,10 +116,8 @@ func executeRetry(ctx *Context, dag *digraph.DAG, originalStatus *persistence.Ru
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	rootDAG := digraph.NewRootDAG(dag.Name, reqID)
-
 	agentInstance := agent.New(
-		reqID,
+		run.Status.RequestID,
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
@@ -122,7 +125,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, originalStatus *persistence.Ru
 		dagStore,
 		ctx.historyStore(),
 		rootDAG,
-		agent.Options{RetryTarget: &originalStatus.Status},
+		agent.Options{RetryTarget: &run.Status},
 	)
 
 	listenSignals(ctx, agentInstance)
@@ -132,10 +135,11 @@ func executeRetry(ctx *Context, dag *digraph.DAG, originalStatus *persistence.Ru
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
-			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, reqID, err)
+			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, run.Status.RequestID, err)
 		}
 	}
 
+	// Print the summary of the execution if the quiet flag is not set.
 	if !ctx.quiet {
 		agentInstance.PrintSummary(ctx)
 	}
