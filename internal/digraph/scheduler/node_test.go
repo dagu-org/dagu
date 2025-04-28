@@ -254,7 +254,7 @@ func setupNode(t *testing.T, opts ...nodeOption) nodeHelper {
 func (n nodeHelper) Execute(t *testing.T) {
 	t.Helper()
 
-	reqID := reqID()
+	reqID := uuid.Must(uuid.NewRandom()).String()
 	err := n.Setup(n.Context, n.Config.Paths.LogDir, reqID)
 	require.NoError(t, err, "failed to setup node")
 
@@ -268,7 +268,8 @@ func (n nodeHelper) Execute(t *testing.T) {
 func (n nodeHelper) ExecuteFail(t *testing.T, expectedErr string) {
 	t.Helper()
 
-	err := n.Node.Execute(n.execContext(reqID()))
+	reqID := uuid.Must(uuid.NewRandom()).String()
+	err := n.Node.Execute(n.execContext(reqID))
 	require.Error(t, err, "expected error")
 	require.Contains(t, err.Error(), expectedErr, "unexpected error")
 }
@@ -292,8 +293,4 @@ func (n nodeHelper) AssertOutput(t *testing.T, key, value string) {
 
 func (n nodeHelper) execContext(reqID string) context.Context {
 	return digraph.NewContext(n.Context, &digraph.DAG{}, nil, digraph.RootDAG{}, reqID, "logFile", nil)
-}
-
-func reqID() string {
-	return uuid.Must(uuid.NewRandom()).String()
 }

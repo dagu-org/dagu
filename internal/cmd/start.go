@@ -39,18 +39,24 @@ func runStart(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
-	rootRequestID, _ := ctx.Flags().GetString("root-request-id")
-	rootDAGName, _ := ctx.Flags().GetString("root-dag-name")
-
-	// Validate consistency between rootRequestID and rootDAGName
-	if (rootRequestID == "" && rootDAGName != "") || (rootRequestID != "" && rootDAGName == "") {
-		return fmt.Errorf("both root-request-id and root-dag-name must be provided together or neither should be provided")
+	// Generate requestID if it's not specified.
+	if requestID == "" {
+		var err error
+		requestID, err = generateRequestID()
+		if err != nil {
+			logger.Error(ctx, "Failed to generate request ID", "err", err)
+			return fmt.Errorf("failed to generate request ID: %w", err)
+		}
+	} else if err := validateRequestID(requestID); err != nil {
+		logger.Error(ctx, "Invalid request ID format", "requestID", requestID, "err", err)
+		return fmt.Errorf("invalid request ID format: %w", err)
 	}
 
 	loadOpts := []digraph.LoadOption{
 		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
 	}
 
+	// Load parameters from command line arguments.
 	var params string
 	if argsLenAtDash := ctx.ArgsLenAtDash(); argsLenAtDash != -1 {
 		// Get parameters from command line arguments after "--"
@@ -64,25 +70,37 @@ func runStart(ctx *Context, args []string) error {
 		loadOpts = append(loadOpts, digraph.WithParams(removeQuotes(params)))
 	}
 
-	return executeDag(ctx, args[0], loadOpts, requestID, rootDAGName, rootRequestID)
+	// Load the DAG from the specified file
+	dag, err := digraph.Load(ctx, args[0], loadOpts...)
+	if err != nil {
+		logger.Error(ctx, "Failed to load DAG", "path", args[0], "err", err)
+		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
+	}
+
+	rootRequestID, _ := ctx.Flags().GetString("root-request-id")
+	rootDAGName, _ := ctx.Flags().GetString("root-dag-name")
+
+	// If rootDAGName is not empty, it means current execution is a sub-DAG.
+	// Sub DAG execution requires both root-request-id and root-dag-name to be set.
+	if (rootRequestID == "" && rootDAGName != "") || (rootRequestID != "" && rootDAGName == "") {
+		return fmt.Errorf("both root-request-id and root-dag-name must be provided together or neither should be provided")
+	}
+
+	var rootDAG digraph.RootDAG
+	if rootDAGName != "" && rootRequestID != "" {
+		// The current execution is a sub-DAG
+		rootDAG = digraph.NewRootDAG(rootDAGName, rootRequestID)
+	} else {
+		// The current execution is a root DAG
+		rootDAG = digraph.NewRootDAG(dag.Name, requestID)
+	}
+
+	return executeDag(ctx, dag, requestID, rootDAG)
 }
 
-func executeDag(ctx *Context, specPath string, loadOpts []digraph.LoadOption, requestID, rootDAGName, rootRequestID string) error {
-	dag, err := digraph.Load(ctx, specPath, loadOpts...)
-	if err != nil {
-		logger.Error(ctx, "Failed to load DAG", "path", specPath, "err", err)
-		return fmt.Errorf("failed to load DAG from %s: %w", specPath, err)
-	}
-
-	if requestID == "" {
-		var err error
-		requestID, err = generateRequestID()
-		if err != nil {
-			logger.Error(ctx, "Failed to generate request ID", "err", err)
-			return fmt.Errorf("failed to generate request ID: %w", err)
-		}
-	}
-
+func executeDag(ctx *Context, dag *digraph.DAG, requestID string, rootDAG digraph.RootDAG) error {
+	// Open the log file for the scheduler. The log file will be used for future
+	// execution for the same DAG/request ID between attempts.
 	logFile, err := ctx.OpenLogFile(dag, requestID)
 	if err != nil {
 		logger.Error(ctx, "failed to initialize log file", "DAG", dag.Name, "err", err)
@@ -106,13 +124,6 @@ func executeDag(ctx *Context, specPath string, loadOpts []digraph.LoadOption, re
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize client", "err", err)
 		return fmt.Errorf("failed to initialize client: %w", err)
-	}
-
-	var rootDAG digraph.RootDAG
-	if rootDAGName != "" && rootRequestID != "" {
-		rootDAG = digraph.NewRootDAG(rootDAGName, rootRequestID)
-	} else {
-		rootDAG = digraph.NewRootDAG(dag.Name, requestID)
 	}
 
 	var opts agent.Options
@@ -141,6 +152,7 @@ func executeDag(ctx *Context, specPath string, loadOpts []digraph.LoadOption, re
 		}
 	}
 
+	// Print the summary of the execution if the quiet flag is not set.
 	if !ctx.quiet {
 		agentInstance.PrintSummary(ctx)
 	}

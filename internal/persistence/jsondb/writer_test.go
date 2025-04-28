@@ -2,13 +2,13 @@ package jsondb
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,7 +18,7 @@ func TestWriter(t *testing.T) {
 
 	t.Run("WriteStatusToNewFile", func(t *testing.T) {
 		dag := th.DAG("test_write_status")
-		requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
+		requestID := uuid.Must(uuid.NewRandom()).String()
 		status := persistence.NewStatusFactory(dag.DAG).Create(
 			requestID, scheduler.StatusRunning, 1, time.Now(),
 		)
@@ -30,7 +30,7 @@ func TestWriter(t *testing.T) {
 
 	t.Run("WriteStatusToExistingFile", func(t *testing.T) {
 		dag := th.DAG("test_append_to_existing")
-		requestID := "request-id-test-write-status-to-existing-file"
+		requestID := uuid.Must(uuid.NewRandom()).String()
 		startedAt := time.Now()
 
 		writer := dag.Writer(t, requestID, startedAt)
@@ -83,7 +83,7 @@ func TestWriterErrorHandling(t *testing.T) {
 		require.NoError(t, writer.close())
 
 		dag := th.DAG("test_write_to_closed_writer")
-		requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
+		requestID := uuid.Must(uuid.NewRandom()).String()
 		status := persistence.NewStatusFactory(dag.DAG).Create(requestID, scheduler.StatusRunning, 1, time.Now())
 		assert.Error(t, writer.write(status))
 	})
@@ -102,7 +102,7 @@ func TestWriterRename(t *testing.T) {
 	// Create a status file with old path
 	dag := th.DAG("test_rename_old")
 	writer := dag.Writer(t, "request-id-1", time.Now())
-	requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
+	requestID := uuid.Must(uuid.NewRandom()).String()
 	status := persistence.NewStatusFactory(dag.DAG).Create(requestID, scheduler.StatusRunning, 1, time.Now())
 	writer.Write(t, status)
 	writer.Close(t)

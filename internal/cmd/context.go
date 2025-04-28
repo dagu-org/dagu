@@ -321,6 +321,17 @@ func generateRequestID() (string, error) {
 	return id.String(), nil
 }
 
+// validateRequestID checks if the request ID is valid and not empty.
+func validateRequestID(requestID string) error {
+	if requestID == "" {
+		return fmt.Errorf("request ID is not set")
+	}
+	if _, err := uuid.Parse(requestID); err != nil {
+		return fmt.Errorf("invalid request ID: %w", err)
+	}
+	return nil
+}
+
 // signalListener is an interface for types that can receive OS signals.
 type signalListener interface {
 	Signal(context.Context, os.Signal)
