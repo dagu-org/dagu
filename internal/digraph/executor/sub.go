@@ -12,17 +12,20 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/google/uuid"
 )
 
 var _ Executor = (*subDAG)(nil)
+var _ SubDAG = (*subDAG)(nil)
 
 type subDAG struct {
-	subDAG    string
-	cmd       *exec.Cmd
+	dag       *digraph.DAG
 	lock      sync.Mutex
 	requestID string
-	writer    io.Writer
+	params    string
+	workDir   string
+	stdout    io.Writer
+	stderr    io.Writer
+	cmd       *exec.Cmd
 }
 
 var ErrWorkingDirNotExist = fmt.Errorf("working directory does not exist")
@@ -30,13 +33,6 @@ var ErrWorkingDirNotExist = fmt.Errorf("working directory does not exist")
 func newSubDAG(
 	ctx context.Context, step digraph.Step,
 ) (Executor, error) {
-	executable, err := executablePath()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get executable path: %w", err)
-	}
-
-	c := digraph.GetExecContext(ctx)
-
 	config, err := digraph.EvalObject(ctx, struct {
 		Name   string
 		Params string
@@ -55,53 +51,73 @@ func newSubDAG(
 		)
 	}
 
-	requestID, err := generateRequestID()
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate request ID: %w", err)
+	// TODO: Evaluate the working directory
+	dir := step.Dir
+	if step.Dir != "" && !fileutil.FileExists(step.Dir) {
+		return nil, ErrWorkingDirNotExist
 	}
+
+	return &subDAG{
+		dag:     sub,
+		params:  config.Params,
+		workDir: dir,
+	}, nil
+}
+
+func (e *subDAG) Run(ctx context.Context) error {
+	executable, err := executablePath()
+	if err != nil {
+		return fmt.Errorf("failed to find executable path: %w", err)
+	}
+
+	if e.requestID == "" {
+		return fmt.Errorf("request ID is not set")
+	}
+
+	e.lock.Lock()
+
+	c := digraph.GetExecContext(ctx)
 
 	args := []string{
 		"start",
-		fmt.Sprintf("--request-id=%s", requestID),
+		fmt.Sprintf("--request-id=%s", e.requestID),
 		fmt.Sprintf("--root-dag-name=%s", c.RootDAG().Name),
 		fmt.Sprintf("--root-request-id=%s", c.RootDAG().RequestID),
 		"--quiet",
-		sub.Location,
+		e.dag.Location,
 	}
 
-	if config.Params != "" {
+	if e.params != "" {
 		args = append(args, "--")
-		args = append(args, config.Params)
+		args = append(args, e.params)
 	}
 
 	cmd := exec.CommandContext(ctx, executable, args...) // nolint:gosec
-	if len(step.Dir) > 0 && !fileutil.FileExists(step.Dir) {
-		return nil, ErrWorkingDirNotExist
-	}
-	cmd.Dir = step.Dir
+	cmd.Dir = e.workDir
 	cmd.Env = append(cmd.Env, c.AllEnvs()...)
+	if e.stdout != nil {
+		cmd.Stdout = e.stdout
+	}
+	if e.stderr != nil {
+		cmd.Stderr = e.stderr
+	}
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 		Pgid:    0,
 	}
 
-	return &subDAG{
-		cmd:       cmd,
-		requestID: requestID,
-		subDAG:    sub.Location,
-	}, nil
-}
+	e.cmd = cmd
 
-func (e *subDAG) Run(ctx context.Context) error {
-	e.lock.Lock()
-	err := e.cmd.Start()
+	err = cmd.Start()
 	e.lock.Unlock()
+
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to start sub-DAG: %w", err)
 	}
-	if err := e.cmd.Wait(); err != nil {
-		return err
+
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("sub-DAG exited with error: %w", err)
 	}
 
 	// get results from the sub-DAG
@@ -115,20 +131,31 @@ func (e *subDAG) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to marshal outputs: %w", err)
 	}
 
-	if _, err := e.writer.Write(jsonData); err != nil {
-		return fmt.Errorf("failed to write outputs: %w", err)
+	if e.stdout != nil {
+		if _, err := e.stdout.Write(jsonData); err != nil {
+			return fmt.Errorf("failed to write outputs: %w", err)
+		}
 	}
 
 	return nil
 }
 
+func (e *subDAG) SetRequestID(id string) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+	e.requestID = id
+}
+
 func (e *subDAG) SetStdout(out io.Writer) {
-	e.cmd.Stdout = out
-	e.writer = out
+	e.lock.Lock()
+	defer e.lock.Unlock()
+	e.stdout = out
 }
 
 func (e *subDAG) SetStderr(out io.Writer) {
-	e.cmd.Stderr = out
+	e.lock.Lock()
+	defer e.lock.Unlock()
+	e.stderr = out
 }
 
 func (e *subDAG) Kill(sig os.Signal) error {
@@ -143,16 +170,6 @@ func (e *subDAG) Kill(sig os.Signal) error {
 func init() {
 	Register(digraph.ExecutorTypeSubLegacy, newSubDAG)
 	Register(digraph.ExecutorTypeSub, newSubDAG)
-}
-
-// generateRequestID generates a new request ID.
-// For simplicity, we use UUIDs as request IDs.
-func generateRequestID() (string, error) {
-	id, err := uuid.NewRandom()
-	if err != nil {
-		return "", err
-	}
-	return id.String(), nil
 }
 
 func executablePath() (string, error) {
