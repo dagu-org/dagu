@@ -751,9 +751,9 @@ func toStep(obj digraph.Step) api.Step {
 		Script:        ptr(obj.Script),
 	}
 
-	if obj.SubWorkflow != nil {
-		step.Run = ptr(obj.SubWorkflow.Name)
-		step.Params = ptr(obj.SubWorkflow.Params)
+	if obj.SubDAG != nil {
+		step.Run = ptr(obj.SubDAG.Name)
+		step.Params = ptr(obj.SubDAG.Params)
 	}
 	return step
 }

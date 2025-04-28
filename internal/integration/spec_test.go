@@ -18,155 +18,155 @@ func TestDAGExecution(t *testing.T) {
 	}
 
 	testCases := []testCase{
-		// {
-		// 	name: "Depends",
-		// 	dag:  "depends.yaml",
-		// },
-		// {
-		// 	name: "Pipe",
-		// 	dag:  "pipe.yaml",
-		// 	expectedOutputs: map[string]any{
-		// 		"OUT1": "hello foo",
-		// 	},
-		// },
-		// {
-		// 	name: "DotEnv",
-		// 	dag:  "dotenv.yaml",
-		// 	expectedOutputs: map[string]any{
-		// 		"OUT1": "123 abc",
-		// 	},
-		// },
-		// {
-		// 	name: "NamedParams",
-		// 	dag:  "named-params.yaml",
-		// 	expectedOutputs: map[string]any{
-		// 		"OUT1": "Dagu",
-		// 		"OUT2": "Hello, Dagu",
-		// 	},
-		// },
-		// {
-		// 	name: "NamedParamsList",
-		// 	dag:  "named-params-list.yaml",
-		// 	expectedOutputs: map[string]any{
-		// 		"OUT1": "Dagu",
-		// 		"OUT2": "Hello, Dagu",
-		// 	},
-		// },
-		// {
-		// 	name: "PositionalParams",
-		// 	dag:  "positional-params.yaml",
-		// 	expectedOutputs: map[string]any{
-		// 		"OUT1": []test.Contains{
-		// 			"$1 is foo",
-		// 			"$2 is bar",
-		// 		},
-		// 	},
-		// },
-		// {
-		// 	name: "PositionalParams",
-		// 	dag:  "positional-params-script.yaml",
-		// 	expectedOutputs: map[string]any{
-		// 		"OUT1": []test.Contains{
-		// 			"$1 is foo",
-		// 			"$2 is bar",
-		// 		},
-		// 	},
-		// },
-		// {
-		// 	name: "Script",
-		// 	dag:  "script.yaml",
-		// 	expectedOutputs: map[string]any{
-		// 		"OUT1": "1 2 3",
-		// 	},
-		// },
-		// {
-		// 	name: "RegexPrecondition",
-		// 	dag:  "precondition-regex.yaml",
-		// 	expectedOutputs: map[string]any{
-		// 		"OUT1": "abc run def",
-		// 		"OUT2": "match",
-		// 	},
-		// },
-		// {
-		// 	name: "JSON",
-		// 	dag:  "json.yaml",
-		// 	expectedOutputs: map[string]any{
-		// 		"OUT1": "Starting server at localhost:8080",
-		// 	},
-		// },
 		{
-			name: "CallSubWorkflow",
+			name: "Depends",
+			dag:  "depends.yaml",
+		},
+		{
+			name: "Pipe",
+			dag:  "pipe.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": "hello foo",
+			},
+		},
+		{
+			name: "DotEnv",
+			dag:  "dotenv.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": "123 abc",
+			},
+		},
+		{
+			name: "NamedParams",
+			dag:  "named-params.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": "Dagu",
+				"OUT2": "Hello, Dagu",
+			},
+		},
+		{
+			name: "NamedParamsList",
+			dag:  "named-params-list.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": "Dagu",
+				"OUT2": "Hello, Dagu",
+			},
+		},
+		{
+			name: "PositionalParams",
+			dag:  "positional-params.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": []test.Contains{
+					"$1 is foo",
+					"$2 is bar",
+				},
+			},
+		},
+		{
+			name: "PositionalParams",
+			dag:  "positional-params-script.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": []test.Contains{
+					"$1 is foo",
+					"$2 is bar",
+				},
+			},
+		},
+		{
+			name: "Script",
+			dag:  "script.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": "1 2 3",
+			},
+		},
+		{
+			name: "RegexPrecondition",
+			dag:  "precondition-regex.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": "abc run def",
+				"OUT2": "match",
+			},
+		},
+		{
+			name: "JSON",
+			dag:  "json.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": "Starting server at localhost:8080",
+			},
+		},
+		{
+			name: "CallSub",
 			dag:  "call-sub.yaml",
 			expectedOutputs: map[string]any{
 				"OUT2": "foo",
 			},
 		},
-		// {
-		// 	name: "EnvVar",
-		// 	dag:  "environment-var.yaml",
-		// 	expectedOutputs: map[string]any{
-		// 		"OUT1": "foo",
-		// 	},
-		// },
-		// {
-		// 	name: "EnvScript",
-		// 	dag:  "env-script.yaml",
-		// 	expectedOutputs: map[string]any{
-		// 		"OUT1": []test.Contains{
-		// 			"E1 is foo",
-		// 			"E2 is bar",
-		// 		},
-		// 	},
-		// },
-		// {
-		// 	name: "SpecialVars",
-		// 	dag:  "special-vars.yaml",
-		// 	expectedOutputs: map[string]any{
-		// 		"OUT1": test.NotEmpty{},
-		// 		"OUT2": test.NotEmpty{},
-		// 		"OUT3": test.NotEmpty{},
-		// 		"OUT4": test.NotEmpty{},
-		// 		"OUT5": test.NotEmpty{},
-		// 	},
-		// },
-		// {
-		// 	name: "JQ",
-		// 	dag:  "jq.yaml",
-		// 	expectedOutputs: map[string]any{
-		// 		"NAME": `"John"`,
-		// 	},
-		// },
-		// {
-		// 	name: "JSONVar",
-		// 	dag:  "json_var.yaml",
-		// 	expectedOutputs: map[string]any{
-		// 		"OUT1": "Starting server at localhost:8080",
-		// 	},
-		// },
-		// {
-		// 	name: "NestedGraph",
-		// 	dag:  "nested_parent.yaml",
-		// 	expectedOutputs: map[string]any{
-		// 		"OUT1": "value is 123",
-		// 	},
-		// },
-		// {
-		// 	name: "Script",
-		// 	dag:  "perl-script.yaml",
-		// 	expectedOutputs: map[string]any{
-		// 		"OUT1": "Hello World",
-		// 	},
-		// },
-		// {
-		// 	name: "Issue-810",
-		// 	dag:  "issue-810.yaml",
-		// 	expectedOutputs: map[string]any{
-		// 		"OUT1": "start",
-		// 		"OUT2": "foo",
-		// 		"OUT3": "bar",
-		// 		"OUT4": "baz",
-		// 	},
-		// },
+		{
+			name: "EnvVar",
+			dag:  "environment-var.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": "foo",
+			},
+		},
+		{
+			name: "EnvScript",
+			dag:  "env-script.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": []test.Contains{
+					"E1 is foo",
+					"E2 is bar",
+				},
+			},
+		},
+		{
+			name: "SpecialVars",
+			dag:  "special-vars.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": test.NotEmpty{},
+				"OUT2": test.NotEmpty{},
+				"OUT3": test.NotEmpty{},
+				"OUT4": test.NotEmpty{},
+				"OUT5": test.NotEmpty{},
+			},
+		},
+		{
+			name: "JQ",
+			dag:  "jq.yaml",
+			expectedOutputs: map[string]any{
+				"NAME": `"John"`,
+			},
+		},
+		{
+			name: "JSONVar",
+			dag:  "json_var.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": "Starting server at localhost:8080",
+			},
+		},
+		{
+			name: "NestedGraph",
+			dag:  "nested_parent.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": "value is 123",
+			},
+		},
+		{
+			name: "Script",
+			dag:  "perl-script.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": "Hello World",
+			},
+		},
+		{
+			name: "Issue-810",
+			dag:  "issue-810.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": "start",
+				"OUT2": "foo",
+				"OUT3": "bar",
+				"OUT4": "baz",
+			},
+		},
 	}
 
 	for _, tc := range testCases {

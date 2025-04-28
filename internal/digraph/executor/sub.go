@@ -38,8 +38,8 @@ func newSubDAG(
 		Name   string
 		Params string
 	}{
-		Name:   step.SubWorkflow.Name,
-		Params: step.SubWorkflow.Params,
+		Name:   step.SubDAG.Name,
+		Params: step.SubDAG.Params,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to substitute string fields: %w", err)
