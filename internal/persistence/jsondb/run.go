@@ -140,7 +140,7 @@ var reRunSub = regexp.MustCompile(`^sub_(.*)$`)                      // Matches 
 // The format is "YYYYMMDD_HHMMSSZ".
 // This is used for generating 'run' directory names.
 func formatRunTimestamp(t TimeInUTC) string {
-	return t.Time.Format(dateTimeFormatUTC)
+	return t.Format(dateTimeFormatUTC)
 }
 
 // parseRunTimestamp converts a timestamp string from a filename into a time.Time.
@@ -161,9 +161,6 @@ const dateTimeFormatUTC = "20060102_150405Z"
 // This is used for generating 'attempt' directory names.
 func formatAttemptTimestamp(t TimeInUTC) string {
 	const format = "20060102_150405"
-	mill := t.Time.UnixMilli()
-	return t.Time.Format(format) + "_" + fmt.Sprintf("%03d", mill%1000) + "Z"
+	mill := t.UnixMilli()
+	return t.Format(format) + "_" + fmt.Sprintf("%03d", mill%1000) + "Z"
 }
-
-// dataFileExtension is the file extension for history record files.
-const dataFileExtension = ".dat"

@@ -108,7 +108,7 @@ func (c *Context) init(cmd *cobra.Command) error {
 	if quiet {
 		opts = append(opts, logger.WithQuiet())
 	}
-	ctx = setupLoggerContext(cfg, ctx, opts...)
+	ctx = setupLoggerContext(ctx, opts...)
 
 	// Log any warnings collected during configuration loading
 	for _, w := range cfg.Warnings {
@@ -295,14 +295,14 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, run func(cmd *Conte
 
 // setupLoggerContext builds a logger context using options derived from configuration.
 // It checks debug mode, quiet mode, and log format.
-func setupLoggerContext(cfg *config.Config, ctx context.Context, opts ...logger.Option) context.Context {
+func setupLoggerContext(ctx context.Context, opts ...logger.Option) context.Context {
 	return logger.WithLogger(ctx, logger.NewLogger(opts...))
 }
 
 // NewContext creates a setup instance from an existing configuration.
 func NewContext(ctx context.Context, cfg *config.Config) *Context {
 	c := &Context{cfg: cfg}
-	c.ctx = setupLoggerContext(cfg, ctx, c.loggingOpts(cfg)...)
+	c.ctx = setupLoggerContext(ctx, c.loggingOpts(cfg)...)
 	return c
 }
 

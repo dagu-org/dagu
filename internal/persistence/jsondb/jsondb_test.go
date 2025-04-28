@@ -239,7 +239,7 @@ func TestJSONDB(t *testing.T) {
 		require.NoError(t, err)
 		statusToWrite.Status = scheduler.StatusSuccess
 		_ = retryRecord.Open(th.Context)
-		retryRecord.Write(th.Context, statusToWrite)
+		_ = retryRecord.Write(th.Context, statusToWrite)
 		_ = retryRecord.Close(th.Context)
 
 		// Verify the retry record is created
