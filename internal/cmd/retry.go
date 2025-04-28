@@ -37,16 +37,10 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
-	specFilePath := args[0]
-
-	absolutePath, err := filepath.Abs(specFilePath)
-	if err != nil {
-		logger.Error(ctx, "Failed to resolve absolute path", "path", specFilePath, "err", err)
-		return fmt.Errorf("failed to resolve absolute path for %s: %w", specFilePath, err)
-	}
+	dagName := args[0]
 
 	// Retrieve the previous run's history record for the specified request ID.
-	historyRecord, err := ctx.historyStore().FindByRequestID(ctx, absolutePath, requestID)
+	historyRecord, err := ctx.historyStore().FindByRequestID(ctx, dagName, requestID)
 	if err != nil {
 		logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
 		return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
@@ -59,7 +53,10 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 
-	loadOpts := []digraph.LoadOption{digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig)}
+	loadOpts := []digraph.LoadOption{
+		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
+		digraph.WithDAGsDir(ctx.cfg.Paths.DAGsDir),
+	}
 	if run.Status.Params != "" {
 		// If the 'Params' field is not empty, use it instead of 'ParamsList' for backward compatibility.
 		loadOpts = append(loadOpts, digraph.WithParams(run.Status.Params))
@@ -69,12 +66,12 @@ func runRetry(ctx *Context, args []string) error {
 
 	// Load the DAG from the local file.
 	// TODO: Read the DAG from the history record instead of the local file.
-	dag, err := digraph.Load(ctx, absolutePath, loadOpts...)
+	dag, err := digraph.Load(ctx, dagName, loadOpts...)
 	if err != nil {
-		logger.Error(ctx, "Failed to load DAG specification", "path", specFilePath, "err", err)
+		logger.Error(ctx, "Failed to load DAG specification", "path", dagName, "err", err)
 		// nolint : staticcheck
 		return fmt.Errorf("failed to load DAG specification from %s with params %s: %w",
-			specFilePath, run.Status.Params, err)
+			dagName, run.Status.Params, err)
 	}
 
 	// The retry command is currently only supported for root DAGs.
@@ -82,7 +79,7 @@ func runRetry(ctx *Context, args []string) error {
 	rootDAG := digraph.NewRootDAG(dag.Name, run.Status.RequestID)
 
 	if err := executeRetry(ctx, dag, run, rootDAG); err != nil {
-		logger.Error(ctx, "Failed to execute retry", "path", specFilePath, "err", err)
+		logger.Error(ctx, "Failed to execute retry", "path", dagName, "err", err)
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
 
@@ -90,6 +87,8 @@ func runRetry(ctx *Context, args []string) error {
 }
 
 func executeRetry(ctx *Context, dag *digraph.DAG, run *persistence.Run, rootDAG digraph.RootDAG) error {
+	logger.Debug(ctx, "Executing retry", "dagName", dag.Name, "requestID", run.Status.RequestID)
+
 	// We use the same log file for the retry as the original run.
 	logFile, err := OpenOrCreateLogFile(run.Status.Log)
 	if err != nil {

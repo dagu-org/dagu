@@ -12,6 +12,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/logger"
 )
 
 var _ Executor = (*subDAG)(nil)
@@ -91,6 +92,8 @@ func (e *subDAG) Run(ctx context.Context) error {
 		args = append(args, "--")
 		args = append(args, e.params)
 	}
+
+	logger.Debug(ctx, "Sub-DAG execution", "args", args)
 
 	cmd := exec.CommandContext(ctx, executable, args...) // nolint:gosec
 	cmd.Dir = e.workDir

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,6 +9,7 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/spf13/cobra"
 )
 
@@ -47,13 +49,16 @@ func runStart(ctx *Context, args []string) error {
 			logger.Error(ctx, "Failed to generate request ID", "err", err)
 			return fmt.Errorf("failed to generate request ID: %w", err)
 		}
-	} else if err := validateRequestID(requestID); err != nil {
-		logger.Error(ctx, "Invalid request ID format", "requestID", requestID, "err", err)
-		return fmt.Errorf("invalid request ID format: %w", err)
+	} else {
+		if err := validateRequestID(requestID); err != nil {
+			logger.Error(ctx, "Invalid request ID format", "requestID", requestID, "err", err)
+			return fmt.Errorf("invalid request ID format: %w", err)
+		}
 	}
 
 	loadOpts := []digraph.LoadOption{
 		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
+		digraph.WithDAGsDir(ctx.cfg.Paths.DAGsDir),
 	}
 
 	// Load parameters from command line arguments.
@@ -89,16 +94,43 @@ func runStart(ctx *Context, args []string) error {
 	var rootDAG digraph.RootDAG
 	if rootDAGName != "" && rootRequestID != "" {
 		// The current execution is a sub-DAG
+		logger.Debug(ctx, "Sub-DAG execution detected", "rootDAGName", rootDAGName, "rootRequestID", rootRequestID)
 		rootDAG = digraph.NewRootDAG(rootDAGName, rootRequestID)
 	} else {
 		// The current execution is a root DAG
 		rootDAG = digraph.NewRootDAG(dag.Name, requestID)
 	}
 
+	// Check for previous runs with this request ID and retry it if found.
+	// This prevents duplicate execution when retrying or when sub-DAGs share the
+	// same request ID, ensuring idempotency across the the DAG from the root DAG.
+	if rootDAG.RequestID != requestID {
+		logger.Debug(ctx, "Checking for previous sub-DAG run with the request ID", "requestID", requestID)
+		var run *persistence.Run
+		record, err := ctx.historyStore().FindBySubRequestID(ctx, requestID, rootDAG)
+		if errors.Is(err, persistence.ErrRequestIDNotFound) {
+			// If the request ID is not found, proceed with execution
+			goto EXEC
+		}
+		if err != nil {
+			logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
+			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
+		}
+		run, err = record.ReadRun(ctx)
+		if err != nil {
+			logger.Error(ctx, "Failed to read previous run status", "requestID", requestID, "err", err)
+			return fmt.Errorf("failed to read previous run status for request ID %s: %w", requestID, err)
+		}
+		return executeRetry(ctx, dag, run, rootDAG)
+	}
+
+EXEC:
 	return executeDag(ctx, dag, requestID, rootDAG)
 }
 
 func executeDag(ctx *Context, dag *digraph.DAG, requestID string, rootDAG digraph.RootDAG) error {
+	logger.Debug(ctx, "Executing DAG", "dagName", dag.Name, "requestID", requestID)
+
 	// Open the log file for the scheduler. The log file will be used for future
 	// execution for the same DAG/request ID between attempts.
 	logFile, err := ctx.OpenLogFile(dag, requestID)

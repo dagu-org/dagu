@@ -64,8 +64,14 @@ func (c *Context) Value(key any) any {
 // LogToFile creates a new logger context with a file writer.
 func (c *Context) LogToFile(f *os.File) {
 	var opts []logger.Option
+	if c.cfg.Global.Debug {
+		opts = append(opts, logger.WithDebug())
+	}
 	if c.quiet {
 		opts = append(opts, logger.WithQuiet())
+	}
+	if c.cfg.Global.LogFormat != "" {
+		opts = append(opts, logger.WithFormat(c.cfg.Global.LogFormat))
 	}
 	if f != nil {
 		opts = append(opts, logger.WithWriter(f))
@@ -98,7 +104,11 @@ func (c *Context) init(cmd *cobra.Command) error {
 	}
 
 	// Create a logger context based on config and quiet mode
-	ctx = setupLoggerContext(cfg, ctx, quiet)
+	opts := c.loggingOpts(cfg)
+	if quiet {
+		opts = append(opts, logger.WithQuiet())
+	}
+	ctx = setupLoggerContext(cfg, ctx, opts...)
 
 	// Log any warnings collected during configuration loading
 	for _, w := range cfg.Warnings {
@@ -222,6 +232,7 @@ func (ctx *Context) OpenLogFile(
 	if err != nil {
 		return nil, fmt.Errorf("failed to expand log directory: %w", err)
 	}
+
 	dagLogDir, err := cmdutil.EvalString(ctx, dag.LogDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to expand DAG log directory: %w", err)
@@ -247,6 +258,20 @@ func (ctx *Context) OpenLogFile(
 	return OpenOrCreateLogFile(filepath.Join(outputDir, filename))
 }
 
+func (c *Context) loggingOpts(cfg *config.Config) []logger.Option {
+	var opts []logger.Option
+	if cfg.Global.Debug || os.Getenv("DEBUG") != "" {
+		opts = append(opts, logger.WithDebug())
+	}
+	if c.quiet {
+		opts = append(opts, logger.WithQuiet())
+	}
+	if cfg.Global.LogFormat != "" {
+		opts = append(opts, logger.WithFormat(cfg.Global.LogFormat))
+	}
+	return opts
+}
+
 // NewCommand creates a new command instance with the given cobra command and run function.
 func NewCommand(cmd *cobra.Command, flags []commandLineFlag, run func(cmd *Context, args []string) error) *cobra.Command {
 	initFlags(cmd, flags...)
@@ -270,23 +295,15 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, run func(cmd *Conte
 
 // setupLoggerContext builds a logger context using options derived from configuration.
 // It checks debug mode, quiet mode, and log format.
-func setupLoggerContext(cfg *config.Config, ctx context.Context, quiet bool) context.Context {
-	var opts []logger.Option
-	if cfg.Global.Debug {
-		opts = append(opts, logger.WithDebug())
-	}
-	if quiet {
-		opts = append(opts, logger.WithQuiet())
-	}
-	if cfg.Global.LogFormat != "" {
-		opts = append(opts, logger.WithFormat(cfg.Global.LogFormat))
-	}
+func setupLoggerContext(cfg *config.Config, ctx context.Context, opts ...logger.Option) context.Context {
 	return logger.WithLogger(ctx, logger.NewLogger(opts...))
 }
 
 // NewContext creates a setup instance from an existing configuration.
 func NewContext(ctx context.Context, cfg *config.Config) *Context {
-	return &Context{cfg: cfg, ctx: setupLoggerContext(cfg, ctx, false)}
+	c := &Context{cfg: cfg}
+	c.ctx = setupLoggerContext(cfg, ctx, c.loggingOpts(cfg)...)
+	return c
 }
 
 // clientOption defines functional options for configuring the client.
@@ -387,6 +404,9 @@ func SetupLogDirectory(config LogFileSettings) (string, error) {
 	if config.DAGLogDir != "" {
 		baseDir = config.DAGLogDir
 	}
+	if baseDir == "" {
+		return "", fmt.Errorf("base log directory is not set")
+	}
 
 	logDir := filepath.Join(baseDir, safeName)
 	if err := os.MkdirAll(logDir, 0750); err != nil {
@@ -403,7 +423,7 @@ func BuildLogFilename(config LogFileSettings) string {
 	truncatedRequestID := stringutil.TruncString(config.RequestID, 8)
 	safeDagName := fileutil.SafeName(config.DAGName)
 
-	return fmt.Sprintf("%s.%s.%s.log",
+	return fmt.Sprintf("scheduler_%s.%s.%s.log",
 		safeDagName,
 		timestamp,
 		truncatedRequestID,

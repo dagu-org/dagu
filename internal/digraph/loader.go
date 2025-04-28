@@ -26,6 +26,7 @@ type LoadOptions struct {
 	paramsList   []string // List of parameters to override default parameters in the DAG.
 	noEval       bool     // Flag to disable evaluation of dynamic fields.
 	onlyMetadata bool     // Flag to load only metadata without full DAG details.
+	dagsDir      string   // Directory containing the DAG files.
 }
 
 // LoadOption is a function type for setting LoadOptions.
@@ -73,6 +74,13 @@ func WithName(name string) LoadOption {
 	}
 }
 
+// WithDAGsDir sets the directory containing the DAG files.
+func WithDAGsDir(dagsDir string) LoadOption {
+	return func(o *LoadOptions) {
+		o.dagsDir = dagsDir
+	}
+}
+
 // Load loads the DAG from the given file with the specified options.
 func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
 	var options LoadOptions
@@ -88,6 +96,7 @@ func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
 			OnlyMetadata:   options.onlyMetadata,
 			NoEval:         options.noEval,
 			Name:           options.name,
+			DAGsDir:        options.dagsDir,
 		},
 	}
 	return loadDAG(buildContext, dag)
@@ -106,6 +115,7 @@ func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*DAG, error
 		OnlyMetadata:   options.onlyMetadata,
 		NoEval:         options.noEval,
 		Name:           options.name,
+		DAGsDir:        options.dagsDir,
 	})
 }
 
@@ -155,7 +165,7 @@ func LoadBaseConfig(ctx BuildContext, file string) (*DAG, error) {
 
 // loadDAG loads the DAG from the given file.
 func loadDAG(ctx BuildContext, dag string) (*DAG, error) {
-	filePath, err := resolveYamlFilePath(dag)
+	filePath, err := resolveYamlFilePath(ctx, dag)
 	if err != nil {
 		return nil, err
 	}
@@ -205,9 +215,27 @@ func defaultName(file string) string {
 
 // resolveYamlFilePath resolves the YAML file path.
 // If the file name does not have an extension, it appends ".yaml".
-func resolveYamlFilePath(file string) (string, error) {
+func resolveYamlFilePath(ctx BuildContext, file string) (string, error) {
 	if file == "" {
 		return "", errors.New("file path is required")
+	}
+
+	if filepath.IsAbs(file) {
+		// If the file is an absolute path, return it as is.
+		return file, nil
+	}
+
+	// Check if the file exists in the current Directory.
+	absFile, err := filepath.Abs(file)
+	if err == nil && fileutil.FileExists(absFile) {
+		// If	the file exists, return the absolute path.
+		return absFile, nil
+	}
+
+	// If the file does not exist, check if it exists in the DAGsDir.
+	if ctx.opts.DAGsDir != "" {
+		// If the file is not an absolute path, prepend the DAGsDir to the file name.
+		file = filepath.Join(ctx.opts.DAGsDir, file)
 	}
 
 	// The file name can be specified without the extension.

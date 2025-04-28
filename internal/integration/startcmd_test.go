@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"context"
 	"os"
 	"path"
 	"path/filepath"
@@ -8,7 +9,11 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/cmd"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/test"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,7 +34,7 @@ func TestServer_StartWithConfig(t *testing.T) {
 				return configFile, tempDir
 			},
 			dagPath: func(t *testing.T, _ string) string {
-				return test.TestdataPath(t, path.Join("integration", "basic"))
+				return test.TestdataPath(t, path.Join("integration", "basic.yaml"))
 			},
 			envVarName: "TMP_LOGS_DIR",
 		},
@@ -59,9 +64,6 @@ steps:
 			// Setup test case
 			configFile, tempDir := tc.setupFunc(t)
 			_ = os.Setenv(tc.envVarName, tempDir)
-			defer func() {
-				_ = os.Unsetenv(tc.envVarName)
-			}()
 
 			// Get DAG path
 			dagPath := tc.dagPath(t, tempDir)
@@ -85,6 +87,120 @@ steps:
 	}
 }
 
+func TestServer_RetrySubDAG(t *testing.T) {
+	// Get DAG path
+	th := test.SetupCommand(t)
+
+	createDAGFile := func(name, content string) {
+		// Create temporary DAG file
+		dagFile := filepath.Join(th.Config.Paths.DAGsDir, name)
+		// Create the directory if it doesn't exist
+		err := os.MkdirAll(filepath.Dir(dagFile), 0755)
+		require.NoError(t, err)
+		// Write the DAG file
+		err = os.WriteFile(dagFile, []byte(content), 0644)
+		require.NoError(t, err)
+	}
+
+	createDAGFile("parent.yaml", `
+steps:
+  - name: parent
+    run: child_1
+    params: "PARAM=FOO"
+`)
+
+	createDAGFile("child_1.yaml", `
+params: "PARAM=BAR"
+steps:
+  - name: child_2
+    run: child_2
+    params: "PARAM=$PARAM"
+`)
+
+	createDAGFile("child_2.yaml", `
+params: "PARAM=BAZ"
+steps:
+  - name: child_2
+    command: echo "Hello, $PARAM"
+`)
+
+	requestID := uuid.Must(uuid.NewRandom()).String()
+	args := []string{"start", "--request-id", requestID, "parent"}
+	th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
+		Args:        args,
+		ExpectedOut: []string{"DAG run finished"},
+	})
+
+	// Update the child_2 status to "failed" to simulate a retry
+	// First, find the child_2 request ID to update its status
+	ctx := context.Background()
+	parentRec, err := th.HistoryStore.FindByRequestID(ctx, "parent", requestID)
+	require.NoError(t, err)
+
+	updateStatus := func(rec persistence.Record, run *persistence.Run) {
+		err = rec.Open(ctx)
+		require.NoError(t, err)
+		err = rec.Write(ctx, run.Status)
+		require.NoError(t, err)
+		err = rec.Close(ctx)
+		require.NoError(t, err)
+	}
+
+	// (1) Find the child_1 node and update its status to "failed"
+	parentRun, err := parentRec.ReadRun(ctx)
+	require.NoError(t, err)
+
+	child1Node := parentRun.Status.Nodes[0]
+	child1Node.Status = scheduler.NodeStatusError
+	updateStatus(parentRec, parentRun)
+
+	// (2) Find the history record for child_1
+	rootDAG := digraph.NewRootDAG("parent", requestID)
+	child1Rec, err := th.HistoryStore.FindBySubRequestID(ctx, child1Node.RequestID, rootDAG)
+	require.NoError(t, err)
+
+	child1Run, err := child1Rec.ReadRun(ctx)
+	require.NoError(t, err)
+
+	// (3) Find the child_2 node and update its status to "failed"
+	child2Node := child1Run.Status.Nodes[0]
+	child2Node.Status = scheduler.NodeStatusError
+	updateStatus(child1Rec, child1Run)
+
+	// (4) Find the history record for child_2
+	child2Rec, err := th.HistoryStore.FindBySubRequestID(ctx, child2Node.RequestID, rootDAG)
+	require.NoError(t, err)
+
+	child2Run, err := child2Rec.ReadRun(ctx)
+	require.NoError(t, err)
+
+	require.Equal(t, child2Run.Status.Status.String(), scheduler.NodeStatusSuccess.String())
+
+	// (5) Update the step in child_2 to "failed" to simulate a retry
+	child2Run.Status.Nodes[0].Status = scheduler.NodeStatusError
+	updateStatus(child2Rec, child2Run)
+
+	// (6) Check if the child_2 status is now "failed"
+	child2Run, err = child2Rec.ReadRun(ctx)
+	require.NoError(t, err)
+	require.Equal(t, child2Run.Status.Nodes[0].Status.String(), scheduler.NodeStatusError.String())
+
+	// Retry the DAG
+
+	args = []string{"retry", "--request-id", requestID, "parent"}
+	th.RunCommand(t, cmd.CmdRetry(), test.CmdTest{
+		Args:        args,
+		ExpectedOut: []string{"DAG run finished"},
+	})
+
+	// Check if the child_2 status is now "success"
+	child2Rec, err = th.HistoryStore.FindBySubRequestID(ctx, child2Node.RequestID, rootDAG)
+	require.NoError(t, err)
+	child2Run, err = child2Rec.ReadRun(ctx)
+	require.NoError(t, err)
+	require.Equal(t, child2Run.Status.Nodes[0].Status.String(), scheduler.NodeStatusSuccess.String())
+}
+
 // verifyLogs checks if the expected log directory and files exist
 func verifyLogs(t *testing.T, tempDir string) {
 	// Check if the logs directory was created
@@ -98,7 +214,7 @@ func verifyLogs(t *testing.T, tempDir string) {
 	// Look for a log file that matches the expected pattern
 	logFileFound := false
 	for _, file := range files {
-		if strings.HasPrefix(file.Name(), "basic.") && strings.HasSuffix(file.Name(), ".log") {
+		if strings.HasPrefix(file.Name(), "scheduler_basic.") && strings.HasSuffix(file.Name(), ".log") {
 			logFileFound = true
 			break
 		}

@@ -18,24 +18,10 @@ func TestLoad(t *testing.T) {
 	t.Run(("WithName"), func(t *testing.T) {
 		t.Parallel()
 
-		testDAG := test.TestdataPath(t, filepath.Join("digraph", "loader_test"))
+		testDAG := test.TestdataPath(t, filepath.Join("digraph", "loader_test.yaml"))
 		dag, err := digraph.Load(context.Background(), testDAG, digraph.WithName("testDAG"))
 		require.NoError(t, err)
 		require.Equal(t, "testDAG", dag.Name)
-	})
-	t.Run(("WithExt"), func(t *testing.T) {
-		t.Parallel()
-
-		testDAG := test.TestdataPath(t, filepath.Join("digraph", "loader_test"))
-		_, err := digraph.Load(context.Background(), testDAG)
-		require.NoError(t, err)
-	})
-	t.Run(("WithoutExt"), func(t *testing.T) {
-		t.Parallel()
-
-		testDAG := test.TestdataPath(t, filepath.Join("digraph", "loader_test.yaml"))
-		_, err := digraph.Load(context.Background(), testDAG)
-		require.NoError(t, err)
 	})
 	t.Run("InvalidPath", func(t *testing.T) {
 		t.Parallel()

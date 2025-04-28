@@ -51,6 +51,8 @@ type BuildOpts struct {
 	NoEval bool
 	// Name of the DAG if it's not defined in the spec
 	Name string
+	// DAGsDir is the directory containing the DAG files.
+	DAGsDir string
 }
 
 var builderRegistry = []builderEntry{

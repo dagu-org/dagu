@@ -90,7 +90,7 @@ func (e Run) FindSubRun(_ context.Context, reqID string) (*Run, error) {
 		return nil, fmt.Errorf("failed to list sub-run directories: %w", err)
 	}
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("no sub-run found with request ID: %s", reqID)
+		return nil, persistence.ErrRequestIDNotFound
 	}
 	// Sort the matches by timestamp
 	sort.Slice(matches, func(i, j int) bool {

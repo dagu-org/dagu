@@ -33,6 +33,7 @@ var dryFlags = []commandLineFlag{paramsFlag}
 func runDry(ctx *Context, args []string) error {
 	loadOpts := []digraph.LoadOption{
 		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
+		digraph.WithDAGsDir(ctx.cfg.Paths.DAGsDir),
 	}
 
 	if argsLenAtDash := ctx.ArgsLenAtDash(); argsLenAtDash != -1 {
