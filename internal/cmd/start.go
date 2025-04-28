@@ -49,11 +49,9 @@ func runStart(ctx *Context, args []string) error {
 			logger.Error(ctx, "Failed to generate request ID", "err", err)
 			return fmt.Errorf("failed to generate request ID: %w", err)
 		}
-	} else {
-		if err := validateRequestID(requestID); err != nil {
-			logger.Error(ctx, "Invalid request ID format", "requestID", requestID, "err", err)
-			return fmt.Errorf("invalid request ID format: %w", err)
-		}
+	} else if err := validateRequestID(requestID); err != nil {
+		logger.Error(ctx, "Invalid request ID format", "requestID", requestID, "err", err)
+		return fmt.Errorf("invalid request ID format: %w", err)
 	}
 
 	loadOpts := []digraph.LoadOption{
