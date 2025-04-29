@@ -169,7 +169,7 @@ func (e *docker) shouldPullImage(ctx context.Context, cli *client.Client, platfo
 
 	// Loop through all locally available images that have the same reference with
 	// the input image to check if we have the correct platform.
-	filters := filters.Args{}
+	filters := filters.NewArgs()
 	filters.Add("reference", e.image)
 
 	images, err := cli.ImageList(ctx, image.ListOptions{Filters: filters})
