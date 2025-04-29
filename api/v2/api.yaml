@@ -618,7 +618,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /runs/{dagName}/{requestId}/{stepName}/log:
+  /runs/{dagName}/{requestId}/steps/{stepName}/log:
     get:
       summary: "Retrieve log for a specific step in a DAG run"
       description: "Fetches the log for an individual step in a DAG run"
@@ -650,7 +650,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /runs/{dagName}/{requestId}/{stepName}/status:
+  /runs/{dagName}/{requestId}/steps/{stepName}/status:
     patch:
       summary: "Manually update a step's execution status"
       description: "Changes the status of a specific step within a DAG run"
