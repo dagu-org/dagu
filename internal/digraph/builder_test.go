@@ -359,12 +359,12 @@ func TestBuildStep(t *testing.T) {
 			},
 		}, th.Steps[0].ExecutorConfig.Config)
 	})
-	t.Run("SubWorkflow", func(t *testing.T) {
+	t.Run("CallingSub", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "subworkflow.yaml")
+		th := testLoad(t, "calling_sub.yaml")
 		assert.Len(t, th.Steps, 1)
-		assert.Equal(t, "subworkflow", th.Steps[0].ExecutorConfig.Type)
+		assert.Equal(t, "sub", th.Steps[0].ExecutorConfig.Type)
 		assert.Equal(t, "run", th.Steps[0].Command)
 		assert.Equal(t, []string{
 			"sub_dag",

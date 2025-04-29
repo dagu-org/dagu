@@ -77,6 +77,7 @@ func handleRestartProcess(ctx *Context, dag *digraph.DAG, specFilePath string) e
 
 	loadOpts := []digraph.LoadOption{
 		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
+		digraph.WithDAGsDir(ctx.cfg.Paths.DAGsDir),
 	}
 	if status.Params != "" {
 		// backward compatibility

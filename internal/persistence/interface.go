@@ -11,12 +11,8 @@ import (
 
 // HistoryStore manages execution history records for DAGs
 type HistoryStore interface {
-	// NewRetryRecord creates a new history record for a retry of a DAG run
-	NewRetryRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string) (Record, error)
 	// NewRecord creates a new history record for a DAG run
-	NewRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string) (Record, error)
-	// NewSubRecord creates a new history record for a sub-DAG run
-	NewSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, rootDAG digraph.RootDAG) (Record, error)
+	NewRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts NewRecordOptions) (Record, error)
 	// Update updates the status of an existing record identified by name and reqID
 	Update(ctx context.Context, name, reqID string, status Status) error
 	// Recent returns the most recent history records for a DAG, limited by itemLimit
@@ -31,6 +27,12 @@ type HistoryStore interface {
 	RemoveOld(ctx context.Context, name string, retentionDays int) error
 	// Rename renames all history records from oldName to newName
 	Rename(ctx context.Context, oldName, newName string) error
+}
+
+// NewRecordOptions contains options for creating a new history record
+type NewRecordOptions struct {
+	Root  *digraph.RootDAG
+	Retry bool
 }
 
 // Record represents a single execution history record that can be read and written

@@ -51,6 +51,8 @@ type BuildOpts struct {
 	NoEval bool
 	// Name of the DAG if it's not defined in the spec
 	Name string
+	// DAGsDir is the directory containing the DAG files.
+	DAGsDir string
 }
 
 var builderRegistry = []builderEntry{
@@ -82,7 +84,7 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "executor", fn: buildExecutor},
 	{name: "command", fn: buildCommand},
 	{name: "depends", fn: buildDepends},
-	{name: "subworkflow", fn: buildSubWorkflow},
+	{name: "sub-DAG", fn: buildSubDAG},
 	{name: "continueOn", fn: buildContinueOn},
 	{name: "retryPolicy", fn: buildRetryPolicy},
 	{name: "repeatPolicy", fn: buildRepeatPolicy},
@@ -687,13 +689,8 @@ func buildSignalOnStop(_ BuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
-// commandRun is not a actual command.
-// subworkflow does not use this command field so it is used
-// just for display purposes.
-const commandRun = "run"
-
-// buildSubWorkflow parses the subworkflow definition and sets the step fields.
-func buildSubWorkflow(_ BuildContext, def stepDef, step *Step) error {
+// buildSubDAG parses the sub-DAG definition and sets the step fields.
+func buildSubDAG(_ BuildContext, def stepDef, step *Step) error {
 	name, params := def.Run, def.Params
 
 	// if the run field is not set, return nil.
@@ -701,19 +698,14 @@ func buildSubWorkflow(_ BuildContext, def stepDef, step *Step) error {
 		return nil
 	}
 
-	// Set the step fields for the subworkflow.
-	step.SubWorkflow = &SubWorkflow{Name: name, Params: params}
-	step.ExecutorConfig.Type = ExecutorTypeSubWorkflow
-	step.Command = commandRun
+	// Set the step fields for the sub-DAG.
+	step.SubDAG = &SubDAG{Name: name, Params: params}
+	step.ExecutorConfig.Type = ExecutorTypeSub
+	step.Command = "run"
 	step.Args = []string{name, params}
 	step.CmdWithArgs = fmt.Sprintf("%s %s", name, params)
 	return nil
 }
-
-const (
-	executorKeyType   = "type"
-	executorKeyConfig = "config"
-)
 
 func buildDepends(_ BuildContext, def stepDef, step *Step) error {
 	deps, err := parseStringOrArray(def.Depends)
@@ -730,6 +722,11 @@ func buildDepends(_ BuildContext, def stepDef, step *Step) error {
 // Case 2: executor is a string
 // Case 3: executor is a struct
 func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
+	const (
+		executorKeyType   = "type"
+		executorKeyConfig = "config"
+	)
+
 	executor := def.Executor
 
 	// Case 1: executor is nil

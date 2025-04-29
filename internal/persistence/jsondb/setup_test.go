@@ -40,7 +40,7 @@ func (th JSONDBTest) CreateRecord(t *testing.T, ts time.Time, requestID string, 
 	t.Helper()
 
 	dag := th.DAG("test_DAG")
-	record, err := th.DB.NewRecord(th.Context, dag.DAG, ts, requestID)
+	record, err := th.DB.NewRecord(th.Context, dag.DAG, ts, requestID, persistence.NewRecordOptions{})
 	require.NoError(t, err)
 
 	err = record.Open(th.Context)

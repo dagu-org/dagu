@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dagu-org/dagu/internal/client"
@@ -27,7 +28,7 @@ func TestClient_GetStatus(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "valid.yaml"))
 		ctx := th.Context
 
-		requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
+		requestID := uuid.Must(uuid.NewV7()).String()
 		socketServer, _ := sock.NewServer(
 			dag.SockAddr(requestID),
 			func(w http.ResponseWriter, _ *http.Request) {
@@ -69,13 +70,13 @@ func TestClient_GetStatus(t *testing.T) {
 	t.Run("UpdateStatus", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "update_status.yaml"))
 
-		requestID := "test-update-status"
+		requestID := uuid.Must(uuid.NewV7()).String()
 		now := time.Now()
 		ctx := th.Context
 		cli := th.Client
 
 		// Open the history store and write a status before updating it.
-		record, err := th.HistoryStore.NewRecord(ctx, dag.DAG, now, requestID)
+		record, err := th.HistoryStore.NewRecord(ctx, dag.DAG, now, requestID, persistence.NewRecordOptions{})
 		require.NoError(t, err)
 
 		err = record.Open(ctx)
@@ -106,14 +107,12 @@ func TestClient_GetStatus(t *testing.T) {
 		require.Equal(t, newStatus, statusByRequestID.Nodes[0].Status)
 	})
 	t.Run("InvalidUpdateStatusWithInvalidReqID", func(t *testing.T) {
-		wrongReqID := "invalid-request-id"
 		dag := th.DAG(t, filepath.Join("client", "invalid_reqid.yaml"))
 		ctx := th.Context
 		cli := th.Client
 
 		// update with invalid request id
-		status := testNewStatus(dag.DAG, wrongReqID, scheduler.StatusError,
-			scheduler.NodeStatusError)
+		status := testNewStatus(dag.DAG, "unknown-req-id", scheduler.StatusError, scheduler.NodeStatusError)
 
 		// Check if the update fails.
 		err := cli.UpdateStatus(ctx, dag.Name, status)

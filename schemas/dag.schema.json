@@ -445,11 +445,11 @@
         },
         "run": {
           "type": "string",
-          "description": "Name of a sub-workflow (another DAG) to run as this step."
+          "description": "Name of a DAG to run."
         },
         "params": {
           "type": "string",
-          "description": "Parameters to pass to the sub-workflow when using 'run'."
+          "description": "Parameters to pass to the DAG."
         }
       }
     },

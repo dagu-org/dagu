@@ -8,6 +8,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/google/uuid"
 
 	"github.com/stretchr/testify/require"
 )
@@ -30,7 +31,7 @@ func TestStatusSerialization(t *testing.T) {
 		InfoMail:  &digraph.MailConfig{},
 		SMTP:      &digraph.SMTPConfig{},
 	}
-	requestID := "request-id-testI"
+	requestID := uuid.Must(uuid.NewV7()).String()
 	statusToPersist := persistence.NewStatusFactory(dag).Create(
 		requestID, scheduler.StatusSuccess, 0, startedAt, persistence.WithFinishedAt(finishedAt),
 	)
@@ -48,7 +49,7 @@ func TestStatusSerialization(t *testing.T) {
 
 func TestCorrectRunningStatus(t *testing.T) {
 	dag := &digraph.DAG{Name: "test"}
-	requestID := "request-id-testII"
+	requestID := uuid.Must(uuid.NewV7()).String()
 	status := persistence.NewStatusFactory(dag).Create(requestID, scheduler.StatusRunning, 0, time.Now())
 	status.SetStatusToErrorIfRunning()
 	require.Equal(t, scheduler.StatusError, status.Status)

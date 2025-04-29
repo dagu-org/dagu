@@ -40,6 +40,7 @@ func FromNode(node scheduler.NodeData) *Node {
 		RetryCount: node.State.RetryCount,
 		DoneCount:  node.State.DoneCount,
 		Error:      errText(node.State.Error),
+		RequestID:  node.State.RequestID,
 	}
 }
 
@@ -55,6 +56,7 @@ type Node struct {
 	DoneCount  int                  `json:"DoneCount,omitempty"`
 	Error      string               `json:"Error,omitempty"`
 	StatusText string               `json:"StatusText"`
+	RequestID  string               `json:"RequestId,omitempty"`
 }
 
 // ToNode converts a persistence Node back to a scheduler Node
@@ -71,6 +73,7 @@ func (n *Node) ToNode() *scheduler.Node {
 		RetryCount: n.RetryCount,
 		DoneCount:  n.DoneCount,
 		Error:      errFromText(n.Error),
+		RequestID:  n.RequestID,
 	})
 }
 

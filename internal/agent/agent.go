@@ -495,15 +495,12 @@ func (a *Agent) setupHistoryRecord(ctx context.Context) (persistence.Record, err
 		logger.Error(ctx, "History data cleanup failed", "err", err)
 	}
 
+	opts := persistence.NewRecordOptions{Retry: a.retryTarget != nil}
 	if a.subExecution.Load() {
-		return a.historyStore.NewSubRecord(ctx, a.dag, time.Now(), a.requestID, a.rootDAG)
+		opts.Root = &a.rootDAG
 	}
 
-	if a.retryTarget != nil {
-		return a.historyStore.NewRetryRecord(ctx, a.dag, time.Now(), a.requestID)
-	}
-
-	return a.historyStore.NewRecord(ctx, a.dag, time.Now(), a.requestID)
+	return a.historyStore.NewRecord(ctx, a.dag, time.Now(), a.requestID, opts)
 }
 
 // setupSocketServer create socket server instance.

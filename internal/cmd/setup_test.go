@@ -119,7 +119,7 @@ func TestCreateLogFile(t *testing.T) {
 		dir := t.TempDir()
 		filePath := filepath.Join(dir, "test.log")
 
-		file, err := cmd.CreateLogFile(filePath)
+		file, err := cmd.OpenOrCreateLogFile(filePath)
 		require.NoError(t, err)
 		defer func() {
 			_ = file.Close()
@@ -134,7 +134,7 @@ func TestCreateLogFile(t *testing.T) {
 	})
 
 	t.Run("invalid path", func(t *testing.T) {
-		_, err := cmd.CreateLogFile("/nonexistent/directory/test.log")
+		_, err := cmd.OpenOrCreateLogFile("/nonexistent/directory/test.log")
 		assert.Error(t, err)
 	})
 }

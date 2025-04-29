@@ -64,7 +64,6 @@ func (l *ConfigLoader) Load() (*Config, error) {
 		return nil, fmt.Errorf("viper setup failed: %w", err)
 	}
 
-	var def Definition
 	// Attempt to read the main config file. If not found, we proceed without error.
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
@@ -81,6 +80,7 @@ func (l *ConfigLoader) Load() (*Config, error) {
 	}
 
 	// Unmarshal the merged configuration into our Definition structure.
+	var def Definition
 	if err := viper.Unmarshal(&def); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}

@@ -71,6 +71,9 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		opt(&options)
 	}
 
+	// Set the log level to debug
+	_ = os.Setenv("DEBUG", "true")
+
 	random := uuid.New().String()
 	tmpDir := fileutil.MustTempDir(fmt.Sprintf("dagu-test-%s", random))
 	require.NoError(t, os.Setenv("DAGU_HOME", tmpDir))
@@ -415,7 +418,7 @@ func setShell(t *testing.T, shell string) {
 }
 
 func genRequestID() string {
-	id, err := uuid.NewRandom()
+	id, err := uuid.NewV7()
 	if err != nil {
 		panic(err)
 	}

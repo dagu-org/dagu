@@ -333,7 +333,7 @@ func (d *dagStoreImpl) locateDAG(nameOrPath string) (string, error) {
 	return "", fmt.Errorf("workflow %s not found: %w", nameOrPath, os.ErrNotExist)
 }
 
-// findDAGFile finds the sub workflow file with the given name.
+// findDAGFile finds the DAG file with the given file name.
 func findDAGFile(name string) (string, error) {
 	ext := path.Ext(name)
 	switch ext {

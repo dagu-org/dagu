@@ -141,9 +141,9 @@ func (dr *DataRoot) ListInRange(ctx context.Context, start, end TimeInUTC) []*Ru
 	return dr.listInRange(ctx, start, end)
 }
 
-func (dr *DataRoot) CreateRun(timestamp TimeInUTC, reqID string) (*Run, error) {
-	dirName := "run_" + timestamp.Format(dateTimeFormatUTC) + "_" + reqID
-	dir := filepath.Join(dr.runsDir, timestamp.Format("2006"), timestamp.Format("01"), timestamp.Format("02"), dirName)
+func (dr *DataRoot) CreateRun(ts TimeInUTC, reqID string) (*Run, error) {
+	dirName := "run_" + formatRunTimestamp(ts) + "_" + reqID
+	dir := filepath.Join(dr.runsDir, ts.Format("2006"), ts.Format("01"), ts.Format("02"), dirName)
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create directory %s: %w", dir, err)
@@ -154,15 +154,6 @@ func (dr *DataRoot) CreateRun(timestamp TimeInUTC, reqID string) (*Run, error) {
 
 func (dr DataRoot) GlobPatternWithRequestID(requestID string) string {
 	return filepath.Join(dr.runsDir, "2*", "*", "*", "run_*"+requestID+"*")
-}
-
-func (dr DataRoot) FilePath(timestamp TimeInUTC, requestID string) string {
-	year := timestamp.Format("2006")
-	month := timestamp.Format("01")
-	date := timestamp.Format("02")
-	ts := timestamp.Format(dateTimeFormatUTC)
-	dirName := "run_" + ts + "_" + requestID
-	return filepath.Join(dr.runsDir, year, month, date, dirName, "status"+dataFileExtension)
 }
 
 func (dr DataRoot) Exists() bool {
@@ -569,9 +560,3 @@ var (
 	reMonth = regexp.MustCompile(`^\d{2}$`) // Matches 2-digit month directories (e.g., "01" for January)
 	reDay   = regexp.MustCompile(`^\d{2}$`) // Matches 2-digit day directories (e.g., "15" for the 15th day)
 )
-
-// dateTimeFormatUTC is the format for run timestamps.
-var dateTimeFormatUTC = "20060102_150405_000Z"
-
-// dataFileExtension is the file extension for history record files.
-var dataFileExtension = ".dat"

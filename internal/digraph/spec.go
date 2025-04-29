@@ -109,9 +109,9 @@ type stepDef struct {
 	SignalOnStop *string
 	// Deprecated: Don't use this field
 	Call *callFuncDef // deprecated
-	// Run is a sub workflow to run
+	// Run is a sub DAG to run
 	Run string
-	// Params is the parameters for the sub workflow
+	// Params is the parameters for the sub DAG
 	Params string
 }
 

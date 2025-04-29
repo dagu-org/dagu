@@ -352,7 +352,7 @@ func TestScheduler(t *testing.T) {
 	})
 	t.Run("RetryPolicySuccess", func(t *testing.T) {
 		file := filepath.Join(
-			os.TempDir(), fmt.Sprintf("flag_test_retry_success_%s", uuid.Must(uuid.NewRandom()).String()),
+			os.TempDir(), fmt.Sprintf("flag_test_retry_success_%s", uuid.Must(uuid.NewV7()).String()),
 		)
 
 		sc := setup(t)
@@ -925,7 +925,7 @@ func setup(t *testing.T, opts ...schedulerOption) testHelper {
 
 	cfg := &scheduler.Config{
 		LogDir: th.Config.Paths.LogDir,
-		ReqID:  uuid.Must(uuid.NewRandom()).String(),
+		ReqID:  uuid.Must(uuid.NewV7()).String(),
 	}
 	for _, opt := range opts {
 		opt(cfg)

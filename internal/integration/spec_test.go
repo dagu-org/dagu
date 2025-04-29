@@ -95,7 +95,7 @@ func TestDAGExecution(t *testing.T) {
 			},
 		},
 		{
-			name: "CallSubWorkflow",
+			name: "CallSub",
 			dag:  "call-sub.yaml",
 			expectedOutputs: map[string]any{
 				"OUT2": "foo",

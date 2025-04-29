@@ -9,6 +9,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/stringutil"
+	"github.com/google/uuid"
 )
 
 // Data is a thread-safe wrapper around NodeData.
@@ -33,6 +34,7 @@ type NodeState struct {
 	DoneCount  int
 	Error      error
 	ExitCode   int
+	RequestID  string
 }
 
 type NodeStatus int
@@ -113,6 +115,20 @@ func (s *Data) Data() NodeData {
 	defer s.mu.RUnlock()
 
 	return s.inner
+}
+
+func (s *Data) RequestID() (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.inner.State.RequestID == "" {
+		reqID, err := generateRequestID()
+		if err != nil {
+			return "", fmt.Errorf("failed to generate request ID: %w", err)
+		}
+		s.inner.State.RequestID = reqID
+	}
+
+	return s.inner.State.RequestID, nil
 }
 
 func (s *Data) Setup(ctx context.Context, logFile string, startedAt time.Time) error {
@@ -332,7 +348,10 @@ func (n *Data) ClearState() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
+	// requestID needs to be retained for sub-DAGs
+	requestID := n.inner.State.RequestID
 	n.inner.State = NodeState{}
+	n.inner.State.RequestID = requestID
 }
 
 func (n *Data) MarkError(err error) {
@@ -341,4 +360,14 @@ func (n *Data) MarkError(err error) {
 
 	n.inner.State.Error = err
 	n.inner.State.Status = NodeStatusError
+}
+
+// generateRequestID generates a new request ID.
+// For simplicity, we use UUIDs as request IDs.
+func generateRequestID() (string, error) {
+	id, err := uuid.NewV7()
+	if err != nil {
+		return "", err
+	}
+	return id.String(), nil
 }
