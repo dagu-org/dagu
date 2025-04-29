@@ -11,9 +11,9 @@ import (
 	"reflect"
 	"strings"
 
+	"dario.cat/mergo"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/go-viper/mapstructure/v2"
-	"github.com/imdario/mergo"
 
 	"gopkg.in/yaml.v2"
 )
