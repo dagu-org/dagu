@@ -444,7 +444,7 @@ Example timeline:
 
 Retry Policies
 ~~~~~~~~~~~~
-Automatically retry failed steps:
+Automatically retry failed steps with configurable error codes:
 
 .. code-block:: yaml
 
@@ -454,6 +454,33 @@ Automatically retry failed steps:
       retryPolicy:
         limit: 3
         intervalSec: 5
+        exitCodes: [1, 2]  # Optional: List of exit codes that should trigger a retry
+
+The retry policy supports the following parameters:
+
+- ``limit``: Maximum number of retry attempts (required)
+- ``intervalSec``: Time in seconds to wait between retries (required)
+- ``exitCodes``: List of exit codes that should trigger a retry (optional)
+
+If ``exitCodes`` is not specified, any non-zero exit code will trigger a retry. When ``exitCodes`` is specified, only the listed exit codes will trigger a retry.
+
+Example with custom error codes:
+
+.. code-block:: yaml
+
+  steps:
+    - name: api call
+      command: make-api-request
+      retryPolicy:
+        limit: 3
+        intervalSec: 30
+        exitCodes: [429, 503]  # Retry on rate limit and service unavailable errors
+
+In this example:
+- The command will be retried up to 3 times
+- There will be a 30-second wait between retries
+- Retries will only occur if the command exits with code 429 (Too Many Requests) or 503 (Service Unavailable)
+- Other error codes will cause immediate failure
 
 Advanced Features
 ---------------
