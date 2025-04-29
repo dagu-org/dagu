@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=oapi_20241018_mod.json
 openapi: "3.0.0"
 info:
   version: "2.0.0"
@@ -1207,7 +1208,7 @@ components:
             type: string
         run:
           type: string
-          description: "Sub DAG to run"
+          description: "The name of the DAG to run as a sub-DAG"
         params:
           type: string
           description: "Parameters to pass to the sub DAG in JSON format"

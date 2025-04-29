@@ -59,7 +59,6 @@ COLOR_RED=\033[0;31m
 
 # Go packages for the tools
 
-PKG_swagger=github.com/go-swagger/go-swagger/cmd/swagger
 PKG_golangci_lint=github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 PKG_gotestsum=gotest.tools/gotestsum
 PKG_addlicense=github.com/google/addlicense
@@ -286,22 +285,6 @@ golangci-lint:
 	@echo "${COLOR_GREEN}Running linter...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_golangci_lint)
 	@${LOCAL_BIN_DIR}/golangci-lint run --fix ./...
-
-# clean-swagger removes generated go files for swagger.
-.PHONY: clean-swagger
-clean-swagger:
-	@echo "${COLOR_GREEN}Cleaning the swagger files...${COLOR_RESET}"
-	@rm -rf ${FE_GEN_DIR}/models
-	@rm -rf ${FE_GEN_DIR}/restapi/operations
-
-# gen-swagger generates go files for the API schema.
-.PHONY: gen-swagger
-gen-swagger:
-	@echo "${COLOR_GREEN}Generating the swagger server code...${COLOR_RESET}"
-	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_swagger)
-	@${LOCAL_BIN_DIR}/swagger validate ./api.v1.yaml
-	@${LOCAL_BIN_DIR}/swagger generate server -t ${FE_GEN_DIR} --server-package=restapi --exclude-main -f ./api.v1.yaml
-	@go mod tidy
 
 # changelog generates a changelog from the releases.
 .PHONY: changelog
