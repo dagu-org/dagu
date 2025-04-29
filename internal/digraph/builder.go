@@ -613,6 +613,10 @@ func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
 		default:
 			return wrapError("retryPolicy.IntervalSec", v, fmt.Errorf("invalid type: %T", v))
 		}
+
+		if def.RetryPolicy.ExitCode != nil {
+			step.RetryPolicy.ExitCodes = def.RetryPolicy.ExitCode
+		}
 	}
 	return nil
 }

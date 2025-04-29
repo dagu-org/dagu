@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"runtime/debug"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -193,12 +196,9 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 							sc.setLastError(execErr)
 
 						case node.retryPolicy.Limit > node.data.GetRetryCount():
-							// retry
-							node.data.IncRetryCount()
-							logger.Info(ctx, "Step execution failed. Retrying...", "step", node.data.Name(), "error", execErr, "retry", node.data.GetRetryCount())
-							time.Sleep(node.retryPolicy.Interval)
-							node.data.SetRetriedAt(time.Now())
-							node.data.SetStatus(NodeStatusNone)
+							if sc.handleNodeRetry(ctx, node, execErr) {
+								continue ExecRepeat
+							}
 
 						default:
 							// finish the node
@@ -586,4 +586,61 @@ func (sc *Scheduler) isSucceed(g *ExecutionGraph) bool {
 
 func (sc *Scheduler) isTimeout(startedAt time.Time) bool {
 	return sc.timeout > 0 && time.Since(startedAt) > sc.timeout
+}
+
+// handleNodeRetry handles the retry logic for a node based on exit codes and retry policy
+func (sc *Scheduler) handleNodeRetry(ctx context.Context, node *Node, execErr error) (shouldRetry bool) {
+	var exitCode int
+	var exitCodeFound bool
+
+	// Try to extract exit code from different error types
+	if exitErr, ok := execErr.(*exec.ExitError); ok {
+		exitCode = exitErr.ExitCode()
+		exitCodeFound = true
+		logger.Debug(ctx, "Found ExitError", "error", execErr, "exitCode", exitCode)
+	} else {
+		// Try to parse exit code from error string
+		errStr := execErr.Error()
+		if strings.Contains(errStr, "exit status") {
+			// Parse "exit status N" format
+			parts := strings.Split(errStr, " ")
+			if len(parts) > 2 {
+				if code, err := strconv.Atoi(parts[2]); err == nil {
+					exitCode = code
+					exitCodeFound = true
+					logger.Debug(ctx, "Parsed exit code from error string", "error", errStr, "exitCode", exitCode)
+				}
+			}
+		} else if strings.Contains(errStr, "signal:") {
+			// Handle signal termination
+			exitCode = -1
+			exitCodeFound = true
+			logger.Debug(ctx, "Process terminated by signal", "error", errStr)
+		}
+	}
+
+	if !exitCodeFound {
+		logger.Debug(ctx, "Could not determine exit code", "error", execErr, "errorType", fmt.Sprintf("%T", execErr))
+		// Default to exit code 1 if we can't determine the actual code
+		exitCode = 1
+	}
+
+	shouldRetry = node.retryPolicy.ShouldRetry(exitCode)
+	logger.Debug(ctx, "Checking retry policy", "exitCode", exitCode, "allowedCodes", node.retryPolicy.ExitCodes, "shouldRetry", shouldRetry)
+
+	if !shouldRetry {
+		// finish the node with error
+		node.data.SetStatus(NodeStatusError)
+		node.data.MarkError(execErr)
+		sc.setLastError(execErr)
+		return false
+	}
+
+	// retry
+	node.data.IncRetryCount()
+	logger.Info(ctx, "Step execution failed. Retrying...", "step", node.data.Name(), "error", execErr, "retry", node.data.GetRetryCount(), "exitCode", exitCode)
+	time.Sleep(node.retryPolicy.Interval)
+	node.data.SetRetriedAt(time.Now())
+	node.data.SetStatus(NodeStatusNone)
+	return true
 }

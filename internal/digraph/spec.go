@@ -145,8 +145,9 @@ type repeatPolicyDef struct {
 
 // retryPolicyDef defines the retry policy for a step.
 type retryPolicyDef struct {
-	Limit       any // Limit on the number of retries
-	IntervalSec any // Interval in seconds between retries
+	Limit       any   `yaml:"limit,omitempty"`
+	IntervalSec any   `yaml:"intervalSec,omitempty"`
+	ExitCode    []int `yaml:"exitCode,omitempty"`
 }
 
 // smtpConfigDef defines the SMTP configuration.
