@@ -122,6 +122,8 @@ type RetryPolicy struct {
 	LimitStr string `json:"LimitStr,omitempty"`
 	// IntervalSecStr is the string representation of the interval.
 	IntervalSecStr string `json:"IntervalSecStr,omitempty"`
+	// ExitCodes is the list of exit codes that should trigger a retry.
+	ExitCodes []int `json:"ExitCode,omitempty"`
 }
 
 // RepeatPolicy contains the repeat policy for a step.

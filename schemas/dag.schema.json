@@ -389,6 +389,13 @@
                 }
               ],
               "description": "Seconds to wait between retry attempts"
+            },
+            "exitCode": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              },
+              "description": "List of exit codes that should trigger a retry. If not specified, all non-zero exit codes will trigger a retry."
             }
           },
           "description": "Configuration for automatically retrying failed steps."
