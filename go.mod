@@ -21,7 +21,7 @@ require (
 	github.com/golangci/golangci-lint/v2 v2.0.2
 	github.com/google/addlicense v1.1.1
 	github.com/google/uuid v1.6.0
-	github.com/itchyny/gojq v0.12.12
+	github.com/itchyny/gojq v0.12.17
 	github.com/jedib0t/go-pretty/v6 v6.3.6
 	github.com/joho/godotenv v1.5.1
 	github.com/oapi-codegen/nethttp-middleware v1.0.2
@@ -152,7 +152,7 @@ require (
 	github.com/huandu/xstrings v1.4.0 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/itchyny/timefmt-go v0.1.5 // indirect
+	github.com/itchyny/timefmt-go v0.1.6 // indirect
 	github.com/jgautheron/goconst v1.7.1 // indirect
 	github.com/jingyugao/rowserrcheck v1.1.1 // indirect
 	github.com/jjti/go-spancheck v0.6.4 // indirect
