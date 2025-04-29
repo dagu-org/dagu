@@ -124,7 +124,7 @@ steps:
     command: echo "Hello, $PARAM"
 `)
 
-	requestID := uuid.Must(uuid.NewRandom()).String()
+	requestID := uuid.Must(uuid.NewV7()).String()
 	args := []string{"start", "--request-id", requestID, "parent"}
 	th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
 		Args:        args,

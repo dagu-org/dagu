@@ -69,7 +69,7 @@ func TestNode(t *testing.T) {
 	t.Run("Stdout", func(t *testing.T) {
 		t.Parallel()
 
-		random := path.Join(os.TempDir(), uuid.Must(uuid.NewRandom()).String())
+		random := path.Join(os.TempDir(), uuid.Must(uuid.NewV7()).String())
 		defer func() {
 			_ = os.Remove(random)
 		}()
@@ -84,7 +84,7 @@ func TestNode(t *testing.T) {
 	t.Run("Stderr", func(t *testing.T) {
 		t.Parallel()
 
-		random := path.Join(os.TempDir(), uuid.Must(uuid.NewRandom()).String())
+		random := path.Join(os.TempDir(), uuid.Must(uuid.NewV7()).String())
 		defer func() {
 			_ = os.Remove(random)
 		}()
@@ -254,7 +254,7 @@ func setupNode(t *testing.T, opts ...nodeOption) nodeHelper {
 func (n nodeHelper) Execute(t *testing.T) {
 	t.Helper()
 
-	reqID := uuid.Must(uuid.NewRandom()).String()
+	reqID := uuid.Must(uuid.NewV7()).String()
 	err := n.Setup(n.Context, n.Config.Paths.LogDir, reqID)
 	require.NoError(t, err, "failed to setup node")
 
@@ -268,7 +268,7 @@ func (n nodeHelper) Execute(t *testing.T) {
 func (n nodeHelper) ExecuteFail(t *testing.T, expectedErr string) {
 	t.Helper()
 
-	reqID := uuid.Must(uuid.NewRandom()).String()
+	reqID := uuid.Must(uuid.NewV7()).String()
 	err := n.Node.Execute(n.execContext(reqID))
 	require.Error(t, err, "expected error")
 	require.Contains(t, err.Error(), expectedErr, "unexpected error")

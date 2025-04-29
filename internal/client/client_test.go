@@ -28,7 +28,7 @@ func TestClient_GetStatus(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "valid.yaml"))
 		ctx := th.Context
 
-		requestID := uuid.Must(uuid.NewRandom()).String()
+		requestID := uuid.Must(uuid.NewV7()).String()
 		socketServer, _ := sock.NewServer(
 			dag.SockAddr(requestID),
 			func(w http.ResponseWriter, _ *http.Request) {
@@ -70,7 +70,7 @@ func TestClient_GetStatus(t *testing.T) {
 	t.Run("UpdateStatus", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "update_status.yaml"))
 
-		requestID := uuid.Must(uuid.NewRandom()).String()
+		requestID := uuid.Must(uuid.NewV7()).String()
 		now := time.Now()
 		ctx := th.Context
 		cli := th.Client

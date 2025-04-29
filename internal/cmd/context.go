@@ -331,7 +331,7 @@ func withHistoryStore(historyStore persistence.HistoryStore) clientOption {
 
 // generateRequestID creates a new UUID string to be used as a request identifier.
 func generateRequestID() (string, error) {
-	id, err := uuid.NewRandom()
+	id, err := uuid.NewV7()
 	if err != nil {
 		return "", err
 	}

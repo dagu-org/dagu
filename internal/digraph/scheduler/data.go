@@ -365,7 +365,7 @@ func (n *Data) MarkError(err error) {
 // generateRequestID generates a new request ID.
 // For simplicity, we use UUIDs as request IDs.
 func generateRequestID() (string, error) {
-	id, err := uuid.NewRandom()
+	id, err := uuid.NewV7()
 	if err != nil {
 		return "", err
 	}

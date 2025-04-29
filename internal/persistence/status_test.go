@@ -31,7 +31,7 @@ func TestStatusSerialization(t *testing.T) {
 		InfoMail:  &digraph.MailConfig{},
 		SMTP:      &digraph.SMTPConfig{},
 	}
-	requestID := uuid.Must(uuid.NewRandom()).String()
+	requestID := uuid.Must(uuid.NewV7()).String()
 	statusToPersist := persistence.NewStatusFactory(dag).Create(
 		requestID, scheduler.StatusSuccess, 0, startedAt, persistence.WithFinishedAt(finishedAt),
 	)
@@ -49,7 +49,7 @@ func TestStatusSerialization(t *testing.T) {
 
 func TestCorrectRunningStatus(t *testing.T) {
 	dag := &digraph.DAG{Name: "test"}
-	requestID := uuid.Must(uuid.NewRandom()).String()
+	requestID := uuid.Must(uuid.NewV7()).String()
 	status := persistence.NewStatusFactory(dag).Create(requestID, scheduler.StatusRunning, 0, time.Now())
 	status.SetStatusToErrorIfRunning()
 	require.Equal(t, scheduler.StatusError, status.Status)
