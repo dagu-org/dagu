@@ -210,7 +210,7 @@ func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
 			starts = append(starts, s)
 		}
 
-	case map[any]any:
+	case map[string]any:
 		// Case 3. schedule is a map.
 		if err := parseScheduleMap(
 			schedule, &starts, &stops, &restarts,
@@ -390,35 +390,33 @@ func parsePrecondition(ctx BuildContext, precondition any) ([]Condition, error) 
 	case string:
 		return []Condition{{Command: v}}, nil
 
-	case map[any]any:
+	case map[string]any:
 		var ret Condition
-		for k, vv := range v {
-			key, ok := k.(string)
-			if !ok {
-				return nil, wrapError("preconditions", k, ErrPreconditionKeyMustBeString)
-			}
-
+		for key, vv := range v {
 			switch strings.ToLower(key) {
 			case "condition":
-				ret.Condition, ok = vv.(string)
+				val, ok := vv.(string)
 				if !ok {
 					return nil, wrapError("preconditions", vv, ErrPreconditionValueMustBeString)
 				}
+				ret.Condition = val
 
 			case "expected":
-				ret.Expected, ok = vv.(string)
+				val, ok := vv.(string)
 				if !ok {
 					return nil, wrapError("preconditions", vv, ErrPreconditionValueMustBeString)
 				}
+				ret.Expected = val
 
 			case "command":
-				ret.Command, ok = vv.(string)
+				val, ok := vv.(string)
 				if !ok {
 					return nil, wrapError("preconditions", vv, ErrPreconditionValueMustBeString)
 				}
+				ret.Command = val
 
 			default:
-				return nil, wrapError("preconditions", k, fmt.Errorf("%w: %s", ErrPreconditionHasInvalidKey, key))
+				return nil, wrapError("preconditions", key, fmt.Errorf("%w: %s", ErrPreconditionHasInvalidKey, key))
 
 			}
 		}
@@ -491,7 +489,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 
 		return nil
 
-	case map[any]any:
+	case map[string]any:
 		stepDefs := make(map[string]stepDef)
 		md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 			ErrorUnused: true,
@@ -622,6 +620,11 @@ func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
 		switch v := def.RetryPolicy.Limit.(type) {
 		case int:
 			step.RetryPolicy.Limit = v
+			step.RetryPolicy.Limit = int(v)
+		case int64:
+			step.RetryPolicy.Limit = int(v)
+		case uint64:
+			step.RetryPolicy.Limit = int(v)
 		case string:
 			step.RetryPolicy.LimitStr = v
 		default:
@@ -630,6 +633,10 @@ func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
 
 		switch v := def.RetryPolicy.IntervalSec.(type) {
 		case int:
+			step.RetryPolicy.Interval = time.Second * time.Duration(v)
+		case int64:
+			step.RetryPolicy.Interval = time.Second * time.Duration(v)
+		case uint64:
 			step.RetryPolicy.Interval = time.Second * time.Duration(v)
 		case string:
 			step.RetryPolicy.IntervalSecStr = v
@@ -740,16 +747,11 @@ func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 		// This can be an executor with default configuration.
 		step.ExecutorConfig.Type = val
 
-	case map[any]any:
+	case map[string]any:
 		// Case 3: executor is a struct
 		// In this case, the executor is a struct with type and config fields.
 		// Config is a map of string keys and values.
-		for k, v := range val {
-			key, ok := k.(string)
-			if !ok {
-				return wrapError("executor.config", k, ErrExecutorConfigMustBeString)
-			}
-
+		for key, v := range val {
 			switch key {
 			case executorKeyType:
 				// Executor type is a string.
@@ -763,15 +765,11 @@ func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 				// Executor config is a map of string keys and values.
 				// The values can be of any type.
 				// It is up to the executor to parse the values.
-				executorConfig, ok := v.(map[any]any)
+				executorConfig, ok := v.(map[string]any)
 				if !ok {
 					return wrapError("executor.config", v, ErrExecutorConfigValueMustBeMap)
 				}
-				for k, v := range executorConfig {
-					configKey, ok := k.(string)
-					if !ok {
-						return wrapError("executor.config", k, ErrExecutorConfigMustBeString)
-					}
+				for configKey, v := range executorConfig {
 					step.ExecutorConfig.Config[configKey] = v
 				}
 
@@ -788,9 +786,7 @@ func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 
 	}
 
-	// Convert map[any]any to map[string]any for executor config.
-	// It is up to the executor to parse the values.
-	return convertMap(step.ExecutorConfig.Config)
+	return nil
 }
 
 // assignValues Assign values to command parameters
@@ -804,45 +800,6 @@ func assignValues(command string, params map[string]string) string {
 	}
 
 	return updatedCommand
-}
-
-// convertMap converts a map[any]any to a map[string]any.
-func convertMap(m map[string]any) error {
-	if m == nil {
-		return nil
-	}
-
-	queue := []map[string]any{m}
-
-	for len(queue) > 0 {
-		curr := queue[0]
-
-		for k, v := range curr {
-			mm, ok := v.(map[any]any)
-			if !ok {
-				// TODO: do we need to return an error here?
-				continue
-			}
-
-			ret := make(map[string]any)
-			for kk, vv := range mm {
-				key, err := parseKey(kk)
-				if err != nil {
-					return fmt.Errorf(
-						"%w: %s", ErrExecutorConfigMustBeString, err,
-					)
-				}
-				ret[key] = vv
-			}
-
-			delete(curr, k)
-			curr[k] = ret
-			queue = append(queue, ret)
-		}
-		queue = queue[1:]
-	}
-
-	return nil
 }
 
 func parseKey(value any) (string, error) {
@@ -874,18 +831,26 @@ func parseIntOrArray(v any) ([]int, error) {
 	switch v := v.(type) {
 	case nil:
 		return nil, nil
-
+	case int64:
+		return []int{int(v)}, nil
+	case uint64:
+		return []int{int(v)}, nil
 	case int:
 		return []int{v}, nil
 
 	case []any:
 		var ret []int
 		for _, vv := range v {
-			i, ok := vv.(int)
-			if !ok {
+			switch vv := vv.(type) {
+			case int:
+				ret = append(ret, vv)
+			case int64:
+				ret = append(ret, int(vv))
+			case uint64:
+				ret = append(ret, int(vv))
+			default:
 				return nil, fmt.Errorf("int or array expected, got %T", vv)
 			}
-			ret = append(ret, i)
 		}
 		return ret, nil
 

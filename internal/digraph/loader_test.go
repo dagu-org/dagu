@@ -44,7 +44,7 @@ func TestLoad(t *testing.T) {
 		testDAG := test.TestdataPath(t, filepath.Join("digraph", "err_parse.yaml"))
 		_, err := digraph.Load(context.Background(), testDAG)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "cannot unmarshal")
+		require.Contains(t, err.Error(), "invalidyaml")
 	})
 	t.Run("MetadataOnly", func(t *testing.T) {
 		t.Parallel()

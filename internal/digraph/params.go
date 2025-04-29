@@ -160,7 +160,7 @@ func parseParamValue(ctx BuildContext, input any) ([]paramPair, error) {
 	case []string:
 		return parseListParams(ctx, v)
 
-	case map[any]any:
+	case map[string]any:
 		return parseMapParams(ctx, []any{v})
 
 	default:
@@ -195,9 +195,8 @@ func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 			}
 			params = append(params, parsedParams...)
 
-		case map[any]any:
+		case map[string]any:
 			for name, value := range m {
-				var nameStr string
 				var valueStr string
 
 				switch v := value.(type) {
@@ -209,15 +208,6 @@ func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 
 				}
 
-				switch n := name.(type) {
-				case string:
-					nameStr = n
-
-				default:
-					return nil, wrapError("params", name, fmt.Errorf("%w: %T", ErrInvalidParamValue, n))
-
-				}
-
 				if !ctx.opts.NoEval {
 					parsed, err := cmdutil.EvalString(ctx.ctx, valueStr)
 					if err != nil {
@@ -226,7 +216,7 @@ func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 					valueStr = parsed
 				}
 
-				paramPair := paramPair{nameStr, valueStr}
+				paramPair := paramPair{name, valueStr}
 				params = append(params, paramPair)
 			}
 
