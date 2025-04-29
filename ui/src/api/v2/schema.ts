@@ -296,7 +296,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/runs/{dagName}/{requestId}/{stepName}/log": {
+    "/runs/{dagName}/{requestId}/steps/{stepName}/log": {
         parameters: {
             query?: never;
             header?: never;
@@ -316,7 +316,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/runs/{dagName}/{requestId}/{stepName}/status": {
+    "/runs/{dagName}/{requestId}/steps/{stepName}/status": {
         parameters: {
             query?: never;
             header?: never;
@@ -411,8 +411,6 @@ export interface components {
             group?: string;
             /** @description Logical name of the DAG */
             name: string;
-            /** @description Physical name of the DAG file */
-            location: string;
             /** @description List of scheduling expressions defining when the DAG should run */
             schedule?: components["schemas"]["Schedule"][];
             /** @description Human-readable description of the DAG's purpose and behavior */
@@ -464,8 +462,6 @@ export interface components {
         NodeStatusText: NodeStatusText;
         /** @description Detailed DAG configuration information */
         DAGDetails: {
-            /** @description Path to the DAG file */
-            location: string;
             /** @description Logical grouping of related DAGs for organizational purposes */
             group?: string;
             /** @description Unique identifier for the DAG within its group */
@@ -569,7 +565,7 @@ export interface components {
             output?: string;
             /** @description List of arguments to pass to the command */
             args?: string[];
-            /** @description Sub DAG to run */
+            /** @description The name of the DAG to run as a sub-DAG */
             run?: string;
             /** @description Parameters to pass to the sub DAG in JSON format */
             params?: string;

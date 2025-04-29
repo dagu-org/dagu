@@ -62,7 +62,6 @@ function App({ config }: Props) {
     // We only want this effect to run if remoteNodes changes,
     // or selectedRemoteNode becomes invalid relative to remoteNodes.
     // Adding handleSelectRemoteNode to deps would cause unnecessary runs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remoteNodes, selectedRemoteNode]);
 
   return (

@@ -31,6 +31,8 @@
     "-": "^0.0.1",
     "@babel/core": "^7.26.10",
     "@babel/preset-react": "^7.26.3",
+    "@eslint/eslintrc": "^3.3.1",
+    "@eslint/js": "^9.25.1",
     "@tailwindcss/postcss": "^4.1.4",
     "@types/lodash-es": "^4.17.12",
     "@types/react": "^19.1.2",
