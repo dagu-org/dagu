@@ -61,7 +61,7 @@ Dagu’s design emphasizes minimal external dependencies: it operates solely as 
   - [Script Execution](#script-execution)
   - [Variable Passing](#variable-passing)
   - [Scheduling](#scheduling)
-  - [Calling a sub-DAG](#calling-a-sub-dag)
+  - [Nested DAGs](#nested-dags)
   - [Running a docker image](#running-a-docker-image)
   - [Environment Variables](#environment-variables)
   - [Notifications on Failure or Success](#notifications-on-failure-or-success)
@@ -499,21 +499,23 @@ steps:
     command: job.sh
 ```
 
-### Calling a sub-DAG
+### Nested DAGs
 
-You can call another DAG from a parent DAG.
+You can specifies another DAG as a step in the parent DAG. This allows you to create reusable components or sub-DAGs. Sub DAGs can be multiple levels deep.
+
+Here is an example of a parent DAG that calls a sub-DAG:
 
 ```yaml
 steps:
-  - name: parent
+  - name: run_sub-dag
     run: sub-dag
     output: OUT
   - name: use output
     command: echo ${OUT.outputs.result}
-    depends: parent
+    depends: run_sub-dag
 ```
 
-The sub-DAG `sub-dag.yaml`:
+And here is the sub-DAG:
 
 ```yaml
 steps:
