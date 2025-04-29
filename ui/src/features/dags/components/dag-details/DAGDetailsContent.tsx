@@ -101,10 +101,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             formatDuration={formatDuration}
           />
           <div className="my-4 flex flex-row justify-between items-center">
-            <Tabs
-              value={activeTab}
-              className="bg-white p-1.5 rounded-lg shadow-sm border border-gray-100/80"
-            >
+            <Tabs className="bg-white p-1.5 rounded-lg shadow-sm border border-gray-100/80">
               {isModal ? (
                 <ModalLinkTab
                   label="Status"
@@ -185,11 +182,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             {activeTab === 'spec' ? <DAGSpec fileId={fileId} /> : null}
             {activeTab === 'history' ? (
               <div data-tab="history">
-                <DAGExecutionHistory
-                  fileId={fileId || ''}
-                  isInModal={isModal}
-                  activeTab={activeTab}
-                />
+                <DAGExecutionHistory fileId={fileId || ''} />
               </div>
             ) : null}
             {activeTab === 'scheduler-log' ? (

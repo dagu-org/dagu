@@ -123,7 +123,6 @@ enum ItemKind {
 type Data = RowItem & { subRows?: RowItem[] };
 
 declare module '@tanstack/react-table' {
-   
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface TableMeta<TData extends RowData> {
     group: string;
@@ -824,7 +823,7 @@ function DAGTable({
   });
 
   // Store the table instance in the ref with type assertion
-  tableInstanceRef.current = instance as any;
+  tableInstanceRef.current = instance as ReturnType<typeof useReactTable>;
 
   const appBarContext = React.useContext(AppBarContext);
   const { data: uniqueTags } = useQuery('/dags/tags', {
@@ -1010,10 +1009,6 @@ function DAGTable({
                 // For DAG rows, make the entire row clickable
                 const isDAGRow = row.original?.kind === ItemKind.DAG;
                 // Type guard to ensure we only access dag property when it exists
-                const navigateTo =
-                  isDAGRow && 'dag' in row.original
-                    ? `/dags/${(row.original as DAGRow).dag.fileId}`
-                    : undefined;
 
                 return (
                   <TableRow

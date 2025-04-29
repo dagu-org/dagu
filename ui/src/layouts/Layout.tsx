@@ -1,8 +1,3 @@
-import * as React from 'react';
-import { cn } from '@/lib/utils';
-import { useUserPreferences } from '../contexts/UserPreference'; // Import the hook
-import { mainListItems as MainListItems } from '../menu';
-import { AppBarContext } from '../contexts/AppBarContext';
 import {
   Select,
   SelectContent,
@@ -10,7 +5,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'; // Import panel icons
+import { cn } from '@/lib/utils';
+import * as React from 'react';
+import { AppBarContext } from '../contexts/AppBarContext';
+import { mainListItems as MainListItems } from '../menu';
 
 // Utility: Get contrast color (black or white) for a given background color (hex, rgb, or named)
 function getContrastColor(input?: string): string {

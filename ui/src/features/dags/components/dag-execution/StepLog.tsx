@@ -60,16 +60,19 @@ function StepLog({ dagName: fileId, requestId, stepName }: Props) {
   }
 
   // Remove ANSI color codes from log content
-  const content = data.content.replace(new RegExp(ANSI_CODES_REGEX, 'g'), '');
+  const logContent =
+    data && typeof data === 'object' && 'content' in data
+      ? (data.content as string).replace(new RegExp(ANSI_CODES_REGEX, 'g'), '')
+      : '';
 
   // Split content into lines for better rendering
-  const lines = content ? content.split('\n') : ['<No log output>'];
+  const lines = logContent ? logContent.split('\n') : ['<No log output>'];
 
   return (
     <div className="w-full h-full">
       <div className="h-full overflow-auto rounded-lg bg-zinc-900 p-4 shadow-md">
         <pre className="h-full font-mono text-sm text-white">
-          {lines.map((line, index) => (
+          {lines.map((line: string, index: number) => (
             <div
               key={index}
               className="flex hover:bg-zinc-800 px-2 py-0.5 rounded"

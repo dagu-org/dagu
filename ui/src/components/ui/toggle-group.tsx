@@ -1,5 +1,5 @@
-import React from 'react';
 import { cn } from '@/lib/utils';
+import React from 'react';
 
 type ToggleGroupProps = {
   value: string;
@@ -10,12 +10,10 @@ type ToggleGroupProps = {
 };
 
 export const ToggleGroup = ({
-  value,
-  onChange,
   children,
   className,
   'aria-label': ariaLabel,
-}: ToggleGroupProps) => {
+}: Omit<ToggleGroupProps, 'value' | 'onChange'>) => {
   return (
     <div
       className={cn('inline-flex rounded-md border bg-background', className)}

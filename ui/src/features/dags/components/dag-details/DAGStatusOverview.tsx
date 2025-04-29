@@ -61,7 +61,7 @@ function DAGStatusOverview({
     if (!timestamp || timestamp === '-') return '-';
     try {
       return dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss Z');
-    } catch (e) {
+    } catch {
       return timestamp;
     }
   };

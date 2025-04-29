@@ -52,9 +52,8 @@ function DAGEditor({
   onChange,
   readOnly = false,
   lineNumbers = true,
-  highlightLine,
   className,
-}: Props) {
+}: Omit<Props, 'highlightLine'>) {
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
 
   // Clean up editor on unmount

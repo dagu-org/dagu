@@ -35,7 +35,7 @@ function DAGStatus({ run, fileId }: Props) {
     status: NodeStatus
   ) => {
     const { error } = await client.PATCH(
-      '/runs/{dagName}/{requestId}/{stepName}/status',
+      '/runs/{dagName}/{requestId}/steps/{stepName}/status',
       {
         params: {
           path: {

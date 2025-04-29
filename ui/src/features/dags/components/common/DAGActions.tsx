@@ -63,7 +63,9 @@ function DAGActions({
    * Reload DAG data after an action is performed
    */
   const reloadData = () => {
-    refresh && refresh();
+    if (refresh) {
+      refresh();
+    }
   };
 
   // Determine which buttons should be enabled based on current status

@@ -26,7 +26,7 @@ type Props = {
 /**
  * DAGStepTable displays a table of steps in a DAG with their properties
  */
-function DAGStepTable({ steps, title }: Props) {
+function DAGStepTable({ steps }: Props) {
   // Don't render if there are no steps
   if (!steps.length) {
     return null;

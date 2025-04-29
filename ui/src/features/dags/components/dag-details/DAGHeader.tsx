@@ -8,7 +8,7 @@ import { RunDetailsContext } from '../../contexts/DAGStatusContext';
 import { DAGActions } from '../common';
 
 interface DAGHeaderProps {
-  dag: any;
+  dag: components['schemas']['DAG'] | components['schemas']['DAGDetails'];
   latestRun: components['schemas']['RunDetails'];
   fileId: string;
   refreshFn: () => void;

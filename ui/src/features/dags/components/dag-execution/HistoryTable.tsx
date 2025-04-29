@@ -3,20 +3,17 @@
  *
  * @module features/dags/components/dag-execution
  */
-import dayjs from '../../../../lib/dayjs';
-import React from 'react';
-import HistoryTableRow from './HistoryTableRow';
 import {
   Table,
   TableBody,
-  TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import BorderedBox from '../../../../ui/BorderedBox';
-import { components } from '../../../../api/v2/schema';
 import { cn } from '@/lib/utils';
+import { components } from '../../../../api/v2/schema';
+import dayjs from '../../../../lib/dayjs';
+import HistoryTableRow from './HistoryTableRow';
 
 /**
  * Props for the HistoryTable component

@@ -4,7 +4,15 @@ import React from 'react';
 
 interface BorderedBoxProps extends React.ComponentProps<typeof Card> {
   children?: React.ReactNode;
-  sx?: Record<string, any>; // Keep sx prop for backward compatibility
+  sx?: {
+    mt?: number;
+    py?: number;
+    px?: number;
+    display?: string;
+    flexDirection?: string;
+    overflowX?: string;
+    [key: string]: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  }; // Keep sx prop for backward compatibility
 }
 
 export default function BorderedBox({

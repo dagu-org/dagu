@@ -40,7 +40,7 @@ const formatTimestamp = (timestamp: string | undefined) => {
   if (!timestamp || timestamp == '-') return '-';
   try {
     return dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss Z');
-  } catch (e) {
+  } catch {
     return timestamp;
   }
 };
@@ -77,7 +77,7 @@ const calculateDuration = (
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
     return `${hours}h ${remainingMinutes}m ${remainingSeconds}s`;
-  } catch (e) {
+  } catch {
     return '-';
   }
 };

@@ -28,11 +28,7 @@ function FlowchartSwitch({ value = 'TD', onChange }: Props) {
 
   return (
     <div className="flex flex-col items-start">
-      <ToggleGroup
-        value={value}
-        onChange={handleChange}
-        aria-label="flowchart direction"
-      >
+      <ToggleGroup aria-label="flowchart direction">
         <ToggleButton
           value="LR"
           groupValue={value}

@@ -17,7 +17,7 @@ function Search() {
   // Use a conditional key pattern - this is a standard SWR pattern for conditional fetching
   // When q is empty, we pass undefined for the first parameter, which tells SWR not to fetch
   const { data, isLoading } = useQuery(
-    q ? '/dags/search' : (undefined as any),
+    q ? '/dags/search' : (undefined as any), // eslint-disable-line @typescript-eslint/no-explicit-any
     q
       ? {
           params: {

@@ -28,8 +28,8 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
     components['schemas']['RunDetails'] | undefined
   >();
   const [activeTab, setActiveTab] = React.useState('status');
-  const [requestId, setRequestId] = React.useState<string>('latest');
-  const [stepName, setStepName] = React.useState<string | null>(null);
+  const [requestId] = React.useState<string>('latest');
+  const [stepName] = React.useState<string | null>(null);
 
   const { data, isLoading, mutate } = useQuery(
     '/dags/{fileId}',

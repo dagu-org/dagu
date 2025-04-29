@@ -1,12 +1,12 @@
-import * as React from 'react';
 import { cn } from '@/lib/utils';
+import * as React from 'react';
 
 interface TabsProps extends React.HTMLAttributes<HTMLDivElement> {
   value: string;
   children: React.ReactNode;
 }
 
-function Tabs({ className, value, children, ...props }: TabsProps) {
+function Tabs({ className, children, ...props }: Omit<TabsProps, 'value'>) {
   return (
     <div
       className={cn(
@@ -25,7 +25,12 @@ interface TabProps extends React.HTMLAttributes<HTMLButtonElement> {
   isActive?: boolean;
 }
 
-function Tab({ className, value, isActive, children, ...props }: TabProps) {
+function Tab({
+  className,
+  isActive,
+  children,
+  ...props
+}: Omit<TabProps, 'value'>) {
   return (
     <button
       className={cn(
@@ -44,4 +49,4 @@ function Tab({ className, value, isActive, children, ...props }: TabProps) {
   );
 }
 
-export { Tabs, Tab };
+export { Tab, Tabs };

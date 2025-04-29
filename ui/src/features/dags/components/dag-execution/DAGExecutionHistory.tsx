@@ -32,7 +32,9 @@ type Props = {
  * DAGExecutionHistory displays the execution history of a DAG
  * including a history table, graph visualization, and status details
  */
-function DAGExecutionHistory({ fileId, isInModal, activeTab }: Props) {
+function DAGExecutionHistory({
+  fileId,
+}: Omit<Props, 'isInModal' | 'activeTab'>) {
   const appBarContext = React.useContext(AppBarContext);
 
   // Fetch execution history data
@@ -201,7 +203,7 @@ function DAGHistoryTable({ gridData, runs }: HistoryTableProps) {
 
     // Call the API to update the step status
     const { error } = await client.PATCH(
-      '/runs/{dagName}/{requestId}/{stepName}/status',
+      '/runs/{dagName}/{requestId}/steps/{stepName}/status',
       {
         params: {
           path: {

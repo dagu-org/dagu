@@ -1,7 +1,7 @@
+import { cn } from '@/lib/utils'; // Assuming cn utility is available
+import { BarChart2, List, Search } from 'lucide-react';
 import * as React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart2, Search, List } from 'lucide-react';
-import { cn } from '@/lib/utils'; // Assuming cn utility is available
 
 // Reusable Icon component using Lucide React
 function Icon({
@@ -33,7 +33,7 @@ type MainListItemsProps = {
 export const mainListItems = React.forwardRef<
   HTMLDivElement,
   MainListItemsProps
->(({ isOpen = false, onNavItemClick }, ref) => (
+>(({ isOpen = false }, ref) => (
   <div ref={ref} className="flex flex-col h-full">
     {/* Fixed height header with absolute positioning for fixed logo */}
     <div className="h-12 relative mb-2">

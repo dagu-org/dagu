@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useLocation, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { components } from '../../../api/v2/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { DAGDetailsContent } from '../../../features/dags/components/dag-details';
@@ -18,8 +18,7 @@ type Params = {
 function DAGDetails() {
   const params = useParams<Params>();
   const appBarContext = React.useContext(AppBarContext);
-  const { pathname } = useLocation();
-  const { data, isLoading, mutate } = useQuery(
+  const { data, isLoading } = useQuery(
     '/dags/{fileId}',
     {
       params: {
