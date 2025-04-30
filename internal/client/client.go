@@ -215,7 +215,7 @@ func (*client) currentStatus(_ context.Context, dag *digraph.DAG) (*persistence.
 
 func (e *client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (persistence.Status, error) {
 	currStatus, _ := e.currentStatus(ctx, dag)
-	if currStatus != nil {
+	if currStatus != nil && currStatus.Status != scheduler.StatusNone {
 		return *currStatus, nil
 	}
 
