@@ -986,7 +986,7 @@ components:
         3: "Cancelled"
         4: "Success"
 
-    StatusText:
+    StatusLabel:
       type: string
       description: "Human-readable status description for the DAG run"
       enum:
@@ -1015,7 +1015,7 @@ components:
         4: "Success"
         5: "Skipped"
 
-    NodeStatusText:
+    NodeStatusLabel:
       type: string
       description: "Human-readable status description for the node"
       enum:
@@ -1113,8 +1113,8 @@ components:
           $ref: "#/components/schemas/DAGName"
         status:
           $ref: "#/components/schemas/Status"
-        statusText:
-          $ref: "#/components/schemas/StatusText"
+        statusLabel:
+          $ref: "#/components/schemas/StatusLabel"
         pid:
           type: integer
           description: "Process ID of the DAG run"
@@ -1134,7 +1134,7 @@ components:
         - requestId
         - name
         - status
-        - statusText
+        - statusLabel
         - startedAt
         - finishedAt
         - log
@@ -1180,8 +1180,8 @@ components:
           description: "RFC3339 timestamp when the step finished"
         status:
           $ref: "#/components/schemas/NodeStatus"
-        statusText:
-          $ref: "#/components/schemas/NodeStatusText"
+        statusLabel:
+          $ref: "#/components/schemas/NodeStatusLabel"
         retryCount:
           type: integer
           description: "Number of retry attempts made for this step"
@@ -1197,7 +1197,7 @@ components:
         - startedAt
         - finishedAt
         - status
-        - statusText
+        - statusLabel
         - retryCount
         - doneCount
 

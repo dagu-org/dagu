@@ -425,7 +425,7 @@ function DAGActions({
             {status?.status !== undefined && (
               <LabeledItem label="Status">
                 <StatusChip status={status.status} size="sm">
-                  {status.statusText || ''}
+                  {status.statusLabel || ''}
                 </StatusChip>
               </LabeledItem>
             )}

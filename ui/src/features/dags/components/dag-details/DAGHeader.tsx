@@ -43,7 +43,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
       <div className="flex flex-row items-center gap-4">
         {latestRun.status ? (
           <StatusChip status={latestRun.status}>
-            {latestRun.statusText || ''}
+            {latestRun.statusLabel || ''}
           </StatusChip>
         ) : null}
 

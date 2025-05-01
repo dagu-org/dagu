@@ -91,7 +91,7 @@ function DAGStatusOverview({
   // Count nodes by status
   const nodeStats = status.nodes?.reduce(
     (acc, node) => {
-      const statusKey = node.statusText.toLowerCase().replace(' ', '_');
+      const statusKey = node.statusLabel.toLowerCase().replace(' ', '_');
       acc[statusKey] = (acc[statusKey] || 0) + 1;
       return acc;
     },
@@ -107,7 +107,7 @@ function DAGStatusOverview({
       <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
         <div className="flex items-center gap-2">
           <StatusChip status={status.status} size="md">
-            {status.statusText}
+            {status.statusLabel}
           </StatusChip>
 
           {status.pid && (

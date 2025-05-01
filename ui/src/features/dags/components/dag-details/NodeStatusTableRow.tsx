@@ -232,7 +232,7 @@ function NodeStatusTableRow({
       {/* Status */}
       <TableCell className="text-center">
         <NodeStatusChip status={node.status} size="sm">
-          {node.statusText}
+          {node.statusLabel}
         </NodeStatusChip>
       </TableCell>
 

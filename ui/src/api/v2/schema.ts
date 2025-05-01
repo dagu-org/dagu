@@ -462,7 +462,7 @@ export interface components {
          * @description Human-readable status description for the DAG run
          * @enum {string}
          */
-        StatusText: StatusText;
+        StatusLabel: StatusLabel;
         /**
          * @description Numeric status code indicating current node state:
          *     0: "Not started"
@@ -479,7 +479,7 @@ export interface components {
          * @description Human-readable status description for the node
          * @enum {string}
          */
-        NodeStatusText: NodeStatusText;
+        NodeStatusLabel: NodeStatusLabel;
         /** @description Detailed DAG configuration information */
         DAGDetails: {
             /** @description Logical grouping of related DAGs for organizational purposes */
@@ -524,7 +524,7 @@ export interface components {
             requestId: components["schemas"]["RequestId"];
             name: components["schemas"]["DAGName"];
             status: components["schemas"]["Status"];
-            statusText: components["schemas"]["StatusText"];
+            statusLabel: components["schemas"]["StatusLabel"];
             /** @description Process ID of the DAG run */
             pid?: number;
             /** @description RFC 3339 timestamp when the DAG run started */
@@ -555,7 +555,7 @@ export interface components {
             /** @description RFC3339 timestamp when the step finished */
             finishedAt: string;
             status: components["schemas"]["NodeStatus"];
-            statusText: components["schemas"]["NodeStatusText"];
+            statusLabel: components["schemas"]["NodeStatusLabel"];
             /** @description Number of retry attempts made for this step */
             retryCount: number;
             /** @description Number of successful completions for repeating steps */
@@ -1542,7 +1542,7 @@ export enum Status {
     Cancelled = 3,
     Success = 4
 }
-export enum StatusText {
+export enum StatusLabel {
     not_started = "not started",
     running = "running",
     failed = "failed",
@@ -1557,7 +1557,7 @@ export enum NodeStatus {
     Success = 4,
     Skipped = 5
 }
-export enum NodeStatusText {
+export enum NodeStatusLabel {
     not_started = "not started",
     running = "running",
     failed = "failed",

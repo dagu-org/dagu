@@ -274,15 +274,15 @@ func (a *API) ListAllDAGs(ctx context.Context, request api.ListAllDAGsRequestObj
 
 	for _, item := range result.Items {
 		run := api.RunSummary{
-			Log:        item.Status.Log,
-			Name:       item.Status.Name,
-			Params:     ptr(item.Status.Params),
-			Pid:        ptr(int(item.Status.PID)),
-			RequestId:  item.Status.RequestID,
-			StartedAt:  item.Status.StartedAt,
-			FinishedAt: item.Status.FinishedAt,
-			Status:     api.Status(item.Status.Status),
-			StatusText: api.StatusText(item.Status.Status.String()),
+			Log:         item.Status.Log,
+			Name:        item.Status.Name,
+			Params:      ptr(item.Status.Params),
+			Pid:         ptr(int(item.Status.PID)),
+			RequestId:   item.Status.RequestID,
+			StartedAt:   item.Status.StartedAt,
+			FinishedAt:  item.Status.FinishedAt,
+			Status:      api.Status(item.Status.Status),
+			StatusLabel: api.StatusLabel(item.Status.Status.String()),
 		}
 
 		var loadErrs digraph.ErrorList
@@ -518,15 +518,15 @@ func toPrecondition(obj digraph.Condition) api.Precondition {
 
 func toRunDetails(s persistence.Status) api.RunDetails {
 	status := api.RunDetails{
-		Log:        s.Log,
-		Name:       s.Name,
-		Params:     ptr(s.Params),
-		Pid:        ptr(int(s.PID)),
-		RequestId:  s.RequestID,
-		StartedAt:  s.StartedAt,
-		FinishedAt: s.FinishedAt,
-		Status:     api.Status(s.Status),
-		StatusText: api.StatusText(s.Status.String()),
+		Log:         s.Log,
+		Name:        s.Name,
+		Params:      ptr(s.Params),
+		Pid:         ptr(int(s.PID)),
+		RequestId:   s.RequestID,
+		StartedAt:   s.StartedAt,
+		FinishedAt:  s.FinishedAt,
+		Status:      api.Status(s.Status),
+		StatusLabel: api.StatusLabel(s.Status.String()),
 	}
 	for _, n := range s.Nodes {
 		status.Nodes = append(status.Nodes, toNode(n))
@@ -548,15 +548,15 @@ func toRunDetails(s persistence.Status) api.RunDetails {
 
 func toNode(node *persistence.Node) api.Node {
 	return api.Node{
-		DoneCount:  node.DoneCount,
-		FinishedAt: node.FinishedAt,
-		Log:        node.Log,
-		RetryCount: node.RetryCount,
-		StartedAt:  node.StartedAt,
-		Status:     api.NodeStatus(node.Status),
-		StatusText: api.NodeStatusText(node.Status.String()),
-		Step:       toStep(node.Step),
-		Error:      ptr(node.Error),
+		DoneCount:   node.DoneCount,
+		FinishedAt:  node.FinishedAt,
+		Log:         node.Log,
+		RetryCount:  node.RetryCount,
+		StartedAt:   node.StartedAt,
+		Status:      api.NodeStatus(node.Status),
+		StatusLabel: api.NodeStatusLabel(node.Status.String()),
+		Step:        toStep(node.Step),
+		Error:       ptr(node.Error),
 	}
 }
 

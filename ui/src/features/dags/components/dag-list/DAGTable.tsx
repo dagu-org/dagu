@@ -349,7 +349,7 @@ const defaultColumns = [
         // Use the updated StatusChip component with xs size
         return (
           <StatusChip status={data.dag.latestRun.status} size="xs">
-            {data.dag.latestRun?.statusText}
+            {data.dag.latestRun?.statusLabel}
           </StatusChip>
         );
       }
