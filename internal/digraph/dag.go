@@ -3,6 +3,7 @@ package digraph
 import (
 	// nolint // gosec
 	"crypto/md5"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -89,6 +90,45 @@ type Schedule struct {
 	Expression string `json:"expression"`
 	// Parsed is the parsed cron schedule.
 	Parsed cron.Schedule `json:"-"`
+}
+
+// MarshalJSON implements the json.Marshaler interface.
+func (s Schedule) MarshalJSON() ([]byte, error) {
+	// Create a temporary struct for marshaling
+	type ScheduleAlias struct {
+		Expression string `json:"expression"`
+	}
+
+	return json.Marshal(ScheduleAlias{
+		Expression: s.Expression,
+	})
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+// and also parses the cron expression to populate the Parsed field.
+func (s *Schedule) UnmarshalJSON(data []byte) error {
+	// Create a temporary struct for unmarshaling
+	type ScheduleAlias struct {
+		Expression string `json:"expression"`
+	}
+
+	var alias ScheduleAlias
+	if err := json.Unmarshal(data, &alias); err != nil {
+		return err
+	}
+
+	s.Expression = alias.Expression
+
+	// Parse the cron expression to populate the Parsed field
+	if s.Expression != "" {
+		parsed, err := cron.ParseStandard(s.Expression)
+		if err != nil {
+			return fmt.Errorf("invalid cron expression %q: %w", s.Expression, err)
+		}
+		s.Parsed = parsed
+	}
+
+	return nil
 }
 
 // HandlerOn contains the steps to be executed on different events in the DAG.
