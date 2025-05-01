@@ -13,10 +13,8 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
 )
 
-const (
-	// SubRunsDir is the name of the directory where sub-runs are stored.
-	SubRunsDir = "subs"
-)
+// SubRunsDir is the name of the directory where sub-runs are stored.
+const SubRunsDir = "sub-runs"
 
 // Run represents a single run of a DAG with its associated timestamp and request ID.
 type Run struct {
