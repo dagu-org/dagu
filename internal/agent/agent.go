@@ -528,7 +528,7 @@ func (a *Agent) checkPreconditions(ctx context.Context) error {
 	}
 	// If one of the conditions does not met, cancel the execution.
 	if err := digraph.EvalConditions(ctx, a.dag.Preconditions); err != nil {
-		logger.Error(ctx, "Preconditions are not met", "err", err)
+		logger.Info(ctx, "Preconditions are not met", "err", err)
 		a.scheduler.Cancel(ctx, a.graph)
 		return err
 	}
