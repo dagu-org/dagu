@@ -54,7 +54,7 @@ tls:
   certFile: "/path/to/cert.pem"
   keyFile: "/path/to/key.pem"
 `
-	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	err := os.WriteFile(configFile, []byte(configContent), 0640)
 	require.NoError(t, err)
 
 	// Load the configuration using the provided config file option.
@@ -138,7 +138,7 @@ auth:
     username: ""
     password: "secret"
 `
-	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	err := os.WriteFile(configFile, []byte(configContent), 0640)
 	require.NoError(t, err)
 
 	_, err = config.Load(config.WithConfigFile(configFile))
@@ -156,7 +156,7 @@ tls:
   certFile: "/path/to/cert.pem"
   keyFile: ""
 `
-	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	err := os.WriteFile(configFile, []byte(configContent), 0640)
 	require.NoError(t, err)
 
 	_, err = config.Load(config.WithConfigFile(configFile))
@@ -252,7 +252,7 @@ func TestSetExecutable(t *testing.T) {
 paths:
   executable: ""
 `
-	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	err := os.WriteFile(configFile, []byte(configContent), 0640)
 	require.NoError(t, err)
 
 	cfg, err := config.Load(config.WithConfigFile(configFile))
@@ -270,7 +270,7 @@ func TestCleanBasePath(t *testing.T) {
 	configContent := `
 basePath: "////dagu//"
 `
-	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	err := os.WriteFile(configFile, []byte(configContent), 0640)
 	require.NoError(t, err)
 
 	cfg, err := config.Load(config.WithConfigFile(configFile))

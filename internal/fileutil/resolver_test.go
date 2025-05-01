@@ -14,7 +14,7 @@ func TestFileResolver(t *testing.T) {
 
 	// Create test directories
 	for _, dir := range []string{dir1, dir2} {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0750); err != nil {
 			t.Fatalf("Failed to create test directory: %v", err)
 		}
 	}
@@ -30,7 +30,7 @@ func TestFileResolver(t *testing.T) {
 	}
 
 	for path, content := range testFiles {
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(path, []byte(content), 0640); err != nil {
 			t.Fatalf("Failed to create test file: %v", err)
 		}
 	}

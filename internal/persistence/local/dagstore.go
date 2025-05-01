@@ -96,8 +96,7 @@ func (d *dagStoreImpl) GetSpec(_ context.Context, name string) (string, error) {
 }
 
 // FileMode used for newly created DAG files
-// TODO: Consider using more restrictive permissions (0600) for security
-const defaultPerm os.FileMode = 0744
+const defaultPerm os.FileMode = 0640
 
 func (d *dagStoreImpl) LoadSpec(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error) {
 	// Validate the spec before saving it.
