@@ -26,7 +26,6 @@ func (f *StatusFactory) Default() Status {
 	return Status{
 		Name:       f.dag.GetName(),
 		Status:     scheduler.StatusNone,
-		StatusText: scheduler.StatusNone.String(),
 		PID:        PID(0),
 		Nodes:      FromSteps(f.dag.Steps),
 		OnExit:     nodeOrNil(f.dag.HandlerOn.Exit),
@@ -119,7 +118,6 @@ func (f *StatusFactory) Create(
 	statusObj := f.Default()
 	statusObj.RequestID = requestID
 	statusObj.Status = status
-	statusObj.StatusText = status.String()
 	statusObj.PID = PID(pid)
 	statusObj.StartedAt = FormatTime(startedAt)
 
@@ -147,7 +145,6 @@ type Status struct {
 	RequestID     string           `json:"requestId,omitempty"`
 	Name          string           `json:"name,omitempty"`
 	Status        scheduler.Status `json:"status"`
-	StatusText    string           `json:"statusText"`
 	PID           PID              `json:"pid,omitempty"`
 	Nodes         []*Node          `json:"nodes,omitempty"`
 	OnExit        *Node            `json:"onExit,omitempty"`
@@ -165,7 +162,6 @@ type Status struct {
 func (st *Status) SetStatusToErrorIfRunning() {
 	if st.Status == scheduler.StatusRunning {
 		st.Status = scheduler.StatusError
-		st.StatusText = st.Status.String()
 	}
 }
 

@@ -39,7 +39,6 @@ func FromNode(node scheduler.NodeData) *Node {
 		StartedAt:  stringutil.FormatTime(node.State.StartedAt),
 		FinishedAt: stringutil.FormatTime(node.State.FinishedAt),
 		Status:     node.State.Status,
-		StatusText: node.State.Status.String(),
 		RetriedAt:  stringutil.FormatTime(node.State.RetriedAt),
 		RetryCount: node.State.RetryCount,
 		DoneCount:  node.State.DoneCount,
@@ -59,7 +58,6 @@ type Node struct {
 	RetryCount int                  `json:"retryCount,omitempty"`
 	DoneCount  int                  `json:"doneCount,omitempty"`
 	Error      string               `json:"error,omitempty"`
-	StatusText string               `json:"statusText"`
 	SubRuns    []SubRun             `json:"subRuns,omitempty"`
 }
 
@@ -96,7 +94,6 @@ func NewNode(step digraph.Step) *Node {
 		StartedAt:  "-",
 		FinishedAt: "-",
 		Status:     scheduler.NodeStatusNone,
-		StatusText: scheduler.NodeStatusNone.String(),
 	}
 }
 

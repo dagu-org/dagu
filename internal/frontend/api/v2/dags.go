@@ -282,7 +282,7 @@ func (a *API) ListAllDAGs(ctx context.Context, request api.ListAllDAGsRequestObj
 			StartedAt:  item.Status.StartedAt,
 			FinishedAt: item.Status.FinishedAt,
 			Status:     api.Status(item.Status.Status),
-			StatusText: api.StatusText(item.Status.StatusText),
+			StatusText: api.StatusText(item.Status.Status.String()),
 		}
 
 		var loadErrs digraph.ErrorList
@@ -526,7 +526,7 @@ func toRunDetails(s persistence.Status) api.RunDetails {
 		StartedAt:  s.StartedAt,
 		FinishedAt: s.FinishedAt,
 		Status:     api.Status(s.Status),
-		StatusText: api.StatusText(s.StatusText),
+		StatusText: api.StatusText(s.Status.String()),
 	}
 	for _, n := range s.Nodes {
 		status.Nodes = append(status.Nodes, toNode(n))
@@ -554,7 +554,7 @@ func toNode(node *persistence.Node) api.Node {
 		RetryCount: node.RetryCount,
 		StartedAt:  node.StartedAt,
 		Status:     api.NodeStatus(node.Status),
-		StatusText: api.NodeStatusText(node.StatusText),
+		StatusText: api.NodeStatusText(node.Status.String()),
 		Step:       toStep(node.Step),
 		Error:      ptr(node.Error),
 	}

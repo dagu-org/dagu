@@ -120,7 +120,6 @@ func TestHistoryRecord_Compact(t *testing.T) {
 		if i == 9 {
 			// Make some status changes to create different records
 			status.Status = scheduler.StatusSuccess
-			status.StatusText = scheduler.StatusSuccess.String()
 		}
 
 		if i == 0 {
@@ -374,13 +373,12 @@ func createTestStatus(status scheduler.Status) persistence.Status {
 	dag := createTestDAG()
 
 	return persistence.Status{
-		RequestID:  "test",
-		Name:       dag.Name,
-		Status:     status,
-		StatusText: status.String(),
-		PID:        persistence.PID(12345),
-		StartedAt:  stringutil.FormatTime(time.Now()),
-		Nodes:      persistence.FromSteps(dag.Steps),
+		RequestID: "test",
+		Name:      dag.Name,
+		Status:    status,
+		PID:       persistence.PID(12345),
+		StartedAt: stringutil.FormatTime(time.Now()),
+		Nodes:     persistence.FromSteps(dag.Steps),
 	}
 }
 

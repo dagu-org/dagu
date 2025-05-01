@@ -136,7 +136,7 @@ func renderStepSummary(nodes []*persistence.Node) string {
 			n.Step.Name,
 			n.StartedAt,
 			n.FinishedAt,
-			n.StatusText,
+			n.Status.String(),
 		}
 		if n.Step.Args != nil {
 			dataRow = append(dataRow, strings.Join(n.Step.Args, " "))

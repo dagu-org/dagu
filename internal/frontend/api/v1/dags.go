@@ -454,7 +454,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 			StartedAt:  item.Status.StartedAt,
 			FinishedAt: item.Status.FinishedAt,
 			Status:     api.RunStatus(item.Status.Status),
-			StatusText: api.RunStatusText(item.Status.StatusText),
+			StatusText: api.RunStatusText(item.Status.Status.String()),
 		}
 
 		dag := api.DAGStatusFile{
@@ -659,7 +659,6 @@ func (a *API) updateStatus(
 	}
 
 	status.Nodes[idxToUpdate].Status = to
-	status.Nodes[idxToUpdate].StatusText = to.String()
 
 	if err := a.client.UpdateStatus(ctx, dagStatus.DAG.Name, *status); err != nil {
 		return fmt.Errorf("error updating status: %w", err)
@@ -775,7 +774,7 @@ func toStatus(s persistence.Status) api.DAGStatusDetails {
 		StartedAt:  s.StartedAt,
 		FinishedAt: s.FinishedAt,
 		Status:     api.RunStatus(s.Status),
-		StatusText: api.RunStatusText(s.StatusText),
+		StatusText: api.RunStatusText(s.Status.String()),
 	}
 	for _, n := range s.Nodes {
 		status.Nodes = append(status.Nodes, toNode(n))
@@ -803,7 +802,7 @@ func toNode(node *persistence.Node) api.Node {
 		RetryCount: node.RetryCount,
 		StartedAt:  node.StartedAt,
 		Status:     api.NodeStatus(node.Status),
-		StatusText: api.NodeStatusText(node.StatusText),
+		StatusText: api.NodeStatusText(node.Status.String()),
 		Step:       toStep(node.Step),
 		Error:      ptr(node.Error),
 	}
