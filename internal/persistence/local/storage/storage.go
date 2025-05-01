@@ -10,10 +10,8 @@ type Storage struct {
 	Dir string
 }
 
-var (
-	// TODO: use 0600 // nolint: gosec
-	defaultPermission os.FileMode = 0744
-)
+// defaultPermission is the default permission for the directory.
+var defaultPermission os.FileMode = 0750
 
 // NewStorage creates a new storage.
 func NewStorage(dir string) *Storage {

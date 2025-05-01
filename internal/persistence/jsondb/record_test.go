@@ -131,7 +131,7 @@ func TestHistoryRecord_Compact(t *testing.T) {
 			data, err := json.Marshal(status)
 			require.NoError(t, err)
 
-			f, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0644)
+			f, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0600)
 			require.NoError(t, err)
 
 			_, err = f.Write(append(data, '\n'))
@@ -245,7 +245,7 @@ func TestHistoryRecord_InvalidJSON(t *testing.T) {
 	writeJSONToFile(t, file, validStatus)
 
 	// Append invalid JSON
-	f, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0600)
 	require.NoError(t, err)
 	_, err = f.Write([]byte("invalid json\n"))
 	require.NoError(t, err)
@@ -264,7 +264,7 @@ func TestReadLineFrom(t *testing.T) {
 
 	// Create a test file with multiple lines
 	content := "line1\nline2\nline3\n"
-	err := os.WriteFile(file, []byte(content), 0644)
+	err := os.WriteFile(file, []byte(content), 0600)
 	require.NoError(t, err)
 
 	f, err := os.Open(file)
@@ -302,7 +302,7 @@ func TestSafeRename(t *testing.T) {
 	targetFile := filepath.Join(dir, "target.txt")
 
 	// Create source file
-	err := os.WriteFile(sourceFile, []byte("test content"), 0644)
+	err := os.WriteFile(sourceFile, []byte("test content"), 0600)
 	require.NoError(t, err)
 
 	// Test rename when target doesn't exist
@@ -312,7 +312,7 @@ func TestSafeRename(t *testing.T) {
 	assert.NoFileExists(t, sourceFile)
 
 	// Create source again
-	err = os.WriteFile(sourceFile, []byte("new content"), 0644)
+	err = os.WriteFile(sourceFile, []byte("new content"), 0600)
 	require.NoError(t, err)
 
 	// Test rename when target exists
@@ -390,6 +390,6 @@ func writeJSONToFile(t *testing.T, file string, obj any) {
 	data, err := json.Marshal(obj)
 	require.NoError(t, err)
 
-	err = os.WriteFile(file, append(data, '\n'), 0644)
+	err = os.WriteFile(file, append(data, '\n'), 0600)
 	require.NoError(t, err)
 }
