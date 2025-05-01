@@ -13,8 +13,17 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
 )
 
-// SubRunsDir is the name of the directory where sub-runs are stored.
-const SubRunsDir = "sub-runs"
+// SubRunsDir is the name of the directory where status files for sub DAGs are stored.
+const SubRunsDir = "children"
+
+// SubRunsDirPrefix is the prefix for sub-run directories.
+const SubRunsDirPrefix = "child_"
+
+// JSONLStatusFile is the name of the status file for each execution attempt.
+// It contains the status of the DAG run in JSON Lines format.
+// While running the DAG, new lines are appended to this file on each status update.
+// After finishing the run, this file will be compacted into a single JSON line file.
+const JSONLStatusFile = "status.jsonl"
 
 // Run represents a single run of a DAG with its associated timestamp and request ID.
 type Run struct {
@@ -67,12 +76,12 @@ func (e Run) CreateRecord(_ context.Context, ts TimeInUTC, cache *filecache.Cach
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create attempt directory: %w", err)
 	}
-	return NewRecord(filepath.Join(dir, "status.json"), cache, opts...), nil
+	return NewRecord(filepath.Join(dir, JSONLStatusFile), cache, opts...), nil
 }
 
 // CreateSubRun creates a new sub-run with the given timestamp and request ID.
 func (e Run) CreateSubRun(_ context.Context, reqID string) (*Run, error) {
-	dirName := "sub_" + reqID
+	dirName := "child_" + reqID
 	dir := filepath.Join(e.baseDir, SubRunsDir, dirName)
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create sub-run directory: %w", err)
@@ -82,7 +91,7 @@ func (e Run) CreateSubRun(_ context.Context, reqID string) (*Run, error) {
 
 // FindSubRun searches for a sub-run with the specified request ID.
 func (e Run) FindSubRun(_ context.Context, reqID string) (*Run, error) {
-	globPattern := filepath.Join(e.baseDir, SubRunsDir, "sub_"+reqID)
+	globPattern := filepath.Join(e.baseDir, SubRunsDir, "child_"+reqID)
 	matches, err := filepath.Glob(globPattern)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list sub-run directories: %w", err)
@@ -106,7 +115,7 @@ func (e Run) LatestRecord(_ context.Context, cache *filecache.Cache[*persistence
 	}
 	// Return the first valid attempt
 	for _, attempt := range attempts {
-		record := NewRecord(filepath.Join(e.baseDir, attempt, "status.json"), cache)
+		record := NewRecord(filepath.Join(e.baseDir, attempt, JSONLStatusFile), cache)
 		if record.Exists() {
 			return record, nil
 		}
@@ -132,7 +141,7 @@ func (e Run) Remove() error {
 // Regular expressions for parsing directory names
 var reRun = regexp.MustCompile(`^run_(\d{8}_\d{6}Z)_(.*)$`)          // Matches runs directory names
 var reAttempt = regexp.MustCompile(`^attempt_(\d{8}_\d{6}_\d{3}Z)$`) // Matches attempt directory names
-var reRunSub = regexp.MustCompile(`^sub_(.*)$`)                      // Matches sub-run directory names
+var reRunSub = regexp.MustCompile(`^child_(.*)$`)                    // Matches sub-run directory names
 
 // formatRunTimestamp formats a TimeInUTC instance into a string representation (without milliseconds).
 // The format is "YYYYMMDD_HHMMSSZ".
