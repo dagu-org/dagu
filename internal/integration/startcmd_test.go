@@ -30,7 +30,7 @@ func TestServer_StartWithConfig(t *testing.T) {
 				tempDir := t.TempDir()
 				configFile := filepath.Join(tempDir, "config.yaml")
 				configContent := `logDir: ${TMP_LOGS_DIR}/logs`
-				require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0644))
+				require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0600))
 				return configFile, tempDir
 			},
 			dagPath: func(t *testing.T, _ string) string {
@@ -49,7 +49,7 @@ steps:
   - name: step1
     command: echo "Hello, world!"
 `
-				require.NoError(t, os.WriteFile(dagFile, []byte(dagContent), 0644))
+				require.NoError(t, os.WriteFile(dagFile, []byte(dagContent), 0600))
 				return dagFile, tempDir
 			},
 			dagPath: func(_ *testing.T, tempDir string) string {
@@ -95,10 +95,10 @@ func TestServer_RetrySubDAG(t *testing.T) {
 		// Create temporary DAG file
 		dagFile := filepath.Join(th.Config.Paths.DAGsDir, name)
 		// Create the directory if it doesn't exist
-		err := os.MkdirAll(filepath.Dir(dagFile), 0755)
+		err := os.MkdirAll(filepath.Dir(dagFile), 0750)
 		require.NoError(t, err)
 		// Write the DAG file
-		err = os.WriteFile(dagFile, []byte(content), 0644)
+		err = os.WriteFile(dagFile, []byte(content), 0600)
 		require.NoError(t, err)
 	}
 

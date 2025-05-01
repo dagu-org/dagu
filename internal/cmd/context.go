@@ -431,12 +431,10 @@ func BuildLogFilename(config LogFileSettings) string {
 }
 
 // OpenOrCreateLogFile opens (or creates) the log file with flags for creation, write-only access,
-// appending, and synchronous I/O. It sets file permissions to 0644.
+// appending, and synchronous I/O. It sets file permissions to 0600.
 func OpenOrCreateLogFile(filepath string) (*os.File, error) {
 	flags := os.O_CREATE | os.O_WRONLY | os.O_APPEND | os.O_SYNC
-	permissions := os.FileMode(0644)
-
-	file, err := os.OpenFile(filepath, flags, permissions) //nolint:gosec
+	file, err := os.OpenFile(filepath, flags, 0600) // nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("failed to create/open log file %s: %w", filepath, err)
 	}

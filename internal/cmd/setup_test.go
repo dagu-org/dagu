@@ -130,7 +130,7 @@ func TestCreateLogFile(t *testing.T) {
 
 		info, err := file.Stat()
 		require.NoError(t, err)
-		assert.Equal(t, os.FileMode(0644), info.Mode().Perm())
+		assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
 	})
 
 	t.Run("invalid path", func(t *testing.T) {

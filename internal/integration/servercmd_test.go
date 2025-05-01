@@ -33,7 +33,7 @@ func TestServer_BasePath(t *testing.T) {
 port: %s
 basePath: "/dagu"
 `, port)
-	require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0644))
+	require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0600))
 
 	// Use the provided test helper to set up context and cancellation.
 	th := test.SetupCommand(t)
@@ -103,7 +103,7 @@ remoteNodes:
   - name: "dev"
     apiBaseUrl: "http://127.0.0.1:%s%s/api/v2"
 `, port, tc.basePath, port, tc.basePath)
-			require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0644))
+			require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0600))
 
 			// Use the provided test helper to set up context and cancellation.
 			th := test.SetupCommand(t)
