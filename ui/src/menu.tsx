@@ -1,3 +1,4 @@
+import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils'; // Assuming cn utility is available
 import { BarChart2, List, Search } from 'lucide-react';
 import * as React from 'react';
@@ -33,67 +34,78 @@ type MainListItemsProps = {
 export const mainListItems = React.forwardRef<
   HTMLDivElement,
   MainListItemsProps
->(({ isOpen = false }, ref) => (
-  <div ref={ref} className="flex flex-col h-full">
-    {/* Fixed height header with absolute positioning for fixed logo */}
-    <div className="h-12 relative mb-2">
-      {/* Fixed position logo that doesn't move */}
-      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center z-10">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 100 100"
-          width="24"
-          height="24"
-        >
-          {/* Main circle with dark green color */}
-          <circle cx="50" cy="50" r="45" fill="#4a6741" />
-          {/* Inner ring with slightly lighter color and a gap */}
-          <path
-            d="M50 20
+>(({ isOpen = false, onNavItemClick }, ref) => {
+  // Get version from config at the top level of the component
+  const config = useConfig();
+
+  return (
+    <div ref={ref} className="flex flex-col h-full">
+      {/* Fixed height header with absolute positioning for fixed logo */}
+      <div className="h-12 relative mb-2">
+        {/* Fixed position logo that doesn't move */}
+        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center z-10">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 100 100"
+            width="24"
+            height="24"
+          >
+            {/* Main circle with dark green color */}
+            <circle cx="50" cy="50" r="45" fill="#4a6741" />
+            {/* Inner ring with slightly lighter color and a gap */}
+            <path
+              d="M50 20
                    A30 30 0 1 1 20 50
                    A30 30 0 1 1 80 50"
-            stroke="white"
-            strokeWidth="6"
-            fill="none"
-            strokeLinecap="round"
-          />
-        </svg>
-      </div>
+              stroke="white"
+              strokeWidth="6"
+              fill="none"
+              strokeLinecap="round"
+            />
+          </svg>
+        </div>
 
-      {/* Text container with instant hide/show */}
+        {/* Text container with instant hide/show */}
+        {isOpen && (
+          <div className="absolute inset-0 flex items-center pl-12">
+            <span className="font-bold tracking-wide select-none text-xl text-white">
+              Dagu
+            </span>
+          </div>
+        )}
+      </div>
+      {/* Navigation */}
+      <nav className="flex-1 flex flex-col gap-2 py-2 px-2">
+        <NavItem
+          to="/dashboard"
+          text="Dashboard"
+          icon={<BarChart2 size={18} />}
+          isOpen={isOpen}
+        />
+        <NavItem
+          to="/dags"
+          text="DAGs"
+          icon={<List size={18} />}
+          isOpen={isOpen}
+        />
+        <NavItem
+          to="/search"
+          text="Search"
+          icon={<Search size={18} />}
+          isOpen={isOpen}
+        />
+      </nav>
+      {/* Version display - only shown when sidebar is expanded */}
       {isOpen && (
-        <div className="absolute inset-0 flex items-center pl-12">
-          <span className="font-bold tracking-wide select-none text-xl text-white">
-            Dagu
-          </span>
+        <div className="px-3 py-2 text-xs text-[#7EB36A]/80">
+          <div className="border-t border-white/10 pt-2">
+            Version: {config.version}
+          </div>
         </div>
       )}
     </div>
-    {/* Navigation */}
-    <nav className="flex-1 flex flex-col gap-2 py-2 px-2">
-      <NavItem
-        to="/dashboard"
-        text="Dashboard"
-        icon={<BarChart2 size={18} />}
-        isOpen={isOpen}
-      />
-      <NavItem
-        to="/dags"
-        text="DAGs"
-        icon={<List size={18} />}
-        isOpen={isOpen}
-      />
-      <NavItem
-        to="/search"
-        text="Search"
-        icon={<Search size={18} />}
-        isOpen={isOpen}
-      />
-    </nav>
-    {/* Optional: Sidebar Footer */}
-    {/* Footer removed as per user request */}
-  </div>
-));
+  );
+});
 mainListItems.displayName = 'MainListItems'; // Add display name for DevTools
 
 // Refactored NavItem component using Tailwind
