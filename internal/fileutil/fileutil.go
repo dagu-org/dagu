@@ -10,6 +10,7 @@ import (
 	"strings"
 )
 
+// Common errors for file operations
 var (
 	ErrUnexpectedEOF         = errors.New("unexpected end of input after escape character")
 	ErrUnknownEscapeSequence = errors.New("unknown escape sequence")
