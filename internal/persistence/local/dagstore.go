@@ -96,7 +96,7 @@ func (d *dagStoreImpl) GetSpec(_ context.Context, name string) (string, error) {
 }
 
 // FileMode used for newly created DAG files
-const defaultPerm os.FileMode = 0640
+const defaultPerm os.FileMode = 0600
 
 func (d *dagStoreImpl) LoadSpec(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error) {
 	// Validate the spec before saving it.

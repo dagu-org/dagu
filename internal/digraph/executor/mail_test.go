@@ -27,7 +27,7 @@ func TestMail(t *testing.T) {
 	content := []byte("Test email")
 
 	_ = os.Setenv("MAIL_SUBJECT", "Test Subject")
-	err = os.WriteFile(attachFile, content, 0640)
+	err = os.WriteFile(attachFile, content, 0600)
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
