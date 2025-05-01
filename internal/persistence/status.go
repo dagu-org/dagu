@@ -142,23 +142,23 @@ func StatusFromJSON(s string) (*Status, error) {
 
 // Status represents the complete execution state of a DAG run
 type Status struct {
-	RootDAGName   string           `json:"RootDAGName,omitempty"`
-	RootRequestID string           `json:"RootRequestId,omitempty"`
-	RequestID     string           `json:"RequestId,omitempty"`
-	Name          string           `json:"Name,omitempty"`
-	Status        scheduler.Status `json:"Status"`
-	StatusText    string           `json:"StatusText"`
-	PID           PID              `json:"Pid,omitempty"`
-	Nodes         []*Node          `json:"Nodes,omitempty"`
-	OnExit        *Node            `json:"OnExit,omitempty"`
-	OnSuccess     *Node            `json:"OnSuccess,omitempty"`
-	OnFailure     *Node            `json:"OnFailure,omitempty"`
-	OnCancel      *Node            `json:"OnCancel,omitempty"`
-	StartedAt     string           `json:"StartedAt,omitempty"`
-	FinishedAt    string           `json:"FinishedAt,omitempty"`
-	Log           string           `json:"Log,omitempty"`
-	Params        string           `json:"Params,omitempty"`
-	ParamsList    []string         `json:"ParamsList,omitempty"`
+	RootDAGName   string           `json:"rootDAGName,omitempty"`
+	RootRequestID string           `json:"rootRequestId,omitempty"`
+	RequestID     string           `json:"requestId,omitempty"`
+	Name          string           `json:"name,omitempty"`
+	Status        scheduler.Status `json:"status"`
+	StatusText    string           `json:"statusText"`
+	PID           PID              `json:"pid,omitempty"`
+	Nodes         []*Node          `json:"nodes,omitempty"`
+	OnExit        *Node            `json:"onExit,omitempty"`
+	OnSuccess     *Node            `json:"onSuccess,omitempty"`
+	OnFailure     *Node            `json:"onFailure,omitempty"`
+	OnCancel      *Node            `json:"onCancel,omitempty"`
+	StartedAt     string           `json:"startedAt,omitempty"`
+	FinishedAt    string           `json:"finishedAt,omitempty"`
+	Log           string           `json:"log,omitempty"`
+	Params        string           `json:"params,omitempty"`
+	ParamsList    []string         `json:"paramsList,omitempty"`
 }
 
 // SetStatusToErrorIfRunning changes the status to Error if it is currently Running

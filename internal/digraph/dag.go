@@ -21,58 +21,58 @@ const (
 // DAG contains all information about a workflow.
 type DAG struct {
 	// Location is the absolute path to the DAG file.
-	Location string `json:"Location,omitempty"`
+	Location string `json:"location,omitempty"`
 	// Group is the group name of the DAG. This is optional.
-	Group string `json:"Group,omitempty"`
+	Group string `json:"group,omitempty"`
 	// Name is the name of the DAG. The default is the filename without the extension.
-	Name string `json:"Name,omitempty"`
+	Name string `json:"name,omitempty"`
 	// Dotenv is the path to the dotenv file. This is optional.
-	Dotenv []string `json:"Dotenv,omitempty"`
+	Dotenv []string `json:"dotenv,omitempty"`
 	// Tags contains the list of tags for the DAG. This is optional.
-	Tags []string `json:"Tags,omitempty"`
+	Tags []string `json:"tags,omitempty"`
 	// Description is the description of the DAG. This is optional.
-	Description string `json:"Description,omitempty"`
+	Description string `json:"description,omitempty"`
 	// Schedule configuration for starting, stopping, and restarting the DAG.
-	Schedule        []Schedule `json:"Schedule,omitempty"`
-	StopSchedule    []Schedule `json:"StopSchedule,omitempty"`
-	RestartSchedule []Schedule `json:"RestartSchedule,omitempty"`
+	Schedule        []Schedule `json:"schedule,omitempty"`
+	StopSchedule    []Schedule `json:"stopSchedule,omitempty"`
+	RestartSchedule []Schedule `json:"restartSchedule,omitempty"`
 	// SkipIfSuccessful indicates whether to skip the DAG if it was successful previously.
 	// E.g., when the DAG has already been executed manually before the scheduled time.
-	SkipIfSuccessful bool `json:"SkipIfSuccessful,omitempty"`
+	SkipIfSuccessful bool `json:"skipIfSuccessful,omitempty"`
 	// Env contains a list of environment variables to be set before running the DAG.
-	Env []string `json:"Env,omitempty"`
+	Env []string `json:"env,omitempty"`
 	// LogDir is the directory where the logs are stored.
-	LogDir string `json:"LogDir,omitempty"`
+	LogDir string `json:"logDir,omitempty"`
 	// DefaultParams contains the default parameters to be passed to the DAG.
-	DefaultParams string `json:"DefaultParams,omitempty"`
+	DefaultParams string `json:"defaultParams,omitempty"`
 	// Params contains the list of parameters to be passed to the DAG.
-	Params []string `json:"Params,omitempty"`
+	Params []string `json:"params,omitempty"`
 	// Steps contains the list of steps in the DAG.
-	Steps []Step `json:"Steps,omitempty"`
+	Steps []Step `json:"steps,omitempty"`
 	// HandlerOn contains the steps to be executed on different events.
-	HandlerOn HandlerOn `json:"HandlerOn,omitempty"`
+	HandlerOn HandlerOn `json:"handlerOn,omitempty"`
 	// Preconditions contains the conditions to be met before running the DAG.
-	Preconditions []Condition `json:"Preconditions,omitempty"`
+	Preconditions []Condition `json:"preconditions,omitempty"`
 	// SMTP contains the SMTP configuration.
-	SMTP *SMTPConfig `json:"Smtp,omitempty"`
+	SMTP *SMTPConfig `json:"smtp,omitempty"`
 	// ErrorMail contains the mail configuration for errors.
-	ErrorMail *MailConfig `json:"ErrorMail,omitempty"`
+	ErrorMail *MailConfig `json:"errorMail,omitempty"`
 	// InfoMail contains the mail configuration for informational messages.
-	InfoMail *MailConfig `json:"InfoMail,omitempty"`
+	InfoMail *MailConfig `json:"infoMail,omitempty"`
 	// MailOn contains the conditions to send mail.
-	MailOn *MailOn `json:"MailOn,omitempty"`
+	MailOn *MailOn `json:"mailOn,omitempty"`
 	// Timeout specifies the maximum execution time of the DAG task.
-	Timeout time.Duration `json:"Timeout,omitempty"`
+	Timeout time.Duration `json:"timeout,omitempty"`
 	// Delay is the delay before starting the DAG.
-	Delay time.Duration `json:"Delay,omitempty"`
+	Delay time.Duration `json:"delay,omitempty"`
 	// RestartWait is the time to wait before restarting the DAG.
-	RestartWait time.Duration `json:"RestartWait,omitempty"`
+	RestartWait time.Duration `json:"restartWait,omitempty"`
 	// MaxActiveRuns specifies the maximum concurrent steps to run in an execution.
-	MaxActiveRuns int `json:"MaxActiveRuns,omitempty"`
+	MaxActiveRuns int `json:"maxActiveRuns,omitempty"`
 	// MaxCleanUpTime is the maximum time to wait for cleanup when the DAG is stopped.
-	MaxCleanUpTime time.Duration `json:"MaxCleanUpTime,omitempty"`
+	MaxCleanUpTime time.Duration `json:"maxCleanUpTime,omitempty"`
 	// HistRetentionDays is the number of days to keep the history.
-	HistRetentionDays int `json:"HistRetentionDays,omitempty"`
+	HistRetentionDays int `json:"histRetentionDays,omitempty"`
 }
 
 // FileName returns the filename of the DAG without the extension.
@@ -86,39 +86,39 @@ func (d *DAG) FileName() string {
 // Schedule contains the cron expression and the parsed cron schedule.
 type Schedule struct {
 	// Expression is the cron expression.
-	Expression string `json:"Expression"`
+	Expression string `json:"expression"`
 	// Parsed is the parsed cron schedule.
 	Parsed cron.Schedule `json:"-"`
 }
 
 // HandlerOn contains the steps to be executed on different events in the DAG.
 type HandlerOn struct {
-	Failure *Step `json:"Failure,omitempty"`
-	Success *Step `json:"Success,omitempty"`
-	Cancel  *Step `json:"Cancel,omitempty"`
-	Exit    *Step `json:"Exit,omitempty"`
+	Failure *Step `json:"failure,omitempty"`
+	Success *Step `json:"success,omitempty"`
+	Cancel  *Step `json:"cancel,omitempty"`
+	Exit    *Step `json:"exit,omitempty"`
 }
 
 // MailOn contains the conditions to send mail.
 type MailOn struct {
-	Failure bool `json:"Failure,omitempty"`
-	Success bool `json:"Success,omitempty"`
+	Failure bool `json:"failure,omitempty"`
+	Success bool `json:"success,omitempty"`
 }
 
 // SMTPConfig contains the SMTP configuration.
 type SMTPConfig struct {
-	Host     string `json:"Host,omitempty"`
-	Port     string `json:"Port,omitempty"`
-	Username string `json:"Username,omitempty"`
-	Password string `json:"Password,omitempty"`
+	Host     string `json:"host,omitempty"`
+	Port     string `json:"port,omitempty"`
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
 }
 
 // MailConfig contains the mail configuration.
 type MailConfig struct {
-	From       string `json:"From,omitempty"`
-	To         string `json:"To,omitempty"`
-	Prefix     string `json:"Prefix,omitempty"`
-	AttachLogs bool   `json:"AttachLogs,omitempty"`
+	From       string `json:"from,omitempty"`
+	To         string `json:"to,omitempty"`
+	Prefix     string `json:"prefix,omitempty"`
+	AttachLogs bool   `json:"attachLogs,omitempty"`
 }
 
 // HandlerType is the type of the handler.

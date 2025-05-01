@@ -50,21 +50,21 @@ func FromNode(node scheduler.NodeData) *Node {
 
 // Node represents a DAG step with its execution state for persistence
 type Node struct {
-	Step       digraph.Step         `json:"Step"`
-	Log        string               `json:"Log"`
-	StartedAt  string               `json:"StartedAt"`
-	FinishedAt string               `json:"FinishedAt"`
-	Status     scheduler.NodeStatus `json:"Status"`
-	RetriedAt  string               `json:"RetriedAt,omitempty"`
-	RetryCount int                  `json:"RetryCount,omitempty"`
-	DoneCount  int                  `json:"DoneCount,omitempty"`
-	Error      string               `json:"Error,omitempty"`
-	StatusText string               `json:"StatusText"`
-	SubRuns    []SubRun             `json:"SubRuns,omitempty"`
+	Step       digraph.Step         `json:"step"`
+	Log        string               `json:"log"`
+	StartedAt  string               `json:"startedAt"`
+	FinishedAt string               `json:"finishedAt"`
+	Status     scheduler.NodeStatus `json:"status"`
+	RetriedAt  string               `json:"retriedAt,omitempty"`
+	RetryCount int                  `json:"retryCount,omitempty"`
+	DoneCount  int                  `json:"doneCount,omitempty"`
+	Error      string               `json:"error,omitempty"`
+	StatusText string               `json:"statusText"`
+	SubRuns    []SubRun             `json:"subRuns,omitempty"`
 }
 
 type SubRun struct {
-	RequestID string `json:"RequestId,omitempty"`
+	RequestID string `json:"requestId,omitempty"`
 }
 
 // ToNode converts a persistence Node back to a scheduler Node

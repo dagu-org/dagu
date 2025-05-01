@@ -17,9 +17,9 @@ var ErrConditionNotMet = fmt.Errorf("condition was not met")
 // The condition can be a command substitution or an environment variable.
 // The expected value must be a string without any substitutions.
 type Condition struct {
-	Command   string `json:"Command,omitempty"`   // Command to evaluate
-	Condition string `json:"Condition,omitempty"` // Condition to evaluate
-	Expected  string `json:"Expected,omitempty"`  // Expected value
+	Command   string `json:"command,omitempty"`   // Command to evaluate
+	Condition string `json:"condition,omitempty"` // Condition to evaluate
+	Expected  string `json:"expected,omitempty"`  // Expected value
 }
 
 func (c Condition) Validate() error {
