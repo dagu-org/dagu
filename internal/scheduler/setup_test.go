@@ -37,7 +37,7 @@ func TestMain(m *testing.M) {
 
 type testHelper struct {
 	manager scheduler.JobManager
-	client  client.Client
+	client  client.RunClient
 	config  *config.Config
 }
 

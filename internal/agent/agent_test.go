@@ -123,9 +123,10 @@ func TestAgent_Run(t *testing.T) {
 		// send a signal to cancel the DAG
 		dagAgent.Abort()
 
+		<-done
+
 		// wait for the DAG to be canceled
 		dag.AssertLatestStatus(t, scheduler.StatusCancel)
-		<-done
 	})
 	t.Run("ExitHandler", func(t *testing.T) {
 		th := test.Setup(t)

@@ -140,7 +140,7 @@ type Helper struct {
 	Cancel        context.CancelFunc
 	Config        *config.Config
 	LoggingOutput *SyncBuffer
-	Client        client.Client
+	Client        client.RunClient
 	HistoryStore  persistence.HistoryStore
 	DAGStore      persistence.DAGStore
 

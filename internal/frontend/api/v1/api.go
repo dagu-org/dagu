@@ -22,7 +22,7 @@ import (
 var _ api.StrictServerInterface = (*API)(nil)
 
 type API struct {
-	client             client.Client
+	client             client.RunClient
 	remoteNodes        map[string]config.RemoteNode
 	apiBasePath        string
 	logEncodingCharset string
@@ -30,7 +30,7 @@ type API struct {
 }
 
 func New(
-	cli client.Client,
+	cli client.RunClient,
 	cfg *config.Config,
 ) *API {
 	remoteNodes := make(map[string]config.RemoteNode)

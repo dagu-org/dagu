@@ -125,7 +125,7 @@ func (c *Context) init(cmd *cobra.Command) error {
 
 // Client initializes a Client using the provided options. If not supplied,
 // it creates default DAGStore and HistoryStore instances.
-func (s *Context) Client(opts ...clientOption) (client.Client, error) {
+func (s *Context) Client(opts ...clientOption) (client.RunClient, error) {
 	options := &clientOptions{}
 	for _, opt := range opts {
 		opt(options)

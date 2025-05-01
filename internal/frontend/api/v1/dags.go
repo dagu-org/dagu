@@ -411,7 +411,7 @@ func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
 
 // ListDAGs implements api.StrictServerInterface.
 func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (api.ListDAGsResponseObject, error) {
-	var opts []client.ListStatusOption
+	var opts []client.ListDAGOption
 	if request.Params.Limit != nil {
 		opts = append(opts, client.WithLimit(*request.Params.Limit))
 	}
@@ -425,7 +425,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 		opts = append(opts, client.WithTag(*request.Params.SearchTag))
 	}
 
-	result, errList, err := a.client.ListStatus(ctx, opts...)
+	result, errList, err := a.client.ListDAGs(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("error listing DAGs: %w", err)
 	}

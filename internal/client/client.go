@@ -26,7 +26,7 @@ func New(
 	flagStore persistence.FlagStore,
 	executable string,
 	workDir string,
-) Client {
+) RunClient {
 	return &client{
 		dagStore:     dagStore,
 		historyStore: historyStore,
@@ -36,7 +36,7 @@ func New(
 	}
 }
 
-var _ Client = (*client)(nil)
+var _ RunClient = (*client)(nil)
 
 type client struct {
 	dagStore     persistence.DAGStore
@@ -45,13 +45,6 @@ type client struct {
 	executable   string
 	workDir      string
 }
-
-var (
-	dagTemplate = []byte(`steps:
-  - name: step1
-    command: echo hello
-`)
-)
 
 func (e *client) LoadYAML(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error) {
 	return e.dagStore.LoadSpec(ctx, spec, opts...)
@@ -269,8 +262,8 @@ func (e *client) DeleteDAG(ctx context.Context, name string) error {
 	return e.dagStore.Delete(ctx, name)
 }
 
-func (e *client) ListStatus(ctx context.Context, opts ...ListStatusOption) (*persistence.PaginatedResult[DAGStatus], []string, error) {
-	var options GetAllStatusOptions
+func (e *client) ListDAGs(ctx context.Context, opts ...ListDAGOption) (*persistence.PaginatedResult[DAGStatus], []string, error) {
+	var options ListDAGOptions
 	for _, opt := range opts {
 		opt(&options)
 	}
@@ -287,8 +280,8 @@ func (e *client) ListStatus(ctx context.Context, opts ...ListStatusOption) (*per
 
 	dags, errList, err := e.dagStore.List(ctx, persistence.ListOptions{
 		Paginator: &pg,
-		Name:      fromPtr(options.Name),
-		Tag:       fromPtr(options.Tag),
+		Name:      ptr(options.Name),
+		Tag:       ptr(options.Tag),
 	})
 	if err != nil {
 		return nil, errList, err
@@ -355,31 +348,6 @@ func (e *client) IsSuspended(_ context.Context, id string) bool {
 	return e.flagStore.IsSuspended(id)
 }
 
-func escapeArg(input string) string {
-	escaped := strings.Builder{}
-
-	for _, char := range input {
-		switch char {
-		case '\r':
-			_, _ = escaped.WriteString("\\r")
-		case '\n':
-			_, _ = escaped.WriteString("\\n")
-		default:
-			_, _ = escaped.WriteRune(char)
-		}
-	}
-
-	return escaped.String()
-}
-
 func (e *client) GetTagList(ctx context.Context) ([]string, []string, error) {
 	return e.dagStore.TagList(ctx)
-}
-
-func fromPtr[T any](p *T) T {
-	var zero T
-	if p == nil {
-		return zero
-	}
-	return *p
 }

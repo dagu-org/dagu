@@ -31,7 +31,7 @@ type DAG struct {
 	WorkDir    string
 	Next       time.Time
 	Schedule   cron.Schedule
-	Client     client.Client
+	Client     client.RunClient
 }
 
 // GetDAG returns the DAG associated with this job.

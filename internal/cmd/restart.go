@@ -95,7 +95,7 @@ func handleRestartProcess(ctx *Context, dag *digraph.DAG, specFilePath string) e
 	return executeDAG(ctx, cli, dag)
 }
 
-func executeDAG(ctx *Context, cli client.Client, dag *digraph.DAG) error {
+func executeDAG(ctx *Context, cli client.RunClient, dag *digraph.DAG) error {
 	requestID, err := generateRequestID()
 	if err != nil {
 		return fmt.Errorf("failed to generate request ID: %w", err)
@@ -145,7 +145,7 @@ func executeDAG(ctx *Context, cli client.Client, dag *digraph.DAG) error {
 	return nil
 }
 
-func stopDAGIfRunning(ctx context.Context, cli client.Client, dag *digraph.DAG) error {
+func stopDAGIfRunning(ctx context.Context, cli client.RunClient, dag *digraph.DAG) error {
 	status, err := cli.GetCurrentStatus(ctx, dag)
 	if err != nil {
 		return fmt.Errorf("failed to get current status: %w", err)
@@ -160,7 +160,7 @@ func stopDAGIfRunning(ctx context.Context, cli client.Client, dag *digraph.DAG) 
 	return nil
 }
 
-func stopRunningDAG(ctx context.Context, cli client.Client, dag *digraph.DAG) error {
+func stopRunningDAG(ctx context.Context, cli client.RunClient, dag *digraph.DAG) error {
 	const stopPollInterval = 100 * time.Millisecond
 	for {
 		status, err := cli.GetCurrentStatus(ctx, dag)
@@ -187,7 +187,7 @@ func waitForRestart(ctx context.Context, restartWait time.Duration) {
 	}
 }
 
-func getPreviousRunStatus(ctx context.Context, cli client.Client, dag *digraph.DAG) (persistence.Status, error) {
+func getPreviousRunStatus(ctx context.Context, cli client.RunClient, dag *digraph.DAG) (persistence.Status, error) {
 	status, err := cli.GetLatestStatus(ctx, dag)
 	if err != nil {
 		return persistence.Status{}, fmt.Errorf("failed to get latest status: %w", err)

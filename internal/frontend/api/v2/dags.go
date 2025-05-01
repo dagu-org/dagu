@@ -248,7 +248,7 @@ func (a *API) readHistoryData(
 }
 
 func (a *API) ListAllDAGs(ctx context.Context, request api.ListAllDAGsRequestObject) (api.ListAllDAGsResponseObject, error) {
-	var opts []client.ListStatusOption
+	var opts []client.ListDAGOption
 	if request.Params.PerPage != nil {
 		opts = append(opts, client.WithLimit(*request.Params.PerPage))
 	}
@@ -262,7 +262,7 @@ func (a *API) ListAllDAGs(ctx context.Context, request api.ListAllDAGsRequestObj
 		opts = append(opts, client.WithTag(*request.Params.Tag))
 	}
 
-	result, errList, err := a.client.ListStatus(ctx, opts...)
+	result, errList, err := a.client.ListDAGs(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("error listing DAGs: %w", err)
 	}
