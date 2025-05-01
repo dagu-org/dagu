@@ -34,7 +34,7 @@ module.exports = merge(common, {
         },
         {
           from: 'favicon.ico',
-          to: 'assets/favicon.ico',
+          to: 'favicon.ico',
         },
       ],
     }),
