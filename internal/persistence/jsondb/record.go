@@ -29,6 +29,9 @@ var (
 	ErrContextCanceled   = errors.New("operation canceled by context")
 )
 
+// DAGDefinition is the name of the file where the DAG definition is stored.
+const DAGDefinition = "dag.json"
+
 var _ persistence.Record = (*Record)(nil)
 
 // Record manages an append-only status file with read, write, and compaction capabilities.
@@ -106,10 +109,10 @@ func (r *Record) Open(ctx context.Context) error {
 	if r.dag != nil {
 		dagJSON, err := json.Marshal(r.dag)
 		if err != nil {
-			return fmt.Errorf("failed to marshal DAG metadata: %w", err)
+			return fmt.Errorf("failed to marshal DAG definition: %w", err)
 		}
-		if err := os.WriteFile(filepath.Join(dir, "dag.json"), dagJSON, 0600); err != nil {
-			return fmt.Errorf("failed to write DAG metadata: %w", err)
+		if err := os.WriteFile(filepath.Join(dir, DAGDefinition), dagJSON, 0600); err != nil {
+			return fmt.Errorf("failed to write DAG definition: %w", err)
 		}
 	}
 
