@@ -11,10 +11,10 @@ import { DAGGraph } from './visualization';
 
 type Props = {
   run: components['schemas']['RunDetails'];
-  fileId: string;
+  fileName: string;
 };
 
-function DAGStatus({ run, fileId }: Props) {
+function DAGStatus({ run, fileName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const [modal, setModal] = useState(false);
   const [selectedStep, setSelectedStep] = useState<
@@ -99,7 +99,7 @@ function DAGStatus({ run, fileId }: Props) {
               <SubTitle className="mb-4">Status</SubTitle>
               <DAGStatusOverview
                 status={run}
-                fileId={fileId}
+                fileName={fileName}
                 onViewLog={(requestId) => {
                   setLogViewer({
                     isOpen: true,

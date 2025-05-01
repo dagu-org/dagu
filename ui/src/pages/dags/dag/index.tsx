@@ -10,7 +10,7 @@ import dayjs from '../../../lib/dayjs';
 import LoadingIndicator from '../../../ui/LoadingIndicator';
 
 type Params = {
-  fileId: string;
+  fileName: string;
   name: string;
   tab?: string;
 };
@@ -19,14 +19,14 @@ function DAGDetails() {
   const params = useParams<Params>();
   const appBarContext = React.useContext(AppBarContext);
   const { data, isLoading } = useQuery(
-    '/dags/{fileId}',
+    '/dags/{fileName}',
     {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          fileId: params.fileId || '',
+          fileName: params.fileName || '',
         },
       },
     },
@@ -66,7 +66,7 @@ function DAGDetails() {
     return `${seconds}s`;
   };
 
-  if (!params.fileId || isLoading || !data || !data.latestRun) {
+  if (!params.fileName || isLoading || !data || !data.latestRun) {
     return <LoadingIndicator />;
   }
 
@@ -74,7 +74,7 @@ function DAGDetails() {
     <DAGContext.Provider
       value={{
         refresh: () => {},
-        fileId: params.fileId || '',
+        fileName: params.fileName || '',
         name: data.dag?.name || '',
       }}
     >
@@ -89,7 +89,7 @@ function DAGDetails() {
         <div className="w-full flex flex-col">
           {data.dag && (
             <DAGDetailsContent
-              fileId={params.fileId || ''}
+              fileName={params.fileName || ''}
               dag={data.dag}
               latestRun={data.latestRun}
               refreshFn={() => {}}

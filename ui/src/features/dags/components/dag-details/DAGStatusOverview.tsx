@@ -27,7 +27,7 @@ type Props = {
   /** DAG run details */
   status?: components['schemas']['RunDetails'];
   /** DAG file ID */
-  fileId: string;
+  fileName: string;
   /** Request ID of the execution */
   requestId?: string;
   /** Function to open log viewer */
@@ -40,7 +40,7 @@ type Props = {
  */
 function DAGStatusOverview({
   status,
-  fileId,
+  fileName,
   requestId = '',
   onViewLog,
 }: Props) {
@@ -49,7 +49,7 @@ function DAGStatusOverview({
   if (requestId) {
     searchParams.set('requestId', requestId);
   }
-  const url = `/dags/${fileId}/scheduler-log?${searchParams.toString()}`;
+  const url = `/dags/${fileName}/scheduler-log?${searchParams.toString()}`;
 
   // Don't render if no status is provided
   if (!status) {

@@ -36,10 +36,10 @@ function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
    */
   const onSubmit = React.useCallback(
     async (suspend: boolean) => {
-      const { error } = await client.POST('/dags/{fileId}/suspend', {
+      const { error } = await client.POST('/dags/{fileName}/suspend', {
         params: {
           path: {
-            fileId: dag.fileId,
+            fileName: dag.fileName,
           },
         },
         body: {
@@ -54,7 +54,7 @@ function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
         refresh();
       }
     },
-    [client, dag.fileId, refresh]
+    [client, dag.fileName, refresh]
   );
 
   /**

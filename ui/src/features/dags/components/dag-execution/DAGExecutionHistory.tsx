@@ -21,7 +21,7 @@ import { HistoryTable, LogViewer, StatusUpdateModal } from './';
  */
 type Props = {
   /** DAG file ID */
-  fileId: string;
+  fileName: string;
   /** Whether the component is rendered in a modal */
   isInModal?: boolean;
   /** The active tab in the parent component */
@@ -33,20 +33,20 @@ type Props = {
  * including a history table, graph visualization, and status details
  */
 function DAGExecutionHistory({
-  fileId,
+  fileName,
 }: Omit<Props, 'isInModal' | 'activeTab'>) {
   const appBarContext = React.useContext(AppBarContext);
 
   // Fetch execution history data
   const { data } = useQuery(
-    '/dags/{fileId}/runs',
+    '/dags/{fileName}/runs',
     {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          fileId: fileId,
+          fileName: fileName,
         },
       },
     },

@@ -4,1545 +4,1564 @@
  */
 
 export interface paths {
-  '/health': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check server health status
+         * @description Returns health information about the Dagu server
+         */
+        get: operations["getHealthStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Check server health status
-     * @description Returns health information about the Dagu server
-     */
-    get: operations['getHealthStatus'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all available DAGs
+         * @description Retrieves DAGs with optional filtering by name and tags
+         */
+        get: operations["listAllDAGs"];
+        put?: never;
+        /**
+         * Create a new DAG definition
+         * @description Creates a new empty DAG file with the specified name
+         */
+        post: operations["createNewDAG"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * List all available DAGs
-     * @description Retrieves DAGs with optional filtering by name and tags
-     */
-    get: operations['listAllDAGs'];
-    put?: never;
-    /**
-     * Create a new DAG definition
-     * @description Creates a new empty DAG file with the specified name
-     */
-    post: operations['createNewDAG'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/{fileId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/{fileName}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve comprehensive DAG information
+         * @description Fetches detailed information about a specific DAG
+         */
+        get: operations["getDAGDetails"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete an existing DAG
+         * @description Permanently removes a DAG definition from the system
+         */
+        delete: operations["deleteDAGByFileName"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Retrieve comprehensive DAG information
-     * @description Fetches detailed information about a specific DAG
-     */
-    get: operations['getDAGDetails'];
-    put?: never;
-    post?: never;
-    /**
-     * Delete an existing DAG
-     * @description Permanently removes a DAG definition from the system
-     */
-    delete: operations['deleteDAGByFileId'];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/{fileId}/start': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/{fileName}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Initiate DAG execution
+         * @description Starts execution of a DAG with optional parameters
+         */
+        post: operations["executeDAG"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /**
-     * Initiate DAG execution
-     * @description Starts execution of a DAG with optional parameters
-     */
-    post: operations['executeDAG'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/{fileId}/stop': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/{fileName}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Terminate running DAG execution
+         * @description Forcefully stops a running DAG workflow
+         */
+        post: operations["terminateDAGExecution"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /**
-     * Terminate running DAG execution
-     * @description Forcefully stops a running DAG workflow
-     */
-    post: operations['terminateDAGExecution'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/{fileId}/retry': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/{fileName}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry DAG execution
+         * @description Reruns a DAG execution
+         */
+        post: operations["retryDAGExecution"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /**
-     * Retry DAG execution
-     * @description Reruns a DAG execution
-     */
-    post: operations['retryDAGExecution'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/{fileId}/runs': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/{fileName}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve execution history of a DAG
+         * @description Fetches execution history of a DAG
+         */
+        get: operations["getDAGExecutionHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Retrieve execution history of a DAG
-     * @description Fetches execution history of a DAG
-     */
-    get: operations['getDAGExecutionHistory'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/{fileId}/runs/{requestId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/{fileName}/runs/{requestId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get detailed status of a specific DAG run
+         * @description Retrieves status information about a particular DAG execution
+         */
+        get: operations["getDAGRunDetails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Get detailed status of a specific DAG run
-     * @description Retrieves status information about a particular DAG execution
-     */
-    get: operations['getDAGRunDetails'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/{fileId}/spec': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/{fileName}/spec": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve DAG definition
+         * @description Fetches the YAML definition of a DAG
+         */
+        get: operations["getDAGDefinition"];
+        /**
+         * Update DAG definition
+         * @description Modifies the YAML definition of a DAG
+         */
+        put: operations["updateDAGDefinition"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Retrieve DAG definition
-     * @description Fetches the YAML definition of a DAG
-     */
-    get: operations['getDAGDefinition'];
-    /**
-     * Update DAG definition
-     * @description Modifies the YAML definition of a DAG
-     */
-    put: operations['updateDAGDefinition'];
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/{fileId}/suspend': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/{fileName}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Toggle DAG suspension state
+         * @description Controls whether the scheduler should execute this DAG according to its defined cron schedule
+         */
+        post: operations["updateDAGSuspensionState"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /**
-     * Toggle DAG suspension state
-     * @description Controls whether the scheduler should execute this DAG according to its defined cron schedule
-     */
-    post: operations['updateDAGSuspensionState'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/{fileId}/rename': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/{fileName}/rename": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change DAG file ID
+         * @description Changes the file ID of the DAG
+         */
+        post: operations["renameDAG"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /**
-     * Change DAG file ID
-     * @description Changes the file ID of the DAG
-     */
-    post: operations['renameDAG'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/search': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search across all DAG definitions
+         * @description Performs a full-text search across all DAG definitions
+         */
+        get: operations["searchDAGDefinitions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Search across all DAG definitions
-     * @description Performs a full-text search across all DAG definitions
-     */
-    get: operations['searchDAGDefinitions'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/tags': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all available DAG tags
+         * @description Retrieves all unique tags used across DAG definitions
+         */
+        get: operations["getAllDAGTags"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * List all available DAG tags
-     * @description Retrieves all unique tags used across DAG definitions
-     */
-    get: operations['getAllDAGTags'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/runs/{dagName}/{requestId}/log': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/runs/{dagName}/{requestId}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve full execution log of a DAG run
+         * @description Fetches the execution log for a DAG run
+         */
+        get: operations["getDAGRunLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Retrieve full execution log of a DAG run
-     * @description Fetches the execution log for a DAG run
-     */
-    get: operations['getDAGRunLog'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/runs/{dagName}/{requestId}/{stepName}/log': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/runs/{dagName}/{requestId}/steps/{stepName}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve log for a specific step in a DAG run
+         * @description Fetches the log for an individual step in a DAG run
+         */
+        get: operations["getDAGStepLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Retrieve log for a specific step in a DAG run
-     * @description Fetches the log for an individual step in a DAG run
-     */
-    get: operations['getDAGStepLog'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/runs/{dagName}/{requestId}/steps/{stepName}/log': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/runs/{dagName}/{requestId}/steps/{stepName}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Manually update a step's execution status
+         * @description Changes the status of a specific step within a DAG run
+         */
+        patch: operations["updateDAGStepStatus"];
+        trace?: never;
     };
-    /**
-     * Retrieve log for a specific step in a DAG run
-     * @description Fetches the log for an individual step in a DAG run
-     */
-    get: operations['getDAGStepLog'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/runs/{dagName}/{requestId}/{stepName}/status': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/runs/{dagName}/{requestId}/sub-runs/{subRequestId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve detailed status of a sub-run
+         * @description Fetches detailed status information about a specific sub-run
+         */
+        get: operations["getSubRunDetails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /**
-     * Manually update a step's execution status
-     * @description Changes the status of a specific step within a DAG run
-     */
-    patch: operations['updateDAGStepStatus'];
-    trace?: never;
-  };
-  '/runs/{dagName}/{requestId}/steps/{stepName}/status': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /**
-     * Manually update a step's execution status
-     * @description Changes the status of a specific step within a DAG run
-     */
-    patch: operations['updateDAGStepStatus'];
-    trace?: never;
-  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-  schemas: {
-    /** @description Generic error response object */
-    Error: {
-      code: components['schemas']['ErrorCode'];
-      /** @description Short error message */
-      message: string;
-      /** @description Additional error details */
-      details?: Record<string, never>;
-    };
-    /**
-     * @description Error code indicating the type of error
-     * @enum {string}
-     */
-    ErrorCode: ErrorCode;
-    /**
-     * Format: regex
-     * @description location of the DAG file
-     */
-    DAGFileId: string;
-    /**
-     * Format: regex
-     * @description Name of the DAG
-     */
-    DAGName: string;
-    Pagination: {
-      /** @description total number of records */
-      totalRecords: number;
-      /** @description current page number */
-      currentPage: number;
-      /** @description total number of pages */
-      totalPages: number;
-      /** @description next page number */
-      nextPage: number;
-      /** @description previous page number */
-      prevPage: number;
-    };
-    /**
-     * @description Unique identifier for the request
-     * @example latest
-     */
-    RequestId: string;
-    /** @description Response object for the health check endpoint */
-    HealthResponse: {
-      /**
-       * @description Overall health status of the server
-       * @enum {string}
-       */
-      status: HealthResponseStatus;
-      /** @description Current version of the server */
-      version: string;
-      /** @description Server uptime in seconds */
-      uptime: number;
-      /** @description Current server time */
-      timestamp: string;
-    };
-    /** @description DAG file with its status information */
-    DAGFile: {
-      /** @description File ID of the DAG file */
-      fileId: string;
-      dag: components['schemas']['DAG'];
-      latestRun: components['schemas']['RunSummary'];
-      /** @description Whether the DAG is suspended */
-      suspended: boolean;
-      /** @description List of errors encountered during the request */
-      errors: string[];
-    };
-    /** @description Core DAG configuration containing workflow definition and metadata */
-    DAG: {
-      /** @description Logical grouping of related DAGs for organizational purposes */
-      group?: string;
-      /** @description Logical name of the DAG */
-      name: string;
-      /** @description List of scheduling expressions defining when the DAG should run */
-      schedule?: components['schemas']['Schedule'][];
-      /** @description Human-readable description of the DAG's purpose and behavior */
-      description?: string;
-      /** @description List of parameter names that can be passed to the DAG at runtime */
-      params?: string[];
-      /** @description Default parameter values in JSON format if not specified at runtime */
-      defaultParams?: string;
-      /** @description List of tags for categorizing and filtering DAGs */
-      tags?: string[];
-    };
-    /** @description Schedule configuration for DAG run */
-    Schedule: {
-      /** @description Cron expression or schedule pattern */
-      expression: string;
-    };
-    /**
-     * @description Numeric status code indicating current run state:
-     *     0: "Not started"
-     *     1: "Running"
-     *     2: "Failed"
-     *     3: "Cancelled"
-     *     4: "Success"
-     *
-     * @enum {integer}
-     */
-    Status: Status;
-    /**
-     * @description Human-readable status description for the DAG run
-     * @enum {string}
-     */
-    StatusText: StatusText;
-    /**
-     * @description Numeric status code indicating current node state:
-     *     0: "Not started"
-     *     1: "Running"
-     *     2: "Failed"
-     *     3: "Cancelled"
-     *     4: "Success"
-     *     5: "Skipped"
-     *
-     * @enum {integer}
-     */
-    NodeStatus: NodeStatus;
-    /**
-     * @description Human-readable status description for the node
-     * @enum {string}
-     */
-    NodeStatusText: NodeStatusText;
-    /** @description Detailed DAG configuration information */
-    DAGDetails: {
-      /** @description Logical grouping of related DAGs for organizational purposes */
-      group?: string;
-      /** @description Unique identifier for the DAG within its group */
-      name: string;
-      /** @description List of scheduling expressions defining when the DAG should run */
-      schedule?: components['schemas']['Schedule'][];
-      /** @description Human-readable description of the DAG's purpose and behavior */
-      description?: string;
-      /** @description List of environment variables to set before executing */
-      env?: string[];
-      /** @description Directory path for storing log files */
-      logDir?: string;
-      handlerOn?: components['schemas']['HandlerOn'];
-      /** @description List of steps to execute in the DAG */
-      steps?: components['schemas']['Step'][];
-      /** @description Time in seconds to wait before starting the DAG */
-      delay?: number;
-      /** @description Number of days to retain historical logs */
-      histRetentionDays?: number;
-      /** @description Conditions that must be met before the DAG can start */
-      preconditions?: components['schemas']['Precondition'][];
-      /** @description Maximum number of concurrent steps to run */
-      maxActiveRuns?: number;
-      /** @description List of parameter names that can be passed to the DAG at runtime */
-      params?: string[];
-      /** @description Default parameter values in JSON format if not specified at runtime */
-      defaultParams?: string;
-      /** @description List of tags for categorizing and filtering DAGs */
-      tags?: string[];
-    };
-    /** @description Configuration for event handlers in a DAG */
-    HandlerOn: {
-      failure?: components['schemas']['Step'];
-      success?: components['schemas']['Step'];
-      cancel?: components['schemas']['Step'];
-      exit?: components['schemas']['Step'];
-    };
-    /** @description Current status of a DAG run */
-    RunSummary: {
-      requestId: components['schemas']['RequestId'];
-      name: components['schemas']['DAGName'];
-      status: components['schemas']['Status'];
-      statusText: components['schemas']['StatusText'];
-      /** @description Process ID of the DAG run */
-      pid?: number;
-      /** @description RFC 3339 timestamp when the DAG run started */
-      startedAt: string;
-      /** @description RFC 3339 timestamp when the DAG run finished */
-      finishedAt: string;
-      /** @description Path to the log file */
-      log: string;
-      /** @description Runtime parameters passed to the DAG in JSON format */
-      params?: string;
-    };
-    /** @description Detailed status of a DAG run including child nodes */
-    RunDetails: components['schemas']['RunSummary'] & {
-      /** @description Status of individual steps within the DAG */
-      nodes: components['schemas']['Node'][];
-      onExit?: components['schemas']['Node'];
-      onSuccess?: components['schemas']['Node'];
-      onFailure?: components['schemas']['Node'];
-      onCancel?: components['schemas']['Node'];
-    };
-    /** @description Status of an individual step within a DAG run */
-    Node: {
-      step: components['schemas']['Step'];
-      /** @description Path to step-specific log file */
-      log: string;
-      /** @description RFC3339 timestamp when the step started */
-      startedAt: string;
-      /** @description RFC3339 timestamp when the step finished */
-      finishedAt: string;
-      status: components['schemas']['NodeStatus'];
-      statusText: components['schemas']['NodeStatusText'];
-      /** @description Number of retry attempts made for this step */
-      retryCount: number;
-      /** @description Number of successful completions for repeating steps */
-      doneCount: number;
-      /** @description Error message if the step failed */
-      error?: string;
-    };
-    /** @description Individual task within a DAG that performs a specific operation */
-    Step: {
-      /** @description Unique identifier for the step within the DAG */
-      name: string;
-      /** @description Human-readable description of what the step does */
-      description?: string;
-      /** @description Working directory for executing the step's command */
-      dir?: string;
-      /** @description Complete command string including arguments to execute */
-      cmdWithArgs?: string;
-      /** @description Base command to execute without arguments */
-      command?: string;
-      /** @description Script content if the step executes a script file */
-      script?: string;
-      /** @description File path for capturing standard output */
-      stdout?: string;
-      /** @description File path for capturing standard error */
-      stderr?: string;
-      /** @description Variable name to store the step's output */
-      output?: string;
-      /** @description List of arguments to pass to the command */
-      args?: string[];
-      /** @description The name of the DAG to run as a sub-DAG */
-      run?: string;
-      /** @description Parameters to pass to the sub DAG in JSON format */
-      params?: string;
-      /** @description List of step names that must complete before this step can start */
-      depends?: string[];
-      repeatPolicy?: components['schemas']['RepeatPolicy'];
-      /** @description Whether to send email notifications on step failure */
-      mailOnError?: boolean;
-      /** @description Conditions that must be met before the step can start */
-      preconditions?: components['schemas']['Precondition'][];
-    };
-    /** @description Individual search result item for a DAG */
-    SearchResultItem: {
-      /** @description Name of the matching DAG */
-      name: string;
-      dag: components['schemas']['DAG'];
-      /** @description Details of where matches were found */
-      matches: components['schemas']['SearchDAGsMatchItem'][];
-    };
-    /** @description Details of a search match within a DAG */
-    SearchDAGsMatchItem: {
-      /** @description Matching line content */
-      line: string;
-      /** @description Line number where match was found */
-      lineNumber: number;
-      /** @description Start line for context */
-      startLine: number;
-    };
-    /** @description Log information for the scheduler */
-    Log: {
-      /** @description Log content */
-      content: string;
-    };
-    /** @description Grid item for log visualization */
-    DAGGridItem: {
-      /** @description Name of the step */
-      name: string;
-      /** @description Status of the step ordered by time */
-      history: components['schemas']['NodeStatus'][];
-    };
-    /** @description Precondition that must be satisfied before running a step or DAG */
-    Precondition: {
-      /** @description Expression or check to evaluate */
-      condition?: string;
-      /** @description Expected result of the condition evaluation */
-      expected?: string;
-    };
-    /** @description Configuration for step retry behavior */
-    RepeatPolicy: {
-      /** @description Whether the step should be retried on failure */
-      repeat?: boolean;
-      /** @description Time in seconds to wait between retry attempts */
-      interval?: number;
-    };
-    /** @description Response object for listing all tags */
-    ListTagResponse: {
-      /** @description List of unique tags */
-      tags: string[];
-      /** @description List of errors encountered during the request */
-      errors: string[];
-    };
-  };
-  responses: never;
-  parameters: {
-    /** @description page number of items to fetch (default is 1) */
-    Page: number;
-    /** @description number of items per page (default is 30, max is 100) */
-    PerPage: number;
-    /** @description File Id of the DAG file */
-    DAGFileId: components['schemas']['DAGFileId'];
-    /** @description name of the DAG */
-    DAGName: components['schemas']['DAGName'];
-    /** @description name of the step */
-    StepName: string;
-    /** @description name of the remote node */
-    RemoteNode: string;
-    /** @description request ID of the DAG run or latest run if specified as 'latest' */
-    RequestId: components['schemas']['RequestId'];
-  };
-  requestBodies: never;
-  headers: never;
-  pathItems: never;
-}
-export type $defs = Record<string, never>;
-export interface operations {
-  getHealthStatus: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
+    schemas: {
+        /** @description Generic error response object */
+        Error: {
+            code: components["schemas"]["ErrorCode"];
+            /** @description Short error message */
+            message: string;
+            /** @description Additional error details */
+            details?: Record<string, never>;
         };
-        content: {
-          'application/json': components['schemas']['HealthResponse'];
+        /**
+         * @description Error code indicating the type of error
+         * @enum {string}
+         */
+        ErrorCode: ErrorCode;
+        /**
+         * Format: regex
+         * @description Name of the DAG file
+         */
+        DAGFileName: string;
+        /**
+         * Format: regex
+         * @description Name of the DAG
+         */
+        DAGName: string;
+        Pagination: {
+            /** @description total number of records */
+            totalRecords: number;
+            /** @description current page number */
+            currentPage: number;
+            /** @description total number of pages */
+            totalPages: number;
+            /** @description next page number */
+            nextPage: number;
+            /** @description previous page number */
+            prevPage: number;
         };
-      };
-      /** @description Unexpected error */
-      default: {
-        headers: {
-          [name: string]: unknown;
+        /**
+         * @description Unique identifier for the request
+         * @example latest
+         */
+        RequestId: string;
+        /** @description Response object for the health check endpoint */
+        HealthResponse: {
+            /**
+             * @description Overall health status of the server
+             * @enum {string}
+             */
+            status: HealthResponseStatus;
+            /** @description Current version of the server */
+            version: string;
+            /** @description Server uptime in seconds */
+            uptime: number;
+            /** @description Current server time */
+            timestamp: string;
         };
-        content?: never;
-      };
-    };
-  };
-  listAllDAGs: {
-    parameters: {
-      query?: {
-        /** @description page number of items to fetch (default is 1) */
-        page?: components['parameters']['Page'];
-        /** @description number of items per page (default is 30, max is 100) */
-        perPage?: components['parameters']['PerPage'];
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-        /** @description Filter DAGs by name */
-        name?: string;
-        /** @description Filter DAGs by tag */
-        tag?: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': {
-            /** @description List of DAGs with their status and metadata */
-            dags: components['schemas']['DAGFile'][];
-            /** @description List of errors encountered during the request */
-            errors: string[];
-            pagination: components['schemas']['Pagination'];
-          };
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  createNewDAG: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': {
-          name: components['schemas']['DAGName'];
-        };
-      };
-    };
-    responses: {
-      /** @description A successful response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': {
-            /** @description Name of the newly created DAG */
-            name: string;
-          };
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  getDAGDetails: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description File Id of the DAG file */
-        fileId: components['parameters']['DAGFileId'];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': {
-            dag?: components['schemas']['DAGDetails'];
-            latestRun: components['schemas']['RunDetails'];
+        /** @description DAG file with its status information */
+        DAGFile: {
+            /** @description File ID of the DAG file */
+            fileName: string;
+            dag: components["schemas"]["DAG"];
+            latestRun: components["schemas"]["RunSummary"];
             /** @description Whether the DAG is suspended */
             suspended: boolean;
             /** @description List of errors encountered during the request */
             errors: string[];
-          };
         };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
+        /** @description Core DAG configuration containing workflow definition and metadata */
+        DAG: {
+            /** @description Logical grouping of related DAGs for organizational purposes */
+            group?: string;
+            /** @description Logical name of the DAG */
+            name: string;
+            /** @description List of scheduling expressions defining when the DAG should run */
+            schedule?: components["schemas"]["Schedule"][];
+            /** @description Human-readable description of the DAG's purpose and behavior */
+            description?: string;
+            /** @description List of parameter names that can be passed to the DAG at runtime */
+            params?: string[];
+            /** @description Default parameter values in JSON format if not specified at runtime */
+            defaultParams?: string;
+            /** @description List of tags for categorizing and filtering DAGs */
+            tags?: string[];
         };
-        content: {
-          'application/json': components['schemas']['Error'];
+        /** @description Schedule configuration for DAG run */
+        Schedule: {
+            /** @description Cron expression or schedule pattern */
+            expression: string;
         };
-      };
-    };
-  };
-  deleteDAGByFileId: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description File Id of the DAG file */
-        fileId: components['parameters']['DAGFileId'];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description DAG successfully deleted */
-      204: {
-        headers: {
-          [name: string]: unknown;
+        /**
+         * @description Numeric status code indicating current run state:
+         *     0: "Not started"
+         *     1: "Running"
+         *     2: "Failed"
+         *     3: "Cancelled"
+         *     4: "Success"
+         *
+         * @enum {integer}
+         */
+        Status: Status;
+        /**
+         * @description Human-readable status description for the DAG run
+         * @enum {string}
+         */
+        StatusText: StatusText;
+        /**
+         * @description Numeric status code indicating current node state:
+         *     0: "Not started"
+         *     1: "Running"
+         *     2: "Failed"
+         *     3: "Cancelled"
+         *     4: "Success"
+         *     5: "Skipped"
+         *
+         * @enum {integer}
+         */
+        NodeStatus: NodeStatus;
+        /**
+         * @description Human-readable status description for the node
+         * @enum {string}
+         */
+        NodeStatusText: NodeStatusText;
+        /** @description Detailed DAG configuration information */
+        DAGDetails: {
+            /** @description Logical grouping of related DAGs for organizational purposes */
+            group?: string;
+            /** @description Unique identifier for the DAG within its group */
+            name: string;
+            /** @description List of scheduling expressions defining when the DAG should run */
+            schedule?: components["schemas"]["Schedule"][];
+            /** @description Human-readable description of the DAG's purpose and behavior */
+            description?: string;
+            /** @description List of environment variables to set before executing */
+            env?: string[];
+            /** @description Directory path for storing log files */
+            logDir?: string;
+            handlerOn?: components["schemas"]["HandlerOn"];
+            /** @description List of steps to execute in the DAG */
+            steps?: components["schemas"]["Step"][];
+            /** @description Time in seconds to wait before starting the DAG */
+            delay?: number;
+            /** @description Number of days to retain historical logs */
+            histRetentionDays?: number;
+            /** @description Conditions that must be met before the DAG can start */
+            preconditions?: components["schemas"]["Precondition"][];
+            /** @description Maximum number of concurrent steps to run */
+            maxActiveRuns?: number;
+            /** @description List of parameter names that can be passed to the DAG at runtime */
+            params?: string[];
+            /** @description Default parameter values in JSON format if not specified at runtime */
+            defaultParams?: string;
+            /** @description List of tags for categorizing and filtering DAGs */
+            tags?: string[];
         };
-        content?: never;
-      };
-      /** @description DAG not found */
-      404: {
-        headers: {
-          [name: string]: unknown;
+        /** @description Configuration for event handlers in a DAG */
+        HandlerOn: {
+            failure?: components["schemas"]["Step"];
+            success?: components["schemas"]["Step"];
+            cancel?: components["schemas"]["Step"];
+            exit?: components["schemas"]["Step"];
         };
-        content: {
-          'application/json': components['schemas']['Error'];
+        /** @description Current status of a DAG run */
+        RunSummary: {
+            requestId: components["schemas"]["RequestId"];
+            name: components["schemas"]["DAGName"];
+            status: components["schemas"]["Status"];
+            statusText: components["schemas"]["StatusText"];
+            /** @description Process ID of the DAG run */
+            pid?: number;
+            /** @description RFC 3339 timestamp when the DAG run started */
+            startedAt: string;
+            /** @description RFC 3339 timestamp when the DAG run finished */
+            finishedAt: string;
+            /** @description Path to the log file */
+            log: string;
+            /** @description Runtime parameters passed to the DAG in JSON format */
+            params?: string;
         };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
+        /** @description Detailed status of a DAG run including child nodes */
+        RunDetails: components["schemas"]["RunSummary"] & {
+            /** @description Status of individual steps within the DAG */
+            nodes: components["schemas"]["Node"][];
+            onExit?: components["schemas"]["Node"];
+            onSuccess?: components["schemas"]["Node"];
+            onFailure?: components["schemas"]["Node"];
+            onCancel?: components["schemas"]["Node"];
         };
-        content: {
-          'application/json': components['schemas']['Error'];
+        /** @description Status of an individual step within a DAG run */
+        Node: {
+            step: components["schemas"]["Step"];
+            /** @description Path to step-specific log file */
+            log: string;
+            /** @description RFC3339 timestamp when the step started */
+            startedAt: string;
+            /** @description RFC3339 timestamp when the step finished */
+            finishedAt: string;
+            status: components["schemas"]["NodeStatus"];
+            statusText: components["schemas"]["NodeStatusText"];
+            /** @description Number of retry attempts made for this step */
+            retryCount: number;
+            /** @description Number of successful completions for repeating steps */
+            doneCount: number;
+            /** @description Error message if the step failed */
+            error?: string;
         };
-      };
-    };
-  };
-  executeDAG: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description File Id of the DAG file */
-        fileId: components['parameters']['DAGFileId'];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': {
-          /** @description Parameters to pass to the DAG in JSON format */
-          params?: string;
+        /** @description Individual task within a DAG that performs a specific operation */
+        Step: {
+            /** @description Unique identifier for the step within the DAG */
+            name: string;
+            /** @description Human-readable description of what the step does */
+            description?: string;
+            /** @description Working directory for executing the step's command */
+            dir?: string;
+            /** @description Complete command string including arguments to execute */
+            cmdWithArgs?: string;
+            /** @description Base command to execute without arguments */
+            command?: string;
+            /** @description Script content if the step executes a script file */
+            script?: string;
+            /** @description File path for capturing standard output */
+            stdout?: string;
+            /** @description File path for capturing standard error */
+            stderr?: string;
+            /** @description Variable name to store the step's output */
+            output?: string;
+            /** @description List of arguments to pass to the command */
+            args?: string[];
+            /** @description The name of the DAG to run as a sub-DAG */
+            run?: string;
+            /** @description Parameters to pass to the sub DAG in JSON format */
+            params?: string;
+            /** @description List of step names that must complete before this step can start */
+            depends?: string[];
+            repeatPolicy?: components["schemas"]["RepeatPolicy"];
+            /** @description Whether to send email notifications on step failure */
+            mailOnError?: boolean;
+            /** @description Conditions that must be met before the step can start */
+            preconditions?: components["schemas"]["Precondition"][];
         };
-      };
-    };
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
+        /** @description Individual search result item for a DAG */
+        SearchResultItem: {
+            /** @description Name of the matching DAG */
+            name: string;
+            dag: components["schemas"]["DAG"];
+            /** @description Details of where matches were found */
+            matches: components["schemas"]["SearchDAGsMatchItem"][];
         };
-        content?: never;
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
+        /** @description Details of a search match within a DAG */
+        SearchDAGsMatchItem: {
+            /** @description Matching line content */
+            line: string;
+            /** @description Line number where match was found */
+            lineNumber: number;
+            /** @description Start line for context */
+            startLine: number;
         };
-        content: {
-          'application/json': components['schemas']['Error'];
+        /** @description Log information for the scheduler */
+        Log: {
+            /** @description Log content */
+            content: string;
         };
-      };
-    };
-  };
-  terminateDAGExecution: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description File Id of the DAG file */
-        fileId: components['parameters']['DAGFileId'];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
+        /** @description Grid item for log visualization */
+        DAGGridItem: {
+            /** @description Name of the step */
+            name: string;
+            /** @description Status of the step ordered by time */
+            history: components["schemas"]["NodeStatus"][];
         };
-        content?: never;
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
+        /** @description Precondition that must be satisfied before running a step or DAG */
+        Precondition: {
+            /** @description Expression or check to evaluate */
+            condition?: string;
+            /** @description Expected result of the condition evaluation */
+            expected?: string;
         };
-        content: {
-          'application/json': components['schemas']['Error'];
+        /** @description Configuration for step retry behavior */
+        RepeatPolicy: {
+            /** @description Whether the step should be retried on failure */
+            repeat?: boolean;
+            /** @description Time in seconds to wait between retry attempts */
+            interval?: number;
         };
-      };
-    };
-  };
-  retryDAGExecution: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description File Id of the DAG file */
-        fileId: components['parameters']['DAGFileId'];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': {
-          /** @description Request ID of the DAG run to retry */
-          requestId: string;
-        };
-      };
-    };
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  getDAGExecutionHistory: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description File Id of the DAG file */
-        fileId: components['parameters']['DAGFileId'];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': {
-            /** @description List of historical runs for the DAG */
-            runs: components['schemas']['RunDetails'][];
-            /** @description Grid data for visualization */
-            gridData: components['schemas']['DAGGridItem'][];
-          };
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  getDAGRunDetails: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description File Id of the DAG file */
-        fileId: components['parameters']['DAGFileId'];
-        /** @description request ID of the DAG run or latest run if specified as 'latest' */
-        requestId: components['parameters']['RequestId'];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': {
-            run: components['schemas']['RunDetails'];
-          };
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  getDAGDefinition: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description File Id of the DAG file */
-        fileId: components['parameters']['DAGFileId'];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': {
-            dag?: components['schemas']['DAGDetails'];
-            /** @description The DAG spec */
-            spec: string;
-            /** @description List of errors in the spec */
+        /** @description Response object for listing all tags */
+        ListTagResponse: {
+            /** @description List of unique tags */
+            tags: string[];
+            /** @description List of errors encountered during the request */
             errors: string[];
-          };
         };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
     };
-  };
-  updateDAGDefinition: {
+    responses: never;
     parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description File Id of the DAG file */
-        fileId: components['parameters']['DAGFileId'];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': {
-          /** @description The new DAG spec */
-          spec: string;
-        };
-      };
-    };
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': {
-            /** @description List of errors in the spec */
-            errors: string[];
-          };
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  updateDAGSuspensionState: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description File Id of the DAG file */
-        fileId: components['parameters']['DAGFileId'];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': {
-          /** @description Suspend status to set for the DAG */
-          suspend: boolean;
-        };
-      };
-    };
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description DAG not found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  renameDAG: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description File Id of the DAG file */
-        fileId: components['parameters']['DAGFileId'];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': {
-          /** @description New file ID for the DAG */
-          newFileId: string;
-        };
-      };
-    };
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description Invalid request */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-      /** @description DAG not found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  searchDAGDefinitions: {
-    parameters: {
-      query: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-        /** @description A search query string */
-        q: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': {
-            /** @description Search results matching the query */
-            results: components['schemas']['SearchResultItem'][];
-            /** @description Errors encountered during the search */
-            errors: string[];
-          };
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  getAllDAGTags: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ListTagResponse'];
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  getDAGRunLog: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
+        /** @description page number of items to fetch (default is 1) */
+        Page: number;
+        /** @description number of items per page (default is 30, max is 100) */
+        PerPage: number;
+        /** @description the name of the DAG file */
+        DAGFileName: components["schemas"]["DAGFileName"];
         /** @description name of the DAG */
-        dagName: components['parameters']['DAGName'];
-        /** @description request ID of the DAG run or latest run if specified as 'latest' */
-        requestId: components['parameters']['RequestId'];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Log'];
-        };
-      };
-      /** @description Log file not found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  getDAGStepLog: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description name of the DAG */
-        dagName: components['parameters']['DAGName'];
-        /** @description request ID of the DAG run or latest run if specified as 'latest' */
-        requestId: components['parameters']['RequestId'];
+        DAGName: components["schemas"]["DAGName"];
         /** @description name of the step */
-        stepName: components['parameters']['StepName'];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Log'];
-        };
-      };
-      /** @description Log file not found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  updateDAGStepStatus: {
-    parameters: {
-      query?: {
+        StepName: string;
         /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description name of the DAG */
-        dagName: components['parameters']['DAGName'];
+        RemoteNode: string;
         /** @description request ID of the DAG run or latest run if specified as 'latest' */
-        requestId: components['parameters']['RequestId'];
-        /** @description name of the step */
-        stepName: components['parameters']['StepName'];
-      };
-      cookie?: never;
+        RequestId: components["schemas"]["RequestId"];
     };
-    requestBody: {
-      content: {
-        'application/json': {
-          status: components['schemas']['NodeStatus'];
+    requestBodies: never;
+    headers: never;
+    pathItems: never;
+}
+export type $defs = Record<string, never>;
+export interface operations {
+    getHealthStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
     };
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
+    listAllDAGs: {
+        parameters: {
+            query?: {
+                /** @description page number of items to fetch (default is 1) */
+                page?: components["parameters"]["Page"];
+                /** @description number of items per page (default is 30, max is 100) */
+                perPage?: components["parameters"]["PerPage"];
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Filter DAGs by name */
+                name?: string;
+                /** @description Filter DAGs by tag */
+                tag?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        content?: never;
-      };
-      /** @description Invalid request */
-      400: {
-        headers: {
-          [name: string]: unknown;
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description List of DAGs with their status and metadata */
+                        dags: components["schemas"]["DAGFile"][];
+                        /** @description List of errors encountered during the request */
+                        errors: string[];
+                        pagination: components["schemas"]["Pagination"];
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-      /** @description Run or step not found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
     };
-  };
+    createNewDAG: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: components["schemas"]["DAGName"];
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Name of the newly created DAG */
+                        name: string;
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getDAGDetails: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        dag?: components["schemas"]["DAGDetails"];
+                        latestRun: components["schemas"]["RunDetails"];
+                        /** @description Whether the DAG is suspended */
+                        suspended: boolean;
+                        /** @description List of errors encountered during the request */
+                        errors: string[];
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteDAGByFileName: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description DAG successfully deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description DAG not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    executeDAG: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Parameters to pass to the DAG in JSON format */
+                    params?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    terminateDAGExecution: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    retryDAGExecution: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Request ID of the DAG run to retry */
+                    requestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getDAGExecutionHistory: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description List of historical runs for the DAG */
+                        runs: components["schemas"]["RunDetails"][];
+                        /** @description Grid data for visualization */
+                        gridData: components["schemas"]["DAGGridItem"][];
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getDAGRunDetails: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+                /** @description request ID of the DAG run or latest run if specified as 'latest' */
+                requestId: components["parameters"]["RequestId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        run: components["schemas"]["RunDetails"];
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getDAGDefinition: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        dag?: components["schemas"]["DAGDetails"];
+                        /** @description The DAG spec */
+                        spec: string;
+                        /** @description List of errors in the spec */
+                        errors: string[];
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateDAGDefinition: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The new DAG spec */
+                    spec: string;
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description List of errors in the spec */
+                        errors: string[];
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateDAGSuspensionState: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Suspend status to set for the DAG */
+                    suspend: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description DAG not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    renameDAG: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description New file name for the DAG */
+                    newFileName: string;
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description DAG not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    searchDAGDefinitions: {
+        parameters: {
+            query: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description A search query string */
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Search results matching the query */
+                        results: components["schemas"]["SearchResultItem"][];
+                        /** @description Errors encountered during the search */
+                        errors: string[];
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getAllDAGTags: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListTagResponse"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getDAGRunLog: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                dagName: components["parameters"]["DAGName"];
+                /** @description request ID of the DAG run or latest run if specified as 'latest' */
+                requestId: components["parameters"]["RequestId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Log"];
+                };
+            };
+            /** @description Log file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getDAGStepLog: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                dagName: components["parameters"]["DAGName"];
+                /** @description request ID of the DAG run or latest run if specified as 'latest' */
+                requestId: components["parameters"]["RequestId"];
+                /** @description name of the step */
+                stepName: components["parameters"]["StepName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Log"];
+                };
+            };
+            /** @description Log file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateDAGStepStatus: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                dagName: components["parameters"]["DAGName"];
+                /** @description request ID of the DAG run or latest run if specified as 'latest' */
+                requestId: components["parameters"]["RequestId"];
+                /** @description name of the step */
+                stepName: components["parameters"]["StepName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    status: components["schemas"]["NodeStatus"];
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Run or step not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getSubRunDetails: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                dagName: components["parameters"]["DAGName"];
+                /** @description request ID of the DAG run or latest run if specified as 'latest' */
+                requestId: components["parameters"]["RequestId"];
+                /** @description ID of the sub-run to retrieve details for */
+                subRequestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunDetails"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
 }
 export enum ErrorCode {
-  bad_request = 'bad_request',
-  not_found = 'not_found',
-  internal_error = 'internal_error',
-  unauthorized = 'unauthorized',
-  bad_gateway = 'bad_gateway',
-  remote_node_error = 'remote_node_error',
-  already_running = 'already_running',
-  not_running = 'not_running',
-  already_exists = 'already_exists',
+    bad_request = "bad_request",
+    not_found = "not_found",
+    internal_error = "internal_error",
+    unauthorized = "unauthorized",
+    bad_gateway = "bad_gateway",
+    remote_node_error = "remote_node_error",
+    already_running = "already_running",
+    not_running = "not_running",
+    already_exists = "already_exists"
 }
 export enum HealthResponseStatus {
-  healthy = 'healthy',
-  unhealthy = 'unhealthy',
+    healthy = "healthy",
+    unhealthy = "unhealthy"
 }
 export enum Status {
-  NotStarted = 0,
-  Running = 1,
-  Failed = 2,
-  Cancelled = 3,
-  Success = 4,
+    NotStarted = 0,
+    Running = 1,
+    Failed = 2,
+    Cancelled = 3,
+    Success = 4
 }
 export enum StatusText {
-  not_started = 'not started',
-  running = 'running',
-  failed = 'failed',
-  cancelled = 'cancelled',
-  finished = 'finished',
+    not_started = "not started",
+    running = "running",
+    failed = "failed",
+    cancelled = "cancelled",
+    finished = "finished"
 }
 export enum NodeStatus {
-  NotStarted = 0,
-  Running = 1,
-  Failed = 2,
-  Cancelled = 3,
-  Success = 4,
-  Skipped = 5,
+    NotStarted = 0,
+    Running = 1,
+    Failed = 2,
+    Cancelled = 3,
+    Success = 4,
+    Skipped = 5
 }
 export enum NodeStatusText {
-  not_started = 'not started',
-  running = 'running',
-  failed = 'failed',
-  canceled = 'canceled',
-  finished = 'finished',
-  skipped = 'skipped',
+    not_started = "not started",
+    running = "running",
+    failed = "failed",
+    canceled = "canceled",
+    finished = "finished",
+    skipped = "skipped"
 }

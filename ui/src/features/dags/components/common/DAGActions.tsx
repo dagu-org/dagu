@@ -30,7 +30,7 @@ type Props = {
     | components['schemas']['RunSummary']
     | components['schemas']['RunDetails'];
   /** File ID of the DAG */
-  fileId: string;
+  fileName: string;
   /** DAG definition */
   dag?: components['schemas']['DAG'] | components['schemas']['DAGDetails'];
   /** Whether to show text labels on buttons */
@@ -46,7 +46,7 @@ type Props = {
  */
 function DAGActions({
   status,
-  fileId,
+  fileName,
   dag,
   refresh,
   displayMode = 'compact',
@@ -192,17 +192,20 @@ function DAGActions({
                   ) {
                     try {
                       // Get all runs for this DAG to find the correct requestId
-                      const { data } = await client.GET('/dags/{fileId}/runs', {
-                        params: {
-                          path: {
-                            fileId: fileId,
+                      const { data } = await client.GET(
+                        '/dags/{fileName}/runs',
+                        {
+                          params: {
+                            path: {
+                              fileName: fileName,
+                            },
+                            query: {
+                              remoteNode:
+                                appBarContext.selectedRemoteNode || 'local',
+                            },
                           },
-                          query: {
-                            remoteNode:
-                              appBarContext.selectedRemoteNode || 'local',
-                          },
-                        },
-                      });
+                        }
+                      );
 
                       if (data?.runs && data.runs.length > 0) {
                         // Convert idx to integer
@@ -284,17 +287,20 @@ function DAGActions({
                   ) {
                     try {
                       // Get all runs for this DAG to find the correct requestId
-                      const { data } = await client.GET('/dags/{fileId}/runs', {
-                        params: {
-                          path: {
-                            fileId: fileId,
+                      const { data } = await client.GET(
+                        '/dags/{fileName}/runs',
+                        {
+                          params: {
+                            path: {
+                              fileName: fileName,
+                            },
+                            query: {
+                              remoteNode:
+                                appBarContext.selectedRemoteNode || 'local',
+                            },
                           },
-                          query: {
-                            remoteNode:
-                              appBarContext.selectedRemoteNode || 'local',
-                          },
-                        },
-                      });
+                        }
+                      );
 
                       if (data?.runs && data.runs.length > 0) {
                         // Convert idx to integer
@@ -348,13 +354,13 @@ function DAGActions({
           dismissModal={() => setIsStopModal(false)}
           onSubmit={async () => {
             setIsStopModal(false);
-            const { error } = await client.POST('/dags/{fileId}/stop', {
+            const { error } = await client.POST('/dags/{fileName}/stop', {
               params: {
                 query: {
                   remoteNode: appBarContext.selectedRemoteNode || 'local',
                 },
                 path: {
-                  fileId: fileId,
+                  fileName: fileName,
                 },
               },
             });
@@ -379,10 +385,10 @@ function DAGActions({
 
             console.log('Submitting retry with requestId:', retryRequestId);
 
-            const { error } = await client.POST('/dags/{fileId}/retry', {
+            const { error } = await client.POST('/dags/{fileName}/retry', {
               params: {
                 path: {
-                  fileId: fileId,
+                  fileName: fileName,
                 },
                 query: {
                   remoteNode: appBarContext.selectedRemoteNode || 'local',
@@ -430,10 +436,10 @@ function DAGActions({
           visible={isStartModal}
           onSubmit={async (params) => {
             setIsStartModal(false);
-            const { error } = await client.POST('/dags/{fileId}/start', {
+            const { error } = await client.POST('/dags/{fileName}/start', {
               params: {
                 path: {
-                  fileId: fileId,
+                  fileName: fileName,
                 },
                 query: {
                   remoteNode: appBarContext.selectedRemoteNode || 'local',

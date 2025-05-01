@@ -75,8 +75,8 @@ type DAG struct {
 	HistRetentionDays int `json:"HistRetentionDays,omitempty"`
 }
 
-// FileID returns the file ID of the local DAG file.
-func (d *DAG) FileID() string {
+// FileName returns the filename of the DAG without the extension.
+func (d *DAG) FileName() string {
 	if d.Location == "" {
 		return ""
 	}

@@ -163,8 +163,8 @@ type DAGFile struct {
 	// Errors List of errors encountered during the request
 	Errors []string `json:"errors"`
 
-	// FileId File ID of the DAG file
-	FileId string `json:"fileId"`
+	// FileName File ID of the DAG file
+	FileName string `json:"fileName"`
 
 	// LatestRun Current status of a DAG run
 	LatestRun RunSummary `json:"latestRun"`
@@ -173,8 +173,8 @@ type DAGFile struct {
 	Suspended bool `json:"suspended"`
 }
 
-// DAGFileId location of the DAG file
-type DAGFileId = string
+// DAGFileName Name of the DAG file
+type DAGFileName = string
 
 // DAGGridItem Grid item for log visualization
 type DAGGridItem struct {
@@ -572,8 +572,8 @@ type GetAllDAGTagsParams struct {
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
-// DeleteDAGByFileIdParams defines parameters for DeleteDAGByFileId.
-type DeleteDAGByFileIdParams struct {
+// DeleteDAGByFileNameParams defines parameters for DeleteDAGByFileName.
+type DeleteDAGByFileNameParams struct {
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
@@ -586,8 +586,8 @@ type GetDAGDetailsParams struct {
 
 // RenameDAGJSONBody defines parameters for RenameDAG.
 type RenameDAGJSONBody struct {
-	// NewFileId New file ID for the DAG
-	NewFileId string `json:"newFileId"`
+	// NewFileName New file name for the DAG
+	NewFileName string `json:"newFileName"`
 }
 
 // RenameDAGParams defines parameters for RenameDAG.
@@ -698,6 +698,12 @@ type UpdateDAGStepStatusParams struct {
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
+// GetSubRunDetailsParams defines parameters for GetSubRunDetails.
+type GetSubRunDetailsParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
 // CreateNewDAGJSONRequestBody defines body for CreateNewDAG for application/json ContentType.
 type CreateNewDAGJSONRequestBody CreateNewDAGJSONBody
 
@@ -734,38 +740,38 @@ type ServerInterface interface {
 	// (GET /dags/tags)
 	GetAllDAGTags(w http.ResponseWriter, r *http.Request, params GetAllDAGTagsParams)
 	// Delete an existing DAG
-	// (DELETE /dags/{fileId})
-	DeleteDAGByFileId(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params DeleteDAGByFileIdParams)
+	// (DELETE /dags/{fileName})
+	DeleteDAGByFileName(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params DeleteDAGByFileNameParams)
 	// Retrieve comprehensive DAG information
-	// (GET /dags/{fileId})
-	GetDAGDetails(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params GetDAGDetailsParams)
+	// (GET /dags/{fileName})
+	GetDAGDetails(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGDetailsParams)
 	// Change DAG file ID
-	// (POST /dags/{fileId}/rename)
-	RenameDAG(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params RenameDAGParams)
+	// (POST /dags/{fileName}/rename)
+	RenameDAG(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RenameDAGParams)
 	// Retry DAG execution
-	// (POST /dags/{fileId}/retry)
-	RetryDAGExecution(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params RetryDAGExecutionParams)
+	// (POST /dags/{fileName}/retry)
+	RetryDAGExecution(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryDAGExecutionParams)
 	// Retrieve execution history of a DAG
-	// (GET /dags/{fileId}/runs)
-	GetDAGExecutionHistory(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params GetDAGExecutionHistoryParams)
+	// (GET /dags/{fileName}/runs)
+	GetDAGExecutionHistory(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGExecutionHistoryParams)
 	// Get detailed status of a specific DAG run
-	// (GET /dags/{fileId}/runs/{requestId})
-	GetDAGRunDetails(w http.ResponseWriter, r *http.Request, fileId DAGFileId, requestId RequestId, params GetDAGRunDetailsParams)
+	// (GET /dags/{fileName}/runs/{requestId})
+	GetDAGRunDetails(w http.ResponseWriter, r *http.Request, fileName DAGFileName, requestId RequestId, params GetDAGRunDetailsParams)
 	// Retrieve DAG definition
-	// (GET /dags/{fileId}/spec)
-	GetDAGDefinition(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params GetDAGDefinitionParams)
+	// (GET /dags/{fileName}/spec)
+	GetDAGDefinition(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGDefinitionParams)
 	// Update DAG definition
-	// (PUT /dags/{fileId}/spec)
-	UpdateDAGDefinition(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params UpdateDAGDefinitionParams)
+	// (PUT /dags/{fileName}/spec)
+	UpdateDAGDefinition(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params UpdateDAGDefinitionParams)
 	// Initiate DAG execution
-	// (POST /dags/{fileId}/start)
-	ExecuteDAG(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params ExecuteDAGParams)
+	// (POST /dags/{fileName}/start)
+	ExecuteDAG(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params ExecuteDAGParams)
 	// Terminate running DAG execution
-	// (POST /dags/{fileId}/stop)
-	TerminateDAGExecution(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params TerminateDAGExecutionParams)
+	// (POST /dags/{fileName}/stop)
+	TerminateDAGExecution(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateDAGExecutionParams)
 	// Toggle DAG suspension state
-	// (POST /dags/{fileId}/suspend)
-	UpdateDAGSuspensionState(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params UpdateDAGSuspensionStateParams)
+	// (POST /dags/{fileName}/suspend)
+	UpdateDAGSuspensionState(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params UpdateDAGSuspensionStateParams)
 	// Check server health status
 	// (GET /health)
 	GetHealthStatus(w http.ResponseWriter, r *http.Request)
@@ -778,6 +784,9 @@ type ServerInterface interface {
 	// Manually update a step's execution status
 	// (PATCH /runs/{dagName}/{requestId}/steps/{stepName}/status)
 	UpdateDAGStepStatus(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, stepName StepName, params UpdateDAGStepStatusParams)
+	// Retrieve detailed status of a sub-run
+	// (GET /runs/{dagName}/{requestId}/sub-runs/{subRequestId})
+	GetSubRunDetails(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, subRequestId string, params GetSubRunDetailsParams)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -809,68 +818,68 @@ func (_ Unimplemented) GetAllDAGTags(w http.ResponseWriter, r *http.Request, par
 }
 
 // Delete an existing DAG
-// (DELETE /dags/{fileId})
-func (_ Unimplemented) DeleteDAGByFileId(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params DeleteDAGByFileIdParams) {
+// (DELETE /dags/{fileName})
+func (_ Unimplemented) DeleteDAGByFileName(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params DeleteDAGByFileNameParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Retrieve comprehensive DAG information
-// (GET /dags/{fileId})
-func (_ Unimplemented) GetDAGDetails(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params GetDAGDetailsParams) {
+// (GET /dags/{fileName})
+func (_ Unimplemented) GetDAGDetails(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGDetailsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Change DAG file ID
-// (POST /dags/{fileId}/rename)
-func (_ Unimplemented) RenameDAG(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params RenameDAGParams) {
+// (POST /dags/{fileName}/rename)
+func (_ Unimplemented) RenameDAG(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RenameDAGParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Retry DAG execution
-// (POST /dags/{fileId}/retry)
-func (_ Unimplemented) RetryDAGExecution(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params RetryDAGExecutionParams) {
+// (POST /dags/{fileName}/retry)
+func (_ Unimplemented) RetryDAGExecution(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryDAGExecutionParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Retrieve execution history of a DAG
-// (GET /dags/{fileId}/runs)
-func (_ Unimplemented) GetDAGExecutionHistory(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params GetDAGExecutionHistoryParams) {
+// (GET /dags/{fileName}/runs)
+func (_ Unimplemented) GetDAGExecutionHistory(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGExecutionHistoryParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Get detailed status of a specific DAG run
-// (GET /dags/{fileId}/runs/{requestId})
-func (_ Unimplemented) GetDAGRunDetails(w http.ResponseWriter, r *http.Request, fileId DAGFileId, requestId RequestId, params GetDAGRunDetailsParams) {
+// (GET /dags/{fileName}/runs/{requestId})
+func (_ Unimplemented) GetDAGRunDetails(w http.ResponseWriter, r *http.Request, fileName DAGFileName, requestId RequestId, params GetDAGRunDetailsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Retrieve DAG definition
-// (GET /dags/{fileId}/spec)
-func (_ Unimplemented) GetDAGDefinition(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params GetDAGDefinitionParams) {
+// (GET /dags/{fileName}/spec)
+func (_ Unimplemented) GetDAGDefinition(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGDefinitionParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Update DAG definition
-// (PUT /dags/{fileId}/spec)
-func (_ Unimplemented) UpdateDAGDefinition(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params UpdateDAGDefinitionParams) {
+// (PUT /dags/{fileName}/spec)
+func (_ Unimplemented) UpdateDAGDefinition(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params UpdateDAGDefinitionParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Initiate DAG execution
-// (POST /dags/{fileId}/start)
-func (_ Unimplemented) ExecuteDAG(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params ExecuteDAGParams) {
+// (POST /dags/{fileName}/start)
+func (_ Unimplemented) ExecuteDAG(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params ExecuteDAGParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Terminate running DAG execution
-// (POST /dags/{fileId}/stop)
-func (_ Unimplemented) TerminateDAGExecution(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params TerminateDAGExecutionParams) {
+// (POST /dags/{fileName}/stop)
+func (_ Unimplemented) TerminateDAGExecution(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateDAGExecutionParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Toggle DAG suspension state
-// (POST /dags/{fileId}/suspend)
-func (_ Unimplemented) UpdateDAGSuspensionState(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params UpdateDAGSuspensionStateParams) {
+// (POST /dags/{fileName}/suspend)
+func (_ Unimplemented) UpdateDAGSuspensionState(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params UpdateDAGSuspensionStateParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -895,6 +904,12 @@ func (_ Unimplemented) GetDAGStepLog(w http.ResponseWriter, r *http.Request, dag
 // Manually update a step's execution status
 // (PATCH /runs/{dagName}/{requestId}/steps/{stepName}/status)
 func (_ Unimplemented) UpdateDAGStepStatus(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, stepName StepName, params UpdateDAGStepStatusParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Retrieve detailed status of a sub-run
+// (GET /runs/{dagName}/{requestId}/sub-runs/{subRequestId})
+func (_ Unimplemented) GetSubRunDetails(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, subRequestId string, params GetSubRunDetailsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1094,17 +1109,17 @@ func (siw *ServerInterfaceWrapper) GetAllDAGTags(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
-// DeleteDAGByFileId operation middleware
-func (siw *ServerInterfaceWrapper) DeleteDAGByFileId(w http.ResponseWriter, r *http.Request) {
+// DeleteDAGByFileName operation middleware
+func (siw *ServerInterfaceWrapper) DeleteDAGByFileName(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
-	// ------------- Path parameter "fileId" -------------
-	var fileId DAGFileId
+	// ------------- Path parameter "fileName" -------------
+	var fileName DAGFileName
 
-	err = runtime.BindStyledParameterWithOptions("simple", "fileId", chi.URLParam(r, "fileId"), &fileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "fileName", chi.URLParam(r, "fileName"), &fileName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileName", Err: err})
 		return
 	}
 
@@ -1117,7 +1132,7 @@ func (siw *ServerInterfaceWrapper) DeleteDAGByFileId(w http.ResponseWriter, r *h
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params DeleteDAGByFileIdParams
+	var params DeleteDAGByFileNameParams
 
 	// ------------- Optional query parameter "remoteNode" -------------
 
@@ -1128,7 +1143,7 @@ func (siw *ServerInterfaceWrapper) DeleteDAGByFileId(w http.ResponseWriter, r *h
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteDAGByFileId(w, r, fileId, params)
+		siw.Handler.DeleteDAGByFileName(w, r, fileName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1143,12 +1158,12 @@ func (siw *ServerInterfaceWrapper) GetDAGDetails(w http.ResponseWriter, r *http.
 
 	var err error
 
-	// ------------- Path parameter "fileId" -------------
-	var fileId DAGFileId
+	// ------------- Path parameter "fileName" -------------
+	var fileName DAGFileName
 
-	err = runtime.BindStyledParameterWithOptions("simple", "fileId", chi.URLParam(r, "fileId"), &fileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "fileName", chi.URLParam(r, "fileName"), &fileName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileName", Err: err})
 		return
 	}
 
@@ -1172,7 +1187,7 @@ func (siw *ServerInterfaceWrapper) GetDAGDetails(w http.ResponseWriter, r *http.
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDAGDetails(w, r, fileId, params)
+		siw.Handler.GetDAGDetails(w, r, fileName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1187,12 +1202,12 @@ func (siw *ServerInterfaceWrapper) RenameDAG(w http.ResponseWriter, r *http.Requ
 
 	var err error
 
-	// ------------- Path parameter "fileId" -------------
-	var fileId DAGFileId
+	// ------------- Path parameter "fileName" -------------
+	var fileName DAGFileName
 
-	err = runtime.BindStyledParameterWithOptions("simple", "fileId", chi.URLParam(r, "fileId"), &fileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "fileName", chi.URLParam(r, "fileName"), &fileName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileName", Err: err})
 		return
 	}
 
@@ -1216,7 +1231,7 @@ func (siw *ServerInterfaceWrapper) RenameDAG(w http.ResponseWriter, r *http.Requ
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RenameDAG(w, r, fileId, params)
+		siw.Handler.RenameDAG(w, r, fileName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1231,12 +1246,12 @@ func (siw *ServerInterfaceWrapper) RetryDAGExecution(w http.ResponseWriter, r *h
 
 	var err error
 
-	// ------------- Path parameter "fileId" -------------
-	var fileId DAGFileId
+	// ------------- Path parameter "fileName" -------------
+	var fileName DAGFileName
 
-	err = runtime.BindStyledParameterWithOptions("simple", "fileId", chi.URLParam(r, "fileId"), &fileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "fileName", chi.URLParam(r, "fileName"), &fileName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileName", Err: err})
 		return
 	}
 
@@ -1260,7 +1275,7 @@ func (siw *ServerInterfaceWrapper) RetryDAGExecution(w http.ResponseWriter, r *h
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RetryDAGExecution(w, r, fileId, params)
+		siw.Handler.RetryDAGExecution(w, r, fileName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1275,12 +1290,12 @@ func (siw *ServerInterfaceWrapper) GetDAGExecutionHistory(w http.ResponseWriter,
 
 	var err error
 
-	// ------------- Path parameter "fileId" -------------
-	var fileId DAGFileId
+	// ------------- Path parameter "fileName" -------------
+	var fileName DAGFileName
 
-	err = runtime.BindStyledParameterWithOptions("simple", "fileId", chi.URLParam(r, "fileId"), &fileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "fileName", chi.URLParam(r, "fileName"), &fileName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileName", Err: err})
 		return
 	}
 
@@ -1304,7 +1319,7 @@ func (siw *ServerInterfaceWrapper) GetDAGExecutionHistory(w http.ResponseWriter,
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDAGExecutionHistory(w, r, fileId, params)
+		siw.Handler.GetDAGExecutionHistory(w, r, fileName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1319,12 +1334,12 @@ func (siw *ServerInterfaceWrapper) GetDAGRunDetails(w http.ResponseWriter, r *ht
 
 	var err error
 
-	// ------------- Path parameter "fileId" -------------
-	var fileId DAGFileId
+	// ------------- Path parameter "fileName" -------------
+	var fileName DAGFileName
 
-	err = runtime.BindStyledParameterWithOptions("simple", "fileId", chi.URLParam(r, "fileId"), &fileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "fileName", chi.URLParam(r, "fileName"), &fileName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileName", Err: err})
 		return
 	}
 
@@ -1357,7 +1372,7 @@ func (siw *ServerInterfaceWrapper) GetDAGRunDetails(w http.ResponseWriter, r *ht
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDAGRunDetails(w, r, fileId, requestId, params)
+		siw.Handler.GetDAGRunDetails(w, r, fileName, requestId, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1372,12 +1387,12 @@ func (siw *ServerInterfaceWrapper) GetDAGDefinition(w http.ResponseWriter, r *ht
 
 	var err error
 
-	// ------------- Path parameter "fileId" -------------
-	var fileId DAGFileId
+	// ------------- Path parameter "fileName" -------------
+	var fileName DAGFileName
 
-	err = runtime.BindStyledParameterWithOptions("simple", "fileId", chi.URLParam(r, "fileId"), &fileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "fileName", chi.URLParam(r, "fileName"), &fileName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileName", Err: err})
 		return
 	}
 
@@ -1401,7 +1416,7 @@ func (siw *ServerInterfaceWrapper) GetDAGDefinition(w http.ResponseWriter, r *ht
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDAGDefinition(w, r, fileId, params)
+		siw.Handler.GetDAGDefinition(w, r, fileName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1416,12 +1431,12 @@ func (siw *ServerInterfaceWrapper) UpdateDAGDefinition(w http.ResponseWriter, r 
 
 	var err error
 
-	// ------------- Path parameter "fileId" -------------
-	var fileId DAGFileId
+	// ------------- Path parameter "fileName" -------------
+	var fileName DAGFileName
 
-	err = runtime.BindStyledParameterWithOptions("simple", "fileId", chi.URLParam(r, "fileId"), &fileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "fileName", chi.URLParam(r, "fileName"), &fileName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileName", Err: err})
 		return
 	}
 
@@ -1445,7 +1460,7 @@ func (siw *ServerInterfaceWrapper) UpdateDAGDefinition(w http.ResponseWriter, r 
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateDAGDefinition(w, r, fileId, params)
+		siw.Handler.UpdateDAGDefinition(w, r, fileName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1460,12 +1475,12 @@ func (siw *ServerInterfaceWrapper) ExecuteDAG(w http.ResponseWriter, r *http.Req
 
 	var err error
 
-	// ------------- Path parameter "fileId" -------------
-	var fileId DAGFileId
+	// ------------- Path parameter "fileName" -------------
+	var fileName DAGFileName
 
-	err = runtime.BindStyledParameterWithOptions("simple", "fileId", chi.URLParam(r, "fileId"), &fileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "fileName", chi.URLParam(r, "fileName"), &fileName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileName", Err: err})
 		return
 	}
 
@@ -1489,7 +1504,7 @@ func (siw *ServerInterfaceWrapper) ExecuteDAG(w http.ResponseWriter, r *http.Req
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ExecuteDAG(w, r, fileId, params)
+		siw.Handler.ExecuteDAG(w, r, fileName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1504,12 +1519,12 @@ func (siw *ServerInterfaceWrapper) TerminateDAGExecution(w http.ResponseWriter, 
 
 	var err error
 
-	// ------------- Path parameter "fileId" -------------
-	var fileId DAGFileId
+	// ------------- Path parameter "fileName" -------------
+	var fileName DAGFileName
 
-	err = runtime.BindStyledParameterWithOptions("simple", "fileId", chi.URLParam(r, "fileId"), &fileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "fileName", chi.URLParam(r, "fileName"), &fileName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileName", Err: err})
 		return
 	}
 
@@ -1533,7 +1548,7 @@ func (siw *ServerInterfaceWrapper) TerminateDAGExecution(w http.ResponseWriter, 
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.TerminateDAGExecution(w, r, fileId, params)
+		siw.Handler.TerminateDAGExecution(w, r, fileName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1548,12 +1563,12 @@ func (siw *ServerInterfaceWrapper) UpdateDAGSuspensionState(w http.ResponseWrite
 
 	var err error
 
-	// ------------- Path parameter "fileId" -------------
-	var fileId DAGFileId
+	// ------------- Path parameter "fileName" -------------
+	var fileName DAGFileName
 
-	err = runtime.BindStyledParameterWithOptions("simple", "fileId", chi.URLParam(r, "fileId"), &fileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "fileName", chi.URLParam(r, "fileName"), &fileName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileName", Err: err})
 		return
 	}
 
@@ -1577,7 +1592,7 @@ func (siw *ServerInterfaceWrapper) UpdateDAGSuspensionState(w http.ResponseWrite
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateDAGSuspensionState(w, r, fileId, params)
+		siw.Handler.UpdateDAGSuspensionState(w, r, fileName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1786,6 +1801,68 @@ func (siw *ServerInterfaceWrapper) UpdateDAGStepStatus(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
+// GetSubRunDetails operation middleware
+func (siw *ServerInterfaceWrapper) GetSubRunDetails(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "dagName" -------------
+	var dagName DAGName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagName", chi.URLParam(r, "dagName"), &dagName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "requestId" -------------
+	var requestId RequestId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "requestId", chi.URLParam(r, "requestId"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "requestId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "subRequestId" -------------
+	var subRequestId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "subRequestId", chi.URLParam(r, "subRequestId"), &subRequestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "subRequestId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetSubRunDetailsParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSubRunDetails(w, r, dagName, requestId, subRequestId, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -1912,37 +1989,37 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/dags/tags", wrapper.GetAllDAGTags)
 	})
 	r.Group(func(r chi.Router) {
-		r.Delete(options.BaseURL+"/dags/{fileId}", wrapper.DeleteDAGByFileId)
+		r.Delete(options.BaseURL+"/dags/{fileName}", wrapper.DeleteDAGByFileName)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dags/{fileId}", wrapper.GetDAGDetails)
+		r.Get(options.BaseURL+"/dags/{fileName}", wrapper.GetDAGDetails)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/dags/{fileId}/rename", wrapper.RenameDAG)
+		r.Post(options.BaseURL+"/dags/{fileName}/rename", wrapper.RenameDAG)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/dags/{fileId}/retry", wrapper.RetryDAGExecution)
+		r.Post(options.BaseURL+"/dags/{fileName}/retry", wrapper.RetryDAGExecution)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dags/{fileId}/runs", wrapper.GetDAGExecutionHistory)
+		r.Get(options.BaseURL+"/dags/{fileName}/runs", wrapper.GetDAGExecutionHistory)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dags/{fileId}/runs/{requestId}", wrapper.GetDAGRunDetails)
+		r.Get(options.BaseURL+"/dags/{fileName}/runs/{requestId}", wrapper.GetDAGRunDetails)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dags/{fileId}/spec", wrapper.GetDAGDefinition)
+		r.Get(options.BaseURL+"/dags/{fileName}/spec", wrapper.GetDAGDefinition)
 	})
 	r.Group(func(r chi.Router) {
-		r.Put(options.BaseURL+"/dags/{fileId}/spec", wrapper.UpdateDAGDefinition)
+		r.Put(options.BaseURL+"/dags/{fileName}/spec", wrapper.UpdateDAGDefinition)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/dags/{fileId}/start", wrapper.ExecuteDAG)
+		r.Post(options.BaseURL+"/dags/{fileName}/start", wrapper.ExecuteDAG)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/dags/{fileId}/stop", wrapper.TerminateDAGExecution)
+		r.Post(options.BaseURL+"/dags/{fileName}/stop", wrapper.TerminateDAGExecution)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/dags/{fileId}/suspend", wrapper.UpdateDAGSuspensionState)
+		r.Post(options.BaseURL+"/dags/{fileName}/suspend", wrapper.UpdateDAGSuspensionState)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/health", wrapper.GetHealthStatus)
@@ -1955,6 +2032,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/runs/{dagName}/{requestId}/steps/{stepName}/status", wrapper.UpdateDAGStepStatus)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/runs/{dagName}/{requestId}/sub-runs/{subRequestId}", wrapper.GetSubRunDetails)
 	})
 
 	return r
@@ -2093,38 +2173,38 @@ func (response GetAllDAGTagsdefaultJSONResponse) VisitGetAllDAGTagsResponse(w ht
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type DeleteDAGByFileIdRequestObject struct {
-	FileId DAGFileId `json:"fileId"`
-	Params DeleteDAGByFileIdParams
+type DeleteDAGByFileNameRequestObject struct {
+	FileName DAGFileName `json:"fileName"`
+	Params   DeleteDAGByFileNameParams
 }
 
-type DeleteDAGByFileIdResponseObject interface {
-	VisitDeleteDAGByFileIdResponse(w http.ResponseWriter) error
+type DeleteDAGByFileNameResponseObject interface {
+	VisitDeleteDAGByFileNameResponse(w http.ResponseWriter) error
 }
 
-type DeleteDAGByFileId204Response struct {
+type DeleteDAGByFileName204Response struct {
 }
 
-func (response DeleteDAGByFileId204Response) VisitDeleteDAGByFileIdResponse(w http.ResponseWriter) error {
+func (response DeleteDAGByFileName204Response) VisitDeleteDAGByFileNameResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
 }
 
-type DeleteDAGByFileId404JSONResponse Error
+type DeleteDAGByFileName404JSONResponse Error
 
-func (response DeleteDAGByFileId404JSONResponse) VisitDeleteDAGByFileIdResponse(w http.ResponseWriter) error {
+func (response DeleteDAGByFileName404JSONResponse) VisitDeleteDAGByFileNameResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type DeleteDAGByFileIddefaultJSONResponse struct {
+type DeleteDAGByFileNamedefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response DeleteDAGByFileIddefaultJSONResponse) VisitDeleteDAGByFileIdResponse(w http.ResponseWriter) error {
+func (response DeleteDAGByFileNamedefaultJSONResponse) VisitDeleteDAGByFileNameResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
@@ -2132,8 +2212,8 @@ func (response DeleteDAGByFileIddefaultJSONResponse) VisitDeleteDAGByFileIdRespo
 }
 
 type GetDAGDetailsRequestObject struct {
-	FileId DAGFileId `json:"fileId"`
-	Params GetDAGDetailsParams
+	FileName DAGFileName `json:"fileName"`
+	Params   GetDAGDetailsParams
 }
 
 type GetDAGDetailsResponseObject interface {
@@ -2174,9 +2254,9 @@ func (response GetDAGDetailsdefaultJSONResponse) VisitGetDAGDetailsResponse(w ht
 }
 
 type RenameDAGRequestObject struct {
-	FileId DAGFileId `json:"fileId"`
-	Params RenameDAGParams
-	Body   *RenameDAGJSONRequestBody
+	FileName DAGFileName `json:"fileName"`
+	Params   RenameDAGParams
+	Body     *RenameDAGJSONRequestBody
 }
 
 type RenameDAGResponseObject interface {
@@ -2222,9 +2302,9 @@ func (response RenameDAGdefaultJSONResponse) VisitRenameDAGResponse(w http.Respo
 }
 
 type RetryDAGExecutionRequestObject struct {
-	FileId DAGFileId `json:"fileId"`
-	Params RetryDAGExecutionParams
-	Body   *RetryDAGExecutionJSONRequestBody
+	FileName DAGFileName `json:"fileName"`
+	Params   RetryDAGExecutionParams
+	Body     *RetryDAGExecutionJSONRequestBody
 }
 
 type RetryDAGExecutionResponseObject interface {
@@ -2252,8 +2332,8 @@ func (response RetryDAGExecutiondefaultJSONResponse) VisitRetryDAGExecutionRespo
 }
 
 type GetDAGExecutionHistoryRequestObject struct {
-	FileId DAGFileId `json:"fileId"`
-	Params GetDAGExecutionHistoryParams
+	FileName DAGFileName `json:"fileName"`
+	Params   GetDAGExecutionHistoryParams
 }
 
 type GetDAGExecutionHistoryResponseObject interface {
@@ -2288,8 +2368,8 @@ func (response GetDAGExecutionHistorydefaultJSONResponse) VisitGetDAGExecutionHi
 }
 
 type GetDAGRunDetailsRequestObject struct {
-	FileId    DAGFileId `json:"fileId"`
-	RequestId RequestId `json:"requestId"`
+	FileName  DAGFileName `json:"fileName"`
+	RequestId RequestId   `json:"requestId"`
 	Params    GetDAGRunDetailsParams
 }
 
@@ -2322,8 +2402,8 @@ func (response GetDAGRunDetailsdefaultJSONResponse) VisitGetDAGRunDetailsRespons
 }
 
 type GetDAGDefinitionRequestObject struct {
-	FileId DAGFileId `json:"fileId"`
-	Params GetDAGDefinitionParams
+	FileName DAGFileName `json:"fileName"`
+	Params   GetDAGDefinitionParams
 }
 
 type GetDAGDefinitionResponseObject interface {
@@ -2361,9 +2441,9 @@ func (response GetDAGDefinitiondefaultJSONResponse) VisitGetDAGDefinitionRespons
 }
 
 type UpdateDAGDefinitionRequestObject struct {
-	FileId DAGFileId `json:"fileId"`
-	Params UpdateDAGDefinitionParams
-	Body   *UpdateDAGDefinitionJSONRequestBody
+	FileName DAGFileName `json:"fileName"`
+	Params   UpdateDAGDefinitionParams
+	Body     *UpdateDAGDefinitionJSONRequestBody
 }
 
 type UpdateDAGDefinitionResponseObject interface {
@@ -2395,9 +2475,9 @@ func (response UpdateDAGDefinitiondefaultJSONResponse) VisitUpdateDAGDefinitionR
 }
 
 type ExecuteDAGRequestObject struct {
-	FileId DAGFileId `json:"fileId"`
-	Params ExecuteDAGParams
-	Body   *ExecuteDAGJSONRequestBody
+	FileName DAGFileName `json:"fileName"`
+	Params   ExecuteDAGParams
+	Body     *ExecuteDAGJSONRequestBody
 }
 
 type ExecuteDAGResponseObject interface {
@@ -2425,8 +2505,8 @@ func (response ExecuteDAGdefaultJSONResponse) VisitExecuteDAGResponse(w http.Res
 }
 
 type TerminateDAGExecutionRequestObject struct {
-	FileId DAGFileId `json:"fileId"`
-	Params TerminateDAGExecutionParams
+	FileName DAGFileName `json:"fileName"`
+	Params   TerminateDAGExecutionParams
 }
 
 type TerminateDAGExecutionResponseObject interface {
@@ -2454,9 +2534,9 @@ func (response TerminateDAGExecutiondefaultJSONResponse) VisitTerminateDAGExecut
 }
 
 type UpdateDAGSuspensionStateRequestObject struct {
-	FileId DAGFileId `json:"fileId"`
-	Params UpdateDAGSuspensionStateParams
-	Body   *UpdateDAGSuspensionStateJSONRequestBody
+	FileName DAGFileName `json:"fileName"`
+	Params   UpdateDAGSuspensionStateParams
+	Body     *UpdateDAGSuspensionStateJSONRequestBody
 }
 
 type UpdateDAGSuspensionStateResponseObject interface {
@@ -2648,6 +2728,38 @@ func (response UpdateDAGStepStatusdefaultJSONResponse) VisitUpdateDAGStepStatusR
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
+type GetSubRunDetailsRequestObject struct {
+	DagName      DAGName   `json:"dagName"`
+	RequestId    RequestId `json:"requestId"`
+	SubRequestId string    `json:"subRequestId"`
+	Params       GetSubRunDetailsParams
+}
+
+type GetSubRunDetailsResponseObject interface {
+	VisitGetSubRunDetailsResponse(w http.ResponseWriter) error
+}
+
+type GetSubRunDetails200JSONResponse RunDetails
+
+func (response GetSubRunDetails200JSONResponse) VisitGetSubRunDetailsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSubRunDetailsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetSubRunDetailsdefaultJSONResponse) VisitGetSubRunDetailsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// List all available DAGs
@@ -2663,37 +2775,37 @@ type StrictServerInterface interface {
 	// (GET /dags/tags)
 	GetAllDAGTags(ctx context.Context, request GetAllDAGTagsRequestObject) (GetAllDAGTagsResponseObject, error)
 	// Delete an existing DAG
-	// (DELETE /dags/{fileId})
-	DeleteDAGByFileId(ctx context.Context, request DeleteDAGByFileIdRequestObject) (DeleteDAGByFileIdResponseObject, error)
+	// (DELETE /dags/{fileName})
+	DeleteDAGByFileName(ctx context.Context, request DeleteDAGByFileNameRequestObject) (DeleteDAGByFileNameResponseObject, error)
 	// Retrieve comprehensive DAG information
-	// (GET /dags/{fileId})
+	// (GET /dags/{fileName})
 	GetDAGDetails(ctx context.Context, request GetDAGDetailsRequestObject) (GetDAGDetailsResponseObject, error)
 	// Change DAG file ID
-	// (POST /dags/{fileId}/rename)
+	// (POST /dags/{fileName}/rename)
 	RenameDAG(ctx context.Context, request RenameDAGRequestObject) (RenameDAGResponseObject, error)
 	// Retry DAG execution
-	// (POST /dags/{fileId}/retry)
+	// (POST /dags/{fileName}/retry)
 	RetryDAGExecution(ctx context.Context, request RetryDAGExecutionRequestObject) (RetryDAGExecutionResponseObject, error)
 	// Retrieve execution history of a DAG
-	// (GET /dags/{fileId}/runs)
+	// (GET /dags/{fileName}/runs)
 	GetDAGExecutionHistory(ctx context.Context, request GetDAGExecutionHistoryRequestObject) (GetDAGExecutionHistoryResponseObject, error)
 	// Get detailed status of a specific DAG run
-	// (GET /dags/{fileId}/runs/{requestId})
+	// (GET /dags/{fileName}/runs/{requestId})
 	GetDAGRunDetails(ctx context.Context, request GetDAGRunDetailsRequestObject) (GetDAGRunDetailsResponseObject, error)
 	// Retrieve DAG definition
-	// (GET /dags/{fileId}/spec)
+	// (GET /dags/{fileName}/spec)
 	GetDAGDefinition(ctx context.Context, request GetDAGDefinitionRequestObject) (GetDAGDefinitionResponseObject, error)
 	// Update DAG definition
-	// (PUT /dags/{fileId}/spec)
+	// (PUT /dags/{fileName}/spec)
 	UpdateDAGDefinition(ctx context.Context, request UpdateDAGDefinitionRequestObject) (UpdateDAGDefinitionResponseObject, error)
 	// Initiate DAG execution
-	// (POST /dags/{fileId}/start)
+	// (POST /dags/{fileName}/start)
 	ExecuteDAG(ctx context.Context, request ExecuteDAGRequestObject) (ExecuteDAGResponseObject, error)
 	// Terminate running DAG execution
-	// (POST /dags/{fileId}/stop)
+	// (POST /dags/{fileName}/stop)
 	TerminateDAGExecution(ctx context.Context, request TerminateDAGExecutionRequestObject) (TerminateDAGExecutionResponseObject, error)
 	// Toggle DAG suspension state
-	// (POST /dags/{fileId}/suspend)
+	// (POST /dags/{fileName}/suspend)
 	UpdateDAGSuspensionState(ctx context.Context, request UpdateDAGSuspensionStateRequestObject) (UpdateDAGSuspensionStateResponseObject, error)
 	// Check server health status
 	// (GET /health)
@@ -2707,6 +2819,9 @@ type StrictServerInterface interface {
 	// Manually update a step's execution status
 	// (PATCH /runs/{dagName}/{requestId}/steps/{stepName}/status)
 	UpdateDAGStepStatus(ctx context.Context, request UpdateDAGStepStatusRequestObject) (UpdateDAGStepStatusResponseObject, error)
+	// Retrieve detailed status of a sub-run
+	// (GET /runs/{dagName}/{requestId}/sub-runs/{subRequestId})
+	GetSubRunDetails(ctx context.Context, request GetSubRunDetailsRequestObject) (GetSubRunDetailsResponseObject, error)
 }
 
 type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
@@ -2849,26 +2964,26 @@ func (sh *strictHandler) GetAllDAGTags(w http.ResponseWriter, r *http.Request, p
 	}
 }
 
-// DeleteDAGByFileId operation middleware
-func (sh *strictHandler) DeleteDAGByFileId(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params DeleteDAGByFileIdParams) {
-	var request DeleteDAGByFileIdRequestObject
+// DeleteDAGByFileName operation middleware
+func (sh *strictHandler) DeleteDAGByFileName(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params DeleteDAGByFileNameParams) {
+	var request DeleteDAGByFileNameRequestObject
 
-	request.FileId = fileId
+	request.FileName = fileName
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.DeleteDAGByFileId(ctx, request.(DeleteDAGByFileIdRequestObject))
+		return sh.ssi.DeleteDAGByFileName(ctx, request.(DeleteDAGByFileNameRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "DeleteDAGByFileId")
+		handler = middleware(handler, "DeleteDAGByFileName")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(DeleteDAGByFileIdResponseObject); ok {
-		if err := validResponse.VisitDeleteDAGByFileIdResponse(w); err != nil {
+	} else if validResponse, ok := response.(DeleteDAGByFileNameResponseObject); ok {
+		if err := validResponse.VisitDeleteDAGByFileNameResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -2877,10 +2992,10 @@ func (sh *strictHandler) DeleteDAGByFileId(w http.ResponseWriter, r *http.Reques
 }
 
 // GetDAGDetails operation middleware
-func (sh *strictHandler) GetDAGDetails(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params GetDAGDetailsParams) {
+func (sh *strictHandler) GetDAGDetails(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGDetailsParams) {
 	var request GetDAGDetailsRequestObject
 
-	request.FileId = fileId
+	request.FileName = fileName
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
@@ -2904,10 +3019,10 @@ func (sh *strictHandler) GetDAGDetails(w http.ResponseWriter, r *http.Request, f
 }
 
 // RenameDAG operation middleware
-func (sh *strictHandler) RenameDAG(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params RenameDAGParams) {
+func (sh *strictHandler) RenameDAG(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RenameDAGParams) {
 	var request RenameDAGRequestObject
 
-	request.FileId = fileId
+	request.FileName = fileName
 	request.Params = params
 
 	var body RenameDAGJSONRequestBody
@@ -2938,10 +3053,10 @@ func (sh *strictHandler) RenameDAG(w http.ResponseWriter, r *http.Request, fileI
 }
 
 // RetryDAGExecution operation middleware
-func (sh *strictHandler) RetryDAGExecution(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params RetryDAGExecutionParams) {
+func (sh *strictHandler) RetryDAGExecution(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryDAGExecutionParams) {
 	var request RetryDAGExecutionRequestObject
 
-	request.FileId = fileId
+	request.FileName = fileName
 	request.Params = params
 
 	var body RetryDAGExecutionJSONRequestBody
@@ -2972,10 +3087,10 @@ func (sh *strictHandler) RetryDAGExecution(w http.ResponseWriter, r *http.Reques
 }
 
 // GetDAGExecutionHistory operation middleware
-func (sh *strictHandler) GetDAGExecutionHistory(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params GetDAGExecutionHistoryParams) {
+func (sh *strictHandler) GetDAGExecutionHistory(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGExecutionHistoryParams) {
 	var request GetDAGExecutionHistoryRequestObject
 
-	request.FileId = fileId
+	request.FileName = fileName
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
@@ -2999,10 +3114,10 @@ func (sh *strictHandler) GetDAGExecutionHistory(w http.ResponseWriter, r *http.R
 }
 
 // GetDAGRunDetails operation middleware
-func (sh *strictHandler) GetDAGRunDetails(w http.ResponseWriter, r *http.Request, fileId DAGFileId, requestId RequestId, params GetDAGRunDetailsParams) {
+func (sh *strictHandler) GetDAGRunDetails(w http.ResponseWriter, r *http.Request, fileName DAGFileName, requestId RequestId, params GetDAGRunDetailsParams) {
 	var request GetDAGRunDetailsRequestObject
 
-	request.FileId = fileId
+	request.FileName = fileName
 	request.RequestId = requestId
 	request.Params = params
 
@@ -3027,10 +3142,10 @@ func (sh *strictHandler) GetDAGRunDetails(w http.ResponseWriter, r *http.Request
 }
 
 // GetDAGDefinition operation middleware
-func (sh *strictHandler) GetDAGDefinition(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params GetDAGDefinitionParams) {
+func (sh *strictHandler) GetDAGDefinition(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGDefinitionParams) {
 	var request GetDAGDefinitionRequestObject
 
-	request.FileId = fileId
+	request.FileName = fileName
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
@@ -3054,10 +3169,10 @@ func (sh *strictHandler) GetDAGDefinition(w http.ResponseWriter, r *http.Request
 }
 
 // UpdateDAGDefinition operation middleware
-func (sh *strictHandler) UpdateDAGDefinition(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params UpdateDAGDefinitionParams) {
+func (sh *strictHandler) UpdateDAGDefinition(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params UpdateDAGDefinitionParams) {
 	var request UpdateDAGDefinitionRequestObject
 
-	request.FileId = fileId
+	request.FileName = fileName
 	request.Params = params
 
 	var body UpdateDAGDefinitionJSONRequestBody
@@ -3088,10 +3203,10 @@ func (sh *strictHandler) UpdateDAGDefinition(w http.ResponseWriter, r *http.Requ
 }
 
 // ExecuteDAG operation middleware
-func (sh *strictHandler) ExecuteDAG(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params ExecuteDAGParams) {
+func (sh *strictHandler) ExecuteDAG(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params ExecuteDAGParams) {
 	var request ExecuteDAGRequestObject
 
-	request.FileId = fileId
+	request.FileName = fileName
 	request.Params = params
 
 	var body ExecuteDAGJSONRequestBody
@@ -3122,10 +3237,10 @@ func (sh *strictHandler) ExecuteDAG(w http.ResponseWriter, r *http.Request, file
 }
 
 // TerminateDAGExecution operation middleware
-func (sh *strictHandler) TerminateDAGExecution(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params TerminateDAGExecutionParams) {
+func (sh *strictHandler) TerminateDAGExecution(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateDAGExecutionParams) {
 	var request TerminateDAGExecutionRequestObject
 
-	request.FileId = fileId
+	request.FileName = fileName
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
@@ -3149,10 +3264,10 @@ func (sh *strictHandler) TerminateDAGExecution(w http.ResponseWriter, r *http.Re
 }
 
 // UpdateDAGSuspensionState operation middleware
-func (sh *strictHandler) UpdateDAGSuspensionState(w http.ResponseWriter, r *http.Request, fileId DAGFileId, params UpdateDAGSuspensionStateParams) {
+func (sh *strictHandler) UpdateDAGSuspensionState(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params UpdateDAGSuspensionStateParams) {
 	var request UpdateDAGSuspensionStateRequestObject
 
-	request.FileId = fileId
+	request.FileName = fileName
 	request.Params = params
 
 	var body UpdateDAGSuspensionStateJSONRequestBody
@@ -3299,92 +3414,122 @@ func (sh *strictHandler) UpdateDAGStepStatus(w http.ResponseWriter, r *http.Requ
 	}
 }
 
+// GetSubRunDetails operation middleware
+func (sh *strictHandler) GetSubRunDetails(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, subRequestId string, params GetSubRunDetailsParams) {
+	var request GetSubRunDetailsRequestObject
+
+	request.DagName = dagName
+	request.RequestId = requestId
+	request.SubRequestId = subRequestId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSubRunDetails(ctx, request.(GetSubRunDetailsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSubRunDetails")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSubRunDetailsResponseObject); ok {
+		if err := validResponse.VisitGetSubRunDetailsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

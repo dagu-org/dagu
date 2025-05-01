@@ -27,7 +27,7 @@ type Props = {
   node: components['schemas']['Node'];
   /** Request ID for log linking */
   requestId?: string;
-  /** DAG name/fileId */
+  /** DAG name or file name */
   name: string;
   /** Function to open log viewer */
   onViewLog?: (stepName: string, requestId: string) => void;

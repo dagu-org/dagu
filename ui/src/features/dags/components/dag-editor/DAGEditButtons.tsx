@@ -14,13 +14,13 @@ import { useClient } from '../../../../hooks/api';
  */
 type Props = {
   /** DAG file ID */
-  fileId: string;
+  fileName: string;
 };
 
 /**
  * DAGEditButtons provides buttons for renaming and deleting a DAG
  */
-function DAGEditButtons({ fileId }: Props) {
+function DAGEditButtons({ fileName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
 
@@ -31,28 +31,28 @@ function DAGEditButtons({ fileId }: Props) {
         size="sm"
         className="cursor-pointer"
         onClick={async () => {
-          const newFileId = window.prompt(
+          const newFileName = window.prompt(
             'Please input the new DAG file ID',
             ''
           );
-          if (!newFileId) {
+          if (!newFileName) {
             return;
           }
-          if (newFileId.indexOf(' ') != -1) {
+          if (newFileName.indexOf(' ') != -1) {
             alert('DAG file ID cannot contain space');
             return;
           }
-          const { error } = await client.POST('/dags/{fileId}/rename', {
+          const { error } = await client.POST('/dags/{fileName}/rename', {
             params: {
               path: {
-                fileId: fileId,
+                fileName: fileName,
               },
             },
             query: {
               remoteNode: appBarContext.selectedRemoteNode || 'local',
             },
             body: {
-              newFileId: newFileId,
+              newFileName: newFileName,
             },
           });
           if (error) {
@@ -61,7 +61,7 @@ function DAGEditButtons({ fileId }: Props) {
           }
           // Redirect to the new DAG page
           const basePath = window.location.pathname.split('/dags')[0] || '';
-          window.location.href = `${basePath}/dags/${newFileId}`;
+          window.location.href = `${basePath}/dags/${newFileName}`;
         }}
       >
         <PencilLine className="h-4 w-4 mr-2" />
@@ -76,10 +76,10 @@ function DAGEditButtons({ fileId }: Props) {
           if (!confirm('Are you sure to delete the DAG?')) {
             return;
           }
-          const { error } = await client.DELETE('/dags/{fileId}', {
+          const { error } = await client.DELETE('/dags/{fileName}', {
             params: {
               path: {
-                fileId: fileId,
+                fileName: fileName,
               },
               query: {
                 remoteNode: appBarContext.selectedRemoteNode || 'local',

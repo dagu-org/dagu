@@ -585,7 +585,7 @@ const defaultColumns = [
           <DAGActions
             dag={data.dag.dag}
             status={data.dag.latestRun}
-            fileId={data.dag.fileId}
+            fileName={data.dag.fileName}
             label={false}
             refresh={table.options.meta?.refreshFn}
           />
@@ -642,20 +642,20 @@ function DAGTable({
   const [expanded, setExpanded] = React.useState<ExpandedState>({});
 
   // State for the side modal
-  const [selectedDAGId, setSelectedDAGId] = useState<string | null>(null);
+  const [selectedDAG, setSelectedDAG] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Handlers for the modal
-  const openModal = (fileId: string) => {
+  const openModal = (fileName: string) => {
     // Check if screen is small (less than 768px width)
     const isSmallScreen = window.innerWidth < 768;
 
     if (isSmallScreen) {
       // For small screens, navigate directly to the DAG details page
-      navigate(`/dags/${fileId}`);
+      navigate(`/dags/${fileName}`);
     } else {
       // For larger screens, open the side modal
-      setSelectedDAGId(fileId);
+      setSelectedDAG(fileName);
       setIsModalOpen(true);
     }
   };
@@ -667,11 +667,11 @@ function DAGTable({
   // Close modal and navigate to full page on window resize if screen becomes small
   React.useEffect(() => {
     const handleResize = () => {
-      if (isModalOpen && selectedDAGId && window.innerWidth < 768) {
+      if (isModalOpen && selectedDAG && window.innerWidth < 768) {
         // Close the modal
         setIsModalOpen(false);
         // Navigate to the full page
-        navigate(`/dags/${selectedDAGId}`);
+        navigate(`/dags/${selectedDAG}`);
       }
     };
 
@@ -679,7 +679,7 @@ function DAGTable({
     return () => {
       window.removeEventListener('resize', handleResize);
     };
-  }, [isModalOpen, selectedDAGId, navigate]);
+  }, [isModalOpen, selectedDAG, navigate]);
 
   // Update column filters based on external search props
   React.useEffect(() => {
@@ -758,20 +758,20 @@ function DAGTable({
 
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!isModalOpen || !selectedDAGId || !tableInstanceRef.current) return;
+      if (!isModalOpen || !selectedDAG || !tableInstanceRef.current) return;
 
       // Get all DAG rows from the sorted table rows (not groups)
       const sortedRows = tableInstanceRef.current.getRowModel().rows;
       const dagRows = sortedRows
         .filter((row) => (row.original as Data)?.kind === ItemKind.DAG)
         .map((row) => ({
-          fileId: (row.original as DAGRow).dag.fileId,
+          fileName: (row.original as DAGRow).dag.fileName,
           row: row.original as DAGRow,
         }));
 
       // Find current index
       const currentIndex = dagRows.findIndex(
-        (item) => item.fileId === selectedDAGId
+        (item) => item.fileName === selectedDAG
       );
       if (currentIndex === -1) return;
 
@@ -780,13 +780,13 @@ function DAGTable({
         // Move to next DAG
         const nextDAG = dagRows[currentIndex + 1];
         if (nextDAG) {
-          setSelectedDAGId(nextDAG.fileId);
+          setSelectedDAG(nextDAG.fileName);
         }
       } else if (event.key === 'ArrowUp' && currentIndex > 0) {
         // Move to previous DAG
         const prevDAG = dagRows[currentIndex - 1];
         if (prevDAG) {
-          setSelectedDAGId(prevDAG.fileId);
+          setSelectedDAG(prevDAG.fileName);
         }
       }
     };
@@ -795,7 +795,7 @@ function DAGTable({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isModalOpen, selectedDAGId, sorting]); // Include sorting in dependencies
+  }, [isModalOpen, selectedDAG, sorting]); // Include sorting in dependencies
 
   const instance = useReactTable<Data>({
     data,
@@ -837,9 +837,9 @@ function DAGTable({
   return (
     <div className="space-y-4">
       {/* Side Modal for DAG Details */}
-      {selectedDAGId && (
+      {selectedDAG && (
         <DAGDetailsModal
-          fileId={selectedDAGId}
+          fileName={selectedDAG}
           isOpen={isModalOpen}
           onClose={closeModal}
         />
@@ -1019,8 +1019,8 @@ function DAGTable({
                         ? 'bg-muted/50 font-semibold cursor-pointer hover:bg-muted/70' // Make group rows clickable
                         : isDAGRow &&
                             'dag' in row.original &&
-                            selectedDAGId ===
-                              (row.original as DAGRow).dag.fileId
+                            selectedDAG ===
+                              (row.original as DAGRow).dag.fileName
                           ? 'cursor-pointer bg-primary/10 hover:bg-primary/15 border-l-4 border-primary border-b-0' // Highlight selected DAG
                           : 'cursor-pointer hover:bg-muted/50'
                     }
@@ -1033,15 +1033,15 @@ function DAGTable({
                       // Handle DAG row clicks - open modal or new tab
                       else if (isDAGRow && 'dag' in row.original) {
                         const dagRow = row.original as DAGRow;
-                        const fileId = dagRow.dag.fileId;
+                        const fileName = dagRow.dag.fileName;
 
                         // If Cmd (Mac) or Ctrl (Windows/Linux) key is pressed, open in new tab
                         if (e.metaKey || e.ctrlKey) {
                           // Open in new tab
-                          window.open(`/dags/${fileId}`, '_blank');
+                          window.open(`/dags/${fileName}`, '_blank');
                         } else {
                           // Normal click behavior
-                          openModal(fileId);
+                          openModal(fileName);
                         }
                       }
                     }}

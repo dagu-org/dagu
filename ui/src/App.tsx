@@ -91,8 +91,14 @@ function App({ config }: Props) {
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/dags/" element={<DAGs />} />
-                    <Route path="/dags/:fileId/:tab" element={<DAGDetails />} />
-                    <Route path="/dags/:fileId/" element={<DAGDetails />} />
+                    <Route
+                      path="/dags/:dagFileName/:tab"
+                      element={<DAGDetails />}
+                    />
+                    <Route
+                      path="/dags/:dagFileName/"
+                      element={<DAGDetails />}
+                    />
                     <Route path="/search/" element={<Search />} />
                   </Routes>
                 </Layout>

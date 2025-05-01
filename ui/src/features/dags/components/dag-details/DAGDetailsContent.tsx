@@ -17,7 +17,7 @@ import {
 import { DAGHeader } from './';
 
 type DAGDetailsContentProps = {
-  fileId: string;
+  fileName: string;
   dag: components['schemas']['DAG'];
   latestRun: components['schemas']['RunDetails'];
   refreshFn: () => void;
@@ -36,7 +36,7 @@ type LogViewerState = {
 };
 
 const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
-  fileId,
+  fileName,
   dag,
   latestRun,
   refreshFn,
@@ -47,7 +47,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   stepName = null,
   isModal = false,
 }) => {
-  const baseUrl = isModal ? '#' : `/dags/${fileId}`;
+  const baseUrl = isModal ? '#' : `/dags/${fileName}`;
   const [logViewer, setLogViewer] = useState<LogViewerState>({
     isOpen: false,
     logType: 'execution',
@@ -82,7 +82,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
     <DAGContext.Provider
       value={{
         refresh: refreshFn,
-        fileId: fileId || '',
+        fileName: fileName || '',
         name: dag?.name || '',
       }}
     >
@@ -96,7 +96,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
           <DAGHeader
             dag={dag}
             latestRun={latestRun}
-            fileId={fileId || ''}
+            fileName={fileName || ''}
             refreshFn={refreshFn}
             formatDuration={formatDuration}
           />
@@ -172,17 +172,17 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                 ))}
             </Tabs>
             {activeTab === 'spec' ? (
-              <DAGEditButtons fileId={fileId || ''} />
+              <DAGEditButtons fileName={fileName || ''} />
             ) : null}
           </div>
           <div className="flex-1">
             {activeTab === 'status' ? (
-              <DAGStatus run={latestRun} fileId={fileId || ''} />
+              <DAGStatus run={latestRun} fileName={fileName || ''} />
             ) : null}
-            {activeTab === 'spec' ? <DAGSpec fileId={fileId} /> : null}
+            {activeTab === 'spec' ? <DAGSpec fileName={fileName} /> : null}
             {activeTab === 'history' ? (
               <div data-tab="history">
-                <DAGExecutionHistory fileId={fileId || ''} />
+                <DAGExecutionHistory fileName={fileName || ''} />
               </div>
             ) : null}
             {activeTab === 'scheduler-log' ? (

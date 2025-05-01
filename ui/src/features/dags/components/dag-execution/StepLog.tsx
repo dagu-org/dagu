@@ -12,7 +12,7 @@ import LoadingIndicator from '../../../../ui/LoadingIndicator';
  * Props for the StepLog component
  */
 type Props = {
-  /** DAG name/fileId */
+  /** DAG name or fileName */
   dagName: string;
   /** Request ID of the execution */
   requestId: string;
@@ -33,19 +33,19 @@ const ANSI_CODES_REGEX = [
  * StepLog displays the log output for a specific step in a DAG run
  * Fetches log data from the API and refreshes every 30 seconds
  */
-function StepLog({ dagName: fileId, requestId, stepName }: Props) {
+function StepLog({ dagName, requestId, stepName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
 
   // Fetch log data with periodic refresh
   const { data } = useQuery(
-    '/runs/{dagName}/{requestId}/{stepName}/log',
+    '/runs/{dagName}/{requestId}/steps/{stepName}/log',
     {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          dagName: fileId,
+          dagName,
           stepName,
           requestId,
         },

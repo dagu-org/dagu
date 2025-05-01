@@ -140,7 +140,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-  /dags/{fileId}:
+  /dags/{fileName}:
     get:
       summary: "Retrieve comprehensive DAG information"
       description: "Fetches detailed information about a specific DAG"
@@ -149,7 +149,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
           description: "A successful response"
@@ -185,12 +185,12 @@ paths:
     delete:
       summary: "Delete an existing DAG"
       description: "Permanently removes a DAG definition from the system"
-      operationId: "deleteDAGByFileId"
+      operationId: "deleteDAGByFileName"
       tags:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
       responses:
         "204":
           description: "DAG successfully deleted"
@@ -207,7 +207,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{fileId}/start:
+  /dags/{fileName}/start:
     post:
       summary: "Initiate DAG execution"
       description: "Starts execution of a DAG with optional parameters"
@@ -216,7 +216,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
         content:
@@ -237,7 +237,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{fileId}/stop:
+  /dags/{fileName}/stop:
     post:
       summary: "Terminate running DAG execution"
       description: "Forcefully stops a running DAG workflow"
@@ -246,7 +246,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
           description: "A successful response"
@@ -257,7 +257,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{fileId}/retry:
+  /dags/{fileName}/retry:
     post:
       summary: "Retry DAG execution"
       description: "Reruns a DAG execution"
@@ -266,7 +266,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
         content:
@@ -289,7 +289,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{fileId}/runs:
+  /dags/{fileName}/runs:
     get:
       summary: "Retrieve execution history of a DAG"
       description: "Fetches execution history of a DAG"
@@ -298,7 +298,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
           description: "A successful response"
@@ -327,7 +327,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{fileId}/runs/{requestId}:
+  /dags/{fileName}/runs/{requestId}:
     get:
       summary: "Get detailed status of a specific DAG run"
       description: "Retrieves status information about a particular DAG execution"
@@ -336,7 +336,7 @@ paths:
       operationId: "getDAGRunDetails"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
         - $ref: "#/components/parameters/RequestId"
       responses:
         "200":
@@ -357,7 +357,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{fileId}/spec:
+  /dags/{fileName}/spec:
     get:
       summary: "Retrieve DAG definition"
       description: "Fetches the YAML definition of a DAG"
@@ -366,7 +366,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
           description: "A successful response"
@@ -402,7 +402,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
         content:
@@ -438,7 +438,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{fileId}/suspend:
+  /dags/{fileName}/suspend:
     post:
       summary: "Toggle DAG suspension state"
       description: "Controls whether the scheduler should execute this DAG according to its defined cron schedule"
@@ -447,7 +447,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
         content:
@@ -476,7 +476,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{fileId}/rename:
+  /dags/{fileName}/rename:
     post:
       summary: "Change DAG file ID"
       description: "Changes the file ID of the DAG"
@@ -485,7 +485,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
         content:
@@ -493,11 +493,11 @@ paths:
             schema:
               type: object
               properties:
-                newFileId:
+                newFileName:
                   type: string
-                  description: "New file ID for the DAG"
+                  description: "New file name for the DAG"
               required:
-                - newFileId
+                - newFileName
       responses:
         "200":
           description: "A successful response"
@@ -695,6 +695,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /runs/{dagName}/{requestId}/sub-runs/{subRequestId}:
+    get:
+      summary: "Retrieve detailed status of a sub-run"
+      description: "Fetches detailed status information about a specific sub-run"
+      operationId: "getSubRunDetails"
+      tags:
+        - "runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/RequestId"
+        - name: "subRequestId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub-run to retrieve details for"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunDetails"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   securitySchemes:
     basicAuth:
@@ -727,13 +758,13 @@ components:
         maximum: 1000
         default: 50
 
-    DAGFileId:
-      name: fileId
+    DAGFileName:
+      name: fileName
       in: path
-      description: File Id of the DAG file
+      description: the name of the DAG file
       required: true
       schema:
-        $ref: "#/components/schemas/DAGFileId"
+        $ref: "#/components/schemas/DAGFileName"
 
     DAGName:
       name: dagName
@@ -799,12 +830,12 @@ components:
         - "not_running"
         - "already_exists"
 
-    DAGFileId:
+    DAGFileName:
       type: string
       # only allows alphanumeric characters, underscores, and hyphens
       format: "regex"
       pattern: "^[a-zA-Z0-9_-]+$"
-      description: "location of the DAG file"
+      description: "Name of the DAG file"
 
     DAGName:
       type: string
@@ -871,7 +902,7 @@ components:
       type: object
       description: "DAG file with its status information"
       properties:
-        fileId:
+        fileName:
           type: string
           description: "File ID of the DAG file"
         dag:
@@ -887,7 +918,7 @@ components:
           items:
             type: string
       required:
-        - fileId
+        - fileName
         - dag
         - latestRun
         - suspended

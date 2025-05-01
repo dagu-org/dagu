@@ -103,6 +103,11 @@ func (a *API) UpdateDAGStepStatus(ctx context.Context, request api.UpdateDAGStep
 	return &api.UpdateDAGStepStatus200Response{}, nil
 }
 
+// GetSubRunDetails implements api.StrictServerInterface.
+func (a *API) GetSubRunDetails(ctx context.Context, request api.GetSubRunDetailsRequestObject) (api.GetSubRunDetailsResponseObject, error) {
+	panic("not implemented")
+}
+
 func (a *API) readFileContent(_ context.Context, f string, d *encoding.Decoder) ([]byte, error) {
 	if d == nil {
 		return os.ReadFile(f) //nolint:gosec
