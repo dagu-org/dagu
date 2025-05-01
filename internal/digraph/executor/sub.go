@@ -72,7 +72,7 @@ func (e *subDAG) Run(ctx context.Context) error {
 	}
 
 	if e.requestID == "" {
-		return fmt.Errorf("request ID is not set")
+		return fmt.Errorf("request ID is not set for sub-DAG")
 	}
 
 	e.lock.Lock()
@@ -102,6 +102,7 @@ func (e *subDAG) Run(ctx context.Context) error {
 		cmd.Stdout = e.stdout
 	}
 	if e.stderr != nil {
+		// TODO: Separate stderr and stdout for sub-DAG to avoid mixing logger output
 		cmd.Stderr = e.stderr
 	}
 

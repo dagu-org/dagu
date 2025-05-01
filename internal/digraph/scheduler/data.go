@@ -25,16 +25,32 @@ type NodeData struct {
 }
 
 type NodeState struct {
-	Status     NodeStatus
-	Log        string
-	StartedAt  time.Time
+	// Status represents the state of the node.
+	Status NodeStatus
+	// Log is the log file path from the node.
+	Log string
+	// StartedAt is the time when the node started.
+	StartedAt time.Time
+	// FinishedAt is the time when the node finished.
 	FinishedAt time.Time
+	// RetryCount is the number of retries happened based on the retry policy.
 	RetryCount int
-	RetriedAt  time.Time
-	DoneCount  int
-	Error      error
-	ExitCode   int
-	RequestID  string
+	// RetriedAt is the time when the node was retried last time.
+	RetriedAt time.Time
+	// DoneCount is the number of times the node was executed.
+	DoneCount int
+	// Error is the error that the executor encountered.
+	Error error
+	// ExitCode is the exit code that the command exited with.
+	// It only makes sense when the node is a command executor.
+	ExitCode int
+	// SubRuns is the list of sub DAG runs that this node has executed.
+	SubRuns []SubRun
+}
+
+type SubRun struct {
+	// RequestID is the request ID of the sub-run.
+	RequestID string
 }
 
 type NodeStatus int
@@ -120,15 +136,17 @@ func (s *Data) Data() NodeData {
 func (s *Data) RequestID() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.inner.State.RequestID == "" {
-		reqID, err := generateRequestID()
-		if err != nil {
-			return "", fmt.Errorf("failed to generate request ID: %w", err)
-		}
-		s.inner.State.RequestID = reqID
+	// If SubRuns is not empty, return the first sub-run's request ID.
+	if len(s.inner.State.SubRuns) > 0 {
+		return s.inner.State.SubRuns[0].RequestID, nil
 	}
-
-	return s.inner.State.RequestID, nil
+	// If SubRuns is empty, generate a new request ID.
+	requestID, err := generateRequestID()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate request ID: %w", err)
+	}
+	s.inner.State.SubRuns = append(s.inner.State.SubRuns, SubRun{RequestID: requestID})
+	return requestID, nil
 }
 
 func (s *Data) Setup(ctx context.Context, logFile string, startedAt time.Time) error {
@@ -348,10 +366,10 @@ func (n *Data) ClearState() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	// requestID needs to be retained for sub-DAGs
-	requestID := n.inner.State.RequestID
+	// SubRuns need to be preserved to retain the request IDs
+	subRuns := n.inner.State.SubRuns
 	n.inner.State = NodeState{}
-	n.inner.State.RequestID = requestID
+	n.inner.State.SubRuns = subRuns
 }
 
 func (n *Data) MarkError(err error) {

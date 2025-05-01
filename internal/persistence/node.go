@@ -29,6 +29,10 @@ func FromNodes(nodes []scheduler.NodeData) []*Node {
 
 // FromNode converts a single scheduler NodeData to a persistence Node
 func FromNode(node scheduler.NodeData) *Node {
+	subRuns := make([]SubRun, len(node.State.SubRuns))
+	for i, subRun := range node.State.SubRuns {
+		subRuns[i] = SubRun(subRun)
+	}
 	return &Node{
 		Step:       node.Step,
 		Log:        node.State.Log,
@@ -40,7 +44,7 @@ func FromNode(node scheduler.NodeData) *Node {
 		RetryCount: node.State.RetryCount,
 		DoneCount:  node.State.DoneCount,
 		Error:      errText(node.State.Error),
-		RequestID:  node.State.RequestID,
+		SubRuns:    subRuns,
 	}
 }
 
@@ -56,7 +60,11 @@ type Node struct {
 	DoneCount  int                  `json:"DoneCount,omitempty"`
 	Error      string               `json:"Error,omitempty"`
 	StatusText string               `json:"StatusText"`
-	RequestID  string               `json:"RequestId,omitempty"`
+	SubRuns    []SubRun             `json:"SubRuns,omitempty"`
+}
+
+type SubRun struct {
+	RequestID string `json:"RequestId,omitempty"`
 }
 
 // ToNode converts a persistence Node back to a scheduler Node
@@ -64,6 +72,10 @@ func (n *Node) ToNode() *scheduler.Node {
 	startedAt, _ := stringutil.ParseTime(n.StartedAt)
 	finishedAt, _ := stringutil.ParseTime(n.FinishedAt)
 	retriedAt, _ := stringutil.ParseTime(n.RetriedAt)
+	subRuns := make([]scheduler.SubRun, len(n.SubRuns))
+	for i, subRun := range n.SubRuns {
+		subRuns[i] = scheduler.SubRun(subRun)
+	}
 	return scheduler.NewNode(n.Step, scheduler.NodeState{
 		Status:     n.Status,
 		Log:        n.Log,
@@ -73,7 +85,7 @@ func (n *Node) ToNode() *scheduler.Node {
 		RetryCount: n.RetryCount,
 		DoneCount:  n.DoneCount,
 		Error:      errFromText(n.Error),
-		RequestID:  n.RequestID,
+		SubRuns:    subRuns,
 	})
 }
 

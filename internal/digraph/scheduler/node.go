@@ -205,6 +205,9 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to determine request ID for sub-DAG: %w", err)
 		}
+		if reqID == "" {
+			return nil, fmt.Errorf("request ID is empty for sub-DAG")
+		}
 		subDAG.SetRequestID(reqID)
 	}
 

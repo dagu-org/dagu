@@ -156,7 +156,7 @@ steps:
 
 	// (2) Find the history record for child_1
 	rootDAG := digraph.NewRootDAG("parent", requestID)
-	child1Rec, err := th.HistoryStore.FindBySubRequestID(ctx, child1Node.RequestID, rootDAG)
+	child1Rec, err := th.HistoryStore.FindBySubRequestID(ctx, child1Node.SubRuns[0].RequestID, rootDAG)
 	require.NoError(t, err)
 
 	child1Run, err := child1Rec.ReadRun(ctx)
@@ -168,7 +168,7 @@ steps:
 	updateStatus(child1Rec, child1Run)
 
 	// (4) Find the history record for child_2
-	child2Rec, err := th.HistoryStore.FindBySubRequestID(ctx, child2Node.RequestID, rootDAG)
+	child2Rec, err := th.HistoryStore.FindBySubRequestID(ctx, child2Node.SubRuns[0].RequestID, rootDAG)
 	require.NoError(t, err)
 
 	child2Run, err := child2Rec.ReadRun(ctx)
@@ -194,7 +194,7 @@ steps:
 	})
 
 	// Check if the child_2 status is now "success"
-	child2Rec, err = th.HistoryStore.FindBySubRequestID(ctx, child2Node.RequestID, rootDAG)
+	child2Rec, err = th.HistoryStore.FindBySubRequestID(ctx, child2Node.SubRuns[0].RequestID, rootDAG)
 	require.NoError(t, err)
 	child2Run, err = child2Rec.ReadRun(ctx)
 	require.NoError(t, err)

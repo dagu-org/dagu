@@ -110,9 +110,11 @@ func TestAgent_Run(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, "agent/sleep.yaml")
 		dagAgent := dag.Agent()
+		done := make(chan struct{})
 
 		go func() {
 			dagAgent.RunCancel(t)
+			close(done)
 		}()
 
 		// wait for the DAG to start
@@ -123,6 +125,7 @@ func TestAgent_Run(t *testing.T) {
 
 		// wait for the DAG to be canceled
 		dag.AssertLatestStatus(t, scheduler.StatusCancel)
+		<-done
 	})
 	t.Run("ExitHandler", func(t *testing.T) {
 		th := test.Setup(t)
