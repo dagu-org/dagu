@@ -54,7 +54,7 @@ func OpenOrCreateFile(file string) (*os.File, error) {
 
 // openFile opens file.
 func openFile(file string) (*os.File, error) {
-	outfile, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0600)
+	outfile, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0600) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func openFile(file string) (*os.File, error) {
 
 // createFile creates file.
 func createFile(file string) (*os.File, error) {
-	outfile, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	outfile, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}
