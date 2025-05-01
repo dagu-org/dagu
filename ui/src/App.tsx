@@ -92,13 +92,10 @@ function App({ config }: Props) {
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/dags/" element={<DAGs />} />
                     <Route
-                      path="/dags/:dagFileName/:tab"
+                      path="/dags/:fileName/:tab"
                       element={<DAGDetails />}
                     />
-                    <Route
-                      path="/dags/:dagFileName/"
-                      element={<DAGDetails />}
-                    />
+                    <Route path="/dags/:fileName/" element={<DAGDetails />} />
                     <Route path="/search/" element={<Search />} />
                   </Routes>
                 </Layout>

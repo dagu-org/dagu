@@ -83,6 +83,7 @@ func (srv *Server) Serve(ctx context.Context) error {
 		AllowCredentials: true,
 		MaxAge:           300, // Maximum value not ignored by any of major browsers
 	}))
+	r.Use(middleware.RedirectSlashes)
 
 	// Configure API paths
 	apiV1BasePath, apiV2BasePath := srv.configureAPIPaths()
