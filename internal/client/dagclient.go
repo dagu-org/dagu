@@ -58,7 +58,7 @@ func (e *dagClient) GrepDAG(ctx context.Context, pattern string) (
 	return e.dagStore.Grep(ctx, pattern)
 }
 
-func (e *dagClient) MoveDAG(ctx context.Context, oldLoc, newLoc string) error {
+func (e *dagClient) MoveDAG(_ context.Context, oldLoc, newLoc string) error {
 	panic("not implemented") // TODO: Implement this function
 	// oldDAG, err := e.dagStore.GetMetadata(ctx, oldLoc)
 	// if err != nil {
@@ -87,17 +87,6 @@ func (e *dagClient) StopDAG(ctx context.Context, dag *digraph.DAG) error {
 	dagClient := sock.NewClient(addr)
 	_, err := dagClient.Request("POST", "/stop")
 	return err
-}
-
-func (*dagClient) currentStatus(_ context.Context, dag *digraph.DAG) (*persistence.Status, error) {
-	// FIXME: Should handle the case of dynamic DAG
-	dagClient := sock.NewClient(dag.SockAddr(""))
-	statusJSON, err := dagClient.Request("GET", "/status")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get status: %w", err)
-	}
-
-	return persistence.StatusFromJSON(statusJSON)
 }
 
 func (e *dagClient) UpdateDAG(ctx context.Context, id string, spec string) error {
