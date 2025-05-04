@@ -16,8 +16,8 @@ function Icon({
   return (
     <span
       className={cn(
-        'flex items-center justify-center w-5 h-5 transform-none',
-        isActive ? 'text-white' : 'text-[#7EB36A]' // Match text color
+        'flex items-center justify-center w-5 h-5 transform-none text-white',
+        isActive ? 'text-white' : 'text-white'
       )}
     >
       {children}
@@ -119,10 +119,10 @@ function NavItem({ to, icon, text, isOpen, onClick }: NavItemProps) {
           to={to}
           onClick={onClick}
           className={cn(
-            'block h-9 flex items-center text-xs font-medium rounded-lg transition-all duration-300 ease-in-out pl-10 pr-3',
+            'block h-9 flex items-center text-xs font-medium rounded-lg transition-all duration-50 ease-in-out pl-10 pr-3',
             isActive
               ? 'text-white bg-white/10' // Active: subtle background
-              : 'text-[#7EB36A] hover:text-white hover:bg-white/5' // Inactive: lighter green for better contrast
+              : 'text-white hover:text-white hover:bg-white/5' // Inactive: lighter green for better contrast
           )}
           aria-current={isActive ? 'page' : undefined}
           title={text}
@@ -144,10 +144,10 @@ function NavItem({ to, icon, text, isOpen, onClick }: NavItemProps) {
           to={to}
           onClick={onClick}
           className={cn(
-            'flex items-center justify-center w-8 h-8 text-xs font-medium rounded-lg transition-all duration-300 ease-in-out',
+            'flex items-center justify-center w-8 h-8 text-xs font-medium rounded-lg transition-all duration-50 ease-in-out',
             isActive
               ? 'text-white bg-white/10' // Active: subtle background
-              : 'text-[#7EB36A] hover:text-white hover:bg-white/5' // Inactive: lighter green for better contrast
+              : 'text-white hover:text-white hover:bg-white/5'
           )}
           aria-current={isActive ? 'page' : undefined}
           title={text}

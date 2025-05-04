@@ -95,11 +95,11 @@ function Content({ title, navbarColor, children }: LayoutProps) {
       <div
         className={cn(
           // Modern base styles with dark background
-          'h-full overflow-hidden bg-[#1D292B] text-white',
+          'h-full overflow-hidden bg-[#222] text-white',
           // Shadow effect
           'shadow-lg',
           // Always visible, not fixed
-          'z-40 transition-all duration-300 ease-in-out',
+          'z-40 transition-all duration-50 ease-in-out',
           isSidebarExpanded ? 'w-60' : sidebarWidthCollapsed
         )}
         onMouseEnter={() => setIsSidebarExpanded(true)}
@@ -132,9 +132,9 @@ function Content({ title, navbarColor, children }: LayoutProps) {
             backgroundColor:
               navbarColor && navbarColor.trim() !== ''
                 ? navbarColor
-                : '#4D6744',
+                : '#222222',
             color: getContrastColor(
-              navbarColor && navbarColor.trim() !== '' ? navbarColor : '#4D6744'
+              navbarColor && navbarColor.trim() !== '' ? navbarColor : '#222222'
             ),
           }}
         >
@@ -145,7 +145,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
                 color={getContrastColor(
                   navbarColor && navbarColor.trim() !== ''
                     ? navbarColor
-                    : '#4D6744'
+                    : '#222222'
                 )}
               >
                 {title || ''}
@@ -157,7 +157,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
                     color={getContrastColor(
                       navbarColor && navbarColor.trim() !== ''
                         ? navbarColor
-                        : '#4D6744'
+                        : '#222222'
                     )}
                   >
                     {context.title}
