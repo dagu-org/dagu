@@ -110,7 +110,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
           <nav className="flex-1">
             <MainListItems
               isOpen={isSidebarExpanded}
-              onNavItemClick={() => setIsSidebarExpanded(false)}
+              // Don't collapse sidebar on navigation to prevent jarring transition
             />
           </nav>
 
