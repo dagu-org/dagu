@@ -1,3 +1,4 @@
+import logoDark from '@/assets/images/logo_dark.png';
 import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils'; // Assuming cn utility is available
 import { BarChart2, List, Search } from 'lucide-react';
@@ -44,25 +45,11 @@ export const mainListItems = React.forwardRef<
       <div className="h-12 relative mb-2">
         {/* Fixed position logo that doesn't move */}
         <div className="absolute left-3 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center z-10">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 100 100"
-            width="24"
-            height="24"
-          >
-            {/* Main circle with dark green color */}
-            <circle cx="50" cy="50" r="45" fill="#4a6741" />
-            {/* Inner ring with slightly lighter color and a gap */}
-            <path
-              d="M50 20
-                   A30 30 0 1 1 20 50
-                   A30 30 0 1 1 80 50"
-              stroke="white"
-              strokeWidth="6"
-              fill="none"
-              strokeLinecap="round"
-            />
-          </svg>
+          <img
+            src={logoDark}
+            alt="Dagu Logo"
+            className="w-6 h-6 object-contain"
+          />
         </div>
 
         {/* Text container with instant hide/show */}
@@ -81,18 +68,21 @@ export const mainListItems = React.forwardRef<
           text="Dashboard"
           icon={<BarChart2 size={18} />}
           isOpen={isOpen}
+          onClick={onNavItemClick}
         />
         <NavItem
           to="/dags"
           text="DAGs"
           icon={<List size={18} />}
           isOpen={isOpen}
+          onClick={onNavItemClick}
         />
         <NavItem
           to="/search"
           text="Search"
           icon={<Search size={18} />}
           isOpen={isOpen}
+          onClick={onNavItemClick}
         />
       </nav>
       {/* Version display - only shown when sidebar is expanded */}
