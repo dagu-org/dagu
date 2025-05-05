@@ -324,15 +324,6 @@ func readYAMLFile(file string) (cfg map[string]any, err error) {
 	return unmarshalData(data)
 }
 
-func readRawFile(file string) ([]byte, error) {
-	data, err := os.ReadFile(file) //nolint:gosec
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file %q: %v", file, err)
-	}
-
-	return data, nil
-}
-
 // unmarshalData unmarshals the data into a map.
 func unmarshalData(data []byte) (map[string]any, error) {
 	var cm map[string]any

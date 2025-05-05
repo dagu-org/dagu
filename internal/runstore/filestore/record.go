@@ -104,7 +104,7 @@ func (r *Record) ReadDAG(ctx context.Context) (*digraph.DAG, error) {
 	}
 
 	// Read the file
-	data, err := os.ReadFile(dagFile)
+	data, err := os.ReadFile(dagFile) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("failed to read DAG definition file: %w", err)
 	}

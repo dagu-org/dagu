@@ -101,7 +101,7 @@ func (d *fileStore) GetSpec(_ context.Context, name string) (string, error) {
 	if err != nil {
 		return "", dagstore.ErrDAGNotFound
 	}
-	dat, err := os.ReadFile(filePath)
+	dat, err := os.ReadFile(filePath) // nolint:gosec
 	if err != nil {
 		return "", err
 	}
@@ -270,7 +270,7 @@ func (d *fileStore) Grep(ctx context.Context, pattern string) (
 	for _, entry := range entries {
 		if fileutil.IsYAMLFile(entry.Name()) {
 			filePath := filepath.Join(d.baseDir, entry.Name())
-			dat, err := os.ReadFile(filePath)
+			dat, err := os.ReadFile(filePath) //nolint:gosec
 			if err != nil {
 				logger.Error(ctx, "Failed to read DAG file", "file", entry.Name(), "err", err)
 				continue

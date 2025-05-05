@@ -103,23 +103,6 @@ func handleRestartProcess(ctx *Context, dag *digraph.DAG, requestID string) erro
 	// Wait before restart if configured
 	waitForRestart(ctx, dag.RestartWait)
 
-	// Get previous parameters
-	status, err := getPreviousRunStatus(ctx, cli, dag)
-	if err != nil {
-		return fmt.Errorf("failed to get previous run parameters: %w", err)
-	}
-
-	loadOpts := []digraph.LoadOption{
-		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
-		digraph.WithDAGsDir(ctx.cfg.Paths.DAGsDir),
-	}
-	if status.Params != "" {
-		// backward compatibility
-		loadOpts = append(loadOpts, digraph.WithParams(status.Params))
-	} else {
-		loadOpts = append(loadOpts, digraph.WithParams(status.ParamsList))
-	}
-
 	// Execute the exact same DAG with the same parameters but a new request ID
 	return executeDAG(ctx, cli, dag)
 }
@@ -214,12 +197,4 @@ func waitForRestart(ctx context.Context, restartWait time.Duration) {
 		logger.Info(ctx, "Waiting for restart", "duration", restartWait)
 		time.Sleep(restartWait)
 	}
-}
-
-func getPreviousRunStatus(ctx context.Context, cli runstore.Client, dag *digraph.DAG) (runstore.Status, error) {
-	status, err := cli.GetLatestStatus(ctx, dag)
-	if err != nil {
-		return runstore.Status{}, fmt.Errorf("failed to get latest status: %w", err)
-	}
-	return status, nil
 }

@@ -248,13 +248,6 @@ func (e *Client) UpdateStatus(ctx context.Context, name string, status Status) e
 	return e.runStore.Update(ctx, name, status.RequestID, status)
 }
 
-func (*Client) emptyDAGIfNil(dag *digraph.DAG, dagLocation string) *digraph.DAG {
-	if dag != nil {
-		return dag
-	}
-	return &digraph.DAG{Location: dagLocation}
-}
-
 func escapeArg(input string) string {
 	escaped := strings.Builder{}
 
