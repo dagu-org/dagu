@@ -101,7 +101,10 @@ func handleRestartProcess(ctx *Context, dag *digraph.DAG, requestID string) erro
 	}
 
 	// Wait before restart if configured
-	waitForRestart(ctx, dag.RestartWait)
+	if dag.RestartWait > 0 {
+		logger.Info(ctx, "Waiting for restart", "duration", dag.RestartWait)
+		time.Sleep(dag.RestartWait)
+	}
 
 	// Execute the exact same DAG with the same parameters but a new request ID
 	return executeDAG(ctx, cli, dag)
@@ -189,12 +192,5 @@ func stopRunningDAG(ctx context.Context, cli runstore.Client, dag *digraph.DAG, 
 		}
 
 		time.Sleep(stopPollInterval)
-	}
-}
-
-func waitForRestart(ctx context.Context, restartWait time.Duration) {
-	if restartWait > 0 {
-		logger.Info(ctx, "Waiting for restart", "duration", restartWait)
-		time.Sleep(restartWait)
 	}
 }
