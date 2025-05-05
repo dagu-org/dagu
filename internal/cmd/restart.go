@@ -24,38 +24,73 @@ func CmdRestart() *cobra.Command {
 			Long: `Stop the currently running DAG and immediately restart it with the same configuration but with a new request ID.
 
 Flags:
-  --request-id string   (required) Unique identifier for tracking the restart execution.
+  --request-id string (optional) Unique identifier for tracking the restart execution.
 
 Example:
   dagu restart --request-id=abc123 dagName
 
 This command gracefully stops the active DAG run before restarting it.
+If the request ID is not provided, it will find the current running DAG by name.
 `,
 			Args: cobra.ExactArgs(1),
 		}, restartFlags, runRestart,
 	)
 }
 
-var restartFlags = []commandLineFlag{}
+var restartFlags = []commandLineFlag{
+	requestIDFlagStop,
+}
 
 func runRestart(ctx *Context, args []string) error {
-	specFilePath := args[0]
-
-	dag, err := digraph.Load(ctx, specFilePath, digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig))
+	requestID, err := ctx.Flags().GetString("request-id")
 	if err != nil {
-		logger.Error(ctx, "Failed to load DAG", "path", specFilePath, "err", err)
-		return fmt.Errorf("failed to load DAG from %s: %w", specFilePath, err)
+		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
-	if err := handleRestartProcess(ctx, dag, specFilePath); err != nil {
-		logger.Error(ctx, "Failed to restart process", "path", specFilePath, "err", err)
+	dagName := args[0]
+
+	var record persistence.Record
+	if requestID != "" {
+		// Retrieve the previous run's history record for the specified request ID.
+		r, err := ctx.historyStore().FindByRequestID(ctx, dagName, requestID)
+		if err != nil {
+			logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
+			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
+		}
+		record = r
+	} else {
+		r, err := ctx.historyStore().Latest(ctx, dagName)
+		if err != nil {
+			logger.Error(ctx, "Failed to retrieve latest history record", "dagName", dagName, "err", err)
+			return fmt.Errorf("failed to retrieve latest history record for DAG %s: %w", dagName, err)
+		}
+		record = r
+	}
+
+	status, err := record.ReadRun(ctx)
+	if err != nil {
+		logger.Error(ctx, "Failed to read status", "err", err)
+		return fmt.Errorf("failed to read status: %w", err)
+	}
+	if status.Status.Status != scheduler.StatusRunning {
+		logger.Error(ctx, "DAG is not running", "dagName", dagName)
+	}
+
+	dag, err := record.ReadDAG(ctx)
+	if err != nil {
+		logger.Error(ctx, "Failed to read DAG from history record", "err", err)
+		return fmt.Errorf("failed to read DAG from history record: %w", err)
+	}
+
+	if err := handleRestartProcess(ctx, dag); err != nil {
+		logger.Error(ctx, "Failed to restart DAG", "dagName", dag.Name, "err", err)
 		return fmt.Errorf("restart process failed for DAG %s: %w", dag.Name, err)
 	}
 
 	return nil
 }
 
-func handleRestartProcess(ctx *Context, dag *digraph.DAG, specFilePath string) error {
+func handleRestartProcess(ctx *Context, dag *digraph.DAG) error {
 	cli, err := ctx.Client()
 	if err != nil {
 		return fmt.Errorf("failed to initialize client: %w", err)
@@ -86,12 +121,7 @@ func handleRestartProcess(ctx *Context, dag *digraph.DAG, specFilePath string) e
 		loadOpts = append(loadOpts, digraph.WithParams(status.ParamsList))
 	}
 
-	// Reload DAG with parameters
-	dag, err = digraph.Load(ctx, specFilePath, loadOpts...)
-	if err != nil {
-		return fmt.Errorf("failed to reload DAG with params: %w", err)
-	}
-
+	// Execute the exact same DAG with the same parameters but a new request ID
 	return executeDAG(ctx, cli, dag)
 }
 

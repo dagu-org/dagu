@@ -219,8 +219,10 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 		lock.Lock()
 		defer lock.Unlock()
 
-		curr, err := d.Client.GetCurrentStatus(d.Context, d.DAG)
-		require.NoError(t, err)
+		curr, _ := d.Client.GetCurrentStatus(d.Context, d.DAG)
+		if curr == nil {
+			return false
+		}
 		status = curr.Status
 		return curr.Status == expected
 	}, time.Second*3, time.Millisecond*50, "expected current status to be %q, got %q", expected, status)

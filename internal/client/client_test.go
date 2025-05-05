@@ -155,7 +155,12 @@ func TestClient_RunDAG(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "restart.yaml"))
 		ctx := th.Context
 
-		err := th.Client.RestartDAG(ctx, dag.DAG, client.RestartOptions{})
+		err := th.Client.StartDAG(th.Context, dag.DAG, client.StartOptions{})
+		require.NoError(t, err)
+
+		dag.AssertLatestStatus(t, scheduler.StatusRunning)
+
+		err = th.Client.RestartDAG(ctx, dag.DAG, client.RestartOptions{})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
