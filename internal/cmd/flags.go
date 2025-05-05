@@ -69,6 +69,12 @@ var (
 		usage:     "Unique request ID for a DAG run",
 	}
 
+	requestIDFlagStop = commandLineFlag{
+		name:      "request-id",
+		shorthand: "r",
+		usage:     "Unique request ID for stopping a DAG run",
+	}
+
 	// rootRequestIDFlag reads the root request ID for starting a sub-DAG run
 	rootRequestIDFlag = commandLineFlag{
 		name:  "root-request-id",

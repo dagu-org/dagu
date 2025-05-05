@@ -19,17 +19,17 @@ import (
 func CmdRestart() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "restart [flags] /path/to/spec.yaml",
+			Use:   "restart --request-id=abc123 dagName",
 			Short: "Restart a running DAG",
-			Long: `Stop the currently running DAG and immediately restart it with the same configuration.
+			Long: `Stop the currently running DAG and immediately restart it with the same configuration but with a new request ID.
 
 Flags:
-  --request-id string   (Optional) Unique identifier for tracking the restart execution.
+  --request-id string   (required) Unique identifier for tracking the restart execution.
 
 Example:
-  dagu restart my_dag.yaml --request-id=abc123
+  dagu restart --request-id=abc123 dagName
 
-This command gracefully stops the active DAG run before reinitiating it.
+This command gracefully stops the active DAG run before restarting it.
 `,
 			Args: cobra.ExactArgs(1),
 		}, restartFlags, runRestart,
