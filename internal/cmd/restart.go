@@ -38,7 +38,7 @@ If the request ID is not provided, it will find the current running DAG by name.
 }
 
 var restartFlags = []commandLineFlag{
-	requestIDFlagStop,
+	requestIDFlagRestart,
 }
 
 func runRestart(ctx *Context, args []string) error {
