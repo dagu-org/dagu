@@ -130,6 +130,24 @@ func (s *Context) Client(opts ...clientOption) (client.RunClient, error) {
 	for _, opt := range opts {
 		opt(options)
 	}
+	historyStore := options.historyStore
+	if historyStore == nil {
+		historyStore = s.historyStore()
+	}
+
+	return client.New(
+		historyStore,
+		s.cfg.Paths.Executable,
+		s.cfg.Global.WorkDir,
+	), nil
+}
+
+// DAGClient initializes a DAGClient using the provided options.
+func (s *Context) DAGClient(runClient client.RunClient, opts ...dagClientOption) (client.DAGClient, error) {
+	options := &dagClientOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
 	dagStore := options.dagStore
 	if dagStore == nil {
 		var err error
@@ -138,21 +156,15 @@ func (s *Context) Client(opts ...clientOption) (client.RunClient, error) {
 			return nil, fmt.Errorf("failed to initialize DAG store: %w", err)
 		}
 	}
-	historyStore := options.historyStore
-	if historyStore == nil {
-		historyStore = s.historyStore()
-	}
 	// Create a flag store based on the suspend flags directory.
 	flagStore := local.NewFlagStore(storage.NewStorage(
 		s.cfg.Paths.SuspendFlagsDir,
 	))
 
-	return client.New(
+	return client.NewDAGClient(
+		runClient,
 		dagStore,
-		historyStore,
 		flagStore,
-		s.cfg.Paths.Executable,
-		s.cfg.Global.WorkDir,
 	), nil
 }
 
@@ -167,22 +179,33 @@ func (ctx *Context) server() (*frontend.Server, error) {
 	historyCache.StartEviction(ctx)
 	historyStore := ctx.historyStoreWithCache(historyCache)
 
-	cli, err := ctx.Client(withDAGStore(dagStore), withHistoryStore(historyStore))
+	runCli, err := ctx.Client(withHistoryStore(historyStore))
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client: %w", err)
 	}
-	return frontend.NewServer(ctx.cfg, cli), nil
+
+	dagCli, err := ctx.DAGClient(runCli, withDAGStore(dagStore))
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize DAG client: %w", err)
+	}
+
+	return frontend.NewServer(ctx.cfg, dagCli, runCli), nil
 }
 
 // scheduler creates a new scheduler instance using the default client.
 // It builds a DAG job manager to handle scheduled executions.
 func (s *Context) scheduler() (*scheduler.Scheduler, error) {
-	cli, err := s.Client()
+	runCli, err := s.Client()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	manager := scheduler.NewDAGJobManager(s.cfg.Paths.DAGsDir, cli, s.cfg.Paths.Executable, s.cfg.Global.WorkDir)
+	dagCli, err := s.DAGClient(runCli)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize DAG client: %w", err)
+	}
+
+	manager := scheduler.NewDAGJobManager(s.cfg.Paths.DAGsDir, dagCli, runCli, s.cfg.Paths.Executable, s.cfg.Global.WorkDir)
 	return scheduler.New(s.cfg, manager), nil
 }
 
@@ -311,21 +334,28 @@ type clientOption func(*clientOptions)
 
 // clientOptions holds optional dependencies for constructing a client.
 type clientOptions struct {
-	dagStore     persistence.DAGStore
 	historyStore persistence.HistoryStore
-}
-
-// withDAGStore returns a clientOption that sets a custom DAGStore.
-func withDAGStore(dagStore persistence.DAGStore) clientOption {
-	return func(o *clientOptions) {
-		o.dagStore = dagStore
-	}
 }
 
 // withHistoryStore returns a clientOption that sets a custom HistoryStore.
 func withHistoryStore(historyStore persistence.HistoryStore) clientOption {
 	return func(o *clientOptions) {
 		o.historyStore = historyStore
+	}
+}
+
+// dagClientOption defines functional options for configuring the DAG client.
+type dagClientOption func(*dagClientOptions)
+
+// dagClientOption defines functional options for configuring the DAG client.
+type dagClientOptions struct {
+	dagStore persistence.DAGStore
+}
+
+// withDAGStore returns a clientOption that sets a custom DAGStore.
+func withDAGStore(dagStore persistence.DAGStore) dagClientOption {
+	return func(o *dagClientOptions) {
+		o.dagStore = dagStore
 	}
 }
 

@@ -40,44 +40,43 @@ var (
 `)
 )
 
-func (e *dagClient) GetDAGSpec(ctx context.Context, id string) (string, error) {
-	return e.dagStore.GetSpec(ctx, id)
+func (cli *dagClient) GetDAGSpec(ctx context.Context, id string) (string, error) {
+	return cli.dagStore.GetSpec(ctx, id)
 }
 
-func (e *dagClient) CreateDAG(ctx context.Context, name string) (string, error) {
-	id, err := e.dagStore.Create(ctx, name, dagTemplate)
+func (cli *dagClient) CreateDAG(ctx context.Context, name string) (string, error) {
+	id, err := cli.dagStore.Create(ctx, name, dagTemplate)
 	if err != nil {
 		return "", fmt.Errorf("failed to create DAG: %w", err)
 	}
 	return id, nil
 }
 
-func (e *dagClient) GrepDAG(ctx context.Context, pattern string) (
+func (cli *dagClient) GrepDAG(ctx context.Context, pattern string) (
 	[]*persistence.GrepResult, []string, error,
 ) {
-	return e.dagStore.Grep(ctx, pattern)
+	return cli.dagStore.Grep(ctx, pattern)
 }
 
-func (e *dagClient) MoveDAG(_ context.Context, oldLoc, newLoc string) error {
-	panic("not implemented") // TODO: Implement this function
-	// oldDAG, err := e.dagStore.GetMetadata(ctx, oldLoc)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to get metadata for %s: %w", oldLoc, err)
-	// }
-	// if err := e.dagStore.Rename(ctx, oldLoc, newLoc); err != nil {
-	// 	return err
-	// }
-	// newDAG, err := e.dagStore.GetMetadata(ctx, newLoc)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to get metadata for %s: %w", newLoc, err)
-	// }
-	// if err := e.historyStore.Rename(ctx, oldDAG.Name, newDAG.Name); err != nil {
-	// 	return fmt.Errorf("failed to rename history for %s: %w", oldLoc, err)
-	// }
-	// return nil
+func (cli *dagClient) MoveDAG(ctx context.Context, oldLoc, newLoc string) error {
+	oldDAG, err := cli.dagStore.GetMetadata(ctx, oldLoc)
+	if err != nil {
+		return fmt.Errorf("failed to get metadata for %s: %w", oldLoc, err)
+	}
+	if err := cli.dagStore.Rename(ctx, oldLoc, newLoc); err != nil {
+		return err
+	}
+	newDAG, err := cli.dagStore.GetMetadata(ctx, newLoc)
+	if err != nil {
+		return fmt.Errorf("failed to get metadata for %s: %w", newLoc, err)
+	}
+	if err := cli.runClient.Rename(ctx, oldDAG.Name, newDAG.Name); err != nil {
+		return fmt.Errorf("failed to rename history for %s: %w", oldLoc, err)
+	}
+	return nil
 }
 
-func (e *dagClient) StopDAG(ctx context.Context, dag *digraph.DAG) error {
+func (cli *dagClient) StopDAG(ctx context.Context, dag *digraph.DAG) error {
 	logger.Info(ctx, "Stopping", "name", dag.Name)
 	addr := dag.SockAddr("") // FIXME: Should handle the case of dynamic DAG
 	if !fileutil.FileExists(addr) {
@@ -89,15 +88,15 @@ func (e *dagClient) StopDAG(ctx context.Context, dag *digraph.DAG) error {
 	return err
 }
 
-func (e *dagClient) UpdateDAG(ctx context.Context, id string, spec string) error {
-	return e.dagStore.UpdateSpec(ctx, id, []byte(spec))
+func (cli *dagClient) UpdateDAG(ctx context.Context, id string, spec string) error {
+	return cli.dagStore.UpdateSpec(ctx, id, []byte(spec))
 }
 
-func (e *dagClient) DeleteDAG(ctx context.Context, name string) error {
-	return e.dagStore.Delete(ctx, name)
+func (cli *dagClient) DeleteDAG(ctx context.Context, name string) error {
+	return cli.dagStore.Delete(ctx, name)
 }
 
-func (e *dagClient) ListDAGs(ctx context.Context, opts ...ListDAGOption) (*persistence.PaginatedResult[DAGStatus], []string, error) {
+func (cli *dagClient) ListDAGs(ctx context.Context, opts ...ListDAGOption) (*persistence.PaginatedResult[DAGStatus], []string, error) {
 	var options ListDAGOptions
 	for _, opt := range opts {
 		opt(&options)
@@ -113,7 +112,7 @@ func (e *dagClient) ListDAGs(ctx context.Context, opts ...ListDAGOption) (*persi
 
 	pg := persistence.NewPaginator(*options.Page, *options.Limit)
 
-	dags, errList, err := e.dagStore.List(ctx, persistence.ListOptions{
+	dags, errList, err := cli.dagStore.List(ctx, persistence.ListOptions{
 		Paginator: &pg,
 		Name:      ptr(options.Name),
 		Tag:       ptr(options.Tag),
@@ -124,14 +123,14 @@ func (e *dagClient) ListDAGs(ctx context.Context, opts ...ListDAGOption) (*persi
 
 	var items []DAGStatus
 	for _, d := range dags.Items {
-		status, err := e.runClient.GetLatestStatus(ctx, d)
+		status, err := cli.runClient.GetLatestStatus(ctx, d)
 		if err != nil {
 			errList = append(errList, err.Error())
 		}
 		items = append(items, DAGStatus{
 			DAG:       d,
 			Status:    status,
-			Suspended: e.IsSuspended(ctx, d.Location),
+			Suspended: cli.IsSuspended(ctx, d.Location),
 			Error:     err,
 		})
 	}
@@ -140,13 +139,13 @@ func (e *dagClient) ListDAGs(ctx context.Context, opts ...ListDAGOption) (*persi
 	return &r, errList, nil
 }
 
-func (e *dagClient) getDAG(ctx context.Context, loc string) (*digraph.DAG, error) {
-	dagDetail, err := e.dagStore.GetDetails(ctx, loc)
-	return e.emptyDAGIfNil(dagDetail, loc), err
+func (cli *dagClient) getDAG(ctx context.Context, loc string) (*digraph.DAG, error) {
+	dagDetail, err := cli.dagStore.GetDetails(ctx, loc)
+	return cli.emptyDAGIfNil(dagDetail, loc), err
 }
 
-func (e *dagClient) GetDAGStatus(ctx context.Context, loc string) (DAGStatus, error) {
-	dag, err := e.getDAG(ctx, loc)
+func (cli *dagClient) GetDAGStatus(ctx context.Context, loc string) (DAGStatus, error) {
+	dag, err := cli.getDAG(ctx, loc)
 	if dag == nil {
 		// TODO: fix not to use location
 		dag = &digraph.DAG{Name: loc, Location: loc}
@@ -155,14 +154,14 @@ func (e *dagClient) GetDAGStatus(ctx context.Context, loc string) (DAGStatus, er
 		// check the dag is correct in terms of graph
 		_, err = scheduler.NewExecutionGraph(dag.Steps...)
 	}
-	latestStatus, _ := e.runClient.GetLatestStatus(ctx, dag)
+	latestStatus, _ := cli.runClient.GetLatestStatus(ctx, dag)
 	return newDAGStatus(
-		dag, latestStatus, e.IsSuspended(ctx, loc), err,
+		dag, latestStatus, cli.IsSuspended(ctx, loc), err,
 	), err
 }
 
-func (e *dagClient) ToggleSuspend(_ context.Context, loc string, suspend bool) error {
-	return e.flagStore.ToggleSuspend(loc, suspend)
+func (cli *dagClient) ToggleSuspend(_ context.Context, loc string, suspend bool) error {
+	return cli.flagStore.ToggleSuspend(loc, suspend)
 }
 
 func (*dagClient) emptyDAGIfNil(dag *digraph.DAG, dagLocation string) *digraph.DAG {
@@ -172,10 +171,10 @@ func (*dagClient) emptyDAGIfNil(dag *digraph.DAG, dagLocation string) *digraph.D
 	return &digraph.DAG{Location: dagLocation}
 }
 
-func (e *dagClient) IsSuspended(_ context.Context, id string) bool {
-	return e.flagStore.IsSuspended(id)
+func (cli *dagClient) IsSuspended(_ context.Context, id string) bool {
+	return cli.flagStore.IsSuspended(id)
 }
 
-func (e *dagClient) GetTagList(ctx context.Context) ([]string, []string, error) {
-	return e.dagStore.TagList(ctx)
+func (cli *dagClient) GetTagList(ctx context.Context) ([]string, []string, error) {
+	return cli.dagStore.TagList(ctx)
 }

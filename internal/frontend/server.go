@@ -37,14 +37,14 @@ type Server struct {
 }
 
 // NewServer creates a new Server instance with the given configuration and client
-func NewServer(cfg *config.Config, cli client.RunClient) *Server {
+func NewServer(cfg *config.Config, dagCli client.DAGClient, runCli client.RunClient) *Server {
 	var remoteNodes []string
 	for _, n := range cfg.Server.RemoteNodes {
 		remoteNodes = append(remoteNodes, n.Name)
 	}
 	return &Server{
-		apiV1:  apiv1.New(cli, cfg),
-		apiV2:  apiv2.New(cli, cfg),
+		apiV1:  apiv1.New(dagCli, runCli, cfg),
+		apiV2:  apiv2.New(dagCli, runCli, cfg),
 		config: cfg,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,

@@ -46,18 +46,20 @@ type dagJobManager struct {
 	targetDir  string
 	registry   map[string]*digraph.DAG
 	lock       sync.Mutex
-	client     client.RunClient
+	dagClient  client.DAGClient
+	runClient  client.RunClient
 	executable string
 	workDir    string
 }
 
 // NewDAGJobManager creates a new DAG manager with the given configuration.
-func NewDAGJobManager(dir string, client client.RunClient, executable, workDir string) JobManager {
+func NewDAGJobManager(dir string, dagCli client.DAGClient, runCli client.RunClient, executable, workDir string) JobManager {
 	return &dagJobManager{
 		targetDir:  dir,
 		lock:       sync.Mutex{},
 		registry:   map[string]*digraph.DAG{},
-		client:     client,
+		dagClient:  dagCli,
+		runClient:  runCli,
 		executable: executable,
 		workDir:    workDir,
 	}
@@ -81,7 +83,7 @@ func (m *dagJobManager) Next(ctx context.Context, now time.Time) ([]*ScheduledJo
 
 	for _, dag := range m.registry {
 		dagName := strings.TrimSuffix(filepath.Base(dag.Location), filepath.Ext(dag.Location))
-		if m.client.IsSuspended(ctx, dagName) {
+		if m.dagClient.IsSuspended(ctx, dagName) {
 			continue
 		}
 
@@ -113,7 +115,7 @@ func (m *dagJobManager) createJob(dag *digraph.DAG, next time.Time, schedule cro
 		WorkDir:    m.workDir,
 		Next:       next,
 		Schedule:   schedule,
-		Client:     m.client,
+		Client:     m.runClient,
 	}
 }
 

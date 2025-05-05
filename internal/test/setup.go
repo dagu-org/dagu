@@ -101,12 +101,14 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		storage.NewStorage(cfg.Paths.SuspendFlagsDir),
 	)
 
-	client := client.New(dagStore, historyStore, flagStore, cfg.Paths.Executable, cfg.Global.WorkDir)
+	runClient := client.New(historyStore, cfg.Paths.Executable, cfg.Global.WorkDir)
+	dagClient := client.NewDAGClient(runClient, dagStore, flagStore)
 
 	helper := Helper{
 		Context:      createDefaultContext(),
 		Config:       cfg,
-		Client:       client,
+		RunClient:    runClient,
+		DAGClient:    dagClient,
 		DAGStore:     dagStore,
 		HistoryStore: historyStore,
 
@@ -140,7 +142,8 @@ type Helper struct {
 	Cancel        context.CancelFunc
 	Config        *config.Config
 	LoggingOutput *SyncBuffer
-	Client        client.RunClient
+	RunClient     client.RunClient
+	DAGClient     client.DAGClient
 	HistoryStore  persistence.HistoryStore
 	DAGStore      persistence.DAGStore
 
@@ -193,7 +196,7 @@ func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 		lock.Lock()
 		defer lock.Unlock()
 
-		latest, _ := d.Client.GetLatestStatus(d.Context, d.DAG)
+		latest, _ := d.RunClient.GetLatestStatus(d.Context, d.DAG)
 		status = latest.Status
 		return latest.Status == expected
 	}, time.Second*3, time.Millisecond*50, "expected latest status to be %q, got %q", expected, status)
@@ -204,7 +207,7 @@ func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
 
 	// the +1 to the limit is needed to ensure that the number of the history
 	// entries is exactly the expected number
-	history := d.Client.GetRecentHistory(d.Context, d.Name, expected+1)
+	history := d.RunClient.GetRecentHistory(d.Context, d.Name, expected+1)
 	require.Len(t, history, expected)
 }
 
@@ -218,7 +221,7 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 		lock.Lock()
 		defer lock.Unlock()
 
-		curr, _ := d.Client.GetCurrentStatus(d.Context, d.DAG, "")
+		curr, _ := d.RunClient.GetCurrentStatus(d.Context, d.DAG, "")
 		if curr == nil {
 			return false
 		}
@@ -233,7 +236,7 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]any) {
 	t.Helper()
 
-	status, err := d.Client.GetLatestStatus(d.Context, d.DAG)
+	status, err := d.RunClient.GetLatestStatus(d.Context, d.DAG)
 	require.NoError(t, err)
 
 	// collect the actual outputs from the status
@@ -322,7 +325,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		d.DAG,
 		logDir,
 		logFile,
-		d.Client,
+		d.RunClient,
 		d.DAGStore,
 		d.HistoryStore,
 		rootDAG,

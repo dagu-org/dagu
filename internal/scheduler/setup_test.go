@@ -36,9 +36,10 @@ func TestMain(m *testing.M) {
 }
 
 type testHelper struct {
-	manager scheduler.JobManager
-	client  client.RunClient
-	config  *config.Config
+	manager   scheduler.JobManager
+	runClient client.RunClient
+	dagClient client.DAGClient
+	config    *config.Config
 }
 
 func setupTest(t *testing.T) testHelper {
@@ -68,12 +69,14 @@ func setupTest(t *testing.T) testHelper {
 	dagStore := local.NewDAGStore(cfg.Paths.DAGsDir)
 	historyStore := jsondb.New(cfg.Paths.DataDir)
 	flagStore := local.NewFlagStore(storage.NewStorage(cfg.Paths.SuspendFlagsDir))
-	cli := client.New(dagStore, historyStore, flagStore, "", cfg.Global.WorkDir)
-	jobManager := scheduler.NewDAGJobManager(testdataDir, cli, "", "")
+	runCli := client.New(historyStore, "", cfg.Global.WorkDir)
+	dagCli := client.NewDAGClient(runCli, dagStore, flagStore)
+	jobManager := scheduler.NewDAGJobManager(testdataDir, dagCli, runCli, "", "")
 
 	return testHelper{
-		manager: jobManager,
-		client:  cli,
-		config:  cfg,
+		manager:   jobManager,
+		dagClient: dagCli,
+		runClient: runCli,
+		config:    cfg,
 	}
 }

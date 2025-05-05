@@ -22,7 +22,8 @@ import (
 var _ api.StrictServerInterface = (*API)(nil)
 
 type API struct {
-	client             client.RunClient
+	dagClient          client.DAGClient
+	runClient          client.RunClient
 	remoteNodes        map[string]config.RemoteNode
 	apiBasePath        string
 	logEncodingCharset string
@@ -30,7 +31,8 @@ type API struct {
 }
 
 func New(
-	cli client.RunClient,
+	dagCli client.DAGClient,
+	runCli client.RunClient,
 	cfg *config.Config,
 ) *API {
 	remoteNodes := make(map[string]config.RemoteNode)
@@ -39,7 +41,8 @@ func New(
 	}
 
 	return &API{
-		client:             cli,
+		dagClient:          dagCli,
+		runClient:          runCli,
 		logEncodingCharset: cfg.UI.LogEncodingCharset,
 		remoteNodes:        remoteNodes,
 		apiBasePath:        cfg.Server.APIBasePath,

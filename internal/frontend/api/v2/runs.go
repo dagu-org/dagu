@@ -16,7 +16,7 @@ func (a *API) GetDAGRunLog(ctx context.Context, request api.GetDAGRunLogRequestO
 	dagName := request.DagName
 	requestId := request.RequestId
 
-	status, err := a.client.GetStatus(ctx, dagName, requestId)
+	status, err := a.runClient.GetStatus(ctx, dagName, requestId)
 	if err != nil {
 		return api.GetDAGRunLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -38,7 +38,7 @@ func (a *API) GetDAGStepLog(ctx context.Context, request api.GetDAGStepLogReques
 	dagName := request.DagName
 	requestId := request.RequestId
 
-	status, err := a.client.GetStatus(ctx, dagName, requestId)
+	status, err := a.runClient.GetStatus(ctx, dagName, requestId)
 	if err != nil {
 		return api.GetDAGStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -65,7 +65,7 @@ func (a *API) GetDAGStepLog(ctx context.Context, request api.GetDAGStepLogReques
 }
 
 func (a *API) UpdateDAGStepStatus(ctx context.Context, request api.UpdateDAGStepStatusRequestObject) (api.UpdateDAGStepStatusResponseObject, error) {
-	status, err := a.client.GetStatus(ctx, request.DagName, request.RequestId)
+	status, err := a.runClient.GetStatus(ctx, request.DagName, request.RequestId)
 	if err != nil {
 		return &api.UpdateDAGStepStatus404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -95,7 +95,7 @@ func (a *API) UpdateDAGStepStatus(ctx context.Context, request api.UpdateDAGStep
 
 	status.Nodes[idxToUpdate].Status = nodeStatusMapping[request.Body.Status]
 
-	if err := a.client.UpdateStatus(ctx, request.DagName, *status); err != nil {
+	if err := a.runClient.UpdateStatus(ctx, request.DagName, *status); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
 	}
 

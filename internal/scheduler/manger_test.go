@@ -14,7 +14,7 @@ func TestReadEntries(t *testing.T) {
 	now := expectedNext.Add(-time.Second)
 
 	t.Run("InvalidDirectory", func(t *testing.T) {
-		manager := scheduler.NewDAGJobManager("invalid_directory", nil, "", "")
+		manager := scheduler.NewDAGJobManager("invalid_directory", nil, nil, "", "")
 		jobs, err := manager.Next(context.Background(), expectedNext)
 		require.NoError(t, err)
 		require.Len(t, jobs, 0)
@@ -54,8 +54,8 @@ func TestReadEntries(t *testing.T) {
 		job := findJobByName(t, beforeSuspend, "scheduled_job").Job
 		dagJob, ok := job.(*scheduler.DAG)
 		require.True(t, ok)
-		dag := dagJob.DAG
-		err = th.client.ToggleSuspend(ctx, dag.Name, true)
+
+		err = th.dagClient.ToggleSuspend(ctx, dagJob.DAG.Name, true)
 		require.NoError(t, err)
 
 		// check if the job is suspended and not returned

@@ -22,7 +22,7 @@ func TestRetryCommand(t *testing.T) {
 		th.RunCommand(t, cmd.CmdStart(), test.CmdTest{Args: args})
 
 		// Find the request ID.
-		cli := th.Client
+		cli := th.DAGClient
 		ctx := context.Background()
 		status, err := cli.GetDAGStatus(ctx, dagFile.Location)
 		require.NoError(t, err)
