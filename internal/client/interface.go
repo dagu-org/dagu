@@ -72,7 +72,8 @@ type RunClient interface {
 	StartDAG(ctx context.Context, dag *digraph.DAG, opts StartOptions) error
 	RestartDAG(ctx context.Context, dag *digraph.DAG, opts RestartOptions) error
 	RetryDAG(ctx context.Context, dag *digraph.DAG, requestID string) error
-	GetCurrentStatus(ctx context.Context, dag *digraph.DAG) (*persistence.Status, error)
+	IsRunning(ctx context.Context, dag *digraph.DAG, requestID string) bool
+	GetCurrentStatus(ctx context.Context, dag *digraph.DAG, requestId string) (*persistence.Status, error)
 	GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, requestID string) (*persistence.Status, error)
 	GetLatestStatus(ctx context.Context, dag *digraph.DAG) (persistence.Status, error)
 	GetRecentHistory(ctx context.Context, name string, n int) []persistence.Run

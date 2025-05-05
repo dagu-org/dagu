@@ -540,12 +540,8 @@ func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
 	if a.subExecution.Load() {
 		return nil // Skip the check for sub-DAGs
 	}
-	status, err := a.client.GetCurrentStatus(ctx, a.dag)
-	if err != nil {
-		return err
-	}
-	if status.Status != scheduler.StatusNone {
-		return fmt.Errorf("the DAG is already running. status=%s, socket=%s", status.Status, a.dag.SockAddr(a.requestID))
+	if a.client.IsRunning(ctx, a.dag, a.requestID) {
+		return fmt.Errorf("the DAG is already running. requestID=%s, socket=%s", a.requestID, a.dag.SockAddr(a.requestID))
 	}
 	return nil
 }

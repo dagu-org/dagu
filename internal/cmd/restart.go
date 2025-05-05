@@ -82,7 +82,7 @@ func runRestart(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read DAG from history record: %w", err)
 	}
 
-	if err := handleRestartProcess(ctx, dag); err != nil {
+	if err := handleRestartProcess(ctx, dag, requestID); err != nil {
 		logger.Error(ctx, "Failed to restart DAG", "dagName", dag.Name, "err", err)
 		return fmt.Errorf("restart process failed for DAG %s: %w", dag.Name, err)
 	}
@@ -90,14 +90,14 @@ func runRestart(ctx *Context, args []string) error {
 	return nil
 }
 
-func handleRestartProcess(ctx *Context, dag *digraph.DAG) error {
+func handleRestartProcess(ctx *Context, dag *digraph.DAG, requestID string) error {
 	cli, err := ctx.Client()
 	if err != nil {
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
 
 	// Stop if running
-	if err := stopDAGIfRunning(ctx, cli, dag); err != nil {
+	if err := stopDAGIfRunning(ctx, cli, dag, requestID); err != nil {
 		return fmt.Errorf("failed to stop DAG: %w", err)
 	}
 
@@ -175,25 +175,25 @@ func executeDAG(ctx *Context, cli client.RunClient, dag *digraph.DAG) error {
 	return nil
 }
 
-func stopDAGIfRunning(ctx context.Context, cli client.RunClient, dag *digraph.DAG) error {
-	status, err := cli.GetCurrentStatus(ctx, dag)
+func stopDAGIfRunning(ctx context.Context, cli client.RunClient, dag *digraph.DAG, requestID string) error {
+	status, err := cli.GetCurrentStatus(ctx, dag, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to get current status: %w", err)
 	}
 
 	if status.Status == scheduler.StatusRunning {
 		logger.Infof(ctx, "Stopping: %s", dag.Name)
-		if err := stopRunningDAG(ctx, cli, dag); err != nil {
+		if err := stopRunningDAG(ctx, cli, dag, requestID); err != nil {
 			return fmt.Errorf("failed to stop running DAG: %w", err)
 		}
 	}
 	return nil
 }
 
-func stopRunningDAG(ctx context.Context, cli client.RunClient, dag *digraph.DAG) error {
+func stopRunningDAG(ctx context.Context, cli client.RunClient, dag *digraph.DAG, requestID string) error {
 	const stopPollInterval = 100 * time.Millisecond
 	for {
-		status, err := cli.GetCurrentStatus(ctx, dag)
+		status, err := cli.GetCurrentStatus(ctx, dag, requestID)
 		if err != nil {
 			return fmt.Errorf("failed to get current status: %w", err)
 		}

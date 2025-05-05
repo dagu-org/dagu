@@ -145,19 +145,32 @@ func (e *client) RetryDAG(_ context.Context, dag *digraph.DAG, requestID string)
 	return cmd.Start()
 }
 
-func (*client) GetCurrentStatus(_ context.Context, dag *digraph.DAG) (*persistence.Status, error) {
-	// FIXME: Should handle the case of dynamic DAG
-	client := sock.NewClient(dag.SockAddr(""))
-	ret, err := client.Request("GET", "/status")
+func (e *client) IsRunning(ctx context.Context, dag *digraph.DAG, requestID string) bool {
+	_, err := e.currentStatus(ctx, dag, requestID)
+	return err == nil
+}
+
+func (e *client) GetCurrentStatus(ctx context.Context, dag *digraph.DAG, requestId string) (*persistence.Status, error) {
+	status, err := e.currentStatus(ctx, dag, requestId)
 	if err != nil {
-		if errors.Is(err, sock.ErrTimeout) {
-			return nil, err
+		// No such file or directory
+		if errors.Is(err, os.ErrNotExist) {
+			goto FALLBACK
 		}
+		if errors.Is(err, sock.ErrTimeout) {
+			goto FALLBACK
+		}
+		return nil, fmt.Errorf("failed to get current status: %w", err)
+	}
+	return status, nil
+
+FALLBACK:
+	if requestId == "" {
 		// The DAG is not running so return the default status
 		status := persistence.NewStatusFactory(dag).Default()
 		return &status, nil
 	}
-	return persistence.StatusFromJSON(ret)
+	return e.GetStatusByRequestID(ctx, dag, requestId)
 }
 
 func (e *client) GetStatus(ctx context.Context, name string, requestID string) (*persistence.Status, error) {
@@ -184,57 +197,75 @@ func (e *client) GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, req
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}
 
-	// If the DAG is running, set the currentStatus to error if the request ID does not match
-	// Because the DAG run must be stopped
-	// TODO: Handle different request IDs for the same DAG
-	currentStatus, _ := e.GetCurrentStatus(ctx, dag)
-	if currentStatus != nil && currentStatus.RequestID != requestID {
-		latestStatus.SetStatusToErrorIfRunning()
+	// If the DAG is running, query the current status
+	if latestStatus.Status == scheduler.StatusRunning {
+		currentStatus, err := e.currentStatus(ctx, dag, latestStatus.RequestID)
+		if err == nil {
+			return currentStatus, nil
+		}
 	}
 
-	return latestStatus, err
+	// If querying the current status fails, even if the status is running,
+	// set the status to error
+	if latestStatus.Status == scheduler.StatusRunning {
+		latestStatus.Status = scheduler.StatusError
+	}
+
+	return latestStatus, nil
 }
 
-func (*client) currentStatus(_ context.Context, dag *digraph.DAG) (*persistence.Status, error) {
+func (*client) currentStatus(_ context.Context, dag *digraph.DAG, requestId string) (*persistence.Status, error) {
 	// FIXME: Should handle the case of dynamic DAG
-	client := sock.NewClient(dag.SockAddr(""))
+	client := sock.NewClient(dag.SockAddr(requestId))
 	statusJSON, err := client.Request("GET", "/status")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get status: %w", err)
+		return nil, fmt.Errorf("failed to get current status: %w", err)
 	}
 
 	return persistence.StatusFromJSON(statusJSON)
 }
 
 func (e *client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (persistence.Status, error) {
-	currStatus, _ := e.currentStatus(ctx, dag)
-	if currStatus != nil && currStatus.Status != scheduler.StatusNone {
-		return *currStatus, nil
-	}
-
 	var latestStatus *persistence.Status
 
+	// Find the latest status by name
 	record, err := e.historyStore.Latest(ctx, dag.Name)
 	if err != nil {
 		goto handleError
 	}
 
+	// Read the latest status
 	latestStatus, err = record.ReadStatus(ctx)
 	if err != nil {
 		goto handleError
 	}
 
-	latestStatus.SetStatusToErrorIfRunning()
+	// If the DAG is running, query the current status
+	if latestStatus.Status == scheduler.StatusRunning {
+		currentStatus, err := e.currentStatus(ctx, dag, latestStatus.RequestID)
+		if err == nil {
+			return *currentStatus, nil
+		}
+	}
+
+	// If querying the current status fails, even if the status is running,
+	// set the status to error
+	if latestStatus.Status == scheduler.StatusRunning {
+		latestStatus.Status = scheduler.StatusError
+	}
+
 	return *latestStatus, nil
 
 handleError:
 
+	// If the latest status is not found, return the default status
+	ret := persistence.NewStatusFactory(dag).Default()
 	if errors.Is(err, persistence.ErrNoStatusData) {
 		// No status for today
-		return persistence.NewStatusFactory(dag).Default(), nil
+		return ret, nil
 	}
 
-	return persistence.NewStatusFactory(dag).Default(), err
+	return ret, err
 }
 
 func (e *client) GetRecentHistory(ctx context.Context, name string, n int) []persistence.Run {

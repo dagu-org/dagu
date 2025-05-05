@@ -158,13 +158,6 @@ type Status struct {
 	ParamsList    []string         `json:"paramsList,omitempty"`
 }
 
-// SetStatusToErrorIfRunning changes the status to Error if it is currently Running
-func (st *Status) SetStatusToErrorIfRunning() {
-	if st.Status == scheduler.StatusRunning {
-		st.Status = scheduler.StatusError
-	}
-}
-
 // NodesByName returns a slice of nodes with the specified name
 func (st *Status) NodeByName(name string) (*Node, error) {
 	for _, node := range st.Nodes {

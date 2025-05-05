@@ -15,8 +15,6 @@ import (
 )
 
 func TestBuild(t *testing.T) {
-	t.Parallel()
-
 	t.Run("SkipIfSuccessful", func(t *testing.T) {
 		t.Parallel()
 

@@ -47,14 +47,6 @@ func TestStatusSerialization(t *testing.T) {
 	require.Equal(t, dag.Steps[0].Name, statusObject.Nodes[0].Step.Name)
 }
 
-func TestCorrectRunningStatus(t *testing.T) {
-	dag := &digraph.DAG{Name: "test"}
-	requestID := uuid.Must(uuid.NewV7()).String()
-	status := persistence.NewStatusFactory(dag).Create(requestID, scheduler.StatusRunning, 0, time.Now())
-	status.SetStatusToErrorIfRunning()
-	require.Equal(t, scheduler.StatusError, status.Status)
-}
-
 func TestJsonMarshal(t *testing.T) {
 	step := digraph.Step{
 		OutputVariables: &digraph.SyncMap{},

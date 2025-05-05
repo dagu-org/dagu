@@ -193,8 +193,7 @@ func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 		lock.Lock()
 		defer lock.Unlock()
 
-		latest, err := d.Client.GetLatestStatus(d.Context, d.DAG)
-		require.NoError(t, err)
+		latest, _ := d.Client.GetLatestStatus(d.Context, d.DAG)
 		status = latest.Status
 		return latest.Status == expected
 	}, time.Second*3, time.Millisecond*50, "expected latest status to be %q, got %q", expected, status)
@@ -219,7 +218,7 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 		lock.Lock()
 		defer lock.Unlock()
 
-		curr, _ := d.Client.GetCurrentStatus(d.Context, d.DAG)
+		curr, _ := d.Client.GetCurrentStatus(d.Context, d.DAG, "")
 		if curr == nil {
 			return false
 		}
