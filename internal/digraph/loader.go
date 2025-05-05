@@ -3,6 +3,7 @@ package digraph
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +17,12 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 
 	"github.com/goccy/go-yaml"
+)
+
+// Errors for loading DAGs
+var (
+	ErrNameOrPathRequired = errors.New("name or path is required")
+	ErrInvalidJSONFile    = errors.New("invalid JSON file")
 )
 
 // LoadOptions contains options for loading a DAG.
@@ -75,14 +82,52 @@ func WithName(name string) LoadOption {
 }
 
 // WithDAGsDir sets the directory containing the DAG files.
+// This directory is used as the base path for resolving relative DAG file paths.
+// When a DAG is loaded by name rather than absolute path, the system will look
+// for the DAG file in this directory. If not specified, the current working
+// directory is used as the default.
 func WithDAGsDir(dagsDir string) LoadOption {
 	return func(o *LoadOptions) {
 		o.dagsDir = dagsDir
 	}
 }
 
-// Load loads the DAG from the given file with the specified options.
-func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
+// Load loads a Directed Acyclic Graph (DAG) from a file path or name with the given options.
+//
+// The function handles different input formats:
+//
+// 1. Absolute paths:
+//   - JSON files (.json): Loaded directly without dynamic evaluation
+//   - YAML files (.yaml/.yml): Processed with dynamic evaluation, including base configs,
+//     parameters, and environment variables
+//
+// 2. Relative paths or filenames:
+//   - Resolved against the DAGsDir specified in options
+//   - If DAGsDir is not provided, the current working directory is used
+//   - For YAML files, the extension is optional
+//
+// This approach provides a flexible way to load DAG definitions from multiple sources
+// while supporting customization through the LoadOptions.
+func Load(ctx context.Context, nameOrPath string, opts ...LoadOption) (*DAG, error) {
+	if nameOrPath == "" {
+		return nil, ErrNameOrPathRequired
+	}
+
+	// If the nameOrPath is an absolute path to JSON file, load it directly.
+	if filepath.IsAbs(nameOrPath) && strings.HasSuffix(nameOrPath, ".json") {
+		raw, err := readRawFile(nameOrPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read JSON file %q: %w", nameOrPath, err)
+		}
+		var dag *DAG
+		if err := json.Unmarshal(raw, &dag); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal JSON file %q: %w", nameOrPath, err)
+		}
+		// We keep the 'location' field as is in the JSON file.
+		// The 'location' field is used to create proper unix socket path.
+		return dag, nil
+	}
+
 	var options LoadOptions
 	for _, opt := range opts {
 		opt(&options)
@@ -99,7 +144,7 @@ func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
 			DAGsDir:        options.dagsDir,
 		},
 	}
-	return loadDAG(buildContext, dag)
+	return loadDAG(buildContext, nameOrPath)
 }
 
 // LoadYAML loads the DAG from the given YAML data with the specified options.
@@ -143,7 +188,7 @@ func LoadBaseConfig(ctx BuildContext, file string) (*DAG, error) {
 	}
 
 	// Load the raw data from the file.
-	raw, err := readFile(file)
+	raw, err := readYAMLFile(file)
 	if err != nil {
 		return nil, err
 	}
@@ -164,8 +209,8 @@ func LoadBaseConfig(ctx BuildContext, file string) (*DAG, error) {
 }
 
 // loadDAG loads the DAG from the given file.
-func loadDAG(ctx BuildContext, dag string) (*DAG, error) {
-	filePath, err := resolveYamlFilePath(ctx, dag)
+func loadDAG(ctx BuildContext, nameOrPath string) (*DAG, error) {
+	filePath, err := resolveYamlFilePath(ctx, nameOrPath)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +222,7 @@ func loadDAG(ctx BuildContext, dag string) (*DAG, error) {
 		return nil, err
 	}
 
-	raw, err := readFile(filePath)
+	raw, err := readYAMLFile(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -287,14 +332,23 @@ func (*mergeTransformer) Transformer(
 	return nil
 }
 
-// readFile reads the contents of the file into a map.
-func readFile(file string) (cfg map[string]any, err error) {
+// readYAMLFile reads the contents of the file into a map.
+func readYAMLFile(file string) (cfg map[string]any, err error) {
 	data, err := os.ReadFile(file) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %q: %v", file, err)
 	}
 
 	return unmarshalData(data)
+}
+
+func readRawFile(file string) ([]byte, error) {
+	data, err := os.ReadFile(file) //nolint:gosec
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file %q: %v", file, err)
+	}
+
+	return data, nil
 }
 
 // unmarshalData unmarshals the data into a map.

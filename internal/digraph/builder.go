@@ -255,11 +255,11 @@ func buildDotenv(ctx BuildContext, spec *definition, dag *DAG) error {
 			case string:
 				dag.Dotenv = append(dag.Dotenv, e)
 			default:
-				return wrapError("dotenv", e, ErrDotenvMustBeStringOrArray)
+				return wrapError("dotenv", e, ErrDotEnvMustBeStringOrArray)
 			}
 		}
 	default:
-		return wrapError("dotenv", v, ErrDotenvMustBeStringOrArray)
+		return wrapError("dotenv", v, ErrDotEnvMustBeStringOrArray)
 	}
 
 	if !ctx.opts.NoEval {
