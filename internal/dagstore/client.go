@@ -106,8 +106,8 @@ func (cli *Client) List(ctx context.Context, opts ...ListDAGOption) (*PaginatedR
 
 	dags, errList, err := cli.dagStore.List(ctx, ListOptions{
 		Paginator: &pg,
-		Name:      ptr(options.Name),
-		Tag:       ptr(options.Tag),
+		Name:      ptrOf(options.Name),
+		Tag:       ptrOf(options.Tag),
 	})
 	if err != nil {
 		return nil, errList, err
@@ -202,7 +202,7 @@ func (cli *Client) TagList(ctx context.Context) ([]string, []string, error) {
 	return cli.dagStore.TagList(ctx)
 }
 
-func ptr[T any](p *T) T {
+func ptrOf[T any](p *T) T {
 	var zero T
 	if p == nil {
 		return zero

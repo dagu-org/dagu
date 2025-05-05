@@ -147,7 +147,7 @@ func (a *API) handleError(w http.ResponseWriter, r *http.Request, err error) {
 	})
 }
 
-func ptr[T any](v T) *T {
+func ptrOf[T any](v T) *T {
 	if reflect.ValueOf(v).IsZero() {
 		return nil
 	}
@@ -155,7 +155,7 @@ func ptr[T any](v T) *T {
 	return &v
 }
 
-func value[T any](ptr *T) T {
+func valueOf[T any](ptr *T) T {
 	if ptr == nil {
 		var zero T
 		return zero

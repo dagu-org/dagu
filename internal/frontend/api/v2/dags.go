@@ -276,8 +276,8 @@ func (a *API) ListAllDAGs(ctx context.Context, request api.ListAllDAGsRequestObj
 		run := api.RunSummary{
 			Log:         item.Status.Log,
 			Name:        item.Status.Name,
-			Params:      ptr(item.Status.Params),
-			Pid:         ptr(int(item.Status.PID)),
+			Params:      ptrOf(item.Status.Params),
+			Pid:         ptrOf(int(item.Status.PID)),
 			RequestId:   item.Status.RequestID,
 			StartedAt:   item.Status.StartedAt,
 			FinishedAt:  item.Status.FinishedAt,
@@ -360,7 +360,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		}
 	}
 	if err := a.runClient.StartDAG(ctx, status.DAG, runstore.StartOptions{
-		Params: value(request.Body.Params),
+		Params: valueOf(request.Body.Params),
 	}); err != nil {
 		return nil, fmt.Errorf("error starting DAG: %w", err)
 	}
@@ -457,174 +457,4 @@ func (a *API) SearchDAGDefinitions(ctx context.Context, request api.SearchDAGDef
 		Results: results,
 		Errors:  errs,
 	}, nil
-}
-
-func toDAG(dag *digraph.DAG) api.DAG {
-	var schedules []api.Schedule
-	for _, s := range dag.Schedule {
-		schedules = append(schedules, api.Schedule{Expression: s.Expression})
-	}
-
-	return api.DAG{
-		Name:          dag.Name,
-		Group:         ptr(dag.Group),
-		Description:   ptr(dag.Description),
-		Params:        ptr(dag.Params),
-		DefaultParams: ptr(dag.DefaultParams),
-		Tags:          ptr(dag.Tags),
-		Schedule:      ptr(schedules),
-	}
-}
-
-func toStep(obj digraph.Step) api.Step {
-	var conditions []api.Precondition
-	for _, cond := range obj.Preconditions {
-		conditions = append(conditions, toPrecondition(cond))
-	}
-
-	repeatPolicy := api.RepeatPolicy{
-		Repeat:   ptr(obj.RepeatPolicy.Repeat),
-		Interval: ptr(int(obj.RepeatPolicy.Interval.Seconds())),
-	}
-
-	step := api.Step{
-		Name:          obj.Name,
-		Description:   ptr(obj.Description),
-		Args:          ptr(obj.Args),
-		CmdWithArgs:   ptr(obj.CmdWithArgs),
-		Command:       ptr(obj.Command),
-		Depends:       ptr(obj.Depends),
-		Dir:           ptr(obj.Dir),
-		MailOnError:   ptr(obj.MailOnError),
-		Output:        ptr(obj.Output),
-		Preconditions: ptr(conditions),
-		RepeatPolicy:  ptr(repeatPolicy),
-		Script:        ptr(obj.Script),
-	}
-
-	if obj.SubDAG != nil {
-		step.Run = ptr(obj.SubDAG.Name)
-		step.Params = ptr(obj.SubDAG.Params)
-	}
-	return step
-}
-
-func toPrecondition(obj digraph.Condition) api.Precondition {
-	return api.Precondition{
-		Condition: ptr(obj.Condition),
-		Expected:  ptr(obj.Expected),
-	}
-}
-
-func toRunDetails(s runstore.Status) api.RunDetails {
-	status := api.RunDetails{
-		Log:         s.Log,
-		Name:        s.Name,
-		Params:      ptr(s.Params),
-		Pid:         ptr(int(s.PID)),
-		RequestId:   s.RequestID,
-		StartedAt:   s.StartedAt,
-		FinishedAt:  s.FinishedAt,
-		Status:      api.Status(s.Status),
-		StatusLabel: api.StatusLabel(s.Status.String()),
-	}
-	for _, n := range s.Nodes {
-		status.Nodes = append(status.Nodes, toNode(n))
-	}
-	if s.OnSuccess != nil {
-		status.OnSuccess = ptr(toNode(s.OnSuccess))
-	}
-	if s.OnFailure != nil {
-		status.OnFailure = ptr(toNode(s.OnFailure))
-	}
-	if s.OnCancel != nil {
-		status.OnCancel = ptr(toNode(s.OnCancel))
-	}
-	if s.OnExit != nil {
-		status.OnExit = ptr(toNode(s.OnExit))
-	}
-	return status
-}
-
-func toNode(node *runstore.Node) api.Node {
-	return api.Node{
-		DoneCount:   node.DoneCount,
-		FinishedAt:  node.FinishedAt,
-		Log:         node.Log,
-		RetryCount:  node.RetryCount,
-		StartedAt:   node.StartedAt,
-		Status:      api.NodeStatus(node.Status),
-		StatusLabel: api.NodeStatusLabel(node.Status.String()),
-		Step:        toStep(node.Step),
-		Error:       ptr(node.Error),
-		SubRuns:     ptr(toSubRuns(node.SubRuns)),
-	}
-}
-
-func toSubRuns(subRuns []runstore.SubRun) []api.SubRun {
-	var result []api.SubRun
-	for _, subRun := range subRuns {
-		result = append(result, api.SubRun{
-			RequestId: subRun.RequestID,
-		})
-	}
-	return result
-}
-
-func toDAGDetails(dag *digraph.DAG) *api.DAGDetails {
-	var details *api.DAGDetails
-	if dag == nil {
-		return details
-	}
-
-	var steps []api.Step
-	for _, step := range dag.Steps {
-		steps = append(steps, toStep(step))
-	}
-
-	handlers := dag.HandlerOn
-
-	handlerOn := api.HandlerOn{}
-	if handlers.Failure != nil {
-		handlerOn.Failure = ptr(toStep(*handlers.Failure))
-	}
-	if handlers.Success != nil {
-		handlerOn.Success = ptr(toStep(*handlers.Success))
-	}
-	if handlers.Cancel != nil {
-		handlerOn.Cancel = ptr(toStep(*handlers.Cancel))
-	}
-	if handlers.Exit != nil {
-		handlerOn.Exit = ptr(toStep(*handlers.Exit))
-	}
-
-	var schedules []api.Schedule
-	for _, s := range dag.Schedule {
-		schedules = append(schedules, api.Schedule{
-			Expression: s.Expression,
-		})
-	}
-
-	var preconditions []api.Precondition
-	for _, p := range dag.Preconditions {
-		preconditions = append(preconditions, toPrecondition(p))
-	}
-
-	return &api.DAGDetails{
-		Name:              dag.Name,
-		Description:       ptr(dag.Description),
-		DefaultParams:     ptr(dag.DefaultParams),
-		Delay:             ptr(int(dag.Delay.Seconds())),
-		Env:               ptr(dag.Env),
-		Group:             ptr(dag.Group),
-		HandlerOn:         ptr(handlerOn),
-		HistRetentionDays: ptr(dag.HistRetentionDays),
-		LogDir:            ptr(dag.LogDir),
-		MaxActiveRuns:     ptr(dag.MaxActiveRuns),
-		Params:            ptr(dag.Params),
-		Preconditions:     ptr(preconditions),
-		Schedule:          ptr(schedules),
-		Steps:             ptr(steps),
-		Tags:              ptr(dag.Tags),
-	}
 }
