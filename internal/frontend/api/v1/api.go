@@ -9,10 +9,10 @@ import (
 	"reflect"
 
 	"github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dagstore"
 	"github.com/dagu-org/dagu/internal/frontend/auth"
-	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/go-chi/chi/v5"
@@ -22,8 +22,8 @@ import (
 var _ api.StrictServerInterface = (*API)(nil)
 
 type API struct {
-	dagClient          client.DAGClient
-	runClient          client.RunClient
+	dagClient          dagstore.Client
+	runClient          runstore.Client
 	remoteNodes        map[string]config.RemoteNode
 	apiBasePath        string
 	logEncodingCharset string
@@ -31,8 +31,8 @@ type API struct {
 }
 
 func New(
-	dagCli client.DAGClient,
-	runCli client.RunClient,
+	dagCli dagstore.Client,
+	runCli runstore.Client,
 	cfg *config.Config,
 ) *API {
 	remoteNodes := make(map[string]config.RemoteNode)
@@ -121,7 +121,7 @@ func (a *API) handleError(w http.ResponseWriter, _ *http.Request, err error) {
 	}
 
 	switch {
-	case errors.Is(err, persistence.ErrRequestIDNotFound):
+	case errors.Is(err, runstore.ErrRequestIDNotFound):
 		code = api.ErrorCodeNotFound
 		message = "Request ID not found"
 	}

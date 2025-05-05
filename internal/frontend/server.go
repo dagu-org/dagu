@@ -15,12 +15,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dagstore"
 	apiv1 "github.com/dagu-org/dagu/internal/frontend/api/v1"
 	apiv2 "github.com/dagu-org/dagu/internal/frontend/api/v2"
 	"github.com/dagu-org/dagu/internal/frontend/metrics"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -37,7 +38,7 @@ type Server struct {
 }
 
 // NewServer creates a new Server instance with the given configuration and client
-func NewServer(cfg *config.Config, dagCli client.DAGClient, runCli client.RunClient) *Server {
+func NewServer(cfg *config.Config, dagCli dagstore.Client, runCli runstore.Client) *Server {
 	var remoteNodes []string
 	for _, n := range cfg.Server.RemoteNodes {
 		remoteNodes = append(remoteNodes, n.Name)

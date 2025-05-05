@@ -8,11 +8,10 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/spf13/cobra"
 )
 
@@ -49,20 +48,20 @@ func runRestart(ctx *Context, args []string) error {
 
 	dagName := args[0]
 
-	var record persistence.Record
+	var record runstore.Record
 	if requestID != "" {
-		// Retrieve the previous run's history record for the specified request ID.
-		r, err := ctx.historyStore().FindByRequestID(ctx, dagName, requestID)
+		// Retrieve the previous run's runstore record for the specified request ID.
+		r, err := ctx.runStore().FindByRequestID(ctx, dagName, requestID)
 		if err != nil {
 			logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
 			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
 		}
 		record = r
 	} else {
-		r, err := ctx.historyStore().Latest(ctx, dagName)
+		r, err := ctx.runStore().Latest(ctx, dagName)
 		if err != nil {
-			logger.Error(ctx, "Failed to retrieve latest history record", "dagName", dagName, "err", err)
-			return fmt.Errorf("failed to retrieve latest history record for DAG %s: %w", dagName, err)
+			logger.Error(ctx, "Failed to retrieve latest runstore record", "dagName", dagName, "err", err)
+			return fmt.Errorf("failed to retrieve latest runstore record for DAG %s: %w", dagName, err)
 		}
 		record = r
 	}
@@ -78,8 +77,8 @@ func runRestart(ctx *Context, args []string) error {
 
 	dag, err := record.ReadDAG(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to read DAG from history record", "err", err)
-		return fmt.Errorf("failed to read DAG from history record: %w", err)
+		logger.Error(ctx, "Failed to read DAG from runstore record", "err", err)
+		return fmt.Errorf("failed to read DAG from runstore record: %w", err)
 	}
 
 	if err := handleRestartProcess(ctx, dag, requestID); err != nil {
@@ -125,7 +124,7 @@ func handleRestartProcess(ctx *Context, dag *digraph.DAG, requestID string) erro
 	return executeDAG(ctx, cli, dag)
 }
 
-func executeDAG(ctx *Context, cli client.RunClient, dag *digraph.DAG) error {
+func executeDAG(ctx *Context, cli runstore.Client, dag *digraph.DAG) error {
 	requestID, err := generateRequestID()
 	if err != nil {
 		return fmt.Errorf("failed to generate request ID: %w", err)
@@ -158,7 +157,7 @@ func executeDAG(ctx *Context, cli client.RunClient, dag *digraph.DAG) error {
 		logFile.Name(),
 		cli,
 		dagStore,
-		ctx.historyStore(),
+		ctx.runStore(),
 		rootDAG,
 		agent.Options{Dry: false})
 
@@ -175,7 +174,7 @@ func executeDAG(ctx *Context, cli client.RunClient, dag *digraph.DAG) error {
 	return nil
 }
 
-func stopDAGIfRunning(ctx context.Context, cli client.RunClient, dag *digraph.DAG, requestID string) error {
+func stopDAGIfRunning(ctx context.Context, cli runstore.Client, dag *digraph.DAG, requestID string) error {
 	status, err := cli.GetCurrentStatus(ctx, dag, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to get current status: %w", err)
@@ -190,7 +189,7 @@ func stopDAGIfRunning(ctx context.Context, cli client.RunClient, dag *digraph.DA
 	return nil
 }
 
-func stopRunningDAG(ctx context.Context, cli client.RunClient, dag *digraph.DAG, requestID string) error {
+func stopRunningDAG(ctx context.Context, cli runstore.Client, dag *digraph.DAG, requestID string) error {
 	const stopPollInterval = 100 * time.Millisecond
 	for {
 		status, err := cli.GetCurrentStatus(ctx, dag, requestID)
@@ -202,7 +201,7 @@ func stopRunningDAG(ctx context.Context, cli client.RunClient, dag *digraph.DAG,
 			return nil
 		}
 
-		if err := cli.StopDAG(ctx, dag); err != nil {
+		if err := cli.StopDAG(ctx, dag, requestID); err != nil {
 			return fmt.Errorf("failed to stop DAG: %w", err)
 		}
 
@@ -217,10 +216,10 @@ func waitForRestart(ctx context.Context, restartWait time.Duration) {
 	}
 }
 
-func getPreviousRunStatus(ctx context.Context, cli client.RunClient, dag *digraph.DAG) (persistence.Status, error) {
+func getPreviousRunStatus(ctx context.Context, cli runstore.Client, dag *digraph.DAG) (runstore.Status, error) {
 	status, err := cli.GetLatestStatus(ctx, dag)
 	if err != nil {
-		return persistence.Status{}, fmt.Errorf("failed to get latest status: %w", err)
+		return runstore.Status{}, fmt.Errorf("failed to get latest status: %w", err)
 	}
 	return status, nil
 }

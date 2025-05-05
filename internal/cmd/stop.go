@@ -44,13 +44,13 @@ func runStop(ctx *Context, args []string) error {
 	var dag *digraph.DAG
 	if requestID != "" {
 		// Retrieve the previous run's history record for the specified request ID.
-		historyRecord, err := ctx.historyStore().FindByRequestID(ctx, dagName, requestID)
+		runRecord, err := ctx.runStore().FindByRequestID(ctx, dagName, requestID)
 		if err != nil {
 			logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
 			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
 		}
 
-		d, err := historyRecord.ReadDAG(ctx)
+		d, err := runRecord.ReadDAG(ctx)
 		if err != nil {
 			logger.Error(ctx, "Failed to read DAG from history record", "err", err)
 			return fmt.Errorf("failed to read DAG from history record: %w", err)
@@ -73,7 +73,7 @@ func runStop(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	if err := cli.StopDAG(ctx, dag); err != nil {
+	if err := cli.StopDAG(ctx, dag, requestID); err != nil {
 		logger.Error(ctx, "Failed to stop DAG", "dag", dag.Name, "err", err)
 		return fmt.Errorf("failed to stop DAG: %w", err)
 	}

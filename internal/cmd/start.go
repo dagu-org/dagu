@@ -9,7 +9,7 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/spf13/cobra"
 )
 
@@ -104,9 +104,9 @@ func runStart(ctx *Context, args []string) error {
 	// same request ID, ensuring idempotency across the the DAG from the root DAG.
 	if rootDAG.RequestID != requestID {
 		logger.Debug(ctx, "Checking for previous sub-DAG run with the request ID", "requestID", requestID)
-		var run *persistence.Run
-		record, err := ctx.historyStore().FindBySubRequestID(ctx, requestID, rootDAG)
-		if errors.Is(err, persistence.ErrRequestIDNotFound) {
+		var run *runstore.Run
+		record, err := ctx.runStore().FindBySubRequestID(ctx, requestID, rootDAG)
+		if errors.Is(err, runstore.ErrRequestIDNotFound) {
 			// If the request ID is not found, proceed with execution
 			goto EXEC
 		}
@@ -164,7 +164,7 @@ func executeDag(ctx *Context, dag *digraph.DAG, requestID string, rootDAG digrap
 		logFile.Name(),
 		cli,
 		dagStore,
-		ctx.historyStore(),
+		ctx.runStore(),
 		rootDAG,
 		opts,
 	)

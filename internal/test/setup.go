@@ -16,16 +16,15 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dagstore"
+	"github.com/dagu-org/dagu/internal/dagstore/filestore"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/dagu-org/dagu/internal/persistence/jsondb"
-	"github.com/dagu-org/dagu/internal/persistence/local"
-	"github.com/dagu-org/dagu/internal/persistence/local/storage"
+	"github.com/dagu-org/dagu/internal/runstore"
+	runfs "github.com/dagu-org/dagu/internal/runstore/filestore"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -95,22 +94,19 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		cfg.Server = *options.ServerConfig
 	}
 
-	dagStore := local.NewDAGStore(cfg.Paths.DAGsDir)
-	historyStore := jsondb.New(cfg.Paths.DataDir)
-	flagStore := local.NewFlagStore(
-		storage.NewStorage(cfg.Paths.SuspendFlagsDir),
-	)
+	dagStore := filestore.New(cfg.Paths.DAGsDir, filestore.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
+	runStore := runfs.New(cfg.Paths.DataDir)
 
-	runClient := client.New(historyStore, cfg.Paths.Executable, cfg.Global.WorkDir)
-	dagClient := client.NewDAGClient(runClient, dagStore, flagStore)
+	runClient := runstore.NewClient(runStore, cfg.Paths.Executable, cfg.Global.WorkDir)
+	dagClient := dagstore.NewClient(runClient, dagStore)
 
 	helper := Helper{
-		Context:      createDefaultContext(),
-		Config:       cfg,
-		RunClient:    runClient,
-		DAGClient:    dagClient,
-		DAGStore:     dagStore,
-		HistoryStore: historyStore,
+		Context:   createDefaultContext(),
+		Config:    cfg,
+		RunClient: runClient,
+		DAGClient: dagClient,
+		DAGStore:  dagStore,
+		RunStore:  runStore,
 
 		tmpDir: tmpDir,
 	}
@@ -142,10 +138,10 @@ type Helper struct {
 	Cancel        context.CancelFunc
 	Config        *config.Config
 	LoggingOutput *SyncBuffer
-	RunClient     client.RunClient
-	DAGClient     client.DAGClient
-	HistoryStore  persistence.HistoryStore
-	DAGStore      persistence.DAGStore
+	RunClient     runstore.Client
+	DAGClient     dagstore.Client
+	RunStore      runstore.Store
+	DAGStore      dagstore.Store
 
 	tmpDir string
 }
@@ -205,10 +201,10 @@ func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
 	t.Helper()
 
-	// the +1 to the limit is needed to ensure that the number of the history
+	// the +1 to the limit is needed to ensure that the number of therunstore
 	// entries is exactly the expected number
-	history := d.RunClient.GetRecentHistory(d.Context, d.Name, expected+1)
-	require.Len(t, history, expected)
+	runstore := d.RunClient.GetRecentHistory(d.Context, d.Name, expected+1)
+	require.Len(t, runstore, expected)
 }
 
 func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
@@ -327,7 +323,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		logFile,
 		d.RunClient,
 		d.DAGStore,
-		d.HistoryStore,
+		d.RunStore,
 		rootDAG,
 		helper.opts,
 	)

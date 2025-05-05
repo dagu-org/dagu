@@ -8,7 +8,7 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/spf13/cobra"
 )
 
@@ -39,24 +39,24 @@ func runRetry(ctx *Context, args []string) error {
 
 	dagName := args[0]
 
-	// Retrieve the previous run's history record for the specified request ID.
-	historyRecord, err := ctx.historyStore().FindByRequestID(ctx, dagName, requestID)
+	// Retrieve the previous run's runstore record for the specified request ID.
+	runRecord, err := ctx.runStore().FindByRequestID(ctx, dagName, requestID)
 	if err != nil {
 		logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
 		return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
 	}
 
 	// Read the detailed status of the previous run.
-	run, err := historyRecord.ReadRun(ctx)
+	run, err := runRecord.ReadRun(ctx)
 	if err != nil {
 		logger.Error(ctx, "Failed to read status", "err", err)
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 
-	// Get the DAG instance from the history record.
-	dag, err := historyRecord.ReadDAG(ctx)
+	// Get the DAG instance from the runstore record.
+	dag, err := runRecord.ReadDAG(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to read DAG from history record", "err", err)
+		logger.Error(ctx, "Failed to read DAG from runstore record", "err", err)
 	}
 
 	// The retry command is currently only supported for root DAGs.
@@ -71,7 +71,7 @@ func runRetry(ctx *Context, args []string) error {
 	return nil
 }
 
-func executeRetry(ctx *Context, dag *digraph.DAG, run *persistence.Run, rootDAG digraph.RootDAG) error {
+func executeRetry(ctx *Context, dag *digraph.DAG, run *runstore.Run, rootDAG digraph.RootDAG) error {
 	logger.Debug(ctx, "Executing retry", "dagName", dag.Name, "requestID", run.Status.RequestID)
 
 	// We use the same log file for the retry as the original run.
@@ -107,7 +107,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, run *persistence.Run, rootDAG 
 		logFile.Name(),
 		cli,
 		dagStore,
-		ctx.historyStore(),
+		ctx.runStore(),
 		rootDAG,
 		agent.Options{RetryTarget: &run.Status},
 	)

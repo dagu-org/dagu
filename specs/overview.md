@@ -84,7 +84,7 @@ isting, editor, visualization, logs, etc.
 - Persistence:
 
   All DAG definitions, run metadata, step logs, and history are stored on disk (by default via
-internal/persistence/jsondb` and friends). No reliance on external DB or services.
+internal/history/jsondb` and friends). No reliance on external DB or services.
 
 - API + Web Server:
 

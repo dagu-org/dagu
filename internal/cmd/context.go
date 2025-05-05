@@ -9,18 +9,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dagstore"
+	"github.com/dagu-org/dagu/internal/dagstore/filestore"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/frontend"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/dagu-org/dagu/internal/persistence/filecache"
-	"github.com/dagu-org/dagu/internal/persistence/jsondb"
-	"github.com/dagu-org/dagu/internal/persistence/local"
-	"github.com/dagu-org/dagu/internal/persistence/local/storage"
+	"github.com/dagu-org/dagu/internal/runstore"
+	runfs "github.com/dagu-org/dagu/internal/runstore/filestore"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
@@ -124,26 +122,26 @@ func (c *Context) init(cmd *cobra.Command) error {
 }
 
 // Client initializes a Client using the provided options. If not supplied,
-// it creates default DAGStore and HistoryStore instances.
-func (s *Context) Client(opts ...clientOption) (client.RunClient, error) {
+// it creates default DAGStore and RunStore instances.
+func (s *Context) Client(opts ...clientOption) (runstore.Client, error) {
 	options := &clientOptions{}
 	for _, opt := range opts {
 		opt(options)
 	}
-	historyStore := options.historyStore
-	if historyStore == nil {
-		historyStore = s.historyStore()
+	runStore := options.runStore
+	if runStore == nil {
+		runStore = s.runStore()
 	}
 
-	return client.New(
-		historyStore,
+	return runstore.NewClient(
+		runStore,
 		s.cfg.Paths.Executable,
 		s.cfg.Global.WorkDir,
 	), nil
 }
 
 // DAGClient initializes a DAGClient using the provided options.
-func (s *Context) DAGClient(runClient client.RunClient, opts ...dagClientOption) (client.DAGClient, error) {
+func (s *Context) DAGClient(runClient runstore.Client, opts ...dagClientOption) (dagstore.Client, error) {
 	options := &dagClientOptions{}
 	for _, opt := range opts {
 		opt(options)
@@ -153,33 +151,28 @@ func (s *Context) DAGClient(runClient client.RunClient, opts ...dagClientOption)
 		var err error
 		dagStore, err = s.dagStore()
 		if err != nil {
-			return nil, fmt.Errorf("failed to initialize DAG store: %w", err)
+			return dagstore.Client{}, fmt.Errorf("failed to initialize DAG store: %w", err)
 		}
 	}
-	// Create a flag store based on the suspend flags directory.
-	flagStore := local.NewFlagStore(storage.NewStorage(
-		s.cfg.Paths.SuspendFlagsDir,
-	))
 
-	return client.NewDAGClient(
+	return dagstore.NewClient(
 		runClient,
 		dagStore,
-		flagStore,
 	), nil
 }
 
 // server creates and returns a new web UI server.
-// It initializes in-memory caches for DAGs and history, and uses them in the client.
+// It initializes in-memory caches for DAGs and runstore, and uses them in the client.
 func (ctx *Context) server() (*frontend.Server, error) {
-	dagCache := filecache.New[*digraph.DAG](0, time.Hour*12)
+	dagCache := fileutil.NewCache[*digraph.DAG](0, time.Hour*12)
 	dagCache.StartEviction(ctx)
 	dagStore := ctx.dagStoreWithCache(dagCache)
 
-	historyCache := filecache.New[*persistence.Status](0, time.Hour*12)
-	historyCache.StartEviction(ctx)
-	historyStore := ctx.historyStoreWithCache(historyCache)
+	statusCache := fileutil.NewCache[*runstore.Status](0, time.Hour*12)
+	statusCache.StartEviction(ctx)
+	runStore := ctx.runStoreWithCache(statusCache)
 
-	runCli, err := ctx.Client(withHistoryStore(historyStore))
+	runCli, err := ctx.Client(withRunStore(runStore))
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client: %w", err)
 	}
@@ -211,7 +204,7 @@ func (s *Context) scheduler() (*scheduler.Scheduler, error) {
 
 // dagStore returns a new DAGStore instance. It ensures that the directory exists
 // (creating it if necessary) before returning the store.
-func (s *Context) dagStore() (persistence.DAGStore, error) {
+func (s *Context) dagStore() (dagstore.Store, error) {
 	baseDir := s.cfg.Paths.DAGsDir
 	_, err := os.Stat(baseDir)
 	if os.IsNotExist(err) {
@@ -220,27 +213,28 @@ func (s *Context) dagStore() (persistence.DAGStore, error) {
 		}
 	}
 
-	return local.NewDAGStore(s.cfg.Paths.DAGsDir), nil
+	// Create a flag store based on the suspend flags directory.
+	return filestore.New(s.cfg.Paths.DAGsDir, filestore.WithFlagsBaseDir(s.cfg.Paths.SuspendFlagsDir)), nil
 }
 
 // dagStoreWithCache returns a DAGStore instance that uses an in-memory file cache.
-func (s *Context) dagStoreWithCache(cache *filecache.Cache[*digraph.DAG]) persistence.DAGStore {
-	return local.NewDAGStore(s.cfg.Paths.DAGsDir, local.WithFileCache(cache))
+func (s *Context) dagStoreWithCache(cache *fileutil.Cache[*digraph.DAG]) dagstore.Store {
+	return filestore.New(s.cfg.Paths.DAGsDir, filestore.WithFlagsBaseDir(s.cfg.Paths.SuspendFlagsDir), filestore.WithFileCache(cache))
 }
 
-// historyStore returns a new HistoryStore instance using JSON database storage.
+// runStore returns a new RunStore instance using JSON database storage.
 // It applies the "latestStatusToday" setting from the server configuration.
-func (s *Context) historyStore() persistence.HistoryStore {
-	return jsondb.New(s.cfg.Paths.DataDir, jsondb.WithLatestStatusToday(
+func (s *Context) runStore() runstore.Store {
+	return runfs.New(s.cfg.Paths.DataDir, runfs.WithLatestStatusToday(
 		s.cfg.Server.LatestStatusToday,
 	))
 }
 
-// historyStoreWithCache returns a HistoryStore that uses an in-memory cache.
-func (s *Context) historyStoreWithCache(cache *filecache.Cache[*persistence.Status]) persistence.HistoryStore {
-	return jsondb.New(s.cfg.Paths.DataDir,
-		jsondb.WithLatestStatusToday(s.cfg.Server.LatestStatusToday),
-		jsondb.WithFileCache(cache),
+// runStoreWithCache returns a RunStore that uses an in-memory cache.
+func (s *Context) runStoreWithCache(cache *fileutil.Cache[*runstore.Status]) runstore.Store {
+	return runfs.New(s.cfg.Paths.DataDir,
+		runfs.WithLatestStatusToday(s.cfg.Server.LatestStatusToday),
+		runfs.WithFileCache(cache),
 	)
 }
 
@@ -334,13 +328,13 @@ type clientOption func(*clientOptions)
 
 // clientOptions holds optional dependencies for constructing a client.
 type clientOptions struct {
-	historyStore persistence.HistoryStore
+	runStore runstore.Store
 }
 
-// withHistoryStore returns a clientOption that sets a custom HistoryStore.
-func withHistoryStore(historyStore persistence.HistoryStore) clientOption {
+// withRunStore returns a clientOption that sets a custom RunStore.
+func withRunStore(historyStore runstore.Store) clientOption {
 	return func(o *clientOptions) {
-		o.historyStore = historyStore
+		o.runStore = historyStore
 	}
 }
 
@@ -349,11 +343,11 @@ type dagClientOption func(*dagClientOptions)
 
 // dagClientOption defines functional options for configuring the DAG client.
 type dagClientOptions struct {
-	dagStore persistence.DAGStore
+	dagStore dagstore.Store
 }
 
 // withDAGStore returns a clientOption that sets a custom DAGStore.
-func withDAGStore(dagStore persistence.DAGStore) dagClientOption {
+func withDAGStore(dagStore dagstore.Store) dagClientOption {
 	return func(o *dagClientOptions) {
 		o.dagStore = dagStore
 	}

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/spf13/cobra"
 )
 
@@ -38,20 +38,20 @@ func runStatus(ctx *Context, args []string) error {
 
 	dagName := args[0]
 
-	var record persistence.Record
+	var record runstore.Record
 	if requestID != "" {
-		// Retrieve the previous run's history record for the specified request ID.
-		r, err := ctx.historyStore().FindByRequestID(ctx, dagName, requestID)
+		// Retrieve the previous run's runstore record for the specified request ID.
+		r, err := ctx.runStore().FindByRequestID(ctx, dagName, requestID)
 		if err != nil {
 			logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
 			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
 		}
 		record = r
 	} else {
-		r, err := ctx.historyStore().Latest(ctx, dagName)
+		r, err := ctx.runStore().Latest(ctx, dagName)
 		if err != nil {
-			logger.Error(ctx, "Failed to retrieve latest history record", "dagName", dagName, "err", err)
-			return fmt.Errorf("failed to retrieve latest history record for DAG %s: %w", dagName, err)
+			logger.Error(ctx, "Failed to retrieve latest runstore record", "dagName", dagName, "err", err)
+			return fmt.Errorf("failed to retrieve latest runstore record for DAG %s: %w", dagName, err)
 		}
 		record = r
 	}

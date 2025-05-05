@@ -12,11 +12,11 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/client"
+	"github.com/dagu-org/dagu/internal/dagstore"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/dagu-org/dagu/internal/persistence/jsondb"
+	"github.com/dagu-org/dagu/internal/runstore"
+	"github.com/dagu-org/dagu/internal/runstore/filestore"
 	"github.com/samber/lo"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/japanese"
@@ -25,9 +25,9 @@ import (
 
 // CreateDAG implements api.StrictServerInterface.
 func (a *API) CreateDAG(ctx context.Context, request api.CreateDAGRequestObject) (api.CreateDAGResponseObject, error) {
-	name, err := a.dagClient.CreateDAG(ctx, request.Body.Value)
+	name, err := a.dagClient.Create(ctx, request.Body.Value)
 	if err != nil {
-		if errors.Is(err, persistence.ErrDAGAlreadyExists) {
+		if errors.Is(err, dagstore.ErrDAGAlreadyExists) {
 			return nil, &Error{
 				HTTPStatus: http.StatusConflict,
 				Code:       api.ErrorCodeAlreadyExists,
@@ -42,7 +42,7 @@ func (a *API) CreateDAG(ctx context.Context, request api.CreateDAGRequestObject)
 
 // DeleteDAG implements api.StrictServerInterface.
 func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject) (api.DeleteDAGResponseObject, error) {
-	_, err := a.dagClient.GetDAGStatus(ctx, request.Name)
+	_, err := a.dagClient.Status(ctx, request.Name)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -50,7 +50,7 @@ func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject)
 			Message:    fmt.Sprintf("DAG %s not found", request.Name),
 		}
 	}
-	if err := a.dagClient.DeleteDAG(ctx, request.Name); err != nil {
+	if err := a.dagClient.Delete(ctx, request.Name); err != nil {
 		return nil, fmt.Errorf("error deleting DAG: %w", err)
 	}
 	return &api.DeleteDAG204Response{}, nil
@@ -65,7 +65,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 		tab = *request.Params.Tab
 	}
 
-	status, err := a.dagClient.GetDAGStatus(ctx, name)
+	status, err := a.dagClient.Status(ctx, name)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -153,7 +153,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 		return resp, nil
 
 	case api.DAGDetailTabSpec:
-		spec, err := a.dagClient.GetDAGSpec(ctx, name)
+		spec, err := a.dagClient.GetSpec(ctx, name)
 		if err != nil {
 			return nil, fmt.Errorf("error getting DAG spec: %w", err)
 		}
@@ -222,13 +222,13 @@ func (a *API) readHistoryData(
 
 	var grid []api.DAGLogGridItem
 	for node, statusList := range data {
-		var history []api.NodeStatus
+		var runstore []api.NodeStatus
 		for _, s := range statusList {
-			history = append(history, api.NodeStatus(s))
+			runstore = append(runstore, api.NodeStatus(s))
 		}
 		grid = append(grid, api.DAGLogGridItem{
 			Name: node,
-			Vals: history,
+			Vals: runstore,
 		})
 	}
 
@@ -260,13 +260,13 @@ func (a *API) readHistoryData(
 		digraph.HandlerOnExit,
 	} {
 		if statusList, ok := handlers[handlerType.String()]; ok {
-			var history []api.NodeStatus
+			var runstore []api.NodeStatus
 			for _, status := range statusList {
-				history = append(history, api.NodeStatus(status))
+				runstore = append(runstore, api.NodeStatus(status))
 			}
 			grid = append(grid, api.DAGLogGridItem{
 				Name: handlerType.String(),
-				Vals: history,
+				Vals: runstore,
 			})
 		}
 	}
@@ -294,7 +294,7 @@ func (a *API) readLog(
 	var logFile string
 
 	if statusFile != "" {
-		status, err := jsondb.ParseStatusFile(statusFile)
+		status, err := filestore.ParseStatusFile(statusFile)
 		if err != nil {
 			return nil, err
 		}
@@ -326,10 +326,10 @@ func (a *API) readStepLog(
 	stepName string,
 	statusFile string,
 ) (*api.StepLog, error) {
-	var status *persistence.Status
+	var status *runstore.Status
 
 	if statusFile != "" {
-		parsedStatus, err := jsondb.ParseStatusFile(statusFile)
+		parsedStatus, err := filestore.ParseStatusFile(statusFile)
 		if err != nil {
 			return nil, err
 		}
@@ -345,7 +345,7 @@ func (a *API) readStepLog(
 	}
 
 	// Find the step in the status to get the log file.
-	var node *persistence.Node
+	var node *runstore.Node
 	for _, n := range status.Nodes {
 		if n.Step.Name == stepName {
 			node = n
@@ -411,21 +411,21 @@ func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
 
 // ListDAGs implements api.StrictServerInterface.
 func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (api.ListDAGsResponseObject, error) {
-	var opts []client.ListDAGOption
+	var opts []dagstore.ListDAGOption
 	if request.Params.Limit != nil {
-		opts = append(opts, client.WithLimit(*request.Params.Limit))
+		opts = append(opts, dagstore.WithLimit(*request.Params.Limit))
 	}
 	if request.Params.Page != nil {
-		opts = append(opts, client.WithPage(*request.Params.Page))
+		opts = append(opts, dagstore.WithPage(*request.Params.Page))
 	}
 	if request.Params.SearchName != nil {
-		opts = append(opts, client.WithName(*request.Params.SearchName))
+		opts = append(opts, dagstore.WithName(*request.Params.SearchName))
 	}
 	if request.Params.SearchTag != nil {
-		opts = append(opts, client.WithTag(*request.Params.SearchTag))
+		opts = append(opts, dagstore.WithTag(*request.Params.SearchTag))
 	}
 
-	result, errList, err := a.dagClient.ListDAGs(ctx, opts...)
+	result, errList, err := a.dagClient.List(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("error listing DAGs: %w", err)
 	}
@@ -477,7 +477,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 
 // ListTags implements api.StrictServerInterface.
 func (a *API) ListTags(ctx context.Context, _ api.ListTagsRequestObject) (api.ListTagsResponseObject, error) {
-	tags, errs, err := a.dagClient.GetTagList(ctx)
+	tags, errs, err := a.dagClient.TagList(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error getting tags: %w", err)
 	}
@@ -491,9 +491,9 @@ func (a *API) ListTags(ctx context.Context, _ api.ListTagsRequestObject) (api.Li
 func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionRequestObject) (api.PostDAGActionResponseObject, error) {
 	action := request.Body.Action
 
-	var status client.DAGStatus
+	var status dagstore.Status
 	if action != api.DAGActionSave {
-		s, err := a.dagClient.GetDAGStatus(ctx, request.Name)
+		s, err := a.dagClient.Status(ctx, request.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -509,7 +509,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "DAG is already running",
 			}
 		}
-		if err := a.runClient.StartDAG(ctx, status.DAG, client.StartOptions{
+		if err := a.runClient.StartDAG(ctx, status.DAG, runstore.StartOptions{
 			Params: value(request.Body.Params),
 		}); err != nil {
 			return nil, fmt.Errorf("error starting DAG: %w", err)
@@ -538,7 +538,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "DAG is not running",
 			}
 		}
-		if err := a.runClient.StopDAG(ctx, status.DAG); err != nil {
+		if err := a.runClient.StopDAG(ctx, status.DAG, ""); err != nil {
 			return nil, fmt.Errorf("error stopping DAG: %w", err)
 		}
 		return api.PostDAGAction200JSONResponse{}, nil
@@ -601,7 +601,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 			}
 		}
 
-		if err := a.dagClient.UpdateDAG(ctx, request.Name, *request.Body.Value); err != nil {
+		if err := a.dagClient.Update(ctx, request.Name, *request.Body.Value); err != nil {
 			return nil, err
 		}
 
@@ -617,7 +617,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 		}
 
 		newName := *request.Body.Value
-		if err := a.dagClient.MoveDAG(ctx, request.Name, newName); err != nil {
+		if err := a.dagClient.Move(ctx, request.Name, newName); err != nil {
 			return nil, fmt.Errorf("error renaming DAG: %w", err)
 		}
 
@@ -635,7 +635,7 @@ func (a *API) updateStatus(
 	ctx context.Context,
 	reqID string,
 	step string,
-	dagStatus client.DAGStatus,
+	dagStatus dagstore.Status,
 	to scheduler.NodeStatus,
 ) error {
 	status, err := a.runClient.GetStatusByRequestID(ctx, dagStatus.DAG, reqID)
@@ -678,7 +678,7 @@ func (a *API) SearchDAGs(ctx context.Context, request api.SearchDAGsRequestObjec
 		}
 	}
 
-	ret, errs, err := a.dagClient.GrepDAG(ctx, query)
+	ret, errs, err := a.dagClient.Grep(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("error searching DAGs: %w", err)
 	}
@@ -764,7 +764,7 @@ func toPrecondition(obj digraph.Condition) api.Precondition {
 	}
 }
 
-func toStatus(s persistence.Status) api.DAGStatusDetails {
+func toStatus(s runstore.Status) api.DAGStatusDetails {
 	status := api.DAGStatusDetails{
 		Log:        s.Log,
 		Name:       s.Name,
@@ -794,7 +794,7 @@ func toStatus(s persistence.Status) api.DAGStatusDetails {
 	return status
 }
 
-func toNode(node *persistence.Node) api.Node {
+func toNode(node *runstore.Node) api.Node {
 	return api.Node{
 		DoneCount:  node.DoneCount,
 		FinishedAt: node.FinishedAt,

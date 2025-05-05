@@ -25,11 +25,11 @@ func TestStatusCommand(t *testing.T) {
 		}()
 
 		require.Eventually(t, func() bool {
-			historyRecords := th.HistoryStore.Recent(th.Context, dagFile.Location, 1)
-			if len(historyRecords) < 1 {
+			runRecords := th.RunStore.Recent(th.Context, dagFile.Location, 1)
+			if len(runRecords) < 1 {
 				return false
 			}
-			status, err := historyRecords[0].ReadStatus(th.Context)
+			status, err := runRecords[0].ReadStatus(th.Context)
 			if err != nil {
 				return false
 			}

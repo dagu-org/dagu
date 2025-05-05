@@ -11,7 +11,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -134,10 +134,10 @@ steps:
 	// Update the child_2 status to "failed" to simulate a retry
 	// First, find the child_2 request ID to update its status
 	ctx := context.Background()
-	parentRec, err := th.HistoryStore.FindByRequestID(ctx, "parent", requestID)
+	parentRec, err := th.RunStore.FindByRequestID(ctx, "parent", requestID)
 	require.NoError(t, err)
 
-	updateStatus := func(rec persistence.Record, run *persistence.Run) {
+	updateStatus := func(rec runstore.Record, run *runstore.Run) {
 		err = rec.Open(ctx)
 		require.NoError(t, err)
 		err = rec.Write(ctx, run.Status)
@@ -154,9 +154,9 @@ steps:
 	child1Node.Status = scheduler.NodeStatusError
 	updateStatus(parentRec, parentRun)
 
-	// (2) Find the history record for child_1
+	// (2) Find the runstore record for child_1
 	rootDAG := digraph.NewRootDAG("parent", requestID)
-	child1Rec, err := th.HistoryStore.FindBySubRequestID(ctx, child1Node.SubRuns[0].RequestID, rootDAG)
+	child1Rec, err := th.RunStore.FindBySubRequestID(ctx, child1Node.SubRuns[0].RequestID, rootDAG)
 	require.NoError(t, err)
 
 	child1Run, err := child1Rec.ReadRun(ctx)
@@ -167,8 +167,8 @@ steps:
 	child2Node.Status = scheduler.NodeStatusError
 	updateStatus(child1Rec, child1Run)
 
-	// (4) Find the history record for child_2
-	child2Rec, err := th.HistoryStore.FindBySubRequestID(ctx, child2Node.SubRuns[0].RequestID, rootDAG)
+	// (4) Find the runstore record for child_2
+	child2Rec, err := th.RunStore.FindBySubRequestID(ctx, child2Node.SubRuns[0].RequestID, rootDAG)
 	require.NoError(t, err)
 
 	child2Run, err := child2Rec.ReadRun(ctx)
@@ -194,7 +194,7 @@ steps:
 	})
 
 	// Check if the child_2 status is now "success"
-	child2Rec, err = th.HistoryStore.FindBySubRequestID(ctx, child2Node.SubRuns[0].RequestID, rootDAG)
+	child2Rec, err = th.RunStore.FindBySubRequestID(ctx, child2Node.SubRuns[0].RequestID, rootDAG)
 	require.NoError(t, err)
 	child2Run, err = child2Rec.ReadRun(ctx)
 	require.NoError(t, err)

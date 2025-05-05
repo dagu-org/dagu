@@ -6,12 +6,12 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/build"
-	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dagstore"
+	"github.com/dagu-org/dagu/internal/dagstore/filestore"
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/persistence/jsondb"
-	"github.com/dagu-org/dagu/internal/persistence/local"
-	"github.com/dagu-org/dagu/internal/persistence/local/storage"
+	"github.com/dagu-org/dagu/internal/runstore"
+	runfs "github.com/dagu-org/dagu/internal/runstore/filestore"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -37,8 +37,8 @@ func TestMain(m *testing.M) {
 
 type testHelper struct {
 	manager   scheduler.JobManager
-	runClient client.RunClient
-	dagClient client.DAGClient
+	runClient runstore.Client
+	dagClient dagstore.Client
 	config    *config.Config
 }
 
@@ -66,11 +66,10 @@ func setupTest(t *testing.T) testHelper {
 		},
 	}
 
-	dagStore := local.NewDAGStore(cfg.Paths.DAGsDir)
-	historyStore := jsondb.New(cfg.Paths.DataDir)
-	flagStore := local.NewFlagStore(storage.NewStorage(cfg.Paths.SuspendFlagsDir))
-	runCli := client.New(historyStore, "", cfg.Global.WorkDir)
-	dagCli := client.NewDAGClient(runCli, dagStore, flagStore)
+	dagStore := filestore.New(cfg.Paths.DAGsDir, filestore.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
+	runStore := runfs.New(cfg.Paths.DataDir)
+	runCli := runstore.NewClient(runStore, "", cfg.Global.WorkDir)
+	dagCli := dagstore.NewClient(runCli, dagStore)
 	jobManager := scheduler.NewDAGJobManager(testdataDir, dagCli, runCli, "", "")
 
 	return testHelper{
