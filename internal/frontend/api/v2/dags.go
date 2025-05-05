@@ -557,7 +557,18 @@ func toNode(node *runstore.Node) api.Node {
 		StatusLabel: api.NodeStatusLabel(node.Status.String()),
 		Step:        toStep(node.Step),
 		Error:       ptr(node.Error),
+		SubRuns:     ptr(toSubRuns(node.SubRuns)),
 	}
+}
+
+func toSubRuns(subRuns []runstore.SubRun) []api.SubRun {
+	var result []api.SubRun
+	for _, subRun := range subRuns {
+		result = append(result, api.SubRun{
+			RequestId: subRun.RequestID,
+		})
+	}
+	return result
 }
 
 func toDAGDetails(dag *digraph.DAG) *api.DAGDetails {

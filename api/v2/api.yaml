@@ -1188,6 +1188,11 @@ components:
         doneCount:
           type: integer
           description: "Number of successful completions for repeating steps"
+        subRuns:
+          type: array
+          description: "List of sub-runs associated with this step"
+          items:
+            $ref: "#/components/schemas/SubRun"
         error:
           type: string
           description: "Error message if the step failed"
@@ -1200,6 +1205,15 @@ components:
         - statusLabel
         - retryCount
         - doneCount
+
+    SubRun:
+      type: object
+      description: "Metadata for a sub-DAG run"
+      properties:
+        requestId:
+          $ref: "#/components/schemas/RequestId"
+      required:
+        - requestId
 
     Step:
       type: object
