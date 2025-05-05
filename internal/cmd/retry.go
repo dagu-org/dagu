@@ -53,25 +53,10 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 
-	loadOpts := []digraph.LoadOption{
-		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
-		digraph.WithDAGsDir(ctx.cfg.Paths.DAGsDir),
-	}
-	if run.Status.Params != "" {
-		// If the 'Params' field is not empty, use it instead of 'ParamsList' for backward compatibility.
-		loadOpts = append(loadOpts, digraph.WithParams(run.Status.Params))
-	} else {
-		loadOpts = append(loadOpts, digraph.WithParams(run.Status.ParamsList))
-	}
-
-	// Load the DAG from the local file.
-	// TODO: Read the DAG from the history record instead of the local file.
-	dag, err := digraph.Load(ctx, dagName, loadOpts...)
+	// Get the DAG instance from the history record.
+	dag, err := historyRecord.ReadDAG(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to load DAG specification", "path", dagName, "err", err)
-		// nolint : staticcheck
-		return fmt.Errorf("failed to load DAG specification from %s with params %s: %w",
-			dagName, run.Status.Params, err)
+		logger.Error(ctx, "Failed to read DAG from history record", "err", err)
 	}
 
 	// The retry command is currently only supported for root DAGs.

@@ -3,7 +3,6 @@ package digraph
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -97,7 +96,6 @@ func WithDAGsDir(dagsDir string) LoadOption {
 // The function handles different input formats:
 //
 // 1. Absolute paths:
-//   - JSON files (.json): Loaded directly without dynamic evaluation
 //   - YAML files (.yaml/.yml): Processed with dynamic evaluation, including base configs,
 //     parameters, and environment variables
 //
@@ -112,22 +110,6 @@ func Load(ctx context.Context, nameOrPath string, opts ...LoadOption) (*DAG, err
 	if nameOrPath == "" {
 		return nil, ErrNameOrPathRequired
 	}
-
-	// If the nameOrPath is an absolute path to JSON file, load it directly.
-	if filepath.IsAbs(nameOrPath) && strings.HasSuffix(nameOrPath, ".json") {
-		raw, err := readRawFile(nameOrPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read JSON file %q: %w", nameOrPath, err)
-		}
-		var dag *DAG
-		if err := json.Unmarshal(raw, &dag); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal JSON file %q: %w", nameOrPath, err)
-		}
-		// We keep the 'location' field as is in the JSON file.
-		// The 'location' field is used to create proper unix socket path.
-		return dag, nil
-	}
-
 	var options LoadOptions
 	for _, opt := range opts {
 		opt(&options)
