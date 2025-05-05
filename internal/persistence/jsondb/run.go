@@ -2,6 +2,7 @@ package jsondb
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +12,11 @@ import (
 
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
+)
+
+// Error definitions for directory structure validation
+var (
+	ErrInvalidRunDir = errors.New("invalid run directory")
 )
 
 // SubRunsDir is the name of the directory where status files for sub DAGs are stored.

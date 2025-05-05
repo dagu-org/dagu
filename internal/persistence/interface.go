@@ -47,6 +47,8 @@ type Record interface {
 	ReadRun(ctx context.Context) (*Run, error)
 	// ReadStatus retrieves the execution status for this record
 	ReadStatus(ctx context.Context) (*Status, error)
+	// ReadDAG retrieves the DAG definition for this record
+	ReadDAG(ctx context.Context) (*digraph.DAG, error)
 }
 
 // DAGStore manages storage and retrieval of DAG definitions

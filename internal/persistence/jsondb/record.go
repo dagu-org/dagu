@@ -81,6 +81,43 @@ func (r *Record) ModTime() (time.Time, error) {
 	return info.ModTime(), nil
 }
 
+// ReadDAG implements persistence.Record.
+func (r *Record) ReadDAG(ctx context.Context) (*digraph.DAG, error) {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("%w: %v", ErrContextCanceled, ctx.Err())
+	default:
+		// Continue with operation
+	}
+
+	// Determine the path to the DAG definition file
+	dir := filepath.Dir(r.file)
+	dagFile := filepath.Join(dir, DAGDefinition)
+
+	// Check if the file exists
+	if _, err := os.Stat(dagFile); err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("DAG definition file not found: %w", err)
+		}
+		return nil, fmt.Errorf("failed to access DAG definition file: %w", err)
+	}
+
+	// Read the file
+	data, err := os.ReadFile(dagFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read DAG definition file: %w", err)
+	}
+
+	// Parse the JSON data
+	var dag digraph.DAG
+	if err := json.Unmarshal(data, &dag); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal DAG definition: %w", err)
+	}
+
+	return &dag, nil
+}
+
 // Open initializes the status file for writing. It returns an error if the file is already open.
 // The context can be used to cancel the operation.
 func (r *Record) Open(ctx context.Context) error {

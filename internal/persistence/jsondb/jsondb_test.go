@@ -250,4 +250,33 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, "sub-id", existingRecordStatus.RequestID)
 		assert.Equal(t, scheduler.StatusSuccess.String(), existingRecordStatus.Status.String())
 	})
+	t.Run("ReadDAG", func(t *testing.T) {
+		th := setupTestJSONDB(t)
+
+		// Create a timestamp for the parent record
+		ts := time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
+
+		// Create a parent record
+		rec := th.CreateRecord(t, ts, "parent-id", scheduler.StatusRunning)
+
+		// Write the status
+		err := rec.Open(th.Context)
+		require.NoError(t, err)
+		defer func() {
+			_ = rec.Close(th.Context)
+		}()
+
+		statusToWrite := persistence.NewStatusFactory(rec.dag).Default()
+		statusToWrite.RequestID = "parent-id"
+
+		err = rec.Write(th.Context, statusToWrite)
+		require.NoError(t, err)
+
+		// Read the DAG and verify it matches the original
+		dag, err := rec.ReadDAG(th.Context)
+		require.NoError(t, err)
+
+		require.NotNil(t, dag)
+		require.Equal(t, *rec.dag, *dag)
+	})
 }
