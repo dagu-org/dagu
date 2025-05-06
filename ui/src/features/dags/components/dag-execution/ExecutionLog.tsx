@@ -3,10 +3,25 @@
  *
  * @module features/dags/components/dag-execution
  */
-import React from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
+import { Button } from '../../../../components/ui/button';
+
+// Extended Log type with pagination fields
+interface LogWithPagination {
+  content: string;
+  lineCount?: number;
+  totalLines?: number;
+  hasMore?: boolean;
+  isEstimate?: boolean;
+}
+
+// Calculate total pages based on total lines and page size
+const calculateTotalPages = (totalLines: number, pageSize: number): number => {
+  return Math.ceil(totalLines / pageSize);
+};
 
 /**
  * Props for the ExecutionLog component
@@ -33,46 +48,360 @@ const ANSI_CODES_REGEX = [
  */
 function ExecutionLog({ name, requestId }: Props) {
   const appBarContext = React.useContext(AppBarContext);
+  const [viewMode, setViewMode] = useState<'tail' | 'head' | 'page'>('tail');
+  const [pageSize, setPageSize] = useState(1000);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [jumpToLine, setJumpToLine] = useState<number | ''>('');
+
+  // Keep track of previous data to prevent flashing
+  const [cachedData, setCachedData] = useState<LogWithPagination | null>(null);
+  const [isNavigating, setIsNavigating] = useState(false);
+
+  // Refs to track component state
+  const isInitialLoad = useRef(true);
+  const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const logContainerRef = useRef<HTMLDivElement>(null);
+
+  // Determine query parameters based on view mode
+  const queryParams: Record<string, number | string> = {
+    remoteNode: appBarContext.selectedRemoteNode || 'local',
+  };
+
+  // Add pagination parameters based on view mode
+  if (viewMode === 'tail') {
+    queryParams.tail = pageSize;
+  } else if (viewMode === 'head') {
+    queryParams.head = pageSize;
+  } else if (viewMode === 'page') {
+    queryParams.offset = (currentPage - 1) * pageSize + 1;
+    queryParams.limit = pageSize;
+  }
 
   // Fetch log data with periodic refresh
-  const { data } = useQuery(
+  const { data, isLoading, error } = useQuery(
     '/runs/{dagName}/{requestId}/log',
     {
       params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-        },
+        query: queryParams,
         path: {
           dagName: name,
           requestId,
         },
       },
     },
-    { refreshInterval: 30000 } // Refresh every 30 seconds
+    {
+      refreshInterval: 30000, // Refresh every 30 seconds
+      keepPreviousData: true, // Keep previous data while loading new data
+      revalidateOnFocus: false, // Don't revalidate when window regains focus
+      dedupingInterval: 1000, // Deduplicate requests within 1 second
+    }
   );
 
-  // Show loading indicator while fetching data
-  if (!data) {
+  // Function to scroll to the bottom of the log container
+  const scrollToBottom = useCallback(() => {
+    if (logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
+  }, []);
+
+  // Combined effect to handle data loading and navigation state
+  useEffect(() => {
+    // When data is received, update cached data and reset navigation state
+    if (data) {
+      setCachedData(data as LogWithPagination);
+      setIsNavigating(false);
+      isInitialLoad.current = false;
+
+      // Clear any pending navigation timeout
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+        navigationTimeoutRef.current = null;
+      }
+
+      // Auto-scroll to bottom when in tail view mode
+      if (viewMode === 'tail') {
+        // Use setTimeout to ensure the DOM has updated
+        setTimeout(scrollToBottom, 100);
+      }
+    }
+
+    // When loading completes with no data but we have cached data
+    if (!isLoading && !data && cachedData && !isInitialLoad.current) {
+      setIsNavigating(false);
+    }
+  }, [data, isLoading, cachedData, viewMode, scrollToBottom]);
+
+  // Set navigating state when changing view parameters
+  useEffect(() => {
+    // Only set navigating state after initial load
+    if (!isInitialLoad.current) {
+      setIsNavigating(true);
+
+      // Clear any existing timeout
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+      }
+
+      // Set a new safety timeout
+      navigationTimeoutRef.current = setTimeout(() => {
+        setIsNavigating(false);
+        navigationTimeoutRef.current = null;
+      }, 3000); // Shorter timeout for better UX
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+        navigationTimeoutRef.current = null;
+      }
+    };
+  }, [viewMode, currentPage, pageSize]);
+
+  // Handle navigation actions
+  const handleViewModeChange = (mode: 'tail' | 'head' | 'page') => {
+    // If already in this mode, don't trigger a reload
+    if (mode === viewMode) return;
+
+    setViewMode(mode);
+    setCurrentPage(1);
+
+    // If switching to tail view, scroll to bottom after data loads
+    // The scrolling will happen in the data effect
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+  };
+
+  const handleJumpToLine = () => {
+    if (
+      jumpToLine !== '' &&
+      jumpToLine > 0 &&
+      jumpToLine <= (cachedData?.totalLines || 0)
+    ) {
+      // Calculate the target page
+      const lineNum = jumpToLine as number;
+      const targetPage = Math.ceil(lineNum / pageSize);
+
+      // Set the page and view mode
+      setCurrentPage(targetPage);
+      setViewMode('page');
+
+      // After the data loads and the component re-renders, scroll to the specific line
+      // We need to use setTimeout to ensure the DOM has updated
+      setTimeout(() => {
+        // Find the line element by its line number
+        const lineElements = document.querySelectorAll('[data-line-number]');
+        for (let i = 0; i < lineElements.length; i++) {
+          const element = lineElements[i] as HTMLElement;
+          const lineNumber = parseInt(
+            element.getAttribute('data-line-number') || '0',
+            10
+          );
+          if (lineNumber === lineNum) {
+            // Scroll the element into view
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Highlight the line temporarily
+            element.classList.add('bg-blue-500', 'bg-opacity-20');
+            setTimeout(() => {
+              element.classList.remove('bg-blue-500', 'bg-opacity-20');
+            }, 2000);
+            break;
+          }
+        }
+      }, 500);
+    }
+  };
+
+  // Show loading indicator only on initial load
+  if (isLoading && !cachedData && isInitialLoad.current) {
     return <LoadingIndicator />;
   }
 
-  // Remove ANSI color codes from log content
-  const content = data.content.replace(new RegExp(ANSI_CODES_REGEX, 'g'), '');
+  // Use cached data if available, otherwise use current data
+  const logData = (data || cachedData) as LogWithPagination;
+
+  // Handle error state
+  if (error && !logData) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="text-red-500">
+          Error loading log data: {error.message || 'Unknown error'}
+        </div>
+      </div>
+    );
+  }
+
+  // Process log data
+  const content =
+    logData?.content.replace(new RegExp(ANSI_CODES_REGEX, 'g'), '') || '';
+  const lineCount = logData?.lineCount || 0;
+  const totalLines = logData?.totalLines || 0;
+  const hasMore = logData?.hasMore || false;
+  const isEstimate = logData?.isEstimate || false;
 
   // Split content into lines for better rendering
   const lines = content ? content.split('\n') : ['<No log output>'];
 
+  // Calculate total pages
+  const totalPages = calculateTotalPages(totalLines, pageSize);
+
+  // Calculate line numbers based on current page and view mode
+  const getLineNumber = (index: number): number => {
+    if (viewMode === 'tail') {
+      // For tail view, line numbers start from (totalLines - lineCount + 1)
+      return totalLines - lineCount + index + 1;
+    } else if (viewMode === 'head') {
+      // For head view, line numbers start from 1
+      return index + 1;
+    } else {
+      // For page view, line numbers start from offset
+      return (currentPage - 1) * pageSize + index + 1;
+    }
+  };
+
   return (
-    <div className="w-full h-full">
-      <div className="h-full overflow-auto rounded-lg bg-zinc-900 p-4 shadow-md">
+    <div className="w-full h-full flex flex-col">
+      {/* Controls for log navigation */}
+      <div className="flex flex-col gap-2 mb-2 p-2 bg-zinc-100 dark:bg-zinc-800 rounded">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex space-x-2">
+            <Button
+              size="sm"
+              variant={viewMode === 'tail' ? 'default' : 'outline'}
+              onClick={() => handleViewModeChange('tail')}
+              disabled={isNavigating}
+            >
+              Show End
+            </Button>
+            <Button
+              size="sm"
+              variant={viewMode === 'head' ? 'default' : 'outline'}
+              onClick={() => handleViewModeChange('head')}
+              disabled={isNavigating}
+            >
+              Show Beginning
+            </Button>
+            <Button
+              size="sm"
+              variant={viewMode === 'page' ? 'default' : 'outline'}
+              onClick={() => handleViewModeChange('page')}
+              disabled={isNavigating}
+            >
+              Page View
+            </Button>
+          </div>
+
+          <select
+            className="px-2 py-1 text-xs border rounded bg-white dark:bg-zinc-700 dark:text-white"
+            value={pageSize}
+            onChange={(e) => setPageSize(Number(e.target.value))}
+            disabled={isNavigating}
+          >
+            <option value="100">100 lines</option>
+            <option value="500">500 lines</option>
+            <option value="1000">1000 lines</option>
+            <option value="5000">5000 lines</option>
+          </select>
+
+          <div className="ml-4 text-xs text-zinc-500 dark:text-zinc-400 flex items-center">
+            Showing {lineCount} of {totalLines} lines{' '}
+            {isEstimate ? '(estimated)' : ''}{' '}
+            {hasMore ? '(more available)' : ''}
+          </div>
+        </div>
+
+        {/* Page navigation controls */}
+        {viewMode === 'page' && totalLines > 0 && (
+          <div className="flex items-center gap-2 mt-2">
+            <Button
+              size="sm"
+              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+              disabled={currentPage <= 1 || isNavigating}
+            >
+              Previous
+            </Button>
+            <span className="text-xs">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              size="sm"
+              onClick={() =>
+                handlePageChange(Math.min(totalPages, currentPage + 1))
+              }
+              disabled={currentPage >= totalPages || isNavigating}
+            >
+              Next
+            </Button>
+          </div>
+        )}
+
+        {/* Jump to line controls */}
+        <div className="flex items-center gap-2 mt-2">
+          <span className="text-xs">Jump to line:</span>
+          <input
+            type="number"
+            min="1"
+            max={totalLines}
+            value={jumpToLine}
+            onChange={(e) =>
+              setJumpToLine(e.target.value === '' ? '' : Number(e.target.value))
+            }
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                // Only trigger if the button is not disabled
+                if (
+                  !isNavigating &&
+                  jumpToLine !== '' &&
+                  (jumpToLine as number) >= 1 &&
+                  (jumpToLine as number) <= totalLines
+                ) {
+                  handleJumpToLine();
+                }
+              }
+            }}
+            className="w-20 px-2 py-1 text-xs border rounded"
+            disabled={isNavigating}
+          />
+          <Button
+            size="sm"
+            onClick={handleJumpToLine}
+            disabled={
+              isNavigating ||
+              jumpToLine === '' ||
+              (jumpToLine as number) < 1 ||
+              (jumpToLine as number) > totalLines
+            }
+          >
+            Go
+          </Button>
+        </div>
+      </div>
+
+      {/* Log content with overlay loading indicator when navigating */}
+      <div
+        ref={logContainerRef}
+        className="flex-1 overflow-auto rounded-lg bg-zinc-900 p-4 shadow-md relative"
+      >
+        {isNavigating && (
+          <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center z-10">
+            <div className="bg-white dark:bg-zinc-800 rounded-lg p-2 shadow-lg">
+              <div className="h-5 w-5 animate-spin rounded-full border-3 border-primary border-t-transparent"></div>
+            </div>
+          </div>
+        )}
         <pre className="h-full font-mono text-sm text-white">
           {lines.map((line, index) => (
             <div
               key={index}
               className="flex hover:bg-zinc-800 px-2 py-0.5 rounded"
             >
-              <span className="text-zinc-500 mr-4 select-none w-8 text-right">
-                {index + 1}
+              <span
+                className="text-zinc-500 mr-4 select-none w-8 text-right"
+                data-line-number={getLineNumber(index)}
+              >
+                {getLineNumber(index)}
               </span>
               <span className="whitespace-pre-wrap break-all">
                 {line || ' '}

@@ -2,7 +2,9 @@ package fileutil
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -20,6 +22,7 @@ type LogResult struct {
 	LineCount  int      // Number of lines returned
 	TotalLines int      // Total number of lines in the file
 	HasMore    bool     // Whether there are more lines available
+	IsEstimate bool     // Whether the TotalLines count is an estimate
 }
 
 // ReadLogLines reads a specific portion of a log file without loading the entire file into memory
@@ -42,23 +45,34 @@ func ReadLogLines(filePath string, options LogReadOptions) (*LogResult, error) {
 			LineCount:  0,
 			TotalLines: 0,
 			HasMore:    false,
+			IsEstimate: false,
 		}, nil
 	}
 
-	// Count total lines in the file
-	totalLines, err := countLines(filePath)
+	// Estimate or count total lines in the file
+	totalLines, isEstimate, err := estimateLineCount(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("error counting lines: %w", err)
 	}
 
 	// If tail is specified, read from the end
 	if options.Tail > 0 {
-		return readLastLines(filePath, options.Tail, totalLines)
+		result, err := readLastLines(filePath, options.Tail, totalLines)
+		if err != nil {
+			return nil, err
+		}
+		result.IsEstimate = isEstimate
+		return result, nil
 	}
 
 	// If head is specified, read from the beginning
 	if options.Head > 0 {
-		return readFirstLines(filePath, options.Head, totalLines)
+		result, err := readFirstLines(filePath, options.Head, totalLines)
+		if err != nil {
+			return nil, err
+		}
+		result.IsEstimate = isEstimate
+		return result, nil
 	}
 
 	// If offset and limit are specified, read a specific range
@@ -67,7 +81,12 @@ func ReadLogLines(filePath string, options LogReadOptions) (*LogResult, error) {
 		if limit <= 0 {
 			limit = 1000 // Default limit
 		}
-		return readLinesRange(filePath, options.Offset, limit, totalLines)
+		result, err := readLinesRange(filePath, options.Offset, limit, totalLines)
+		if err != nil {
+			return nil, err
+		}
+		result.IsEstimate = isEstimate
+		return result, nil
 	}
 
 	// Default: read with a reasonable limit
@@ -75,11 +94,90 @@ func ReadLogLines(filePath string, options LogReadOptions) (*LogResult, error) {
 	if limit <= 0 {
 		limit = 1000 // Default limit
 	}
-	return readLinesRange(filePath, 1, limit, totalLines)
+	result, err := readLinesRange(filePath, 1, limit, totalLines)
+	if err != nil {
+		return nil, err
+	}
+	result.IsEstimate = isEstimate
+	return result, nil
 }
 
-// countLines counts the number of lines in a file
-func countLines(filePath string) (int, error) {
+// estimateLineCount estimates the number of lines in a file based on file size and sampling
+func estimateLineCount(filePath string) (int, bool, error) {
+	// Get file info for size
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		return 0, false, fmt.Errorf("error getting file info: %w", err)
+	}
+
+	fileSize := fileInfo.Size()
+
+	// For small files (e.g., < 10KB), just count the lines exactly
+	if fileSize < 10*1024 {
+		exactCount, err := countLinesExact(filePath)
+		return exactCount, false, err
+	}
+
+	// For large files, sample the file to estimate average line length
+	sampleSize := int64(1024 * 1024) // 1MB sample
+	if sampleSize > fileSize {
+		sampleSize = fileSize
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return 0, false, err
+	}
+	defer file.Close()
+
+	// Sample from the beginning of the file
+	startSample := make([]byte, sampleSize)
+	_, err = file.Read(startSample)
+	if err != nil {
+		return 0, false, err
+	}
+
+	// Count newlines in the sample
+	startLineCount := bytes.Count(startSample, []byte{'\n'})
+
+	// If the file is large enough, take another sample from the middle
+	var middleLineCount int
+	if fileSize > sampleSize*2 {
+		_, err = file.Seek(fileSize/2, 0)
+		if err != nil {
+			return 0, false, err
+		}
+
+		middleSample := make([]byte, sampleSize)
+		_, err = file.Read(middleSample)
+		if err != nil && err != io.EOF {
+			return 0, false, err
+		}
+
+		middleLineCount = bytes.Count(middleSample, []byte{'\n'})
+	}
+
+	// Calculate average line length from samples
+	var avgLineLength float64
+	if fileSize > sampleSize*2 {
+		// Average of start and middle samples
+		avgLineLength = float64(sampleSize*2) / float64(startLineCount+middleLineCount)
+	} else {
+		// Just use start sample
+		avgLineLength = float64(sampleSize) / float64(startLineCount)
+	}
+
+	// Estimate total lines based on file size and average line length
+	estimatedLines := int(float64(fileSize) / avgLineLength)
+
+	// Add a small buffer to the estimate to ensure we don't underestimate
+	estimatedLines = int(float64(estimatedLines) * 1.05)
+
+	return estimatedLines, true, nil
+}
+
+// countLinesExact counts the exact number of lines in a file
+func countLinesExact(filePath string) (int, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return 0, err
@@ -125,6 +223,7 @@ func readFirstLines(filePath string, n int, totalLines int) (*LogResult, error) 
 		LineCount:  lineCount,
 		TotalLines: totalLines,
 		HasMore:    lineCount < totalLines,
+		IsEstimate: false, // Will be set by the caller
 	}, nil
 }
 
@@ -137,6 +236,7 @@ func readLastLines(filePath string, n int, totalLines int) (*LogResult, error) {
 			LineCount:  0,
 			TotalLines: totalLines,
 			HasMore:    totalLines > 0,
+			IsEstimate: false, // Will be set by the caller
 		}, nil
 	}
 
@@ -183,6 +283,7 @@ func readLastLines(filePath string, n int, totalLines int) (*LogResult, error) {
 		LineCount:  len(result),
 		TotalLines: totalLines,
 		HasMore:    len(result) < totalLines,
+		IsEstimate: false, // Will be set by the caller
 	}, nil
 }
 
@@ -204,6 +305,7 @@ func readLinesRange(filePath string, offset, limit int, totalLines int) (*LogRes
 			LineCount:  0,
 			TotalLines: totalLines,
 			HasMore:    false,
+			IsEstimate: false, // Will be set by the caller
 		}, nil
 	}
 
@@ -231,14 +333,15 @@ func readLinesRange(filePath string, offset, limit int, totalLines int) (*LogRes
 		LineCount:  len(lines),
 		TotalLines: totalLines,
 		HasMore:    offset+len(lines)-1 < totalLines,
+		IsEstimate: false, // Will be set by the caller
 	}, nil
 }
 
 // ReadLogContent reads a specific portion of a log file and returns it as a string
-func ReadLogContent(filePath string, options LogReadOptions) (string, int, int, bool, error) {
+func ReadLogContent(filePath string, options LogReadOptions) (string, int, int, bool, bool, error) {
 	result, err := ReadLogLines(filePath, options)
 	if err != nil {
-		return "", 0, 0, false, err
+		return "", 0, 0, false, false, err
 	}
 
 	content := ""
@@ -249,5 +352,5 @@ func ReadLogContent(filePath string, options LogReadOptions) (string, int, int, 
 		}
 	}
 
-	return content, result.LineCount, result.TotalLines, result.HasMore, nil
+	return content, result.LineCount, result.TotalLines, result.HasMore, result.IsEstimate, nil
 }

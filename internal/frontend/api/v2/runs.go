@@ -35,7 +35,7 @@ func (a *API) GetRunLog(ctx context.Context, request api.GetRunLogRequestObject)
 	}
 
 	// Use the new log utility function
-	content, lineCount, totalLines, hasMore, err := fileutil.ReadLogContent(status.Log, options)
+	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(status.Log, options)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %w", status.Log, err)
 	}
@@ -45,6 +45,7 @@ func (a *API) GetRunLog(ctx context.Context, request api.GetRunLogRequestObject)
 		LineCount:  ptrOf(lineCount),
 		TotalLines: ptrOf(totalLines),
 		HasMore:    ptrOf(hasMore),
+		IsEstimate: ptrOf(isEstimate),
 	}, nil
 }
 
@@ -77,7 +78,7 @@ func (a *API) GetRunStepLog(ctx context.Context, request api.GetRunStepLogReques
 	}
 
 	// Use the new log utility function
-	content, lineCount, totalLines, hasMore, err := fileutil.ReadLogContent(node.Log, options)
+	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(node.Log, options)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %w", node.Log, err)
 	}
@@ -87,6 +88,7 @@ func (a *API) GetRunStepLog(ctx context.Context, request api.GetRunStepLogReques
 		LineCount:  ptrOf(lineCount),
 		TotalLines: ptrOf(totalLines),
 		HasMore:    ptrOf(hasMore),
+		IsEstimate: ptrOf(isEstimate),
 	}, nil
 }
 
@@ -178,7 +180,7 @@ func (a *API) GetSubRunLog(ctx context.Context, request api.GetSubRunLogRequestO
 	}
 
 	// Use the new log utility function
-	content, lineCount, totalLines, hasMore, err := fileutil.ReadLogContent(status.Log, options)
+	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(status.Log, options)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %w", status.Log, err)
 	}
@@ -188,6 +190,7 @@ func (a *API) GetSubRunLog(ctx context.Context, request api.GetSubRunLogRequestO
 		LineCount:  ptrOf(lineCount),
 		TotalLines: ptrOf(totalLines),
 		HasMore:    ptrOf(hasMore),
+		IsEstimate: ptrOf(isEstimate),
 	}, nil
 }
 
@@ -219,7 +222,7 @@ func (a *API) GetSubRunStepLog(ctx context.Context, request api.GetSubRunStepLog
 	}
 
 	// Use the new log utility function
-	content, lineCount, totalLines, hasMore, err := fileutil.ReadLogContent(node.Log, options)
+	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(node.Log, options)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %w", node.Log, err)
 	}
@@ -229,6 +232,7 @@ func (a *API) GetSubRunStepLog(ctx context.Context, request api.GetSubRunStepLog
 		LineCount:  ptrOf(lineCount),
 		TotalLines: ptrOf(totalLines),
 		HasMore:    ptrOf(hasMore),
+		IsEstimate: ptrOf(isEstimate),
 	}, nil
 }
 

@@ -1564,6 +1564,9 @@ components:
         hasMore:
           type: boolean
           description: "Whether there are more lines available"
+        isEstimate:
+          type: boolean
+          description: "Whether the line count is an estimate"
       required:
         - content
 
