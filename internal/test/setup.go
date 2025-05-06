@@ -206,7 +206,7 @@ func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
 
 	// the +1 to the limit is needed to ensure that the number of therunstore
 	// entries is exactly the expected number
-	runstore := d.RunClient.GetRecentHistory(d.Context, d.Name, expected+1)
+	runstore := d.RunClient.ListRecentHistory(d.Context, d.Name, expected+1)
 	require.Len(t, runstore, expected)
 }
 
@@ -220,7 +220,7 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 		lock.Lock()
 		defer lock.Unlock()
 
-		curr, _ := d.RunClient.GetCurrentStatus(d.Context, d.DAG, "")
+		curr, _ := d.RunClient.GetRealtimeStatus(d.Context, d.DAG, "")
 		if curr == nil {
 			return false
 		}

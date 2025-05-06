@@ -76,7 +76,7 @@ func TestClient_GetStatus(t *testing.T) {
 		_ = record.Close(ctx)
 
 		// Get the status and check if it is the same as the one we wrote.
-		statusToCheck, err := cli.GetStatusByRequestID(ctx, dag.DAG, requestID)
+		statusToCheck, err := cli.FindByRequestID(ctx, dag.DAG.Name, requestID)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.NodeStatusSuccess, statusToCheck.Nodes[0].Status)
 
@@ -84,10 +84,11 @@ func TestClient_GetStatus(t *testing.T) {
 		newStatus := scheduler.NodeStatusError
 		status.Nodes[0].Status = newStatus
 
-		err = cli.UpdateStatus(ctx, dag.Name, status)
+		rootDAG := digraph.NewRootDAG(dag.DAG.Name, requestID)
+		err = cli.UpdateStatus(ctx, rootDAG, status)
 		require.NoError(t, err)
 
-		statusByRequestID, err := cli.GetStatusByRequestID(ctx, dag.DAG, requestID)
+		statusByRequestID, err := cli.FindByRequestID(ctx, dag.DAG.Name, requestID)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, len(status.Nodes))
@@ -102,7 +103,8 @@ func TestClient_GetStatus(t *testing.T) {
 		status := testNewStatus(dag.DAG, "unknown-req-id", scheduler.StatusError, scheduler.NodeStatusError)
 
 		// Check if the update fails.
-		err := cli.UpdateStatus(ctx, dag.Name, status)
+		rootDAG := digraph.NewRootDAG(dag.DAG.Name, "unknown-req-id")
+		err := cli.UpdateStatus(ctx, rootDAG, status)
 		require.Error(t, err)
 	})
 }
@@ -115,7 +117,7 @@ func TestClient_RunDAG(t *testing.T) {
 		dagStatus, err := th.DAGClient.Status(th.Context, dag.Location)
 		require.NoError(t, err)
 
-		err = th.RunClient.StartDAG(th.Context, dagStatus.DAG, runstore.StartOptions{})
+		err = th.RunClient.Start(th.Context, dagStatus.DAG, runstore.StartOptions{})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
@@ -128,12 +130,12 @@ func TestClient_RunDAG(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "stop.yaml"))
 		ctx := th.Context
 
-		err := th.RunClient.StartDAG(ctx, dag.DAG, runstore.StartOptions{})
+		err := th.RunClient.Start(ctx, dag.DAG, runstore.StartOptions{})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusRunning)
 
-		err = th.RunClient.StopDAG(ctx, dag.DAG, "")
+		err = th.RunClient.Stop(ctx, dag.DAG, "")
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusCancel)
@@ -142,12 +144,12 @@ func TestClient_RunDAG(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "restart.yaml"))
 		ctx := th.Context
 
-		err := th.RunClient.StartDAG(th.Context, dag.DAG, runstore.StartOptions{})
+		err := th.RunClient.Start(th.Context, dag.DAG, runstore.StartOptions{})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusRunning)
 
-		err = th.RunClient.RestartDAG(ctx, dag.DAG, runstore.RestartOptions{})
+		err = th.RunClient.Restart(ctx, dag.DAG, runstore.RestartOptions{})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
@@ -157,7 +159,7 @@ func TestClient_RunDAG(t *testing.T) {
 		ctx := th.Context
 		cli := th.RunClient
 
-		err := cli.StartDAG(ctx, dag.DAG, runstore.StartOptions{Params: "x y z"})
+		err := cli.Start(ctx, dag.DAG, runstore.StartOptions{Params: "x y z"})
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish
@@ -172,7 +174,7 @@ func TestClient_RunDAG(t *testing.T) {
 
 		time.Sleep(1 * time.Second)
 
-		err = cli.RetryDAG(ctx, dag.DAG, previousRequestID)
+		err = cli.Retry(ctx, dag.DAG, previousRequestID)
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish

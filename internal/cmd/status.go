@@ -67,7 +67,7 @@ func runStatus(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	status, err := cli.GetCurrentStatus(ctx, dag, requestID)
+	status, err := cli.GetRealtimeStatus(ctx, dag, requestID)
 	if err != nil {
 		logger.Error(ctx, "Failed to retrieve current status", "dag", dag.Name, "err", err)
 		return fmt.Errorf("failed to retrieve current status: %w", err)

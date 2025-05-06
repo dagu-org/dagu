@@ -44,12 +44,12 @@ type NodeState struct {
 	// ExitCode is the exit code that the command exited with.
 	// It only makes sense when the node is a command executor.
 	ExitCode int
-	// ChildRuns is the list of child runs that this node has executed.
-	ChildRuns []ChildRun
+	// SubRuns is the list of sub-runs that this node has executed.
+	SubRuns []SubRun
 }
 
-type ChildRun struct {
-	// RequestID is the request ID of the child run.
+type SubRun struct {
+	// RequestID is the request ID of the sub-run.
 	RequestID string
 }
 
@@ -133,19 +133,19 @@ func (s *Data) Data() NodeData {
 	return s.inner
 }
 
-func (s *Data) ChildRequestID() (string, error) {
+func (s *Data) SubRunRequestID() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// If children is not empty, return the first child's request ID.
-	if len(s.inner.State.ChildRuns) > 0 {
-		return s.inner.State.ChildRuns[0].RequestID, nil
+	// If subRuns is not empty, return the first child's request ID.
+	if len(s.inner.State.SubRuns) > 0 {
+		return s.inner.State.SubRuns[0].RequestID, nil
 	}
 	// Generate a new request ID for the current node.
 	r, err := generateRequestID()
 	if err != nil {
 		return "", fmt.Errorf("failed to generate request ID: %w", err)
 	}
-	s.inner.State.ChildRuns = append(s.inner.State.ChildRuns, ChildRun{RequestID: r})
+	s.inner.State.SubRuns = append(s.inner.State.SubRuns, SubRun{RequestID: r})
 	return r, nil
 }
 
@@ -366,10 +366,10 @@ func (n *Data) ClearState() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	// The data of child runs need to be preserved to retain their request IDs
-	childRuns := n.inner.State.ChildRuns
+	// The data of sub-runs need to be preserved to retain their request IDs
+	subRuns := n.inner.State.SubRuns
 	n.inner.State = NodeState{}
-	n.inner.State.ChildRuns = childRuns
+	n.inner.State.SubRuns = subRuns
 }
 
 func (n *Data) MarkError(err error) {

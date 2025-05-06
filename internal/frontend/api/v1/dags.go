@@ -197,7 +197,7 @@ func (a *API) readHistoryData(
 	dag *digraph.DAG,
 ) api.DAGHistoryData {
 	defaultHistoryLimit := 30
-	statuses := a.runClient.GetRecentHistory(ctx, dag.Name, defaultHistoryLimit)
+	statuses := a.runClient.ListRecentHistory(ctx, dag.Name, defaultHistoryLimit)
 
 	data := map[string][]scheduler.NodeStatus{}
 
@@ -508,7 +508,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "DAG is already running",
 			}
 		}
-		if err := a.runClient.StartDAG(ctx, status.DAG, runstore.StartOptions{
+		if err := a.runClient.Start(ctx, status.DAG, runstore.StartOptions{
 			Params: valueOf(request.Body.Params),
 		}); err != nil {
 			return nil, fmt.Errorf("error starting DAG: %w", err)
@@ -537,7 +537,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "DAG is not running",
 			}
 		}
-		if err := a.runClient.StopDAG(ctx, status.DAG, ""); err != nil {
+		if err := a.runClient.Stop(ctx, status.DAG, ""); err != nil {
 			return nil, fmt.Errorf("error stopping DAG: %w", err)
 		}
 		return api.PostDAGAction200JSONResponse{}, nil
@@ -550,7 +550,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "requestId is required for retry action",
 			}
 		}
-		if err := a.runClient.RetryDAG(ctx, status.DAG, *request.Body.RequestId); err != nil {
+		if err := a.runClient.Retry(ctx, status.DAG, *request.Body.RequestId); err != nil {
 			return nil, fmt.Errorf("error retrying DAG: %w", err)
 		}
 		return api.PostDAGAction200JSONResponse{}, nil
@@ -637,9 +637,17 @@ func (a *API) updateStatus(
 	dagStatus dagstore.Status,
 	to scheduler.NodeStatus,
 ) error {
-	status, err := a.runClient.GetStatusByRequestID(ctx, dagStatus.DAG, reqID)
+	status, err := a.runClient.GetRealtimeStatus(ctx, dagStatus.DAG, reqID)
 	if err != nil {
 		return fmt.Errorf("error getting status: %w", err)
+	}
+
+	if status.Status == scheduler.StatusRunning {
+		return &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "cannot change status of running DAG",
+		}
 	}
 
 	idxToUpdate := -1
@@ -659,7 +667,8 @@ func (a *API) updateStatus(
 
 	status.Nodes[idxToUpdate].Status = to
 
-	if err := a.runClient.UpdateStatus(ctx, dagStatus.DAG.Name, *status); err != nil {
+	rootDAG := digraph.NewRootDAG(dagStatus.DAG.Name, reqID)
+	if err := a.runClient.UpdateStatus(ctx, rootDAG, *status); err != nil {
 		return fmt.Errorf("error updating status: %w", err)
 	}
 

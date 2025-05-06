@@ -83,12 +83,6 @@ const (
 	StatusLabelRunning    StatusLabel = "running"
 )
 
-// ChildRun Metadata for a child run
-type ChildRun struct {
-	// RequestId Unique identifier for the request
-	RequestId RequestId `json:"requestId"`
-}
-
 // DAG Core DAG configuration containing workflow definition and metadata
 type DAG struct {
 	// DefaultParams Default parameter values in JSON format if not specified at runtime
@@ -259,9 +253,6 @@ type Log struct {
 
 // Node Status of an individual step within a DAG run
 type Node struct {
-	// ChildRuns List of child runs associated with this step
-	ChildRuns *[]ChildRun `json:"childRuns,omitempty"`
-
 	// DoneCount Number of successful completions for repeating steps
 	DoneCount int `json:"doneCount"`
 
@@ -294,6 +285,9 @@ type Node struct {
 
 	// Step Individual task within a DAG that performs a specific operation
 	Step Step `json:"step"`
+
+	// SubRuns List of sub-runs associated with this step
+	SubRuns *[]SubRun `json:"subRuns,omitempty"`
 }
 
 // NodeStatus Numeric status code indicating current node state:
@@ -502,7 +496,7 @@ type Step struct {
 	// Output Variable name to store the step's output
 	Output *string `json:"output,omitempty"`
 
-	// Params Parameters to pass to the child DAG in JSON format
+	// Params Parameters to pass to the sub-run in JSON format
 	Params *string `json:"params,omitempty"`
 
 	// Preconditions Conditions that must be met before the step can start
@@ -511,7 +505,7 @@ type Step struct {
 	// RepeatPolicy Configuration for step retry behavior
 	RepeatPolicy *RepeatPolicy `json:"repeatPolicy,omitempty"`
 
-	// Run The name of the DAG to run as a child
+	// Run The name of the DAG to run as a sub-run
 	Run *string `json:"run,omitempty"`
 
 	// Script Script content if the step executes a script file
@@ -522,6 +516,12 @@ type Step struct {
 
 	// Stdout File path for capturing standard output
 	Stdout *string `json:"stdout,omitempty"`
+}
+
+// SubRun Metadata for a sub run
+type SubRun struct {
+	// RequestId Unique identifier for the request
+	RequestId RequestId `json:"requestId"`
 }
 
 // Page defines model for Page.
@@ -536,8 +536,8 @@ type RemoteNode = string
 // StepName defines model for StepName.
 type StepName = string
 
-// ListAllDAGsParams defines parameters for ListAllDAGs.
-type ListAllDAGsParams struct {
+// ListDAGsParams defines parameters for ListDAGs.
+type ListDAGsParams struct {
 	// Page page number of items to fetch (default is 1)
 	Page *Page `form:"page,omitempty" json:"page,omitempty"`
 
@@ -566,8 +566,8 @@ type CreateNewDAGParams struct {
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
-// SearchDAGDefinitionsParams defines parameters for SearchDAGDefinitions.
-type SearchDAGDefinitionsParams struct {
+// SearchDAGsParams defines parameters for SearchDAGs.
+type SearchDAGsParams struct {
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 
@@ -581,8 +581,8 @@ type GetAllDAGTagsParams struct {
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
-// DeleteDAGByFileNameParams defines parameters for DeleteDAGByFileName.
-type DeleteDAGByFileNameParams struct {
+// DeleteDAGParams defines parameters for DeleteDAG.
+type DeleteDAGParams struct {
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
@@ -605,20 +605,20 @@ type RenameDAGParams struct {
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
-// RetryDAGExecutionJSONBody defines parameters for RetryDAGExecution.
-type RetryDAGExecutionJSONBody struct {
+// RetryDAGRunJSONBody defines parameters for RetryDAGRun.
+type RetryDAGRunJSONBody struct {
 	// RequestId Request ID of the DAG run to retry
 	RequestId string `json:"requestId"`
 }
 
-// RetryDAGExecutionParams defines parameters for RetryDAGExecution.
-type RetryDAGExecutionParams struct {
+// RetryDAGRunParams defines parameters for RetryDAGRun.
+type RetryDAGRunParams struct {
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
-// GetDAGExecutionHistoryParams defines parameters for GetDAGExecutionHistory.
-type GetDAGExecutionHistoryParams struct {
+// GetDAGRunHistoryParams defines parameters for GetDAGRunHistory.
+type GetDAGRunHistoryParams struct {
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
@@ -629,20 +629,20 @@ type GetDAGRunDetailsParams struct {
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
-// GetDAGDefinitionParams defines parameters for GetDAGDefinition.
-type GetDAGDefinitionParams struct {
+// GetDAGSpecParams defines parameters for GetDAGSpec.
+type GetDAGSpecParams struct {
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
-// UpdateDAGDefinitionJSONBody defines parameters for UpdateDAGDefinition.
-type UpdateDAGDefinitionJSONBody struct {
+// UpdateDAGSpecJSONBody defines parameters for UpdateDAGSpec.
+type UpdateDAGSpecJSONBody struct {
 	// Spec The new DAG spec
 	Spec string `json:"spec"`
 }
 
-// UpdateDAGDefinitionParams defines parameters for UpdateDAGDefinition.
-type UpdateDAGDefinitionParams struct {
+// UpdateDAGSpecParams defines parameters for UpdateDAGSpec.
+type UpdateDAGSpecParams struct {
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
@@ -659,8 +659,8 @@ type ExecuteDAGParams struct {
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
-// TerminateDAGExecutionParams defines parameters for TerminateDAGExecution.
-type TerminateDAGExecutionParams struct {
+// TerminateDAGRunParams defines parameters for TerminateDAGRun.
+type TerminateDAGRunParams struct {
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
@@ -677,26 +677,26 @@ type UpdateDAGSuspensionStateParams struct {
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
-// GetChildRunDetailsParams defines parameters for GetChildRunDetails.
-type GetChildRunDetailsParams struct {
+// GetRunDetailsParams defines parameters for GetRunDetails.
+type GetRunDetailsParams struct {
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
-// GetDAGRunLogParams defines parameters for GetDAGRunLog.
-type GetDAGRunLogParams struct {
+// GetRunLogParams defines parameters for GetRunLog.
+type GetRunLogParams struct {
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
-// GetDAGStepLogParams defines parameters for GetDAGStepLog.
-type GetDAGStepLogParams struct {
+// GetRunStepLogParams defines parameters for GetRunStepLog.
+type GetRunStepLogParams struct {
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
-// UpdateDAGStepStatusJSONBody defines parameters for UpdateDAGStepStatus.
-type UpdateDAGStepStatusJSONBody struct {
+// UpdateRunStepStatusJSONBody defines parameters for UpdateRunStepStatus.
+type UpdateRunStepStatusJSONBody struct {
 	// Status Numeric status code indicating current node state:
 	// 0: "Not started"
 	// 1: "Running"
@@ -707,8 +707,44 @@ type UpdateDAGStepStatusJSONBody struct {
 	Status NodeStatus `json:"status"`
 }
 
-// UpdateDAGStepStatusParams defines parameters for UpdateDAGStepStatus.
-type UpdateDAGStepStatusParams struct {
+// UpdateRunStepStatusParams defines parameters for UpdateRunStepStatus.
+type UpdateRunStepStatusParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
+// GetSubRunDetailsParams defines parameters for GetSubRunDetails.
+type GetSubRunDetailsParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
+// GetSubRunLogParams defines parameters for GetSubRunLog.
+type GetSubRunLogParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
+// GetSubRunStepLogParams defines parameters for GetSubRunStepLog.
+type GetSubRunStepLogParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
+// UpdateSubRunStepStatusJSONBody defines parameters for UpdateSubRunStepStatus.
+type UpdateSubRunStepStatusJSONBody struct {
+	// Status Numeric status code indicating current node state:
+	// 0: "Not started"
+	// 1: "Running"
+	// 2: "Failed"
+	// 3: "Cancelled"
+	// 4: "Success"
+	// 5: "Skipped"
+	Status NodeStatus `json:"status"`
+}
+
+// UpdateSubRunStepStatusParams defines parameters for UpdateSubRunStepStatus.
+type UpdateSubRunStepStatusParams struct {
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
@@ -719,11 +755,11 @@ type CreateNewDAGJSONRequestBody CreateNewDAGJSONBody
 // RenameDAGJSONRequestBody defines body for RenameDAG for application/json ContentType.
 type RenameDAGJSONRequestBody RenameDAGJSONBody
 
-// RetryDAGExecutionJSONRequestBody defines body for RetryDAGExecution for application/json ContentType.
-type RetryDAGExecutionJSONRequestBody RetryDAGExecutionJSONBody
+// RetryDAGRunJSONRequestBody defines body for RetryDAGRun for application/json ContentType.
+type RetryDAGRunJSONRequestBody RetryDAGRunJSONBody
 
-// UpdateDAGDefinitionJSONRequestBody defines body for UpdateDAGDefinition for application/json ContentType.
-type UpdateDAGDefinitionJSONRequestBody UpdateDAGDefinitionJSONBody
+// UpdateDAGSpecJSONRequestBody defines body for UpdateDAGSpec for application/json ContentType.
+type UpdateDAGSpecJSONRequestBody UpdateDAGSpecJSONBody
 
 // ExecuteDAGJSONRequestBody defines body for ExecuteDAG for application/json ContentType.
 type ExecuteDAGJSONRequestBody ExecuteDAGJSONBody
@@ -731,26 +767,29 @@ type ExecuteDAGJSONRequestBody ExecuteDAGJSONBody
 // UpdateDAGSuspensionStateJSONRequestBody defines body for UpdateDAGSuspensionState for application/json ContentType.
 type UpdateDAGSuspensionStateJSONRequestBody UpdateDAGSuspensionStateJSONBody
 
-// UpdateDAGStepStatusJSONRequestBody defines body for UpdateDAGStepStatus for application/json ContentType.
-type UpdateDAGStepStatusJSONRequestBody UpdateDAGStepStatusJSONBody
+// UpdateRunStepStatusJSONRequestBody defines body for UpdateRunStepStatus for application/json ContentType.
+type UpdateRunStepStatusJSONRequestBody UpdateRunStepStatusJSONBody
+
+// UpdateSubRunStepStatusJSONRequestBody defines body for UpdateSubRunStepStatus for application/json ContentType.
+type UpdateSubRunStepStatusJSONRequestBody UpdateSubRunStepStatusJSONBody
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// List all available DAGs
 	// (GET /dags)
-	ListAllDAGs(w http.ResponseWriter, r *http.Request, params ListAllDAGsParams)
+	ListDAGs(w http.ResponseWriter, r *http.Request, params ListDAGsParams)
 	// Create a new DAG definition
 	// (POST /dags)
 	CreateNewDAG(w http.ResponseWriter, r *http.Request, params CreateNewDAGParams)
-	// Search across all DAG definitions
+	// Search DAGs
 	// (GET /dags/search)
-	SearchDAGDefinitions(w http.ResponseWriter, r *http.Request, params SearchDAGDefinitionsParams)
+	SearchDAGs(w http.ResponseWriter, r *http.Request, params SearchDAGsParams)
 	// List all available DAG tags
 	// (GET /dags/tags)
 	GetAllDAGTags(w http.ResponseWriter, r *http.Request, params GetAllDAGTagsParams)
 	// Delete an existing DAG
 	// (DELETE /dags/{fileName})
-	DeleteDAGByFileName(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params DeleteDAGByFileNameParams)
+	DeleteDAG(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params DeleteDAGParams)
 	// Retrieve comprehensive DAG information
 	// (GET /dags/{fileName})
 	GetDAGDetails(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGDetailsParams)
@@ -759,43 +798,55 @@ type ServerInterface interface {
 	RenameDAG(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RenameDAGParams)
 	// Retry DAG execution
 	// (POST /dags/{fileName}/retry)
-	RetryDAGExecution(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryDAGExecutionParams)
+	RetryDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryDAGRunParams)
 	// Retrieve execution history of a DAG
 	// (GET /dags/{fileName}/runs)
-	GetDAGExecutionHistory(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGExecutionHistoryParams)
+	GetDAGRunHistory(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGRunHistoryParams)
 	// Get detailed status of a specific DAG run
 	// (GET /dags/{fileName}/runs/{requestId})
 	GetDAGRunDetails(w http.ResponseWriter, r *http.Request, fileName DAGFileName, requestId RequestId, params GetDAGRunDetailsParams)
-	// Retrieve DAG definition
+	// Retrieve DAG specification
 	// (GET /dags/{fileName}/spec)
-	GetDAGDefinition(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGDefinitionParams)
-	// Update DAG definition
+	GetDAGSpec(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGSpecParams)
+	// Update DAG spec
 	// (PUT /dags/{fileName}/spec)
-	UpdateDAGDefinition(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params UpdateDAGDefinitionParams)
+	UpdateDAGSpec(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params UpdateDAGSpecParams)
 	// Initiate DAG execution
 	// (POST /dags/{fileName}/start)
 	ExecuteDAG(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params ExecuteDAGParams)
 	// Terminate running DAG execution
 	// (POST /dags/{fileName}/stop)
-	TerminateDAGExecution(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateDAGExecutionParams)
+	TerminateDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateDAGRunParams)
 	// Toggle DAG suspension state
 	// (POST /dags/{fileName}/suspend)
 	UpdateDAGSuspensionState(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params UpdateDAGSuspensionStateParams)
 	// Check server health status
 	// (GET /health)
 	GetHealthStatus(w http.ResponseWriter, r *http.Request)
-	// Retrieve detailed status of a child run
-	// (GET /runs/{dagName}/{requestId}/children/{childRequestId})
-	GetChildRunDetails(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, childRequestId string, params GetChildRunDetailsParams)
+	// Retrieve detailed status of a DAG run
+	// (GET /runs/{dagName}/{requestId})
+	GetRunDetails(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, params GetRunDetailsParams)
 	// Retrieve full execution log of a DAG run
 	// (GET /runs/{dagName}/{requestId}/log)
-	GetDAGRunLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, params GetDAGRunLogParams)
+	GetRunLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, params GetRunLogParams)
 	// Retrieve log for a specific step in a DAG run
 	// (GET /runs/{dagName}/{requestId}/steps/{stepName}/log)
-	GetDAGStepLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, stepName StepName, params GetDAGStepLogParams)
+	GetRunStepLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, stepName StepName, params GetRunStepLogParams)
 	// Manually update a step's execution status
 	// (PATCH /runs/{dagName}/{requestId}/steps/{stepName}/status)
-	UpdateDAGStepStatus(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, stepName StepName, params UpdateDAGStepStatusParams)
+	UpdateRunStepStatus(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, stepName StepName, params UpdateRunStepStatusParams)
+	// Retrieve detailed status of a sub run
+	// (GET /runs/{dagName}/{requestId}/subs/{subRunRequestId})
+	GetSubRunDetails(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, subRunRequestId string, params GetSubRunDetailsParams)
+	// Retrieve log for a specific sub run
+	// (GET /runs/{dagName}/{requestId}/subs/{subRunRequestId}/log)
+	GetSubRunLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, subRunRequestId string, params GetSubRunLogParams)
+	// Retrieve log for a specific step in a sub run
+	// (GET /runs/{dagName}/{requestId}/subs/{subRunRequestId}/steps/{stepName}/log)
+	GetSubRunStepLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, subRunRequestId string, stepName StepName, params GetSubRunStepLogParams)
+	// Manually update a step's execution status in a sub run
+	// (PATCH /runs/{dagName}/{requestId}/subs/{subRunRequestId}/steps/{stepName}/status)
+	UpdateSubRunStepStatus(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, subRunRequestId string, stepName StepName, params UpdateSubRunStepStatusParams)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -804,7 +855,7 @@ type Unimplemented struct{}
 
 // List all available DAGs
 // (GET /dags)
-func (_ Unimplemented) ListAllDAGs(w http.ResponseWriter, r *http.Request, params ListAllDAGsParams) {
+func (_ Unimplemented) ListDAGs(w http.ResponseWriter, r *http.Request, params ListDAGsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -814,9 +865,9 @@ func (_ Unimplemented) CreateNewDAG(w http.ResponseWriter, r *http.Request, para
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Search across all DAG definitions
+// Search DAGs
 // (GET /dags/search)
-func (_ Unimplemented) SearchDAGDefinitions(w http.ResponseWriter, r *http.Request, params SearchDAGDefinitionsParams) {
+func (_ Unimplemented) SearchDAGs(w http.ResponseWriter, r *http.Request, params SearchDAGsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -828,7 +879,7 @@ func (_ Unimplemented) GetAllDAGTags(w http.ResponseWriter, r *http.Request, par
 
 // Delete an existing DAG
 // (DELETE /dags/{fileName})
-func (_ Unimplemented) DeleteDAGByFileName(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params DeleteDAGByFileNameParams) {
+func (_ Unimplemented) DeleteDAG(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params DeleteDAGParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -846,13 +897,13 @@ func (_ Unimplemented) RenameDAG(w http.ResponseWriter, r *http.Request, fileNam
 
 // Retry DAG execution
 // (POST /dags/{fileName}/retry)
-func (_ Unimplemented) RetryDAGExecution(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryDAGExecutionParams) {
+func (_ Unimplemented) RetryDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryDAGRunParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Retrieve execution history of a DAG
 // (GET /dags/{fileName}/runs)
-func (_ Unimplemented) GetDAGExecutionHistory(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGExecutionHistoryParams) {
+func (_ Unimplemented) GetDAGRunHistory(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGRunHistoryParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -862,15 +913,15 @@ func (_ Unimplemented) GetDAGRunDetails(w http.ResponseWriter, r *http.Request, 
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Retrieve DAG definition
+// Retrieve DAG specification
 // (GET /dags/{fileName}/spec)
-func (_ Unimplemented) GetDAGDefinition(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGDefinitionParams) {
+func (_ Unimplemented) GetDAGSpec(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGSpecParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Update DAG definition
+// Update DAG spec
 // (PUT /dags/{fileName}/spec)
-func (_ Unimplemented) UpdateDAGDefinition(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params UpdateDAGDefinitionParams) {
+func (_ Unimplemented) UpdateDAGSpec(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params UpdateDAGSpecParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -882,7 +933,7 @@ func (_ Unimplemented) ExecuteDAG(w http.ResponseWriter, r *http.Request, fileNa
 
 // Terminate running DAG execution
 // (POST /dags/{fileName}/stop)
-func (_ Unimplemented) TerminateDAGExecution(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateDAGExecutionParams) {
+func (_ Unimplemented) TerminateDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateDAGRunParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -898,27 +949,51 @@ func (_ Unimplemented) GetHealthStatus(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Retrieve detailed status of a child run
-// (GET /runs/{dagName}/{requestId}/children/{childRequestId})
-func (_ Unimplemented) GetChildRunDetails(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, childRequestId string, params GetChildRunDetailsParams) {
+// Retrieve detailed status of a DAG run
+// (GET /runs/{dagName}/{requestId})
+func (_ Unimplemented) GetRunDetails(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, params GetRunDetailsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Retrieve full execution log of a DAG run
 // (GET /runs/{dagName}/{requestId}/log)
-func (_ Unimplemented) GetDAGRunLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, params GetDAGRunLogParams) {
+func (_ Unimplemented) GetRunLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, params GetRunLogParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Retrieve log for a specific step in a DAG run
 // (GET /runs/{dagName}/{requestId}/steps/{stepName}/log)
-func (_ Unimplemented) GetDAGStepLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, stepName StepName, params GetDAGStepLogParams) {
+func (_ Unimplemented) GetRunStepLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, stepName StepName, params GetRunStepLogParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Manually update a step's execution status
 // (PATCH /runs/{dagName}/{requestId}/steps/{stepName}/status)
-func (_ Unimplemented) UpdateDAGStepStatus(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, stepName StepName, params UpdateDAGStepStatusParams) {
+func (_ Unimplemented) UpdateRunStepStatus(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, stepName StepName, params UpdateRunStepStatusParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Retrieve detailed status of a sub run
+// (GET /runs/{dagName}/{requestId}/subs/{subRunRequestId})
+func (_ Unimplemented) GetSubRunDetails(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, subRunRequestId string, params GetSubRunDetailsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Retrieve log for a specific sub run
+// (GET /runs/{dagName}/{requestId}/subs/{subRunRequestId}/log)
+func (_ Unimplemented) GetSubRunLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, subRunRequestId string, params GetSubRunLogParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Retrieve log for a specific step in a sub run
+// (GET /runs/{dagName}/{requestId}/subs/{subRunRequestId}/steps/{stepName}/log)
+func (_ Unimplemented) GetSubRunStepLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, subRunRequestId string, stepName StepName, params GetSubRunStepLogParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Manually update a step's execution status in a sub run
+// (PATCH /runs/{dagName}/{requestId}/subs/{subRunRequestId}/steps/{stepName}/status)
+func (_ Unimplemented) UpdateSubRunStepStatus(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, subRunRequestId string, stepName StepName, params UpdateSubRunStepStatusParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -931,8 +1006,8 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
-// ListAllDAGs operation middleware
-func (siw *ServerInterfaceWrapper) ListAllDAGs(w http.ResponseWriter, r *http.Request) {
+// ListDAGs operation middleware
+func (siw *ServerInterfaceWrapper) ListDAGs(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -945,7 +1020,7 @@ func (siw *ServerInterfaceWrapper) ListAllDAGs(w http.ResponseWriter, r *http.Re
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params ListAllDAGsParams
+	var params ListDAGsParams
 
 	// ------------- Optional query parameter "page" -------------
 
@@ -988,7 +1063,7 @@ func (siw *ServerInterfaceWrapper) ListAllDAGs(w http.ResponseWriter, r *http.Re
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListAllDAGs(w, r, params)
+		siw.Handler.ListDAGs(w, r, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1033,8 +1108,8 @@ func (siw *ServerInterfaceWrapper) CreateNewDAG(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
-// SearchDAGDefinitions operation middleware
-func (siw *ServerInterfaceWrapper) SearchDAGDefinitions(w http.ResponseWriter, r *http.Request) {
+// SearchDAGs operation middleware
+func (siw *ServerInterfaceWrapper) SearchDAGs(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -1047,7 +1122,7 @@ func (siw *ServerInterfaceWrapper) SearchDAGDefinitions(w http.ResponseWriter, r
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params SearchDAGDefinitionsParams
+	var params SearchDAGsParams
 
 	// ------------- Optional query parameter "remoteNode" -------------
 
@@ -1073,7 +1148,7 @@ func (siw *ServerInterfaceWrapper) SearchDAGDefinitions(w http.ResponseWriter, r
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.SearchDAGDefinitions(w, r, params)
+		siw.Handler.SearchDAGs(w, r, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1118,8 +1193,8 @@ func (siw *ServerInterfaceWrapper) GetAllDAGTags(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
-// DeleteDAGByFileName operation middleware
-func (siw *ServerInterfaceWrapper) DeleteDAGByFileName(w http.ResponseWriter, r *http.Request) {
+// DeleteDAG operation middleware
+func (siw *ServerInterfaceWrapper) DeleteDAG(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -1141,7 +1216,7 @@ func (siw *ServerInterfaceWrapper) DeleteDAGByFileName(w http.ResponseWriter, r 
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params DeleteDAGByFileNameParams
+	var params DeleteDAGParams
 
 	// ------------- Optional query parameter "remoteNode" -------------
 
@@ -1152,7 +1227,7 @@ func (siw *ServerInterfaceWrapper) DeleteDAGByFileName(w http.ResponseWriter, r 
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteDAGByFileName(w, r, fileName, params)
+		siw.Handler.DeleteDAG(w, r, fileName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1250,8 +1325,8 @@ func (siw *ServerInterfaceWrapper) RenameDAG(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
-// RetryDAGExecution operation middleware
-func (siw *ServerInterfaceWrapper) RetryDAGExecution(w http.ResponseWriter, r *http.Request) {
+// RetryDAGRun operation middleware
+func (siw *ServerInterfaceWrapper) RetryDAGRun(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -1273,7 +1348,7 @@ func (siw *ServerInterfaceWrapper) RetryDAGExecution(w http.ResponseWriter, r *h
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params RetryDAGExecutionParams
+	var params RetryDAGRunParams
 
 	// ------------- Optional query parameter "remoteNode" -------------
 
@@ -1284,7 +1359,7 @@ func (siw *ServerInterfaceWrapper) RetryDAGExecution(w http.ResponseWriter, r *h
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RetryDAGExecution(w, r, fileName, params)
+		siw.Handler.RetryDAGRun(w, r, fileName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1294,8 +1369,8 @@ func (siw *ServerInterfaceWrapper) RetryDAGExecution(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
-// GetDAGExecutionHistory operation middleware
-func (siw *ServerInterfaceWrapper) GetDAGExecutionHistory(w http.ResponseWriter, r *http.Request) {
+// GetDAGRunHistory operation middleware
+func (siw *ServerInterfaceWrapper) GetDAGRunHistory(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -1317,7 +1392,7 @@ func (siw *ServerInterfaceWrapper) GetDAGExecutionHistory(w http.ResponseWriter,
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params GetDAGExecutionHistoryParams
+	var params GetDAGRunHistoryParams
 
 	// ------------- Optional query parameter "remoteNode" -------------
 
@@ -1328,7 +1403,7 @@ func (siw *ServerInterfaceWrapper) GetDAGExecutionHistory(w http.ResponseWriter,
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDAGExecutionHistory(w, r, fileName, params)
+		siw.Handler.GetDAGRunHistory(w, r, fileName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1391,8 +1466,8 @@ func (siw *ServerInterfaceWrapper) GetDAGRunDetails(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
-// GetDAGDefinition operation middleware
-func (siw *ServerInterfaceWrapper) GetDAGDefinition(w http.ResponseWriter, r *http.Request) {
+// GetDAGSpec operation middleware
+func (siw *ServerInterfaceWrapper) GetDAGSpec(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -1414,7 +1489,7 @@ func (siw *ServerInterfaceWrapper) GetDAGDefinition(w http.ResponseWriter, r *ht
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params GetDAGDefinitionParams
+	var params GetDAGSpecParams
 
 	// ------------- Optional query parameter "remoteNode" -------------
 
@@ -1425,7 +1500,7 @@ func (siw *ServerInterfaceWrapper) GetDAGDefinition(w http.ResponseWriter, r *ht
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDAGDefinition(w, r, fileName, params)
+		siw.Handler.GetDAGSpec(w, r, fileName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1435,8 +1510,8 @@ func (siw *ServerInterfaceWrapper) GetDAGDefinition(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
-// UpdateDAGDefinition operation middleware
-func (siw *ServerInterfaceWrapper) UpdateDAGDefinition(w http.ResponseWriter, r *http.Request) {
+// UpdateDAGSpec operation middleware
+func (siw *ServerInterfaceWrapper) UpdateDAGSpec(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -1458,7 +1533,7 @@ func (siw *ServerInterfaceWrapper) UpdateDAGDefinition(w http.ResponseWriter, r 
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params UpdateDAGDefinitionParams
+	var params UpdateDAGSpecParams
 
 	// ------------- Optional query parameter "remoteNode" -------------
 
@@ -1469,7 +1544,7 @@ func (siw *ServerInterfaceWrapper) UpdateDAGDefinition(w http.ResponseWriter, r 
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateDAGDefinition(w, r, fileName, params)
+		siw.Handler.UpdateDAGSpec(w, r, fileName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1523,8 +1598,8 @@ func (siw *ServerInterfaceWrapper) ExecuteDAG(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
-// TerminateDAGExecution operation middleware
-func (siw *ServerInterfaceWrapper) TerminateDAGExecution(w http.ResponseWriter, r *http.Request) {
+// TerminateDAGRun operation middleware
+func (siw *ServerInterfaceWrapper) TerminateDAGRun(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -1546,7 +1621,7 @@ func (siw *ServerInterfaceWrapper) TerminateDAGExecution(w http.ResponseWriter, 
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params TerminateDAGExecutionParams
+	var params TerminateDAGRunParams
 
 	// ------------- Optional query parameter "remoteNode" -------------
 
@@ -1557,7 +1632,7 @@ func (siw *ServerInterfaceWrapper) TerminateDAGExecution(w http.ResponseWriter, 
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.TerminateDAGExecution(w, r, fileName, params)
+		siw.Handler.TerminateDAGRun(w, r, fileName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1633,70 +1708,8 @@ func (siw *ServerInterfaceWrapper) GetHealthStatus(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
-// GetChildRunDetails operation middleware
-func (siw *ServerInterfaceWrapper) GetChildRunDetails(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "dagName" -------------
-	var dagName DAGName
-
-	err = runtime.BindStyledParameterWithOptions("simple", "dagName", chi.URLParam(r, "dagName"), &dagName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagName", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "requestId" -------------
-	var requestId RequestId
-
-	err = runtime.BindStyledParameterWithOptions("simple", "requestId", chi.URLParam(r, "requestId"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "requestId", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "childRequestId" -------------
-	var childRequestId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "childRequestId", chi.URLParam(r, "childRequestId"), &childRequestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "childRequestId", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params GetChildRunDetailsParams
-
-	// ------------- Optional query parameter "remoteNode" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetChildRunDetails(w, r, dagName, requestId, childRequestId, params)
-	}))
-
-	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
-		handler = siw.HandlerMiddlewares[i](handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetDAGRunLog operation middleware
-func (siw *ServerInterfaceWrapper) GetDAGRunLog(w http.ResponseWriter, r *http.Request) {
+// GetRunDetails operation middleware
+func (siw *ServerInterfaceWrapper) GetRunDetails(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -1727,7 +1740,7 @@ func (siw *ServerInterfaceWrapper) GetDAGRunLog(w http.ResponseWriter, r *http.R
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params GetDAGRunLogParams
+	var params GetRunDetailsParams
 
 	// ------------- Optional query parameter "remoteNode" -------------
 
@@ -1738,7 +1751,7 @@ func (siw *ServerInterfaceWrapper) GetDAGRunLog(w http.ResponseWriter, r *http.R
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDAGRunLog(w, r, dagName, requestId, params)
+		siw.Handler.GetRunDetails(w, r, dagName, requestId, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1748,8 +1761,61 @@ func (siw *ServerInterfaceWrapper) GetDAGRunLog(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
-// GetDAGStepLog operation middleware
-func (siw *ServerInterfaceWrapper) GetDAGStepLog(w http.ResponseWriter, r *http.Request) {
+// GetRunLog operation middleware
+func (siw *ServerInterfaceWrapper) GetRunLog(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "dagName" -------------
+	var dagName DAGName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagName", chi.URLParam(r, "dagName"), &dagName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "requestId" -------------
+	var requestId RequestId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "requestId", chi.URLParam(r, "requestId"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "requestId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetRunLogParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetRunLog(w, r, dagName, requestId, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetRunStepLog operation middleware
+func (siw *ServerInterfaceWrapper) GetRunStepLog(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -1789,7 +1855,7 @@ func (siw *ServerInterfaceWrapper) GetDAGStepLog(w http.ResponseWriter, r *http.
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params GetDAGStepLogParams
+	var params GetRunStepLogParams
 
 	// ------------- Optional query parameter "remoteNode" -------------
 
@@ -1800,7 +1866,7 @@ func (siw *ServerInterfaceWrapper) GetDAGStepLog(w http.ResponseWriter, r *http.
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDAGStepLog(w, r, dagName, requestId, stepName, params)
+		siw.Handler.GetRunStepLog(w, r, dagName, requestId, stepName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1810,8 +1876,8 @@ func (siw *ServerInterfaceWrapper) GetDAGStepLog(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
-// UpdateDAGStepStatus operation middleware
-func (siw *ServerInterfaceWrapper) UpdateDAGStepStatus(w http.ResponseWriter, r *http.Request) {
+// UpdateRunStepStatus operation middleware
+func (siw *ServerInterfaceWrapper) UpdateRunStepStatus(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -1851,7 +1917,7 @@ func (siw *ServerInterfaceWrapper) UpdateDAGStepStatus(w http.ResponseWriter, r 
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params UpdateDAGStepStatusParams
+	var params UpdateRunStepStatusParams
 
 	// ------------- Optional query parameter "remoteNode" -------------
 
@@ -1862,7 +1928,273 @@ func (siw *ServerInterfaceWrapper) UpdateDAGStepStatus(w http.ResponseWriter, r 
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateDAGStepStatus(w, r, dagName, requestId, stepName, params)
+		siw.Handler.UpdateRunStepStatus(w, r, dagName, requestId, stepName, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSubRunDetails operation middleware
+func (siw *ServerInterfaceWrapper) GetSubRunDetails(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "dagName" -------------
+	var dagName DAGName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagName", chi.URLParam(r, "dagName"), &dagName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "requestId" -------------
+	var requestId RequestId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "requestId", chi.URLParam(r, "requestId"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "requestId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "subRunRequestId" -------------
+	var subRunRequestId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "subRunRequestId", chi.URLParam(r, "subRunRequestId"), &subRunRequestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "subRunRequestId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetSubRunDetailsParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSubRunDetails(w, r, dagName, requestId, subRunRequestId, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSubRunLog operation middleware
+func (siw *ServerInterfaceWrapper) GetSubRunLog(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "dagName" -------------
+	var dagName DAGName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagName", chi.URLParam(r, "dagName"), &dagName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "requestId" -------------
+	var requestId RequestId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "requestId", chi.URLParam(r, "requestId"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "requestId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "subRunRequestId" -------------
+	var subRunRequestId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "subRunRequestId", chi.URLParam(r, "subRunRequestId"), &subRunRequestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "subRunRequestId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetSubRunLogParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSubRunLog(w, r, dagName, requestId, subRunRequestId, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSubRunStepLog operation middleware
+func (siw *ServerInterfaceWrapper) GetSubRunStepLog(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "dagName" -------------
+	var dagName DAGName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagName", chi.URLParam(r, "dagName"), &dagName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "requestId" -------------
+	var requestId RequestId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "requestId", chi.URLParam(r, "requestId"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "requestId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "subRunRequestId" -------------
+	var subRunRequestId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "subRunRequestId", chi.URLParam(r, "subRunRequestId"), &subRunRequestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "subRunRequestId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "stepName" -------------
+	var stepName StepName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "stepName", chi.URLParam(r, "stepName"), &stepName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "stepName", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetSubRunStepLogParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSubRunStepLog(w, r, dagName, requestId, subRunRequestId, stepName, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateSubRunStepStatus operation middleware
+func (siw *ServerInterfaceWrapper) UpdateSubRunStepStatus(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "dagName" -------------
+	var dagName DAGName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagName", chi.URLParam(r, "dagName"), &dagName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "requestId" -------------
+	var requestId RequestId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "requestId", chi.URLParam(r, "requestId"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "requestId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "subRunRequestId" -------------
+	var subRunRequestId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "subRunRequestId", chi.URLParam(r, "subRunRequestId"), &subRunRequestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "subRunRequestId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "stepName" -------------
+	var stepName StepName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "stepName", chi.URLParam(r, "stepName"), &stepName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "stepName", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateSubRunStepStatusParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateSubRunStepStatus(w, r, dagName, requestId, subRunRequestId, stepName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1986,19 +2318,19 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dags", wrapper.ListAllDAGs)
+		r.Get(options.BaseURL+"/dags", wrapper.ListDAGs)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/dags", wrapper.CreateNewDAG)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dags/search", wrapper.SearchDAGDefinitions)
+		r.Get(options.BaseURL+"/dags/search", wrapper.SearchDAGs)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/dags/tags", wrapper.GetAllDAGTags)
 	})
 	r.Group(func(r chi.Router) {
-		r.Delete(options.BaseURL+"/dags/{fileName}", wrapper.DeleteDAGByFileName)
+		r.Delete(options.BaseURL+"/dags/{fileName}", wrapper.DeleteDAG)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/dags/{fileName}", wrapper.GetDAGDetails)
@@ -2007,25 +2339,25 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/dags/{fileName}/rename", wrapper.RenameDAG)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/dags/{fileName}/retry", wrapper.RetryDAGExecution)
+		r.Post(options.BaseURL+"/dags/{fileName}/retry", wrapper.RetryDAGRun)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dags/{fileName}/runs", wrapper.GetDAGExecutionHistory)
+		r.Get(options.BaseURL+"/dags/{fileName}/runs", wrapper.GetDAGRunHistory)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/dags/{fileName}/runs/{requestId}", wrapper.GetDAGRunDetails)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dags/{fileName}/spec", wrapper.GetDAGDefinition)
+		r.Get(options.BaseURL+"/dags/{fileName}/spec", wrapper.GetDAGSpec)
 	})
 	r.Group(func(r chi.Router) {
-		r.Put(options.BaseURL+"/dags/{fileName}/spec", wrapper.UpdateDAGDefinition)
+		r.Put(options.BaseURL+"/dags/{fileName}/spec", wrapper.UpdateDAGSpec)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/dags/{fileName}/start", wrapper.ExecuteDAG)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/dags/{fileName}/stop", wrapper.TerminateDAGExecution)
+		r.Post(options.BaseURL+"/dags/{fileName}/stop", wrapper.TerminateDAGRun)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/dags/{fileName}/suspend", wrapper.UpdateDAGSuspensionState)
@@ -2034,30 +2366,42 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/health", wrapper.GetHealthStatus)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/runs/{dagName}/{requestId}/children/{childRequestId}", wrapper.GetChildRunDetails)
+		r.Get(options.BaseURL+"/runs/{dagName}/{requestId}", wrapper.GetRunDetails)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/runs/{dagName}/{requestId}/log", wrapper.GetDAGRunLog)
+		r.Get(options.BaseURL+"/runs/{dagName}/{requestId}/log", wrapper.GetRunLog)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/runs/{dagName}/{requestId}/steps/{stepName}/log", wrapper.GetDAGStepLog)
+		r.Get(options.BaseURL+"/runs/{dagName}/{requestId}/steps/{stepName}/log", wrapper.GetRunStepLog)
 	})
 	r.Group(func(r chi.Router) {
-		r.Patch(options.BaseURL+"/runs/{dagName}/{requestId}/steps/{stepName}/status", wrapper.UpdateDAGStepStatus)
+		r.Patch(options.BaseURL+"/runs/{dagName}/{requestId}/steps/{stepName}/status", wrapper.UpdateRunStepStatus)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/runs/{dagName}/{requestId}/subs/{subRunRequestId}", wrapper.GetSubRunDetails)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/runs/{dagName}/{requestId}/subs/{subRunRequestId}/log", wrapper.GetSubRunLog)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/runs/{dagName}/{requestId}/subs/{subRunRequestId}/steps/{stepName}/log", wrapper.GetSubRunStepLog)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/runs/{dagName}/{requestId}/subs/{subRunRequestId}/steps/{stepName}/status", wrapper.UpdateSubRunStepStatus)
 	})
 
 	return r
 }
 
-type ListAllDAGsRequestObject struct {
-	Params ListAllDAGsParams
+type ListDAGsRequestObject struct {
+	Params ListDAGsParams
 }
 
-type ListAllDAGsResponseObject interface {
-	VisitListAllDAGsResponse(w http.ResponseWriter) error
+type ListDAGsResponseObject interface {
+	VisitListDAGsResponse(w http.ResponseWriter) error
 }
 
-type ListAllDAGs200JSONResponse struct {
+type ListDAGs200JSONResponse struct {
 	// Dags List of DAGs with their status and metadata
 	Dags []DAGFile `json:"dags"`
 
@@ -2066,19 +2410,19 @@ type ListAllDAGs200JSONResponse struct {
 	Pagination Pagination `json:"pagination"`
 }
 
-func (response ListAllDAGs200JSONResponse) VisitListAllDAGsResponse(w http.ResponseWriter) error {
+func (response ListDAGs200JSONResponse) VisitListDAGsResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ListAllDAGsdefaultJSONResponse struct {
+type ListDAGsdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response ListAllDAGsdefaultJSONResponse) VisitListAllDAGsResponse(w http.ResponseWriter) error {
+func (response ListDAGsdefaultJSONResponse) VisitListDAGsResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
@@ -2118,15 +2462,15 @@ func (response CreateNewDAGdefaultJSONResponse) VisitCreateNewDAGResponse(w http
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type SearchDAGDefinitionsRequestObject struct {
-	Params SearchDAGDefinitionsParams
+type SearchDAGsRequestObject struct {
+	Params SearchDAGsParams
 }
 
-type SearchDAGDefinitionsResponseObject interface {
-	VisitSearchDAGDefinitionsResponse(w http.ResponseWriter) error
+type SearchDAGsResponseObject interface {
+	VisitSearchDAGsResponse(w http.ResponseWriter) error
 }
 
-type SearchDAGDefinitions200JSONResponse struct {
+type SearchDAGs200JSONResponse struct {
 	// Errors Errors encountered during the search
 	Errors []string `json:"errors"`
 
@@ -2134,19 +2478,19 @@ type SearchDAGDefinitions200JSONResponse struct {
 	Results []SearchResultItem `json:"results"`
 }
 
-func (response SearchDAGDefinitions200JSONResponse) VisitSearchDAGDefinitionsResponse(w http.ResponseWriter) error {
+func (response SearchDAGs200JSONResponse) VisitSearchDAGsResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type SearchDAGDefinitionsdefaultJSONResponse struct {
+type SearchDAGsdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response SearchDAGDefinitionsdefaultJSONResponse) VisitSearchDAGDefinitionsResponse(w http.ResponseWriter) error {
+func (response SearchDAGsdefaultJSONResponse) VisitSearchDAGsResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
@@ -2182,38 +2526,38 @@ func (response GetAllDAGTagsdefaultJSONResponse) VisitGetAllDAGTagsResponse(w ht
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type DeleteDAGByFileNameRequestObject struct {
+type DeleteDAGRequestObject struct {
 	FileName DAGFileName `json:"fileName"`
-	Params   DeleteDAGByFileNameParams
+	Params   DeleteDAGParams
 }
 
-type DeleteDAGByFileNameResponseObject interface {
-	VisitDeleteDAGByFileNameResponse(w http.ResponseWriter) error
+type DeleteDAGResponseObject interface {
+	VisitDeleteDAGResponse(w http.ResponseWriter) error
 }
 
-type DeleteDAGByFileName204Response struct {
+type DeleteDAG204Response struct {
 }
 
-func (response DeleteDAGByFileName204Response) VisitDeleteDAGByFileNameResponse(w http.ResponseWriter) error {
+func (response DeleteDAG204Response) VisitDeleteDAGResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
 }
 
-type DeleteDAGByFileName404JSONResponse Error
+type DeleteDAG404JSONResponse Error
 
-func (response DeleteDAGByFileName404JSONResponse) VisitDeleteDAGByFileNameResponse(w http.ResponseWriter) error {
+func (response DeleteDAG404JSONResponse) VisitDeleteDAGResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type DeleteDAGByFileNamedefaultJSONResponse struct {
+type DeleteDAGdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response DeleteDAGByFileNamedefaultJSONResponse) VisitDeleteDAGByFileNameResponse(w http.ResponseWriter) error {
+func (response DeleteDAGdefaultJSONResponse) VisitDeleteDAGResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
@@ -2236,7 +2580,7 @@ type GetDAGDetails200JSONResponse struct {
 	// Errors List of errors encountered during the request
 	Errors []string `json:"errors"`
 
-	// LatestRun Detailed status of a DAG run including child nodes
+	// LatestRun Detailed status of a DAG run including sub-run nodes
 	LatestRun RunDetails `json:"latestRun"`
 
 	// Suspended Whether the DAG is suspended
@@ -2310,46 +2654,46 @@ func (response RenameDAGdefaultJSONResponse) VisitRenameDAGResponse(w http.Respo
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type RetryDAGExecutionRequestObject struct {
+type RetryDAGRunRequestObject struct {
 	FileName DAGFileName `json:"fileName"`
-	Params   RetryDAGExecutionParams
-	Body     *RetryDAGExecutionJSONRequestBody
+	Params   RetryDAGRunParams
+	Body     *RetryDAGRunJSONRequestBody
 }
 
-type RetryDAGExecutionResponseObject interface {
-	VisitRetryDAGExecutionResponse(w http.ResponseWriter) error
+type RetryDAGRunResponseObject interface {
+	VisitRetryDAGRunResponse(w http.ResponseWriter) error
 }
 
-type RetryDAGExecution200Response struct {
+type RetryDAGRun200Response struct {
 }
 
-func (response RetryDAGExecution200Response) VisitRetryDAGExecutionResponse(w http.ResponseWriter) error {
+func (response RetryDAGRun200Response) VisitRetryDAGRunResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type RetryDAGExecutiondefaultJSONResponse struct {
+type RetryDAGRundefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response RetryDAGExecutiondefaultJSONResponse) VisitRetryDAGExecutionResponse(w http.ResponseWriter) error {
+func (response RetryDAGRundefaultJSONResponse) VisitRetryDAGRunResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type GetDAGExecutionHistoryRequestObject struct {
+type GetDAGRunHistoryRequestObject struct {
 	FileName DAGFileName `json:"fileName"`
-	Params   GetDAGExecutionHistoryParams
+	Params   GetDAGRunHistoryParams
 }
 
-type GetDAGExecutionHistoryResponseObject interface {
-	VisitGetDAGExecutionHistoryResponse(w http.ResponseWriter) error
+type GetDAGRunHistoryResponseObject interface {
+	VisitGetDAGRunHistoryResponse(w http.ResponseWriter) error
 }
 
-type GetDAGExecutionHistory200JSONResponse struct {
+type GetDAGRunHistory200JSONResponse struct {
 	// GridData Grid data for visualization
 	GridData []DAGGridItem `json:"gridData"`
 
@@ -2357,19 +2701,19 @@ type GetDAGExecutionHistory200JSONResponse struct {
 	Runs []RunDetails `json:"runs"`
 }
 
-func (response GetDAGExecutionHistory200JSONResponse) VisitGetDAGExecutionHistoryResponse(w http.ResponseWriter) error {
+func (response GetDAGRunHistory200JSONResponse) VisitGetDAGRunHistoryResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetDAGExecutionHistorydefaultJSONResponse struct {
+type GetDAGRunHistorydefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response GetDAGExecutionHistorydefaultJSONResponse) VisitGetDAGExecutionHistoryResponse(w http.ResponseWriter) error {
+func (response GetDAGRunHistorydefaultJSONResponse) VisitGetDAGRunHistoryResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
@@ -2387,7 +2731,7 @@ type GetDAGRunDetailsResponseObject interface {
 }
 
 type GetDAGRunDetails200JSONResponse struct {
-	// Run Detailed status of a DAG run including child nodes
+	// Run Detailed status of a DAG run including sub-run nodes
 	Run RunDetails `json:"run"`
 }
 
@@ -2410,16 +2754,16 @@ func (response GetDAGRunDetailsdefaultJSONResponse) VisitGetDAGRunDetailsRespons
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type GetDAGDefinitionRequestObject struct {
+type GetDAGSpecRequestObject struct {
 	FileName DAGFileName `json:"fileName"`
-	Params   GetDAGDefinitionParams
+	Params   GetDAGSpecParams
 }
 
-type GetDAGDefinitionResponseObject interface {
-	VisitGetDAGDefinitionResponse(w http.ResponseWriter) error
+type GetDAGSpecResponseObject interface {
+	VisitGetDAGSpecResponse(w http.ResponseWriter) error
 }
 
-type GetDAGDefinition200JSONResponse struct {
+type GetDAGSpec200JSONResponse struct {
 	// Dag Detailed DAG configuration information
 	Dag *DAGDetails `json:"dag,omitempty"`
 
@@ -2430,53 +2774,53 @@ type GetDAGDefinition200JSONResponse struct {
 	Spec string `json:"spec"`
 }
 
-func (response GetDAGDefinition200JSONResponse) VisitGetDAGDefinitionResponse(w http.ResponseWriter) error {
+func (response GetDAGSpec200JSONResponse) VisitGetDAGSpecResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetDAGDefinitiondefaultJSONResponse struct {
+type GetDAGSpecdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response GetDAGDefinitiondefaultJSONResponse) VisitGetDAGDefinitionResponse(w http.ResponseWriter) error {
+func (response GetDAGSpecdefaultJSONResponse) VisitGetDAGSpecResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type UpdateDAGDefinitionRequestObject struct {
+type UpdateDAGSpecRequestObject struct {
 	FileName DAGFileName `json:"fileName"`
-	Params   UpdateDAGDefinitionParams
-	Body     *UpdateDAGDefinitionJSONRequestBody
+	Params   UpdateDAGSpecParams
+	Body     *UpdateDAGSpecJSONRequestBody
 }
 
-type UpdateDAGDefinitionResponseObject interface {
-	VisitUpdateDAGDefinitionResponse(w http.ResponseWriter) error
+type UpdateDAGSpecResponseObject interface {
+	VisitUpdateDAGSpecResponse(w http.ResponseWriter) error
 }
 
-type UpdateDAGDefinition200JSONResponse struct {
+type UpdateDAGSpec200JSONResponse struct {
 	// Errors List of errors in the spec
 	Errors []string `json:"errors"`
 }
 
-func (response UpdateDAGDefinition200JSONResponse) VisitUpdateDAGDefinitionResponse(w http.ResponseWriter) error {
+func (response UpdateDAGSpec200JSONResponse) VisitUpdateDAGSpecResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type UpdateDAGDefinitiondefaultJSONResponse struct {
+type UpdateDAGSpecdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response UpdateDAGDefinitiondefaultJSONResponse) VisitUpdateDAGDefinitionResponse(w http.ResponseWriter) error {
+func (response UpdateDAGSpecdefaultJSONResponse) VisitUpdateDAGSpecResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
@@ -2493,12 +2837,16 @@ type ExecuteDAGResponseObject interface {
 	VisitExecuteDAGResponse(w http.ResponseWriter) error
 }
 
-type ExecuteDAG200Response struct {
+type ExecuteDAG200JSONResponse struct {
+	// RequestId Request ID of the initiated DAG run
+	RequestId string `json:"requestId"`
 }
 
-func (response ExecuteDAG200Response) VisitExecuteDAGResponse(w http.ResponseWriter) error {
+func (response ExecuteDAG200JSONResponse) VisitExecuteDAGResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	return nil
+
+	return json.NewEncoder(w).Encode(response)
 }
 
 type ExecuteDAGdefaultJSONResponse struct {
@@ -2513,29 +2861,29 @@ func (response ExecuteDAGdefaultJSONResponse) VisitExecuteDAGResponse(w http.Res
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type TerminateDAGExecutionRequestObject struct {
+type TerminateDAGRunRequestObject struct {
 	FileName DAGFileName `json:"fileName"`
-	Params   TerminateDAGExecutionParams
+	Params   TerminateDAGRunParams
 }
 
-type TerminateDAGExecutionResponseObject interface {
-	VisitTerminateDAGExecutionResponse(w http.ResponseWriter) error
+type TerminateDAGRunResponseObject interface {
+	VisitTerminateDAGRunResponse(w http.ResponseWriter) error
 }
 
-type TerminateDAGExecution200Response struct {
+type TerminateDAGRun200Response struct {
 }
 
-func (response TerminateDAGExecution200Response) VisitTerminateDAGExecutionResponse(w http.ResponseWriter) error {
+func (response TerminateDAGRun200Response) VisitTerminateDAGRunResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type TerminateDAGExecutiondefaultJSONResponse struct {
+type TerminateDAGRundefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response TerminateDAGExecutiondefaultJSONResponse) VisitTerminateDAGExecutionResponse(w http.ResponseWriter) error {
+func (response TerminateDAGRundefaultJSONResponse) VisitTerminateDAGRunResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
@@ -2606,163 +2954,352 @@ func (response GetHealthStatusdefaultResponse) VisitGetHealthStatusResponse(w ht
 	return nil
 }
 
-type GetChildRunDetailsRequestObject struct {
-	DagName        DAGName   `json:"dagName"`
-	RequestId      RequestId `json:"requestId"`
-	ChildRequestId string    `json:"childRequestId"`
-	Params         GetChildRunDetailsParams
-}
-
-type GetChildRunDetailsResponseObject interface {
-	VisitGetChildRunDetailsResponse(w http.ResponseWriter) error
-}
-
-type GetChildRunDetails200JSONResponse RunDetails
-
-func (response GetChildRunDetails200JSONResponse) VisitGetChildRunDetailsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetChildRunDetailsdefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response GetChildRunDetailsdefaultJSONResponse) VisitGetChildRunDetailsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-
-	return json.NewEncoder(w).Encode(response.Body)
-}
-
-type GetDAGRunLogRequestObject struct {
+type GetRunDetailsRequestObject struct {
 	DagName   DAGName   `json:"dagName"`
 	RequestId RequestId `json:"requestId"`
-	Params    GetDAGRunLogParams
+	Params    GetRunDetailsParams
 }
 
-type GetDAGRunLogResponseObject interface {
-	VisitGetDAGRunLogResponse(w http.ResponseWriter) error
+type GetRunDetailsResponseObject interface {
+	VisitGetRunDetailsResponse(w http.ResponseWriter) error
 }
 
-type GetDAGRunLog200JSONResponse Log
+type GetRunDetails200JSONResponse struct {
+	// RunDetails Detailed status of a DAG run including sub-run nodes
+	RunDetails RunDetails `json:"runDetails"`
+}
 
-func (response GetDAGRunLog200JSONResponse) VisitGetDAGRunLogResponse(w http.ResponseWriter) error {
+func (response GetRunDetails200JSONResponse) VisitGetRunDetailsResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetDAGRunLog404JSONResponse Error
+type GetRunDetails404JSONResponse Error
 
-func (response GetDAGRunLog404JSONResponse) VisitGetDAGRunLogResponse(w http.ResponseWriter) error {
+func (response GetRunDetails404JSONResponse) VisitGetRunDetailsResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetDAGRunLogdefaultJSONResponse struct {
+type GetRunDetailsdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response GetDAGRunLogdefaultJSONResponse) VisitGetDAGRunLogResponse(w http.ResponseWriter) error {
+func (response GetRunDetailsdefaultJSONResponse) VisitGetRunDetailsResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type GetDAGStepLogRequestObject struct {
+type GetRunLogRequestObject struct {
 	DagName   DAGName   `json:"dagName"`
 	RequestId RequestId `json:"requestId"`
-	StepName  StepName  `json:"stepName"`
-	Params    GetDAGStepLogParams
+	Params    GetRunLogParams
 }
 
-type GetDAGStepLogResponseObject interface {
-	VisitGetDAGStepLogResponse(w http.ResponseWriter) error
+type GetRunLogResponseObject interface {
+	VisitGetRunLogResponse(w http.ResponseWriter) error
 }
 
-type GetDAGStepLog200JSONResponse Log
+type GetRunLog200JSONResponse Log
 
-func (response GetDAGStepLog200JSONResponse) VisitGetDAGStepLogResponse(w http.ResponseWriter) error {
+func (response GetRunLog200JSONResponse) VisitGetRunLogResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetDAGStepLog404JSONResponse Error
+type GetRunLog404JSONResponse Error
 
-func (response GetDAGStepLog404JSONResponse) VisitGetDAGStepLogResponse(w http.ResponseWriter) error {
+func (response GetRunLog404JSONResponse) VisitGetRunLogResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetDAGStepLogdefaultJSONResponse struct {
+type GetRunLogdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response GetDAGStepLogdefaultJSONResponse) VisitGetDAGStepLogResponse(w http.ResponseWriter) error {
+func (response GetRunLogdefaultJSONResponse) VisitGetRunLogResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type UpdateDAGStepStatusRequestObject struct {
+type GetRunStepLogRequestObject struct {
 	DagName   DAGName   `json:"dagName"`
 	RequestId RequestId `json:"requestId"`
 	StepName  StepName  `json:"stepName"`
-	Params    UpdateDAGStepStatusParams
-	Body      *UpdateDAGStepStatusJSONRequestBody
+	Params    GetRunStepLogParams
 }
 
-type UpdateDAGStepStatusResponseObject interface {
-	VisitUpdateDAGStepStatusResponse(w http.ResponseWriter) error
+type GetRunStepLogResponseObject interface {
+	VisitGetRunStepLogResponse(w http.ResponseWriter) error
 }
 
-type UpdateDAGStepStatus200Response struct {
+type GetRunStepLog200JSONResponse Log
+
+func (response GetRunStepLog200JSONResponse) VisitGetRunStepLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
 }
 
-func (response UpdateDAGStepStatus200Response) VisitUpdateDAGStepStatusResponse(w http.ResponseWriter) error {
+type GetRunStepLog404JSONResponse Error
+
+func (response GetRunStepLog404JSONResponse) VisitGetRunStepLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRunStepLogdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetRunStepLogdefaultJSONResponse) VisitGetRunStepLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type UpdateRunStepStatusRequestObject struct {
+	DagName   DAGName   `json:"dagName"`
+	RequestId RequestId `json:"requestId"`
+	StepName  StepName  `json:"stepName"`
+	Params    UpdateRunStepStatusParams
+	Body      *UpdateRunStepStatusJSONRequestBody
+}
+
+type UpdateRunStepStatusResponseObject interface {
+	VisitUpdateRunStepStatusResponse(w http.ResponseWriter) error
+}
+
+type UpdateRunStepStatus200Response struct {
+}
+
+func (response UpdateRunStepStatus200Response) VisitUpdateRunStepStatusResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type UpdateDAGStepStatus400JSONResponse Error
+type UpdateRunStepStatus400JSONResponse Error
 
-func (response UpdateDAGStepStatus400JSONResponse) VisitUpdateDAGStepStatusResponse(w http.ResponseWriter) error {
+func (response UpdateRunStepStatus400JSONResponse) VisitUpdateRunStepStatusResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type UpdateDAGStepStatus404JSONResponse Error
+type UpdateRunStepStatus404JSONResponse Error
 
-func (response UpdateDAGStepStatus404JSONResponse) VisitUpdateDAGStepStatusResponse(w http.ResponseWriter) error {
+func (response UpdateRunStepStatus404JSONResponse) VisitUpdateRunStepStatusResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type UpdateDAGStepStatusdefaultJSONResponse struct {
+type UpdateRunStepStatusdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response UpdateDAGStepStatusdefaultJSONResponse) VisitUpdateDAGStepStatusResponse(w http.ResponseWriter) error {
+func (response UpdateRunStepStatusdefaultJSONResponse) VisitUpdateRunStepStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type GetSubRunDetailsRequestObject struct {
+	DagName         DAGName   `json:"dagName"`
+	RequestId       RequestId `json:"requestId"`
+	SubRunRequestId string    `json:"subRunRequestId"`
+	Params          GetSubRunDetailsParams
+}
+
+type GetSubRunDetailsResponseObject interface {
+	VisitGetSubRunDetailsResponse(w http.ResponseWriter) error
+}
+
+type GetSubRunDetails200JSONResponse struct {
+	// RunDetails Detailed status of a DAG run including sub-run nodes
+	RunDetails RunDetails `json:"runDetails"`
+}
+
+func (response GetSubRunDetails200JSONResponse) VisitGetSubRunDetailsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSubRunDetails404JSONResponse Error
+
+func (response GetSubRunDetails404JSONResponse) VisitGetSubRunDetailsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSubRunDetailsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetSubRunDetailsdefaultJSONResponse) VisitGetSubRunDetailsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type GetSubRunLogRequestObject struct {
+	DagName         DAGName   `json:"dagName"`
+	RequestId       RequestId `json:"requestId"`
+	SubRunRequestId string    `json:"subRunRequestId"`
+	Params          GetSubRunLogParams
+}
+
+type GetSubRunLogResponseObject interface {
+	VisitGetSubRunLogResponse(w http.ResponseWriter) error
+}
+
+type GetSubRunLog200JSONResponse Log
+
+func (response GetSubRunLog200JSONResponse) VisitGetSubRunLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSubRunLog404JSONResponse Error
+
+func (response GetSubRunLog404JSONResponse) VisitGetSubRunLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSubRunLogdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetSubRunLogdefaultJSONResponse) VisitGetSubRunLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type GetSubRunStepLogRequestObject struct {
+	DagName         DAGName   `json:"dagName"`
+	RequestId       RequestId `json:"requestId"`
+	SubRunRequestId string    `json:"subRunRequestId"`
+	StepName        StepName  `json:"stepName"`
+	Params          GetSubRunStepLogParams
+}
+
+type GetSubRunStepLogResponseObject interface {
+	VisitGetSubRunStepLogResponse(w http.ResponseWriter) error
+}
+
+type GetSubRunStepLog200JSONResponse Log
+
+func (response GetSubRunStepLog200JSONResponse) VisitGetSubRunStepLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSubRunStepLog404JSONResponse Error
+
+func (response GetSubRunStepLog404JSONResponse) VisitGetSubRunStepLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSubRunStepLogdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetSubRunStepLogdefaultJSONResponse) VisitGetSubRunStepLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type UpdateSubRunStepStatusRequestObject struct {
+	DagName         DAGName   `json:"dagName"`
+	RequestId       RequestId `json:"requestId"`
+	SubRunRequestId string    `json:"subRunRequestId"`
+	StepName        StepName  `json:"stepName"`
+	Params          UpdateSubRunStepStatusParams
+	Body            *UpdateSubRunStepStatusJSONRequestBody
+}
+
+type UpdateSubRunStepStatusResponseObject interface {
+	VisitUpdateSubRunStepStatusResponse(w http.ResponseWriter) error
+}
+
+type UpdateSubRunStepStatus200Response struct {
+}
+
+func (response UpdateSubRunStepStatus200Response) VisitUpdateSubRunStepStatusResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type UpdateSubRunStepStatus400JSONResponse Error
+
+func (response UpdateSubRunStepStatus400JSONResponse) VisitUpdateSubRunStepStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateSubRunStepStatus404JSONResponse Error
+
+func (response UpdateSubRunStepStatus404JSONResponse) VisitUpdateSubRunStepStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateSubRunStepStatusdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response UpdateSubRunStepStatusdefaultJSONResponse) VisitUpdateSubRunStepStatusResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
@@ -2773,19 +3310,19 @@ func (response UpdateDAGStepStatusdefaultJSONResponse) VisitUpdateDAGStepStatusR
 type StrictServerInterface interface {
 	// List all available DAGs
 	// (GET /dags)
-	ListAllDAGs(ctx context.Context, request ListAllDAGsRequestObject) (ListAllDAGsResponseObject, error)
+	ListDAGs(ctx context.Context, request ListDAGsRequestObject) (ListDAGsResponseObject, error)
 	// Create a new DAG definition
 	// (POST /dags)
 	CreateNewDAG(ctx context.Context, request CreateNewDAGRequestObject) (CreateNewDAGResponseObject, error)
-	// Search across all DAG definitions
+	// Search DAGs
 	// (GET /dags/search)
-	SearchDAGDefinitions(ctx context.Context, request SearchDAGDefinitionsRequestObject) (SearchDAGDefinitionsResponseObject, error)
+	SearchDAGs(ctx context.Context, request SearchDAGsRequestObject) (SearchDAGsResponseObject, error)
 	// List all available DAG tags
 	// (GET /dags/tags)
 	GetAllDAGTags(ctx context.Context, request GetAllDAGTagsRequestObject) (GetAllDAGTagsResponseObject, error)
 	// Delete an existing DAG
 	// (DELETE /dags/{fileName})
-	DeleteDAGByFileName(ctx context.Context, request DeleteDAGByFileNameRequestObject) (DeleteDAGByFileNameResponseObject, error)
+	DeleteDAG(ctx context.Context, request DeleteDAGRequestObject) (DeleteDAGResponseObject, error)
 	// Retrieve comprehensive DAG information
 	// (GET /dags/{fileName})
 	GetDAGDetails(ctx context.Context, request GetDAGDetailsRequestObject) (GetDAGDetailsResponseObject, error)
@@ -2794,43 +3331,55 @@ type StrictServerInterface interface {
 	RenameDAG(ctx context.Context, request RenameDAGRequestObject) (RenameDAGResponseObject, error)
 	// Retry DAG execution
 	// (POST /dags/{fileName}/retry)
-	RetryDAGExecution(ctx context.Context, request RetryDAGExecutionRequestObject) (RetryDAGExecutionResponseObject, error)
+	RetryDAGRun(ctx context.Context, request RetryDAGRunRequestObject) (RetryDAGRunResponseObject, error)
 	// Retrieve execution history of a DAG
 	// (GET /dags/{fileName}/runs)
-	GetDAGExecutionHistory(ctx context.Context, request GetDAGExecutionHistoryRequestObject) (GetDAGExecutionHistoryResponseObject, error)
+	GetDAGRunHistory(ctx context.Context, request GetDAGRunHistoryRequestObject) (GetDAGRunHistoryResponseObject, error)
 	// Get detailed status of a specific DAG run
 	// (GET /dags/{fileName}/runs/{requestId})
 	GetDAGRunDetails(ctx context.Context, request GetDAGRunDetailsRequestObject) (GetDAGRunDetailsResponseObject, error)
-	// Retrieve DAG definition
+	// Retrieve DAG specification
 	// (GET /dags/{fileName}/spec)
-	GetDAGDefinition(ctx context.Context, request GetDAGDefinitionRequestObject) (GetDAGDefinitionResponseObject, error)
-	// Update DAG definition
+	GetDAGSpec(ctx context.Context, request GetDAGSpecRequestObject) (GetDAGSpecResponseObject, error)
+	// Update DAG spec
 	// (PUT /dags/{fileName}/spec)
-	UpdateDAGDefinition(ctx context.Context, request UpdateDAGDefinitionRequestObject) (UpdateDAGDefinitionResponseObject, error)
+	UpdateDAGSpec(ctx context.Context, request UpdateDAGSpecRequestObject) (UpdateDAGSpecResponseObject, error)
 	// Initiate DAG execution
 	// (POST /dags/{fileName}/start)
 	ExecuteDAG(ctx context.Context, request ExecuteDAGRequestObject) (ExecuteDAGResponseObject, error)
 	// Terminate running DAG execution
 	// (POST /dags/{fileName}/stop)
-	TerminateDAGExecution(ctx context.Context, request TerminateDAGExecutionRequestObject) (TerminateDAGExecutionResponseObject, error)
+	TerminateDAGRun(ctx context.Context, request TerminateDAGRunRequestObject) (TerminateDAGRunResponseObject, error)
 	// Toggle DAG suspension state
 	// (POST /dags/{fileName}/suspend)
 	UpdateDAGSuspensionState(ctx context.Context, request UpdateDAGSuspensionStateRequestObject) (UpdateDAGSuspensionStateResponseObject, error)
 	// Check server health status
 	// (GET /health)
 	GetHealthStatus(ctx context.Context, request GetHealthStatusRequestObject) (GetHealthStatusResponseObject, error)
-	// Retrieve detailed status of a child run
-	// (GET /runs/{dagName}/{requestId}/children/{childRequestId})
-	GetChildRunDetails(ctx context.Context, request GetChildRunDetailsRequestObject) (GetChildRunDetailsResponseObject, error)
+	// Retrieve detailed status of a DAG run
+	// (GET /runs/{dagName}/{requestId})
+	GetRunDetails(ctx context.Context, request GetRunDetailsRequestObject) (GetRunDetailsResponseObject, error)
 	// Retrieve full execution log of a DAG run
 	// (GET /runs/{dagName}/{requestId}/log)
-	GetDAGRunLog(ctx context.Context, request GetDAGRunLogRequestObject) (GetDAGRunLogResponseObject, error)
+	GetRunLog(ctx context.Context, request GetRunLogRequestObject) (GetRunLogResponseObject, error)
 	// Retrieve log for a specific step in a DAG run
 	// (GET /runs/{dagName}/{requestId}/steps/{stepName}/log)
-	GetDAGStepLog(ctx context.Context, request GetDAGStepLogRequestObject) (GetDAGStepLogResponseObject, error)
+	GetRunStepLog(ctx context.Context, request GetRunStepLogRequestObject) (GetRunStepLogResponseObject, error)
 	// Manually update a step's execution status
 	// (PATCH /runs/{dagName}/{requestId}/steps/{stepName}/status)
-	UpdateDAGStepStatus(ctx context.Context, request UpdateDAGStepStatusRequestObject) (UpdateDAGStepStatusResponseObject, error)
+	UpdateRunStepStatus(ctx context.Context, request UpdateRunStepStatusRequestObject) (UpdateRunStepStatusResponseObject, error)
+	// Retrieve detailed status of a sub run
+	// (GET /runs/{dagName}/{requestId}/subs/{subRunRequestId})
+	GetSubRunDetails(ctx context.Context, request GetSubRunDetailsRequestObject) (GetSubRunDetailsResponseObject, error)
+	// Retrieve log for a specific sub run
+	// (GET /runs/{dagName}/{requestId}/subs/{subRunRequestId}/log)
+	GetSubRunLog(ctx context.Context, request GetSubRunLogRequestObject) (GetSubRunLogResponseObject, error)
+	// Retrieve log for a specific step in a sub run
+	// (GET /runs/{dagName}/{requestId}/subs/{subRunRequestId}/steps/{stepName}/log)
+	GetSubRunStepLog(ctx context.Context, request GetSubRunStepLogRequestObject) (GetSubRunStepLogResponseObject, error)
+	// Manually update a step's execution status in a sub run
+	// (PATCH /runs/{dagName}/{requestId}/subs/{subRunRequestId}/steps/{stepName}/status)
+	UpdateSubRunStepStatus(ctx context.Context, request UpdateSubRunStepStatusRequestObject) (UpdateSubRunStepStatusResponseObject, error)
 }
 
 type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
@@ -2862,25 +3411,25 @@ type strictHandler struct {
 	options     StrictHTTPServerOptions
 }
 
-// ListAllDAGs operation middleware
-func (sh *strictHandler) ListAllDAGs(w http.ResponseWriter, r *http.Request, params ListAllDAGsParams) {
-	var request ListAllDAGsRequestObject
+// ListDAGs operation middleware
+func (sh *strictHandler) ListDAGs(w http.ResponseWriter, r *http.Request, params ListDAGsParams) {
+	var request ListDAGsRequestObject
 
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ListAllDAGs(ctx, request.(ListAllDAGsRequestObject))
+		return sh.ssi.ListDAGs(ctx, request.(ListDAGsRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListAllDAGs")
+		handler = middleware(handler, "ListDAGs")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ListAllDAGsResponseObject); ok {
-		if err := validResponse.VisitListAllDAGsResponse(w); err != nil {
+	} else if validResponse, ok := response.(ListDAGsResponseObject); ok {
+		if err := validResponse.VisitListDAGsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -2921,25 +3470,25 @@ func (sh *strictHandler) CreateNewDAG(w http.ResponseWriter, r *http.Request, pa
 	}
 }
 
-// SearchDAGDefinitions operation middleware
-func (sh *strictHandler) SearchDAGDefinitions(w http.ResponseWriter, r *http.Request, params SearchDAGDefinitionsParams) {
-	var request SearchDAGDefinitionsRequestObject
+// SearchDAGs operation middleware
+func (sh *strictHandler) SearchDAGs(w http.ResponseWriter, r *http.Request, params SearchDAGsParams) {
+	var request SearchDAGsRequestObject
 
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.SearchDAGDefinitions(ctx, request.(SearchDAGDefinitionsRequestObject))
+		return sh.ssi.SearchDAGs(ctx, request.(SearchDAGsRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "SearchDAGDefinitions")
+		handler = middleware(handler, "SearchDAGs")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(SearchDAGDefinitionsResponseObject); ok {
-		if err := validResponse.VisitSearchDAGDefinitionsResponse(w); err != nil {
+	} else if validResponse, ok := response.(SearchDAGsResponseObject); ok {
+		if err := validResponse.VisitSearchDAGsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -2973,26 +3522,26 @@ func (sh *strictHandler) GetAllDAGTags(w http.ResponseWriter, r *http.Request, p
 	}
 }
 
-// DeleteDAGByFileName operation middleware
-func (sh *strictHandler) DeleteDAGByFileName(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params DeleteDAGByFileNameParams) {
-	var request DeleteDAGByFileNameRequestObject
+// DeleteDAG operation middleware
+func (sh *strictHandler) DeleteDAG(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params DeleteDAGParams) {
+	var request DeleteDAGRequestObject
 
 	request.FileName = fileName
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.DeleteDAGByFileName(ctx, request.(DeleteDAGByFileNameRequestObject))
+		return sh.ssi.DeleteDAG(ctx, request.(DeleteDAGRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "DeleteDAGByFileName")
+		handler = middleware(handler, "DeleteDAG")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(DeleteDAGByFileNameResponseObject); ok {
-		if err := validResponse.VisitDeleteDAGByFileNameResponse(w); err != nil {
+	} else if validResponse, ok := response.(DeleteDAGResponseObject); ok {
+		if err := validResponse.VisitDeleteDAGResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3061,14 +3610,14 @@ func (sh *strictHandler) RenameDAG(w http.ResponseWriter, r *http.Request, fileN
 	}
 }
 
-// RetryDAGExecution operation middleware
-func (sh *strictHandler) RetryDAGExecution(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryDAGExecutionParams) {
-	var request RetryDAGExecutionRequestObject
+// RetryDAGRun operation middleware
+func (sh *strictHandler) RetryDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryDAGRunParams) {
+	var request RetryDAGRunRequestObject
 
 	request.FileName = fileName
 	request.Params = params
 
-	var body RetryDAGExecutionJSONRequestBody
+	var body RetryDAGRunJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -3076,18 +3625,18 @@ func (sh *strictHandler) RetryDAGExecution(w http.ResponseWriter, r *http.Reques
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.RetryDAGExecution(ctx, request.(RetryDAGExecutionRequestObject))
+		return sh.ssi.RetryDAGRun(ctx, request.(RetryDAGRunRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "RetryDAGExecution")
+		handler = middleware(handler, "RetryDAGRun")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(RetryDAGExecutionResponseObject); ok {
-		if err := validResponse.VisitRetryDAGExecutionResponse(w); err != nil {
+	} else if validResponse, ok := response.(RetryDAGRunResponseObject); ok {
+		if err := validResponse.VisitRetryDAGRunResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3095,26 +3644,26 @@ func (sh *strictHandler) RetryDAGExecution(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-// GetDAGExecutionHistory operation middleware
-func (sh *strictHandler) GetDAGExecutionHistory(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGExecutionHistoryParams) {
-	var request GetDAGExecutionHistoryRequestObject
+// GetDAGRunHistory operation middleware
+func (sh *strictHandler) GetDAGRunHistory(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGRunHistoryParams) {
+	var request GetDAGRunHistoryRequestObject
 
 	request.FileName = fileName
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetDAGExecutionHistory(ctx, request.(GetDAGExecutionHistoryRequestObject))
+		return sh.ssi.GetDAGRunHistory(ctx, request.(GetDAGRunHistoryRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetDAGExecutionHistory")
+		handler = middleware(handler, "GetDAGRunHistory")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetDAGExecutionHistoryResponseObject); ok {
-		if err := validResponse.VisitGetDAGExecutionHistoryResponse(w); err != nil {
+	} else if validResponse, ok := response.(GetDAGRunHistoryResponseObject); ok {
+		if err := validResponse.VisitGetDAGRunHistoryResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3150,26 +3699,26 @@ func (sh *strictHandler) GetDAGRunDetails(w http.ResponseWriter, r *http.Request
 	}
 }
 
-// GetDAGDefinition operation middleware
-func (sh *strictHandler) GetDAGDefinition(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGDefinitionParams) {
-	var request GetDAGDefinitionRequestObject
+// GetDAGSpec operation middleware
+func (sh *strictHandler) GetDAGSpec(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGSpecParams) {
+	var request GetDAGSpecRequestObject
 
 	request.FileName = fileName
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetDAGDefinition(ctx, request.(GetDAGDefinitionRequestObject))
+		return sh.ssi.GetDAGSpec(ctx, request.(GetDAGSpecRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetDAGDefinition")
+		handler = middleware(handler, "GetDAGSpec")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetDAGDefinitionResponseObject); ok {
-		if err := validResponse.VisitGetDAGDefinitionResponse(w); err != nil {
+	} else if validResponse, ok := response.(GetDAGSpecResponseObject); ok {
+		if err := validResponse.VisitGetDAGSpecResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3177,14 +3726,14 @@ func (sh *strictHandler) GetDAGDefinition(w http.ResponseWriter, r *http.Request
 	}
 }
 
-// UpdateDAGDefinition operation middleware
-func (sh *strictHandler) UpdateDAGDefinition(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params UpdateDAGDefinitionParams) {
-	var request UpdateDAGDefinitionRequestObject
+// UpdateDAGSpec operation middleware
+func (sh *strictHandler) UpdateDAGSpec(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params UpdateDAGSpecParams) {
+	var request UpdateDAGSpecRequestObject
 
 	request.FileName = fileName
 	request.Params = params
 
-	var body UpdateDAGDefinitionJSONRequestBody
+	var body UpdateDAGSpecJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -3192,18 +3741,18 @@ func (sh *strictHandler) UpdateDAGDefinition(w http.ResponseWriter, r *http.Requ
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.UpdateDAGDefinition(ctx, request.(UpdateDAGDefinitionRequestObject))
+		return sh.ssi.UpdateDAGSpec(ctx, request.(UpdateDAGSpecRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "UpdateDAGDefinition")
+		handler = middleware(handler, "UpdateDAGSpec")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(UpdateDAGDefinitionResponseObject); ok {
-		if err := validResponse.VisitUpdateDAGDefinitionResponse(w); err != nil {
+	} else if validResponse, ok := response.(UpdateDAGSpecResponseObject); ok {
+		if err := validResponse.VisitUpdateDAGSpecResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3245,26 +3794,26 @@ func (sh *strictHandler) ExecuteDAG(w http.ResponseWriter, r *http.Request, file
 	}
 }
 
-// TerminateDAGExecution operation middleware
-func (sh *strictHandler) TerminateDAGExecution(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateDAGExecutionParams) {
-	var request TerminateDAGExecutionRequestObject
+// TerminateDAGRun operation middleware
+func (sh *strictHandler) TerminateDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateDAGRunParams) {
+	var request TerminateDAGRunRequestObject
 
 	request.FileName = fileName
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.TerminateDAGExecution(ctx, request.(TerminateDAGExecutionRequestObject))
+		return sh.ssi.TerminateDAGRun(ctx, request.(TerminateDAGRunRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "TerminateDAGExecution")
+		handler = middleware(handler, "TerminateDAGRun")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(TerminateDAGExecutionResponseObject); ok {
-		if err := validResponse.VisitTerminateDAGExecutionResponse(w); err != nil {
+	} else if validResponse, ok := response.(TerminateDAGRunResponseObject); ok {
+		if err := validResponse.VisitTerminateDAGRunResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3330,28 +3879,27 @@ func (sh *strictHandler) GetHealthStatus(w http.ResponseWriter, r *http.Request)
 	}
 }
 
-// GetChildRunDetails operation middleware
-func (sh *strictHandler) GetChildRunDetails(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, childRequestId string, params GetChildRunDetailsParams) {
-	var request GetChildRunDetailsRequestObject
+// GetRunDetails operation middleware
+func (sh *strictHandler) GetRunDetails(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, params GetRunDetailsParams) {
+	var request GetRunDetailsRequestObject
 
 	request.DagName = dagName
 	request.RequestId = requestId
-	request.ChildRequestId = childRequestId
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetChildRunDetails(ctx, request.(GetChildRunDetailsRequestObject))
+		return sh.ssi.GetRunDetails(ctx, request.(GetRunDetailsRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetChildRunDetails")
+		handler = middleware(handler, "GetRunDetails")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetChildRunDetailsResponseObject); ok {
-		if err := validResponse.VisitGetChildRunDetailsResponse(w); err != nil {
+	} else if validResponse, ok := response.(GetRunDetailsResponseObject); ok {
+		if err := validResponse.VisitGetRunDetailsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3359,27 +3907,27 @@ func (sh *strictHandler) GetChildRunDetails(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-// GetDAGRunLog operation middleware
-func (sh *strictHandler) GetDAGRunLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, params GetDAGRunLogParams) {
-	var request GetDAGRunLogRequestObject
+// GetRunLog operation middleware
+func (sh *strictHandler) GetRunLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, params GetRunLogParams) {
+	var request GetRunLogRequestObject
 
 	request.DagName = dagName
 	request.RequestId = requestId
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetDAGRunLog(ctx, request.(GetDAGRunLogRequestObject))
+		return sh.ssi.GetRunLog(ctx, request.(GetRunLogRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetDAGRunLog")
+		handler = middleware(handler, "GetRunLog")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetDAGRunLogResponseObject); ok {
-		if err := validResponse.VisitGetDAGRunLogResponse(w); err != nil {
+	} else if validResponse, ok := response.(GetRunLogResponseObject); ok {
+		if err := validResponse.VisitGetRunLogResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3387,9 +3935,9 @@ func (sh *strictHandler) GetDAGRunLog(w http.ResponseWriter, r *http.Request, da
 	}
 }
 
-// GetDAGStepLog operation middleware
-func (sh *strictHandler) GetDAGStepLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, stepName StepName, params GetDAGStepLogParams) {
-	var request GetDAGStepLogRequestObject
+// GetRunStepLog operation middleware
+func (sh *strictHandler) GetRunStepLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, stepName StepName, params GetRunStepLogParams) {
+	var request GetRunStepLogRequestObject
 
 	request.DagName = dagName
 	request.RequestId = requestId
@@ -3397,18 +3945,18 @@ func (sh *strictHandler) GetDAGStepLog(w http.ResponseWriter, r *http.Request, d
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetDAGStepLog(ctx, request.(GetDAGStepLogRequestObject))
+		return sh.ssi.GetRunStepLog(ctx, request.(GetRunStepLogRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetDAGStepLog")
+		handler = middleware(handler, "GetRunStepLog")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetDAGStepLogResponseObject); ok {
-		if err := validResponse.VisitGetDAGStepLogResponse(w); err != nil {
+	} else if validResponse, ok := response.(GetRunStepLogResponseObject); ok {
+		if err := validResponse.VisitGetRunStepLogResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3416,16 +3964,16 @@ func (sh *strictHandler) GetDAGStepLog(w http.ResponseWriter, r *http.Request, d
 	}
 }
 
-// UpdateDAGStepStatus operation middleware
-func (sh *strictHandler) UpdateDAGStepStatus(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, stepName StepName, params UpdateDAGStepStatusParams) {
-	var request UpdateDAGStepStatusRequestObject
+// UpdateRunStepStatus operation middleware
+func (sh *strictHandler) UpdateRunStepStatus(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, stepName StepName, params UpdateRunStepStatusParams) {
+	var request UpdateRunStepStatusRequestObject
 
 	request.DagName = dagName
 	request.RequestId = requestId
 	request.StepName = stepName
 	request.Params = params
 
-	var body UpdateDAGStepStatusJSONRequestBody
+	var body UpdateRunStepStatusJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -3433,18 +3981,143 @@ func (sh *strictHandler) UpdateDAGStepStatus(w http.ResponseWriter, r *http.Requ
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.UpdateDAGStepStatus(ctx, request.(UpdateDAGStepStatusRequestObject))
+		return sh.ssi.UpdateRunStepStatus(ctx, request.(UpdateRunStepStatusRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "UpdateDAGStepStatus")
+		handler = middleware(handler, "UpdateRunStepStatus")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(UpdateDAGStepStatusResponseObject); ok {
-		if err := validResponse.VisitUpdateDAGStepStatusResponse(w); err != nil {
+	} else if validResponse, ok := response.(UpdateRunStepStatusResponseObject); ok {
+		if err := validResponse.VisitUpdateRunStepStatusResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSubRunDetails operation middleware
+func (sh *strictHandler) GetSubRunDetails(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, subRunRequestId string, params GetSubRunDetailsParams) {
+	var request GetSubRunDetailsRequestObject
+
+	request.DagName = dagName
+	request.RequestId = requestId
+	request.SubRunRequestId = subRunRequestId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSubRunDetails(ctx, request.(GetSubRunDetailsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSubRunDetails")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSubRunDetailsResponseObject); ok {
+		if err := validResponse.VisitGetSubRunDetailsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSubRunLog operation middleware
+func (sh *strictHandler) GetSubRunLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, subRunRequestId string, params GetSubRunLogParams) {
+	var request GetSubRunLogRequestObject
+
+	request.DagName = dagName
+	request.RequestId = requestId
+	request.SubRunRequestId = subRunRequestId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSubRunLog(ctx, request.(GetSubRunLogRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSubRunLog")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSubRunLogResponseObject); ok {
+		if err := validResponse.VisitGetSubRunLogResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSubRunStepLog operation middleware
+func (sh *strictHandler) GetSubRunStepLog(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, subRunRequestId string, stepName StepName, params GetSubRunStepLogParams) {
+	var request GetSubRunStepLogRequestObject
+
+	request.DagName = dagName
+	request.RequestId = requestId
+	request.SubRunRequestId = subRunRequestId
+	request.StepName = stepName
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSubRunStepLog(ctx, request.(GetSubRunStepLogRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSubRunStepLog")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSubRunStepLogResponseObject); ok {
+		if err := validResponse.VisitGetSubRunStepLogResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateSubRunStepStatus operation middleware
+func (sh *strictHandler) UpdateSubRunStepStatus(w http.ResponseWriter, r *http.Request, dagName DAGName, requestId RequestId, subRunRequestId string, stepName StepName, params UpdateSubRunStepStatusParams) {
+	var request UpdateSubRunStepStatusRequestObject
+
+	request.DagName = dagName
+	request.RequestId = requestId
+	request.SubRunRequestId = subRunRequestId
+	request.StepName = stepName
+	request.Params = params
+
+	var body UpdateSubRunStepStatusJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateSubRunStepStatus(ctx, request.(UpdateSubRunStepStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateSubRunStepStatus")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateSubRunStepStatusResponseObject); ok {
+		if err := validResponse.VisitUpdateSubRunStepStatusResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3455,92 +4128,93 @@ func (sh *strictHandler) UpdateDAGStepStatus(w http.ResponseWriter, r *http.Requ
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"AAA=",
+	"H4sIAAAAAAAC/+w9XXPbOJJ/BaXbqtmtk2PPZPZh/eaNEydXGY9Lzt7W3YwvBZEtCRsSYABQtibl/36F",
+	"BkCCJPgh20nsbN4kEWw0Gv3dDejTLBF5IThwrWbHn2YFlTQHDRK/nZ6cvWIZnNMczNcUVCJZoZngs+OZ",
+	"3gDhNAciVsR8Pj05IyuWwWw+Y+Z5QfVmNp9xfHm28nDmMwkfSyYhnR1rWcJ8ppIN5NRM8CcJq9nx7D8O",
+	"a6QO7VN1GOJyezs3uMXxauEURyel6/tiU2FyQdcRNAq6BsLLfAnSYMM05IpoQVagkw35cworWmaaMEV+",
+	"/IvH8WMJclcjaUDMQozcS7PjH+eznHGWlzl+1rvCjGdcwxqkRQpkHK82SgVIgriGKD0/mpOc3iB2R0e9",
+	"+Lk5oij+9Wg+y+mNw/Ho6GgU5QXkQsO5SEc2VeI4ws3AOGKyhhTFbZaJhGazCgulJeNrh8THEpR+k3Zx",
+	"kPYReXMasrwsORGSZFSbZ+YbWxFVQMJWDFJCFfnBPvshzomymvCuvFijbBZwqaEYFwyloYjjo/z7Q+i0",
+	"6XbrH3q10Z39hZCWYIngK7YuJTUPzDdNGWd8Ta6F/LDKxDVJYcU4w8eUpyQHTVOq6Ww+K6QoQGoGKtjP",
+	"C6OzVHfGU8fPlU4jW5qVoAjj5L8ufz0nKyFzqs1+caHDPcN91AyJ0FrqvDlJe87XZU75gQSa0mUGJHgY",
+	"8MwPihSlLIQCXN8SNnTLhIxNtpaiLLrTvBVrltCM4GNDO7EiEgyfpWYCZZZGhFxTzv5AOtPMT6li0/Ao",
+	"w/hZuhq1A6Do2YO3TGnzar0HBpgiekM1SSgnSyAFVQpSoxu9TDU2ANVUhOkqLKiUdDdzLJiWGfSj4UYY",
+	"isFNIUEpJrhyDGdYcAO8wkJtRJmlBpMQiyFJvPQIRJDTdD1AH/MUNy2hGtZCsj8MOoY7VizTYFaMG7sH",
+	"PW5DAf7NbvEcNR/OfVWNF8t/QaJn1qaegqYsi0qTeWD5qyXDjFtJMgMfi4xmdNed7R3LwUBWkAieojm+",
+	"pkyTJayMdlKaSm0o3WH0ykx9YfEHvu3nGeBbJgXPgWuypZKZKXFNCqolwQ0kpVnTXoL0hbTOhvI0A/kr",
+	"H5Or19VA8xZTegEauJnhlO4iXHVe+Tgp3SFJpOFeTsy7QuIiMrFW0Q3OxPqUyQirMgmJFnJHjMHEtSIw",
+	"vjaw0PWNrjKnNyeJZltYlDyC6y/WRwpcxUTwpJTSbKsxxhZ/VEJdZOOK+x+cfSyBsNQQacVAIrZer10z",
+	"vWGcMK3sTj5afV5IlFP0BFTMo/DP7PR5qQzfG3/Bs79HwGCG0j1Vk18EUz85U4NcM4CZZyqrHFAjBsHS",
+	"pNmN+/h0jZwJJCMC7gJYFBAUD6WpLtWwfaPrCbEi6nIphRygjn1OgCei5BokpCQtpTdHLkzYS35WvbG7",
+	"IUArjnGheweoDV4W5aiSXpT8ssxzKi0PlqoAnkIkjvrnBvQGan3EFKlHVxgshciA8s4WB4kEQ/sQwXDW",
+	"it4DLBCnzXk8p2FZAAO2NdwYPqBagzRv/N9v9OCPk4P/PTr42/uDq//8U4yMpydnZ5KlbzTk3SnNEwzH",
+	"UTqMNdkyVdLMmdEO01kzFnFwLi3DBkEeETJFXlruSFsBD+2mCZ4ttBhn8VHKuQCzG2BHxNUvp2erJm3T",
+	"/XfopeGXyN4AB8kSK55EgioEV0Achu2dSVz2Yoi0ONELMxDdyR5/+yS11odmbmo/MkKkHJSKJnsuN0Jq",
+	"974fNLYpiU2b+OGxTalX0JkRHxEDgzCeMqOHnQYzUCo9Z+STl7mZb0nT97V240K/X4mSp5idMNtHs/f+",
+	"lZLTUm+M4UAJN2+uqYZrusNsRS40vOciheoFmhlffPdelpxbJ9jAr7/553DDlA51Rc0Wr0MnteOABFGQ",
+	"EV3YGq/N+bUYxFDHnC02oTyBbKqVhRump45dUZaVEqYOV2WSgJpo728jrPAaaKY3CycWXRotmgJTOaIb",
+	"fI8kG0g+EOBpIRjvipM1wF2ov25B0izzUFRT7YHcQshhdtQOGch/jm210Y9K0zwS+rzwDjnCJn1xZ1ng",
+	"k64c2tfs4yACjfr0W5AqGl16JNyAznqH5drRsoZfoRuuPCbuxkN5R9f7bXLGFIq+2SZ0C9t7++X9oWHv",
+	"tLRBk8P1jg6oe3vA93gr1tHIOvQyKynxYYaMGBpuQuA4KP9wXNXbcTE843n42sGgHBX8lqUlzayr4QJL",
+	"6vPiXWdZcHhhdnMoZHcqaVVmxGiiDGyIt0LrW4A1KDbEiUkPxM34y9AGEhY4SCtMa8Wk2URqagPpSQTf",
+	"xasXz58//xupJKcO6CxU927UpY6xwAXVG0zeaCgOXJ4rqTILMTAStNyNkhNHEeMJ5YVWJKcpOPYyfnfD",
+	"SwuoiMHy3VbuXo1hXKvz6a6nfectXY7by/pFO9yFwtNt4TKeoqkC53J5IEuuCFVKJAzzXhgrhrScFj/j",
+	"VKPaxIE0/BJuSYMz57ViD0nVYI95IHl9sn7ZY2rPyxz9X2dj256dz1QZtwvHwPHv/OiY/D47F9rzwu+z",
+	"3/mP5reF9bzM95/M91coe+brc/P1BbpF7pefzS+XVhmY73/F7x9YUdjntYE/mv84/2n+fP7z/K9XHWae",
+	"z24OzLiDLZWYqzKEPRf6smLTReUOvvKqoEJkNvcomE928tlVg2QVaw6mgh35woywV/KukOm9FV7Tzexi",
+	"hVylp6zziB8DLaM8chG5u6BrxqlPWbcMid3AeLHY725QzI6nIeGmB4J5Mvp6IWHbU0WXsGWiVKMgtNA0",
+	"MzAiLIzPggRrgcN6oSwgETKdAEe6gdFqdsMrCMHOGyRvYB4QMiBKTGIb+cmuLQmeNnOjimqmsIDiMqSO",
+	"vwj12YJ4vNI/18squWletv68FgS2NCupjhouuCkg0bHU0Ev3xMTZZaa9h1svxoG17mvXuenQaYEew4XI",
+	"WLKbEsAhEazJDOoyTWJgWLql2T71JX0NwFu2OMqB1sUZTppZM2tTxktAqGZHzRJc9BfNokWI09vr0F9B",
+	"qB1vuKHGPZsduxTc3hmXRcmDciPNsl9Xs+Pf9sgy9tYou4nb2qXG7HfbVX3W2WWjldWQA9zyfiuYe6bS",
+	"z10iqB2sCP5iUpLAvy/4ywlpgnr0q2mJgvqFy2mpAvtCO9GHxOwqsqv5yA6aQKNqs2E8ycoU3X/riREL",
+	"N8baNZv0x/LdKTpcMBICkD5P2KN85zDAABly/n0GdlKTWn89b2HLcnU9T0XKd81afLRcyNKYFRKGYbr9",
+	"Uj2KL1BGE9udxuKU0e25d6xypzilEaO0JCVsB3Pp8R7/vjceMHwV8xkue2uW/kmrr2NlvYGoYNQ1zYiA",
+	"SWOpG36BT2QQbyHGUhMB/OhagMpkc3pypn6hOtnEyyrOuFgJV/gGyc3whvrvLC1jHGJ1ep1ssNjPOPRn",
+	"WOb4ug2/Y5Ekr5pCrzcgweNDFfFZ755g/G0UK4xiLEpYWDVo3ehxjxTX2MA1nKaf4gv0y+LkfhMYREts",
+	"58VVla04vaeXUJFYoAZ3OiArKHJtvlT1hEmheYSz7lQByz3DRFvm4pUwW9H0y4xuw/3CdKf0Pl+UHonK",
+	"P2NMflVR5N5ReK3o9gzEW5F4LP6+dFmoXnnRVH1o+qQYtRUgjc1VRn35jKCRnHhVmMqh9DaV6zI3nG4s",
+	"u7Hx3sInIs9pUz5GM+lJnv6T6c1JdMYXNmtbQSYWTuC+NXBxXSgxVepR60zxd6pq8EEniyGhKHU9Qbw5",
+	"sACejjTIhH1NGDwnflVVa5HL+cWbi0ZJeI8+wmuDVBUIpiLed5bGmtj+KeQHswNp1cyGZUvfJVhB/UEF",
+	"fBFpaWPZr7ynYF5FqoIo4CkBM5pwYeJI25ajTKha5d7j8er+rW1hCWKgU1mUuigj7uJ/uw5K2+2MiXjf",
+	"QeYI4t7co1vuovaqW0LnA5gJrvWDNMH1M+p9uuBkK7sy7LYHY29Rn0YSKJEzRbb7kVDUgpZsUX8dwcR8",
+	"W/PZO2yNyo/TGgjYjuqLtpROQcqePqqqHTShhbYVSqUpT6lMq2aHGEQRY8NRiH1cGHMoog6ELT10/Vt3",
+	"ysI5aqpcRv3+u4RpvSFOFz9DGUhKyfTOBCW5s2wFeyc+AGK9BCpBvvK9PqKgH8vqmA+qEBxQE2ijNZZ3",
+	"llSx5KTUG2wsqEabX9uDDRqMr4QvtNIEd8qdkPkfoSl5TXOa0tl8VsrMvaeODw/XTG/K5bNE5Ic7oTXd",
+	"5GlH2c9OLt5U3roUWea7IHPBmesoPqXr0hX2n6GfnoCrvDskzi7eHjx/djSEQErX5YGQa/xwuMzE8jCn",
+	"jB++ffPi5fnly2cWNc005vDMjEFzwPHsp2dHz45QYxbAacFmx7Pn+BOm+Ta4MQY0flhDLALHxOQWlO0O",
+	"x1KZKFxTU93yudxZmUdbbuvnlZNj+AztsusLDc8n9mQK6yGHmD6/nY+PcwfZJgwNDql184+vcE12tW5V",
+	"PSfUfGjfe6JqDLbGSCEG2j7ph3xlpNH2a+DW/XR01GoooEWROVN9+C9l/ZMaXid4G/Ck6n3XG2DS+9+t",
+	"U12TbJFv242YoS/fSVI0CmqDJrQe2daDaaNXpAE0ohi7WiTslPA7apWNO+a4x6aO9ivGMIi3Rlol7pOv",
+	"dhNolhG6pSxDD8vJsm3HcXQwkVwhlI5lk4BaI83hmkBe6B1ptmqjQa9OBjnRaqoQC+Qcrl0CYi81Esr8",
+	"VZWp/LtId/cQnL0SuNOMe3OYliXcdmT9xwdAuT/nweE625EEiZ1OT3x8Q+xuGc0xq2HT+jBrl+Vv59aC",
+	"Htp8Wa8hvajzAKsyyw403GifY6OJFEqhhDWn69rROrV1LxHomKYTjwtaIhfu91inj3udK76vrRpvU7SY",
+	"BydPpjUpvhw0KW4797EoNlUaKziGqVRVZxXNPJ62eyQ2gwTuWPeRR2mgnfHJiqmjatwSVWKpp3m3RvaC",
+	"7lFSKki9XI7J5Bnokyw7PTl753pk72eZ7iErQ8RudwB/a+6Ijzv6GOGTP3V0a/kgAw1RNZ1Tg2y2w0sq",
+	"kDdaHEBWUuRWSeyUkcI2Q5wi8Pu6KeOBTOM+lS7v/Bw/H1fvcbYjlg4YRf5sX/i8G2wQ4EK7es6jYy27",
+	"c4RygsdJgtJP29GN6pNXYEtWqW+BCLtX6BLT2nUZwELu6JLgBP9XZZ+HNtNr0EjQNCzp3r2Y6Gn0VYLH",
+	"fU5UBoh+thOVex+gfLLK35tsLOZI2ABXbOt7XMIzvuN24FCCD4d6wtYN5WusIIENVRttMB3ZXSC4r6H2",
+	"HySYheuBA7VwbSmAWb6g3joeHAZg7xbuHkUOVvbx6s8P6DD18ukbvqUZSyvF8d122rAZpaXO67w5nSqF",
+	"2rb4xYVwAfa8BgJ2VU4U8Lbwabk7PTmzOvDpiZ/sb+Rd9F5aZm9FwfhxWAoH6zUPLIOPz17sOrwzhS3d",
+	"OaJBR6+C6a6l2YVeTcyzW5T8tTsq/4ScuyarriVLT6mmPZcgVBXI9gUIU2sE1SULsRzL4Omu4G4gVBpN",
+	"QzVp/qbDNpxcKTEZUJHjW/SyBhl8ohQdfqrUz+2EVEyk8d+HTgWVmiVlRuWINaiE7StEUlMKkFVd/WEl",
+	"U+4XkHT5+Vvi4TPQdSAeHhQIA3Dfyz7OyeatUXsQlLHsisfswaWB+mQtweeK1F37l7LE2eP2SLdH3Y4k",
+	"THxZcCNXLNhB33Dg7ElR8Wi0jhtrbPpFpGzF9mPzfxQpxVzoV+H0h/DM+5nK1wenM9Y9vO87Yv9ZJa59",
+	"4OObExrLvY1NnmApsD+zN6DFDvkwdKhOrzW7qwJJaQvVS9v1+FRTTfv32k45wnb7xWVrr5gdi0e+p4JE",
+	"O2D3DNqfpES9cWS4S0iutCj65eqVkAnYqpYZqAitTsajcLmryTvC9A5kzrg1Ul8je/SNJFoqMjaovu8O",
+	"29rFQEre9tsqch0epvdXLPkT9f4sCR7wwNtrk0RIPLeiBV4LitVcSEkiBa/eH3BeEC/FBL/U9kaEJ+jH",
+	"1LRtGST7wMdI7vbpaJK/r/7kYX+JDP/3TPs7sV67pgdVMaY9ExgXM3tj3lDupZRc+av4upkX5IO6nT0W",
+	"y9pLBC/9OefP1sbSuqzwjoawfSDJX2fiDnu0CxuQfPDXBjauKwyo7VpBLL1t1sv9Qc3tpPxXp3VgIA0W",
+	"SWB09uNL5r4eQ94ruIXk7ukv/+he/tYX01D29oxHq6WqhEM6cCFIIEGYTh+Tn0N348ZoFq4Or/AKDn9y",
+	"fUBc3uIVbd+eqAw2BYr14+Ptt+7OlCfB3CbgaDHbvfgb7yE6/OT/wmk6w1ds3r3Us3WhZ4z5LzUUj1UA",
+	"xgdXf5j1XVgetbDUqrhyYWIMek+Jqa/9Kai2RzL6+7qihaG+q3Bj0aETnsrz/Qbk50Gizb3viY3fdf29",
+	"Z+xe8y7sXxva6zAer4b4hfKSZtmOlDbhTv2FDbVl7URcE7VDuTTKAU/MLz5TGFZfadAxrfao/mOOxDpH",
+	"weqUtbtAwLeZBc48ttb0/Plkk9Rf9KzYv3tUeFndqfhEo8L6yoqHkPL7+s5jYv2IHeZ9RDqgwOMT6e8O",
+	"+Zd2yB9WBD9bPDsqnY88pH00Evo9vP63CK8/t1w/dNTdJ9826q5F/HEH3hOk3IU84Z+vGNo8Dln/ngr4",
+	"ngp4pKmAMbUW3EOHCqG+ge63KyMIwWVy+INheFvktQqkVXCj65KcXLypS+D20rZPdtW3x4eHnzZC6dtD",
+	"WrDD7U+z+az6Q2/8v8+qncURG//hNsOf23R6LZRu3KHo5rydNw5ce0B44V3wV3n2K94mh3S4qmjT+Q8+",
+	"r1ntUZmccrr2N9nVF4riDWB/tv+dDSk5SXZJxhJyJmmxUX+pFRM2HHSVXmsS59QYwMFxHTw0ZKbNxFq5",
+	"a8eIO2DjwOO3LvhLLLzXd+q6pdT38OFNZX5l3U4Gr1Vt/f726vb/AwAA//+LzeaTUIcAAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

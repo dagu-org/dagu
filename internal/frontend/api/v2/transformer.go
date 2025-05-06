@@ -104,14 +104,14 @@ func toNode(node *runstore.Node) api.Node {
 		StatusLabel: api.NodeStatusLabel(node.Status.String()),
 		Step:        toStep(node.Step),
 		Error:       ptrOf(node.Error),
-		ChildRuns:   ptrOf(toChildRuns(node.Children)),
+		SubRuns:     ptrOf(toSubRuns(node.SubRuns)),
 	}
 }
 
-func toChildRuns(childRuns []runstore.ChildRun) []api.ChildRun {
-	var result []api.ChildRun
-	for _, r := range childRuns {
-		result = append(result, api.ChildRun{
+func toSubRuns(subRuns []runstore.SubRun) []api.SubRun {
+	var result []api.SubRun
+	for _, r := range subRuns {
+		result = append(result, api.SubRun{
 			RequestId: r.RequestID,
 		})
 	}

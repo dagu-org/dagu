@@ -109,7 +109,7 @@ type stepDef struct {
 	SignalOnStop *string
 	// Deprecated: Don't use this field
 	Call *callFuncDef // deprecated
-	// Run is the name of a DAG to run as a sub DAG (child DAG).
+	// Run is the name of a DAG to run as a sub-run
 	Run string
 	// Params specifies the parameters for the sub DAG.
 	Params string

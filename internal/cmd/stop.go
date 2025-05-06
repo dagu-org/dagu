@@ -73,7 +73,7 @@ func runStop(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	if err := cli.StopDAG(ctx, dag, requestID); err != nil {
+	if err := cli.Stop(ctx, dag, requestID); err != nil {
 		logger.Error(ctx, "Failed to stop DAG", "dag", dag.Name, "err", err)
 		return fmt.Errorf("failed to stop DAG: %w", err)
 	}

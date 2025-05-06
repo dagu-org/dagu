@@ -18,16 +18,14 @@ var (
 type Store interface {
 	// NewRecord creates a new history record for a DAG run
 	NewRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts NewRecordOptions) (Record, error)
-	// Update updates the status of an existing record identified by name and reqID
-	Update(ctx context.Context, name, reqID string, status Status) error
 	// Recent returns the most recent history records for a DAG, limited by itemLimit
 	Recent(ctx context.Context, name string, itemLimit int) []Record
 	// Latest returns the most recent history record for a DAG
 	Latest(ctx context.Context, name string) (Record, error)
 	// FindByRequestID finds a history record by its request ID
 	FindByRequestID(ctx context.Context, name string, reqID string) (Record, error)
-	// FindByChildRequestID finds a child run record by its request ID
-	FindByChildRequestID(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (Record, error)
+	// FindBySubRunRequestID finds a sub-run record by its request ID
+	FindBySubRunRequestID(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (Record, error)
 	// RemoveOld removes history records older than retentionDays
 	RemoveOld(ctx context.Context, name string, retentionDays int) error
 	// Rename renames all history records from oldName to newName
