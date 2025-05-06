@@ -185,20 +185,14 @@ type DAG struct {
 func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
-	var status scheduler.Status
-	var lock sync.Mutex
-
 	require.Eventually(t, func() bool {
-		lock.Lock()
-		defer lock.Unlock()
-
 		latest, err := d.RunClient.GetLatestStatus(d.Context, d.DAG)
 		if err != nil {
 			return false
 		}
-		status = latest.Status
+		t.Logf("latest status=%s errors=%v", latest.Status.String(), latest.Errors())
 		return latest.Status == expected
-	}, time.Second*3, time.Millisecond*50, "expected latest status to be %q, got %q", expected, status)
+	}, time.Second*3, time.Millisecond*50)
 }
 
 func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
@@ -213,20 +207,14 @@ func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
 func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
-	var status scheduler.Status
-	var lock sync.Mutex
-
 	assert.Eventually(t, func() bool {
-		lock.Lock()
-		defer lock.Unlock()
-
 		curr, _ := d.RunClient.GetRealtimeStatus(d.Context, d.DAG, "")
 		if curr == nil {
 			return false
 		}
-		status = curr.Status
+		t.Logf("current status=%s errors=%v", curr.Status.String(), curr.Errors())
 		return curr.Status == expected
-	}, time.Second*3, time.Millisecond*50, "expected current status to be %q, got %q", expected, status)
+	}, time.Second*3, time.Millisecond*50)
 }
 
 // AssertOutputs checks the given outputs against the actual outputs of the DAG

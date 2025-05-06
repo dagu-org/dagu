@@ -144,7 +144,7 @@ func executeDag(ctx *Context, dag *digraph.DAG, requestID string, rootDAG digrap
 
 	logger.Debug(ctx, "DAG run initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
 
-	dagStore, err := ctx.dagStore()
+	dagStore, err := ctx.dagStore([]string{filepath.Dir(dag.Location)})
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
 		return fmt.Errorf("failed to initialize DAG store: %w", err)

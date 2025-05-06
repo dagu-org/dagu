@@ -158,6 +158,29 @@ type Status struct {
 	ParamsList    []string         `json:"paramsList,omitempty"`
 }
 
+// Errors returns a slice of errors for the current status
+func (st *Status) Errors() []error {
+	var errs []error
+	for _, node := range st.Nodes {
+		if node.Error != "" {
+			errs = append(errs, fmt.Errorf("node %s: %s", node.Step.Name, node.Error))
+		}
+	}
+	if st.OnExit != nil && st.OnExit.Error != "" {
+		errs = append(errs, fmt.Errorf("onExit: %s", st.OnExit.Error))
+	}
+	if st.OnSuccess != nil && st.OnSuccess.Error != "" {
+		errs = append(errs, fmt.Errorf("onSuccess: %s", st.OnSuccess.Error))
+	}
+	if st.OnFailure != nil && st.OnFailure.Error != "" {
+		errs = append(errs, fmt.Errorf("onFailure: %s", st.OnFailure.Error))
+	}
+	if st.OnCancel != nil && st.OnCancel.Error != "" {
+		errs = append(errs, fmt.Errorf("onCancel: %s", st.OnCancel.Error))
+	}
+	return errs
+}
+
 // RootDAG returns the root DAG object for the current status
 func (st *Status) RootDAG() digraph.RootDAG {
 	if st.RootDAGName == "" || st.RootRequestID == "" {

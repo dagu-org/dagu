@@ -149,7 +149,7 @@ func (s *Context) DAGClient(runClient runstore.Client, opts ...dagClientOption) 
 	dagStore := options.dagStore
 	if dagStore == nil {
 		var err error
-		dagStore, err = s.dagStore()
+		dagStore, err = s.dagStore(nil)
 		if err != nil {
 			return dagstore.Client{}, fmt.Errorf("failed to initialize DAG store: %w", err)
 		}
@@ -204,7 +204,7 @@ func (s *Context) scheduler() (*scheduler.Scheduler, error) {
 
 // dagStore returns a new DAGStore instance. It ensures that the directory exists
 // (creating it if necessary) before returning the store.
-func (s *Context) dagStore() (dagstore.Store, error) {
+func (s *Context) dagStore(searchPaths []string) (dagstore.Store, error) {
 	baseDir := s.cfg.Paths.DAGsDir
 	_, err := os.Stat(baseDir)
 	if os.IsNotExist(err) {
@@ -214,7 +214,10 @@ func (s *Context) dagStore() (dagstore.Store, error) {
 	}
 
 	// Create a flag store based on the suspend flags directory.
-	return filestore.New(s.cfg.Paths.DAGsDir, filestore.WithFlagsBaseDir(s.cfg.Paths.SuspendFlagsDir)), nil
+	return filestore.New(
+		s.cfg.Paths.DAGsDir,
+		filestore.WithFlagsBaseDir(s.cfg.Paths.SuspendFlagsDir),
+		filestore.WithSearchPaths(searchPaths)), nil
 }
 
 // dagStoreWithCache returns a DAGStore instance that uses an in-memory file cache.

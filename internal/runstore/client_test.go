@@ -94,6 +94,37 @@ func TestClient_GetStatus(t *testing.T) {
 		require.Equal(t, 1, len(status.Nodes))
 		require.Equal(t, newStatus, statusByRequestID.Nodes[0].Status)
 	})
+	t.Run("UpdateSubRunStatus", func(t *testing.T) {
+		dag := th.DAG(t, filepath.Join("client", "tree_parent.yaml"))
+		dagStatus, err := th.DAGClient.Status(th.Context, dag.Location)
+		require.NoError(t, err)
+
+		err = th.RunClient.Start(th.Context, dagStatus.DAG, runstore.StartOptions{})
+		require.NoError(t, err)
+
+		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+
+		// Get the sub run status.
+		status, err := th.RunClient.GetLatestStatus(th.Context, dag.DAG)
+		require.NoError(t, err)
+		requestId := status.RequestID
+		subRun := status.Nodes[0].SubRuns[0]
+
+		rootDAG := digraph.NewRootDAG(dag.DAG.Name, requestId)
+		subRunStatus, err := th.RunClient.FindBySubRunRequestID(th.Context, rootDAG, subRun.RequestID)
+		require.NoError(t, err)
+		require.Equal(t, scheduler.StatusSuccess.String(), subRunStatus.Status.String())
+
+		// Update the sub run status.
+		subRunStatus.Nodes[0].Status = scheduler.NodeStatusError
+		err = th.RunClient.UpdateStatus(th.Context, rootDAG, *subRunStatus)
+		require.NoError(t, err)
+
+		// Check if the sub run status is updated.
+		subRunStatus, err = th.RunClient.FindBySubRunRequestID(th.Context, rootDAG, subRun.RequestID)
+		require.NoError(t, err)
+		require.Equal(t, scheduler.NodeStatusError.String(), subRunStatus.Nodes[0].Status.String())
+	})
 	t.Run("InvalidUpdateStatusWithInvalidReqID", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "invalid_reqid.yaml"))
 		ctx := th.Context

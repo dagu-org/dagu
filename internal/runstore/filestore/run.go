@@ -44,7 +44,6 @@ func NewRun(dir string) (*Run, error) {
 	// Determine if the run is a sub-run
 	parentDir := filepath.Dir(dir)
 	if filepath.Base(parentDir) == SubRunsDir {
-		// Sub-workflow run
 		matches := reRunSub.FindStringSubmatch(filepath.Base(dir))
 		if len(matches) != 2 {
 			return nil, ErrInvalidRunDir

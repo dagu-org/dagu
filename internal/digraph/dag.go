@@ -292,7 +292,7 @@ func (d *DAG) initializeDefaults() {
 	d.setupHandlers(workDir)
 }
 
-// setupSteps initializes all workflow steps
+// setupSteps initializes all steps
 func (d *DAG) setupSteps(workDir string) {
 	for i := range d.Steps {
 		d.Steps[i].setup(workDir)

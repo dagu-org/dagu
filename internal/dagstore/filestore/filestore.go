@@ -28,6 +28,7 @@ type Option func(*Options)
 type Options struct {
 	FlagsBaseDir string                        // Base directory for flag storage
 	FileCache    *fileutil.Cache[*digraph.DAG] // Optional cache for DAG objects
+	SearchPaths  []string                      // Additional search paths for DAG files
 }
 
 // WithFileCache returns a DAGStoreOption that sets the file cache for DAG storage
@@ -44,11 +45,19 @@ func WithFlagsBaseDir(dir string) Option {
 	}
 }
 
+// WithSearchPaths returns a DAGStoreOption that sets additional search paths for DAG files
+func WithSearchPaths(paths []string) Option {
+	return func(o *Options) {
+		o.SearchPaths = paths
+	}
+}
+
 // fileStore implements the DAGStore interface with local filesystem storage
 type fileStore struct {
 	baseDir      string                        // Base directory for DAG storage
 	flagsBaseDir string                        // Base directory for flag storage
 	fileCache    *fileutil.Cache[*digraph.DAG] // Optional cache for DAG objects
+	searchPaths  []string                      // Additional search paths for DAG files
 }
 
 // New creates a new DAG store implementation using the local filesystem
@@ -60,11 +69,22 @@ func New(baseDir string, opts ...Option) dagstore.Store {
 	if options.FlagsBaseDir == "" {
 		options.FlagsBaseDir = filepath.Join(baseDir, "flags")
 	}
+	uniqSearchPaths := make(map[string]struct{})
+	uniqSearchPaths[baseDir] = struct{}{}
+	uniqSearchPaths["."] = struct{}{}
+	for _, path := range options.SearchPaths {
+		uniqSearchPaths[path] = struct{}{}
+	}
+	searchPaths := make([]string, 0, len(uniqSearchPaths))
+	for path := range uniqSearchPaths {
+		searchPaths = append(searchPaths, path)
+	}
 
 	return &fileStore{
 		baseDir:      baseDir,
 		flagsBaseDir: options.FlagsBaseDir,
 		fileCache:    options.FileCache,
+		searchPaths:  searchPaths,
 	}
 }
 
@@ -72,7 +92,7 @@ func New(baseDir string, opts ...Option) dagstore.Store {
 func (d *fileStore) GetMetadata(ctx context.Context, name string) (*digraph.DAG, error) {
 	filePath, err := d.locateDAG(name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to locate DAG %s: %w", name, err)
+		return nil, fmt.Errorf("failed to locate DAG %s in search paths (%v): %w", name, d.searchPaths, err)
 	}
 	if d.fileCache == nil {
 		return digraph.Load(ctx, filePath, digraph.OnlyMetadata(), digraph.WithoutEval())
@@ -365,9 +385,12 @@ func (d *fileStore) locateDAG(nameOrPath string) (string, error) {
 		}
 	}
 
-	searchPaths := []string{".", d.baseDir}
-	for _, dir := range searchPaths {
-		candidatePath := filepath.Join(dir, nameOrPath)
+	for _, dir := range d.searchPaths {
+		absDir, err := filepath.Abs(dir)
+		if err != nil {
+			continue
+		}
+		candidatePath := filepath.Join(absDir, nameOrPath)
 		foundPath, err := findDAGFile(candidatePath)
 		if err == nil {
 			return foundPath, nil
@@ -375,7 +398,7 @@ func (d *fileStore) locateDAG(nameOrPath string) (string, error) {
 	}
 
 	// DAG not found
-	return "", fmt.Errorf("workflow %s not found: %w", nameOrPath, os.ErrNotExist)
+	return "", fmt.Errorf("DAG %s not found: %w", nameOrPath, os.ErrNotExist)
 }
 
 // findDAGFile finds the DAG file with the given file name.
