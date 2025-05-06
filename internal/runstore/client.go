@@ -31,17 +31,23 @@ func NewClient(
 	}
 }
 
+// Client provides methods to interact with DAGs, including starting, stopping,
+// restarting, and retrieving status information. It communicates with the DAG
+// through a socket interface and manages run records through a Store.
 type Client struct {
-	runStore   Store
-	executable string
-	workDir    string
+	runStore   Store  // Store interface for persisting run data
+	executable string // Path to the executable used to run DAGs
+	workDir    string // Working directory for executing commands
 }
 
+// LoadYAML loads a DAG from YAML specification bytes without evaluating it.
+// It appends the WithoutEval option to any provided options.
 func (e *Client) LoadYAML(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error) {
 	opts = append(slices.Clone(opts), digraph.WithoutEval())
 	return digraph.LoadYAML(ctx, spec, opts...)
 }
 
+// Rename changes the name of a DAG from oldName to newName in the run store.
 func (e *Client) Rename(ctx context.Context, oldName, newName string) error {
 	if err := e.runStore.Rename(ctx, oldName, newName); err != nil {
 		return fmt.Errorf("failed to rename DAG: %w", err)
@@ -49,6 +55,8 @@ func (e *Client) Rename(ctx context.Context, oldName, newName string) error {
 	return nil
 }
 
+// StopDAG stops a running DAG by sending a stop request to its socket.
+// If the DAG is not running, it logs a message and returns nil.
 func (e *Client) StopDAG(ctx context.Context, dag *digraph.DAG, requestID string) error {
 	logger.Info(ctx, "Stopping", "name", dag.Name)
 	addr := dag.SockAddr(requestID)
@@ -61,6 +69,8 @@ func (e *Client) StopDAG(ctx context.Context, dag *digraph.DAG, requestID string
 	return err
 }
 
+// StartDAG starts a DAG by executing the configured executable with appropriate arguments.
+// It sets up the command to run in its own process group and configures standard output/error.
 func (e *Client) StartDAG(_ context.Context, dag *digraph.DAG, opts StartOptions) error {
 	args := []string{"start"}
 	if opts.Params != "" {
@@ -82,6 +92,8 @@ func (e *Client) StartDAG(_ context.Context, dag *digraph.DAG, opts StartOptions
 	return cmd.Start()
 }
 
+// RestartDAG restarts a DAG by executing the configured executable with the restart command.
+// It sets up the command to run in its own process group.
 func (e *Client) RestartDAG(_ context.Context, dag *digraph.DAG, opts RestartOptions) error {
 	args := []string{"restart"}
 	if opts.Quiet {
@@ -96,6 +108,8 @@ func (e *Client) RestartDAG(_ context.Context, dag *digraph.DAG, opts RestartOpt
 	return cmd.Start()
 }
 
+// RetryDAG retries a DAG execution with the specified requestID by executing
+// the configured executable with the retry command.
 func (e *Client) RetryDAG(_ context.Context, dag *digraph.DAG, requestID string) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--request-id=%s", requestID))
@@ -108,11 +122,16 @@ func (e *Client) RetryDAG(_ context.Context, dag *digraph.DAG, requestID string)
 	return cmd.Start()
 }
 
+// IsRunning checks if a DAG is currently running by attempting to get its current status.
+// Returns true if the status can be retrieved without error, false otherwise.
 func (e *Client) IsRunning(ctx context.Context, dag *digraph.DAG, requestID string) bool {
 	_, err := e.currentStatus(ctx, dag, requestID)
 	return err == nil
 }
 
+// GetCurrentStatus retrieves the current status of a DAG.
+// If the DAG is running, it gets the status from the socket.
+// If the socket doesn't exist or times out, it falls back to stored status or creates an initial status.
 func (e *Client) GetCurrentStatus(ctx context.Context, dag *digraph.DAG, requestId string) (*Status, error) {
 	status, err := e.currentStatus(ctx, dag, requestId)
 	if err != nil {
@@ -136,6 +155,7 @@ FALLBACK:
 	return e.GetStatusByRequestID(ctx, dag, requestId)
 }
 
+// GetStatus retrieves the status of a DAG run by name and requestID from the run store.
 func (e *Client) GetStatus(ctx context.Context, name string, requestID string) (*Status, error) {
 	record, err := e.runStore.FindByRequestID(ctx, name, requestID)
 	if err != nil {
@@ -148,6 +168,9 @@ func (e *Client) GetStatus(ctx context.Context, name string, requestID string) (
 	return latestStatus, nil
 }
 
+// GetStatusByRequestID retrieves the status of a DAG run by requestID.
+// If the stored status indicates the DAG is running, it attempts to get the current status.
+// If that fails, it marks the status as error.
 func (e *Client) GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, requestID string) (
 	*Status, error,
 ) {
@@ -191,6 +214,8 @@ func (e *Client) GetStatusByChildRunRequestID(ctx context.Context, name string, 
 	return latestStatus, nil
 }
 
+// currentStatus retrieves the current status of a running DAG by querying its socket.
+// This is a private method used internally by other status-related methods.
 func (*Client) currentStatus(_ context.Context, dag *digraph.DAG, requestId string) (*Status, error) {
 	// FIXME: Should handle the case of dynamic DAG
 	client := sock.NewClient(dag.SockAddr(requestId))
@@ -202,6 +227,9 @@ func (*Client) currentStatus(_ context.Context, dag *digraph.DAG, requestId stri
 	return StatusFromJSON(statusJSON)
 }
 
+// GetLatestStatus retrieves the latest status of a DAG.
+// If the DAG is running, it attempts to get the current status from the socket.
+// If that fails or no status exists, it returns an initial status or an error.
 func (e *Client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (Status, error) {
 	var latestStatus *Status
 
@@ -245,6 +273,8 @@ handleError:
 	return ret, err
 }
 
+// GetRecentHistory retrieves the n most recent status records for a DAG by name.
+// It returns a slice of Status objects, filtering out any that cannot be read.
 func (e *Client) GetRecentHistory(ctx context.Context, name string, n int) []Status {
 	records := e.runStore.Recent(ctx, name, n)
 
@@ -258,10 +288,13 @@ func (e *Client) GetRecentHistory(ctx context.Context, name string, n int) []Sta
 	return runs
 }
 
+// UpdateStatus updates the status of a DAG run in the run store.
 func (e *Client) UpdateStatus(ctx context.Context, name string, status Status) error {
 	return e.runStore.Update(ctx, name, status.RequestID, status)
 }
 
+// escapeArg escapes special characters in command arguments.
+// Currently handles carriage returns and newlines by adding backslashes.
 func escapeArg(input string) string {
 	escaped := strings.Builder{}
 
@@ -279,11 +312,13 @@ func escapeArg(input string) string {
 	return escaped.String()
 }
 
+// StartOptions contains options for starting a DAG.
 type StartOptions struct {
-	Params string
-	Quiet  bool
+	Params string // Parameters to pass to the DAG
+	Quiet  bool   // Whether to run in quiet mode
 }
 
+// RestartOptions contains options for restarting a DAG.
 type RestartOptions struct {
-	Quiet bool
+	Quiet bool // Whether to run in quiet mode
 }
