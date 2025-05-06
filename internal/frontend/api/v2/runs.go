@@ -9,6 +9,7 @@ import (
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/transform"
 )
@@ -25,13 +26,25 @@ func (a *API) GetRunLog(ctx context.Context, request api.GetRunLogRequestObject)
 		}, nil
 	}
 
-	content, err := a.readFileContent(ctx, status.Log, nil)
+	// Extract pagination parameters
+	options := fileutil.LogReadOptions{
+		Head:   valueOf(request.Params.Head),
+		Tail:   valueOf(request.Params.Tail),
+		Offset: valueOf(request.Params.Offset),
+		Limit:  valueOf(request.Params.Limit),
+	}
+
+	// Use the new log utility function
+	content, lineCount, totalLines, hasMore, err := fileutil.ReadLogContent(status.Log, options)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %w", status.Log, err)
 	}
 
 	return api.GetRunLog200JSONResponse{
-		Content: string(content),
+		Content:    content,
+		LineCount:  ptrOf(lineCount),
+		TotalLines: ptrOf(totalLines),
+		HasMore:    ptrOf(hasMore),
 	}, nil
 }
 
@@ -55,13 +68,25 @@ func (a *API) GetRunStepLog(ctx context.Context, request api.GetRunStepLogReques
 		}, nil
 	}
 
-	content, err := a.readFileContent(ctx, node.Log, nil)
+	// Extract pagination parameters
+	options := fileutil.LogReadOptions{
+		Head:   valueOf(request.Params.Head),
+		Tail:   valueOf(request.Params.Tail),
+		Offset: valueOf(request.Params.Offset),
+		Limit:  valueOf(request.Params.Limit),
+	}
+
+	// Use the new log utility function
+	content, lineCount, totalLines, hasMore, err := fileutil.ReadLogContent(node.Log, options)
 	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %w", status.Log, err)
+		return nil, fmt.Errorf("error reading %s: %w", node.Log, err)
 	}
 
 	return api.GetRunStepLog200JSONResponse{
-		Content: string(content),
+		Content:    content,
+		LineCount:  ptrOf(lineCount),
+		TotalLines: ptrOf(totalLines),
+		HasMore:    ptrOf(hasMore),
 	}, nil
 }
 
@@ -144,13 +169,25 @@ func (a *API) GetSubRunLog(ctx context.Context, request api.GetSubRunLogRequestO
 		}, nil
 	}
 
-	content, err := a.readFileContent(ctx, status.Log, nil)
+	// Extract pagination parameters
+	options := fileutil.LogReadOptions{
+		Head:   valueOf(request.Params.Head),
+		Tail:   valueOf(request.Params.Tail),
+		Offset: valueOf(request.Params.Offset),
+		Limit:  valueOf(request.Params.Limit),
+	}
+
+	// Use the new log utility function
+	content, lineCount, totalLines, hasMore, err := fileutil.ReadLogContent(status.Log, options)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %w", status.Log, err)
 	}
 
 	return &api.GetSubRunLog200JSONResponse{
-		Content: string(content),
+		Content:    content,
+		LineCount:  ptrOf(lineCount),
+		TotalLines: ptrOf(totalLines),
+		HasMore:    ptrOf(hasMore),
 	}, nil
 }
 
@@ -173,13 +210,25 @@ func (a *API) GetSubRunStepLog(ctx context.Context, request api.GetSubRunStepLog
 		}, nil
 	}
 
-	content, err := a.readFileContent(ctx, node.Log, nil)
+	// Extract pagination parameters
+	options := fileutil.LogReadOptions{
+		Head:   valueOf(request.Params.Head),
+		Tail:   valueOf(request.Params.Tail),
+		Offset: valueOf(request.Params.Offset),
+		Limit:  valueOf(request.Params.Limit),
+	}
+
+	// Use the new log utility function
+	content, lineCount, totalLines, hasMore, err := fileutil.ReadLogContent(node.Log, options)
 	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %w", status.Log, err)
+		return nil, fmt.Errorf("error reading %s: %w", node.Log, err)
 	}
 
 	return &api.GetSubRunStepLog200JSONResponse{
-		Content: string(content),
+		Content:    content,
+		LineCount:  ptrOf(lineCount),
+		TotalLines: ptrOf(totalLines),
+		HasMore:    ptrOf(hasMore),
 	}, nil
 }
 
