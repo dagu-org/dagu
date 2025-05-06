@@ -180,7 +180,7 @@ func (e *Client) GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, req
 // GetStatusByChildRunRequestID retrieves the status of a child run by its request ID.
 func (e *Client) GetStatusByChildRunRequestID(ctx context.Context, name string, requestID string) (*Status, error) {
 	root := digraph.NewRootDAG(name, requestID)
-	record, err := e.runStore.FindBySubRunRequestID(ctx, name, root)
+	record, err := e.runStore.FindByChildRequestID(ctx, name, root)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find child status by request id: %w", err)
 	}

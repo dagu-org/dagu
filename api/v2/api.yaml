@@ -695,23 +695,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /runs/{dagName}/{requestId}/sub-runs/{subRequestId}:
+  /runs/{dagName}/{requestId}/children/{childRequestId}:
     get:
-      summary: "Retrieve detailed status of a sub-run"
-      description: "Fetches detailed status information about a specific sub-run"
-      operationId: "getSubRunDetails"
+      summary: "Retrieve detailed status of a child run"
+      description: "Fetches detailed status information about a specific child-run"
+      operationId: "getChildRunDetails"
       tags:
         - "runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/RequestId"
-        - name: "subRequestId"
+        - name: "childRequestId"
           in: "path"
           required: true
           schema:
             type: "string"
-          description: "ID of the sub-run to retrieve details for"
+          description: "ID of the child run to retrieve details for"
       responses:
         "200":
           description: "A successful response"
@@ -1188,11 +1188,11 @@ components:
         doneCount:
           type: integer
           description: "Number of successful completions for repeating steps"
-        subRuns:
+        childRuns:
           type: array
-          description: "List of sub-runs associated with this step"
+          description: "List of child runs associated with this step"
           items:
-            $ref: "#/components/schemas/SubRun"
+            $ref: "#/components/schemas/ChildRun"
         error:
           type: string
           description: "Error message if the step failed"
@@ -1206,9 +1206,9 @@ components:
         - retryCount
         - doneCount
 
-    SubRun:
+    ChildRun:
       type: object
-      description: "Metadata for a sub-DAG run"
+      description: "Metadata for a child run"
       properties:
         requestId:
           $ref: "#/components/schemas/RequestId"
@@ -1253,10 +1253,10 @@ components:
             type: string
         run:
           type: string
-          description: "The name of the DAG to run as a sub-DAG"
+          description: "The name of the DAG to run as a child"
         params:
           type: string
-          description: "Parameters to pass to the sub DAG in JSON format"
+          description: "Parameters to pass to the child DAG in JSON format"
         depends:
           type: array
           description: "List of step names that must complete before this step can start"

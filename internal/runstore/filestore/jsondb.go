@@ -164,13 +164,13 @@ func (db *fileStore) newSubRecord(ctx context.Context, dag *digraph.DAG, timesta
 
 	var run *Run
 	if opts.Retry {
-		r, err := rootRun.FindSubRun(ctx, reqID)
+		r, err := rootRun.FindChildRun(ctx, reqID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find run: %w", err)
 		}
 		run = r
 	} else {
-		r, err := rootRun.CreateSubRun(ctx, reqID)
+		r, err := rootRun.CreateChildRun(ctx, reqID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create sub run: %w", err)
 		}
@@ -277,8 +277,8 @@ func (db *fileStore) FindByRequestID(ctx context.Context, dagName, reqID string)
 	return run.LatestRecord(ctx, db.cache)
 }
 
-// FindBySubRunRequestID finds a runstore record by request ID for a sub-DAG.
-func (db *fileStore) FindBySubRunRequestID(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (runstore.Record, error) {
+// FindByChildRequestID finds a runstore record by request ID for a sub-DAG.
+func (db *fileStore) FindByChildRequestID(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (runstore.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -297,11 +297,11 @@ func (db *fileStore) FindBySubRunRequestID(ctx context.Context, reqID string, ro
 		return nil, err
 	}
 
-	subRun, err := run.FindSubRun(ctx, reqID)
+	childRun, err := run.FindChildRun(ctx, reqID)
 	if err != nil {
 		return nil, err
 	}
-	return subRun.LatestRecord(ctx, db.cache)
+	return childRun.LatestRecord(ctx, db.cache)
 }
 
 // RemoveOld removes runstore records older than retentionDays for the specified key.

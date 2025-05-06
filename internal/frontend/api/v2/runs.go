@@ -102,8 +102,8 @@ func (a *API) UpdateDAGStepStatus(ctx context.Context, request api.UpdateDAGStep
 	return &api.UpdateDAGStepStatus200Response{}, nil
 }
 
-// GetSubRunDetails implements api.StrictServerInterface.
-func (a *API) GetSubRunDetails(_ context.Context, _ api.GetSubRunDetailsRequestObject) (api.GetSubRunDetailsResponseObject, error) {
+// GetChildRunDetails implements api.StrictServerInterface.
+func (a *API) GetChildRunDetails(_ context.Context, _ api.GetChildRunDetailsRequestObject) (api.GetChildRunDetailsResponseObject, error) {
 	panic("not implemented")
 }
 

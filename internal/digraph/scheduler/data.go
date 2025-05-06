@@ -44,12 +44,12 @@ type NodeState struct {
 	// ExitCode is the exit code that the command exited with.
 	// It only makes sense when the node is a command executor.
 	ExitCode int
-	// SubRuns is the list of sub DAG runs that this node has executed.
-	SubRuns []SubRun
+	// ChildRuns is the list of child runs that this node has executed.
+	ChildRuns []ChildRun
 }
 
-type SubRun struct {
-	// RequestID is the request ID of the sub-run.
+type ChildRun struct {
+	// RequestID is the request ID of the child run.
 	RequestID string
 }
 
@@ -133,20 +133,20 @@ func (s *Data) Data() NodeData {
 	return s.inner
 }
 
-func (s *Data) RequestID() (string, error) {
+func (s *Data) ChildRequestID() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// If SubRuns is not empty, return the first sub-run's request ID.
-	if len(s.inner.State.SubRuns) > 0 {
-		return s.inner.State.SubRuns[0].RequestID, nil
+	// If children is not empty, return the first child's request ID.
+	if len(s.inner.State.ChildRuns) > 0 {
+		return s.inner.State.ChildRuns[0].RequestID, nil
 	}
-	// If SubRuns is empty, generate a new request ID.
-	requestID, err := generateRequestID()
+	// Generate a new request ID for the current node.
+	r, err := generateRequestID()
 	if err != nil {
 		return "", fmt.Errorf("failed to generate request ID: %w", err)
 	}
-	s.inner.State.SubRuns = append(s.inner.State.SubRuns, SubRun{RequestID: requestID})
-	return requestID, nil
+	s.inner.State.ChildRuns = append(s.inner.State.ChildRuns, ChildRun{RequestID: r})
+	return r, nil
 }
 
 func (s *Data) Setup(ctx context.Context, logFile string, startedAt time.Time) error {
@@ -366,10 +366,10 @@ func (n *Data) ClearState() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	// SubRuns need to be preserved to retain the request IDs
-	subRuns := n.inner.State.SubRuns
+	// The data of child runs need to be preserved to retain their request IDs
+	childRuns := n.inner.State.ChildRuns
 	n.inner.State = NodeState{}
-	n.inner.State.SubRuns = subRuns
+	n.inner.State.ChildRuns = childRuns
 }
 
 func (n *Data) MarkError(err error) {

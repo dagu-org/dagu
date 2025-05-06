@@ -185,7 +185,7 @@ func TestJSONDB(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify record is created
-		existingRecord, err := th.DB.FindBySubRunRequestID(th.Context, "sub-id", rootDAG)
+		existingRecord, err := th.DB.FindByChildRequestID(th.Context, "sub-id", rootDAG)
 		require.NoError(t, err)
 
 		status, err := existingRecord.ReadStatus(th.Context)
@@ -224,7 +224,7 @@ func TestJSONDB(t *testing.T) {
 
 		// Find the sub run by request ID
 		ts = time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
-		existingRecord, err := th.DB.FindBySubRunRequestID(th.Context, "sub-id", rootDAG)
+		existingRecord, err := th.DB.FindByChildRequestID(th.Context, "sub-id", rootDAG)
 		require.NoError(t, err)
 		existingRecordStatus, err := existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)
@@ -243,7 +243,7 @@ func TestJSONDB(t *testing.T) {
 		_ = retryRecord.Close(th.Context)
 
 		// Verify the retry record is created
-		existingRecord, err = th.DB.FindBySubRunRequestID(th.Context, "sub-id", rootDAG)
+		existingRecord, err = th.DB.FindByChildRequestID(th.Context, "sub-id", rootDAG)
 		require.NoError(t, err)
 		existingRecordStatus, err = existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)

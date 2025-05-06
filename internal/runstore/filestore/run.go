@@ -19,11 +19,11 @@ var (
 	ErrInvalidRunDir = errors.New("invalid run directory")
 )
 
-// SubRunsDir is the name of the directory where status files for sub DAGs are stored.
-const SubRunsDir = "children"
+// ChildRunsDir is the name of the directory where status files for sub DAGs are stored.
+const ChildRunsDir = "children"
 
-// SubRunsDirPrefix is the prefix for sub-run directories.
-const SubRunsDirPrefix = "child_"
+// ChildRunsDirPrefix is the prefix for sub-run directories.
+const ChildRunsDirPrefix = "child_"
 
 // JSONLStatusFile is the name of the status file for each execution attempt.
 // It contains the status of the DAG run in JSON Lines format.
@@ -43,7 +43,7 @@ type Run struct {
 func NewRun(dir string) (*Run, error) {
 	// Determine if the run is a sub-run
 	parentDir := filepath.Dir(dir)
-	if filepath.Base(parentDir) == SubRunsDir {
+	if filepath.Base(parentDir) == ChildRunsDir {
 		// Sub-workflow run
 		matches := reRunSub.FindStringSubmatch(filepath.Base(dir))
 		if len(matches) != 2 {
@@ -85,19 +85,19 @@ func (e Run) CreateRecord(_ context.Context, ts TimeInUTC, cache *fileutil.Cache
 	return NewRecord(filepath.Join(dir, JSONLStatusFile), cache, opts...), nil
 }
 
-// CreateSubRun creates a new sub-run with the given timestamp and request ID.
-func (e Run) CreateSubRun(_ context.Context, reqID string) (*Run, error) {
+// CreateChildRun creates a new sub-run with the given timestamp and request ID.
+func (e Run) CreateChildRun(_ context.Context, reqID string) (*Run, error) {
 	dirName := "child_" + reqID
-	dir := filepath.Join(e.baseDir, SubRunsDir, dirName)
+	dir := filepath.Join(e.baseDir, ChildRunsDir, dirName)
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create sub-run directory: %w", err)
 	}
 	return NewRun(dir)
 }
 
-// FindSubRun searches for a sub-run with the specified request ID.
-func (e Run) FindSubRun(_ context.Context, reqID string) (*Run, error) {
-	globPattern := filepath.Join(e.baseDir, SubRunsDir, "child_"+reqID)
+// FindChildRun searches for a sub-run with the specified request ID.
+func (e Run) FindChildRun(_ context.Context, reqID string) (*Run, error) {
+	globPattern := filepath.Join(e.baseDir, ChildRunsDir, "child_"+reqID)
 	matches, err := filepath.Glob(globPattern)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list sub-run directories: %w", err)
