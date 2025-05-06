@@ -368,6 +368,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 	if err := a.runClient.Start(ctx, status.DAG, runstore.StartOptions{
 		Params:    valueOf(request.Body.Params),
 		RequestID: requestID,
+		Quiet:     true,
 	}); err != nil {
 		return nil, fmt.Errorf("error starting DAG: %w", err)
 	}
@@ -389,7 +390,8 @@ waitLoop:
 			if status == nil {
 				continue
 			}
-			if status.Status == scheduler.StatusRunning {
+			if status.Status != scheduler.StatusNone {
+				// If status is not None, it means the DAG has started or even finished
 				running = true
 				timer.Stop()
 				break waitLoop

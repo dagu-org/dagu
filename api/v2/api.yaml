@@ -644,6 +644,10 @@ paths:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/RequestId"
+        - $ref: "#/components/parameters/Tail"
+        - $ref: "#/components/parameters/Head"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
       responses:
         "200":
           description: "A successful response"
@@ -676,6 +680,10 @@ paths:
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/RequestId"
         - $ref: "#/components/parameters/StepName"
+        - $ref: "#/components/parameters/Tail"
+        - $ref: "#/components/parameters/Head"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
       responses:
         "200":
           description: "A successful response"
@@ -794,6 +802,10 @@ paths:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/RequestId"
+        - $ref: "#/components/parameters/Tail"
+        - $ref: "#/components/parameters/Head"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
         - name: "subRunRequestId"
           in: "path"
           required: true
@@ -831,6 +843,10 @@ paths:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/RequestId"
+        - $ref: "#/components/parameters/Tail"
+        - $ref: "#/components/parameters/Head"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
         - name: "subRunRequestId"
           in: "path"
           required: true
@@ -981,6 +997,43 @@ components:
       required: true
       schema:
         $ref: "#/components/schemas/RequestId"
+
+    Tail:
+      name: tail
+      in: query
+      description: Number of lines to return from the end of the file
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+
+    Head:
+      name: head
+      in: query
+      description: Number of lines to return from the beginning of the file
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+
+    Offset:
+      name: offset
+      in: query
+      description: Line number to start reading from (1-based)
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+
+    Limit:
+      name: limit
+      in: query
+      description: Maximum number of lines to return
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 10000
 
   schemas:
     Error:
@@ -1502,6 +1555,18 @@ components:
         content:
           type: string
           description: "Log content"
+        lineCount:
+          type: integer
+          description: "Number of lines returned"
+        totalLines:
+          type: integer
+          description: "Total number of lines in the log file"
+        hasMore:
+          type: boolean
+          description: "Whether there are more lines available"
+        isEstimate:
+          type: boolean
+          description: "Whether the line count is an estimate"
       required:
         - content
 

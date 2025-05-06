@@ -68,7 +68,7 @@ func setupTest(t *testing.T) testHelper {
 
 	dagStore := filestore.New(cfg.Paths.DAGsDir, filestore.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
 	runStore := runfs.New(cfg.Paths.DataDir)
-	runCli := runstore.NewClient(runStore, "", cfg.Global.WorkDir)
+	runCli := runstore.NewClient(runStore, "", cfg.Global.WorkDir, "")
 	dagCli := dagstore.NewClient(runCli, dagStore)
 	jobManager := scheduler.NewDAGJobManager(testdataDir, dagCli, runCli, "", "")
 

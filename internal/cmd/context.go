@@ -123,25 +123,26 @@ func (c *Context) init(cmd *cobra.Command) error {
 
 // Client initializes a Client using the provided options. If not supplied,
 // it creates default DAGStore and RunStore instances.
-func (s *Context) Client(opts ...clientOption) (runstore.Client, error) {
+func (c *Context) Client(opts ...clientOption) (runstore.Client, error) {
 	options := &clientOptions{}
 	for _, opt := range opts {
 		opt(options)
 	}
 	runStore := options.runStore
 	if runStore == nil {
-		runStore = s.runStore()
+		runStore = c.runStore()
 	}
 
 	return runstore.NewClient(
 		runStore,
-		s.cfg.Paths.Executable,
-		s.cfg.Global.WorkDir,
+		c.cfg.Paths.Executable,
+		c.cfg.Global.WorkDir,
+		c.cfg.Global.ConfigPath,
 	), nil
 }
 
 // DAGClient initializes a DAGClient using the provided options.
-func (s *Context) DAGClient(runClient runstore.Client, opts ...dagClientOption) (dagstore.Client, error) {
+func (c *Context) DAGClient(runClient runstore.Client, opts ...dagClientOption) (dagstore.Client, error) {
 	options := &dagClientOptions{}
 	for _, opt := range opts {
 		opt(options)
@@ -149,7 +150,7 @@ func (s *Context) DAGClient(runClient runstore.Client, opts ...dagClientOption) 
 	dagStore := options.dagStore
 	if dagStore == nil {
 		var err error
-		dagStore, err = s.dagStore(nil)
+		dagStore, err = c.dagStore(nil)
 		if err != nil {
 			return dagstore.Client{}, fmt.Errorf("failed to initialize DAG store: %w", err)
 		}
@@ -163,49 +164,49 @@ func (s *Context) DAGClient(runClient runstore.Client, opts ...dagClientOption) 
 
 // server creates and returns a new web UI server.
 // It initializes in-memory caches for DAGs and runstore, and uses them in the client.
-func (ctx *Context) server() (*frontend.Server, error) {
+func (c *Context) server() (*frontend.Server, error) {
 	dagCache := fileutil.NewCache[*digraph.DAG](0, time.Hour*12)
-	dagCache.StartEviction(ctx)
-	dagStore := ctx.dagStoreWithCache(dagCache)
+	dagCache.StartEviction(c)
+	dagStore := c.dagStoreWithCache(dagCache)
 
 	statusCache := fileutil.NewCache[*runstore.Status](0, time.Hour*12)
-	statusCache.StartEviction(ctx)
-	runStore := ctx.runStoreWithCache(statusCache)
+	statusCache.StartEviction(c)
+	runStore := c.runStoreWithCache(statusCache)
 
-	runCli, err := ctx.Client(withRunStore(runStore))
+	runCli, err := c.Client(withRunStore(runStore))
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	dagCli, err := ctx.DAGClient(runCli, withDAGStore(dagStore))
+	dagCli, err := c.DAGClient(runCli, withDAGStore(dagStore))
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize DAG client: %w", err)
 	}
 
-	return frontend.NewServer(ctx.cfg, dagCli, runCli), nil
+	return frontend.NewServer(c.cfg, dagCli, runCli), nil
 }
 
 // scheduler creates a new scheduler instance using the default client.
 // It builds a DAG job manager to handle scheduled executions.
-func (s *Context) scheduler() (*scheduler.Scheduler, error) {
-	runCli, err := s.Client()
+func (c *Context) scheduler() (*scheduler.Scheduler, error) {
+	runCli, err := c.Client()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	dagCli, err := s.DAGClient(runCli)
+	dagCli, err := c.DAGClient(runCli)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize DAG client: %w", err)
 	}
 
-	manager := scheduler.NewDAGJobManager(s.cfg.Paths.DAGsDir, dagCli, runCli, s.cfg.Paths.Executable, s.cfg.Global.WorkDir)
-	return scheduler.New(s.cfg, manager), nil
+	manager := scheduler.NewDAGJobManager(c.cfg.Paths.DAGsDir, dagCli, runCli, c.cfg.Paths.Executable, c.cfg.Global.WorkDir)
+	return scheduler.New(c.cfg, manager), nil
 }
 
 // dagStore returns a new DAGStore instance. It ensures that the directory exists
 // (creating it if necessary) before returning the store.
-func (s *Context) dagStore(searchPaths []string) (dagstore.Store, error) {
-	baseDir := s.cfg.Paths.DAGsDir
+func (c *Context) dagStore(searchPaths []string) (dagstore.Store, error) {
+	baseDir := c.cfg.Paths.DAGsDir
 	_, err := os.Stat(baseDir)
 	if os.IsNotExist(err) {
 		if err := os.MkdirAll(baseDir, 0750); err != nil {
@@ -215,28 +216,28 @@ func (s *Context) dagStore(searchPaths []string) (dagstore.Store, error) {
 
 	// Create a flag store based on the suspend flags directory.
 	return filestore.New(
-		s.cfg.Paths.DAGsDir,
-		filestore.WithFlagsBaseDir(s.cfg.Paths.SuspendFlagsDir),
+		c.cfg.Paths.DAGsDir,
+		filestore.WithFlagsBaseDir(c.cfg.Paths.SuspendFlagsDir),
 		filestore.WithSearchPaths(searchPaths)), nil
 }
 
 // dagStoreWithCache returns a DAGStore instance that uses an in-memory file cache.
-func (s *Context) dagStoreWithCache(cache *fileutil.Cache[*digraph.DAG]) dagstore.Store {
-	return filestore.New(s.cfg.Paths.DAGsDir, filestore.WithFlagsBaseDir(s.cfg.Paths.SuspendFlagsDir), filestore.WithFileCache(cache))
+func (c *Context) dagStoreWithCache(cache *fileutil.Cache[*digraph.DAG]) dagstore.Store {
+	return filestore.New(c.cfg.Paths.DAGsDir, filestore.WithFlagsBaseDir(c.cfg.Paths.SuspendFlagsDir), filestore.WithFileCache(cache))
 }
 
 // runStore returns a new RunStore instance using JSON database storage.
 // It applies the "latestStatusToday" setting from the server configuration.
-func (s *Context) runStore() runstore.Store {
-	return runfs.New(s.cfg.Paths.DataDir, runfs.WithLatestStatusToday(
-		s.cfg.Server.LatestStatusToday,
+func (c *Context) runStore() runstore.Store {
+	return runfs.New(c.cfg.Paths.DataDir, runfs.WithLatestStatusToday(
+		c.cfg.Server.LatestStatusToday,
 	))
 }
 
 // runStoreWithCache returns a RunStore that uses an in-memory cache.
-func (s *Context) runStoreWithCache(cache *fileutil.Cache[*runstore.Status]) runstore.Store {
-	return runfs.New(s.cfg.Paths.DataDir,
-		runfs.WithLatestStatusToday(s.cfg.Server.LatestStatusToday),
+func (c *Context) runStoreWithCache(cache *fileutil.Cache[*runstore.Status]) runstore.Store {
+	return runfs.New(c.cfg.Paths.DataDir,
+		runfs.WithLatestStatusToday(c.cfg.Server.LatestStatusToday),
 		runfs.WithFileCache(cache),
 	)
 }
@@ -244,16 +245,16 @@ func (s *Context) runStoreWithCache(cache *fileutil.Cache[*runstore.Status]) run
 // OpenLogFile creates and opens a log file for a given DAG run.
 // It evaluates the log directory, validates settings, creates the log directory,
 // builds a filename using the current timestamp and request ID, and then opens the file.
-func (ctx *Context) OpenLogFile(
+func (c *Context) OpenLogFile(
 	dag *digraph.DAG,
 	requestID string,
 ) (*os.File, error) {
-	logDir, err := cmdutil.EvalString(ctx, ctx.cfg.Paths.LogDir)
+	logDir, err := cmdutil.EvalString(c, c.cfg.Paths.LogDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to expand log directory: %w", err)
 	}
 
-	dagLogDir, err := cmdutil.EvalString(ctx, dag.LogDir)
+	dagLogDir, err := cmdutil.EvalString(c, dag.LogDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to expand DAG log directory: %w", err)
 	}

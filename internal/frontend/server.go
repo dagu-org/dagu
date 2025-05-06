@@ -242,8 +242,6 @@ func (srv *Server) setupGracefulShutdown(ctx context.Context) {
 	if err := srv.httpServer.Shutdown(shutdownCtx); err != nil {
 		logger.Error(ctx, "Failed to shutdown server gracefully", "err", err)
 	}
-
-	logger.Info(ctx, "Server shutdown complete")
 }
 
 // CustomRecoverer provides a middleware that recovers from panics

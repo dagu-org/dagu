@@ -41,6 +41,9 @@ type Global struct {
 	// WorkDir specifies the default working directory for DAG (Directed Acyclic Graph) files.
 	// If not explicitly provided, it defaults to the directory where the DAG file resides.
 	WorkDir string
+
+	// ConfigPath is the path to the configuration file used to load settings.
+	ConfigPath string
 }
 
 func (cfg *Global) setTimezone() error {

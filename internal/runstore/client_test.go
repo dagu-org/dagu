@@ -99,7 +99,7 @@ func TestClient_GetStatus(t *testing.T) {
 		dagStatus, err := th.DAGClient.Status(th.Context, dag.Location)
 		require.NoError(t, err)
 
-		err = th.RunClient.Start(th.Context, dagStatus.DAG, runstore.StartOptions{})
+		err = th.RunClient.Start(th.Context, dagStatus.DAG, runstore.StartOptions{Quiet: true})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
@@ -148,7 +148,9 @@ func TestClient_RunDAG(t *testing.T) {
 		dagStatus, err := th.DAGClient.Status(th.Context, dag.Location)
 		require.NoError(t, err)
 
-		err = th.RunClient.Start(th.Context, dagStatus.DAG, runstore.StartOptions{})
+		err = th.RunClient.Start(th.Context, dagStatus.DAG, runstore.StartOptions{
+			Quiet: true,
+		})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
