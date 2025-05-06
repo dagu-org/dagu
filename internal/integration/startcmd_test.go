@@ -137,53 +137,53 @@ steps:
 	parentRec, err := th.RunStore.FindByRequestID(ctx, "parent", requestID)
 	require.NoError(t, err)
 
-	updateStatus := func(rec runstore.Record, run *runstore.Run) {
+	updateStatus := func(rec runstore.Record, status *runstore.Status) {
 		err = rec.Open(ctx)
 		require.NoError(t, err)
-		err = rec.Write(ctx, run.Status)
+		err = rec.Write(ctx, *status)
 		require.NoError(t, err)
 		err = rec.Close(ctx)
 		require.NoError(t, err)
 	}
 
 	// (1) Find the child_1 node and update its status to "failed"
-	parentRun, err := parentRec.ReadRun(ctx)
+	parentStatus, err := parentRec.ReadStatus(ctx)
 	require.NoError(t, err)
 
-	child1Node := parentRun.Status.Nodes[0]
+	child1Node := parentStatus.Nodes[0]
 	child1Node.Status = scheduler.NodeStatusError
-	updateStatus(parentRec, parentRun)
+	updateStatus(parentRec, parentStatus)
 
 	// (2) Find the runstore record for child_1
 	rootDAG := digraph.NewRootDAG("parent", requestID)
 	child1Rec, err := th.RunStore.FindBySubRequestID(ctx, child1Node.SubRuns[0].RequestID, rootDAG)
 	require.NoError(t, err)
 
-	child1Run, err := child1Rec.ReadRun(ctx)
+	child1Status, err := child1Rec.ReadStatus(ctx)
 	require.NoError(t, err)
 
 	// (3) Find the child_2 node and update its status to "failed"
-	child2Node := child1Run.Status.Nodes[0]
+	child2Node := child1Status.Nodes[0]
 	child2Node.Status = scheduler.NodeStatusError
-	updateStatus(child1Rec, child1Run)
+	updateStatus(child1Rec, child1Status)
 
 	// (4) Find the runstore record for child_2
 	child2Rec, err := th.RunStore.FindBySubRequestID(ctx, child2Node.SubRuns[0].RequestID, rootDAG)
 	require.NoError(t, err)
 
-	child2Run, err := child2Rec.ReadRun(ctx)
+	child2Status, err := child2Rec.ReadStatus(ctx)
 	require.NoError(t, err)
 
-	require.Equal(t, child2Run.Status.Status.String(), scheduler.NodeStatusSuccess.String())
+	require.Equal(t, child2Status.Status.String(), scheduler.NodeStatusSuccess.String())
 
 	// (5) Update the step in child_2 to "failed" to simulate a retry
-	child2Run.Status.Nodes[0].Status = scheduler.NodeStatusError
-	updateStatus(child2Rec, child2Run)
+	child2Status.Nodes[0].Status = scheduler.NodeStatusError
+	updateStatus(child2Rec, child2Status)
 
 	// (6) Check if the child_2 status is now "failed"
-	child2Run, err = child2Rec.ReadRun(ctx)
+	child2Status, err = child2Rec.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, child2Run.Status.Nodes[0].Status.String(), scheduler.NodeStatusError.String())
+	require.Equal(t, child2Status.Nodes[0].Status.String(), scheduler.NodeStatusError.String())
 
 	// Retry the DAG
 
@@ -196,9 +196,9 @@ steps:
 	// Check if the child_2 status is now "success"
 	child2Rec, err = th.RunStore.FindBySubRequestID(ctx, child2Node.SubRuns[0].RequestID, rootDAG)
 	require.NoError(t, err)
-	child2Run, err = child2Rec.ReadRun(ctx)
+	child2Status, err = child2Rec.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, child2Run.Status.Nodes[0].Status.String(), scheduler.NodeStatusSuccess.String())
+	require.Equal(t, child2Status.Nodes[0].Status.String(), scheduler.NodeStatusSuccess.String())
 }
 
 // verifyLogs checks if the expected log directory and files exist

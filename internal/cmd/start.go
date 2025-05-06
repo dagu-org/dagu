@@ -104,7 +104,7 @@ func runStart(ctx *Context, args []string) error {
 	// same request ID, ensuring idempotency across the the DAG from the root DAG.
 	if rootDAG.RequestID != requestID {
 		logger.Debug(ctx, "Checking for previous sub-DAG run with the request ID", "requestID", requestID)
-		var run *runstore.Run
+		var status *runstore.Status
 		record, err := ctx.runStore().FindBySubRequestID(ctx, requestID, rootDAG)
 		if errors.Is(err, runstore.ErrRequestIDNotFound) {
 			// If the request ID is not found, proceed with execution
@@ -114,12 +114,12 @@ func runStart(ctx *Context, args []string) error {
 			logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
 			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
 		}
-		run, err = record.ReadRun(ctx)
+		status, err = record.ReadStatus(ctx)
 		if err != nil {
 			logger.Error(ctx, "Failed to read previous run status", "requestID", requestID, "err", err)
 			return fmt.Errorf("failed to read previous run status for request ID %s: %w", requestID, err)
 		}
-		return executeRetry(ctx, dag, run, rootDAG)
+		return executeRetry(ctx, dag, status, rootDAG)
 	}
 
 EXEC:

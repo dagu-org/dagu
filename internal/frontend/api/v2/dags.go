@@ -128,14 +128,14 @@ func (a *API) GetDAGExecutionHistory(ctx context.Context, request api.GetDAGExec
 	}
 
 	defaultHistoryLimit := 30
-	recentRuns := a.runClient.GetRecentHistory(ctx, status.DAG.Name, defaultHistoryLimit)
+	recentHistory := a.runClient.GetRecentHistory(ctx, status.DAG.Name, defaultHistoryLimit)
 
 	var runs []api.RunDetails
-	for _, log := range recentRuns {
-		runs = append(runs, toRunDetails(log.Status))
+	for _, status := range recentHistory {
+		runs = append(runs, toRunDetails(status))
 	}
 
-	gridData := a.readHistoryData(ctx, recentRuns)
+	gridData := a.readHistoryData(ctx, recentHistory)
 	return api.GetDAGExecutionHistory200JSONResponse{
 		Runs:     runs,
 		GridData: gridData,
@@ -170,7 +170,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 
 func (a *API) readHistoryData(
 	_ context.Context,
-	recentRuns []runstore.Run,
+	statusList []runstore.Status,
 ) []api.DAGGridItem {
 	data := map[string][]scheduler.NodeStatus{}
 
@@ -187,9 +187,9 @@ func (a *API) readHistoryData(
 		data[nodeName][logIdx] = status
 	}
 
-	for idx, run := range recentRuns {
-		for _, node := range run.Status.Nodes {
-			addStatusFn(data, len(recentRuns), idx, node.Step.Name, node.Status)
+	for idx, status := range statusList {
+		for _, node := range status.Nodes {
+			addStatusFn(data, len(statusList), idx, node.Step.Name, node.Status)
 		}
 	}
 
@@ -210,19 +210,18 @@ func (a *API) readHistoryData(
 	})
 
 	handlers := map[string][]scheduler.NodeStatus{}
-	for idx, log := range recentRuns {
-		if n := log.Status.OnSuccess; n != nil {
-			addStatusFn(handlers, len(recentRuns), idx, n.Step.Name, n.Status)
+	for idx, status := range statusList {
+		if n := status.OnSuccess; n != nil {
+			addStatusFn(handlers, len(statusList), idx, n.Step.Name, n.Status)
 		}
-		if n := log.Status.OnFailure; n != nil {
-			addStatusFn(handlers, len(recentRuns), idx, n.Step.Name, n.Status)
+		if n := status.OnFailure; n != nil {
+			addStatusFn(handlers, len(statusList), idx, n.Step.Name, n.Status)
 		}
-		if n := log.Status.OnCancel; n != nil {
-			n := log.Status.OnCancel
-			addStatusFn(handlers, len(recentRuns), idx, n.Step.Name, n.Status)
+		if n := status.OnCancel; n != nil {
+			addStatusFn(handlers, len(statusList), idx, n.Step.Name, n.Status)
 		}
-		if n := log.Status.OnExit; n != nil {
-			addStatusFn(handlers, len(recentRuns), idx, n.Step.Name, n.Status)
+		if n := status.OnExit; n != nil {
+			addStatusFn(handlers, len(statusList), idx, n.Step.Name, n.Status)
 		}
 	}
 

@@ -66,12 +66,12 @@ func runRestart(ctx *Context, args []string) error {
 		record = r
 	}
 
-	status, err := record.ReadRun(ctx)
+	status, err := record.ReadStatus(ctx)
 	if err != nil {
 		logger.Error(ctx, "Failed to read status", "err", err)
 		return fmt.Errorf("failed to read status: %w", err)
 	}
-	if status.Status.Status != scheduler.StatusRunning {
+	if status.Status != scheduler.StatusRunning {
 		logger.Error(ctx, "DAG is not running", "dagName", dagName)
 	}
 

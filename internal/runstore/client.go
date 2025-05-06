@@ -231,13 +231,13 @@ handleError:
 	return ret, err
 }
 
-func (e *Client) GetRecentHistory(ctx context.Context, name string, n int) []Run {
+func (e *Client) GetRecentHistory(ctx context.Context, name string, n int) []Status {
 	records := e.runStore.Recent(ctx, name, n)
 
-	var runs []Run
+	var runs []Status
 	for _, record := range records {
-		if run, err := record.ReadRun(ctx); err == nil {
-			runs = append(runs, *run)
+		if status, err := record.ReadStatus(ctx); err == nil {
+			runs = append(runs, *status)
 		}
 	}
 

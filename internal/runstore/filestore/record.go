@@ -345,24 +345,6 @@ func (r *Record) ReadStatus(ctx context.Context) (*runstore.Status, error) {
 		// Continue with operation
 	}
 
-	run, err := r.ReadRun(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return &run.Status, nil
-}
-
-// ReadRun returns the full status file information, including the file path.
-// The context can be used to cancel the operation.
-func (r *Record) ReadRun(ctx context.Context) (*runstore.Run, error) {
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		return nil, fmt.Errorf("%w: %v", ErrContextCanceled, ctx.Err())
-	default:
-		// Continue with operation
-	}
-
 	// Try to use cache first if available
 	if r.cache != nil {
 		status, cacheErr := r.cache.LoadLatest(r.file, func() (*runstore.Status, error) {
@@ -372,7 +354,7 @@ func (r *Record) ReadRun(ctx context.Context) (*runstore.Run, error) {
 		})
 
 		if cacheErr == nil {
-			return runstore.NewRun(r.file, *status), nil
+			return status, nil
 		}
 	}
 
@@ -385,7 +367,8 @@ func (r *Record) ReadRun(ctx context.Context) (*runstore.Run, error) {
 		return nil, fmt.Errorf("failed to parse status file: %w", parseErr)
 	}
 
-	return runstore.NewRun(r.file, *parsed), nil
+	return parsed, nil
+
 }
 
 // parseLocked reads the status file and returns the last valid status.

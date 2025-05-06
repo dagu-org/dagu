@@ -48,24 +48,8 @@ type Record interface {
 	Write(ctx context.Context, status Status) error
 	// Close finalizes any pending operations on the record
 	Close(ctx context.Context) error
-	// ReadRun retrieves the run metadata for this record
-	ReadRun(ctx context.Context) (*Run, error)
 	// ReadStatus retrieves the execution status for this record
 	ReadStatus(ctx context.Context) (*Status, error)
 	// ReadDAG retrieves the DAG definition for this record
 	ReadDAG(ctx context.Context) (*digraph.DAG, error)
-}
-
-// Run represents metadata about a DAG run
-type Run struct {
-	File   string
-	Status Status
-}
-
-// NewRun creates a new Run instance with the specified file path and status
-func NewRun(file string, status Status) *Run {
-	return &Run{
-		File:   file,
-		Status: status,
-	}
 }

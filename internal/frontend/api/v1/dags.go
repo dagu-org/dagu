@@ -197,7 +197,7 @@ func (a *API) readHistoryData(
 	dag *digraph.DAG,
 ) api.DAGHistoryData {
 	defaultHistoryLimit := 30
-	logs := a.runClient.GetRecentHistory(ctx, dag.Name, defaultHistoryLimit)
+	statuses := a.runClient.GetRecentHistory(ctx, dag.Name, defaultHistoryLimit)
 
 	data := map[string][]scheduler.NodeStatus{}
 
@@ -214,9 +214,9 @@ func (a *API) readHistoryData(
 		data[nodeName][logIdx] = status
 	}
 
-	for idx, log := range logs {
-		for _, node := range log.Status.Nodes {
-			addStatusFn(data, len(logs), idx, node.Step.Name, node.Status)
+	for idx, status := range statuses {
+		for _, node := range status.Nodes {
+			addStatusFn(data, len(statuses), idx, node.Step.Name, node.Status)
 		}
 	}
 
@@ -237,19 +237,18 @@ func (a *API) readHistoryData(
 	})
 
 	handlers := map[string][]scheduler.NodeStatus{}
-	for idx, log := range logs {
-		if n := log.Status.OnSuccess; n != nil {
-			addStatusFn(handlers, len(logs), idx, n.Step.Name, n.Status)
+	for idx, log := range statuses {
+		if n := log.OnSuccess; n != nil {
+			addStatusFn(handlers, len(statuses), idx, n.Step.Name, n.Status)
 		}
-		if n := log.Status.OnFailure; n != nil {
-			addStatusFn(handlers, len(logs), idx, n.Step.Name, n.Status)
+		if n := log.OnFailure; n != nil {
+			addStatusFn(handlers, len(statuses), idx, n.Step.Name, n.Status)
 		}
-		if n := log.Status.OnCancel; n != nil {
-			n := log.Status.OnCancel
-			addStatusFn(handlers, len(logs), idx, n.Step.Name, n.Status)
+		if n := log.OnCancel; n != nil {
+			addStatusFn(handlers, len(statuses), idx, n.Step.Name, n.Status)
 		}
-		if n := log.Status.OnExit; n != nil {
-			addStatusFn(handlers, len(logs), idx, n.Step.Name, n.Status)
+		if n := log.OnExit; n != nil {
+			addStatusFn(handlers, len(statuses), idx, n.Step.Name, n.Status)
 		}
 	}
 
@@ -272,10 +271,10 @@ func (a *API) readHistoryData(
 	}
 
 	var statusList []api.DAGLogStatusFile
-	for _, log := range logs {
+	for _, status := range statuses {
 		statusFile := api.DAGLogStatusFile{
-			File:   log.File,
-			Status: toStatus(log.Status),
+			File:   "", // We don't provide the file name here anymore
+			Status: toStatus(status),
 		}
 		statusList = append(statusList, statusFile)
 	}
