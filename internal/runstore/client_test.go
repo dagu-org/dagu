@@ -76,7 +76,7 @@ func TestClient_GetStatus(t *testing.T) {
 		_ = record.Close(ctx)
 
 		// Get the status and check if it is the same as the one we wrote.
-		statusToCheck, err := cli.FindByRequestID(ctx, dag.DAG.Name, requestID)
+		statusToCheck, err := cli.FindByRequestID(ctx, dag.Name, requestID)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.NodeStatusSuccess, statusToCheck.Nodes[0].Status)
 
@@ -84,11 +84,11 @@ func TestClient_GetStatus(t *testing.T) {
 		newStatus := scheduler.NodeStatusError
 		status.Nodes[0].Status = newStatus
 
-		rootDAG := digraph.NewRootDAG(dag.DAG.Name, requestID)
+		rootDAG := digraph.NewRootDAG(dag.Name, requestID)
 		err = cli.UpdateStatus(ctx, rootDAG, status)
 		require.NoError(t, err)
 
-		statusByRequestID, err := cli.FindByRequestID(ctx, dag.DAG.Name, requestID)
+		statusByRequestID, err := cli.FindByRequestID(ctx, dag.Name, requestID)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, len(status.Nodes))
@@ -110,7 +110,7 @@ func TestClient_GetStatus(t *testing.T) {
 		requestId := status.RequestID
 		subRun := status.Nodes[0].SubRuns[0]
 
-		rootDAG := digraph.NewRootDAG(dag.DAG.Name, requestId)
+		rootDAG := digraph.NewRootDAG(dag.Name, requestId)
 		subRunStatus, err := th.RunClient.FindBySubRunRequestID(th.Context, rootDAG, subRun.RequestID)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusSuccess.String(), subRunStatus.Status.String())
@@ -134,7 +134,7 @@ func TestClient_GetStatus(t *testing.T) {
 		status := testNewStatus(dag.DAG, "unknown-req-id", scheduler.StatusError, scheduler.NodeStatusError)
 
 		// Check if the update fails.
-		rootDAG := digraph.NewRootDAG(dag.DAG.Name, "unknown-req-id")
+		rootDAG := digraph.NewRootDAG(dag.Name, "unknown-req-id")
 		err := cli.UpdateStatus(ctx, rootDAG, status)
 		require.Error(t, err)
 	})

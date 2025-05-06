@@ -71,7 +71,7 @@ func (e *Client) Stop(ctx context.Context, dag *digraph.DAG, requestID string) e
 }
 
 // GenerateRequestID generates a unique request ID for a DAG run using UUID v7.
-func (e *Client) GenerateRequestID(ctx context.Context) (string, error) {
+func (e *Client) GenerateRequestID(_ context.Context) (string, error) {
 	// Generate a unique request ID for the DAG run
 	id, err := uuid.NewV7()
 	if err != nil {
