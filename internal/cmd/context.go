@@ -425,8 +425,6 @@ func ValidateSettings(config LogFileSettings) error {
 // SetupLogDirectory creates (if necessary) and returns the log directory based on the log file settings.
 // It uses a safe version of the DAG name to avoid issues with invalid filesystem characters.
 func SetupLogDirectory(config LogFileSettings) (string, error) {
-	safeName := fileutil.SafeName(config.DAGName)
-
 	// Choose the base directory: if DAGLogDir is provided, use it; otherwise use LogDir.
 	baseDir := config.LogDir
 	if config.DAGLogDir != "" {
@@ -436,7 +434,10 @@ func SetupLogDirectory(config LogFileSettings) (string, error) {
 		return "", fmt.Errorf("base log directory is not set")
 	}
 
-	logDir := filepath.Join(baseDir, safeName)
+	utcTimestamp := time.Now().UTC().Format("20060102_150405Z")
+
+	safeName := fileutil.SafeName(config.DAGName)
+	logDir := filepath.Join(baseDir, safeName, utcTimestamp+"_"+config.RequestID)
 	if err := os.MkdirAll(logDir, 0750); err != nil {
 		return "", fmt.Errorf("failed to initialize directory %s: %w", logDir, err)
 	}

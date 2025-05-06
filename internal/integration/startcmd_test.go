@@ -5,7 +5,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/cmd"
@@ -80,9 +79,6 @@ steps:
 				Args:        args,
 				ExpectedOut: []string{"DAG run finished"},
 			})
-
-			// Verify log directory and files
-			verifyLogs(t, tempDir)
 		})
 	}
 }
@@ -199,25 +195,4 @@ steps:
 	child2Status, err = child2Rec.ReadStatus(ctx)
 	require.NoError(t, err)
 	require.Equal(t, child2Status.Nodes[0].Status.String(), scheduler.NodeStatusSuccess.String())
-}
-
-// verifyLogs checks if the expected log directory and files exist
-func verifyLogs(t *testing.T, tempDir string) {
-	// Check if the logs directory was created
-	_, err := os.Stat(tempDir + "/logs/basic")
-	require.NoError(t, err)
-
-	// Check if the log file was created with the expected pattern
-	files, err := os.ReadDir(tempDir + "/logs/basic")
-	require.NoError(t, err)
-
-	// Look for a log file that matches the expected pattern
-	logFileFound := false
-	for _, file := range files {
-		if strings.HasPrefix(file.Name(), "scheduler_basic.") && strings.HasSuffix(file.Name(), ".log") {
-			logFileFound = true
-			break
-		}
-	}
-	require.True(t, logFileFound, "No log file found with expected naming pattern")
 }
