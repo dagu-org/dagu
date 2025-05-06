@@ -97,7 +97,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	dagStore := filestore.New(cfg.Paths.DAGsDir, filestore.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
 	runStore := runfs.New(cfg.Paths.DataDir)
 
-	runClient := runstore.NewClient(runStore, cfg.Paths.Executable, cfg.Global.WorkDir)
+	runClient := runstore.NewClient(runStore, cfg.Paths.Executable, cfg.Global.WorkDir, "")
 	dagClient := dagstore.NewClient(runClient, dagStore)
 
 	helper := Helper{

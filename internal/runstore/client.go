@@ -24,11 +24,13 @@ func NewClient(
 	runStore Store,
 	executable string,
 	workDir string,
+	configPath string,
 ) Client {
 	return Client{
 		runStore:   runStore,
 		executable: executable,
 		workDir:    workDir,
+		configPath: configPath,
 	}
 }
 
@@ -39,6 +41,7 @@ type Client struct {
 	runStore   Store  // Store interface for persisting run data
 	executable string // Path to the executable used to run DAGs
 	workDir    string // Working directory for executing commands
+	configPath string // Path to the configuration file
 }
 
 // LoadYAML loads a DAG from YAML specification bytes without evaluating it.
@@ -93,6 +96,9 @@ func (e *Client) Start(_ context.Context, dag *digraph.DAG, opts StartOptions) e
 	}
 	if opts.RequestID != "" {
 		args = append(args, fmt.Sprintf("--request-id=%s", opts.RequestID))
+	}
+	if e.configPath != "" {
+		args = append(args, fmt.Sprintf("--config=%s", e.configPath))
 	}
 	args = append(args, dag.Location)
 	// nolint:gosec

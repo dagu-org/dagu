@@ -439,6 +439,7 @@ func (d *fileStore) TagList(ctx context.Context) ([]string, []string, error) {
 		parsedDAG, err := d.GetMetadata(ctx, entry.Name())
 		if err != nil {
 			errList = append(errList, fmt.Sprintf("reading %s failed: %s", entry.Name(), err))
+			return nil
 		}
 
 		for _, tag := range parsedDAG.Tags {
