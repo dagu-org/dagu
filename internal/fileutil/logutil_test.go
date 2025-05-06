@@ -769,7 +769,9 @@ func TestEstimateLineCount(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to create test file: %v", err)
 				}
-				defer file.Close()
+				defer func() {
+					_ = file.Close()
+				}()
 
 				// Write content in chunks to reach desired file size
 				contentBytes := []byte(tt.content)

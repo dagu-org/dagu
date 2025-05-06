@@ -124,12 +124,13 @@ func estimateLineCount(filePath string) (int, bool, error) {
 		sampleSize = fileSize
 	}
 
-	file, err := os.Open(filePath)
+	file, err := os.Open(filePath) //nolint:gosec
 	if err != nil {
 		return 0, false, err
 	}
-	defer file.Close()
-
+	defer func() {
+		_ = file.Close()
+	}()
 	// Sample from the beginning of the file
 	startSample := make([]byte, sampleSize)
 	_, err = file.Read(startSample)
@@ -178,11 +179,13 @@ func estimateLineCount(filePath string) (int, bool, error) {
 
 // countLinesExact counts the exact number of lines in a file
 func countLinesExact(filePath string) (int, error) {
-	file, err := os.Open(filePath)
+	file, err := os.Open(filePath) //nolint:gosec
 	if err != nil {
 		return 0, err
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	scanner := bufio.NewScanner(file)
 	lineCount := 0
@@ -199,11 +202,13 @@ func countLinesExact(filePath string) (int, error) {
 
 // readFirstLines reads the first n lines from a file
 func readFirstLines(filePath string, n int, totalLines int) (*LogResult, error) {
-	file, err := os.Open(filePath)
+	file, err := os.Open(filePath) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	scanner := bufio.NewScanner(file)
 	lines := make([]string, 0, n)
@@ -240,11 +245,13 @@ func readLastLines(filePath string, n int, totalLines int) (*LogResult, error) {
 		}, nil
 	}
 
-	file, err := os.Open(filePath)
+	file, err := os.Open(filePath) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	// If n is greater than or equal to total lines, read all lines
 	if n >= totalLines {
@@ -289,11 +296,13 @@ func readLastLines(filePath string, n int, totalLines int) (*LogResult, error) {
 
 // readLinesRange reads a range of lines from a file
 func readLinesRange(filePath string, offset, limit int, totalLines int) (*LogResult, error) {
-	file, err := os.Open(filePath)
+	file, err := os.Open(filePath) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	// Adjust offset if it's out of range
 	if offset < 1 {
@@ -338,6 +347,7 @@ func readLinesRange(filePath string, offset, limit int, totalLines int) (*LogRes
 }
 
 // ReadLogContent reads a specific portion of a log file and returns it as a string
+// nolint:revive
 func ReadLogContent(filePath string, options LogReadOptions) (string, int, int, bool, bool, error) {
 	result, err := ReadLogLines(filePath, options)
 	if err != nil {

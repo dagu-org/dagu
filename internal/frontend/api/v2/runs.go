@@ -3,15 +3,11 @@ package api
 import (
 	"context"
 	"fmt"
-	"io"
-	"os"
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"golang.org/x/text/encoding"
-	"golang.org/x/text/transform"
 )
 
 func (a *API) GetRunLog(ctx context.Context, request api.GetRunLogRequestObject) (api.GetRunLogResponseObject, error) {
@@ -274,23 +270,6 @@ func (a *API) UpdateSubRunStepStatus(ctx context.Context, request api.UpdateSubR
 	}
 
 	return &api.UpdateSubRunStepStatus200Response{}, nil
-}
-
-func (a *API) readFileContent(_ context.Context, f string, d *encoding.Decoder) ([]byte, error) {
-	if d == nil {
-		return os.ReadFile(f) //nolint:gosec
-	}
-
-	r, err := os.Open(f) //nolint:gosec
-	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %w", f, err)
-	}
-	defer func() {
-		_ = r.Close()
-	}()
-	tr := transform.NewReader(r, d)
-	ret, err := io.ReadAll(tr)
-	return ret, err
 }
 
 var nodeStatusMapping = map[api.NodeStatus]scheduler.NodeStatus{
