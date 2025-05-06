@@ -27,7 +27,7 @@ type Props = {
   /** DAG run details */
   status?: components['schemas']['RunDetails'];
   /** DAG file ID */
-  fileId: string;
+  fileName: string;
   /** Request ID of the execution */
   requestId?: string;
   /** Function to open log viewer */
@@ -40,7 +40,7 @@ type Props = {
  */
 function DAGStatusOverview({
   status,
-  fileId,
+  fileName,
   requestId = '',
   onViewLog,
 }: Props) {
@@ -49,7 +49,7 @@ function DAGStatusOverview({
   if (requestId) {
     searchParams.set('requestId', requestId);
   }
-  const url = `/dags/${fileId}/scheduler-log?${searchParams.toString()}`;
+  const url = `/dags/${fileName}/scheduler-log?${searchParams.toString()}`;
 
   // Don't render if no status is provided
   if (!status) {
@@ -61,7 +61,7 @@ function DAGStatusOverview({
     if (!timestamp || timestamp === '-') return '-';
     try {
       return dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss Z');
-    } catch (e) {
+    } catch {
       return timestamp;
     }
   };
@@ -91,7 +91,7 @@ function DAGStatusOverview({
   // Count nodes by status
   const nodeStats = status.nodes?.reduce(
     (acc, node) => {
-      const statusKey = node.statusText.toLowerCase().replace(' ', '_');
+      const statusKey = node.statusLabel.toLowerCase().replace(' ', '_');
       acc[statusKey] = (acc[statusKey] || 0) + 1;
       return acc;
     },
@@ -107,7 +107,7 @@ function DAGStatusOverview({
       <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
         <div className="flex items-center gap-2">
           <StatusChip status={status.status} size="md">
-            {status.statusText}
+            {status.statusLabel}
           </StatusChip>
 
           {status.pid && (

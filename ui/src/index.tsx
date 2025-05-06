@@ -1,9 +1,9 @@
 import { createRoot } from 'react-dom/client';
 
-import App from './App';
 import { CookiesProvider } from 'react-cookie';
-import './styles/prism.css';
+import App from './App';
 import './styles/global.css';
+import './styles/prism.css';
 
 import { Config } from './contexts/ConfigContext';
 

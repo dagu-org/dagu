@@ -9,11 +9,11 @@ import (
 	"reflect"
 
 	"github.com/dagu-org/dagu/api/v2"
-	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dagstore"
 	"github.com/dagu-org/dagu/internal/frontend/auth"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/go-chi/chi/v5"
@@ -23,7 +23,8 @@ import (
 var _ api.StrictServerInterface = (*API)(nil)
 
 type API struct {
-	client             client.Client
+	dagClient          dagstore.Client
+	runClient          runstore.Client
 	remoteNodes        map[string]config.RemoteNode
 	apiBasePath        string
 	logEncodingCharset string
@@ -31,7 +32,8 @@ type API struct {
 }
 
 func New(
-	cli client.Client,
+	dagCli dagstore.Client,
+	runCli runstore.Client,
 	cfg *config.Config,
 ) *API {
 	remoteNodes := make(map[string]config.RemoteNode)
@@ -40,7 +42,8 @@ func New(
 	}
 
 	return &API{
-		client:             cli,
+		dagClient:          dagCli,
+		runClient:          runCli,
 		logEncodingCharset: cfg.UI.LogEncodingCharset,
 		remoteNodes:        remoteNodes,
 		apiBasePath:        cfg.Server.APIBasePath,
@@ -119,15 +122,15 @@ func (a *API) handleError(w http.ResponseWriter, r *http.Request, err error) {
 	}
 
 	switch {
-	case errors.Is(err, persistence.ErrDAGNotFound):
+	case errors.Is(err, dagstore.ErrDAGNotFound):
 		code = api.ErrorCodeNotFound
 		message = "DAG not found"
 
-	case errors.Is(err, persistence.ErrRequestIDNotFound):
+	case errors.Is(err, runstore.ErrRequestIDNotFound):
 		code = api.ErrorCodeNotFound
 		message = "Request ID not found"
 
-	case errors.Is(err, persistence.ErrDAGAlreadyExists):
+	case errors.Is(err, dagstore.ErrDAGAlreadyExists):
 		code = api.ErrorCodeAlreadyExists
 		message = "DAG already exists"
 
@@ -144,7 +147,7 @@ func (a *API) handleError(w http.ResponseWriter, r *http.Request, err error) {
 	})
 }
 
-func ptr[T any](v T) *T {
+func ptrOf[T any](v T) *T {
 	if reflect.ValueOf(v).IsZero() {
 		return nil
 	}
@@ -152,7 +155,7 @@ func ptr[T any](v T) *T {
 	return &v
 }
 
-func value[T any](ptr *T) T {
+func valueOf[T any](ptr *T) T {
 	if ptr == nil {
 		var zero T
 		return zero
@@ -161,7 +164,7 @@ func value[T any](ptr *T) T {
 }
 
 // toPagination converts a paginated result to an API pagination object.
-func toPagination[T any](paginatedResult persistence.PaginatedResult[T]) api.Pagination {
+func toPagination[T any](paginatedResult dagstore.PaginatedResult[T]) api.Pagination {
 	return api.Pagination{
 		CurrentPage:  paginatedResult.CurrentPage,
 		NextPage:     paginatedResult.NextPage,

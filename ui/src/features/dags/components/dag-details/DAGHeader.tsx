@@ -8,9 +8,9 @@ import { RunDetailsContext } from '../../contexts/DAGStatusContext';
 import { DAGActions } from '../common';
 
 interface DAGHeaderProps {
-  dag: any;
+  dag: components['schemas']['DAG'] | components['schemas']['DAGDetails'];
   latestRun: components['schemas']['RunDetails'];
-  fileId: string;
+  fileName: string;
   refreshFn: () => void;
   formatDuration: (startDate: string, endDate: string) => string;
 }
@@ -18,7 +18,7 @@ interface DAGHeaderProps {
 const DAGHeader: React.FC<DAGHeaderProps> = ({
   dag,
   latestRun,
-  fileId,
+  fileName,
   refreshFn,
   formatDuration,
 }) => (
@@ -31,7 +31,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
             <DAGActions
               status={status.data}
               dag={dag}
-              fileId={fileId}
+              fileName={fileName}
               refresh={refreshFn}
               displayMode="full"
             />
@@ -43,7 +43,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
       <div className="flex flex-row items-center gap-4">
         {latestRun.status ? (
           <StatusChip status={latestRun.status}>
-            {latestRun.statusText || ''}
+            {latestRun.statusLabel || ''}
           </StatusChip>
         ) : null}
 

@@ -16,16 +16,15 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dagstore"
+	"github.com/dagu-org/dagu/internal/dagstore/filestore"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/dagu-org/dagu/internal/persistence/jsondb"
-	"github.com/dagu-org/dagu/internal/persistence/local"
-	"github.com/dagu-org/dagu/internal/persistence/local/storage"
+	"github.com/dagu-org/dagu/internal/runstore"
+	runfs "github.com/dagu-org/dagu/internal/runstore/filestore"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -95,20 +94,19 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		cfg.Server = *options.ServerConfig
 	}
 
-	dagStore := local.NewDAGStore(cfg.Paths.DAGsDir)
-	historyStore := jsondb.New(cfg.Paths.DataDir)
-	flagStore := local.NewFlagStore(
-		storage.NewStorage(cfg.Paths.SuspendFlagsDir),
-	)
+	dagStore := filestore.New(cfg.Paths.DAGsDir, filestore.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
+	runStore := runfs.New(cfg.Paths.DataDir)
 
-	client := client.New(dagStore, historyStore, flagStore, cfg.Paths.Executable, cfg.Global.WorkDir)
+	runClient := runstore.NewClient(runStore, cfg.Paths.Executable, cfg.Global.WorkDir)
+	dagClient := dagstore.NewClient(runClient, dagStore)
 
 	helper := Helper{
-		Context:      createDefaultContext(),
-		Config:       cfg,
-		Client:       client,
-		DAGStore:     dagStore,
-		HistoryStore: historyStore,
+		Context:   createDefaultContext(),
+		Config:    cfg,
+		RunClient: runClient,
+		DAGClient: dagClient,
+		DAGStore:  dagStore,
+		RunStore:  runStore,
 
 		tmpDir: tmpDir,
 	}
@@ -140,9 +138,10 @@ type Helper struct {
 	Cancel        context.CancelFunc
 	Config        *config.Config
 	LoggingOutput *SyncBuffer
-	Client        client.Client
-	HistoryStore  persistence.HistoryStore
-	DAGStore      persistence.DAGStore
+	RunClient     runstore.Client
+	DAGClient     dagstore.Client
+	RunStore      runstore.Store
+	DAGStore      dagstore.Store
 
 	tmpDir string
 }
@@ -186,44 +185,36 @@ type DAG struct {
 func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
-	var status scheduler.Status
-	var lock sync.Mutex
-
 	require.Eventually(t, func() bool {
-		lock.Lock()
-		defer lock.Unlock()
-
-		latest, err := d.Client.GetLatestStatus(d.Context, d.DAG)
-		require.NoError(t, err)
-		status = latest.Status
+		latest, err := d.RunClient.GetLatestStatus(d.Context, d.DAG)
+		if err != nil {
+			return false
+		}
+		t.Logf("latest status=%s errors=%v", latest.Status.String(), latest.Errors())
 		return latest.Status == expected
-	}, time.Second*3, time.Millisecond*50, "expected latest status to be %q, got %q", expected, status)
+	}, time.Second*3, time.Millisecond*50)
 }
 
 func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
 	t.Helper()
 
-	// the +1 to the limit is needed to ensure that the number of the history
+	// the +1 to the limit is needed to ensure that the number of therunstore
 	// entries is exactly the expected number
-	history := d.Client.GetRecentHistory(d.Context, d.Name, expected+1)
-	require.Len(t, history, expected)
+	runstore := d.RunClient.ListRecentHistory(d.Context, d.Name, expected+1)
+	require.Len(t, runstore, expected)
 }
 
 func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
-	var status scheduler.Status
-	var lock sync.Mutex
-
 	assert.Eventually(t, func() bool {
-		lock.Lock()
-		defer lock.Unlock()
-
-		curr, err := d.Client.GetCurrentStatus(d.Context, d.DAG)
-		require.NoError(t, err)
-		status = curr.Status
+		curr, _ := d.RunClient.GetRealtimeStatus(d.Context, d.DAG, "")
+		if curr == nil {
+			return false
+		}
+		t.Logf("current status=%s errors=%v", curr.Status.String(), curr.Errors())
 		return curr.Status == expected
-	}, time.Second*3, time.Millisecond*50, "expected current status to be %q, got %q", expected, status)
+	}, time.Second*3, time.Millisecond*50)
 }
 
 // AssertOutputs checks the given outputs against the actual outputs of the DAG
@@ -232,7 +223,7 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]any) {
 	t.Helper()
 
-	status, err := d.Client.GetLatestStatus(d.Context, d.DAG)
+	status, err := d.RunClient.GetLatestStatus(d.Context, d.DAG)
 	require.NoError(t, err)
 
 	// collect the actual outputs from the status
@@ -321,9 +312,9 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		d.DAG,
 		logDir,
 		logFile,
-		d.Client,
+		d.RunClient,
 		d.DAGStore,
-		d.HistoryStore,
+		d.RunStore,
 		rootDAG,
 		helper.opts,
 	)

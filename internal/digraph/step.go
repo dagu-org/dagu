@@ -11,52 +11,52 @@ import (
 // It marshals/unmarshals to/from JSON when it is saved in the execution history.
 type Step struct {
 	// Name is the name of the step.
-	Name string `json:"Name"`
+	Name string `json:"name"`
 	// Description is the description of the step. This is optional.
-	Description string `json:"Description,omitempty"`
+	Description string `json:"description,omitempty"`
 	// Shell is the shell program to execute the command. This is optional.
-	Shell string `json:"Shell,omitempty"`
+	Shell string `json:"shell,omitempty"`
 	// OutputVariables stores the output variables for the following steps.
 	// It only contains the local output variables.
-	OutputVariables *SyncMap `json:"OutputVariables,omitempty"`
+	OutputVariables *SyncMap `json:"outputVariables,omitempty"`
 	// Dir is the working directory for the step.
-	Dir string `json:"Dir,omitempty"`
+	Dir string `json:"dir,omitempty"`
 	// ExecutorConfig contains the configuration for the executor.
-	ExecutorConfig ExecutorConfig `json:"ExecutorConfig,omitempty"`
+	ExecutorConfig ExecutorConfig `json:"executorConfig,omitempty"`
 	// CmdWithArgs is the command with arguments (only display purpose).
-	CmdWithArgs string `json:"CmdWithArgs,omitempty"`
+	CmdWithArgs string `json:"cmdWithArgs,omitempty"`
 	// CmdArgsSys is the command with arguments for the system.
-	CmdArgsSys string `json:"CmdArgsSys,omitempty"`
+	CmdArgsSys string `json:"cmdArgsSys,omitempty"`
 	// Command specifies only the command without arguments.
-	Command string `json:"Command,omitempty"`
+	Command string `json:"command,omitempty"`
 	// ShellCmdArgs is the shell command with arguments.
-	ShellCmdArgs string `json:"ShellCmdArgs,omitempty"`
+	ShellCmdArgs string `json:"shellCmdArgs,omitempty"`
 	// Script is the script to be executed.
-	Script string `json:"Script,omitempty"`
+	Script string `json:"script,omitempty"`
 	// Args contains the arguments for the command.
-	Args []string `json:"Args,omitempty"`
+	Args []string `json:"args,omitempty"`
 	// Stdout is the file to store the standard output.
-	Stdout string `json:"Stdout,omitempty"`
+	Stdout string `json:"stdout,omitempty"`
 	// Stderr is the file to store the standard error.
-	Stderr string `json:"Stderr,omitempty"`
+	Stderr string `json:"stderr,omitempty"`
 	// Output is the variable name to store the output.
-	Output string `json:"Output,omitempty"`
+	Output string `json:"output,omitempty"`
 	// Depends contains the list of step names to depend on.
-	Depends []string `json:"Depends,omitempty"`
+	Depends []string `json:"depends,omitempty"`
 	// ContinueOn contains the conditions to continue on failure or skipped.
-	ContinueOn ContinueOn `json:"ContinueOn,omitempty"`
+	ContinueOn ContinueOn `json:"continueOn,omitempty"`
 	// RetryPolicy contains the retry policy for the step.
-	RetryPolicy RetryPolicy `json:"RetryPolicy,omitempty"`
+	RetryPolicy RetryPolicy `json:"retryPolicy,omitempty"`
 	// RepeatPolicy contains the repeat policy for the step.
-	RepeatPolicy RepeatPolicy `json:"RepeatPolicy,omitempty"`
+	RepeatPolicy RepeatPolicy `json:"repeatPolicy,omitempty"`
 	// MailOnError is the flag to send mail on error.
-	MailOnError bool `json:"MailOnError,omitempty"`
+	MailOnError bool `json:"mailOnError,omitempty"`
 	// Preconditions contains the conditions to be met before running the step.
-	Preconditions []Condition `json:"Preconditions,omitempty"`
+	Preconditions []Condition `json:"preconditions,omitempty"`
 	// SignalOnStop is the signal to send on stop.
-	SignalOnStop string `json:"SignalOnStop,omitempty"`
+	SignalOnStop string `json:"signalOnStop,omitempty"`
 	// SubDAG contains the information about a sub DAG to be executed.
-	SubDAG *SubDAG `json:"Sub,omitempty"`
+	SubDAG *SubDAG `json:"sub,omitempty"`
 }
 
 // setup sets the default values for the step.
@@ -90,8 +90,8 @@ func (s *Step) String() string {
 
 // SubDAG contains information about a sub DAG to be executed.
 type SubDAG struct {
-	Name   string `json:"Name,omitempty"`
-	Params string `json:"Params,omitempty"`
+	Name   string `json:"name,omitempty"`
+	Params string `json:"params,omitempty"`
 }
 
 // ExecutorTypeSubLegacy is defined here in order to parse
@@ -103,8 +103,8 @@ const ExecutorTypeSub = "sub"
 type ExecutorConfig struct {
 	// Type represents one of the registered executors.
 	// See `executor.Register` in `internal/executor/executor.go`.
-	Type   string         `json:"Type,omitempty"`
-	Config map[string]any `json:"Config,omitempty"` // Config contains executor-specific configuration.
+	Type   string         `json:"type,omitempty"`
+	Config map[string]any `json:"config,omitempty"` // Config contains executor-specific configuration.
 }
 
 // IsCommand returns true if the executor is a command
@@ -115,23 +115,23 @@ func (e ExecutorConfig) IsCommand() bool {
 // RetryPolicy contains the retry policy for a step.
 type RetryPolicy struct {
 	// Limit is the number of retries allowed.
-	Limit int `json:"Limit,omitempty"`
+	Limit int `json:"limit,omitempty"`
 	// Interval is the time to wait between retries.
-	Interval time.Duration `json:"Interval,omitempty"`
+	Interval time.Duration `json:"interval,omitempty"`
 	// LimitStr is the string representation of the limit.
-	LimitStr string `json:"LimitStr,omitempty"`
+	LimitStr string `json:"limitStr,omitempty"`
 	// IntervalSecStr is the string representation of the interval.
-	IntervalSecStr string `json:"IntervalSecStr,omitempty"`
+	IntervalSecStr string `json:"intervalSecStr,omitempty"`
 	// ExitCodes is the list of exit codes that should trigger a retry.
-	ExitCodes []int `json:"ExitCode,omitempty"`
+	ExitCodes []int `json:"exitCode,omitempty"`
 }
 
 // RepeatPolicy contains the repeat policy for a step.
 type RepeatPolicy struct {
 	// Repeat determines if the step should be repeated.
-	Repeat bool `json:"Repeat,omitempty"`
+	Repeat bool `json:"repeat,omitempty"`
 	// Interval is the time to wait between repeats.
-	Interval time.Duration `json:"Interval,omitempty"`
+	Interval time.Duration `json:"interval,omitempty"`
 }
 
 // ContinueOn contains the conditions to continue on failure or skipped.
@@ -140,9 +140,9 @@ type RepeatPolicy struct {
 // A step can be skipped when the preconditions are not met.
 // Then if the ContinueOn.Skip is set, the step will continue to the next step.
 type ContinueOn struct {
-	Failure     bool     `json:"Failure,omitempty"`     // Failure is the flag to continue to the next step on failure.
-	Skipped     bool     `json:"Skipped,omitempty"`     // Skipped is the flag to continue to the next step on skipped.
-	ExitCode    []int    `json:"ExitCode,omitempty"`    // ExitCode is the list of exit codes to continue to the next step.
-	Output      []string `json:"Output,omitempty"`      // Output is the list of output (stdout/stderr) to continue to the next step.
-	MarkSuccess bool     `json:"MarkSuccess,omitempty"` // MarkSuccess is the flag to mark the step as success when the condition is met.
+	Failure     bool     `json:"failure,omitempty"`     // Failure is the flag to continue to the next step on failure.
+	Skipped     bool     `json:"skipped,omitempty"`     // Skipped is the flag to continue to the next step on skipped.
+	ExitCode    []int    `json:"exitCode,omitempty"`    // ExitCode is the list of exit codes to continue to the next step.
+	Output      []string `json:"output,omitempty"`      // Output is the list of output (stdout/stderr) to continue to the next step.
+	MarkSuccess bool     `json:"markSuccess,omitempty"` // MarkSuccess is the flag to mark the step as success when the condition is met.
 }

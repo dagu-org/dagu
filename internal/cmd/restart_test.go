@@ -57,10 +57,10 @@ func TestRestartCommand(t *testing.T) {
 
 		time.Sleep(time.Millisecond * 300) // Wait for the history to be updated.
 
-		recentHistory := client.GetRecentHistory(th.Context, loaded.Name, 2)
+		recentHistory := client.ListRecentHistory(th.Context, loaded.Name, 2)
 
 		require.Len(t, recentHistory, 2)
-		require.Equal(t, recentHistory[0].Status.Params, recentHistory[1].Status.Params)
+		require.Equal(t, recentHistory[0].Params, recentHistory[1].Params)
 
 		<-done
 	})

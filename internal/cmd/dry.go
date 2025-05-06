@@ -68,7 +68,7 @@ func runDry(ctx *Context, args []string) error {
 
 	ctx.LogToFile(logFile)
 
-	dagStore, err := ctx.dagStore()
+	dagStore, err := ctx.dagStore([]string{filepath.Dir(dag.Location)})
 	if err != nil {
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
@@ -87,7 +87,7 @@ func runDry(ctx *Context, args []string) error {
 		logFile.Name(),
 		cli,
 		dagStore,
-		ctx.historyStore(),
+		ctx.runStore(),
 		rootDAG,
 		agent.Options{Dry: true},
 	)

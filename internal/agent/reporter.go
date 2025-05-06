@@ -9,7 +9,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 
@@ -31,7 +31,7 @@ func newReporter(f SenderFn) *reporter {
 
 // reportStep is a function that reports the status of a step.
 func (r *reporter) reportStep(
-	ctx context.Context, dag *digraph.DAG, status persistence.Status, node *scheduler.Node,
+	ctx context.Context, dag *digraph.DAG, status runstore.Status, node *scheduler.Node,
 ) error {
 	nodeStatus := node.State().Status
 	if nodeStatus != scheduler.NodeStatusNone {
@@ -49,7 +49,7 @@ func (r *reporter) reportStep(
 }
 
 // report is a function that reports the status of the scheduler.
-func (r *reporter) getSummary(_ context.Context, status persistence.Status, err error) string {
+func (r *reporter) getSummary(_ context.Context, status runstore.Status, err error) string {
 	var buf bytes.Buffer
 	_, _ = buf.Write([]byte("\n"))
 	_, _ = buf.Write([]byte("Summary ->\n"))
@@ -61,7 +61,7 @@ func (r *reporter) getSummary(_ context.Context, status persistence.Status, err 
 }
 
 // send is a function that sends a report mail.
-func (r *reporter) send(ctx context.Context, dag *digraph.DAG, status persistence.Status, err error) error {
+func (r *reporter) send(ctx context.Context, dag *digraph.DAG, status runstore.Status, err error) error {
 	if err != nil || status.Status == scheduler.StatusError {
 		if dag.MailOn != nil && dag.MailOn.Failure && dag.ErrorMail != nil {
 			fromAddress := dag.ErrorMail.From
@@ -94,7 +94,7 @@ var dagHeader = table.Row{
 	"Error",
 }
 
-func renderDAGSummary(status persistence.Status, err error) string {
+func renderDAGSummary(status runstore.Status, err error) string {
 	dataRow := table.Row{
 		status.RequestID,
 		status.Name,
@@ -125,7 +125,7 @@ var stepHeader = table.Row{
 	"Error",
 }
 
-func renderStepSummary(nodes []*persistence.Node) string {
+func renderStepSummary(nodes []*runstore.Node) string {
 	stepTable := table.NewWriter()
 	stepTable.AppendHeader(stepHeader)
 
@@ -136,7 +136,7 @@ func renderStepSummary(nodes []*persistence.Node) string {
 			n.Step.Name,
 			n.StartedAt,
 			n.FinishedAt,
-			n.StatusText,
+			n.Status.String(),
 		}
 		if n.Step.Args != nil {
 			dataRow = append(dataRow, strings.Join(n.Step.Args, " "))
@@ -150,7 +150,7 @@ func renderStepSummary(nodes []*persistence.Node) string {
 	return stepTable.Render()
 }
 
-func renderHTML(nodes []*persistence.Node) string {
+func renderHTML(nodes []*runstore.Node) string {
 	var buffer bytes.Buffer
 	addValFunc := func(val string) {
 		_, _ = buffer.WriteString(
@@ -198,7 +198,7 @@ func renderHTML(nodes []*persistence.Node) string {
 }
 
 func addAttachments(
-	trigger bool, nodes []*persistence.Node,
+	trigger bool, nodes []*runstore.Node,
 ) (attachments []string) {
 	if trigger {
 		for _, n := range nodes {

@@ -23,7 +23,6 @@ const ModalLinkTab: React.FC<ModalLinkTabProps> = ({
 }) => (
   <div className="focus:outline-none cursor-pointer" onClick={onClick}>
     <Tab
-      value={value}
       isActive={isActive}
       className={cn(
         'group relative rounded-md px-4 py-2 transition-all duration-200 ease-in-out',

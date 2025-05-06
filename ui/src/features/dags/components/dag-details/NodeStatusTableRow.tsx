@@ -27,7 +27,7 @@ type Props = {
   node: components['schemas']['Node'];
   /** Request ID for log linking */
   requestId?: string;
-  /** DAG name/fileId */
+  /** DAG name or file name */
   name: string;
   /** Function to open log viewer */
   onViewLog?: (stepName: string, requestId: string) => void;
@@ -40,7 +40,7 @@ const formatTimestamp = (timestamp: string | undefined) => {
   if (!timestamp || timestamp == '-') return '-';
   try {
     return dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss Z');
-  } catch (e) {
+  } catch {
     return timestamp;
   }
 };
@@ -77,7 +77,7 @@ const calculateDuration = (
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
     return `${hours}h ${remainingMinutes}m ${remainingSeconds}s`;
-  } catch (e) {
+  } catch {
     return '-';
   }
 };
@@ -232,7 +232,7 @@ function NodeStatusTableRow({
       {/* Status */}
       <TableCell className="text-center">
         <NodeStatusChip status={node.status} size="sm">
-          {node.statusText}
+          {node.statusLabel}
         </NodeStatusChip>
       </TableCell>
 

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/dagu-org/dagu/internal/test"
 
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -35,18 +35,18 @@ func TestAgent_Run(t *testing.T) {
 		dag := th.DAG(t, "agent/delete_old_history.yaml")
 		dagAgent := dag.Agent()
 
-		// Create a history file by running a DAG
+		// Create a runstore file by running a DAG
 		dagAgent.RunSuccess(t)
 		dag.AssertHistoryCount(t, 1)
 
-		// Set the retention days to 0 (delete all history files except the latest one)
+		// Set the retention days to 0 (delete all runstore files except the latest one)
 		dag.HistRetentionDays = 0
 
 		// Run the DAG again
 		dagAgent = dag.Agent()
 		dagAgent.RunSuccess(t)
 
-		// Check if only the latest history file exists
+		// Check if only the latest runstore file exists
 		dag.AssertHistoryCount(t, 1)
 	})
 	t.Run("AlreadyRunning", func(t *testing.T) {
@@ -110,9 +110,11 @@ func TestAgent_Run(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, "agent/sleep.yaml")
 		dagAgent := dag.Agent()
+		done := make(chan struct{})
 
 		go func() {
 			dagAgent.RunCancel(t)
+			close(done)
 		}()
 
 		// wait for the DAG to start
@@ -120,6 +122,8 @@ func TestAgent_Run(t *testing.T) {
 
 		// send a signal to cancel the DAG
 		dagAgent.Abort()
+
+		<-done
 
 		// wait for the DAG to be canceled
 		dag.AssertLatestStatus(t, scheduler.StatusCancel)
@@ -215,7 +219,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		require.Equal(t, http.StatusOK, mockResponseWriter.status)
 
 		// Check if the status is returned correctly
-		status, err := persistence.StatusFromJSON(mockResponseWriter.body)
+		status, err := runstore.StatusFromJSON(mockResponseWriter.body)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusRunning, status.Status)
 

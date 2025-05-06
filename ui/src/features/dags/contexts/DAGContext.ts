@@ -5,5 +5,5 @@ export const DAGContext = React.createContext({
     return;
   },
   name: '',
-  fileId: '',
+  fileName: '',
 });

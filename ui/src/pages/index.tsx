@@ -86,7 +86,10 @@ function Dashboard(): React.ReactElement | null {
   const totalDags = dagsList.length;
 
   dagsList.forEach((dagFile) => {
-    if (dagFile.latestRun && metrics.hasOwnProperty(dagFile.latestRun.status)) {
+    if (
+      dagFile.latestRun &&
+      Object.prototype.hasOwnProperty.call(metrics, dagFile.latestRun.status)
+    ) {
       const statusKey = dagFile.latestRun.status as Status;
       metrics[statusKey]! += 1;
     }

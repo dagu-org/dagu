@@ -21,6 +21,13 @@ module.exports = {
         ],
       },
       {
+        test: /\.ico$/i,
+        type: 'asset/resource',
+        generator: {
+          filename: '[name][ext]',
+        },
+      },
+      {
         test: /\.ttf$/,
         type: 'asset/resource',
       },

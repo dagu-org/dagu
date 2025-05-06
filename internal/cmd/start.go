@@ -9,7 +9,7 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/spf13/cobra"
 )
 
@@ -104,9 +104,9 @@ func runStart(ctx *Context, args []string) error {
 	// same request ID, ensuring idempotency across the the DAG from the root DAG.
 	if rootDAG.RequestID != requestID {
 		logger.Debug(ctx, "Checking for previous sub-DAG run with the request ID", "requestID", requestID)
-		var run *persistence.Run
-		record, err := ctx.historyStore().FindBySubRequestID(ctx, requestID, rootDAG)
-		if errors.Is(err, persistence.ErrRequestIDNotFound) {
+		var status *runstore.Status
+		record, err := ctx.runStore().FindBySubRunRequestID(ctx, requestID, rootDAG)
+		if errors.Is(err, runstore.ErrRequestIDNotFound) {
 			// If the request ID is not found, proceed with execution
 			goto EXEC
 		}
@@ -114,12 +114,12 @@ func runStart(ctx *Context, args []string) error {
 			logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
 			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
 		}
-		run, err = record.ReadRun(ctx)
+		status, err = record.ReadStatus(ctx)
 		if err != nil {
 			logger.Error(ctx, "Failed to read previous run status", "requestID", requestID, "err", err)
 			return fmt.Errorf("failed to read previous run status for request ID %s: %w", requestID, err)
 		}
-		return executeRetry(ctx, dag, run, rootDAG)
+		return executeRetry(ctx, dag, status, rootDAG)
 	}
 
 EXEC:
@@ -144,7 +144,7 @@ func executeDag(ctx *Context, dag *digraph.DAG, requestID string, rootDAG digrap
 
 	logger.Debug(ctx, "DAG run initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
 
-	dagStore, err := ctx.dagStore()
+	dagStore, err := ctx.dagStore([]string{filepath.Dir(dag.Location)})
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
@@ -164,7 +164,7 @@ func executeDag(ctx *Context, dag *digraph.DAG, requestID string, rootDAG digrap
 		logFile.Name(),
 		cli,
 		dagStore,
-		ctx.historyStore(),
+		ctx.runStore(),
 		rootDAG,
 		opts,
 	)

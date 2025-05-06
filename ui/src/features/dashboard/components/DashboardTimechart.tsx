@@ -29,7 +29,7 @@ function DashboardTimeChart({ data: input }: Props) {
       // Test if the timezone is valid
       dayjs().tz(tz);
       return tz;
-    } catch (e) {
+    } catch {
       // If it's an offset format like UTC+9, convert to a valid IANA timezone
       if (tz.startsWith('UTC+') || tz.startsWith('UTC-')) {
         // Default to a common timezone in that offset

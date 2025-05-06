@@ -20,11 +20,10 @@ const oldDurationPrototype = dayjs.duration.prototype;
 const newDurationPrototype = Object.create(oldDurationPrototype);
 
 newDurationPrototype.format = function (formatStr: string) {
-  const duration = this;
-  const days = Math.floor(duration.asDays());
-  const hours = duration.hours();
-  const minutes = duration.minutes();
-  const seconds = duration.seconds();
+  const days = Math.floor(this.asDays());
+  const hours = this.hours();
+  const minutes = this.minutes();
+  const seconds = this.seconds();
 
   let result = formatStr;
 

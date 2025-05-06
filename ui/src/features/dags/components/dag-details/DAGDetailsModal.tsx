@@ -12,13 +12,13 @@ import { RunDetailsContext } from '../../contexts/DAGStatusContext';
 import DAGDetailsContent from './DAGDetailsContent';
 
 type DAGDetailsModalProps = {
-  fileId: string;
+  fileName: string;
   isOpen: boolean;
   onClose: () => void;
 };
 
 const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
-  fileId,
+  fileName,
   isOpen,
   onClose,
 }) => {
@@ -28,18 +28,18 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
     components['schemas']['RunDetails'] | undefined
   >();
   const [activeTab, setActiveTab] = React.useState('status');
-  const [requestId, setRequestId] = React.useState<string>('latest');
-  const [stepName, setStepName] = React.useState<string | null>(null);
+  const [requestId] = React.useState<string>('latest');
+  const [stepName] = React.useState<string | null>(null);
 
   const { data, isLoading, mutate } = useQuery(
-    '/dags/{fileId}',
+    '/dags/{fileName}',
     {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          fileId: fileId || '',
+          fileName: fileName || '',
         },
       },
     },
@@ -52,7 +52,7 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
 
   const handleFullscreenClick = (e?: React.MouseEvent) => {
     // Determine the URL path based on the active tab
-    let url = `/dags/${fileId}`;
+    let url = `/dags/${fileName}`;
 
     // Add the tab to the URL if it's not the default 'status' tab
     if (activeTab !== 'status') {
@@ -134,7 +134,7 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
         <DAGContext.Provider
           value={{
             refresh: refreshFn,
-            fileId: fileId || '',
+            fileName: fileName || '',
             name: data.dag?.name || '',
           }}
         >
@@ -189,7 +189,7 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
               <div className="flex-1 overflow-y-auto">
                 {data.dag && (
                   <DAGDetailsContent
-                    fileId={fileId}
+                    fileName={fileName}
                     dag={data.dag}
                     latestRun={data.latestRun}
                     refreshFn={refreshFn}

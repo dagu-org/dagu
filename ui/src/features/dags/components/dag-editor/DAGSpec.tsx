@@ -25,14 +25,14 @@ import DAGEditor from './DAGEditor';
  */
 type Props = {
   /** DAG file ID */
-  fileId: string;
+  fileName: string;
 };
 
 /**
  * DAGSpec displays and allows editing of a DAG specification
  * including visualization, attributes, steps, and YAML definition
  */
-function DAGSpec({ fileId }: Props) {
+function DAGSpec({ fileName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
   const { showToast } = useSimpleToast();
@@ -65,14 +65,14 @@ function DAGSpec({ fileId }: Props) {
 
   // Fetch DAG specification data
   const { data, isLoading } = useQuery(
-    '/dags/{fileId}/spec',
+    '/dags/{fileName}/spec',
     {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          fileId: fileId,
+          fileName: fileName,
         },
       },
     },
@@ -225,11 +225,11 @@ function DAGSpec({ fileId }: Props) {
                           // Save current scroll position before any operations that might cause re-render
                           saveScrollPosition();
                           const { data, error } = await client.PUT(
-                            '/dags/{fileId}/spec',
+                            '/dags/{fileName}/spec',
                             {
                               params: {
                                 path: {
-                                  fileId: props.fileId,
+                                  fileName: props.fileName,
                                 },
                                 query: {
                                   remoteNode:

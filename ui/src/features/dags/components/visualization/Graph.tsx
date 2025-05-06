@@ -198,7 +198,7 @@ const Graph: React.FC<Props> = ({
   return (
     <div className="relative">
       <div className="absolute right-2 top-2 z-10 bg-white">
-        <ToggleGroup value="" onChange={() => {}} aria-label="Zoom controls">
+        <ToggleGroup aria-label="Zoom controls">
           <ToggleButton
             value="zoomin"
             onClick={() => zoomIn()}

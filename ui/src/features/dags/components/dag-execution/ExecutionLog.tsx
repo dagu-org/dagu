@@ -12,7 +12,7 @@ import LoadingIndicator from '../../../../ui/LoadingIndicator';
  * Props for the ExecutionLog component
  */
 type Props = {
-  /** DAG name/fileId */
+  /** DAG name or fileName */
   name: string;
   /** Request ID of the execution */
   requestId: string;

@@ -62,7 +62,6 @@ function App({ config }: Props) {
     // We only want this effect to run if remoteNodes changes,
     // or selectedRemoteNode becomes invalid relative to remoteNodes.
     // Adding handleSelectRemoteNode to deps would cause unnecessary runs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remoteNodes, selectedRemoteNode]);
 
   return (
@@ -92,8 +91,11 @@ function App({ config }: Props) {
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/dags/" element={<DAGs />} />
-                    <Route path="/dags/:fileId/:tab" element={<DAGDetails />} />
-                    <Route path="/dags/:fileId/" element={<DAGDetails />} />
+                    <Route
+                      path="/dags/:fileName/:tab"
+                      element={<DAGDetails />}
+                    />
+                    <Route path="/dags/:fileName/" element={<DAGDetails />} />
                     <Route path="/search/" element={<Search />} />
                   </Routes>
                 </Layout>

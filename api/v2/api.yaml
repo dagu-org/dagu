@@ -52,7 +52,7 @@ paths:
     get:
       summary: "List all available DAGs"
       description: "Retrieves DAGs with optional filtering by name and tags"
-      operationId: "listAllDAGs"
+      operationId: "listDAGs"
       tags:
         - "dags"
       parameters:
@@ -140,7 +140,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-  /dags/{fileId}:
+  /dags/{fileName}:
     get:
       summary: "Retrieve comprehensive DAG information"
       description: "Fetches detailed information about a specific DAG"
@@ -149,7 +149,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
           description: "A successful response"
@@ -185,12 +185,12 @@ paths:
     delete:
       summary: "Delete an existing DAG"
       description: "Permanently removes a DAG definition from the system"
-      operationId: "deleteDAGByFileId"
+      operationId: "deleteDAG"
       tags:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
       responses:
         "204":
           description: "DAG successfully deleted"
@@ -207,7 +207,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{fileId}/start:
+  /dags/{fileName}/start:
     post:
       summary: "Initiate DAG execution"
       description: "Starts execution of a DAG with optional parameters"
@@ -216,7 +216,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
         content:
@@ -230,6 +230,16 @@ paths:
       responses:
         "200":
           description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                    description: "Request ID of the initiated DAG run"
+                required:
+                  - requestId
         default:
           description: "Generic error response"
           content:
@@ -237,16 +247,16 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{fileId}/stop:
+  /dags/{fileName}/stop:
     post:
       summary: "Terminate running DAG execution"
       description: "Forcefully stops a running DAG workflow"
-      operationId: "terminateDAGExecution"
+      operationId: "terminateDAGRun"
       tags:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
           description: "A successful response"
@@ -257,16 +267,16 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{fileId}/retry:
+  /dags/{fileName}/retry:
     post:
       summary: "Retry DAG execution"
       description: "Reruns a DAG execution"
-      operationId: "retryDAGExecution"
+      operationId: "retryDAGRun"
       tags:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
         content:
@@ -289,16 +299,16 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{fileId}/runs:
+  /dags/{fileName}/runs:
     get:
       summary: "Retrieve execution history of a DAG"
       description: "Fetches execution history of a DAG"
-      operationId: "getDAGExecutionHistory"
+      operationId: "getDAGRunHistory"
       tags:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
           description: "A successful response"
@@ -327,7 +337,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{fileId}/runs/{requestId}:
+  /dags/{fileName}/runs/{requestId}:
     get:
       summary: "Get detailed status of a specific DAG run"
       description: "Retrieves status information about a particular DAG execution"
@@ -336,7 +346,7 @@ paths:
       operationId: "getDAGRunDetails"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
         - $ref: "#/components/parameters/RequestId"
       responses:
         "200":
@@ -357,16 +367,16 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{fileId}/spec:
+  /dags/{fileName}/spec:
     get:
-      summary: "Retrieve DAG definition"
-      description: "Fetches the YAML definition of a DAG"
-      operationId: "getDAGDefinition"
+      summary: "Retrieve DAG specification"
+      description: "Fetches the specification of a DAG"
+      operationId: "getDAGSpec"
       tags:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
           description: "A successful response"
@@ -395,14 +405,14 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
     put:
-      summary: "Update DAG definition"
-      description: "Modifies the YAML definition of a DAG"
-      operationId: "updateDAGDefinition"
+      summary: "Update DAG spec"
+      description: "Modifies the specification of a DAG"
+      operationId: "updateDAGSpec"
       tags:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
         content:
@@ -438,7 +448,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{fileId}/suspend:
+  /dags/{fileName}/suspend:
     post:
       summary: "Toggle DAG suspension state"
       description: "Controls whether the scheduler should execute this DAG according to its defined cron schedule"
@@ -447,7 +457,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
         content:
@@ -476,7 +486,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{fileId}/rename:
+  /dags/{fileName}/rename:
     post:
       summary: "Change DAG file ID"
       description: "Changes the file ID of the DAG"
@@ -485,7 +495,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileId"
+        - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
         content:
@@ -493,11 +503,11 @@ paths:
             schema:
               type: object
               properties:
-                newFileId:
+                newFileName:
                   type: string
-                  description: "New file ID for the DAG"
+                  description: "New file name for the DAG"
               required:
-                - newFileId
+                - newFileName
       responses:
         "200":
           description: "A successful response"
@@ -522,9 +532,9 @@ paths:
 
   /dags/search:
     get:
-      summary: "Search across all DAG definitions"
+      summary: "Search DAGs"
       description: "Performs a full-text search across all DAG definitions"
-      operationId: "searchDAGDefinitions"
+      operationId: "searchDAGs"
       tags:
         - "dags"
       parameters:
@@ -587,11 +597,47 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /runs/{dagName}/{requestId}:
+    get:
+      summary: "Retrieve detailed status of a DAG run"
+      description: "Fetches detailed status information about a specific DAG run"
+      operationId: "getRunDetails"
+      tags:
+        - "runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  runDetails:
+                    $ref: "#/components/schemas/RunDetails"
+                required:
+                  - runDetails
+        "404":
+          description: "DAG run not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /runs/{dagName}/{requestId}/log:
     get:
       summary: "Retrieve full execution log of a DAG run"
       description: "Fetches the execution log for a DAG run"
-      operationId: "getDAGRunLog"
+      operationId: "getRunLog"
       tags:
         - "runs"
       parameters:
@@ -618,11 +664,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /runs/{dagName}/{requestId}/{stepName}/log:
+  /runs/{dagName}/{requestId}/steps/{stepName}/log:
     get:
       summary: "Retrieve log for a specific step in a DAG run"
       description: "Fetches the log for an individual step in a DAG run"
-      operationId: "getDAGStepLog"
+      operationId: "getRunStepLog"
       tags:
         - "runs"
       parameters:
@@ -650,17 +696,185 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /runs/{dagName}/{requestId}/{stepName}/status:
+  /runs/{dagName}/{requestId}/steps/{stepName}/status:
     patch:
       summary: "Manually update a step's execution status"
       description: "Changes the status of a specific step within a DAG run"
-      operationId: "updateDAGStepStatus"
+      operationId: "updateRunStepStatus"
       tags:
         - "runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/RequestId"
+        - $ref: "#/components/parameters/StepName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  $ref: "#/components/schemas/NodeStatus"
+              required:
+                - status
+      responses:
+        "200":
+          description: "A successful response"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Run or step not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /runs/{dagName}/{requestId}/subs/{subRunRequestId}:
+    get:
+      summary: "Retrieve detailed status of a sub run"
+      description: "Fetches detailed status information about a specific sub-run"
+      operationId: "getSubRunDetails"
+      tags:
+        - "runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/RequestId"
+        - name: "subRunRequestId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub run to retrieve details for"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  runDetails:
+                    $ref: "#/components/schemas/RunDetails"
+                required:
+                  - runDetails
+        "404":
+          description: "Sub-run not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /runs/{dagName}/{requestId}/subs/{subRunRequestId}/log:
+    get:
+      summary: "Retrieve log for a specific sub run"
+      description: "Fetches the log for an individual sub-run"
+      operationId: "getSubRunLog"
+      tags:
+        - "runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/RequestId"
+        - name: "subRunRequestId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub run to retrieve the log for"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Log"
+        "404":
+          description: "Log file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /runs/{dagName}/{requestId}/subs/{subRunRequestId}/steps/{stepName}/log:
+    get:
+      summary: "Retrieve log for a specific step in a sub run"
+      description: "Fetches the log for an individual step in a sub-run"
+      operationId: "getSubRunStepLog"
+      tags:
+        - "runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/RequestId"
+        - name: "subRunRequestId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub run to retrieve the log for"
+        - $ref: "#/components/parameters/StepName"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Log"
+        "404":
+          description: "Log file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /runs/{dagName}/{requestId}/subs/{subRunRequestId}/steps/{stepName}/status:
+    patch:
+      summary: "Manually update a step's execution status in a sub run"
+      description: "Changes the status of a specific step within a sub-run"
+      operationId: "updateSubRunStepStatus"
+      tags:
+        - "runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/RequestId"
+        - name: "subRunRequestId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub run to update the step status for"
         - $ref: "#/components/parameters/StepName"
       requestBody:
         required: true
@@ -727,13 +941,13 @@ components:
         maximum: 1000
         default: 50
 
-    DAGFileId:
-      name: fileId
+    DAGFileName:
+      name: fileName
       in: path
-      description: File Id of the DAG file
+      description: the name of the DAG file
       required: true
       schema:
-        $ref: "#/components/schemas/DAGFileId"
+        $ref: "#/components/schemas/DAGFileName"
 
     DAGName:
       name: dagName
@@ -799,12 +1013,12 @@ components:
         - "not_running"
         - "already_exists"
 
-    DAGFileId:
+    DAGFileName:
       type: string
       # only allows alphanumeric characters, underscores, and hyphens
       format: "regex"
       pattern: "^[a-zA-Z0-9_-]+$"
-      description: "location of the DAG file"
+      description: "Name of the DAG file"
 
     DAGName:
       type: string
@@ -871,7 +1085,7 @@ components:
       type: object
       description: "DAG file with its status information"
       properties:
-        fileId:
+        fileName:
           type: string
           description: "File ID of the DAG file"
         dag:
@@ -887,7 +1101,7 @@ components:
           items:
             type: string
       required:
-        - fileId
+        - fileName
         - dag
         - latestRun
         - suspended
@@ -955,7 +1169,7 @@ components:
         3: "Cancelled"
         4: "Success"
 
-    StatusText:
+    StatusLabel:
       type: string
       description: "Human-readable status description for the DAG run"
       enum:
@@ -984,7 +1198,7 @@ components:
         4: "Success"
         5: "Skipped"
 
-    NodeStatusText:
+    NodeStatusLabel:
       type: string
       description: "Human-readable status description for the node"
       enum:
@@ -1082,8 +1296,8 @@ components:
           $ref: "#/components/schemas/DAGName"
         status:
           $ref: "#/components/schemas/Status"
-        statusText:
-          $ref: "#/components/schemas/StatusText"
+        statusLabel:
+          $ref: "#/components/schemas/StatusLabel"
         pid:
           type: integer
           description: "Process ID of the DAG run"
@@ -1103,14 +1317,14 @@ components:
         - requestId
         - name
         - status
-        - statusText
+        - statusLabel
         - startedAt
         - finishedAt
         - log
 
     RunDetails:
       type: object
-      description: "Detailed status of a DAG run including child nodes"
+      description: "Detailed status of a DAG run including sub-run nodes"
       allOf:
         - $ref: "#/components/schemas/RunSummary"
         - type: object
@@ -1149,14 +1363,19 @@ components:
           description: "RFC3339 timestamp when the step finished"
         status:
           $ref: "#/components/schemas/NodeStatus"
-        statusText:
-          $ref: "#/components/schemas/NodeStatusText"
+        statusLabel:
+          $ref: "#/components/schemas/NodeStatusLabel"
         retryCount:
           type: integer
           description: "Number of retry attempts made for this step"
         doneCount:
           type: integer
           description: "Number of successful completions for repeating steps"
+        subRuns:
+          type: array
+          description: "List of sub-runs associated with this step"
+          items:
+            $ref: "#/components/schemas/SubRun"
         error:
           type: string
           description: "Error message if the step failed"
@@ -1166,9 +1385,18 @@ components:
         - startedAt
         - finishedAt
         - status
-        - statusText
+        - statusLabel
         - retryCount
         - doneCount
+
+    SubRun:
+      type: object
+      description: "Metadata for a sub run"
+      properties:
+        requestId:
+          $ref: "#/components/schemas/RequestId"
+      required:
+        - requestId
 
     Step:
       type: object
@@ -1208,10 +1436,10 @@ components:
             type: string
         run:
           type: string
-          description: "The name of the DAG to run as a sub-DAG"
+          description: "The name of the DAG to run as a sub-run"
         params:
           type: string
-          description: "Parameters to pass to the sub DAG in JSON format"
+          description: "Parameters to pass to the sub-run in JSON format"
         depends:
           type: array
           description: "List of step names that must complete before this step can start"

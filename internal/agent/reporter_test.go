@@ -9,14 +9,14 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/stretchr/testify/require"
 )
 
 func TestReporter(t *testing.T) {
 	for scenario, fn := range map[string]func(
-		t *testing.T, rp *reporter, mock *mockSender, dag *digraph.DAG, nodes []*persistence.Node,
+		t *testing.T, rp *reporter, mock *mockSender, dag *digraph.DAG, nodes []*runstore.Node,
 	){
 		"create error mail":   testErrorMail,
 		"no error mail":       testNoErrorMail,
@@ -49,7 +49,7 @@ func TestReporter(t *testing.T) {
 				},
 			}
 
-			nodes := []*persistence.Node{
+			nodes := []*runstore.Node{
 				{
 					Step: digraph.Step{
 						Name:    "test-step",
@@ -70,11 +70,11 @@ func TestReporter(t *testing.T) {
 	}
 }
 
-func testErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.DAG, nodes []*persistence.Node) {
+func testErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.DAG, nodes []*runstore.Node) {
 	dag.MailOn.Failure = true
 	dag.MailOn.Success = false
 
-	_ = rp.send(context.Background(), dag, persistence.Status{
+	_ = rp.send(context.Background(), dag, runstore.Status{
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}, fmt.Errorf("Error"))
@@ -84,11 +84,11 @@ func testErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.DA
 	require.Equal(t, 1, mock.count)
 }
 
-func testNoErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.DAG, nodes []*persistence.Node) {
+func testNoErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.DAG, nodes []*runstore.Node) {
 	dag.MailOn.Failure = false
 	dag.MailOn.Success = true
 
-	err := rp.send(context.Background(), dag, persistence.Status{
+	err := rp.send(context.Background(), dag, runstore.Status{
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}, nil)
@@ -96,11 +96,11 @@ func testNoErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.
 	require.Equal(t, 0, mock.count)
 }
 
-func testSuccessMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.DAG, nodes []*persistence.Node) {
+func testSuccessMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.DAG, nodes []*runstore.Node) {
 	dag.MailOn.Failure = true
 	dag.MailOn.Success = true
 
-	err := rp.send(context.Background(), dag, persistence.Status{
+	err := rp.send(context.Background(), dag, runstore.Status{
 		Status: scheduler.StatusSuccess,
 		Nodes:  nodes,
 	}, nil)
@@ -111,14 +111,14 @@ func testSuccessMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.
 	require.Equal(t, 1, mock.count)
 }
 
-func testRenderSummary(t *testing.T, _ *reporter, _ *mockSender, dag *digraph.DAG, _ []*persistence.Node) {
-	status := persistence.NewStatusFactory(dag).Create("request-id", scheduler.StatusError, 0, time.Now())
+func testRenderSummary(t *testing.T, _ *reporter, _ *mockSender, dag *digraph.DAG, _ []*runstore.Node) {
+	status := runstore.NewStatusBuilder(dag).Create("request-id", scheduler.StatusError, 0, time.Now())
 	summary := renderDAGSummary(status, errors.New("test error"))
 	require.Contains(t, summary, "test error")
 	require.Contains(t, summary, dag.Name)
 }
 
-func testRenderTable(t *testing.T, _ *reporter, _ *mockSender, _ *digraph.DAG, nodes []*persistence.Node) {
+func testRenderTable(t *testing.T, _ *reporter, _ *mockSender, _ *digraph.DAG, nodes []*runstore.Node) {
 	summary := renderStepSummary(nodes)
 	require.Contains(t, summary, nodes[0].Step.Name)
 	require.Contains(t, summary, nodes[0].Step.Args[0])

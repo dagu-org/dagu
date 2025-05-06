@@ -1,8 +1,3 @@
-import * as React from 'react';
-import { cn } from '@/lib/utils';
-import { useUserPreferences } from '../contexts/UserPreference'; // Import the hook
-import { mainListItems as MainListItems } from '../menu';
-import { AppBarContext } from '../contexts/AppBarContext';
 import {
   Select,
   SelectContent,
@@ -10,7 +5,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'; // Import panel icons
+import { cn } from '@/lib/utils';
+import * as React from 'react';
+import { AppBarContext } from '../contexts/AppBarContext';
+import { mainListItems as MainListItems } from '../menu';
 
 // Utility: Get contrast color (black or white) for a given background color (hex, rgb, or named)
 function getContrastColor(input?: string): string {
@@ -97,11 +95,11 @@ function Content({ title, navbarColor, children }: LayoutProps) {
       <div
         className={cn(
           // Modern base styles with dark background
-          'h-full overflow-hidden bg-[#1D292B] text-white',
+          'h-full overflow-hidden bg-[#222] text-white',
           // Shadow effect
           'shadow-lg',
           // Always visible, not fixed
-          'z-40 transition-all duration-300 ease-in-out',
+          'z-40 transition-all duration-50 ease-in-out',
           isSidebarExpanded ? 'w-60' : sidebarWidthCollapsed
         )}
         onMouseEnter={() => setIsSidebarExpanded(true)}
@@ -112,7 +110,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
           <nav className="flex-1">
             <MainListItems
               isOpen={isSidebarExpanded}
-              onNavItemClick={() => setIsSidebarExpanded(false)}
+              // Don't collapse sidebar on navigation to prevent jarring transition
             />
           </nav>
 
@@ -134,9 +132,9 @@ function Content({ title, navbarColor, children }: LayoutProps) {
             backgroundColor:
               navbarColor && navbarColor.trim() !== ''
                 ? navbarColor
-                : '#4D6744',
+                : '#222222',
             color: getContrastColor(
-              navbarColor && navbarColor.trim() !== '' ? navbarColor : '#4D6744'
+              navbarColor && navbarColor.trim() !== '' ? navbarColor : '#222222'
             ),
           }}
         >
@@ -147,7 +145,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
                 color={getContrastColor(
                   navbarColor && navbarColor.trim() !== ''
                     ? navbarColor
-                    : '#4D6744'
+                    : '#222222'
                 )}
               >
                 {title || ''}
@@ -159,7 +157,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
                     color={getContrastColor(
                       navbarColor && navbarColor.trim() !== ''
                         ? navbarColor
-                        : '#4D6744'
+                        : '#222222'
                     )}
                   >
                     {context.title}

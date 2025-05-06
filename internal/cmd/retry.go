@@ -8,7 +8,7 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/spf13/cobra"
 )
 
@@ -39,46 +39,31 @@ func runRetry(ctx *Context, args []string) error {
 
 	dagName := args[0]
 
-	// Retrieve the previous run's history record for the specified request ID.
-	historyRecord, err := ctx.historyStore().FindByRequestID(ctx, dagName, requestID)
+	// Retrieve the previous run's runstore record for the specified request ID.
+	runRecord, err := ctx.runStore().FindByRequestID(ctx, dagName, requestID)
 	if err != nil {
 		logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
 		return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
 	}
 
-	// Read the detailed status of the previous run.
-	run, err := historyRecord.ReadRun(ctx)
+	// Read the detailed status of the previous status.
+	status, err := runRecord.ReadStatus(ctx)
 	if err != nil {
 		logger.Error(ctx, "Failed to read status", "err", err)
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 
-	loadOpts := []digraph.LoadOption{
-		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
-		digraph.WithDAGsDir(ctx.cfg.Paths.DAGsDir),
-	}
-	if run.Status.Params != "" {
-		// If the 'Params' field is not empty, use it instead of 'ParamsList' for backward compatibility.
-		loadOpts = append(loadOpts, digraph.WithParams(run.Status.Params))
-	} else {
-		loadOpts = append(loadOpts, digraph.WithParams(run.Status.ParamsList))
-	}
-
-	// Load the DAG from the local file.
-	// TODO: Read the DAG from the history record instead of the local file.
-	dag, err := digraph.Load(ctx, dagName, loadOpts...)
+	// Get the DAG instance from the runstore record.
+	dag, err := runRecord.ReadDAG(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to load DAG specification", "path", dagName, "err", err)
-		// nolint : staticcheck
-		return fmt.Errorf("failed to load DAG specification from %s with params %s: %w",
-			dagName, run.Status.Params, err)
+		logger.Error(ctx, "Failed to read DAG from runstore record", "err", err)
 	}
 
 	// The retry command is currently only supported for root DAGs.
 	// Therefore we use the request ID as the root DAG request ID here.
-	rootDAG := digraph.NewRootDAG(dag.Name, run.Status.RequestID)
+	rootDAG := digraph.NewRootDAG(dag.Name, status.RequestID)
 
-	if err := executeRetry(ctx, dag, run, rootDAG); err != nil {
+	if err := executeRetry(ctx, dag, status, rootDAG); err != nil {
 		logger.Error(ctx, "Failed to execute retry", "path", dagName, "err", err)
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
@@ -86,11 +71,11 @@ func runRetry(ctx *Context, args []string) error {
 	return nil
 }
 
-func executeRetry(ctx *Context, dag *digraph.DAG, run *persistence.Run, rootDAG digraph.RootDAG) error {
-	logger.Debug(ctx, "Executing retry", "dagName", dag.Name, "requestID", run.Status.RequestID)
+func executeRetry(ctx *Context, dag *digraph.DAG, status *runstore.Status, rootDAG digraph.RootDAG) error {
+	logger.Debug(ctx, "Executing retry", "dagName", dag.Name, "requestID", status.RequestID)
 
 	// We use the same log file for the retry as the original run.
-	logFile, err := OpenOrCreateLogFile(run.Status.Log)
+	logFile, err := OpenOrCreateLogFile(status.Log)
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %w", err)
 	}
@@ -98,12 +83,12 @@ func executeRetry(ctx *Context, dag *digraph.DAG, run *persistence.Run, rootDAG 
 		_ = logFile.Close()
 	}()
 
-	logger.Info(ctx, "DAG retry initiated", "DAG", dag.Name, "requestID", run.Status.RequestID, "logFile", logFile.Name())
+	logger.Info(ctx, "DAG retry initiated", "DAG", dag.Name, "requestID", status.RequestID, "logFile", logFile.Name())
 
 	// Update the context with the log file
 	ctx.LogToFile(logFile)
 
-	dagStore, err := ctx.dagStore()
+	dagStore, err := ctx.dagStore([]string{filepath.Dir(dag.Location)})
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
@@ -116,15 +101,15 @@ func executeRetry(ctx *Context, dag *digraph.DAG, run *persistence.Run, rootDAG 
 	}
 
 	agentInstance := agent.New(
-		run.Status.RequestID,
+		status.RequestID,
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
 		cli,
 		dagStore,
-		ctx.historyStore(),
+		ctx.runStore(),
 		rootDAG,
-		agent.Options{RetryTarget: &run.Status},
+		agent.Options{RetryTarget: status},
 	)
 
 	listenSignals(ctx, agentInstance)
@@ -134,7 +119,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, run *persistence.Run, rootDAG 
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
-			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, run.Status.RequestID, err)
+			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, status.RequestID, err)
 		}
 	}
 

@@ -8,94 +8,109 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/spf13/cobra"
 )
 
 func CmdRestart() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "restart [flags] /path/to/spec.yaml",
+			Use:   "restart --request-id=abc123 dagName",
 			Short: "Restart a running DAG",
-			Long: `Stop the currently running DAG and immediately restart it with the same configuration.
+			Long: `Stop the currently running DAG and immediately restart it with the same configuration but with a new request ID.
 
 Flags:
-  --request-id string   (Optional) Unique identifier for tracking the restart execution.
+  --request-id string (optional) Unique identifier for tracking the restart execution.
 
 Example:
-  dagu restart my_dag.yaml --request-id=abc123
+  dagu restart --request-id=abc123 dagName
 
-This command gracefully stops the active DAG run before reinitiating it.
+This command gracefully stops the active DAG run before restarting it.
+If the request ID is not provided, it will find the current running DAG by name.
 `,
 			Args: cobra.ExactArgs(1),
 		}, restartFlags, runRestart,
 	)
 }
 
-var restartFlags = []commandLineFlag{}
+var restartFlags = []commandLineFlag{
+	requestIDFlagRestart,
+}
 
 func runRestart(ctx *Context, args []string) error {
-	specFilePath := args[0]
-
-	dag, err := digraph.Load(ctx, specFilePath, digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig))
+	requestID, err := ctx.Flags().GetString("request-id")
 	if err != nil {
-		logger.Error(ctx, "Failed to load DAG", "path", specFilePath, "err", err)
-		return fmt.Errorf("failed to load DAG from %s: %w", specFilePath, err)
+		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
-	if err := handleRestartProcess(ctx, dag, specFilePath); err != nil {
-		logger.Error(ctx, "Failed to restart process", "path", specFilePath, "err", err)
+	dagName := args[0]
+
+	var record runstore.Record
+	if requestID != "" {
+		// Retrieve the previous run's runstore record for the specified request ID.
+		r, err := ctx.runStore().FindByRequestID(ctx, dagName, requestID)
+		if err != nil {
+			logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
+			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
+		}
+		record = r
+	} else {
+		r, err := ctx.runStore().Latest(ctx, dagName)
+		if err != nil {
+			logger.Error(ctx, "Failed to retrieve latest runstore record", "dagName", dagName, "err", err)
+			return fmt.Errorf("failed to retrieve latest runstore record for DAG %s: %w", dagName, err)
+		}
+		record = r
+	}
+
+	status, err := record.ReadStatus(ctx)
+	if err != nil {
+		logger.Error(ctx, "Failed to read status", "err", err)
+		return fmt.Errorf("failed to read status: %w", err)
+	}
+	if status.Status != scheduler.StatusRunning {
+		logger.Error(ctx, "DAG is not running", "dagName", dagName)
+	}
+
+	dag, err := record.ReadDAG(ctx)
+	if err != nil {
+		logger.Error(ctx, "Failed to read DAG from runstore record", "err", err)
+		return fmt.Errorf("failed to read DAG from runstore record: %w", err)
+	}
+
+	if err := handleRestartProcess(ctx, dag, requestID); err != nil {
+		logger.Error(ctx, "Failed to restart DAG", "dagName", dag.Name, "err", err)
 		return fmt.Errorf("restart process failed for DAG %s: %w", dag.Name, err)
 	}
 
 	return nil
 }
 
-func handleRestartProcess(ctx *Context, dag *digraph.DAG, specFilePath string) error {
+func handleRestartProcess(ctx *Context, dag *digraph.DAG, requestID string) error {
 	cli, err := ctx.Client()
 	if err != nil {
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
 
 	// Stop if running
-	if err := stopDAGIfRunning(ctx, cli, dag); err != nil {
+	if err := stopDAGIfRunning(ctx, cli, dag, requestID); err != nil {
 		return fmt.Errorf("failed to stop DAG: %w", err)
 	}
 
 	// Wait before restart if configured
-	waitForRestart(ctx, dag.RestartWait)
-
-	// Get previous parameters
-	status, err := getPreviousRunStatus(ctx, cli, dag)
-	if err != nil {
-		return fmt.Errorf("failed to get previous run parameters: %w", err)
+	if dag.RestartWait > 0 {
+		logger.Info(ctx, "Waiting for restart", "duration", dag.RestartWait)
+		time.Sleep(dag.RestartWait)
 	}
 
-	loadOpts := []digraph.LoadOption{
-		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
-		digraph.WithDAGsDir(ctx.cfg.Paths.DAGsDir),
-	}
-	if status.Params != "" {
-		// backward compatibility
-		loadOpts = append(loadOpts, digraph.WithParams(status.Params))
-	} else {
-		loadOpts = append(loadOpts, digraph.WithParams(status.ParamsList))
-	}
-
-	// Reload DAG with parameters
-	dag, err = digraph.Load(ctx, specFilePath, loadOpts...)
-	if err != nil {
-		return fmt.Errorf("failed to reload DAG with params: %w", err)
-	}
-
+	// Execute the exact same DAG with the same parameters but a new request ID
 	return executeDAG(ctx, cli, dag)
 }
 
-func executeDAG(ctx *Context, cli client.Client, dag *digraph.DAG) error {
+func executeDAG(ctx *Context, cli runstore.Client, dag *digraph.DAG) error {
 	requestID, err := generateRequestID()
 	if err != nil {
 		return fmt.Errorf("failed to generate request ID: %w", err)
@@ -113,7 +128,7 @@ func executeDAG(ctx *Context, cli client.Client, dag *digraph.DAG) error {
 
 	logger.Info(ctx, "DAG restart initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
 
-	dagStore, err := ctx.dagStore()
+	dagStore, err := ctx.dagStore([]string{filepath.Dir(dag.Location)})
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
@@ -128,7 +143,7 @@ func executeDAG(ctx *Context, cli client.Client, dag *digraph.DAG) error {
 		logFile.Name(),
 		cli,
 		dagStore,
-		ctx.historyStore(),
+		ctx.runStore(),
 		rootDAG,
 		agent.Options{Dry: false})
 
@@ -145,25 +160,25 @@ func executeDAG(ctx *Context, cli client.Client, dag *digraph.DAG) error {
 	return nil
 }
 
-func stopDAGIfRunning(ctx context.Context, cli client.Client, dag *digraph.DAG) error {
-	status, err := cli.GetCurrentStatus(ctx, dag)
+func stopDAGIfRunning(ctx context.Context, cli runstore.Client, dag *digraph.DAG, requestID string) error {
+	status, err := cli.GetRealtimeStatus(ctx, dag, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to get current status: %w", err)
 	}
 
 	if status.Status == scheduler.StatusRunning {
 		logger.Infof(ctx, "Stopping: %s", dag.Name)
-		if err := stopRunningDAG(ctx, cli, dag); err != nil {
+		if err := stopRunningDAG(ctx, cli, dag, requestID); err != nil {
 			return fmt.Errorf("failed to stop running DAG: %w", err)
 		}
 	}
 	return nil
 }
 
-func stopRunningDAG(ctx context.Context, cli client.Client, dag *digraph.DAG) error {
+func stopRunningDAG(ctx context.Context, cli runstore.Client, dag *digraph.DAG, requestID string) error {
 	const stopPollInterval = 100 * time.Millisecond
 	for {
-		status, err := cli.GetCurrentStatus(ctx, dag)
+		status, err := cli.GetRealtimeStatus(ctx, dag, requestID)
 		if err != nil {
 			return fmt.Errorf("failed to get current status: %w", err)
 		}
@@ -172,25 +187,10 @@ func stopRunningDAG(ctx context.Context, cli client.Client, dag *digraph.DAG) er
 			return nil
 		}
 
-		if err := cli.StopDAG(ctx, dag); err != nil {
+		if err := cli.Stop(ctx, dag, requestID); err != nil {
 			return fmt.Errorf("failed to stop DAG: %w", err)
 		}
 
 		time.Sleep(stopPollInterval)
 	}
-}
-
-func waitForRestart(ctx context.Context, restartWait time.Duration) {
-	if restartWait > 0 {
-		logger.Info(ctx, "Waiting for restart", "duration", restartWait)
-		time.Sleep(restartWait)
-	}
-}
-
-func getPreviousRunStatus(ctx context.Context, cli client.Client, dag *digraph.DAG) (persistence.Status, error) {
-	status, err := cli.GetLatestStatus(ctx, dag)
-	if err != nil {
-		return persistence.Status{}, fmt.Errorf("failed to get latest status: %w", err)
-	}
-	return status, nil
 }

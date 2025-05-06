@@ -12,7 +12,7 @@ import LoadingIndicator from '../../../../ui/LoadingIndicator';
  * Props for the StepLog component
  */
 type Props = {
-  /** DAG name/fileId */
+  /** DAG name or fileName */
   dagName: string;
   /** Request ID of the execution */
   requestId: string;
@@ -33,19 +33,19 @@ const ANSI_CODES_REGEX = [
  * StepLog displays the log output for a specific step in a DAG run
  * Fetches log data from the API and refreshes every 30 seconds
  */
-function StepLog({ dagName: fileId, requestId, stepName }: Props) {
+function StepLog({ dagName, requestId, stepName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
 
   // Fetch log data with periodic refresh
   const { data } = useQuery(
-    '/runs/{dagName}/{requestId}/{stepName}/log',
+    '/runs/{dagName}/{requestId}/steps/{stepName}/log',
     {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          dagName: fileId,
+          dagName,
           stepName,
           requestId,
         },
@@ -60,16 +60,19 @@ function StepLog({ dagName: fileId, requestId, stepName }: Props) {
   }
 
   // Remove ANSI color codes from log content
-  const content = data.content.replace(new RegExp(ANSI_CODES_REGEX, 'g'), '');
+  const logContent =
+    data && typeof data === 'object' && 'content' in data
+      ? (data.content as string).replace(new RegExp(ANSI_CODES_REGEX, 'g'), '')
+      : '';
 
   // Split content into lines for better rendering
-  const lines = content ? content.split('\n') : ['<No log output>'];
+  const lines = logContent ? logContent.split('\n') : ['<No log output>'];
 
   return (
     <div className="w-full h-full">
       <div className="h-full overflow-auto rounded-lg bg-zinc-900 p-4 shadow-md">
         <pre className="h-full font-mono text-sm text-white">
-          {lines.map((line, index) => (
+          {lines.map((line: string, index: number) => (
             <div
               key={index}
               className="flex hover:bg-zinc-800 px-2 py-0.5 rounded"

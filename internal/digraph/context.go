@@ -30,7 +30,7 @@ func NewRootDAG(name, requestID string) RootDAG {
 }
 
 func GetDAGByName(ctx context.Context, name string) (*DAG, error) {
-	c := GetContext(ctx)
+	c := GetExecContext(ctx)
 	return c.client.GetDAG(ctx, name)
 }
 

@@ -48,9 +48,8 @@ function DAGGraph({ run, onSelectStep }: Props) {
   return (
     <div>
       <div className="flex justify-between items-start mb-4">
-        <Tabs value={sub} className="w-auto">
+        <Tabs className="w-auto">
           <Tab
-            value="0"
             isActive={sub === '0'}
             onClick={() => setSub('0')}
             className={cn(
@@ -62,7 +61,6 @@ function DAGGraph({ run, onSelectStep }: Props) {
             Graph
           </Tab>
           <Tab
-            value="1"
             isActive={sub === '1'}
             onClick={() => setSub('1')}
             className={cn(

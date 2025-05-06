@@ -15,12 +15,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/client"
+	"github.com/dagu-org/dagu/internal/dagstore"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/mailer"
-	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/dagu-org/dagu/internal/sock"
 )
 
@@ -33,20 +33,20 @@ import (
 type Agent struct {
 	dag          *digraph.DAG
 	dry          bool
-	retryTarget  *persistence.Status
-	dagStore     persistence.DAGStore
-	client       client.Client
+	retryTarget  *runstore.Status
+	dagStore     dagstore.Store
+	client       runstore.Client
 	scheduler    *scheduler.Scheduler
 	graph        *scheduler.ExecutionGraph
 	reporter     *reporter
-	historyStore persistence.HistoryStore
+	runStore     runstore.Store
 	socketServer *sock.Server
 	logDir       string
 	logFile      string
 	rootDAG      digraph.RootDAG
 
 	// requestID is request ID to identify DAG run uniquely.
-	// The request ID can be used for history lookup, retry, etc.
+	// The request ID can be used for runstore lookup, retry, etc.
 	requestID string
 	finished  atomic.Bool
 
@@ -60,12 +60,12 @@ type Agent struct {
 // Options is the configuration for the Agent.
 type Options struct {
 	// Dry is a dry-run mode. It does not execute the actual command.
-	// Dry run does not create history data.
+	// Dry run does not create runstore data.
 	Dry bool
-	// RetryTarget is the target status (history of execution) to retry.
+	// RetryTarget is the target status (runstore of execution) to retry.
 	// If it's specified the agent will execute the DAG with the same
-	// configuration as the specified history.
-	RetryTarget *persistence.Status
+	// configuration as the specified runstore.
+	RetryTarget *runstore.Status
 }
 
 // New creates a new Agent.
@@ -74,23 +74,23 @@ func New(
 	dag *digraph.DAG,
 	logDir string,
 	logFile string,
-	cli client.Client,
-	dagStore persistence.DAGStore,
-	historyStore persistence.HistoryStore,
+	cli runstore.Client,
+	dagStore dagstore.Store,
+	runStore runstore.Store,
 	rootDAG digraph.RootDAG,
 	opts Options,
 ) *Agent {
 	return &Agent{
-		rootDAG:      rootDAG,
-		requestID:    requestID,
-		dag:          dag,
-		dry:          opts.Dry,
-		retryTarget:  opts.RetryTarget,
-		logDir:       logDir,
-		logFile:      logFile,
-		client:       cli,
-		dagStore:     dagStore,
-		historyStore: historyStore,
+		rootDAG:     rootDAG,
+		requestID:   requestID,
+		dag:         dag,
+		dry:         opts.Dry,
+		retryTarget: opts.RetryTarget,
+		logDir:      logDir,
+		logFile:     logFile,
+		client:      cli,
+		dagStore:    dagStore,
+		runStore:    runStore,
 	}
 }
 
@@ -104,7 +104,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Create a new context for the DAG run with all necessary information
-	dbClient := newDBClient(a.historyStore, a.dagStore)
+	dbClient := newDBClient(a.runStore, a.dagStore)
 	ctx = digraph.NewContext(ctx, a.dag, dbClient, a.rootDAG, a.requestID, a.logFile, a.dag.Params)
 
 	// Add structured logging context
@@ -132,18 +132,18 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Make a connection to the database.
-	// It should close the connection to the history database when the DAG
+	// It should close the connection to the runstore database when the DAG
 	// execution is finished.
-	historyRecord, err := a.setupHistoryRecord(ctx)
+	historyRecord, err := a.setupRunRecord(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to setup history record: %w", err)
+		return fmt.Errorf("failed to setup runstore record: %w", err)
 	}
 	if err := historyRecord.Open(ctx); err != nil {
-		return fmt.Errorf("failed to open history record: %w", err)
+		return fmt.Errorf("failed to open runstore record: %w", err)
 	}
 	defer func() {
 		if err := historyRecord.Close(ctx); err != nil {
-			logger.Error(ctx, "Failed to close history store", "err", err)
+			logger.Error(ctx, "Failed to close runstore store", "err", err)
 		}
 	}()
 
@@ -210,7 +210,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	logger.Debug(ctx, "DAG run started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
 	lastErr := a.scheduler.Schedule(ctx, a.graph, done)
 
-	// Update the finished status to the history database.
+	// Update the finished status to the runstore database.
 	finishedStatus := a.Status()
 	logger.Info(ctx, "DAG run finished", "status", finishedStatus.Status.String())
 	if err := historyRecord.Write(ctx, a.Status()); err != nil {
@@ -237,7 +237,7 @@ func (a *Agent) PrintSummary(ctx context.Context) {
 }
 
 // Status collects the current running status of the DAG and returns it.
-func (a *Agent) Status() persistence.Status {
+func (a *Agent) Status() runstore.Status {
 	// Lock to avoid race condition.
 	a.lock.RLock()
 	defer a.lock.RUnlock()
@@ -248,22 +248,22 @@ func (a *Agent) Status() persistence.Status {
 		schedulerStatus = scheduler.StatusRunning
 	}
 
-	opts := []persistence.StatusOption{
-		persistence.WithFinishedAt(a.graph.FinishAt()),
-		persistence.WithNodes(a.graph.NodeData()),
-		persistence.WithLogFilePath(a.logFile),
-		persistence.WithOnExitNode(a.scheduler.HandlerNode(digraph.HandlerOnExit)),
-		persistence.WithOnSuccessNode(a.scheduler.HandlerNode(digraph.HandlerOnSuccess)),
-		persistence.WithOnFailureNode(a.scheduler.HandlerNode(digraph.HandlerOnFailure)),
-		persistence.WithOnCancelNode(a.scheduler.HandlerNode(digraph.HandlerOnCancel)),
+	opts := []runstore.StatusOption{
+		runstore.WithFinishedAt(a.graph.FinishAt()),
+		runstore.WithNodes(a.graph.NodeData()),
+		runstore.WithLogFilePath(a.logFile),
+		runstore.WithOnExitNode(a.scheduler.HandlerNode(digraph.HandlerOnExit)),
+		runstore.WithOnSuccessNode(a.scheduler.HandlerNode(digraph.HandlerOnSuccess)),
+		runstore.WithOnFailureNode(a.scheduler.HandlerNode(digraph.HandlerOnFailure)),
+		runstore.WithOnCancelNode(a.scheduler.HandlerNode(digraph.HandlerOnCancel)),
 	}
 
 	if a.subExecution.Load() {
-		opts = append(opts, persistence.WithRootDAG(a.rootDAG))
+		opts = append(opts, runstore.WithRootDAG(a.rootDAG))
 	}
 
 	// Create the status object to record the current status.
-	return persistence.NewStatusFactory(a.dag).
+	return runstore.NewStatusBuilder(a.dag).
 		Create(
 			a.requestID,
 			schedulerStatus,
@@ -400,7 +400,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 
 	logger.Info(ctx, "Dry-run started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
 
-	dagCtx := digraph.NewContext(context.Background(), a.dag, newDBClient(a.historyStore, a.dagStore), a.rootDAG, a.requestID, a.logFile, a.dag.Params)
+	dagCtx := digraph.NewContext(context.Background(), a.dag, newDBClient(a.runStore, a.dagStore), a.rootDAG, a.requestID, a.logFile, a.dag.Params)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 	a.lastErr = lastErr
 
@@ -489,18 +489,18 @@ func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 	return nil
 }
 
-func (a *Agent) setupHistoryRecord(ctx context.Context) (persistence.Record, error) {
+func (a *Agent) setupRunRecord(ctx context.Context) (runstore.Record, error) {
 	retentionDays := a.dag.HistRetentionDays
-	if err := a.historyStore.RemoveOld(ctx, a.dag.Name, retentionDays); err != nil {
+	if err := a.runStore.RemoveOld(ctx, a.dag.Name, retentionDays); err != nil {
 		logger.Error(ctx, "History data cleanup failed", "err", err)
 	}
 
-	opts := persistence.NewRecordOptions{Retry: a.retryTarget != nil}
+	opts := runstore.NewRecordOptions{Retry: a.retryTarget != nil}
 	if a.subExecution.Load() {
 		opts.Root = &a.rootDAG
 	}
 
-	return a.historyStore.NewRecord(ctx, a.dag, time.Now(), a.requestID, opts)
+	return a.runStore.NewRecord(ctx, a.dag, time.Now(), a.requestID, opts)
 }
 
 // setupSocketServer create socket server instance.
@@ -528,7 +528,7 @@ func (a *Agent) checkPreconditions(ctx context.Context) error {
 	}
 	// If one of the conditions does not met, cancel the execution.
 	if err := digraph.EvalConditions(ctx, a.dag.Preconditions); err != nil {
-		logger.Error(ctx, "Preconditions are not met", "err", err)
+		logger.Info(ctx, "Preconditions are not met", "err", err)
 		a.scheduler.Cancel(ctx, a.graph)
 		return err
 	}
@@ -540,12 +540,8 @@ func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
 	if a.subExecution.Load() {
 		return nil // Skip the check for sub-DAGs
 	}
-	status, err := a.client.GetCurrentStatus(ctx, a.dag)
-	if err != nil {
-		return err
-	}
-	if status.Status != scheduler.StatusNone {
-		return fmt.Errorf("the DAG is already running. status=%s, socket=%s", status.Status, a.dag.SockAddr(a.requestID))
+	if a.client.IsRunning(ctx, a.dag, a.requestID) {
+		return fmt.Errorf("the DAG is already running. requestID=%s, socket=%s", a.requestID, a.dag.SockAddr(a.requestID))
 	}
 	return nil
 }
@@ -602,14 +598,14 @@ func encodeError(w http.ResponseWriter, err error) {
 var _ digraph.DBClient = &dbClient{}
 
 type dbClient struct {
-	dagStore     persistence.DAGStore
-	historyStore persistence.HistoryStore
+	dagStore dagstore.Store
+	runStore runstore.Store
 }
 
-func newDBClient(h persistence.HistoryStore, d persistence.DAGStore) *dbClient {
+func newDBClient(h runstore.Store, d dagstore.Store) *dbClient {
 	return &dbClient{
-		historyStore: h,
-		dagStore:     d,
+		runStore: h,
+		dagStore: d,
 	}
 }
 
@@ -619,11 +615,11 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error
 }
 
 func (o *dbClient) GetSubStatus(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (*digraph.Status, error) {
-	historyRecord, err := o.historyStore.FindBySubRequestID(ctx, reqID, rootDAG)
+	runRecord, err := o.runStore.FindBySubRunRequestID(ctx, reqID, rootDAG)
 	if err != nil {
 		return nil, err
 	}
-	status, err := historyRecord.ReadStatus(ctx)
+	status, err := runRecord.ReadStatus(ctx)
 	if err != nil {
 		return nil, err
 	}
