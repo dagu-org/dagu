@@ -304,7 +304,6 @@ function ExecutionLog({ name, requestId }: Props) {
             <option value="1000">1000 lines</option>
             <option value="5000">5000 lines</option>
             <option value="10000">10000 lines</option>
-            <option value="50000">50000 lines</option>
           </select>
 
           <div className="ml-4 text-xs text-zinc-500 dark:text-zinc-400 flex items-center">
