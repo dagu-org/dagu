@@ -277,8 +277,8 @@ func (db *fileStore) FindByRequestID(ctx context.Context, dagName, reqID string)
 	return run.LatestRecord(ctx, db.cache)
 }
 
-// FindBySubRequestID finds a runstore record by request ID for a sub-DAG.
-func (db *fileStore) FindBySubRequestID(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (runstore.Record, error) {
+// FindBySubRunRequestID finds a runstore record by request ID for a sub-DAG.
+func (db *fileStore) FindBySubRunRequestID(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (runstore.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():

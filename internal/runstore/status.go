@@ -158,6 +158,15 @@ type Status struct {
 	ParamsList    []string         `json:"paramsList,omitempty"`
 }
 
+// RootDAG returns the root DAG object for the current status
+func (st *Status) RootDAG() digraph.RootDAG {
+	if st.RootDAGName == "" || st.RootRequestID == "" {
+		// If the root DAG name and request ID are not set, it means this is the root DAG
+		return digraph.NewRootDAG(st.Name, st.RequestID)
+	}
+	return digraph.NewRootDAG(st.RootDAGName, st.RootRequestID)
+}
+
 // NodesByName returns a slice of nodes with the specified name
 func (st *Status) NodeByName(name string) (*Node, error) {
 	for _, node := range st.Nodes {

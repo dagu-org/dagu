@@ -615,7 +615,7 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error
 }
 
 func (o *dbClient) GetSubStatus(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (*digraph.Status, error) {
-	runRecord, err := o.runStore.FindBySubRequestID(ctx, reqID, rootDAG)
+	runRecord, err := o.runStore.FindBySubRunRequestID(ctx, reqID, rootDAG)
 	if err != nil {
 		return nil, err
 	}

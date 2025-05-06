@@ -105,7 +105,7 @@ func runStart(ctx *Context, args []string) error {
 	if rootDAG.RequestID != requestID {
 		logger.Debug(ctx, "Checking for previous sub-DAG run with the request ID", "requestID", requestID)
 		var status *runstore.Status
-		record, err := ctx.runStore().FindBySubRequestID(ctx, requestID, rootDAG)
+		record, err := ctx.runStore().FindBySubRunRequestID(ctx, requestID, rootDAG)
 		if errors.Is(err, runstore.ErrRequestIDNotFound) {
 			// If the request ID is not found, proceed with execution
 			goto EXEC

@@ -177,6 +177,20 @@ func (e *Client) GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, req
 	return latestStatus, nil
 }
 
+// GetStatusByChildRunRequestID retrieves the status of a child run by its request ID.
+func (e *Client) GetStatusByChildRunRequestID(ctx context.Context, name string, requestID string) (*Status, error) {
+	root := digraph.NewRootDAG(name, requestID)
+	record, err := e.runStore.FindBySubRunRequestID(ctx, name, root)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find child status by request id: %w", err)
+	}
+	latestStatus, err := record.ReadStatus(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read status: %w", err)
+	}
+	return latestStatus, nil
+}
+
 func (*Client) currentStatus(_ context.Context, dag *digraph.DAG, requestId string) (*Status, error) {
 	// FIXME: Should handle the case of dynamic DAG
 	client := sock.NewClient(dag.SockAddr(requestId))

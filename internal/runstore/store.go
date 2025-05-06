@@ -26,8 +26,8 @@ type Store interface {
 	Latest(ctx context.Context, name string) (Record, error)
 	// FindByRequestID finds a history record by its request ID
 	FindByRequestID(ctx context.Context, name string, reqID string) (Record, error)
-	// FindBySubRequestID finds a sub-DAG history record by its request ID
-	FindBySubRequestID(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (Record, error)
+	// FindBySubRunRequestID finds a child run record by its request ID
+	FindBySubRunRequestID(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (Record, error)
 	// RemoveOld removes history records older than retentionDays
 	RemoveOld(ctx context.Context, name string, retentionDays int) error
 	// Rename renames all history records from oldName to newName

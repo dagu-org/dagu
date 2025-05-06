@@ -192,7 +192,10 @@ func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 		lock.Lock()
 		defer lock.Unlock()
 
-		latest, _ := d.RunClient.GetLatestStatus(d.Context, d.DAG)
+		latest, err := d.RunClient.GetLatestStatus(d.Context, d.DAG)
+		if err != nil {
+			return false
+		}
 		status = latest.Status
 		return latest.Status == expected
 	}, time.Second*3, time.Millisecond*50, "expected latest status to be %q, got %q", expected, status)
