@@ -704,6 +704,14 @@ export interface components {
         Log: {
             /** @description Log content */
             content: string;
+            /** @description Number of lines returned */
+            lineCount?: number;
+            /** @description Total number of lines in the log file */
+            totalLines?: number;
+            /** @description Whether there are more lines available */
+            hasMore?: boolean;
+            /** @description Whether the line count is an estimate */
+            isEstimate?: boolean;
         };
         /** @description Grid item for log visualization */
         DAGGridItem: {
@@ -750,6 +758,14 @@ export interface components {
         RemoteNode: string;
         /** @description request ID of the DAG run or latest run if specified as 'latest' */
         RequestId: components["schemas"]["RequestId"];
+        /** @description Number of lines to return from the end of the file */
+        Tail: number;
+        /** @description Number of lines to return from the beginning of the file */
+        Head: number;
+        /** @description Line number to start reading from (1-based) */
+        Offset: number;
+        /** @description Maximum number of lines to return */
+        Limit: number;
     };
     requestBodies: never;
     headers: never;
@@ -1469,6 +1485,14 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Number of lines to return from the end of the file */
+                tail?: components["parameters"]["Tail"];
+                /** @description Number of lines to return from the beginning of the file */
+                head?: components["parameters"]["Head"];
+                /** @description Line number to start reading from (1-based) */
+                offset?: components["parameters"]["Offset"];
+                /** @description Maximum number of lines to return */
+                limit?: components["parameters"]["Limit"];
             };
             header?: never;
             path: {
@@ -1515,6 +1539,14 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Number of lines to return from the end of the file */
+                tail?: components["parameters"]["Tail"];
+                /** @description Number of lines to return from the beginning of the file */
+                head?: components["parameters"]["Head"];
+                /** @description Line number to start reading from (1-based) */
+                offset?: components["parameters"]["Offset"];
+                /** @description Maximum number of lines to return */
+                limit?: components["parameters"]["Limit"];
             };
             header?: never;
             path: {
@@ -1674,6 +1706,14 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Number of lines to return from the end of the file */
+                tail?: components["parameters"]["Tail"];
+                /** @description Number of lines to return from the beginning of the file */
+                head?: components["parameters"]["Head"];
+                /** @description Line number to start reading from (1-based) */
+                offset?: components["parameters"]["Offset"];
+                /** @description Maximum number of lines to return */
+                limit?: components["parameters"]["Limit"];
             };
             header?: never;
             path: {
@@ -1722,6 +1762,14 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Number of lines to return from the end of the file */
+                tail?: components["parameters"]["Tail"];
+                /** @description Number of lines to return from the beginning of the file */
+                head?: components["parameters"]["Head"];
+                /** @description Line number to start reading from (1-based) */
+                offset?: components["parameters"]["Offset"];
+                /** @description Maximum number of lines to return */
+                limit?: components["parameters"]["Limit"];
             };
             header?: never;
             path: {
