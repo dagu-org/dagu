@@ -18,5 +18,14 @@
   },
   "editor.codeActionsOnSave": {
     "source.organizeImports": "always",
-  }
+  },
+  "json.schemas": [
+    {
+      "fileMatch": [
+        "tsconfig.json",
+        "tsconfig.*.json"
+      ],
+      "url": "https://json.schemastore.org/tsconfig"
+    }
+  ]
 }
