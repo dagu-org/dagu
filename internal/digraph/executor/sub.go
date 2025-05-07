@@ -81,8 +81,8 @@ func (e *subDAG) Run(ctx context.Context) error {
 
 	args := []string{
 		"start",
-		fmt.Sprintf("--root-dag-name=%s", c.RunContext.Root.RootName),
-		fmt.Sprintf("--root-request-id=%s", c.RunContext.Root.RootID),
+		fmt.Sprintf("--root-dag-name=%s", c.Root.RootName),
+		fmt.Sprintf("--root-request-id=%s", c.Root.RootID),
 		fmt.Sprintf("--parent-request-id=%s", c.RequestID),
 		fmt.Sprintf("--request-id=%s", e.subRequestID),
 		"--quiet",

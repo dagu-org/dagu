@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/dagstore"
 	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/stretchr/testify/require"
@@ -16,7 +15,7 @@ func TestReadEntries(t *testing.T) {
 	now := expectedNext.Add(-time.Second)
 
 	t.Run("InvalidDirectory", func(t *testing.T) {
-		manager := scheduler.NewDAGJobManager("invalid_directory", dagstore.Store{}, history.Manager{}, "", "")
+		manager := scheduler.NewDAGJobManager("invalid_directory", nil, history.Manager{}, "", "")
 		jobs, err := manager.Next(context.Background(), expectedNext)
 		require.NoError(t, err)
 		require.Len(t, jobs, 0)
@@ -57,7 +56,7 @@ func TestReadEntries(t *testing.T) {
 		dagJob, ok := job.(*scheduler.DAG)
 		require.True(t, ok)
 
-		err = th.dagClient.ToggleSuspend(ctx, dagJob.DAG.Name, true)
+		err = th.dagRepo.ToggleSuspend(ctx, dagJob.DAG.Name, true)
 		require.NoError(t, err)
 
 		// check if the job is suspended and not returned

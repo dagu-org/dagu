@@ -17,14 +17,14 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/dagstore"
-	"github.com/dagu-org/dagu/internal/dagstore/local"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/history"
 	runfs "github.com/dagu-org/dagu/internal/history/filestore"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/repository"
+	"github.com/dagu-org/dagu/internal/repository/local"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -94,19 +94,17 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		cfg.Server = *options.ServerConfig
 	}
 
-	dagStore := local.New(cfg.Paths.DAGsDir, local.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
+	dagRepo := local.New(cfg.Paths.DAGsDir, local.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
 	runStore := runfs.New(cfg.Paths.DataDir)
 
 	historyManager := history.New(runStore, cfg.Paths.Executable, cfg.Global.WorkDir, "")
-	dagClient := dagstore.New(historyManager, dagStore)
 
 	helper := Helper{
-		Context:   createDefaultContext(),
-		Config:    cfg,
-		History:   historyManager,
-		DAGClient: dagClient,
-		DAGStore:  dagStore,
-		RunStore:  runStore,
+		Context:  createDefaultContext(),
+		Config:   cfg,
+		History:  historyManager,
+		DAGRepo:  dagRepo,
+		RunStore: runStore,
 
 		tmpDir: tmpDir,
 	}
@@ -139,9 +137,8 @@ type Helper struct {
 	Config        *config.Config
 	LoggingOutput *SyncBuffer
 	History       history.Manager
-	DAGClient     dagstore.Store
-	RunStore      history.Database
-	DAGStore      dagstore.Driver
+	DAGRepo       repository.DAGRepository
+	RunStore      history.HistoryRepository
 
 	tmpDir string
 }
@@ -313,7 +310,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		logDir,
 		logFile,
 		d.History,
-		d.DAGStore,
+		d.DAGRepo,
 		d.RunStore,
 		rootDAG,
 		helper.opts,

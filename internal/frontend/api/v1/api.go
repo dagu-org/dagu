@@ -10,9 +10,9 @@ import (
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/dagstore"
 	"github.com/dagu-org/dagu/internal/frontend/auth"
 	"github.com/dagu-org/dagu/internal/history"
+	"github.com/dagu-org/dagu/internal/repository"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/go-chi/chi/v5"
@@ -22,7 +22,7 @@ import (
 var _ api.StrictServerInterface = (*API)(nil)
 
 type API struct {
-	dagClient          dagstore.Store
+	dagRepository      repository.DAGRepository
 	historyManager     history.Manager
 	remoteNodes        map[string]config.RemoteNode
 	apiBasePath        string
@@ -31,7 +31,7 @@ type API struct {
 }
 
 func New(
-	dagCli dagstore.Store,
+	dagCli repository.DAGRepository,
 	runCli history.Manager,
 	cfg *config.Config,
 ) *API {
@@ -41,7 +41,7 @@ func New(
 	}
 
 	return &API{
-		dagClient:          dagCli,
+		dagRepository:      dagCli,
 		historyManager:     runCli,
 		logEncodingCharset: cfg.UI.LogEncodingCharset,
 		remoteNodes:        remoteNodes,

@@ -1,4 +1,4 @@
-package dagstore
+package repository
 
 import (
 	"reflect"

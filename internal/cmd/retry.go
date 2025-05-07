@@ -88,7 +88,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *history.Status, rootDA
 	// Update the context with the log file
 	ctx.LogToFile(logFile)
 
-	dagStore, err := ctx.dagStore([]string{filepath.Dir(dag.Location)})
+	dr, err := ctx.dagRepo([]string{filepath.Dir(dag.Location)})
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
@@ -106,7 +106,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *history.Status, rootDA
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
 		manager,
-		dagStore,
+		dr,
 		ctx.runStore(),
 		rootDAG,
 		agent.Options{

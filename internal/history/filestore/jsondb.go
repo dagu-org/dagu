@@ -20,7 +20,7 @@ var (
 	ErrRootRequestIDEmpty = errors.New("root requestID is empty")
 )
 
-var _ history.Database = (*fileStore)(nil)
+var _ history.HistoryRepository = (*fileStore)(nil)
 
 // fileStore manages DAGs status files in local storage with high performance and reliability.
 type fileStore struct {

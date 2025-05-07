@@ -11,14 +11,14 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/dagstore"
-	daglocal "github.com/dagu-org/dagu/internal/dagstore/local"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/frontend"
 	"github.com/dagu-org/dagu/internal/history"
 	runfs "github.com/dagu-org/dagu/internal/history/filestore"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/repository"
+	daglocal "github.com/dagu-org/dagu/internal/repository/local"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
@@ -122,7 +122,6 @@ func (c *Context) init(cmd *cobra.Command) error {
 }
 
 // HistoryManager initializes a HistoryManager using the provided options. If not supplied,
-// it creates default DAGStore and RunStore instances.
 func (c *Context) HistoryManager(opts ...clientOption) (history.Manager, error) {
 	options := &clientOptions{}
 	for _, opt := range opts {
@@ -141,49 +140,23 @@ func (c *Context) HistoryManager(opts ...clientOption) (history.Manager, error) 
 	), nil
 }
 
-// DAGClient initializes a DAGClient using the provided options.
-func (c *Context) DAGClient(historyManager history.Manager, opts ...dagClientOption) (dagstore.Store, error) {
-	options := &dagClientOptions{}
-	for _, opt := range opts {
-		opt(options)
-	}
-	dagStore := options.dagStore
-	if dagStore == nil {
-		var err error
-		dagStore, err = c.dagStore(nil)
-		if err != nil {
-			return dagstore.Store{}, fmt.Errorf("failed to initialize DAG store: %w", err)
-		}
-	}
-
-	return dagstore.New(
-		historyManager,
-		dagStore,
-	), nil
-}
-
 // server creates and returns a new web UI server.
 // It initializes in-memory caches for DAGs and runstore, and uses them in the client.
 func (c *Context) server() (*frontend.Server, error) {
 	dagCache := fileutil.NewCache[*digraph.DAG](0, time.Hour*12)
 	dagCache.StartEviction(c)
-	dagStore := c.dagStoreWithCache(dagCache)
+	dagRepo := c.dagRepoWithCache(dagCache)
 
 	statusCache := fileutil.NewCache[*history.Status](0, time.Hour*12)
 	statusCache.StartEviction(c)
-	runStore := c.runStoreWithCache(statusCache)
+	historyRepo := c.historyRepo(statusCache)
 
-	runCli, err := c.HistoryManager(withRunStore(runStore))
+	historyManager, err := c.HistoryManager(withHistoryRepo(historyRepo))
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	dagCli, err := c.DAGClient(runCli, withDAGStore(dagStore))
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize DAG client: %w", err)
-	}
-
-	return frontend.NewServer(c.cfg, dagCli, runCli), nil
+	return frontend.NewServer(c.cfg, dagRepo, historyManager), nil
 }
 
 // scheduler creates a new scheduler instance using the default client.
@@ -194,18 +167,18 @@ func (c *Context) scheduler() (*scheduler.Scheduler, error) {
 		return nil, fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	dagCli, err := c.DAGClient(runCli)
+	dagRepo, err := c.dagRepo(nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize DAG client: %w", err)
 	}
 
-	manager := scheduler.NewDAGJobManager(c.cfg.Paths.DAGsDir, dagCli, runCli, c.cfg.Paths.Executable, c.cfg.Global.WorkDir)
+	manager := scheduler.NewDAGJobManager(c.cfg.Paths.DAGsDir, dagRepo, runCli, c.cfg.Paths.Executable, c.cfg.Global.WorkDir)
 	return scheduler.New(c.cfg, manager), nil
 }
 
-// dagStore returns a new DAGStore instance. It ensures that the directory exists
+// dagRepo returns a new DAGRepository instance. It ensures that the directory exists
 // (creating it if necessary) before returning the store.
-func (c *Context) dagStore(searchPaths []string) (dagstore.Driver, error) {
+func (c *Context) dagRepo(searchPaths []string) (repository.DAGRepository, error) {
 	baseDir := c.cfg.Paths.DAGsDir
 	_, err := os.Stat(baseDir)
 	if os.IsNotExist(err) {
@@ -221,21 +194,21 @@ func (c *Context) dagStore(searchPaths []string) (dagstore.Driver, error) {
 		daglocal.WithSearchPaths(searchPaths)), nil
 }
 
-// dagStoreWithCache returns a DAGStore instance that uses an in-memory file cache.
-func (c *Context) dagStoreWithCache(cache *fileutil.Cache[*digraph.DAG]) dagstore.Driver {
+// dagRepoWithCache returns a DAGRepository instance that uses an in-memory file cache.
+func (c *Context) dagRepoWithCache(cache *fileutil.Cache[*digraph.DAG]) repository.DAGRepository {
 	return daglocal.New(c.cfg.Paths.DAGsDir, daglocal.WithFlagsBaseDir(c.cfg.Paths.SuspendFlagsDir), daglocal.WithFileCache(cache))
 }
 
 // runStore returns a new RunStore instance using JSON database storage.
 // It applies the "latestStatusToday" setting from the server configuration.
-func (c *Context) runStore() history.Database {
+func (c *Context) runStore() history.HistoryRepository {
 	return runfs.New(c.cfg.Paths.DataDir, runfs.WithLatestStatusToday(
 		c.cfg.Server.LatestStatusToday,
 	))
 }
 
-// runStoreWithCache returns a RunStore that uses an in-memory cache.
-func (c *Context) runStoreWithCache(cache *fileutil.Cache[*history.Status]) history.Database {
+// historyRepo returns a RunStore that uses an in-memory cache.
+func (c *Context) historyRepo(cache *fileutil.Cache[*history.Status]) history.HistoryRepository {
 	return runfs.New(c.cfg.Paths.DataDir,
 		runfs.WithLatestStatusToday(c.cfg.Server.LatestStatusToday),
 		runfs.WithFileCache(cache),
@@ -332,28 +305,13 @@ type clientOption func(*clientOptions)
 
 // clientOptions holds optional dependencies for constructing a client.
 type clientOptions struct {
-	runStore history.Database
+	runStore history.HistoryRepository
 }
 
-// withRunStore returns a clientOption that sets a custom RunStore.
-func withRunStore(historyStore history.Database) clientOption {
+// withHistoryRepo returns a clientOption that sets a custom RunStore.
+func withHistoryRepo(historyStore history.HistoryRepository) clientOption {
 	return func(o *clientOptions) {
 		o.runStore = historyStore
-	}
-}
-
-// dagClientOption defines functional options for configuring the DAG client.
-type dagClientOption func(*dagClientOptions)
-
-// dagClientOption defines functional options for configuring the DAG client.
-type dagClientOptions struct {
-	dagStore dagstore.Driver
-}
-
-// withDAGStore returns a clientOption that sets a custom DAGStore.
-func withDAGStore(dagStore dagstore.Driver) dagClientOption {
-	return func(o *dagClientOptions) {
-		o.dagStore = dagStore
 	}
 }
 

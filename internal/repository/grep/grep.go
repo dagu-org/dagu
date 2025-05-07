@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/dagstore"
+	"github.com/dagu-org/dagu/internal/repository"
 	"github.com/samber/lo"
 )
 
@@ -42,7 +42,7 @@ var DefaultGrepOptions = GrepOptions{
 
 // Grep reads data and returns lines that match the given pattern.
 // If opts is nil, default options will be used.
-func Grep(dat []byte, pattern string, opts GrepOptions) ([]*dagstore.Match, error) {
+func Grep(dat []byte, pattern string, opts GrepOptions) ([]*repository.Match, error) {
 	if pattern == "" {
 		return nil, ErrEmptyPattern
 	}
@@ -91,15 +91,15 @@ func scanLines(dat []byte, matcher Matcher) ([]string, []int, error) {
 }
 
 // buildMatches constructs Match objects from matched line indices.
-func buildMatches(lines []string, matches []int, opts GrepOptions) []*dagstore.Match {
-	var ret []*dagstore.Match
+func buildMatches(lines []string, matches []int, opts GrepOptions) []*repository.Match {
+	var ret []*repository.Match
 
 	for _, m := range matches {
 		low := lo.Max([]int{0, m - opts.Before})
 		high := lo.Min([]int{len(lines), m + opts.After + 1})
 		matchText := strings.Join(lines[low:high], "\n")
 
-		ret = append(ret, &dagstore.Match{
+		ret = append(ret, &repository.Match{
 			StartLine:  low + 1,
 			LineNumber: m + 1,
 			Line:       matchText,

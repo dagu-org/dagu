@@ -1,4 +1,4 @@
-package dagstore
+package repository
 
 const (
 	defaultPerPage = 50

@@ -159,7 +159,7 @@ func executeDag(ctx *Context, dag *digraph.DAG, parentRequestID, requestID strin
 
 	logger.Debug(ctx, "DAG run initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
 
-	dagStore, err := ctx.dagStore([]string{filepath.Dir(dag.Location)})
+	dr, err := ctx.dagRepo([]string{filepath.Dir(dag.Location)})
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
@@ -177,7 +177,7 @@ func executeDag(ctx *Context, dag *digraph.DAG, parentRequestID, requestID strin
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
 		cli,
-		dagStore,
+		dr,
 		ctx.runStore(),
 		rootDAG,
 		agent.Options{ParentID: parentRequestID},

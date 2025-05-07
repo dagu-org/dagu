@@ -96,10 +96,8 @@ func TestManager(t *testing.T) {
 	})
 	t.Run("UpdateSubRunStatus", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "tree_parent.yaml"))
-		dagStatus, err := th.DAGClient.Status(th.Context, dag.Location)
-		require.NoError(t, err)
 
-		err = th.History.Start(th.Context, dagStatus.DAG, history.StartOptions{Quiet: true})
+		err := th.History.Start(th.Context, dag.DAG, history.StartOptions{Quiet: true})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
@@ -145,17 +143,15 @@ func TestClient_RunDAG(t *testing.T) {
 
 	t.Run("RunDAG", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "run_dag.yaml"))
-		dagStatus, err := th.DAGClient.Status(th.Context, dag.Location)
-		require.NoError(t, err)
 
-		err = th.History.Start(th.Context, dagStatus.DAG, history.StartOptions{
+		err := th.History.Start(th.Context, dag.DAG, history.StartOptions{
 			Quiet: true,
 		})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
 
-		status, err := th.History.GetLatestStatus(th.Context, dagStatus.DAG)
+		status, err := th.History.GetLatestStatus(th.Context, dag.DAG)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusSuccess.String(), status.Status.String())
 	})

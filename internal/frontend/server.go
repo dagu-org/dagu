@@ -16,12 +16,12 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/dagstore"
 	apiv1 "github.com/dagu-org/dagu/internal/frontend/api/v1"
 	apiv2 "github.com/dagu-org/dagu/internal/frontend/api/v2"
 	"github.com/dagu-org/dagu/internal/frontend/metrics"
 	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/repository"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -38,14 +38,14 @@ type Server struct {
 }
 
 // NewServer creates a new Server instance with the given configuration and client
-func NewServer(cfg *config.Config, dagCli dagstore.Store, runCli history.Manager) *Server {
+func NewServer(cfg *config.Config, dagRepo repository.DAGRepository, runCli history.Manager) *Server {
 	var remoteNodes []string
 	for _, n := range cfg.Server.RemoteNodes {
 		remoteNodes = append(remoteNodes, n.Name)
 	}
 	return &Server{
-		apiV1:  apiv1.New(dagCli, runCli, cfg),
-		apiV2:  apiv2.New(dagCli, runCli, cfg),
+		apiV1:  apiv1.New(dagRepo, runCli, cfg),
+		apiV2:  apiv2.New(dagRepo, runCli, cfg),
 		config: cfg,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,

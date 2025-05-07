@@ -14,11 +14,11 @@ var (
 	ErrNoStatusData      = errors.New("no status data")
 )
 
-// Database provides an interface for interacting with the underlying database
+// HistoryRepository provides an interface for interacting with the underlying database
 // for storing and retrieving execution history records of DAGs.
 // It abstracts the details of the storage mechanism, allowing for different
 // implementations (e.g., file-based, in-memory, etc.) to be used interchangeably.
-type Database interface {
+type HistoryRepository interface {
 	// Create creates a new history record for a DAG run
 	Create(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts NewRecordOptions) (Record, error)
 	// Recent returns the most recent history records for a DAG, limited by itemLimit

@@ -41,7 +41,7 @@ func GetDAGByName(ctx context.Context, name string) (*DAG, error) {
 
 func GetSubResult(ctx context.Context, requestID string) (*Status, error) {
 	c := GetContext(ctx)
-	return c.client.GetSubStatus(ctx, requestID, c.RunContext.Root)
+	return c.client.GetSubStatus(ctx, requestID, c.Root)
 }
 
 func ApplyEnvs(ctx context.Context) {

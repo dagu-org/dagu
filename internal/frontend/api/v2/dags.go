@@ -10,16 +10,20 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
-	"github.com/dagu-org/dagu/internal/dagstore"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/history"
+	"github.com/dagu-org/dagu/internal/repository"
 )
 
 func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestObject) (api.CreateNewDAGResponseObject, error) {
-	name, err := a.dagClient.Create(ctx, request.Body.Name)
-	if err != nil {
-		if errors.Is(err, dagstore.ErrDAGAlreadyExists) {
+	spec := []byte(`steps:
+  - name: step1
+    command: echo hello
+`)
+
+	if err := a.dagRepository.Create(ctx, request.Body.Name, spec); err != nil {
+		if errors.Is(err, repository.ErrDAGAlreadyExists) {
 			return nil, &Error{
 				HTTPStatus: http.StatusConflict,
 				Code:       api.ErrorCodeAlreadyExists,
@@ -27,13 +31,14 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 		}
 		return nil, fmt.Errorf("error creating DAG: %w", err)
 	}
+
 	return &api.CreateNewDAG201JSONResponse{
-		Name: name,
+		Name: request.Body.Name,
 	}, nil
 }
 
 func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject) (api.DeleteDAGResponseObject, error) {
-	_, err := a.dagClient.Status(ctx, request.FileName)
+	_, err := a.dagRepository.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -41,14 +46,14 @@ func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject)
 			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
 		}
 	}
-	if err := a.dagClient.Delete(ctx, request.FileName); err != nil {
+	if err := a.dagRepository.Delete(ctx, request.FileName); err != nil {
 		return nil, fmt.Errorf("error deleting DAG: %w", err)
 	}
 	return &api.DeleteDAG204Response{}, nil
 }
 
 func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObject) (api.GetDAGSpecResponseObject, error) {
-	spec, err := a.dagClient.GetSpec(ctx, request.FileName)
+	spec, err := a.dagRepository.GetSpec(ctx, request.FileName)
 	if err != nil {
 		return nil, err
 	}
@@ -72,19 +77,11 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 }
 
 func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecRequestObject) (api.UpdateDAGSpecResponseObject, error) {
-	_, err := a.dagClient.Status(ctx, request.FileName)
-	if err != nil {
-		return nil, &Error{
-			HTTPStatus: http.StatusNotFound,
-			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
-		}
-	}
-
-	err = a.dagClient.UpdateSpec(ctx, request.FileName, []byte(request.Body.Spec))
-	var errs []string
+	err := a.dagRepository.UpdateSpec(ctx, request.FileName, []byte(request.Body.Spec))
 
 	var loadErrs digraph.ErrorList
+	var errs []string
+
 	if errors.As(err, &loadErrs) {
 		errs = loadErrs.ToStringList()
 	} else {
@@ -97,7 +94,7 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 }
 
 func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject) (api.RenameDAGResponseObject, error) {
-	status, err := a.dagClient.Status(ctx, request.FileName)
+	dag, err := a.dagRepository.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -105,21 +102,48 @@ func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject)
 			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
 		}
 	}
-	if status.Status.Status == scheduler.StatusRunning {
+
+	status, err := a.historyManager.GetLatestStatus(ctx, dag)
+	if err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
+		}
+	}
+
+	if status.Status == scheduler.StatusRunning {
 		return nil, &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeNotRunning,
 			Message:    "DAG is running",
 		}
 	}
-	if err := a.dagClient.Move(ctx, request.FileName, request.Body.NewFileName); err != nil {
+
+	old, err := a.dagRepository.GetMetadata(ctx, request.FileName)
+	if err != nil {
+		return nil, fmt.Errorf("error getting the DAG metadata: %w", err)
+	}
+
+	if err := a.dagRepository.Rename(ctx, request.FileName, request.Body.NewFileName); err != nil {
 		return nil, fmt.Errorf("failed to move DAG: %w", err)
 	}
+
+	renamed, err := a.dagRepository.GetMetadata(ctx, request.Body.NewFileName)
+	if err != nil {
+		return nil, fmt.Errorf("error getting new DAG metadata: %w", err)
+	}
+
+	// Rename the history as well
+	if err := a.historyManager.Rename(ctx, old.Name, renamed.Name); err != nil {
+		return nil, fmt.Errorf("error renaming history: %w", err)
+	}
+
 	return api.RenameDAG200Response{}, nil
 }
 
 func (a *API) GetDAGRunHistory(ctx context.Context, request api.GetDAGRunHistoryRequestObject) (api.GetDAGRunHistoryResponseObject, error) {
-	status, err := a.dagClient.Status(ctx, request.FileName)
+	dag, err := a.dagRepository.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -129,7 +153,7 @@ func (a *API) GetDAGRunHistory(ctx context.Context, request api.GetDAGRunHistory
 	}
 
 	defaultHistoryLimit := 30
-	recentHistory := a.historyManager.ListRecentHistory(ctx, status.DAG.Name, defaultHistoryLimit)
+	recentHistory := a.historyManager.ListRecentHistory(ctx, dag.Name, defaultHistoryLimit)
 
 	var runs []api.RunDetails
 	for _, status := range recentHistory {
@@ -145,7 +169,7 @@ func (a *API) GetDAGRunHistory(ctx context.Context, request api.GetDAGRunHistory
 
 func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsRequestObject) (api.GetDAGDetailsResponseObject, error) {
 	fileName := request.FileName
-	status, err := a.dagClient.Status(ctx, fileName)
+	dag, err := a.dagRepository.GetMetadata(ctx, fileName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -154,18 +178,21 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 		}
 	}
 
-	dag := status.DAG
-	details := toDAGDetails(dag)
-	var errs []string
-	if status.Error != nil {
-		errs = append(errs, status.Error.Error())
+	status, err := a.historyManager.GetLatestStatus(ctx, dag)
+	if err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("DAG %s not found", fileName),
+		}
 	}
+
+	details := toDAGDetails(dag)
 
 	return api.GetDAGDetails200JSONResponse{
 		Dag:       details,
-		LatestRun: toRunDetails(status.Status),
-		Suspended: status.Suspended,
-		Errors:    errs,
+		LatestRun: toRunDetails(status),
+		Suspended: a.dagRepository.IsSuspended(ctx, fileName),
 	}, nil
 }
 
@@ -248,57 +275,50 @@ func (a *API) readHistoryData(
 }
 
 func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (api.ListDAGsResponseObject, error) {
-	var opts []dagstore.ListDAGOption
-	if request.Params.PerPage != nil {
-		opts = append(opts, dagstore.WithLimit(*request.Params.PerPage))
-	}
-	if request.Params.Page != nil {
-		opts = append(opts, dagstore.WithPage(*request.Params.Page))
-	}
-	if request.Params.Name != nil {
-		opts = append(opts, dagstore.WithName(*request.Params.Name))
-	}
-	if request.Params.Tag != nil {
-		opts = append(opts, dagstore.WithTag(*request.Params.Tag))
-	}
-
-	result, errList, err := a.dagClient.List(ctx, opts...)
+	pg := repository.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
+	result, errList, err := a.dagRepository.List(ctx, repository.ListOptions{
+		Paginator: &pg,
+		Name:      valueOf(request.Params.Name),
+		Tag:       valueOf(request.Params.Tag),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("error listing DAGs: %w", err)
 	}
 
 	resp := &api.ListDAGs200JSONResponse{
 		Errors:     errList,
-		Pagination: toPagination(*result),
+		Pagination: toPagination(result),
 	}
 
+	// Get status for each DAG
+	dagStatuses := make([]history.Status, len(result.Items))
 	for _, item := range result.Items {
-		run := api.RunSummary{
-			Log:         item.Status.Log,
-			Name:        item.Status.Name,
-			Params:      ptrOf(item.Status.Params),
-			Pid:         ptrOf(int(item.Status.PID)),
-			RequestId:   item.Status.RequestID,
-			StartedAt:   item.Status.StartedAt,
-			FinishedAt:  item.Status.FinishedAt,
-			Status:      api.Status(item.Status.Status),
-			StatusLabel: api.StatusLabel(item.Status.Status.String()),
+		status, err := a.historyManager.GetLatestStatus(ctx, item)
+		if err != nil {
+			errList = append(errList, err.Error())
 		}
+		dagStatuses = append(dagStatuses, status)
+	}
 
-		var loadErrs digraph.ErrorList
-		var errs []string
-		if item.Error != nil && errors.As(item.Error, &loadErrs) {
-			errs = loadErrs.ToStringList()
-		} else if item.Error != nil {
-			errs = []string{item.Error.Error()}
+	for i, item := range result.Items {
+		run := api.RunSummary{
+			Log:         dagStatuses[i].Log,
+			Name:        dagStatuses[i].Name,
+			Params:      ptrOf(dagStatuses[i].Params),
+			Pid:         ptrOf(int(dagStatuses[i].PID)),
+			RequestId:   dagStatuses[i].RequestID,
+			StartedAt:   dagStatuses[i].StartedAt,
+			FinishedAt:  dagStatuses[i].FinishedAt,
+			Status:      api.Status(dagStatuses[i].Status),
+			StatusLabel: api.StatusLabel(dagStatuses[i].Status.String()),
 		}
 
 		dag := api.DAGFile{
-			FileName:  item.DAG.FileName(),
-			Errors:    errs,
+			FileName:  item.FileName(),
+			Errors:    errList,
 			LatestRun: run,
-			Suspended: item.Suspended,
-			Dag:       toDAG(item.DAG),
+			Suspended: a.dagRepository.IsSuspended(ctx, item.FileName()),
+			Dag:       toDAG(item),
 		}
 
 		resp.Dags = append(resp.Dags, dag)
@@ -308,7 +328,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 }
 
 func (a *API) GetAllDAGTags(ctx context.Context, _ api.GetAllDAGTagsRequestObject) (api.GetAllDAGTagsResponseObject, error) {
-	tags, errs, err := a.dagClient.TagList(ctx)
+	tags, errs, err := a.dagRepository.TagList(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error getting tags: %w", err)
 	}
@@ -322,18 +342,26 @@ func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetails
 	dagFileName := request.FileName
 	requestId := request.RequestId
 
-	dagWithStatus, err := a.dagClient.Status(ctx, dagFileName)
+	dag, err := a.dagRepository.GetMetadata(ctx, dagFileName)
 	if err != nil {
-		return nil, fmt.Errorf("error getting latest status: %w", err)
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("DAG %s not found", dagFileName),
+		}
 	}
 
 	if requestId == "latest" {
+		latestStatus, err := a.historyManager.GetLatestStatus(ctx, dag)
+		if err != nil {
+			return nil, fmt.Errorf("error getting latest status: %w", err)
+		}
 		return &api.GetDAGRunDetails200JSONResponse{
-			Run: toRunDetails(dagWithStatus.Status),
+			Run: toRunDetails(latestStatus),
 		}, nil
 	}
 
-	status, err := a.historyManager.GetRealtimeStatus(ctx, dagWithStatus.DAG, requestId)
+	status, err := a.historyManager.GetRealtimeStatus(ctx, dag, requestId)
 	if err != nil {
 		return nil, fmt.Errorf("error getting status by request ID: %w", err)
 	}
@@ -344,7 +372,7 @@ func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetails
 }
 
 func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObject) (api.ExecuteDAGResponseObject, error) {
-	status, err := a.dagClient.Status(ctx, request.FileName)
+	dag, err := a.dagRepository.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -352,7 +380,17 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
 		}
 	}
-	if status.Status.Status == scheduler.StatusRunning {
+
+	status, err := a.historyManager.GetLatestStatus(ctx, dag)
+	if err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
+		}
+	}
+
+	if status.Status == scheduler.StatusRunning {
 		return nil, &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeAlreadyRunning,
@@ -365,7 +403,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		return nil, fmt.Errorf("error generating request ID: %w", err)
 	}
 
-	if err := a.historyManager.Start(ctx, status.DAG, history.StartOptions{
+	if err := a.historyManager.Start(ctx, dag, history.StartOptions{
 		Params:    valueOf(request.Body.Params),
 		RequestID: requestID,
 		Quiet:     true,
@@ -386,7 +424,7 @@ waitLoop:
 		case <-ctx.Done():
 			break waitLoop
 		default:
-			status, _ := a.historyManager.GetRealtimeStatus(ctx, status.DAG, requestID)
+			status, _ := a.historyManager.GetRealtimeStatus(ctx, dag, requestID)
 			if status == nil {
 				continue
 			}
@@ -414,7 +452,7 @@ waitLoop:
 }
 
 func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRequestObject) (api.TerminateDAGRunResponseObject, error) {
-	status, err := a.dagClient.Status(ctx, request.FileName)
+	dag, err := a.dagRepository.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -422,21 +460,30 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
 		}
 	}
-	if status.Status.Status != scheduler.StatusRunning {
+
+	status, err := a.historyManager.GetLatestStatus(ctx, dag)
+	if err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
+		}
+	}
+	if status.Status != scheduler.StatusRunning {
 		return nil, &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeNotRunning,
 			Message:    "DAG is not running",
 		}
 	}
-	if err := a.historyManager.Stop(ctx, status.DAG, status.Status.RequestID); err != nil {
+	if err := a.historyManager.Stop(ctx, dag, status.RequestID); err != nil {
 		return nil, fmt.Errorf("error stopping DAG: %w", err)
 	}
 	return api.TerminateDAGRun200Response{}, nil
 }
 
 func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObject) (api.RetryDAGRunResponseObject, error) {
-	status, err := a.dagClient.Status(ctx, request.FileName)
+	dag, err := a.dagRepository.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -444,7 +491,17 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
 		}
 	}
-	if status.Status.Status == scheduler.StatusRunning {
+
+	status, err := a.historyManager.GetLatestStatus(ctx, dag)
+	if err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
+		}
+	}
+
+	if status.Status == scheduler.StatusRunning {
 		return nil, &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeAlreadyRunning,
@@ -452,7 +509,7 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 		}
 	}
 
-	if err := a.historyManager.Retry(ctx, status.DAG, request.Body.RequestId); err != nil {
+	if err := a.historyManager.Retry(ctx, dag, request.Body.RequestId); err != nil {
 		return nil, fmt.Errorf("error retrying DAG: %w", err)
 	}
 
@@ -460,15 +517,16 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 }
 
 func (a *API) UpdateDAGSuspensionState(ctx context.Context, request api.UpdateDAGSuspensionStateRequestObject) (api.UpdateDAGSuspensionStateResponseObject, error) {
-	_, err := a.dagClient.Status(ctx, request.FileName)
+	_, err := a.dagRepository.GetMetadata(ctx, request.FileName)
 	if err != nil {
-		return &api.UpdateDAGSuspensionState404JSONResponse{
-			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("DAG %s not found", request.FileName),
-		}, nil
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
+		}
 	}
 
-	if err := a.dagClient.ToggleSuspend(ctx, request.FileName, request.Body.Suspend); err != nil {
+	if err := a.dagRepository.ToggleSuspend(ctx, request.FileName, request.Body.Suspend); err != nil {
 		return nil, fmt.Errorf("error toggling suspend: %w", err)
 	}
 
@@ -476,7 +534,7 @@ func (a *API) UpdateDAGSuspensionState(ctx context.Context, request api.UpdateDA
 }
 
 func (a *API) SearchDAGs(ctx context.Context, request api.SearchDAGsRequestObject) (api.SearchDAGsResponseObject, error) {
-	ret, errs, err := a.dagClient.Grep(ctx, request.Params.Q)
+	ret, errs, err := a.dagRepository.Grep(ctx, request.Params.Q)
 	if err != nil {
 		return nil, fmt.Errorf("error searching DAGs: %w", err)
 	}

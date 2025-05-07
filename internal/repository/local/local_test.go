@@ -10,19 +10,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDAGStore(t *testing.T) {
+func TestDAGRepo(t *testing.T) {
 	tmpDir := fileutil.MustTempDir("test-suspend-checker")
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	dagStore := New(tmpDir)
+	dr := New(tmpDir)
 	ctx := context.Background()
 
-	require.False(t, dagStore.IsSuspended(ctx, "test"))
+	require.False(t, dr.IsSuspended(ctx, "test"))
 
-	err := dagStore.ToggleSuspend(ctx, "test", true)
+	err := dr.ToggleSuspend(ctx, "test", true)
 	require.NoError(t, err)
 
-	require.True(t, dagStore.IsSuspended(ctx, "test"))
+	require.True(t, dr.IsSuspended(ctx, "test"))
 }

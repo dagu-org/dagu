@@ -68,12 +68,12 @@ func runDry(ctx *Context, args []string) error {
 
 	ctx.LogToFile(logFile)
 
-	dagStore, err := ctx.dagStore([]string{filepath.Dir(dag.Location)})
+	dagRepo, err := ctx.dagRepo([]string{filepath.Dir(dag.Location)})
 	if err != nil {
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	cli, err := ctx.HistoryManager()
+	historyManager, err := ctx.HistoryManager()
 	if err != nil {
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
@@ -85,8 +85,8 @@ func runDry(ctx *Context, args []string) error {
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
-		cli,
-		dagStore,
+		historyManager,
+		dagRepo,
 		ctx.runStore(),
 		rootDAG,
 		agent.Options{Dry: true},

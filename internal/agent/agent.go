@@ -15,12 +15,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/dagstore"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/mailer"
+	"github.com/dagu-org/dagu/internal/repository"
 	"github.com/dagu-org/dagu/internal/sock"
 )
 
@@ -40,8 +40,8 @@ type Agent struct {
 	// It is nil if it's not a retry execution.
 	retryTarget *history.Status
 
-	// dagStore is the database to store the DAG definitions.
-	dagStore dagstore.Driver
+	// dagRepo is the database to store the DAG definitions.
+	dagRepo repository.DAGRepository
 
 	// client is the runstore client to communicate with the history.
 	client history.Manager
@@ -56,7 +56,7 @@ type Agent struct {
 	reporter *reporter
 
 	// runStore is the database to store the run history.
-	runStore history.Database
+	runStore history.HistoryRepository
 
 	// socketServer is the unix socket server to handle HTTP requests.
 	// It listens to the requests from the local client (e.g., frontend server).
@@ -116,8 +116,8 @@ func New(
 	logDir string,
 	logFile string,
 	cli history.Manager,
-	dagStore dagstore.Driver,
-	runStore history.Database,
+	dagRepo repository.DAGRepository,
+	runStore history.HistoryRepository,
 	rootDAG digraph.RootDAG,
 	opts Options,
 ) *Agent {
@@ -130,7 +130,7 @@ func New(
 		logDir:          logDir,
 		logFile:         logFile,
 		client:          cli,
-		dagStore:        dagStore,
+		dagRepo:         dagRepo,
 		runStore:        runStore,
 		parentRequestID: opts.ParentID,
 	}
@@ -146,7 +146,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Create a new context for the DAG run with all necessary information
-	dbClient := newDBClient(a.runStore, a.dagStore)
+	dbClient := newDBClient(a.runStore, a.dagRepo)
 	ctx = digraph.NewContext(ctx, a.dag, dbClient, a.request, a.logFile, a.dag.Params)
 
 	// Add structured logging context
@@ -452,7 +452,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 
 	logger.Info(ctx, "Dry-run started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
 
-	dagCtx := digraph.NewContext(ctx, a.dag, newDBClient(a.runStore, a.dagStore), a.request, a.logFile, a.dag.Params)
+	dagCtx := digraph.NewContext(ctx, a.dag, newDBClient(a.runStore, a.dagRepo), a.request, a.logFile, a.dag.Params)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 	a.lastErr = lastErr
 
@@ -650,24 +650,24 @@ func encodeError(w http.ResponseWriter, err error) {
 var _ digraph.DBClient = &dbClient{}
 
 type dbClient struct {
-	dagStore dagstore.Driver
-	runStore history.Database
+	dagRepo     repository.DAGRepository
+	historyRepo history.HistoryRepository
 }
 
-func newDBClient(h history.Database, d dagstore.Driver) *dbClient {
+func newDBClient(h history.HistoryRepository, d repository.DAGRepository) *dbClient {
 	return &dbClient{
-		runStore: h,
-		dagStore: d,
+		historyRepo: h,
+		dagRepo:     d,
 	}
 }
 
 // GetDAG implements digraph.DBClient.
 func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error) {
-	return o.dagStore.GetDetails(ctx, name)
+	return o.dagRepo.GetDetails(ctx, name)
 }
 
 func (o *dbClient) GetSubStatus(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (*digraph.Status, error) {
-	runRecord, err := o.runStore.FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, reqID)
+	runRecord, err := o.historyRepo.FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, reqID)
 	if err != nil {
 		return nil, err
 	}

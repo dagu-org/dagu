@@ -21,16 +21,16 @@ import (
 // New creates a new Manager instance.
 // The Manager is used to interact with the DAG.
 func New(
-	db Database,
+	repo HistoryRepository,
 	executable string,
 	workDir string,
 	configPath string,
 ) Manager {
 	return Manager{
-		Database:   db,
-		executable: executable,
-		workDir:    workDir,
-		configPath: configPath,
+		HistoryRepository: repo,
+		executable:        executable,
+		workDir:           workDir,
+		configPath:        configPath,
 	}
 }
 
@@ -38,7 +38,7 @@ func New(
 // restarting, and retrieving status information. It communicates with the DAG
 // through a socket interface and manages run records through a Store.
 type Manager struct {
-	Database // Store interface for persisting run data
+	HistoryRepository // Store interface for persisting run data
 
 	executable string // Path to the executable used to run DAGs
 	workDir    string // Working directory for executing commands
@@ -170,7 +170,7 @@ FALLBACK:
 
 // FindByRequestID retrieves the status of a DAG run by name and requestID from the run store.
 func (e *Manager) FindByRequestID(ctx context.Context, name string, requestID string) (*Status, error) {
-	record, err := e.Database.Find(ctx, name, requestID)
+	record, err := e.Find(ctx, name, requestID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by request id: %w", err)
 	}
@@ -187,7 +187,7 @@ func (e *Manager) FindByRequestID(ctx context.Context, name string, requestID st
 func (m *Manager) findPersistedStatus(ctx context.Context, dag *digraph.DAG, requestID string) (
 	*Status, error,
 ) {
-	record, err := m.Database.Find(ctx, dag.Name, requestID)
+	record, err := m.Find(ctx, dag.Name, requestID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by request id: %w", err)
 	}
@@ -215,7 +215,7 @@ func (m *Manager) findPersistedStatus(ctx context.Context, dag *digraph.DAG, req
 
 // FindBySubRunRequestID retrieves the status of a sub-run by its request ID.
 func (m *Manager) FindBySubRunRequestID(ctx context.Context, root digraph.RootDAG, requestID string) (*Status, error) {
-	record, err := m.Database.FindSubRun(ctx, root.RootName, root.RootID, requestID)
+	record, err := m.FindSubRun(ctx, root.RootName, root.RootID, requestID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sub-run status by request id: %w", err)
 	}
@@ -246,7 +246,7 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (Status
 	var latestStatus *Status
 
 	// Find the latest status by name
-	record, err := m.Database.Latest(ctx, dag.Name)
+	record, err := m.Latest(ctx, dag.Name)
 	if err != nil {
 		goto handleError
 	}
@@ -288,7 +288,7 @@ handleError:
 // ListRecentHistory retrieves the n most recent status records for a DAG by name.
 // It returns a slice of Status objects, filtering out any that cannot be read.
 func (m *Manager) ListRecentHistory(ctx context.Context, name string, n int) []Status {
-	records := m.Database.Recent(ctx, name, n)
+	records := m.Recent(ctx, name, n)
 
 	var runs []Status
 	for _, record := range records {
@@ -315,14 +315,14 @@ func (e *Manager) UpdateStatus(ctx context.Context, root digraph.RootDAG, status
 
 	if root.RootID == status.RequestID {
 		// If the request ID matches the root DAG's request ID, find the runstore record by request ID
-		r, err := e.Database.Find(ctx, root.RootName, status.RequestID)
+		r, err := e.Find(ctx, root.RootName, status.RequestID)
 		if err != nil {
 			return fmt.Errorf("failed to find runstore record: %w", err)
 		}
 		historyRecord = r
 	} else {
 		// If the request ID does not match, find the runstore record by sub-run request ID
-		r, err := e.Database.FindSubRun(ctx, root.RootName, root.RootID, status.RequestID)
+		r, err := e.FindSubRun(ctx, root.RootName, root.RootID, status.RequestID)
 		if err != nil {
 			return fmt.Errorf("failed to find sub-runstore record: %w", err)
 		}

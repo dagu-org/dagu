@@ -12,48 +12,48 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/dagstore"
-	"github.com/dagu-org/dagu/internal/dagstore/grep"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/repository"
+	"github.com/dagu-org/dagu/internal/repository/grep"
 )
 
-var _ dagstore.Driver = (*fileStore)(nil)
+var _ repository.DAGRepository = (*dagFileStorage)(nil)
 
-// Option is a functional option for configuring the DAG store
+// Option is a functional option for configuring the DAG repository
 type Option func(*Options)
 
-// Options contains configuration options for the DAG store
+// Options contains configuration options for the DAG repository
 type Options struct {
 	FlagsBaseDir string                        // Base directory for flag storage
 	FileCache    *fileutil.Cache[*digraph.DAG] // Optional cache for DAG objects
 	SearchPaths  []string                      // Additional search paths for DAG files
 }
 
-// WithFileCache returns a DAGStoreOption that sets the file cache for DAG storage
+// WithFileCache returns a DAGRepositoryOption that sets the file cache for DAG objects
 func WithFileCache(cache *fileutil.Cache[*digraph.DAG]) Option {
 	return func(o *Options) {
 		o.FileCache = cache
 	}
 }
 
-// WithFlagsBaseDir returns a DAGStoreOption that sets the base directory for flag storage
+// WithFlagsBaseDir returns a DAGRepositoryOption that sets the base directory for flag storage
 func WithFlagsBaseDir(dir string) Option {
 	return func(o *Options) {
 		o.FlagsBaseDir = dir
 	}
 }
 
-// WithSearchPaths returns a DAGStoreOption that sets additional search paths for DAG files
+// WithSearchPaths returns a DAGRepositoryOption that sets additional search paths for DAG files
 func WithSearchPaths(paths []string) Option {
 	return func(o *Options) {
 		o.SearchPaths = paths
 	}
 }
 
-// fileStore implements the DAGStore interface with local filesystem storage
-type fileStore struct {
+// dagFileStorage implements the DAGRepository interface using the local filesystem
+type dagFileStorage struct {
 	baseDir      string                        // Base directory for DAG storage
 	flagsBaseDir string                        // Base directory for flag storage
 	fileCache    *fileutil.Cache[*digraph.DAG] // Optional cache for DAG objects
@@ -61,7 +61,7 @@ type fileStore struct {
 }
 
 // New creates a new DAG store implementation using the local filesystem
-func New(baseDir string, opts ...Option) dagstore.Driver {
+func New(baseDir string, opts ...Option) repository.DAGRepository {
 	options := &Options{}
 	for _, opt := range opts {
 		opt(options)
@@ -80,7 +80,7 @@ func New(baseDir string, opts ...Option) dagstore.Driver {
 		searchPaths = append(searchPaths, path)
 	}
 
-	return &fileStore{
+	return &dagFileStorage{
 		baseDir:      baseDir,
 		flagsBaseDir: options.FlagsBaseDir,
 		fileCache:    options.FileCache,
@@ -89,7 +89,7 @@ func New(baseDir string, opts ...Option) dagstore.Driver {
 }
 
 // GetMetadata retrieves the metadata of a DAG by its name.
-func (d *fileStore) GetMetadata(ctx context.Context, name string) (*digraph.DAG, error) {
+func (d *dagFileStorage) GetMetadata(ctx context.Context, name string) (*digraph.DAG, error) {
 	filePath, err := d.locateDAG(name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to locate DAG %s in search paths (%v): %w", name, d.searchPaths, err)
@@ -103,7 +103,7 @@ func (d *fileStore) GetMetadata(ctx context.Context, name string) (*digraph.DAG,
 }
 
 // GetDetails retrieves the details of a DAG by its name.
-func (d *fileStore) GetDetails(ctx context.Context, name string) (*digraph.DAG, error) {
+func (d *dagFileStorage) GetDetails(ctx context.Context, name string) (*digraph.DAG, error) {
 	filePath, err := d.locateDAG(name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to locate DAG %s: %w", name, err)
@@ -116,10 +116,10 @@ func (d *fileStore) GetDetails(ctx context.Context, name string) (*digraph.DAG, 
 }
 
 // GetSpec retrieves the specification of a DAG by its name.
-func (d *fileStore) GetSpec(_ context.Context, name string) (string, error) {
+func (d *dagFileStorage) GetSpec(_ context.Context, name string) (string, error) {
 	filePath, err := d.locateDAG(name)
 	if err != nil {
-		return "", dagstore.ErrDAGNotFound
+		return "", repository.ErrDAGNotFound
 	}
 	dat, err := os.ReadFile(filePath) // nolint:gosec
 	if err != nil {
@@ -131,14 +131,14 @@ func (d *fileStore) GetSpec(_ context.Context, name string) (string, error) {
 // FileMode used for newly created DAG files
 const defaultPerm os.FileMode = 0600
 
-func (d *fileStore) LoadSpec(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error) {
+func (d *dagFileStorage) LoadSpec(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error) {
 	// Validate the spec before saving it.
 	opts = append(slices.Clone(opts), digraph.WithoutEval())
 	return digraph.LoadYAML(ctx, spec, opts...)
 }
 
 // UpdateSpec updates the specification of a DAG by its name.
-func (d *fileStore) UpdateSpec(ctx context.Context, name string, spec []byte) error {
+func (d *dagFileStorage) UpdateSpec(ctx context.Context, name string, spec []byte) error {
 	// Validate the spec before saving it.
 	dag, err := digraph.LoadYAML(ctx, spec, digraph.WithoutEval())
 	if err != nil {
@@ -161,22 +161,22 @@ func (d *fileStore) UpdateSpec(ctx context.Context, name string, spec []byte) er
 }
 
 // Create creates a new DAG with the given name and specification.
-func (d *fileStore) Create(_ context.Context, name string, spec []byte) (string, error) {
+func (d *dagFileStorage) Create(_ context.Context, name string, spec []byte) error {
 	if err := d.ensureDirExist(); err != nil {
-		return "", fmt.Errorf("failed to create DAGs directory %s: %w", d.baseDir, err)
+		return fmt.Errorf("failed to create DAGs directory %s: %w", d.baseDir, err)
 	}
 	filePath := d.generateFilePath(name)
 	if fileExists(filePath) {
-		return "", dagstore.ErrDAGAlreadyExists
+		return repository.ErrDAGAlreadyExists
 	}
 	if err := os.WriteFile(filePath, spec, defaultPerm); err != nil {
-		return "", fmt.Errorf("failed to write DAG %s: %w", name, err)
+		return fmt.Errorf("failed to write DAG %s: %w", name, err)
 	}
-	return name, nil
+	return nil
 }
 
 // Delete deletes a DAG by its name.
-func (d *fileStore) Delete(_ context.Context, name string) error {
+func (d *dagFileStorage) Delete(_ context.Context, name string) error {
 	filePath, err := d.locateDAG(name)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -194,7 +194,7 @@ func (d *fileStore) Delete(_ context.Context, name string) error {
 }
 
 // ensureDirExist ensures that the base directory exists.
-func (d *fileStore) ensureDirExist() error {
+func (d *dagFileStorage) ensureDirExist() error {
 	if !fileExists(d.baseDir) {
 		if err := os.MkdirAll(d.baseDir, 0750); err != nil {
 			return err
@@ -204,13 +204,13 @@ func (d *fileStore) ensureDirExist() error {
 }
 
 // List lists DAGs with pagination support.
-func (d *fileStore) List(ctx context.Context, opts dagstore.ListOptions) (dagstore.PaginatedResult[*digraph.DAG], []string, error) {
+func (d *dagFileStorage) List(ctx context.Context, opts repository.ListOptions) (repository.PaginatedResult[*digraph.DAG], []string, error) {
 	var dags []*digraph.DAG
 	var errList []string
 	var totalCount int
 
 	if opts.Paginator == nil {
-		p := dagstore.DefaultPaginator()
+		p := repository.DefaultPaginator()
 		opts.Paginator = &p
 	}
 
@@ -257,7 +257,7 @@ func (d *fileStore) List(ctx context.Context, opts dagstore.ListOptions) (dagsto
 		return nil
 	})
 
-	result := dagstore.NewPaginatedResult(
+	result := repository.NewPaginatedResult(
 		dags, totalCount, *opts.Paginator,
 	)
 	if err != nil {
@@ -268,8 +268,8 @@ func (d *fileStore) List(ctx context.Context, opts dagstore.ListOptions) (dagsto
 }
 
 // Grep searches for a pattern in all DAGs.
-func (d *fileStore) Grep(ctx context.Context, pattern string) (
-	ret []*dagstore.GrepResult, errs []string, err error,
+func (d *dagFileStorage) Grep(ctx context.Context, pattern string) (
+	ret []*repository.GrepResult, errs []string, err error,
 ) {
 	if pattern == "" {
 		// return empty result if pattern is empty
@@ -308,7 +308,7 @@ func (d *fileStore) Grep(ctx context.Context, pattern string) (
 				errs = append(errs, fmt.Sprintf("check %s failed: %s", entry.Name(), err))
 				continue
 			}
-			ret = append(ret, &dagstore.GrepResult{
+			ret = append(ret, &repository.GrepResult{
 				Name:    strings.TrimSuffix(entry.Name(), path.Ext(entry.Name())),
 				DAG:     dag,
 				Matches: matches,
@@ -318,7 +318,7 @@ func (d *fileStore) Grep(ctx context.Context, pattern string) (
 	return ret, errs, nil
 }
 
-func (f fileStore) ToggleSuspend(ctx context.Context, id string, suspend bool) error {
+func (f dagFileStorage) ToggleSuspend(ctx context.Context, id string, suspend bool) error {
 	if suspend {
 		return f.createFlag(fileName(id))
 	} else if f.IsSuspended(ctx, id) {
@@ -327,7 +327,7 @@ func (f fileStore) ToggleSuspend(ctx context.Context, id string, suspend bool) e
 	return nil
 }
 
-func (f fileStore) IsSuspended(_ context.Context, id string) bool {
+func (f dagFileStorage) IsSuspended(_ context.Context, id string) bool {
 	return f.flagExists(fileName(id))
 }
 
@@ -352,20 +352,20 @@ func normalizeFilename(str, replacement string) string {
 }
 
 // Rename renames a DAG from oldID to newID.
-func (d *fileStore) Rename(_ context.Context, oldID, newID string) error {
+func (d *dagFileStorage) Rename(_ context.Context, oldID, newID string) error {
 	oldFilePath, err := d.locateDAG(oldID)
 	if err != nil {
 		return fmt.Errorf("failed to locate DAG %s: %w", oldID, err)
 	}
 	newFilePath := d.generateFilePath(newID)
 	if fileExists(newFilePath) {
-		return dagstore.ErrDAGAlreadyExists
+		return repository.ErrDAGAlreadyExists
 	}
 	return os.Rename(oldFilePath, newFilePath)
 }
 
 // generateFilePath generates the file path for a DAG by its name.
-func (d *fileStore) generateFilePath(name string) string {
+func (d *dagFileStorage) generateFilePath(name string) string {
 	if strings.Contains(name, string(filepath.Separator)) {
 		filePath, err := filepath.Abs(name)
 		if err == nil {
@@ -377,7 +377,7 @@ func (d *fileStore) generateFilePath(name string) string {
 }
 
 // locateDAG locates the DAG file by its name or path.
-func (d *fileStore) locateDAG(nameOrPath string) (string, error) {
+func (d *dagFileStorage) locateDAG(nameOrPath string) (string, error) {
 	if strings.Contains(nameOrPath, string(filepath.Separator)) {
 		foundPath, err := findDAGFile(nameOrPath)
 		if err == nil {
@@ -421,7 +421,7 @@ func findDAGFile(name string) (string, error) {
 }
 
 // TagList lists all unique tags from the DAGs.
-func (d *fileStore) TagList(ctx context.Context) ([]string, []string, error) {
+func (d *dagFileStorage) TagList(ctx context.Context) ([]string, []string, error) {
 	var (
 		errList []string
 		tagSet  = make(map[string]struct{})
@@ -459,20 +459,20 @@ func (d *fileStore) TagList(ctx context.Context) ([]string, []string, error) {
 }
 
 // CreateFlag creates the given file.
-func (s *fileStore) createFlag(file string) error {
+func (s *dagFileStorage) createFlag(file string) error {
 	_ = os.MkdirAll(s.flagsBaseDir, flagPermission)
 	return os.WriteFile(path.Join(s.flagsBaseDir, file), []byte{}, flagPermission)
 }
 
 // flagExists returns true if the given file exists.
-func (s *fileStore) flagExists(file string) bool {
+func (s *dagFileStorage) flagExists(file string) bool {
 	_ = os.MkdirAll(s.flagsBaseDir, flagPermission)
 	_, err := os.Stat(path.Join(s.flagsBaseDir, file))
 	return err == nil
 }
 
 // deleteFlag deletes the given file.
-func (s *fileStore) deleteFlag(file string) error {
+func (s *dagFileStorage) deleteFlag(file string) error {
 	_ = os.MkdirAll(s.flagsBaseDir, flagPermission)
 	return os.Remove(path.Join(s.flagsBaseDir, file))
 }

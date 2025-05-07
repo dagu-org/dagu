@@ -22,14 +22,18 @@ func TestRetryCommand(t *testing.T) {
 		th.RunCommand(t, cmd.CmdStart(), test.CmdTest{Args: args})
 
 		// Find the request ID.
-		cli := th.DAGClient
+		cli := th.DAGRepo
 		ctx := context.Background()
-		status, err := cli.Status(ctx, dagFile.Location)
+
+		dag, err := cli.GetMetadata(ctx, dagFile.Location)
 		require.NoError(t, err)
-		require.Equal(t, status.Status.Status, scheduler.StatusSuccess)
+
+		status, err := th.History.GetLatestStatus(ctx, dag)
+		require.NoError(t, err)
+		require.Equal(t, status.Status, scheduler.StatusSuccess)
 		require.NotNil(t, status.Status)
 
-		requestID := status.Status.RequestID
+		requestID := status.RequestID
 
 		// Retry with the request ID.
 		args = []string{"retry", fmt.Sprintf("--request-id=%s", requestID), dagFile.Location}
