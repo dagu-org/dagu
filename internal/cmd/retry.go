@@ -109,7 +109,10 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *runstore.Status, rootD
 		dagStore,
 		ctx.runStore(),
 		rootDAG,
-		agent.Options{RetryTarget: status},
+		agent.Options{
+			RetryTarget: status,
+			ParentID:    status.ParentID,
+		},
 	)
 
 	listenSignals(ctx, agentInstance)

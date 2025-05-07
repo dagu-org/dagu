@@ -320,9 +320,9 @@ func (e *Client) UpdateStatus(ctx context.Context, root digraph.RootDAG, status 
 	// Find the runstore record
 	var historyRecord Record
 
-	if root.RequestID == status.RequestID {
+	if root.RootID == status.RequestID {
 		// If the request ID matches the root DAG's request ID, find the runstore record by request ID
-		r, err := e.runStore.FindByRequestID(ctx, root.Name, status.RequestID)
+		r, err := e.runStore.FindByRequestID(ctx, root.RootName, status.RequestID)
 		if err != nil {
 			return fmt.Errorf("failed to find runstore record: %w", err)
 		}

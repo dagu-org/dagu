@@ -31,26 +31,64 @@ import (
 // 3. Handle the HTTP request via the unix socket.
 // 4. Write the log and status to the data store.
 type Agent struct {
-	dag          *digraph.DAG
-	dry          bool
-	retryTarget  *runstore.Status
-	dagStore     dagstore.Store
-	client       runstore.Client
-	scheduler    *scheduler.Scheduler
-	graph        *scheduler.ExecutionGraph
-	reporter     *reporter
-	runStore     runstore.Store
+	lock sync.RWMutex
+
+	// dry indicates if the agent is running in dry-run mode.
+	dry bool
+
+	// retryTarget is the target status to retry the DAG.
+	// It is nil if it's not a retry execution.
+	retryTarget *runstore.Status
+
+	// dagStore is the database to store the DAG definitions.
+	dagStore dagstore.Store
+
+	// client is the runstore client to communicate with the runstore.
+	client runstore.Client
+
+	// scheduler is the scheduler instance to run the DAG.
+	scheduler *scheduler.Scheduler
+
+	// graph is the execution graph for the DAG.
+	graph *scheduler.ExecutionGraph
+
+	// reporter is responsible for sending the report to the user.
+	reporter *reporter
+
+	// runStore is the database to store the run history.
+	runStore runstore.Store
+
+	// socketServer is the unix socket server to handle HTTP requests.
+	// It listens to the requests from the local client (e.g., frontend server).
 	socketServer *sock.Server
-	logDir       string
-	logFile      string
-	rootDAG      digraph.RootDAG
+
+	// logDir is the directory to store the log files for each node in the DAG.
+	logDir string
+
+	// logFile is the file to write the scheduler log.
+	logFile string
+
+	// dag is the DAG to run.
+	dag *digraph.DAG
+
+	// rootDAG indicates the root DAG name and request ID.
+	// It is same as the DAG name and request ID if it's not a sub-DAG.
+	rootDAG digraph.RootDAG
 
 	// requestID is request ID to identify DAG run uniquely.
 	// The request ID can be used for runstore lookup, retry, etc.
 	requestID string
-	finished  atomic.Bool
 
-	lock    sync.RWMutex
+	// parentRequestID is the request ID of the parent DAG run.
+	parentRequestID string
+
+	// request contains the request information for the DAG run.
+	request digraph.RunContext
+
+	// finished is true if the DAG run is finished.
+	finished atomic.Bool
+
+	// lastErr is the last error occurred during the DAG run.
 	lastErr error
 
 	// subExecution is true if the agent is running as a sub-DAG.
@@ -66,6 +104,9 @@ type Options struct {
 	// If it's specified the agent will execute the DAG with the same
 	// configuration as the specified runstore.
 	RetryTarget *runstore.Status
+	// ParentID is the request ID of the parent DAG run.
+	// It is required for sub-DAG runs to identify the parent DAG.
+	ParentID string
 }
 
 // New creates a new Agent.
@@ -81,16 +122,17 @@ func New(
 	opts Options,
 ) *Agent {
 	return &Agent{
-		rootDAG:     rootDAG,
-		requestID:   requestID,
-		dag:         dag,
-		dry:         opts.Dry,
-		retryTarget: opts.RetryTarget,
-		logDir:      logDir,
-		logFile:     logFile,
-		client:      cli,
-		dagStore:    dagStore,
-		runStore:    runStore,
+		rootDAG:         rootDAG,
+		requestID:       requestID,
+		dag:             dag,
+		dry:             opts.Dry,
+		retryTarget:     opts.RetryTarget,
+		logDir:          logDir,
+		logFile:         logFile,
+		client:          cli,
+		dagStore:        dagStore,
+		runStore:        runStore,
+		parentRequestID: opts.ParentID,
 	}
 }
 
@@ -105,12 +147,12 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create a new context for the DAG run with all necessary information
 	dbClient := newDBClient(a.runStore, a.dagStore)
-	ctx = digraph.NewContext(ctx, a.dag, dbClient, a.rootDAG, a.requestID, a.logFile, a.dag.Params)
+	ctx = digraph.NewContext(ctx, a.dag, dbClient, a.request, a.logFile, a.dag.Params)
 
 	// Add structured logging context
 	logFields := []any{"dag", a.dag.Name, "requestID", a.requestID}
 	if a.subExecution.Load() {
-		logFields = append(logFields, "rootDAG", a.rootDAG.Name, "rootRequestID", a.rootDAG.RequestID)
+		logFields = append(logFields, "rootDAG", a.rootDAG.RootName, "rootRequestID", a.rootDAG.RootID)
 	}
 	ctx = logger.WithValues(ctx, logFields...)
 
@@ -259,7 +301,7 @@ func (a *Agent) Status() runstore.Status {
 	}
 
 	if a.subExecution.Load() {
-		opts = append(opts, runstore.WithRootDAG(a.rootDAG))
+		opts = append(opts, runstore.WithRunContext(a.request))
 	}
 
 	// Create the status object to record the current status.
@@ -326,9 +368,19 @@ func (a *Agent) setup(ctx context.Context) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	if a.rootDAG.RequestID != a.requestID {
-		logger.Debug(ctx, "Initiating sub-DAG run", "rootDAG", a.rootDAG.Name, "rootRequestID", a.rootDAG.RequestID)
+	if a.rootDAG.RootID != a.requestID {
+		logger.Debug(ctx, "Initiating sub-DAG run", "rootDAG", a.rootDAG.RootName, "rootRequestID", a.rootDAG.RootID)
 		a.subExecution.Store(true)
+		if a.parentRequestID == "" {
+			logger.Error(ctx, "Parent request ID is required for sub-DAG run")
+			return fmt.Errorf("parent request ID is required for sub-DAG run")
+		}
+	}
+
+	a.request = digraph.RunContext{
+		Root:      a.rootDAG,
+		RequestID: a.requestID,
+		ParentID:  a.parentRequestID,
 	}
 
 	a.scheduler = a.newScheduler()
@@ -400,7 +452,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 
 	logger.Info(ctx, "Dry-run started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
 
-	dagCtx := digraph.NewContext(context.Background(), a.dag, newDBClient(a.runStore, a.dagStore), a.rootDAG, a.requestID, a.logFile, a.dag.Params)
+	dagCtx := digraph.NewContext(ctx, a.dag, newDBClient(a.runStore, a.dagStore), a.request, a.logFile, a.dag.Params)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 	a.lastErr = lastErr
 

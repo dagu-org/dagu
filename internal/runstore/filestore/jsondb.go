@@ -114,8 +114,8 @@ func (db *fileStore) NewRecord(ctx context.Context, dag *digraph.DAG, timestamp 
 
 // NewSubRecord creates a new runstore record for the specified sub-run.
 func (db *fileStore) newSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts runstore.NewRecordOptions) (runstore.Record, error) {
-	dataRoot := NewDataRoot(db.baseDir, opts.Root.Name)
-	rootRun, err := dataRoot.FindByRequestID(ctx, opts.Root.RequestID)
+	dataRoot := NewDataRoot(db.baseDir, opts.Root.RootName)
+	rootRun, err := dataRoot.FindByRequestID(ctx, opts.Root.RootID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find root run: %w", err)
 	}
@@ -251,8 +251,8 @@ func (db *fileStore) FindBySubRunRequestID(ctx context.Context, reqID string, ro
 		return nil, ErrRequestIDEmpty
 	}
 
-	root := NewDataRoot(db.baseDir, rootDAG.Name)
-	run, err := root.FindByRequestID(ctx, rootDAG.RequestID)
+	root := NewDataRoot(db.baseDir, rootDAG.RootName)
+	run, err := root.FindByRequestID(ctx, rootDAG.RootID)
 	if err != nil {
 		return nil, err
 	}

@@ -42,11 +42,12 @@ func InitialStatus(dag *digraph.DAG) Status {
 // StatusOption is a functional option pattern for configuring Status objects
 type StatusOption func(*Status)
 
-// WithRootDAG returns a StatusOption that sets the root DAG information
-func WithRootDAG(rootDAG digraph.RootDAG) StatusOption {
+// WithRunContext returns a StatusOption that sets the root DAG information
+func WithRunContext(ctx digraph.RunContext) StatusOption {
 	return func(s *Status) {
-		s.RootRequestID = rootDAG.RequestID
-		s.RootDAGName = rootDAG.Name
+		s.RootRequestID = ctx.Root.RootID
+		s.RootDAGName = ctx.Root.RootName
+		s.ParentID = ctx.ParentID
 	}
 }
 
@@ -142,6 +143,7 @@ func StatusFromJSON(s string) (*Status, error) {
 type Status struct {
 	RootDAGName   string           `json:"rootDAGName,omitempty"`
 	RootRequestID string           `json:"rootRequestId,omitempty"`
+	ParentID      string           `json:"parentId,omitempty"`
 	RequestID     string           `json:"requestId,omitempty"`
 	Name          string           `json:"name,omitempty"`
 	Status        scheduler.Status `json:"status"`

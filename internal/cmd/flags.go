@@ -93,13 +93,19 @@ var (
 	// rootRequestIDFlag reads the root request ID for starting a sub-DAG run
 	rootRequestIDFlag = commandLineFlag{
 		name:  "root-request-id",
-		usage: "Root request ID for a DAG run",
+		usage: "[only for sub-DAG runs] Root request ID for a DAG run",
 	}
 
 	// rootDAGNameFlag reads the root DAG name for starting a sub-DAG run.
 	rootDAGNameFlag = commandLineFlag{
 		name:  "root-dag-name",
-		usage: "Root DAG name for a DAG run",
+		usage: "[only for sub-DAG runs] Root DAG name for a DAG run",
+	}
+
+	// parentRequestIDFlag reads the parent request ID for starting a sub-DAG run.
+	parentRequestIDFlag = commandLineFlag{
+		name:  "parent-request-id",
+		usage: "[only for sub-DAG runs] Parent request ID for a DAG run",
 	}
 
 	// Suppresses output during DAG run (e.g., logs, status updates).

@@ -10,22 +10,27 @@ import (
 )
 
 type Context struct {
-	rootDAG   RootDAG
-	requestID string
-	dag       *DAG
-	client    DBClient
-	envs      map[string]string
+	RunContext
+	dag    *DAG
+	client DBClient
+	envs   map[string]string
 }
 
-type RootDAG struct {
-	Name      string
+type RunContext struct {
+	Root      RootDAG
+	ParentID  string
 	RequestID string
 }
 
-func NewRootDAG(name, requestID string) RootDAG {
+type RootDAG struct {
+	RootName string
+	RootID   string
+}
+
+func NewRootDAG(rootName, rootID string) RootDAG {
 	return RootDAG{
-		Name:      name,
-		RequestID: requestID,
+		RootName: rootName,
+		RootID:   rootID,
 	}
 }
 
@@ -36,7 +41,7 @@ func GetDAGByName(ctx context.Context, name string) (*DAG, error) {
 
 func GetSubResult(ctx context.Context, requestID string) (*Status, error) {
 	c := GetContext(ctx)
-	return c.client.GetSubStatus(ctx, requestID, c.rootDAG)
+	return c.client.GetSubStatus(ctx, requestID, c.RunContext.Root)
 }
 
 func ApplyEnvs(ctx context.Context) {
@@ -57,24 +62,15 @@ func (c Context) AllEnvs() []string {
 	return envs
 }
 
-func (c Context) WithEnv(key, value string) Context {
-	c.envs[key] = value
-	return c
-}
-
 func (c Context) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
 	opts = append(opts, cmdutil.WithVariables(c.envs))
 	return cmdutil.EvalString(ctx, s, opts...)
 }
 
-func (c Context) RootDAG() RootDAG {
-	return c.rootDAG
-}
-
-func NewContext(ctx context.Context, d *DAG, c DBClient, rd RootDAG, reqID, logFile string, params []string) context.Context {
+func NewContext(ctx context.Context, d *DAG, c DBClient, r RunContext, logFile string, params []string) context.Context {
 	var envs = map[string]string{
 		EnvKeySchedulerLogPath: logFile,
-		EnvKeyRequestID:        reqID,
+		EnvKeyRequestID:        r.RequestID,
 		EnvKeyDAGName:          d.Name,
 	}
 	for _, param := range params {
@@ -87,11 +83,10 @@ func NewContext(ctx context.Context, d *DAG, c DBClient, rd RootDAG, reqID, logF
 	}
 
 	return context.WithValue(ctx, ctxKey{}, Context{
-		rootDAG:   rd,
-		requestID: reqID,
-		dag:       d,
-		client:    c,
-		envs:      envs,
+		RunContext: r,
+		dag:        d,
+		client:     c,
+		envs:       envs,
 	})
 }
 

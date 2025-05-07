@@ -33,7 +33,7 @@ This command parses the DAG specification, resolves parameters, and initiates th
 	)
 }
 
-var startFlags = []commandLineFlag{paramsFlag, requestIDFlagStart, rootDAGNameFlag, rootRequestIDFlag}
+var startFlags = []commandLineFlag{paramsFlag, requestIDFlagStart, parentRequestIDFlag, rootDAGNameFlag, rootRequestIDFlag}
 
 func runStart(ctx *Context, args []string) error {
 	requestID, err := ctx.Flags().GetString("request-id")
@@ -82,6 +82,7 @@ func runStart(ctx *Context, args []string) error {
 
 	rootRequestID, _ := ctx.Flags().GetString("root-request-id")
 	rootDAGName, _ := ctx.Flags().GetString("root-dag-name")
+	parentRequestID, _ := ctx.Flags().GetString("parent-request-id")
 
 	// If rootDAGName is not empty, it means current execution is a sub-DAG.
 	// Sub DAG execution requires both root-request-id and root-dag-name to be set.
@@ -92,17 +93,33 @@ func runStart(ctx *Context, args []string) error {
 	var rootDAG digraph.RootDAG
 	if rootDAGName != "" && rootRequestID != "" {
 		// The current execution is a sub-DAG
-		logger.Debug(ctx, "Sub-DAG execution detected", "rootDAGName", rootDAGName, "rootRequestID", rootRequestID)
 		rootDAG = digraph.NewRootDAG(rootDAGName, rootRequestID)
+		logger.Info(ctx, "Executing sub-DAG",
+			"dagName", dag.Name,
+			"params", params,
+			"requestID", requestID,
+			"rootDAGName", rootDAGName,
+			"rootRequestID", rootRequestID,
+			"parentRequestID", parentRequestID,
+		)
 	} else {
 		// The current execution is a root DAG
 		rootDAG = digraph.NewRootDAG(dag.Name, requestID)
+		logger.Info(ctx, "Executing root DAG",
+			"dagName", dag.Name,
+			"params", params,
+			"requestID", requestID,
+		)
 	}
 
 	// Check for previous runs with this request ID and retry it if found.
 	// This prevents duplicate execution when retrying or when sub-DAGs share the
 	// same request ID, ensuring idempotency across the the DAG from the root DAG.
-	if rootDAG.RequestID != requestID {
+	if rootDAG.RootID != requestID {
+		if requestID == "" {
+			logger.Error(ctx, "Request ID must be provided for sub-DAG run")
+			return fmt.Errorf("request ID must be provided for sub-DAG run")
+		}
 		logger.Debug(ctx, "Checking for previous sub-DAG run with the request ID", "requestID", requestID)
 		var status *runstore.Status
 		record, err := ctx.runStore().FindBySubRunRequestID(ctx, requestID, rootDAG)
@@ -123,12 +140,10 @@ func runStart(ctx *Context, args []string) error {
 	}
 
 EXEC:
-	return executeDag(ctx, dag, requestID, rootDAG)
+	return executeDag(ctx, dag, parentRequestID, requestID, rootDAG)
 }
 
-func executeDag(ctx *Context, dag *digraph.DAG, requestID string, rootDAG digraph.RootDAG) error {
-	logger.Debug(ctx, "Executing DAG", "dagName", dag.Name, "requestID", requestID)
-
+func executeDag(ctx *Context, dag *digraph.DAG, parentRequestID, requestID string, rootDAG digraph.RootDAG) error {
 	// Open the log file for the scheduler. The log file will be used for future
 	// execution for the same DAG/request ID between attempts.
 	logFile, err := ctx.OpenLogFile(dag, requestID)
@@ -156,7 +171,6 @@ func executeDag(ctx *Context, dag *digraph.DAG, requestID string, rootDAG digrap
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	var opts agent.Options
 	agentInstance := agent.New(
 		requestID,
 		dag,
@@ -166,7 +180,7 @@ func executeDag(ctx *Context, dag *digraph.DAG, requestID string, rootDAG digrap
 		dagStore,
 		ctx.runStore(),
 		rootDAG,
-		opts,
+		agent.Options{ParentID: parentRequestID},
 	)
 
 	listenSignals(ctx, agentInstance)
