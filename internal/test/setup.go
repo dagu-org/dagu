@@ -22,9 +22,9 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/history"
+	runfs "github.com/dagu-org/dagu/internal/history/filestore"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/runstore"
-	runfs "github.com/dagu-org/dagu/internal/runstore/filestore"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -97,13 +97,13 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	dagStore := local.New(cfg.Paths.DAGsDir, local.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
 	runStore := runfs.New(cfg.Paths.DataDir)
 
-	runClient := runstore.NewClient(runStore, cfg.Paths.Executable, cfg.Global.WorkDir, "")
-	dagClient := dagstore.New(runClient, dagStore)
+	historyManager := history.New(runStore, cfg.Paths.Executable, cfg.Global.WorkDir, "")
+	dagClient := dagstore.New(historyManager, dagStore)
 
 	helper := Helper{
 		Context:   createDefaultContext(),
 		Config:    cfg,
-		RunClient: runClient,
+		History:   historyManager,
 		DAGClient: dagClient,
 		DAGStore:  dagStore,
 		RunStore:  runStore,
@@ -138,9 +138,9 @@ type Helper struct {
 	Cancel        context.CancelFunc
 	Config        *config.Config
 	LoggingOutput *SyncBuffer
-	RunClient     runstore.Client
+	History       history.Manager
 	DAGClient     dagstore.Store
-	RunStore      runstore.Store
+	RunStore      history.Database
 	DAGStore      dagstore.Driver
 
 	tmpDir string
@@ -186,7 +186,7 @@ func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
 	require.Eventually(t, func() bool {
-		latest, err := d.RunClient.GetLatestStatus(d.Context, d.DAG)
+		latest, err := d.History.GetLatestStatus(d.Context, d.DAG)
 		if err != nil {
 			return false
 		}
@@ -200,7 +200,7 @@ func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
 
 	// the +1 to the limit is needed to ensure that the number of therunstore
 	// entries is exactly the expected number
-	runstore := d.RunClient.ListRecentHistory(d.Context, d.Name, expected+1)
+	runstore := d.History.ListRecentHistory(d.Context, d.Name, expected+1)
 	require.Len(t, runstore, expected)
 }
 
@@ -208,7 +208,7 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
 	assert.Eventually(t, func() bool {
-		curr, _ := d.RunClient.GetRealtimeStatus(d.Context, d.DAG, "")
+		curr, _ := d.History.GetRealtimeStatus(d.Context, d.DAG, "")
 		if curr == nil {
 			return false
 		}
@@ -223,7 +223,7 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]any) {
 	t.Helper()
 
-	status, err := d.RunClient.GetLatestStatus(d.Context, d.DAG)
+	status, err := d.History.GetLatestStatus(d.Context, d.DAG)
 	require.NoError(t, err)
 
 	// collect the actual outputs from the status
@@ -312,7 +312,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		d.DAG,
 		logDir,
 		logFile,
-		d.RunClient,
+		d.History,
 		d.DAGStore,
 		d.RunStore,
 		rootDAG,

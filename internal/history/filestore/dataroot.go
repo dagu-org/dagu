@@ -20,8 +20,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/runstore"
 )
 
 // DataRoot manages the directory structure for run history data.
@@ -47,7 +47,7 @@ func WithRootDAG(rootDAG *digraph.RootDAG) RootOption {
 	}
 }
 
-// NewDataRoot creates a new DataRoot instance for managing a DAG's run runstore.
+// NewDataRoot creates a new DataRoot instance for managing a DAG's run history.
 // It sanitizes the DAG name to create a safe directory structure and applies any provided options.
 //
 // Parameters:
@@ -105,7 +105,7 @@ func (dr *DataRoot) FindByRequestID(_ context.Context, requestID string) (*Run, 
 	}
 
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("%w: %s", runstore.ErrRequestIDNotFound, requestID)
+		return nil, fmt.Errorf("%w: %s", history.ErrRequestIDNotFound, requestID)
 	}
 
 	// Sort matches by timestamp (most recent first)
@@ -129,10 +129,10 @@ func (dr *DataRoot) LatestAfter(ctx context.Context, cutoff TimeInUTC) (*Run, er
 		return nil, fmt.Errorf("failed to list recent runs: %w", err)
 	}
 	if len(runs) == 0 {
-		return nil, runstore.ErrNoStatusData
+		return nil, history.ErrNoStatusData
 	}
 	if runs[0].timestamp.Before(cutoff.Time) {
-		return nil, runstore.ErrNoStatusData
+		return nil, history.ErrNoStatusData
 	}
 	return runs[0], nil
 }

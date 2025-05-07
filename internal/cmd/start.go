@@ -8,8 +8,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/spf13/cobra"
 )
 
@@ -121,9 +121,9 @@ func runStart(ctx *Context, args []string) error {
 			return fmt.Errorf("request ID must be provided for sub-DAG run")
 		}
 		logger.Debug(ctx, "Checking for previous sub-DAG run with the request ID", "requestID", requestID)
-		var status *runstore.Status
+		var status *history.Status
 		record, err := ctx.runStore().FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, requestID)
-		if errors.Is(err, runstore.ErrRequestIDNotFound) {
+		if errors.Is(err, history.ErrRequestIDNotFound) {
 			// If the request ID is not found, proceed with execution
 			goto EXEC
 		}
@@ -165,7 +165,7 @@ func executeDag(ctx *Context, dag *digraph.DAG, parentRequestID, requestID strin
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	cli, err := ctx.Client()
+	cli, err := ctx.HistoryManager()
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize client", "err", err)
 		return fmt.Errorf("failed to initialize client: %w", err)

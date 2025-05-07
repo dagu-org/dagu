@@ -1,4 +1,4 @@
-package runstore
+package history
 
 import (
 	"encoding/json"

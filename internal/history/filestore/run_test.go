@@ -7,7 +7,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/runstore"
+	"github.com/dagu-org/dagu/internal/history"
 	"github.com/stretchr/testify/require"
 )
 
@@ -62,7 +62,7 @@ func (et ExecutionTest) WriteStatus(t *testing.T, ts TimeInUTC, s scheduler.Stat
 	t.Helper()
 
 	dag := &digraph.DAG{Name: "test-dag"}
-	status := runstore.InitialStatus(dag)
+	status := history.InitialStatus(dag)
 	status.RequestID = "test-id-1"
 	status.Status = s
 

@@ -52,7 +52,7 @@ func TestRestartCommand(t *testing.T) {
 
 		// Check parameter was the same as the first execution
 		setup := cmd.NewContext(th.Context, th.Config)
-		client, err := setup.Client()
+		client, err := setup.HistoryManager()
 		require.NoError(t, err)
 
 		time.Sleep(time.Millisecond * 300) // Wait for the history to be updated.

@@ -15,8 +15,8 @@ import (
 	"github.com/dagu-org/dagu/internal/dagstore"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/runstore"
-	"github.com/dagu-org/dagu/internal/runstore/filestore"
+	"github.com/dagu-org/dagu/internal/history"
+	"github.com/dagu-org/dagu/internal/history/filestore"
 	"github.com/samber/lo"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/japanese"
@@ -197,7 +197,7 @@ func (a *API) readHistoryData(
 	dag *digraph.DAG,
 ) api.DAGHistoryData {
 	defaultHistoryLimit := 30
-	statuses := a.runClient.ListRecentHistory(ctx, dag.Name, defaultHistoryLimit)
+	statuses := a.historyManager.ListRecentHistory(ctx, dag.Name, defaultHistoryLimit)
 
 	data := map[string][]scheduler.NodeStatus{}
 
@@ -301,7 +301,7 @@ func (a *API) readLog(
 	}
 
 	if logFile == "" {
-		lastStatus, err := a.runClient.GetLatestStatus(ctx, dag)
+		lastStatus, err := a.historyManager.GetLatestStatus(ctx, dag)
 		if err != nil {
 			return nil, fmt.Errorf("error getting latest status: %w", err)
 		}
@@ -325,7 +325,7 @@ func (a *API) readStepLog(
 	stepName string,
 	statusFile string,
 ) (*api.StepLog, error) {
-	var status *runstore.Status
+	var status *history.Status
 
 	if statusFile != "" {
 		parsedStatus, err := filestore.ParseStatusFile(statusFile)
@@ -336,7 +336,7 @@ func (a *API) readStepLog(
 	}
 
 	if status == nil {
-		latestStatus, err := a.runClient.GetLatestStatus(ctx, dag)
+		latestStatus, err := a.historyManager.GetLatestStatus(ctx, dag)
 		if err != nil {
 			return nil, fmt.Errorf("error getting latest status: %w", err)
 		}
@@ -344,7 +344,7 @@ func (a *API) readStepLog(
 	}
 
 	// Find the step in the status to get the log file.
-	var node *runstore.Node
+	var node *history.Node
 	for _, n := range status.Nodes {
 		if n.Step.Name == stepName {
 			node = n
@@ -508,7 +508,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "DAG is already running",
 			}
 		}
-		if err := a.runClient.Start(ctx, status.DAG, runstore.StartOptions{
+		if err := a.historyManager.Start(ctx, status.DAG, history.StartOptions{
 			Params: valueOf(request.Body.Params),
 		}); err != nil {
 			return nil, fmt.Errorf("error starting DAG: %w", err)
@@ -537,7 +537,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "DAG is not running",
 			}
 		}
-		if err := a.runClient.Stop(ctx, status.DAG, ""); err != nil {
+		if err := a.historyManager.Stop(ctx, status.DAG, ""); err != nil {
 			return nil, fmt.Errorf("error stopping DAG: %w", err)
 		}
 		return api.PostDAGAction200JSONResponse{}, nil
@@ -550,7 +550,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "requestId is required for retry action",
 			}
 		}
-		if err := a.runClient.Retry(ctx, status.DAG, *request.Body.RequestId); err != nil {
+		if err := a.historyManager.Retry(ctx, status.DAG, *request.Body.RequestId); err != nil {
 			return nil, fmt.Errorf("error retrying DAG: %w", err)
 		}
 		return api.PostDAGAction200JSONResponse{}, nil
@@ -637,7 +637,7 @@ func (a *API) updateStatus(
 	dagStatus dagstore.Status,
 	to scheduler.NodeStatus,
 ) error {
-	status, err := a.runClient.GetRealtimeStatus(ctx, dagStatus.DAG, reqID)
+	status, err := a.historyManager.GetRealtimeStatus(ctx, dagStatus.DAG, reqID)
 	if err != nil {
 		return fmt.Errorf("error getting status: %w", err)
 	}
@@ -668,7 +668,7 @@ func (a *API) updateStatus(
 	status.Nodes[idxToUpdate].Status = to
 
 	rootDAG := digraph.NewRootDAG(dagStatus.DAG.Name, reqID)
-	if err := a.runClient.UpdateStatus(ctx, rootDAG, *status); err != nil {
+	if err := a.historyManager.UpdateStatus(ctx, rootDAG, *status); err != nil {
 		return fmt.Errorf("error updating status: %w", err)
 	}
 
@@ -772,7 +772,7 @@ func toPrecondition(obj digraph.Condition) api.Precondition {
 	}
 }
 
-func toStatus(s runstore.Status) api.DAGStatusDetails {
+func toStatus(s history.Status) api.DAGStatusDetails {
 	status := api.DAGStatusDetails{
 		Log:        s.Log,
 		Name:       s.Name,
@@ -802,7 +802,7 @@ func toStatus(s runstore.Status) api.DAGStatusDetails {
 	return status
 }
 
-func toNode(node *runstore.Node) api.Node {
+func toNode(node *history.Node) api.Node {
 	return api.Node{
 		DoneCount:  node.DoneCount,
 		FinishedAt: node.FinishedAt,

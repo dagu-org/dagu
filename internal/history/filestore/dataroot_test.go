@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/runstore"
+	"github.com/dagu-org/dagu/internal/history"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -109,7 +109,7 @@ func TestDataRootRuns(t *testing.T) {
 		latest := root.CreateTestRun(t, "test-id3", ts3)
 
 		_, err := root.LatestAfter(context.Background(), ts4)
-		require.ErrorIs(t, err, runstore.ErrNoStatusData, "LatestAfter should return ErrNoStatusData when no runs are found")
+		require.ErrorIs(t, err, history.ErrNoStatusData, "LatestAfter should return ErrNoStatusData when no runs are found")
 
 		run, err := root.LatestAfter(context.Background(), ts3)
 		require.NoError(t, err)

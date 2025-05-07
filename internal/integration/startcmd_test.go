@@ -10,7 +10,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/runstore"
+	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -133,7 +133,7 @@ steps:
 	parentRec, err := th.RunStore.Find(ctx, "parent", requestID)
 	require.NoError(t, err)
 
-	updateStatus := func(rec runstore.Record, status *runstore.Status) {
+	updateStatus := func(rec history.Record, status *history.Status) {
 		err = rec.Open(ctx)
 		require.NoError(t, err)
 		err = rec.Write(ctx, *status)

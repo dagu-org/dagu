@@ -6,7 +6,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/runstore"
+	"github.com/dagu-org/dagu/internal/history"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -96,7 +96,7 @@ func TestJSONDB(t *testing.T) {
 
 		// Verify an error is returned if the request ID does not exist
 		_, err = th.DB.Find(th.Context, "test_DAG", "nonexistent-id")
-		assert.ErrorIs(t, err, runstore.ErrRequestIDNotFound)
+		assert.ErrorIs(t, err, history.ErrRequestIDNotFound)
 	})
 	t.Run("RemoveOld", func(t *testing.T) {
 		th := setupTestJSONDB(t)
@@ -136,7 +136,7 @@ func TestJSONDB(t *testing.T) {
 		// Create a sub record
 		rootDAG := digraph.NewRootDAG("test_DAG", "parent-id")
 		subDAG := th.DAG("sub_dag")
-		record, err := th.DB.Create(th.Context, subDAG.DAG, ts, "sub-id", runstore.NewRecordOptions{
+		record, err := th.DB.Create(th.Context, subDAG.DAG, ts, "sub-id", history.NewRecordOptions{
 			Root: &rootDAG,
 		})
 		require.NoError(t, err)
@@ -148,7 +148,7 @@ func TestJSONDB(t *testing.T) {
 			_ = record.Close(th.Context)
 		}()
 
-		statusToWrite := runstore.InitialStatus(subDAG.DAG)
+		statusToWrite := history.InitialStatus(subDAG.DAG)
 		statusToWrite.RequestID = "sub-id"
 		err = record.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
@@ -173,7 +173,7 @@ func TestJSONDB(t *testing.T) {
 		// Create a sub record
 		rootDAG := digraph.NewRootDAG("test_DAG", "parent-id")
 		subDAG := th.DAG("sub_dag")
-		record, err := th.DB.Create(th.Context, subDAG.DAG, ts, "sub-id", runstore.NewRecordOptions{
+		record, err := th.DB.Create(th.Context, subDAG.DAG, ts, "sub-id", history.NewRecordOptions{
 			Root: &rootDAG,
 		})
 		require.NoError(t, err)
@@ -185,7 +185,7 @@ func TestJSONDB(t *testing.T) {
 			_ = record.Close(th.Context)
 		}()
 
-		statusToWrite := runstore.InitialStatus(subDAG.DAG)
+		statusToWrite := history.InitialStatus(subDAG.DAG)
 		statusToWrite.RequestID = "sub-id"
 		statusToWrite.Status = scheduler.StatusRunning
 		err = record.Write(th.Context, statusToWrite)
@@ -201,7 +201,7 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, scheduler.StatusRunning.String(), existingRecordStatus.Status.String())
 
 		// Create a retry record and write different status
-		retryRecord, err := th.DB.Create(th.Context, subDAG.DAG, ts, "sub-id", runstore.NewRecordOptions{
+		retryRecord, err := th.DB.Create(th.Context, subDAG.DAG, ts, "sub-id", history.NewRecordOptions{
 			Root:  &rootDAG,
 			Retry: true,
 		})
@@ -235,7 +235,7 @@ func TestJSONDB(t *testing.T) {
 			_ = rec.Close(th.Context)
 		}()
 
-		statusToWrite := runstore.InitialStatus(rec.dag)
+		statusToWrite := history.InitialStatus(rec.dag)
 		statusToWrite.RequestID = "parent-id"
 
 		err = rec.Write(th.Context, statusToWrite)

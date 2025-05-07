@@ -1,4 +1,4 @@
-package runstore_test
+package history_test
 
 import (
 	"encoding/json"
@@ -12,12 +12,12 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/runstore"
+	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/sock"
 	"github.com/dagu-org/dagu/internal/test"
 )
 
-func TestClient_GetStatus(t *testing.T) {
+func TestManager(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
@@ -30,7 +30,7 @@ func TestClient_GetStatus(t *testing.T) {
 		socketServer, _ := sock.NewServer(
 			dag.SockAddr(requestID),
 			func(w http.ResponseWriter, _ *http.Request) {
-				status := runstore.NewStatusBuilder(dag.DAG).Create(
+				status := history.NewStatusBuilder(dag.DAG).Create(
 					requestID, scheduler.StatusRunning, 0, time.Now(),
 				)
 				w.WriteHeader(http.StatusOK)
@@ -60,10 +60,10 @@ func TestClient_GetStatus(t *testing.T) {
 		requestID := uuid.Must(uuid.NewV7()).String()
 		now := time.Now()
 		ctx := th.Context
-		cli := th.RunClient
+		cli := th.History
 
-		// Open the runstore store and write a status before updating it.
-		record, err := th.RunStore.Create(ctx, dag.DAG, now, requestID, runstore.NewRecordOptions{})
+		// Open the history store and write a status before updating it.
+		record, err := th.RunStore.Create(ctx, dag.DAG, now, requestID, history.NewRecordOptions{})
 		require.NoError(t, err)
 
 		err = record.Open(ctx)
@@ -99,36 +99,36 @@ func TestClient_GetStatus(t *testing.T) {
 		dagStatus, err := th.DAGClient.Status(th.Context, dag.Location)
 		require.NoError(t, err)
 
-		err = th.RunClient.Start(th.Context, dagStatus.DAG, runstore.StartOptions{Quiet: true})
+		err = th.History.Start(th.Context, dagStatus.DAG, history.StartOptions{Quiet: true})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
 
 		// Get the sub run status.
-		status, err := th.RunClient.GetLatestStatus(th.Context, dag.DAG)
+		status, err := th.History.GetLatestStatus(th.Context, dag.DAG)
 		require.NoError(t, err)
 		requestId := status.RequestID
 		subRun := status.Nodes[0].SubRuns[0]
 
 		rootDAG := digraph.NewRootDAG(dag.Name, requestId)
-		subRunStatus, err := th.RunClient.FindBySubRunRequestID(th.Context, rootDAG, subRun.RequestID)
+		subRunStatus, err := th.History.FindBySubRunRequestID(th.Context, rootDAG, subRun.RequestID)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusSuccess.String(), subRunStatus.Status.String())
 
 		// Update the sub run status.
 		subRunStatus.Nodes[0].Status = scheduler.NodeStatusError
-		err = th.RunClient.UpdateStatus(th.Context, rootDAG, *subRunStatus)
+		err = th.History.UpdateStatus(th.Context, rootDAG, *subRunStatus)
 		require.NoError(t, err)
 
 		// Check if the sub run status is updated.
-		subRunStatus, err = th.RunClient.FindBySubRunRequestID(th.Context, rootDAG, subRun.RequestID)
+		subRunStatus, err = th.History.FindBySubRunRequestID(th.Context, rootDAG, subRun.RequestID)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.NodeStatusError.String(), subRunStatus.Nodes[0].Status.String())
 	})
 	t.Run("InvalidUpdateStatusWithInvalidReqID", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "invalid_reqid.yaml"))
 		ctx := th.Context
-		cli := th.RunClient
+		cli := th.History
 
 		// update with invalid request id
 		status := testNewStatus(dag.DAG, "unknown-req-id", scheduler.StatusError, scheduler.NodeStatusError)
@@ -148,14 +148,14 @@ func TestClient_RunDAG(t *testing.T) {
 		dagStatus, err := th.DAGClient.Status(th.Context, dag.Location)
 		require.NoError(t, err)
 
-		err = th.RunClient.Start(th.Context, dagStatus.DAG, runstore.StartOptions{
+		err = th.History.Start(th.Context, dagStatus.DAG, history.StartOptions{
 			Quiet: true,
 		})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
 
-		status, err := th.RunClient.GetLatestStatus(th.Context, dagStatus.DAG)
+		status, err := th.History.GetLatestStatus(th.Context, dagStatus.DAG)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusSuccess.String(), status.Status.String())
 	})
@@ -163,12 +163,12 @@ func TestClient_RunDAG(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "stop.yaml"))
 		ctx := th.Context
 
-		err := th.RunClient.Start(ctx, dag.DAG, runstore.StartOptions{})
+		err := th.History.Start(ctx, dag.DAG, history.StartOptions{})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusRunning)
 
-		err = th.RunClient.Stop(ctx, dag.DAG, "")
+		err = th.History.Stop(ctx, dag.DAG, "")
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusCancel)
@@ -177,12 +177,12 @@ func TestClient_RunDAG(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "restart.yaml"))
 		ctx := th.Context
 
-		err := th.RunClient.Start(th.Context, dag.DAG, runstore.StartOptions{})
+		err := th.History.Start(th.Context, dag.DAG, history.StartOptions{})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusRunning)
 
-		err = th.RunClient.Restart(ctx, dag.DAG, runstore.RestartOptions{})
+		err = th.History.Restart(ctx, dag.DAG, history.RestartOptions{})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
@@ -190,9 +190,9 @@ func TestClient_RunDAG(t *testing.T) {
 	t.Run("Retry", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "retry.yaml"))
 		ctx := th.Context
-		cli := th.RunClient
+		cli := th.History
 
-		err := cli.Start(ctx, dag.DAG, runstore.StartOptions{Params: "x y z"})
+		err := cli.Start(ctx, dag.DAG, history.StartOptions{Params: "x y z"})
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish
@@ -222,11 +222,11 @@ func TestClient_RunDAG(t *testing.T) {
 	})
 }
 
-func testNewStatus(dag *digraph.DAG, requestID string, status scheduler.Status, nodeStatus scheduler.NodeStatus) runstore.Status {
+func testNewStatus(dag *digraph.DAG, requestID string, status scheduler.Status, nodeStatus scheduler.NodeStatus) history.Status {
 	nodes := []scheduler.NodeData{{State: scheduler.NodeState{Status: nodeStatus}}}
 	tm := time.Now()
 	startedAt := &tm
-	return runstore.NewStatusBuilder(dag).Create(
-		requestID, status, 0, *startedAt, runstore.WithNodes(nodes),
+	return history.NewStatusBuilder(dag).Create(
+		requestID, status, 0, *startedAt, history.WithNodes(nodes),
 	)
 }

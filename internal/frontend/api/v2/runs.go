@@ -14,7 +14,7 @@ func (a *API) GetRunLog(ctx context.Context, request api.GetRunLogRequestObject)
 	dagName := request.DagName
 	requestId := request.RequestId
 
-	status, err := a.runClient.FindByRequestID(ctx, dagName, requestId)
+	status, err := a.historyManager.FindByRequestID(ctx, dagName, requestId)
 	if err != nil {
 		return api.GetRunLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -49,7 +49,7 @@ func (a *API) GetRunStepLog(ctx context.Context, request api.GetRunStepLogReques
 	dagName := request.DagName
 	requestId := request.RequestId
 
-	status, err := a.runClient.FindByRequestID(ctx, dagName, requestId)
+	status, err := a.historyManager.FindByRequestID(ctx, dagName, requestId)
 	if err != nil {
 		return api.GetRunStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -89,7 +89,7 @@ func (a *API) GetRunStepLog(ctx context.Context, request api.GetRunStepLogReques
 }
 
 func (a *API) UpdateRunStepStatus(ctx context.Context, request api.UpdateRunStepStatusRequestObject) (api.UpdateRunStepStatusResponseObject, error) {
-	status, err := a.runClient.FindByRequestID(ctx, request.DagName, request.RequestId)
+	status, err := a.historyManager.FindByRequestID(ctx, request.DagName, request.RequestId)
 	if err != nil {
 		return &api.UpdateRunStepStatus404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -120,7 +120,7 @@ func (a *API) UpdateRunStepStatus(ctx context.Context, request api.UpdateRunStep
 	status.Nodes[idxToUpdate].Status = nodeStatusMapping[request.Body.Status]
 
 	rootDAG := digraph.NewRootDAG(request.DagName, request.RequestId)
-	if err := a.runClient.UpdateStatus(ctx, rootDAG, *status); err != nil {
+	if err := a.historyManager.UpdateStatus(ctx, rootDAG, *status); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
 	}
 
@@ -129,7 +129,7 @@ func (a *API) UpdateRunStepStatus(ctx context.Context, request api.UpdateRunStep
 
 // GetRunDetails implements api.StrictServerInterface.
 func (a *API) GetRunDetails(ctx context.Context, request api.GetRunDetailsRequestObject) (api.GetRunDetailsResponseObject, error) {
-	status, err := a.runClient.FindByRequestID(ctx, request.DagName, request.RequestId)
+	status, err := a.historyManager.FindByRequestID(ctx, request.DagName, request.RequestId)
 	if err != nil {
 		return &api.GetRunDetails404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -144,7 +144,7 @@ func (a *API) GetRunDetails(ctx context.Context, request api.GetRunDetailsReques
 // GetSubRunDetails implements api.StrictServerInterface.
 func (a *API) GetSubRunDetails(ctx context.Context, request api.GetSubRunDetailsRequestObject) (api.GetSubRunDetailsResponseObject, error) {
 	root := digraph.NewRootDAG(request.DagName, request.RequestId)
-	status, err := a.runClient.FindBySubRunRequestID(ctx, root, request.SubRunRequestId)
+	status, err := a.historyManager.FindBySubRunRequestID(ctx, root, request.SubRunRequestId)
 	if err != nil {
 		return &api.GetSubRunDetails404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -159,7 +159,7 @@ func (a *API) GetSubRunDetails(ctx context.Context, request api.GetSubRunDetails
 // GetSubRunLog implements api.StrictServerInterface.
 func (a *API) GetSubRunLog(ctx context.Context, request api.GetSubRunLogRequestObject) (api.GetSubRunLogResponseObject, error) {
 	root := digraph.NewRootDAG(request.DagName, request.RequestId)
-	status, err := a.runClient.FindBySubRunRequestID(ctx, root, request.SubRunRequestId)
+	status, err := a.historyManager.FindBySubRunRequestID(ctx, root, request.SubRunRequestId)
 	if err != nil {
 		return &api.GetSubRunLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -193,7 +193,7 @@ func (a *API) GetSubRunLog(ctx context.Context, request api.GetSubRunLogRequestO
 // GetSubRunStepLog implements api.StrictServerInterface.
 func (a *API) GetSubRunStepLog(ctx context.Context, request api.GetSubRunStepLogRequestObject) (api.GetSubRunStepLogResponseObject, error) {
 	root := digraph.NewRootDAG(request.DagName, request.RequestId)
-	status, err := a.runClient.FindBySubRunRequestID(ctx, root, request.SubRunRequestId)
+	status, err := a.historyManager.FindBySubRunRequestID(ctx, root, request.SubRunRequestId)
 	if err != nil {
 		return &api.GetSubRunStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -235,7 +235,7 @@ func (a *API) GetSubRunStepLog(ctx context.Context, request api.GetSubRunStepLog
 // UpdateSubRunStepStatus implements api.StrictServerInterface.
 func (a *API) UpdateSubRunStepStatus(ctx context.Context, request api.UpdateSubRunStepStatusRequestObject) (api.UpdateSubRunStepStatusResponseObject, error) {
 	root := digraph.NewRootDAG(request.DagName, request.RequestId)
-	status, err := a.runClient.FindBySubRunRequestID(ctx, root, request.SubRunRequestId)
+	status, err := a.historyManager.FindBySubRunRequestID(ctx, root, request.SubRunRequestId)
 	if err != nil {
 		return &api.UpdateSubRunStepStatus404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -265,7 +265,7 @@ func (a *API) UpdateSubRunStepStatus(ctx context.Context, request api.UpdateSubR
 
 	status.Nodes[idxToUpdate].Status = nodeStatusMapping[request.Body.Status]
 
-	if err := a.runClient.UpdateStatus(ctx, root, *status); err != nil {
+	if err := a.historyManager.UpdateStatus(ctx, root, *status); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
 	}
 

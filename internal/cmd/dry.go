@@ -73,7 +73,7 @@ func runDry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	cli, err := ctx.Client()
+	cli, err := ctx.HistoryManager()
 	if err != nil {
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}

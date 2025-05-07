@@ -1,4 +1,4 @@
-package runstore
+package history
 
 import (
 	"context"
@@ -18,27 +18,28 @@ import (
 	"github.com/google/uuid"
 )
 
-// NewClient creates a new Client instance.
-// The Client is used to interact with the DAG.
-func NewClient(
-	runStore Store,
+// New creates a new Manager instance.
+// The Manager is used to interact with the DAG.
+func New(
+	db Database,
 	executable string,
 	workDir string,
 	configPath string,
-) Client {
-	return Client{
-		runStore:   runStore,
+) Manager {
+	return Manager{
+		Database:   db,
 		executable: executable,
 		workDir:    workDir,
 		configPath: configPath,
 	}
 }
 
-// Client provides methods to interact with DAGs, including starting, stopping,
+// Manager provides methods to interact with DAGs, including starting, stopping,
 // restarting, and retrieving status information. It communicates with the DAG
 // through a socket interface and manages run records through a Store.
-type Client struct {
-	runStore   Store  // Store interface for persisting run data
+type Manager struct {
+	Database // Store interface for persisting run data
+
 	executable string // Path to the executable used to run DAGs
 	workDir    string // Working directory for executing commands
 	configPath string // Path to the configuration file
@@ -46,22 +47,14 @@ type Client struct {
 
 // LoadYAML loads a DAG from YAML specification bytes without evaluating it.
 // It appends the WithoutEval option to any provided options.
-func (e *Client) LoadYAML(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error) {
+func (m *Manager) LoadYAML(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error) {
 	opts = append(slices.Clone(opts), digraph.WithoutEval())
 	return digraph.LoadYAML(ctx, spec, opts...)
 }
 
-// Rename changes the name of a DAG from oldName to newName in the run store.
-func (e *Client) Rename(ctx context.Context, oldName, newName string) error {
-	if err := e.runStore.Rename(ctx, oldName, newName); err != nil {
-		return fmt.Errorf("failed to rename DAG: %w", err)
-	}
-	return nil
-}
-
 // Stop stops a running DAG by sending a stop request to its socket.
 // If the DAG is not running, it logs a message and returns nil.
-func (e *Client) Stop(ctx context.Context, dag *digraph.DAG, requestID string) error {
+func (m *Manager) Stop(ctx context.Context, dag *digraph.DAG, requestID string) error {
 	logger.Info(ctx, "Stopping", "name", dag.Name)
 	addr := dag.SockAddr(requestID)
 	if !fileutil.FileExists(addr) {
@@ -74,7 +67,7 @@ func (e *Client) Stop(ctx context.Context, dag *digraph.DAG, requestID string) e
 }
 
 // GenerateRequestID generates a unique request ID for a DAG run using UUID v7.
-func (e *Client) GenerateRequestID(_ context.Context) (string, error) {
+func (m *Manager) GenerateRequestID(_ context.Context) (string, error) {
 	// Generate a unique request ID for the DAG run
 	id, err := uuid.NewV7()
 	if err != nil {
@@ -85,7 +78,7 @@ func (e *Client) GenerateRequestID(_ context.Context) (string, error) {
 
 // Start starts a DAG by executing the configured executable with appropriate arguments.
 // It sets up the command to run in its own process group and configures standard output/error.
-func (e *Client) Start(_ context.Context, dag *digraph.DAG, opts StartOptions) error {
+func (m *Manager) Start(_ context.Context, dag *digraph.DAG, opts StartOptions) error {
 	args := []string{"start"}
 	if opts.Params != "" {
 		args = append(args, "-p")
@@ -97,14 +90,14 @@ func (e *Client) Start(_ context.Context, dag *digraph.DAG, opts StartOptions) e
 	if opts.RequestID != "" {
 		args = append(args, fmt.Sprintf("--request-id=%s", opts.RequestID))
 	}
-	if e.configPath != "" {
-		args = append(args, fmt.Sprintf("--config=%s", e.configPath))
+	if m.configPath != "" {
+		args = append(args, fmt.Sprintf("--config=%s", m.configPath))
 	}
 	args = append(args, dag.Location)
 	// nolint:gosec
-	cmd := exec.Command(e.executable, args...)
+	cmd := exec.Command(m.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
-	cmd.Dir = e.workDir
+	cmd.Dir = m.workDir
 	cmd.Env = os.Environ()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -114,46 +107,46 @@ func (e *Client) Start(_ context.Context, dag *digraph.DAG, opts StartOptions) e
 
 // Restart restarts a DAG by executing the configured executable with the restart command.
 // It sets up the command to run in its own process group.
-func (e *Client) Restart(_ context.Context, dag *digraph.DAG, opts RestartOptions) error {
+func (m *Manager) Restart(_ context.Context, dag *digraph.DAG, opts RestartOptions) error {
 	args := []string{"restart"}
 	if opts.Quiet {
 		args = append(args, "-q")
 	}
 	args = append(args, dag.Location)
 	// nolint:gosec
-	cmd := exec.Command(e.executable, args...)
+	cmd := exec.Command(m.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
-	cmd.Dir = e.workDir
+	cmd.Dir = m.workDir
 	cmd.Env = os.Environ()
 	return cmd.Start()
 }
 
 // Retry retries a DAG execution with the specified requestID by executing
 // the configured executable with the retry command.
-func (e *Client) Retry(_ context.Context, dag *digraph.DAG, requestID string) error {
+func (m *Manager) Retry(_ context.Context, dag *digraph.DAG, requestID string) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--request-id=%s", requestID))
 	args = append(args, dag.Location)
 	// nolint:gosec
-	cmd := exec.Command(e.executable, args...)
+	cmd := exec.Command(m.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
-	cmd.Dir = e.workDir
+	cmd.Dir = m.workDir
 	cmd.Env = os.Environ()
 	return cmd.Start()
 }
 
 // IsRunning checks if a DAG is currently running by attempting to get its current status.
 // Returns true if the status can be retrieved without error, false otherwise.
-func (e *Client) IsRunning(ctx context.Context, dag *digraph.DAG, requestID string) bool {
-	_, err := e.currentStatus(ctx, dag, requestID)
+func (m *Manager) IsRunning(ctx context.Context, dag *digraph.DAG, requestID string) bool {
+	_, err := m.currentStatus(ctx, dag, requestID)
 	return err == nil
 }
 
 // GetRealtimeStatus retrieves the current status of a DAG.
 // If the DAG is running, it gets the status from the socket.
 // If the socket doesn't exist or times out, it falls back to stored status or creates an initial status.
-func (e *Client) GetRealtimeStatus(ctx context.Context, dag *digraph.DAG, requestId string) (*Status, error) {
-	status, err := e.currentStatus(ctx, dag, requestId)
+func (m *Manager) GetRealtimeStatus(ctx context.Context, dag *digraph.DAG, requestId string) (*Status, error) {
+	status, err := m.currentStatus(ctx, dag, requestId)
 	if err != nil {
 		// No such file or directory
 		if errors.Is(err, os.ErrNotExist) {
@@ -172,12 +165,12 @@ FALLBACK:
 		status := InitialStatus(dag)
 		return &status, nil
 	}
-	return e.findPersistedStatus(ctx, dag, requestId)
+	return m.findPersistedStatus(ctx, dag, requestId)
 }
 
 // FindByRequestID retrieves the status of a DAG run by name and requestID from the run store.
-func (e *Client) FindByRequestID(ctx context.Context, name string, requestID string) (*Status, error) {
-	record, err := e.runStore.Find(ctx, name, requestID)
+func (e *Manager) FindByRequestID(ctx context.Context, name string, requestID string) (*Status, error) {
+	record, err := e.Database.Find(ctx, name, requestID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by request id: %w", err)
 	}
@@ -191,10 +184,10 @@ func (e *Client) FindByRequestID(ctx context.Context, name string, requestID str
 // findPersistedStatus retrieves the status of a DAG run by requestID.
 // If the stored status indicates the DAG is running, it attempts to get the current status.
 // If that fails, it marks the status as error.
-func (e *Client) findPersistedStatus(ctx context.Context, dag *digraph.DAG, requestID string) (
+func (m *Manager) findPersistedStatus(ctx context.Context, dag *digraph.DAG, requestID string) (
 	*Status, error,
 ) {
-	record, err := e.runStore.Find(ctx, dag.Name, requestID)
+	record, err := m.Database.Find(ctx, dag.Name, requestID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by request id: %w", err)
 	}
@@ -205,7 +198,7 @@ func (e *Client) findPersistedStatus(ctx context.Context, dag *digraph.DAG, requ
 
 	// If the DAG is running, query the current status
 	if latestStatus.Status == scheduler.StatusRunning {
-		currentStatus, err := e.currentStatus(ctx, dag, latestStatus.RequestID)
+		currentStatus, err := m.currentStatus(ctx, dag, latestStatus.RequestID)
 		if err == nil {
 			return currentStatus, nil
 		}
@@ -221,8 +214,8 @@ func (e *Client) findPersistedStatus(ctx context.Context, dag *digraph.DAG, requ
 }
 
 // FindBySubRunRequestID retrieves the status of a sub-run by its request ID.
-func (e *Client) FindBySubRunRequestID(ctx context.Context, root digraph.RootDAG, requestID string) (*Status, error) {
-	record, err := e.runStore.FindSubRun(ctx, root.RootName, root.RootID, requestID)
+func (m *Manager) FindBySubRunRequestID(ctx context.Context, root digraph.RootDAG, requestID string) (*Status, error) {
+	record, err := m.Database.FindSubRun(ctx, root.RootName, root.RootID, requestID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sub-run status by request id: %w", err)
 	}
@@ -235,7 +228,7 @@ func (e *Client) FindBySubRunRequestID(ctx context.Context, root digraph.RootDAG
 
 // currentStatus retrieves the current status of a running DAG by querying its socket.
 // This is a private method used internally by other status-related methods.
-func (*Client) currentStatus(_ context.Context, dag *digraph.DAG, requestId string) (*Status, error) {
+func (*Manager) currentStatus(_ context.Context, dag *digraph.DAG, requestId string) (*Status, error) {
 	// FIXME: Should handle the case of dynamic DAG
 	client := sock.NewClient(dag.SockAddr(requestId))
 	statusJSON, err := client.Request("GET", "/status")
@@ -249,11 +242,11 @@ func (*Client) currentStatus(_ context.Context, dag *digraph.DAG, requestId stri
 // GetLatestStatus retrieves the latest status of a DAG.
 // If the DAG is running, it attempts to get the current status from the socket.
 // If that fails or no status exists, it returns an initial status or an error.
-func (e *Client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (Status, error) {
+func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (Status, error) {
 	var latestStatus *Status
 
 	// Find the latest status by name
-	record, err := e.runStore.Latest(ctx, dag.Name)
+	record, err := m.Database.Latest(ctx, dag.Name)
 	if err != nil {
 		goto handleError
 	}
@@ -266,7 +259,7 @@ func (e *Client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (Status,
 
 	// If the DAG is running, query the current status
 	if latestStatus.Status == scheduler.StatusRunning {
-		currentStatus, err := e.currentStatus(ctx, dag, latestStatus.RequestID)
+		currentStatus, err := m.currentStatus(ctx, dag, latestStatus.RequestID)
 		if err == nil {
 			return *currentStatus, nil
 		}
@@ -294,8 +287,8 @@ handleError:
 
 // ListRecentHistory retrieves the n most recent status records for a DAG by name.
 // It returns a slice of Status objects, filtering out any that cannot be read.
-func (e *Client) ListRecentHistory(ctx context.Context, name string, n int) []Status {
-	records := e.runStore.Recent(ctx, name, n)
+func (m *Manager) ListRecentHistory(ctx context.Context, name string, n int) []Status {
+	records := m.Database.Recent(ctx, name, n)
 
 	var runs []Status
 	for _, record := range records {
@@ -308,7 +301,7 @@ func (e *Client) ListRecentHistory(ctx context.Context, name string, n int) []St
 }
 
 // UpdateStatus updates the status of a DAG run in the run store.
-func (e *Client) UpdateStatus(ctx context.Context, root digraph.RootDAG, status Status) error {
+func (e *Manager) UpdateStatus(ctx context.Context, root digraph.RootDAG, status Status) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -322,14 +315,14 @@ func (e *Client) UpdateStatus(ctx context.Context, root digraph.RootDAG, status 
 
 	if root.RootID == status.RequestID {
 		// If the request ID matches the root DAG's request ID, find the runstore record by request ID
-		r, err := e.runStore.Find(ctx, root.RootName, status.RequestID)
+		r, err := e.Database.Find(ctx, root.RootName, status.RequestID)
 		if err != nil {
 			return fmt.Errorf("failed to find runstore record: %w", err)
 		}
 		historyRecord = r
 	} else {
 		// If the request ID does not match, find the runstore record by sub-run request ID
-		r, err := e.runStore.FindSubRun(ctx, root.RootName, root.RootID, status.RequestID)
+		r, err := e.Database.FindSubRun(ctx, root.RootName, root.RootID, status.RequestID)
 		if err != nil {
 			return fmt.Errorf("failed to find sub-runstore record: %w", err)
 		}

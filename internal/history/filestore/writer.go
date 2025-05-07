@@ -11,8 +11,8 @@ import (
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/runstore"
 )
 
 // WriterState represents the current state of a writer
@@ -88,7 +88,7 @@ func (w *Writer) Open() error {
 
 // Write serializes the status to JSON and appends it to the file.
 // It automatically flushes data to ensure durability.
-func (w *Writer) Write(ctx context.Context, st runstore.Status) error {
+func (w *Writer) Write(ctx context.Context, st history.Status) error {
 	// Add context info to logs if write fails
 	if err := w.write(st); err != nil {
 		logger.Errorf(ctx, "Failed to write status: %v", err)
@@ -98,7 +98,7 @@ func (w *Writer) Write(ctx context.Context, st runstore.Status) error {
 	return nil
 }
 
-func (w *Writer) write(st runstore.Status) error {
+func (w *Writer) write(st history.Status) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 

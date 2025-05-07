@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/dagstore"
-	"github.com/dagu-org/dagu/internal/runstore"
+	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/stretchr/testify/require"
 )
@@ -16,7 +16,7 @@ func TestReadEntries(t *testing.T) {
 	now := expectedNext.Add(-time.Second)
 
 	t.Run("InvalidDirectory", func(t *testing.T) {
-		manager := scheduler.NewDAGJobManager("invalid_directory", dagstore.Store{}, runstore.Client{}, "", "")
+		manager := scheduler.NewDAGJobManager("invalid_directory", dagstore.Store{}, history.Manager{}, "", "")
 		jobs, err := manager.Next(context.Background(), expectedNext)
 		require.NoError(t, err)
 		require.Len(t, jobs, 0)

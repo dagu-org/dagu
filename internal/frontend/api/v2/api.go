@@ -12,8 +12,8 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/dagstore"
 	"github.com/dagu-org/dagu/internal/frontend/auth"
+	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/go-chi/chi/v5"
@@ -24,7 +24,7 @@ var _ api.StrictServerInterface = (*API)(nil)
 
 type API struct {
 	dagClient          dagstore.Store
-	runClient          runstore.Client
+	historyManager     history.Manager
 	remoteNodes        map[string]config.RemoteNode
 	apiBasePath        string
 	logEncodingCharset string
@@ -33,7 +33,7 @@ type API struct {
 
 func New(
 	dagCli dagstore.Store,
-	runCli runstore.Client,
+	runCli history.Manager,
 	cfg *config.Config,
 ) *API {
 	remoteNodes := make(map[string]config.RemoteNode)
@@ -43,7 +43,7 @@ func New(
 
 	return &API{
 		dagClient:          dagCli,
-		runClient:          runCli,
+		historyManager:     runCli,
 		logEncodingCharset: cfg.UI.LogEncodingCharset,
 		remoteNodes:        remoteNodes,
 		apiBasePath:        cfg.Server.APIBasePath,
@@ -126,7 +126,7 @@ func (a *API) handleError(w http.ResponseWriter, r *http.Request, err error) {
 		code = api.ErrorCodeNotFound
 		message = "DAG not found"
 
-	case errors.Is(err, runstore.ErrRequestIDNotFound):
+	case errors.Is(err, history.ErrRequestIDNotFound):
 		code = api.ErrorCodeNotFound
 		message = "Request ID not found"
 

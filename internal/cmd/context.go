@@ -16,9 +16,9 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/frontend"
+	"github.com/dagu-org/dagu/internal/history"
+	runfs "github.com/dagu-org/dagu/internal/history/filestore"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/runstore"
-	runfs "github.com/dagu-org/dagu/internal/runstore/filestore"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
@@ -121,9 +121,9 @@ func (c *Context) init(cmd *cobra.Command) error {
 	return nil
 }
 
-// Client initializes a Client using the provided options. If not supplied,
+// HistoryManager initializes a HistoryManager using the provided options. If not supplied,
 // it creates default DAGStore and RunStore instances.
-func (c *Context) Client(opts ...clientOption) (runstore.Client, error) {
+func (c *Context) HistoryManager(opts ...clientOption) (history.Manager, error) {
 	options := &clientOptions{}
 	for _, opt := range opts {
 		opt(options)
@@ -133,7 +133,7 @@ func (c *Context) Client(opts ...clientOption) (runstore.Client, error) {
 		runStore = c.runStore()
 	}
 
-	return runstore.NewClient(
+	return history.New(
 		runStore,
 		c.cfg.Paths.Executable,
 		c.cfg.Global.WorkDir,
@@ -142,7 +142,7 @@ func (c *Context) Client(opts ...clientOption) (runstore.Client, error) {
 }
 
 // DAGClient initializes a DAGClient using the provided options.
-func (c *Context) DAGClient(runClient runstore.Client, opts ...dagClientOption) (dagstore.Store, error) {
+func (c *Context) DAGClient(historyManager history.Manager, opts ...dagClientOption) (dagstore.Store, error) {
 	options := &dagClientOptions{}
 	for _, opt := range opts {
 		opt(options)
@@ -157,7 +157,7 @@ func (c *Context) DAGClient(runClient runstore.Client, opts ...dagClientOption) 
 	}
 
 	return dagstore.New(
-		runClient,
+		historyManager,
 		dagStore,
 	), nil
 }
@@ -169,11 +169,11 @@ func (c *Context) server() (*frontend.Server, error) {
 	dagCache.StartEviction(c)
 	dagStore := c.dagStoreWithCache(dagCache)
 
-	statusCache := fileutil.NewCache[*runstore.Status](0, time.Hour*12)
+	statusCache := fileutil.NewCache[*history.Status](0, time.Hour*12)
 	statusCache.StartEviction(c)
 	runStore := c.runStoreWithCache(statusCache)
 
-	runCli, err := c.Client(withRunStore(runStore))
+	runCli, err := c.HistoryManager(withRunStore(runStore))
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client: %w", err)
 	}
@@ -189,7 +189,7 @@ func (c *Context) server() (*frontend.Server, error) {
 // scheduler creates a new scheduler instance using the default client.
 // It builds a DAG job manager to handle scheduled executions.
 func (c *Context) scheduler() (*scheduler.Scheduler, error) {
-	runCli, err := c.Client()
+	runCli, err := c.HistoryManager()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client: %w", err)
 	}
@@ -228,14 +228,14 @@ func (c *Context) dagStoreWithCache(cache *fileutil.Cache[*digraph.DAG]) dagstor
 
 // runStore returns a new RunStore instance using JSON database storage.
 // It applies the "latestStatusToday" setting from the server configuration.
-func (c *Context) runStore() runstore.Store {
+func (c *Context) runStore() history.Database {
 	return runfs.New(c.cfg.Paths.DataDir, runfs.WithLatestStatusToday(
 		c.cfg.Server.LatestStatusToday,
 	))
 }
 
 // runStoreWithCache returns a RunStore that uses an in-memory cache.
-func (c *Context) runStoreWithCache(cache *fileutil.Cache[*runstore.Status]) runstore.Store {
+func (c *Context) runStoreWithCache(cache *fileutil.Cache[*history.Status]) history.Database {
 	return runfs.New(c.cfg.Paths.DataDir,
 		runfs.WithLatestStatusToday(c.cfg.Server.LatestStatusToday),
 		runfs.WithFileCache(cache),
@@ -332,11 +332,11 @@ type clientOption func(*clientOptions)
 
 // clientOptions holds optional dependencies for constructing a client.
 type clientOptions struct {
-	runStore runstore.Store
+	runStore history.Database
 }
 
 // withRunStore returns a clientOption that sets a custom RunStore.
-func withRunStore(historyStore runstore.Store) clientOption {
+func withRunStore(historyStore history.Database) clientOption {
 	return func(o *clientOptions) {
 		o.runStore = historyStore
 	}

@@ -13,7 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/dagstore"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/runstore"
+	"github.com/dagu-org/dagu/internal/history"
 )
 
 func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestObject) (api.CreateNewDAGResponseObject, error) {
@@ -54,7 +54,7 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 	}
 
 	// Validate the spec
-	dag, err := a.runClient.LoadYAML(ctx, []byte(spec), digraph.WithName(request.FileName))
+	dag, err := a.historyManager.LoadYAML(ctx, []byte(spec), digraph.WithName(request.FileName))
 	var errs []string
 
 	var loadErrs digraph.ErrorList
@@ -129,7 +129,7 @@ func (a *API) GetDAGRunHistory(ctx context.Context, request api.GetDAGRunHistory
 	}
 
 	defaultHistoryLimit := 30
-	recentHistory := a.runClient.ListRecentHistory(ctx, status.DAG.Name, defaultHistoryLimit)
+	recentHistory := a.historyManager.ListRecentHistory(ctx, status.DAG.Name, defaultHistoryLimit)
 
 	var runs []api.RunDetails
 	for _, status := range recentHistory {
@@ -171,7 +171,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 
 func (a *API) readHistoryData(
 	_ context.Context,
-	statusList []runstore.Status,
+	statusList []history.Status,
 ) []api.DAGGridItem {
 	data := map[string][]scheduler.NodeStatus{}
 
@@ -333,7 +333,7 @@ func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetails
 		}, nil
 	}
 
-	status, err := a.runClient.GetRealtimeStatus(ctx, dagWithStatus.DAG, requestId)
+	status, err := a.historyManager.GetRealtimeStatus(ctx, dagWithStatus.DAG, requestId)
 	if err != nil {
 		return nil, fmt.Errorf("error getting status by request ID: %w", err)
 	}
@@ -360,12 +360,12 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		}
 	}
 
-	requestID, err := a.runClient.GenerateRequestID(ctx)
+	requestID, err := a.historyManager.GenerateRequestID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error generating request ID: %w", err)
 	}
 
-	if err := a.runClient.Start(ctx, status.DAG, runstore.StartOptions{
+	if err := a.historyManager.Start(ctx, status.DAG, history.StartOptions{
 		Params:    valueOf(request.Body.Params),
 		RequestID: requestID,
 		Quiet:     true,
@@ -386,7 +386,7 @@ waitLoop:
 		case <-ctx.Done():
 			break waitLoop
 		default:
-			status, _ := a.runClient.GetRealtimeStatus(ctx, status.DAG, requestID)
+			status, _ := a.historyManager.GetRealtimeStatus(ctx, status.DAG, requestID)
 			if status == nil {
 				continue
 			}
@@ -429,7 +429,7 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 			Message:    "DAG is not running",
 		}
 	}
-	if err := a.runClient.Stop(ctx, status.DAG, status.Status.RequestID); err != nil {
+	if err := a.historyManager.Stop(ctx, status.DAG, status.Status.RequestID); err != nil {
 		return nil, fmt.Errorf("error stopping DAG: %w", err)
 	}
 	return api.TerminateDAGRun200Response{}, nil
@@ -452,7 +452,7 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 		}
 	}
 
-	if err := a.runClient.Retry(ctx, status.DAG, request.Body.RequestId); err != nil {
+	if err := a.historyManager.Retry(ctx, status.DAG, request.Body.RequestId); err != nil {
 		return nil, fmt.Errorf("error retrying DAG: %w", err)
 	}
 

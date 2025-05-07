@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/runstore"
+	"github.com/dagu-org/dagu/internal/history"
 )
 
 // Error definitions for directory structure validation
@@ -71,7 +71,7 @@ func NewRun(dir string) (*Run, error) {
 
 // CreateRecord creates a new record for this run with the given timestamp.
 // It creates a new attempt directory and initializes a record within it.
-func (e Run) CreateRecord(_ context.Context, ts TimeInUTC, cache *fileutil.Cache[*runstore.Status], opts ...RecordOption) (*Record, error) {
+func (e Run) CreateRecord(_ context.Context, ts TimeInUTC, cache *fileutil.Cache[*history.Status], opts ...RecordOption) (*Record, error) {
 	dirName := "attempt_" + formatAttemptTimestamp(ts)
 	dir := filepath.Join(e.baseDir, dirName)
 	// Error if the directory already exists
@@ -102,7 +102,7 @@ func (e Run) FindSubRun(_ context.Context, reqID string) (*Run, error) {
 		return nil, fmt.Errorf("failed to list sub-run directories: %w", err)
 	}
 	if len(matches) == 0 {
-		return nil, runstore.ErrRequestIDNotFound
+		return nil, history.ErrRequestIDNotFound
 	}
 	// Sort the matches by timestamp
 	sort.Slice(matches, func(i, j int) bool {
@@ -113,7 +113,7 @@ func (e Run) FindSubRun(_ context.Context, reqID string) (*Run, error) {
 
 // LatestRecord returns the most recent record for this run.
 // It searches through all attempt directories and returns the first valid record found.
-func (e Run) LatestRecord(_ context.Context, cache *fileutil.Cache[*runstore.Status]) (*Record, error) {
+func (e Run) LatestRecord(_ context.Context, cache *fileutil.Cache[*history.Status]) (*Record, error) {
 	attempts, err := listDirsSorted(e.baseDir, true, reAttempt)
 	if err != nil {
 		return nil, err
@@ -125,7 +125,7 @@ func (e Run) LatestRecord(_ context.Context, cache *fileutil.Cache[*runstore.Sta
 			return record, nil
 		}
 	}
-	return nil, runstore.ErrNoStatusData
+	return nil, history.ErrNoStatusData
 }
 
 // LastUpdated returns the last modification time of the latest record.

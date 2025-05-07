@@ -9,7 +9,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/runstore"
+	"github.com/dagu-org/dagu/internal/history"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -40,7 +40,7 @@ func (th JSONDBTest) CreateRecord(t *testing.T, ts time.Time, requestID string, 
 	t.Helper()
 
 	dag := th.DAG("test_DAG")
-	record, err := th.DB.Create(th.Context, dag.DAG, ts, requestID, runstore.NewRecordOptions{})
+	record, err := th.DB.Create(th.Context, dag.DAG, ts, requestID, history.NewRecordOptions{})
 	require.NoError(t, err)
 
 	err = record.Open(th.Context)
@@ -50,7 +50,7 @@ func (th JSONDBTest) CreateRecord(t *testing.T, ts time.Time, requestID string, 
 		_ = record.Close(th.Context)
 	}()
 
-	status := runstore.InitialStatus(dag.DAG)
+	status := history.InitialStatus(dag.DAG)
 	status.RequestID = requestID
 	status.Status = s
 
@@ -101,7 +101,7 @@ func (d DAGTest) Writer(t *testing.T, requestID string, startedAt time.Time) Wri
 	}
 }
 
-func (w WriterTest) Write(t *testing.T, status runstore.Status) {
+func (w WriterTest) Write(t *testing.T, status history.Status) {
 	t.Helper()
 
 	err := w.Writer.write(status)

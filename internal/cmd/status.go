@@ -3,8 +3,8 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/spf13/cobra"
 )
 
@@ -38,7 +38,7 @@ func runStatus(ctx *Context, args []string) error {
 
 	dagName := args[0]
 
-	var record runstore.Record
+	var record history.Record
 	if requestID != "" {
 		// Retrieve the previous run's runstore record for the specified request ID.
 		r, err := ctx.runStore().Find(ctx, dagName, requestID)
@@ -61,7 +61,7 @@ func runStatus(ctx *Context, args []string) error {
 		logger.Error(ctx, "Failed to read DAG from record", "dagName", dagName, "err", err)
 	}
 
-	cli, err := ctx.Client()
+	cli, err := ctx.HistoryManager()
 	if err != nil {
 		logger.Error(ctx, "failed to initialize client", "err", err)
 		return fmt.Errorf("failed to initialize client: %w", err)

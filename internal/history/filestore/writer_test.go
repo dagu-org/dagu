@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/runstore"
+	"github.com/dagu-org/dagu/internal/history"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,7 +19,7 @@ func TestWriter(t *testing.T) {
 	t.Run("WriteStatusToNewFile", func(t *testing.T) {
 		dag := th.DAG("test_write_status")
 		requestID := uuid.Must(uuid.NewV7()).String()
-		status := runstore.NewStatusBuilder(dag.DAG).Create(
+		status := history.NewStatusBuilder(dag.DAG).Create(
 			requestID, scheduler.StatusRunning, 1, time.Now(),
 		)
 		writer := dag.Writer(t, requestID, time.Now())
@@ -35,7 +35,7 @@ func TestWriter(t *testing.T) {
 
 		writer := dag.Writer(t, requestID, startedAt)
 
-		status := runstore.NewStatusBuilder(dag.DAG).Create(
+		status := history.NewStatusBuilder(dag.DAG).Create(
 			requestID, scheduler.StatusCancel, 1, time.Now(),
 		)
 
@@ -84,7 +84,7 @@ func TestWriterErrorHandling(t *testing.T) {
 
 		dag := th.DAG("test_write_to_closed_writer")
 		requestID := uuid.Must(uuid.NewV7()).String()
-		status := runstore.NewStatusBuilder(dag.DAG).Create(requestID, scheduler.StatusRunning, 1, time.Now())
+		status := history.NewStatusBuilder(dag.DAG).Create(requestID, scheduler.StatusRunning, 1, time.Now())
 		assert.Error(t, writer.write(status))
 	})
 
@@ -103,7 +103,7 @@ func TestWriterRename(t *testing.T) {
 	dag := th.DAG("test_rename_old")
 	writer := dag.Writer(t, "request-id-1", time.Now())
 	requestID := uuid.Must(uuid.NewV7()).String()
-	status := runstore.NewStatusBuilder(dag.DAG).Create(requestID, scheduler.StatusRunning, 1, time.Now())
+	status := history.NewStatusBuilder(dag.DAG).Create(requestID, scheduler.StatusRunning, 1, time.Now())
 	writer.Write(t, status)
 	writer.Close(t)
 	require.FileExists(t, writer.FilePath)

@@ -7,8 +7,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/robfig/cron/v3"
 )
@@ -30,7 +30,7 @@ type DAG struct {
 	WorkDir    string
 	Next       time.Time
 	Schedule   cron.Schedule
-	Client     runstore.Client
+	Client     history.Manager
 }
 
 // GetDAG returns the DAG associated with this job.
@@ -56,11 +56,11 @@ func (job *DAG) Start(ctx context.Context) error {
 	}
 
 	// Job is ready; proceed to start.
-	return job.Client.Start(ctx, job.DAG, runstore.StartOptions{Quiet: true})
+	return job.Client.Start(ctx, job.DAG, history.StartOptions{Quiet: true})
 }
 
 // Ready checks whether the job can be safely started based on the latest status.
-func (job *DAG) Ready(ctx context.Context, latestStatus runstore.Status) error {
+func (job *DAG) Ready(ctx context.Context, latestStatus history.Status) error {
 	// Prevent starting if it's already running.
 	if latestStatus.Status == scheduler.StatusRunning {
 		return ErrJobRunning
@@ -85,7 +85,7 @@ func (job *DAG) Ready(ctx context.Context, latestStatus runstore.Status) error {
 
 // skipIfSuccessful checks if the DAG has already run successfully in the window since the last scheduled time.
 // If so, the current run is skipped.
-func (job *DAG) skipIfSuccessful(ctx context.Context, latestStatus runstore.Status, latestStartedAt time.Time) error {
+func (job *DAG) skipIfSuccessful(ctx context.Context, latestStatus history.Status, latestStartedAt time.Time) error {
 	// If skip is not configured, or the DAG is not currently successful, do nothing.
 	if !job.DAG.SkipIfSuccessful || latestStatus.Status != scheduler.StatusSuccess {
 		return nil
@@ -122,7 +122,7 @@ func (job *DAG) Stop(ctx context.Context) error {
 
 // Restart restarts the job unconditionally (quiet mode).
 func (job *DAG) Restart(ctx context.Context) error {
-	return job.Client.Restart(ctx, job.DAG, runstore.RestartOptions{Quiet: true})
+	return job.Client.Restart(ctx, job.DAG, history.RestartOptions{Quiet: true})
 }
 
 // String returns a string representation of the job, which is the DAG's name.

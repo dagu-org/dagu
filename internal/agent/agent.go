@@ -18,9 +18,9 @@ import (
 	"github.com/dagu-org/dagu/internal/dagstore"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/mailer"
-	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/dagu-org/dagu/internal/sock"
 )
 
@@ -38,13 +38,13 @@ type Agent struct {
 
 	// retryTarget is the target status to retry the DAG.
 	// It is nil if it's not a retry execution.
-	retryTarget *runstore.Status
+	retryTarget *history.Status
 
 	// dagStore is the database to store the DAG definitions.
 	dagStore dagstore.Driver
 
-	// client is the runstore client to communicate with the runstore.
-	client runstore.Client
+	// client is the runstore client to communicate with the history.
+	client history.Manager
 
 	// scheduler is the scheduler instance to run the DAG.
 	scheduler *scheduler.Scheduler
@@ -56,7 +56,7 @@ type Agent struct {
 	reporter *reporter
 
 	// runStore is the database to store the run history.
-	runStore runstore.Store
+	runStore history.Database
 
 	// socketServer is the unix socket server to handle HTTP requests.
 	// It listens to the requests from the local client (e.g., frontend server).
@@ -102,8 +102,8 @@ type Options struct {
 	Dry bool
 	// RetryTarget is the target status (runstore of execution) to retry.
 	// If it's specified the agent will execute the DAG with the same
-	// configuration as the specified runstore.
-	RetryTarget *runstore.Status
+	// configuration as the specified history.
+	RetryTarget *history.Status
 	// ParentID is the request ID of the parent DAG run.
 	// It is required for sub-DAG runs to identify the parent DAG.
 	ParentID string
@@ -115,9 +115,9 @@ func New(
 	dag *digraph.DAG,
 	logDir string,
 	logFile string,
-	cli runstore.Client,
+	cli history.Manager,
 	dagStore dagstore.Driver,
-	runStore runstore.Store,
+	runStore history.Database,
 	rootDAG digraph.RootDAG,
 	opts Options,
 ) *Agent {
@@ -279,7 +279,7 @@ func (a *Agent) PrintSummary(ctx context.Context) {
 }
 
 // Status collects the current running status of the DAG and returns it.
-func (a *Agent) Status() runstore.Status {
+func (a *Agent) Status() history.Status {
 	// Lock to avoid race condition.
 	a.lock.RLock()
 	defer a.lock.RUnlock()
@@ -290,22 +290,22 @@ func (a *Agent) Status() runstore.Status {
 		schedulerStatus = scheduler.StatusRunning
 	}
 
-	opts := []runstore.StatusOption{
-		runstore.WithFinishedAt(a.graph.FinishAt()),
-		runstore.WithNodes(a.graph.NodeData()),
-		runstore.WithLogFilePath(a.logFile),
-		runstore.WithOnExitNode(a.scheduler.HandlerNode(digraph.HandlerOnExit)),
-		runstore.WithOnSuccessNode(a.scheduler.HandlerNode(digraph.HandlerOnSuccess)),
-		runstore.WithOnFailureNode(a.scheduler.HandlerNode(digraph.HandlerOnFailure)),
-		runstore.WithOnCancelNode(a.scheduler.HandlerNode(digraph.HandlerOnCancel)),
+	opts := []history.StatusOption{
+		history.WithFinishedAt(a.graph.FinishAt()),
+		history.WithNodes(a.graph.NodeData()),
+		history.WithLogFilePath(a.logFile),
+		history.WithOnExitNode(a.scheduler.HandlerNode(digraph.HandlerOnExit)),
+		history.WithOnSuccessNode(a.scheduler.HandlerNode(digraph.HandlerOnSuccess)),
+		history.WithOnFailureNode(a.scheduler.HandlerNode(digraph.HandlerOnFailure)),
+		history.WithOnCancelNode(a.scheduler.HandlerNode(digraph.HandlerOnCancel)),
 	}
 
 	if a.subExecution.Load() {
-		opts = append(opts, runstore.WithRunContext(a.request))
+		opts = append(opts, history.WithRunContext(a.request))
 	}
 
 	// Create the status object to record the current status.
-	return runstore.NewStatusBuilder(a.dag).
+	return history.NewStatusBuilder(a.dag).
 		Create(
 			a.requestID,
 			schedulerStatus,
@@ -541,13 +541,13 @@ func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 	return nil
 }
 
-func (a *Agent) setupRunRecord(ctx context.Context) (runstore.Record, error) {
+func (a *Agent) setupRunRecord(ctx context.Context) (history.Record, error) {
 	retentionDays := a.dag.HistRetentionDays
 	if err := a.runStore.RemoveOld(ctx, a.dag.Name, retentionDays); err != nil {
 		logger.Error(ctx, "History data cleanup failed", "err", err)
 	}
 
-	opts := runstore.NewRecordOptions{Retry: a.retryTarget != nil}
+	opts := history.NewRecordOptions{Retry: a.retryTarget != nil}
 	if a.subExecution.Load() {
 		opts.Root = &a.rootDAG
 	}
@@ -651,10 +651,10 @@ var _ digraph.DBClient = &dbClient{}
 
 type dbClient struct {
 	dagStore dagstore.Driver
-	runStore runstore.Store
+	runStore history.Database
 }
 
-func newDBClient(h runstore.Store, d dagstore.Driver) *dbClient {
+func newDBClient(h history.Database, d dagstore.Driver) *dbClient {
 	return &dbClient{
 		runStore: h,
 		dagStore: d,

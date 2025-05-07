@@ -7,8 +7,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/spf13/cobra"
 )
 
@@ -71,7 +71,7 @@ func runRetry(ctx *Context, args []string) error {
 	return nil
 }
 
-func executeRetry(ctx *Context, dag *digraph.DAG, status *runstore.Status, rootDAG digraph.RootDAG) error {
+func executeRetry(ctx *Context, dag *digraph.DAG, status *history.Status, rootDAG digraph.RootDAG) error {
 	logger.Debug(ctx, "Executing retry", "dagName", dag.Name, "requestID", status.RequestID)
 
 	// We use the same log file for the retry as the original run.
@@ -94,7 +94,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *runstore.Status, rootD
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	cli, err := ctx.Client()
+	manager, err := ctx.HistoryManager()
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize client", "err", err)
 		return fmt.Errorf("failed to initialize client: %w", err)
@@ -105,7 +105,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *runstore.Status, rootD
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
-		cli,
+		manager,
 		dagStore,
 		ctx.runStore(),
 		rootDAG,

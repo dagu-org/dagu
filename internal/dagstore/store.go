@@ -6,12 +6,12 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/runstore"
+	"github.com/dagu-org/dagu/internal/history"
 )
 
 // New creates a new Store instance.
-func New(runCli runstore.Client, driver Driver) Store {
-	return Store{Driver: driver, runClient: runCli}
+func New(historyManager history.Manager, driver Driver) Store {
+	return Store{Driver: driver, historyManager: historyManager}
 }
 
 // Store provides operations for managing DAGs in the DAG store.
@@ -20,7 +20,7 @@ func New(runCli runstore.Client, driver Driver) Store {
 type Store struct {
 	Driver
 
-	runClient runstore.Client // Client for interacting with run history
+	historyManager history.Manager
 }
 
 // dagTemplate is the default template used when creating a new DAG.
@@ -55,7 +55,7 @@ func (store *Store) Move(ctx context.Context, oldLoc, newLoc string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get metadata for %s: %w", newLoc, err)
 	}
-	if err := store.runClient.Rename(ctx, oldDAG.Name, newDAG.Name); err != nil {
+	if err := store.historyManager.Rename(ctx, oldDAG.Name, newDAG.Name); err != nil {
 		return fmt.Errorf("failed to rename history for %s: %w", oldLoc, err)
 	}
 	return nil
@@ -104,7 +104,7 @@ func (store *Store) List(ctx context.Context, opts ...ListDAGOption) (*Paginated
 
 	var items []Status
 	for _, d := range dags.Items {
-		status, err := store.runClient.GetLatestStatus(ctx, d)
+		status, err := store.historyManager.GetLatestStatus(ctx, d)
 		if err != nil {
 			errList = append(errList, err.Error())
 		}
@@ -172,7 +172,7 @@ func (store *Store) Status(ctx context.Context, loc string) (Status, error) {
 		// check the dag is correct in terms of graph
 		_, err = scheduler.NewExecutionGraph(dag.Steps...)
 	}
-	latestStatus, _ := store.runClient.GetLatestStatus(ctx, dag)
+	latestStatus, _ := store.historyManager.GetLatestStatus(ctx, dag)
 	return NewStatus(
 		dag, latestStatus, store.IsSuspended(ctx, loc), err,
 	), err

@@ -10,8 +10,8 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/runstore"
 	"github.com/spf13/cobra"
 )
 
@@ -48,7 +48,7 @@ func runRestart(ctx *Context, args []string) error {
 
 	dagName := args[0]
 
-	var record runstore.Record
+	var record history.Record
 	if requestID != "" {
 		// Retrieve the previous run's runstore record for the specified request ID.
 		r, err := ctx.runStore().Find(ctx, dagName, requestID)
@@ -90,7 +90,7 @@ func runRestart(ctx *Context, args []string) error {
 }
 
 func handleRestartProcess(ctx *Context, dag *digraph.DAG, requestID string) error {
-	cli, err := ctx.Client()
+	cli, err := ctx.HistoryManager()
 	if err != nil {
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
@@ -110,7 +110,7 @@ func handleRestartProcess(ctx *Context, dag *digraph.DAG, requestID string) erro
 	return executeDAG(ctx, cli, dag)
 }
 
-func executeDAG(ctx *Context, cli runstore.Client, dag *digraph.DAG) error {
+func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
 	requestID, err := generateRequestID()
 	if err != nil {
 		return fmt.Errorf("failed to generate request ID: %w", err)
@@ -160,7 +160,7 @@ func executeDAG(ctx *Context, cli runstore.Client, dag *digraph.DAG) error {
 	return nil
 }
 
-func stopDAGIfRunning(ctx context.Context, cli runstore.Client, dag *digraph.DAG, requestID string) error {
+func stopDAGIfRunning(ctx context.Context, cli history.Manager, dag *digraph.DAG, requestID string) error {
 	status, err := cli.GetRealtimeStatus(ctx, dag, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to get current status: %w", err)
@@ -175,7 +175,7 @@ func stopDAGIfRunning(ctx context.Context, cli runstore.Client, dag *digraph.DAG
 	return nil
 }
 
-func stopRunningDAG(ctx context.Context, cli runstore.Client, dag *digraph.DAG, requestID string) error {
+func stopRunningDAG(ctx context.Context, cli history.Manager, dag *digraph.DAG, requestID string) error {
 	const stopPollInterval = 100 * time.Millisecond
 	for {
 		status, err := cli.GetRealtimeStatus(ctx, dag, requestID)
