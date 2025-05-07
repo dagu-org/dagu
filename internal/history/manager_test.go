@@ -13,6 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/history"
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/sock"
 	"github.com/dagu-org/dagu/internal/test"
 )
@@ -30,7 +31,7 @@ func TestManager(t *testing.T) {
 		socketServer, _ := sock.NewServer(
 			dag.SockAddr(requestID),
 			func(w http.ResponseWriter, _ *http.Request) {
-				status := history.NewStatusBuilder(dag.DAG).Create(
+				status := models.NewStatusBuilder(dag.DAG).Create(
 					requestID, scheduler.StatusRunning, 0, time.Now(),
 				)
 				w.WriteHeader(http.StatusOK)
@@ -63,7 +64,7 @@ func TestManager(t *testing.T) {
 		cli := th.History
 
 		// Open the history store and write a status before updating it.
-		record, err := th.RunStore.Create(ctx, dag.DAG, now, requestID, history.NewRecordOptions{})
+		record, err := th.HistoryRepo.Create(ctx, dag.DAG, now, requestID, models.NewRecordOptions{})
 		require.NoError(t, err)
 
 		err = record.Open(ctx)
@@ -218,11 +219,11 @@ func TestClient_RunDAG(t *testing.T) {
 	})
 }
 
-func testNewStatus(dag *digraph.DAG, requestID string, status scheduler.Status, nodeStatus scheduler.NodeStatus) history.Status {
+func testNewStatus(dag *digraph.DAG, requestID string, status scheduler.Status, nodeStatus scheduler.NodeStatus) models.Status {
 	nodes := []scheduler.NodeData{{State: scheduler.NodeState{Status: nodeStatus}}}
 	tm := time.Now()
 	startedAt := &tm
-	return history.NewStatusBuilder(dag).Create(
-		requestID, status, 0, *startedAt, history.WithNodes(nodes),
+	return models.NewStatusBuilder(dag).Create(
+		requestID, status, 0, *startedAt, models.WithNodes(nodes),
 	)
 }

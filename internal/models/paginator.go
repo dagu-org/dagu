@@ -1,4 +1,4 @@
-package repository
+package models
 
 const (
 	defaultPerPage = 50

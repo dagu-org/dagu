@@ -9,6 +9,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/robfig/cron/v3"
 )
@@ -60,7 +61,7 @@ func (job *DAG) Start(ctx context.Context) error {
 }
 
 // Ready checks whether the job can be safely started based on the latest status.
-func (job *DAG) Ready(ctx context.Context, latestStatus history.Status) error {
+func (job *DAG) Ready(ctx context.Context, latestStatus models.Status) error {
 	// Prevent starting if it's already running.
 	if latestStatus.Status == scheduler.StatusRunning {
 		return ErrJobRunning
@@ -85,7 +86,7 @@ func (job *DAG) Ready(ctx context.Context, latestStatus history.Status) error {
 
 // skipIfSuccessful checks if the DAG has already run successfully in the window since the last scheduled time.
 // If so, the current run is skipped.
-func (job *DAG) skipIfSuccessful(ctx context.Context, latestStatus history.Status, latestStartedAt time.Time) error {
+func (job *DAG) skipIfSuccessful(ctx context.Context, latestStatus models.Status, latestStartedAt time.Time) error {
 	// If skip is not configured, or the DAG is not currently successful, do nothing.
 	if !job.DAG.SkipIfSuccessful || latestStatus.Status != scheduler.StatusSuccess {
 		return nil

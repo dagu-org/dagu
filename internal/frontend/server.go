@@ -21,7 +21,7 @@ import (
 	"github.com/dagu-org/dagu/internal/frontend/metrics"
 	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/repository"
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -38,7 +38,7 @@ type Server struct {
 }
 
 // NewServer creates a new Server instance with the given configuration and client
-func NewServer(cfg *config.Config, dagRepo repository.DAGRepository, runCli history.Manager) *Server {
+func NewServer(cfg *config.Config, dagRepo models.DAGRepository, runCli history.Manager) *Server {
 	var remoteNodes []string
 	for _, n := range cfg.Server.RemoteNodes {
 		remoteNodes = append(remoteNodes, n.Name)

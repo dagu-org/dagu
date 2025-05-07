@@ -87,7 +87,7 @@ func runDry(ctx *Context, args []string) error {
 		logFile.Name(),
 		historyManager,
 		dagRepo,
-		ctx.runStore(),
+		ctx.historyRepo(),
 		rootDAG,
 		agent.Options{Dry: true},
 	)

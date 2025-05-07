@@ -15,8 +15,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/models"
 )
 
 // Error definitions for common issues
@@ -32,17 +32,17 @@ var (
 // DAGDefinition is the name of the file where the DAG definition is stored.
 const DAGDefinition = "dag.json"
 
-var _ history.Record = (*Record)(nil)
+var _ models.Record = (*Record)(nil)
 
 // Record manages an append-only status file with read, write, and compaction capabilities.
 // It provides thread-safe operations and supports metrics collection.
 type Record struct {
-	file      string                           // Path to the status file
-	writer    *Writer                          // Writer for appending status updates
-	mu        sync.RWMutex                     // Mutex for thread safety
-	cache     *fileutil.Cache[*history.Status] // Optional cache for read operations
-	isClosing atomic.Bool                      // Flag to prevent writes during Close/Compact
-	dag       *digraph.DAG                     // DAG associated with the status file
+	file      string                          // Path to the status file
+	writer    *Writer                         // Writer for appending status updates
+	mu        sync.RWMutex                    // Mutex for thread safety
+	cache     *fileutil.Cache[*models.Status] // Optional cache for read operations
+	isClosing atomic.Bool                     // Flag to prevent writes during Close/Compact
+	dag       *digraph.DAG                    // DAG associated with the status file
 }
 
 // RecordOption defines a functional option for configuring a Record.
@@ -57,7 +57,7 @@ func WithDAG(dag *digraph.DAG) RecordOption {
 }
 
 // NewRecord creates a new HistoryRecord for the specified file.
-func NewRecord(file string, cache *fileutil.Cache[*history.Status], opts ...RecordOption) *Record {
+func NewRecord(file string, cache *fileutil.Cache[*models.Status], opts ...RecordOption) *Record {
 	r := &Record{file: file, cache: cache}
 	for _, opt := range opts {
 		opt(r)
@@ -81,7 +81,7 @@ func (r *Record) ModTime() (time.Time, error) {
 	return info.ModTime(), nil
 }
 
-// ReadDAG implements history.Record.
+// ReadDAG implements models.Record.
 func (r *Record) ReadDAG(ctx context.Context) (*digraph.DAG, error) {
 	// Check for context cancellation
 	select {
@@ -167,7 +167,7 @@ func (r *Record) Open(ctx context.Context) error {
 
 // Write adds a new status record to the file. It returns an error if the file is not open
 // or is currently being closed. The context can be used to cancel the operation.
-func (r *Record) Write(ctx context.Context, status history.Status) error {
+func (r *Record) Write(ctx context.Context, status models.Status) error {
 	// Check if we're closing before acquiring the mutex to reduce contention
 	if r.isClosing.Load() {
 		return fmt.Errorf("cannot write while file is closing: %w", ErrStatusFileNotOpen)
@@ -336,7 +336,7 @@ func safeRename(source, target string) error {
 
 // ReadStatus reads the latest status from the file, using cache if available.
 // The context can be used to cancel the operation.
-func (r *Record) ReadStatus(ctx context.Context) (*history.Status, error) {
+func (r *Record) ReadStatus(ctx context.Context) (*models.Status, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -347,7 +347,7 @@ func (r *Record) ReadStatus(ctx context.Context) (*history.Status, error) {
 
 	// Try to use cache first if available
 	if r.cache != nil {
-		status, cacheErr := r.cache.LoadLatest(r.file, func() (*history.Status, error) {
+		status, cacheErr := r.cache.LoadLatest(r.file, func() (*models.Status, error) {
 			r.mu.RLock()
 			defer r.mu.RUnlock()
 			return r.parseLocked()
@@ -373,13 +373,13 @@ func (r *Record) ReadStatus(ctx context.Context) (*history.Status, error) {
 
 // parseLocked reads the status file and returns the last valid status.
 // Must be called with a lock (read or write) already held.
-func (r *Record) parseLocked() (*history.Status, error) {
+func (r *Record) parseLocked() (*models.Status, error) {
 	return ParseStatusFile(r.file)
 }
 
 // ParseStatusFile reads the status file and returns the last valid status.
 // The bufferSize parameter controls the size of the read buffer.
-func ParseStatusFile(file string) (*history.Status, error) {
+func ParseStatusFile(file string) (*models.Status, error) {
 	f, err := os.Open(file) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrReadFailed, err)
@@ -390,7 +390,7 @@ func ParseStatusFile(file string) (*history.Status, error) {
 
 	var (
 		offset int64
-		result *history.Status
+		result *models.Status
 	)
 
 	// Read append-only file from the beginning and find the last status
@@ -407,7 +407,7 @@ func ParseStatusFile(file string) (*history.Status, error) {
 
 		offset = nextOffset
 		if len(line) > 0 {
-			status, err := history.StatusFromJSON(string(line))
+			status, err := models.StatusFromJSON(string(line))
 			if err == nil {
 				result = status
 			}

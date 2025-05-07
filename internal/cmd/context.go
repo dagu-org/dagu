@@ -17,8 +17,8 @@ import (
 	"github.com/dagu-org/dagu/internal/history"
 	runfs "github.com/dagu-org/dagu/internal/history/filestore"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/repository"
-	daglocal "github.com/dagu-org/dagu/internal/repository/local"
+	"github.com/dagu-org/dagu/internal/models"
+	daglocal "github.com/dagu-org/dagu/internal/models/local"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
@@ -127,9 +127,9 @@ func (c *Context) HistoryManager(opts ...clientOption) (history.Manager, error) 
 	for _, opt := range opts {
 		opt(options)
 	}
-	runStore := options.runStore
+	runStore := options.historyRepo
 	if runStore == nil {
-		runStore = c.runStore()
+		runStore = c.historyRepo()
 	}
 
 	return history.New(
@@ -147,9 +147,9 @@ func (c *Context) server() (*frontend.Server, error) {
 	dagCache.StartEviction(c)
 	dagRepo := c.dagRepoWithCache(dagCache)
 
-	statusCache := fileutil.NewCache[*history.Status](0, time.Hour*12)
+	statusCache := fileutil.NewCache[*models.Status](0, time.Hour*12)
 	statusCache.StartEviction(c)
-	historyRepo := c.historyRepo(statusCache)
+	historyRepo := c.historyRepoWithCache(statusCache)
 
 	historyManager, err := c.HistoryManager(withHistoryRepo(historyRepo))
 	if err != nil {
@@ -178,7 +178,7 @@ func (c *Context) scheduler() (*scheduler.Scheduler, error) {
 
 // dagRepo returns a new DAGRepository instance. It ensures that the directory exists
 // (creating it if necessary) before returning the store.
-func (c *Context) dagRepo(searchPaths []string) (repository.DAGRepository, error) {
+func (c *Context) dagRepo(searchPaths []string) (models.DAGRepository, error) {
 	baseDir := c.cfg.Paths.DAGsDir
 	_, err := os.Stat(baseDir)
 	if os.IsNotExist(err) {
@@ -195,20 +195,20 @@ func (c *Context) dagRepo(searchPaths []string) (repository.DAGRepository, error
 }
 
 // dagRepoWithCache returns a DAGRepository instance that uses an in-memory file cache.
-func (c *Context) dagRepoWithCache(cache *fileutil.Cache[*digraph.DAG]) repository.DAGRepository {
+func (c *Context) dagRepoWithCache(cache *fileutil.Cache[*digraph.DAG]) models.DAGRepository {
 	return daglocal.New(c.cfg.Paths.DAGsDir, daglocal.WithFlagsBaseDir(c.cfg.Paths.SuspendFlagsDir), daglocal.WithFileCache(cache))
 }
 
-// runStore returns a new RunStore instance using JSON database storage.
+// historyRepo returns a new HistoryRepository instance using JSON database storage.
 // It applies the "latestStatusToday" setting from the server configuration.
-func (c *Context) runStore() history.HistoryRepository {
+func (c *Context) historyRepo() models.HistoryRepository {
 	return runfs.New(c.cfg.Paths.DataDir, runfs.WithLatestStatusToday(
 		c.cfg.Server.LatestStatusToday,
 	))
 }
 
-// historyRepo returns a RunStore that uses an in-memory cache.
-func (c *Context) historyRepo(cache *fileutil.Cache[*history.Status]) history.HistoryRepository {
+// historyRepoWithCache returns a HistoryRepository that uses an in-memory cache.
+func (c *Context) historyRepoWithCache(cache *fileutil.Cache[*models.Status]) models.HistoryRepository {
 	return runfs.New(c.cfg.Paths.DataDir,
 		runfs.WithLatestStatusToday(c.cfg.Server.LatestStatusToday),
 		runfs.WithFileCache(cache),
@@ -305,13 +305,13 @@ type clientOption func(*clientOptions)
 
 // clientOptions holds optional dependencies for constructing a client.
 type clientOptions struct {
-	runStore history.HistoryRepository
+	historyRepo models.HistoryRepository
 }
 
 // withHistoryRepo returns a clientOption that sets a custom RunStore.
-func withHistoryRepo(historyStore history.HistoryRepository) clientOption {
+func withHistoryRepo(historyRepo models.HistoryRepository) clientOption {
 	return func(o *clientOptions) {
-		o.runStore = historyStore
+		o.historyRepo = historyRepo
 	}
 }
 

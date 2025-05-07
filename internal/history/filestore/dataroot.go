@@ -20,8 +20,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/models"
 )
 
 // DataRoot manages the directory structure for run history data.
@@ -105,7 +105,7 @@ func (dr *DataRoot) FindByRequestID(_ context.Context, requestID string) (*Run, 
 	}
 
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("%w: %s", history.ErrRequestIDNotFound, requestID)
+		return nil, fmt.Errorf("%w: %s", models.ErrRequestIDNotFound, requestID)
 	}
 
 	// Sort matches by timestamp (most recent first)
@@ -129,10 +129,10 @@ func (dr *DataRoot) LatestAfter(ctx context.Context, cutoff TimeInUTC) (*Run, er
 		return nil, fmt.Errorf("failed to list recent runs: %w", err)
 	}
 	if len(runs) == 0 {
-		return nil, history.ErrNoStatusData
+		return nil, models.ErrNoStatusData
 	}
 	if runs[0].timestamp.Before(cutoff.Time) {
-		return nil, history.ErrNoStatusData
+		return nil, models.ErrNoStatusData
 	}
 	return runs[0], nil
 }

@@ -10,8 +10,8 @@ import (
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/history"
 	runfs "github.com/dagu-org/dagu/internal/history/filestore"
-	"github.com/dagu-org/dagu/internal/repository"
-	"github.com/dagu-org/dagu/internal/repository/local"
+	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/models/local"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -38,7 +38,7 @@ func TestMain(m *testing.M) {
 type testHelper struct {
 	manager        scheduler.JobManager
 	historyManager history.Manager
-	dagRepo        repository.DAGRepository
+	dagRepo        models.DAGRepository
 	config         *config.Config
 }
 

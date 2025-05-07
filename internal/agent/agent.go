@@ -20,7 +20,7 @@ import (
 	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/mailer"
-	"github.com/dagu-org/dagu/internal/repository"
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/sock"
 )
 
@@ -38,10 +38,13 @@ type Agent struct {
 
 	// retryTarget is the target status to retry the DAG.
 	// It is nil if it's not a retry execution.
-	retryTarget *history.Status
+	retryTarget *models.Status
 
 	// dagRepo is the database to store the DAG definitions.
-	dagRepo repository.DAGRepository
+	dagRepo models.DAGRepository
+
+	// historyRepo is the database to store the run history.
+	historyRepo models.HistoryRepository
 
 	// client is the runstore client to communicate with the history.
 	client history.Manager
@@ -54,9 +57,6 @@ type Agent struct {
 
 	// reporter is responsible for sending the report to the user.
 	reporter *reporter
-
-	// runStore is the database to store the run history.
-	runStore history.HistoryRepository
 
 	// socketServer is the unix socket server to handle HTTP requests.
 	// It listens to the requests from the local client (e.g., frontend server).
@@ -103,7 +103,7 @@ type Options struct {
 	// RetryTarget is the target status (runstore of execution) to retry.
 	// If it's specified the agent will execute the DAG with the same
 	// configuration as the specified history.
-	RetryTarget *history.Status
+	RetryTarget *models.Status
 	// ParentID is the request ID of the parent DAG run.
 	// It is required for sub-DAG runs to identify the parent DAG.
 	ParentID string
@@ -116,8 +116,8 @@ func New(
 	logDir string,
 	logFile string,
 	cli history.Manager,
-	dagRepo repository.DAGRepository,
-	runStore history.HistoryRepository,
+	dagRepo models.DAGRepository,
+	historyRepo models.HistoryRepository,
 	rootDAG digraph.RootDAG,
 	opts Options,
 ) *Agent {
@@ -131,7 +131,7 @@ func New(
 		logFile:         logFile,
 		client:          cli,
 		dagRepo:         dagRepo,
-		runStore:        runStore,
+		historyRepo:     historyRepo,
 		parentRequestID: opts.ParentID,
 	}
 }
@@ -146,7 +146,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Create a new context for the DAG run with all necessary information
-	dbClient := newDBClient(a.runStore, a.dagRepo)
+	dbClient := newDBClient(a.historyRepo, a.dagRepo)
 	ctx = digraph.NewContext(ctx, a.dag, dbClient, a.request, a.logFile, a.dag.Params)
 
 	// Add structured logging context
@@ -178,10 +178,10 @@ func (a *Agent) Run(ctx context.Context) error {
 	// execution is finished.
 	historyRecord, err := a.setupRunRecord(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to setup runstore record: %w", err)
+		return fmt.Errorf("failed to setup run record: %w", err)
 	}
 	if err := historyRecord.Open(ctx); err != nil {
-		return fmt.Errorf("failed to open runstore record: %w", err)
+		return fmt.Errorf("failed to open run record: %w", err)
 	}
 	defer func() {
 		if err := historyRecord.Close(ctx); err != nil {
@@ -279,7 +279,7 @@ func (a *Agent) PrintSummary(ctx context.Context) {
 }
 
 // Status collects the current running status of the DAG and returns it.
-func (a *Agent) Status() history.Status {
+func (a *Agent) Status() models.Status {
 	// Lock to avoid race condition.
 	a.lock.RLock()
 	defer a.lock.RUnlock()
@@ -290,22 +290,22 @@ func (a *Agent) Status() history.Status {
 		schedulerStatus = scheduler.StatusRunning
 	}
 
-	opts := []history.StatusOption{
-		history.WithFinishedAt(a.graph.FinishAt()),
-		history.WithNodes(a.graph.NodeData()),
-		history.WithLogFilePath(a.logFile),
-		history.WithOnExitNode(a.scheduler.HandlerNode(digraph.HandlerOnExit)),
-		history.WithOnSuccessNode(a.scheduler.HandlerNode(digraph.HandlerOnSuccess)),
-		history.WithOnFailureNode(a.scheduler.HandlerNode(digraph.HandlerOnFailure)),
-		history.WithOnCancelNode(a.scheduler.HandlerNode(digraph.HandlerOnCancel)),
+	opts := []models.StatusOption{
+		models.WithFinishedAt(a.graph.FinishAt()),
+		models.WithNodes(a.graph.NodeData()),
+		models.WithLogFilePath(a.logFile),
+		models.WithOnExitNode(a.scheduler.HandlerNode(digraph.HandlerOnExit)),
+		models.WithOnSuccessNode(a.scheduler.HandlerNode(digraph.HandlerOnSuccess)),
+		models.WithOnFailureNode(a.scheduler.HandlerNode(digraph.HandlerOnFailure)),
+		models.WithOnCancelNode(a.scheduler.HandlerNode(digraph.HandlerOnCancel)),
 	}
 
 	if a.subExecution.Load() {
-		opts = append(opts, history.WithRunContext(a.request))
+		opts = append(opts, models.WithRunContext(a.request))
 	}
 
 	// Create the status object to record the current status.
-	return history.NewStatusBuilder(a.dag).
+	return models.NewStatusBuilder(a.dag).
 		Create(
 			a.requestID,
 			schedulerStatus,
@@ -452,7 +452,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 
 	logger.Info(ctx, "Dry-run started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
 
-	dagCtx := digraph.NewContext(ctx, a.dag, newDBClient(a.runStore, a.dagRepo), a.request, a.logFile, a.dag.Params)
+	dagCtx := digraph.NewContext(ctx, a.dag, newDBClient(a.historyRepo, a.dagRepo), a.request, a.logFile, a.dag.Params)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 	a.lastErr = lastErr
 
@@ -541,18 +541,18 @@ func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 	return nil
 }
 
-func (a *Agent) setupRunRecord(ctx context.Context) (history.Record, error) {
+func (a *Agent) setupRunRecord(ctx context.Context) (models.Record, error) {
 	retentionDays := a.dag.HistRetentionDays
-	if err := a.runStore.RemoveOld(ctx, a.dag.Name, retentionDays); err != nil {
+	if err := a.historyRepo.RemoveOld(ctx, a.dag.Name, retentionDays); err != nil {
 		logger.Error(ctx, "History data cleanup failed", "err", err)
 	}
 
-	opts := history.NewRecordOptions{Retry: a.retryTarget != nil}
+	opts := models.NewRecordOptions{Retry: a.retryTarget != nil}
 	if a.subExecution.Load() {
 		opts.Root = &a.rootDAG
 	}
 
-	return a.runStore.Create(ctx, a.dag, time.Now(), a.requestID, opts)
+	return a.historyRepo.Create(ctx, a.dag, time.Now(), a.requestID, opts)
 }
 
 // setupSocketServer create socket server instance.
@@ -650,11 +650,11 @@ func encodeError(w http.ResponseWriter, err error) {
 var _ digraph.DBClient = &dbClient{}
 
 type dbClient struct {
-	dagRepo     repository.DAGRepository
-	historyRepo history.HistoryRepository
+	dagRepo     models.DAGRepository
+	historyRepo models.HistoryRepository
 }
 
-func newDBClient(h history.HistoryRepository, d repository.DAGRepository) *dbClient {
+func newDBClient(h models.HistoryRepository, d models.DAGRepository) *dbClient {
 	return &dbClient{
 		historyRepo: h,
 		dagRepo:     d,

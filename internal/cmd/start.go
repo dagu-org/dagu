@@ -8,8 +8,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
 )
 
@@ -121,9 +121,9 @@ func runStart(ctx *Context, args []string) error {
 			return fmt.Errorf("request ID must be provided for sub-DAG run")
 		}
 		logger.Debug(ctx, "Checking for previous sub-DAG run with the request ID", "requestID", requestID)
-		var status *history.Status
-		record, err := ctx.runStore().FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, requestID)
-		if errors.Is(err, history.ErrRequestIDNotFound) {
+		var status *models.Status
+		record, err := ctx.historyRepo().FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, requestID)
+		if errors.Is(err, models.ErrRequestIDNotFound) {
 			// If the request ID is not found, proceed with execution
 			goto EXEC
 		}
@@ -178,7 +178,7 @@ func executeDag(ctx *Context, dag *digraph.DAG, parentRequestID, requestID strin
 		logFile.Name(),
 		cli,
 		dr,
-		ctx.runStore(),
+		ctx.historyRepo(),
 		rootDAG,
 		agent.Options{ParentID: parentRequestID},
 	)

@@ -12,7 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/frontend/auth"
 	"github.com/dagu-org/dagu/internal/history"
-	"github.com/dagu-org/dagu/internal/repository"
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/go-chi/chi/v5"
@@ -22,7 +22,7 @@ import (
 var _ api.StrictServerInterface = (*API)(nil)
 
 type API struct {
-	dagRepository      repository.DAGRepository
+	dagRepository      models.DAGRepository
 	historyManager     history.Manager
 	remoteNodes        map[string]config.RemoteNode
 	apiBasePath        string
@@ -31,7 +31,7 @@ type API struct {
 }
 
 func New(
-	dagCli repository.DAGRepository,
+	dagCli models.DAGRepository,
 	runCli history.Manager,
 	cfg *config.Config,
 ) *API {
@@ -121,7 +121,7 @@ func (a *API) handleError(w http.ResponseWriter, _ *http.Request, err error) {
 	}
 
 	switch {
-	case errors.Is(err, history.ErrRequestIDNotFound):
+	case errors.Is(err, models.ErrRequestIDNotFound):
 		code = api.ErrorCodeNotFound
 		message = "Request ID not found"
 	}

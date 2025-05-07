@@ -44,7 +44,7 @@ func runStop(ctx *Context, args []string) error {
 	var dag *digraph.DAG
 	if requestID != "" {
 		// Retrieve the previous run's history record for the specified request ID.
-		runRecord, err := ctx.runStore().Find(ctx, dagName, requestID)
+		runRecord, err := ctx.historyRepo().Find(ctx, dagName, requestID)
 		if err != nil {
 			logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
 			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)

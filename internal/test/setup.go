@@ -23,8 +23,8 @@ import (
 	"github.com/dagu-org/dagu/internal/history"
 	runfs "github.com/dagu-org/dagu/internal/history/filestore"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/repository"
-	"github.com/dagu-org/dagu/internal/repository/local"
+	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/models/local"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -100,11 +100,11 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	historyManager := history.New(runStore, cfg.Paths.Executable, cfg.Global.WorkDir, "")
 
 	helper := Helper{
-		Context:  createDefaultContext(),
-		Config:   cfg,
-		History:  historyManager,
-		DAGRepo:  dagRepo,
-		RunStore: runStore,
+		Context:     createDefaultContext(),
+		Config:      cfg,
+		History:     historyManager,
+		DAGRepo:     dagRepo,
+		HistoryRepo: runStore,
 
 		tmpDir: tmpDir,
 	}
@@ -137,8 +137,8 @@ type Helper struct {
 	Config        *config.Config
 	LoggingOutput *SyncBuffer
 	History       history.Manager
-	DAGRepo       repository.DAGRepository
-	RunStore      history.HistoryRepository
+	DAGRepo       models.DAGRepository
+	HistoryRepo   models.HistoryRepository
 
 	tmpDir string
 }
@@ -311,7 +311,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		logFile,
 		d.History,
 		d.DAGRepo,
-		d.RunStore,
+		d.HistoryRepo,
 		rootDAG,
 		helper.opts,
 	)

@@ -7,8 +7,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
 )
 
@@ -39,8 +39,8 @@ func runRetry(ctx *Context, args []string) error {
 
 	dagName := args[0]
 
-	// Retrieve the previous run's runstore record for the specified request ID.
-	runRecord, err := ctx.runStore().Find(ctx, dagName, requestID)
+	// Retrieve the previous run data for specified request ID.
+	runRecord, err := ctx.historyRepo().Find(ctx, dagName, requestID)
 	if err != nil {
 		logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
 		return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
@@ -53,10 +53,10 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 
-	// Get the DAG instance from the runstore record.
+	// Get the DAG instance from the run record.
 	dag, err := runRecord.ReadDAG(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to read DAG from runstore record", "err", err)
+		logger.Error(ctx, "Failed to read DAG from run record", "err", err)
 	}
 
 	// The retry command is currently only supported for root DAGs.
@@ -71,7 +71,7 @@ func runRetry(ctx *Context, args []string) error {
 	return nil
 }
 
-func executeRetry(ctx *Context, dag *digraph.DAG, status *history.Status, rootDAG digraph.RootDAG) error {
+func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootDAG digraph.RootDAG) error {
 	logger.Debug(ctx, "Executing retry", "dagName", dag.Name, "requestID", status.RequestID)
 
 	// We use the same log file for the retry as the original run.
@@ -107,7 +107,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *history.Status, rootDA
 		logFile.Name(),
 		manager,
 		dr,
-		ctx.runStore(),
+		ctx.historyRepo(),
 		rootDAG,
 		agent.Options{
 			RetryTarget: status,

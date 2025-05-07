@@ -12,7 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/repository"
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/scheduler/filenotify"
 	"github.com/robfig/cron/v3"
 
@@ -47,14 +47,14 @@ type dagJobManager struct {
 	targetDir      string
 	registry       map[string]*digraph.DAG
 	lock           sync.Mutex
-	dagClient      repository.DAGRepository
+	dagClient      models.DAGRepository
 	historyManager history.Manager
 	executable     string
 	workDir        string
 }
 
 // NewDAGJobManager creates a new DAG manager with the given configuration.
-func NewDAGJobManager(dir string, dagCli repository.DAGRepository, runCli history.Manager, executable, workDir string) JobManager {
+func NewDAGJobManager(dir string, dagCli models.DAGRepository, runCli history.Manager, executable, workDir string) JobManager {
 	return &dagJobManager{
 		targetDir:      dir,
 		lock:           sync.Mutex{},

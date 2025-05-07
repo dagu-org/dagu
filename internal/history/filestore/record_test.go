@@ -11,7 +11,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/history"
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -369,16 +369,16 @@ func createTestDAG() *digraph.DAG {
 }
 
 // createTestStatus creates a sample status for testing using StatusFactory
-func createTestStatus(status scheduler.Status) history.Status {
+func createTestStatus(status scheduler.Status) models.Status {
 	dag := createTestDAG()
 
-	return history.Status{
+	return models.Status{
 		RequestID: "test",
 		Name:      dag.Name,
 		Status:    status,
-		PID:       history.PID(12345),
+		PID:       models.PID(12345),
 		StartedAt: stringutil.FormatTime(time.Now()),
-		Nodes:     history.FromSteps(dag.Steps),
+		Nodes:     models.FromSteps(dag.Steps),
 	}
 }
 

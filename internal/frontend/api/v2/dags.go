@@ -13,7 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/history"
-	"github.com/dagu-org/dagu/internal/repository"
+	"github.com/dagu-org/dagu/internal/models"
 )
 
 func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestObject) (api.CreateNewDAGResponseObject, error) {
@@ -23,7 +23,7 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 `)
 
 	if err := a.dagRepository.Create(ctx, request.Body.Name, spec); err != nil {
-		if errors.Is(err, repository.ErrDAGAlreadyExists) {
+		if errors.Is(err, models.ErrDAGAlreadyExists) {
 			return nil, &Error{
 				HTTPStatus: http.StatusConflict,
 				Code:       api.ErrorCodeAlreadyExists,
@@ -198,7 +198,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 
 func (a *API) readHistoryData(
 	_ context.Context,
-	statusList []history.Status,
+	statusList []models.Status,
 ) []api.DAGGridItem {
 	data := map[string][]scheduler.NodeStatus{}
 
@@ -275,8 +275,8 @@ func (a *API) readHistoryData(
 }
 
 func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (api.ListDAGsResponseObject, error) {
-	pg := repository.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
-	result, errList, err := a.dagRepository.List(ctx, repository.ListOptions{
+	pg := models.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
+	result, errList, err := a.dagRepository.List(ctx, models.ListOptions{
 		Paginator: &pg,
 		Name:      valueOf(request.Params.Name),
 		Tag:       valueOf(request.Params.Tag),
@@ -291,7 +291,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	}
 
 	// Get status for each DAG
-	dagStatuses := make([]history.Status, len(result.Items))
+	dagStatuses := make([]models.Status, len(result.Items))
 	for _, item := range result.Items {
 		status, err := a.historyManager.GetLatestStatus(ctx, item)
 		if err != nil {

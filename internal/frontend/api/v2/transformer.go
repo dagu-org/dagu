@@ -3,7 +3,7 @@ package api
 import (
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/history"
+	"github.com/dagu-org/dagu/internal/models"
 )
 
 func toDAG(dag *digraph.DAG) api.DAG {
@@ -63,7 +63,7 @@ func toPrecondition(obj digraph.Condition) api.Precondition {
 	}
 }
 
-func toRunDetails(s history.Status) api.RunDetails {
+func toRunDetails(s models.Status) api.RunDetails {
 	status := api.RunDetails{
 		Log:         s.Log,
 		Name:        s.Name,
@@ -93,7 +93,7 @@ func toRunDetails(s history.Status) api.RunDetails {
 	return status
 }
 
-func toNode(node *history.Node) api.Node {
+func toNode(node *models.Node) api.Node {
 	return api.Node{
 		DoneCount:   node.DoneCount,
 		FinishedAt:  node.FinishedAt,
@@ -108,7 +108,7 @@ func toNode(node *history.Node) api.Node {
 	}
 }
 
-func toSubRuns(subRuns []history.SubRun) []api.SubRun {
+func toSubRuns(subRuns []models.SubRun) []api.SubRun {
 	var result []api.SubRun
 	for _, r := range subRuns {
 		result = append(result, api.SubRun{

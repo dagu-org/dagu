@@ -1,4 +1,4 @@
-package history_test
+package models_test
 
 import (
 	"encoding/json"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/history"
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/google/uuid"
 
 	"github.com/stretchr/testify/require"
@@ -32,14 +32,14 @@ func TestStatusSerialization(t *testing.T) {
 		SMTP:      &digraph.SMTPConfig{},
 	}
 	requestID := uuid.Must(uuid.NewV7()).String()
-	statusToPersist := history.NewStatusBuilder(dag).Create(
-		requestID, scheduler.StatusSuccess, 0, startedAt, history.WithFinishedAt(finishedAt),
+	statusToPersist := models.NewStatusBuilder(dag).Create(
+		requestID, scheduler.StatusSuccess, 0, startedAt, models.WithFinishedAt(finishedAt),
 	)
 
 	rawJSON, err := json.Marshal(statusToPersist)
 	require.NoError(t, err)
 
-	statusObject, err := history.StatusFromJSON(string(rawJSON))
+	statusObject, err := models.StatusFromJSON(string(rawJSON))
 	require.NoError(t, err)
 
 	require.Equal(t, statusToPersist.Name, statusObject.Name)

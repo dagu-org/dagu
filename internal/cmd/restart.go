@@ -12,6 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
 )
 
@@ -48,20 +49,20 @@ func runRestart(ctx *Context, args []string) error {
 
 	dagName := args[0]
 
-	var record history.Record
+	var record models.Record
 	if requestID != "" {
-		// Retrieve the previous run's runstore record for the specified request ID.
-		r, err := ctx.runStore().Find(ctx, dagName, requestID)
+		// Retrieve the previous run's record for the specified request ID.
+		r, err := ctx.historyRepo().Find(ctx, dagName, requestID)
 		if err != nil {
 			logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
 			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
 		}
 		record = r
 	} else {
-		r, err := ctx.runStore().Latest(ctx, dagName)
+		r, err := ctx.historyRepo().Latest(ctx, dagName)
 		if err != nil {
-			logger.Error(ctx, "Failed to retrieve latest runstore record", "dagName", dagName, "err", err)
-			return fmt.Errorf("failed to retrieve latest runstore record for DAG %s: %w", dagName, err)
+			logger.Error(ctx, "Failed to retrieve latest run record", "dagName", dagName, "err", err)
+			return fmt.Errorf("failed to retrieve latest run record for DAG %s: %w", dagName, err)
 		}
 		record = r
 	}
@@ -77,8 +78,8 @@ func runRestart(ctx *Context, args []string) error {
 
 	dag, err := record.ReadDAG(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to read DAG from runstore record", "err", err)
-		return fmt.Errorf("failed to read DAG from runstore record: %w", err)
+		logger.Error(ctx, "Failed to read DAG from run record", "err", err)
+		return fmt.Errorf("failed to read DAG from run record: %w", err)
 	}
 
 	if err := handleRestartProcess(ctx, dag, requestID); err != nil {
@@ -143,7 +144,7 @@ func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
 		logFile.Name(),
 		cli,
 		dr,
-		ctx.runStore(),
+		ctx.historyRepo(),
 		rootDAG,
 		agent.Options{Dry: false})
 

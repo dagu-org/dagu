@@ -15,11 +15,11 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/repository"
-	"github.com/dagu-org/dagu/internal/repository/grep"
+	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/models/grep"
 )
 
-var _ repository.DAGRepository = (*dagFileStorage)(nil)
+var _ models.DAGRepository = (*dagFileStorage)(nil)
 
 // Option is a functional option for configuring the DAG repository
 type Option func(*Options)
@@ -61,7 +61,7 @@ type dagFileStorage struct {
 }
 
 // New creates a new DAG store implementation using the local filesystem
-func New(baseDir string, opts ...Option) repository.DAGRepository {
+func New(baseDir string, opts ...Option) models.DAGRepository {
 	options := &Options{}
 	for _, opt := range opts {
 		opt(options)
@@ -119,7 +119,7 @@ func (d *dagFileStorage) GetDetails(ctx context.Context, name string) (*digraph.
 func (d *dagFileStorage) GetSpec(_ context.Context, name string) (string, error) {
 	filePath, err := d.locateDAG(name)
 	if err != nil {
-		return "", repository.ErrDAGNotFound
+		return "", models.ErrDAGNotFound
 	}
 	dat, err := os.ReadFile(filePath) // nolint:gosec
 	if err != nil {
@@ -167,7 +167,7 @@ func (d *dagFileStorage) Create(_ context.Context, name string, spec []byte) err
 	}
 	filePath := d.generateFilePath(name)
 	if fileExists(filePath) {
-		return repository.ErrDAGAlreadyExists
+		return models.ErrDAGAlreadyExists
 	}
 	if err := os.WriteFile(filePath, spec, defaultPerm); err != nil {
 		return fmt.Errorf("failed to write DAG %s: %w", name, err)
@@ -204,13 +204,13 @@ func (d *dagFileStorage) ensureDirExist() error {
 }
 
 // List lists DAGs with pagination support.
-func (d *dagFileStorage) List(ctx context.Context, opts repository.ListOptions) (repository.PaginatedResult[*digraph.DAG], []string, error) {
+func (d *dagFileStorage) List(ctx context.Context, opts models.ListOptions) (models.PaginatedResult[*digraph.DAG], []string, error) {
 	var dags []*digraph.DAG
 	var errList []string
 	var totalCount int
 
 	if opts.Paginator == nil {
-		p := repository.DefaultPaginator()
+		p := models.DefaultPaginator()
 		opts.Paginator = &p
 	}
 
@@ -257,7 +257,7 @@ func (d *dagFileStorage) List(ctx context.Context, opts repository.ListOptions) 
 		return nil
 	})
 
-	result := repository.NewPaginatedResult(
+	result := models.NewPaginatedResult(
 		dags, totalCount, *opts.Paginator,
 	)
 	if err != nil {
@@ -269,7 +269,7 @@ func (d *dagFileStorage) List(ctx context.Context, opts repository.ListOptions) 
 
 // Grep searches for a pattern in all DAGs.
 func (d *dagFileStorage) Grep(ctx context.Context, pattern string) (
-	ret []*repository.GrepResult, errs []string, err error,
+	ret []*models.GrepResult, errs []string, err error,
 ) {
 	if pattern == "" {
 		// return empty result if pattern is empty
@@ -308,7 +308,7 @@ func (d *dagFileStorage) Grep(ctx context.Context, pattern string) (
 				errs = append(errs, fmt.Sprintf("check %s failed: %s", entry.Name(), err))
 				continue
 			}
-			ret = append(ret, &repository.GrepResult{
+			ret = append(ret, &models.GrepResult{
 				Name:    strings.TrimSuffix(entry.Name(), path.Ext(entry.Name())),
 				DAG:     dag,
 				Matches: matches,
@@ -359,7 +359,7 @@ func (d *dagFileStorage) Rename(_ context.Context, oldID, newID string) error {
 	}
 	newFilePath := d.generateFilePath(newID)
 	if fileExists(newFilePath) {
-		return repository.ErrDAGAlreadyExists
+		return models.ErrDAGAlreadyExists
 	}
 	return os.Rename(oldFilePath, newFilePath)
 }

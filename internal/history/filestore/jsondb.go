@@ -9,8 +9,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/models"
 )
 
 // Error definitions for common issues
@@ -20,14 +20,14 @@ var (
 	ErrRootRequestIDEmpty = errors.New("root requestID is empty")
 )
 
-var _ history.HistoryRepository = (*fileStore)(nil)
+var _ models.HistoryRepository = (*fileStore)(nil)
 
 // fileStore manages DAGs status files in local storage with high performance and reliability.
 type fileStore struct {
-	baseDir           string                           // Base directory for all status files
-	latestStatusToday bool                             // Whether to only return today's status
-	cache             *fileutil.Cache[*history.Status] // Optional cache for read operations
-	maxWorkers        int                              // Maximum number of parallel workers
+	baseDir           string                          // Base directory for all status files
+	latestStatusToday bool                            // Whether to only return today's status
+	cache             *fileutil.Cache[*models.Status] // Optional cache for read operations
+	maxWorkers        int                             // Maximum number of parallel workers
 }
 
 // Option defines functional options for configuring local.
@@ -35,14 +35,14 @@ type Option func(*Options)
 
 // Options holds configuration options for local.
 type Options struct {
-	FileCache         *fileutil.Cache[*history.Status] // Optional cache for status files
-	LatestStatusToday bool                             // Whether to only return today's status
-	MaxWorkers        int                              // Maximum number of parallel workers
-	OperationTimeout  time.Duration                    // Timeout for operations
+	FileCache         *fileutil.Cache[*models.Status] // Optional cache for status files
+	LatestStatusToday bool                            // Whether to only return today's status
+	MaxWorkers        int                             // Maximum number of parallel workers
+	OperationTimeout  time.Duration                   // Timeout for operations
 }
 
 // WithFileCache sets the file cache for local.
-func WithFileCache(cache *fileutil.Cache[*history.Status]) Option {
+func WithFileCache(cache *fileutil.Cache[*models.Status]) Option {
 	return func(o *Options) {
 		o.FileCache = cache
 	}
@@ -74,10 +74,10 @@ func New(baseDir string, opts ...Option) *fileStore {
 	}
 }
 
-// Create creates a new runstore record for the specified DAG run.
+// Create creates a new run record for the specified DAG run.
 // If opts.Root is not nil, it creates a sub-record for the specified root DAG.
 // If opts.Retry is true, it creates a retry record for the specified request ID.
-func (db *fileStore) Create(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts history.NewRecordOptions) (history.Record, error) {
+func (db *fileStore) Create(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts models.NewRecordOptions) (models.Record, error) {
 	if reqID == "" {
 		return nil, ErrRequestIDEmpty
 	}
@@ -112,8 +112,8 @@ func (db *fileStore) Create(ctx context.Context, dag *digraph.DAG, timestamp tim
 	return record, nil
 }
 
-// NewSubRecord creates a new runstore record for the specified sub-run.
-func (db *fileStore) newSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts history.NewRecordOptions) (history.Record, error) {
+// NewSubRecord creates a new run record for the specified sub-run.
+func (db *fileStore) newSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts models.NewRecordOptions) (models.Record, error) {
 	dataRoot := NewDataRoot(db.baseDir, opts.Root.RootName)
 	rootRun, err := dataRoot.FindByRequestID(ctx, opts.Root.RootID)
 	if err != nil {
@@ -146,8 +146,8 @@ func (db *fileStore) newSubRecord(ctx context.Context, dag *digraph.DAG, timesta
 	return record, nil
 }
 
-// Recent returns the most recent runstore records for the specified key, up to itemLimit.
-func (db *fileStore) Recent(ctx context.Context, dagName string, itemLimit int) []history.Record {
+// Recent returns the most recent run records for the specified key, up to itemLimit.
+func (db *fileStore) Recent(ctx context.Context, dagName string, itemLimit int) []models.Record {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -167,7 +167,7 @@ func (db *fileStore) Recent(ctx context.Context, dagName string, itemLimit int) 
 	items := root.Latest(ctx, itemLimit)
 
 	// Get the latest record for each item
-	records := make([]history.Record, 0, len(items))
+	records := make([]models.Record, 0, len(items))
 	for _, item := range items {
 		record, err := item.LatestRecord(ctx, db.cache)
 		if err != nil {
@@ -180,8 +180,8 @@ func (db *fileStore) Recent(ctx context.Context, dagName string, itemLimit int) 
 	return records
 }
 
-// Latest returns the most recent runstore record for today.
-func (db *fileStore) Latest(ctx context.Context, dagName string) (history.Record, error) {
+// Latest returns the most recent run record for today.
+func (db *fileStore) Latest(ctx context.Context, dagName string) (models.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -208,13 +208,13 @@ func (db *fileStore) Latest(ctx context.Context, dagName string) (history.Record
 	// Get the latest file
 	latestRun := root.Latest(ctx, 1)
 	if len(latestRun) == 0 {
-		return nil, history.ErrNoStatusData
+		return nil, models.ErrNoStatusData
 	}
 	return latestRun[0].LatestRecord(ctx, db.cache)
 }
 
-// Find finds a runstore record by request ID.
-func (db *fileStore) Find(ctx context.Context, dagName, reqID string) (history.Record, error) {
+// Find finds a run record by request ID.
+func (db *fileStore) Find(ctx context.Context, dagName, reqID string) (models.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -237,8 +237,8 @@ func (db *fileStore) Find(ctx context.Context, dagName, reqID string) (history.R
 	return run.LatestRecord(ctx, db.cache)
 }
 
-// FindSubRun finds a runstore record by request ID for a sub-DAG.
-func (db *fileStore) FindSubRun(ctx context.Context, name, reqID string, subRunID string) (history.Record, error) {
+// FindSubRun finds a run record by request ID for a sub-DAG.
+func (db *fileStore) FindSubRun(ctx context.Context, name, reqID string, subRunID string) (models.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -264,7 +264,7 @@ func (db *fileStore) FindSubRun(ctx context.Context, name, reqID string, subRunI
 	return subRun.LatestRecord(ctx, db.cache)
 }
 
-// RemoveOld removes runstore records older than retentionDays for the specified key.
+// RemoveOld removes run records older than retentionDays for the specified key.
 func (db *fileStore) RemoveOld(ctx context.Context, dagName string, retentionDays int) error {
 	// Check for context cancellation
 	select {
@@ -283,7 +283,7 @@ func (db *fileStore) RemoveOld(ctx context.Context, dagName string, retentionDay
 	return root.RemoveOld(ctx, retentionDays)
 }
 
-// Rename renames all runstore records from oldKey to newKey.
+// Rename renames all run records from oldKey to newKey.
 func (db *fileStore) Rename(ctx context.Context, oldNameOrPath, newNameOrPath string) error {
 	// Check for context cancellation
 	select {

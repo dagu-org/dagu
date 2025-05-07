@@ -1,4 +1,4 @@
-package history
+package models
 
 import (
 	"errors"
