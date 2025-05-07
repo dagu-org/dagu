@@ -552,7 +552,7 @@ func (a *Agent) setupRunRecord(ctx context.Context) (runstore.Record, error) {
 		opts.Root = &a.rootDAG
 	}
 
-	return a.runStore.NewRecord(ctx, a.dag, time.Now(), a.requestID, opts)
+	return a.runStore.Create(ctx, a.dag, time.Now(), a.requestID, opts)
 }
 
 // setupSocketServer create socket server instance.
@@ -667,7 +667,7 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error
 }
 
 func (o *dbClient) GetSubStatus(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (*digraph.Status, error) {
-	runRecord, err := o.runStore.FindBySubRunRequestID(ctx, reqID, rootDAG)
+	runRecord, err := o.runStore.FindSubRun(ctx, reqID, rootDAG)
 	if err != nil {
 		return nil, err
 	}

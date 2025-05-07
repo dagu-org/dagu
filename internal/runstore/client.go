@@ -177,7 +177,7 @@ FALLBACK:
 
 // FindByRequestID retrieves the status of a DAG run by name and requestID from the run store.
 func (e *Client) FindByRequestID(ctx context.Context, name string, requestID string) (*Status, error) {
-	record, err := e.runStore.FindByRequestID(ctx, name, requestID)
+	record, err := e.runStore.Find(ctx, name, requestID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by request id: %w", err)
 	}
@@ -194,7 +194,7 @@ func (e *Client) FindByRequestID(ctx context.Context, name string, requestID str
 func (e *Client) findPersistedStatus(ctx context.Context, dag *digraph.DAG, requestID string) (
 	*Status, error,
 ) {
-	record, err := e.runStore.FindByRequestID(ctx, dag.Name, requestID)
+	record, err := e.runStore.Find(ctx, dag.Name, requestID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by request id: %w", err)
 	}
@@ -222,7 +222,7 @@ func (e *Client) findPersistedStatus(ctx context.Context, dag *digraph.DAG, requ
 
 // FindBySubRunRequestID retrieves the status of a sub-run by its request ID.
 func (e *Client) FindBySubRunRequestID(ctx context.Context, root digraph.RootDAG, requestID string) (*Status, error) {
-	record, err := e.runStore.FindBySubRunRequestID(ctx, requestID, root)
+	record, err := e.runStore.FindSubRun(ctx, requestID, root)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sub-run status by request id: %w", err)
 	}
@@ -322,14 +322,14 @@ func (e *Client) UpdateStatus(ctx context.Context, root digraph.RootDAG, status 
 
 	if root.RootID == status.RequestID {
 		// If the request ID matches the root DAG's request ID, find the runstore record by request ID
-		r, err := e.runStore.FindByRequestID(ctx, root.RootName, status.RequestID)
+		r, err := e.runStore.Find(ctx, root.RootName, status.RequestID)
 		if err != nil {
 			return fmt.Errorf("failed to find runstore record: %w", err)
 		}
 		historyRecord = r
 	} else {
 		// If the request ID does not match, find the runstore record by sub-run request ID
-		r, err := e.runStore.FindBySubRunRequestID(ctx, status.RequestID, root)
+		r, err := e.runStore.FindSubRun(ctx, status.RequestID, root)
 		if err != nil {
 			return fmt.Errorf("failed to find sub-runstore record: %w", err)
 		}

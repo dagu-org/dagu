@@ -63,7 +63,7 @@ func TestClient_GetStatus(t *testing.T) {
 		cli := th.RunClient
 
 		// Open the runstore store and write a status before updating it.
-		record, err := th.RunStore.NewRecord(ctx, dag.DAG, now, requestID, runstore.NewRecordOptions{})
+		record, err := th.RunStore.Create(ctx, dag.DAG, now, requestID, runstore.NewRecordOptions{})
 		require.NoError(t, err)
 
 		err = record.Open(ctx)

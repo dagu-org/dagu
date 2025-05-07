@@ -41,7 +41,7 @@ func runStatus(ctx *Context, args []string) error {
 	var record runstore.Record
 	if requestID != "" {
 		// Retrieve the previous run's runstore record for the specified request ID.
-		r, err := ctx.runStore().FindByRequestID(ctx, dagName, requestID)
+		r, err := ctx.runStore().Find(ctx, dagName, requestID)
 		if err != nil {
 			logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
 			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)

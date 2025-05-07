@@ -74,10 +74,10 @@ func New(baseDir string, opts ...Option) *fileStore {
 	}
 }
 
-// NewRecord creates a new runstore record for the specified DAG run.
+// Create creates a new runstore record for the specified DAG run.
 // If opts.Root is not nil, it creates a sub-record for the specified root DAG.
 // If opts.Retry is true, it creates a retry record for the specified request ID.
-func (db *fileStore) NewRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts runstore.NewRecordOptions) (runstore.Record, error) {
+func (db *fileStore) Create(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts runstore.NewRecordOptions) (runstore.Record, error) {
 	if reqID == "" {
 		return nil, ErrRequestIDEmpty
 	}
@@ -213,8 +213,8 @@ func (db *fileStore) Latest(ctx context.Context, dagName string) (runstore.Recor
 	return latestRun[0].LatestRecord(ctx, db.cache)
 }
 
-// FindByRequestID finds a runstore record by request ID.
-func (db *fileStore) FindByRequestID(ctx context.Context, dagName, reqID string) (runstore.Record, error) {
+// Find finds a runstore record by request ID.
+func (db *fileStore) Find(ctx context.Context, dagName, reqID string) (runstore.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -237,8 +237,8 @@ func (db *fileStore) FindByRequestID(ctx context.Context, dagName, reqID string)
 	return run.LatestRecord(ctx, db.cache)
 }
 
-// FindBySubRunRequestID finds a runstore record by request ID for a sub-DAG.
-func (db *fileStore) FindBySubRunRequestID(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (runstore.Record, error) {
+// FindSubRun finds a runstore record by request ID for a sub-DAG.
+func (db *fileStore) FindSubRun(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (runstore.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():

@@ -86,7 +86,7 @@ func TestJSONDB(t *testing.T) {
 		th.CreateRecord(t, ts3, "request-id-3", scheduler.StatusSuccess)
 
 		// Find the record with request ID "request-id-2"
-		record, err := th.DB.FindByRequestID(th.Context, "test_DAG", "request-id-2")
+		record, err := th.DB.Find(th.Context, "test_DAG", "request-id-2")
 		require.NoError(t, err)
 
 		// Verify the record is the correct one
@@ -95,7 +95,7 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, "request-id-2", status.RequestID)
 
 		// Verify an error is returned if the request ID does not exist
-		_, err = th.DB.FindByRequestID(th.Context, "test_DAG", "nonexistent-id")
+		_, err = th.DB.Find(th.Context, "test_DAG", "nonexistent-id")
 		assert.ErrorIs(t, err, runstore.ErrRequestIDNotFound)
 	})
 	t.Run("RemoveOld", func(t *testing.T) {
@@ -136,7 +136,7 @@ func TestJSONDB(t *testing.T) {
 		// Create a sub record
 		rootDAG := digraph.NewRootDAG("test_DAG", "parent-id")
 		subDAG := th.DAG("sub_dag")
-		record, err := th.DB.NewRecord(th.Context, subDAG.DAG, ts, "sub-id", runstore.NewRecordOptions{
+		record, err := th.DB.Create(th.Context, subDAG.DAG, ts, "sub-id", runstore.NewRecordOptions{
 			Root: &rootDAG,
 		})
 		require.NoError(t, err)
@@ -154,7 +154,7 @@ func TestJSONDB(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify record is created
-		existingRecord, err := th.DB.FindBySubRunRequestID(th.Context, "sub-id", rootDAG)
+		existingRecord, err := th.DB.FindSubRun(th.Context, "sub-id", rootDAG)
 		require.NoError(t, err)
 
 		status, err := existingRecord.ReadStatus(th.Context)
@@ -173,7 +173,7 @@ func TestJSONDB(t *testing.T) {
 		// Create a sub record
 		rootDAG := digraph.NewRootDAG("test_DAG", "parent-id")
 		subDAG := th.DAG("sub_dag")
-		record, err := th.DB.NewRecord(th.Context, subDAG.DAG, ts, "sub-id", runstore.NewRecordOptions{
+		record, err := th.DB.Create(th.Context, subDAG.DAG, ts, "sub-id", runstore.NewRecordOptions{
 			Root: &rootDAG,
 		})
 		require.NoError(t, err)
@@ -193,7 +193,7 @@ func TestJSONDB(t *testing.T) {
 
 		// Find the sub run by request ID
 		ts = time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
-		existingRecord, err := th.DB.FindBySubRunRequestID(th.Context, "sub-id", rootDAG)
+		existingRecord, err := th.DB.FindSubRun(th.Context, "sub-id", rootDAG)
 		require.NoError(t, err)
 		existingRecordStatus, err := existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)
@@ -201,7 +201,7 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, scheduler.StatusRunning.String(), existingRecordStatus.Status.String())
 
 		// Create a retry record and write different status
-		retryRecord, err := th.DB.NewRecord(th.Context, subDAG.DAG, ts, "sub-id", runstore.NewRecordOptions{
+		retryRecord, err := th.DB.Create(th.Context, subDAG.DAG, ts, "sub-id", runstore.NewRecordOptions{
 			Root:  &rootDAG,
 			Retry: true,
 		})
@@ -212,7 +212,7 @@ func TestJSONDB(t *testing.T) {
 		_ = retryRecord.Close(th.Context)
 
 		// Verify the retry record is created
-		existingRecord, err = th.DB.FindBySubRunRequestID(th.Context, "sub-id", rootDAG)
+		existingRecord, err = th.DB.FindSubRun(th.Context, "sub-id", rootDAG)
 		require.NoError(t, err)
 		existingRecordStatus, err = existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)

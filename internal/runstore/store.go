@@ -16,16 +16,16 @@ var (
 
 // Store provides an interface for managing the execution data of DAGs.
 type Store interface {
-	// NewRecord creates a new history record for a DAG run
-	NewRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts NewRecordOptions) (Record, error)
+	// Create creates a new history record for a DAG run
+	Create(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts NewRecordOptions) (Record, error)
 	// Recent returns the most recent history records for a DAG, limited by itemLimit
 	Recent(ctx context.Context, name string, itemLimit int) []Record
 	// Latest returns the most recent history record for a DAG
 	Latest(ctx context.Context, name string) (Record, error)
-	// FindByRequestID finds a history record by its request ID
-	FindByRequestID(ctx context.Context, name string, reqID string) (Record, error)
-	// FindBySubRunRequestID finds a sub-run record by its request ID
-	FindBySubRunRequestID(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (Record, error)
+	// Find finds a history record by its request ID
+	Find(ctx context.Context, name string, reqID string) (Record, error)
+	// FindSubRun finds a sub-run record by its request ID
+	FindSubRun(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (Record, error)
 	// RemoveOld removes history records older than retentionDays
 	RemoveOld(ctx context.Context, name string, retentionDays int) error
 	// Rename renames all history records from oldName to newName
