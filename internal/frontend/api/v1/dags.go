@@ -600,7 +600,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 			}
 		}
 
-		if err := a.dagClient.Update(ctx, request.Name, *request.Body.Value); err != nil {
+		if err := a.dagClient.UpdateSpec(ctx, request.Name, []byte(*request.Body.Value)); err != nil {
 			return nil, err
 		}
 

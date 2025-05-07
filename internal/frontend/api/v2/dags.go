@@ -81,7 +81,7 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 		}
 	}
 
-	err = a.dagClient.Update(ctx, request.FileName, request.Body.Spec)
+	err = a.dagClient.UpdateSpec(ctx, request.FileName, []byte(request.Body.Spec))
 	var errs []string
 
 	var loadErrs digraph.ErrorList

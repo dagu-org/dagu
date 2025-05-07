@@ -27,7 +27,7 @@ steps:
     command: "true"
 `
 		// Update Error: the DAG does not exist
-		err := cli.Update(ctx, "non-existing-dag", validDAG)
+		err := cli.UpdateSpec(ctx, "non-existing-dag", []byte(validDAG))
 		require.Error(t, err)
 
 		// create a new DAG file
@@ -35,7 +35,7 @@ steps:
 		require.NoError(t, err)
 
 		// Update the DAG
-		err = cli.Update(ctx, id, validDAG)
+		err = cli.UpdateSpec(ctx, id, []byte(validDAG))
 		require.NoError(t, err)
 
 		// Check the content of the DAG file
@@ -54,7 +54,7 @@ steps:
 `
 		id, err := cli.Create(ctx, "test")
 		require.NoError(t, err)
-		err = cli.Update(ctx, id, spec)
+		err = cli.UpdateSpec(ctx, id, []byte(spec))
 		require.NoError(t, err)
 
 		// check file
@@ -152,7 +152,7 @@ func TestClient_GetTagList(t *testing.T) {
 		} else {
 			spec = "tags: tag2,tag3\nsteps:\n  - name: step1\n    command: echo hello\n"
 		}
-		if err = cli.Update(ctx, id, spec); err != nil {
+		if err = cli.UpdateSpec(ctx, id, []byte(spec)); err != nil {
 			t.Fatal(err)
 		}
 	}

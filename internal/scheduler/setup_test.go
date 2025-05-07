@@ -8,7 +8,7 @@ import (
 	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/dagstore"
-	"github.com/dagu-org/dagu/internal/dagstore/filestore"
+	"github.com/dagu-org/dagu/internal/dagstore/local"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/runstore"
 	runfs "github.com/dagu-org/dagu/internal/runstore/filestore"
@@ -38,7 +38,7 @@ func TestMain(m *testing.M) {
 type testHelper struct {
 	manager   scheduler.JobManager
 	runClient runstore.Client
-	dagClient dagstore.Client
+	dagClient dagstore.Store
 	config    *config.Config
 }
 
@@ -61,15 +61,13 @@ func setupTest(t *testing.T) testHelper {
 			DAGsDir:         testdataDir,
 			SuspendFlagsDir: tempDir,
 		},
-		Global: config.Global{
-			WorkDir: tempDir,
-		},
+		Global: config.Global{WorkDir: tempDir},
 	}
 
-	dagStore := filestore.New(cfg.Paths.DAGsDir, filestore.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
+	dagStore := local.New(cfg.Paths.DAGsDir, local.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
 	runStore := runfs.New(cfg.Paths.DataDir)
 	runCli := runstore.NewClient(runStore, "", cfg.Global.WorkDir, "")
-	dagCli := dagstore.NewClient(runCli, dagStore)
+	dagCli := dagstore.New(runCli, dagStore)
 	jobManager := scheduler.NewDAGJobManager(testdataDir, dagCli, runCli, "", "")
 
 	return testHelper{

@@ -41,7 +41,7 @@ type Agent struct {
 	retryTarget *runstore.Status
 
 	// dagStore is the database to store the DAG definitions.
-	dagStore dagstore.Store
+	dagStore dagstore.Driver
 
 	// client is the runstore client to communicate with the runstore.
 	client runstore.Client
@@ -116,7 +116,7 @@ func New(
 	logDir string,
 	logFile string,
 	cli runstore.Client,
-	dagStore dagstore.Store,
+	dagStore dagstore.Driver,
 	runStore runstore.Store,
 	rootDAG digraph.RootDAG,
 	opts Options,
@@ -650,11 +650,11 @@ func encodeError(w http.ResponseWriter, err error) {
 var _ digraph.DBClient = &dbClient{}
 
 type dbClient struct {
-	dagStore dagstore.Store
+	dagStore dagstore.Driver
 	runStore runstore.Store
 }
 
-func newDBClient(h runstore.Store, d dagstore.Store) *dbClient {
+func newDBClient(h runstore.Store, d dagstore.Driver) *dbClient {
 	return &dbClient{
 		runStore: h,
 		dagStore: d,

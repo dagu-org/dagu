@@ -12,7 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/dagstore"
-	"github.com/dagu-org/dagu/internal/dagstore/filestore"
+	daglocal "github.com/dagu-org/dagu/internal/dagstore/local"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/frontend"
@@ -142,7 +142,7 @@ func (c *Context) Client(opts ...clientOption) (runstore.Client, error) {
 }
 
 // DAGClient initializes a DAGClient using the provided options.
-func (c *Context) DAGClient(runClient runstore.Client, opts ...dagClientOption) (dagstore.Client, error) {
+func (c *Context) DAGClient(runClient runstore.Client, opts ...dagClientOption) (dagstore.Store, error) {
 	options := &dagClientOptions{}
 	for _, opt := range opts {
 		opt(options)
@@ -152,11 +152,11 @@ func (c *Context) DAGClient(runClient runstore.Client, opts ...dagClientOption) 
 		var err error
 		dagStore, err = c.dagStore(nil)
 		if err != nil {
-			return dagstore.Client{}, fmt.Errorf("failed to initialize DAG store: %w", err)
+			return dagstore.Store{}, fmt.Errorf("failed to initialize DAG store: %w", err)
 		}
 	}
 
-	return dagstore.NewClient(
+	return dagstore.New(
 		runClient,
 		dagStore,
 	), nil
@@ -205,7 +205,7 @@ func (c *Context) scheduler() (*scheduler.Scheduler, error) {
 
 // dagStore returns a new DAGStore instance. It ensures that the directory exists
 // (creating it if necessary) before returning the store.
-func (c *Context) dagStore(searchPaths []string) (dagstore.Store, error) {
+func (c *Context) dagStore(searchPaths []string) (dagstore.Driver, error) {
 	baseDir := c.cfg.Paths.DAGsDir
 	_, err := os.Stat(baseDir)
 	if os.IsNotExist(err) {
@@ -215,15 +215,15 @@ func (c *Context) dagStore(searchPaths []string) (dagstore.Store, error) {
 	}
 
 	// Create a flag store based on the suspend flags directory.
-	return filestore.New(
+	return daglocal.New(
 		c.cfg.Paths.DAGsDir,
-		filestore.WithFlagsBaseDir(c.cfg.Paths.SuspendFlagsDir),
-		filestore.WithSearchPaths(searchPaths)), nil
+		daglocal.WithFlagsBaseDir(c.cfg.Paths.SuspendFlagsDir),
+		daglocal.WithSearchPaths(searchPaths)), nil
 }
 
 // dagStoreWithCache returns a DAGStore instance that uses an in-memory file cache.
-func (c *Context) dagStoreWithCache(cache *fileutil.Cache[*digraph.DAG]) dagstore.Store {
-	return filestore.New(c.cfg.Paths.DAGsDir, filestore.WithFlagsBaseDir(c.cfg.Paths.SuspendFlagsDir), filestore.WithFileCache(cache))
+func (c *Context) dagStoreWithCache(cache *fileutil.Cache[*digraph.DAG]) dagstore.Driver {
+	return daglocal.New(c.cfg.Paths.DAGsDir, daglocal.WithFlagsBaseDir(c.cfg.Paths.SuspendFlagsDir), daglocal.WithFileCache(cache))
 }
 
 // runStore returns a new RunStore instance using JSON database storage.
@@ -347,11 +347,11 @@ type dagClientOption func(*dagClientOptions)
 
 // dagClientOption defines functional options for configuring the DAG client.
 type dagClientOptions struct {
-	dagStore dagstore.Store
+	dagStore dagstore.Driver
 }
 
 // withDAGStore returns a clientOption that sets a custom DAGStore.
-func withDAGStore(dagStore dagstore.Store) dagClientOption {
+func withDAGStore(dagStore dagstore.Driver) dagClientOption {
 	return func(o *dagClientOptions) {
 		o.dagStore = dagStore
 	}

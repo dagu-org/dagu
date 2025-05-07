@@ -1,4 +1,4 @@
-package filestore
+package local
 
 import (
 	"context"
@@ -19,7 +19,7 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
-var _ dagstore.Store = (*fileStore)(nil)
+var _ dagstore.Driver = (*fileStore)(nil)
 
 // Option is a functional option for configuring the DAG store
 type Option func(*Options)
@@ -61,7 +61,7 @@ type fileStore struct {
 }
 
 // New creates a new DAG store implementation using the local filesystem
-func New(baseDir string, opts ...Option) dagstore.Store {
+func New(baseDir string, opts ...Option) dagstore.Driver {
 	options := &Options{}
 	for _, opt := range opts {
 		opt(options)
@@ -318,16 +318,16 @@ func (d *fileStore) Grep(ctx context.Context, pattern string) (
 	return ret, errs, nil
 }
 
-func (f fileStore) ToggleSuspend(id string, suspend bool) error {
+func (f fileStore) ToggleSuspend(ctx context.Context, id string, suspend bool) error {
 	if suspend {
 		return f.createFlag(fileName(id))
-	} else if f.IsSuspended(id) {
+	} else if f.IsSuspended(ctx, id) {
 		return f.deleteFlag(fileName(id))
 	}
 	return nil
 }
 
-func (f fileStore) IsSuspended(id string) bool {
+func (f fileStore) IsSuspended(_ context.Context, id string) bool {
 	return f.flagExists(fileName(id))
 }
 

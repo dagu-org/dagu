@@ -2,71 +2,198 @@ package dagstore
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/runstore"
 )
 
-// Errors for DAG file operations
-var (
-	ErrDAGAlreadyExists = errors.New("DAG already exists")
-	ErrDAGNotFound      = errors.New("DAG is not found")
-)
-
-// Store manages the DAG files and their metadata (e.g., tags, suspend status).
-type Store interface {
-	// Create stores a new DAG definition with the given name and returns its ID
-	Create(ctx context.Context, name string, spec []byte) (string, error)
-	// Delete removes a DAG definition by name
-	Delete(ctx context.Context, name string) error
-	// List returns a paginated list of DAG definitions with filtering options
-	List(ctx context.Context, params ListOptions) (PaginatedResult[*digraph.DAG], []string, error)
-	// GetMetadata retrieves only the metadata of a DAG definition (faster than full load)
-	GetMetadata(ctx context.Context, name string) (*digraph.DAG, error)
-	// GetDetails retrieves the complete DAG definition including all fields
-	GetDetails(ctx context.Context, name string) (*digraph.DAG, error)
-	// Grep searches for a pattern in all DAG definitions and returns matching results
-	Grep(ctx context.Context, pattern string) (ret []*GrepResult, errs []string, err error)
-	// Rename changes a DAG's identifier from oldID to newID
-	Rename(ctx context.Context, oldID, newID string) error
-	// GetSpec retrieves the raw YAML specification of a DAG
-	GetSpec(ctx context.Context, name string) (string, error)
-	// UpdateSpec modifies the specification of an existing DAG
-	UpdateSpec(ctx context.Context, name string, spec []byte) error
-	// LoadSpec loads a DAG from a YAML file and returns the DAG object
-	LoadSpec(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error)
-	// TagList returns all unique tags across all DAGs with any errors encountered
-	TagList(ctx context.Context) ([]string, []string, error)
-	// ToggleSuspend changes the suspension state of a DAG by ID
-	ToggleSuspend(id string, suspend bool) error
-	// IsSuspended checks if a DAG is currently suspended
-	IsSuspended(id string) bool
+// New creates a new Store instance.
+func New(runCli runstore.Client, driver Driver) Store {
+	return Store{Driver: driver, runClient: runCli}
 }
 
-// ListOptions contains parameters for paginated DAG listing
-type ListOptions struct {
-	Paginator *Paginator
-	Name      string // Optional name filter
-	Tag       string // Optional tag filter
+// Store provides operations for managing DAGs in the DAG store.
+// It wraps the underlying DAG store and run client to provide a unified interface
+// for DAG operations.
+type Store struct {
+	Driver
+
+	runClient runstore.Client // Client for interacting with run history
 }
 
-// ListResult contains the result of a paginated DAG listing operation
-type ListResult struct {
-	DAGs   []*digraph.DAG // The list of DAGs for the current page
-	Count  int            // Total count of DAGs matching the filter
-	Errors []string       // Any errors encountered during listing
+// dagTemplate is the default template used when creating a new DAG.
+// It contains a minimal DAG with a single step that echoes "hello".
+var dagTemplate = []byte(`steps:
+  - name: step1
+    command: echo hello
+`)
+
+// Create creates a new DAG with the given name using the default template.
+// It returns the ID of the newly created DAG or an error if creation fails.
+func (store *Store) Create(ctx context.Context, name string) (string, error) {
+	id, err := store.Driver.Create(ctx, name, dagTemplate)
+	if err != nil {
+		return "", fmt.Errorf("failed to create DAG: %w", err)
+	}
+	return id, nil
 }
 
-// GrepResult represents the result of a pattern search within a DAG definition
-type GrepResult struct {
-	Name    string       // Name of the DAG
-	DAG     *digraph.DAG // The DAG object
-	Matches []*Match     // Matching lines and their context
+// Move relocates a DAG from one location to another.
+// It updates both the DAG's location in the store and its run history.
+// Returns an error if any part of the move operation fails.
+func (store *Store) Move(ctx context.Context, oldLoc, newLoc string) error {
+	oldDAG, err := store.GetMetadata(ctx, oldLoc)
+	if err != nil {
+		return fmt.Errorf("failed to get metadata for %s: %w", oldLoc, err)
+	}
+	if err := store.Rename(ctx, oldLoc, newLoc); err != nil {
+		return err
+	}
+	newDAG, err := store.GetMetadata(ctx, newLoc)
+	if err != nil {
+		return fmt.Errorf("failed to get metadata for %s: %w", newLoc, err)
+	}
+	if err := store.runClient.Rename(ctx, oldDAG.Name, newDAG.Name); err != nil {
+		return fmt.Errorf("failed to rename history for %s: %w", oldLoc, err)
+	}
+	return nil
 }
 
-// Match contains matched line number and line content.
-type Match struct {
-	Line       string
-	LineNumber int
-	StartLine  int
+// ListDAGOptions defines the options for listing DAGs from the DAG store.
+type ListDAGOptions struct {
+	// Number of items to return per page
+	Limit *int
+	// Page number (for pagination)
+	Page *int
+	// Filter DAGs by matching name
+	Name *string
+	// Filter DAGs by matching tag
+	Tag *string
+}
+
+// List retrieves a paginated list of DAGs with their statuses.
+// It accepts optional functional options for configuring the listing operation.
+// Returns a paginated result containing DAG statuses, a list of errors encountered
+// during the listing, and an error if the listing operation fails.
+func (store *Store) List(ctx context.Context, opts ...ListDAGOption) (*PaginatedResult[Status], []string, error) {
+	var options ListDAGOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+	if options.Limit == nil {
+		options.Limit = new(int)
+		*options.Limit = 100
+	}
+	if options.Page == nil {
+		options.Page = new(int)
+		*options.Page = 1
+	}
+
+	pg := NewPaginator(*options.Page, *options.Limit)
+
+	dags, errList, err := store.Driver.List(ctx, ListOptions{
+		Paginator: &pg,
+		Name:      ptrOf(options.Name),
+		Tag:       ptrOf(options.Tag),
+	})
+	if err != nil {
+		return nil, errList, err
+	}
+
+	var items []Status
+	for _, d := range dags.Items {
+		status, err := store.runClient.GetLatestStatus(ctx, d)
+		if err != nil {
+			errList = append(errList, err.Error())
+		}
+		items = append(items, Status{
+			DAG:       d,
+			Status:    status,
+			Suspended: store.IsSuspended(ctx, d.Location),
+			Error:     err,
+		})
+	}
+
+	r := NewPaginatedResult(items, dags.TotalCount, pg)
+	return &r, errList, nil
+}
+
+// ListDAGOption is a functional option type for configuring ListDAGOptions.
+type ListDAGOption func(*ListDAGOptions)
+
+// WithLimit sets the limit for the number of items to return per page.
+func WithLimit(limit int) ListDAGOption {
+	return func(opt *ListDAGOptions) {
+		opt.Limit = &limit
+	}
+}
+
+// WithPage sets the page number for pagination.
+func WithPage(page int) ListDAGOption {
+	return func(opt *ListDAGOptions) {
+		opt.Page = &page
+	}
+}
+
+// WithName sets the file name filter for the DAGs to be listed.
+func WithName(name string) ListDAGOption {
+	return func(opt *ListDAGOptions) {
+		opt.Name = &name
+	}
+}
+
+// WithTag sets the tag filter for the DAGs to be listed.
+func WithTag(tag string) ListDAGOption {
+	return func(opt *ListDAGOptions) {
+		opt.Tag = &tag
+	}
+}
+
+// getDAG retrieves a DAG by its location.
+// It returns the DAG and any error encountered during retrieval.
+// If the DAG is nil but a location is provided, it returns an empty DAG with the location set.
+func (store *Store) getDAG(ctx context.Context, loc string) (*digraph.DAG, error) {
+	dagDetail, err := store.GetDetails(ctx, loc)
+	return store.emptyDAGIfNil(dagDetail, loc), err
+}
+
+// Status retrieves the status of a DAG by its location.
+// It returns a Status object containing the DAG, its latest run status,
+// whether it's suspended, and any error encountered during retrieval.
+func (store *Store) Status(ctx context.Context, loc string) (Status, error) {
+	dag, err := store.getDAG(ctx, loc)
+	if dag == nil {
+		// TODO: fix not to use location
+		dag = &digraph.DAG{Name: loc, Location: loc}
+	}
+	if err == nil {
+		// check the dag is correct in terms of graph
+		_, err = scheduler.NewExecutionGraph(dag.Steps...)
+	}
+	latestStatus, _ := store.runClient.GetLatestStatus(ctx, dag)
+	return NewStatus(
+		dag, latestStatus, store.IsSuspended(ctx, loc), err,
+	), err
+}
+
+// emptyDAGIfNil returns the provided DAG if it's not nil,
+// otherwise it returns an empty DAG with the provided location.
+// This is a helper method to avoid nil pointer dereferences.
+func (*Store) emptyDAGIfNil(dag *digraph.DAG, dagLocation string) *digraph.DAG {
+	if dag != nil {
+		return dag
+	}
+	return &digraph.DAG{Location: dagLocation}
+}
+
+// ptrOf returns the value pointed to by p, or the zero value of type T if p is nil.
+// This is a generic helper function for safely dereferencing pointers.
+func ptrOf[T any](p *T) T {
+	var zero T
+	if p == nil {
+		return zero
+	}
+	return *p
 }

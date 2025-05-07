@@ -22,7 +22,7 @@ import (
 var _ api.StrictServerInterface = (*API)(nil)
 
 type API struct {
-	dagClient          dagstore.Client
+	dagClient          dagstore.Store
 	runClient          runstore.Client
 	remoteNodes        map[string]config.RemoteNode
 	apiBasePath        string
@@ -31,7 +31,7 @@ type API struct {
 }
 
 func New(
-	dagCli dagstore.Client,
+	dagCli dagstore.Store,
 	runCli runstore.Client,
 	cfg *config.Config,
 ) *API {

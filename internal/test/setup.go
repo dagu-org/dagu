@@ -18,7 +18,7 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/dagstore"
-	"github.com/dagu-org/dagu/internal/dagstore/filestore"
+	"github.com/dagu-org/dagu/internal/dagstore/local"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
@@ -94,11 +94,11 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		cfg.Server = *options.ServerConfig
 	}
 
-	dagStore := filestore.New(cfg.Paths.DAGsDir, filestore.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
+	dagStore := local.New(cfg.Paths.DAGsDir, local.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
 	runStore := runfs.New(cfg.Paths.DataDir)
 
 	runClient := runstore.NewClient(runStore, cfg.Paths.Executable, cfg.Global.WorkDir, "")
-	dagClient := dagstore.NewClient(runClient, dagStore)
+	dagClient := dagstore.New(runClient, dagStore)
 
 	helper := Helper{
 		Context:   createDefaultContext(),
@@ -139,9 +139,9 @@ type Helper struct {
 	Config        *config.Config
 	LoggingOutput *SyncBuffer
 	RunClient     runstore.Client
-	DAGClient     dagstore.Client
+	DAGClient     dagstore.Store
 	RunStore      runstore.Store
-	DAGStore      dagstore.Store
+	DAGStore      dagstore.Driver
 
 	tmpDir string
 }

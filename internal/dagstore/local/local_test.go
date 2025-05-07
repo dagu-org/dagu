@@ -1,6 +1,7 @@
-package filestore
+package local
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -16,11 +17,12 @@ func TestDAGStore(t *testing.T) {
 	}()
 
 	dagStore := New(tmpDir)
+	ctx := context.Background()
 
-	require.False(t, dagStore.IsSuspended("test"))
+	require.False(t, dagStore.IsSuspended(ctx, "test"))
 
-	err := dagStore.ToggleSuspend("test", true)
+	err := dagStore.ToggleSuspend(ctx, "test", true)
 	require.NoError(t, err)
 
-	require.True(t, dagStore.IsSuspended("test"))
+	require.True(t, dagStore.IsSuspended(ctx, "test"))
 }

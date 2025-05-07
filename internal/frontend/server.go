@@ -38,7 +38,7 @@ type Server struct {
 }
 
 // NewServer creates a new Server instance with the given configuration and client
-func NewServer(cfg *config.Config, dagCli dagstore.Client, runCli runstore.Client) *Server {
+func NewServer(cfg *config.Config, dagCli dagstore.Store, runCli runstore.Client) *Server {
 	var remoteNodes []string
 	for _, n := range cfg.Server.RemoteNodes {
 		remoteNodes = append(remoteNodes, n.Name)
