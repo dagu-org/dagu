@@ -222,7 +222,7 @@ func (e *Client) findPersistedStatus(ctx context.Context, dag *digraph.DAG, requ
 
 // FindBySubRunRequestID retrieves the status of a sub-run by its request ID.
 func (e *Client) FindBySubRunRequestID(ctx context.Context, root digraph.RootDAG, requestID string) (*Status, error) {
-	record, err := e.runStore.FindSubRun(ctx, requestID, root)
+	record, err := e.runStore.FindSubRun(ctx, root.RootName, root.RootID, requestID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sub-run status by request id: %w", err)
 	}
@@ -329,7 +329,7 @@ func (e *Client) UpdateStatus(ctx context.Context, root digraph.RootDAG, status 
 		historyRecord = r
 	} else {
 		// If the request ID does not match, find the runstore record by sub-run request ID
-		r, err := e.runStore.FindSubRun(ctx, status.RequestID, root)
+		r, err := e.runStore.FindSubRun(ctx, root.RootName, root.RootID, status.RequestID)
 		if err != nil {
 			return fmt.Errorf("failed to find sub-runstore record: %w", err)
 		}

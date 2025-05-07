@@ -238,7 +238,7 @@ func (db *fileStore) Find(ctx context.Context, dagName, reqID string) (runstore.
 }
 
 // FindSubRun finds a runstore record by request ID for a sub-DAG.
-func (db *fileStore) FindSubRun(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (runstore.Record, error) {
+func (db *fileStore) FindSubRun(ctx context.Context, name, reqID string, subRunID string) (runstore.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -251,13 +251,13 @@ func (db *fileStore) FindSubRun(ctx context.Context, reqID string, rootDAG digra
 		return nil, ErrRequestIDEmpty
 	}
 
-	root := NewDataRoot(db.baseDir, rootDAG.RootName)
-	run, err := root.FindByRequestID(ctx, rootDAG.RootID)
+	root := NewDataRoot(db.baseDir, name)
+	run, err := root.FindByRequestID(ctx, reqID)
 	if err != nil {
 		return nil, err
 	}
 
-	subRun, err := run.FindSubRun(ctx, reqID)
+	subRun, err := run.FindSubRun(ctx, subRunID)
 	if err != nil {
 		return nil, err
 	}

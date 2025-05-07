@@ -152,7 +152,7 @@ steps:
 
 	// (2) Find the runstore record for child_1
 	rootDAG := digraph.NewRootDAG("parent", requestID)
-	child1Rec, err := th.RunStore.FindSubRun(ctx, child1Node.SubRuns[0].RequestID, rootDAG)
+	child1Rec, err := th.RunStore.FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, child1Node.SubRuns[0].RequestID)
 	require.NoError(t, err)
 
 	child1Status, err := child1Rec.ReadStatus(ctx)
@@ -164,7 +164,7 @@ steps:
 	updateStatus(child1Rec, child1Status)
 
 	// (4) Find the runstore record for child_2
-	child2Rec, err := th.RunStore.FindSubRun(ctx, child2Node.SubRuns[0].RequestID, rootDAG)
+	child2Rec, err := th.RunStore.FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, child2Node.SubRuns[0].RequestID)
 	require.NoError(t, err)
 
 	child2Status, err := child2Rec.ReadStatus(ctx)
@@ -190,7 +190,7 @@ steps:
 	})
 
 	// Check if the child_2 status is now "success"
-	child2Rec, err = th.RunStore.FindSubRun(ctx, child2Node.SubRuns[0].RequestID, rootDAG)
+	child2Rec, err = th.RunStore.FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, child2Node.SubRuns[0].RequestID)
 	require.NoError(t, err)
 	child2Status, err = child2Rec.ReadStatus(ctx)
 	require.NoError(t, err)
