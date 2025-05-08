@@ -65,7 +65,7 @@ type Node struct {
 }
 
 type SubRun struct {
-	RequestID string `json:"requestId,omitempty"`
+	ReqID string `json:"reqId,omitempty"`
 }
 
 // ToNode converts a persistence Node back to a scheduler Node

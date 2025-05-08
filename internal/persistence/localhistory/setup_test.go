@@ -36,11 +36,11 @@ func setupTestJSONDB(t *testing.T) JSONDBTest {
 	return th
 }
 
-func (th JSONDBTest) CreateRecord(t *testing.T, ts time.Time, requestID string, s scheduler.Status) *Record {
+func (th JSONDBTest) CreateRecord(t *testing.T, ts time.Time, reqID string, s scheduler.Status) *Record {
 	t.Helper()
 
 	dag := th.DAG("test_DAG")
-	record, err := th.Repo.Create(th.Context, dag.DAG, ts, requestID, models.NewRecordOptions{})
+	record, err := th.Repo.Create(th.Context, dag.DAG, ts, reqID, models.NewRecordOptions{})
 	require.NoError(t, err)
 
 	err = record.Open(th.Context)
@@ -51,7 +51,7 @@ func (th JSONDBTest) CreateRecord(t *testing.T, ts time.Time, requestID string, 
 	}()
 
 	status := models.InitialStatus(dag.DAG)
-	status.RequestID = requestID
+	status.ReqID = reqID
 	status.Status = s
 
 	err = record.Write(th.Context, status)
@@ -75,11 +75,11 @@ type DAGTest struct {
 	*digraph.DAG
 }
 
-func (d DAGTest) Writer(t *testing.T, requestID string, startedAt time.Time) WriterTest {
+func (d DAGTest) Writer(t *testing.T, reqID string, startedAt time.Time) WriterTest {
 	t.Helper()
 
 	root := NewDataRoot(d.th.tmpDir, d.Name)
-	run, err := root.CreateRun(NewUTC(startedAt), requestID)
+	run, err := root.CreateRun(NewUTC(startedAt), reqID)
 	require.NoError(t, err)
 
 	obj := d.th.Repo.(*historyStorage)
@@ -96,9 +96,9 @@ func (d DAGTest) Writer(t *testing.T, requestID string, startedAt time.Time) Wri
 	return WriterTest{
 		th: d.th,
 
-		RequestID: requestID,
-		FilePath:  record.file,
-		Writer:    writer,
+		ReqID:    reqID,
+		FilePath: record.file,
+		Writer:   writer,
 	}
 }
 
@@ -109,14 +109,14 @@ func (w WriterTest) Write(t *testing.T, status models.Status) {
 	require.NoError(t, err)
 }
 
-func (w WriterTest) AssertContent(t *testing.T, name, requestID string, status scheduler.Status) {
+func (w WriterTest) AssertContent(t *testing.T, name, reqID string, status scheduler.Status) {
 	t.Helper()
 
 	data, err := ParseStatusFile(w.FilePath)
 	require.NoError(t, err)
 
 	assert.Equal(t, name, data.Name)
-	assert.Equal(t, requestID, data.RequestID)
+	assert.Equal(t, reqID, data.ReqID)
 	assert.Equal(t, status, data.Status)
 }
 
@@ -129,8 +129,8 @@ func (w WriterTest) Close(t *testing.T) {
 type WriterTest struct {
 	th JSONDBTest
 
-	RequestID string
-	FilePath  string
-	Writer    *Writer
-	Closed    bool
+	ReqID    string
+	FilePath string
+	Writer   *Writer
+	Closed   bool
 }

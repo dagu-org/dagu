@@ -189,7 +189,7 @@ func (c *Context) dagRepo(cache *fileutil.Cache[*digraph.DAG], searchPaths []str
 // builds a filename using the current timestamp and request ID, and then opens the file.
 func (c *Context) OpenLogFile(
 	dag *digraph.DAG,
-	requestID string,
+	reqID string,
 ) (*os.File, error) {
 	// Read the global configuration for log directory.
 	baseLogDir, err := cmdutil.EvalString(c, c.Config.Paths.LogDir)
@@ -207,7 +207,7 @@ func (c *Context) OpenLogFile(
 		BaseDir:   baseLogDir,
 		DAGLogDir: dagLogDir,
 		DAGName:   dag.Name,
-		RequestID: requestID,
+		ReqID:     reqID,
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -243,8 +243,8 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *C
 	return cmd
 }
 
-// generateRequestID creates a new UUID string to be used as a request identifier.
-func generateRequestID() (string, error) {
+// genReqID creates a new UUID string to be used as a request identifier.
+func genReqID() (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return "", err
@@ -252,12 +252,12 @@ func generateRequestID() (string, error) {
 	return id.String(), nil
 }
 
-// validateRequestID checks if the request ID is valid and not empty.
-func validateRequestID(requestID string) error {
-	if requestID == "" {
+// validateReqID checks if the request ID is valid and not empty.
+func validateReqID(reqID string) error {
+	if reqID == "" {
 		return fmt.Errorf("request ID is not set")
 	}
-	if _, err := uuid.Parse(requestID); err != nil {
+	if _, err := uuid.Parse(reqID); err != nil {
 		return fmt.Errorf("invalid request ID: %w", err)
 	}
 	return nil
@@ -293,7 +293,7 @@ type LogConfig struct {
 	BaseDir   string // Base directory for logs.
 	DAGLogDir string // Optional alternative log directory specified by the DAG.
 	DAGName   string // Name of the DAG; used for generating a safe directory name.
-	RequestID string // Unique request ID used in the filename.
+	ReqID     string // Unique request ID used in the filename.
 }
 
 // Validate checks that essential fields are provided.
@@ -323,7 +323,7 @@ func (cfg LogConfig) LogDir() (string, error) {
 	utcTimestamp := time.Now().UTC().Format("20060102_150405Z")
 
 	safeName := fileutil.SafeName(cfg.DAGName)
-	logDir := filepath.Join(baseDir, safeName, utcTimestamp+"_"+cfg.RequestID)
+	logDir := filepath.Join(baseDir, safeName, utcTimestamp+"_"+cfg.ReqID)
 	if err := os.MkdirAll(logDir, 0750); err != nil {
 		return "", fmt.Errorf("failed to initialize directory %s: %w", logDir, err)
 	}
@@ -335,12 +335,12 @@ func (cfg LogConfig) LogDir() (string, error) {
 // and a truncated version of the request ID.
 func (cfg LogConfig) LogFile() string {
 	timestamp := time.Now().Format("20060102.15:04:05.000")
-	truncatedRequestID := stringutil.TruncString(cfg.RequestID, 8)
+	truncReqID := stringutil.TruncString(cfg.ReqID, 8)
 	safeDagName := fileutil.SafeName(cfg.DAGName)
 
 	return fmt.Sprintf("scheduler_%s.%s.%s.log",
 		safeDagName,
 		timestamp,
-		truncatedRequestID,
+		truncReqID,
 	)
 }

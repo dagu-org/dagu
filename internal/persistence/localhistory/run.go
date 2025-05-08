@@ -35,7 +35,7 @@ const JSONLStatusFile = "status.jsonl"
 type Run struct {
 	baseDir   string    // Base directory path for this run
 	timestamp time.Time // Timestamp when the run was created
-	requestID string    // Unique request ID for this run
+	reqID     string    // Unique request ID for this run
 }
 
 // NewRun creates a new Run instance from a directory path.
@@ -49,8 +49,8 @@ func NewRun(dir string) (*Run, error) {
 			return nil, ErrInvalidRunDir
 		}
 		return &Run{
-			baseDir:   dir,
-			requestID: matches[1],
+			baseDir: dir,
+			reqID:   matches[1],
 		}, nil
 	}
 
@@ -65,7 +65,7 @@ func NewRun(dir string) (*Run, error) {
 	return &Run{
 		baseDir:   dir,
 		timestamp: ts,
-		requestID: matches[2],
+		reqID:     matches[2],
 	}, nil
 }
 
@@ -102,7 +102,7 @@ func (e Run) FindSubRun(_ context.Context, reqID string) (*Run, error) {
 		return nil, fmt.Errorf("failed to list sub-run directories: %w", err)
 	}
 	if len(matches) == 0 {
-		return nil, models.ErrRequestIDNotFound
+		return nil, models.ErrReqIDNotFound
 	}
 	// Sort the matches by timestamp
 	sort.Slice(matches, func(i, j int) bool {

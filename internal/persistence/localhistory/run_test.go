@@ -63,7 +63,7 @@ func (et ExecutionTest) WriteStatus(t *testing.T, ts TimeInUTC, s scheduler.Stat
 
 	dag := &digraph.DAG{Name: "test-dag"}
 	status := models.InitialStatus(dag)
-	status.RequestID = "test-id-1"
+	status.ReqID = "test-id-1"
 	status.Status = s
 
 	record, err := et.CreateRecord(et.Context, ts, nil)

@@ -69,7 +69,7 @@ func toRunDetails(s models.Status) api.RunDetails {
 		Name:        s.Name,
 		Params:      ptrOf(s.Params),
 		Pid:         ptrOf(int(s.PID)),
-		RequestId:   s.RequestID,
+		RequestId:   s.ReqID,
 		StartedAt:   s.StartedAt,
 		FinishedAt:  s.FinishedAt,
 		Status:      api.Status(s.Status),
@@ -112,7 +112,7 @@ func toSubRuns(subRuns []models.SubRun) []api.SubRun {
 	var result []api.SubRun
 	for _, r := range subRuns {
 		result = append(result, api.SubRun{
-			RequestId: r.RequestID,
+			RequestId: r.ReqID,
 		})
 	}
 	return result

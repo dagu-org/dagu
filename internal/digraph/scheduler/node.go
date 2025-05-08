@@ -201,14 +201,14 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 
 	// If the command is a sub-DAG, we need to set the request ID.
 	if subDAG, ok := cmd.(executor.SubDAG); ok {
-		reqID, err := n.SubRunRequestID()
+		reqID, err := n.SubRunReqID()
 		if err != nil {
 			return nil, fmt.Errorf("failed to determine request ID for sub-DAG: %w", err)
 		}
 		if reqID == "" {
 			return nil, fmt.Errorf("request ID is empty for sub-DAG")
 		}
-		subDAG.SetRequestID(reqID)
+		subDAG.SetReqID(reqID)
 	}
 
 	return cmd, nil

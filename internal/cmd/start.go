@@ -33,24 +33,24 @@ This command parses the DAG specification, resolves parameters, and initiates th
 	)
 }
 
-var startFlags = []commandLineFlag{paramsFlag, requestIDFlagStart, parentRequestIDFlag, rootDAGNameFlag, rootRequestIDFlag}
+var startFlags = []commandLineFlag{paramsFlag, reqIDFlagStart, parentReqIDFlag, rootDAGNameFlag, rootReqIDFlag}
 
 func runStart(ctx *Context, args []string) error {
-	requestID, err := ctx.Command.Flags().GetString("request-id")
+	reqID, err := ctx.Command.Flags().GetString("request-id")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
 	// Generate requestID if it's not specified.
-	if requestID == "" {
+	if reqID == "" {
 		var err error
-		requestID, err = generateRequestID()
+		reqID, err = genReqID()
 		if err != nil {
 			logger.Error(ctx, "Failed to generate request ID", "err", err)
 			return fmt.Errorf("failed to generate request ID: %w", err)
 		}
-	} else if err := validateRequestID(requestID); err != nil {
-		logger.Error(ctx, "Invalid request ID format", "requestID", requestID, "err", err)
+	} else if err := validateReqID(reqID); err != nil {
+		logger.Error(ctx, "Invalid request ID format", "reqId", reqID, "err", err)
 		return fmt.Errorf("invalid request ID format: %w", err)
 	}
 
@@ -97,50 +97,50 @@ func runStart(ctx *Context, args []string) error {
 		logger.Info(ctx, "Executing sub-DAG",
 			"dagName", dag.Name,
 			"params", params,
-			"requestID", requestID,
+			"reqId", reqID,
 			"rootDAGName", rootDAGName,
 			"rootRequestID", rootRequestID,
 			"parentRequestID", parentRequestID,
 		)
 	} else {
 		// The current execution is a root DAG
-		rootDAG = digraph.NewRootDAG(dag.Name, requestID)
+		rootDAG = digraph.NewRootDAG(dag.Name, reqID)
 		logger.Info(ctx, "Executing root DAG",
 			"dagName", dag.Name,
 			"params", params,
-			"requestID", requestID,
+			"reqId", reqID,
 		)
 	}
 
 	// Check for previous runs with this request ID and retry it if found.
 	// This prevents duplicate execution when retrying or when sub-DAGs share the
 	// same request ID, ensuring idempotency across the the DAG from the root DAG.
-	if rootDAG.RootID != requestID {
-		if requestID == "" {
+	if rootDAG.RootID != reqID {
+		if reqID == "" {
 			logger.Error(ctx, "Request ID must be provided for sub-DAG run")
 			return fmt.Errorf("request ID must be provided for sub-DAG run")
 		}
-		logger.Debug(ctx, "Checking for previous sub-DAG run with the request ID", "requestID", requestID)
+		logger.Debug(ctx, "Checking for previous sub-DAG run with the request ID", "reqId", reqID)
 		var status *models.Status
-		record, err := ctx.HistoryRepo.FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, requestID)
-		if errors.Is(err, models.ErrRequestIDNotFound) {
+		record, err := ctx.HistoryRepo.FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, reqID)
+		if errors.Is(err, models.ErrReqIDNotFound) {
 			// If the request ID is not found, proceed with execution
 			goto EXEC
 		}
 		if err != nil {
-			logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
-			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
+			logger.Error(ctx, "Failed to retrieve historical run", "reqId", reqID, "err", err)
+			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", reqID, err)
 		}
 		status, err = record.ReadStatus(ctx)
 		if err != nil {
-			logger.Error(ctx, "Failed to read previous run status", "requestID", requestID, "err", err)
-			return fmt.Errorf("failed to read previous run status for request ID %s: %w", requestID, err)
+			logger.Error(ctx, "Failed to read previous run status", "reqId", reqID, "err", err)
+			return fmt.Errorf("failed to read previous run status for request ID %s: %w", reqID, err)
 		}
 		return executeRetry(ctx, dag, status, rootDAG)
 	}
 
 EXEC:
-	return executeDag(ctx, dag, parentRequestID, requestID, rootDAG)
+	return executeDag(ctx, dag, parentRequestID, reqID, rootDAG)
 }
 
 func executeDag(ctx *Context, d *digraph.DAG, parentReqID, reqID string, rootDAG digraph.RootDAG) error {
@@ -157,7 +157,7 @@ func executeDag(ctx *Context, d *digraph.DAG, parentReqID, reqID string, rootDAG
 
 	ctx.LogToFile(logFile)
 
-	logger.Debug(ctx, "DAG run initiated", "DAG", d.Name, "requestID", reqID, "logFile", logFile.Name())
+	logger.Debug(ctx, "DAG run initiated", "DAG", d.Name, "reqId", reqID, "logFile", logFile.Name())
 
 	dr, err := ctx.dagRepo(nil, []string{filepath.Dir(d.Location)})
 	if err != nil {
@@ -180,7 +180,7 @@ func executeDag(ctx *Context, d *digraph.DAG, parentReqID, reqID string, rootDAG
 	listenSignals(ctx, agentInstance)
 
 	if err := agentInstance.Run(ctx); err != nil {
-		logger.Error(ctx, "Failed to execute DAG", "DAG", d.Name, "requestID", reqID, "err", err)
+		logger.Error(ctx, "Failed to execute DAG", "DAG", d.Name, "reqId", reqID, "err", err)
 
 		if ctx.Quiet {
 			os.Exit(1)

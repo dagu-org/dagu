@@ -120,8 +120,8 @@ steps:
     command: echo "Hello, $PARAM"
 `)
 
-	requestID := uuid.Must(uuid.NewV7()).String()
-	args := []string{"start", "--request-id", requestID, "parent"}
+	reqID := uuid.Must(uuid.NewV7()).String()
+	args := []string{"start", "--request-id", reqID, "parent"}
 	th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"DAG run finished"},
@@ -130,7 +130,7 @@ steps:
 	// Update the child_2 status to "failed" to simulate a retry
 	// First, find the child_2 request ID to update its status
 	ctx := context.Background()
-	parentRec, err := th.HistoryRepo.Find(ctx, "parent", requestID)
+	parentRec, err := th.HistoryRepo.Find(ctx, "parent", reqID)
 	require.NoError(t, err)
 
 	updateStatus := func(rec models.Record, status *models.Status) {
@@ -151,8 +151,8 @@ steps:
 	updateStatus(parentRec, parentStatus)
 
 	// (2) Find the run record for child_1
-	rootDAG := digraph.NewRootDAG("parent", requestID)
-	child1Rec, err := th.HistoryRepo.FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, child1Node.SubRuns[0].RequestID)
+	rootDAG := digraph.NewRootDAG("parent", reqID)
+	child1Rec, err := th.HistoryRepo.FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, child1Node.SubRuns[0].ReqID)
 	require.NoError(t, err)
 
 	child1Status, err := child1Rec.ReadStatus(ctx)
@@ -164,7 +164,7 @@ steps:
 	updateStatus(child1Rec, child1Status)
 
 	// (4) Find the run record for child_2
-	child2Rec, err := th.HistoryRepo.FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, child2Node.SubRuns[0].RequestID)
+	child2Rec, err := th.HistoryRepo.FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, child2Node.SubRuns[0].ReqID)
 	require.NoError(t, err)
 
 	child2Status, err := child2Rec.ReadStatus(ctx)
@@ -183,14 +183,14 @@ steps:
 
 	// Retry the DAG
 
-	args = []string{"retry", "--request-id", requestID, "parent"}
+	args = []string{"retry", "--request-id", reqID, "parent"}
 	th.RunCommand(t, cmd.CmdRetry(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"DAG run finished"},
 	})
 
 	// Check if the child_2 status is now "success"
-	child2Rec, err = th.HistoryRepo.FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, child2Node.SubRuns[0].RequestID)
+	child2Rec, err = th.HistoryRepo.FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, child2Node.SubRuns[0].ReqID)
 	require.NoError(t, err)
 	child2Status, err = child2Rec.ReadStatus(ctx)
 	require.NoError(t, err)

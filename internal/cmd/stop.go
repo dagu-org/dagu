@@ -30,7 +30,7 @@ Example:
 }
 
 var stopFlags = []commandLineFlag{
-	requestIDFlagStop,
+	reqIDFlagStop,
 }
 
 func runStop(ctx *Context, args []string) error {
@@ -46,7 +46,7 @@ func runStop(ctx *Context, args []string) error {
 		// Retrieve the previous run's history record for the specified request ID.
 		rec, err := ctx.HistoryRepo.Find(ctx, name, reqID)
 		if err != nil {
-			logger.Error(ctx, "Failed to retrieve historical run", "requestID", reqID, "err", err)
+			logger.Error(ctx, "Failed to retrieve historical run", "reqId", reqID, "err", err)
 			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", reqID, err)
 		}
 

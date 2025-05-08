@@ -17,9 +17,9 @@ type Context struct {
 }
 
 type RunContext struct {
-	Root      RootDAG
-	ParentID  string
-	RequestID string
+	Root        RootDAG
+	ParentReqID string
+	CurrReqID   string
 }
 
 type RootDAG struct {
@@ -70,7 +70,7 @@ func (c Context) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalO
 func NewContext(ctx context.Context, d *DAG, c DBClient, r RunContext, logFile string, params []string) context.Context {
 	var envs = map[string]string{
 		EnvKeySchedulerLogPath: logFile,
-		EnvKeyRequestID:        r.RequestID,
+		EnvKeyReqID:            r.CurrReqID,
 		EnvKeyDAGName:          d.Name,
 	}
 	for _, param := range params {

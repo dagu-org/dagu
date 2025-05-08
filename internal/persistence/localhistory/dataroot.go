@@ -87,25 +87,25 @@ func NewDataRoot(baseDir, dagName string, opts ...RootOption) DataRoot {
 	return root
 }
 
-// FindByRequestID locates an runs by its request ID.
+// FindByReqID locates an runs by its request ID.
 // It searches through all runs directories to find a match,
 // and returns the most recent one if multiple matches are found.
 //
 // Parameters:
 //   - ctx: Context for the operation (unused but kept for interface consistency)
-//   - requestID: The unique request ID to search for
+//   - reqID: The unique request ID to search for
 //
 // Returns:
 //   - The matching Execution instance, or an error if not found
-func (dr *DataRoot) FindByRequestID(_ context.Context, requestID string) (*Run, error) {
+func (dr *DataRoot) FindByReqID(_ context.Context, reqID string) (*Run, error) {
 	// Find matching files
-	matches, err := filepath.Glob(dr.GlobPatternWithRequestID(requestID))
+	matches, err := filepath.Glob(dr.GlobPatternWithReqID(reqID))
 	if err != nil {
 		return nil, fmt.Errorf("failed to glob pattern: %w", err)
 	}
 
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("%w: %s", models.ErrRequestIDNotFound, requestID)
+		return nil, fmt.Errorf("%w: %s", models.ErrReqIDNotFound, reqID)
 	}
 
 	// Sort matches by timestamp (most recent first)
@@ -152,8 +152,8 @@ func (dr *DataRoot) CreateRun(ts TimeInUTC, reqID string) (*Run, error) {
 	return NewRun(dir)
 }
 
-func (dr DataRoot) GlobPatternWithRequestID(requestID string) string {
-	return filepath.Join(dr.runsDir, "2*", "*", "*", "run_*"+requestID+"*")
+func (dr DataRoot) GlobPatternWithReqID(reqID string) string {
+	return filepath.Join(dr.runsDir, "2*", "*", "*", "run_*"+reqID+"*")
 }
 
 func (dr DataRoot) Exists() bool {

@@ -27,41 +27,41 @@ Example:
 }
 
 var statusFlags = []commandLineFlag{
-	requestIDFlagStatus,
+	reqIDFlagStatus,
 }
 
 func runStatus(ctx *Context, args []string) error {
-	requestID, err := ctx.Command.Flags().GetString("request-id")
+	reqID, err := ctx.Command.Flags().GetString("request-id")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
-	dagName := args[0]
+	name := args[0]
 
 	var record models.Record
-	if requestID != "" {
+	if reqID != "" {
 		// Retrieve the previous run's record for the specified request ID.
-		r, err := ctx.HistoryRepo.Find(ctx, dagName, requestID)
+		r, err := ctx.HistoryRepo.Find(ctx, name, reqID)
 		if err != nil {
-			logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
-			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
+			logger.Error(ctx, "Failed to retrieve historical run", "reqId", reqID, "err", err)
+			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", reqID, err)
 		}
 		record = r
 	} else {
-		r, err := ctx.HistoryRepo.Latest(ctx, dagName)
+		r, err := ctx.HistoryRepo.Latest(ctx, name)
 		if err != nil {
-			logger.Error(ctx, "Failed to retrieve latest run record", "dagName", dagName, "err", err)
-			return fmt.Errorf("failed to retrieve latest run record for DAG %s: %w", dagName, err)
+			logger.Error(ctx, "Failed to retrieve latest run record", "dagName", name, "err", err)
+			return fmt.Errorf("failed to retrieve latest run record for DAG %s: %w", name, err)
 		}
 		record = r
 	}
 
 	dag, err := record.ReadDAG(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to read DAG from record", "dagName", dagName, "err", err)
+		logger.Error(ctx, "Failed to read DAG from record", "dagName", name, "err", err)
 	}
 
-	status, err := ctx.HistoryMgr.GetRealtimeStatus(ctx, dag, requestID)
+	status, err := ctx.HistoryMgr.GetRealtimeStatus(ctx, dag, reqID)
 	if err != nil {
 		logger.Error(ctx, "Failed to retrieve current status", "dag", dag.Name, "err", err)
 		return fmt.Errorf("failed to retrieve current status: %w", err)

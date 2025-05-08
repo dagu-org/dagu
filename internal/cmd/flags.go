@@ -54,7 +54,7 @@ var (
 
 	// Unique request ID required for retrying a DAG run.
 	// This flag must be provided when using the retry command.
-	requestIDFlagRetry = commandLineFlag{
+	reqIDFlagRetry = commandLineFlag{
 		name:      "request-id",
 		shorthand: "r",
 		usage:     "Unique request ID for retrying a DAG run (required)",
@@ -63,35 +63,35 @@ var (
 
 	// Unique request ID used for starting a new DAG run.
 	// This is used to track and identify the execution instance and its status.
-	requestIDFlagStart = commandLineFlag{
+	reqIDFlagStart = commandLineFlag{
 		name:      "request-id",
 		shorthand: "r",
 		usage:     "Unique request ID for a DAG run",
 	}
 
 	// Unique request ID used for stopping a DAG run.
-	requestIDFlagStop = commandLineFlag{
+	reqIDFlagStop = commandLineFlag{
 		name:      "request-id",
 		shorthand: "r",
 		usage:     "Request ID for stopping a DAG run",
 	}
 
 	// Unique request ID used for restarting a DAG run.
-	requestIDFlagRestart = commandLineFlag{
+	reqIDFlagRestart = commandLineFlag{
 		name:      "request-id",
 		shorthand: "r",
 		usage:     "Request ID for restarting a DAG run",
 	}
 
 	// Unique request ID used for checking the status of a DAG run.
-	requestIDFlagStatus = commandLineFlag{
+	reqIDFlagStatus = commandLineFlag{
 		name:      "request-id",
 		shorthand: "r",
 		usage:     "Request ID for checking the status of a DAG run",
 	}
 
-	// rootRequestIDFlag reads the root request ID for starting a sub-DAG run
-	rootRequestIDFlag = commandLineFlag{
+	// rootReqIDFlag reads the root request ID for starting a sub-DAG run
+	rootReqIDFlag = commandLineFlag{
 		name:  "root-request-id",
 		usage: "[only for sub-DAG runs] Root request ID for a DAG run",
 	}
@@ -102,8 +102,8 @@ var (
 		usage: "[only for sub-DAG runs] Root DAG name for a DAG run",
 	}
 
-	// parentRequestIDFlag reads the parent request ID for starting a sub-DAG run.
-	parentRequestIDFlag = commandLineFlag{
+	// parentReqIDFlag reads the parent request ID for starting a sub-DAG run.
+	parentReqIDFlag = commandLineFlag{
 		name:  "parent-request-id",
 		usage: "[only for sub-DAG runs] Parent request ID for a DAG run",
 	}

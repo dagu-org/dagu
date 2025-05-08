@@ -10,8 +10,8 @@ import (
 
 // Error variables for history operations
 var (
-	ErrRequestIDNotFound = errors.New("request id not found")
-	ErrNoStatusData      = errors.New("no status data")
+	ErrReqIDNotFound = errors.New("request id not found")
+	ErrNoStatusData  = errors.New("no status data")
 )
 
 // HistoryRepository provides an interface for interacting with the underlying database

@@ -18,35 +18,35 @@ func TestWriter(t *testing.T) {
 
 	t.Run("WriteStatusToNewFile", func(t *testing.T) {
 		dag := th.DAG("test_write_status")
-		requestID := uuid.Must(uuid.NewV7()).String()
+		reqID := uuid.Must(uuid.NewV7()).String()
 		status := models.NewStatusBuilder(dag.DAG).Create(
-			requestID, scheduler.StatusRunning, 1, time.Now(),
+			reqID, scheduler.StatusRunning, 1, time.Now(),
 		)
-		writer := dag.Writer(t, requestID, time.Now())
+		writer := dag.Writer(t, reqID, time.Now())
 		writer.Write(t, status)
 
-		writer.AssertContent(t, "test_write_status", requestID, scheduler.StatusRunning)
+		writer.AssertContent(t, "test_write_status", reqID, scheduler.StatusRunning)
 	})
 
 	t.Run("WriteStatusToExistingFile", func(t *testing.T) {
 		dag := th.DAG("test_append_to_existing")
-		requestID := uuid.Must(uuid.NewV7()).String()
+		reqID := uuid.Must(uuid.NewV7()).String()
 		startedAt := time.Now()
 
-		writer := dag.Writer(t, requestID, startedAt)
+		writer := dag.Writer(t, reqID, startedAt)
 
 		status := models.NewStatusBuilder(dag.DAG).Create(
-			requestID, scheduler.StatusCancel, 1, time.Now(),
+			reqID, scheduler.StatusCancel, 1, time.Now(),
 		)
 
 		// Write initial status
 		writer.Write(t, status)
 		writer.Close(t)
-		writer.AssertContent(t, "test_append_to_existing", requestID, scheduler.StatusCancel)
+		writer.AssertContent(t, "test_append_to_existing", reqID, scheduler.StatusCancel)
 
 		// Append to existing file
 		dataRoot := NewDataRoot(th.tmpDir, dag.Name)
-		run, err := dataRoot.FindByRequestID(th.Context, requestID)
+		run, err := dataRoot.FindByReqID(th.Context, reqID)
 		require.NoError(t, err)
 
 		record, err := run.LatestRecord(th.Context, nil)
@@ -64,7 +64,7 @@ func TestWriter(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify appended data
-		writer.AssertContent(t, "test_append_to_existing", requestID, scheduler.StatusSuccess)
+		writer.AssertContent(t, "test_append_to_existing", reqID, scheduler.StatusSuccess)
 	})
 }
 
@@ -83,8 +83,8 @@ func TestWriterErrorHandling(t *testing.T) {
 		require.NoError(t, writer.close())
 
 		dag := th.DAG("test_write_to_closed_writer")
-		requestID := uuid.Must(uuid.NewV7()).String()
-		status := models.NewStatusBuilder(dag.DAG).Create(requestID, scheduler.StatusRunning, 1, time.Now())
+		reqID := uuid.Must(uuid.NewV7()).String()
+		status := models.NewStatusBuilder(dag.DAG).Create(reqID, scheduler.StatusRunning, 1, time.Now())
 		assert.Error(t, writer.write(status))
 	})
 
@@ -102,8 +102,8 @@ func TestWriterRename(t *testing.T) {
 	// Create a status file with old path
 	dag := th.DAG("test_rename_old")
 	writer := dag.Writer(t, "request-id-1", time.Now())
-	requestID := uuid.Must(uuid.NewV7()).String()
-	status := models.NewStatusBuilder(dag.DAG).Create(requestID, scheduler.StatusRunning, 1, time.Now())
+	reqID := uuid.Must(uuid.NewV7()).String()
+	status := models.NewStatusBuilder(dag.DAG).Create(reqID, scheduler.StatusRunning, 1, time.Now())
 	writer.Write(t, status)
 	writer.Close(t)
 	require.FileExists(t, writer.FilePath)

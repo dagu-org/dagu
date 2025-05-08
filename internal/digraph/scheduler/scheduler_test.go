@@ -964,7 +964,7 @@ func (gh graphHelper) Schedule(t *testing.T, expectedStatus scheduler.Status) sc
 	logFilePath := path.Join(gh.Config.LogDir, logFilename)
 
 	ctx := digraph.NewContext(gh.Context, dag, nil, digraph.RunContext{
-		RequestID: gh.Config.ReqID,
+		CurrReqID: gh.Config.ReqID,
 	}, logFilePath, nil)
 
 	var doneNodes []*scheduler.Node

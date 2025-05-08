@@ -4,10 +4,10 @@ import "context"
 
 // Header information for executing DAGs
 type ExecMeta struct {
-	RootRequestID    string
-	RootDAGName      string
-	ParentRequestID  string
-	CurrentRequestID string
+	RootReqID    string
+	RootDAGName  string
+	ParentReqID  string
+	CurrentReqID string
 }
 
 type metaKey struct{}

@@ -19,14 +19,14 @@ var _ Executor = (*subDAG)(nil)
 var _ SubDAG = (*subDAG)(nil)
 
 type subDAG struct {
-	dag          *digraph.DAG
-	lock         sync.Mutex
-	subRequestID string
-	params       string
-	workDir      string
-	stdout       io.Writer
-	stderr       io.Writer
-	cmd          *exec.Cmd
+	dag         *digraph.DAG
+	lock        sync.Mutex
+	subRunReqID string
+	params      string
+	workDir     string
+	stdout      io.Writer
+	stderr      io.Writer
+	cmd         *exec.Cmd
 }
 
 var ErrWorkingDirNotExist = fmt.Errorf("working directory does not exist")
@@ -71,7 +71,7 @@ func (e *subDAG) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to find executable path: %w", err)
 	}
 
-	if e.subRequestID == "" {
+	if e.subRunReqID == "" {
 		return fmt.Errorf("request ID is not set for sub-DAG")
 	}
 
@@ -83,8 +83,8 @@ func (e *subDAG) Run(ctx context.Context) error {
 		"start",
 		fmt.Sprintf("--root-dag-name=%s", c.Root.RootName),
 		fmt.Sprintf("--root-request-id=%s", c.Root.RootID),
-		fmt.Sprintf("--parent-request-id=%s", c.RequestID),
-		fmt.Sprintf("--request-id=%s", e.subRequestID),
+		fmt.Sprintf("--parent-request-id=%s", c.CurrReqID),
+		fmt.Sprintf("--request-id=%s", e.subRunReqID),
 		"--quiet",
 		e.dag.Location,
 	}
@@ -126,7 +126,7 @@ func (e *subDAG) Run(ctx context.Context) error {
 	}
 
 	// get results from the sub-DAG
-	result, err := digraph.GetSubResult(ctx, e.subRequestID)
+	result, err := digraph.GetSubResult(ctx, e.subRunReqID)
 	if err != nil {
 		return fmt.Errorf("failed to collect result: %w", err)
 	}
@@ -145,10 +145,10 @@ func (e *subDAG) Run(ctx context.Context) error {
 	return nil
 }
 
-func (e *subDAG) SetRequestID(id string) {
+func (e *subDAG) SetReqID(id string) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
-	e.subRequestID = id
+	e.subRunReqID = id
 }
 
 func (e *subDAG) SetStdout(out io.Writer) {

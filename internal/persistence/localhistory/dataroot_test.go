@@ -65,7 +65,7 @@ func TestDataRoot(t *testing.T) {
 func TestDataRootRuns(t *testing.T) {
 	t.Parallel()
 
-	t.Run("FindByRequestID", func(t *testing.T) {
+	t.Run("FindByReqID", func(t *testing.T) {
 		ts := NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
 		ctx := context.Background()
 
@@ -73,10 +73,10 @@ func TestDataRootRuns(t *testing.T) {
 		run := root.CreateTestRun(t, "test-id1", ts)
 		_ = root.CreateTestRun(t, "test-id2", ts)
 
-		actual, err := root.FindByRequestID(ctx, "test-id1")
+		actual, err := root.FindByReqID(ctx, "test-id1")
 		require.NoError(t, err)
 
-		assert.Equal(t, run.Run, actual, "FindByRequestID should return the correct run")
+		assert.Equal(t, run.Run, actual, "FindByReqID should return the correct run")
 	})
 
 	t.Run("Latest", func(t *testing.T) {
@@ -93,7 +93,7 @@ func TestDataRootRuns(t *testing.T) {
 		runs := root.Latest(context.Background(), 2)
 		require.Len(t, runs, 2)
 
-		assert.Equal(t, "test-id3", runs[0].requestID, "Latest should return the most recent runs")
+		assert.Equal(t, "test-id3", runs[0].reqID, "Latest should return the most recent runs")
 	})
 
 	t.Run("LatestAfter", func(t *testing.T) {

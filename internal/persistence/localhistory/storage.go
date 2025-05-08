@@ -15,7 +15,7 @@ import (
 
 // Error definitions for common issues
 var (
-	ErrRequestIDEmpty = errors.New("requestID is empty")
+	ErrReqIDEmpty = errors.New("requestID is empty")
 )
 
 var _ models.HistoryRepository = (*historyStorage)(nil)
@@ -77,7 +77,7 @@ func New(baseDir string, opts ...HistoryStorageOption) models.HistoryRepository 
 // If opts.Retry is true, it creates a retry record for the specified request ID.
 func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts models.NewRecordOptions) (models.Record, error) {
 	if reqID == "" {
-		return nil, ErrRequestIDEmpty
+		return nil, ErrReqIDEmpty
 	}
 
 	if opts.Root != nil {
@@ -89,7 +89,7 @@ func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestam
 
 	var run *Run
 	if opts.Retry {
-		r, err := dataRoot.FindByRequestID(ctx, reqID)
+		r, err := dataRoot.FindByReqID(ctx, reqID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find run: %w", err)
 		}
@@ -113,7 +113,7 @@ func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestam
 // NewSubRecord creates a new run record for the specified sub-run.
 func (db *historyStorage) newSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts models.NewRecordOptions) (models.Record, error) {
 	dataRoot := NewDataRoot(db.baseDir, opts.Root.RootName)
-	rootRun, err := dataRoot.FindByRequestID(ctx, opts.Root.RootID)
+	rootRun, err := dataRoot.FindByReqID(ctx, opts.Root.RootID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find root run: %w", err)
 	}
@@ -216,17 +216,17 @@ func (db *historyStorage) Find(ctx context.Context, dagName, reqID string) (mode
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
-		return nil, fmt.Errorf("FindByRequestID canceled: %w", ctx.Err())
+		return nil, fmt.Errorf("FindByReqID canceled: %w", ctx.Err())
 	default:
 		// Continue with operation
 	}
 
 	if reqID == "" {
-		return nil, ErrRequestIDEmpty
+		return nil, ErrReqIDEmpty
 	}
 
 	root := NewDataRoot(db.baseDir, dagName)
-	run, err := root.FindByRequestID(ctx, reqID)
+	run, err := root.FindByReqID(ctx, reqID)
 
 	if err != nil {
 		return nil, err
@@ -240,17 +240,17 @@ func (db *historyStorage) FindSubRun(ctx context.Context, name, reqID string, su
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
-		return nil, fmt.Errorf("FindBySubRequestID canceled: %w", ctx.Err())
+		return nil, fmt.Errorf("FindBySubReqID canceled: %w", ctx.Err())
 	default:
 		// Continue with operation
 	}
 
 	if reqID == "" {
-		return nil, ErrRequestIDEmpty
+		return nil, ErrReqIDEmpty
 	}
 
 	root := NewDataRoot(db.baseDir, name)
-	run, err := root.FindByRequestID(ctx, reqID)
+	run, err := root.FindByReqID(ctx, reqID)
 	if err != nil {
 		return nil, err
 	}

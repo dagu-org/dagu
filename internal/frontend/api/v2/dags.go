@@ -306,7 +306,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 			Name:        dagStatuses[i].Name,
 			Params:      ptrOf(dagStatuses[i].Params),
 			Pid:         ptrOf(int(dagStatuses[i].PID)),
-			RequestId:   dagStatuses[i].RequestID,
+			RequestId:   dagStatuses[i].ReqID,
 			StartedAt:   dagStatuses[i].StartedAt,
 			FinishedAt:  dagStatuses[i].FinishedAt,
 			Status:      api.Status(dagStatuses[i].Status),
@@ -340,7 +340,7 @@ func (a *API) GetAllDAGTags(ctx context.Context, _ api.GetAllDAGTagsRequestObjec
 
 func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetailsRequestObject) (api.GetDAGRunDetailsResponseObject, error) {
 	dagFileName := request.FileName
-	requestId := request.RequestId
+	reqID := request.RequestId
 
 	dag, err := a.dagRepository.GetMetadata(ctx, dagFileName)
 	if err != nil {
@@ -351,7 +351,7 @@ func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetails
 		}
 	}
 
-	if requestId == "latest" {
+	if reqID == "latest" {
 		latestStatus, err := a.historyManager.GetLatestStatus(ctx, dag)
 		if err != nil {
 			return nil, fmt.Errorf("error getting latest status: %w", err)
@@ -361,7 +361,7 @@ func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetails
 		}, nil
 	}
 
-	status, err := a.historyManager.GetRealtimeStatus(ctx, dag, requestId)
+	status, err := a.historyManager.GetRealtimeStatus(ctx, dag, reqID)
 	if err != nil {
 		return nil, fmt.Errorf("error getting status by request ID: %w", err)
 	}
@@ -398,15 +398,15 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		}
 	}
 
-	requestID, err := a.historyManager.GenerateRequestID(ctx)
+	reqID, err := a.historyManager.GenReqID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error generating request ID: %w", err)
 	}
 
 	if err := a.historyManager.Start(ctx, dag, history.StartOptions{
-		Params:    valueOf(request.Body.Params),
-		RequestID: requestID,
-		Quiet:     true,
+		Params: valueOf(request.Body.Params),
+		ReqID:  reqID,
+		Quiet:  true,
 	}); err != nil {
 		return nil, fmt.Errorf("error starting DAG: %w", err)
 	}
@@ -424,7 +424,7 @@ waitLoop:
 		case <-ctx.Done():
 			break waitLoop
 		default:
-			status, _ := a.historyManager.GetRealtimeStatus(ctx, dag, requestID)
+			status, _ := a.historyManager.GetRealtimeStatus(ctx, dag, reqID)
 			if status == nil {
 				continue
 			}
@@ -447,7 +447,7 @@ waitLoop:
 	}
 
 	return api.ExecuteDAG200JSONResponse{
-		RequestId: requestID,
+		RequestId: reqID,
 	}, nil
 }
 
@@ -476,7 +476,7 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 			Message:    "DAG is not running",
 		}
 	}
-	if err := a.historyManager.Stop(ctx, dag, status.RequestID); err != nil {
+	if err := a.historyManager.Stop(ctx, dag, status.ReqID); err != nil {
 		return nil, fmt.Errorf("error stopping DAG: %w", err)
 	}
 	return api.TerminateDAGRun200Response{}, nil

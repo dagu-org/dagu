@@ -293,19 +293,19 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		opt(helper)
 	}
 
-	var requestID string
+	var reqID string
 	if helper.opts.RetryTarget != nil {
-		requestID = helper.opts.RetryTarget.RequestID
+		reqID = helper.opts.RetryTarget.ReqID
 	} else {
-		requestID = genRequestID()
+		reqID = genReqID()
 	}
 
 	logDir := d.Config.Paths.LogDir
-	logFile := filepath.Join(d.Config.Paths.LogDir, requestID+".log")
-	rootDAG := digraph.NewRootDAG(d.Name, requestID)
+	logFile := filepath.Join(d.Config.Paths.LogDir, reqID+".log")
+	rootDAG := digraph.NewRootDAG(d.Name, reqID)
 
 	helper.Agent = agent.New(
-		requestID,
+		reqID,
 		d.DAG,
 		logDir,
 		logFile,
@@ -405,7 +405,7 @@ func setShell(t *testing.T, shell string) {
 	_ = os.Setenv("SHELL", shPath)
 }
 
-func genRequestID() string {
+func genReqID() string {
 	id, err := uuid.NewV7()
 	if err != nil {
 		panic(err)

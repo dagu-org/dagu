@@ -164,7 +164,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 							"error", err,
 							"step", node.Name(),
 							"stack", stack,
-							"requestID", sc.requestID)
+							"reqId", sc.requestID)
 						node.MarkError(err)
 						sc.setLastError(err)
 
@@ -316,7 +316,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 
 	// Log execution summary
 	logger.Info(ctx, "DAG run completed",
-		"requestID", sc.requestID,
+		"reqId", sc.requestID,
 		"status", sc.Status(graph).String(),
 		"totalTime", sc.metrics.totalExecutionTime/time.Second,
 		"totalNodes", sc.metrics.totalNodes,
@@ -340,7 +340,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 		// These states should not occur at this point
 		logger.Warn(ctx, "Unexpected final status",
 			"status", sc.Status(graph).String(),
-			"requestID", sc.requestID)
+			"reqId", sc.requestID)
 	}
 
 	handlers = append(handlers, digraph.HandlerOnExit)
@@ -607,7 +607,7 @@ func (sc *Scheduler) setup(ctx context.Context) (err error) {
 
 	// Log scheduler setup
 	logger.Debug(ctx, "Scheduler setup complete",
-		"requestID", sc.requestID,
+		"reqId", sc.requestID,
 		"maxActiveRuns", sc.maxActiveRuns,
 		"timeout", sc.timeout,
 		"dry", sc.dry)

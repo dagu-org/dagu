@@ -33,10 +33,10 @@ func TestRetryCommand(t *testing.T) {
 		require.Equal(t, status.Status, scheduler.StatusSuccess)
 		require.NotNil(t, status.Status)
 
-		requestID := status.RequestID
+		reqID := status.ReqID
 
 		// Retry with the request ID.
-		args = []string{"retry", fmt.Sprintf("--request-id=%s", requestID), dagFile.Location}
+		args = []string{"retry", fmt.Sprintf("--request-id=%s", reqID), dagFile.Location}
 		th.RunCommand(t, cmd.CmdRetry(), test.CmdTest{
 			Args:        args,
 			ExpectedOut: []string{`[1=foo]`},

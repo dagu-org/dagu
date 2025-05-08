@@ -38,11 +38,11 @@ If the request ID is not provided, it will find the current running DAG by name.
 }
 
 var restartFlags = []commandLineFlag{
-	requestIDFlagRestart,
+	reqIDFlagRestart,
 }
 
 func runRestart(ctx *Context, args []string) error {
-	requestID, err := ctx.Command.Flags().GetString("request-id")
+	reqID, err := ctx.Command.Flags().GetString("request-id")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
@@ -50,12 +50,12 @@ func runRestart(ctx *Context, args []string) error {
 	name := args[0]
 
 	var record models.Record
-	if requestID != "" {
+	if reqID != "" {
 		// Retrieve the previous run's record for the specified request ID.
-		r, err := ctx.HistoryRepo.Find(ctx, name, requestID)
+		r, err := ctx.HistoryRepo.Find(ctx, name, reqID)
 		if err != nil {
-			logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
-			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
+			logger.Error(ctx, "Failed to retrieve historical run", "reqId", reqID, "err", err)
+			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", reqID, err)
 		}
 		record = r
 	} else {
@@ -82,7 +82,7 @@ func runRestart(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read DAG from run record: %w", err)
 	}
 
-	if err := handleRestartProcess(ctx, dag, requestID); err != nil {
+	if err := handleRestartProcess(ctx, dag, reqID); err != nil {
 		logger.Error(ctx, "Failed to restart DAG", "dagName", dag.Name, "err", err)
 		return fmt.Errorf("restart process failed for DAG %s: %w", dag.Name, err)
 	}
@@ -107,12 +107,12 @@ func handleRestartProcess(ctx *Context, d *digraph.DAG, reqID string) error {
 }
 
 func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
-	requestID, err := generateRequestID()
+	reqID, err := genReqID()
 	if err != nil {
 		return fmt.Errorf("failed to generate request ID: %w", err)
 	}
 
-	logFile, err := ctx.OpenLogFile(dag, requestID)
+	logFile, err := ctx.OpenLogFile(dag, reqID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file: %w", err)
 	}
@@ -122,7 +122,7 @@ func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
 
 	ctx.LogToFile(logFile)
 
-	logger.Info(ctx, "DAG restart initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
+	logger.Info(ctx, "DAG restart initiated", "DAG", dag.Name, "reqId", reqID, "logFile", logFile.Name())
 
 	dr, err := ctx.dagRepo(nil, []string{filepath.Dir(dag.Location)})
 	if err != nil {
@@ -130,10 +130,10 @@ func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	rootDAG := digraph.NewRootDAG(dag.Name, requestID)
+	rootDAG := digraph.NewRootDAG(dag.Name, reqID)
 
 	agentInstance := agent.New(
-		requestID,
+		reqID,
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),

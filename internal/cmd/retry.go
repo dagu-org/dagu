@@ -30,10 +30,10 @@ This command is useful for recovering from errors or transient issues by re-runn
 	)
 }
 
-var retryFlags = []commandLineFlag{requestIDFlagRetry}
+var retryFlags = []commandLineFlag{reqIDFlagRetry}
 
 func runRetry(ctx *Context, args []string) error {
-	requestID, err := ctx.Command.Flags().GetString("request-id")
+	reqID, err := ctx.Command.Flags().GetString("request-id")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
@@ -41,10 +41,10 @@ func runRetry(ctx *Context, args []string) error {
 	dagName := args[0]
 
 	// Retrieve the previous run data for specified request ID.
-	runRecord, err := ctx.HistoryRepo.Find(ctx, dagName, requestID)
+	runRecord, err := ctx.HistoryRepo.Find(ctx, dagName, reqID)
 	if err != nil {
-		logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
-		return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
+		logger.Error(ctx, "Failed to retrieve historical run", "reqId", reqID, "err", err)
+		return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", reqID, err)
 	}
 
 	// Read the detailed status of the previous status.
@@ -62,7 +62,7 @@ func runRetry(ctx *Context, args []string) error {
 
 	// The retry command is currently only supported for root DAGs.
 	// Therefore we use the request ID as the root DAG request ID here.
-	rootDAG := digraph.NewRootDAG(dag.Name, status.RequestID)
+	rootDAG := digraph.NewRootDAG(dag.Name, status.ReqID)
 
 	if err := executeRetry(ctx, dag, status, rootDAG); err != nil {
 		logger.Error(ctx, "Failed to execute retry", "path", dagName, "err", err)
@@ -73,7 +73,7 @@ func runRetry(ctx *Context, args []string) error {
 }
 
 func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootDAG digraph.RootDAG) error {
-	logger.Debug(ctx, "Executing retry", "dagName", dag.Name, "requestID", status.RequestID)
+	logger.Debug(ctx, "Executing retry", "dagName", dag.Name, "reqId", status.ReqID)
 
 	// We use the same log file for the retry as the original run.
 	logFile, err := fileutil.OpenOrCreateFile(status.Log)
@@ -84,7 +84,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootDAG
 		_ = logFile.Close()
 	}()
 
-	logger.Info(ctx, "DAG retry initiated", "DAG", dag.Name, "requestID", status.RequestID, "logFile", logFile.Name())
+	logger.Info(ctx, "DAG retry initiated", "DAG", dag.Name, "reqId", status.ReqID, "logFile", logFile.Name())
 
 	// Update the context with the log file
 	ctx.LogToFile(logFile)
@@ -96,7 +96,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootDAG
 	}
 
 	agentInstance := agent.New(
-		status.RequestID,
+		status.ReqID,
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
@@ -117,7 +117,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootDAG
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
-			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, status.RequestID, err)
+			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, status.ReqID, err)
 		}
 	}
 

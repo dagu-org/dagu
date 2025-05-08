@@ -49,8 +49,8 @@ type NodeState struct {
 }
 
 type SubRun struct {
-	// RequestID is the request ID of the sub-run.
-	RequestID string
+	// ReqID is the request ID of the sub-run.
+	ReqID string
 }
 
 type NodeStatus int
@@ -133,19 +133,19 @@ func (s *Data) Data() NodeData {
 	return s.inner
 }
 
-func (s *Data) SubRunRequestID() (string, error) {
+func (s *Data) SubRunReqID() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// If subRuns is not empty, return the first child's request ID.
 	if len(s.inner.State.SubRuns) > 0 {
-		return s.inner.State.SubRuns[0].RequestID, nil
+		return s.inner.State.SubRuns[0].ReqID, nil
 	}
 	// Generate a new request ID for the current node.
-	r, err := generateRequestID()
+	r, err := genReqID()
 	if err != nil {
 		return "", fmt.Errorf("failed to generate request ID: %w", err)
 	}
-	s.inner.State.SubRuns = append(s.inner.State.SubRuns, SubRun{RequestID: r})
+	s.inner.State.SubRuns = append(s.inner.State.SubRuns, SubRun{ReqID: r})
 	return r, nil
 }
 
@@ -380,9 +380,9 @@ func (n *Data) MarkError(err error) {
 	n.inner.State.Status = NodeStatusError
 }
 
-// generateRequestID generates a new request ID.
+// genReqID generates a new request ID.
 // For simplicity, we use UUIDs as request IDs.
-func generateRequestID() (string, error) {
+func genReqID() (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return "", err

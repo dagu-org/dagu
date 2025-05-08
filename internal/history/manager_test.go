@@ -27,12 +27,12 @@ func TestManager(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "valid.yaml"))
 		ctx := th.Context
 
-		requestID := uuid.Must(uuid.NewV7()).String()
+		reqID := uuid.Must(uuid.NewV7()).String()
 		socketServer, _ := sock.NewServer(
-			dag.SockAddr(requestID),
+			dag.SockAddr(reqID),
 			func(w http.ResponseWriter, _ *http.Request) {
 				status := models.NewStatusBuilder(dag.DAG).Create(
-					requestID, scheduler.StatusRunning, 0, time.Now(),
+					reqID, scheduler.StatusRunning, 0, time.Now(),
 				)
 				w.WriteHeader(http.StatusOK)
 				jsonData, err := json.Marshal(status)
@@ -58,26 +58,26 @@ func TestManager(t *testing.T) {
 	t.Run("UpdateStatus", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "update_status.yaml"))
 
-		requestID := uuid.Must(uuid.NewV7()).String()
+		reqID := uuid.Must(uuid.NewV7()).String()
 		now := time.Now()
 		ctx := th.Context
 		cli := th.HistoryMgr
 
 		// Open the history store and write a status before updating it.
-		record, err := th.HistoryRepo.Create(ctx, dag.DAG, now, requestID, models.NewRecordOptions{})
+		record, err := th.HistoryRepo.Create(ctx, dag.DAG, now, reqID, models.NewRecordOptions{})
 		require.NoError(t, err)
 
 		err = record.Open(ctx)
 		require.NoError(t, err)
 
-		status := testNewStatus(dag.DAG, requestID, scheduler.StatusSuccess, scheduler.NodeStatusSuccess)
+		status := testNewStatus(dag.DAG, reqID, scheduler.StatusSuccess, scheduler.NodeStatusSuccess)
 
 		err = record.Write(ctx, status)
 		require.NoError(t, err)
 		_ = record.Close(ctx)
 
 		// Get the status and check if it is the same as the one we wrote.
-		statusToCheck, err := cli.FindByRequestID(ctx, dag.Name, requestID)
+		statusToCheck, err := cli.FindByReqID(ctx, dag.Name, reqID)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.NodeStatusSuccess, statusToCheck.Nodes[0].Status)
 
@@ -85,15 +85,15 @@ func TestManager(t *testing.T) {
 		newStatus := scheduler.NodeStatusError
 		status.Nodes[0].Status = newStatus
 
-		rootDAG := digraph.NewRootDAG(dag.Name, requestID)
+		rootDAG := digraph.NewRootDAG(dag.Name, reqID)
 		err = cli.UpdateStatus(ctx, rootDAG, status)
 		require.NoError(t, err)
 
-		statusByRequestID, err := cli.FindByRequestID(ctx, dag.Name, requestID)
+		statusByReqID, err := cli.FindByReqID(ctx, dag.Name, reqID)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, len(status.Nodes))
-		require.Equal(t, newStatus, statusByRequestID.Nodes[0].Status)
+		require.Equal(t, newStatus, statusByReqID.Nodes[0].Status)
 	})
 	t.Run("UpdateSubRunStatus", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "tree_parent.yaml"))
@@ -106,11 +106,11 @@ func TestManager(t *testing.T) {
 		// Get the sub run status.
 		status, err := th.HistoryMgr.GetLatestStatus(th.Context, dag.DAG)
 		require.NoError(t, err)
-		requestId := status.RequestID
+		reqID := status.ReqID
 		subRun := status.Nodes[0].SubRuns[0]
 
-		rootDAG := digraph.NewRootDAG(dag.Name, requestId)
-		subRunStatus, err := th.HistoryMgr.FindBySubRunRequestID(th.Context, rootDAG, subRun.RequestID)
+		rootDAG := digraph.NewRootDAG(dag.Name, reqID)
+		subRunStatus, err := th.HistoryMgr.FindBySubRunReqID(th.Context, rootDAG, subRun.ReqID)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusSuccess.String(), subRunStatus.Status.String())
 
@@ -120,7 +120,7 @@ func TestManager(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check if the sub run status is updated.
-		subRunStatus, err = th.HistoryMgr.FindBySubRunRequestID(th.Context, rootDAG, subRun.RequestID)
+		subRunStatus, err = th.HistoryMgr.FindBySubRunReqID(th.Context, rootDAG, subRun.ReqID)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.NodeStatusError.String(), subRunStatus.Nodes[0].Status.String())
 	})
@@ -199,12 +199,12 @@ func TestClient_RunDAG(t *testing.T) {
 		status, err := cli.GetLatestStatus(ctx, dag.DAG)
 		require.NoError(t, err)
 
-		previousRequestID := status.RequestID
-		previousParams := status.Params
+		prevReqID := status.ReqID
+		prevParams := status.Params
 
 		time.Sleep(1 * time.Second)
 
-		err = cli.Retry(ctx, dag.DAG, previousRequestID)
+		err = cli.Retry(ctx, dag.DAG, prevReqID)
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish
@@ -214,16 +214,16 @@ func TestClient_RunDAG(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check if the params are the same as the previous run.
-		require.Equal(t, previousRequestID, status.RequestID)
-		require.Equal(t, previousParams, status.Params)
+		require.Equal(t, prevReqID, status.ReqID)
+		require.Equal(t, prevParams, status.Params)
 	})
 }
 
-func testNewStatus(dag *digraph.DAG, requestID string, status scheduler.Status, nodeStatus scheduler.NodeStatus) models.Status {
+func testNewStatus(dag *digraph.DAG, reqID string, status scheduler.Status, nodeStatus scheduler.NodeStatus) models.Status {
 	nodes := []scheduler.NodeData{{State: scheduler.NodeState{Status: nodeStatus}}}
 	tm := time.Now()
 	startedAt := &tm
 	return models.NewStatusBuilder(dag).Create(
-		requestID, status, 0, *startedAt, models.WithNodes(nodes),
+		reqID, status, 0, *startedAt, models.WithNodes(nodes),
 	)
 }

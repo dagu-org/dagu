@@ -32,12 +32,12 @@ func TestJSONDB(t *testing.T) {
 		// Verify the first record is the most recent
 		status0, err := records[0].ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "request-id-3", status0.RequestID)
+		assert.Equal(t, "request-id-3", status0.ReqID)
 
 		// Verify the second record is the second most recent
 		status1, err := records[1].ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "request-id-2", status1.RequestID)
+		assert.Equal(t, "request-id-2", status1.ReqID)
 
 		// Verify all records are returned if the number requested is equal to the number of records
 		records = th.Repo.Recent(th.Context, "test_DAG", 3)
@@ -71,9 +71,9 @@ func TestJSONDB(t *testing.T) {
 		status, err := record.ReadStatus(th.Context)
 		require.NoError(t, err)
 
-		assert.Equal(t, "request-id-3", status.RequestID)
+		assert.Equal(t, "request-id-3", status.ReqID)
 	})
-	t.Run("FindByRequestID", func(t *testing.T) {
+	t.Run("FindByReqID", func(t *testing.T) {
 		th := setupTestJSONDB(t)
 
 		// Create timestamps for the records
@@ -93,11 +93,11 @@ func TestJSONDB(t *testing.T) {
 		// Verify the record is the correct one
 		status, err := record.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "request-id-2", status.RequestID)
+		assert.Equal(t, "request-id-2", status.ReqID)
 
 		// Verify an error is returned if the request ID does not exist
 		_, err = th.Repo.Find(th.Context, "test_DAG", "nonexistent-id")
-		assert.ErrorIs(t, err, models.ErrRequestIDNotFound)
+		assert.ErrorIs(t, err, models.ErrReqIDNotFound)
 	})
 	t.Run("RemoveOld", func(t *testing.T) {
 		th := setupTestJSONDB(t)
@@ -150,7 +150,7 @@ func TestJSONDB(t *testing.T) {
 		}()
 
 		statusToWrite := models.InitialStatus(subDAG.DAG)
-		statusToWrite.RequestID = "sub-id"
+		statusToWrite.ReqID = "sub-id"
 		err = record.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
 
@@ -160,7 +160,7 @@ func TestJSONDB(t *testing.T) {
 
 		status, err := existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "sub-id", status.RequestID)
+		assert.Equal(t, "sub-id", status.ReqID)
 	})
 	t.Run("SubRecord_Retry", func(t *testing.T) {
 		th := setupTestJSONDB(t)
@@ -187,7 +187,7 @@ func TestJSONDB(t *testing.T) {
 		}()
 
 		statusToWrite := models.InitialStatus(subDAG.DAG)
-		statusToWrite.RequestID = "sub-id"
+		statusToWrite.ReqID = "sub-id"
 		statusToWrite.Status = scheduler.StatusRunning
 		err = record.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
@@ -198,7 +198,7 @@ func TestJSONDB(t *testing.T) {
 		require.NoError(t, err)
 		existingRecordStatus, err := existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "sub-id", existingRecordStatus.RequestID)
+		assert.Equal(t, "sub-id", existingRecordStatus.ReqID)
 		assert.Equal(t, scheduler.StatusRunning.String(), existingRecordStatus.Status.String())
 
 		// Create a retry record and write different status
@@ -217,7 +217,7 @@ func TestJSONDB(t *testing.T) {
 		require.NoError(t, err)
 		existingRecordStatus, err = existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "sub-id", existingRecordStatus.RequestID)
+		assert.Equal(t, "sub-id", existingRecordStatus.ReqID)
 		assert.Equal(t, scheduler.StatusSuccess.String(), existingRecordStatus.Status.String())
 	})
 	t.Run("ReadDAG", func(t *testing.T) {
@@ -237,7 +237,7 @@ func TestJSONDB(t *testing.T) {
 		}()
 
 		statusToWrite := models.InitialStatus(rec.dag)
-		statusToWrite.RequestID = "parent-id"
+		statusToWrite.ReqID = "parent-id"
 
 		err = rec.Write(th.Context, statusToWrite)
 		require.NoError(t, err)

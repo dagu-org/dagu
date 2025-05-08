@@ -69,8 +69,8 @@ func TestLogDir(t *testing.T) {
 func TestLogFileName(t *testing.T) {
 	t.Run("filename format", func(t *testing.T) {
 		cfg := cmd.LogConfig{
-			DAGName:   "test dag",
-			RequestID: "12345678901234", // Longer than 8 chars to test truncation
+			DAGName: "test dag",
+			ReqID:   "12345678901234", // Longer than 8 chars to test truncation
 		}
 
 		filename := cfg.LogFile()
