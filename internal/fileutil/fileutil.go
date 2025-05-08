@@ -45,12 +45,16 @@ func FileExists(file string) bool {
 	return !os.IsNotExist(err)
 }
 
-// OpenOrCreateFile opens file or creates it if it doesn't exist.
-func OpenOrCreateFile(file string) (*os.File, error) {
-	if FileExists(file) {
-		return openFile(file)
+// OpenOrCreateFile opens (or creates) the log file with flags for creation, write-only access,
+// appending, and synchronous I/O. It sets file permissions to 0600.
+func OpenOrCreateFile(filepath string) (*os.File, error) {
+	flags := os.O_CREATE | os.O_WRONLY | os.O_APPEND | os.O_SYNC
+	file, err := os.OpenFile(filepath, flags, 0600) // nolint:gosec
+	if err != nil {
+		return nil, fmt.Errorf("failed to create/open log file %s: %w", filepath, err)
 	}
-	return createFile(file)
+
+	return file, nil
 }
 
 // openFile opens file.

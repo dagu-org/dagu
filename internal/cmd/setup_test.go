@@ -1,54 +1,26 @@
 package cmd_test
 
 import (
-	"context"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmd"
-	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestOpenLogFile(t *testing.T) {
-	t.Run("successful log file creation", func(t *testing.T) {
-		tempDir := t.TempDir() // Using t.TempDir() for automatic cleanup
-
-		setup := cmd.NewContext(context.Background(), &config.Config{
-			Paths: config.PathsConfig{LogDir: tempDir},
-		})
-
-		file, err := setup.OpenLogFile(&digraph.DAG{
-			Name:   "test_dag",
-			LogDir: "",
-		}, "12345678")
-		require.NoError(t, err)
-		defer func() {
-			_ = file.Close()
-		}()
-
-		assert.NotNil(t, file)
-		assert.True(t, filepath.IsAbs(file.Name()))
-		assert.Contains(t, file.Name(), "test_dag")
-		assert.Contains(t, file.Name(), "12345678")
-	})
-}
-
-func TestSetupLogDirectory(t *testing.T) {
+func TestLogDir(t *testing.T) {
 	tests := []struct {
 		name     string
-		config   cmd.LogFileSettings
+		config   cmd.LogConfig
 		wantErr  bool
 		validate func(t *testing.T, path string)
 	}{
 		{
 			name: "using LogDir",
-			config: cmd.LogFileSettings{
-				LogDir:  t.TempDir(),
+			config: cmd.LogConfig{
+				BaseDir: t.TempDir(),
 				DAGName: "test_dag",
 			},
 			validate: func(t *testing.T, path string) {
@@ -58,7 +30,7 @@ func TestSetupLogDirectory(t *testing.T) {
 		},
 		{
 			name: "using DAGLogDir",
-			config: cmd.LogFileSettings{
+			config: cmd.LogConfig{
 				DAGLogDir: filepath.Join(t.TempDir(), "custom"),
 				DAGName:   "test_dag",
 			},
@@ -70,8 +42,8 @@ func TestSetupLogDirectory(t *testing.T) {
 		},
 		{
 			name: "with special characters in DAGName",
-			config: cmd.LogFileSettings{
-				LogDir:  t.TempDir(),
+			config: cmd.LogConfig{
+				BaseDir: t.TempDir(),
 				DAGName: "test/dag*special",
 			},
 			validate: func(t *testing.T, path string) {
@@ -83,25 +55,25 @@ func TestSetupLogDirectory(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := cmd.SetupLogDirectory(tt.config)
+			logDir, err := tt.config.LogDir()
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
-			tt.validate(t, result)
+			tt.validate(t, logDir)
 		})
 	}
 }
 
-func TestBuildLogFilename(t *testing.T) {
+func TestLogFileName(t *testing.T) {
 	t.Run("filename format", func(t *testing.T) {
-		config := cmd.LogFileSettings{
+		cfg := cmd.LogConfig{
 			DAGName:   "test dag",
 			RequestID: "12345678901234", // Longer than 8 chars to test truncation
 		}
 
-		filename := cmd.BuildLogFilename(config)
+		filename := cfg.LogFile()
 
 		assert.Contains(t, filename, "test_dag")
 		assert.Contains(t, filename, time.Now().Format("20060102"))
@@ -114,55 +86,30 @@ func TestBuildLogFilename(t *testing.T) {
 	})
 }
 
-func TestCreateLogFile(t *testing.T) {
-	t.Run("file creation and permissions", func(t *testing.T) {
-		dir := t.TempDir()
-		filePath := filepath.Join(dir, "test.log")
-
-		file, err := cmd.OpenOrCreateLogFile(filePath)
-		require.NoError(t, err)
-		defer func() {
-			_ = file.Close()
-		}()
-
-		assert.NotNil(t, file)
-		assert.Equal(t, filePath, file.Name())
-
-		info, err := file.Stat()
-		require.NoError(t, err)
-		assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
-	})
-
-	t.Run("invalid path", func(t *testing.T) {
-		_, err := cmd.OpenOrCreateLogFile("/nonexistent/directory/test.log")
-		assert.Error(t, err)
-	})
-}
-
-func TestValidateSettings(t *testing.T) {
+func TestLogConfigValidation(t *testing.T) {
 	tests := []struct {
 		name    string
-		config  cmd.LogFileSettings
+		config  cmd.LogConfig
 		wantErr bool
 	}{
 		{
 			name: "valid settings",
-			config: cmd.LogFileSettings{
-				LogDir:  "/tmp",
+			config: cmd.LogConfig{
+				BaseDir: "/tmp",
 				DAGName: "test",
 			},
 			wantErr: false,
 		},
 		{
 			name: "empty DAGName",
-			config: cmd.LogFileSettings{
-				LogDir: "/tmp",
+			config: cmd.LogConfig{
+				BaseDir: "/tmp",
 			},
 			wantErr: true,
 		},
 		{
 			name: "no directories",
-			config: cmd.LogFileSettings{
+			config: cmd.LogConfig{
 				DAGName: "test",
 			},
 			wantErr: true,
@@ -171,7 +118,7 @@ func TestValidateSettings(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := cmd.ValidateSettings(tt.config)
+			err := tt.config.Validate()
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {

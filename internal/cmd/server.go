@@ -24,9 +24,9 @@ Example:
 var serverFlags = []commandLineFlag{dagsFlag, hostFlag, portFlag}
 
 func runServer(ctx *Context, _ []string) error {
-	logger.Info(ctx, "Server initialization", "host", ctx.cfg.Server.Host, "port", ctx.cfg.Server.Port)
+	logger.Info(ctx, "Server initialization", "host", ctx.Config.Server.Host, "port", ctx.Config.Server.Port)
 
-	server, err := ctx.server()
+	server, err := ctx.NewServer()
 	if err != nil {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}

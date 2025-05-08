@@ -36,7 +36,7 @@ This command parses the DAG specification, resolves parameters, and initiates th
 var startFlags = []commandLineFlag{paramsFlag, requestIDFlagStart, parentRequestIDFlag, rootDAGNameFlag, rootRequestIDFlag}
 
 func runStart(ctx *Context, args []string) error {
-	requestID, err := ctx.cmd.Flags().GetString("request-id")
+	requestID, err := ctx.Command.Flags().GetString("request-id")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
@@ -55,18 +55,18 @@ func runStart(ctx *Context, args []string) error {
 	}
 
 	loadOpts := []digraph.LoadOption{
-		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
-		digraph.WithDAGsDir(ctx.cfg.Paths.DAGsDir),
+		digraph.WithBaseConfig(ctx.Config.Paths.BaseConfig),
+		digraph.WithDAGsDir(ctx.Config.Paths.DAGsDir),
 	}
 
 	// Load parameters from command line arguments.
 	var params string
-	if argsLenAtDash := ctx.cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
+	if argsLenAtDash := ctx.Command.ArgsLenAtDash(); argsLenAtDash != -1 {
 		// Get parameters from command line arguments after "--"
 		loadOpts = append(loadOpts, digraph.WithParams(args[argsLenAtDash:]))
 	} else {
 		// Get parameters from flags
-		params, err = ctx.cmd.Flags().GetString("params")
+		params, err = ctx.Command.Flags().GetString("params")
 		if err != nil {
 			return fmt.Errorf("failed to get parameters: %w", err)
 		}
@@ -80,9 +80,9 @@ func runStart(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 	}
 
-	rootRequestID, _ := ctx.cmd.Flags().GetString("root-request-id")
-	rootDAGName, _ := ctx.cmd.Flags().GetString("root-dag-name")
-	parentRequestID, _ := ctx.cmd.Flags().GetString("parent-request-id")
+	rootRequestID, _ := ctx.Command.Flags().GetString("root-request-id")
+	rootDAGName, _ := ctx.Command.Flags().GetString("root-dag-name")
+	parentRequestID, _ := ctx.Command.Flags().GetString("parent-request-id")
 
 	// If rootDAGName is not empty, it means current execution is a sub-DAG.
 	// Sub DAG execution requires both root-request-id and root-dag-name to be set.
@@ -122,7 +122,7 @@ func runStart(ctx *Context, args []string) error {
 		}
 		logger.Debug(ctx, "Checking for previous sub-DAG run with the request ID", "requestID", requestID)
 		var status *models.Status
-		record, err := ctx.HistoryRepo(nil).FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, requestID)
+		record, err := ctx.HistoryRepo.FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, requestID)
 		if errors.Is(err, models.ErrRequestIDNotFound) {
 			// If the request ID is not found, proceed with execution
 			goto EXEC
@@ -165,17 +165,14 @@ func executeDag(ctx *Context, d *digraph.DAG, parentReqID, reqID string, rootDAG
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	hr := ctx.HistoryRepo(nil)
-	hm := ctx.HistoryManager(hr)
-
 	agentInstance := agent.New(
 		reqID,
 		d,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
-		hm,
+		ctx.HistoryMgr,
 		dr,
-		hr,
+		ctx.HistoryRepo,
 		rootDAG,
 		agent.Options{ParentID: parentReqID},
 	)
@@ -185,7 +182,7 @@ func executeDag(ctx *Context, d *digraph.DAG, parentReqID, reqID string, rootDAG
 	if err := agentInstance.Run(ctx); err != nil {
 		logger.Error(ctx, "Failed to execute DAG", "DAG", d.Name, "requestID", reqID, "err", err)
 
-		if ctx.quiet {
+		if ctx.Quiet {
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
@@ -194,7 +191,7 @@ func executeDag(ctx *Context, d *digraph.DAG, parentReqID, reqID string, rootDAG
 	}
 
 	// Print the summary of the execution if the quiet flag is not set.
-	if !ctx.quiet {
+	if !ctx.Quiet {
 		agentInstance.PrintSummary(ctx)
 	}
 

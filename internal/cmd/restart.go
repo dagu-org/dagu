@@ -42,25 +42,24 @@ var restartFlags = []commandLineFlag{
 }
 
 func runRestart(ctx *Context, args []string) error {
-	requestID, err := ctx.cmd.Flags().GetString("request-id")
+	requestID, err := ctx.Command.Flags().GetString("request-id")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
 	name := args[0]
-	hr := ctx.HistoryRepo(nil)
 
 	var record models.Record
 	if requestID != "" {
 		// Retrieve the previous run's record for the specified request ID.
-		r, err := hr.Find(ctx, name, requestID)
+		r, err := ctx.HistoryRepo.Find(ctx, name, requestID)
 		if err != nil {
 			logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
 			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
 		}
 		record = r
 	} else {
-		r, err := hr.Latest(ctx, name)
+		r, err := ctx.HistoryRepo.Latest(ctx, name)
 		if err != nil {
 			logger.Error(ctx, "Failed to retrieve latest run record", "dagName", name, "err", err)
 			return fmt.Errorf("failed to retrieve latest run record for DAG %s: %w", name, err)
@@ -92,11 +91,8 @@ func runRestart(ctx *Context, args []string) error {
 }
 
 func handleRestartProcess(ctx *Context, d *digraph.DAG, reqID string) error {
-	hr := ctx.HistoryRepo(nil)
-	hm := ctx.HistoryManager(hr)
-
 	// Stop if running
-	if err := stopDAGIfRunning(ctx, hm, d, reqID); err != nil {
+	if err := stopDAGIfRunning(ctx, ctx.HistoryMgr, d, reqID); err != nil {
 		return fmt.Errorf("failed to stop DAG: %w", err)
 	}
 
@@ -107,7 +103,7 @@ func handleRestartProcess(ctx *Context, d *digraph.DAG, reqID string) error {
 	}
 
 	// Execute the exact same DAG with the same parameters but a new request ID
-	return executeDAG(ctx, hm, d)
+	return executeDAG(ctx, ctx.HistoryMgr, d)
 }
 
 func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
@@ -143,13 +139,13 @@ func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
 		logFile.Name(),
 		cli,
 		dr,
-		ctx.HistoryRepo(nil),
+		ctx.HistoryRepo,
 		rootDAG,
 		agent.Options{Dry: false})
 
 	listenSignals(ctx, agentInstance)
 	if err := agentInstance.Run(ctx); err != nil {
-		if ctx.quiet {
+		if ctx.Quiet {
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)

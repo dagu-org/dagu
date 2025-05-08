@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
@@ -52,14 +53,6 @@ func WithSearchPaths(paths []string) Option {
 	}
 }
 
-// storage implements the DAGRepository interface using the local filesystem
-type storage struct {
-	baseDir      string                        // Base directory for DAG storage
-	flagsBaseDir string                        // Base directory for flag storage
-	fileCache    *fileutil.Cache[*digraph.DAG] // Optional cache for DAG objects
-	searchPaths  []string                      // Additional search paths for DAG files
-}
-
 // New creates a new DAG store implementation using the local filesystem
 func New(baseDir string, opts ...Option) models.DAGRepository {
 	options := &Options{}
@@ -86,6 +79,15 @@ func New(baseDir string, opts ...Option) models.DAGRepository {
 		fileCache:    options.FileCache,
 		searchPaths:  searchPaths,
 	}
+}
+
+// storage implements the DAGRepository interface using the local filesystem
+type storage struct {
+	baseDir      string                        // Base directory for DAG storage
+	flagsBaseDir string                        // Base directory for flag storage
+	fileCache    *fileutil.Cache[*digraph.DAG] // Optional cache for DAG objects
+	searchPaths  []string                      // Additional search paths for DAG files
+	lock         sync.Mutex
 }
 
 // GetMetadata retrieves the metadata of a DAG by its name.

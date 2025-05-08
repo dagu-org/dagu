@@ -24,11 +24,11 @@ Example:
 var startAllFlags = []commandLineFlag{dagsFlag, hostFlag, portFlag}
 
 func runStartAll(ctx *Context, _ []string) error {
-	if dagsDir, _ := ctx.cmd.Flags().GetString("dags"); dagsDir != "" {
-		ctx.cfg.Paths.DAGsDir = dagsDir
+	if dagsDir, _ := ctx.Command.Flags().GetString("dags"); dagsDir != "" {
+		ctx.Config.Paths.DAGsDir = dagsDir
 	}
 
-	scheduler, err := ctx.scheduler()
+	scheduler, err := ctx.NewScheduler()
 	if err != nil {
 		return fmt.Errorf("failed to initialize scheduler: %w", err)
 	}
@@ -36,7 +36,7 @@ func runStartAll(ctx *Context, _ []string) error {
 	// Start scheduler in a goroutine
 	errChan := make(chan error, 1)
 	go func() {
-		logger.Info(ctx, "Scheduler initialization", "dags", ctx.cfg.Paths.DAGsDir)
+		logger.Info(ctx, "Scheduler initialization", "dags", ctx.Config.Paths.DAGsDir)
 
 		if err := scheduler.Start(ctx); err != nil {
 			errChan <- fmt.Errorf("scheduler initialization failed: %w", err)
@@ -45,13 +45,13 @@ func runStartAll(ctx *Context, _ []string) error {
 		errChan <- nil
 	}()
 
-	server, err := ctx.server()
+	server, err := ctx.NewServer()
 	if err != nil {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}
 
 	// Start server in a goroutine
-	logger.Info(ctx, "Server initialization", "host", ctx.cfg.Server.Host, "port", ctx.cfg.Server.Port)
+	logger.Info(ctx, "Server initialization", "host", ctx.Config.Server.Host, "port", ctx.Config.Server.Port)
 
 	serverErr := make(chan error, 1)
 	go func() {

@@ -32,16 +32,16 @@ var dryFlags = []commandLineFlag{paramsFlag}
 
 func runDry(ctx *Context, args []string) error {
 	loadOpts := []digraph.LoadOption{
-		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
-		digraph.WithDAGsDir(ctx.cfg.Paths.DAGsDir),
+		digraph.WithBaseConfig(ctx.Config.Paths.BaseConfig),
+		digraph.WithDAGsDir(ctx.Config.Paths.DAGsDir),
 	}
 
-	if argsLenAtDash := ctx.cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
+	if argsLenAtDash := ctx.Command.ArgsLenAtDash(); argsLenAtDash != -1 {
 		// Get parameters from command line arguments after "--"
 		loadOpts = append(loadOpts, digraph.WithParams(args[argsLenAtDash:]))
 	} else {
 		// Get parameters from flags
-		params, err := ctx.cmd.Flags().GetString("params")
+		params, err := ctx.Command.Flags().GetString("params")
 		if err != nil {
 			return fmt.Errorf("failed to get parameters: %w", err)
 		}
@@ -73,9 +73,6 @@ func runDry(ctx *Context, args []string) error {
 		return err
 	}
 
-	hr := ctx.HistoryRepo(nil)
-	hm := ctx.HistoryManager(hr)
-
 	rootDAG := digraph.NewRootDAG(dag.Name, requestID)
 
 	agentInstance := agent.New(
@@ -83,9 +80,9 @@ func runDry(ctx *Context, args []string) error {
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
-		hm,
+		ctx.HistoryMgr,
 		dr,
-		hr,
+		ctx.HistoryRepo,
 		rootDAG,
 		agent.Options{Dry: true},
 	)

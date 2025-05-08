@@ -31,7 +31,7 @@ var statusFlags = []commandLineFlag{
 }
 
 func runStatus(ctx *Context, args []string) error {
-	requestID, err := ctx.cmd.Flags().GetString("request-id")
+	requestID, err := ctx.Command.Flags().GetString("request-id")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
@@ -39,17 +39,16 @@ func runStatus(ctx *Context, args []string) error {
 	dagName := args[0]
 
 	var record models.Record
-	hr := ctx.HistoryRepo(nil)
 	if requestID != "" {
 		// Retrieve the previous run's record for the specified request ID.
-		r, err := hr.Find(ctx, dagName, requestID)
+		r, err := ctx.HistoryRepo.Find(ctx, dagName, requestID)
 		if err != nil {
 			logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
 			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
 		}
 		record = r
 	} else {
-		r, err := hr.Latest(ctx, dagName)
+		r, err := ctx.HistoryRepo.Latest(ctx, dagName)
 		if err != nil {
 			logger.Error(ctx, "Failed to retrieve latest run record", "dagName", dagName, "err", err)
 			return fmt.Errorf("failed to retrieve latest run record for DAG %s: %w", dagName, err)
@@ -62,8 +61,7 @@ func runStatus(ctx *Context, args []string) error {
 		logger.Error(ctx, "Failed to read DAG from record", "dagName", dagName, "err", err)
 	}
 
-	hm := ctx.HistoryManager(hr)
-	status, err := hm.GetRealtimeStatus(ctx, dag, requestID)
+	status, err := ctx.HistoryMgr.GetRealtimeStatus(ctx, dag, requestID)
 	if err != nil {
 		logger.Error(ctx, "Failed to retrieve current status", "dag", dag.Name, "err", err)
 		return fmt.Errorf("failed to retrieve current status: %w", err)

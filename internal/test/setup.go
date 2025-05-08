@@ -102,7 +102,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	helper := Helper{
 		Context:     createDefaultContext(),
 		Config:      cfg,
-		History:     historyManager,
+		HistoryMgr:  historyManager,
 		DAGRepo:     dagRepo,
 		HistoryRepo: runStore,
 
@@ -136,9 +136,9 @@ type Helper struct {
 	Cancel        context.CancelFunc
 	Config        *config.Config
 	LoggingOutput *SyncBuffer
-	History       history.Manager
 	DAGRepo       models.DAGRepository
 	HistoryRepo   models.HistoryRepository
+	HistoryMgr    history.Manager
 
 	tmpDir string
 }
@@ -183,7 +183,7 @@ func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
 	require.Eventually(t, func() bool {
-		latest, err := d.History.GetLatestStatus(d.Context, d.DAG)
+		latest, err := d.HistoryMgr.GetLatestStatus(d.Context, d.DAG)
 		if err != nil {
 			return false
 		}
@@ -197,7 +197,7 @@ func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
 
 	// the +1 to the limit is needed to ensure that the number of therunstore
 	// entries is exactly the expected number
-	runstore := d.History.ListRecentHistory(d.Context, d.Name, expected+1)
+	runstore := d.HistoryMgr.ListRecentHistory(d.Context, d.Name, expected+1)
 	require.Len(t, runstore, expected)
 }
 
@@ -205,7 +205,7 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
 	assert.Eventually(t, func() bool {
-		curr, _ := d.History.GetRealtimeStatus(d.Context, d.DAG, "")
+		curr, _ := d.HistoryMgr.GetRealtimeStatus(d.Context, d.DAG, "")
 		if curr == nil {
 			return false
 		}
@@ -220,7 +220,7 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]any) {
 	t.Helper()
 
-	status, err := d.History.GetLatestStatus(d.Context, d.DAG)
+	status, err := d.HistoryMgr.GetLatestStatus(d.Context, d.DAG)
 	require.NoError(t, err)
 
 	// collect the actual outputs from the status
@@ -309,7 +309,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		d.DAG,
 		logDir,
 		logFile,
-		d.History,
+		d.HistoryMgr,
 		d.DAGRepo,
 		d.HistoryRepo,
 		rootDAG,

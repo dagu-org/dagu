@@ -61,7 +61,7 @@ func TestManager(t *testing.T) {
 		requestID := uuid.Must(uuid.NewV7()).String()
 		now := time.Now()
 		ctx := th.Context
-		cli := th.History
+		cli := th.HistoryMgr
 
 		// Open the history store and write a status before updating it.
 		record, err := th.HistoryRepo.Create(ctx, dag.DAG, now, requestID, models.NewRecordOptions{})
@@ -98,36 +98,36 @@ func TestManager(t *testing.T) {
 	t.Run("UpdateSubRunStatus", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "tree_parent.yaml"))
 
-		err := th.History.Start(th.Context, dag.DAG, history.StartOptions{Quiet: true})
+		err := th.HistoryMgr.Start(th.Context, dag.DAG, history.StartOptions{Quiet: true})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
 
 		// Get the sub run status.
-		status, err := th.History.GetLatestStatus(th.Context, dag.DAG)
+		status, err := th.HistoryMgr.GetLatestStatus(th.Context, dag.DAG)
 		require.NoError(t, err)
 		requestId := status.RequestID
 		subRun := status.Nodes[0].SubRuns[0]
 
 		rootDAG := digraph.NewRootDAG(dag.Name, requestId)
-		subRunStatus, err := th.History.FindBySubRunRequestID(th.Context, rootDAG, subRun.RequestID)
+		subRunStatus, err := th.HistoryMgr.FindBySubRunRequestID(th.Context, rootDAG, subRun.RequestID)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusSuccess.String(), subRunStatus.Status.String())
 
 		// Update the sub run status.
 		subRunStatus.Nodes[0].Status = scheduler.NodeStatusError
-		err = th.History.UpdateStatus(th.Context, rootDAG, *subRunStatus)
+		err = th.HistoryMgr.UpdateStatus(th.Context, rootDAG, *subRunStatus)
 		require.NoError(t, err)
 
 		// Check if the sub run status is updated.
-		subRunStatus, err = th.History.FindBySubRunRequestID(th.Context, rootDAG, subRun.RequestID)
+		subRunStatus, err = th.HistoryMgr.FindBySubRunRequestID(th.Context, rootDAG, subRun.RequestID)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.NodeStatusError.String(), subRunStatus.Nodes[0].Status.String())
 	})
 	t.Run("InvalidUpdateStatusWithInvalidReqID", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "invalid_reqid.yaml"))
 		ctx := th.Context
-		cli := th.History
+		cli := th.HistoryMgr
 
 		// update with invalid request id
 		status := testNewStatus(dag.DAG, "unknown-req-id", scheduler.StatusError, scheduler.NodeStatusError)
@@ -145,14 +145,14 @@ func TestClient_RunDAG(t *testing.T) {
 	t.Run("RunDAG", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "run_dag.yaml"))
 
-		err := th.History.Start(th.Context, dag.DAG, history.StartOptions{
+		err := th.HistoryMgr.Start(th.Context, dag.DAG, history.StartOptions{
 			Quiet: true,
 		})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
 
-		status, err := th.History.GetLatestStatus(th.Context, dag.DAG)
+		status, err := th.HistoryMgr.GetLatestStatus(th.Context, dag.DAG)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusSuccess.String(), status.Status.String())
 	})
@@ -160,12 +160,12 @@ func TestClient_RunDAG(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "stop.yaml"))
 		ctx := th.Context
 
-		err := th.History.Start(ctx, dag.DAG, history.StartOptions{})
+		err := th.HistoryMgr.Start(ctx, dag.DAG, history.StartOptions{})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusRunning)
 
-		err = th.History.Stop(ctx, dag.DAG, "")
+		err = th.HistoryMgr.Stop(ctx, dag.DAG, "")
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusCancel)
@@ -174,12 +174,12 @@ func TestClient_RunDAG(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "restart.yaml"))
 		ctx := th.Context
 
-		err := th.History.Start(th.Context, dag.DAG, history.StartOptions{})
+		err := th.HistoryMgr.Start(th.Context, dag.DAG, history.StartOptions{})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusRunning)
 
-		err = th.History.Restart(ctx, dag.DAG, history.RestartOptions{})
+		err = th.HistoryMgr.Restart(ctx, dag.DAG, history.RestartOptions{})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
@@ -187,7 +187,7 @@ func TestClient_RunDAG(t *testing.T) {
 	t.Run("Retry", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "retry.yaml"))
 		ctx := th.Context
-		cli := th.History
+		cli := th.HistoryMgr
 
 		err := cli.Start(ctx, dag.DAG, history.StartOptions{Params: "x y z"})
 		require.NoError(t, err)

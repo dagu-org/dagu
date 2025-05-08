@@ -7,6 +7,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
@@ -32,7 +33,7 @@ This command is useful for recovering from errors or transient issues by re-runn
 var retryFlags = []commandLineFlag{requestIDFlagRetry}
 
 func runRetry(ctx *Context, args []string) error {
-	requestID, err := ctx.cmd.Flags().GetString("request-id")
+	requestID, err := ctx.Command.Flags().GetString("request-id")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
@@ -40,8 +41,7 @@ func runRetry(ctx *Context, args []string) error {
 	dagName := args[0]
 
 	// Retrieve the previous run data for specified request ID.
-	hr := ctx.HistoryRepo(nil)
-	runRecord, err := hr.Find(ctx, dagName, requestID)
+	runRecord, err := ctx.HistoryRepo.Find(ctx, dagName, requestID)
 	if err != nil {
 		logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
 		return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
@@ -76,7 +76,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootDAG
 	logger.Debug(ctx, "Executing retry", "dagName", dag.Name, "requestID", status.RequestID)
 
 	// We use the same log file for the retry as the original run.
-	logFile, err := OpenOrCreateLogFile(status.Log)
+	logFile, err := fileutil.OpenOrCreateFile(status.Log)
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %w", err)
 	}
@@ -95,17 +95,14 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootDAG
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	hr := ctx.HistoryRepo(nil)
-	hm := ctx.HistoryManager(hr)
-
 	agentInstance := agent.New(
 		status.RequestID,
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
-		hm,
+		ctx.HistoryMgr,
 		dr,
-		hr,
+		ctx.HistoryRepo,
 		rootDAG,
 		agent.Options{
 			RetryTarget: status,
@@ -116,7 +113,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootDAG
 	listenSignals(ctx, agentInstance)
 
 	if err := agentInstance.Run(ctx); err != nil {
-		if ctx.quiet {
+		if ctx.Quiet {
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
@@ -125,7 +122,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootDAG
 	}
 
 	// Print the summary of the execution if the quiet flag is not set.
-	if !ctx.quiet {
+	if !ctx.Quiet {
 		agentInstance.PrintSummary(ctx)
 	}
 
