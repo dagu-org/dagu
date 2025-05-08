@@ -36,12 +36,12 @@ func runDry(ctx *Context, args []string) error {
 		digraph.WithDAGsDir(ctx.cfg.Paths.DAGsDir),
 	}
 
-	if argsLenAtDash := ctx.ArgsLenAtDash(); argsLenAtDash != -1 {
+	if argsLenAtDash := ctx.cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
 		// Get parameters from command line arguments after "--"
 		loadOpts = append(loadOpts, digraph.WithParams(args[argsLenAtDash:]))
 	} else {
 		// Get parameters from flags
-		params, err := ctx.Flags().GetString("params")
+		params, err := ctx.cmd.Flags().GetString("params")
 		if err != nil {
 			return fmt.Errorf("failed to get parameters: %w", err)
 		}
@@ -68,15 +68,13 @@ func runDry(ctx *Context, args []string) error {
 
 	ctx.LogToFile(logFile)
 
-	dagRepo, err := ctx.dagRepo([]string{filepath.Dir(dag.Location)})
+	dr, err := ctx.dagRepo(nil, []string{filepath.Dir(dag.Location)})
 	if err != nil {
-		return fmt.Errorf("failed to initialize DAG store: %w", err)
+		return err
 	}
 
-	historyManager, err := ctx.HistoryManager()
-	if err != nil {
-		return fmt.Errorf("failed to initialize client: %w", err)
-	}
+	hr := ctx.HistoryRepo(nil)
+	hm := ctx.HistoryManager(hr)
 
 	rootDAG := digraph.NewRootDAG(dag.Name, requestID)
 
@@ -85,9 +83,9 @@ func runDry(ctx *Context, args []string) error {
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
-		historyManager,
-		dagRepo,
-		ctx.historyRepo(),
+		hm,
+		dr,
+		hr,
 		rootDAG,
 		agent.Options{Dry: true},
 	)

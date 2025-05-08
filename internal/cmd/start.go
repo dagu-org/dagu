@@ -36,7 +36,7 @@ This command parses the DAG specification, resolves parameters, and initiates th
 var startFlags = []commandLineFlag{paramsFlag, requestIDFlagStart, parentRequestIDFlag, rootDAGNameFlag, rootRequestIDFlag}
 
 func runStart(ctx *Context, args []string) error {
-	requestID, err := ctx.Flags().GetString("request-id")
+	requestID, err := ctx.cmd.Flags().GetString("request-id")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
@@ -61,12 +61,12 @@ func runStart(ctx *Context, args []string) error {
 
 	// Load parameters from command line arguments.
 	var params string
-	if argsLenAtDash := ctx.ArgsLenAtDash(); argsLenAtDash != -1 {
+	if argsLenAtDash := ctx.cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
 		// Get parameters from command line arguments after "--"
 		loadOpts = append(loadOpts, digraph.WithParams(args[argsLenAtDash:]))
 	} else {
 		// Get parameters from flags
-		params, err = ctx.Flags().GetString("params")
+		params, err = ctx.cmd.Flags().GetString("params")
 		if err != nil {
 			return fmt.Errorf("failed to get parameters: %w", err)
 		}
@@ -80,9 +80,9 @@ func runStart(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 	}
 
-	rootRequestID, _ := ctx.Flags().GetString("root-request-id")
-	rootDAGName, _ := ctx.Flags().GetString("root-dag-name")
-	parentRequestID, _ := ctx.Flags().GetString("parent-request-id")
+	rootRequestID, _ := ctx.cmd.Flags().GetString("root-request-id")
+	rootDAGName, _ := ctx.cmd.Flags().GetString("root-dag-name")
+	parentRequestID, _ := ctx.cmd.Flags().GetString("parent-request-id")
 
 	// If rootDAGName is not empty, it means current execution is a sub-DAG.
 	// Sub DAG execution requires both root-request-id and root-dag-name to be set.
@@ -122,7 +122,7 @@ func runStart(ctx *Context, args []string) error {
 		}
 		logger.Debug(ctx, "Checking for previous sub-DAG run with the request ID", "requestID", requestID)
 		var status *models.Status
-		record, err := ctx.historyRepo().FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, requestID)
+		record, err := ctx.HistoryRepo(nil).FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, requestID)
 		if errors.Is(err, models.ErrRequestIDNotFound) {
 			// If the request ID is not found, proceed with execution
 			goto EXEC
@@ -143,13 +143,13 @@ EXEC:
 	return executeDag(ctx, dag, parentRequestID, requestID, rootDAG)
 }
 
-func executeDag(ctx *Context, dag *digraph.DAG, parentRequestID, requestID string, rootDAG digraph.RootDAG) error {
+func executeDag(ctx *Context, d *digraph.DAG, parentReqID, reqID string, rootDAG digraph.RootDAG) error {
 	// Open the log file for the scheduler. The log file will be used for future
 	// execution for the same DAG/request ID between attempts.
-	logFile, err := ctx.OpenLogFile(dag, requestID)
+	logFile, err := ctx.OpenLogFile(d, reqID)
 	if err != nil {
-		logger.Error(ctx, "failed to initialize log file", "DAG", dag.Name, "err", err)
-		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
+		logger.Error(ctx, "failed to initialize log file", "DAG", d.Name, "err", err)
+		return fmt.Errorf("failed to initialize log file for DAG %s: %w", d.Name, err)
 	}
 	defer func() {
 		_ = logFile.Close()
@@ -157,42 +157,39 @@ func executeDag(ctx *Context, dag *digraph.DAG, parentRequestID, requestID strin
 
 	ctx.LogToFile(logFile)
 
-	logger.Debug(ctx, "DAG run initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
+	logger.Debug(ctx, "DAG run initiated", "DAG", d.Name, "requestID", reqID, "logFile", logFile.Name())
 
-	dr, err := ctx.dagRepo([]string{filepath.Dir(dag.Location)})
+	dr, err := ctx.dagRepo(nil, []string{filepath.Dir(d.Location)})
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	cli, err := ctx.HistoryManager()
-	if err != nil {
-		logger.Error(ctx, "Failed to initialize client", "err", err)
-		return fmt.Errorf("failed to initialize client: %w", err)
-	}
+	hr := ctx.HistoryRepo(nil)
+	hm := ctx.HistoryManager(hr)
 
 	agentInstance := agent.New(
-		requestID,
-		dag,
+		reqID,
+		d,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
-		cli,
+		hm,
 		dr,
-		ctx.historyRepo(),
+		hr,
 		rootDAG,
-		agent.Options{ParentID: parentRequestID},
+		agent.Options{ParentID: parentReqID},
 	)
 
 	listenSignals(ctx, agentInstance)
 
 	if err := agentInstance.Run(ctx); err != nil {
-		logger.Error(ctx, "Failed to execute DAG", "DAG", dag.Name, "requestID", requestID, "err", err)
+		logger.Error(ctx, "Failed to execute DAG", "DAG", d.Name, "requestID", reqID, "err", err)
 
 		if ctx.quiet {
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
-			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, requestID, err)
+			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", d.Name, reqID, err)
 		}
 	}
 

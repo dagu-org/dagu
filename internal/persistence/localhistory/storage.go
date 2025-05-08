@@ -1,4 +1,4 @@
-package filestore
+package localhistory
 
 import (
 	"context"
@@ -15,49 +15,47 @@ import (
 
 // Error definitions for common issues
 var (
-	ErrInvalidPath        = errors.New("invalid path")
-	ErrRequestIDEmpty     = errors.New("requestID is empty")
-	ErrRootRequestIDEmpty = errors.New("root requestID is empty")
+	ErrRequestIDEmpty = errors.New("requestID is empty")
 )
 
-var _ models.HistoryRepository = (*fileStore)(nil)
+var _ models.HistoryRepository = (*historyStorage)(nil)
 
-// fileStore manages DAGs status files in local storage with high performance and reliability.
-type fileStore struct {
+// historyStorage manages DAGs status files in local historyStorage with high performance and reliability.
+type historyStorage struct {
 	baseDir           string                          // Base directory for all status files
 	latestStatusToday bool                            // Whether to only return today's status
 	cache             *fileutil.Cache[*models.Status] // Optional cache for read operations
 	maxWorkers        int                             // Maximum number of parallel workers
 }
 
-// Option defines functional options for configuring local.
-type Option func(*Options)
+// HistoryStorageOption defines functional options for configuring local.
+type HistoryStorageOption func(*HistoryStorageOptions)
 
-// Options holds configuration options for local.
-type Options struct {
+// HistoryStorageOptions holds configuration options for local.
+type HistoryStorageOptions struct {
 	FileCache         *fileutil.Cache[*models.Status] // Optional cache for status files
 	LatestStatusToday bool                            // Whether to only return today's status
 	MaxWorkers        int                             // Maximum number of parallel workers
 	OperationTimeout  time.Duration                   // Timeout for operations
 }
 
-// WithFileCache sets the file cache for local.
-func WithFileCache(cache *fileutil.Cache[*models.Status]) Option {
-	return func(o *Options) {
+// WithHistoryFileCache sets the file cache for local.
+func WithHistoryFileCache(cache *fileutil.Cache[*models.Status]) HistoryStorageOption {
+	return func(o *HistoryStorageOptions) {
 		o.FileCache = cache
 	}
 }
 
 // WithLatestStatusToday sets whether to only return today's status.
-func WithLatestStatusToday(latestStatusToday bool) Option {
-	return func(o *Options) {
+func WithLatestStatusToday(latestStatusToday bool) HistoryStorageOption {
+	return func(o *HistoryStorageOptions) {
 		o.LatestStatusToday = latestStatusToday
 	}
 }
 
 // New creates a new JSONDB instance with the specified options.
-func New(baseDir string, opts ...Option) *fileStore {
-	options := &Options{
+func New(baseDir string, opts ...HistoryStorageOption) models.HistoryRepository {
+	options := &HistoryStorageOptions{
 		LatestStatusToday: true,
 		MaxWorkers:        runtime.NumCPU(),
 	}
@@ -66,7 +64,7 @@ func New(baseDir string, opts ...Option) *fileStore {
 		opt(options)
 	}
 
-	return &fileStore{
+	return &historyStorage{
 		baseDir:           baseDir,
 		latestStatusToday: options.LatestStatusToday,
 		cache:             options.FileCache,
@@ -77,7 +75,7 @@ func New(baseDir string, opts ...Option) *fileStore {
 // Create creates a new run record for the specified DAG run.
 // If opts.Root is not nil, it creates a sub-record for the specified root DAG.
 // If opts.Retry is true, it creates a retry record for the specified request ID.
-func (db *fileStore) Create(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts models.NewRecordOptions) (models.Record, error) {
+func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts models.NewRecordOptions) (models.Record, error) {
 	if reqID == "" {
 		return nil, ErrRequestIDEmpty
 	}
@@ -113,7 +111,7 @@ func (db *fileStore) Create(ctx context.Context, dag *digraph.DAG, timestamp tim
 }
 
 // NewSubRecord creates a new run record for the specified sub-run.
-func (db *fileStore) newSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts models.NewRecordOptions) (models.Record, error) {
+func (db *historyStorage) newSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts models.NewRecordOptions) (models.Record, error) {
 	dataRoot := NewDataRoot(db.baseDir, opts.Root.RootName)
 	rootRun, err := dataRoot.FindByRequestID(ctx, opts.Root.RootID)
 	if err != nil {
@@ -147,7 +145,7 @@ func (db *fileStore) newSubRecord(ctx context.Context, dag *digraph.DAG, timesta
 }
 
 // Recent returns the most recent run records for the specified key, up to itemLimit.
-func (db *fileStore) Recent(ctx context.Context, dagName string, itemLimit int) []models.Record {
+func (db *historyStorage) Recent(ctx context.Context, dagName string, itemLimit int) []models.Record {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -181,7 +179,7 @@ func (db *fileStore) Recent(ctx context.Context, dagName string, itemLimit int) 
 }
 
 // Latest returns the most recent run record for today.
-func (db *fileStore) Latest(ctx context.Context, dagName string) (models.Record, error) {
+func (db *historyStorage) Latest(ctx context.Context, dagName string) (models.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -214,7 +212,7 @@ func (db *fileStore) Latest(ctx context.Context, dagName string) (models.Record,
 }
 
 // Find finds a run record by request ID.
-func (db *fileStore) Find(ctx context.Context, dagName, reqID string) (models.Record, error) {
+func (db *historyStorage) Find(ctx context.Context, dagName, reqID string) (models.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -238,7 +236,7 @@ func (db *fileStore) Find(ctx context.Context, dagName, reqID string) (models.Re
 }
 
 // FindSubRun finds a run record by request ID for a sub-DAG.
-func (db *fileStore) FindSubRun(ctx context.Context, name, reqID string, subRunID string) (models.Record, error) {
+func (db *historyStorage) FindSubRun(ctx context.Context, name, reqID string, subRunID string) (models.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -265,7 +263,7 @@ func (db *fileStore) FindSubRun(ctx context.Context, name, reqID string, subRunI
 }
 
 // RemoveOld removes run records older than retentionDays for the specified key.
-func (db *fileStore) RemoveOld(ctx context.Context, dagName string, retentionDays int) error {
+func (db *historyStorage) RemoveOld(ctx context.Context, dagName string, retentionDays int) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -284,7 +282,7 @@ func (db *fileStore) RemoveOld(ctx context.Context, dagName string, retentionDay
 }
 
 // Rename renames all run records from oldKey to newKey.
-func (db *fileStore) Rename(ctx context.Context, oldNameOrPath, newNameOrPath string) error {
+func (db *historyStorage) Rename(ctx context.Context, oldNameOrPath, newNameOrPath string) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():

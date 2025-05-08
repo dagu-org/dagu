@@ -1,4 +1,4 @@
-package filestore
+package localhistory
 
 import (
 	"testing"
@@ -26,7 +26,7 @@ func TestJSONDB(t *testing.T) {
 		th.CreateRecord(t, ts3, "request-id-3", scheduler.StatusSuccess)
 
 		// Request 2 most recent records
-		records := th.DB.Recent(th.Context, "test_DAG", 2)
+		records := th.Repo.Recent(th.Context, "test_DAG", 2)
 		require.Len(t, records, 2)
 
 		// Verify the first record is the most recent
@@ -40,11 +40,11 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, "request-id-2", status1.RequestID)
 
 		// Verify all records are returned if the number requested is equal to the number of records
-		records = th.DB.Recent(th.Context, "test_DAG", 3)
+		records = th.Repo.Recent(th.Context, "test_DAG", 3)
 		require.Len(t, records, 3)
 
 		// Verify all records are returned if the number requested is greater than the number of records
-		records = th.DB.Recent(th.Context, "test_DAG", 4)
+		records = th.Repo.Recent(th.Context, "test_DAG", 4)
 		require.Len(t, records, 3)
 	})
 	t.Run("LatestRecord", func(t *testing.T) {
@@ -62,8 +62,9 @@ func TestJSONDB(t *testing.T) {
 
 		// Set the database to return the latest status (even if it was created today)
 		// Verify that record created before today is returned
-		th.DB.latestStatusToday = false
-		record, err := th.DB.Latest(th.Context, "test_DAG")
+		obj := th.Repo.(*historyStorage)
+		obj.latestStatusToday = false
+		record, err := th.Repo.Latest(th.Context, "test_DAG")
 		require.NoError(t, err)
 
 		// Verify the record is the most recent
@@ -86,7 +87,7 @@ func TestJSONDB(t *testing.T) {
 		th.CreateRecord(t, ts3, "request-id-3", scheduler.StatusSuccess)
 
 		// Find the record with request ID "request-id-2"
-		record, err := th.DB.Find(th.Context, "test_DAG", "request-id-2")
+		record, err := th.Repo.Find(th.Context, "test_DAG", "request-id-2")
 		require.NoError(t, err)
 
 		// Verify the record is the correct one
@@ -95,7 +96,7 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, "request-id-2", status.RequestID)
 
 		// Verify an error is returned if the request ID does not exist
-		_, err = th.DB.Find(th.Context, "test_DAG", "nonexistent-id")
+		_, err = th.Repo.Find(th.Context, "test_DAG", "nonexistent-id")
 		assert.ErrorIs(t, err, models.ErrRequestIDNotFound)
 	})
 	t.Run("RemoveOld", func(t *testing.T) {
@@ -112,16 +113,16 @@ func TestJSONDB(t *testing.T) {
 		th.CreateRecord(t, ts3, "request-id-3", scheduler.StatusSuccess)
 
 		// Verify records are present
-		records := th.DB.Recent(th.Context, "test_DAG", 3)
+		records := th.Repo.Recent(th.Context, "test_DAG", 3)
 		require.Len(t, records, 3)
 
 		// Remove records older than 0 days
 		// It should remove all records
-		err := th.DB.RemoveOld(th.Context, "test_DAG", 0)
+		err := th.Repo.RemoveOld(th.Context, "test_DAG", 0)
 		require.NoError(t, err)
 
 		// Verify records are removed
-		records = th.DB.Recent(th.Context, "test_DAG", 3)
+		records = th.Repo.Recent(th.Context, "test_DAG", 3)
 		require.Len(t, records, 0)
 	})
 	t.Run("SubRecord", func(t *testing.T) {
@@ -136,7 +137,7 @@ func TestJSONDB(t *testing.T) {
 		// Create a sub record
 		rootDAG := digraph.NewRootDAG("test_DAG", "parent-id")
 		subDAG := th.DAG("sub_dag")
-		record, err := th.DB.Create(th.Context, subDAG.DAG, ts, "sub-id", models.NewRecordOptions{
+		record, err := th.Repo.Create(th.Context, subDAG.DAG, ts, "sub-id", models.NewRecordOptions{
 			Root: &rootDAG,
 		})
 		require.NoError(t, err)
@@ -154,7 +155,7 @@ func TestJSONDB(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify record is created
-		existingRecord, err := th.DB.FindSubRun(th.Context, rootDAG.RootName, rootDAG.RootID, "sub-id")
+		existingRecord, err := th.Repo.FindSubRun(th.Context, rootDAG.RootName, rootDAG.RootID, "sub-id")
 		require.NoError(t, err)
 
 		status, err := existingRecord.ReadStatus(th.Context)
@@ -173,7 +174,7 @@ func TestJSONDB(t *testing.T) {
 		// Create a sub record
 		rootDAG := digraph.NewRootDAG("test_DAG", "parent-id")
 		subDAG := th.DAG("sub_dag")
-		record, err := th.DB.Create(th.Context, subDAG.DAG, ts, "sub-id", models.NewRecordOptions{
+		record, err := th.Repo.Create(th.Context, subDAG.DAG, ts, "sub-id", models.NewRecordOptions{
 			Root: &rootDAG,
 		})
 		require.NoError(t, err)
@@ -193,7 +194,7 @@ func TestJSONDB(t *testing.T) {
 
 		// Find the sub run by request ID
 		ts = time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
-		existingRecord, err := th.DB.FindSubRun(th.Context, rootDAG.RootName, rootDAG.RootID, "sub-id")
+		existingRecord, err := th.Repo.FindSubRun(th.Context, rootDAG.RootName, rootDAG.RootID, "sub-id")
 		require.NoError(t, err)
 		existingRecordStatus, err := existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)
@@ -201,7 +202,7 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, scheduler.StatusRunning.String(), existingRecordStatus.Status.String())
 
 		// Create a retry record and write different status
-		retryRecord, err := th.DB.Create(th.Context, subDAG.DAG, ts, "sub-id", models.NewRecordOptions{
+		retryRecord, err := th.Repo.Create(th.Context, subDAG.DAG, ts, "sub-id", models.NewRecordOptions{
 			Root:  &rootDAG,
 			Retry: true,
 		})
@@ -212,7 +213,7 @@ func TestJSONDB(t *testing.T) {
 		_ = retryRecord.Close(th.Context)
 
 		// Verify the retry record is created
-		existingRecord, err = th.DB.FindSubRun(th.Context, rootDAG.RootName, rootDAG.RootID, "sub-id")
+		existingRecord, err = th.Repo.FindSubRun(th.Context, rootDAG.RootName, rootDAG.RootID, "sub-id")
 		require.NoError(t, err)
 		existingRecordStatus, err = existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)

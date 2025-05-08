@@ -1,4 +1,4 @@
-package filestore
+package localhistory
 
 import (
 	"context"
@@ -110,7 +110,7 @@ func TestWriterRename(t *testing.T) {
 
 	// Rename and verify the file
 	newDAG := th.DAG("test_rename_new")
-	err := th.DB.Rename(context.Background(), dag.Location, newDAG.Location)
+	err := th.Repo.Rename(context.Background(), dag.Location, newDAG.Location)
 	require.NoError(t, err)
 	newWriter := newDAG.Writer(t, "request-id-2", time.Now())
 

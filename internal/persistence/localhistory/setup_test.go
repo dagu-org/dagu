@@ -1,4 +1,4 @@
-package filestore
+package localhistory
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 
 type JSONDBTest struct {
 	Context context.Context
-	DB      *fileStore
+	Repo    models.HistoryRepository
 	tmpDir  string
 }
 
@@ -26,7 +26,7 @@ func setupTestJSONDB(t *testing.T) JSONDBTest {
 
 	th := JSONDBTest{
 		Context: context.Background(),
-		DB:      New(tmpDir),
+		Repo:    New(tmpDir),
 		tmpDir:  tmpDir,
 	}
 
@@ -40,7 +40,7 @@ func (th JSONDBTest) CreateRecord(t *testing.T, ts time.Time, requestID string, 
 	t.Helper()
 
 	dag := th.DAG("test_DAG")
-	record, err := th.DB.Create(th.Context, dag.DAG, ts, requestID, models.NewRecordOptions{})
+	record, err := th.Repo.Create(th.Context, dag.DAG, ts, requestID, models.NewRecordOptions{})
 	require.NoError(t, err)
 
 	err = record.Open(th.Context)
@@ -82,7 +82,8 @@ func (d DAGTest) Writer(t *testing.T, requestID string, startedAt time.Time) Wri
 	run, err := root.CreateRun(NewUTC(startedAt), requestID)
 	require.NoError(t, err)
 
-	record, err := run.CreateRecord(d.th.Context, NewUTC(startedAt), d.th.DB.cache, WithDAG(d.DAG))
+	obj := d.th.Repo.(*historyStorage)
+	record, err := run.CreateRecord(d.th.Context, NewUTC(startedAt), obj.cache, WithDAG(d.DAG))
 	require.NoError(t, err)
 
 	writer := NewWriter(record.file)

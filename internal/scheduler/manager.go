@@ -54,13 +54,13 @@ type dagJobManager struct {
 }
 
 // NewDAGJobManager creates a new DAG manager with the given configuration.
-func NewDAGJobManager(dir string, dagCli models.DAGRepository, runCli history.Manager, executable, workDir string) JobManager {
+func NewDAGJobManager(dir string, dagCli models.DAGRepository, hm history.Manager, executable, workDir string) JobManager {
 	return &dagJobManager{
 		targetDir:      dir,
 		lock:           sync.Mutex{},
 		registry:       map[string]*digraph.DAG{},
 		dagClient:      dagCli,
-		historyManager: runCli,
+		historyManager: hm,
 		executable:     executable,
 		workDir:        workDir,
 	}

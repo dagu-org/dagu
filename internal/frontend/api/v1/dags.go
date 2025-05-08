@@ -15,8 +15,8 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/history"
-	"github.com/dagu-org/dagu/internal/history/filestore"
 	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/persistence/localhistory"
 	"github.com/samber/lo"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/japanese"
@@ -311,7 +311,7 @@ func (a *API) readLog(
 	var logFile string
 
 	if statusFile != "" {
-		status, err := filestore.ParseStatusFile(statusFile)
+		status, err := localhistory.ParseStatusFile(statusFile)
 		if err != nil {
 			return nil, err
 		}
@@ -346,7 +346,7 @@ func (a *API) readStepLog(
 	var status *models.Status
 
 	if statusFile != "" {
-		parsedStatus, err := filestore.ParseStatusFile(statusFile)
+		parsedStatus, err := localhistory.ParseStatusFile(statusFile)
 		if err != nil {
 			return nil, err
 		}

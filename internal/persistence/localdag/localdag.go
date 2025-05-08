@@ -1,4 +1,4 @@
-package local
+package localdag
 
 import (
 	"context"
@@ -14,12 +14,12 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/grep"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
-	"github.com/dagu-org/dagu/internal/models/grep"
 )
 
-var _ models.DAGRepository = (*dagFileStorage)(nil)
+var _ models.DAGRepository = (*storage)(nil)
 
 // Option is a functional option for configuring the DAG repository
 type Option func(*Options)
@@ -52,8 +52,8 @@ func WithSearchPaths(paths []string) Option {
 	}
 }
 
-// dagFileStorage implements the DAGRepository interface using the local filesystem
-type dagFileStorage struct {
+// storage implements the DAGRepository interface using the local filesystem
+type storage struct {
 	baseDir      string                        // Base directory for DAG storage
 	flagsBaseDir string                        // Base directory for flag storage
 	fileCache    *fileutil.Cache[*digraph.DAG] // Optional cache for DAG objects
@@ -80,7 +80,7 @@ func New(baseDir string, opts ...Option) models.DAGRepository {
 		searchPaths = append(searchPaths, path)
 	}
 
-	return &dagFileStorage{
+	return &storage{
 		baseDir:      baseDir,
 		flagsBaseDir: options.FlagsBaseDir,
 		fileCache:    options.FileCache,
@@ -89,22 +89,22 @@ func New(baseDir string, opts ...Option) models.DAGRepository {
 }
 
 // GetMetadata retrieves the metadata of a DAG by its name.
-func (d *dagFileStorage) GetMetadata(ctx context.Context, name string) (*digraph.DAG, error) {
-	filePath, err := d.locateDAG(name)
+func (sto *storage) GetMetadata(ctx context.Context, name string) (*digraph.DAG, error) {
+	filePath, err := sto.locateDAG(name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to locate DAG %s in search paths (%v): %w", name, d.searchPaths, err)
+		return nil, fmt.Errorf("failed to locate DAG %s in search paths (%v): %w", name, sto.searchPaths, err)
 	}
-	if d.fileCache == nil {
+	if sto.fileCache == nil {
 		return digraph.Load(ctx, filePath, digraph.OnlyMetadata(), digraph.WithoutEval())
 	}
-	return d.fileCache.LoadLatest(filePath, func() (*digraph.DAG, error) {
+	return sto.fileCache.LoadLatest(filePath, func() (*digraph.DAG, error) {
 		return digraph.Load(ctx, filePath, digraph.OnlyMetadata(), digraph.WithoutEval())
 	})
 }
 
 // GetDetails retrieves the details of a DAG by its name.
-func (d *dagFileStorage) GetDetails(ctx context.Context, name string) (*digraph.DAG, error) {
-	filePath, err := d.locateDAG(name)
+func (sto *storage) GetDetails(ctx context.Context, name string) (*digraph.DAG, error) {
+	filePath, err := sto.locateDAG(name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to locate DAG %s: %w", name, err)
 	}
@@ -116,8 +116,8 @@ func (d *dagFileStorage) GetDetails(ctx context.Context, name string) (*digraph.
 }
 
 // GetSpec retrieves the specification of a DAG by its name.
-func (d *dagFileStorage) GetSpec(_ context.Context, name string) (string, error) {
-	filePath, err := d.locateDAG(name)
+func (sto *storage) GetSpec(_ context.Context, name string) (string, error) {
+	filePath, err := sto.locateDAG(name)
 	if err != nil {
 		return "", models.ErrDAGNotFound
 	}
@@ -131,14 +131,14 @@ func (d *dagFileStorage) GetSpec(_ context.Context, name string) (string, error)
 // FileMode used for newly created DAG files
 const defaultPerm os.FileMode = 0600
 
-func (d *dagFileStorage) LoadSpec(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error) {
+func (sto *storage) LoadSpec(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error) {
 	// Validate the spec before saving it.
 	opts = append(slices.Clone(opts), digraph.WithoutEval())
 	return digraph.LoadYAML(ctx, spec, opts...)
 }
 
 // UpdateSpec updates the specification of a DAG by its name.
-func (d *dagFileStorage) UpdateSpec(ctx context.Context, name string, spec []byte) error {
+func (sto *storage) UpdateSpec(ctx context.Context, name string, spec []byte) error {
 	// Validate the spec before saving it.
 	dag, err := digraph.LoadYAML(ctx, spec, digraph.WithoutEval())
 	if err != nil {
@@ -147,21 +147,21 @@ func (d *dagFileStorage) UpdateSpec(ctx context.Context, name string, spec []byt
 	if err := dag.Validate(); err != nil {
 		return err
 	}
-	filePath, err := d.locateDAG(name)
+	filePath, err := sto.locateDAG(name)
 	if err != nil {
 		return fmt.Errorf("failed to locate DAG %s: %w", name, err)
 	}
 	if err := os.WriteFile(filePath, spec, defaultPerm); err != nil {
 		return err
 	}
-	if d.fileCache != nil {
-		d.fileCache.Invalidate(filePath)
+	if sto.fileCache != nil {
+		sto.fileCache.Invalidate(filePath)
 	}
 	return nil
 }
 
 // Create creates a new DAG with the given name and specification.
-func (d *dagFileStorage) Create(_ context.Context, name string, spec []byte) error {
+func (d *storage) Create(_ context.Context, name string, spec []byte) error {
 	if err := d.ensureDirExist(); err != nil {
 		return fmt.Errorf("failed to create DAGs directory %s: %w", d.baseDir, err)
 	}
@@ -176,7 +176,7 @@ func (d *dagFileStorage) Create(_ context.Context, name string, spec []byte) err
 }
 
 // Delete deletes a DAG by its name.
-func (d *dagFileStorage) Delete(_ context.Context, name string) error {
+func (d *storage) Delete(_ context.Context, name string) error {
 	filePath, err := d.locateDAG(name)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -194,7 +194,7 @@ func (d *dagFileStorage) Delete(_ context.Context, name string) error {
 }
 
 // ensureDirExist ensures that the base directory exists.
-func (d *dagFileStorage) ensureDirExist() error {
+func (d *storage) ensureDirExist() error {
 	if !fileExists(d.baseDir) {
 		if err := os.MkdirAll(d.baseDir, 0750); err != nil {
 			return err
@@ -204,7 +204,7 @@ func (d *dagFileStorage) ensureDirExist() error {
 }
 
 // List lists DAGs with pagination support.
-func (d *dagFileStorage) List(ctx context.Context, opts models.ListOptions) (models.PaginatedResult[*digraph.DAG], []string, error) {
+func (d *storage) List(ctx context.Context, opts models.ListOptions) (models.PaginatedResult[*digraph.DAG], []string, error) {
 	var dags []*digraph.DAG
 	var errList []string
 	var totalCount int
@@ -268,7 +268,7 @@ func (d *dagFileStorage) List(ctx context.Context, opts models.ListOptions) (mod
 }
 
 // Grep searches for a pattern in all DAGs.
-func (d *dagFileStorage) Grep(ctx context.Context, pattern string) (
+func (d *storage) Grep(ctx context.Context, pattern string) (
 	ret []*models.GrepResult, errs []string, err error,
 ) {
 	if pattern == "" {
@@ -318,41 +318,25 @@ func (d *dagFileStorage) Grep(ctx context.Context, pattern string) (
 	return ret, errs, nil
 }
 
-func (f dagFileStorage) ToggleSuspend(ctx context.Context, id string, suspend bool) error {
+func (d *storage) ToggleSuspend(ctx context.Context, id string, suspend bool) error {
 	if suspend {
-		return f.createFlag(fileName(id))
-	} else if f.IsSuspended(ctx, id) {
-		return f.deleteFlag(fileName(id))
+		return d.createFlag(fileName(id))
+	} else if d.IsSuspended(ctx, id) {
+		return d.deleteFlag(fileName(id))
 	}
 	return nil
 }
 
-func (f dagFileStorage) IsSuspended(_ context.Context, id string) bool {
-	return f.flagExists(fileName(id))
+func (d *storage) IsSuspended(_ context.Context, id string) bool {
+	return d.flagExists(fileName(id))
 }
 
 func fileName(id string) string {
 	return fmt.Sprintf("%s.suspend", normalizeFilename(id, "-"))
 }
 
-// https://github.com/sindresorhus/filename-reserved-regex/blob/master/index.js
-var (
-	filenameReservedRegex = regexp.MustCompile(
-		`[<>:"/\\|?*\x00-\x1F]`,
-	)
-	filenameReservedWindowsNamesRegex = regexp.MustCompile(
-		`(?i)^(con|prn|aux|nul|com[0-9]|lpt[0-9])$`,
-	)
-)
-
-func normalizeFilename(str, replacement string) string {
-	s := filenameReservedRegex.ReplaceAllString(str, replacement)
-	s = filenameReservedWindowsNamesRegex.ReplaceAllString(s, replacement)
-	return strings.ReplaceAll(s, " ", replacement)
-}
-
 // Rename renames a DAG from oldID to newID.
-func (d *dagFileStorage) Rename(_ context.Context, oldID, newID string) error {
+func (d *storage) Rename(_ context.Context, oldID, newID string) error {
 	oldFilePath, err := d.locateDAG(oldID)
 	if err != nil {
 		return fmt.Errorf("failed to locate DAG %s: %w", oldID, err)
@@ -365,7 +349,7 @@ func (d *dagFileStorage) Rename(_ context.Context, oldID, newID string) error {
 }
 
 // generateFilePath generates the file path for a DAG by its name.
-func (d *dagFileStorage) generateFilePath(name string) string {
+func (d *storage) generateFilePath(name string) string {
 	if strings.Contains(name, string(filepath.Separator)) {
 		filePath, err := filepath.Abs(name)
 		if err == nil {
@@ -377,7 +361,7 @@ func (d *dagFileStorage) generateFilePath(name string) string {
 }
 
 // locateDAG locates the DAG file by its name or path.
-func (d *dagFileStorage) locateDAG(nameOrPath string) (string, error) {
+func (d *storage) locateDAG(nameOrPath string) (string, error) {
 	if strings.Contains(nameOrPath, string(filepath.Separator)) {
 		foundPath, err := findDAGFile(nameOrPath)
 		if err == nil {
@@ -401,27 +385,8 @@ func (d *dagFileStorage) locateDAG(nameOrPath string) (string, error) {
 	return "", fmt.Errorf("DAG %s not found: %w", nameOrPath, os.ErrNotExist)
 }
 
-// findDAGFile finds the DAG file with the given file name.
-func findDAGFile(name string) (string, error) {
-	ext := path.Ext(name)
-	switch ext {
-	case ".yaml", ".yml":
-		if fileutil.FileExists(name) {
-			return filepath.Abs(name)
-		}
-	default:
-		// try all supported extensions
-		for _, ext := range fileutil.ValidYAMLExtensions {
-			if fileutil.FileExists(name + ext) {
-				return filepath.Abs(name + ext)
-			}
-		}
-	}
-	return "", fmt.Errorf("file %s not found: %w", name, os.ErrNotExist)
-}
-
 // TagList lists all unique tags from the DAGs.
-func (d *dagFileStorage) TagList(ctx context.Context) ([]string, []string, error) {
+func (d *storage) TagList(ctx context.Context) ([]string, []string, error) {
 	var (
 		errList []string
 		tagSet  = make(map[string]struct{})
@@ -459,20 +424,20 @@ func (d *dagFileStorage) TagList(ctx context.Context) ([]string, []string, error
 }
 
 // CreateFlag creates the given file.
-func (s *dagFileStorage) createFlag(file string) error {
+func (s *storage) createFlag(file string) error {
 	_ = os.MkdirAll(s.flagsBaseDir, flagPermission)
 	return os.WriteFile(path.Join(s.flagsBaseDir, file), []byte{}, flagPermission)
 }
 
 // flagExists returns true if the given file exists.
-func (s *dagFileStorage) flagExists(file string) bool {
+func (s *storage) flagExists(file string) bool {
 	_ = os.MkdirAll(s.flagsBaseDir, flagPermission)
 	_, err := os.Stat(path.Join(s.flagsBaseDir, file))
 	return err == nil
 }
 
 // deleteFlag deletes the given file.
-func (s *dagFileStorage) deleteFlag(file string) error {
+func (s *storage) deleteFlag(file string) error {
 	_ = os.MkdirAll(s.flagsBaseDir, flagPermission)
 	return os.Remove(path.Join(s.flagsBaseDir, file))
 }
@@ -500,4 +465,40 @@ func containsTag(tags []string, searchTag string) bool {
 func fileExists(file string) bool {
 	_, err := os.Stat(file)
 	return !os.IsNotExist(err)
+}
+
+// normalizeFilename normalizes a filename by replacing reserved characters with a replacement string.
+func normalizeFilename(str, replacement string) string {
+	s := filenameReservedRegex.ReplaceAllString(str, replacement)
+	s = filenameReservedWindowsNamesRegex.ReplaceAllString(s, replacement)
+	return strings.ReplaceAll(s, " ", replacement)
+}
+
+// https://github.com/sindresorhus/filename-reserved-regex/blob/master/index.js
+var (
+	filenameReservedRegex = regexp.MustCompile(
+		`[<>:"/\\|?*\x00-\x1F]`,
+	)
+	filenameReservedWindowsNamesRegex = regexp.MustCompile(
+		`(?i)^(con|prn|aux|nul|com[0-9]|lpt[0-9])$`,
+	)
+)
+
+// findDAGFile finds the DAG file with the given file name.
+func findDAGFile(name string) (string, error) {
+	ext := path.Ext(name)
+	switch ext {
+	case ".yaml", ".yml":
+		if fileutil.FileExists(name) {
+			return filepath.Abs(name)
+		}
+	default:
+		// try all supported extensions
+		for _, ext := range fileutil.ValidYAMLExtensions {
+			if fileutil.FileExists(name + ext) {
+				return filepath.Abs(name + ext)
+			}
+		}
+	}
+	return "", fmt.Errorf("file %s not found: %w", name, os.ErrNotExist)
 }

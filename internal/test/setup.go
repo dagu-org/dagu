@@ -21,10 +21,10 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/history"
-	runfs "github.com/dagu-org/dagu/internal/history/filestore"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
-	"github.com/dagu-org/dagu/internal/models/local"
+	"github.com/dagu-org/dagu/internal/persistence/localdag"
+	"github.com/dagu-org/dagu/internal/persistence/localhistory"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -94,8 +94,8 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		cfg.Server = *options.ServerConfig
 	}
 
-	dagRepo := local.New(cfg.Paths.DAGsDir, local.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
-	runStore := runfs.New(cfg.Paths.DataDir)
+	dagRepo := localdag.New(cfg.Paths.DAGsDir, localdag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
+	runStore := localhistory.New(cfg.Paths.DataDir)
 
 	historyManager := history.New(runStore, cfg.Paths.Executable, cfg.Global.WorkDir, "")
 

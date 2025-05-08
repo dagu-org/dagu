@@ -15,10 +15,10 @@ import (
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/frontend"
 	"github.com/dagu-org/dagu/internal/history"
-	runfs "github.com/dagu-org/dagu/internal/history/filestore"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
-	daglocal "github.com/dagu-org/dagu/internal/models/local"
+	"github.com/dagu-org/dagu/internal/persistence/localdag"
+	"github.com/dagu-org/dagu/internal/persistence/localhistory"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
@@ -26,37 +26,15 @@ import (
 	"github.com/spf13/viper"
 )
 
-var _ context.Context = (*Context)(nil)
-
 // Context holds the configuration for a command.
 type Context struct {
-	*cobra.Command
+	context.Context
 
+	cmd   *cobra.Command
 	run   func(cmd *Context, args []string) error
 	flags []commandLineFlag
 	cfg   *config.Config
-	ctx   context.Context
 	quiet bool
-}
-
-// Deadline implements context.Context.
-func (c *Context) Deadline() (deadline time.Time, ok bool) {
-	return c.ctx.Deadline()
-}
-
-// Done implements context.Context.
-func (c *Context) Done() <-chan struct{} {
-	return c.ctx.Done()
-}
-
-// Err implements context.Context.
-func (c *Context) Err() error {
-	return c.ctx.Err()
-}
-
-// Value implements context.Context.
-func (c *Context) Value(key any) any {
-	return c.ctx.Value(key)
 }
 
 // LogToFile creates a new logger context with a file writer.
@@ -74,13 +52,13 @@ func (c *Context) LogToFile(f *os.File) {
 	if f != nil {
 		opts = append(opts, logger.WithWriter(f))
 	}
-	c.ctx = logger.WithLogger(c.ctx, logger.NewLogger(opts...))
+	c.Context = logger.WithLogger(c.Context, logger.NewLogger(opts...))
 }
 
 // init initializes the application setup by loading configuration,
 // setting up logger context, and logging any warnings.
 func (c *Context) init(cmd *cobra.Command) error {
-	ctx := cmd.Context()
+	c.Context = cmd.Context()
 
 	bindFlags(cmd, c.flags...)
 
@@ -106,112 +84,93 @@ func (c *Context) init(cmd *cobra.Command) error {
 	if quiet {
 		opts = append(opts, logger.WithQuiet())
 	}
-	ctx = setupLoggerContext(ctx, opts...)
+	c.Context = setupLoggerContext(c.Context, opts...)
 
 	// Log any warnings collected during configuration loading
 	for _, w := range cfg.Warnings {
-		logger.Warn(ctx, w)
+		logger.Warn(c.Context, w)
 	}
 
-	c.Command = cmd
+	c.cmd = cmd
 	c.cfg = cfg
-	c.ctx = ctx
 	c.quiet = quiet
 
 	return nil
 }
 
 // HistoryManager initializes a HistoryManager using the provided options. If not supplied,
-func (c *Context) HistoryManager(opts ...clientOption) (history.Manager, error) {
-	options := &clientOptions{}
-	for _, opt := range opts {
-		opt(options)
-	}
-	runStore := options.historyRepo
-	if runStore == nil {
-		runStore = c.historyRepo()
-	}
 
+func (c *Context) HistoryManager(hr models.HistoryRepository) history.Manager {
 	return history.New(
-		runStore,
+		hr,
 		c.cfg.Paths.Executable,
 		c.cfg.Global.WorkDir,
 		c.cfg.Global.ConfigPath,
-	), nil
+	)
 }
 
 // server creates and returns a new web UI server.
 // It initializes in-memory caches for DAGs and runstore, and uses them in the client.
 func (c *Context) server() (*frontend.Server, error) {
-	dagCache := fileutil.NewCache[*digraph.DAG](0, time.Hour*12)
-	dagCache.StartEviction(c)
-	dagRepo := c.dagRepoWithCache(dagCache)
+	dc := fileutil.NewCache[*digraph.DAG](0, time.Hour*12)
+	dc.StartEviction(c)
 
-	statusCache := fileutil.NewCache[*models.Status](0, time.Hour*12)
-	statusCache.StartEviction(c)
-	historyRepo := c.historyRepoWithCache(statusCache)
-
-	historyManager, err := c.HistoryManager(withHistoryRepo(historyRepo))
+	dr, err := c.dagRepo(dc, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize client: %w", err)
+		return nil, err
 	}
 
-	return frontend.NewServer(c.cfg, dagRepo, historyManager), nil
+	hc := fileutil.NewCache[*models.Status](0, time.Hour*12)
+	hc.StartEviction(c)
+
+	hm := c.HistoryManager(c.HistoryRepo(hc))
+
+	return frontend.NewServer(c.cfg, dr, hm), nil
 }
 
 // scheduler creates a new scheduler instance using the default client.
 // It builds a DAG job manager to handle scheduled executions.
 func (c *Context) scheduler() (*scheduler.Scheduler, error) {
-	runCli, err := c.HistoryManager()
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize client: %w", err)
-	}
+	cache := fileutil.NewCache[*digraph.DAG](0, time.Hour*12)
+	cache.StartEviction(c)
 
-	dagRepo, err := c.dagRepo(nil)
+	dr, err := c.dagRepo(cache, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize DAG client: %w", err)
 	}
 
-	manager := scheduler.NewDAGJobManager(c.cfg.Paths.DAGsDir, dagRepo, runCli, c.cfg.Paths.Executable, c.cfg.Global.WorkDir)
-	return scheduler.New(c.cfg, manager), nil
+	hr := c.HistoryRepo(nil)
+	hm := c.HistoryManager(hr)
+	m := scheduler.NewDAGJobManager(c.cfg.Paths.DAGsDir, dr, hm, c.cfg.Paths.Executable, c.cfg.Global.WorkDir)
+	return scheduler.New(c.cfg, m), nil
 }
 
 // dagRepo returns a new DAGRepository instance. It ensures that the directory exists
 // (creating it if necessary) before returning the store.
-func (c *Context) dagRepo(searchPaths []string) (models.DAGRepository, error) {
-	baseDir := c.cfg.Paths.DAGsDir
-	_, err := os.Stat(baseDir)
+func (c *Context) dagRepo(cache *fileutil.Cache[*digraph.DAG], searchPaths []string) (models.DAGRepository, error) {
+	dir := c.cfg.Paths.DAGsDir
+	_, err := os.Stat(dir)
 	if os.IsNotExist(err) {
-		if err := os.MkdirAll(baseDir, 0750); err != nil {
-			return nil, fmt.Errorf("failed to initialize directory %s: %w", baseDir, err)
+		if err := os.MkdirAll(dir, 0750); err != nil {
+			return nil, fmt.Errorf("failed to create DAGs directory %s: %w", dir, err)
 		}
 	}
 
 	// Create a flag store based on the suspend flags directory.
-	return daglocal.New(
+	return localdag.New(
 		c.cfg.Paths.DAGsDir,
-		daglocal.WithFlagsBaseDir(c.cfg.Paths.SuspendFlagsDir),
-		daglocal.WithSearchPaths(searchPaths)), nil
-}
-
-// dagRepoWithCache returns a DAGRepository instance that uses an in-memory file cache.
-func (c *Context) dagRepoWithCache(cache *fileutil.Cache[*digraph.DAG]) models.DAGRepository {
-	return daglocal.New(c.cfg.Paths.DAGsDir, daglocal.WithFlagsBaseDir(c.cfg.Paths.SuspendFlagsDir), daglocal.WithFileCache(cache))
+		localdag.WithFlagsBaseDir(c.cfg.Paths.SuspendFlagsDir),
+		localdag.WithSearchPaths(searchPaths),
+		localdag.WithFileCache(cache),
+	), nil
 }
 
 // historyRepo returns a new HistoryRepository instance using JSON database storage.
 // It applies the "latestStatusToday" setting from the server configuration.
-func (c *Context) historyRepo() models.HistoryRepository {
-	return runfs.New(c.cfg.Paths.DataDir, runfs.WithLatestStatusToday(
-		c.cfg.Server.LatestStatusToday,
-	))
-}
-
-// historyRepoWithCache returns a HistoryRepository that uses an in-memory cache.
-func (c *Context) historyRepoWithCache(cache *fileutil.Cache[*models.Status]) models.HistoryRepository {
-	return runfs.New(c.cfg.Paths.DataDir,
-		runfs.WithLatestStatusToday(c.cfg.Server.LatestStatusToday),
-		runfs.WithFileCache(cache),
+func (c *Context) HistoryRepo(cache *fileutil.Cache[*models.Status]) models.HistoryRepository {
+	return localhistory.New(c.cfg.Paths.DataDir,
+		localhistory.WithLatestStatusToday(c.cfg.Server.LatestStatusToday),
+		localhistory.WithHistoryFileCache(cache),
 	)
 }
 
@@ -248,8 +207,8 @@ func (c *Context) OpenLogFile(
 		return nil, fmt.Errorf("failed to setup log directory: %w", err)
 	}
 
-	filename := BuildLogFilename(config)
-	return OpenOrCreateLogFile(filepath.Join(outputDir, filename))
+	logFile := BuildLogFilename(config)
+	return OpenOrCreateLogFile(filepath.Join(outputDir, logFile))
 }
 
 func (c *Context) loggingOpts(cfg *config.Config) []logger.Option {
@@ -278,7 +237,7 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, run func(cmd *Conte
 			os.Exit(1)
 		}
 		if err := ctx.run(ctx, args); err != nil {
-			logger.Error(ctx.ctx, "Command failed", "err", err)
+			logger.Error(ctx.Context, "Command failed", "err", err)
 			os.Exit(1)
 		}
 		return nil
@@ -296,23 +255,8 @@ func setupLoggerContext(ctx context.Context, opts ...logger.Option) context.Cont
 // NewContext creates a setup instance from an existing configuration.
 func NewContext(ctx context.Context, cfg *config.Config) *Context {
 	c := &Context{cfg: cfg}
-	c.ctx = setupLoggerContext(ctx, c.loggingOpts(cfg)...)
+	c.Context = setupLoggerContext(ctx, c.loggingOpts(cfg)...)
 	return c
-}
-
-// clientOption defines functional options for configuring the client.
-type clientOption func(*clientOptions)
-
-// clientOptions holds optional dependencies for constructing a client.
-type clientOptions struct {
-	historyRepo models.HistoryRepository
-}
-
-// withHistoryRepo returns a clientOption that sets a custom RunStore.
-func withHistoryRepo(historyRepo models.HistoryRepository) clientOption {
-	return func(o *clientOptions) {
-		o.historyRepo = historyRepo
-	}
 }
 
 // generateRequestID creates a new UUID string to be used as a request identifier.

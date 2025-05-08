@@ -32,7 +32,7 @@ This command is useful for recovering from errors or transient issues by re-runn
 var retryFlags = []commandLineFlag{requestIDFlagRetry}
 
 func runRetry(ctx *Context, args []string) error {
-	requestID, err := ctx.Flags().GetString("request-id")
+	requestID, err := ctx.cmd.Flags().GetString("request-id")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
@@ -40,7 +40,8 @@ func runRetry(ctx *Context, args []string) error {
 	dagName := args[0]
 
 	// Retrieve the previous run data for specified request ID.
-	runRecord, err := ctx.historyRepo().Find(ctx, dagName, requestID)
+	hr := ctx.HistoryRepo(nil)
+	runRecord, err := hr.Find(ctx, dagName, requestID)
 	if err != nil {
 		logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
 		return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
@@ -88,26 +89,23 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootDAG
 	// Update the context with the log file
 	ctx.LogToFile(logFile)
 
-	dr, err := ctx.dagRepo([]string{filepath.Dir(dag.Location)})
+	dr, err := ctx.dagRepo(nil, []string{filepath.Dir(dag.Location)})
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	manager, err := ctx.HistoryManager()
-	if err != nil {
-		logger.Error(ctx, "Failed to initialize client", "err", err)
-		return fmt.Errorf("failed to initialize client: %w", err)
-	}
+	hr := ctx.HistoryRepo(nil)
+	hm := ctx.HistoryManager(hr)
 
 	agentInstance := agent.New(
 		status.RequestID,
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
-		manager,
+		hm,
 		dr,
-		ctx.historyRepo(),
+		hr,
 		rootDAG,
 		agent.Options{
 			RetryTarget: status,

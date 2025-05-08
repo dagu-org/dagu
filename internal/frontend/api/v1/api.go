@@ -31,8 +31,8 @@ type API struct {
 }
 
 func New(
-	dagCli models.DAGRepository,
-	runCli history.Manager,
+	dr models.DAGRepository,
+	hm history.Manager,
 	cfg *config.Config,
 ) *API {
 	remoteNodes := make(map[string]config.RemoteNode)
@@ -41,8 +41,8 @@ func New(
 	}
 
 	return &API{
-		dagRepository:      dagCli,
-		historyManager:     runCli,
+		dagRepository:      dr,
+		historyManager:     hm,
 		logEncodingCharset: cfg.UI.LogEncodingCharset,
 		remoteNodes:        remoteNodes,
 		apiBasePath:        cfg.Server.APIBasePath,

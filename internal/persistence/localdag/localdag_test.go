@@ -1,4 +1,4 @@
-package local
+package localdag
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDAGRepo(t *testing.T) {
+func TestStorage(t *testing.T) {
 	tmpDir := fileutil.MustTempDir("test-suspend-checker")
 	defer func() {
 		_ = os.RemoveAll(tmpDir)

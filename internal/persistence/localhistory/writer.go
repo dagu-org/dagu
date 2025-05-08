@@ -1,4 +1,4 @@
-package filestore
+package localhistory
 
 import (
 	"bufio"
@@ -18,6 +18,7 @@ import (
 // WriterState represents the current state of a writer
 type WriterState int
 
+// WriterState constants
 const (
 	WriterStateClosed WriterState = iota
 	WriterStateOpen
@@ -25,7 +26,6 @@ const (
 
 // Error definitions
 var (
-	ErrWriterClosed  = errors.New("writer is closed")
 	ErrWriterNotOpen = errors.New("writer is not open")
 )
 

@@ -9,9 +9,9 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/history"
-	runfs "github.com/dagu-org/dagu/internal/history/filestore"
 	"github.com/dagu-org/dagu/internal/models"
-	"github.com/dagu-org/dagu/internal/models/local"
+	"github.com/dagu-org/dagu/internal/persistence/localdag"
+	"github.com/dagu-org/dagu/internal/persistence/localhistory"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -64,15 +64,15 @@ func setupTest(t *testing.T) testHelper {
 		Global: config.Global{WorkDir: tempDir},
 	}
 
-	dagRepo := local.New(cfg.Paths.DAGsDir, local.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
-	runStore := runfs.New(cfg.Paths.DataDir)
-	runCli := history.New(runStore, "", cfg.Global.WorkDir, "")
-	jobManager := scheduler.NewDAGJobManager(testdataDir, dagRepo, runCli, "", "")
+	dr := localdag.New(cfg.Paths.DAGsDir, localdag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
+	hr := localhistory.New(cfg.Paths.DataDir)
+	hm := history.New(hr, "", cfg.Global.WorkDir, "")
+	jobManager := scheduler.NewDAGJobManager(testdataDir, dr, hm, "", "")
 
 	return testHelper{
 		manager:        jobManager,
-		dagRepo:        dagRepo,
-		historyManager: runCli,
+		dagRepo:        dr,
+		historyManager: hm,
 		config:         cfg,
 	}
 }
