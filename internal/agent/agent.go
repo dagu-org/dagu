@@ -153,12 +153,6 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 	ctx = logger.WithValues(ctx, logFields...)
 
-	// It should not run the DAG if the condition is unmet.
-	if err := a.checkPreconditions(ctx); err != nil {
-		logger.Info(ctx, "Preconditions are not met", "err", err)
-		return err
-	}
-
 	// Handle dry execution.
 	if a.dry {
 		return a.dryRun(ctx)
@@ -561,21 +555,6 @@ func (a *Agent) setupSocketServer(ctx context.Context) error {
 		return err
 	}
 	a.socketServer = socketServer
-	return nil
-}
-
-// checkPrecondition check if the preconditions are met. If not, it returns
-// error.
-func (a *Agent) checkPreconditions(ctx context.Context) error {
-	if len(a.dag.Preconditions) == 0 {
-		return nil
-	}
-	// If one of the conditions does not met, cancel the execution.
-	if err := scheduler.EvalConditions(ctx, a.dag.Preconditions); err != nil {
-		logger.Info(ctx, "Preconditions are not met", "err", err)
-		a.scheduler.Cancel(ctx, a.graph)
-		return err
-	}
 	return nil
 }
 

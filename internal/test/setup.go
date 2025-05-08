@@ -189,7 +189,7 @@ func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 		}
 		t.Logf("latest status=%s errors=%v", latest.Status.String(), latest.Errors())
 		return latest.Status == expected
-	}, time.Second*3, time.Millisecond*50)
+	}, time.Second*3, time.Second)
 }
 
 func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
@@ -211,7 +211,7 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 		}
 		t.Logf("current status=%s errors=%v", curr.Status.String(), curr.Errors())
 		return curr.Status == expected
-	}, time.Second*3, time.Millisecond*50)
+	}, time.Second*3, time.Second)
 }
 
 // AssertOutputs checks the given outputs against the actual outputs of the DAG

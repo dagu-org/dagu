@@ -14,6 +14,7 @@ import (
 
 func TestDAG(t *testing.T) {
 	server := test.SetupServer(t)
+
 	t.Run("CreateExecuteDelete", func(t *testing.T) {
 		// Create a new DAG
 		_ = server.Client().Post("/api/v2/dags", api.CreateNewDAG201JSONResponse{

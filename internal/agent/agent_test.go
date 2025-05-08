@@ -80,7 +80,7 @@ func TestAgent_Run(t *testing.T) {
 		}
 
 		dagAgent := dag.Agent()
-		dagAgent.RunCheckErr(t, "condition was not met")
+		dagAgent.RunCancel(t)
 
 		// Check if all nodes are not executed
 		status := dagAgent.Status()

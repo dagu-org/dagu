@@ -130,6 +130,14 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 
 	var wg = sync.WaitGroup{}
 
+	dagCtx := digraph.GetContext(ctx)
+
+	// If one of the conditions does not met, cancel the execution.
+	if err := EvalConditions(ctx, dagCtx.DAG.Preconditions); err != nil {
+		logger.Info(ctx, "Preconditions are not met", "err", err)
+		sc.Cancel(ctx, graph)
+	}
+
 	for !sc.isFinished(graph) {
 		if sc.isCanceled() {
 			break
