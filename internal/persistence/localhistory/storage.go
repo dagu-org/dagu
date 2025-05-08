@@ -112,8 +112,8 @@ func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestam
 
 // NewSubRecord creates a new run record for the specified sub-run.
 func (db *historyStorage) newSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts models.NewRecordOptions) (models.Record, error) {
-	dataRoot := NewDataRoot(db.baseDir, opts.Root.RootName)
-	rootRun, err := dataRoot.FindByReqID(ctx, opts.Root.RootID)
+	dataRoot := NewDataRoot(db.baseDir, opts.Root.Name)
+	rootRun, err := dataRoot.FindByReqID(ctx, opts.Root.ReqID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find root run: %w", err)
 	}

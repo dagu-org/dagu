@@ -37,7 +37,7 @@ type HistoryRepository interface {
 
 // NewRecordOptions contains options for creating a new history record
 type NewRecordOptions struct {
-	Root  *digraph.RootDAG
+	Root  *digraph.RootRun
 	Retry bool
 }
 

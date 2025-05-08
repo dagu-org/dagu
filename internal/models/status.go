@@ -42,12 +42,12 @@ func InitialStatus(dag *digraph.DAG) Status {
 // StatusOption is a functional option pattern for configuring Status objects
 type StatusOption func(*Status)
 
-// WithRunContext returns a StatusOption that sets the root DAG information
-func WithRunContext(ctx digraph.RunContext) StatusOption {
+// WithSubRunMetadata returns a StatusOption that sets the root DAG information
+func WithSubRunMetadata(r digraph.RootRun, parentReqID string) StatusOption {
 	return func(s *Status) {
-		s.RootReqID = ctx.Root.RootID
-		s.RootDAGName = ctx.Root.RootName
-		s.ParentID = ctx.ParentReqID
+		s.RootReqID = r.ReqID
+		s.RootDAGName = r.Name
+		s.ParentID = parentReqID
 	}
 }
 
@@ -184,12 +184,12 @@ func (st *Status) Errors() []error {
 }
 
 // RootDAG returns the root DAG object for the current status
-func (st *Status) RootDAG() digraph.RootDAG {
+func (st *Status) RootDAG() digraph.RootRun {
 	if st.RootDAGName == "" || st.RootReqID == "" {
 		// If the root DAG name and request ID are not set, it means this is the root DAG
-		return digraph.NewRootDAG(st.Name, st.ReqID)
+		return digraph.NewRootRun(st.Name, st.ReqID)
 	}
-	return digraph.NewRootDAG(st.RootDAGName, st.RootReqID)
+	return digraph.NewRootRun(st.RootDAGName, st.RootReqID)
 }
 
 // NodesByName returns a slice of nodes with the specified name

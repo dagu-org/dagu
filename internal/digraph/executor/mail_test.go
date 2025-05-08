@@ -77,7 +77,7 @@ func TestMail(t *testing.T) {
 				ctx := context.Background()
 				ctx = digraph.NewContext(ctx, &digraph.DAG{
 					SMTP: &digraph.SMTPConfig{},
-				}, nil, digraph.RunContext{}, "", nil)
+				}, nil, digraph.RootRun{}, "", "", nil)
 
 				exec, err := newMail(ctx, tt.step)
 

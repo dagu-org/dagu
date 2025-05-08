@@ -52,6 +52,7 @@ func GetExecContext(ctx context.Context) ExecContext {
 // available to the step.
 type ExecContext struct {
 	Context
+
 	vars *SyncMap
 	step Step
 	envs map[string]string
@@ -92,21 +93,21 @@ func (c ExecContext) LoadOutputVariables(vars *SyncMap) {
 }
 
 func (c ExecContext) MailerConfig(ctx context.Context) (mailer.Config, error) {
-	if c.dag.SMTP == nil {
+	if c.DAG.SMTP == nil {
 		return mailer.Config{}, nil
 	}
 	return cmdutil.EvalStringFields(ctx, mailer.Config{
-		Host:     c.dag.SMTP.Host,
-		Port:     c.dag.SMTP.Port,
-		Username: c.dag.SMTP.Username,
-		Password: c.dag.SMTP.Password,
+		Host:     c.DAG.SMTP.Host,
+		Port:     c.DAG.SMTP.Port,
+		Username: c.DAG.SMTP.Username,
+		Password: c.DAG.SMTP.Password,
 	}, cmdutil.WithVariables(c.vars.Variables()))
 }
 
 // EvalString evaluates the given string with the variables within the execution context.
 func (c ExecContext) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
 	dagCtx := GetContext(ctx)
-	opts = append(opts, cmdutil.WithVariables(dagCtx.envs))
+	opts = append(opts, cmdutil.WithVariables(dagCtx.Envs))
 	opts = append(opts, cmdutil.WithVariables(c.envs))
 	opts = append(opts, cmdutil.WithVariables(c.vars.Variables()))
 	return cmdutil.EvalString(ctx, s, opts...)

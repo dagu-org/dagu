@@ -62,9 +62,9 @@ func runRetry(ctx *Context, args []string) error {
 
 	// The retry command is currently only supported for root DAGs.
 	// Therefore we use the request ID as the root DAG request ID here.
-	rootDAG := digraph.NewRootDAG(dag.Name, status.ReqID)
+	rootRun := digraph.NewRootRun(dag.Name, status.ReqID)
 
-	if err := executeRetry(ctx, dag, status, rootDAG); err != nil {
+	if err := executeRetry(ctx, dag, status, rootRun); err != nil {
 		logger.Error(ctx, "Failed to execute retry", "path", dagName, "err", err)
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
@@ -72,7 +72,7 @@ func runRetry(ctx *Context, args []string) error {
 	return nil
 }
 
-func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootDAG digraph.RootDAG) error {
+func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootRun digraph.RootRun) error {
 	logger.Debug(ctx, "Executing retry", "dagName", dag.Name, "reqId", status.ReqID)
 
 	// We use the same log file for the retry as the original run.
@@ -103,7 +103,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootDAG
 		ctx.HistoryMgr,
 		dr,
 		ctx.HistoryRepo,
-		rootDAG,
+		rootRun,
 		agent.Options{
 			RetryTarget: status,
 			ParentID:    status.ParentID,

@@ -135,10 +135,10 @@ func TestJSONDB(t *testing.T) {
 		_ = th.CreateRecord(t, ts, "parent-id", scheduler.StatusRunning)
 
 		// Create a sub record
-		rootDAG := digraph.NewRootDAG("test_DAG", "parent-id")
+		rootRun := digraph.NewRootRun("test_DAG", "parent-id")
 		subDAG := th.DAG("sub_dag")
 		record, err := th.Repo.Create(th.Context, subDAG.DAG, ts, "sub-id", models.NewRecordOptions{
-			Root: &rootDAG,
+			Root: &rootRun,
 		})
 		require.NoError(t, err)
 
@@ -155,7 +155,7 @@ func TestJSONDB(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify record is created
-		existingRecord, err := th.Repo.FindSubRun(th.Context, rootDAG.RootName, rootDAG.RootID, "sub-id")
+		existingRecord, err := th.Repo.FindSubRun(th.Context, rootRun.Name, rootRun.ReqID, "sub-id")
 		require.NoError(t, err)
 
 		status, err := existingRecord.ReadStatus(th.Context)
@@ -172,10 +172,10 @@ func TestJSONDB(t *testing.T) {
 		_ = th.CreateRecord(t, ts, "parent-id", scheduler.StatusRunning)
 
 		// Create a sub record
-		rootDAG := digraph.NewRootDAG("test_DAG", "parent-id")
+		rootRun := digraph.NewRootRun("test_DAG", "parent-id")
 		subDAG := th.DAG("sub_dag")
 		record, err := th.Repo.Create(th.Context, subDAG.DAG, ts, "sub-id", models.NewRecordOptions{
-			Root: &rootDAG,
+			Root: &rootRun,
 		})
 		require.NoError(t, err)
 
@@ -194,7 +194,7 @@ func TestJSONDB(t *testing.T) {
 
 		// Find the sub run by request ID
 		ts = time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
-		existingRecord, err := th.Repo.FindSubRun(th.Context, rootDAG.RootName, rootDAG.RootID, "sub-id")
+		existingRecord, err := th.Repo.FindSubRun(th.Context, rootRun.Name, rootRun.ReqID, "sub-id")
 		require.NoError(t, err)
 		existingRecordStatus, err := existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)
@@ -203,7 +203,7 @@ func TestJSONDB(t *testing.T) {
 
 		// Create a retry record and write different status
 		retryRecord, err := th.Repo.Create(th.Context, subDAG.DAG, ts, "sub-id", models.NewRecordOptions{
-			Root:  &rootDAG,
+			Root:  &rootRun,
 			Retry: true,
 		})
 		require.NoError(t, err)
@@ -213,7 +213,7 @@ func TestJSONDB(t *testing.T) {
 		_ = retryRecord.Close(th.Context)
 
 		// Verify the retry record is created
-		existingRecord, err = th.Repo.FindSubRun(th.Context, rootDAG.RootName, rootDAG.RootID, "sub-id")
+		existingRecord, err = th.Repo.FindSubRun(th.Context, rootRun.Name, rootRun.ReqID, "sub-id")
 		require.NoError(t, err)
 		existingRecordStatus, err = existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)

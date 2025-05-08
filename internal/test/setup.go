@@ -284,10 +284,7 @@ func WithAgentOptions(options agent.Options) AgentOption {
 }
 
 func (d *DAG) Agent(opts ...AgentOption) *Agent {
-	helper := &Agent{
-		Helper: d.Helper,
-		DAG:    d.DAG,
-	}
+	helper := &Agent{Helper: d.Helper, DAG: d.DAG}
 
 	for _, opt := range opts {
 		opt(helper)
@@ -302,7 +299,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 
 	logDir := d.Config.Paths.LogDir
 	logFile := filepath.Join(d.Config.Paths.LogDir, reqID+".log")
-	rootDAG := digraph.NewRootDAG(d.Name, reqID)
+	rootRun := digraph.NewRootRun(d.Name, reqID)
 
 	helper.Agent = agent.New(
 		reqID,
@@ -312,7 +309,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		d.HistoryMgr,
 		d.DAGRepo,
 		d.HistoryRepo,
-		rootDAG,
+		rootRun,
 		helper.opts,
 	)
 

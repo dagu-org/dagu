@@ -2,10 +2,10 @@ package digraph
 
 import "context"
 
-// DBClient gets a result of a DAG run.
-type DBClient interface {
+// DB gets a result of a DAG run.
+type DB interface {
 	GetDAG(ctx context.Context, name string) (*DAG, error)
-	GetSubStatus(ctx context.Context, requestID string, rootDAG RootDAG) (*Status, error)
+	GetSubStatus(ctx context.Context, requestID string, rootDAG RootRun) (*Status, error)
 }
 
 // Status is the result of a DAG run.

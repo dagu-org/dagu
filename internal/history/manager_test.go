@@ -85,8 +85,8 @@ func TestManager(t *testing.T) {
 		newStatus := scheduler.NodeStatusError
 		status.Nodes[0].Status = newStatus
 
-		rootDAG := digraph.NewRootDAG(dag.Name, reqID)
-		err = cli.UpdateStatus(ctx, rootDAG, status)
+		rootRun := digraph.NewRootRun(dag.Name, reqID)
+		err = cli.UpdateStatus(ctx, rootRun, status)
 		require.NoError(t, err)
 
 		statusByReqID, err := cli.FindByReqID(ctx, dag.Name, reqID)
@@ -109,18 +109,18 @@ func TestManager(t *testing.T) {
 		reqID := status.ReqID
 		subRun := status.Nodes[0].SubRuns[0]
 
-		rootDAG := digraph.NewRootDAG(dag.Name, reqID)
-		subRunStatus, err := th.HistoryMgr.FindBySubRunReqID(th.Context, rootDAG, subRun.ReqID)
+		rootRun := digraph.NewRootRun(dag.Name, reqID)
+		subRunStatus, err := th.HistoryMgr.FindBySubRunReqID(th.Context, rootRun, subRun.ReqID)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusSuccess.String(), subRunStatus.Status.String())
 
 		// Update the sub run status.
 		subRunStatus.Nodes[0].Status = scheduler.NodeStatusError
-		err = th.HistoryMgr.UpdateStatus(th.Context, rootDAG, *subRunStatus)
+		err = th.HistoryMgr.UpdateStatus(th.Context, rootRun, *subRunStatus)
 		require.NoError(t, err)
 
 		// Check if the sub run status is updated.
-		subRunStatus, err = th.HistoryMgr.FindBySubRunReqID(th.Context, rootDAG, subRun.ReqID)
+		subRunStatus, err = th.HistoryMgr.FindBySubRunReqID(th.Context, rootRun, subRun.ReqID)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.NodeStatusError.String(), subRunStatus.Nodes[0].Status.String())
 	})
@@ -133,8 +133,8 @@ func TestManager(t *testing.T) {
 		status := testNewStatus(dag.DAG, "unknown-req-id", scheduler.StatusError, scheduler.NodeStatusError)
 
 		// Check if the update fails.
-		rootDAG := digraph.NewRootDAG(dag.Name, "unknown-req-id")
-		err := cli.UpdateStatus(ctx, rootDAG, status)
+		rootRun := digraph.NewRootRun(dag.Name, "unknown-req-id")
+		err := cli.UpdateStatus(ctx, rootRun, status)
 		require.Error(t, err)
 	})
 }

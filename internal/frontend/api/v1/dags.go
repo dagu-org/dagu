@@ -702,8 +702,8 @@ func (a *API) updateStatus(
 
 	status.Nodes[idxToUpdate].Status = to
 
-	rootDAG := digraph.NewRootDAG(dag.Name, reqID)
-	if err := a.historyManager.UpdateStatus(ctx, rootDAG, *status); err != nil {
+	rootRun := digraph.NewRootRun(dag.Name, reqID)
+	if err := a.historyManager.UpdateStatus(ctx, rootRun, *status); err != nil {
 		return fmt.Errorf("error updating status: %w", err)
 	}
 

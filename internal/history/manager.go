@@ -215,8 +215,8 @@ func (m *Manager) findPersistedStatus(ctx context.Context, dag *digraph.DAG, req
 }
 
 // FindBySubRunReqID retrieves the status of a sub-run by its request ID.
-func (m *Manager) FindBySubRunReqID(ctx context.Context, root digraph.RootDAG, reqID string) (*models.Status, error) {
-	record, err := m.FindSubRun(ctx, root.RootName, root.RootID, reqID)
+func (m *Manager) FindBySubRunReqID(ctx context.Context, root digraph.RootRun, reqID string) (*models.Status, error) {
+	record, err := m.FindSubRun(ctx, root.Name, root.ReqID, reqID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sub-run status by request id: %w", err)
 	}
@@ -302,7 +302,7 @@ func (m *Manager) ListRecentHistory(ctx context.Context, name string, n int) []m
 }
 
 // UpdateStatus updates the status of a DAG run in the run store.
-func (e *Manager) UpdateStatus(ctx context.Context, root digraph.RootDAG, status models.Status) error {
+func (e *Manager) UpdateStatus(ctx context.Context, root digraph.RootRun, status models.Status) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -314,16 +314,16 @@ func (e *Manager) UpdateStatus(ctx context.Context, root digraph.RootDAG, status
 	// Find the run record
 	var historyRecord models.Record
 
-	if root.RootID == status.ReqID {
+	if root.ReqID == status.ReqID {
 		// If the request ID matches the root DAG's request ID, find the run record by request ID
-		r, err := e.Find(ctx, root.RootName, status.ReqID)
+		r, err := e.Find(ctx, root.Name, status.ReqID)
 		if err != nil {
 			return fmt.Errorf("failed to find run record: %w", err)
 		}
 		historyRecord = r
 	} else {
 		// If the request ID does not match, find the run record by sub-run request ID
-		r, err := e.FindSubRun(ctx, root.RootName, root.RootID, status.ReqID)
+		r, err := e.FindSubRun(ctx, root.Name, root.ReqID, status.ReqID)
 		if err != nil {
 			return fmt.Errorf("failed to find sub-run record: %w", err)
 		}

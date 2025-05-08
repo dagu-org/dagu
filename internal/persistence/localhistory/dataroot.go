@@ -33,18 +33,7 @@ type DataRoot struct {
 	prefix      string           // Sanitized prefix for directory names
 	runsDir     string           // Path to the runs directory
 	globPattern string           // Pattern for finding run directories
-	rootDAG     *digraph.RootDAG // Optional reference to the root DAG
-}
-
-// RootOption defines a functional option for configuring DataRoot.
-type RootOption func(*DataRoot)
-
-// WithRootDAG sets the root DAG for the DataRoot.
-// This is used when the DataRoot needs access to the DAG definition.
-func WithRootDAG(rootDAG *digraph.RootDAG) RootOption {
-	return func(dr *DataRoot) {
-		dr.rootDAG = rootDAG
-	}
+	rootRun     *digraph.RootRun // Optional reference to the root DAG
 }
 
 // NewDataRoot creates a new DataRoot instance for managing a DAG's run history.
@@ -57,13 +46,9 @@ func WithRootDAG(rootDAG *digraph.RootDAG) RootOption {
 //
 // Returns:
 //   - A configured DataRoot instance
-func NewDataRoot(baseDir, dagName string, opts ...RootOption) DataRoot {
+func NewDataRoot(baseDir, dagName string) DataRoot {
 	ext := filepath.Ext(dagName)
 	root := DataRoot{baseDir: baseDir, dagName: dagName}
-
-	for _, opt := range opts {
-		opt(&root)
-	}
 
 	base := filepath.Base(dagName)
 	if fileutil.IsYAMLFile(dagName) {

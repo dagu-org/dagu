@@ -71,9 +71,9 @@ type Agent struct {
 	// dag is the DAG to run.
 	dag *digraph.DAG
 
-	// rootDAG indicates the root DAG name and request ID.
-	// It is same as the DAG name and request ID if it's not a sub-DAG.
-	rootDAG digraph.RootDAG
+	// rootRun indicates the DAG name and request ID of the root run history.
+	// It is same as the current DAG name and request ID if it's not a sub-DAG.
+	rootRun digraph.RootRun
 
 	// reqID is request ID to identify DAG run uniquely.
 	// The request ID can be used for runstore lookup, retry, etc.
@@ -81,9 +81,6 @@ type Agent struct {
 
 	// parentReqID is the request ID of the parent DAG run.
 	parentReqID string
-
-	// request contains the request information for the DAG run.
-	request digraph.RunContext
 
 	// finished is true if the DAG run is finished.
 	finished atomic.Bool
@@ -118,11 +115,11 @@ func New(
 	cli history.Manager,
 	dagRepo models.DAGRepository,
 	historyRepo models.HistoryRepository,
-	rootDAG digraph.RootDAG,
+	rootRun digraph.RootRun,
 	opts Options,
 ) *Agent {
 	return &Agent{
-		rootDAG:     rootDAG,
+		rootRun:     rootRun,
 		reqID:       reqID,
 		dag:         dag,
 		dry:         opts.Dry,
@@ -147,12 +144,12 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create a new context for the DAG run with all necessary information
 	dbClient := newDBClient(a.historyRepo, a.dagRepo)
-	ctx = digraph.NewContext(ctx, a.dag, dbClient, a.request, a.logFile, a.dag.Params)
+	ctx = digraph.NewContext(ctx, a.dag, dbClient, a.rootRun, a.reqID, a.logFile, a.dag.Params)
 
 	// Add structured logging context
 	logFields := []any{"dag", a.dag.Name, "reqId", a.reqID}
 	if a.subExecution.Load() {
-		logFields = append(logFields, "rootDAG", a.rootDAG.RootName, "rootRequestID", a.rootDAG.RootID)
+		logFields = append(logFields, "rootDAG", a.rootRun.Name, "rootReqID", a.rootRun.ReqID)
 	}
 	ctx = logger.WithValues(ctx, logFields...)
 
@@ -301,7 +298,7 @@ func (a *Agent) Status() models.Status {
 	}
 
 	if a.subExecution.Load() {
-		opts = append(opts, models.WithRunContext(a.request))
+		opts = append(opts, models.WithSubRunMetadata(a.rootRun, a.parentReqID))
 	}
 
 	// Create the status object to record the current status.
@@ -368,19 +365,13 @@ func (a *Agent) setup(ctx context.Context) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	if a.rootDAG.RootID != a.reqID {
-		logger.Debug(ctx, "Initiating sub-DAG run", "rootDAG", a.rootDAG.RootName, "rootRequestID", a.rootDAG.RootID)
+	if a.rootRun.ReqID != a.reqID {
+		logger.Debug(ctx, "Initiating sub-DAG run", "rootDAG", a.rootRun.Name, "rootReqID", a.rootRun.ReqID)
 		a.subExecution.Store(true)
 		if a.parentReqID == "" {
 			logger.Error(ctx, "Parent request ID is required for sub-DAG run")
 			return fmt.Errorf("parent request ID is required for sub-DAG run")
 		}
-	}
-
-	a.request = digraph.RunContext{
-		Root:        a.rootDAG,
-		ParentReqID: a.parentReqID,
-		CurrReqID:   a.reqID,
 	}
 
 	a.scheduler = a.newScheduler()
@@ -452,7 +443,8 @@ func (a *Agent) dryRun(ctx context.Context) error {
 
 	logger.Info(ctx, "Dry-run started", "reqId", a.reqID, "name", a.dag.Name, "params", a.dag.Params)
 
-	dagCtx := digraph.NewContext(ctx, a.dag, newDBClient(a.historyRepo, a.dagRepo), a.request, a.logFile, a.dag.Params)
+	db := newDBClient(a.historyRepo, a.dagRepo)
+	dagCtx := digraph.NewContext(ctx, a.dag, db, a.rootRun, a.reqID, a.logFile, a.dag.Params)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 	a.lastErr = lastErr
 
@@ -549,7 +541,7 @@ func (a *Agent) setupRunRecord(ctx context.Context) (models.Record, error) {
 
 	opts := models.NewRecordOptions{Retry: a.retryTarget != nil}
 	if a.subExecution.Load() {
-		opts.Root = &a.rootDAG
+		opts.Root = &a.rootRun
 	}
 
 	return a.historyRepo.Create(ctx, a.dag, time.Now(), a.reqID, opts)
@@ -579,7 +571,7 @@ func (a *Agent) checkPreconditions(ctx context.Context) error {
 		return nil
 	}
 	// If one of the conditions does not met, cancel the execution.
-	if err := digraph.EvalConditions(ctx, a.dag.Preconditions); err != nil {
+	if err := scheduler.EvalConditions(ctx, a.dag.Preconditions); err != nil {
 		logger.Info(ctx, "Preconditions are not met", "err", err)
 		a.scheduler.Cancel(ctx, a.graph)
 		return err
@@ -647,7 +639,7 @@ func encodeError(w http.ResponseWriter, err error) {
 	}
 }
 
-var _ digraph.DBClient = &dbClient{}
+var _ digraph.DB = &dbClient{}
 
 type dbClient struct {
 	dagRepo     models.DAGRepository
@@ -666,8 +658,8 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error
 	return o.dagRepo.GetDetails(ctx, name)
 }
 
-func (o *dbClient) GetSubStatus(ctx context.Context, reqID string, rootDAG digraph.RootDAG) (*digraph.Status, error) {
-	runRecord, err := o.historyRepo.FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, reqID)
+func (o *dbClient) GetSubStatus(ctx context.Context, reqID string, rootDAG digraph.RootRun) (*digraph.Status, error) {
+	runRecord, err := o.historyRepo.FindSubRun(ctx, rootDAG.Name, rootDAG.ReqID, reqID)
 	if err != nil {
 		return nil, err
 	}

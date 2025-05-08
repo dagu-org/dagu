@@ -90,21 +90,21 @@ func runStart(ctx *Context, args []string) error {
 		return fmt.Errorf("both root-request-id and root-dag-name must be provided together or neither should be provided")
 	}
 
-	var rootDAG digraph.RootDAG
+	var rootRun digraph.RootRun
 	if rootDAGName != "" && rootRequestID != "" {
 		// The current execution is a sub-DAG
-		rootDAG = digraph.NewRootDAG(rootDAGName, rootRequestID)
+		rootRun = digraph.NewRootRun(rootDAGName, rootRequestID)
 		logger.Info(ctx, "Executing sub-DAG",
 			"dagName", dag.Name,
 			"params", params,
 			"reqId", reqID,
 			"rootDAGName", rootDAGName,
-			"rootRequestID", rootRequestID,
+			"rootReqID", rootRequestID,
 			"parentRequestID", parentRequestID,
 		)
 	} else {
 		// The current execution is a root DAG
-		rootDAG = digraph.NewRootDAG(dag.Name, reqID)
+		rootRun = digraph.NewRootRun(dag.Name, reqID)
 		logger.Info(ctx, "Executing root DAG",
 			"dagName", dag.Name,
 			"params", params,
@@ -115,14 +115,14 @@ func runStart(ctx *Context, args []string) error {
 	// Check for previous runs with this request ID and retry it if found.
 	// This prevents duplicate execution when retrying or when sub-DAGs share the
 	// same request ID, ensuring idempotency across the the DAG from the root DAG.
-	if rootDAG.RootID != reqID {
+	if rootRun.ReqID != reqID {
 		if reqID == "" {
 			logger.Error(ctx, "Request ID must be provided for sub-DAG run")
 			return fmt.Errorf("request ID must be provided for sub-DAG run")
 		}
 		logger.Debug(ctx, "Checking for previous sub-DAG run with the request ID", "reqId", reqID)
 		var status *models.Status
-		record, err := ctx.HistoryRepo.FindSubRun(ctx, rootDAG.RootName, rootDAG.RootID, reqID)
+		record, err := ctx.HistoryRepo.FindSubRun(ctx, rootRun.Name, rootRun.ReqID, reqID)
 		if errors.Is(err, models.ErrReqIDNotFound) {
 			// If the request ID is not found, proceed with execution
 			goto EXEC
@@ -136,14 +136,14 @@ func runStart(ctx *Context, args []string) error {
 			logger.Error(ctx, "Failed to read previous run status", "reqId", reqID, "err", err)
 			return fmt.Errorf("failed to read previous run status for request ID %s: %w", reqID, err)
 		}
-		return executeRetry(ctx, dag, status, rootDAG)
+		return executeRetry(ctx, dag, status, rootRun)
 	}
 
 EXEC:
-	return executeDag(ctx, dag, parentRequestID, reqID, rootDAG)
+	return executeDag(ctx, dag, parentRequestID, reqID, rootRun)
 }
 
-func executeDag(ctx *Context, d *digraph.DAG, parentReqID, reqID string, rootDAG digraph.RootDAG) error {
+func executeDag(ctx *Context, d *digraph.DAG, parentReqID, reqID string, rootRun digraph.RootRun) error {
 	// Open the log file for the scheduler. The log file will be used for future
 	// execution for the same DAG/request ID between attempts.
 	logFile, err := ctx.OpenLogFile(d, reqID)
@@ -173,7 +173,7 @@ func executeDag(ctx *Context, d *digraph.DAG, parentReqID, reqID string, rootDAG
 		ctx.HistoryMgr,
 		dr,
 		ctx.HistoryRepo,
-		rootDAG,
+		rootRun,
 		agent.Options{ParentID: parentReqID},
 	)
 

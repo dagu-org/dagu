@@ -73,7 +73,7 @@ func runDry(ctx *Context, args []string) error {
 		return err
 	}
 
-	rootDAG := digraph.NewRootDAG(dag.Name, reqID)
+	rootRun := digraph.NewRootRun(dag.Name, reqID)
 
 	agentInstance := agent.New(
 		reqID,
@@ -83,7 +83,7 @@ func runDry(ctx *Context, args []string) error {
 		ctx.HistoryMgr,
 		dr,
 		ctx.HistoryRepo,
-		rootDAG,
+		rootRun,
 		agent.Options{Dry: true},
 	)
 

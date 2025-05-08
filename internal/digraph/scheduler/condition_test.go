@@ -1,4 +1,4 @@
-package digraph_test
+package scheduler_test
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/stretchr/testify/require"
 )
 
@@ -110,10 +111,10 @@ func TestCondition_Eval(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := digraph.EvalConditions(context.Background(), tt.condition)
+			err := scheduler.EvalConditions(context.Background(), tt.condition)
 			require.Equal(t, tt.wantErr, err != nil)
 			if err != nil {
-				require.ErrorIs(t, err, digraph.ErrConditionNotMet)
+				require.ErrorIs(t, err, scheduler.ErrConditionNotMet)
 			}
 		})
 	}

@@ -204,7 +204,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 				// Check preconditions
 				if len(node.Step().Preconditions) > 0 {
 					logger.Infof(ctx, "Checking pre conditions for \"%s\"", node.Name())
-					if err := digraph.EvalConditions(ctx, node.Step().Preconditions); err != nil {
+					if err := EvalConditions(ctx, node.Step().Preconditions); err != nil {
 						logger.Infof(ctx, "Pre conditions failed for \"%s\"", node.Name())
 						node.SetStatus(NodeStatusSkipped)
 						node.SetError(err)
