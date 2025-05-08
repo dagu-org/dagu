@@ -292,5 +292,5 @@ func (n nodeHelper) AssertOutput(t *testing.T, key, value string) {
 }
 
 func (n nodeHelper) execContext(reqID string) context.Context {
-	return digraph.NewContext(n.Context, &digraph.DAG{}, nil, digraph.RootRun{}, reqID, "logFile", nil)
+	return digraph.SetupEnv(n.Context, &digraph.DAG{}, nil, digraph.RootRun{}, reqID, "logFile", nil)
 }

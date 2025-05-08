@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
@@ -128,15 +129,14 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 	// Initialize node count metrics
 	sc.metrics.totalNodes = len(graph.nodes)
 
-	var wg = sync.WaitGroup{}
-
-	dagCtx := digraph.GetContext(ctx)
-
 	// If one of the conditions does not met, cancel the execution.
-	if err := EvalConditions(ctx, dagCtx.DAG.Preconditions); err != nil {
+	env := digraph.GetEnv(ctx)
+	if err := EvalConditions(ctx, env.DAG.Preconditions); err != nil {
 		logger.Info(ctx, "Preconditions are not met", "err", err)
 		sc.Cancel(ctx, graph)
 	}
+
+	var wg = sync.WaitGroup{}
 
 	for !sc.isFinished(graph) {
 		if sc.isCanceled() {
@@ -207,7 +207,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 					wg.Done()
 				}()
 
-				ctx = sc.setupContext(nodeCtx, graph, node)
+				ctx = sc.setupEnviron(nodeCtx, graph, node)
 
 				// Check preconditions
 				if len(node.Step().Preconditions) > 0 {
@@ -333,16 +333,16 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 		"skippedNodes", sc.metrics.skippedNodes,
 		"canceledNodes", sc.metrics.canceledNodes)
 
-	var handlers []digraph.HandlerType
+	var eventHandlers []digraph.HandlerType
 	switch sc.Status(graph) {
 	case StatusSuccess:
-		handlers = append(handlers, digraph.HandlerOnSuccess)
+		eventHandlers = append(eventHandlers, digraph.HandlerOnSuccess)
 
 	case StatusError:
-		handlers = append(handlers, digraph.HandlerOnFailure)
+		eventHandlers = append(eventHandlers, digraph.HandlerOnFailure)
 
 	case StatusCancel:
-		handlers = append(handlers, digraph.HandlerOnCancel)
+		eventHandlers = append(eventHandlers, digraph.HandlerOnCancel)
 
 	case StatusNone, StatusRunning:
 		// These states should not occur at this point
@@ -351,11 +351,11 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 			"reqId", sc.requestID)
 	}
 
-	handlers = append(handlers, digraph.HandlerOnExit)
-	for _, handler := range handlers {
+	eventHandlers = append(eventHandlers, digraph.HandlerOnExit)
+	for _, handler := range eventHandlers {
 		if handlerNode := sc.handlers[handler]; handlerNode != nil {
 			logger.Info(ctx, "Handler execution started", "handler", handlerNode.Name())
-			if err := sc.runHandlerNode(ctx, graph, handlerNode); err != nil {
+			if err := sc.runEventHandler(ctx, graph, handlerNode); err != nil {
 				sc.setLastError(err)
 			}
 
@@ -389,8 +389,8 @@ func (sc *Scheduler) teardownNode(ctx context.Context, node *Node) error {
 	return nil
 }
 
-func (sc *Scheduler) setupContext(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
-	stepCtx := digraph.NewExecContext(ctx, node.Step())
+func (sc *Scheduler) setupEnviron(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
+	env := executor.NewEnv(ctx, node.Step())
 
 	curr := node.id
 	visited := make(map[int]struct{})
@@ -408,14 +408,14 @@ func (sc *Scheduler) setupContext(ctx context.Context, graph *ExecutionGraph, no
 			continue
 		}
 
-		stepCtx.LoadOutputVariables(node.Step().OutputVariables)
+		env.LoadOutputVariables(node.Step().OutputVariables)
 	}
 
-	return digraph.WithExecContext(ctx, stepCtx)
+	return executor.WithEnv(ctx, env)
 }
 
-func (sc *Scheduler) setupExecCtxForHandlerNode(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
-	c := digraph.NewExecContext(ctx, node.Step())
+func (sc *Scheduler) setupEnvironEventHandler(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
+	env := executor.NewEnv(ctx, node.Step())
 
 	// get all output variables
 	for _, node := range graph.nodes {
@@ -424,10 +424,10 @@ func (sc *Scheduler) setupExecCtxForHandlerNode(ctx context.Context, graph *Exec
 			continue
 		}
 
-		c.LoadOutputVariables(nodeStep.OutputVariables)
+		env.LoadOutputVariables(nodeStep.OutputVariables)
 	}
 
-	return digraph.WithExecContext(ctx, c)
+	return executor.WithEnv(ctx, env)
 }
 
 func (sc *Scheduler) execNode(ctx context.Context, node *Node) error {
@@ -556,7 +556,7 @@ func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 	return ready
 }
 
-func (sc *Scheduler) runHandlerNode(ctx context.Context, graph *ExecutionGraph, node *Node) error {
+func (sc *Scheduler) runEventHandler(ctx context.Context, graph *ExecutionGraph, node *Node) error {
 	defer node.Finish()
 
 	node.SetStatus(NodeStatusRunning)
@@ -571,7 +571,7 @@ func (sc *Scheduler) runHandlerNode(ctx context.Context, graph *ExecutionGraph, 
 			_ = node.Teardown(ctx)
 		}()
 
-		ctx = sc.setupExecCtxForHandlerNode(ctx, graph, node)
+		ctx = sc.setupEnvironEventHandler(ctx, graph, node)
 		if err := node.Execute(ctx); err != nil {
 			node.SetStatus(NodeStatusError)
 			return err
@@ -586,7 +586,9 @@ func (sc *Scheduler) runHandlerNode(ctx context.Context, graph *ExecutionGraph, 
 }
 
 func (sc *Scheduler) setup(ctx context.Context) (err error) {
-	digraph.ApplyEnvs(ctx)
+	// Apply environment variables specified for the DAG.
+	env := digraph.GetEnv(ctx)
+	env.ApplyEnvs(ctx)
 
 	if !sc.dry {
 		if err = os.MkdirAll(sc.logDir, 0750); err != nil {

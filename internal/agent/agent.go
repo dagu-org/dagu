@@ -144,7 +144,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create a new context for the DAG run with all necessary information
 	dbClient := newDBClient(a.historyRepo, a.dagRepo)
-	ctx = digraph.NewContext(ctx, a.dag, dbClient, a.rootRun, a.reqID, a.logFile, a.dag.Params)
+	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.rootRun, a.reqID, a.logFile, a.dag.Params)
 
 	// Add structured logging context
 	logFields := []any{"dag", a.dag.Name, "reqId", a.reqID}
@@ -438,7 +438,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 	logger.Info(ctx, "Dry-run started", "reqId", a.reqID, "name", a.dag.Name, "params", a.dag.Params)
 
 	db := newDBClient(a.historyRepo, a.dagRepo)
-	dagCtx := digraph.NewContext(ctx, a.dag, db, a.rootRun, a.reqID, a.logFile, a.dag.Params)
+	dagCtx := digraph.SetupEnv(ctx, a.dag, db, a.rootRun, a.reqID, a.logFile, a.dag.Params)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 	a.lastErr = lastErr
 

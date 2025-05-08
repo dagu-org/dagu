@@ -226,7 +226,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		// CmdArgsSys is a string with the command and args separated by special markers.
 		cmd, args := cmdutil.SplitCommandArgs(step.CmdArgsSys)
 		for i, arg := range args {
-			value, err := digraph.EvalString(ctx, arg, cmdutil.WithoutExpandEnv())
+			value, err := executor.EvalString(ctx, arg, cmdutil.WithoutExpandEnv())
 			if err != nil {
 				return fmt.Errorf("failed to eval command with args: %w", err)
 			}
@@ -241,7 +241,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 
 	case step.CmdWithArgs != "":
 		// In case of the command and args are defined as a string.
-		cmdWithArgs, err := digraph.EvalString(ctx, step.CmdWithArgs, cmdutil.WithoutExpandEnv())
+		cmdWithArgs, err := executor.EvalString(ctx, step.CmdWithArgs, cmdutil.WithoutExpandEnv())
 		if err != nil {
 			return err
 		}
@@ -273,7 +273,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 			return fmt.Errorf("failed to split command: %w", err)
 		}
 		for i, arg := range args {
-			value, err := digraph.EvalString(ctx, arg, cmdutil.WithoutExpandEnv())
+			value, err := executor.EvalString(ctx, arg, cmdutil.WithoutExpandEnv())
 			if err != nil {
 				return fmt.Errorf("failed to eval command args: %w", err)
 			}
@@ -288,7 +288,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		// Shouldn't reach here except for testing.
 
 		if step.Command != "" {
-			value, err := digraph.EvalString(ctx, step.Command, cmdutil.WithoutExpandEnv())
+			value, err := executor.EvalString(ctx, step.Command, cmdutil.WithoutExpandEnv())
 			if err != nil {
 				return fmt.Errorf("failed to eval command: %w", err)
 			}
@@ -296,7 +296,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		}
 
 		for i, arg := range step.Args {
-			value, err := digraph.EvalString(ctx, arg, cmdutil.WithoutExpandEnv())
+			value, err := executor.EvalString(ctx, arg, cmdutil.WithoutExpandEnv())
 			if err != nil {
 				return fmt.Errorf("failed to eval command args: %w", err)
 			}
@@ -345,12 +345,12 @@ func (n *Node) Cancel(ctx context.Context) {
 func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	c := digraph.GetExecContext(ctx)
-	c = c.WithEnv(
+	env := executor.GetEnv(ctx)
+	env = env.WithEnv(
 		digraph.EnvKeyLogPath, n.Log(),
 		digraph.EnvKeyStepLogPath, n.Log(),
 	)
-	return digraph.WithExecContext(ctx, c)
+	return executor.WithEnv(ctx, env)
 }
 
 func (n *Node) Setup(ctx context.Context, logDir string, requestID string) error {

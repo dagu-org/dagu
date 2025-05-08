@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
 )
@@ -156,23 +157,23 @@ func (s *Data) Setup(ctx context.Context, logFile string, startedAt time.Time) e
 	s.inner.State.Log = logFile
 	s.inner.State.StartedAt = startedAt
 
-	c := digraph.GetExecContext(ctx)
+	env := executor.GetEnv(ctx)
 
 	// Evaluate the stdout and stderr fields
-	stdout, err := c.EvalString(ctx, s.inner.Step.Stdout)
+	stdout, err := env.EvalString(ctx, s.inner.Step.Stdout)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate stdout field: %w", err)
 	}
 	s.inner.Step.Stdout = stdout
 
-	stderr, err := c.EvalString(ctx, s.inner.Step.Stderr)
+	stderr, err := env.EvalString(ctx, s.inner.Step.Stderr)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate stderr field: %w", err)
 	}
 	s.inner.Step.Stderr = stderr
 
 	// Evaluate the dir field
-	dir, err := c.EvalString(ctx, s.inner.Step.Dir)
+	dir, err := env.EvalString(ctx, s.inner.Step.Dir)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate dir field: %w", err)
 	}

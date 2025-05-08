@@ -73,7 +73,7 @@ func boolToPullPolicy(b bool) PullPolicy {
 func parsePullPolicy(ctx context.Context, raw any) (PullPolicy, error) {
 	switch value := raw.(type) {
 	case string:
-		value, err := digraph.EvalString(ctx, value)
+		value, err := EvalString(ctx, value)
 		if err != nil {
 			return PullPolicyMissing, fmt.Errorf("failed to evaluate pull policy: %w", err)
 		}
@@ -210,7 +210,7 @@ func (e *docker) Run(ctx context.Context) error {
 	// Evaluate args
 	var args []string
 	for _, arg := range e.step.Args {
-		val, err := digraph.EvalString(ctx, arg)
+		val, err := EvalString(ctx, arg)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate arg %s: %w", arg, err)
 		}
@@ -247,7 +247,7 @@ func (e *docker) Run(ctx context.Context) error {
 
 	env := make([]string, len(containerConfig.Env))
 	for i, e := range containerConfig.Env {
-		env[i], err = digraph.EvalString(ctx, e)
+		env[i], err = EvalString(ctx, e)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate env %s: %w", e, err)
 		}
@@ -413,7 +413,7 @@ func newDocker(
 		if err := md.Decode(cfg); err != nil {
 			return nil, fmt.Errorf("failed to decode config: %w", err)
 		}
-		replaced, err := digraph.EvalObject(ctx, *containerConfig)
+		replaced, err := EvalObject(ctx, *containerConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate string fields: %w", err)
 		}
@@ -430,7 +430,7 @@ func newDocker(
 		if err := md.Decode(cfg); err != nil {
 			return nil, fmt.Errorf("failed to decode config: %w", err)
 		}
-		replaced, err := digraph.EvalObject(ctx, *hostConfig)
+		replaced, err := EvalObject(ctx, *hostConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate string fields: %w", err)
 		}
@@ -447,7 +447,7 @@ func newDocker(
 		if err := md.Decode(cfg); err != nil {
 			return nil, fmt.Errorf("failed to decode config: %w", err)
 		}
-		replaced, err := digraph.EvalObject(ctx, *networkConfig)
+		replaced, err := EvalObject(ctx, *networkConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate string fields: %w", err)
 		}
@@ -464,7 +464,7 @@ func newDocker(
 		if err := md.Decode(cfg); err != nil {
 			return nil, fmt.Errorf("failed to decode config: %w", err)
 		}
-		replaced, err := digraph.EvalObject(ctx, *execConfig)
+		replaced, err := EvalObject(ctx, *execConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate string fields: %w", err)
 		}
@@ -479,7 +479,7 @@ func newDocker(
 
 	if a, ok := execCfg.Config["autoRemove"]; ok {
 		var err error
-		autoRemove, err = digraph.EvalBool(ctx, a)
+		autoRemove, err = EvalBool(ctx, a)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate autoRemove value: %w", err)
 		}
@@ -497,7 +497,7 @@ func newDocker(
 	platform := ""
 	if value, ok := execCfg.Config["platform"].(string); ok {
 		var err error
-		platform, err = digraph.EvalString(ctx, value)
+		platform, err = EvalString(ctx, value)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate platform: %w", err)
 		}
@@ -506,7 +506,7 @@ func newDocker(
 	containerName := ""
 	if value, ok := execCfg.Config["containerName"].(string); ok {
 		var err error
-		containerName, err = digraph.EvalString(ctx, value)
+		containerName, err = EvalString(ctx, value)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate containerName: %w", err)
 		}
@@ -527,7 +527,7 @@ func newDocker(
 
 	// If image is provided, we don't care about containerName and will create a new container
 	if img, ok := execCfg.Config["image"].(string); ok {
-		value, err := digraph.EvalString(ctx, img)
+		value, err := EvalString(ctx, img)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate image: %w", err)
 		}

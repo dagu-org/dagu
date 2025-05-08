@@ -8,6 +8,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
@@ -63,7 +64,7 @@ func evalCondition(ctx context.Context, c digraph.Condition) error {
 }
 
 func evalCommand(ctx context.Context, c digraph.Condition) (bool, error) {
-	commandToRun, err := digraph.EvalString(ctx, c.Command, cmdutil.OnlyReplaceVars())
+	commandToRun, err := executor.EvalString(ctx, c.Command, cmdutil.OnlyReplaceVars())
 	if err != nil {
 		return false, fmt.Errorf("failed to evaluate command: %w", err)
 	}
@@ -92,7 +93,7 @@ func runDirectCommand(ctx context.Context, commandToRun string) (bool, error) {
 }
 
 func matchCondition(ctx context.Context, c digraph.Condition) (bool, error) {
-	evaluatedVal, err := digraph.EvalString(ctx, c.Condition)
+	evaluatedVal, err := executor.EvalString(ctx, c.Condition)
 	if err != nil {
 		return false, fmt.Errorf("failed to evaluate condition: Condition=%s Error=%v", c.Condition, err)
 	}

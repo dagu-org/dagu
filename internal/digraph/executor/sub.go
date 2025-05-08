@@ -34,7 +34,7 @@ var ErrWorkingDirNotExist = fmt.Errorf("working directory does not exist")
 func newSubDAG(
 	ctx context.Context, step digraph.Step,
 ) (Executor, error) {
-	config, err := digraph.EvalObject(ctx, struct {
+	config, err := EvalObject(ctx, struct {
 		Name   string
 		Params string
 	}{
@@ -45,7 +45,8 @@ func newSubDAG(
 		return nil, fmt.Errorf("failed to substitute string fields: %w", err)
 	}
 
-	sub, err := digraph.GetDAGByName(ctx, config.Name)
+	env := GetEnv(ctx)
+	sub, err := env.DB.GetDAG(ctx, config.Name)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to find sub DAG %q: %w", config.Name, err,
@@ -77,13 +78,13 @@ func (e *subDAG) Run(ctx context.Context) error {
 
 	e.lock.Lock()
 
-	c := digraph.GetExecContext(ctx)
+	env := GetEnv(ctx)
 
 	args := []string{
 		"start",
-		fmt.Sprintf("--root-dag-name=%s", c.RootRun.Name),
-		fmt.Sprintf("--root-request-id=%s", c.RootRun.ReqID),
-		fmt.Sprintf("--parent-request-id=%s", c.ReqID),
+		fmt.Sprintf("--root-dag-name=%s", env.RootRun.Name),
+		fmt.Sprintf("--root-request-id=%s", env.RootRun.ReqID),
+		fmt.Sprintf("--parent-request-id=%s", env.ReqID),
 		fmt.Sprintf("--request-id=%s", e.subRunReqID),
 		"--quiet",
 		e.dag.Location,
@@ -98,7 +99,7 @@ func (e *subDAG) Run(ctx context.Context) error {
 
 	cmd := exec.CommandContext(ctx, executable, args...) // nolint:gosec
 	cmd.Dir = e.workDir
-	cmd.Env = append(cmd.Env, c.AllEnvs()...)
+	cmd.Env = append(cmd.Env, env.AllEnvs()...)
 	if e.stdout != nil {
 		cmd.Stdout = e.stdout
 	}
@@ -126,7 +127,7 @@ func (e *subDAG) Run(ctx context.Context) error {
 	}
 
 	// get results from the sub-DAG
-	result, err := digraph.GetSubResult(ctx, e.subRunReqID)
+	result, err := env.DB.GetSubStatus(ctx, e.subRunReqID, env.RootRun)
 	if err != nil {
 		return fmt.Errorf("failed to collect result: %w", err)
 	}
