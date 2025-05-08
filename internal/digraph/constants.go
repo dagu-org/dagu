@@ -6,7 +6,7 @@ const SystemVariablePrefix = "DAGU_"
 const (
 	EnvKeyLogPath          = "DAG_EXECUTION_LOG_PATH"
 	EnvKeySchedulerLogPath = "DAG_SCHEDULER_LOG_PATH" // Deprecated in favor of EnvKeyDAGStepLogPath
-	EnvKeyReqID            = "DAG_REQUEST_ID"
+	EnvKeyExecID           = "DAG_REQUEST_ID"
 	EnvKeyDAGName          = "DAG_NAME"
 	EnvKeyStepName         = "DAG_STEP_NAME"
 	EnvKeyStepLogPath      = "DAG_STEP_LOG_PATH"

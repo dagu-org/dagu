@@ -3,7 +3,6 @@ package integration_test
 import (
 	"context"
 	"os"
-	"path"
 	"path/filepath"
 	"testing"
 
@@ -16,74 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestServer_StartWithConfig(t *testing.T) {
-	testCases := []struct {
-		name       string
-		setupFunc  func(t *testing.T) (string, string) // returns configFile and tempDir
-		dagPath    func(t *testing.T, tempDir string) string
-		envVarName string
-	}{
-		{
-			name: "GlobalLogDir",
-			setupFunc: func(t *testing.T) (string, string) {
-				tempDir := t.TempDir()
-				configFile := filepath.Join(tempDir, "config.yaml")
-				configContent := `logDir: ${TMP_LOGS_DIR}/logs`
-				require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0600))
-				return configFile, tempDir
-			},
-			dagPath: func(t *testing.T, _ string) string {
-				return test.TestdataPath(t, path.Join("integration", "basic.yaml"))
-			},
-			envVarName: "TMP_LOGS_DIR",
-		},
-		{
-			name: "DAGLocalLogDir",
-			setupFunc: func(t *testing.T) (string, string) {
-				tempDir := t.TempDir()
-				dagFile := filepath.Join(tempDir, "basic.yaml")
-				dagContent := `
-logDir: ${DAG_TMP_LOGS_DIR}/logs
-steps:
-  - name: step1
-    command: echo "Hello, world!"
-`
-				require.NoError(t, os.WriteFile(dagFile, []byte(dagContent), 0600))
-				return dagFile, tempDir
-			},
-			dagPath: func(_ *testing.T, tempDir string) string {
-				return filepath.Join(tempDir, "basic.yaml")
-			},
-			envVarName: "DAG_TMP_LOGS_DIR",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Setup test case
-			configFile, tempDir := tc.setupFunc(t)
-			_ = os.Setenv(tc.envVarName, tempDir)
-
-			// Get DAG path
-			dagPath := tc.dagPath(t, tempDir)
-
-			// Run command
-			th := test.SetupCommand(t)
-			args := []string{"start"}
-			if tc.name == "GlobalLogDir" {
-				args = append(args, "--config", configFile)
-			}
-			args = append(args, dagPath)
-
-			th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
-				Args:        args,
-				ExpectedOut: []string{"DAG run finished"},
-			})
-		})
-	}
-}
-
-func TestServer_RetrySubDAG(t *testing.T) {
+func TestRetryChildExecution(t *testing.T) {
 	// Get DAG path
 	th := test.SetupCommand(t)
 
@@ -120,17 +52,18 @@ steps:
     command: echo "Hello, $PARAM"
 `)
 
-	reqID := uuid.Must(uuid.NewV7()).String()
-	args := []string{"start", "--request-id", reqID, "parent"}
+	execID := uuid.Must(uuid.NewV7()).String()
+	args := []string{"start", "--exec-id", execID, "parent"}
 	th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"DAG run finished"},
 	})
 
 	// Update the child_2 status to "failed" to simulate a retry
-	// First, find the child_2 request ID to update its status
+	// First, find the child_2 execution ID to update its status
 	ctx := context.Background()
-	parentRec, err := th.HistoryRepo.Find(ctx, "parent", reqID)
+	ref := digraph.NewExecRef("parent", execID)
+	parentRec, err := th.HistoryRepo.Find(ctx, ref)
 	require.NoError(t, err)
 
 	updateStatus := func(rec models.Record, status *models.Status) {
@@ -151,8 +84,7 @@ steps:
 	updateStatus(parentRec, parentStatus)
 
 	// (2) Find the run record for child_1
-	rootRun := digraph.NewRootRun("parent", reqID)
-	child1Rec, err := th.HistoryRepo.FindSubRun(ctx, rootRun.Name, rootRun.ReqID, child1Node.SubRuns[0].ReqID)
+	child1Rec, err := th.HistoryRepo.FindChildExecution(ctx, ref, child1Node.Children[0].ExecID)
 	require.NoError(t, err)
 
 	child1Status, err := child1Rec.ReadStatus(ctx)
@@ -164,7 +96,7 @@ steps:
 	updateStatus(child1Rec, child1Status)
 
 	// (4) Find the run record for child_2
-	child2Rec, err := th.HistoryRepo.FindSubRun(ctx, rootRun.Name, rootRun.ReqID, child2Node.SubRuns[0].ReqID)
+	child2Rec, err := th.HistoryRepo.FindChildExecution(ctx, ref, child2Node.Children[0].ExecID)
 	require.NoError(t, err)
 
 	child2Status, err := child2Rec.ReadStatus(ctx)
@@ -183,14 +115,14 @@ steps:
 
 	// Retry the DAG
 
-	args = []string{"retry", "--request-id", reqID, "parent"}
+	args = []string{"retry", "--exec-id", execID, "parent"}
 	th.RunCommand(t, cmd.CmdRetry(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"DAG run finished"},
 	})
 
 	// Check if the child_2 status is now "success"
-	child2Rec, err = th.HistoryRepo.FindSubRun(ctx, rootRun.Name, rootRun.ReqID, child2Node.SubRuns[0].ReqID)
+	child2Rec, err = th.HistoryRepo.FindChildExecution(ctx, ref, child2Node.Children[0].ExecID)
 	require.NoError(t, err)
 	child2Status, err = child2Rec.ReadStatus(ctx)
 	require.NoError(t, err)

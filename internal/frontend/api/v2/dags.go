@@ -169,7 +169,7 @@ func (a *API) GetDAGRunHistory(ctx context.Context, request api.GetDAGRunHistory
 
 func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsRequestObject) (api.GetDAGDetailsResponseObject, error) {
 	fileName := request.FileName
-	dag, err := a.dagRepository.GetMetadata(ctx, fileName)
+	dag, err := a.dagRepository.GetDetails(ctx, fileName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -292,12 +292,12 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 
 	// Get status for each DAG
 	dagStatuses := make([]models.Status, len(result.Items))
-	for _, item := range result.Items {
+	for i, item := range result.Items {
 		status, err := a.historyManager.GetLatestStatus(ctx, item)
 		if err != nil {
 			errList = append(errList, err.Error())
 		}
-		dagStatuses = append(dagStatuses, status)
+		dagStatuses[i] = status
 	}
 
 	for i, item := range result.Items {
@@ -306,7 +306,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 			Name:        dagStatuses[i].Name,
 			Params:      ptrOf(dagStatuses[i].Params),
 			Pid:         ptrOf(int(dagStatuses[i].PID)),
-			RequestId:   dagStatuses[i].ReqID,
+			RequestId:   dagStatuses[i].ExecID,
 			StartedAt:   dagStatuses[i].StartedAt,
 			FinishedAt:  dagStatuses[i].FinishedAt,
 			Status:      api.Status(dagStatuses[i].Status),
@@ -363,7 +363,7 @@ func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetails
 
 	status, err := a.historyManager.GetRealtimeStatus(ctx, dag, reqID)
 	if err != nil {
-		return nil, fmt.Errorf("error getting status by request ID: %w", err)
+		return nil, fmt.Errorf("error getting status by execution ID: %w", err)
 	}
 
 	return &api.GetDAGRunDetails200JSONResponse{
@@ -400,7 +400,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 
 	reqID, err := a.historyManager.GenReqID(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error generating request ID: %w", err)
+		return nil, fmt.Errorf("error generating execution ID: %w", err)
 	}
 
 	if err := a.historyManager.Start(ctx, dag, history.StartOptions{
@@ -476,7 +476,7 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 			Message:    "DAG is not running",
 		}
 	}
-	if err := a.historyManager.Stop(ctx, dag, status.ReqID); err != nil {
+	if err := a.historyManager.Stop(ctx, dag, status.ExecID); err != nil {
 		return nil, fmt.Errorf("error stopping DAG: %w", err)
 	}
 	return api.TerminateDAGRun200Response{}, nil

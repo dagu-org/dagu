@@ -10,8 +10,8 @@ import (
 
 // Error variables for history operations
 var (
-	ErrReqIDNotFound = errors.New("request id not found")
-	ErrNoStatusData  = errors.New("no status data")
+	ErrExecIDNotFound = errors.New("exec ID not found")
+	ErrNoStatusData   = errors.New("no status data")
 )
 
 // HistoryRepository provides an interface for interacting with the underlying database
@@ -20,15 +20,15 @@ var (
 // implementations (e.g., file-based, in-memory, etc.) to be used interchangeably.
 type HistoryRepository interface {
 	// Create creates a new history record for a DAG run
-	Create(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts NewRecordOptions) (Record, error)
+	Create(ctx context.Context, dag *digraph.DAG, timestamp time.Time, execID string, opts NewRecordOptions) (Record, error)
 	// Recent returns the most recent history records for a DAG, limited by itemLimit
 	Recent(ctx context.Context, name string, itemLimit int) []Record
 	// Latest returns the most recent history record for a DAG
 	Latest(ctx context.Context, name string) (Record, error)
-	// Find finds a history record by its request ID
-	Find(ctx context.Context, name string, reqID string) (Record, error)
-	// FindSubRun finds a sub-run record by its request ID
-	FindSubRun(ctx context.Context, name, reqID string, subRunID string) (Record, error)
+	// Find finds a history record by its execution ID
+	Find(ctx context.Context, ref digraph.ExecRef) (Record, error)
+	// FindChildExecution finds a child execution record by its execution ID
+	FindChildExecution(ctx context.Context, ref digraph.ExecRef, childExecID string) (Record, error)
 	// RemoveOld removes history records older than retentionDays
 	RemoveOld(ctx context.Context, name string, retentionDays int) error
 	// Rename renames all history records from oldName to newName
@@ -37,7 +37,7 @@ type HistoryRepository interface {
 
 // NewRecordOptions contains options for creating a new history record
 type NewRecordOptions struct {
-	Root  *digraph.RootRun
+	Root  *digraph.ExecRef
 	Retry bool
 }
 

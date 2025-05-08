@@ -199,17 +199,17 @@ func (d *DAG) HasTag(tag string) bool {
 
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
-func (d *DAG) SockAddr(reqID string) string {
+func (d *DAG) SockAddr(execID string) string {
 	if d.Location != "" {
 		return SockAddr(d.Location, "")
 	}
-	return SockAddr(d.Name, reqID)
+	return SockAddr(d.Name, execID)
 }
 
-// SockAddrSub returns the unix socket address for a specific request ID.
-// This is used to control sub DAG runs.
-func (d *DAG) SockAddrSub(reqID string) string {
-	return SockAddr(d.GetName(), reqID)
+// SockAddrSub returns the unix socket address for a specific execution ID.
+// This is used to control child executions.
+func (d *DAG) SockAddrSub(execID string) string {
+	return SockAddr(d.GetName(), execID)
 }
 
 // GetName returns the name of the DAG.

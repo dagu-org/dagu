@@ -456,7 +456,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 			Name:       dagStatuses[i].Name,
 			Params:     ptrOf(dagStatuses[i].Params),
 			Pid:        ptrOf(int(dagStatuses[i].PID)),
-			RequestId:  dagStatuses[i].ReqID,
+			RequestId:  dagStatuses[i].ExecID,
 			StartedAt:  dagStatuses[i].StartedAt,
 			FinishedAt: dagStatuses[i].FinishedAt,
 			Status:     api.RunStatus(dagStatuses[i].Status),
@@ -702,8 +702,8 @@ func (a *API) updateStatus(
 
 	status.Nodes[idxToUpdate].Status = to
 
-	rootRun := digraph.NewRootRun(dag.Name, reqID)
-	if err := a.historyManager.UpdateStatus(ctx, rootRun, *status); err != nil {
+	root := digraph.NewExecRef(dag.Name, reqID)
+	if err := a.historyManager.UpdateStatus(ctx, root, *status); err != nil {
 		return fmt.Errorf("error updating status: %w", err)
 	}
 
@@ -793,9 +793,9 @@ func toStep(obj digraph.Step) api.Step {
 		Script:        ptrOf(obj.Script),
 	}
 
-	if obj.SubDAG != nil {
-		step.Run = ptrOf(obj.SubDAG.Name)
-		step.Params = ptrOf(obj.SubDAG.Params)
+	if obj.ChildDAG != nil {
+		step.Run = ptrOf(obj.ChildDAG.Name)
+		step.Params = ptrOf(obj.ChildDAG.Params)
 	}
 	return step
 }
@@ -813,7 +813,7 @@ func toStatus(s models.Status) api.DAGStatusDetails {
 		Name:       s.Name,
 		Params:     ptrOf(s.Params),
 		Pid:        int(s.PID),
-		RequestId:  s.ReqID,
+		RequestId:  s.ExecID,
 		StartedAt:  s.StartedAt,
 		FinishedAt: s.FinishedAt,
 		Status:     api.RunStatus(s.Status),

@@ -55,7 +55,7 @@ func runDry(ctx *Context, args []string) error {
 
 	reqID, err := genReqID()
 	if err != nil {
-		return fmt.Errorf("failed to generate request ID: %w", err)
+		return fmt.Errorf("failed to generate execution ID: %w", err)
 	}
 
 	logFile, err := ctx.OpenLogFile(dag, reqID)
@@ -73,7 +73,7 @@ func runDry(ctx *Context, args []string) error {
 		return err
 	}
 
-	rootRun := digraph.NewRootRun(dag.Name, reqID)
+	root := digraph.NewExecRef(dag.Name, reqID)
 
 	agentInstance := agent.New(
 		reqID,
@@ -83,7 +83,7 @@ func runDry(ctx *Context, args []string) error {
 		ctx.HistoryMgr,
 		dr,
 		ctx.HistoryRepo,
-		rootRun,
+		root,
 		agent.Options{Dry: true},
 	)
 

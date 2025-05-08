@@ -58,7 +58,7 @@ func TestHistoryRecord_Write(t *testing.T) {
 	// Verify file content
 	actual, err := hr.ReadStatus(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, "test", actual.ReqID)
+	assert.Equal(t, "test", actual.ExecID)
 	assert.Equal(t, scheduler.StatusRunning, actual.Status)
 
 	// Close
@@ -208,7 +208,7 @@ func TestHistoryRecord_HandleNonExistentFile(t *testing.T) {
 	// Verify the file was created with correct data
 	status, err := hr.ReadStatus(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, "test", status.ReqID)
+	assert.Equal(t, "test", status.ExecID)
 
 	// Cleanup
 	err = hr.Close(context.Background())
@@ -373,8 +373,8 @@ func createTestStatus(status scheduler.Status) models.Status {
 	dag := createTestDAG()
 
 	return models.Status{
-		ReqID:     "test",
 		Name:      dag.Name,
+		ExecID:    "test",
 		Status:    status,
 		PID:       models.PID(12345),
 		StartedAt: stringutil.FormatTime(time.Now()),

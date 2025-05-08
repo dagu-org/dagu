@@ -5,7 +5,7 @@ import (
 )
 
 // parseFuncCall parses the function call in the step definition.
-// Deprecated: use sub-DAG instead.
+// Deprecated: use child DAG instead.
 func parseFuncCall(step *Step, call *callFuncDef, funcs []*funcDef) error {
 	if call == nil {
 		return nil

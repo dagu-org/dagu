@@ -9,13 +9,13 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
-// Env contains the execution metadata for a DAG run.
+// Env contains the execution metadata for a DAG execution.
 type Env struct {
-	RootRun RootRun
-	DAG     *DAG
-	DB      DB
-	Envs    map[string]string
-	ReqID   string
+	ExecID string
+	Root   ExecRef
+	DAG    *DAG
+	DB     DB
+	Envs   map[string]string
 }
 
 func (e Env) AllEnvs() []string {
@@ -40,12 +40,12 @@ func (e Env) ApplyEnvs(ctx context.Context) {
 	}
 }
 
-// SetupEnv sets up the execution context for a DAG run.
+// SetupEnv sets up the execution context for a DAG execution.
 // It initializes the environment variables and the DAG metadata.
-func SetupEnv(ctx context.Context, d *DAG, c DB, r RootRun, reqID, logFile string, params []string) context.Context {
+func SetupEnv(ctx context.Context, d *DAG, c DB, root ExecRef, execID, logFile string, params []string) context.Context {
 	var envs = map[string]string{
 		EnvKeySchedulerLogPath: logFile,
-		EnvKeyReqID:            reqID,
+		EnvKeyExecID:           execID,
 		EnvKeyDAGName:          d.Name,
 	}
 	for _, param := range params {
@@ -58,11 +58,11 @@ func SetupEnv(ctx context.Context, d *DAG, c DB, r RootRun, reqID, logFile strin
 	}
 
 	return context.WithValue(ctx, envCtxKey{}, Env{
-		RootRun: r,
-		DAG:     d,
-		DB:      c,
-		Envs:    envs,
-		ReqID:   reqID,
+		Root:   root,
+		DAG:    d,
+		DB:     c,
+		Envs:   envs,
+		ExecID: execID,
 	})
 }
 
@@ -81,15 +81,3 @@ func GetEnv(ctx context.Context) Env {
 }
 
 type envCtxKey struct{}
-
-type RootRun struct {
-	Name  string
-	ReqID string
-}
-
-func NewRootRun(name, reqID string) RootRun {
-	return RootRun{
-		Name:  name,
-		ReqID: reqID,
-	}
-}

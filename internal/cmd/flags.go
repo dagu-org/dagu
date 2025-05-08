@@ -42,7 +42,7 @@ var (
 		bindViper:    true,
 	}
 
-	// Additional parameters to pass to the DAG run.
+	// Additional parameters to pass to the DAG execution.
 	// These parameters override the default values defined in the DAG.
 	// They can be specified either inline or following a "--" separator to distinguish them from other flags.
 	// Accepted formats include positional parameters and key=value pairs (e.g., "P1=foo P2=bar").
@@ -52,60 +52,54 @@ var (
 		usage:     "Parameters to pass to the DAG run (overrides DAG defaults; supports positional values and key=value pairs, e.g., P1=foo P2=bar)",
 	}
 
-	// Unique request ID required for retrying a DAG run.
+	// Unique execution ID required for retrying a DAG execution.
 	// This flag must be provided when using the retry command.
-	reqIDFlagRetry = commandLineFlag{
-		name:      "request-id",
-		shorthand: "r",
-		usage:     "Unique request ID for retrying a DAG run (required)",
+	execIDFlagRetry = commandLineFlag{
+		name:      "exec-id",
+		shorthand: "e",
+		usage:     "Unique execution ID for retrying a DAG run (required)",
 		required:  true,
 	}
 
-	// Unique request ID used for starting a new DAG run.
+	// Unique execution ID used for starting a new DAG execution.
 	// This is used to track and identify the execution instance and its status.
-	reqIDFlagStart = commandLineFlag{
-		name:      "request-id",
-		shorthand: "r",
-		usage:     "Unique request ID for a DAG run",
+	execIDFlagStart = commandLineFlag{
+		name:      "exec-id",
+		shorthand: "e",
+		usage:     "Unique execution ID for a DAG run",
 	}
 
-	// Unique request ID used for stopping a DAG run.
-	reqIDFlagStop = commandLineFlag{
-		name:      "request-id",
-		shorthand: "r",
-		usage:     "Request ID for stopping a DAG run",
+	// Unique execution ID used for stopping a DAG execution.
+	execIDFlagStop = commandLineFlag{
+		name:      "exec-id",
+		shorthand: "e",
+		usage:     "execution ID for stopping a DAG run",
 	}
 
-	// Unique request ID used for restarting a DAG run.
-	reqIDFlagRestart = commandLineFlag{
-		name:      "request-id",
-		shorthand: "r",
-		usage:     "Request ID for restarting a DAG run",
+	// Unique execution ID used for restarting a DAG execution.
+	execIDFlagRestart = commandLineFlag{
+		name:      "exec-id",
+		shorthand: "e",
+		usage:     "execution ID for restarting a DAG run",
 	}
 
-	// Unique request ID used for checking the status of a DAG run.
-	reqIDFlagStatus = commandLineFlag{
-		name:      "request-id",
-		shorthand: "r",
-		usage:     "Request ID for checking the status of a DAG run",
+	// Unique execution ID used for checking the status of a DAG execution.
+	execIDFlagStatus = commandLineFlag{
+		name:      "exec-id",
+		shorthand: "e",
+		usage:     "execution ID for checking the status of a DAG run",
 	}
 
-	// rootReqIDFlag reads the root request ID for starting a sub-DAG run
-	rootReqIDFlag = commandLineFlag{
-		name:  "root-request-id",
-		usage: "[only for sub-DAG runs] Root request ID for a DAG run",
+	// rootDAGNameFlag reads the root DAG name for starting a child execution.
+	rootFlag = commandLineFlag{
+		name:  "root",
+		usage: "[only for child executions] Root execution ID for a DAG run",
 	}
 
-	// rootDAGNameFlag reads the root DAG name for starting a sub-DAG run.
-	rootDAGNameFlag = commandLineFlag{
-		name:  "root-dag-name",
-		usage: "[only for sub-DAG runs] Root DAG name for a DAG run",
-	}
-
-	// parentReqIDFlag reads the parent request ID for starting a sub-DAG run.
-	parentReqIDFlag = commandLineFlag{
-		name:  "parent-request-id",
-		usage: "[only for sub-DAG runs] Parent request ID for a DAG run",
+	// parentFlag reads the parent ref for starting a child execution.
+	parentFlag = commandLineFlag{
+		name:  "parent",
+		usage: "[only for child executions] Parent execution ID for a DAG run",
 	}
 
 	// Suppresses output during DAG run (e.g., logs, status updates).

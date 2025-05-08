@@ -35,7 +35,7 @@ func TestDAG(t *testing.T) {
 		var execResp api.ExecuteDAG200JSONResponse
 		resp.Unmarshal(t, &execResp)
 
-		require.NotEmpty(t, execResp.RequestId, "expected a non-empty request ID")
+		require.NotEmpty(t, execResp.RequestId, "expected a non-empty execution ID")
 
 		// Check the status of the DAG execution
 		require.Eventually(t, func() bool {

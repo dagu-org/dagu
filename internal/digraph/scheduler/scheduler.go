@@ -59,7 +59,7 @@ type Scheduler struct {
 	onSuccess     *digraph.Step
 	onFailure     *digraph.Step
 	onCancel      *digraph.Step
-	requestID     string
+	execID        string
 
 	canceled  int32
 	mu        sync.RWMutex
@@ -89,7 +89,7 @@ func New(cfg *Config) *Scheduler {
 		onSuccess:     cfg.OnSuccess,
 		onFailure:     cfg.OnFailure,
 		onCancel:      cfg.OnCancel,
-		requestID:     cfg.ReqID,
+		execID:        cfg.ExecID,
 		pause:         time.Millisecond * 100,
 	}
 }
@@ -104,7 +104,7 @@ type Config struct {
 	OnSuccess     *digraph.Step
 	OnFailure     *digraph.Step
 	OnCancel      *digraph.Step
-	ReqID         string
+	ExecID        string
 }
 
 // Schedule runs the graph of steps.
@@ -172,7 +172,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 							"error", err,
 							"step", node.Name(),
 							"stack", stack,
-							"reqId", sc.requestID)
+							"execId", sc.execID)
 						node.MarkError(err)
 						sc.setLastError(err)
 
@@ -324,7 +324,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 
 	// Log execution summary
 	logger.Info(ctx, "DAG run completed",
-		"reqId", sc.requestID,
+		"execId", sc.execID,
 		"status", sc.Status(graph).String(),
 		"totalTime", sc.metrics.totalExecutionTime/time.Second,
 		"totalNodes", sc.metrics.totalNodes,
@@ -348,7 +348,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 		// These states should not occur at this point
 		logger.Warn(ctx, "Unexpected final status",
 			"status", sc.Status(graph).String(),
-			"reqId", sc.requestID)
+			"execId", sc.execID)
 	}
 
 	eventHandlers = append(eventHandlers, digraph.HandlerOnExit)
@@ -377,7 +377,7 @@ func (sc *Scheduler) setLastError(err error) {
 
 func (sc *Scheduler) setupNode(ctx context.Context, node *Node) error {
 	if !sc.dry {
-		return node.Setup(ctx, sc.logDir, sc.requestID)
+		return node.Setup(ctx, sc.logDir, sc.execID)
 	}
 	return nil
 }
@@ -562,7 +562,7 @@ func (sc *Scheduler) runEventHandler(ctx context.Context, graph *ExecutionGraph,
 	node.SetStatus(NodeStatusRunning)
 
 	if !sc.dry {
-		if err := node.Setup(ctx, sc.logDir, sc.requestID); err != nil {
+		if err := node.Setup(ctx, sc.logDir, sc.execID); err != nil {
 			node.SetStatus(NodeStatusError)
 			return nil
 		}
@@ -617,7 +617,7 @@ func (sc *Scheduler) setup(ctx context.Context) (err error) {
 
 	// Log scheduler setup
 	logger.Debug(ctx, "Scheduler setup complete",
-		"reqId", sc.requestID,
+		"execId", sc.execID,
 		"maxActiveRuns", sc.maxActiveRuns,
 		"timeout", sc.timeout,
 		"dry", sc.dry)

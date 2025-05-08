@@ -77,7 +77,8 @@ func TestManager(t *testing.T) {
 		_ = record.Close(ctx)
 
 		// Get the status and check if it is the same as the one we wrote.
-		statusToCheck, err := cli.FindByReqID(ctx, dag.Name, reqID)
+		ref := digraph.NewExecRef(dag.Name, reqID)
+		statusToCheck, err := cli.FindByReqID(ctx, ref)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.NodeStatusSuccess, statusToCheck.Nodes[0].Status)
 
@@ -85,17 +86,17 @@ func TestManager(t *testing.T) {
 		newStatus := scheduler.NodeStatusError
 		status.Nodes[0].Status = newStatus
 
-		rootRun := digraph.NewRootRun(dag.Name, reqID)
-		err = cli.UpdateStatus(ctx, rootRun, status)
+		root := digraph.NewExecRef(dag.Name, reqID)
+		err = cli.UpdateStatus(ctx, root, status)
 		require.NoError(t, err)
 
-		statusByReqID, err := cli.FindByReqID(ctx, dag.Name, reqID)
+		statusByReqID, err := cli.FindByReqID(ctx, ref)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, len(status.Nodes))
 		require.Equal(t, newStatus, statusByReqID.Nodes[0].Status)
 	})
-	t.Run("UpdateSubRunStatus", func(t *testing.T) {
+	t.Run("UpdateChildExecStatus", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "tree_parent.yaml"))
 
 		err := th.HistoryMgr.Start(th.Context, dag.DAG, history.StartOptions{Quiet: true})
@@ -103,38 +104,38 @@ func TestManager(t *testing.T) {
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
 
-		// Get the sub run status.
+		// Get the child execution ID.
 		status, err := th.HistoryMgr.GetLatestStatus(th.Context, dag.DAG)
 		require.NoError(t, err)
-		reqID := status.ReqID
-		subRun := status.Nodes[0].SubRuns[0]
+		execID := status.ExecID
+		childExec := status.Nodes[0].Children[0]
 
-		rootRun := digraph.NewRootRun(dag.Name, reqID)
-		subRunStatus, err := th.HistoryMgr.FindBySubRunReqID(th.Context, rootRun, subRun.ReqID)
+		root := digraph.NewExecRef(dag.Name, execID)
+		childExecStatus, err := th.HistoryMgr.FindChildExec(th.Context, root, childExec.ExecID)
 		require.NoError(t, err)
-		require.Equal(t, scheduler.StatusSuccess.String(), subRunStatus.Status.String())
+		require.Equal(t, scheduler.StatusSuccess.String(), childExecStatus.Status.String())
 
-		// Update the sub run status.
-		subRunStatus.Nodes[0].Status = scheduler.NodeStatusError
-		err = th.HistoryMgr.UpdateStatus(th.Context, rootRun, *subRunStatus)
+		// Update the the child execution status.
+		childExecStatus.Nodes[0].Status = scheduler.NodeStatusError
+		err = th.HistoryMgr.UpdateStatus(th.Context, root, *childExecStatus)
 		require.NoError(t, err)
 
-		// Check if the sub run status is updated.
-		subRunStatus, err = th.HistoryMgr.FindBySubRunReqID(th.Context, rootRun, subRun.ReqID)
+		// Check if the child execution status is updated.
+		childExecStatus, err = th.HistoryMgr.FindChildExec(th.Context, root, childExec.ExecID)
 		require.NoError(t, err)
-		require.Equal(t, scheduler.NodeStatusError.String(), subRunStatus.Nodes[0].Status.String())
+		require.Equal(t, scheduler.NodeStatusError.String(), childExecStatus.Nodes[0].Status.String())
 	})
 	t.Run("InvalidUpdateStatusWithInvalidReqID", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "invalid_reqid.yaml"))
 		ctx := th.Context
 		cli := th.HistoryMgr
 
-		// update with invalid request id
+		// update with invalid execution ID
 		status := testNewStatus(dag.DAG, "unknown-req-id", scheduler.StatusError, scheduler.NodeStatusError)
 
 		// Check if the update fails.
-		rootRun := digraph.NewRootRun(dag.Name, "unknown-req-id")
-		err := cli.UpdateStatus(ctx, rootRun, status)
+		root := digraph.NewExecRef(dag.Name, "unknown-req-id")
+		err := cli.UpdateStatus(ctx, root, status)
 		require.Error(t, err)
 	})
 }
@@ -199,12 +200,12 @@ func TestClient_RunDAG(t *testing.T) {
 		status, err := cli.GetLatestStatus(ctx, dag.DAG)
 		require.NoError(t, err)
 
-		prevReqID := status.ReqID
+		prevExecID := status.ExecID
 		prevParams := status.Params
 
 		time.Sleep(1 * time.Second)
 
-		err = cli.Retry(ctx, dag.DAG, prevReqID)
+		err = cli.Retry(ctx, dag.DAG, prevExecID)
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish
@@ -214,7 +215,7 @@ func TestClient_RunDAG(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check if the params are the same as the previous run.
-		require.Equal(t, prevReqID, status.ReqID)
+		require.Equal(t, prevExecID, status.ExecID)
 		require.Equal(t, prevParams, status.Params)
 	})
 }

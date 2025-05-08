@@ -925,7 +925,7 @@ func setup(t *testing.T, opts ...schedulerOption) testHelper {
 
 	cfg := &scheduler.Config{
 		LogDir: th.Config.Paths.LogDir,
-		ReqID:  uuid.Must(uuid.NewV7()).String(),
+		ExecID: uuid.Must(uuid.NewV7()).String(),
 	}
 	for _, opt := range opts {
 		opt(cfg)
@@ -960,10 +960,10 @@ func (gh graphHelper) Schedule(t *testing.T, expectedStatus scheduler.Status) sc
 	t.Helper()
 
 	dag := &digraph.DAG{Name: "test_dag"}
-	logFilename := fmt.Sprintf("%s_%s.log", dag.Name, gh.Config.ReqID)
+	logFilename := fmt.Sprintf("%s_%s.log", dag.Name, gh.Config.ExecID)
 	logFilePath := path.Join(gh.Config.LogDir, logFilename)
 
-	ctx := digraph.SetupEnv(gh.Context, dag, nil, digraph.RootRun{}, gh.Config.ReqID, logFilePath, nil)
+	ctx := digraph.SetupEnv(gh.Context, dag, nil, digraph.ExecRef{}, gh.Config.ExecID, logFilePath, nil)
 
 	var doneNodes []*scheduler.Node
 	nodeCompletedChan := make(chan *scheduler.Node)

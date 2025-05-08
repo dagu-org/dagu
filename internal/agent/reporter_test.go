@@ -112,7 +112,7 @@ func testSuccessMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.
 }
 
 func testRenderSummary(t *testing.T, _ *reporter, _ *mockSender, dag *digraph.DAG, _ []*models.Node) {
-	status := models.NewStatusBuilder(dag).Create("request-id", scheduler.StatusError, 0, time.Now())
+	status := models.NewStatusBuilder(dag).Create("exec-id", scheduler.StatusError, 0, time.Now())
 	summary := renderDAGSummary(status, errors.New("test error"))
 	require.Contains(t, summary, "test error")
 	require.Contains(t, summary, dag.Name)

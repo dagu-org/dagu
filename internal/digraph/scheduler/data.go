@@ -45,13 +45,13 @@ type NodeState struct {
 	// ExitCode is the exit code that the command exited with.
 	// It only makes sense when the node is a command executor.
 	ExitCode int
-	// SubRuns is the list of sub-runs that this node has executed.
-	SubRuns []SubRun
+	// Child executions is the list of child executions that this node has executed.
+	Children []ChildExec
 }
 
-type SubRun struct {
-	// ReqID is the request ID of the sub-run.
-	ReqID string
+type ChildExec struct {
+	// ExecID is the execution ID of the child execution.
+	ExecID string
 }
 
 type NodeStatus int
@@ -134,19 +134,19 @@ func (s *Data) Data() NodeData {
 	return s.inner
 }
 
-func (s *Data) SubRunReqID() (string, error) {
+func (s *Data) ChildExecID() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// If subRuns is not empty, return the first child's request ID.
-	if len(s.inner.State.SubRuns) > 0 {
-		return s.inner.State.SubRuns[0].ReqID, nil
+	// If children is not empty, return the first child's execution ID.
+	if len(s.inner.State.Children) > 0 {
+		return s.inner.State.Children[0].ExecID, nil
 	}
-	// Generate a new request ID for the current node.
+	// Generate a new execution ID for the current node.
 	r, err := genReqID()
 	if err != nil {
-		return "", fmt.Errorf("failed to generate request ID: %w", err)
+		return "", fmt.Errorf("failed to generate execution ID: %w", err)
 	}
-	s.inner.State.SubRuns = append(s.inner.State.SubRuns, SubRun{ReqID: r})
+	s.inner.State.Children = append(s.inner.State.Children, ChildExec{ExecID: r})
 	return r, nil
 }
 
@@ -367,10 +367,10 @@ func (n *Data) ClearState() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	// The data of sub-runs need to be preserved to retain their request IDs
-	subRuns := n.inner.State.SubRuns
+	// The data of child executions need to be preserved to retain their execution IDs
+	children := n.inner.State.Children
 	n.inner.State = NodeState{}
-	n.inner.State.SubRuns = subRuns
+	n.inner.State.Children = children
 }
 
 func (n *Data) MarkError(err error) {
@@ -381,8 +381,8 @@ func (n *Data) MarkError(err error) {
 	n.inner.State.Status = NodeStatusError
 }
 
-// genReqID generates a new request ID.
-// For simplicity, we use UUIDs as request IDs.
+// genReqID generates a new execution ID.
+// For simplicity, we use UUIDs as execution IDs.
 func genReqID() (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {

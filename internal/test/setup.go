@@ -290,26 +290,26 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		opt(helper)
 	}
 
-	var reqID string
+	var execID string
 	if helper.opts.RetryTarget != nil {
-		reqID = helper.opts.RetryTarget.ReqID
+		execID = helper.opts.RetryTarget.ExecID
 	} else {
-		reqID = genReqID()
+		execID = genReqID()
 	}
 
 	logDir := d.Config.Paths.LogDir
-	logFile := filepath.Join(d.Config.Paths.LogDir, reqID+".log")
-	rootRun := digraph.NewRootRun(d.Name, reqID)
+	logFile := filepath.Join(d.Config.Paths.LogDir, execID+".log")
+	root := digraph.NewExecRef(d.Name, execID)
 
 	helper.Agent = agent.New(
-		reqID,
+		execID,
 		d.DAG,
 		logDir,
 		logFile,
 		d.HistoryMgr,
 		d.DAGRepo,
 		d.HistoryRepo,
-		rootRun,
+		root,
 		helper.opts,
 	)
 

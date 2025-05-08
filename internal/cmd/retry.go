@@ -18,10 +18,10 @@ func CmdRetry() *cobra.Command {
 		&cobra.Command{
 			Use:   "retry [flags] /path/to/spec.yaml",
 			Short: "Retry a DAG run",
-			Long: `Re-execute a previously run DAG using its unique request ID.
+			Long: `Re-execute a previously run DAG using its unique execution ID.
 
 Example:
-  dagu retry my_dag.yaml --request-id=abc123
+  dagu retry my_dag.yaml --exec-id=abc123
 
 This command is useful for recovering from errors or transient issues by re-running the DAG.
 `,
@@ -30,50 +30,46 @@ This command is useful for recovering from errors or transient issues by re-runn
 	)
 }
 
-var retryFlags = []commandLineFlag{reqIDFlagRetry}
+var retryFlags = []commandLineFlag{execIDFlagRetry}
 
 func runRetry(ctx *Context, args []string) error {
-	reqID, err := ctx.Command.Flags().GetString("request-id")
+	reqID, err := ctx.Command.Flags().GetString("exec-id")
 	if err != nil {
-		return fmt.Errorf("failed to get request ID: %w", err)
+		return fmt.Errorf("failed to get execution ID: %w", err)
 	}
 
-	dagName := args[0]
+	name := args[0]
 
-	// Retrieve the previous run data for specified request ID.
-	runRecord, err := ctx.HistoryRepo.Find(ctx, dagName, reqID)
+	// Retrieve the previous run data for specified execution ID.
+	ref := digraph.NewExecRef(name, reqID)
+	runRecord, err := ctx.HistoryRepo.Find(ctx, ref)
 	if err != nil {
-		logger.Error(ctx, "Failed to retrieve historical run", "reqId", reqID, "err", err)
-		return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", reqID, err)
+		return fmt.Errorf("failed to find the record for execution ID %s: %w", reqID, err)
 	}
 
 	// Read the detailed status of the previous status.
 	status, err := runRecord.ReadStatus(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to read status", "err", err)
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 
 	// Get the DAG instance from the run record.
 	dag, err := runRecord.ReadDAG(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to read DAG from run record", "err", err)
+		return fmt.Errorf("failed to read DAG from record: %w", err)
 	}
 
 	// The retry command is currently only supported for root DAGs.
-	// Therefore we use the request ID as the root DAG request ID here.
-	rootRun := digraph.NewRootRun(dag.Name, status.ReqID)
-
-	if err := executeRetry(ctx, dag, status, rootRun); err != nil {
-		logger.Error(ctx, "Failed to execute retry", "path", dagName, "err", err)
+	if err := executeRetry(ctx, dag, status, status.ExecRef()); err != nil {
+		logger.Error(ctx, "Failed to execute retry", "path", name, "err", err)
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
 
 	return nil
 }
 
-func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootRun digraph.RootRun) error {
-	logger.Debug(ctx, "Executing retry", "dagName", dag.Name, "reqId", status.ReqID)
+func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootRun digraph.ExecRef) error {
+	logger.Debug(ctx, "Executing retry", "name", dag.Name, "execId", status.ExecID)
 
 	// We use the same log file for the retry as the original run.
 	logFile, err := fileutil.OpenOrCreateFile(status.Log)
@@ -84,7 +80,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootRun
 		_ = logFile.Close()
 	}()
 
-	logger.Info(ctx, "DAG retry initiated", "DAG", dag.Name, "reqId", status.ReqID, "logFile", logFile.Name())
+	logger.Info(ctx, "DAG retry initiated", "DAG", dag.Name, "execId", status.ExecID, "logFile", logFile.Name())
 
 	// Update the context with the log file
 	ctx.LogToFile(logFile)
@@ -96,7 +92,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootRun
 	}
 
 	agentInstance := agent.New(
-		status.ReqID,
+		status.ExecID,
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
@@ -106,7 +102,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootRun
 		rootRun,
 		agent.Options{
 			RetryTarget: status,
-			ParentID:    status.ParentID,
+			Parent:      status.Parent,
 		},
 	)
 
@@ -117,7 +113,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootRun
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
-			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, status.ReqID, err)
+			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, status.ExecID, err)
 		}
 	}
 

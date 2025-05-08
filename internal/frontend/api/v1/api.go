@@ -121,9 +121,9 @@ func (a *API) handleError(w http.ResponseWriter, _ *http.Request, err error) {
 	}
 
 	switch {
-	case errors.Is(err, models.ErrReqIDNotFound):
+	case errors.Is(err, models.ErrExecIDNotFound):
 		code = api.ErrorCodeNotFound
-		message = "Request ID not found"
+		message = "execution ID not found"
 	}
 
 	w.Header().Set("Content-Type", "application/json")

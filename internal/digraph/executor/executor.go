@@ -21,8 +21,8 @@ type ExitCoder interface {
 	ExitCode() int
 }
 
-type SubDAG interface {
-	SetReqID(string)
+type ChildExec interface {
+	SetExecID(string)
 }
 
 type Creator func(ctx context.Context, step digraph.Step) (Executor, error)

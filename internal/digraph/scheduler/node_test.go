@@ -291,6 +291,6 @@ func (n nodeHelper) AssertOutput(t *testing.T, key, value string) {
 	require.Equal(t, fmt.Sprintf(`%s=%s`, key, value), data, "output variable value mismatch")
 }
 
-func (n nodeHelper) execContext(reqID string) context.Context {
-	return digraph.SetupEnv(n.Context, &digraph.DAG{}, nil, digraph.RootRun{}, reqID, "logFile", nil)
+func (n nodeHelper) execContext(execID string) context.Context {
+	return digraph.SetupEnv(n.Context, &digraph.DAG{}, nil, digraph.ExecRef{}, execID, "logFile", nil)
 }

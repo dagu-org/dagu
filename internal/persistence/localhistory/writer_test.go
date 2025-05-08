@@ -30,23 +30,23 @@ func TestWriter(t *testing.T) {
 
 	t.Run("WriteStatusToExistingFile", func(t *testing.T) {
 		dag := th.DAG("test_append_to_existing")
-		reqID := uuid.Must(uuid.NewV7()).String()
+		execID := uuid.Must(uuid.NewV7()).String()
 		startedAt := time.Now()
 
-		writer := dag.Writer(t, reqID, startedAt)
+		writer := dag.Writer(t, execID, startedAt)
 
 		status := models.NewStatusBuilder(dag.DAG).Create(
-			reqID, scheduler.StatusCancel, 1, time.Now(),
+			execID, scheduler.StatusCancel, 1, time.Now(),
 		)
 
 		// Write initial status
 		writer.Write(t, status)
 		writer.Close(t)
-		writer.AssertContent(t, "test_append_to_existing", reqID, scheduler.StatusCancel)
+		writer.AssertContent(t, "test_append_to_existing", execID, scheduler.StatusCancel)
 
 		// Append to existing file
 		dataRoot := NewDataRoot(th.tmpDir, dag.Name)
-		run, err := dataRoot.FindByReqID(th.Context, reqID)
+		run, err := dataRoot.FindByExecID(th.Context, execID)
 		require.NoError(t, err)
 
 		record, err := run.LatestRecord(th.Context, nil)
@@ -64,7 +64,7 @@ func TestWriter(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify appended data
-		writer.AssertContent(t, "test_append_to_existing", reqID, scheduler.StatusSuccess)
+		writer.AssertContent(t, "test_append_to_existing", execID, scheduler.StatusSuccess)
 	})
 }
 

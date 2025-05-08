@@ -15,13 +15,13 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
-var _ Executor = (*subDAG)(nil)
-var _ SubDAG = (*subDAG)(nil)
+var _ Executor = (*childExec)(nil)
+var _ ChildExec = (*childExec)(nil)
 
-type subDAG struct {
+type childExec struct {
 	dag         *digraph.DAG
 	lock        sync.Mutex
-	subRunReqID string
+	childExecID string
 	params      string
 	workDir     string
 	stdout      io.Writer
@@ -31,15 +31,15 @@ type subDAG struct {
 
 var ErrWorkingDirNotExist = fmt.Errorf("working directory does not exist")
 
-func newSubDAG(
+func newChildExec(
 	ctx context.Context, step digraph.Step,
 ) (Executor, error) {
 	config, err := EvalObject(ctx, struct {
 		Name   string
 		Params string
 	}{
-		Name:   step.SubDAG.Name,
-		Params: step.SubDAG.Params,
+		Name:   step.ChildDAG.Name,
+		Params: step.ChildDAG.Params,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to substitute string fields: %w", err)
@@ -48,44 +48,48 @@ func newSubDAG(
 	env := GetEnv(ctx)
 	sub, err := env.DB.GetDAG(ctx, config.Name)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to find sub DAG %q: %w", config.Name, err,
-		)
+		return nil, fmt.Errorf("failed to find child DAG %q: %w", config.Name, err)
 	}
 
-	// TODO: Evaluate the working directory
-	dir := step.Dir
+	dir, err := EvalString(ctx, step.Dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate working directory: %w", err)
+	}
+
 	if step.Dir != "" && !fileutil.FileExists(step.Dir) {
 		return nil, ErrWorkingDirNotExist
 	}
 
-	return &subDAG{
+	return &childExec{
 		dag:     sub,
 		params:  config.Params,
 		workDir: dir,
 	}, nil
 }
 
-func (e *subDAG) Run(ctx context.Context) error {
+func (e *childExec) Run(ctx context.Context) error {
 	executable, err := executablePath()
 	if err != nil {
 		return fmt.Errorf("failed to find executable path: %w", err)
 	}
 
-	if e.subRunReqID == "" {
-		return fmt.Errorf("request ID is not set for sub-DAG")
+	if e.childExecID == "" {
+		return fmt.Errorf("execution ID is not set for child DAG")
 	}
 
 	e.lock.Lock()
 
 	env := GetEnv(ctx)
 
+	if env.Root.IsZero() {
+		return fmt.Errorf("root execution ID is not set")
+	}
+
 	args := []string{
 		"start",
-		fmt.Sprintf("--root-dag-name=%s", env.RootRun.Name),
-		fmt.Sprintf("--root-request-id=%s", env.RootRun.ReqID),
-		fmt.Sprintf("--parent-request-id=%s", env.ReqID),
-		fmt.Sprintf("--request-id=%s", e.subRunReqID),
+		fmt.Sprintf("--root=%s", env.Root.String()),
+		fmt.Sprintf("--parent=%s", env.ExecRef().String()),
+		fmt.Sprintf("--exec-id=%s", e.childExecID),
 		"--quiet",
 		e.dag.Location,
 	}
@@ -95,8 +99,6 @@ func (e *subDAG) Run(ctx context.Context) error {
 		args = append(args, e.params)
 	}
 
-	logger.Debug(ctx, "Sub-DAG execution", "args", args)
-
 	cmd := exec.CommandContext(ctx, executable, args...) // nolint:gosec
 	cmd.Dir = e.workDir
 	cmd.Env = append(cmd.Env, env.AllEnvs()...)
@@ -104,7 +106,7 @@ func (e *subDAG) Run(ctx context.Context) error {
 		cmd.Stdout = e.stdout
 	}
 	if e.stderr != nil {
-		// TODO: Separate stderr and stdout for sub-DAG to avoid mixing logger output
+		// TODO: Separate stderr and stdout for child DAG to avoid mixing logger output
 		cmd.Stderr = e.stderr
 	}
 
@@ -115,21 +117,27 @@ func (e *subDAG) Run(ctx context.Context) error {
 
 	e.cmd = cmd
 
+	logger.Info(ctx, "Executing child DAG",
+		"execId", e.childExecID,
+		"target", e.dag.Name,
+		"args", args,
+	)
+
 	err = cmd.Start()
 	e.lock.Unlock()
 
 	if err != nil {
-		return fmt.Errorf("failed to start sub-DAG: %w", err)
+		return fmt.Errorf("failed to start child DAG: %w", err)
 	}
 
 	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("sub-DAG exited with error: %w", err)
+		return fmt.Errorf("child DAG exited with error: %w", err)
 	}
 
-	// get results from the sub-DAG
-	result, err := env.DB.GetSubStatus(ctx, e.subRunReqID, env.RootRun)
+	// get results from the child DAG
+	result, err := env.DB.GetChildExecStatus(ctx, e.childExecID, env.Root)
 	if err != nil {
-		return fmt.Errorf("failed to collect result: %w", err)
+		return fmt.Errorf("failed to collect result for the child execucion (exec ID=%s root=%s): %w", e.childExecID, env.Root, err)
 	}
 
 	jsonData, err := json.MarshalIndent(result, "", "  ")
@@ -146,25 +154,25 @@ func (e *subDAG) Run(ctx context.Context) error {
 	return nil
 }
 
-func (e *subDAG) SetReqID(id string) {
+func (e *childExec) SetExecID(id string) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
-	e.subRunReqID = id
+	e.childExecID = id
 }
 
-func (e *subDAG) SetStdout(out io.Writer) {
+func (e *childExec) SetStdout(out io.Writer) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	e.stdout = out
 }
 
-func (e *subDAG) SetStderr(out io.Writer) {
+func (e *childExec) SetStderr(out io.Writer) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	e.stderr = out
 }
 
-func (e *subDAG) Kill(sig os.Signal) error {
+func (e *childExec) Kill(sig os.Signal) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	if e.cmd == nil || e.cmd.Process == nil {
@@ -174,8 +182,8 @@ func (e *subDAG) Kill(sig os.Signal) error {
 }
 
 func init() {
-	Register(digraph.ExecutorTypeSubLegacy, newSubDAG)
-	Register(digraph.ExecutorTypeSub, newSubDAG)
+	Register(digraph.ExecutorTypeSubLegacy, newChildExec)
+	Register(digraph.ExecutorTypeSub, newChildExec)
 }
 
 func executablePath() (string, error) {

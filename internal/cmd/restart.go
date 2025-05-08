@@ -19,18 +19,18 @@ import (
 func CmdRestart() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "restart --request-id=abc123 dagName",
+			Use:   "restart --exec-id=abc123 dagName",
 			Short: "Restart a running DAG",
-			Long: `Stop the currently running DAG and immediately restart it with the same configuration but with a new request ID.
+			Long: `Stop the currently running DAG and immediately restart it with the same configuration but with a new execution ID.
 
 Flags:
-  --request-id string (optional) Unique identifier for tracking the restart execution.
+  --exec-id string (optional) Unique identifier for tracking the restart execution.
 
 Example:
-  dagu restart --request-id=abc123 dagName
+  dagu restart --exec-id=abc123 dagName
 
 This command gracefully stops the active DAG run before restarting it.
-If the request ID is not provided, it will find the current running DAG by name.
+If the execution ID is not provided, it will find the current running DAG by name.
 `,
 			Args: cobra.ExactArgs(1),
 		}, restartFlags, runRestart,
@@ -38,31 +38,30 @@ If the request ID is not provided, it will find the current running DAG by name.
 }
 
 var restartFlags = []commandLineFlag{
-	reqIDFlagRestart,
+	execIDFlagRestart,
 }
 
 func runRestart(ctx *Context, args []string) error {
-	reqID, err := ctx.Command.Flags().GetString("request-id")
+	reqID, err := ctx.Command.Flags().GetString("exec-id")
 	if err != nil {
-		return fmt.Errorf("failed to get request ID: %w", err)
+		return fmt.Errorf("failed to get execution ID: %w", err)
 	}
 
 	name := args[0]
 
 	var record models.Record
 	if reqID != "" {
-		// Retrieve the previous run's record for the specified request ID.
-		r, err := ctx.HistoryRepo.Find(ctx, name, reqID)
+		// Retrieve the previous run's record for the specified execution ID.
+		ref := digraph.NewExecRef(name, reqID)
+		r, err := ctx.HistoryRepo.Find(ctx, ref)
 		if err != nil {
-			logger.Error(ctx, "Failed to retrieve historical run", "reqId", reqID, "err", err)
-			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", reqID, err)
+			return fmt.Errorf("failed to find the record for execution ID %s: %w", reqID, err)
 		}
 		record = r
 	} else {
 		r, err := ctx.HistoryRepo.Latest(ctx, name)
 		if err != nil {
-			logger.Error(ctx, "Failed to retrieve latest run record", "dagName", name, "err", err)
-			return fmt.Errorf("failed to retrieve latest run record for DAG %s: %w", name, err)
+			return fmt.Errorf("failed to find the latest run record for DAG %s: %w", name, err)
 		}
 		record = r
 	}
@@ -73,7 +72,7 @@ func runRestart(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 	if status.Status != scheduler.StatusRunning {
-		logger.Error(ctx, "DAG is not running", "dagName", name)
+		logger.Error(ctx, "DAG is not running", "name", name)
 	}
 
 	dag, err := record.ReadDAG(ctx)
@@ -83,7 +82,7 @@ func runRestart(ctx *Context, args []string) error {
 	}
 
 	if err := handleRestartProcess(ctx, dag, reqID); err != nil {
-		logger.Error(ctx, "Failed to restart DAG", "dagName", dag.Name, "err", err)
+		logger.Error(ctx, "Failed to restart DAG", "name", dag.Name, "err", err)
 		return fmt.Errorf("restart process failed for DAG %s: %w", dag.Name, err)
 	}
 
@@ -102,14 +101,14 @@ func handleRestartProcess(ctx *Context, d *digraph.DAG, reqID string) error {
 		time.Sleep(d.RestartWait)
 	}
 
-	// Execute the exact same DAG with the same parameters but a new request ID
+	// Execute the exact same DAG with the same parameters but a new execution ID
 	return executeDAG(ctx, ctx.HistoryMgr, d)
 }
 
 func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
 	reqID, err := genReqID()
 	if err != nil {
-		return fmt.Errorf("failed to generate request ID: %w", err)
+		return fmt.Errorf("failed to generate execution ID: %w", err)
 	}
 
 	logFile, err := ctx.OpenLogFile(dag, reqID)
@@ -122,7 +121,7 @@ func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
 
 	ctx.LogToFile(logFile)
 
-	logger.Info(ctx, "DAG restart initiated", "DAG", dag.Name, "reqId", reqID, "logFile", logFile.Name())
+	logger.Info(ctx, "DAG restart initiated", "DAG", dag.Name, "execId", reqID, "logFile", logFile.Name())
 
 	dr, err := ctx.dagRepo(nil, []string{filepath.Dir(dag.Location)})
 	if err != nil {
@@ -138,7 +137,7 @@ func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
 		cli,
 		dr,
 		ctx.HistoryRepo,
-		digraph.NewRootRun(dag.Name, reqID),
+		digraph.NewExecRef(dag.Name, reqID),
 		agent.Options{Dry: false})
 
 	listenSignals(ctx, agentInstance)

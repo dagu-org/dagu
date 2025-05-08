@@ -49,9 +49,9 @@ func toStep(obj digraph.Step) api.Step {
 		Script:        ptrOf(obj.Script),
 	}
 
-	if obj.SubDAG != nil {
-		step.Run = ptrOf(obj.SubDAG.Name)
-		step.Params = ptrOf(obj.SubDAG.Params)
+	if obj.ChildDAG != nil {
+		step.Run = ptrOf(obj.ChildDAG.Name)
+		step.Params = ptrOf(obj.ChildDAG.Params)
 	}
 	return step
 }
@@ -69,7 +69,7 @@ func toRunDetails(s models.Status) api.RunDetails {
 		Name:        s.Name,
 		Params:      ptrOf(s.Params),
 		Pid:         ptrOf(int(s.PID)),
-		RequestId:   s.ReqID,
+		RequestId:   s.ExecID,
 		StartedAt:   s.StartedAt,
 		FinishedAt:  s.FinishedAt,
 		Status:      api.Status(s.Status),
@@ -104,15 +104,15 @@ func toNode(node *models.Node) api.Node {
 		StatusLabel: api.NodeStatusLabel(node.Status.String()),
 		Step:        toStep(node.Step),
 		Error:       ptrOf(node.Error),
-		SubRuns:     ptrOf(toSubRuns(node.SubRuns)),
+		SubRuns:     ptrOf(toChildExecutions(node.Children)),
 	}
 }
 
-func toSubRuns(subRuns []models.SubRun) []api.SubRun {
+func toChildExecutions(subRuns []models.ChildExec) []api.SubRun {
 	var result []api.SubRun
 	for _, r := range subRuns {
 		result = append(result, api.SubRun{
-			RequestId: r.ReqID,
+			RequestId: r.ExecID,
 		})
 	}
 	return result

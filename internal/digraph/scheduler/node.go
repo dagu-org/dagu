@@ -199,16 +199,16 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 		return nil, fmt.Errorf("failed to setup executor IO: %w", err)
 	}
 
-	// If the command is a sub-DAG, we need to set the request ID.
-	if subDAG, ok := cmd.(executor.SubDAG); ok {
-		reqID, err := n.SubRunReqID()
+	// If the command is a child DAG, we need to set the execution ID.
+	if childDAGExec, ok := cmd.(executor.ChildExec); ok {
+		reqID, err := n.ChildExecID()
 		if err != nil {
-			return nil, fmt.Errorf("failed to determine request ID for sub-DAG: %w", err)
+			return nil, fmt.Errorf("failed to determine execution ID for child DAG: %w", err)
 		}
 		if reqID == "" {
-			return nil, fmt.Errorf("request ID is empty for sub-DAG")
+			return nil, fmt.Errorf("execution ID is empty for child DAG")
 		}
-		subDAG.SetReqID(reqID)
+		childDAGExec.SetExecID(reqID)
 	}
 
 	return cmd, nil

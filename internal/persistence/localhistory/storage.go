@@ -15,7 +15,7 @@ import (
 
 // Error definitions for common issues
 var (
-	ErrReqIDEmpty = errors.New("requestID is empty")
+	ErrExecIDEmpty = errors.New("requestID is empty")
 )
 
 var _ models.HistoryRepository = (*historyStorage)(nil)
@@ -72,12 +72,12 @@ func New(baseDir string, opts ...HistoryStorageOption) models.HistoryRepository 
 	}
 }
 
-// Create creates a new run record for the specified DAG run.
+// Create creates a new run record for the specified DAG execution.
 // If opts.Root is not nil, it creates a sub-record for the specified root DAG.
-// If opts.Retry is true, it creates a retry record for the specified request ID.
+// If opts.Retry is true, it creates a retry record for the specified execution ID.
 func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts models.NewRecordOptions) (models.Record, error) {
 	if reqID == "" {
-		return nil, ErrReqIDEmpty
+		return nil, ErrExecIDEmpty
 	}
 
 	if opts.Root != nil {
@@ -87,11 +87,11 @@ func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestam
 	dataRoot := NewDataRoot(db.baseDir, dag.Name)
 	ts := NewUTC(timestamp)
 
-	var run *Run
+	var run *Execution
 	if opts.Retry {
-		r, err := dataRoot.FindByReqID(ctx, reqID)
+		r, err := dataRoot.FindByExecID(ctx, reqID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to find run: %w", err)
+			return nil, fmt.Errorf("failed to find execution: %w", err)
 		}
 		run = r
 	} else {
@@ -110,34 +110,34 @@ func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestam
 	return record, nil
 }
 
-// NewSubRecord creates a new run record for the specified sub-run.
-func (db *historyStorage) newSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts models.NewRecordOptions) (models.Record, error) {
+// NewSubRecord creates a new run record for the specified child execution.
+func (db *historyStorage) newSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, execID string, opts models.NewRecordOptions) (models.Record, error) {
 	dataRoot := NewDataRoot(db.baseDir, opts.Root.Name)
-	rootRun, err := dataRoot.FindByReqID(ctx, opts.Root.ReqID)
+	root, err := dataRoot.FindByExecID(ctx, opts.Root.ExecID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find root run: %w", err)
+		return nil, fmt.Errorf("failed to find root execution: %w", err)
 	}
 
 	ts := NewUTC(timestamp)
 
-	var run *Run
+	var run *Execution
 	if opts.Retry {
-		r, err := rootRun.FindSubRun(ctx, reqID)
+		r, err := root.FindChildExec(ctx, execID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to find run: %w", err)
+			return nil, fmt.Errorf("failed to find child execution record: %w", err)
 		}
 		run = r
 	} else {
-		r, err := rootRun.CreateSubRun(ctx, reqID)
+		r, err := root.CreateChildExec(ctx, execID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create sub run: %w", err)
+			return nil, fmt.Errorf("failed to create child execution: %w", err)
 		}
 		run = r
 	}
 
 	record, err := run.CreateRecord(ctx, ts, db.cache, WithDAG(dag))
 	if err != nil {
-		logger.Error(ctx, "Failed to create record", "err", err)
+		logger.Error(ctx, "Failed to create child execution record", "err", err)
 		return nil, err
 	}
 
@@ -194,25 +194,25 @@ func (db *historyStorage) Latest(ctx context.Context, dagName string) (models.Re
 		startOfDay := time.Now().Truncate(24 * time.Hour)
 		startOfDayInUTC := NewUTC(startOfDay)
 
-		// Get the latest file for today
-		run, err := root.LatestAfter(ctx, startOfDayInUTC)
+		// Get the latest execution data after the start of the day.
+		exec, err := root.LatestAfter(ctx, startOfDayInUTC)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get latest after: %w", err)
 		}
 
-		return run.LatestRecord(ctx, db.cache)
+		return exec.LatestRecord(ctx, db.cache)
 	}
 
-	// Get the latest file
-	latestRun := root.Latest(ctx, 1)
-	if len(latestRun) == 0 {
+	// Get the latest execution data.
+	latest := root.Latest(ctx, 1)
+	if len(latest) == 0 {
 		return nil, models.ErrNoStatusData
 	}
-	return latestRun[0].LatestRecord(ctx, db.cache)
+	return latest[0].LatestRecord(ctx, db.cache)
 }
 
-// Find finds a run record by request ID.
-func (db *historyStorage) Find(ctx context.Context, dagName, reqID string) (models.Record, error) {
+// Find finds a run record by execution ID.
+func (db *historyStorage) Find(ctx context.Context, ref digraph.ExecRef) (models.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -221,12 +221,12 @@ func (db *historyStorage) Find(ctx context.Context, dagName, reqID string) (mode
 		// Continue with operation
 	}
 
-	if reqID == "" {
-		return nil, ErrReqIDEmpty
+	if ref.ExecID == "" {
+		return nil, ErrExecIDEmpty
 	}
 
-	root := NewDataRoot(db.baseDir, dagName)
-	run, err := root.FindByReqID(ctx, reqID)
+	root := NewDataRoot(db.baseDir, ref.Name)
+	run, err := root.FindByExecID(ctx, ref.ExecID)
 
 	if err != nil {
 		return nil, err
@@ -235,8 +235,8 @@ func (db *historyStorage) Find(ctx context.Context, dagName, reqID string) (mode
 	return run.LatestRecord(ctx, db.cache)
 }
 
-// FindSubRun finds a run record by request ID for a sub-DAG.
-func (db *historyStorage) FindSubRun(ctx context.Context, name, reqID string, subRunID string) (models.Record, error) {
+// FindChildExecution finds a run record by execution ID for a child DAG.
+func (db *historyStorage) FindChildExecution(ctx context.Context, ref digraph.ExecRef, childExecID string) (models.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -245,21 +245,21 @@ func (db *historyStorage) FindSubRun(ctx context.Context, name, reqID string, su
 		// Continue with operation
 	}
 
-	if reqID == "" {
-		return nil, ErrReqIDEmpty
+	if ref.ExecID == "" {
+		return nil, ErrExecIDEmpty
 	}
 
-	root := NewDataRoot(db.baseDir, name)
-	run, err := root.FindByReqID(ctx, reqID)
+	root := NewDataRoot(db.baseDir, ref.Name)
+	run, err := root.FindByExecID(ctx, ref.ExecID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to find execution: %w", err)
 	}
 
-	subRun, err := run.FindSubRun(ctx, subRunID)
+	childExec, err := run.FindChildExec(ctx, childExecID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to find child execution: %w", err)
 	}
-	return subRun.LatestRecord(ctx, db.cache)
+	return childExec.LatestRecord(ctx, db.cache)
 }
 
 // RemoveOld removes run records older than retentionDays for the specified key.

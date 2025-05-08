@@ -85,7 +85,7 @@ func (r *reporter) send(ctx context.Context, dag *digraph.DAG, status models.Sta
 }
 
 var dagHeader = table.Row{
-	"reqId",
+	"ExecID",
 	"Name",
 	"Started At",
 	"Finished At",
@@ -96,7 +96,7 @@ var dagHeader = table.Row{
 
 func renderDAGSummary(status models.Status, err error) string {
 	dataRow := table.Row{
-		status.ReqID,
+		status.ExecID,
 		status.Name,
 		status.StartedAt,
 		status.FinishedAt,

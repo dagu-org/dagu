@@ -55,9 +55,9 @@ func (m *Manager) LoadYAML(ctx context.Context, spec []byte, opts ...digraph.Loa
 
 // Stop stops a running DAG by sending a stop request to its socket.
 // If the DAG is not running, it logs a message and returns nil.
-func (m *Manager) Stop(ctx context.Context, dag *digraph.DAG, reqID string) error {
+func (m *Manager) Stop(ctx context.Context, dag *digraph.DAG, execID string) error {
 	logger.Info(ctx, "Stopping", "name", dag.Name)
-	addr := dag.SockAddr(reqID)
+	addr := dag.SockAddr(execID)
 	if !fileutil.FileExists(addr) {
 		logger.Info(ctx, "The DAG is not running", "name", dag.Name)
 		return nil
@@ -67,12 +67,12 @@ func (m *Manager) Stop(ctx context.Context, dag *digraph.DAG, reqID string) erro
 	return err
 }
 
-// GenReqID generates a unique request ID for a DAG run using UUID v7.
+// GenReqID generates a unique execution ID for a DAG run using UUID v7.
 func (m *Manager) GenReqID(_ context.Context) (string, error) {
-	// Generate a unique request ID for the DAG run
+	// Generate a unique execution ID for the DAG run
 	id, err := uuid.NewV7()
 	if err != nil {
-		return "", fmt.Errorf("failed to generate request ID: %w", err)
+		return "", fmt.Errorf("failed to generate execution ID: %w", err)
 	}
 	return id.String(), nil
 }
@@ -89,7 +89,7 @@ func (m *Manager) Start(_ context.Context, dag *digraph.DAG, opts StartOptions) 
 		args = append(args, "-q")
 	}
 	if opts.ReqID != "" {
-		args = append(args, fmt.Sprintf("--request-id=%s", opts.ReqID))
+		args = append(args, fmt.Sprintf("--exec-id=%s", opts.ReqID))
 	}
 	if m.configPath != "" {
 		args = append(args, fmt.Sprintf("--config=%s", m.configPath))
@@ -126,7 +126,7 @@ func (m *Manager) Restart(_ context.Context, dag *digraph.DAG, opts RestartOptio
 // the configured executable with the retry command.
 func (m *Manager) Retry(_ context.Context, dag *digraph.DAG, reqID string) error {
 	args := []string{"retry"}
-	args = append(args, fmt.Sprintf("--request-id=%s", reqID))
+	args = append(args, fmt.Sprintf("--exec-id=%s", reqID))
 	args = append(args, dag.Location)
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
@@ -138,16 +138,16 @@ func (m *Manager) Retry(_ context.Context, dag *digraph.DAG, reqID string) error
 
 // IsRunning checks if a DAG is currently running by attempting to get its current status.
 // Returns true if the status can be retrieved without error, false otherwise.
-func (m *Manager) IsRunning(ctx context.Context, dag *digraph.DAG, reqID string) bool {
-	_, err := m.currentStatus(ctx, dag, reqID)
+func (m *Manager) IsRunning(ctx context.Context, dag *digraph.DAG, execID string) bool {
+	_, err := m.currentStatus(ctx, dag, execID)
 	return err == nil
 }
 
 // GetRealtimeStatus retrieves the current status of a DAG.
 // If the DAG is running, it gets the status from the socket.
 // If the socket doesn't exist or times out, it falls back to stored status or creates an initial status.
-func (m *Manager) GetRealtimeStatus(ctx context.Context, dag *digraph.DAG, reqID string) (*models.Status, error) {
-	status, err := m.currentStatus(ctx, dag, reqID)
+func (m *Manager) GetRealtimeStatus(ctx context.Context, dag *digraph.DAG, execID string) (*models.Status, error) {
+	status, err := m.currentStatus(ctx, dag, execID)
 	if err != nil {
 		// No such file or directory
 		if errors.Is(err, os.ErrNotExist) {
@@ -161,19 +161,19 @@ func (m *Manager) GetRealtimeStatus(ctx context.Context, dag *digraph.DAG, reqID
 	return status, nil
 
 FALLBACK:
-	if reqID == "" {
+	if execID == "" {
 		// The DAG is not running so return the default status
 		status := models.InitialStatus(dag)
 		return &status, nil
 	}
-	return m.findPersistedStatus(ctx, dag, reqID)
+	return m.findPersistedStatus(ctx, dag, execID)
 }
 
 // FindByReqID retrieves the status of a DAG run by name and requestID from the run store.
-func (e *Manager) FindByReqID(ctx context.Context, name string, reqID string) (*models.Status, error) {
-	record, err := e.Find(ctx, name, reqID)
+func (e *Manager) FindByReqID(ctx context.Context, ref digraph.ExecRef) (*models.Status, error) {
+	record, err := e.Find(ctx, ref)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find status by request id: %w", err)
+		return nil, fmt.Errorf("failed to find status by execution ID: %w", err)
 	}
 	latestStatus, err := record.ReadStatus(ctx)
 	if err != nil {
@@ -188,9 +188,10 @@ func (e *Manager) FindByReqID(ctx context.Context, name string, reqID string) (*
 func (m *Manager) findPersistedStatus(ctx context.Context, dag *digraph.DAG, reqID string) (
 	*models.Status, error,
 ) {
-	record, err := m.Find(ctx, dag.Name, reqID)
+	ref := digraph.NewExecRef(dag.Name, reqID)
+	record, err := m.Find(ctx, ref)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find status by request id: %w", err)
+		return nil, fmt.Errorf("failed to find status by execution ID: %w", err)
 	}
 	latestStatus, err := record.ReadStatus(ctx)
 	if err != nil {
@@ -199,7 +200,7 @@ func (m *Manager) findPersistedStatus(ctx context.Context, dag *digraph.DAG, req
 
 	// If the DAG is running, query the current status
 	if latestStatus.Status == scheduler.StatusRunning {
-		currentStatus, err := m.currentStatus(ctx, dag, latestStatus.ReqID)
+		currentStatus, err := m.currentStatus(ctx, dag, latestStatus.ExecID)
 		if err == nil {
 			return currentStatus, nil
 		}
@@ -214,11 +215,11 @@ func (m *Manager) findPersistedStatus(ctx context.Context, dag *digraph.DAG, req
 	return latestStatus, nil
 }
 
-// FindBySubRunReqID retrieves the status of a sub-run by its request ID.
-func (m *Manager) FindBySubRunReqID(ctx context.Context, root digraph.RootRun, reqID string) (*models.Status, error) {
-	record, err := m.FindSubRun(ctx, root.Name, root.ReqID, reqID)
+// FindChildExec retrieves the status of a child execution by its execution ID.
+func (m *Manager) FindChildExec(ctx context.Context, ref digraph.ExecRef, reqID string) (*models.Status, error) {
+	record, err := m.FindChildExecution(ctx, ref, reqID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find sub-run status by request id: %w", err)
+		return nil, fmt.Errorf("failed to find child execution status by execution ID: %w", err)
 	}
 	latestStatus, err := record.ReadStatus(ctx)
 	if err != nil {
@@ -260,7 +261,7 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 
 	// If the DAG is running, query the current status
 	if latestStatus.Status == scheduler.StatusRunning {
-		currentStatus, err := m.currentStatus(ctx, dag, latestStatus.ReqID)
+		currentStatus, err := m.currentStatus(ctx, dag, latestStatus.ExecID)
 		if err == nil {
 			return *currentStatus, nil
 		}
@@ -302,7 +303,7 @@ func (m *Manager) ListRecentHistory(ctx context.Context, name string, n int) []m
 }
 
 // UpdateStatus updates the status of a DAG run in the run store.
-func (e *Manager) UpdateStatus(ctx context.Context, root digraph.RootRun, status models.Status) error {
+func (e *Manager) UpdateStatus(ctx context.Context, root digraph.ExecRef, status models.Status) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -314,18 +315,18 @@ func (e *Manager) UpdateStatus(ctx context.Context, root digraph.RootRun, status
 	// Find the run record
 	var historyRecord models.Record
 
-	if root.ReqID == status.ReqID {
-		// If the request ID matches the root DAG's request ID, find the run record by request ID
-		r, err := e.Find(ctx, root.Name, status.ReqID)
+	if root.ExecID == status.ExecID {
+		// If the execution ID matches the root DAG's execution ID, find the run record by execution ID
+		r, err := e.Find(ctx, root)
 		if err != nil {
-			return fmt.Errorf("failed to find run record: %w", err)
+			return fmt.Errorf("failed to find execution record: %w", err)
 		}
 		historyRecord = r
 	} else {
-		// If the request ID does not match, find the run record by sub-run request ID
-		r, err := e.FindSubRun(ctx, root.Name, root.ReqID, status.ReqID)
+		// If the execution ID does not match, find the run record by child execution execution ID
+		r, err := e.FindChildExecution(ctx, root, status.ExecID)
 		if err != nil {
-			return fmt.Errorf("failed to find sub-run record: %w", err)
+			return fmt.Errorf("failed to find child execution record: %w", err)
 		}
 		historyRecord = r
 	}
@@ -372,7 +373,7 @@ func escapeArg(input string) string {
 type StartOptions struct {
 	Params string // Parameters to pass to the DAG
 	Quiet  bool   // Whether to run in quiet mode
-	ReqID  string // Request ID for the DAG run
+	ReqID  string // execution ID for the DAG run
 }
 
 // RestartOptions contains options for restarting a DAG.

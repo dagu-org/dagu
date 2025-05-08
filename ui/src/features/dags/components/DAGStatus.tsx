@@ -21,6 +21,7 @@ function DAGStatus({ run, fileName }: Props) {
     components['schemas']['Step'] | undefined
   >(undefined);
 
+  console.log('DAGStatus', run);
   // State for log viewer
   const [logViewer, setLogViewer] = useState({
     isOpen: false,

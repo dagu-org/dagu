@@ -25,8 +25,8 @@ func TestDataRoot(t *testing.T) {
 
 			assert.Equal(t, dagName, dr.dagName, "dagName should be set correctly")
 			assert.Equal(t, "test-dag", dr.prefix, "prefix should be set correctly")
-			assert.Equal(t, filepath.Join(baseDir, "test-dag", "runs"), dr.runsDir, "path should be set correctly")
-			assert.Equal(t, filepath.Join(baseDir, "test-dag", "runs", "*", "*", "*", "run_*"), dr.globPattern, "globPattern should be set correctly")
+			assert.Equal(t, filepath.Join(baseDir, "test-dag", "executions"), dr.executionsDir, "path should be set correctly")
+			assert.Equal(t, filepath.Join(baseDir, "test-dag", "executions", "*", "*", "*", "exec_*"), dr.globPattern, "globPattern should be set correctly")
 		})
 
 		t.Run("WithYAMLExtension", func(t *testing.T) {
@@ -70,13 +70,13 @@ func TestDataRootRuns(t *testing.T) {
 		ctx := context.Background()
 
 		root := setupTestDataRoot(t)
-		run := root.CreateTestRun(t, "test-id1", ts)
-		_ = root.CreateTestRun(t, "test-id2", ts)
+		exec := root.CreateTestExecution(t, "test-id1", ts)
+		_ = root.CreateTestExecution(t, "test-id2", ts)
 
-		actual, err := root.FindByReqID(ctx, "test-id1")
+		actual, err := root.FindByExecID(ctx, "test-id1")
 		require.NoError(t, err)
 
-		assert.Equal(t, run.Run, actual, "FindByReqID should return the correct run")
+		assert.Equal(t, exec.Execution, actual, "FindByReqID should return the correct run")
 	})
 
 	t.Run("Latest", func(t *testing.T) {
@@ -86,9 +86,9 @@ func TestDataRootRuns(t *testing.T) {
 		ts2 := NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
 		ts3 := NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC))
 
-		_ = root.CreateTestRun(t, "test-id1", ts1)
-		_ = root.CreateTestRun(t, "test-id2", ts2)
-		_ = root.CreateTestRun(t, "test-id3", ts3)
+		_ = root.CreateTestExecution(t, "test-id1", ts1)
+		_ = root.CreateTestExecution(t, "test-id2", ts2)
+		_ = root.CreateTestExecution(t, "test-id3", ts3)
 
 		runs := root.Latest(context.Background(), 2)
 		require.Len(t, runs, 2)
@@ -104,9 +104,9 @@ func TestDataRootRuns(t *testing.T) {
 		ts3 := NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC))
 		ts4 := NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 1, time.UTC))
 
-		_ = root.CreateTestRun(t, "test-id1", ts1)
-		_ = root.CreateTestRun(t, "test-id2", ts2)
-		latest := root.CreateTestRun(t, "test-id3", ts3)
+		_ = root.CreateTestExecution(t, "test-id1", ts1)
+		_ = root.CreateTestExecution(t, "test-id2", ts2)
+		latest := root.CreateTestExecution(t, "test-id3", ts3)
 
 		_, err := root.LatestAfter(context.Background(), ts4)
 		require.ErrorIs(t, err, models.ErrNoStatusData, "LatestAfter should return ErrNoStatusData when no runs are found")
@@ -114,7 +114,7 @@ func TestDataRootRuns(t *testing.T) {
 		run, err := root.LatestAfter(context.Background(), ts3)
 		require.NoError(t, err)
 
-		assert.Equal(t, *latest.Run, *run, "LatestAfter should return the most recent run after the given timestamp")
+		assert.Equal(t, *latest.Execution, *run, "LatestAfter should return the most recent run after the given timestamp")
 	})
 
 	t.Run("ListInRange", func(t *testing.T) {
@@ -123,7 +123,7 @@ func TestDataRootRuns(t *testing.T) {
 		for date := 1; date <= 31; date++ {
 			for hour := 0; hour < 24; hour++ {
 				ts := NewUTC(time.Date(2021, 1, date, hour, 0, 0, 0, time.UTC))
-				_ = root.CreateTestRun(t, fmt.Sprintf("test-id-%d-%d", date, hour), ts)
+				_ = root.CreateTestExecution(t, fmt.Sprintf("test-id-%d-%d", date, hour), ts)
 			}
 		}
 
@@ -152,7 +152,7 @@ func TestDataRootRename(t *testing.T) {
 
 	for date := 1; date <= 3; date++ {
 		ts := NewUTC(time.Date(2021, 1, date, 0, 0, 0, 0, time.UTC))
-		_ = root.CreateTestRun(t, fmt.Sprintf("test-id-%d", date), ts)
+		_ = root.CreateTestExecution(t, fmt.Sprintf("test-id-%d", date), ts)
 	}
 
 	newRoot := NewDataRoot(root.baseDir, "new-dag")
@@ -190,7 +190,7 @@ func TestDataRootUtils(t *testing.T) {
 	assert.True(t, isEmpty, "IsEmpty should return true for empty directory")
 
 	// Add a file to the directory
-	root.CreateTestRun(t, "test-id", NewUTC(time.Now()))
+	root.CreateTestExecution(t, "test-id", NewUTC(time.Now()))
 	require.NoError(t, err)
 
 	// IsEmpty should return false for non-empty directory
@@ -219,7 +219,7 @@ type DataRootTest struct {
 	Context context.Context
 }
 
-func (drt *DataRootTest) CreateTestRun(t *testing.T, reqID string, ts TimeInUTC) ExecutionTest {
+func (drt *DataRootTest) CreateTestExecution(t *testing.T, reqID string, ts TimeInUTC) ExecutionTest {
 	t.Helper()
 
 	err := drt.Create()
@@ -230,6 +230,6 @@ func (drt *DataRootTest) CreateTestRun(t *testing.T, reqID string, ts TimeInUTC)
 
 	return ExecutionTest{
 		DataRootTest: *drt,
-		Run:          run,
+		Execution:    run,
 		TB:           t}
 }

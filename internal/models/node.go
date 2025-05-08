@@ -28,9 +28,9 @@ func FromNodes(nodes []scheduler.NodeData) []*Node {
 
 // FromNode converts a single scheduler NodeData to a persistence Node
 func FromNode(node scheduler.NodeData) *Node {
-	subRuns := make([]SubRun, len(node.State.SubRuns))
-	for i, subRun := range node.State.SubRuns {
-		subRuns[i] = SubRun(subRun)
+	children := make([]ChildExec, len(node.State.Children))
+	for i, childExec := range node.State.Children {
+		children[i] = ChildExec(childExec)
 	}
 	var errText string
 	if node.State.Error != nil {
@@ -46,7 +46,7 @@ func FromNode(node scheduler.NodeData) *Node {
 		RetryCount: node.State.RetryCount,
 		DoneCount:  node.State.DoneCount,
 		Error:      errText,
-		SubRuns:    subRuns,
+		Children:   children,
 	}
 }
 
@@ -61,11 +61,11 @@ type Node struct {
 	RetryCount int                  `json:"retryCount,omitempty"`
 	DoneCount  int                  `json:"doneCount,omitempty"`
 	Error      string               `json:"error,omitempty"`
-	SubRuns    []SubRun             `json:"subRuns,omitempty"`
+	Children   []ChildExec          `json:"children,omitempty"`
 }
 
-type SubRun struct {
-	ReqID string `json:"reqId,omitempty"`
+type ChildExec struct {
+	ExecID string `json:"execId,omitempty"`
 }
 
 // ToNode converts a persistence Node back to a scheduler Node
@@ -73,9 +73,9 @@ func (n *Node) ToNode() *scheduler.Node {
 	startedAt, _ := stringutil.ParseTime(n.StartedAt)
 	finishedAt, _ := stringutil.ParseTime(n.FinishedAt)
 	retriedAt, _ := stringutil.ParseTime(n.RetriedAt)
-	subRuns := make([]scheduler.SubRun, len(n.SubRuns))
-	for i, r := range n.SubRuns {
-		subRuns[i] = scheduler.SubRun(r)
+	children := make([]scheduler.ChildExec, len(n.Children))
+	for i, r := range n.Children {
+		children[i] = scheduler.ChildExec(r)
 	}
 	return scheduler.NewNode(n.Step, scheduler.NodeState{
 		Status:     n.Status,
@@ -86,7 +86,7 @@ func (n *Node) ToNode() *scheduler.Node {
 		RetryCount: n.RetryCount,
 		DoneCount:  n.DoneCount,
 		Error:      errors.New(n.Error),
-		SubRuns:    subRuns,
+		Children:   children,
 	})
 }
 

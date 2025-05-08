@@ -84,7 +84,7 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "executor", fn: buildExecutor},
 	{name: "command", fn: buildCommand},
 	{name: "depends", fn: buildDepends},
-	{name: "sub-DAG", fn: buildSubDAG},
+	{name: "childDAG", fn: buildDAGExecStep},
 	{name: "continueOn", fn: buildContinueOn},
 	{name: "retryPolicy", fn: buildRetryPolicy},
 	{name: "repeatPolicy", fn: buildRepeatPolicy},
@@ -700,8 +700,8 @@ func buildSignalOnStop(_ BuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
-// buildSubDAG parses the sub-DAG definition and sets the step fields.
-func buildSubDAG(_ BuildContext, def stepDef, step *Step) error {
+// buildDAGExecStep parses the child DAG definition and sets the step fields.
+func buildDAGExecStep(_ BuildContext, def stepDef, step *Step) error {
 	name, params := def.Run, def.Params
 
 	// if the run field is not set, return nil.
@@ -709,8 +709,8 @@ func buildSubDAG(_ BuildContext, def stepDef, step *Step) error {
 		return nil
 	}
 
-	// Set the step fields for the sub-DAG.
-	step.SubDAG = &SubDAG{Name: name, Params: params}
+	// Set the step fields for the child DAG.
+	step.ChildDAG = &ChildDAG{Name: name, Params: params}
 	step.ExecutorConfig.Type = ExecutorTypeSub
 	step.Command = "run"
 	step.Args = []string{name, params}

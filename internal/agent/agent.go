@@ -71,24 +71,23 @@ type Agent struct {
 	// dag is the DAG to run.
 	dag *digraph.DAG
 
-	// rootRun indicates the DAG name and request ID of the root run history.
-	// It is same as the current DAG name and request ID if it's not a sub-DAG.
-	rootRun digraph.RootRun
+	// root indicates the DAG name and execution reference of the root execution history.
+	// It is same as the current execution reference if it's not a child execution.
+	root digraph.ExecRef
 
-	// reqID is request ID to identify DAG run uniquely.
-	// The request ID can be used for runstore lookup, retry, etc.
-	reqID string
+	// parent is the execution reference of the parent DAG execution.
+	parent digraph.ExecRef
 
-	// parentReqID is the request ID of the parent DAG run.
-	parentReqID string
+	// execID is the execution ID of the current DAG execution.
+	execID string
 
 	// finished is true if the DAG run is finished.
 	finished atomic.Bool
 
-	// lastErr is the last error occurred during the DAG run.
+	// lastErr is the last error occurred during the DAG execution.
 	lastErr error
 
-	// subExecution is true if the agent is running as a sub-DAG.
+	// subExecution is true if the agent is running as a child DAG.
 	subExecution atomic.Bool
 }
 
@@ -101,26 +100,27 @@ type Options struct {
 	// If it's specified the agent will execute the DAG with the same
 	// configuration as the specified history.
 	RetryTarget *models.Status
-	// ParentID is the request ID of the parent DAG run.
-	// It is required for sub-DAG runs to identify the parent DAG.
-	ParentID string
+	// Parent is the execution ID of the parent DAG execution.
+	// It is required for child executions to identify the parent DAG.
+	Parent digraph.ExecRef
 }
 
 // New creates a new Agent.
 func New(
-	reqID string,
+	execID string,
 	dag *digraph.DAG,
 	logDir string,
 	logFile string,
 	cli history.Manager,
 	dagRepo models.DAGRepository,
 	historyRepo models.HistoryRepository,
-	rootRun digraph.RootRun,
+	root digraph.ExecRef,
 	opts Options,
 ) *Agent {
 	return &Agent{
-		rootRun:     rootRun,
-		reqID:       reqID,
+		root:        root,
+		parent:      opts.Parent,
+		execID:      execID,
 		dag:         dag,
 		dry:         opts.Dry,
 		retryTarget: opts.RetryTarget,
@@ -129,7 +129,6 @@ func New(
 		client:      cli,
 		dagRepo:     dagRepo,
 		historyRepo: historyRepo,
-		parentReqID: opts.ParentID,
 	}
 }
 
@@ -144,12 +143,12 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create a new context for the DAG run with all necessary information
 	dbClient := newDBClient(a.historyRepo, a.dagRepo)
-	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.rootRun, a.reqID, a.logFile, a.dag.Params)
+	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.root, a.execID, a.logFile, a.dag.Params)
 
 	// Add structured logging context
-	logFields := []any{"dag", a.dag.Name, "reqId", a.reqID}
+	logFields := []any{"dag", a.dag.Name, "execId", a.execID}
 	if a.subExecution.Load() {
-		logFields = append(logFields, "rootDAG", a.rootRun.Name, "rootReqID", a.rootRun.ReqID)
+		logFields = append(logFields, "rootDAG", a.root.Name, "rootReqID", a.root.ExecID)
 	}
 	ctx = logger.WithValues(ctx, logFields...)
 
@@ -198,7 +197,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 	})
 
-	// Stop the socket server when finishing the DAG run.
+	// Stop the socket server when finishing the DAG execution.
 	defer func() {
 		if err := a.socketServer.Shutdown(ctx); err != nil {
 			logger.Error(ctx, "Failed to shutdown socket frontend", "err", err)
@@ -239,8 +238,8 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 	})
 
-	// Start the DAG run.
-	logger.Debug(ctx, "DAG run started", "reqId", a.reqID, "name", a.dag.Name, "params", a.dag.Params)
+	// Start the DAG execution.
+	logger.Debug(ctx, "DAG run started", "execId", a.execID, "name", a.dag.Name, "params", a.dag.Params)
 	lastErr := a.scheduler.Schedule(ctx, a.graph, done)
 
 	// Update the finished status to the runstore database.
@@ -259,7 +258,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Mark the agent finished.
 	a.finished.Store(true)
 
-	// Return the last error on the DAG run.
+	// Return the last error on the DAG execution.
 	return lastErr
 }
 
@@ -292,13 +291,13 @@ func (a *Agent) Status() models.Status {
 	}
 
 	if a.subExecution.Load() {
-		opts = append(opts, models.WithSubRunMetadata(a.rootRun, a.parentReqID))
+		opts = append(opts, models.WithHierarchyRefs(a.root, a.parent))
 	}
 
 	// Create the status object to record the current status.
 	return models.NewStatusBuilder(a.dag).
 		Create(
-			a.reqID,
+			a.execID,
 			schedulerStatus,
 			os.Getpid(),
 			a.graph.StartAt(),
@@ -337,7 +336,7 @@ func (a *Agent) HandleHTTP(ctx context.Context) sock.HTTPHandlerFunc {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write(statusJSON)
 		case r.Method == http.MethodPost && stopRe.MatchString(r.URL.Path):
-			// Handle Stop request for the DAG run.
+			// Handle Stop request for the DAG execution.
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("OK"))
 			go func() {
@@ -353,18 +352,18 @@ func (a *Agent) HandleHTTP(ctx context.Context) sock.HTTPHandlerFunc {
 	}
 }
 
-// setup the agent instance for DAG run.
+// setup the agent instance for DAG execution.
 func (a *Agent) setup(ctx context.Context) error {
 	// Lock to prevent race condition.
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	if a.rootRun.ReqID != a.reqID {
-		logger.Debug(ctx, "Initiating sub-DAG run", "rootDAG", a.rootRun.Name, "rootReqID", a.rootRun.ReqID)
+	if a.root.ExecID != a.execID {
+		logger.Debug(ctx, "Initiating child execution", "rootDAG", a.root.Name, "rootReqID", a.root.ExecID)
 		a.subExecution.Store(true)
-		if a.parentReqID == "" {
-			logger.Error(ctx, "Parent request ID is required for sub-DAG run")
-			return fmt.Errorf("parent request ID is required for sub-DAG run")
+		if a.parent.IsZero() {
+			logger.Error(ctx, "Parent execution ID is required for child execution")
+			return fmt.Errorf("parent execution ID is required for child execution")
 		}
 	}
 
@@ -388,7 +387,7 @@ func (a *Agent) setup(ctx context.Context) error {
 	return a.setupGraph(ctx)
 }
 
-// newScheduler creates a scheduler instance for the DAG run.
+// newScheduler creates a scheduler instance for the DAG execution.
 func (a *Agent) newScheduler() *scheduler.Scheduler {
 	cfg := &scheduler.Config{
 		LogDir:        a.logDir,
@@ -396,7 +395,7 @@ func (a *Agent) newScheduler() *scheduler.Scheduler {
 		Timeout:       a.dag.Timeout,
 		Delay:         a.dag.Delay,
 		Dry:           a.dry,
-		ReqID:         a.reqID,
+		ExecID:        a.execID,
 	}
 
 	if a.dag.HandlerOn.Exit != nil {
@@ -435,14 +434,12 @@ func (a *Agent) dryRun(ctx context.Context) error {
 		}
 	}()
 
-	logger.Info(ctx, "Dry-run started", "reqId", a.reqID, "name", a.dag.Name, "params", a.dag.Params)
-
 	db := newDBClient(a.historyRepo, a.dagRepo)
-	dagCtx := digraph.SetupEnv(ctx, a.dag, db, a.rootRun, a.reqID, a.logFile, a.dag.Params)
+	dagCtx := digraph.SetupEnv(ctx, a.dag, db, a.root, a.execID, a.logFile, a.dag.Params)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 	a.lastErr = lastErr
 
-	logger.Info(ctx, "Dry-run finished", "reqId", a.reqID)
+	logger.Info(ctx, "Dry-run finished", "params", a.dag.Params)
 
 	return lastErr
 }
@@ -502,7 +499,6 @@ func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 // from the retry node so that it runs the same DAG as the previous run.
 func (a *Agent) setupGraph(ctx context.Context) error {
 	if a.retryTarget != nil {
-		logger.Info(ctx, "Retry run", "reqId", a.reqID)
 		return a.setupGraphForRetry(ctx)
 	}
 	graph, err := scheduler.NewExecutionGraph(a.dag.Steps...)
@@ -535,20 +531,20 @@ func (a *Agent) setupRunRecord(ctx context.Context) (models.Record, error) {
 
 	opts := models.NewRecordOptions{Retry: a.retryTarget != nil}
 	if a.subExecution.Load() {
-		opts.Root = &a.rootRun
+		opts.Root = &a.root
 	}
 
-	return a.historyRepo.Create(ctx, a.dag, time.Now(), a.reqID, opts)
+	return a.historyRepo.Create(ctx, a.dag, time.Now(), a.execID, opts)
 }
 
 // setupSocketServer create socket server instance.
 func (a *Agent) setupSocketServer(ctx context.Context) error {
 	var socketAddr string
 	if a.subExecution.Load() {
-		// Use separate socket address for sub-DAGs to allow them run concurrently.
-		socketAddr = a.dag.SockAddrSub(a.reqID)
+		// Use separate socket address for child DAGs to allow them run concurrently.
+		socketAddr = a.dag.SockAddrSub(a.execID)
 	} else {
-		socketAddr = a.dag.SockAddr(a.reqID)
+		socketAddr = a.dag.SockAddr(a.execID)
 	}
 	socketServer, err := sock.NewServer(socketAddr, a.HandleHTTP(ctx))
 	if err != nil {
@@ -561,10 +557,10 @@ func (a *Agent) setupSocketServer(ctx context.Context) error {
 // checkIsAlreadyRunning returns error if the DAG is already running.
 func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
 	if a.subExecution.Load() {
-		return nil // Skip the check for sub-DAGs
+		return nil // Skip the check for child DAGs
 	}
-	if a.client.IsRunning(ctx, a.dag, a.reqID) {
-		return fmt.Errorf("the DAG is already running. requestID=%s, socket=%s", a.reqID, a.dag.SockAddr(a.reqID))
+	if a.client.IsRunning(ctx, a.dag, a.execID) {
+		return fmt.Errorf("the DAG is already running. execID=%s, socket=%s", a.execID, a.dag.SockAddr(a.execID))
 	}
 	return nil
 }
@@ -637,14 +633,14 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error
 	return o.dagRepo.GetDetails(ctx, name)
 }
 
-func (o *dbClient) GetSubStatus(ctx context.Context, reqID string, rootDAG digraph.RootRun) (*digraph.Status, error) {
-	runRecord, err := o.historyRepo.FindSubRun(ctx, rootDAG.Name, rootDAG.ReqID, reqID)
+func (o *dbClient) GetChildExecStatus(ctx context.Context, reqID string, root digraph.ExecRef) (*digraph.Status, error) {
+	runRecord, err := o.historyRepo.FindChildExecution(ctx, root, reqID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to find the record for execution ID %s: %w", reqID, err)
 	}
 	status, err := runRecord.ReadStatus(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read status: %w", err)
 	}
 
 	outputVariables := map[string]string{}

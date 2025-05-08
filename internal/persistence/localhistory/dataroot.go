@@ -28,12 +28,12 @@ import (
 // It handles the organization of run data in a hierarchical structure
 // based on year, month, and day.
 type DataRoot struct {
-	baseDir     string           // Base directory for all DAGs
-	dagName     string           // Name of the DAG
-	prefix      string           // Sanitized prefix for directory names
-	runsDir     string           // Path to the runs directory
-	globPattern string           // Pattern for finding run directories
-	rootRun     *digraph.RootRun // Optional reference to the root DAG
+	baseDir       string           // Base directory for all DAGs
+	dagName       string           // Name of the DAG
+	prefix        string           // Sanitized prefix for directory names
+	executionsDir string           // Path to the executions directory
+	globPattern   string           // Pattern for finding run directories
+	root          *digraph.ExecRef // Optional reference to the root DAG
 }
 
 // NewDataRoot creates a new DataRoot instance for managing a DAG's run history.
@@ -66,31 +66,31 @@ func NewDataRoot(baseDir, dagName string) DataRoot {
 	}
 
 	root.prefix = prefix
-	root.runsDir = filepath.Join(baseDir, root.prefix, "runs")
-	root.globPattern = filepath.Join(root.runsDir, "*", "*", "*", "run_*")
+	root.executionsDir = filepath.Join(baseDir, root.prefix, "executions")
+	root.globPattern = filepath.Join(root.executionsDir, "*", "*", "*", "exec_*")
 
 	return root
 }
 
-// FindByReqID locates an runs by its request ID.
+// FindByExecID locates an runs by its execution ID.
 // It searches through all runs directories to find a match,
 // and returns the most recent one if multiple matches are found.
 //
 // Parameters:
 //   - ctx: Context for the operation (unused but kept for interface consistency)
-//   - reqID: The unique request ID to search for
+//   - reqID: The unique execution ID to search for
 //
 // Returns:
 //   - The matching Execution instance, or an error if not found
-func (dr *DataRoot) FindByReqID(_ context.Context, reqID string) (*Run, error) {
+func (dr *DataRoot) FindByExecID(_ context.Context, execID string) (*Execution, error) {
 	// Find matching files
-	matches, err := filepath.Glob(dr.GlobPatternWithReqID(reqID))
+	matches, err := filepath.Glob(dr.GlobPatternWithReqID(execID))
 	if err != nil {
-		return nil, fmt.Errorf("failed to glob pattern: %w", err)
+		return nil, fmt.Errorf("failed to make glob pattern: %w", err)
 	}
 
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("%w: %s", models.ErrReqIDNotFound, reqID)
+		return nil, fmt.Errorf("%w: %s", models.ErrExecIDNotFound, execID)
 	}
 
 	// Sort matches by timestamp (most recent first)
@@ -99,7 +99,7 @@ func (dr *DataRoot) FindByReqID(_ context.Context, reqID string) (*Run, error) {
 	return NewRun(matches[0])
 }
 
-func (dr *DataRoot) Latest(ctx context.Context, itemLimit int) []*Run {
+func (dr *DataRoot) Latest(ctx context.Context, itemLimit int) []*Execution {
 	runs, err := dr.listRecentRuns(ctx, itemLimit)
 	if err != nil {
 		logger.Errorf(ctx, "failed to list recent runs: %v", err)
@@ -108,7 +108,7 @@ func (dr *DataRoot) Latest(ctx context.Context, itemLimit int) []*Run {
 	return runs
 }
 
-func (dr *DataRoot) LatestAfter(ctx context.Context, cutoff TimeInUTC) (*Run, error) {
+func (dr *DataRoot) LatestAfter(ctx context.Context, cutoff TimeInUTC) (*Execution, error) {
 	runs, err := dr.listRecentRuns(ctx, 1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list recent runs: %w", err)
@@ -122,13 +122,13 @@ func (dr *DataRoot) LatestAfter(ctx context.Context, cutoff TimeInUTC) (*Run, er
 	return runs[0], nil
 }
 
-func (dr *DataRoot) ListInRange(ctx context.Context, start, end TimeInUTC) []*Run {
+func (dr *DataRoot) ListInRange(ctx context.Context, start, end TimeInUTC) []*Execution {
 	return dr.listInRange(ctx, start, end)
 }
 
-func (dr *DataRoot) CreateRun(ts TimeInUTC, reqID string) (*Run, error) {
-	dirName := "run_" + formatRunTimestamp(ts) + "_" + reqID
-	dir := filepath.Join(dr.runsDir, ts.Format("2006"), ts.Format("01"), ts.Format("02"), dirName)
+func (dr *DataRoot) CreateRun(ts TimeInUTC, reqID string) (*Execution, error) {
+	dirName := "exec_" + formatExecTimestamp(ts) + "_" + reqID
+	dir := filepath.Join(dr.executionsDir, ts.Format("2006"), ts.Format("01"), ts.Format("02"), dirName)
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create directory %s: %w", dir, err)
@@ -137,12 +137,12 @@ func (dr *DataRoot) CreateRun(ts TimeInUTC, reqID string) (*Run, error) {
 	return NewRun(dir)
 }
 
-func (dr DataRoot) GlobPatternWithReqID(reqID string) string {
-	return filepath.Join(dr.runsDir, "2*", "*", "*", "run_*"+reqID+"*")
+func (dr DataRoot) GlobPatternWithReqID(execID string) string {
+	return filepath.Join(dr.executionsDir, "2*", "*", "*", "exec_*"+execID+"*")
 }
 
 func (dr DataRoot) Exists() bool {
-	_, err := os.Stat(dr.runsDir)
+	_, err := os.Stat(dr.executionsDir)
 	return !os.IsNotExist(err)
 }
 
@@ -150,14 +150,14 @@ func (dr DataRoot) Create() error {
 	if dr.Exists() {
 		return nil
 	}
-	if err := os.MkdirAll(dr.runsDir, 0750); err != nil {
-		return fmt.Errorf("failed to create directory %s: %w", dr.runsDir, err)
+	if err := os.MkdirAll(dr.executionsDir, 0750); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dr.executionsDir, err)
 	}
 	return nil
 }
 
 func (dr DataRoot) IsEmpty() bool {
-	_, err := os.Stat(dr.runsDir)
+	_, err := os.Stat(dr.executionsDir)
 	if err != nil && os.IsNotExist(err) {
 		return true
 	}
@@ -172,8 +172,8 @@ func (dr DataRoot) IsEmpty() bool {
 }
 
 func (dr DataRoot) Remove() error {
-	if err := os.RemoveAll(dr.runsDir); err != nil {
-		return fmt.Errorf("failed to remove directory %s: %w", dr.runsDir, err)
+	if err := os.RemoveAll(dr.executionsDir); err != nil {
+		return fmt.Errorf("failed to remove directory %s: %w", dr.executionsDir, err)
 	}
 	return nil
 }
@@ -202,7 +202,7 @@ func (dr DataRoot) Rename(ctx context.Context, newRoot DataRoot) error {
 		day := filepath.Base(filepath.Dir(targetDir))
 		month := filepath.Base(filepath.Dir(filepath.Dir(targetDir)))
 		year := filepath.Base(filepath.Dir(filepath.Dir(filepath.Dir(targetDir))))
-		newDir := filepath.Join(newRoot.runsDir, year, month, day, filepath.Base(targetDir))
+		newDir := filepath.Join(newRoot.executionsDir, year, month, day, filepath.Base(targetDir))
 
 		// Make sure the new directory exists
 		if err := os.MkdirAll(filepath.Dir(newDir), 0750); err != nil {
@@ -277,8 +277,8 @@ func (dr DataRoot) removeEmptyDir(ctx context.Context, dayDir string) {
 	}
 }
 
-func (dr DataRoot) listInRange(ctx context.Context, start, end TimeInUTC) []*Run {
-	var result []*Run
+func (dr DataRoot) listInRange(ctx context.Context, start, end TimeInUTC) []*Execution {
+	var result []*Execution
 	var lock sync.Mutex
 
 	// If start time is after end time, return empty result
@@ -301,14 +301,14 @@ func (dr DataRoot) listInRange(ctx context.Context, start, end TimeInUTC) []*Run
 		endDate = end.Time
 	}
 
-	years, err := listDirsSorted(dr.runsDir, false, reYear)
+	years, err := listDirsSorted(dr.executionsDir, false, reYear)
 	if err != nil {
 		return nil
 	}
 
 	for _, year := range years {
 		yearInt, _ := strconv.Atoi(year)
-		yearPath := filepath.Join(dr.runsDir, year)
+		yearPath := filepath.Join(dr.executionsDir, year)
 
 		// Skip years outside the range
 		if yearInt < startDate.Year() || yearInt > endDate.Year() {
@@ -348,7 +348,7 @@ func (dr DataRoot) listInRange(ctx context.Context, start, end TimeInUTC) []*Run
 				}
 
 				// Find all status files for this day
-				files, err := filepath.Glob(filepath.Join(dayPath, "run_*"))
+				files, err := filepath.Glob(filepath.Join(dayPath, "exec_*"))
 				if err != nil {
 					continue
 				}
@@ -379,17 +379,17 @@ func (dr DataRoot) listInRange(ctx context.Context, start, end TimeInUTC) []*Run
 	return result
 }
 
-func (dr DataRoot) listRecentRuns(_ context.Context, itemLimit int) ([]*Run, error) {
+func (dr DataRoot) listRecentRuns(_ context.Context, itemLimit int) ([]*Execution, error) {
 	var founds []string
 
-	years, err := listDirsSorted(dr.runsDir, true, reYear)
+	years, err := listDirsSorted(dr.executionsDir, true, reYear)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list years: %w", err)
 	}
 
 YEAR_LOOP:
 	for _, year := range years {
-		yearPath := filepath.Join(dr.runsDir, year)
+		yearPath := filepath.Join(dr.executionsDir, year)
 		months, err := listDirsSorted(yearPath, true, reMonth)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list months: %w", err)
@@ -402,7 +402,7 @@ YEAR_LOOP:
 			}
 			for _, day := range days {
 				dayPath := filepath.Join(monthPath, day)
-				runs, err := filepath.Glob(filepath.Join(dayPath, "run_*"))
+				runs, err := filepath.Glob(filepath.Join(dayPath, "exec_*"))
 				if err != nil {
 					return nil, fmt.Errorf("failed to find matches for pattern %s: %w", dayPath, err)
 				}
@@ -420,7 +420,7 @@ YEAR_LOOP:
 		founds = founds[:itemLimit]
 	}
 
-	var result []*Run
+	var result []*Execution
 	for _, f := range founds {
 		run, err := NewRun(f)
 		if err != nil {

@@ -124,7 +124,7 @@ func TestJobReady(t *testing.T) {
 			wantErr:        scheduler.ErrJobRunning,
 		},
 		{
-			name:           "last_run_after_next_schedule",
+			name:           "last_execution_after_next_schedule",
 			schedule:       "0 * * * *",
 			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 			lastRunTime:    time.Date(2020, 1, 1, 2, 0, 0, 0, time.UTC),

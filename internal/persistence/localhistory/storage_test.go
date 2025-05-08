@@ -32,12 +32,12 @@ func TestJSONDB(t *testing.T) {
 		// Verify the first record is the most recent
 		status0, err := records[0].ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "request-id-3", status0.ReqID)
+		assert.Equal(t, "request-id-3", status0.ExecID)
 
 		// Verify the second record is the second most recent
 		status1, err := records[1].ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "request-id-2", status1.ReqID)
+		assert.Equal(t, "request-id-2", status1.ExecID)
 
 		// Verify all records are returned if the number requested is equal to the number of records
 		records = th.Repo.Recent(th.Context, "test_DAG", 3)
@@ -71,7 +71,7 @@ func TestJSONDB(t *testing.T) {
 		status, err := record.ReadStatus(th.Context)
 		require.NoError(t, err)
 
-		assert.Equal(t, "request-id-3", status.ReqID)
+		assert.Equal(t, "request-id-3", status.ExecID)
 	})
 	t.Run("FindByReqID", func(t *testing.T) {
 		th := setupTestJSONDB(t)
@@ -86,18 +86,20 @@ func TestJSONDB(t *testing.T) {
 		th.CreateRecord(t, ts2, "request-id-2", scheduler.StatusError)
 		th.CreateRecord(t, ts3, "request-id-3", scheduler.StatusSuccess)
 
-		// Find the record with request ID "request-id-2"
-		record, err := th.Repo.Find(th.Context, "test_DAG", "request-id-2")
+		// Find the record with execution ID "request-id-2"
+		ref := digraph.NewExecRef("test_DAG", "request-id-2")
+		record, err := th.Repo.Find(th.Context, ref)
 		require.NoError(t, err)
 
 		// Verify the record is the correct one
 		status, err := record.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "request-id-2", status.ReqID)
+		assert.Equal(t, "request-id-2", status.ExecID)
 
-		// Verify an error is returned if the request ID does not exist
-		_, err = th.Repo.Find(th.Context, "test_DAG", "nonexistent-id")
-		assert.ErrorIs(t, err, models.ErrReqIDNotFound)
+		// Verify an error is returned if the execution ID does not exist
+		refNonExist := digraph.NewExecRef("test_DAG", "nonexistent-id")
+		_, err = th.Repo.Find(th.Context, refNonExist)
+		assert.ErrorIs(t, err, models.ErrExecIDNotFound)
 	})
 	t.Run("RemoveOld", func(t *testing.T) {
 		th := setupTestJSONDB(t)
@@ -135,10 +137,10 @@ func TestJSONDB(t *testing.T) {
 		_ = th.CreateRecord(t, ts, "parent-id", scheduler.StatusRunning)
 
 		// Create a sub record
-		rootRun := digraph.NewRootRun("test_DAG", "parent-id")
-		subDAG := th.DAG("sub_dag")
-		record, err := th.Repo.Create(th.Context, subDAG.DAG, ts, "sub-id", models.NewRecordOptions{
-			Root: &rootRun,
+		root := digraph.NewExecRef("test_DAG", "parent-id")
+		childDAG := th.DAG("sub_dag")
+		record, err := th.Repo.Create(th.Context, childDAG.DAG, ts, "sub-id", models.NewRecordOptions{
+			Root: &root,
 		})
 		require.NoError(t, err)
 
@@ -149,20 +151,21 @@ func TestJSONDB(t *testing.T) {
 			_ = record.Close(th.Context)
 		}()
 
-		statusToWrite := models.InitialStatus(subDAG.DAG)
-		statusToWrite.ReqID = "sub-id"
+		statusToWrite := models.InitialStatus(childDAG.DAG)
+		statusToWrite.ExecID = "sub-id"
 		err = record.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
 
 		// Verify record is created
-		existingRecord, err := th.Repo.FindSubRun(th.Context, rootRun.Name, rootRun.ReqID, "sub-id")
+		ref := digraph.NewExecRef("test_DAG", "parent-id")
+		existingRecord, err := th.Repo.FindChildExecution(th.Context, ref, "sub-id")
 		require.NoError(t, err)
 
 		status, err := existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "sub-id", status.ReqID)
+		assert.Equal(t, "sub-id", status.ExecID)
 	})
-	t.Run("SubRecord_Retry", func(t *testing.T) {
+	t.Run("ChildExecRecord_Retry", func(t *testing.T) {
 		th := setupTestJSONDB(t)
 
 		// Create a timestamp for the parent record
@@ -172,10 +175,13 @@ func TestJSONDB(t *testing.T) {
 		_ = th.CreateRecord(t, ts, "parent-id", scheduler.StatusRunning)
 
 		// Create a sub record
-		rootRun := digraph.NewRootRun("test_DAG", "parent-id")
-		subDAG := th.DAG("sub_dag")
-		record, err := th.Repo.Create(th.Context, subDAG.DAG, ts, "sub-id", models.NewRecordOptions{
-			Root: &rootRun,
+		const childExecID = "child-exec-id"
+		const parentExecID = "parent-id"
+
+		root := digraph.NewExecRef("test_DAG", parentExecID)
+		childDAG := th.DAG("sub_dag")
+		record, err := th.Repo.Create(th.Context, childDAG.DAG, ts, childExecID, models.NewRecordOptions{
+			Root: &root,
 		})
 		require.NoError(t, err)
 
@@ -186,24 +192,25 @@ func TestJSONDB(t *testing.T) {
 			_ = record.Close(th.Context)
 		}()
 
-		statusToWrite := models.InitialStatus(subDAG.DAG)
-		statusToWrite.ReqID = "sub-id"
+		statusToWrite := models.InitialStatus(childDAG.DAG)
+		statusToWrite.ExecID = childExecID
 		statusToWrite.Status = scheduler.StatusRunning
 		err = record.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
 
-		// Find the sub run by request ID
+		// Find the child execution record
 		ts = time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
-		existingRecord, err := th.Repo.FindSubRun(th.Context, rootRun.Name, rootRun.ReqID, "sub-id")
+		ref := digraph.NewExecRef("test_DAG", parentExecID)
+		existingRecord, err := th.Repo.FindChildExecution(th.Context, ref, childExecID)
 		require.NoError(t, err)
 		existingRecordStatus, err := existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "sub-id", existingRecordStatus.ReqID)
+		assert.Equal(t, childExecID, existingRecordStatus.ExecID)
 		assert.Equal(t, scheduler.StatusRunning.String(), existingRecordStatus.Status.String())
 
 		// Create a retry record and write different status
-		retryRecord, err := th.Repo.Create(th.Context, subDAG.DAG, ts, "sub-id", models.NewRecordOptions{
-			Root:  &rootRun,
+		retryRecord, err := th.Repo.Create(th.Context, childDAG.DAG, ts, childExecID, models.NewRecordOptions{
+			Root:  &root,
 			Retry: true,
 		})
 		require.NoError(t, err)
@@ -213,11 +220,11 @@ func TestJSONDB(t *testing.T) {
 		_ = retryRecord.Close(th.Context)
 
 		// Verify the retry record is created
-		existingRecord, err = th.Repo.FindSubRun(th.Context, rootRun.Name, rootRun.ReqID, "sub-id")
+		existingRecord, err = th.Repo.FindChildExecution(th.Context, ref, childExecID)
 		require.NoError(t, err)
 		existingRecordStatus, err = existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "sub-id", existingRecordStatus.ReqID)
+		assert.Equal(t, childExecID, existingRecordStatus.ExecID)
 		assert.Equal(t, scheduler.StatusSuccess.String(), existingRecordStatus.Status.String())
 	})
 	t.Run("ReadDAG", func(t *testing.T) {
@@ -237,7 +244,7 @@ func TestJSONDB(t *testing.T) {
 		}()
 
 		statusToWrite := models.InitialStatus(rec.dag)
-		statusToWrite.ReqID = "parent-id"
+		statusToWrite.ExecID = "parent-id"
 
 		err = rec.Write(th.Context, statusToWrite)
 		require.NoError(t, err)

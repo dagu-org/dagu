@@ -24,7 +24,7 @@ func NewStatusBuilder(dag *digraph.DAG) *StatusBuilder {
 // InitialStatus creates an initial Status object for the given DAG
 func InitialStatus(dag *digraph.DAG) Status {
 	return Status{
-		Name:       dag.GetName(),
+		Name:       dag.Name,
 		Status:     scheduler.StatusNone,
 		PID:        PID(0),
 		Nodes:      FromSteps(dag.Steps),
@@ -42,12 +42,11 @@ func InitialStatus(dag *digraph.DAG) Status {
 // StatusOption is a functional option pattern for configuring Status objects
 type StatusOption func(*Status)
 
-// WithSubRunMetadata returns a StatusOption that sets the root DAG information
-func WithSubRunMetadata(r digraph.RootRun, parentReqID string) StatusOption {
+// WithHierarchyRefs returns a StatusOption that sets the root DAG information
+func WithHierarchyRefs(root digraph.ExecRef, parent digraph.ExecRef) StatusOption {
 	return func(s *Status) {
-		s.RootReqID = r.ReqID
-		s.RootDAGName = r.Name
-		s.ParentID = parentReqID
+		s.Root = root
+		s.Parent = parent
 	}
 }
 
@@ -110,14 +109,14 @@ func WithLogFilePath(logFilePath string) StatusOption {
 
 // Create builds a Status object for a DAG run with the specified parameters
 func (f *StatusBuilder) Create(
-	reqID string,
+	execID string,
 	status scheduler.Status,
 	pid int,
 	startedAt time.Time,
 	opts ...StatusOption,
 ) Status {
 	statusObj := InitialStatus(f.dag)
-	statusObj.ReqID = reqID
+	statusObj.ExecID = execID
 	statusObj.Status = status
 	statusObj.PID = PID(pid)
 	statusObj.StartedAt = formatTime(startedAt)
@@ -141,23 +140,27 @@ func StatusFromJSON(s string) (*Status, error) {
 
 // Status represents the complete execution state of a DAG run
 type Status struct {
-	RootDAGName string           `json:"rootDAGName,omitempty"`
-	RootReqID   string           `json:"rootReqId,omitempty"`
-	ParentID    string           `json:"parentId,omitempty"`
-	ReqID       string           `json:"reqId,omitempty"`
-	Name        string           `json:"name,omitempty"`
-	Status      scheduler.Status `json:"status"`
-	PID         PID              `json:"pid,omitempty"`
-	Nodes       []*Node          `json:"nodes,omitempty"`
-	OnExit      *Node            `json:"onExit,omitempty"`
-	OnSuccess   *Node            `json:"onSuccess,omitempty"`
-	OnFailure   *Node            `json:"onFailure,omitempty"`
-	OnCancel    *Node            `json:"onCancel,omitempty"`
-	StartedAt   string           `json:"startedAt,omitempty"`
-	FinishedAt  string           `json:"finishedAt,omitempty"`
-	Log         string           `json:"log,omitempty"`
-	Params      string           `json:"params,omitempty"`
-	ParamsList  []string         `json:"paramsList,omitempty"`
+	Root       digraph.ExecRef  `json:"root,omitempty"`
+	Parent     digraph.ExecRef  `json:"parent,omitempty"`
+	Name       string           `json:"name"`
+	ExecID     string           `json:"execId"`
+	Status     scheduler.Status `json:"status"`
+	PID        PID              `json:"pid,omitempty"`
+	Nodes      []*Node          `json:"nodes,omitempty"`
+	OnExit     *Node            `json:"onExit,omitempty"`
+	OnSuccess  *Node            `json:"onSuccess,omitempty"`
+	OnFailure  *Node            `json:"onFailure,omitempty"`
+	OnCancel   *Node            `json:"onCancel,omitempty"`
+	StartedAt  string           `json:"startedAt,omitempty"`
+	FinishedAt string           `json:"finishedAt,omitempty"`
+	Log        string           `json:"log,omitempty"`
+	Params     string           `json:"params,omitempty"`
+	ParamsList []string         `json:"paramsList,omitempty"`
+}
+
+// ExecRef returns the execution reference for the current status
+func (st *Status) ExecRef() digraph.ExecRef {
+	return digraph.NewExecRef(st.Name, st.ExecID)
 }
 
 // Errors returns a slice of errors for the current status
@@ -181,15 +184,6 @@ func (st *Status) Errors() []error {
 		errs = append(errs, fmt.Errorf("onCancel: %s", st.OnCancel.Error))
 	}
 	return errs
-}
-
-// RootDAG returns the root DAG object for the current status
-func (st *Status) RootDAG() digraph.RootRun {
-	if st.RootDAGName == "" || st.RootReqID == "" {
-		// If the root DAG name and request ID are not set, it means this is the root DAG
-		return digraph.NewRootRun(st.Name, st.ReqID)
-	}
-	return digraph.NewRootRun(st.RootDAGName, st.RootReqID)
 }
 
 // NodesByName returns a slice of nodes with the specified name
