@@ -63,13 +63,13 @@ func toPrecondition(obj digraph.Condition) api.Precondition {
 	}
 }
 
-func toRunDetails(s models.Status) api.RunDetails {
-	status := api.RunDetails{
+func toWorkflowDetails(s models.Status) api.WorkflowDetails {
+	status := api.WorkflowDetails{
 		Log:         s.Log,
 		Name:        s.Name,
 		Params:      ptrOf(s.Params),
 		Pid:         ptrOf(int(s.PID)),
-		RequestId:   s.ExecID,
+		WorkflowId:  s.ExecID,
 		StartedAt:   s.StartedAt,
 		FinishedAt:  s.FinishedAt,
 		Status:      api.Status(s.Status),
@@ -104,15 +104,15 @@ func toNode(node *models.Node) api.Node {
 		StatusLabel: api.NodeStatusLabel(node.Status.String()),
 		Step:        toStep(node.Step),
 		Error:       ptrOf(node.Error),
-		SubRuns:     ptrOf(toChildExecutions(node.Children)),
+		SubRuns:     ptrOf(toChildWorkflows(node.Children)),
 	}
 }
 
-func toChildExecutions(subRuns []models.ChildExec) []api.SubRun {
-	var result []api.SubRun
-	for _, r := range subRuns {
-		result = append(result, api.SubRun{
-			RequestId: r.ExecID,
+func toChildWorkflows(childWorkflows []models.ChildExec) []api.ChildWorkflow {
+	var result []api.ChildWorkflow
+	for _, w := range childWorkflows {
+		result = append(result, api.ChildWorkflow{
+			WorkflowId: w.ExecID,
 		})
 	}
 	return result

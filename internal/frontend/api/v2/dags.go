@@ -142,7 +142,7 @@ func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject)
 	return api.RenameDAG200Response{}, nil
 }
 
-func (a *API) GetDAGRunHistory(ctx context.Context, request api.GetDAGRunHistoryRequestObject) (api.GetDAGRunHistoryResponseObject, error) {
+func (a *API) GetDAGWorkflowHistory(ctx context.Context, request api.GetDAGWorkflowHistoryRequestObject) (api.GetDAGWorkflowHistoryResponseObject, error) {
 	dag, err := a.dagRepository.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
@@ -155,15 +155,15 @@ func (a *API) GetDAGRunHistory(ctx context.Context, request api.GetDAGRunHistory
 	defaultHistoryLimit := 30
 	recentHistory := a.historyManager.ListRecentHistory(ctx, dag.Name, defaultHistoryLimit)
 
-	var runs []api.RunDetails
+	var workflows []api.WorkflowDetails
 	for _, status := range recentHistory {
-		runs = append(runs, toRunDetails(status))
+		workflows = append(workflows, toWorkflowDetails(status))
 	}
 
 	gridData := a.readHistoryData(ctx, recentHistory)
-	return api.GetDAGRunHistory200JSONResponse{
-		Runs:     runs,
-		GridData: gridData,
+	return api.GetDAGWorkflowHistory200JSONResponse{
+		Workflows: workflows,
+		GridData:  gridData,
 	}, nil
 }
 
@@ -190,9 +190,9 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 	details := toDAGDetails(dag)
 
 	return api.GetDAGDetails200JSONResponse{
-		Dag:       details,
-		LatestRun: toRunDetails(status),
-		Suspended: a.dagRepository.IsSuspended(ctx, fileName),
+		Dag:            details,
+		LatestWorkflow: toWorkflowDetails(status),
+		Suspended:      a.dagRepository.IsSuspended(ctx, fileName),
 	}, nil
 }
 
@@ -301,12 +301,12 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	}
 
 	for i, item := range result.Items {
-		run := api.RunSummary{
+		workflow := api.WorkflowSummary{
 			Log:         dagStatuses[i].Log,
 			Name:        dagStatuses[i].Name,
 			Params:      ptrOf(dagStatuses[i].Params),
 			Pid:         ptrOf(int(dagStatuses[i].PID)),
-			RequestId:   dagStatuses[i].ExecID,
+			WorkflowId:  dagStatuses[i].ExecID,
 			StartedAt:   dagStatuses[i].StartedAt,
 			FinishedAt:  dagStatuses[i].FinishedAt,
 			Status:      api.Status(dagStatuses[i].Status),
@@ -314,11 +314,11 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 		}
 
 		dag := api.DAGFile{
-			FileName:  item.FileName(),
-			Errors:    errList,
-			LatestRun: run,
-			Suspended: a.dagRepository.IsSuspended(ctx, item.FileName()),
-			Dag:       toDAG(item),
+			FileName:       item.FileName(),
+			Errors:         errList,
+			LatestWorkflow: workflow,
+			Suspended:      a.dagRepository.IsSuspended(ctx, item.FileName()),
+			Dag:            toDAG(item),
 		}
 
 		resp.Dags = append(resp.Dags, dag)
@@ -338,9 +338,9 @@ func (a *API) GetAllDAGTags(ctx context.Context, _ api.GetAllDAGTagsRequestObjec
 	}, nil
 }
 
-func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetailsRequestObject) (api.GetDAGRunDetailsResponseObject, error) {
+func (a *API) GetDAGWorkflowDetails(ctx context.Context, request api.GetDAGWorkflowDetailsRequestObject) (api.GetDAGWorkflowDetailsResponseObject, error) {
 	dagFileName := request.FileName
-	reqID := request.RequestId
+	workflowId := request.WorkflowId
 
 	dag, err := a.dagRepository.GetMetadata(ctx, dagFileName)
 	if err != nil {
@@ -351,23 +351,23 @@ func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetails
 		}
 	}
 
-	if reqID == "latest" {
+	if workflowId == "latest" {
 		latestStatus, err := a.historyManager.GetLatestStatus(ctx, dag)
 		if err != nil {
 			return nil, fmt.Errorf("error getting latest status: %w", err)
 		}
-		return &api.GetDAGRunDetails200JSONResponse{
-			Run: toRunDetails(latestStatus),
+		return &api.GetDAGWorkflowDetails200JSONResponse{
+			Workflow: toWorkflowDetails(latestStatus),
 		}, nil
 	}
 
-	status, err := a.historyManager.GetRealtimeStatus(ctx, dag, reqID)
+	status, err := a.historyManager.GetRealtimeStatus(ctx, dag, workflowId)
 	if err != nil {
 		return nil, fmt.Errorf("error getting status by execution ID: %w", err)
 	}
 
-	return &api.GetDAGRunDetails200JSONResponse{
-		Run: toRunDetails(*status),
+	return &api.GetDAGWorkflowDetails200JSONResponse{
+		Workflow: toWorkflowDetails(*status),
 	}, nil
 }
 
@@ -398,14 +398,14 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		}
 	}
 
-	reqID, err := a.historyManager.GenReqID(ctx)
+	workflowId, err := a.historyManager.GenReqID(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error generating execution ID: %w", err)
+		return nil, fmt.Errorf("error generating workflow ID: %w", err)
 	}
 
 	if err := a.historyManager.Start(ctx, dag, history.StartOptions{
 		Params: valueOf(request.Body.Params),
-		ReqID:  reqID,
+		ReqID:  workflowId,
 		Quiet:  true,
 	}); err != nil {
 		return nil, fmt.Errorf("error starting DAG: %w", err)
@@ -424,7 +424,7 @@ waitLoop:
 		case <-ctx.Done():
 			break waitLoop
 		default:
-			status, _ := a.historyManager.GetRealtimeStatus(ctx, dag, reqID)
+			status, _ := a.historyManager.GetRealtimeStatus(ctx, dag, workflowId)
 			if status == nil {
 				continue
 			}
@@ -447,7 +447,7 @@ waitLoop:
 	}
 
 	return api.ExecuteDAG200JSONResponse{
-		RequestId: reqID,
+		WorkflowId: workflowId,
 	}, nil
 }
 
@@ -509,7 +509,7 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 		}
 	}
 
-	if err := a.historyManager.Retry(ctx, dag, request.Body.RequestId); err != nil {
+	if err := a.historyManager.Retry(ctx, dag, request.Body.WorkflowId); err != nil {
 		return nil, fmt.Errorf("error retrying DAG: %w", err)
 	}
 

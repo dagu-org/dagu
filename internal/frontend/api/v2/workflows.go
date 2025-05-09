@@ -10,16 +10,16 @@ import (
 	"github.com/dagu-org/dagu/internal/fileutil"
 )
 
-func (a *API) GetRunLog(ctx context.Context, request api.GetRunLogRequestObject) (api.GetRunLogResponseObject, error) {
-	dagName := request.DagName
-	reqID := request.RequestId
+func (a *API) GetWorkflowLog(ctx context.Context, request api.GetWorkflowLogRequestObject) (api.GetWorkflowLogResponseObject, error) {
+	dagName := request.Name
+	workflowId := request.WorkflowId
 
-	ref := digraph.NewExecRef(dagName, reqID)
+	ref := digraph.NewExecRef(dagName, workflowId)
 	status, err := a.historyManager.FindByReqID(ctx, ref)
 	if err != nil {
-		return api.GetRunLog404JSONResponse{
+		return api.GetWorkflowLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("execution ID %s not found for DAG %s", reqID, dagName),
+			Message: fmt.Sprintf("workflow ID %s not found for DAG %s", workflowId, dagName),
 		}, nil
 	}
 
@@ -37,7 +37,7 @@ func (a *API) GetRunLog(ctx context.Context, request api.GetRunLogRequestObject)
 		return nil, fmt.Errorf("error reading %s: %w", status.Log, err)
 	}
 
-	return api.GetRunLog200JSONResponse{
+	return api.GetWorkflowLog200JSONResponse{
 		Content:    content,
 		LineCount:  ptrOf(lineCount),
 		TotalLines: ptrOf(totalLines),
@@ -46,22 +46,22 @@ func (a *API) GetRunLog(ctx context.Context, request api.GetRunLogRequestObject)
 	}, nil
 }
 
-func (a *API) GetRunStepLog(ctx context.Context, request api.GetRunStepLogRequestObject) (api.GetRunStepLogResponseObject, error) {
-	dagName := request.DagName
-	reqID := request.RequestId
+func (a *API) GetWorkflowStepLog(ctx context.Context, request api.GetWorkflowStepLogRequestObject) (api.GetWorkflowStepLogResponseObject, error) {
+	dagName := request.Name
+	workflowId := request.WorkflowId
 
-	ref := digraph.NewExecRef(dagName, reqID)
+	ref := digraph.NewExecRef(dagName, workflowId)
 	status, err := a.historyManager.FindByReqID(ctx, ref)
 	if err != nil {
-		return api.GetRunStepLog404JSONResponse{
+		return api.GetWorkflowStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("execution ID %s not found for DAG %s", reqID, dagName),
+			Message: fmt.Sprintf("workflow ID %s not found for DAG %s", workflowId, dagName),
 		}, nil
 	}
 
 	node, err := status.NodeByName(request.StepName)
 	if err != nil {
-		return api.GetRunStepLog404JSONResponse{
+		return api.GetWorkflowStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
 			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, dagName),
 		}, nil
@@ -81,7 +81,7 @@ func (a *API) GetRunStepLog(ctx context.Context, request api.GetRunStepLogReques
 		return nil, fmt.Errorf("error reading %s: %w", node.Log, err)
 	}
 
-	return api.GetRunStepLog200JSONResponse{
+	return api.GetWorkflowStepLog200JSONResponse{
 		Content:    content,
 		LineCount:  ptrOf(lineCount),
 		TotalLines: ptrOf(totalLines),
@@ -90,19 +90,19 @@ func (a *API) GetRunStepLog(ctx context.Context, request api.GetRunStepLogReques
 	}, nil
 }
 
-func (a *API) UpdateRunStepStatus(ctx context.Context, request api.UpdateRunStepStatusRequestObject) (api.UpdateRunStepStatusResponseObject, error) {
-	ref := digraph.NewExecRef(request.DagName, request.RequestId)
+func (a *API) UpdateWorkflowStepStatus(ctx context.Context, request api.UpdateWorkflowStepStatusRequestObject) (api.UpdateWorkflowStepStatusResponseObject, error) {
+	ref := digraph.NewExecRef(request.Name, request.WorkflowId)
 	status, err := a.historyManager.FindByReqID(ctx, ref)
 	if err != nil {
-		return &api.UpdateRunStepStatus404JSONResponse{
+		return &api.UpdateWorkflowStepStatus404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("execution ID %s not found for DAG %s", request.RequestId, request.DagName),
+			Message: fmt.Sprintf("workflow ID %s not found for DAG %s", request.WorkflowId, request.Name),
 		}, nil
 	}
 	if status.Status == scheduler.StatusRunning {
-		return &api.UpdateRunStepStatus400JSONResponse{
+		return &api.UpdateWorkflowStepStatus400JSONResponse{
 			Code:    api.ErrorCodeBadRequest,
-			Message: fmt.Sprintf("execution ID %s for DAG %s is still running", request.RequestId, request.DagName),
+			Message: fmt.Sprintf("workflow ID %s for DAG %s is still running", request.WorkflowId, request.Name),
 		}, nil
 	}
 
@@ -114,60 +114,60 @@ func (a *API) UpdateRunStepStatus(ctx context.Context, request api.UpdateRunStep
 		}
 	}
 	if idxToUpdate < 0 {
-		return &api.UpdateRunStepStatus404JSONResponse{
+		return &api.UpdateWorkflowStepStatus404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, request.DagName),
+			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, request.Name),
 		}, nil
 	}
 
 	status.Nodes[idxToUpdate].Status = nodeStatusMapping[request.Body.Status]
 
-	root := digraph.NewExecRef(request.DagName, request.RequestId)
+	root := digraph.NewExecRef(request.Name, request.WorkflowId)
 	if err := a.historyManager.UpdateStatus(ctx, root, *status); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
 	}
 
-	return &api.UpdateRunStepStatus200Response{}, nil
+	return &api.UpdateWorkflowStepStatus200Response{}, nil
 }
 
-// GetRunDetails implements api.StrictServerInterface.
-func (a *API) GetRunDetails(ctx context.Context, request api.GetRunDetailsRequestObject) (api.GetRunDetailsResponseObject, error) {
-	ref := digraph.NewExecRef(request.DagName, request.RequestId)
+// GetWorkflowDetails implements api.StrictServerInterface.
+func (a *API) GetWorkflowDetails(ctx context.Context, request api.GetWorkflowDetailsRequestObject) (api.GetWorkflowDetailsResponseObject, error) {
+	ref := digraph.NewExecRef(request.Name, request.WorkflowId)
 	status, err := a.historyManager.FindByReqID(ctx, ref)
 	if err != nil {
-		return &api.GetRunDetails404JSONResponse{
+		return &api.GetWorkflowDetails404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("execution ID %s not found for DAG %s", request.RequestId, request.DagName),
+			Message: fmt.Sprintf("workflow ID %s not found for DAG %s", request.WorkflowId, request.Name),
 		}, nil
 	}
-	return &api.GetRunDetails200JSONResponse{
-		RunDetails: toRunDetails(*status),
+	return &api.GetWorkflowDetails200JSONResponse{
+		WorkflowDetails: toWorkflowDetails(*status),
 	}, nil
 }
 
-// GetSubRunDetails implements api.StrictServerInterface.
-func (a *API) GetSubRunDetails(ctx context.Context, request api.GetSubRunDetailsRequestObject) (api.GetSubRunDetailsResponseObject, error) {
-	root := digraph.NewExecRef(request.DagName, request.RequestId)
-	status, err := a.historyManager.FindChildExec(ctx, root, request.SubRunRequestId)
+// GetChildWorkflowDetails implements api.StrictServerInterface.
+func (a *API) GetChildWorkflowDetails(ctx context.Context, request api.GetChildWorkflowDetailsRequestObject) (api.GetChildWorkflowDetailsResponseObject, error) {
+	root := digraph.NewExecRef(request.Name, request.WorkflowId)
+	status, err := a.historyManager.FindChildExec(ctx, root, request.ChildWorkflowId)
 	if err != nil {
-		return &api.GetSubRunDetails404JSONResponse{
+		return &api.GetChildWorkflowDetails404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("execution ID %s not found for DAG %s", request.RequestId, request.DagName),
+			Message: fmt.Sprintf("child workflow ID %s not found for DAG %s", request.ChildWorkflowId, request.Name),
 		}, nil
 	}
-	return &api.GetSubRunDetails200JSONResponse{
-		RunDetails: toRunDetails(*status),
+	return &api.GetChildWorkflowDetails200JSONResponse{
+		WorkflowDetails: toWorkflowDetails(*status),
 	}, nil
 }
 
-// GetSubRunLog implements api.StrictServerInterface.
-func (a *API) GetSubRunLog(ctx context.Context, request api.GetSubRunLogRequestObject) (api.GetSubRunLogResponseObject, error) {
-	root := digraph.NewExecRef(request.DagName, request.RequestId)
-	status, err := a.historyManager.FindChildExec(ctx, root, request.SubRunRequestId)
+// GetChildWorkflowLog implements api.StrictServerInterface.
+func (a *API) GetChildWorkflowLog(ctx context.Context, request api.GetChildWorkflowLogRequestObject) (api.GetChildWorkflowLogResponseObject, error) {
+	root := digraph.NewExecRef(request.Name, request.WorkflowId)
+	status, err := a.historyManager.FindChildExec(ctx, root, request.ChildWorkflowId)
 	if err != nil {
-		return &api.GetSubRunLog404JSONResponse{
+		return &api.GetChildWorkflowLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("execution ID %s not found for DAG %s", request.RequestId, request.DagName),
+			Message: fmt.Sprintf("child workflow ID %s not found for DAG %s", request.ChildWorkflowId, request.Name),
 		}, nil
 	}
 
@@ -185,7 +185,7 @@ func (a *API) GetSubRunLog(ctx context.Context, request api.GetSubRunLogRequestO
 		return nil, fmt.Errorf("error reading %s: %w", status.Log, err)
 	}
 
-	return &api.GetSubRunLog200JSONResponse{
+	return &api.GetChildWorkflowLog200JSONResponse{
 		Content:    content,
 		LineCount:  ptrOf(lineCount),
 		TotalLines: ptrOf(totalLines),
@@ -194,22 +194,22 @@ func (a *API) GetSubRunLog(ctx context.Context, request api.GetSubRunLogRequestO
 	}, nil
 }
 
-// GetSubRunStepLog implements api.StrictServerInterface.
-func (a *API) GetSubRunStepLog(ctx context.Context, request api.GetSubRunStepLogRequestObject) (api.GetSubRunStepLogResponseObject, error) {
-	root := digraph.NewExecRef(request.DagName, request.RequestId)
-	status, err := a.historyManager.FindChildExec(ctx, root, request.SubRunRequestId)
+// GetChildWorkflowStepLog implements api.StrictServerInterface.
+func (a *API) GetChildWorkflowStepLog(ctx context.Context, request api.GetChildWorkflowStepLogRequestObject) (api.GetChildWorkflowStepLogResponseObject, error) {
+	root := digraph.NewExecRef(request.Name, request.WorkflowId)
+	status, err := a.historyManager.FindChildExec(ctx, root, request.ChildWorkflowId)
 	if err != nil {
-		return &api.GetSubRunStepLog404JSONResponse{
+		return &api.GetChildWorkflowStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("execution ID %s not found for DAG %s", request.RequestId, request.DagName),
+			Message: fmt.Sprintf("child workflow ID %s not found for DAG %s", request.ChildWorkflowId, request.Name),
 		}, nil
 	}
 
 	node, err := status.NodeByName(request.StepName)
 	if err != nil {
-		return &api.GetSubRunStepLog404JSONResponse{
+		return &api.GetChildWorkflowStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, request.DagName),
+			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, request.Name),
 		}, nil
 	}
 
@@ -227,7 +227,7 @@ func (a *API) GetSubRunStepLog(ctx context.Context, request api.GetSubRunStepLog
 		return nil, fmt.Errorf("error reading %s: %w", node.Log, err)
 	}
 
-	return &api.GetSubRunStepLog200JSONResponse{
+	return &api.GetChildWorkflowStepLog200JSONResponse{
 		Content:    content,
 		LineCount:  ptrOf(lineCount),
 		TotalLines: ptrOf(totalLines),
@@ -236,20 +236,20 @@ func (a *API) GetSubRunStepLog(ctx context.Context, request api.GetSubRunStepLog
 	}, nil
 }
 
-// UpdateSubRunStepStatus implements api.StrictServerInterface.
-func (a *API) UpdateSubRunStepStatus(ctx context.Context, request api.UpdateSubRunStepStatusRequestObject) (api.UpdateSubRunStepStatusResponseObject, error) {
-	root := digraph.NewExecRef(request.DagName, request.RequestId)
-	status, err := a.historyManager.FindChildExec(ctx, root, request.SubRunRequestId)
+// UpdateChildWorkflowStepStatus implements api.StrictServerInterface.
+func (a *API) UpdateChildWorkflowStepStatus(ctx context.Context, request api.UpdateChildWorkflowStepStatusRequestObject) (api.UpdateChildWorkflowStepStatusResponseObject, error) {
+	root := digraph.NewExecRef(request.Name, request.WorkflowId)
+	status, err := a.historyManager.FindChildExec(ctx, root, request.ChildWorkflowId)
 	if err != nil {
-		return &api.UpdateSubRunStepStatus404JSONResponse{
+		return &api.UpdateChildWorkflowStepStatus404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("execution ID %s not found for DAG %s", request.RequestId, request.DagName),
+			Message: fmt.Sprintf("child workflow ID %s not found for DAG %s", request.ChildWorkflowId, request.Name),
 		}, nil
 	}
 	if status.Status == scheduler.StatusRunning {
-		return &api.UpdateSubRunStepStatus400JSONResponse{
+		return &api.UpdateChildWorkflowStepStatus400JSONResponse{
 			Code:    api.ErrorCodeBadRequest,
-			Message: fmt.Sprintf("execution ID %s for DAG %s is still running", request.RequestId, request.DagName),
+			Message: fmt.Sprintf("workflow ID %s for DAG %s is still running", request.WorkflowId, request.Name),
 		}, nil
 	}
 
@@ -261,9 +261,9 @@ func (a *API) UpdateSubRunStepStatus(ctx context.Context, request api.UpdateSubR
 		}
 	}
 	if idxToUpdate < 0 {
-		return &api.UpdateSubRunStepStatus404JSONResponse{
+		return &api.UpdateChildWorkflowStepStatus404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, request.DagName),
+			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, request.Name),
 		}, nil
 	}
 
@@ -273,7 +273,7 @@ func (a *API) UpdateSubRunStepStatus(ctx context.Context, request api.UpdateSubR
 		return nil, fmt.Errorf("error updating status: %w", err)
 	}
 
-	return &api.UpdateSubRunStepStatus200Response{}, nil
+	return &api.UpdateChildWorkflowStepStatus200Response{}, nil
 }
 
 var nodeStatusMapping = map[api.NodeStatus]scheduler.NodeStatus{
