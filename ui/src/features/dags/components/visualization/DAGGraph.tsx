@@ -1,5 +1,5 @@
 /**
- * DAGGraph component provides a tabbed interface for visualizing DAG runs as either a graph or timeline.
+ * DAGGraph component provides a tabbed interface for visualizing DAG workflows as either a graph or timeline.
  *
  * @module features/dags/components/visualization
  */
@@ -16,17 +16,17 @@ import { FlowchartSwitch, FlowchartType, Graph, TimelineChart } from './';
  * Props for the DAGGraph component
  */
 type Props = {
-  /** DAG run details containing execution information */
-  run: components['schemas']['RunDetails'];
+  /** DAG workflow details containing execution information */
+  workflow: components['schemas']['WorkflowDetails'];
   /** Callback for when a step is selected in the graph */
   onSelectStep?: (id: string) => void;
 };
 
 /**
- * DAGGraph component provides a tabbed interface for visualizing DAG runs
+ * DAGGraph component provides a tabbed interface for visualizing DAG workflows
  * with options to switch between graph and timeline views
  */
-function DAGGraph({ run, onSelectStep }: Props) {
+function DAGGraph({ workflow, onSelectStep }: Props) {
   // Active tab state (0 = Graph, 1 = Timeline)
   const [sub, setSub] = React.useState('0');
 
@@ -80,15 +80,15 @@ function DAGGraph({ run, onSelectStep }: Props) {
         <div className="overflow-x-auto">
           {sub === '0' ? (
             <Graph
-              steps={run.nodes}
+              steps={workflow.nodes}
               type="status"
               flowchart={flowchart}
               onClickNode={onSelectStep}
-              showIcons={run.status > Status.NotStarted}
-              animate={run.status == Status.Running}
+              showIcons={workflow.status > Status.NotStarted}
+              animate={workflow.status == Status.Running}
             />
           ) : (
-            <TimelineChart status={run} />
+            <TimelineChart status={workflow} />
           )}
         </div>
       </BorderedBox>

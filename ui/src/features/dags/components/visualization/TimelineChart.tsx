@@ -1,5 +1,5 @@
 /**
- * TimelineChart component visualizes the execution timeline of a DAG run using a Gantt chart.
+ * TimelineChart component visualizes the execution timeline of a DAG workflow using a Gantt chart.
  *
  * @module features/dags/components/visualization
  */
@@ -13,8 +13,8 @@ import { useConfig } from '../../../../contexts/ConfigContext';
  * Props for the TimelineChart component
  */
 type Props = {
-  /** DAG run details containing execution information */
-  status: components['schemas']['RunDetails'];
+  /** DAG workflow details containing execution information */
+  status: components['schemas']['WorkflowDetails'];
 };
 
 /** Format for displaying timestamps */
@@ -22,7 +22,7 @@ const timeFormat = 'YYYY-MM-DD HH:mm:ss';
 
 /**
  * TimelineChart component renders a Gantt chart showing the execution timeline of DAG steps
- * Only renders for completed DAG runs (not shown for running or not started DAGs)
+ * Only renders for completed DAG workflows (not shown for running or not started DAGs)
  */
 function TimelineChart({ status }: Props) {
   // Get the config

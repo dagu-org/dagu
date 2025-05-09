@@ -3,11 +3,11 @@
  *
  * @module features/dags/components/dag-execution
  */
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Button } from '../../../../components/ui/button';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
-import { Button } from '../../../../components/ui/button';
 
 // Extended Log type with pagination fields
 interface LogWithPagination {
@@ -29,8 +29,8 @@ const calculateTotalPages = (totalLines: number, pageSize: number): number => {
 type Props = {
   /** DAG name or fileName */
   dagName: string;
-  /** Request ID of the execution */
-  requestId: string;
+  /** Workflow ID of the execution */
+  workflowId: string;
   /** Name of the step to display logs for */
   stepName: string;
 };
@@ -48,7 +48,7 @@ const ANSI_CODES_REGEX = [
  * StepLog displays the log output for a specific step in a DAG run
  * Fetches log data from the API and refreshes every 30 seconds
  */
-function StepLog({ dagName, requestId, stepName }: Props) {
+function StepLog({ dagName, workflowId, stepName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const [viewMode, setViewMode] = useState<'tail' | 'head' | 'page'>('tail');
   const [pageSize, setPageSize] = useState(1000);
@@ -81,14 +81,14 @@ function StepLog({ dagName, requestId, stepName }: Props) {
 
   // Fetch log data with periodic refresh
   const { data, isLoading, error } = useQuery(
-    '/runs/{dagName}/{requestId}/steps/{stepName}/log',
+    '/workflows/{name}/{workflowId}/steps/{stepName}/log',
     {
       params: {
         query: queryParams,
         path: {
-          dagName,
+          name: dagName,
           stepName,
-          requestId,
+          workflowId,
         },
       },
     },

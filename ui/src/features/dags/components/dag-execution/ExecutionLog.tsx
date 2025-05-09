@@ -3,11 +3,11 @@
  *
  * @module features/dags/components/dag-execution
  */
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Button } from '../../../../components/ui/button';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
-import { Button } from '../../../../components/ui/button';
 
 // Extended Log type with pagination fields
 interface LogWithPagination {
@@ -29,8 +29,8 @@ const calculateTotalPages = (totalLines: number, pageSize: number): number => {
 type Props = {
   /** DAG name or fileName */
   name: string;
-  /** Request ID of the execution */
-  requestId: string;
+  /** Workflow ID of the execution */
+  workflowId: string;
 };
 
 /**
@@ -46,7 +46,7 @@ const ANSI_CODES_REGEX = [
  * ExecutionLog displays the log output for a DAG run
  * Fetches log data from the API and refreshes every 30 seconds
  */
-function ExecutionLog({ name, requestId }: Props) {
+function ExecutionLog({ name, workflowId }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const [viewMode, setViewMode] = useState<'tail' | 'head' | 'page'>('tail');
   const [pageSize, setPageSize] = useState(1000);
@@ -79,13 +79,13 @@ function ExecutionLog({ name, requestId }: Props) {
 
   // Fetch log data with periodic refresh
   const { data, isLoading, error } = useQuery(
-    '/runs/{dagName}/{requestId}/log',
+    '/workflows/{name}/{workflowId}/log',
     {
       params: {
         query: queryParams,
         path: {
-          dagName: name,
-          requestId,
+          name,
+          workflowId,
         },
       },
     },

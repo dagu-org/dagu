@@ -19,12 +19,12 @@ import NodeStatusTableRow from './NodeStatusTableRow';
 type Props = {
   /** List of nodes to display */
   nodes?: components['schemas']['Node'][];
-  /** DAG run details */
-  status: components['schemas']['RunDetails'];
+  /** DAG workflow details */
+  status: components['schemas']['WorkflowDetails'];
   /** DAG file ID */
   fileName: string;
   /** Function to open log viewer */
-  onViewLog?: (stepName: string, requestId: string) => void;
+  onViewLog?: (stepName: string, workflowId: string) => void;
 };
 
 /**
@@ -70,7 +70,7 @@ function NodeStatusTable({ nodes, status, fileName, onViewLog }: Props) {
               key={n.step.name}
               rownum={idx + 1}
               node={n}
-              requestId={status.requestId}
+              workflowId={status.workflowId}
               name={fileName}
               onViewLog={onViewLog}
             />

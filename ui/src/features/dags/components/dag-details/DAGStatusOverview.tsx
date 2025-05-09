@@ -24,14 +24,14 @@ import StatusChip from '../../../../ui/StatusChip';
  * Props for the DAGStatusOverview component
  */
 type Props = {
-  /** DAG run details */
-  status?: components['schemas']['RunDetails'];
+  /** DAG workflow details */
+  status?: components['schemas']['WorkflowDetails'];
   /** DAG file ID */
   fileName: string;
-  /** Request ID of the execution */
-  requestId?: string;
+  /** Workflow ID of the execution */
+  workflowId?: string;
   /** Function to open log viewer */
-  onViewLog?: (requestId: string) => void;
+  onViewLog?: (workflowId: string) => void;
 };
 
 /**
@@ -41,13 +41,13 @@ type Props = {
 function DAGStatusOverview({
   status,
   fileName,
-  requestId = '',
+  workflowId = '',
   onViewLog,
 }: Props) {
   // Build URL for log viewing
   const searchParams = new URLSearchParams();
-  if (requestId) {
-    searchParams.set('requestId', requestId);
+  if (workflowId) {
+    searchParams.set('workflowId', workflowId);
   }
   const url = `/dags/${fileName}/scheduler-log?${searchParams.toString()}`;
 
@@ -123,12 +123,12 @@ function DAGStatusOverview({
           )}
         </div>
 
-        {status.requestId && (
+        {status.workflowId && (
           <div className="flex items-center gap-1.5">
             <div className="flex items-center">
               <Hash className="h-3 w-3 mr-0.5 text-slate-500 dark:text-slate-400" />
               <span className="text-xs font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-300">
-                {status.requestId}
+                {status.workflowId}
               </span>
             </div>
 
@@ -137,7 +137,7 @@ function DAGStatusOverview({
               onClick={(e) => {
                 if (!(e.metaKey || e.ctrlKey) && onViewLog) {
                   e.preventDefault();
-                  onViewLog(status.requestId);
+                  onViewLog(status.workflowId);
                 }
               }}
               className="inline-flex items-center text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors duration-200 cursor-pointer"

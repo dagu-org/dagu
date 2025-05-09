@@ -25,12 +25,12 @@ type Props = {
   rownum: number;
   /** Node data to display */
   node: components['schemas']['Node'];
-  /** Request ID for log linking */
-  requestId?: string;
+  /** Workflow ID for log linking */
+  workflowId?: string;
   /** DAG name or file name */
   name: string;
   /** Function to open log viewer */
-  onViewLog?: (stepName: string, requestId: string) => void;
+  onViewLog?: (stepName: string, workflowId: string) => void;
 };
 
 /**
@@ -89,7 +89,7 @@ function NodeStatusTableRow({
   name,
   rownum,
   node,
-  requestId,
+  workflowId,
   onViewLog,
 }: Props) {
   // State to store the current duration for running tasks
@@ -119,8 +119,8 @@ function NodeStatusTableRow({
   if (node.step) {
     searchParams.set('step', node.step.name);
   }
-  if (requestId) {
-    searchParams.set('requestId', requestId);
+  if (workflowId) {
+    searchParams.set('workflowId', workflowId);
   }
 
   const url = `/dags/${name}/log?${searchParams.toString()}`;
@@ -255,7 +255,7 @@ function NodeStatusTableRow({
               // which will open the link in a new tab
               if (!(e.metaKey || e.ctrlKey) && onViewLog) {
                 e.preventDefault();
-                onViewLog(node.step.name, requestId || '');
+                onViewLog(node.step.name, workflowId || '');
               }
             }}
             className="inline-flex items-center justify-center p-2 transition-colors duration-200 rounded-md text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"

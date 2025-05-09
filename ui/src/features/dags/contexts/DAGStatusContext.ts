@@ -1,14 +1,15 @@
 import React from 'react';
 import { components } from '../../../api/v2/schema';
 
-type RunDetailsContextType = {
-  data: components['schemas']['RunDetails'] | undefined;
-  setData(runDetails: components['schemas']['RunDetails']): void;
+type WorkflowDetailsContextType = {
+  data: components['schemas']['WorkflowDetails'] | undefined;
+  setData(workflowDetails: components['schemas']['WorkflowDetails']): void;
 };
 
-export const RunDetailsContext = React.createContext<RunDetailsContextType>({
-  data: undefined as components['schemas']['RunDetails'] | undefined,
-  setData: () => {
-    return;
-  },
-});
+export const WorkflowDetailsContext =
+  React.createContext<WorkflowDetailsContextType>({
+    data: undefined as components['schemas']['WorkflowDetails'] | undefined,
+    setData: () => {
+      return;
+    },
+  });

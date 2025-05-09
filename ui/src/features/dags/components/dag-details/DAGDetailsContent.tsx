@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { components } from '../../../../api/v2/schema';
 import { DAGStatus } from '../../components';
 import { DAGContext } from '../../contexts/DAGContext';
-import { RunDetailsContext } from '../../contexts/DAGStatusContext';
+import { WorkflowDetailsContext } from '../../contexts/DAGStatusContext';
 import { LinkTab } from '../common';
 import ModalLinkTab from '../common/ModalLinkTab';
 import { DAGEditButtons, DAGSpec } from '../dag-editor';
@@ -19,12 +19,12 @@ import { DAGHeader } from './';
 type DAGDetailsContentProps = {
   fileName: string;
   dag: components['schemas']['DAG'];
-  latestRun: components['schemas']['RunDetails'];
+  latestWorkflow: components['schemas']['WorkflowDetails'];
   refreshFn: () => void;
   formatDuration: (startDate: string, endDate: string) => string;
   activeTab: string;
   onTabChange?: (tab: string) => void;
-  requestId?: string;
+  workflowId?: string;
   stepName?: string | null;
   isModal?: boolean;
 };
@@ -38,12 +38,12 @@ type LogViewerState = {
 const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   fileName,
   dag,
-  latestRun,
+  latestWorkflow,
   refreshFn,
   formatDuration,
   activeTab,
   onTabChange,
-  requestId = 'latest',
+  workflowId = 'latest',
   stepName = null,
   isModal = false,
 }) => {
@@ -86,16 +86,16 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
         name: dag?.name || '',
       }}
     >
-      <RunDetailsContext.Provider
+      <WorkflowDetailsContext.Provider
         value={{
-          data: latestRun,
+          data: latestWorkflow,
           setData: () => {}, // This will be overridden by the parent component
         }}
       >
         <div className="w-full flex flex-col">
           <DAGHeader
             dag={dag}
-            latestRun={latestRun}
+            latestWorkflow={latestWorkflow}
             fileName={fileName || ''}
             refreshFn={refreshFn}
             formatDuration={formatDuration}
@@ -177,7 +177,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
           </div>
           <div className="flex-1">
             {activeTab === 'status' ? (
-              <DAGStatus run={latestRun} fileName={fileName || ''} />
+              <DAGStatus workflow={latestWorkflow} fileName={fileName || ''} />
             ) : null}
             {activeTab === 'spec' ? <DAGSpec fileName={fileName} /> : null}
             {activeTab === 'history' ? (
@@ -186,12 +186,12 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
               </div>
             ) : null}
             {activeTab === 'scheduler-log' ? (
-              <ExecutionLog name={dag?.name || ''} requestId={requestId} />
+              <ExecutionLog name={dag?.name || ''} workflowId={workflowId} />
             ) : null}
             {activeTab === 'log' && stepName ? (
               <StepLog
                 dagName={dag?.name || ''}
-                requestId={requestId}
+                workflowId={workflowId}
                 stepName={stepName}
               />
             ) : null}
@@ -202,13 +202,13 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
               onClose={closeLogViewer}
               logType={logViewer.logType}
               dagName={dag?.name || ''}
-              requestId={requestId}
+              workflowId={workflowId}
               stepName={logViewer.stepName}
               isInModal={isModal}
             />
           </div>
         </div>
-      </RunDetailsContext.Provider>
+      </WorkflowDetailsContext.Provider>
     </DAGContext.Provider>
   );
 };

@@ -8,7 +8,7 @@ type LogViewerProps = {
   onClose: () => void;
   logType: 'execution' | 'step';
   dagName: string;
-  requestId: string;
+  workflowId: string;
   stepName?: string;
   isInModal?: boolean;
 };
@@ -22,7 +22,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
   onClose,
   logType,
   dagName,
-  requestId,
+  workflowId,
   stepName,
   isInModal = true,
 }) => {
@@ -39,18 +39,18 @@ const LogViewer: React.FC<LogViewerProps> = ({
       title={title}
       isInModal={isInModal}
       dagName={dagName}
-      requestId={requestId}
+      workflowId={workflowId}
       stepName={stepName}
       logType={logType}
     >
       <div className="h-full">
         {logType === 'execution' ? (
-          <ExecutionLog name={dagName} requestId={requestId} />
+          <ExecutionLog name={dagName} workflowId={workflowId} />
         ) : (
           stepName && (
             <StepLog
               dagName={dagName}
-              requestId={requestId}
+              workflowId={workflowId}
               stepName={stepName}
             />
           )

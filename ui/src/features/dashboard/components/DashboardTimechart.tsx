@@ -54,15 +54,16 @@ function DashboardTimeChart({ data: input }: Props) {
 
     input.forEach((item) => {
       const dag = item.dag;
-      const run = item.latestRun;
-      const status = run.status;
-      const start = run.startedAt;
+      const workflow = item.latestWorkflow;
+      const status = workflow.status;
+      const start = workflow.startedAt;
       if (start && start !== '-') {
         const startMoment = dayjs(start);
-        const end = run.finishedAt !== '-' ? dayjs(run.finishedAt) : now;
+        const end =
+          workflow.finishedAt !== '-' ? dayjs(workflow.finishedAt) : now;
 
         items.push({
-          id: dag.name + `_${run.requestId}`,
+          id: dag.name + `_${workflow.workflowId}`,
           content: dag.name,
           start: startMoment.tz(validTimezone).toDate(),
           end: end.tz(validTimezone).toDate(),

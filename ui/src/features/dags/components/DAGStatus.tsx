@@ -10,24 +10,24 @@ import { LogViewer, StatusUpdateModal } from './dag-execution';
 import { DAGGraph } from './visualization';
 
 type Props = {
-  run: components['schemas']['RunDetails'];
+  workflow: components['schemas']['WorkflowDetails'];
   fileName: string;
 };
 
-function DAGStatus({ run, fileName }: Props) {
+function DAGStatus({ workflow, fileName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const [modal, setModal] = useState(false);
   const [selectedStep, setSelectedStep] = useState<
     components['schemas']['Step'] | undefined
   >(undefined);
 
-  console.log('DAGStatus', run);
+  console.log('DAGStatus', workflow);
   // State for log viewer
   const [logViewer, setLogViewer] = useState({
     isOpen: false,
     logType: 'step' as 'execution' | 'step',
     stepName: '',
-    requestId: '',
+    workflowId: '',
   });
   const client = useClient();
   const dismissModal = () => setModal(false);
@@ -36,12 +36,12 @@ function DAGStatus({ run, fileName }: Props) {
     status: NodeStatus
   ) => {
     const { error } = await client.PATCH(
-      '/runs/{dagName}/{requestId}/steps/{stepName}/status',
+      '/workflows/{name}/{workflowId}/steps/{stepName}/status',
       {
         params: {
           path: {
-            dagName: run.name,
-            requestId: run.requestId,
+            name: workflow.name,
+            workflowId: workflow.workflowId,
             stepName: step.name,
           },
           query: {
@@ -61,36 +61,38 @@ function DAGStatus({ run, fileName }: Props) {
   };
   const onSelectStepOnGraph = React.useCallback(
     async (id: string) => {
-      const status = run.status;
+      const status = workflow.status;
       if (status == Status.Running || status == Status.NotStarted) {
         return;
       }
       // find the clicked step
-      const n = run.nodes?.find((n) => n.step.name.replace(/\s/g, '_') == id);
+      const n = workflow.nodes?.find(
+        (n) => n.step.name.replace(/\s/g, '_') == id
+      );
       if (n) {
         setSelectedStep(n.step);
         setModal(true);
       }
     },
-    [run]
+    [workflow]
   );
 
-  const handlers = getEventHandlers(run);
+  const handlers = getEventHandlers(workflow);
 
   // Handler for opening log viewer
-  const handleViewLog = (stepName: string, requestId: string) => {
+  const handleViewLog = (stepName: string, workflowId: string) => {
     setLogViewer({
       isOpen: true,
       logType: 'step',
       stepName,
-      requestId: requestId || run.requestId,
+      workflowId: workflowId || workflow.workflowId,
     });
   };
 
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
-        <DAGGraph run={run} onSelectStep={onSelectStepOnGraph} />
+        <DAGGraph workflow={workflow} onSelectStep={onSelectStepOnGraph} />
       </div>
 
       <DAGContext.Consumer>
@@ -99,14 +101,14 @@ function DAGStatus({ run, fileName }: Props) {
             <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
               <SubTitle className="mb-4">Status</SubTitle>
               <DAGStatusOverview
-                status={run}
+                status={workflow}
                 fileName={fileName}
-                onViewLog={(requestId) => {
+                onViewLog={(workflowId) => {
                   setLogViewer({
                     isOpen: true,
                     logType: 'execution',
                     stepName: '',
-                    requestId,
+                    workflowId,
                   });
                 }}
               />
@@ -115,8 +117,8 @@ function DAGStatus({ run, fileName }: Props) {
             <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
               <SubTitle className="mb-4">Steps</SubTitle>
               <NodeStatusTable
-                nodes={run.nodes}
-                status={run}
+                nodes={workflow.nodes}
+                status={workflow}
                 {...props}
                 onViewLog={handleViewLog}
               />
@@ -127,7 +129,7 @@ function DAGStatus({ run, fileName }: Props) {
                 <SubTitle className="mb-4">Lifecycle Hooks</SubTitle>
                 <NodeStatusTable
                   nodes={handlers}
-                  status={run}
+                  status={workflow}
                   {...props}
                   onViewLog={handleViewLog}
                 />
@@ -149,8 +151,8 @@ function DAGStatus({ run, fileName }: Props) {
         isOpen={logViewer.isOpen}
         onClose={() => setLogViewer((prev) => ({ ...prev, isOpen: false }))}
         logType={logViewer.logType}
-        dagName={run.name}
-        requestId={logViewer.requestId}
+        dagName={workflow.name}
+        workflowId={logViewer.workflowId}
         stepName={logViewer.stepName}
       />
     </div>

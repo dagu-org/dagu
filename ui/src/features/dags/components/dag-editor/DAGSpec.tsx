@@ -188,7 +188,7 @@ function DAGSpec({ fileName }: Props) {
               >
                 <div className="flex justify-between items-center mb-4">
                   <div className="flex items-center">
-                    <SubTitle className="mb-0 mr-2">Spec</SubTitle>
+                    <SubTitle className="mb-0 mr-2">Definition</SubTitle>
                     <div
                       className={`text-xs font-medium px-2 py-1 rounded-full transition-all duration-300 ${
                         editing

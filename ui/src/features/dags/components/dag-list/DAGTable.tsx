@@ -173,7 +173,7 @@ function getNextSchedule(
 // Allow returning number for group sorting placeholder
 function getStatus(data: RowItem): components['schemas']['Status'] | number {
   if (data.kind === ItemKind.DAG) {
-    return data.dag.latestRun.status;
+    return data.dag.latestWorkflow.status;
   }
   // Use a number outside the Status enum range for groups
   return -1;
@@ -348,8 +348,8 @@ const defaultColumns = [
       if (data.kind === ItemKind.DAG) {
         // Use the updated StatusChip component with xs size
         return (
-          <StatusChip status={data.dag.latestRun.status} size="xs">
-            {data.dag.latestRun?.statusLabel}
+          <StatusChip status={data.dag.latestWorkflow.status} size="xs">
+            {data.dag.latestWorkflow?.statusLabel}
           </StatusChip>
         );
       }
@@ -379,7 +379,7 @@ const defaultColumns = [
         return null;
       }
 
-      const { startedAt, finishedAt, status } = data.dag.latestRun;
+      const { startedAt, finishedAt, status } = data.dag.latestWorkflow;
 
       if (!startedAt || startedAt === '-') {
         // If no start time, display nothing or a placeholder
@@ -426,8 +426,8 @@ const defaultColumns = [
         return dataA.kind === ItemKind.Group ? -1 : 1;
       }
       // Prioritize rows with startedAt dates
-      const startedAtA = dataA.dag.latestRun.startedAt;
-      const startedAtB = dataB.dag.latestRun.startedAt;
+      const startedAtA = dataA.dag.latestWorkflow.startedAt;
+      const startedAtB = dataB.dag.latestWorkflow.startedAt;
 
       if (!startedAtA && !startedAtB) return 0; // Both null/undefined
       if (!startedAtA) return 1; // A is null, should come after B
@@ -584,7 +584,7 @@ const defaultColumns = [
         >
           <DAGActions
             dag={data.dag.dag}
-            status={data.dag.latestRun}
+            status={data.dag.latestWorkflow}
             fileName={data.dag.fileName}
             label={false}
             refresh={table.options.meta?.refreshFn}

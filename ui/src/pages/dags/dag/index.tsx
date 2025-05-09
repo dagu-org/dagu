@@ -4,7 +4,7 @@ import { components } from '../../../api/v2/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { DAGDetailsContent } from '../../../features/dags/components/dag-details';
 import { DAGContext } from '../../../features/dags/contexts/DAGContext';
-import { RunDetailsContext } from '../../../features/dags/contexts/DAGStatusContext';
+import { WorkflowDetailsContext } from '../../../features/dags/contexts/DAGStatusContext';
 import { useQuery } from '../../../hooks/api';
 import dayjs from '../../../lib/dayjs';
 import LoadingIndicator from '../../../ui/LoadingIndicator';
@@ -32,18 +32,18 @@ function DAGDetails() {
     },
     { refreshInterval: 2000 }
   );
-  const [currentRun, setCurrentRun] = React.useState<
-    components['schemas']['RunDetails'] | undefined
+  const [currentWorkflow, setCurrentWorkflow] = React.useState<
+    components['schemas']['WorkflowDetails'] | undefined
   >();
   const query = new URLSearchParams(window.location.search);
-  const requestId =
-    query.get('requestId') || data?.latestRun?.requestId || 'latest';
+  const workflowId =
+    query.get('workflowId') || data?.latestWorkflow?.workflowId || 'latest';
   const stepName = query.get('step');
 
   React.useEffect(() => {
     if (data) {
       appBarContext.setTitle(data.dag?.name || '');
-      setCurrentRun(data.latestRun);
+      setCurrentWorkflow(data.latestWorkflow);
     }
   }, [data, appBarContext]);
 
@@ -66,7 +66,7 @@ function DAGDetails() {
     return `${seconds}s`;
   };
 
-  if (!params.fileName || isLoading || !data || !data.latestRun) {
+  if (!params.fileName || isLoading || !data || !data.latestWorkflow) {
     return <LoadingIndicator />;
   }
 
@@ -78,11 +78,11 @@ function DAGDetails() {
         name: data.dag?.name || '',
       }}
     >
-      <RunDetailsContext.Provider
+      <WorkflowDetailsContext.Provider
         value={{
-          data: currentRun,
-          setData: (status: components['schemas']['RunDetails']) => {
-            setCurrentRun(status);
+          data: currentWorkflow,
+          setData: (status: components['schemas']['WorkflowDetails']) => {
+            setCurrentWorkflow(status);
           },
         }}
       >
@@ -91,17 +91,17 @@ function DAGDetails() {
             <DAGDetailsContent
               fileName={params.fileName || ''}
               dag={data.dag}
-              latestRun={data.latestRun}
+              latestWorkflow={data.latestWorkflow}
               refreshFn={() => {}}
               formatDuration={formatDuration}
               activeTab={tab}
-              requestId={requestId}
+              workflowId={workflowId}
               stepName={stepName}
               isModal={false}
             />
           )}
         </div>
-      </RunDetailsContext.Provider>
+      </WorkflowDetailsContext.Provider>
     </DAGContext.Provider>
   );
 }
