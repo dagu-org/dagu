@@ -72,7 +72,7 @@ func NewDataRoot(baseDir, dagName string) DataRoot {
 	return root
 }
 
-// FindByExecID locates an runs by its workflow ID.
+// FindByWorkflowID locates an runs by its workflow ID.
 // It searches through all runs directories to find a match,
 // and returns the most recent one if multiple matches are found.
 //
@@ -82,7 +82,7 @@ func NewDataRoot(baseDir, dagName string) DataRoot {
 //
 // Returns:
 //   - The matching Execution instance, or an error if not found
-func (dr *DataRoot) FindByExecID(_ context.Context, workflowID string) (*Execution, error) {
+func (dr *DataRoot) FindByWorkflowID(_ context.Context, workflowID string) (*Execution, error) {
 	// Find matching files
 	matches, err := filepath.Glob(dr.GlobPatternWithWorkflowID(workflowID))
 	if err != nil {
@@ -90,7 +90,7 @@ func (dr *DataRoot) FindByExecID(_ context.Context, workflowID string) (*Executi
 	}
 
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("%w: %s", models.ErrExecIDNotFound, workflowID)
+		return nil, fmt.Errorf("%w: %s", models.ErrWorkflowIDNotFound, workflowID)
 	}
 
 	// Sort matches by timestamp (most recent first)

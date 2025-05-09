@@ -149,25 +149,25 @@ func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
 	return nil
 }
 
-func stopDAGIfRunning(ctx context.Context, cli history.Manager, dag *digraph.DAG, requestID string) error {
-	status, err := cli.GetDAGRealtimeStatus(ctx, dag, requestID)
+func stopDAGIfRunning(ctx context.Context, cli history.Manager, dag *digraph.DAG, workflowID string) error {
+	status, err := cli.GetDAGRealtimeStatus(ctx, dag, workflowID)
 	if err != nil {
 		return fmt.Errorf("failed to get current status: %w", err)
 	}
 
 	if status.Status == scheduler.StatusRunning {
 		logger.Infof(ctx, "Stopping: %s", dag.Name)
-		if err := stopRunningDAG(ctx, cli, dag, requestID); err != nil {
+		if err := stopRunningDAG(ctx, cli, dag, workflowID); err != nil {
 			return fmt.Errorf("failed to stop running DAG: %w", err)
 		}
 	}
 	return nil
 }
 
-func stopRunningDAG(ctx context.Context, cli history.Manager, dag *digraph.DAG, requestID string) error {
+func stopRunningDAG(ctx context.Context, cli history.Manager, dag *digraph.DAG, workflowID string) error {
 	const stopPollInterval = 100 * time.Millisecond
 	for {
-		status, err := cli.GetDAGRealtimeStatus(ctx, dag, requestID)
+		status, err := cli.GetDAGRealtimeStatus(ctx, dag, workflowID)
 		if err != nil {
 			return fmt.Errorf("failed to get current status: %w", err)
 		}
@@ -176,7 +176,7 @@ func stopRunningDAG(ctx context.Context, cli history.Manager, dag *digraph.DAG, 
 			return nil
 		}
 
-		if err := cli.Stop(ctx, dag, requestID); err != nil {
+		if err := cli.Stop(ctx, dag, workflowID); err != nil {
 			return fmt.Errorf("failed to stop DAG: %w", err)
 		}
 

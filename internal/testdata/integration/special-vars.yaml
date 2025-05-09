@@ -1,20 +1,20 @@
 steps:
   - name: step1
-    command: echo $DAG_EXECUTION_LOG_PATH
+    command: echo $WORKFLOW_LOG_FILE
     output: OUT1
   - name: step2
-    command: echo $DAG_EXECUTION_LOG_PATH
+    command: echo $WORKFLOW_STEP_LOG_FILE
     output: OUT2
   - name: step3
-    command: echo $DAG_REQUEST_ID
+    command: echo $WORKFLOW_STEP_NAME
     output: OUT3
   - name: step4
     command: sh
     output: OUT4
     script: |
-      echo $DAG_EXECUTION_LOG_PATH
+      echo $WORKFLOW_NAME
   - name: step5
     command: bash
     output: OUT5
     script: |
-      echo $DAG_REQUEST_ID
+      echo $WORKFLOW_ID

@@ -129,7 +129,7 @@ func (a *API) handleError(w http.ResponseWriter, r *http.Request, err error) {
 		code = api.ErrorCodeNotFound
 		message = "DAG not found"
 
-	case errors.Is(err, models.ErrExecIDNotFound):
+	case errors.Is(err, models.ErrWorkflowIDNotFound):
 		code = api.ErrorCodeNotFound
 		message = "workflow ID not found"
 

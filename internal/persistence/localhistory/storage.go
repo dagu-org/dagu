@@ -15,7 +15,7 @@ import (
 
 // Error definitions for common issues
 var (
-	ErrExecIDEmpty = errors.New("requestID is empty")
+	ErrWorkflowIDEmpty = errors.New("workflow ID is empty")
 )
 
 var _ models.HistoryRepository = (*historyStorage)(nil)
@@ -77,11 +77,11 @@ func New(baseDir string, opts ...HistoryStorageOption) models.HistoryRepository 
 // If opts.Retry is true, it creates a retry record for the specified workflow ID.
 func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewRecordOptions) (models.Record, error) {
 	if workflowID == "" {
-		return nil, ErrExecIDEmpty
+		return nil, ErrWorkflowIDEmpty
 	}
 
 	if opts.Root != nil {
-		return db.newSubRecord(ctx, dag, timestamp, workflowID, opts)
+		return db.newChildRecord(ctx, dag, timestamp, workflowID, opts)
 	}
 
 	dataRoot := NewDataRoot(db.baseDir, dag.Name)
@@ -89,7 +89,7 @@ func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestam
 
 	var run *Execution
 	if opts.Retry {
-		r, err := dataRoot.FindByExecID(ctx, workflowID)
+		r, err := dataRoot.FindByWorkflowID(ctx, workflowID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find execution: %w", err)
 		}
@@ -110,10 +110,10 @@ func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestam
 	return record, nil
 }
 
-// NewSubRecord creates a new history record for a child workflow.
-func (db *historyStorage) newSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewRecordOptions) (models.Record, error) {
+// newChildRecord creates a new history record for a child workflow.
+func (db *historyStorage) newChildRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewRecordOptions) (models.Record, error) {
 	dataRoot := NewDataRoot(db.baseDir, opts.Root.Name)
-	root, err := dataRoot.FindByExecID(ctx, opts.Root.WorkflowID)
+	root, err := dataRoot.FindByWorkflowID(ctx, opts.Root.WorkflowID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find root execution: %w", err)
 	}
@@ -223,11 +223,11 @@ func (db *historyStorage) Find(ctx context.Context, ref digraph.WorkflowRef) (mo
 	}
 
 	if ref.WorkflowID == "" {
-		return nil, ErrExecIDEmpty
+		return nil, ErrWorkflowIDEmpty
 	}
 
 	root := NewDataRoot(db.baseDir, ref.Name)
-	run, err := root.FindByExecID(ctx, ref.WorkflowID)
+	run, err := root.FindByWorkflowID(ctx, ref.WorkflowID)
 
 	if err != nil {
 		return nil, err
@@ -248,11 +248,11 @@ func (db *historyStorage) FindChildWorkflow(ctx context.Context, ref digraph.Wor
 	}
 
 	if ref.WorkflowID == "" {
-		return nil, ErrExecIDEmpty
+		return nil, ErrWorkflowIDEmpty
 	}
 
 	root := NewDataRoot(db.baseDir, ref.Name)
-	run, err := root.FindByExecID(ctx, ref.WorkflowID)
+	run, err := root.FindByWorkflowID(ctx, ref.WorkflowID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find execution: %w", err)
 	}

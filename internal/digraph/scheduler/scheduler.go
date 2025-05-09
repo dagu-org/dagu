@@ -89,7 +89,7 @@ func New(cfg *Config) *Scheduler {
 		onSuccess:     cfg.OnSuccess,
 		onFailure:     cfg.OnFailure,
 		onCancel:      cfg.OnCancel,
-		workflowID:    cfg.ExecID,
+		workflowID:    cfg.WorkflowID,
 		pause:         time.Millisecond * 100,
 	}
 }
@@ -104,7 +104,7 @@ type Config struct {
 	OnSuccess     *digraph.Step
 	OnFailure     *digraph.Step
 	OnCancel      *digraph.Step
-	ExecID        string
+	WorkflowID    string
 }
 
 // Schedule runs the graph of steps.

@@ -10,8 +10,8 @@ import (
 
 // Error variables for history operations
 var (
-	ErrExecIDNotFound = errors.New("exec ID not found")
-	ErrNoStatusData   = errors.New("no status data")
+	ErrWorkflowIDNotFound = errors.New("workflow ID not found")
+	ErrNoStatusData       = errors.New("no status data")
 )
 
 // HistoryRepository provides an interface for interacting with the underlying database

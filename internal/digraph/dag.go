@@ -322,7 +322,7 @@ func SockAddr(name, workflowID string) string {
 	name = fileutil.SafeName(name)
 	workflowID = fileutil.SafeName(workflowID)
 
-	// Create MD5 hash of the combined name and requestID and take first 8 chars
+	// Create MD5 hash of the combined name and workflow ID and take first 8 chars
 	combined := name + workflowID
 	hashLength := 6
 	hash := fmt.Sprintf("%x", md5.Sum([]byte(combined)))[:hashLength] // nolint:gosec

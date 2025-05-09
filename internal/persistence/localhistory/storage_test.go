@@ -99,7 +99,7 @@ func TestJSONDB(t *testing.T) {
 		// Verify an error is returned if the workflow ID does not exist
 		refNonExist := digraph.NewWorkflowRef("test_DAG", "nonexistent-id")
 		_, err = th.Repo.Find(th.Context, refNonExist)
-		assert.ErrorIs(t, err, models.ErrExecIDNotFound)
+		assert.ErrorIs(t, err, models.ErrWorkflowIDNotFound)
 	})
 	t.Run("RemoveOld", func(t *testing.T) {
 		th := setupTestJSONDB(t)

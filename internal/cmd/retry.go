@@ -113,7 +113,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootRun
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
-			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, status.WorkflowID, err)
+			return fmt.Errorf("failed to execute the workflow %s (workflow ID: %s): %w", dag.Name, status.WorkflowID, err)
 		}
 	}
 

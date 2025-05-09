@@ -102,7 +102,7 @@ func (e Execution) FindChildExec(_ context.Context, workflowID string) (*Executi
 		return nil, fmt.Errorf("failed to list child workflow directories: %w", err)
 	}
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("no matching child workflow found for ID %s (glob=%s): %w", workflowID, globPattern, models.ErrExecIDNotFound)
+		return nil, fmt.Errorf("no matching child workflow found for ID %s (glob=%s): %w", workflowID, globPattern, models.ErrWorkflowIDNotFound)
 	}
 	// Sort the matches by timestamp
 	sort.Slice(matches, func(i, j int) bool {

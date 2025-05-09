@@ -347,13 +347,12 @@ func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
 	defer n.mu.RUnlock()
 	env := executor.GetEnv(ctx)
 	env = env.WithEnv(
-		digraph.EnvKeyLogPath, n.Log(),
-		digraph.EnvKeyStepLogPath, n.Log(),
+		digraph.EnvKeyWorkflowStepLogFile, n.Log(),
 	)
 	return executor.WithEnv(ctx, env)
 }
 
-func (n *Node) Setup(ctx context.Context, logDir string, requestID string) error {
+func (n *Node) Setup(ctx context.Context, logDir string, workflowID string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -361,7 +360,7 @@ func (n *Node) Setup(ctx context.Context, logDir string, requestID string) error
 	startedAt := time.Now()
 	safeName := fileutil.SafeName(n.Name())
 	timestamp := startedAt.Format("20060102.15:04:05.000")
-	postfix := stringutil.TruncString(requestID, 8)
+	postfix := stringutil.TruncString(workflowID, 8)
 	logFilename := fmt.Sprintf("%s.%s.%s.log", safeName, timestamp, postfix)
 	if !fileutil.FileExists(logDir) {
 		if err := os.MkdirAll(logDir, 0750); err != nil {

@@ -124,7 +124,7 @@ func (a *API) handleError(w http.ResponseWriter, _ *http.Request, err error) {
 	}
 
 	switch {
-	case errors.Is(err, models.ErrExecIDNotFound):
+	case errors.Is(err, models.ErrWorkflowIDNotFound):
 		code = api.ErrorCodeNotFound
 		message = "workflow ID not found"
 	}

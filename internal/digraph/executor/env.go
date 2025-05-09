@@ -66,7 +66,7 @@ func NewEnv(ctx context.Context, step digraph.Step) Env {
 		Variables: &digraph.SyncMap{},
 		Step:      step,
 		Envs: map[string]string{
-			digraph.EnvKeyStepName: step.Name,
+			digraph.EnvKeyWorkflowStepName: step.Name,
 		},
 	}
 }

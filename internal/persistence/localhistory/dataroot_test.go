@@ -73,7 +73,7 @@ func TestDataRootRuns(t *testing.T) {
 		exec := root.CreateTestExecution(t, "test-id1", ts)
 		_ = root.CreateTestExecution(t, "test-id2", ts)
 
-		actual, err := root.FindByExecID(ctx, "test-id1")
+		actual, err := root.FindByWorkflowID(ctx, "test-id1")
 		require.NoError(t, err)
 
 		assert.Equal(t, exec.Execution, actual, "FindByWorkflowID should return the correct run")

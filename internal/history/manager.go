@@ -121,7 +121,7 @@ func (m *Manager) RestartDAG(_ context.Context, dag *digraph.DAG, opts RestartOp
 	return cmd.Start()
 }
 
-// RetryDAG retries a workflow with the specified requestID by executing
+// RetryDAG retries a workflow with the specified workflow ID by executing
 // the configured executable with the retry command.
 func (m *Manager) RetryDAG(_ context.Context, dag *digraph.DAG, workflowID string) error {
 	args := []string{"retry"}
@@ -168,7 +168,7 @@ FALLBACK:
 	return m.findPersistedStatus(ctx, dag, workflowID)
 }
 
-// FindWorkflowStatus retrieves the status of a workflow by name and requestID from the execution history.
+// FindWorkflowStatus retrieves the status of a workflow by name and workflow ID from the execution history.
 func (e *Manager) FindWorkflowStatus(ctx context.Context, ref digraph.WorkflowRef) (*models.Status, error) {
 	record, err := e.historyRepo.Find(ctx, ref)
 	if err != nil {
@@ -181,7 +181,7 @@ func (e *Manager) FindWorkflowStatus(ctx context.Context, ref digraph.WorkflowRe
 	return latestStatus, nil
 }
 
-// findPersistedStatus retrieves the status of a workflow by requestID.
+// findPersistedStatus retrieves the status of a workflow by workflow ID.
 // If the stored status indicates the DAG is running, it attempts to get the current status.
 // If that fails, it marks the status as error.
 func (m *Manager) findPersistedStatus(ctx context.Context, dag *digraph.DAG, workflowID string) (

@@ -60,7 +60,7 @@ func runDry(ctx *Context, args []string) error {
 
 	logFile, err := ctx.OpenLogFile(dag, workflowID)
 	if err != nil {
-		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
+		return fmt.Errorf("failed to initialize log file for workflow %s: %w", dag.Name, err)
 	}
 	defer func() {
 		_ = logFile.Close()
@@ -90,7 +90,7 @@ func runDry(ctx *Context, args []string) error {
 	listenSignals(ctx, agentInstance)
 
 	if err := agentInstance.Run(ctx); err != nil {
-		return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, workflowID, err)
+		return fmt.Errorf("failed to execute the workflow %s (workflow ID: %s): %w", dag.Name, workflowID, err)
 	}
 
 	agentInstance.PrintSummary(ctx)

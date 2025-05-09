@@ -15,11 +15,11 @@ import (
 
 // Errors for start command
 var (
-	// ErrExecIDRequired is returned when a child workflow is attempted without providing an workflow ID
-	ErrExecIDRequired = errors.New("workflow ID is required for child workflow")
+	// ErrWorkflowIDRequired is returned when a child workflow is attempted without providing an workflow ID
+	ErrWorkflowIDRequired = errors.New("workflow ID is required for child workflow")
 
-	// ErrExecIDFormat is returned when the provided workflow ID has an invalid format
-	ErrExecIDFormat = errors.New("invalid workflow ID format")
+	// ErrWorkflowIDFormat is returned when the provided workflow ID has an invalid format
+	ErrWorkflowIDFormat = errors.New("workflow ID must only contain alphanumeric characters, dashes, and underscores")
 )
 
 // CmdStart creates and returns a cobra command for starting workflow
@@ -102,13 +102,13 @@ func getExecutionInfo(ctx *Context) (workflowID string, rootRef string, parentRe
 
 	// Validate workflow ID for child workflows
 	if isChildExec && workflowID == "" {
-		return "", "", "", false, ErrExecIDRequired
+		return "", "", "", false, ErrWorkflowIDRequired
 	}
 
 	// Validate or generate workflow ID
 	if workflowID != "" {
 		if err := validateWorkflowID(workflowID); err != nil {
-			return "", "", "", false, ErrExecIDFormat
+			return "", "", "", false, ErrWorkflowIDFormat
 		}
 	} else {
 		// Generate a new workflow ID if not provided
@@ -195,7 +195,7 @@ func handleChildWorkflow(ctx *Context, dag *digraph.DAG, workflowID string, para
 
 	// Look for existing execution record
 	record, err := ctx.HistoryRepo.FindChildWorkflow(ctx, root, workflowID)
-	if errors.Is(err, models.ErrExecIDNotFound) {
+	if errors.Is(err, models.ErrWorkflowIDNotFound) {
 		// If the workflow ID is not found, proceed with new execution
 		return executeWorkflow(ctx, dag, parent, workflowID, root)
 	}
@@ -256,13 +256,13 @@ func executeWorkflow(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, w
 
 	// Run the DAG
 	if err := agentInstance.Run(ctx); err != nil {
-		logger.Error(ctx, "Failed to execute DAG", "DAG", d.Name, "workflowId", workflowID, "err", err)
+		logger.Error(ctx, "Failed to execute the workflow", "name", d.Name, "workflowId", workflowID, "err", err)
 
 		if ctx.Quiet {
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
-			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", d.Name, workflowID, err)
+			return fmt.Errorf("failed to execute the workflow %s (workflow ID: %s): %w", d.Name, workflowID, err)
 		}
 	}
 

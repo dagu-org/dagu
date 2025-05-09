@@ -395,7 +395,7 @@ func (a *Agent) newScheduler() *scheduler.Scheduler {
 		Timeout:       a.dag.Timeout,
 		Delay:         a.dag.Delay,
 		Dry:           a.dry,
-		ExecID:        a.workflowID,
+		WorkflowID:    a.workflowID,
 	}
 
 	if a.dag.HandlerOn.Exit != nil {
