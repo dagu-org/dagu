@@ -17,11 +17,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestHistoryRecord_Open(t *testing.T) {
+func TestRun_Open(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "status.dat")
 
-	hr := NewRecord(file, nil)
+	hr := NewRun(file, nil)
 
 	// Test successful open
 	err := hr.Open(context.Background())
@@ -36,11 +36,11 @@ func TestHistoryRecord_Open(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestHistoryRecord_Write(t *testing.T) {
+func TestRun_Write(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "status.dat")
 
-	hr := NewRecord(file, nil)
+	hr := NewRun(file, nil)
 
 	// Test write without open
 	status := createTestStatus(scheduler.StatusRunning)
@@ -66,7 +66,7 @@ func TestHistoryRecord_Write(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestHistoryRecord_Read(t *testing.T) {
+func TestRun_Read(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "status.dat")
 
@@ -95,8 +95,8 @@ func TestHistoryRecord_Read(t *testing.T) {
 	err = f.Close()
 	require.NoError(t, err)
 
-	// Initialize HistoryRecord and test reading
-	hr := NewRecord(file, nil)
+	// Initialize Run and test reading
+	hr := NewRun(file, nil)
 
 	// Read status - should get the last entry (test2)
 	status, err := hr.ReadStatus(context.Background())
@@ -109,7 +109,7 @@ func TestHistoryRecord_Read(t *testing.T) {
 	assert.Equal(t, scheduler.StatusSuccess.String(), latestStatus.Status.String())
 }
 
-func TestHistoryRecord_Compact(t *testing.T) {
+func TestRun_Compact(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "status.dat")
 
@@ -118,7 +118,7 @@ func TestHistoryRecord_Compact(t *testing.T) {
 		status := createTestStatus(scheduler.StatusRunning)
 
 		if i == 9 {
-			// Make some status changes to create different records
+			// Make some status changes to create different runs
 			status.Status = scheduler.StatusSuccess
 		}
 
@@ -144,8 +144,8 @@ func TestHistoryRecord_Compact(t *testing.T) {
 	require.NoError(t, err)
 	beforeSize := fileInfo.Size()
 
-	// Initialize HistoryRecord
-	hr := NewRecord(file, nil)
+	// Initialize Run
+	hr := NewRun(file, nil)
 
 	// Compact the file
 	err = hr.Compact(context.Background())
@@ -165,12 +165,12 @@ func TestHistoryRecord_Compact(t *testing.T) {
 	assert.Equal(t, scheduler.StatusSuccess, status.Status)
 }
 
-func TestHistoryRecord_Close(t *testing.T) {
+func TestRun_Close(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "status.dat")
 
-	// Initialize and open HistoryRecord
-	hr := NewRecord(file, nil)
+	// Initialize and open Run
+	hr := NewRun(file, nil)
 	err := hr.Open(context.Background())
 	require.NoError(t, err)
 
@@ -191,11 +191,11 @@ func TestHistoryRecord_Close(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestHistoryRecord_HandleNonExistentFile(t *testing.T) {
+func TestRun_HandleNonExistentFile(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "nonexistent", "status.dat")
 
-	hr := NewRecord(file, nil)
+	hr := NewRun(file, nil)
 
 	// Should be able to open a non-existent file
 	err := hr.Open(context.Background())
@@ -215,7 +215,7 @@ func TestHistoryRecord_HandleNonExistentFile(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestHistoryRecord_EmptyFile(t *testing.T) {
+func TestRun_EmptyFile(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "empty.dat")
 
@@ -224,7 +224,7 @@ func TestHistoryRecord_EmptyFile(t *testing.T) {
 	require.NoError(t, err)
 	_ = f.Close()
 
-	hr := NewRecord(file, nil)
+	hr := NewRun(file, nil)
 
 	// Reading an empty file should return EOF
 	_, err = hr.ReadStatus(context.Background())
@@ -235,7 +235,7 @@ func TestHistoryRecord_EmptyFile(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestHistoryRecord_InvalidJSON(t *testing.T) {
+func TestRun_InvalidJSON(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "invalid.dat")
 
@@ -249,7 +249,7 @@ func TestHistoryRecord_InvalidJSON(t *testing.T) {
 	_, err = f.Write([]byte("invalid json\n"))
 	require.NoError(t, err)
 
-	hr := NewRecord(file, nil)
+	hr := NewRun(file, nil)
 
 	// Should be able to read and get the valid entry
 	status, err := hr.ReadStatus(context.Background())
@@ -329,7 +329,7 @@ func TestSafeRename(t *testing.T) {
 // createTempDir creates a temporary directory for testing
 func createTempDir(t *testing.T) string {
 	t.Helper()
-	dir, err := os.MkdirTemp("", "history_record_test_")
+	dir, err := os.MkdirTemp("", "run_test_")
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = os.RemoveAll(dir)

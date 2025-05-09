@@ -26,17 +26,17 @@ var (
 func CmdStart() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "start [flags] /path/to/spec.yaml [-- param1 param2 ...]",
-			Short: "Execute a DAG",
-			Long: `Begin execution of a DAG defined in a YAML file.
+			Use:   "start [flags] <DAG name> [-- param1 param2 ...]",
+			Short: "Execute a workflow",
+			Long: `Begin execution of a workflow.
 
 Parameters after the "--" separator are passed as execution parameters (either positional or key=value pairs).
 Flags can override default settings such as workflow ID or suppress output.
 
 Example:
-  dagu start my_dag.yaml -- P1=foo P2=bar
+  dagu start my_dag -- P1=foo P2=bar
 
-This command parses the DAG specification, resolves parameters, and initiates the execution process.
+This command parses the DAG definition, resolves parameters, and initiates the execution process.
 `,
 			Args: cobra.MinimumNArgs(1),
 		}, startFlags, runStart,
@@ -88,7 +88,7 @@ func runStart(ctx *Context, args []string) error {
 }
 
 // getExecutionInfo extracts and validates workflow ID and references from command flags
-func getExecutionInfo(ctx *Context) (workflowID string, rootRef string, parentRef string, isChildExec bool, err error) {
+func getExecutionInfo(ctx *Context) (workflowID string, rootRef string, parentRef string, isChildWorkflow bool, err error) {
 	// Get workflow ID from flags
 	workflowID, err = ctx.Command.Flags().GetString("workflow-id")
 	if err != nil {
@@ -98,10 +98,10 @@ func getExecutionInfo(ctx *Context) (workflowID string, rootRef string, parentRe
 	// Get root and parent execution references
 	rootRef, _ = ctx.Command.Flags().GetString("root")
 	parentRef, _ = ctx.Command.Flags().GetString("parent")
-	isChildExec = parentRef != "" || rootRef != ""
+	isChildWorkflow = parentRef != "" || rootRef != ""
 
 	// Validate workflow ID for child workflows
-	if isChildExec && workflowID == "" {
+	if isChildWorkflow && workflowID == "" {
 		return "", "", "", false, ErrWorkflowIDRequired
 	}
 
@@ -118,7 +118,7 @@ func getExecutionInfo(ctx *Context) (workflowID string, rootRef string, parentRe
 		}
 	}
 
-	return workflowID, rootRef, parentRef, isChildExec, nil
+	return workflowID, rootRef, parentRef, isChildWorkflow, nil
 }
 
 // loadDAGWithParams loads the DAG and its parameters from command arguments
@@ -193,8 +193,8 @@ func handleChildWorkflow(ctx *Context, dag *digraph.DAG, workflowID string, para
 	// Check for previous child workflow with this ID
 	logger.Debug(ctx, "Checking for previous child workflow with the workflow ID", "workflowId", workflowID)
 
-	// Look for existing execution record
-	record, err := ctx.HistoryRepo.FindChildWorkflow(ctx, root, workflowID)
+	// Look for existing execution run
+	run, err := ctx.HistoryRepo.FindChildWorkflowRun(ctx, root, workflowID)
 	if errors.Is(err, models.ErrWorkflowIDNotFound) {
 		// If the workflow ID is not found, proceed with new execution
 		return executeWorkflow(ctx, dag, parent, workflowID, root)
@@ -204,7 +204,7 @@ func handleChildWorkflow(ctx *Context, dag *digraph.DAG, workflowID string, para
 	}
 
 	// Read the status of the previous run
-	status, err := record.ReadStatus(ctx)
+	status, err := run.ReadStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read previous run status for workflow ID %s: %w", workflowID, err)
 	}
@@ -219,7 +219,6 @@ func executeWorkflow(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, w
 	// execution for the same DAG/workflow ID between attempts.
 	logFile, err := ctx.OpenLogFile(d, workflowID)
 	if err != nil {
-		logger.Error(ctx, "failed to initialize log file", "DAG", d.Name, "err", err)
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", d.Name, err)
 	}
 	defer func() {
@@ -234,7 +233,6 @@ func executeWorkflow(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, w
 	// Initialize DAG repository with the DAG's directory in the search path
 	dr, err := ctx.dagRepo(nil, []string{filepath.Dir(d.Location)})
 	if err != nil {
-		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 

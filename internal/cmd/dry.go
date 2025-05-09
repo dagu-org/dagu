@@ -12,9 +12,9 @@ import (
 func CmdDry() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "dry [flags] /path/to/spec.yaml [-- param1 param2 ...]",
-			Short: "Perform a dry-run of a DAG",
-			Long: `Simulate the execution of a DAG without performing any real actions.
+			Use:   "dry [flags] <DAG name> [-- param1 param2 ...]",
+			Short: "Perform a dry-run of a workflow",
+			Long: `Simulate the execution of a workflow without performing any real actions.
 
 The specified YAML file defines the DAG. Any parameters provided after "--" override default values.
 This simulation shows the planned execution steps and configuration without side effects.

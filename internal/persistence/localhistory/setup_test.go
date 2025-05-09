@@ -14,79 +14,79 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type JSONDBTest struct {
-	Context context.Context
-	Repo    models.HistoryRepository
-	tmpDir  string
+type LocalStorageTest struct {
+	Context     context.Context
+	HistoryRepo models.HistoryRepository
+	TmpDir      string
 }
 
-func setupTestJSONDB(t *testing.T) JSONDBTest {
+func setupTestLocalStorage(t *testing.T) LocalStorageTest {
 	tmpDir, err := os.MkdirTemp("", "test")
 	require.NoError(t, err)
 
-	th := JSONDBTest{
-		Context: context.Background(),
-		Repo:    New(tmpDir),
-		tmpDir:  tmpDir,
+	th := LocalStorageTest{
+		Context:     context.Background(),
+		HistoryRepo: New(tmpDir),
+		TmpDir:      tmpDir,
 	}
 
 	t.Cleanup(func() {
-		_ = os.RemoveAll(th.tmpDir)
+		_ = os.RemoveAll(th.TmpDir)
 	})
 	return th
 }
 
-func (th JSONDBTest) CreateRecord(t *testing.T, ts time.Time, workflowID string, s scheduler.Status) *Record {
+func (th LocalStorageTest) CreateRun(t *testing.T, ts time.Time, workflowID string, s scheduler.Status) *Run {
 	t.Helper()
 
 	dag := th.DAG("test_DAG")
-	record, err := th.Repo.Create(th.Context, dag.DAG, ts, workflowID, models.NewRecordOptions{})
+	run, err := th.HistoryRepo.CreateRun(th.Context, dag.DAG, ts, workflowID, models.NewRunOptions{})
 	require.NoError(t, err)
 
-	err = record.Open(th.Context)
+	err = run.Open(th.Context)
 	require.NoError(t, err)
 
 	defer func() {
-		_ = record.Close(th.Context)
+		_ = run.Close(th.Context)
 	}()
 
 	status := models.InitialStatus(dag.DAG)
 	status.WorkflowID = workflowID
 	status.Status = s
 
-	err = record.Write(th.Context, status)
+	err = run.Write(th.Context, status)
 	require.NoError(t, err)
 
-	return record.(*Record)
+	return run.(*Run)
 }
 
-func (th JSONDBTest) DAG(name string) DAGTest {
+func (th LocalStorageTest) DAG(name string) DAGTest {
 	return DAGTest{
 		th: th,
 		DAG: &digraph.DAG{
 			Name:     name,
-			Location: filepath.Join(th.tmpDir, name+".yaml"),
+			Location: filepath.Join(th.TmpDir, name+".yaml"),
 		},
 	}
 }
 
 type DAGTest struct {
-	th JSONDBTest
+	th LocalStorageTest
 	*digraph.DAG
 }
 
 func (d DAGTest) Writer(t *testing.T, workflowID string, startedAt time.Time) WriterTest {
 	t.Helper()
 
-	root := NewDataRoot(d.th.tmpDir, d.Name)
-	run, err := root.CreateWorkflow(NewUTC(startedAt), workflowID)
+	root := NewDataRoot(d.th.TmpDir, d.Name)
+	workflow, err := root.CreateWorkflow(NewUTC(startedAt), workflowID)
 	require.NoError(t, err)
 
-	obj := d.th.Repo.(*historyStorage)
-	record, err := run.CreateRecord(d.th.Context, NewUTC(startedAt), obj.cache, WithDAG(d.DAG))
+	obj := d.th.HistoryRepo.(*localStorage)
+	run, err := workflow.CreateRun(d.th.Context, NewUTC(startedAt), obj.cache, WithDAG(d.DAG))
 	require.NoError(t, err)
 
-	writer := NewWriter(record.file)
+	writer := NewWriter(run.file)
 	require.NoError(t, writer.Open())
 
 	t.Cleanup(func() {
@@ -97,7 +97,7 @@ func (d DAGTest) Writer(t *testing.T, workflowID string, startedAt time.Time) Wr
 		th: d.th,
 
 		WorkflowID: workflowID,
-		FilePath:   record.file,
+		FilePath:   run.file,
 		Writer:     writer,
 	}
 }
@@ -127,7 +127,7 @@ func (w WriterTest) Close(t *testing.T) {
 }
 
 type WriterTest struct {
-	th JSONDBTest
+	th LocalStorageTest
 
 	WorkflowID string
 	FilePath   string

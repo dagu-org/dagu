@@ -11,7 +11,7 @@ import (
 func CmdStop() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "stop --workflow-id=abc123 name",
+			Use:   "stop --workflow-id=abc123 <DAG name or workflow name>",
 			Short: "Stop a running workflow",
 			Long: `Gracefully terminate an active workflow.
 
@@ -45,7 +45,7 @@ func runStop(ctx *Context, args []string) error {
 	if workflowID != "" {
 		// Retrieve the previous run's history record for the specified workflow ID.
 		ref := digraph.NewWorkflowRef(name, workflowID)
-		rec, err := ctx.HistoryRepo.Find(ctx, ref)
+		rec, err := ctx.HistoryRepo.FindRun(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflowID, err)
 		}

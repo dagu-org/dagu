@@ -63,10 +63,10 @@ steps:
 	// First, find the child_2 workflow ID to update its status
 	ctx := context.Background()
 	ref := digraph.NewWorkflowRef("parent", workflowID)
-	parentRec, err := th.HistoryRepo.Find(ctx, ref)
+	parentRun, err := th.HistoryRepo.FindRun(ctx, ref)
 	require.NoError(t, err)
 
-	updateStatus := func(rec models.Record, status *models.Status) {
+	updateStatus := func(rec models.Run, status *models.Status) {
 		err = rec.Open(ctx)
 		require.NoError(t, err)
 		err = rec.Write(ctx, *status)
@@ -76,40 +76,40 @@ steps:
 	}
 
 	// (1) Find the child_1 node and update its status to "failed"
-	parentStatus, err := parentRec.ReadStatus(ctx)
+	parentStatus, err := parentRun.ReadStatus(ctx)
 	require.NoError(t, err)
 
 	child1Node := parentStatus.Nodes[0]
 	child1Node.Status = scheduler.NodeStatusError
-	updateStatus(parentRec, parentStatus)
+	updateStatus(parentRun, parentStatus)
 
 	// (2) Find the child_1 workflow ID to update its status
-	child1Rec, err := th.HistoryRepo.FindChildWorkflow(ctx, ref, child1Node.Children[0].ExecID)
+	child1Run, err := th.HistoryRepo.FindChildWorkflowRun(ctx, ref, child1Node.Children[0].ExecID)
 	require.NoError(t, err)
 
-	child1Status, err := child1Rec.ReadStatus(ctx)
+	child1Status, err := child1Run.ReadStatus(ctx)
 	require.NoError(t, err)
 
 	// (3) Find the child_2 node and update its status to "failed"
 	child2Node := child1Status.Nodes[0]
 	child2Node.Status = scheduler.NodeStatusError
-	updateStatus(child1Rec, child1Status)
+	updateStatus(child1Run, child1Status)
 
 	// (4) Find the child_2 workflow ID to update its status
-	child2Rec, err := th.HistoryRepo.FindChildWorkflow(ctx, ref, child2Node.Children[0].ExecID)
+	child2Run, err := th.HistoryRepo.FindChildWorkflowRun(ctx, ref, child2Node.Children[0].ExecID)
 	require.NoError(t, err)
 
-	child2Status, err := child2Rec.ReadStatus(ctx)
+	child2Status, err := child2Run.ReadStatus(ctx)
 	require.NoError(t, err)
 
 	require.Equal(t, child2Status.Status.String(), scheduler.NodeStatusSuccess.String())
 
 	// (5) Update the step in child_2 to "failed" to simulate a retry
 	child2Status.Nodes[0].Status = scheduler.NodeStatusError
-	updateStatus(child2Rec, child2Status)
+	updateStatus(child2Run, child2Status)
 
 	// (6) Check if the child_2 status is now "failed"
-	child2Status, err = child2Rec.ReadStatus(ctx)
+	child2Status, err = child2Run.ReadStatus(ctx)
 	require.NoError(t, err)
 	require.Equal(t, child2Status.Nodes[0].Status.String(), scheduler.NodeStatusError.String())
 
@@ -122,9 +122,9 @@ steps:
 	})
 
 	// Check if the child_2 status is now "success"
-	child2Rec, err = th.HistoryRepo.FindChildWorkflow(ctx, ref, child2Node.Children[0].ExecID)
+	child2Run, err = th.HistoryRepo.FindChildWorkflowRun(ctx, ref, child2Node.Children[0].ExecID)
 	require.NoError(t, err)
-	child2Status, err = child2Rec.ReadStatus(ctx)
+	child2Status, err = child2Run.ReadStatus(ctx)
 	require.NoError(t, err)
 	require.Equal(t, child2Status.Nodes[0].Status.String(), scheduler.NodeStatusSuccess.String())
 }

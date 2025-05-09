@@ -63,18 +63,18 @@ func TestManager(t *testing.T) {
 		ctx := th.Context
 		cli := th.HistoryMgr
 
-		// Open the history store and write a status before updating it.
-		record, err := th.HistoryRepo.Create(ctx, dag.DAG, now, workflowID, models.NewRecordOptions{})
+		// Open the run data and write a status before updating it.
+		run, err := th.HistoryRepo.CreateRun(ctx, dag.DAG, now, workflowID, models.NewRunOptions{})
 		require.NoError(t, err)
 
-		err = record.Open(ctx)
+		err = run.Open(ctx)
 		require.NoError(t, err)
 
 		status := testNewStatus(dag.DAG, workflowID, scheduler.StatusSuccess, scheduler.NodeStatusSuccess)
 
-		err = record.Write(ctx, status)
+		err = run.Write(ctx, status)
 		require.NoError(t, err)
-		_ = record.Close(ctx)
+		_ = run.Close(ctx)
 
 		// Get the status and check if it is the same as the one we wrote.
 		ref := digraph.NewWorkflowRef(dag.Name, workflowID)

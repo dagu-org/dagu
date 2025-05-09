@@ -170,15 +170,15 @@ FALLBACK:
 
 // FindWorkflowStatus retrieves the status of a workflow by name and workflow ID from the execution history.
 func (e *Manager) FindWorkflowStatus(ctx context.Context, ref digraph.WorkflowRef) (*models.Status, error) {
-	record, err := e.historyRepo.Find(ctx, ref)
+	run, err := e.historyRepo.FindRun(ctx, ref)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by workflow ID: %w", err)
 	}
-	latestStatus, err := record.ReadStatus(ctx)
+	status, err := run.ReadStatus(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}
-	return latestStatus, nil
+	return status, nil
 }
 
 // findPersistedStatus retrieves the status of a workflow by workflow ID.
@@ -188,11 +188,11 @@ func (m *Manager) findPersistedStatus(ctx context.Context, dag *digraph.DAG, wor
 	*models.Status, error,
 ) {
 	ref := digraph.NewWorkflowRef(dag.Name, workflowID)
-	record, err := m.historyRepo.Find(ctx, ref)
+	run, err := m.historyRepo.FindRun(ctx, ref)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by workflow ID: %w", err)
 	}
-	latestStatus, err := record.ReadStatus(ctx)
+	latestStatus, err := run.ReadStatus(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}
@@ -216,11 +216,11 @@ func (m *Manager) findPersistedStatus(ctx context.Context, dag *digraph.DAG, wor
 
 // FindChildWorkflowStatus retrieves the status of a child workflow by its workflow ID.
 func (m *Manager) FindChildWorkflowStatus(ctx context.Context, ref digraph.WorkflowRef, workflowID string) (*models.Status, error) {
-	record, err := m.historyRepo.FindChildWorkflow(ctx, ref, workflowID)
+	run, err := m.historyRepo.FindChildWorkflowRun(ctx, ref, workflowID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find child workflow status by workflow ID: %w", err)
 	}
-	latestStatus, err := record.ReadStatus(ctx)
+	latestStatus, err := run.ReadStatus(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}
@@ -247,13 +247,13 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 	var latestStatus *models.Status
 
 	// Find the latest status by name
-	record, err := m.historyRepo.Latest(ctx, dag.Name)
+	run, err := m.historyRepo.LatestRun(ctx, dag.Name)
 	if err != nil {
 		goto handleError
 	}
 
 	// Read the latest status
-	latestStatus, err = record.ReadStatus(ctx)
+	latestStatus, err = run.ReadStatus(ctx)
 	if err != nil {
 		goto handleError
 	}
@@ -286,23 +286,23 @@ handleError:
 	return ret, err
 }
 
-// ListRecentHistory retrieves the n most recent status records for a DAG by name.
+// ListRecentStatus retrieves the n most recent statuses for a DAG by name.
 // It returns a slice of Status objects, filtering out any that cannot be read.
-func (m *Manager) ListRecentHistory(ctx context.Context, name string, n int) []models.Status {
-	records := m.historyRepo.Recent(ctx, name, n)
+func (m *Manager) ListRecentStatus(ctx context.Context, name string, n int) []models.Status {
+	runs := m.historyRepo.RecentRuns(ctx, name, n)
 
-	var runs []models.Status
-	for _, record := range records {
-		if status, err := record.ReadStatus(ctx); err == nil {
-			runs = append(runs, *status)
+	var statuses []models.Status
+	for _, run := range runs {
+		if status, err := run.ReadStatus(ctx); err == nil {
+			statuses = append(statuses, *status)
 		}
 	}
 
-	return runs
+	return statuses
 }
 
-// UpdateStatus updates the status of a workflow in the execution history.
-// It finds the execution record for the workflow and writes the new status to it.
+// UpdateStatus updates the status of a workflow execution.
+// It finds the run for the workflow and writes the new status to it.
 func (e *Manager) UpdateStatus(ctx context.Context, root digraph.WorkflowRef, status models.Status) error {
 	// Check for context cancellation
 	select {
@@ -312,39 +312,39 @@ func (e *Manager) UpdateStatus(ctx context.Context, root digraph.WorkflowRef, st
 		// Continue with operation
 	}
 
-	// Find the execution record for the workflow
-	var historyRecord models.Record
+	// Find the run for the status.
+	var run models.Run
 
 	if root.WorkflowID == status.WorkflowID {
-		// If the workflow ID matches the root workflow ID, find the execution record by the root workflow ID
-		r, err := e.historyRepo.Find(ctx, root)
+		// If the workflow ID matches the root workflow ID, find the run by the root workflow ID
+		r, err := e.historyRepo.FindRun(ctx, root)
 		if err != nil {
-			return fmt.Errorf("failed to find execution record: %w", err)
+			return fmt.Errorf("failed to find the run: %w", err)
 		}
-		historyRecord = r
+		run = r
 	} else {
-		// If the workflow ID does not match, find the child workflow record
+		// If the workflow ID does not match, find the child workflow run
 		// by the root workflow ID and the child workflow ID
-		r, err := e.historyRepo.FindChildWorkflow(ctx, root, status.WorkflowID)
+		r, err := e.historyRepo.FindChildWorkflowRun(ctx, root, status.WorkflowID)
 		if err != nil {
-			return fmt.Errorf("failed to find child workflow record: %w", err)
+			return fmt.Errorf("failed to find child workflow run: %w", err)
 		}
-		historyRecord = r
+		run = r
 	}
 
-	// Open, write, and close the record
-	if err := historyRecord.Open(ctx); err != nil {
-		return fmt.Errorf("failed to open workflow record: %w", err)
+	// Open, write, and close the run
+	if err := run.Open(ctx); err != nil {
+		return fmt.Errorf("failed to open workflow run data: %w", err)
 	}
 
-	// Ensure the record is closed even if write fails
+	// Ensure the run data is closed even if write fails
 	defer func() {
-		if closeErr := historyRecord.Close(ctx); closeErr != nil {
-			logger.Errorf(ctx, "Failed to close workflow record: %v", closeErr)
+		if closeErr := run.Close(ctx); closeErr != nil {
+			logger.Errorf(ctx, "Failed to close workflow run data: %v", closeErr)
 		}
 	}()
 
-	if err := historyRecord.Write(ctx, status); err != nil {
+	if err := run.Write(ctx, status); err != nil {
 		return fmt.Errorf("failed to write status: %w", err)
 	}
 

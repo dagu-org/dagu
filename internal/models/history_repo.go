@@ -15,42 +15,42 @@ var (
 )
 
 // HistoryRepository provides an interface for interacting with the underlying database
-// for storing and retrieving execution history records of DAGs.
+// for storing and retrieving workflow run data.
 // It abstracts the details of the storage mechanism, allowing for different
 // implementations (e.g., file-based, in-memory, etc.) to be used interchangeably.
 type HistoryRepository interface {
-	// Create creates a new history record for a workflow
-	Create(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts NewRecordOptions) (Record, error)
-	// Recent returns the most recent history records for a DAG, limited by itemLimit
-	Recent(ctx context.Context, name string, itemLimit int) []Record
-	// Latest returns the most recent history record for a DAG
-	Latest(ctx context.Context, name string) (Record, error)
-	// Find finds a history record by its workflow ID
-	Find(ctx context.Context, ref digraph.WorkflowRef) (Record, error)
-	// FindChildWorkflow finds a child workflow record by its workflow ID
-	FindChildWorkflow(ctx context.Context, ref digraph.WorkflowRef, childWorkflowID string) (Record, error)
-	// RemoveOld removes history records older than retentionDays
-	RemoveOld(ctx context.Context, name string, retentionDays int) error
-	// Rename renames all history records from oldName to newName
-	Rename(ctx context.Context, oldName, newName string) error
+	// CreateRun creates a new execution record for a workflow
+	CreateRun(ctx context.Context, dag *digraph.DAG, ts time.Time, workflowID string, opts NewRunOptions) (Run, error)
+	// RecentRuns returns the most recent workflows for the given name, limited by itemLimit
+	RecentRuns(ctx context.Context, name string, itemLimit int) []Run
+	// LatestRun returns the most recent workflows for the given name
+	LatestRun(ctx context.Context, name string) (Run, error)
+	// FindRun finds a run by it's workflow ID
+	FindRun(ctx context.Context, workflow digraph.WorkflowRef) (Run, error)
+	// FindChildWorkflowRun finds a child workflow record by its workflow ID
+	FindChildWorkflowRun(ctx context.Context, workflow digraph.WorkflowRef, childWorkflowID string) (Run, error)
+	// RemoveOldWorkflows delete run data older than retentionDays
+	RemoveOldWorkflows(ctx context.Context, name string, retentionDays int) error
+	// RenameWorkflows renames all run data from oldName to newName
+	RenameWorkflows(ctx context.Context, oldName, newName string) error
 }
 
-// NewRecordOptions contains options for creating a new history record
-type NewRecordOptions struct {
+// NewRunOptions contains options for creating a new run record
+type NewRunOptions struct {
 	Root  *digraph.WorkflowRef
 	Retry bool
 }
 
-// Record represents a single execution history record that can be read and written
-type Record interface {
-	// Open prepares the record for writing
+// Run represents a single execution of a workflow that can be read and written
+type Run interface {
+	// Open prepares the run for writing
 	Open(ctx context.Context) error
-	// Write updates the record with new status information
+	// Write updates the run with new status information
 	Write(ctx context.Context, status Status) error
-	// Close finalizes any pending operations on the record
+	// Close finalizes any pending operations on the run
 	Close(ctx context.Context) error
-	// ReadStatus retrieves the execution status for this record
+	// ReadStatus retrieves the execution status for this run
 	ReadStatus(ctx context.Context) (*Status, error)
-	// ReadDAG retrieves the DAG definition for this record
+	// ReadDAG retrieves the DAG definition for this run
 	ReadDAG(ctx context.Context) (*digraph.DAG, error)
 }

@@ -166,20 +166,20 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Make a connection to the database.
 	// It should close the connection to the runstore database when the DAG
 	// execution is finished.
-	historyRecord, err := a.setupRunRecord(ctx)
+	run, err := a.setupRun(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to setup execution history: %w", err)
 	}
-	if err := historyRecord.Open(ctx); err != nil {
+	if err := run.Open(ctx); err != nil {
 		return fmt.Errorf("failed to open execution history: %w", err)
 	}
 	defer func() {
-		if err := historyRecord.Close(ctx); err != nil {
+		if err := run.Close(ctx); err != nil {
 			logger.Error(ctx, "Failed to close runstore store", "err", err)
 		}
 	}()
 
-	if err := historyRecord.Write(ctx, a.Status()); err != nil {
+	if err := run.Write(ctx, a.Status()); err != nil {
 		logger.Error(ctx, "Failed to write status", "err", err)
 	}
 
@@ -217,7 +217,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	go execWithRecovery(ctx, func() {
 		for node := range progressCh {
 			status := a.Status()
-			if err := historyRecord.Write(ctx, status); err != nil {
+			if err := run.Write(ctx, status); err != nil {
 				logger.Error(ctx, "Failed to write status", "err", err)
 			}
 			if err := a.reporter.reportStep(ctx, a.dag, status, node); err != nil {
@@ -233,7 +233,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		if a.finished.Load() {
 			return
 		}
-		if err := historyRecord.Write(ctx, a.Status()); err != nil {
+		if err := run.Write(ctx, a.Status()); err != nil {
 			logger.Error(ctx, "Status write failed", "err", err)
 		}
 	})
@@ -245,7 +245,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Update the finished status to the runstore database.
 	finishedStatus := a.Status()
 	logger.Info(ctx, "workflow finished", "status", finishedStatus.Status.String())
-	if err := historyRecord.Write(ctx, a.Status()); err != nil {
+	if err := run.Write(ctx, a.Status()); err != nil {
 		logger.Error(ctx, "Status write failed", "err", err)
 	}
 
@@ -523,18 +523,18 @@ func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 	return nil
 }
 
-func (a *Agent) setupRunRecord(ctx context.Context) (models.Record, error) {
+func (a *Agent) setupRun(ctx context.Context) (models.Run, error) {
 	retentionDays := a.dag.HistRetentionDays
-	if err := a.historyRepo.RemoveOld(ctx, a.dag.Name, retentionDays); err != nil {
+	if err := a.historyRepo.RemoveOldWorkflows(ctx, a.dag.Name, retentionDays); err != nil {
 		logger.Error(ctx, "History data cleanup failed", "err", err)
 	}
 
-	opts := models.NewRecordOptions{Retry: a.retryTarget != nil}
+	opts := models.NewRunOptions{Retry: a.retryTarget != nil}
 	if a.childWorkflow.Load() {
 		opts.Root = &a.root
 	}
 
-	return a.historyRepo.Create(ctx, a.dag, time.Now(), a.workflowID, opts)
+	return a.historyRepo.CreateRun(ctx, a.dag, time.Now(), a.workflowID, opts)
 }
 
 // setupSocketServer create socket server instance.
@@ -634,11 +634,11 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error
 }
 
 func (o *dbClient) GetChildWorkflowStatus(ctx context.Context, workflowID string, root digraph.WorkflowRef) (*digraph.Status, error) {
-	runRecord, err := o.historyRepo.FindChildWorkflow(ctx, root, workflowID)
+	run, err := o.historyRepo.FindChildWorkflowRun(ctx, root, workflowID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find the record for workflow ID %s: %w", workflowID, err)
+		return nil, fmt.Errorf("failed to find run for workflow ID %s: %w", workflowID, err)
 	}
-	status, err := runRecord.ReadStatus(ctx)
+	status, err := run.ReadStatus(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}

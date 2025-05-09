@@ -197,7 +197,7 @@ func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
 
 	// the +1 to the limit is needed to ensure that the number of therunstore
 	// entries is exactly the expected number
-	runstore := d.HistoryMgr.ListRecentHistory(d.Context, d.Name, expected+1)
+	runstore := d.HistoryMgr.ListRecentStatus(d.Context, d.Name, expected+1)
 	require.Len(t, runstore, expected)
 }
 

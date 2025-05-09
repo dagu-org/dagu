@@ -19,7 +19,7 @@ import (
 func CmdRestart() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "restart --workflow-id=abc123 dagName",
+			Use:   "restart --workflow-id=abc123 <DAG name or workflow name>",
 			Short: "Restart a running DAG",
 			Long: `Stop the currently running DAG and immediately restart it with the same configuration but with a new workflow ID.
 
@@ -27,10 +27,10 @@ Flags:
   --workflow-id string (optional) Unique identifier for tracking the restart execution.
 
 Example:
-  dagu restart --workflow-id=abc123 dagName
+  dagu restart --workflow-id=abc123 my_dag
 
 This command gracefully stops the active workflow before restarting it.
-If the workflow ID is not provided, it will find the current running DAG by name.
+If the workflow ID is not provided, it will find the current running workflow by the given DAG name.
 `,
 			Args: cobra.ExactArgs(1),
 		}, restartFlags, runRestart,
@@ -49,24 +49,24 @@ func runRestart(ctx *Context, args []string) error {
 
 	name := args[0]
 
-	var record models.Record
+	var run models.Run
 	if workflowID != "" {
-		// Retrieve the previous run's record for the specified workflow ID.
+		// Retrieve the previous run for the specified workflow ID.
 		ref := digraph.NewWorkflowRef(name, workflowID)
-		r, err := ctx.HistoryRepo.Find(ctx, ref)
+		r, err := ctx.HistoryRepo.FindRun(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflowID, err)
+			return fmt.Errorf("failed to find the run for workflow ID %s: %w", workflowID, err)
 		}
-		record = r
+		run = r
 	} else {
-		r, err := ctx.HistoryRepo.Latest(ctx, name)
+		r, err := ctx.HistoryRepo.LatestRun(ctx, name)
 		if err != nil {
 			return fmt.Errorf("failed to find the latest execution history for DAG %s: %w", name, err)
 		}
-		record = r
+		run = r
 	}
 
-	status, err := record.ReadStatus(ctx)
+	status, err := run.ReadStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read status: %w", err)
 	}
@@ -74,7 +74,7 @@ func runRestart(ctx *Context, args []string) error {
 		return fmt.Errorf("workflow %s is not running", name)
 	}
 
-	dag, err := record.ReadDAG(ctx)
+	dag, err := run.ReadDAG(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read DAG from execution history: %w", err)
 	}

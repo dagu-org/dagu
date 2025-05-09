@@ -24,10 +24,10 @@ func TestExecution(t *testing.T) {
 		_ = exec.WriteStatus(t, ts2, scheduler.StatusSuccess)
 		_ = exec.WriteStatus(t, ts3, scheduler.StatusError)
 
-		record, err := exec.LatestRecord(exec.Context, nil)
+		latestRun, err := exec.LatestRun(exec.Context, nil)
 		require.NoError(t, err)
 
-		status, err := record.ReadStatus(exec.Context)
+		status, err := latestRun.ReadStatus(exec.Context)
 		require.NoError(t, err)
 
 		require.Equal(t, scheduler.StatusError.String(), status.Status.String())
@@ -40,12 +40,12 @@ func TestExecution(t *testing.T) {
 		ts2 := NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
 
 		_ = exec.WriteStatus(t, ts1, scheduler.StatusRunning)
-		record := exec.WriteStatus(t, ts2, scheduler.StatusSuccess)
+		run := exec.WriteStatus(t, ts2, scheduler.StatusSuccess)
 
 		lastUpdate, err := exec.LastUpdated(exec.Context)
 		require.NoError(t, err)
 
-		info, err := os.Stat(record.file)
+		info, err := os.Stat(run.file)
 		require.NoError(t, err)
 
 		require.Equal(t, info.ModTime(), lastUpdate)
@@ -58,7 +58,7 @@ type ExecutionTest struct {
 	TB testing.TB
 }
 
-func (et ExecutionTest) WriteStatus(t *testing.T, ts TimeInUTC, s scheduler.Status) *Record {
+func (et ExecutionTest) WriteStatus(t *testing.T, ts TimeInUTC, s scheduler.Status) *Run {
 	t.Helper()
 
 	dag := &digraph.DAG{Name: "test-dag"}
@@ -66,17 +66,17 @@ func (et ExecutionTest) WriteStatus(t *testing.T, ts TimeInUTC, s scheduler.Stat
 	status.WorkflowID = "test-id-1"
 	status.Status = s
 
-	record, err := et.CreateRecord(et.Context, ts, nil)
+	run, err := et.CreateRun(et.Context, ts, nil)
 	require.NoError(t, err)
-	err = record.Open(et.Context)
+	err = run.Open(et.Context)
 	require.NoError(t, err)
 
 	defer func() {
-		_ = record.Close(et.Context)
+		_ = run.Close(et.Context)
 	}()
 
-	err = record.Write(et.Context, status)
+	err = run.Write(et.Context, status)
 	require.NoError(t, err)
 
-	return record
+	return run
 }

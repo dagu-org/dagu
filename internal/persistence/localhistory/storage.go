@@ -18,10 +18,10 @@ var (
 	ErrWorkflowIDEmpty = errors.New("workflow ID is empty")
 )
 
-var _ models.HistoryRepository = (*historyStorage)(nil)
+var _ models.HistoryRepository = (*localStorage)(nil)
 
-// historyStorage manages DAGs status files in local historyStorage with high performance and reliability.
-type historyStorage struct {
+// localStorage manages DAGs status files in local localStorage with high performance and reliability.
+type localStorage struct {
 	baseDir           string                          // Base directory for all status files
 	latestStatusToday bool                            // Whether to only return today's status
 	cache             *fileutil.Cache[*models.Status] // Optional cache for read operations
@@ -64,7 +64,7 @@ func New(baseDir string, opts ...HistoryStorageOption) models.HistoryRepository 
 		opt(options)
 	}
 
-	return &historyStorage{
+	return &localStorage{
 		baseDir:           baseDir,
 		latestStatusToday: options.LatestStatusToday,
 		cache:             options.FileCache,
@@ -72,10 +72,10 @@ func New(baseDir string, opts ...HistoryStorageOption) models.HistoryRepository 
 	}
 }
 
-// Create creates a new history record for the specified workflow ID.
+// CreateRun creates a new history record for the specified workflow ID.
 // If opts.Root is not nil, it creates a new history record for a child workflow.
 // If opts.Retry is true, it creates a retry record for the specified workflow ID.
-func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewRecordOptions) (models.Record, error) {
+func (db *localStorage) CreateRun(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewRunOptions) (models.Run, error) {
 	if workflowID == "" {
 		return nil, ErrWorkflowIDEmpty
 	}
@@ -102,7 +102,7 @@ func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestam
 		run = r
 	}
 
-	record, err := run.CreateRecord(ctx, ts, db.cache, WithDAG(dag))
+	record, err := run.CreateRun(ctx, ts, db.cache, WithDAG(dag))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create record: %w", err)
 	}
@@ -111,7 +111,7 @@ func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestam
 }
 
 // newChildRecord creates a new history record for a child workflow.
-func (db *historyStorage) newChildRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewRecordOptions) (models.Record, error) {
+func (db *localStorage) newChildRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewRunOptions) (models.Run, error) {
 	dataRoot := NewDataRoot(db.baseDir, opts.Root.Name)
 	root, err := dataRoot.FindByWorkflowID(ctx, opts.Root.WorkflowID)
 	if err != nil {
@@ -135,7 +135,7 @@ func (db *historyStorage) newChildRecord(ctx context.Context, dag *digraph.DAG, 
 		run = r
 	}
 
-	record, err := run.CreateRecord(ctx, ts, db.cache, WithDAG(dag))
+	record, err := run.CreateRun(ctx, ts, db.cache, WithDAG(dag))
 	if err != nil {
 		logger.Error(ctx, "Failed to create child workflow record", "err", err)
 		return nil, err
@@ -144,8 +144,8 @@ func (db *historyStorage) newChildRecord(ctx context.Context, dag *digraph.DAG, 
 	return record, nil
 }
 
-// Recent returns the most recent history records for the specified workflow name.
-func (db *historyStorage) Recent(ctx context.Context, dagName string, itemLimit int) []models.Record {
+// RecentRuns returns the most recent history records for the specified workflow name.
+func (db *localStorage) RecentRuns(ctx context.Context, dagName string, itemLimit int) []models.Run {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -165,9 +165,9 @@ func (db *historyStorage) Recent(ctx context.Context, dagName string, itemLimit 
 	items := root.Latest(ctx, itemLimit)
 
 	// Get the latest record for each item
-	records := make([]models.Record, 0, len(items))
+	records := make([]models.Run, 0, len(items))
 	for _, item := range items {
-		record, err := item.LatestRecord(ctx, db.cache)
+		record, err := item.LatestRun(ctx, db.cache)
 		if err != nil {
 			logger.Error(ctx, "Failed to get latest record", "err", err)
 			continue
@@ -178,9 +178,9 @@ func (db *historyStorage) Recent(ctx context.Context, dagName string, itemLimit 
 	return records
 }
 
-// Latest returns the most recent history record for the specified workflow name.
+// LatestRun returns the most recent history record for the specified workflow name.
 // If latestStatusToday is true, it only returns today's status.
-func (db *historyStorage) Latest(ctx context.Context, dagName string) (models.Record, error) {
+func (db *localStorage) LatestRun(ctx context.Context, dagName string) (models.Run, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -201,7 +201,7 @@ func (db *historyStorage) Latest(ctx context.Context, dagName string) (models.Re
 			return nil, fmt.Errorf("failed to get latest after: %w", err)
 		}
 
-		return exec.LatestRecord(ctx, db.cache)
+		return exec.LatestRun(ctx, db.cache)
 	}
 
 	// Get the latest execution data.
@@ -209,11 +209,11 @@ func (db *historyStorage) Latest(ctx context.Context, dagName string) (models.Re
 	if len(latest) == 0 {
 		return nil, models.ErrNoStatusData
 	}
-	return latest[0].LatestRecord(ctx, db.cache)
+	return latest[0].LatestRun(ctx, db.cache)
 }
 
-// Find finds a history record by workflow ID.
-func (db *historyStorage) Find(ctx context.Context, ref digraph.WorkflowRef) (models.Record, error) {
+// FindRun finds a history record by workflow ID.
+func (db *localStorage) FindRun(ctx context.Context, ref digraph.WorkflowRef) (models.Run, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -233,12 +233,12 @@ func (db *historyStorage) Find(ctx context.Context, ref digraph.WorkflowRef) (mo
 		return nil, err
 	}
 
-	return run.LatestRecord(ctx, db.cache)
+	return run.LatestRun(ctx, db.cache)
 }
 
-// FindChildWorkflow finds a child workflow by its ID.
+// FindChildWorkflowRun finds a child workflow by its ID.
 // It returns the latest record for the specified child workflow ID.
-func (db *historyStorage) FindChildWorkflow(ctx context.Context, ref digraph.WorkflowRef, childWorkflowID string) (models.Record, error) {
+func (db *localStorage) FindChildWorkflowRun(ctx context.Context, ref digraph.WorkflowRef, childWorkflowID string) (models.Run, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -261,15 +261,15 @@ func (db *historyStorage) FindChildWorkflow(ctx context.Context, ref digraph.Wor
 	if err != nil {
 		return nil, fmt.Errorf("failed to find child workflow: %w", err)
 	}
-	return childWorkflow.LatestRecord(ctx, db.cache)
+	return childWorkflow.LatestRun(ctx, db.cache)
 }
 
-// RemoveOld removes old history records older than the specified retention days.
+// RemoveOldWorkflows removes old history records older than the specified retention days.
 // It only removes records older than the specified retention days.
 // If retentionDays is negative, no files will be removed.
 // If retentionDays is zero, all files will be removed.
 // If retentionDays is positive, only files older than the specified number of days will be removed.
-func (db *historyStorage) RemoveOld(ctx context.Context, dagName string, retentionDays int) error {
+func (db *localStorage) RemoveOldWorkflows(ctx context.Context, dagName string, retentionDays int) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -287,8 +287,8 @@ func (db *historyStorage) RemoveOld(ctx context.Context, dagName string, retenti
 	return root.RemoveOld(ctx, retentionDays)
 }
 
-// Rename renames all history records for the specified workflow name.
-func (db *historyStorage) Rename(ctx context.Context, oldNameOrPath, newNameOrPath string) error {
+// RenameWorkflows renames all history records for the specified workflow name.
+func (db *localStorage) RenameWorkflows(ctx context.Context, oldNameOrPath, newNameOrPath string) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():

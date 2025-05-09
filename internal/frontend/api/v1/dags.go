@@ -215,7 +215,7 @@ func (a *API) readHistoryData(
 	dag *digraph.DAG,
 ) api.DAGHistoryData {
 	defaultHistoryLimit := 30
-	statuses := a.historyManager.ListRecentHistory(ctx, dag.Name, defaultHistoryLimit)
+	statuses := a.historyManager.ListRecentStatus(ctx, dag.Name, defaultHistoryLimit)
 
 	data := map[string][]scheduler.NodeStatus{}
 
@@ -651,7 +651,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 		}
 
 		// Rename the history as well
-		if err := a.historyRepo.Rename(ctx, old.Name, renamed.Name); err != nil {
+		if err := a.historyRepo.RenameWorkflows(ctx, old.Name, renamed.Name); err != nil {
 			return nil, fmt.Errorf("error renaming history: %w", err)
 		}
 

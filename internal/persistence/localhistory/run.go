@@ -32,11 +32,11 @@ var (
 // DAGDefinition is the name of the file where the DAG definition is stored.
 const DAGDefinition = "dag.json"
 
-var _ models.Record = (*Record)(nil)
+var _ models.Run = (*Run)(nil)
 
-// Record manages an append-only status file with read, write, and compaction capabilities.
+// Run manages an append-only status file with read, write, and compaction capabilities.
 // It provides thread-safe operations and supports metrics collection.
-type Record struct {
+type Run struct {
 	file      string                          // Path to the status file
 	writer    *Writer                         // Writer for appending status updates
 	mu        sync.RWMutex                    // Mutex for thread safety
@@ -45,20 +45,20 @@ type Record struct {
 	dag       *digraph.DAG                    // DAG associated with the status file
 }
 
-// RecordOption defines a functional option for configuring a Record.
-type RecordOption func(*Record)
+// RunOption defines a functional option for configuring a run.
+type RunOption func(*Run)
 
-// WithDAG sets the DAG associated with the record.
-// This allows the record to store DAG metadata alongside the run data.
-func WithDAG(dag *digraph.DAG) RecordOption {
-	return func(r *Record) {
+// WithDAG sets the DAG associated with the run.
+// This allows the run to store DAG metadata alongside the status data.
+func WithDAG(dag *digraph.DAG) RunOption {
+	return func(r *Run) {
 		r.dag = dag
 	}
 }
 
-// NewRecord creates a new HistoryRecord for the specified file.
-func NewRecord(file string, cache *fileutil.Cache[*models.Status], opts ...RecordOption) *Record {
-	r := &Record{file: file, cache: cache}
+// NewRun creates a new Run for the specified file.
+func NewRun(file string, cache *fileutil.Cache[*models.Status], opts ...RunOption) *Run {
+	r := &Run{file: file, cache: cache}
 	for _, opt := range opts {
 		opt(r)
 	}
@@ -66,14 +66,14 @@ func NewRecord(file string, cache *fileutil.Cache[*models.Status], opts ...Recor
 }
 
 // Exists returns true if the status file exists.
-func (r *Record) Exists() bool {
+func (r *Run) Exists() bool {
 	_, err := os.Stat(r.file)
 	return err == nil
 }
 
 // ModTime returns the last modification time of the status file.
-// This is used to determine when the record was last updated.
-func (r *Record) ModTime() (time.Time, error) {
+// This is used to determine when the run was last updated.
+func (r *Run) ModTime() (time.Time, error) {
 	info, err := os.Stat(r.file)
 	if err != nil {
 		return time.Time{}, err
@@ -81,8 +81,8 @@ func (r *Record) ModTime() (time.Time, error) {
 	return info.ModTime(), nil
 }
 
-// ReadDAG implements models.Record.
-func (r *Record) ReadDAG(ctx context.Context) (*digraph.DAG, error) {
+// ReadDAG implements models.Run.
+func (r *Run) ReadDAG(ctx context.Context) (*digraph.DAG, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -120,7 +120,7 @@ func (r *Record) ReadDAG(ctx context.Context) (*digraph.DAG, error) {
 
 // Open initializes the status file for writing. It returns an error if the file is already open.
 // The context can be used to cancel the operation.
-func (r *Record) Open(ctx context.Context) error {
+func (r *Run) Open(ctx context.Context) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -142,7 +142,7 @@ func (r *Record) Open(ctx context.Context) error {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
-	// If it's a new record, save the DAG metadata
+	// If it's a new run, save the DAG metadata
 	if r.dag != nil {
 		dagJSON, err := json.Marshal(r.dag)
 		if err != nil {
@@ -165,9 +165,9 @@ func (r *Record) Open(ctx context.Context) error {
 	return nil
 }
 
-// Write adds a new status record to the file. It returns an error if the file is not open
+// Write adds a new status to the file. It returns an error if the file is not open
 // or is currently being closed. The context can be used to cancel the operation.
-func (r *Record) Write(ctx context.Context, status models.Status) error {
+func (r *Run) Write(ctx context.Context, status models.Status) error {
 	// Check if we're closing before acquiring the mutex to reduce contention
 	if r.isClosing.Load() {
 		return fmt.Errorf("cannot write while file is closing: %w", ErrStatusFileNotOpen)
@@ -194,7 +194,7 @@ func (r *Record) Write(ctx context.Context, status models.Status) error {
 
 // Close properly closes the status file, performs compaction, and invalidates the cache.
 // It's safe to call Close multiple times. The context can be used to cancel the operation.
-func (r *Record) Close(ctx context.Context) error {
+func (r *Run) Close(ctx context.Context) error {
 	// Set the closing flag to prevent new writes
 	r.isClosing.Store(true)
 	defer r.isClosing.Store(false)
@@ -231,7 +231,7 @@ func (r *Record) Close(ctx context.Context) error {
 
 // Compact performs file compaction to optimize storage and read performance.
 // It's safe to call while the file is open or closed. The context can be used to cancel the operation.
-func (r *Record) Compact(ctx context.Context) error {
+func (r *Run) Compact(ctx context.Context) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -251,7 +251,7 @@ func (r *Record) Compact(ctx context.Context) error {
 }
 
 // compactLocked performs actual compaction with the lock already held
-func (r *Record) compactLocked(ctx context.Context) error {
+func (r *Run) compactLocked(ctx context.Context) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -336,7 +336,7 @@ func safeRename(source, target string) error {
 
 // ReadStatus reads the latest status from the file, using cache if available.
 // The context can be used to cancel the operation.
-func (r *Record) ReadStatus(ctx context.Context) (*models.Status, error) {
+func (r *Run) ReadStatus(ctx context.Context) (*models.Status, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -373,7 +373,7 @@ func (r *Record) ReadStatus(ctx context.Context) (*models.Status, error) {
 
 // parseLocked reads the status file and returns the last valid status.
 // Must be called with a lock (read or write) already held.
-func (r *Record) parseLocked() (*models.Status, error) {
+func (r *Run) parseLocked() (*models.Status, error) {
 	return ParseStatusFile(r.file)
 }
 

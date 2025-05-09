@@ -14,7 +14,7 @@ import (
 )
 
 func TestWriter(t *testing.T) {
-	th := setupTestJSONDB(t)
+	th := setupTestLocalStorage(t)
 
 	t.Run("WriteStatusToNewFile", func(t *testing.T) {
 		dag := th.DAG("test_write_status")
@@ -45,22 +45,22 @@ func TestWriter(t *testing.T) {
 		writer.AssertContent(t, "test_append_to_existing", workflowID, scheduler.StatusCancel)
 
 		// Append to existing file
-		dataRoot := NewDataRoot(th.tmpDir, dag.Name)
+		dataRoot := NewDataRoot(th.TmpDir, dag.Name)
 		run, err := dataRoot.FindByWorkflowID(th.Context, workflowID)
 		require.NoError(t, err)
 
-		record, err := run.LatestRecord(th.Context, nil)
+		latestRun, err := run.LatestRun(th.Context, nil)
 		require.NoError(t, err)
 
-		err = record.Open(th.Context)
+		err = latestRun.Open(th.Context)
 		require.NoError(t, err)
 		defer func() {
-			_ = record.Close(th.Context)
+			_ = latestRun.Close(th.Context)
 		}()
 
 		// Append new status
 		status.Status = scheduler.StatusSuccess
-		err = record.Write(th.Context, status)
+		err = latestRun.Write(th.Context, status)
 		require.NoError(t, err)
 
 		// Verify appended data
@@ -69,7 +69,7 @@ func TestWriter(t *testing.T) {
 }
 
 func TestWriterErrorHandling(t *testing.T) {
-	th := setupTestJSONDB(t)
+	th := setupTestLocalStorage(t)
 
 	t.Run("OpenNonExistentDirectory", func(t *testing.T) {
 		writer := NewWriter("/nonexistent/dir/file.dat")
@@ -78,7 +78,7 @@ func TestWriterErrorHandling(t *testing.T) {
 	})
 
 	t.Run("WriteToClosedWriter", func(t *testing.T) {
-		writer := NewWriter(filepath.Join(th.tmpDir, "test.dat"))
+		writer := NewWriter(filepath.Join(th.TmpDir, "test.dat"))
 		require.NoError(t, writer.Open())
 		require.NoError(t, writer.close())
 
@@ -89,7 +89,7 @@ func TestWriterErrorHandling(t *testing.T) {
 	})
 
 	t.Run("CloseMultipleTimes", func(t *testing.T) {
-		writer := NewWriter(filepath.Join(th.tmpDir, "test.dat"))
+		writer := NewWriter(filepath.Join(th.TmpDir, "test.dat"))
 		require.NoError(t, writer.Open())
 		require.NoError(t, writer.close())
 		assert.NoError(t, writer.close()) // Second close should not return an error
@@ -97,7 +97,7 @@ func TestWriterErrorHandling(t *testing.T) {
 }
 
 func TestWriterRename(t *testing.T) {
-	th := setupTestJSONDB(t)
+	th := setupTestLocalStorage(t)
 
 	// Create a status file with old path
 	dag := th.DAG("test_rename_old")
@@ -110,7 +110,7 @@ func TestWriterRename(t *testing.T) {
 
 	// Rename and verify the file
 	newDAG := th.DAG("test_rename_new")
-	err := th.Repo.Rename(context.Background(), dag.Location, newDAG.Location)
+	err := th.HistoryRepo.RenameWorkflows(context.Background(), dag.Location, newDAG.Location)
 	require.NoError(t, err)
 	newWriter := newDAG.Writer(t, "workflow-id-2", time.Now())
 

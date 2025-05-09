@@ -233,7 +233,7 @@ func (dr DataRoot) Rename(ctx context.Context, newRoot DataRoot) error {
 	return nil
 }
 
-// RemoveOld removes old history records older than the specified retention days.
+// RemoveOld removes old workflow executions older than the specified retention days.
 // It only removes records older than the specified retention days.
 // If retentionDays is negative, no files will be removed.
 // If retentionDays is zero, all files will be removed.

@@ -12,15 +12,15 @@ import (
 func CmdStatus() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "status --workflow-id=abc123 dagName",
-			Short: "Display the current status of a DAG",
+			Use:   "status --workflow-id=abc123 <workflow name>",
+			Short: "Display the current status of a workflow",
 			Long: `Show real-time status information for a specified workflow.
 
 Flags:
 	--workflow-id string (optional) Unique identifier for tracking the execution.
 
 Example:
-  dagu status my_dag.yaml
+  dagu status my_dag
 `,
 			Args: cobra.ExactArgs(1),
 		}, statusFlags, runStatus,
@@ -39,31 +39,30 @@ func runStatus(ctx *Context, args []string) error {
 
 	name := args[0]
 
-	var record models.Record
+	var run models.Run
 	if workflowID != "" {
 		// Retrieve the previous run's record for the specified workflow ID.
 		ref := digraph.NewWorkflowRef(name, workflowID)
-		r, err := ctx.HistoryRepo.Find(ctx, ref)
+		r, err := ctx.HistoryRepo.FindRun(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflowID, err)
+			return fmt.Errorf("failed to find run data for workflow ID %s: %w", workflowID, err)
 		}
-		record = r
+		run = r
 	} else {
-		r, err := ctx.HistoryRepo.Latest(ctx, name)
+		r, err := ctx.HistoryRepo.LatestRun(ctx, name)
 		if err != nil {
-			return fmt.Errorf("failed to find the latest record for DAG %s: %w", name, err)
+			return fmt.Errorf("failed to find the latest run data for DAG %s: %w", name, err)
 		}
-		record = r
+		run = r
 	}
 
-	dag, err := record.ReadDAG(ctx)
+	dag, err := run.ReadDAG(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to read DAG from record", "name", name, "err", err)
+		return fmt.Errorf("Failed to read DAG from run data: %w", err)
 	}
 
 	status, err := ctx.HistoryMgr.GetDAGRealtimeStatus(ctx, dag, workflowID)
 	if err != nil {
-		logger.Error(ctx, "Failed to retrieve current status", "dag", dag.Name, "err", err)
 		return fmt.Errorf("failed to retrieve current status: %w", err)
 	}
 

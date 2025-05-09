@@ -77,9 +77,9 @@ func NewWorkflow(dir string) (*Workflow, error) {
 	}, nil
 }
 
-// CreateRecord creates a new record for this run with the given timestamp.
+// CreateRun creates a new run for the workflow with the given timestamp.
 // It creates a new run directory and initializes a record within it.
-func (e Workflow) CreateRecord(_ context.Context, ts TimeInUTC, cache *fileutil.Cache[*models.Status], opts ...RecordOption) (*Record, error) {
+func (e Workflow) CreateRun(_ context.Context, ts TimeInUTC, cache *fileutil.Cache[*models.Status], opts ...RunOption) (*Run, error) {
 	dir := filepath.Join(e.baseDir, RunDirPrefix+formatRunTimestamp(ts))
 	// Error if the directory already exists
 	if _, err := os.Stat(dir); err == nil {
@@ -88,7 +88,7 @@ func (e Workflow) CreateRecord(_ context.Context, ts TimeInUTC, cache *fileutil.
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create the run directory: %w", err)
 	}
-	return NewRecord(filepath.Join(dir, JSONLStatusFile), cache, opts...), nil
+	return NewRun(filepath.Join(dir, JSONLStatusFile), cache, opts...), nil
 }
 
 // CreateChildWorkflow creates a new child workflow with the given timestamp and workflow ID.
@@ -118,18 +118,18 @@ func (e Workflow) FindChildWorkflow(_ context.Context, workflowID string) (*Work
 	return NewWorkflow(matches[0])
 }
 
-// LatestRecord returns the most recent record for this run.
-// It searches through all run directories and returns the first valid record found.
-func (e Workflow) LatestRecord(_ context.Context, cache *fileutil.Cache[*models.Status]) (*Record, error) {
-	runs, err := listDirsSorted(e.baseDir, true, reRun)
+// LatestRun returns the most recent run for the workflow.
+// It searches through all run directories and returns the first valid runs found.
+func (e Workflow) LatestRun(_ context.Context, cache *fileutil.Cache[*models.Status]) (*Run, error) {
+	runDirs, err := listDirsSorted(e.baseDir, true, reRun)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list run directories: %w", err)
 	}
 	// Return the first valid run
-	for _, run := range runs {
-		record := NewRecord(filepath.Join(e.baseDir, run, JSONLStatusFile), cache)
-		if record.Exists() {
-			return record, nil
+	for _, runDir := range runDirs {
+		run := NewRun(filepath.Join(e.baseDir, runDir, JSONLStatusFile), cache)
+		if run.Exists() {
+			return run, nil
 		}
 	}
 	return nil, models.ErrNoStatusData
@@ -138,11 +138,11 @@ func (e Workflow) LatestRecord(_ context.Context, cache *fileutil.Cache[*models.
 // LastUpdated returns the last modification time of the latest record.
 // This is used to determine when the run was last updated.
 func (e Workflow) LastUpdated(ctx context.Context) (time.Time, error) {
-	latestRecord, err := e.LatestRecord(ctx, nil)
+	run, err := e.LatestRun(ctx, nil)
 	if err != nil {
 		return time.Time{}, err
 	}
-	return latestRecord.ModTime()
+	return run.ModTime()
 }
 
 // Remove deletes the entire run directory and all its contents.

@@ -135,7 +135,7 @@ func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject)
 	}
 
 	// Rename the history as well
-	if err := a.historyRepo.Rename(ctx, old.Name, renamed.Name); err != nil {
+	if err := a.historyRepo.RenameWorkflows(ctx, old.Name, renamed.Name); err != nil {
 		return nil, fmt.Errorf("error renaming history: %w", err)
 	}
 
@@ -153,7 +153,7 @@ func (a *API) GetDAGWorkflowHistory(ctx context.Context, request api.GetDAGWorkf
 	}
 
 	defaultHistoryLimit := 30
-	recentHistory := a.historyManager.ListRecentHistory(ctx, dag.Name, defaultHistoryLimit)
+	recentHistory := a.historyManager.ListRecentStatus(ctx, dag.Name, defaultHistoryLimit)
 
 	var workflows []api.WorkflowDetails
 	for _, status := range recentHistory {

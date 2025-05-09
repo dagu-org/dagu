@@ -16,12 +16,12 @@ import (
 func CmdRetry() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "retry [flags] /path/to/spec.yaml",
+			Use:   "retry [flags] <workflow name>",
 			Short: "Retry a workflow",
-			Long: `Re-execute a previously run DAG using its unique workflow ID.
+			Long: `Re-execute a previously run workflow using its unique workflow ID.
 
 Example:
-  dagu retry my_dag.yaml --workflow-id=abc123
+  dagu retry --workflow-id=abc123 my_dag
 
 This command is useful for recovering from errors or transient issues by re-running the DAG.
 `,
@@ -42,7 +42,7 @@ func runRetry(ctx *Context, args []string) error {
 
 	// Retrieve the previous run data for specified workflow ID.
 	ref := digraph.NewWorkflowRef(name, workflowID)
-	runRecord, err := ctx.HistoryRepo.Find(ctx, ref)
+	runRecord, err := ctx.HistoryRepo.FindRun(ctx, ref)
 	if err != nil {
 		return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflowID, err)
 	}
@@ -61,7 +61,6 @@ func runRetry(ctx *Context, args []string) error {
 
 	// The retry command is currently only supported for root DAGs.
 	if err := executeRetry(ctx, dag, status, status.Workflow()); err != nil {
-		logger.Error(ctx, "Failed to execute retry", "path", name, "err", err)
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
 
@@ -87,7 +86,6 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootRun
 
 	dr, err := ctx.dagRepo(nil, []string{filepath.Dir(dag.Location)})
 	if err != nil {
-		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
