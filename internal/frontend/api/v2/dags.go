@@ -363,7 +363,7 @@ func (a *API) GetDAGWorkflowDetails(ctx context.Context, request api.GetDAGWorkf
 
 	status, err := a.historyManager.GetRealtimeStatus(ctx, dag, workflowId)
 	if err != nil {
-		return nil, fmt.Errorf("error getting status by execution ID: %w", err)
+		return nil, fmt.Errorf("error getting status by workflow ID: %w", err)
 	}
 
 	return &api.GetDAGWorkflowDetails200JSONResponse{
@@ -451,7 +451,7 @@ waitLoop:
 	}, nil
 }
 
-func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRequestObject) (api.TerminateDAGRunResponseObject, error) {
+func (a *API) TerminateWorkflow(ctx context.Context, request api.TerminateWorkflowRequestObject) (api.TerminateWorkflowResponseObject, error) {
 	dag, err := a.dagRepository.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
@@ -479,10 +479,10 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 	if err := a.historyManager.Stop(ctx, dag, status.ExecID); err != nil {
 		return nil, fmt.Errorf("error stopping DAG: %w", err)
 	}
-	return api.TerminateDAGRun200Response{}, nil
+	return api.TerminateWorkflow200Response{}, nil
 }
 
-func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObject) (api.RetryDAGRunResponseObject, error) {
+func (a *API) RetryWorkflow(ctx context.Context, request api.RetryWorkflowRequestObject) (api.RetryWorkflowResponseObject, error) {
 	dag, err := a.dagRepository.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
@@ -513,7 +513,7 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 		return nil, fmt.Errorf("error retrying DAG: %w", err)
 	}
 
-	return api.RetryDAGRun200Response{}, nil
+	return api.RetryWorkflow200Response{}, nil
 }
 
 func (a *API) UpdateDAGSuspensionState(ctx context.Context, request api.UpdateDAGSuspensionStateRequestObject) (api.UpdateDAGSuspensionStateResponseObject, error) {

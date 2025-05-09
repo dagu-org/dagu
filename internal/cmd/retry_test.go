@@ -21,7 +21,7 @@ func TestRetryCommand(t *testing.T) {
 		args := []string{"start", `--params="foo"`, dagFile.Location}
 		th.RunCommand(t, cmd.CmdStart(), test.CmdTest{Args: args})
 
-		// Find the execution ID.
+		// Find the workflow ID.
 		cli := th.DAGRepo
 		ctx := context.Background()
 
@@ -33,7 +33,7 @@ func TestRetryCommand(t *testing.T) {
 		require.Equal(t, status.Status, scheduler.StatusSuccess)
 		require.NotNil(t, status.Status)
 
-		// Retry with the execution ID.
+		// Retry with the workflow ID.
 		args = []string{"retry", fmt.Sprintf("--workflow-id=%s", status.ExecID), dagFile.Location}
 		th.RunCommand(t, cmd.CmdRetry(), test.CmdTest{
 			Args:        args,

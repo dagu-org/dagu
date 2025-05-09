@@ -128,7 +128,7 @@ func (a *API) handleError(w http.ResponseWriter, r *http.Request, err error) {
 
 	case errors.Is(err, models.ErrExecIDNotFound):
 		code = api.ErrorCodeNotFound
-		message = "execution ID not found"
+		message = "workflow ID not found"
 
 	case errors.Is(err, models.ErrDAGAlreadyExists):
 		code = api.ErrorCodeAlreadyExists

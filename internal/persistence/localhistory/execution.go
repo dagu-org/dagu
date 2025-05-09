@@ -26,20 +26,20 @@ const ChildExecDir = "children"
 const ChildExecDirPrefix = "child_"
 
 // JSONLStatusFile is the name of the status file for each execution attempt.
-// It contains the status of the DAG run in JSON Lines format.
+// It contains the status of the workflow in JSON Lines format.
 // While running the DAG, new lines are appended to this file on each status update.
 // After finishing the run, this file will be compacted into a single JSON line file.
 const JSONLStatusFile = "status.jsonl"
 
-// Execution represents a single run of a DAG with its associated timestamp and execution ID.
+// Execution represents a single run of a DAG with its associated timestamp and workflow ID.
 type Execution struct {
 	baseDir   string    // Base directory path for this run
 	timestamp time.Time // Timestamp when the run was created
-	reqID     string    // Unique execution ID for this run
+	reqID     string    // Unique workflow ID for this run
 }
 
 // NewRun creates a new Run instance from a directory path.
-// It parses the directory name to extract the timestamp and execution ID.
+// It parses the directory name to extract the timestamp and workflow ID.
 func NewRun(dir string) (*Execution, error) {
 	// Determine if the run is a child execution
 	parentDir := filepath.Dir(dir)
@@ -84,7 +84,7 @@ func (e Execution) CreateRecord(_ context.Context, ts TimeInUTC, cache *fileutil
 	return NewRecord(filepath.Join(dir, JSONLStatusFile), cache, opts...), nil
 }
 
-// CreateChildExec creates a new child execution with the given timestamp and execution ID.
+// CreateChildExec creates a new child execution with the given timestamp and workflow ID.
 func (e Execution) CreateChildExec(_ context.Context, workflowID string) (*Execution, error) {
 	dirName := "child_" + workflowID
 	dir := filepath.Join(e.baseDir, ChildExecDir, dirName)
@@ -94,7 +94,7 @@ func (e Execution) CreateChildExec(_ context.Context, workflowID string) (*Execu
 	return NewRun(dir)
 }
 
-// FindChildExec searches for a child execution with the specified execution ID.
+// FindChildExec searches for a child execution with the specified workflow ID.
 func (e Execution) FindChildExec(_ context.Context, workflowID string) (*Execution, error) {
 	globPattern := filepath.Join(e.baseDir, ChildExecDir, "child_"+workflowID)
 	matches, err := filepath.Glob(globPattern)

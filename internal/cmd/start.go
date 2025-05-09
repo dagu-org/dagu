@@ -15,14 +15,14 @@ import (
 
 // Errors for start command
 var (
-	// ErrExecIDRequired is returned when a child execution is attempted without providing an execution ID
-	ErrExecIDRequired = errors.New("execution ID is required for child execution")
+	// ErrExecIDRequired is returned when a child execution is attempted without providing an workflow ID
+	ErrExecIDRequired = errors.New("workflow ID is required for child execution")
 
-	// ErrExecIDFormat is returned when the provided execution ID has an invalid format
-	ErrExecIDFormat = errors.New("invalid execution ID format")
+	// ErrExecIDFormat is returned when the provided workflow ID has an invalid format
+	ErrExecIDFormat = errors.New("invalid workflow ID format")
 )
 
-// CmdStart creates and returns a cobra command for starting DAG execution
+// CmdStart creates and returns a cobra command for starting workflow
 func CmdStart() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
@@ -31,7 +31,7 @@ func CmdStart() *cobra.Command {
 			Long: `Begin execution of a DAG defined in a YAML file.
 
 Parameters after the "--" separator are passed as execution parameters (either positional or key=value pairs).
-Flags can override default settings such as execution ID or suppress output.
+Flags can override default settings such as workflow ID or suppress output.
 
 Example:
   dagu start my_dag.yaml -- P1=foo P2=bar
@@ -48,7 +48,7 @@ var startFlags = []commandLineFlag{paramsFlag, workflowIDFlagStart, parentFlag, 
 
 // runStart handles the execution of the start command
 func runStart(ctx *Context, args []string) error {
-	// Get execution ID and references
+	// Get workflow ID and references
 	workflowID, rootRef, parentRef, isChildExec, err := getExecutionInfo(ctx)
 	if err != nil {
 		return err
@@ -71,7 +71,7 @@ func runStart(ctx *Context, args []string) error {
 		return handleChildExecution(ctx, dag, workflowID, params, root, parentRef)
 	}
 
-	// Log root DAG execution
+	// Log root workflow
 	logger.Info(ctx, "Executing root DAG",
 		"name", dag.Name,
 		"params", params,
@@ -82,12 +82,12 @@ func runStart(ctx *Context, args []string) error {
 	return executeDag(ctx, dag, digraph.ExecRef{}, workflowID, root)
 }
 
-// getExecutionInfo extracts and validates execution ID and references from command flags
+// getExecutionInfo extracts and validates workflow ID and references from command flags
 func getExecutionInfo(ctx *Context) (workflowID string, rootRef string, parentRef string, isChildExec bool, err error) {
-	// Get execution ID from flags
+	// Get workflow ID from flags
 	workflowID, err = ctx.Command.Flags().GetString("workflow-id")
 	if err != nil {
-		return "", "", "", false, fmt.Errorf("failed to get execution ID: %w", err)
+		return "", "", "", false, fmt.Errorf("failed to get workflow ID: %w", err)
 	}
 
 	// Get root and parent execution references
@@ -95,21 +95,21 @@ func getExecutionInfo(ctx *Context) (workflowID string, rootRef string, parentRe
 	parentRef, _ = ctx.Command.Flags().GetString("parent")
 	isChildExec = parentRef != "" || rootRef != ""
 
-	// Validate execution ID for child executions
+	// Validate workflow ID for child executions
 	if isChildExec && workflowID == "" {
 		return "", "", "", false, ErrExecIDRequired
 	}
 
-	// Validate or generate execution ID
+	// Validate or generate workflow ID
 	if workflowID != "" {
 		if err := validateExecID(workflowID); err != nil {
 			return "", "", "", false, ErrExecIDFormat
 		}
 	} else {
-		// Generate a new execution ID if not provided
+		// Generate a new workflow ID if not provided
 		workflowID, err = genReqID()
 		if err != nil {
-			return "", "", "", false, fmt.Errorf("failed to generate execution ID: %w", err)
+			return "", "", "", false, fmt.Errorf("failed to generate workflow ID: %w", err)
 		}
 	}
 
@@ -169,7 +169,7 @@ func determineRootExecRef(isChildExec bool, rootExecRefID string, dag *digraph.D
 	return digraph.NewExecRef(dag.Name, workflowID), nil
 }
 
-// handleChildExecution processes a child DAG execution, checking for previous runs
+// handleChildExecution processes a child workflow, checking for previous runs
 func handleChildExecution(ctx *Context, dag *digraph.DAG, workflowID string, params string, root digraph.ExecRef, parentRefID string) error {
 	// Parse parent execution reference
 	parent, err := digraph.ParseExecRef(parentRefID)
@@ -177,7 +177,7 @@ func handleChildExecution(ctx *Context, dag *digraph.DAG, workflowID string, par
 		return fmt.Errorf("failed to parse parent exec ref: %w", err)
 	}
 
-	// Log child DAG execution
+	// Log child workflow
 	logger.Info(ctx, "Executing child DAG",
 		"name", dag.Name,
 		"params", params,
@@ -186,28 +186,28 @@ func handleChildExecution(ctx *Context, dag *digraph.DAG, workflowID string, par
 		"parent", parent,
 	)
 
-	// Double-check execution ID is provided (should be caught earlier, but being defensive)
+	// Double-check workflow ID is provided (should be caught earlier, but being defensive)
 	if workflowID == "" {
-		return fmt.Errorf("execution ID must be provided for child execution")
+		return fmt.Errorf("workflow ID must be provided for child execution")
 	}
 
 	// Check for previous child execution with this ID
-	logger.Debug(ctx, "Checking for previous child execution with the execution ID", "workflowId", workflowID)
+	logger.Debug(ctx, "Checking for previous child execution with the workflow ID", "workflowId", workflowID)
 
 	// Look for existing execution record
 	record, err := ctx.HistoryRepo.FindChildExecution(ctx, root, workflowID)
 	if errors.Is(err, models.ErrExecIDNotFound) {
-		// If the execution ID is not found, proceed with new execution
+		// If the workflow ID is not found, proceed with new execution
 		return executeDag(ctx, dag, parent, workflowID, root)
 	}
 	if err != nil {
-		return fmt.Errorf("failed to find the record for execution ID %s: %w", workflowID, err)
+		return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflowID, err)
 	}
 
 	// Read the status of the previous run
 	status, err := record.ReadStatus(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to read previous run status for execution ID %s: %w", workflowID, err)
+		return fmt.Errorf("failed to read previous run status for workflow ID %s: %w", workflowID, err)
 	}
 
 	// Execute as a retry of the previous run
@@ -217,7 +217,7 @@ func handleChildExecution(ctx *Context, dag *digraph.DAG, workflowID string, par
 // executeDag handles the actual execution of a DAG
 func executeDag(ctx *Context, d *digraph.DAG, parent digraph.ExecRef, reqID string, rootRun digraph.ExecRef) error {
 	// Open the log file for the scheduler. The log file will be used for future
-	// execution for the same DAG/execution ID between attempts.
+	// execution for the same DAG/workflow ID between attempts.
 	logFile, err := ctx.OpenLogFile(d, reqID)
 	if err != nil {
 		logger.Error(ctx, "failed to initialize log file", "DAG", d.Name, "err", err)
@@ -230,7 +230,7 @@ func executeDag(ctx *Context, d *digraph.DAG, parent digraph.ExecRef, reqID stri
 	// Configure logging to the file
 	ctx.LogToFile(logFile)
 
-	logger.Debug(ctx, "DAG run initiated", "DAG", d.Name, "workflowId", reqID, "logFile", logFile.Name())
+	logger.Debug(ctx, "workflow initiated", "DAG", d.Name, "workflowId", reqID, "logFile", logFile.Name())
 
 	// Initialize DAG repository with the DAG's directory in the search path
 	dr, err := ctx.dagRepo(nil, []string{filepath.Dir(d.Location)})

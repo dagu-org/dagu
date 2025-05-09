@@ -67,12 +67,11 @@ func (m *Manager) Stop(ctx context.Context, dag *digraph.DAG, workflowID string)
 	return err
 }
 
-// GenReqID generates a unique execution ID for a DAG run using UUID v7.
+// GenReqID generates a unique workflow ID for a workflow using UUID v7.
 func (m *Manager) GenReqID(_ context.Context) (string, error) {
-	// Generate a unique execution ID for the DAG run
 	id, err := uuid.NewV7()
 	if err != nil {
-		return "", fmt.Errorf("failed to generate execution ID: %w", err)
+		return "", fmt.Errorf("failed to generate workflow ID: %w", err)
 	}
 	return id.String(), nil
 }
@@ -122,7 +121,7 @@ func (m *Manager) Restart(_ context.Context, dag *digraph.DAG, opts RestartOptio
 	return cmd.Start()
 }
 
-// Retry retries a DAG execution with the specified requestID by executing
+// Retry retries a workflow with the specified requestID by executing
 // the configured executable with the retry command.
 func (m *Manager) Retry(_ context.Context, dag *digraph.DAG, reqID string) error {
 	args := []string{"retry"}
@@ -169,11 +168,11 @@ FALLBACK:
 	return m.findPersistedStatus(ctx, dag, workflowID)
 }
 
-// FindByReqID retrieves the status of a DAG run by name and requestID from the run store.
+// FindByReqID retrieves the status of a workflow by name and requestID from the run store.
 func (e *Manager) FindByReqID(ctx context.Context, ref digraph.ExecRef) (*models.Status, error) {
 	record, err := e.Find(ctx, ref)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find status by execution ID: %w", err)
+		return nil, fmt.Errorf("failed to find status by workflow ID: %w", err)
 	}
 	latestStatus, err := record.ReadStatus(ctx)
 	if err != nil {
@@ -182,7 +181,7 @@ func (e *Manager) FindByReqID(ctx context.Context, ref digraph.ExecRef) (*models
 	return latestStatus, nil
 }
 
-// findPersistedStatus retrieves the status of a DAG run by requestID.
+// findPersistedStatus retrieves the status of a workflow by requestID.
 // If the stored status indicates the DAG is running, it attempts to get the current status.
 // If that fails, it marks the status as error.
 func (m *Manager) findPersistedStatus(ctx context.Context, dag *digraph.DAG, reqID string) (
@@ -191,7 +190,7 @@ func (m *Manager) findPersistedStatus(ctx context.Context, dag *digraph.DAG, req
 	ref := digraph.NewExecRef(dag.Name, reqID)
 	record, err := m.Find(ctx, ref)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find status by execution ID: %w", err)
+		return nil, fmt.Errorf("failed to find status by workflow ID: %w", err)
 	}
 	latestStatus, err := record.ReadStatus(ctx)
 	if err != nil {
@@ -215,11 +214,11 @@ func (m *Manager) findPersistedStatus(ctx context.Context, dag *digraph.DAG, req
 	return latestStatus, nil
 }
 
-// FindChildExec retrieves the status of a child execution by its execution ID.
+// FindChildExec retrieves the status of a child execution by its workflow ID.
 func (m *Manager) FindChildExec(ctx context.Context, ref digraph.ExecRef, reqID string) (*models.Status, error) {
 	record, err := m.FindChildExecution(ctx, ref, reqID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find child execution status by execution ID: %w", err)
+		return nil, fmt.Errorf("failed to find child execution status by workflow ID: %w", err)
 	}
 	latestStatus, err := record.ReadStatus(ctx)
 	if err != nil {
@@ -302,7 +301,7 @@ func (m *Manager) ListRecentHistory(ctx context.Context, name string, n int) []m
 	return runs
 }
 
-// UpdateStatus updates the status of a DAG run in the run store.
+// UpdateStatus updates the status of a workflow in the run store.
 func (e *Manager) UpdateStatus(ctx context.Context, root digraph.ExecRef, status models.Status) error {
 	// Check for context cancellation
 	select {
@@ -316,14 +315,14 @@ func (e *Manager) UpdateStatus(ctx context.Context, root digraph.ExecRef, status
 	var historyRecord models.Record
 
 	if root.ExecID == status.ExecID {
-		// If the execution ID matches the root DAG's execution ID, find the run record by execution ID
+		// If the workflow ID matches the root DAG's workflow ID, find the run record by workflow ID
 		r, err := e.Find(ctx, root)
 		if err != nil {
 			return fmt.Errorf("failed to find execution record: %w", err)
 		}
 		historyRecord = r
 	} else {
-		// If the execution ID does not match, find the run record by child execution execution ID
+		// If the workflow ID does not match, find the run record by child execution workflow ID
 		r, err := e.FindChildExecution(ctx, root, status.ExecID)
 		if err != nil {
 			return fmt.Errorf("failed to find child execution record: %w", err)
@@ -373,7 +372,7 @@ func escapeArg(input string) string {
 type StartOptions struct {
 	Params string // Parameters to pass to the DAG
 	Quiet  bool   // Whether to run in quiet mode
-	ReqID  string // execution ID for the DAG run
+	ReqID  string // workflow ID for the workflow
 }
 
 // RestartOptions contains options for restarting a DAG.

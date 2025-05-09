@@ -14,7 +14,7 @@ func CmdStatus() *cobra.Command {
 		&cobra.Command{
 			Use:   "status --workflow-id=abc123 dagName",
 			Short: "Display the current status of a DAG",
-			Long: `Show real-time status information for a specified DAG execution.
+			Long: `Show real-time status information for a specified workflow.
 
 Flags:
 	--workflow-id string (optional) Unique identifier for tracking the execution.
@@ -34,18 +34,18 @@ var statusFlags = []commandLineFlag{
 func runStatus(ctx *Context, args []string) error {
 	reqID, err := ctx.Command.Flags().GetString("workflow-id")
 	if err != nil {
-		return fmt.Errorf("failed to get execution ID: %w", err)
+		return fmt.Errorf("failed to get workflow ID: %w", err)
 	}
 
 	name := args[0]
 
 	var record models.Record
 	if reqID != "" {
-		// Retrieve the previous run's record for the specified execution ID.
+		// Retrieve the previous run's record for the specified workflow ID.
 		ref := digraph.NewExecRef(name, reqID)
 		r, err := ctx.HistoryRepo.Find(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to find the record for execution ID %s: %w", reqID, err)
+			return fmt.Errorf("failed to find the record for workflow ID %s: %w", reqID, err)
 		}
 		record = r
 	} else {

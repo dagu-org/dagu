@@ -23,7 +23,7 @@ and managing workflows.
 
   Main backend application logic, divided into submodules:
 
-  * `agent/` – Agents for DAG execution and status reporting.
+  * `agent/` – Agents for workflow and status reporting.
   * `build/` – Build system versioning, codegen utilities.
   * `client/` – Code for interacting with the server's API programmatically (SDK).
   * `cmd/` – CLI subcommand implementations.
@@ -97,7 +97,7 @@ internal/history/jsondb` and friends). No reliance on external DB or services.
 ## Relationships and Data Flow
 
 1. Authoring: User creates/revises YAML DAGs, either via file, CLI (dagu start ...), or web UI (which writes files on disk via backend APIs).
-2. Execution: CLI or scheduler triggers DAG run -> engine resolves dependencies, schedules and runs steps using built-in or plugin executors.
+2. Execution: CLI or scheduler triggers DAG -> engine resolves dependencies, schedules and runs steps using built-in or plugin executors.
 3. Observation: UI and API surface current and historical DAG/step state, logs, error diagnostics, and dependency graphs.
 4. Persistence: All definitions and run results are committed to local storage, supporting air-gapped/offline-first workflows.
 

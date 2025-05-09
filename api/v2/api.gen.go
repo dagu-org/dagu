@@ -89,9 +89,9 @@ type ChildWorkflow struct {
 	WorkflowId WorkflowId `json:"workflowId"`
 }
 
-// DAG Core DAG configuration containing workflow definition and metadata
+// DAG Core DAG configuration containing definition and metadata
 type DAG struct {
-	// DefaultParams Default parameter values in JSON format if not specified at runtime
+	// DefaultParams Default parameter values in JSON format if not specified at workflow creation
 	DefaultParams *string `json:"defaultParams,omitempty"`
 
 	// Description Human-readable description of the DAG's purpose and behavior
@@ -103,10 +103,10 @@ type DAG struct {
 	// Name Logical name of the DAG
 	Name string `json:"name"`
 
-	// Params List of parameter names that can be passed to the DAG at runtime
+	// Params List of parameter names that can be passed to workflows created from this DAG
 	Params *[]string `json:"params,omitempty"`
 
-	// Schedule List of scheduling expressions defining when the DAG should run
+	// Schedule List of scheduling expressions defining when workflows should be created from this DAG
 	Schedule *[]Schedule `json:"schedule,omitempty"`
 
 	// Tags List of tags for categorizing and filtering DAGs
@@ -115,22 +115,22 @@ type DAG struct {
 
 // DAGDetails Detailed DAG configuration information
 type DAGDetails struct {
-	// DefaultParams Default parameter values in JSON format if not specified at runtime
+	// DefaultParams Default parameter values in JSON format if not specified at workflow creation
 	DefaultParams *string `json:"defaultParams,omitempty"`
 
-	// Delay Time in seconds to wait before starting the DAG
+	// Delay Time in seconds to wait before starting a workflow
 	Delay *int `json:"delay,omitempty"`
 
 	// Description Human-readable description of the DAG's purpose and behavior
 	Description *string `json:"description,omitempty"`
 
-	// Env List of environment variables to set before executing
+	// Env List of environment variables to set before executing a workflow
 	Env *[]string `json:"env,omitempty"`
 
 	// Group Logical grouping of related DAGs for organizational purposes
 	Group *string `json:"group,omitempty"`
 
-	// HandlerOn Configuration for event handlers in a DAG
+	// HandlerOn Configuration for event handlers in a workflow
 	HandlerOn *HandlerOn `json:"handlerOn,omitempty"`
 
 	// HistRetentionDays Number of days to retain historical logs
@@ -139,22 +139,22 @@ type DAGDetails struct {
 	// LogDir Directory path for storing log files
 	LogDir *string `json:"logDir,omitempty"`
 
-	// MaxActiveRuns Maximum number of concurrent steps to run
+	// MaxActiveRuns Maximum number of concurrent workflows allowed from this DAG
 	MaxActiveRuns *int `json:"maxActiveRuns,omitempty"`
 
 	// Name Unique identifier for the DAG within its group
 	Name string `json:"name"`
 
-	// Params List of parameter names that can be passed to the DAG at runtime
+	// Params List of parameter names that can be passed to workflows created from this DAG
 	Params *[]string `json:"params,omitempty"`
 
-	// Preconditions Conditions that must be met before the DAG can start
+	// Preconditions Conditions that must be met before a workflow can start
 	Preconditions *[]Precondition `json:"preconditions,omitempty"`
 
-	// Schedule List of scheduling expressions defining when the DAG should run
+	// Schedule List of scheduling expressions defining when workflows should be created from this DAG
 	Schedule *[]Schedule `json:"schedule,omitempty"`
 
-	// Steps List of steps to execute in the DAG
+	// Steps List of steps to execute in workflows created from this DAG
 	Steps *[]Step `json:"steps,omitempty"`
 
 	// Tags List of tags for categorizing and filtering DAGs
@@ -163,7 +163,7 @@ type DAGDetails struct {
 
 // DAGFile DAG file with its status information
 type DAGFile struct {
-	// Dag Core DAG configuration containing workflow definition and metadata
+	// Dag Core DAG configuration containing definition and metadata
 	Dag DAG `json:"dag"`
 
 	// Errors List of errors encountered during the request
@@ -172,7 +172,7 @@ type DAGFile struct {
 	// FileName File ID of the DAG file
 	FileName string `json:"fileName"`
 
-	// LatestWorkflow Current status of a DAG workflow
+	// LatestWorkflow Current status of a workflow
 	LatestWorkflow WorkflowSummary `json:"latestWorkflow"`
 
 	// Suspended Whether the DAG is suspended
@@ -182,7 +182,7 @@ type DAGFile struct {
 // DAGFileName Name of the DAG file
 type DAGFileName = string
 
-// DAGGridItem Grid item for log visualization
+// DAGGridItem Grid item for visualizing workflow execution history
 type DAGGridItem struct {
 	// History Status of the step ordered by time
 	History []NodeStatus `json:"history"`
@@ -209,18 +209,18 @@ type Error struct {
 // ErrorCode Error code indicating the type of error
 type ErrorCode string
 
-// HandlerOn Configuration for event handlers in a DAG
+// HandlerOn Configuration for event handlers in a workflow
 type HandlerOn struct {
-	// Cancel Individual task within a DAG that performs a specific operation
+	// Cancel Individual task definition that performs a specific operation in a workflow
 	Cancel *Step `json:"cancel,omitempty"`
 
-	// Exit Individual task within a DAG that performs a specific operation
+	// Exit Individual task definition that performs a specific operation in a workflow
 	Exit *Step `json:"exit,omitempty"`
 
-	// Failure Individual task within a DAG that performs a specific operation
+	// Failure Individual task definition that performs a specific operation in a workflow
 	Failure *Step `json:"failure,omitempty"`
 
-	// Success Individual task within a DAG that performs a specific operation
+	// Success Individual task definition that performs a specific operation in a workflow
 	Success *Step `json:"success,omitempty"`
 }
 
@@ -251,7 +251,7 @@ type ListTagResponse struct {
 	Tags []string `json:"tags"`
 }
 
-// Log Log information for the scheduler
+// Log Log information for the execution
 type Log struct {
 	// Content Log content
 	Content string `json:"content"`
@@ -269,7 +269,7 @@ type Log struct {
 	TotalLines *int `json:"totalLines,omitempty"`
 }
 
-// Node Status of an individual step within a DAG workflow
+// Node Status of an individual step within a workflow
 type Node struct {
 	// DoneCount Number of successful completions for repeating steps
 	DoneCount int `json:"doneCount"`
@@ -301,7 +301,7 @@ type Node struct {
 	// StatusLabel Human-readable status description for the node
 	StatusLabel NodeStatusLabel `json:"statusLabel"`
 
-	// Step Individual task within a DAG that performs a specific operation
+	// Step Individual task definition that performs a specific operation in a workflow
 	Step Step `json:"step"`
 
 	// SubRuns List of child workflows associated with this step
@@ -338,7 +338,7 @@ type Pagination struct {
 	TotalRecords int `json:"totalRecords"`
 }
 
-// Precondition Precondition that must be satisfied before running a step or DAG
+// Precondition Precondition that must be satisfied before running a step or workflow
 type Precondition struct {
 	// Condition Expression or check to evaluate
 	Condition *string `json:"condition,omitempty"`
@@ -356,13 +356,13 @@ type RepeatPolicy struct {
 	Repeat *bool `json:"repeat,omitempty"`
 }
 
-// Schedule Schedule configuration for DAG run
+// Schedule Schedule configuration for workflow creation
 type Schedule struct {
 	// Expression Cron expression or schedule pattern
 	Expression string `json:"expression"`
 }
 
-// SearchDAGsMatchItem Details of a search match within a DAG
+// SearchDAGsMatchItem Details of a search match within a DAG definition
 type SearchDAGsMatchItem struct {
 	// Line Matching line content
 	Line string `json:"line"`
@@ -376,7 +376,7 @@ type SearchDAGsMatchItem struct {
 
 // SearchResultItem Individual search result item for a DAG
 type SearchResultItem struct {
-	// Dag Core DAG configuration containing workflow definition and metadata
+	// Dag Core DAG configuration containing definition and metadata
 	Dag DAG `json:"dag"`
 
 	// Matches Details of where matches were found
@@ -397,7 +397,7 @@ type Status int
 // StatusLabel Human-readable status description for the workflow
 type StatusLabel string
 
-// Step Individual task within a DAG that performs a specific operation
+// Step Individual task definition that performs a specific operation in a workflow
 type Step struct {
 	// Args List of arguments to pass to the command
 	Args *[]string `json:"args,omitempty"`
@@ -420,7 +420,7 @@ type Step struct {
 	// MailOnError Whether to send email notifications on step failure
 	MailOnError *bool `json:"mailOnError,omitempty"`
 
-	// Name Unique identifier for the step within the DAG
+	// Name Unique identifier for the step within the workflow
 	Name string `json:"name"`
 
 	// Output Variable name to store the step's output
@@ -450,7 +450,7 @@ type Step struct {
 
 // WorkflowDetails defines model for WorkflowDetails.
 type WorkflowDetails struct {
-	// FinishedAt RFC 3339 timestamp when the DAG workflow finished
+	// FinishedAt RFC 3339 timestamp when the workflow finished
 	FinishedAt string `json:"finishedAt"`
 
 	// Log Path to the log file
@@ -459,28 +459,28 @@ type WorkflowDetails struct {
 	// Name Name of the DAG
 	Name DAGName `json:"name"`
 
-	// Nodes Status of individual steps within the DAG
+	// Nodes Status of individual steps within the workflow
 	Nodes []Node `json:"nodes"`
 
-	// OnCancel Status of an individual step within a DAG workflow
+	// OnCancel Status of an individual step within a workflow
 	OnCancel *Node `json:"onCancel,omitempty"`
 
-	// OnExit Status of an individual step within a DAG workflow
+	// OnExit Status of an individual step within a workflow
 	OnExit *Node `json:"onExit,omitempty"`
 
-	// OnFailure Status of an individual step within a DAG workflow
+	// OnFailure Status of an individual step within a workflow
 	OnFailure *Node `json:"onFailure,omitempty"`
 
-	// OnSuccess Status of an individual step within a DAG workflow
+	// OnSuccess Status of an individual step within a workflow
 	OnSuccess *Node `json:"onSuccess,omitempty"`
 
-	// Params Runtime parameters passed to the DAG in JSON format
+	// Params Runtime parameters passed to the workflow in JSON format
 	Params *string `json:"params,omitempty"`
 
-	// Pid Process ID of the DAG workflow
+	// Pid Process ID of the workflow
 	Pid *int `json:"pid,omitempty"`
 
-	// StartedAt RFC 3339 timestamp when the DAG workflow started
+	// StartedAt RFC 3339 timestamp when the workflow started
 	StartedAt string `json:"startedAt"`
 
 	// Status Numeric status code indicating current workflow state:
@@ -501,9 +501,9 @@ type WorkflowDetails struct {
 // WorkflowId Unique identifier for the workflow
 type WorkflowId = string
 
-// WorkflowSummary Current status of a DAG workflow
+// WorkflowSummary Current status of a workflow
 type WorkflowSummary struct {
-	// FinishedAt RFC 3339 timestamp when the DAG workflow finished
+	// FinishedAt RFC 3339 timestamp when the workflow finished
 	FinishedAt string `json:"finishedAt"`
 
 	// Log Path to the log file
@@ -512,13 +512,13 @@ type WorkflowSummary struct {
 	// Name Name of the DAG
 	Name DAGName `json:"name"`
 
-	// Params Runtime parameters passed to the DAG in JSON format
+	// Params Runtime parameters passed to the workflow in JSON format
 	Params *string `json:"params,omitempty"`
 
-	// Pid Process ID of the DAG workflow
+	// Pid Process ID of the workflow
 	Pid *int `json:"pid,omitempty"`
 
-	// StartedAt RFC 3339 timestamp when the DAG workflow started
+	// StartedAt RFC 3339 timestamp when the workflow started
 	StartedAt string `json:"startedAt"`
 
 	// Status Numeric status code indicating current workflow state:
@@ -629,14 +629,14 @@ type RenameDAGParams struct {
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
-// RetryDAGRunJSONBody defines parameters for RetryDAGRun.
-type RetryDAGRunJSONBody struct {
-	// WorkflowId Workflow ID of the DAG workflow to retry
+// RetryWorkflowJSONBody defines parameters for RetryWorkflow.
+type RetryWorkflowJSONBody struct {
+	// WorkflowId ID of the workflow to retry
 	WorkflowId string `json:"workflowId"`
 }
 
-// RetryDAGRunParams defines parameters for RetryDAGRun.
-type RetryDAGRunParams struct {
+// RetryWorkflowParams defines parameters for RetryWorkflow.
+type RetryWorkflowParams struct {
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
@@ -649,7 +649,7 @@ type GetDAGSpecParams struct {
 
 // UpdateDAGSpecJSONBody defines parameters for UpdateDAGSpec.
 type UpdateDAGSpecJSONBody struct {
-	// Spec The new DAG spec
+	// Spec The new DAG spec in YAML format
 	Spec string `json:"spec"`
 }
 
@@ -661,7 +661,7 @@ type UpdateDAGSpecParams struct {
 
 // ExecuteDAGJSONBody defines parameters for ExecuteDAG.
 type ExecuteDAGJSONBody struct {
-	// Params Parameters to pass to the DAG in JSON format
+	// Params Parameters to pass to the workflow in JSON format
 	Params *string `json:"params,omitempty"`
 }
 
@@ -671,8 +671,8 @@ type ExecuteDAGParams struct {
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
-// TerminateDAGRunParams defines parameters for TerminateDAGRun.
-type TerminateDAGRunParams struct {
+// TerminateWorkflowParams defines parameters for TerminateWorkflow.
+type TerminateWorkflowParams struct {
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
@@ -827,8 +827,8 @@ type CreateNewDAGJSONRequestBody CreateNewDAGJSONBody
 // RenameDAGJSONRequestBody defines body for RenameDAG for application/json ContentType.
 type RenameDAGJSONRequestBody RenameDAGJSONBody
 
-// RetryDAGRunJSONRequestBody defines body for RetryDAGRun for application/json ContentType.
-type RetryDAGRunJSONRequestBody RetryDAGRunJSONBody
+// RetryWorkflowJSONRequestBody defines body for RetryWorkflow for application/json ContentType.
+type RetryWorkflowJSONRequestBody RetryWorkflowJSONBody
 
 // UpdateDAGSpecJSONRequestBody defines body for UpdateDAGSpec for application/json ContentType.
 type UpdateDAGSpecJSONRequestBody UpdateDAGSpecJSONBody
@@ -868,28 +868,28 @@ type ServerInterface interface {
 	// Change DAG file ID
 	// (POST /dags/{fileName}/rename)
 	RenameDAG(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RenameDAGParams)
-	// Retry DAG execution
+	// Retry workflow execution
 	// (POST /dags/{fileName}/retry)
-	RetryDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryDAGRunParams)
+	RetryWorkflow(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryWorkflowParams)
 	// Retrieve DAG specification
 	// (GET /dags/{fileName}/spec)
 	GetDAGSpec(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGSpecParams)
 	// Update DAG spec
 	// (PUT /dags/{fileName}/spec)
 	UpdateDAGSpec(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params UpdateDAGSpecParams)
-	// Initiate DAG execution
+	// Create and execute a workflow from DAG
 	// (POST /dags/{fileName}/start)
 	ExecuteDAG(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params ExecuteDAGParams)
-	// Terminate running DAG execution
+	// Terminate a running workflow
 	// (POST /dags/{fileName}/stop)
-	TerminateDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateDAGRunParams)
+	TerminateWorkflow(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateWorkflowParams)
 	// Toggle DAG suspension state
 	// (POST /dags/{fileName}/suspend)
 	UpdateDAGSuspensionState(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params UpdateDAGSuspensionStateParams)
 	// Retrieve execution history of a DAG
 	// (GET /dags/{fileName}/workflows)
 	GetDAGWorkflowHistory(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGWorkflowHistoryParams)
-	// Get detailed status of a specific DAG run
+	// Get detailed status of a specific workflow
 	// (GET /dags/{fileName}/workflows/{workflowId})
 	GetDAGWorkflowDetails(w http.ResponseWriter, r *http.Request, fileName DAGFileName, workflowId WorkflowId, params GetDAGWorkflowDetailsParams)
 	// Check server health status
@@ -967,9 +967,9 @@ func (_ Unimplemented) RenameDAG(w http.ResponseWriter, r *http.Request, fileNam
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Retry DAG execution
+// Retry workflow execution
 // (POST /dags/{fileName}/retry)
-func (_ Unimplemented) RetryDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryDAGRunParams) {
+func (_ Unimplemented) RetryWorkflow(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryWorkflowParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -985,15 +985,15 @@ func (_ Unimplemented) UpdateDAGSpec(w http.ResponseWriter, r *http.Request, fil
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Initiate DAG execution
+// Create and execute a workflow from DAG
 // (POST /dags/{fileName}/start)
 func (_ Unimplemented) ExecuteDAG(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params ExecuteDAGParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Terminate running DAG execution
+// Terminate a running workflow
 // (POST /dags/{fileName}/stop)
-func (_ Unimplemented) TerminateDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateDAGRunParams) {
+func (_ Unimplemented) TerminateWorkflow(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateWorkflowParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1009,7 +1009,7 @@ func (_ Unimplemented) GetDAGWorkflowHistory(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Get detailed status of a specific DAG run
+// Get detailed status of a specific workflow
 // (GET /dags/{fileName}/workflows/{workflowId})
 func (_ Unimplemented) GetDAGWorkflowDetails(w http.ResponseWriter, r *http.Request, fileName DAGFileName, workflowId WorkflowId, params GetDAGWorkflowDetailsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -1397,8 +1397,8 @@ func (siw *ServerInterfaceWrapper) RenameDAG(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
-// RetryDAGRun operation middleware
-func (siw *ServerInterfaceWrapper) RetryDAGRun(w http.ResponseWriter, r *http.Request) {
+// RetryWorkflow operation middleware
+func (siw *ServerInterfaceWrapper) RetryWorkflow(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -1420,7 +1420,7 @@ func (siw *ServerInterfaceWrapper) RetryDAGRun(w http.ResponseWriter, r *http.Re
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params RetryDAGRunParams
+	var params RetryWorkflowParams
 
 	// ------------- Optional query parameter "remoteNode" -------------
 
@@ -1431,7 +1431,7 @@ func (siw *ServerInterfaceWrapper) RetryDAGRun(w http.ResponseWriter, r *http.Re
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RetryDAGRun(w, r, fileName, params)
+		siw.Handler.RetryWorkflow(w, r, fileName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1573,8 +1573,8 @@ func (siw *ServerInterfaceWrapper) ExecuteDAG(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
-// TerminateDAGRun operation middleware
-func (siw *ServerInterfaceWrapper) TerminateDAGRun(w http.ResponseWriter, r *http.Request) {
+// TerminateWorkflow operation middleware
+func (siw *ServerInterfaceWrapper) TerminateWorkflow(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -1596,7 +1596,7 @@ func (siw *ServerInterfaceWrapper) TerminateDAGRun(w http.ResponseWriter, r *htt
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params TerminateDAGRunParams
+	var params TerminateWorkflowParams
 
 	// ------------- Optional query parameter "remoteNode" -------------
 
@@ -1607,7 +1607,7 @@ func (siw *ServerInterfaceWrapper) TerminateDAGRun(w http.ResponseWriter, r *htt
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.TerminateDAGRun(w, r, fileName, params)
+		siw.Handler.TerminateWorkflow(w, r, fileName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -2539,7 +2539,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/dags/{fileName}/rename", wrapper.RenameDAG)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/dags/{fileName}/retry", wrapper.RetryDAGRun)
+		r.Post(options.BaseURL+"/dags/{fileName}/retry", wrapper.RetryWorkflow)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/dags/{fileName}/spec", wrapper.GetDAGSpec)
@@ -2551,7 +2551,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/dags/{fileName}/start", wrapper.ExecuteDAG)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/dags/{fileName}/stop", wrapper.TerminateDAGRun)
+		r.Post(options.BaseURL+"/dags/{fileName}/stop", wrapper.TerminateWorkflow)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/dags/{fileName}/suspend", wrapper.UpdateDAGSuspensionState)
@@ -2602,7 +2602,7 @@ type ListDAGsResponseObject interface {
 }
 
 type ListDAGs200JSONResponse struct {
-	// Dags List of DAGs with their status and metadata
+	// Dags List of DAG definitions with their status and metadata
 	Dags []DAGFile `json:"dags"`
 
 	// Errors List of errors encountered during the request
@@ -2780,7 +2780,7 @@ type GetDAGDetails200JSONResponse struct {
 	// Errors List of errors encountered during the request
 	Errors []string `json:"errors"`
 
-	// LatestWorkflow Detailed status of a DAG workflow including child workflow nodes
+	// LatestWorkflow Detailed status of a workflow including child workflow nodes
 	LatestWorkflow WorkflowDetails `json:"latestWorkflow"`
 
 	// Suspended Whether the DAG is suspended
@@ -2854,30 +2854,30 @@ func (response RenameDAGdefaultJSONResponse) VisitRenameDAGResponse(w http.Respo
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type RetryDAGRunRequestObject struct {
+type RetryWorkflowRequestObject struct {
 	FileName DAGFileName `json:"fileName"`
-	Params   RetryDAGRunParams
-	Body     *RetryDAGRunJSONRequestBody
+	Params   RetryWorkflowParams
+	Body     *RetryWorkflowJSONRequestBody
 }
 
-type RetryDAGRunResponseObject interface {
-	VisitRetryDAGRunResponse(w http.ResponseWriter) error
+type RetryWorkflowResponseObject interface {
+	VisitRetryWorkflowResponse(w http.ResponseWriter) error
 }
 
-type RetryDAGRun200Response struct {
+type RetryWorkflow200Response struct {
 }
 
-func (response RetryDAGRun200Response) VisitRetryDAGRunResponse(w http.ResponseWriter) error {
+func (response RetryWorkflow200Response) VisitRetryWorkflowResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type RetryDAGRundefaultJSONResponse struct {
+type RetryWorkflowdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response RetryDAGRundefaultJSONResponse) VisitRetryDAGRunResponse(w http.ResponseWriter) error {
+func (response RetryWorkflowdefaultJSONResponse) VisitRetryWorkflowResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
@@ -2900,7 +2900,7 @@ type GetDAGSpec200JSONResponse struct {
 	// Errors List of errors in the spec
 	Errors []string `json:"errors"`
 
-	// Spec The DAG spec
+	// Spec The DAG spec in YAML format
 	Spec string `json:"spec"`
 }
 
@@ -2968,7 +2968,7 @@ type ExecuteDAGResponseObject interface {
 }
 
 type ExecuteDAG200JSONResponse struct {
-	// WorkflowId Workflow ID of the initiated DAG workflow
+	// WorkflowId ID of the created workflow
 	WorkflowId string `json:"workflowId"`
 }
 
@@ -2991,29 +2991,29 @@ func (response ExecuteDAGdefaultJSONResponse) VisitExecuteDAGResponse(w http.Res
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type TerminateDAGRunRequestObject struct {
+type TerminateWorkflowRequestObject struct {
 	FileName DAGFileName `json:"fileName"`
-	Params   TerminateDAGRunParams
+	Params   TerminateWorkflowParams
 }
 
-type TerminateDAGRunResponseObject interface {
-	VisitTerminateDAGRunResponse(w http.ResponseWriter) error
+type TerminateWorkflowResponseObject interface {
+	VisitTerminateWorkflowResponse(w http.ResponseWriter) error
 }
 
-type TerminateDAGRun200Response struct {
+type TerminateWorkflow200Response struct {
 }
 
-func (response TerminateDAGRun200Response) VisitTerminateDAGRunResponse(w http.ResponseWriter) error {
+func (response TerminateWorkflow200Response) VisitTerminateWorkflowResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type TerminateDAGRundefaultJSONResponse struct {
+type TerminateWorkflowdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response TerminateDAGRundefaultJSONResponse) VisitTerminateDAGRunResponse(w http.ResponseWriter) error {
+func (response TerminateWorkflowdefaultJSONResponse) VisitTerminateWorkflowResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
@@ -3072,7 +3072,7 @@ type GetDAGWorkflowHistory200JSONResponse struct {
 	// GridData Grid data for visualization
 	GridData []DAGGridItem `json:"gridData"`
 
-	// Workflows List of historical workflows for the DAG
+	// Workflows List of historical workflows created from this DAG
 	Workflows []WorkflowDetails `json:"workflows"`
 }
 
@@ -3106,7 +3106,7 @@ type GetDAGWorkflowDetailsResponseObject interface {
 }
 
 type GetDAGWorkflowDetails200JSONResponse struct {
-	// Workflow Detailed status of a DAG workflow including child workflow nodes
+	// Workflow Detailed status of a workflow including child workflow nodes
 	Workflow WorkflowDetails `json:"workflow"`
 }
 
@@ -3165,7 +3165,7 @@ type GetWorkflowDetailsResponseObject interface {
 }
 
 type GetWorkflowDetails200JSONResponse struct {
-	// WorkflowDetails Detailed status of a DAG workflow including child workflow nodes
+	// WorkflowDetails Detailed status of a workflow including child workflow nodes
 	WorkflowDetails WorkflowDetails `json:"workflowDetails"`
 }
 
@@ -3209,7 +3209,7 @@ type GetChildWorkflowDetailsResponseObject interface {
 }
 
 type GetChildWorkflowDetails200JSONResponse struct {
-	// WorkflowDetails Detailed status of a DAG workflow including child workflow nodes
+	// WorkflowDetails Detailed status of a workflow including child workflow nodes
 	WorkflowDetails WorkflowDetails `json:"workflowDetails"`
 }
 
@@ -3529,28 +3529,28 @@ type StrictServerInterface interface {
 	// Change DAG file ID
 	// (POST /dags/{fileName}/rename)
 	RenameDAG(ctx context.Context, request RenameDAGRequestObject) (RenameDAGResponseObject, error)
-	// Retry DAG execution
+	// Retry workflow execution
 	// (POST /dags/{fileName}/retry)
-	RetryDAGRun(ctx context.Context, request RetryDAGRunRequestObject) (RetryDAGRunResponseObject, error)
+	RetryWorkflow(ctx context.Context, request RetryWorkflowRequestObject) (RetryWorkflowResponseObject, error)
 	// Retrieve DAG specification
 	// (GET /dags/{fileName}/spec)
 	GetDAGSpec(ctx context.Context, request GetDAGSpecRequestObject) (GetDAGSpecResponseObject, error)
 	// Update DAG spec
 	// (PUT /dags/{fileName}/spec)
 	UpdateDAGSpec(ctx context.Context, request UpdateDAGSpecRequestObject) (UpdateDAGSpecResponseObject, error)
-	// Initiate DAG execution
+	// Create and execute a workflow from DAG
 	// (POST /dags/{fileName}/start)
 	ExecuteDAG(ctx context.Context, request ExecuteDAGRequestObject) (ExecuteDAGResponseObject, error)
-	// Terminate running DAG execution
+	// Terminate a running workflow
 	// (POST /dags/{fileName}/stop)
-	TerminateDAGRun(ctx context.Context, request TerminateDAGRunRequestObject) (TerminateDAGRunResponseObject, error)
+	TerminateWorkflow(ctx context.Context, request TerminateWorkflowRequestObject) (TerminateWorkflowResponseObject, error)
 	// Toggle DAG suspension state
 	// (POST /dags/{fileName}/suspend)
 	UpdateDAGSuspensionState(ctx context.Context, request UpdateDAGSuspensionStateRequestObject) (UpdateDAGSuspensionStateResponseObject, error)
 	// Retrieve execution history of a DAG
 	// (GET /dags/{fileName}/workflows)
 	GetDAGWorkflowHistory(ctx context.Context, request GetDAGWorkflowHistoryRequestObject) (GetDAGWorkflowHistoryResponseObject, error)
-	// Get detailed status of a specific DAG run
+	// Get detailed status of a specific workflow
 	// (GET /dags/{fileName}/workflows/{workflowId})
 	GetDAGWorkflowDetails(ctx context.Context, request GetDAGWorkflowDetailsRequestObject) (GetDAGWorkflowDetailsResponseObject, error)
 	// Check server health status
@@ -3810,14 +3810,14 @@ func (sh *strictHandler) RenameDAG(w http.ResponseWriter, r *http.Request, fileN
 	}
 }
 
-// RetryDAGRun operation middleware
-func (sh *strictHandler) RetryDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryDAGRunParams) {
-	var request RetryDAGRunRequestObject
+// RetryWorkflow operation middleware
+func (sh *strictHandler) RetryWorkflow(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryWorkflowParams) {
+	var request RetryWorkflowRequestObject
 
 	request.FileName = fileName
 	request.Params = params
 
-	var body RetryDAGRunJSONRequestBody
+	var body RetryWorkflowJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -3825,18 +3825,18 @@ func (sh *strictHandler) RetryDAGRun(w http.ResponseWriter, r *http.Request, fil
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.RetryDAGRun(ctx, request.(RetryDAGRunRequestObject))
+		return sh.ssi.RetryWorkflow(ctx, request.(RetryWorkflowRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "RetryDAGRun")
+		handler = middleware(handler, "RetryWorkflow")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(RetryDAGRunResponseObject); ok {
-		if err := validResponse.VisitRetryDAGRunResponse(w); err != nil {
+	} else if validResponse, ok := response.(RetryWorkflowResponseObject); ok {
+		if err := validResponse.VisitRetryWorkflowResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3939,26 +3939,26 @@ func (sh *strictHandler) ExecuteDAG(w http.ResponseWriter, r *http.Request, file
 	}
 }
 
-// TerminateDAGRun operation middleware
-func (sh *strictHandler) TerminateDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateDAGRunParams) {
-	var request TerminateDAGRunRequestObject
+// TerminateWorkflow operation middleware
+func (sh *strictHandler) TerminateWorkflow(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateWorkflowParams) {
+	var request TerminateWorkflowRequestObject
 
 	request.FileName = fileName
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.TerminateDAGRun(ctx, request.(TerminateDAGRunRequestObject))
+		return sh.ssi.TerminateWorkflow(ctx, request.(TerminateWorkflowRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "TerminateDAGRun")
+		handler = middleware(handler, "TerminateWorkflow")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(TerminateDAGRunResponseObject); ok {
-		if err := validResponse.VisitTerminateDAGRunResponse(w); err != nil {
+	} else if validResponse, ok := response.(TerminateWorkflowResponseObject); ok {
+		if err := validResponse.VisitTerminateWorkflowResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -4328,97 +4328,98 @@ func (sh *strictHandler) UpdateWorkflowStepStatus(w http.ResponseWriter, r *http
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"Cv0euy1HbgnXaHNzefP/AQAA///jAIuAZI8AAA==",
+	"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",
+	"RmwXkQAA",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

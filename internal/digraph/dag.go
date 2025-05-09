@@ -206,7 +206,7 @@ func (d *DAG) SockAddr(workflowID string) string {
 	return SockAddr(d.Name, workflowID)
 }
 
-// SockAddrSub returns the unix socket address for a specific execution ID.
+// SockAddrSub returns the unix socket address for a specific workflow ID.
 // This is used to control child executions.
 func (d *DAG) SockAddrSub(workflowID string) string {
 	return SockAddr(d.GetName(), workflowID)

@@ -11,18 +11,18 @@ import (
 func CmdStop() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "stop --workflow-id=abc123 dagName",
-			Short: "Stop a running DAG",
-			Long: `Gracefully terminate an active DAG execution.
+			Use:   "stop --workflow-id=abc123 name",
+			Short: "Stop a running workflow",
+			Long: `Gracefully terminate an active workflow.
 
 Flags:
   --workflow-id string   (optional) Unique identifier for tracking the restart execution.
 
-This command stops all running tasks of the specified DAG, ensuring resources are properly released.
-If execution ID is not provided, it will find the current running DAG by name.
+This command stops all running tasks of the specified workflow, ensuring resources are properly released.
+If workflow ID is not provided, it will find the dag definition by name and stop the currently running workflow.
 
 Example:
-  dagu stop --workflow-id=abc123 dagName
+  dagu stop --workflow-id=abc123 name
 `,
 			Args: cobra.ExactArgs(1),
 		}, stopFlags, runStop,
@@ -36,18 +36,18 @@ var stopFlags = []commandLineFlag{
 func runStop(ctx *Context, args []string) error {
 	reqID, err := ctx.Command.Flags().GetString("workflow-id")
 	if err != nil {
-		return fmt.Errorf("failed to get execution ID: %w", err)
+		return fmt.Errorf("failed to get workflow ID: %w", err)
 	}
 
 	name := args[0]
 
 	var dag *digraph.DAG
 	if reqID != "" {
-		// Retrieve the previous run's history record for the specified execution ID.
+		// Retrieve the previous run's history record for the specified workflow ID.
 		ref := digraph.NewExecRef(name, reqID)
 		rec, err := ctx.HistoryRepo.Find(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to find the record for execution ID %s: %w", reqID, err)
+			return fmt.Errorf("failed to find the record for workflow ID %s: %w", reqID, err)
 		}
 
 		d, err := rec.ReadDAG(ctx)
@@ -63,12 +63,12 @@ func runStop(ctx *Context, args []string) error {
 		dag = d
 	}
 
-	logger.Info(ctx, "DAG is stopping", "dag", dag.Name)
+	logger.Info(ctx, "workflow is stopping", "dag", dag.Name)
 
 	if err := ctx.HistoryMgr.Stop(ctx, dag, reqID); err != nil {
 		return fmt.Errorf("failed to stop DAG: %w", err)
 	}
 
-	logger.Info(ctx, "DAG stopped", "dag", dag.Name)
+	logger.Info(ctx, "workflow stopped", "dag", dag.Name)
 	return nil
 }

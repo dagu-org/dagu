@@ -75,16 +75,16 @@ type Agent struct {
 	// It is same as the current execution reference if it's not a child execution.
 	root digraph.ExecRef
 
-	// parent is the execution reference of the parent DAG execution.
+	// parent is the execution reference of the parent workflow.
 	parent digraph.ExecRef
 
-	// workflowID is the execution ID of the current DAG execution.
+	// workflowID is the workflow ID of the current workflow.
 	workflowID string
 
-	// finished is true if the DAG run is finished.
+	// finished is true if the workflow is finished.
 	finished atomic.Bool
 
-	// lastErr is the last error occurred during the DAG execution.
+	// lastErr is the last error occurred during the workflow.
 	lastErr error
 
 	// subExecution is true if the agent is running as a child DAG.
@@ -100,7 +100,7 @@ type Options struct {
 	// If it's specified the agent will execute the DAG with the same
 	// configuration as the specified history.
 	RetryTarget *models.Status
-	// Parent is the execution ID of the parent DAG execution.
+	// Parent is the workflow ID of the parent workflow.
 	// It is required for child executions to identify the parent DAG.
 	Parent digraph.ExecRef
 }
@@ -141,7 +141,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		return fmt.Errorf("agent setup failed: %w", err)
 	}
 
-	// Create a new context for the DAG run with all necessary information
+	// Create a new context for the workflow with all necessary information
 	dbClient := newDBClient(a.historyRepo, a.dagRepo)
 	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.root, a.workflowID, a.logFile, a.dag.Params)
 
@@ -197,7 +197,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 	})
 
-	// Stop the socket server when finishing the DAG execution.
+	// Stop the socket server when finishing the workflow.
 	defer func() {
 		if err := a.socketServer.Shutdown(ctx); err != nil {
 			logger.Error(ctx, "Failed to shutdown socket frontend", "err", err)
@@ -238,13 +238,13 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 	})
 
-	// Start the DAG execution.
-	logger.Debug(ctx, "DAG run started", "workflowId", a.workflowID, "name", a.dag.Name, "params", a.dag.Params)
+	// Start the workflow.
+	logger.Debug(ctx, "workflow started", "workflowId", a.workflowID, "name", a.dag.Name, "params", a.dag.Params)
 	lastErr := a.scheduler.Schedule(ctx, a.graph, done)
 
 	// Update the finished status to the runstore database.
 	finishedStatus := a.Status()
-	logger.Info(ctx, "DAG run finished", "status", finishedStatus.Status.String())
+	logger.Info(ctx, "workflow finished", "status", finishedStatus.Status.String())
 	if err := historyRecord.Write(ctx, a.Status()); err != nil {
 		logger.Error(ctx, "Status write failed", "err", err)
 	}
@@ -258,7 +258,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Mark the agent finished.
 	a.finished.Store(true)
 
-	// Return the last error on the DAG execution.
+	// Return the last error on the workflow.
 	return lastErr
 }
 
@@ -336,7 +336,7 @@ func (a *Agent) HandleHTTP(ctx context.Context) sock.HTTPHandlerFunc {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write(statusJSON)
 		case r.Method == http.MethodPost && stopRe.MatchString(r.URL.Path):
-			// Handle Stop request for the DAG execution.
+			// Handle Stop request for the workflow.
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("OK"))
 			go func() {
@@ -352,7 +352,7 @@ func (a *Agent) HandleHTTP(ctx context.Context) sock.HTTPHandlerFunc {
 	}
 }
 
-// setup the agent instance for DAG execution.
+// setup the agent instance for workflow.
 func (a *Agent) setup(ctx context.Context) error {
 	// Lock to prevent race condition.
 	a.lock.Lock()
@@ -362,8 +362,8 @@ func (a *Agent) setup(ctx context.Context) error {
 		logger.Debug(ctx, "Initiating child execution", "rootDAG", a.root.Name, "rootReqID", a.root.ExecID)
 		a.subExecution.Store(true)
 		if a.parent.IsZero() {
-			logger.Error(ctx, "Parent execution ID is required for child execution")
-			return fmt.Errorf("parent execution ID is required for child execution")
+			logger.Error(ctx, "Parent workflow ID is required for child execution")
+			return fmt.Errorf("parent workflow ID is required for child execution")
 		}
 	}
 
@@ -387,7 +387,7 @@ func (a *Agent) setup(ctx context.Context) error {
 	return a.setupGraph(ctx)
 }
 
-// newScheduler creates a scheduler instance for the DAG execution.
+// newScheduler creates a scheduler instance for the workflow.
 func (a *Agent) newScheduler() *scheduler.Scheduler {
 	cfg := &scheduler.Config{
 		LogDir:        a.logDir,
@@ -633,10 +633,10 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error
 	return o.dagRepo.GetDetails(ctx, name)
 }
 
-func (o *dbClient) GetChildExecStatus(ctx context.Context, reqID string, root digraph.ExecRef) (*digraph.Status, error) {
+func (o *dbClient) GetChildWorkflowStatus(ctx context.Context, reqID string, root digraph.ExecRef) (*digraph.Status, error) {
 	runRecord, err := o.historyRepo.FindChildExecution(ctx, root, reqID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find the record for execution ID %s: %w", reqID, err)
+		return nil, fmt.Errorf("failed to find the record for workflow ID %s: %w", reqID, err)
 	}
 	status, err := runRecord.ReadStatus(ctx)
 	if err != nil {

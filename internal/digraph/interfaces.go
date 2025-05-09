@@ -2,18 +2,18 @@ package digraph
 
 import "context"
 
-// DB gets a result of a DAG execution.
+// DB gets a result of a workflow.
 type DB interface {
 	GetDAG(ctx context.Context, name string) (*DAG, error)
-	GetChildExecStatus(ctx context.Context, requestID string, root ExecRef) (*Status, error)
+	GetChildWorkflowStatus(ctx context.Context, requestID string, root ExecRef) (*Status, error)
 }
 
-// Status is the result of a DAG execution.
+// Status is the result of a workflow.
 type Status struct {
-	// Name represents the name of the executed DAG.
+	// Name represents the name of the executed workflow.
 	Name string `json:"name,omitempty"`
-	// Params is the parameters of the DAG run
+	// Params is the parameters of the workflow
 	Params string `json:"params,omitempty"`
-	// Outputs is the outputs of the DAG execution.
+	// Outputs is the outputs of the workflow.
 	Outputs map[string]string `json:"outputs,omitempty"`
 }

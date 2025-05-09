@@ -26,13 +26,13 @@ func TestStopCommand(t *testing.T) {
 
 		time.Sleep(time.Millisecond * 100)
 
-		// Wait for the DAG running.
+		// Wait for the workflow running.
 		dagFile.AssertLatestStatus(t, scheduler.StatusRunning)
 
 		// Stop the DAG.
 		th.RunCommand(t, cmd.CmdStop(), test.CmdTest{
 			Args:        []string{"stop", dagFile.Location},
-			ExpectedOut: []string{"DAG stopped"}})
+			ExpectedOut: []string{"workflow stopped"}})
 
 		// Check the DAG is stopped.
 		dagFile.AssertLatestStatus(t, scheduler.StatusCancel)
@@ -54,13 +54,13 @@ func TestStopCommand(t *testing.T) {
 
 		time.Sleep(time.Millisecond * 100)
 
-		// Wait for the DAG running.
+		// Wait for the workflow running.
 		dagFile.AssertLatestStatus(t, scheduler.StatusRunning)
 
-		// Stop the DAG.
+		// Stop the workflow.
 		th.RunCommand(t, cmd.CmdStop(), test.CmdTest{
 			Args:        []string{"stop", dagFile.Location, "--workflow-id=" + reqId},
-			ExpectedOut: []string{"DAG stopped"}})
+			ExpectedOut: []string{"workflow stopped"}})
 
 		// Check the DAG is stopped.
 		dagFile.AssertLatestStatus(t, scheduler.StatusCancel)

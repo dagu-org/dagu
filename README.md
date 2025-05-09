@@ -266,10 +266,10 @@ dagu start <file or DAG name> [-- value1 value2 ...]
 # Displays the current status of the DAG
 dagu status <file or DAG name>
 
-# Re-runs the specified DAG run
+# Re-runs the specified workflow
 dagu retry --request-id=<request-id> <file or DAG name>
 
-# Stops the DAG run
+# Stops the workflow
 dagu stop <file or DAG name>
 
 # Restarts the current running DAG
@@ -874,7 +874,7 @@ Search across all DAG definitions.
 
 ### Execution History
 
-Review past DAG runs and logs at a glance.
+Review past workflows and logs at a glance.
 
 ![History](assets/images/ui-history.webp?raw=true)
 

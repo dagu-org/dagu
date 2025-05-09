@@ -55,7 +55,7 @@ func runDry(ctx *Context, args []string) error {
 
 	reqID, err := genReqID()
 	if err != nil {
-		return fmt.Errorf("failed to generate execution ID: %w", err)
+		return fmt.Errorf("failed to generate workflow ID: %w", err)
 	}
 
 	logFile, err := ctx.OpenLogFile(dag, reqID)

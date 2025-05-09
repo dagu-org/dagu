@@ -34,7 +34,7 @@
     },
     "schedule": {
       "type": "string",
-      "description": "Cron expression that determines how often the DAG runs (e.g., '5 4 * * *' runs daily at 04:05). If omitted, the DAG will only run manually."
+      "description": "Cron expression that determines how often the DAG triggers (e.g., '5 4 * * *' runs daily at 04:05). If omitted, the DAG will only run manually."
     },
     "skipIfSuccessful": {
       "type": "boolean",
@@ -322,11 +322,11 @@
           "properties": {
             "failure": {
               "type": "boolean",
-              "description": "Continue DAG run even if this step fails"
+              "description": "Continue workflow even if this step fails"
             },
             "skipped": {
               "type": "boolean",
-              "description": "Continue DAG run even if this step is skipped due to preconditions"
+              "description": "Continue workflow even if this step is skipped due to preconditions"
             },
             "exitCode": {
               "oneOf": [

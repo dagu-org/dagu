@@ -107,7 +107,7 @@ func WithLogFilePath(logFilePath string) StatusOption {
 	}
 }
 
-// Create builds a Status object for a DAG run with the specified parameters
+// Create builds a Status object for a workflow with the specified parameters
 func (f *StatusBuilder) Create(
 	workflowID string,
 	status scheduler.Status,
@@ -138,7 +138,7 @@ func StatusFromJSON(s string) (*Status, error) {
 	return status, err
 }
 
-// Status represents the complete execution state of a DAG run
+// Status represents the complete execution state of a workflow
 type Status struct {
 	Root       digraph.ExecRef  `json:"root,omitempty"`
 	Parent     digraph.ExecRef  `json:"parent,omitempty"`
@@ -208,7 +208,7 @@ func (st *Status) NodeByName(name string) (*Node, error) {
 	return nil, fmt.Errorf("node %s not found", name)
 }
 
-// PID represents a process ID for a running DAG run
+// PID represents a process ID for a running workflow
 type PID int
 
 // String returns the string representation of the PID, or an empty string if 0

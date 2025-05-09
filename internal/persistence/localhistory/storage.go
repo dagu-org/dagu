@@ -72,9 +72,9 @@ func New(baseDir string, opts ...HistoryStorageOption) models.HistoryRepository 
 	}
 }
 
-// Create creates a new run record for the specified DAG execution.
+// Create creates a new run record for the specified workflow.
 // If opts.Root is not nil, it creates a sub-record for the specified root DAG.
-// If opts.Retry is true, it creates a retry record for the specified execution ID.
+// If opts.Retry is true, it creates a retry record for the specified workflow ID.
 func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts models.NewRecordOptions) (models.Record, error) {
 	if reqID == "" {
 		return nil, ErrExecIDEmpty
@@ -211,7 +211,7 @@ func (db *historyStorage) Latest(ctx context.Context, dagName string) (models.Re
 	return latest[0].LatestRecord(ctx, db.cache)
 }
 
-// Find finds a run record by execution ID.
+// Find finds a run record by workflow ID.
 func (db *historyStorage) Find(ctx context.Context, ref digraph.ExecRef) (models.Record, error) {
 	// Check for context cancellation
 	select {
@@ -235,7 +235,7 @@ func (db *historyStorage) Find(ctx context.Context, ref digraph.ExecRef) (models
 	return run.LatestRecord(ctx, db.cache)
 }
 
-// FindChildExecution finds a run record by execution ID for a child DAG.
+// FindChildExecution finds a run record by workflow ID for a child DAG.
 func (db *historyStorage) FindChildExecution(ctx context.Context, ref digraph.ExecRef, childWorkflowID string) (models.Record, error) {
 	// Check for context cancellation
 	select {

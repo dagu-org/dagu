@@ -50,7 +50,7 @@ type NodeState struct {
 }
 
 type ChildExec struct {
-	// ExecID is the execution ID of the child execution.
+	// ExecID is the workflow ID of the child execution.
 	ExecID string
 }
 
@@ -137,14 +137,14 @@ func (s *Data) Data() NodeData {
 func (s *Data) ChildExecID() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// If children is not empty, return the first child's execution ID.
+	// If children is not empty, return the first child's workflow ID.
 	if len(s.inner.State.Children) > 0 {
 		return s.inner.State.Children[0].ExecID, nil
 	}
-	// Generate a new execution ID for the current node.
+	// Generate a new workflow ID for the current node.
 	r, err := genReqID()
 	if err != nil {
-		return "", fmt.Errorf("failed to generate execution ID: %w", err)
+		return "", fmt.Errorf("failed to generate workflow ID: %w", err)
 	}
 	s.inner.State.Children = append(s.inner.State.Children, ChildExec{ExecID: r})
 	return r, nil
@@ -367,7 +367,7 @@ func (n *Data) ClearState() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	// The data of child executions need to be preserved to retain their execution IDs
+	// The data of child executions need to be preserved to retain their workflow IDs
 	children := n.inner.State.Children
 	n.inner.State = NodeState{}
 	n.inner.State.Children = children
@@ -381,8 +381,8 @@ func (n *Data) MarkError(err error) {
 	n.inner.State.Status = NodeStatusError
 }
 
-// genReqID generates a new execution ID.
-// For simplicity, we use UUIDs as execution IDs.
+// genReqID generates a new workflow ID.
+// For simplicity, we use UUIDs as workflow IDs.
 func genReqID() (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {

@@ -72,13 +72,13 @@ func NewDataRoot(baseDir, dagName string) DataRoot {
 	return root
 }
 
-// FindByExecID locates an runs by its execution ID.
+// FindByExecID locates an runs by its workflow ID.
 // It searches through all runs directories to find a match,
 // and returns the most recent one if multiple matches are found.
 //
 // Parameters:
 //   - ctx: Context for the operation (unused but kept for interface consistency)
-//   - reqID: The unique execution ID to search for
+//   - reqID: The unique workflow ID to search for
 //
 // Returns:
 //   - The matching Execution instance, or an error if not found

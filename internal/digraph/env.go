@@ -9,7 +9,7 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
-// Env contains the execution metadata for a DAG execution.
+// Env contains the execution metadata for a workflow.
 type Env struct {
 	ExecID string
 	Root   ExecRef
@@ -40,7 +40,7 @@ func (e Env) ApplyEnvs(ctx context.Context) {
 	}
 }
 
-// SetupEnv sets up the execution context for a DAG execution.
+// SetupEnv sets up the execution context for a workflow.
 // It initializes the environment variables and the DAG metadata.
 func SetupEnv(ctx context.Context, d *DAG, c DB, root ExecRef, workflowID, logFile string, params []string) context.Context {
 	var envs = map[string]string{

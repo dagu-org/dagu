@@ -33,7 +33,7 @@ export interface paths {
         };
         /**
          * List all available DAGs
-         * @description Retrieves DAGs with optional filtering by name and tags
+         * @description Retrieves DAG definitions with optional filtering by name and tags
          */
         get: operations["listDAGs"];
         put?: never;
@@ -57,7 +57,7 @@ export interface paths {
         };
         /**
          * Retrieve comprehensive DAG information
-         * @description Fetches detailed information about a specific DAG
+         * @description Fetches detailed information about a specific DAG definition
          */
         get: operations["getDAGDetails"];
         put?: never;
@@ -82,8 +82,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Initiate DAG execution
-         * @description Starts execution of a DAG with optional parameters
+         * Create and execute a workflow from DAG
+         * @description Creates a workflow from the DAG definition and starts its execution with optional parameters
          */
         post: operations["executeDAG"];
         delete?: never;
@@ -102,10 +102,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Terminate running DAG execution
-         * @description Forcefully stops a running DAG workflow
+         * Terminate a running workflow
+         * @description Forcefully stops a running workflow created from this DAG
          */
-        post: operations["terminateDAGRun"];
+        post: operations["terminateWorkflow"];
         delete?: never;
         options?: never;
         head?: never;
@@ -122,10 +122,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Retry DAG execution
-         * @description Reruns a DAG execution
+         * Retry workflow execution
+         * @description Creates a new workflow based on a previous execution
          */
-        post: operations["retryDAGRun"];
+        post: operations["retryWorkflow"];
         delete?: never;
         options?: never;
         head?: never;
@@ -141,7 +141,7 @@ export interface paths {
         };
         /**
          * Retrieve execution history of a DAG
-         * @description Fetches execution history of a DAG
+         * @description Fetches history of workflows created from this DAG definition
          */
         get: operations["getDAGWorkflowHistory"];
         put?: never;
@@ -160,8 +160,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get detailed status of a specific DAG run
-         * @description Retrieves status information about a particular DAG execution
+         * Get detailed status of a specific workflow
+         * @description Retrieves status information about a particular workflow created from this DAG
          */
         get: operations["getDAGWorkflowDetails"];
         put?: never;
@@ -181,12 +181,12 @@ export interface paths {
         };
         /**
          * Retrieve DAG specification
-         * @description Fetches the specification of a DAG
+         * @description Fetches the YAML specification of a DAG definition
          */
         get: operations["getDAGSpec"];
         /**
          * Update DAG spec
-         * @description Modifies the specification of a DAG
+         * @description Modifies the YAML specification of a DAG definition
          */
         put: operations["updateDAGSpec"];
         post?: never;
@@ -207,7 +207,7 @@ export interface paths {
         put?: never;
         /**
          * Toggle DAG suspension state
-         * @description Controls whether the scheduler should execute this DAG according to its defined cron schedule
+         * @description Controls whether the scheduler should create workflows from this DAG according to its defined cron schedule
          */
         post: operations["updateDAGSuspensionState"];
         delete?: never;
@@ -227,7 +227,7 @@ export interface paths {
         put?: never;
         /**
          * Change DAG file ID
-         * @description Changes the file ID of the DAG
+         * @description Changes the file ID of the DAG definition
          */
         post: operations["renameDAG"];
         delete?: never;
@@ -505,24 +505,24 @@ export interface components {
             /** @description List of errors encountered during the request */
             errors: string[];
         };
-        /** @description Core DAG configuration containing workflow definition and metadata */
+        /** @description Core DAG configuration containing definition and metadata */
         DAG: {
             /** @description Logical grouping of related DAGs for organizational purposes */
             group?: string;
             /** @description Logical name of the DAG */
             name: string;
-            /** @description List of scheduling expressions defining when the DAG should run */
+            /** @description List of scheduling expressions defining when workflows should be created from this DAG */
             schedule?: components["schemas"]["Schedule"][];
             /** @description Human-readable description of the DAG's purpose and behavior */
             description?: string;
-            /** @description List of parameter names that can be passed to the DAG at runtime */
+            /** @description List of parameter names that can be passed to workflows created from this DAG */
             params?: string[];
-            /** @description Default parameter values in JSON format if not specified at runtime */
+            /** @description Default parameter values in JSON format if not specified at workflow creation */
             defaultParams?: string;
             /** @description List of tags for categorizing and filtering DAGs */
             tags?: string[];
         };
-        /** @description Schedule configuration for DAG run */
+        /** @description Schedule configuration for workflow creation */
         Schedule: {
             /** @description Cron expression or schedule pattern */
             expression: string;
@@ -566,66 +566,66 @@ export interface components {
             group?: string;
             /** @description Unique identifier for the DAG within its group */
             name: string;
-            /** @description List of scheduling expressions defining when the DAG should run */
+            /** @description List of scheduling expressions defining when workflows should be created from this DAG */
             schedule?: components["schemas"]["Schedule"][];
             /** @description Human-readable description of the DAG's purpose and behavior */
             description?: string;
-            /** @description List of environment variables to set before executing */
+            /** @description List of environment variables to set before executing a workflow */
             env?: string[];
             /** @description Directory path for storing log files */
             logDir?: string;
             handlerOn?: components["schemas"]["HandlerOn"];
-            /** @description List of steps to execute in the DAG */
+            /** @description List of steps to execute in workflows created from this DAG */
             steps?: components["schemas"]["Step"][];
-            /** @description Time in seconds to wait before starting the DAG */
+            /** @description Time in seconds to wait before starting a workflow */
             delay?: number;
             /** @description Number of days to retain historical logs */
             histRetentionDays?: number;
-            /** @description Conditions that must be met before the DAG can start */
+            /** @description Conditions that must be met before a workflow can start */
             preconditions?: components["schemas"]["Precondition"][];
-            /** @description Maximum number of concurrent steps to run */
+            /** @description Maximum number of concurrent workflows allowed from this DAG */
             maxActiveRuns?: number;
-            /** @description List of parameter names that can be passed to the DAG at runtime */
+            /** @description List of parameter names that can be passed to workflows created from this DAG */
             params?: string[];
-            /** @description Default parameter values in JSON format if not specified at runtime */
+            /** @description Default parameter values in JSON format if not specified at workflow creation */
             defaultParams?: string;
             /** @description List of tags for categorizing and filtering DAGs */
             tags?: string[];
         };
-        /** @description Configuration for event handlers in a DAG */
+        /** @description Configuration for event handlers in a workflow */
         HandlerOn: {
             failure?: components["schemas"]["Step"];
             success?: components["schemas"]["Step"];
             cancel?: components["schemas"]["Step"];
             exit?: components["schemas"]["Step"];
         };
-        /** @description Current status of a DAG workflow */
+        /** @description Current status of a workflow */
         WorkflowSummary: {
             workflowId: components["schemas"]["WorkflowId"];
             name: components["schemas"]["DAGName"];
             status: components["schemas"]["Status"];
             statusLabel: components["schemas"]["StatusLabel"];
-            /** @description Process ID of the DAG workflow */
+            /** @description Process ID of the workflow */
             pid?: number;
-            /** @description RFC 3339 timestamp when the DAG workflow started */
+            /** @description RFC 3339 timestamp when the workflow started */
             startedAt: string;
-            /** @description RFC 3339 timestamp when the DAG workflow finished */
+            /** @description RFC 3339 timestamp when the workflow finished */
             finishedAt: string;
             /** @description Path to the log file */
             log: string;
-            /** @description Runtime parameters passed to the DAG in JSON format */
+            /** @description Runtime parameters passed to the workflow in JSON format */
             params?: string;
         };
-        /** @description Detailed status of a DAG workflow including child workflow nodes */
+        /** @description Detailed status of a workflow including child workflow nodes */
         WorkflowDetails: components["schemas"]["WorkflowSummary"] & {
-            /** @description Status of individual steps within the DAG */
+            /** @description Status of individual steps within the workflow */
             nodes: components["schemas"]["Node"][];
             onExit?: components["schemas"]["Node"];
             onSuccess?: components["schemas"]["Node"];
             onFailure?: components["schemas"]["Node"];
             onCancel?: components["schemas"]["Node"];
         };
-        /** @description Status of an individual step within a DAG workflow */
+        /** @description Status of an individual step within a workflow */
         Node: {
             step: components["schemas"]["Step"];
             /** @description Path to step-specific log file */
@@ -649,9 +649,9 @@ export interface components {
         ChildWorkflow: {
             workflowId: components["schemas"]["WorkflowId"];
         };
-        /** @description Individual task within a DAG that performs a specific operation */
+        /** @description Individual task definition that performs a specific operation in a workflow */
         Step: {
-            /** @description Unique identifier for the step within the DAG */
+            /** @description Unique identifier for the step within the workflow */
             name: string;
             /** @description Human-readable description of what the step does */
             description?: string;
@@ -691,7 +691,7 @@ export interface components {
             /** @description Details of where matches were found */
             matches: components["schemas"]["SearchDAGsMatchItem"][];
         };
-        /** @description Details of a search match within a DAG */
+        /** @description Details of a search match within a DAG definition */
         SearchDAGsMatchItem: {
             /** @description Matching line content */
             line: string;
@@ -700,7 +700,7 @@ export interface components {
             /** @description Start line for context */
             startLine: number;
         };
-        /** @description Log information for the scheduler */
+        /** @description Log information for the execution */
         Log: {
             /** @description Log content */
             content: string;
@@ -713,14 +713,14 @@ export interface components {
             /** @description Whether the line count is an estimate */
             isEstimate?: boolean;
         };
-        /** @description Grid item for log visualization */
+        /** @description Grid item for visualizing workflow execution history */
         DAGGridItem: {
             /** @description Name of the step */
             name: string;
             /** @description Status of the step ordered by time */
             history: components["schemas"]["NodeStatus"][];
         };
-        /** @description Precondition that must be satisfied before running a step or DAG */
+        /** @description Precondition that must be satisfied before running a step or workflow */
         Precondition: {
             /** @description Expression or check to evaluate */
             condition?: string;
@@ -756,7 +756,7 @@ export interface components {
         StepName: string;
         /** @description name of the remote node */
         RemoteNode: string;
-        /** @description workflow ID of the DAG workflow or latest workflow if specified as 'latest' */
+        /** @description ID of the workflow or 'latest' to get the most recent workflow */
         WorkflowId: components["schemas"]["WorkflowId"];
         /** @description Number of lines to return from the end of the file */
         Tail: number;
@@ -827,7 +827,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        /** @description List of DAGs with their status and metadata */
+                        /** @description List of DAG definitions with their status and metadata */
                         dags: components["schemas"]["DAGFile"][];
                         /** @description List of errors encountered during the request */
                         errors: string[];
@@ -987,7 +987,7 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description Parameters to pass to the DAG in JSON format */
+                    /** @description Parameters to pass to the workflow in JSON format */
                     params?: string;
                 };
             };
@@ -1000,7 +1000,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        /** @description Workflow ID of the initiated DAG workflow */
+                        /** @description ID of the created workflow */
                         workflowId: string;
                     };
                 };
@@ -1016,7 +1016,7 @@ export interface operations {
             };
         };
     };
-    terminateDAGRun: {
+    terminateWorkflow: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -1049,7 +1049,7 @@ export interface operations {
             };
         };
     };
-    retryDAGRun: {
+    retryWorkflow: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -1065,7 +1065,7 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description Workflow ID of the DAG workflow to retry */
+                    /** @description ID of the workflow to retry */
                     workflowId: string;
                 };
             };
@@ -1111,7 +1111,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        /** @description List of historical workflows for the DAG */
+                        /** @description List of historical workflows created from this DAG */
                         workflows: components["schemas"]["WorkflowDetails"][];
                         /** @description Grid data for visualization */
                         gridData: components["schemas"]["DAGGridItem"][];
@@ -1139,7 +1139,7 @@ export interface operations {
             path: {
                 /** @description the name of the DAG file */
                 fileName: components["parameters"]["DAGFileName"];
-                /** @description workflow ID of the DAG workflow or latest workflow if specified as 'latest' */
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
                 workflowId: components["parameters"]["WorkflowId"];
             };
             cookie?: never;
@@ -1191,7 +1191,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         dag?: components["schemas"]["DAGDetails"];
-                        /** @description The DAG spec */
+                        /** @description The DAG spec in YAML format */
                         spec: string;
                         /** @description List of errors in the spec */
                         errors: string[];
@@ -1225,7 +1225,7 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description The new DAG spec */
+                    /** @description The new DAG spec in YAML format */
                     spec: string;
                 };
             };
@@ -1442,7 +1442,7 @@ export interface operations {
             path: {
                 /** @description name of the DAG */
                 name: components["parameters"]["DAGName"];
-                /** @description workflow ID of the DAG workflow or latest workflow if specified as 'latest' */
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
                 workflowId: components["parameters"]["WorkflowId"];
             };
             cookie?: never;
@@ -1498,7 +1498,7 @@ export interface operations {
             path: {
                 /** @description name of the DAG */
                 name: components["parameters"]["DAGName"];
-                /** @description workflow ID of the DAG workflow or latest workflow if specified as 'latest' */
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
                 workflowId: components["parameters"]["WorkflowId"];
             };
             cookie?: never;
@@ -1552,7 +1552,7 @@ export interface operations {
             path: {
                 /** @description name of the DAG */
                 name: components["parameters"]["DAGName"];
-                /** @description workflow ID of the DAG workflow or latest workflow if specified as 'latest' */
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
                 workflowId: components["parameters"]["WorkflowId"];
                 /** @description name of the step */
                 stepName: components["parameters"]["StepName"];
@@ -1600,7 +1600,7 @@ export interface operations {
             path: {
                 /** @description name of the DAG */
                 name: components["parameters"]["DAGName"];
-                /** @description workflow ID of the DAG workflow or latest workflow if specified as 'latest' */
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
                 workflowId: components["parameters"]["WorkflowId"];
                 /** @description name of the step */
                 stepName: components["parameters"]["StepName"];
@@ -1661,7 +1661,7 @@ export interface operations {
             path: {
                 /** @description name of the DAG */
                 name: components["parameters"]["DAGName"];
-                /** @description workflow ID of the DAG workflow or latest workflow if specified as 'latest' */
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
                 workflowId: components["parameters"]["WorkflowId"];
                 /** @description ID of the child workflow to retrieve details for */
                 childWorkflowId: string;
@@ -1719,7 +1719,7 @@ export interface operations {
             path: {
                 /** @description name of the DAG */
                 name: components["parameters"]["DAGName"];
-                /** @description workflow ID of the DAG workflow or latest workflow if specified as 'latest' */
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
                 workflowId: components["parameters"]["WorkflowId"];
                 /** @description ID of the child workflow to retrieve the log for */
                 childWorkflowId: string;
@@ -1775,7 +1775,7 @@ export interface operations {
             path: {
                 /** @description name of the DAG */
                 name: components["parameters"]["DAGName"];
-                /** @description workflow ID of the DAG workflow or latest workflow if specified as 'latest' */
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
                 workflowId: components["parameters"]["WorkflowId"];
                 /** @description ID of the child workflow to retrieve the log for */
                 childWorkflowId: string;
@@ -1825,7 +1825,7 @@ export interface operations {
             path: {
                 /** @description name of the DAG */
                 name: components["parameters"]["DAGName"];
-                /** @description workflow ID of the DAG workflow or latest workflow if specified as 'latest' */
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
                 workflowId: components["parameters"]["WorkflowId"];
                 /** @description ID of the child workflow to update the step status for */
                 childWorkflowId: string;

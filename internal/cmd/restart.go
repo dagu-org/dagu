@@ -21,7 +21,7 @@ func CmdRestart() *cobra.Command {
 		&cobra.Command{
 			Use:   "restart --workflow-id=abc123 dagName",
 			Short: "Restart a running DAG",
-			Long: `Stop the currently running DAG and immediately restart it with the same configuration but with a new execution ID.
+			Long: `Stop the currently running DAG and immediately restart it with the same configuration but with a new workflow ID.
 
 Flags:
   --workflow-id string (optional) Unique identifier for tracking the restart execution.
@@ -29,8 +29,8 @@ Flags:
 Example:
   dagu restart --workflow-id=abc123 dagName
 
-This command gracefully stops the active DAG run before restarting it.
-If the execution ID is not provided, it will find the current running DAG by name.
+This command gracefully stops the active workflow before restarting it.
+If the workflow ID is not provided, it will find the current running DAG by name.
 `,
 			Args: cobra.ExactArgs(1),
 		}, restartFlags, runRestart,
@@ -44,18 +44,18 @@ var restartFlags = []commandLineFlag{
 func runRestart(ctx *Context, args []string) error {
 	reqID, err := ctx.Command.Flags().GetString("workflow-id")
 	if err != nil {
-		return fmt.Errorf("failed to get execution ID: %w", err)
+		return fmt.Errorf("failed to get workflow ID: %w", err)
 	}
 
 	name := args[0]
 
 	var record models.Record
 	if reqID != "" {
-		// Retrieve the previous run's record for the specified execution ID.
+		// Retrieve the previous run's record for the specified workflow ID.
 		ref := digraph.NewExecRef(name, reqID)
 		r, err := ctx.HistoryRepo.Find(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to find the record for execution ID %s: %w", reqID, err)
+			return fmt.Errorf("failed to find the record for workflow ID %s: %w", reqID, err)
 		}
 		record = r
 	} else {
@@ -101,14 +101,14 @@ func handleRestartProcess(ctx *Context, d *digraph.DAG, reqID string) error {
 		time.Sleep(d.RestartWait)
 	}
 
-	// Execute the exact same DAG with the same parameters but a new execution ID
+	// Execute the exact same DAG with the same parameters but a new workflow ID
 	return executeDAG(ctx, ctx.HistoryMgr, d)
 }
 
 func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
 	reqID, err := genReqID()
 	if err != nil {
-		return fmt.Errorf("failed to generate execution ID: %w", err)
+		return fmt.Errorf("failed to generate workflow ID: %w", err)
 	}
 
 	logFile, err := ctx.OpenLogFile(dag, reqID)
@@ -146,7 +146,7 @@ func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
-			return fmt.Errorf("DAG run failed: %w", err)
+			return fmt.Errorf("workflow failed: %w", err)
 		}
 	}
 

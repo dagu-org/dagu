@@ -17,8 +17,8 @@ func CmdRetry() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "retry [flags] /path/to/spec.yaml",
-			Short: "Retry a DAG run",
-			Long: `Re-execute a previously run DAG using its unique execution ID.
+			Short: "Retry a workflow",
+			Long: `Re-execute a previously run DAG using its unique workflow ID.
 
 Example:
   dagu retry my_dag.yaml --workflow-id=abc123
@@ -35,16 +35,16 @@ var retryFlags = []commandLineFlag{workflowIDFlagRetry}
 func runRetry(ctx *Context, args []string) error {
 	reqID, err := ctx.Command.Flags().GetString("workflow-id")
 	if err != nil {
-		return fmt.Errorf("failed to get execution ID: %w", err)
+		return fmt.Errorf("failed to get workflow ID: %w", err)
 	}
 
 	name := args[0]
 
-	// Retrieve the previous run data for specified execution ID.
+	// Retrieve the previous run data for specified workflow ID.
 	ref := digraph.NewExecRef(name, reqID)
 	runRecord, err := ctx.HistoryRepo.Find(ctx, ref)
 	if err != nil {
-		return fmt.Errorf("failed to find the record for execution ID %s: %w", reqID, err)
+		return fmt.Errorf("failed to find the record for workflow ID %s: %w", reqID, err)
 	}
 
 	// Read the detailed status of the previous status.

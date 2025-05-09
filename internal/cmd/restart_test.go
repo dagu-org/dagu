@@ -35,7 +35,7 @@ func TestRestartCommand(t *testing.T) {
 			th.RunCommand(t, cmd.CmdRestart(), test.CmdTest{Args: args})
 		}()
 
-		// Wait for the DAG running again.
+		// Wait for the workflowning again.
 		dag.AssertCurrentStatus(t, scheduler.StatusRunning)
 
 		time.Sleep(time.Millisecond * 300) // Wait a bit (need to investigate why this is needed).

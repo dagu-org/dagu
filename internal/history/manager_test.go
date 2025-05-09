@@ -104,7 +104,7 @@ func TestManager(t *testing.T) {
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
 
-		// Get the child execution ID.
+		// Get the child workflow ID.
 		status, err := th.HistoryMgr.GetLatestStatus(th.Context, dag.DAG)
 		require.NoError(t, err)
 		workflowID := status.ExecID
@@ -130,7 +130,7 @@ func TestManager(t *testing.T) {
 		ctx := th.Context
 		cli := th.HistoryMgr
 
-		// update with invalid execution ID
+		// update with invalid workflow ID
 		status := testNewStatus(dag.DAG, "unknown-req-id", scheduler.StatusError, scheduler.NodeStatusError)
 
 		// Check if the update fails.

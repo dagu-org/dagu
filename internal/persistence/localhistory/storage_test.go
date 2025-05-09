@@ -86,7 +86,7 @@ func TestJSONDB(t *testing.T) {
 		th.CreateRecord(t, ts2, "request-id-2", scheduler.StatusError)
 		th.CreateRecord(t, ts3, "request-id-3", scheduler.StatusSuccess)
 
-		// Find the record with execution ID "request-id-2"
+		// Find the record with workflow ID "request-id-2"
 		ref := digraph.NewExecRef("test_DAG", "request-id-2")
 		record, err := th.Repo.Find(th.Context, ref)
 		require.NoError(t, err)
@@ -96,7 +96,7 @@ func TestJSONDB(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "request-id-2", status.ExecID)
 
-		// Verify an error is returned if the execution ID does not exist
+		// Verify an error is returned if the workflow ID does not exist
 		refNonExist := digraph.NewExecRef("test_DAG", "nonexistent-id")
 		_, err = th.Repo.Find(th.Context, refNonExist)
 		assert.ErrorIs(t, err, models.ErrExecIDNotFound)

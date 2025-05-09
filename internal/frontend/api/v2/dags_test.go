@@ -35,9 +35,9 @@ func TestDAG(t *testing.T) {
 		var execResp api.ExecuteDAG200JSONResponse
 		resp.Unmarshal(t, &execResp)
 
-		require.NotEmpty(t, execResp.WorkflowId, "expected a non-empty execution ID")
+		require.NotEmpty(t, execResp.WorkflowId, "expected a non-empty workflow ID")
 
-		// Check the status of the DAG execution
+		// Check the status of the workflow
 		require.Eventually(t, func() bool {
 			url := fmt.Sprintf("/api/v2/dags/test_dag/workflows/%s", execResp.WorkflowId)
 			statusResp := server.Client().Get(url).ExpectStatus(http.StatusOK).Send(t)

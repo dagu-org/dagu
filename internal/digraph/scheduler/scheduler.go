@@ -323,7 +323,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 	sc.metrics.totalExecutionTime = time.Since(sc.metrics.startTime)
 
 	// Log execution summary
-	logger.Info(ctx, "DAG run completed",
+	logger.Info(ctx, "workflow completed",
 		"workflowId", sc.workflowID,
 		"status", sc.Status(graph).String(),
 		"totalTime", sc.metrics.totalExecutionTime/time.Second,

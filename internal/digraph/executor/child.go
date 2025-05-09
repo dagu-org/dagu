@@ -74,7 +74,7 @@ func (e *childWorkflow) Run(ctx context.Context) error {
 	}
 
 	if e.childWorkflowID == "" {
-		return fmt.Errorf("execution ID is not set for child DAG")
+		return fmt.Errorf("workflow ID is not set for child DAG")
 	}
 
 	e.lock.Lock()
@@ -82,7 +82,7 @@ func (e *childWorkflow) Run(ctx context.Context) error {
 	env := GetEnv(ctx)
 
 	if env.Root.IsZero() {
-		return fmt.Errorf("root execution ID is not set")
+		return fmt.Errorf("root workflow ID is not set")
 	}
 
 	args := []string{
@@ -135,7 +135,7 @@ func (e *childWorkflow) Run(ctx context.Context) error {
 	}
 
 	// get results from the child DAG
-	result, err := env.DB.GetChildExecStatus(ctx, e.childWorkflowID, env.Root)
+	result, err := env.DB.GetChildWorkflowStatus(ctx, e.childWorkflowID, env.Root)
 	if err != nil {
 		return fmt.Errorf("failed to collect result for the child execucion (exec ID=%s root=%s): %w", e.childWorkflowID, env.Root, err)
 	}

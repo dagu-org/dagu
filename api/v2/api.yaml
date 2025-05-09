@@ -24,9 +24,9 @@ servers:
 
 tags:
   - name: "dags"
-    description: "Operations for managing and executing DAGs (Directed Acyclic Graphs)"
+    description: "Operations for managing and creating DAG definitions"
   - name: "workflows"
-    description: "Operations for retrieving historical data and logs of DAG workflows"
+    description: "Operations for retrieving historical data and logs of workflow executions"
   - name: "system"
     description: "System operations for monitoring and managing the Dagu server"
 
@@ -51,7 +51,7 @@ paths:
   /dags:
     get:
       summary: "List all available DAGs"
-      description: "Retrieves DAGs with optional filtering by name and tags"
+      description: "Retrieves DAG definitions with optional filtering by name and tags"
       operationId: "listDAGs"
       tags:
         - "dags"
@@ -81,7 +81,7 @@ paths:
                 properties:
                   dags:
                     type: array
-                    description: "List of DAGs with their status and metadata"
+                    description: "List of DAG definitions with their status and metadata"
                     items:
                       $ref: "#/components/schemas/DAGFile"
                   errors:
@@ -143,7 +143,7 @@ paths:
   /dags/{fileName}:
     get:
       summary: "Retrieve comprehensive DAG information"
-      description: "Fetches detailed information about a specific DAG"
+      description: "Fetches detailed information about a specific DAG definition"
       operationId: "getDAGDetails"
       tags:
         - "dags"
@@ -209,8 +209,8 @@ paths:
 
   /dags/{fileName}/start:
     post:
-      summary: "Initiate DAG execution"
-      description: "Starts execution of a DAG with optional parameters"
+      summary: "Create and execute a workflow from DAG"
+      description: "Creates a workflow from the DAG definition and starts its execution with optional parameters"
       operationId: "executeDAG"
       tags:
         - "dags"
@@ -226,7 +226,7 @@ paths:
               properties:
                 params:
                   type: string
-                  description: "Parameters to pass to the DAG in JSON format"
+                  description: "Parameters to pass to the workflow in JSON format"
       responses:
         "200":
           description: "A successful response"
@@ -237,7 +237,7 @@ paths:
                 properties:
                   workflowId:
                     type: string
-                    description: "Workflow ID of the initiated DAG workflow"
+                    description: "ID of the created workflow"
                 required:
                   - workflowId
         default:
@@ -249,9 +249,9 @@ paths:
 
   /dags/{fileName}/stop:
     post:
-      summary: "Terminate running DAG execution"
-      description: "Forcefully stops a running DAG workflow"
-      operationId: "terminateDAGRun"
+      summary: "Terminate a running workflow"
+      description: "Forcefully stops a running workflow created from this DAG"
+      operationId: "terminateWorkflow"
       tags:
         - "dags"
       parameters:
@@ -269,9 +269,9 @@ paths:
 
   /dags/{fileName}/retry:
     post:
-      summary: "Retry DAG execution"
-      description: "Reruns a DAG execution"
-      operationId: "retryDAGRun"
+      summary: "Retry workflow execution"
+      description: "Creates a new workflow based on a previous execution"
+      operationId: "retryWorkflow"
       tags:
         - "dags"
       parameters:
@@ -286,7 +286,7 @@ paths:
               properties:
                 workflowId:
                   type: string
-                  description: "Workflow ID of the DAG workflow to retry"
+                  description: "ID of the workflow to retry"
               required:
                 - workflowId
       responses:
@@ -302,7 +302,7 @@ paths:
   /dags/{fileName}/workflows:
     get:
       summary: "Retrieve execution history of a DAG"
-      description: "Fetches execution history of a DAG"
+      description: "Fetches history of workflows created from this DAG definition"
       operationId: "getDAGWorkflowHistory"
       tags:
         - "dags"
@@ -319,7 +319,7 @@ paths:
                 properties:
                   workflows:
                     type: array
-                    description: "List of historical workflows for the DAG"
+                    description: "List of historical workflows created from this DAG"
                     items:
                       $ref: "#/components/schemas/WorkflowDetails"
                   gridData:
@@ -339,8 +339,8 @@ paths:
 
   /dags/{fileName}/workflows/{workflowId}:
     get:
-      summary: "Get detailed status of a specific DAG run"
-      description: "Retrieves status information about a particular DAG execution"
+      summary: "Get detailed status of a specific workflow"
+      description: "Retrieves status information about a particular workflow created from this DAG"
       tags:
         - "dags"
       operationId: "getDAGWorkflowDetails"
@@ -370,7 +370,7 @@ paths:
   /dags/{fileName}/spec:
     get:
       summary: "Retrieve DAG specification"
-      description: "Fetches the specification of a DAG"
+      description: "Fetches the YAML specification of a DAG definition"
       operationId: "getDAGSpec"
       tags:
         - "dags"
@@ -389,7 +389,7 @@ paths:
                     $ref: "#/components/schemas/DAGDetails"
                   spec:
                     type: string
-                    description: "The DAG spec"
+                    description: "The DAG spec in YAML format"
                   errors:
                     type: array
                     description: "List of errors in the spec"
@@ -406,7 +406,7 @@ paths:
                 $ref: "#/components/schemas/Error"
     put:
       summary: "Update DAG spec"
-      description: "Modifies the specification of a DAG"
+      description: "Modifies the YAML specification of a DAG definition"
       operationId: "updateDAGSpec"
       tags:
         - "dags"
@@ -422,7 +422,7 @@ paths:
               properties:
                 spec:
                   type: string
-                  description: "The new DAG spec"
+                  description: "The new DAG spec in YAML format"
               required:
                 - spec
       responses:
@@ -451,7 +451,7 @@ paths:
   /dags/{fileName}/suspend:
     post:
       summary: "Toggle DAG suspension state"
-      description: "Controls whether the scheduler should execute this DAG according to its defined cron schedule"
+      description: "Controls whether the scheduler should create workflows from this DAG according to its defined cron schedule"
       operationId: "updateDAGSuspensionState"
       tags:
         - "dags"
@@ -489,7 +489,7 @@ paths:
   /dags/{fileName}/rename:
     post:
       summary: "Change DAG file ID"
-      description: "Changes the file ID of the DAG"
+      description: "Changes the file ID of the DAG definition"
       operationId: "renameDAG"
       tags:
         - "dags"
@@ -993,7 +993,7 @@ components:
     WorkflowId:
       name: workflowId
       in: path
-      description: workflow ID of the DAG workflow or latest workflow if specified as 'latest'
+      description: ID of the workflow or 'latest' to get the most recent workflow
       required: true
       schema:
         $ref: "#/components/schemas/WorkflowId"
@@ -1162,7 +1162,7 @@ components:
 
     DAG:
       type: object
-      description: "Core DAG configuration containing workflow definition and metadata"
+      description: "Core DAG configuration containing definition and metadata"
       properties:
         group:
           type: string
@@ -1172,7 +1172,7 @@ components:
           description: "Logical name of the DAG"
         schedule:
           type: array
-          description: "List of scheduling expressions defining when the DAG should run"
+          description: "List of scheduling expressions defining when workflows should be created from this DAG"
           items:
             $ref: "#/components/schemas/Schedule"
         description:
@@ -1180,12 +1180,12 @@ components:
           description: "Human-readable description of the DAG's purpose and behavior"
         params:
           type: array
-          description: "List of parameter names that can be passed to the DAG at runtime"
+          description: "List of parameter names that can be passed to workflows created from this DAG"
           items:
             type: string
         defaultParams:
           type: string
-          description: "Default parameter values in JSON format if not specified at runtime"
+          description: "Default parameter values in JSON format if not specified at workflow creation"
         tags:
           type: array
           description: "List of tags for categorizing and filtering DAGs"
@@ -1197,7 +1197,7 @@ components:
 
     Schedule:
       type: object
-      description: "Schedule configuration for DAG run"
+      description: "Schedule configuration for workflow creation"
       properties:
         expression:
           type: string
@@ -1274,7 +1274,7 @@ components:
           description: "Unique identifier for the DAG within its group"
         schedule:
           type: array
-          description: "List of scheduling expressions defining when the DAG should run"
+          description: "List of scheduling expressions defining when workflows should be created from this DAG"
           items:
             $ref: "#/components/schemas/Schedule"
         description:
@@ -1282,7 +1282,7 @@ components:
           description: "Human-readable description of the DAG's purpose and behavior"
         env:
           type: array
-          description: "List of environment variables to set before executing"
+          description: "List of environment variables to set before executing a workflow"
           items:
             type: string
         logDir:
@@ -1292,31 +1292,31 @@ components:
           $ref: "#/components/schemas/HandlerOn"
         steps:
           type: array
-          description: "List of steps to execute in the DAG"
+          description: "List of steps to execute in workflows created from this DAG"
           items:
             $ref: "#/components/schemas/Step"
         delay:
           type: integer
-          description: "Time in seconds to wait before starting the DAG"
+          description: "Time in seconds to wait before starting a workflow"
         histRetentionDays:
           type: integer
           description: "Number of days to retain historical logs"
         preconditions:
           type: array
-          description: "Conditions that must be met before the DAG can start"
+          description: "Conditions that must be met before a workflow can start"
           items:
             $ref: "#/components/schemas/Precondition"
         maxActiveRuns:
           type: integer
-          description: "Maximum number of concurrent steps to run"
+          description: "Maximum number of concurrent workflows allowed from this DAG"
         params:
           type: array
-          description: "List of parameter names that can be passed to the DAG at runtime"
+          description: "List of parameter names that can be passed to workflows created from this DAG"
           items:
             type: string
         defaultParams:
           type: string
-          description: "Default parameter values in JSON format if not specified at runtime"
+          description: "Default parameter values in JSON format if not specified at workflow creation"
         tags:
           type: array
           description: "List of tags for categorizing and filtering DAGs"
@@ -1328,7 +1328,7 @@ components:
 
     HandlerOn:
       type: object
-      description: "Configuration for event handlers in a DAG"
+      description: "Configuration for event handlers in a workflow"
       properties:
         failure:
           $ref: "#/components/schemas/Step"
@@ -1341,7 +1341,7 @@ components:
 
     WorkflowSummary:
       type: object
-      description: "Current status of a DAG workflow"
+      description: "Current status of a workflow"
       properties:
         workflowId:
           $ref: "#/components/schemas/WorkflowId"
@@ -1353,19 +1353,19 @@ components:
           $ref: "#/components/schemas/StatusLabel"
         pid:
           type: integer
-          description: "Process ID of the DAG workflow"
+          description: "Process ID of the workflow"
         startedAt:
           type: string
-          description: "RFC 3339 timestamp when the DAG workflow started"
+          description: "RFC 3339 timestamp when the workflow started"
         finishedAt:
           type: string
-          description: "RFC 3339 timestamp when the DAG workflow finished"
+          description: "RFC 3339 timestamp when the workflow finished"
         log:
           type: string
           description: "Path to the log file"
         params:
           type: string
-          description: "Runtime parameters passed to the DAG in JSON format"
+          description: "Runtime parameters passed to the workflow in JSON format"
       required:
         - workflowId
         - name
@@ -1377,15 +1377,15 @@ components:
 
     WorkflowDetails:
       type: object
-      description: "Detailed status of a DAG workflow including child workflow nodes"
+      description: "Detailed status of a workflow including child workflow nodes"
       allOf:
         - $ref: "#/components/schemas/WorkflowSummary"
         - type: object
-          description: "Detailed status information for the steps within a DAG workflow."
+          description: "Detailed status information for the steps within a workflow."
           properties:
             nodes:
               type: array
-              description: "Status of individual steps within the DAG"
+              description: "Status of individual steps within the workflow"
               items:
                 $ref: "#/components/schemas/Node"
             onExit:
@@ -1401,7 +1401,7 @@ components:
 
     Node:
       type: object
-      description: "Status of an individual step within a DAG workflow"
+      description: "Status of an individual step within a workflow"
       properties:
         step:
           $ref: "#/components/schemas/Step"
@@ -1453,11 +1453,11 @@ components:
 
     Step:
       type: object
-      description: "Individual task within a DAG that performs a specific operation"
+      description: "Individual task definition that performs a specific operation in a workflow"
       properties:
         name:
           type: string
-          description: "Unique identifier for the step within the DAG"
+          description: "Unique identifier for the step within the workflow"
         description:
           type: string
           description: "Human-readable description of what the step does"
@@ -1532,7 +1532,7 @@ components:
 
     SearchDAGsMatchItem:
       type: object
-      description: "Details of a search match within a DAG"
+      description: "Details of a search match within a DAG definition"
       properties:
         line:
           type: string
@@ -1550,7 +1550,7 @@ components:
 
     Log:
       type: object
-      description: "Log information for the scheduler"
+      description: "Log information for the execution"
       properties:
         content:
           type: string
@@ -1572,7 +1572,7 @@ components:
 
     DAGGridItem:
       type: object
-      description: "Grid item for log visualization"
+      description: "Grid item for visualizing workflow execution history"
       properties:
         name:
           type: string
@@ -1588,7 +1588,7 @@ components:
 
     Precondition:
       type: object
-      description: "Precondition that must be satisfied before running a step or DAG"
+      description: "Precondition that must be satisfied before running a step or workflow"
       properties:
         condition:
           type: string

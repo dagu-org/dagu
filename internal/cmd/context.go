@@ -184,9 +184,9 @@ func (c *Context) dagRepo(cache *fileutil.Cache[*digraph.DAG], searchPaths []str
 	), nil
 }
 
-// OpenLogFile creates and opens a log file for a given DAG execution.
+// OpenLogFile creates and opens a log file for a given workflow.
 // It evaluates the log directory, validates settings, creates the log directory,
-// builds a filename using the current timestamp and execution ID, and then opens the file.
+// builds a filename using the current timestamp and workflow ID, and then opens the file.
 func (c *Context) OpenLogFile(
 	dag *digraph.DAG,
 	reqID string,
@@ -243,7 +243,7 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *C
 	return cmd
 }
 
-// genReqID creates a new UUID string to be used as a execution IDentifier.
+// genReqID creates a new UUID string to be used as a workflow IDentifier.
 func genReqID() (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
@@ -252,13 +252,13 @@ func genReqID() (string, error) {
 	return id.String(), nil
 }
 
-// validateExecID checks if the execution ID is valid and not empty.
+// validateExecID checks if the workflow ID is valid and not empty.
 func validateExecID(workflowID string) error {
 	if workflowID == "" {
-		return fmt.Errorf("execution ID is not set")
+		return fmt.Errorf("workflow ID is not set")
 	}
 	if _, err := uuid.Parse(workflowID); err != nil {
-		return fmt.Errorf("invalid execution ID: %w", err)
+		return fmt.Errorf("invalid workflow ID: %w", err)
 	}
 	return nil
 }
@@ -293,7 +293,7 @@ type LogConfig struct {
 	BaseDir   string // Base directory for logs.
 	DAGLogDir string // Optional alternative log directory specified by the DAG.
 	DAGName   string // Name of the DAG; used for generating a safe directory name.
-	ReqID     string // Unique execution ID used in the filename.
+	ReqID     string // Unique workflow ID used in the filename.
 }
 
 // Validate checks that essential fields are provided.
@@ -332,7 +332,7 @@ func (cfg LogConfig) LogDir() (string, error) {
 }
 
 // LogFile constructs the log filename using the prefix, safe DAG name, current timestamp,
-// and a truncated version of the execution ID.
+// and a truncated version of the workflow ID.
 func (cfg LogConfig) LogFile() string {
 	timestamp := time.Now().Format("20060102.15:04:05.000")
 	truncReqID := stringutil.TruncString(cfg.ReqID, 8)

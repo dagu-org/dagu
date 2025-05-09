@@ -42,71 +42,71 @@ var (
 		bindViper:    true,
 	}
 
-	// Additional parameters to pass to the DAG execution.
+	// Additional parameters to pass to the workflow.
 	// These parameters override the default values defined in the DAG.
 	// They can be specified either inline or following a "--" separator to distinguish them from other flags.
 	// Accepted formats include positional parameters and key=value pairs (e.g., "P1=foo P2=bar").
 	paramsFlag = commandLineFlag{
 		name:      "params",
 		shorthand: "p",
-		usage:     "Parameters to pass to the DAG run (overrides DAG defaults; supports positional values and key=value pairs, e.g., P1=foo P2=bar)",
+		usage:     "Parameters to pass to the workflow (overrides DAG defaults; supports positional values and key=value pairs, e.g., P1=foo P2=bar)",
 	}
 
-	// Unique execution ID required for retrying a DAG execution.
+	// Unique workflow ID required for retrying a workflow.
 	// This flag must be provided when using the retry command.
 	workflowIDFlagRetry = commandLineFlag{
 		name:      "workflow-id",
 		shorthand: "e",
-		usage:     "Unique execution ID for retrying a DAG run (required)",
+		usage:     "Unique workflow ID for retrying a workflow (required)",
 		required:  true,
 	}
 
-	// Unique execution ID used for starting a new DAG execution.
+	// Unique workflow ID used for starting a new workflow.
 	// This is used to track and identify the execution instance and its status.
 	workflowIDFlagStart = commandLineFlag{
 		name:      "workflow-id",
 		shorthand: "e",
-		usage:     "Unique execution ID for a DAG run",
+		usage:     "Unique workflow ID for a workflow",
 	}
 
-	// Unique execution ID used for stopping a DAG execution.
+	// Unique workflow ID used for stopping a workflow.
 	workflowIDFlagStop = commandLineFlag{
 		name:      "workflow-id",
 		shorthand: "e",
-		usage:     "execution ID for stopping a DAG run",
+		usage:     "workflow ID for stopping a workflow",
 	}
 
-	// Unique execution ID used for restarting a DAG execution.
+	// Unique workflow ID used for restarting a workflow.
 	workflowIDFlagRestart = commandLineFlag{
 		name:      "workflow-id",
 		shorthand: "e",
-		usage:     "execution ID for restarting a DAG run",
+		usage:     "workflow ID for restarting a workflow",
 	}
 
-	// Unique execution ID used for checking the status of a DAG execution.
+	// Unique workflow ID used for checking the status of a workflow.
 	workflowIDFlagStatus = commandLineFlag{
 		name:      "workflow-id",
 		shorthand: "e",
-		usage:     "execution ID for checking the status of a DAG run",
+		usage:     "workflow ID for checking the status of a workflow",
 	}
 
 	// rootDAGNameFlag reads the root DAG name for starting a child execution.
 	rootFlag = commandLineFlag{
 		name:  "root",
-		usage: "[only for child executions] Root execution ID for a DAG run",
+		usage: "[only for child executions] Root workflow ID for a workflow",
 	}
 
 	// parentFlag reads the parent ref for starting a child execution.
 	parentFlag = commandLineFlag{
 		name:  "parent",
-		usage: "[only for child executions] Parent execution ID for a DAG run",
+		usage: "[only for child executions] Parent workflow ID for a workflow",
 	}
 
-	// Suppresses output during DAG run (e.g., logs, status updates).
+	// Suppresses output during workflow (e.g., logs, status updates).
 	quietFlag = commandLineFlag{
 		name:      "quiet",
 		shorthand: "q",
-		usage:     "Suppress output during DAG run",
+		usage:     "Suppress output during workflow",
 		isBool:    true,
 	}
 )
