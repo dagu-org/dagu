@@ -2,6 +2,8 @@ package localhistory
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -13,7 +15,6 @@ import (
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
-	"github.com/google/uuid"
 )
 
 // Error definitions for directory structure validation
@@ -196,9 +197,10 @@ func formatRunTimestamp(t TimeInUTC) string {
 
 // genRunID generates unique run ID
 func genRunID() (string, error) {
-	id, err := uuid.NewRandom()
-	if err != nil {
-		return "", fmt.Errorf("failed to generate run ID: %w", err)
+	// 3 bytes → 6 hex characters
+	b := make([]byte, 3)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("failed to read random bytes: %w", err)
 	}
-	return id.String(), nil
+	return hex.EncodeToString(b), nil
 }
