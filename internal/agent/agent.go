@@ -81,6 +81,9 @@ type Agent struct {
 	// workflowID is the workflow ID of the current workflow.
 	workflowID string
 
+	// runID is the ID for the current run of the workflow.
+	runID string
+
 	// finished is true if the workflow is finished.
 	finished atomic.Bool
 
@@ -170,6 +173,8 @@ func (a *Agent) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to setup execution history: %w", err)
 	}
+	a.runID = run.ID()
+
 	if err := run.Open(ctx); err != nil {
 		return fmt.Errorf("failed to open execution history: %w", err)
 	}
@@ -288,6 +293,7 @@ func (a *Agent) Status() models.Status {
 		models.WithOnSuccessNode(a.scheduler.HandlerNode(digraph.HandlerOnSuccess)),
 		models.WithOnFailureNode(a.scheduler.HandlerNode(digraph.HandlerOnFailure)),
 		models.WithOnCancelNode(a.scheduler.HandlerNode(digraph.HandlerOnCancel)),
+		models.WithRunID(a.runID),
 	}
 
 	if a.childWorkflow.Load() {

@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
+	"github.com/google/uuid"
 )
 
 // Error definitions for directory structure validation
@@ -80,7 +82,11 @@ func NewWorkflow(dir string) (*Workflow, error) {
 // CreateRun creates a new run for the workflow with the given timestamp.
 // It creates a new run directory and initializes a record within it.
 func (e Workflow) CreateRun(_ context.Context, ts TimeInUTC, cache *fileutil.Cache[*models.Status], opts ...RunOption) (*Run, error) {
-	dir := filepath.Join(e.baseDir, RunDirPrefix+formatRunTimestamp(ts))
+	runID, err := genRunID()
+	if err != nil {
+		return nil, err
+	}
+	dir := filepath.Join(e.baseDir, RunDirPrefix+formatRunTimestamp(ts)+"_"+runID)
 	// Error if the directory already exists
 	if _, err := os.Stat(dir); err == nil {
 		return nil, fmt.Errorf("run directory already exists: %s", dir)
@@ -88,7 +94,7 @@ func (e Workflow) CreateRun(_ context.Context, ts TimeInUTC, cache *fileutil.Cac
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create the run directory: %w", err)
 	}
-	return NewRun(filepath.Join(dir, JSONLStatusFile), cache, opts...), nil
+	return NewRun(filepath.Join(dir, JSONLStatusFile), cache, opts...)
 }
 
 // CreateChildWorkflow creates a new child workflow with the given timestamp and workflow ID.
@@ -120,14 +126,18 @@ func (e Workflow) FindChildWorkflow(_ context.Context, workflowID string) (*Work
 
 // LatestRun returns the most recent run for the workflow.
 // It searches through all run directories and returns the first valid runs found.
-func (e Workflow) LatestRun(_ context.Context, cache *fileutil.Cache[*models.Status]) (*Run, error) {
+func (e Workflow) LatestRun(ctx context.Context, cache *fileutil.Cache[*models.Status]) (*Run, error) {
 	runDirs, err := listDirsSorted(e.baseDir, true, reRun)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list run directories: %w", err)
 	}
 	// Return the first valid run
 	for _, runDir := range runDirs {
-		run := NewRun(filepath.Join(e.baseDir, runDir, JSONLStatusFile), cache)
+		run, err := NewRun(filepath.Join(e.baseDir, runDir, JSONLStatusFile), cache)
+		if err != nil {
+			logger.Error(ctx, "failed to read a run data: %w", err)
+			continue
+		}
 		if run.Exists() {
 			return run, nil
 		}
@@ -152,7 +162,7 @@ func (e Workflow) Remove() error {
 
 // Regular expressions for parsing directory names
 var reWorkflow = regexp.MustCompile(`^` + WorkflowDirPrefix + `(\d{8}_\d{6}Z)_(.*)$`) // Matches workflow directory names
-var reRun = regexp.MustCompile(`^` + RunDirPrefix + `(\d{8}_\d{6}_\d{3}Z)$`)          // Matches run directory names
+var reRun = regexp.MustCompile(`^` + RunDirPrefix + `(\d{8}_\d{6}_\d{3}Z)_(.*)$`)     // Matches run directory names
 var reChildWorkflow = regexp.MustCompile(`^` + ChildWorkflowDirPrefix + `(.*)$`)      // Matches child workflow directory names
 
 // formatWorkflowTimestamp formats a TimeInUTC instance into a string representation (without milliseconds).
@@ -182,4 +192,13 @@ func formatRunTimestamp(t TimeInUTC) string {
 	const format = "20060102_150405"
 	mill := t.UnixMilli()
 	return t.Format(format) + "_" + fmt.Sprintf("%03d", mill%1000) + "Z"
+}
+
+// genRunID generates unique run ID
+func genRunID() (string, error) {
+	id, err := uuid.NewRandom()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate run ID: %w", err)
+	}
+	return id.String(), nil
 }

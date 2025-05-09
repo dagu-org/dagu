@@ -37,6 +37,7 @@ var _ models.Run = (*Run)(nil)
 // Run manages an append-only status file with read, write, and compaction capabilities.
 // It provides thread-safe operations and supports metrics collection.
 type Run struct {
+	id        string                          // Run ID
 	file      string                          // Path to the status file
 	writer    *Writer                         // Writer for appending status updates
 	mu        sync.RWMutex                    // Mutex for thread safety
@@ -56,13 +57,22 @@ func WithDAG(dag *digraph.DAG) RunOption {
 	}
 }
 
+// ID implements models.Run.
+func (r *Run) ID() string {
+	return r.id
+}
+
 // NewRun creates a new Run for the specified file.
-func NewRun(file string, cache *fileutil.Cache[*models.Status], opts ...RunOption) *Run {
-	r := &Run{file: file, cache: cache}
+func NewRun(file string, cache *fileutil.Cache[*models.Status], opts ...RunOption) (*Run, error) {
+	matches := reRun.FindStringSubmatch(filepath.Base(filepath.Dir(file)))
+	if len(matches) != 3 {
+		return nil, fmt.Errorf("invalid file path for run data: %s", file)
+	}
+	r := &Run{id: matches[2], file: file, cache: cache}
 	for _, opt := range opts {
 		opt(r)
 	}
-	return r
+	return r, nil
 }
 
 // Exists returns true if the status file exists.

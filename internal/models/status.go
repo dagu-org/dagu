@@ -57,6 +57,12 @@ func WithNodes(nodes []scheduler.NodeData) StatusOption {
 	}
 }
 
+func WithRunID(runID string) StatusOption {
+	return func(s *Status) {
+		s.RunID = runID
+	}
+}
+
 // WithFinishedAt returns a StatusOption that sets the finished time
 func WithFinishedAt(t time.Time) StatusOption {
 	return func(s *Status) {
@@ -144,6 +150,7 @@ type Status struct {
 	Parent     digraph.WorkflowRef `json:"parent,omitempty"`
 	Name       string              `json:"name"`
 	WorkflowID string              `json:"workflowId"`
+	RunID      string              `json:"runId"`
 	Status     scheduler.Status    `json:"status"`
 	PID        PID                 `json:"pid,omitempty"`
 	Nodes      []*Node             `json:"nodes,omitempty"`

@@ -43,6 +43,8 @@ type NewRunOptions struct {
 
 // Run represents a single execution of a workflow that can be read and written
 type Run interface {
+	// ID returns the ID of the run
+	ID() string
 	// Open prepares the run for writing
 	Open(ctx context.Context) error
 	// Write updates the run with new status information

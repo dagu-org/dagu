@@ -21,10 +21,11 @@ func TestRun_Open(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "status.dat")
 
-	hr := NewRun(file, nil)
+	hr, err := NewRun(file, nil)
+	require.NoError(t, err)
 
 	// Test successful open
-	err := hr.Open(context.Background())
+	err = hr.Open(context.Background())
 	assert.NoError(t, err)
 
 	// Test open when already open
@@ -40,11 +41,12 @@ func TestRun_Write(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "status.dat")
 
-	hr := NewRun(file, nil)
+	hr, err := NewRun(file, nil)
+	require.NoError(t, err)
 
 	// Test write without open
 	status := createTestStatus(scheduler.StatusRunning)
-	err := hr.Write(context.Background(), status)
+	err = hr.Write(context.Background(), status)
 	assert.ErrorIs(t, err, ErrStatusFileNotOpen)
 
 	// Open and write
@@ -96,7 +98,8 @@ func TestRun_Read(t *testing.T) {
 	require.NoError(t, err)
 
 	// Initialize Run and test reading
-	hr := NewRun(file, nil)
+	hr, err := NewRun(file, nil)
+	require.NoError(t, err)
 
 	// Read status - should get the last entry (test2)
 	status, err := hr.ReadStatus(context.Background())
@@ -145,7 +148,8 @@ func TestRun_Compact(t *testing.T) {
 	beforeSize := fileInfo.Size()
 
 	// Initialize Run
-	hr := NewRun(file, nil)
+	hr, err := NewRun(file, nil)
+	require.NoError(t, err)
 
 	// Compact the file
 	err = hr.Compact(context.Background())
@@ -170,8 +174,10 @@ func TestRun_Close(t *testing.T) {
 	file := filepath.Join(dir, "status.dat")
 
 	// Initialize and open Run
-	hr := NewRun(file, nil)
-	err := hr.Open(context.Background())
+	hr, err := NewRun(file, nil)
+	require.NoError(t, err)
+
+	err = hr.Open(context.Background())
 	require.NoError(t, err)
 
 	// Write some data
@@ -193,12 +199,13 @@ func TestRun_Close(t *testing.T) {
 
 func TestRun_HandleNonExistentFile(t *testing.T) {
 	dir := createTempDir(t)
-	file := filepath.Join(dir, "nonexistent", "status.dat")
+	file := filepath.Join(dir, "invalid.dat")
 
-	hr := NewRun(file, nil)
+	hr, err := NewRun(file, nil)
+	require.NoError(t, err)
 
 	// Should be able to open a non-existent file
-	err := hr.Open(context.Background())
+	err = hr.Open(context.Background())
 	assert.NoError(t, err)
 
 	// Write to create the file
@@ -224,7 +231,8 @@ func TestRun_EmptyFile(t *testing.T) {
 	require.NoError(t, err)
 	_ = f.Close()
 
-	hr := NewRun(file, nil)
+	hr, err := NewRun(file, nil)
+	require.NoError(t, err)
 
 	// Reading an empty file should return EOF
 	_, err = hr.ReadStatus(context.Background())
@@ -249,7 +257,8 @@ func TestRun_InvalidJSON(t *testing.T) {
 	_, err = f.Write([]byte("invalid json\n"))
 	require.NoError(t, err)
 
-	hr := NewRun(file, nil)
+	hr, err := NewRun(file, nil)
+	require.NoError(t, err)
 
 	// Should be able to read and get the valid entry
 	status, err := hr.ReadStatus(context.Background())
@@ -329,11 +338,16 @@ func TestSafeRename(t *testing.T) {
 // createTempDir creates a temporary directory for testing
 func createTempDir(t *testing.T) string {
 	t.Helper()
-	dir, err := os.MkdirTemp("", "run_test_")
+
+	runID, err := genRunID()
+	require.NoError(t, err)
+
+	dir, err := os.MkdirTemp("", "run_"+formatRunTimestamp(NewUTC(time.Now()))+"_"+runID)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = os.RemoveAll(dir)
 	})
+
 	return dir
 }
 
