@@ -72,7 +72,7 @@ steps:
 
 			th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
 				Args:        args,
-				ExpectedOut: []string{"workflow finished"},
+				ExpectedOut: []string{"Workflow finished"},
 			})
 		})
 	}

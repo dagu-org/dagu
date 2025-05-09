@@ -334,7 +334,7 @@ func (cfg LogConfig) LogDir() (string, error) {
 	utcTimestamp := time.Now().UTC().Format("20060102_150405Z")
 
 	safeName := fileutil.SafeName(cfg.Name)
-	logDir := filepath.Join(baseDir, safeName, utcTimestamp+"_"+cfg.WorkflowID)
+	logDir := filepath.Join(baseDir, safeName, "workflow_"+utcTimestamp+"_"+cfg.WorkflowID)
 	if err := os.MkdirAll(logDir, 0750); err != nil {
 		return "", fmt.Errorf("failed to initialize directory %s: %w", logDir, err)
 	}
@@ -347,10 +347,8 @@ func (cfg LogConfig) LogDir() (string, error) {
 func (cfg LogConfig) LogFile() string {
 	timestamp := time.Now().Format("20060102.15:04:05.000")
 	truncatedWorkflowID := stringutil.TruncString(cfg.WorkflowID, 8)
-	safeName := fileutil.SafeName(cfg.Name)
 
-	return fmt.Sprintf("workflow_%s.%s.%s.log",
-		safeName,
+	return fmt.Sprintf("workflow_%s.%s.log",
 		timestamp,
 		truncatedWorkflowID,
 	)

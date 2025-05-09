@@ -326,17 +326,6 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 	// Collect final metrics
 	sc.metrics.totalExecutionTime = time.Since(sc.metrics.startTime)
 
-	// Log execution summary
-	logger.Info(ctx, "workflow completed",
-		"workflowId", sc.workflowID,
-		"status", sc.Status(graph).String(),
-		"totalTime", sc.metrics.totalExecutionTime/time.Second,
-		"totalNodes", sc.metrics.totalNodes,
-		"completedNodes", sc.metrics.completedNodes,
-		"failedNodes", sc.metrics.failedNodes,
-		"skippedNodes", sc.metrics.skippedNodes,
-		"canceledNodes", sc.metrics.canceledNodes)
-
 	var eventHandlers []digraph.HandlerType
 	switch sc.Status(graph) {
 	case StatusSuccess:

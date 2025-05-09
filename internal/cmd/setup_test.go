@@ -75,7 +75,7 @@ func TestLogFileName(t *testing.T) {
 
 		filename := cfg.LogFile()
 
-		assert.Contains(t, filename, "test_dag")
+		assert.Contains(t, filename, "workflow")
 		assert.Contains(t, filename, time.Now().Format("20060102"))
 		assert.Contains(t, filename, "12345678")  // Should be truncated
 		assert.NotContains(t, filename, "901234") // Shouldn't contain the rest

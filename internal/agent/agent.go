@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"runtime/debug"
 	"strings"
@@ -140,11 +141,40 @@ func (a *Agent) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if err := a.setup(ctx); err != nil {
-		return fmt.Errorf("agent setup failed: %w", err)
+	if a.root.WorkflowID != a.workflowID {
+		logger.Debug(ctx, "Initiating child workflow", "rootRef", a.root.String())
+		a.childWorkflow.Store(true)
+		if a.parent.Zero() {
+			logger.Error(ctx, "Parent workflow ID is required for child workflow")
+			return fmt.Errorf("parent workflow ID is required for child workflow")
+		}
 	}
 
-	// Create a new context for the workflow with all necessary information
+	var run models.Run
+
+	if !a.dry {
+		// Setup the run record for the workflow.
+		// It's not required for dry-run because it does not create data.
+		r, err := a.setupRun(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to setup execution history: %w", err)
+		}
+		run = r
+		a.runID = run.ID()
+	}
+
+	// Initialize the scheduler
+	a.scheduler = a.newScheduler()
+
+	// Setup the reporter to send the report to the user.
+	a.setupReporter(ctx)
+
+	// Setup the graph for the workflow.
+	if err := a.setupGraph(ctx); err != nil {
+		return fmt.Errorf("failed to setup execution graph: %w", err)
+	}
+
+	// Create a new environment for the workflow execution.
 	dbClient := newDBClient(a.historyRepo, a.dagRepo)
 	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.root, a.workflowID, a.logFile, a.dag.Params)
 
@@ -165,15 +195,6 @@ func (a *Agent) Run(ctx context.Context) error {
 		a.scheduler.Cancel(ctx, a.graph)
 		return err
 	}
-
-	// Make a connection to the database.
-	// It should close the connection to the runstore database when the DAG
-	// execution is finished.
-	run, err := a.setupRun(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to setup execution history: %w", err)
-	}
-	a.runID = run.ID()
 
 	if err := run.Open(ctx); err != nil {
 		return fmt.Errorf("failed to open execution history: %w", err)
@@ -249,7 +270,17 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Update the finished status to the runstore database.
 	finishedStatus := a.Status()
-	logger.Info(ctx, "workflow finished", "status", finishedStatus.Status.String())
+
+	// Log execution summary
+	logger.Info(ctx, "Workflow finished",
+		"name", a.dag.Name,
+		"workflowId", a.workflowID,
+		"runID", a.runID,
+		"status", finishedStatus.Status.String(),
+		"startedAt", finishedStatus.StartedAt,
+		"finishedAt", finishedStatus.FinishedAt,
+	)
+
 	if err := run.Write(ctx, a.Status()); err != nil {
 		logger.Error(ctx, "Status write failed", "err", err)
 	}
@@ -358,22 +389,12 @@ func (a *Agent) HandleHTTP(ctx context.Context) sock.HTTPHandlerFunc {
 	}
 }
 
-// setup the agent instance for workflow.
-func (a *Agent) setup(ctx context.Context) error {
+// setupReporter setups the reporter to send the report to the user.
+func (a *Agent) setupReporter(ctx context.Context) {
 	// Lock to prevent race condition.
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	if a.root.WorkflowID != a.workflowID {
-		logger.Debug(ctx, "Initiating child workflow", "rootRef", a.root.String())
-		a.childWorkflow.Store(true)
-		if a.parent.Zero() {
-			logger.Error(ctx, "Parent workflow ID is required for child workflow")
-			return fmt.Errorf("parent workflow ID is required for child workflow")
-		}
-	}
-
-	a.scheduler = a.newScheduler()
 	var senderFn SenderFn
 	if a.dag.SMTP != nil {
 		senderFn = mailer.New(mailer.Config{
@@ -388,15 +409,19 @@ func (a *Agent) setup(ctx context.Context) error {
 			return nil
 		}
 	}
-	a.reporter = newReporter(senderFn)
 
-	return a.setupGraph(ctx)
+	a.reporter = newReporter(senderFn)
 }
 
 // newScheduler creates a scheduler instance for the workflow.
 func (a *Agent) newScheduler() *scheduler.Scheduler {
+	// schedulerLogDir is the directory to store the log files for each node in the workflow.
+	const dateTimeFormatUTC = "20060102_150405Z"
+	ts := time.Now().UTC().Format(dateTimeFormatUTC)
+	schedulerLogDir := filepath.Join(a.logDir, "run_"+ts+"_"+a.runID)
+
 	cfg := &scheduler.Config{
-		LogDir:        a.logDir,
+		LogDir:        schedulerLogDir,
 		MaxActiveRuns: a.dag.MaxActiveRuns,
 		Timeout:       a.dag.Timeout,
 		Delay:         a.dag.Delay,

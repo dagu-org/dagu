@@ -56,7 +56,7 @@ steps:
 	args := []string{"start", "--workflow-id", workflowID, "parent"}
 	th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
 		Args:        args,
-		ExpectedOut: []string{"workflow finished"},
+		ExpectedOut: []string{"Workflow finished"},
 	})
 
 	// Update the child_2 status to "failed" to simulate a retry
@@ -118,7 +118,7 @@ steps:
 	args = []string{"retry", "--workflow-id", workflowID, "parent"}
 	th.RunCommand(t, cmd.CmdRetry(), test.CmdTest{
 		Args:        args,
-		ExpectedOut: []string{"workflow finished"},
+		ExpectedOut: []string{"Workflow finished"},
 	})
 
 	// Check if the child_2 status is now "success"
