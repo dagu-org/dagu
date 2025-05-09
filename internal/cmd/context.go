@@ -256,10 +256,13 @@ func getWorkflowID() (string, error) {
 // validateWorkflowID checks if the workflow ID is valid and not empty.
 func validateWorkflowID(workflowID string) error {
 	if workflowID == "" {
-		return fmt.Errorf("workflow ID is not set")
+		return ErrWorkflowIDRequired
 	}
 	if !regexWorkflowID.MatchString(workflowID) {
-		return fmt.Errorf("invalid workflow ID format: %s", workflowID)
+		return ErrWorkflowIDFormat
+	}
+	if len(workflowID) > maxWorkflowIDLen {
+		return ErrWorkflowIDTooLong
 	}
 	return nil
 }
@@ -267,6 +270,9 @@ func validateWorkflowID(workflowID string) error {
 // regexWorkflowID is a regular expression to validate workflow IDs.
 // It allows alphanumeric characters, hyphens, and underscores.
 var regexWorkflowID = regexp.MustCompile(`^[a-zA-Z0-9-_]+$`)
+
+// maxWorkflowIDLen is the max length of the workflow ID
+const maxWorkflowIDLen = 60
 
 // signalListener is an interface for types that can receive OS signals.
 type signalListener interface {

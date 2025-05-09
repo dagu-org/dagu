@@ -43,6 +43,7 @@ var (
 	ErrDuplicateFunction                   = errors.New("duplicate function")
 	ErrFuncParamsMismatch                  = errors.New("func params and args given to func command do not match")
 	ErrStepNameRequired                    = errors.New("step name must be specified")
+	ErrStepNameTooLong                     = errors.New("step name must be less than 40 characters")
 	ErrStepCommandIsRequired               = errors.New("step command is required")
 	ErrStepCommandIsEmpty                  = errors.New("step command is empty")
 	ErrStepCommandMustBeArrayOrString      = errors.New("step command must be an array of strings or a string")

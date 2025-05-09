@@ -23,8 +23,6 @@ type definition struct {
 	Env any
 	// HandlerOn is the handler configuration.
 	HandlerOn handlerOnDef
-	// Deprecated: Don't use this field
-	Functions []*funcDef // deprecated
 	// Steps is the list of steps to run.
 	Steps any // []stepDef or map[string]stepDef
 	// SMTP is the SMTP configuration.
@@ -107,25 +105,10 @@ type stepDef struct {
 	// When it is empty, the same signal as the parent process is sent.
 	// It can be KILL when the process does not stop over the timeout.
 	SignalOnStop *string
-	// Deprecated: Don't use this field
-	Call *callFuncDef // deprecated
 	// Run is the name of a DAG to run as a child workflow
 	Run string
 	// Params specifies the parameters for the child workflow.
 	Params string
-}
-
-// funcDef defines a function in the DAG.
-type funcDef struct {
-	Name    string // Name of the function
-	Params  string // Parameters for the function
-	Command string // Command to execute the function
-}
-
-// callFuncDef defines a function call in the DAG.
-type callFuncDef struct {
-	Function string         // Name of the function to call
-	Args     map[string]any // Arguments for the function call
 }
 
 // continueOnDef defines the conditions to continue on failure or skipped.

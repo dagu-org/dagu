@@ -91,6 +91,7 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "signalOnStop", fn: buildSignalOnStop},
 	{name: "precondition", fn: buildStepPrecondition},
 	{name: "output", fn: buildOutput},
+	{name: "validate", fn: validateStep},
 }
 
 type stepBuilderEntry struct {
@@ -122,13 +123,6 @@ func build(ctx BuildContext, spec *definition) (*DAG, error) {
 		}
 		if err := builder.fn(ctx, spec, dag); err != nil {
 			errs.Add(wrapError(builder.name, nil, err))
-		}
-	}
-
-	if !ctx.opts.OnlyMetadata {
-		// TODO: Remove functions feature.
-		if err := assertFunctions(spec.Functions); err != nil {
-			errs.Add(err)
 		}
 	}
 
@@ -336,28 +330,28 @@ func buildLogDir(_ BuildContext, spec *definition, dag *DAG) (err error) {
 func buildHandlers(ctx BuildContext, spec *definition, dag *DAG) (err error) {
 	if spec.HandlerOn.Exit != nil {
 		spec.HandlerOn.Exit.Name = HandlerOnExit.String()
-		if dag.HandlerOn.Exit, err = buildStep(ctx, *spec.HandlerOn.Exit, spec.Functions); err != nil {
+		if dag.HandlerOn.Exit, err = buildStep(ctx, *spec.HandlerOn.Exit); err != nil {
 			return err
 		}
 	}
 
 	if spec.HandlerOn.Success != nil {
 		spec.HandlerOn.Success.Name = HandlerOnSuccess.String()
-		if dag.HandlerOn.Success, err = buildStep(ctx, *spec.HandlerOn.Success, spec.Functions); err != nil {
+		if dag.HandlerOn.Success, err = buildStep(ctx, *spec.HandlerOn.Success); err != nil {
 			return
 		}
 	}
 
 	if spec.HandlerOn.Failure != nil {
 		spec.HandlerOn.Failure.Name = HandlerOnFailure.String()
-		if dag.HandlerOn.Failure, err = buildStep(ctx, *spec.HandlerOn.Failure, spec.Functions); err != nil {
+		if dag.HandlerOn.Failure, err = buildStep(ctx, *spec.HandlerOn.Failure); err != nil {
 			return
 		}
 	}
 
 	if spec.HandlerOn.Cancel != nil {
 		spec.HandlerOn.Cancel.Name = HandlerOnCancel.String()
-		if dag.HandlerOn.Cancel, err = buildStep(ctx, *spec.HandlerOn.Cancel, spec.Functions); err != nil {
+		if dag.HandlerOn.Cancel, err = buildStep(ctx, *spec.HandlerOn.Cancel); err != nil {
 			return
 		}
 	}
@@ -480,7 +474,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 			return wrapError("steps", v, err)
 		}
 		for _, stepDef := range stepDefs {
-			step, err := buildStep(ctx, stepDef, spec.Functions)
+			step, err := buildStep(ctx, stepDef)
 			if err != nil {
 				return err
 			}
@@ -500,7 +494,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 		}
 		for name, stepDef := range stepDefs {
 			stepDef.Name = name
-			step, err := buildStep(ctx, stepDef, spec.Functions)
+			step, err := buildStep(ctx, stepDef)
 			if err != nil {
 				return err
 			}
@@ -560,11 +554,7 @@ func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
 }
 
 // buildStep builds a step from the step definition.
-func buildStep(ctx BuildContext, def stepDef, fns []*funcDef) (*Step, error) {
-	if err := assertStepDef(def, fns); err != nil {
-		return nil, err
-	}
-
+func buildStep(ctx BuildContext, def stepDef) (*Step, error) {
 	step := &Step{
 		Name:           def.Name,
 		Description:    def.Description,
@@ -575,11 +565,6 @@ func buildStep(ctx BuildContext, def stepDef, fns []*funcDef) (*Step, error) {
 		Dir:            def.Dir,
 		MailOnError:    def.MailOnError,
 		ExecutorConfig: ExecutorConfig{Config: make(map[string]any)},
-	}
-
-	// TODO: remove the deprecated call field.
-	if err := parseFuncCall(step, def.Call, fns); err != nil {
-		return nil, err
 	}
 
 	for _, entry := range stepBuilderRegistry {
@@ -672,6 +657,29 @@ func buildOutput(_ BuildContext, def stepDef, step *Step) error {
 	step.Output = def.Output
 	return nil
 }
+
+func validateStep(_ BuildContext, def stepDef, step *Step) error {
+	if step.Name == "" {
+		return wrapError("name", step.Name, ErrStepNameRequired)
+	}
+
+	if len(step.Name) > maxStepNameLen {
+		return wrapError("name", step.Name, ErrStepNameTooLong)
+	}
+
+	// TODO: Validate executor config for each executor type.
+
+	if step.Command == "" {
+		if step.ExecutorConfig.Type == "" && step.Script == "" && step.ChildWorkflow == nil {
+			return ErrStepCommandIsRequired
+		}
+	}
+
+	return nil
+}
+
+// maxStepNameLen is the maximum length of a step name.
+const maxStepNameLen = 40
 
 func buildStepPrecondition(ctx BuildContext, def stepDef, step *Step) error {
 	// Parse both `preconditions` and `precondition` fields.

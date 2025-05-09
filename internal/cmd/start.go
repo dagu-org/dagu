@@ -20,6 +20,9 @@ var (
 
 	// ErrWorkflowIDFormat is returned when the provided workflow ID has an invalid format
 	ErrWorkflowIDFormat = errors.New("workflow ID must only contain alphanumeric characters, dashes, and underscores")
+
+	// ErrWorkflowIDTooLong is returned when the provided workflow ID is too long
+	ErrWorkflowIDTooLong = errors.New("workflow ID length must be less than 60 characters")
 )
 
 // CmdStart creates and returns a cobra command for starting workflow
@@ -108,7 +111,7 @@ func getExecutionInfo(ctx *Context) (workflowID string, rootRef string, parentRe
 	// Validate or generate workflow ID
 	if workflowID != "" {
 		if err := validateWorkflowID(workflowID); err != nil {
-			return "", "", "", false, ErrWorkflowIDFormat
+			return "", "", "", false, err
 		}
 	} else {
 		// Generate a new workflow ID if not provided
