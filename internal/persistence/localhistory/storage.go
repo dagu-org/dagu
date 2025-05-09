@@ -73,15 +73,15 @@ func New(baseDir string, opts ...HistoryStorageOption) models.HistoryRepository 
 }
 
 // Create creates a new history record for the specified workflow ID.
-// If opts.Root is not nil, it creates a sub-record for the specified root DAG.
+// If opts.Root is not nil, it creates a new history record for a child workflow.
 // If opts.Retry is true, it creates a retry record for the specified workflow ID.
-func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts models.NewRecordOptions) (models.Record, error) {
-	if reqID == "" {
+func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewRecordOptions) (models.Record, error) {
+	if workflowID == "" {
 		return nil, ErrExecIDEmpty
 	}
 
 	if opts.Root != nil {
-		return db.newSubRecord(ctx, dag, timestamp, reqID, opts)
+		return db.newSubRecord(ctx, dag, timestamp, workflowID, opts)
 	}
 
 	dataRoot := NewDataRoot(db.baseDir, dag.Name)
@@ -89,13 +89,13 @@ func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestam
 
 	var run *Execution
 	if opts.Retry {
-		r, err := dataRoot.FindByExecID(ctx, reqID)
+		r, err := dataRoot.FindByExecID(ctx, workflowID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find execution: %w", err)
 		}
 		run = r
 	} else {
-		r, err := dataRoot.CreateRun(ts, reqID)
+		r, err := dataRoot.CreateRun(ts, workflowID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create run: %w", err)
 		}
@@ -184,7 +184,7 @@ func (db *historyStorage) Latest(ctx context.Context, dagName string) (models.Re
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
-		return nil, fmt.Errorf("LatestToday canceled: %w", ctx.Err())
+		return nil, fmt.Errorf("Latest canceled: %w", ctx.Err())
 	default:
 		// Continue with operation
 	}
@@ -217,7 +217,7 @@ func (db *historyStorage) Find(ctx context.Context, ref digraph.WorkflowRef) (mo
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
-		return nil, fmt.Errorf("FindByReqID canceled: %w", ctx.Err())
+		return nil, fmt.Errorf("Find canceled: %w", ctx.Err())
 	default:
 		// Continue with operation
 	}
@@ -242,7 +242,7 @@ func (db *historyStorage) FindChildWorkflow(ctx context.Context, ref digraph.Wor
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
-		return nil, fmt.Errorf("FindBySubReqID canceled: %w", ctx.Err())
+		return nil, fmt.Errorf("FindChildWorkflow canceled: %w", ctx.Err())
 	default:
 		// Continue with operation
 	}
@@ -292,7 +292,7 @@ func (db *historyStorage) Rename(ctx context.Context, oldNameOrPath, newNameOrPa
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
-		return fmt.Errorf("rename canceled: %w", ctx.Err())
+		return fmt.Errorf("Rename canceled: %w", ctx.Err())
 	default:
 		// Continue with operation
 	}

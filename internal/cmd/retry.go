@@ -33,7 +33,7 @@ This command is useful for recovering from errors or transient issues by re-runn
 var retryFlags = []commandLineFlag{workflowIDFlagRetry}
 
 func runRetry(ctx *Context, args []string) error {
-	reqID, err := ctx.Command.Flags().GetString("workflow-id")
+	workflowID, err := ctx.Command.Flags().GetString("workflow-id")
 	if err != nil {
 		return fmt.Errorf("failed to get workflow ID: %w", err)
 	}
@@ -41,10 +41,10 @@ func runRetry(ctx *Context, args []string) error {
 	name := args[0]
 
 	// Retrieve the previous run data for specified workflow ID.
-	ref := digraph.NewWorkflowRef(name, reqID)
+	ref := digraph.NewWorkflowRef(name, workflowID)
 	runRecord, err := ctx.HistoryRepo.Find(ctx, ref)
 	if err != nil {
-		return fmt.Errorf("failed to find the record for workflow ID %s: %w", reqID, err)
+		return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflowID, err)
 	}
 
 	// Read the detailed status of the previous status.

@@ -38,15 +38,15 @@ func newChildWorkflow(
 		Name   string
 		Params string
 	}{
-		Name:   step.ChildDAG.Name,
-		Params: step.ChildDAG.Params,
+		Name:   step.ChildWorkflow.Name,
+		Params: step.ChildWorkflow.Params,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to substitute string fields: %w", err)
 	}
 
 	env := GetEnv(ctx)
-	sub, err := env.DB.GetDAG(ctx, config.Name)
+	dag, err := env.DB.GetDAG(ctx, config.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find child workflow %q: %w", config.Name, err)
 	}
@@ -61,7 +61,7 @@ func newChildWorkflow(
 	}
 
 	return &childWorkflow{
-		dag:     sub,
+		dag:     dag,
 		params:  config.Params,
 		workDir: dir,
 	}, nil
@@ -137,7 +137,7 @@ func (e *childWorkflow) Run(ctx context.Context) error {
 	// get results from the child workflow
 	result, err := env.DB.GetChildWorkflowStatus(ctx, e.childWorkflowID, env.Root)
 	if err != nil {
-		return fmt.Errorf("failed to collect result for the child execucion (exec ID=%s root=%s): %w", e.childWorkflowID, env.Root, err)
+		return fmt.Errorf("failed to find result for the child workflow (workflow ID=%s root=%s): %w", e.childWorkflowID, env.Root, err)
 	}
 
 	jsonData, err := json.MarshalIndent(result, "", "  ")

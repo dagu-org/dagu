@@ -123,9 +123,9 @@ func (m *Manager) RestartDAG(_ context.Context, dag *digraph.DAG, opts RestartOp
 
 // RetryDAG retries a workflow with the specified requestID by executing
 // the configured executable with the retry command.
-func (m *Manager) RetryDAG(_ context.Context, dag *digraph.DAG, reqID string) error {
+func (m *Manager) RetryDAG(_ context.Context, dag *digraph.DAG, workflowID string) error {
 	args := []string{"retry"}
-	args = append(args, fmt.Sprintf("--workflow-id=%s", reqID))
+	args = append(args, fmt.Sprintf("--workflow-id=%s", workflowID))
 	args = append(args, dag.Location)
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
@@ -184,10 +184,10 @@ func (e *Manager) FindWorkflowStatus(ctx context.Context, ref digraph.WorkflowRe
 // findPersistedStatus retrieves the status of a workflow by requestID.
 // If the stored status indicates the DAG is running, it attempts to get the current status.
 // If that fails, it marks the status as error.
-func (m *Manager) findPersistedStatus(ctx context.Context, dag *digraph.DAG, reqID string) (
+func (m *Manager) findPersistedStatus(ctx context.Context, dag *digraph.DAG, workflowID string) (
 	*models.Status, error,
 ) {
-	ref := digraph.NewWorkflowRef(dag.Name, reqID)
+	ref := digraph.NewWorkflowRef(dag.Name, workflowID)
 	record, err := m.historyRepo.Find(ctx, ref)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by workflow ID: %w", err)
@@ -215,8 +215,8 @@ func (m *Manager) findPersistedStatus(ctx context.Context, dag *digraph.DAG, req
 }
 
 // FindChildWorkflowStatus retrieves the status of a child workflow by its workflow ID.
-func (m *Manager) FindChildWorkflowStatus(ctx context.Context, ref digraph.WorkflowRef, reqID string) (*models.Status, error) {
-	record, err := m.historyRepo.FindChildWorkflow(ctx, ref, reqID)
+func (m *Manager) FindChildWorkflowStatus(ctx context.Context, ref digraph.WorkflowRef, workflowID string) (*models.Status, error) {
+	record, err := m.historyRepo.FindChildWorkflow(ctx, ref, workflowID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find child workflow status by workflow ID: %w", err)
 	}
@@ -229,9 +229,9 @@ func (m *Manager) FindChildWorkflowStatus(ctx context.Context, ref digraph.Workf
 
 // currentStatus retrieves the current status of a running DAG by querying its socket.
 // This is a private method used internally by other status-related methods.
-func (*Manager) currentStatus(_ context.Context, dag *digraph.DAG, reqID string) (*models.Status, error) {
+func (*Manager) currentStatus(_ context.Context, dag *digraph.DAG, workflowID string) (*models.Status, error) {
 	// FIXME: Should handle the case of dynamic DAG
-	client := sock.NewClient(dag.SockAddr(reqID))
+	client := sock.NewClient(dag.SockAddr(workflowID))
 	statusJSON, err := client.Request("GET", "/status")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current status: %w", err)

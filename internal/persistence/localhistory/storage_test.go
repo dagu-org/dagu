@@ -21,9 +21,9 @@ func TestJSONDB(t *testing.T) {
 		ts3 := time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC)
 
 		// Create records with different statuses
-		th.CreateRecord(t, ts1, "request-id-1", scheduler.StatusRunning)
-		th.CreateRecord(t, ts2, "request-id-2", scheduler.StatusError)
-		th.CreateRecord(t, ts3, "request-id-3", scheduler.StatusSuccess)
+		th.CreateRecord(t, ts1, "workflow-id-1", scheduler.StatusRunning)
+		th.CreateRecord(t, ts2, "workflow-id-2", scheduler.StatusError)
+		th.CreateRecord(t, ts3, "workflow-id-3", scheduler.StatusSuccess)
 
 		// Request 2 most recent records
 		records := th.Repo.Recent(th.Context, "test_DAG", 2)
@@ -32,12 +32,12 @@ func TestJSONDB(t *testing.T) {
 		// Verify the first record is the most recent
 		status0, err := records[0].ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "request-id-3", status0.WorkflowID)
+		assert.Equal(t, "workflow-id-3", status0.WorkflowID)
 
 		// Verify the second record is the second most recent
 		status1, err := records[1].ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "request-id-2", status1.WorkflowID)
+		assert.Equal(t, "workflow-id-2", status1.WorkflowID)
 
 		// Verify all records are returned if the number requested is equal to the number of records
 		records = th.Repo.Recent(th.Context, "test_DAG", 3)
@@ -56,9 +56,9 @@ func TestJSONDB(t *testing.T) {
 		ts3 := time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC)
 
 		// Create records with different statuses
-		th.CreateRecord(t, ts1, "request-id-1", scheduler.StatusRunning)
-		th.CreateRecord(t, ts2, "request-id-2", scheduler.StatusError)
-		th.CreateRecord(t, ts3, "request-id-3", scheduler.StatusSuccess)
+		th.CreateRecord(t, ts1, "workflow-id-1", scheduler.StatusRunning)
+		th.CreateRecord(t, ts2, "workflow-id-2", scheduler.StatusError)
+		th.CreateRecord(t, ts3, "workflow-id-3", scheduler.StatusSuccess)
 
 		// Set the database to return the latest status (even if it was created today)
 		// Verify that record created before today is returned
@@ -71,9 +71,9 @@ func TestJSONDB(t *testing.T) {
 		status, err := record.ReadStatus(th.Context)
 		require.NoError(t, err)
 
-		assert.Equal(t, "request-id-3", status.WorkflowID)
+		assert.Equal(t, "workflow-id-3", status.WorkflowID)
 	})
-	t.Run("FindByReqID", func(t *testing.T) {
+	t.Run("FindByWorkflowID", func(t *testing.T) {
 		th := setupTestJSONDB(t)
 
 		// Create timestamps for the records
@@ -82,19 +82,19 @@ func TestJSONDB(t *testing.T) {
 		ts3 := time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC)
 
 		// Create records with different statuses
-		th.CreateRecord(t, ts1, "request-id-1", scheduler.StatusRunning)
-		th.CreateRecord(t, ts2, "request-id-2", scheduler.StatusError)
-		th.CreateRecord(t, ts3, "request-id-3", scheduler.StatusSuccess)
+		th.CreateRecord(t, ts1, "workflow-id-1", scheduler.StatusRunning)
+		th.CreateRecord(t, ts2, "workflow-id-2", scheduler.StatusError)
+		th.CreateRecord(t, ts3, "workflow-id-3", scheduler.StatusSuccess)
 
-		// Find the record with workflow ID "request-id-2"
-		ref := digraph.NewWorkflowRef("test_DAG", "request-id-2")
+		// Find the record with workflow ID "workflow-id-2"
+		ref := digraph.NewWorkflowRef("test_DAG", "workflow-id-2")
 		record, err := th.Repo.Find(th.Context, ref)
 		require.NoError(t, err)
 
 		// Verify the record is the correct one
 		status, err := record.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "request-id-2", status.WorkflowID)
+		assert.Equal(t, "workflow-id-2", status.WorkflowID)
 
 		// Verify an error is returned if the workflow ID does not exist
 		refNonExist := digraph.NewWorkflowRef("test_DAG", "nonexistent-id")
@@ -110,9 +110,9 @@ func TestJSONDB(t *testing.T) {
 		ts3 := time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC)
 
 		// Create records with different statuses
-		th.CreateRecord(t, ts1, "request-id-1", scheduler.StatusRunning)
-		th.CreateRecord(t, ts2, "request-id-2", scheduler.StatusError)
-		th.CreateRecord(t, ts3, "request-id-3", scheduler.StatusSuccess)
+		th.CreateRecord(t, ts1, "workflow-id-1", scheduler.StatusRunning)
+		th.CreateRecord(t, ts2, "workflow-id-2", scheduler.StatusError)
+		th.CreateRecord(t, ts3, "workflow-id-3", scheduler.StatusSuccess)
 
 		// Verify records are present
 		records := th.Repo.Recent(th.Context, "test_DAG", 3)
@@ -138,8 +138,8 @@ func TestJSONDB(t *testing.T) {
 
 		// Create a sub record
 		root := digraph.NewWorkflowRef("test_DAG", "parent-id")
-		childDAG := th.DAG("sub_dag")
-		record, err := th.Repo.Create(th.Context, childDAG.DAG, ts, "sub-id", models.NewRecordOptions{
+		childWorkflowDAG := th.DAG("child")
+		record, err := th.Repo.Create(th.Context, childWorkflowDAG.DAG, ts, "sub-id", models.NewRecordOptions{
 			Root: &root,
 		})
 		require.NoError(t, err)
@@ -151,7 +151,7 @@ func TestJSONDB(t *testing.T) {
 			_ = record.Close(th.Context)
 		}()
 
-		statusToWrite := models.InitialStatus(childDAG.DAG)
+		statusToWrite := models.InitialStatus(childWorkflowDAG.DAG)
 		statusToWrite.WorkflowID = "sub-id"
 		err = record.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
@@ -179,8 +179,8 @@ func TestJSONDB(t *testing.T) {
 		const parentExecID = "parent-id"
 
 		root := digraph.NewWorkflowRef("test_DAG", parentExecID)
-		childDAG := th.DAG("sub_dag")
-		record, err := th.Repo.Create(th.Context, childDAG.DAG, ts, childWorkflowID, models.NewRecordOptions{
+		childWorkflowDAG := th.DAG("child")
+		record, err := th.Repo.Create(th.Context, childWorkflowDAG.DAG, ts, childWorkflowID, models.NewRecordOptions{
 			Root: &root,
 		})
 		require.NoError(t, err)
@@ -192,7 +192,7 @@ func TestJSONDB(t *testing.T) {
 			_ = record.Close(th.Context)
 		}()
 
-		statusToWrite := models.InitialStatus(childDAG.DAG)
+		statusToWrite := models.InitialStatus(childWorkflowDAG.DAG)
 		statusToWrite.WorkflowID = childWorkflowID
 		statusToWrite.Status = scheduler.StatusRunning
 		err = record.Write(th.Context, statusToWrite)
@@ -209,7 +209,7 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, scheduler.StatusRunning.String(), existingRecordStatus.Status.String())
 
 		// Create a retry record and write different status
-		retryRecord, err := th.Repo.Create(th.Context, childDAG.DAG, ts, childWorkflowID, models.NewRecordOptions{
+		retryRecord, err := th.Repo.Create(th.Context, childWorkflowDAG.DAG, ts, childWorkflowID, models.NewRecordOptions{
 			Root:  &root,
 			Retry: true,
 		})

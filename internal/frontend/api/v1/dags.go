@@ -667,12 +667,12 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 
 func (a *API) updateStatus(
 	ctx context.Context,
-	reqID string,
+	workflowID string,
 	step string,
 	dag *digraph.DAG,
 	to scheduler.NodeStatus,
 ) error {
-	status, err := a.historyManager.GetDAGRealtimeStatus(ctx, dag, reqID)
+	status, err := a.historyManager.GetDAGRealtimeStatus(ctx, dag, workflowID)
 	if err != nil {
 		return fmt.Errorf("error getting status: %w", err)
 	}
@@ -702,7 +702,7 @@ func (a *API) updateStatus(
 
 	status.Nodes[idxToUpdate].Status = to
 
-	root := digraph.NewWorkflowRef(dag.Name, reqID)
+	root := digraph.NewWorkflowRef(dag.Name, workflowID)
 	if err := a.historyManager.UpdateStatus(ctx, root, *status); err != nil {
 		return fmt.Errorf("error updating status: %w", err)
 	}
@@ -793,9 +793,9 @@ func toStep(obj digraph.Step) api.Step {
 		Script:        ptrOf(obj.Script),
 	}
 
-	if obj.ChildDAG != nil {
-		step.Run = ptrOf(obj.ChildDAG.Name)
-		step.Params = ptrOf(obj.ChildDAG.Params)
+	if obj.ChildWorkflow != nil {
+		step.Run = ptrOf(obj.ChildWorkflow.Name)
+		step.Params = ptrOf(obj.ChildWorkflow.Params)
 	}
 	return step
 }

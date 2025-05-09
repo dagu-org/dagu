@@ -34,7 +34,7 @@ var stopFlags = []commandLineFlag{
 }
 
 func runStop(ctx *Context, args []string) error {
-	reqID, err := ctx.Command.Flags().GetString("workflow-id")
+	workflowID, err := ctx.Command.Flags().GetString("workflow-id")
 	if err != nil {
 		return fmt.Errorf("failed to get workflow ID: %w", err)
 	}
@@ -42,12 +42,12 @@ func runStop(ctx *Context, args []string) error {
 	name := args[0]
 
 	var dag *digraph.DAG
-	if reqID != "" {
+	if workflowID != "" {
 		// Retrieve the previous run's history record for the specified workflow ID.
-		ref := digraph.NewWorkflowRef(name, reqID)
+		ref := digraph.NewWorkflowRef(name, workflowID)
 		rec, err := ctx.HistoryRepo.Find(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to find the record for workflow ID %s: %w", reqID, err)
+			return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflowID, err)
 		}
 
 		d, err := rec.ReadDAG(ctx)
@@ -65,7 +65,7 @@ func runStop(ctx *Context, args []string) error {
 
 	logger.Info(ctx, "workflow is stopping", "dag", dag.Name)
 
-	if err := ctx.HistoryMgr.Stop(ctx, dag, reqID); err != nil {
+	if err := ctx.HistoryMgr.Stop(ctx, dag, workflowID); err != nil {
 		return fmt.Errorf("failed to stop DAG: %w", err)
 	}
 

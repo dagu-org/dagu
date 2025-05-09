@@ -36,20 +36,6 @@
                 "${input:pathToSpec}"
             ]
         },
-        {
-            "name": "Test",
-            "type": "go",
-            "request": "launch",
-            "mode": "auto",
-            "program": "${workspaceFolder}/cmd/",
-            "args": [
-                "start",
-                "--root=_parent:0196b021-11a9-78ba-ae6e-e2b78eda65c5",
-                "--parent=_parent:0196b021-11a9-78ba-ae6e-e2b78eda65c5",
-                "--exec-id=0196b021-11bf-742a-98fb-b42919195327",
-                "/Users/hamadayouta/dev/dagu/.local/dags/_child.yaml"
-            ]
-        }
     ],
     "inputs": [
         {

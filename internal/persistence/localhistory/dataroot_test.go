@@ -65,7 +65,7 @@ func TestDataRoot(t *testing.T) {
 func TestDataRootRuns(t *testing.T) {
 	t.Parallel()
 
-	t.Run("FindByReqID", func(t *testing.T) {
+	t.Run("FindByWorkflowID", func(t *testing.T) {
 		ts := NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
 		ctx := context.Background()
 
@@ -76,7 +76,7 @@ func TestDataRootRuns(t *testing.T) {
 		actual, err := root.FindByExecID(ctx, "test-id1")
 		require.NoError(t, err)
 
-		assert.Equal(t, exec.Execution, actual, "FindByReqID should return the correct run")
+		assert.Equal(t, exec.Execution, actual, "FindByWorkflowID should return the correct run")
 	})
 
 	t.Run("Latest", func(t *testing.T) {
@@ -93,7 +93,7 @@ func TestDataRootRuns(t *testing.T) {
 		runs := root.Latest(context.Background(), 2)
 		require.Len(t, runs, 2)
 
-		assert.Equal(t, "test-id3", runs[0].reqID, "Latest should return the most recent runs")
+		assert.Equal(t, "test-id3", runs[0].workflowID, "Latest should return the most recent runs")
 	})
 
 	t.Run("LatestAfter", func(t *testing.T) {
@@ -219,13 +219,13 @@ type DataRootTest struct {
 	Context context.Context
 }
 
-func (drt *DataRootTest) CreateTestExecution(t *testing.T, reqID string, ts TimeInUTC) ExecutionTest {
+func (drt *DataRootTest) CreateTestExecution(t *testing.T, workflowID string, ts TimeInUTC) ExecutionTest {
 	t.Helper()
 
 	err := drt.Create()
 	require.NoError(t, err)
 
-	run, err := drt.CreateRun(ts, reqID)
+	run, err := drt.CreateRun(ts, workflowID)
 	require.NoError(t, err)
 
 	return ExecutionTest{

@@ -42,7 +42,7 @@ var restartFlags = []commandLineFlag{
 }
 
 func runRestart(ctx *Context, args []string) error {
-	reqID, err := ctx.Command.Flags().GetString("workflow-id")
+	workflowID, err := ctx.Command.Flags().GetString("workflow-id")
 	if err != nil {
 		return fmt.Errorf("failed to get workflow ID: %w", err)
 	}
@@ -50,12 +50,12 @@ func runRestart(ctx *Context, args []string) error {
 	name := args[0]
 
 	var record models.Record
-	if reqID != "" {
+	if workflowID != "" {
 		// Retrieve the previous run's record for the specified workflow ID.
-		ref := digraph.NewWorkflowRef(name, reqID)
+		ref := digraph.NewWorkflowRef(name, workflowID)
 		r, err := ctx.HistoryRepo.Find(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to find the record for workflow ID %s: %w", reqID, err)
+			return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflowID, err)
 		}
 		record = r
 	} else {
@@ -79,16 +79,16 @@ func runRestart(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read DAG from execution history: %w", err)
 	}
 
-	if err := handleRestartProcess(ctx, dag, reqID); err != nil {
+	if err := handleRestartProcess(ctx, dag, workflowID); err != nil {
 		return fmt.Errorf("restart process failed for DAG %s: %w", dag.Name, err)
 	}
 
 	return nil
 }
 
-func handleRestartProcess(ctx *Context, d *digraph.DAG, reqID string) error {
+func handleRestartProcess(ctx *Context, d *digraph.DAG, workflowID string) error {
 	// Stop if running
-	if err := stopDAGIfRunning(ctx, ctx.HistoryMgr, d, reqID); err != nil {
+	if err := stopDAGIfRunning(ctx, ctx.HistoryMgr, d, workflowID); err != nil {
 		return fmt.Errorf("failed to stop DAG: %w", err)
 	}
 

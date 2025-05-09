@@ -55,8 +55,8 @@ type Step struct {
 	Preconditions []Condition `json:"preconditions,omitempty"`
 	// SignalOnStop is the signal to send on stop.
 	SignalOnStop string `json:"signalOnStop,omitempty"`
-	// ChildDAG contains the information about a child workflow to be executed.
-	ChildDAG *ChildWorkflow `json:"child,omitempty"`
+	// ChildWorkflow contains the information about a child workflow to be executed.
+	ChildWorkflow *ChildWorkflow `json:"childWorkflow,omitempty"`
 }
 
 // setup sets the default values for the step.

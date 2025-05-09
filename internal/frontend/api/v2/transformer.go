@@ -49,9 +49,9 @@ func toStep(obj digraph.Step) api.Step {
 		Script:        ptrOf(obj.Script),
 	}
 
-	if obj.ChildDAG != nil {
-		step.Run = ptrOf(obj.ChildDAG.Name)
-		step.Params = ptrOf(obj.ChildDAG.Params)
+	if obj.ChildWorkflow != nil {
+		step.Run = ptrOf(obj.ChildWorkflow.Name)
+		step.Params = ptrOf(obj.ChildWorkflow.Params)
 	}
 	return step
 }

@@ -33,9 +33,9 @@ const JSONLStatusFile = "status.jsonl"
 
 // Execution represents a single run of a DAG with its associated timestamp and workflow ID.
 type Execution struct {
-	baseDir   string    // Base directory path for this run
-	timestamp time.Time // Timestamp when the run was created
-	reqID     string    // Unique workflow ID for this run
+	baseDir    string    // Base directory path for this run
+	timestamp  time.Time // Timestamp when the run was created
+	workflowID string    // Unique workflow ID for this run
 }
 
 // NewRun creates a new Run instance from a directory path.
@@ -49,8 +49,8 @@ func NewRun(dir string) (*Execution, error) {
 			return nil, ErrInvalidRunDir
 		}
 		return &Execution{
-			baseDir: dir,
-			reqID:   matches[1],
+			baseDir:    dir,
+			workflowID: matches[1],
 		}, nil
 	}
 
@@ -63,9 +63,9 @@ func NewRun(dir string) (*Execution, error) {
 		return nil, err
 	}
 	return &Execution{
-		baseDir:   dir,
-		timestamp: ts,
-		reqID:     matches[2],
+		baseDir:    dir,
+		timestamp:  ts,
+		workflowID: matches[2],
 	}, nil
 }
 

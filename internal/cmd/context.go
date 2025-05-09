@@ -190,7 +190,7 @@ func (c *Context) dagRepo(cache *fileutil.Cache[*digraph.DAG], searchPaths []str
 // builds a filename using the current timestamp and workflow ID, and then opens the file.
 func (c *Context) OpenLogFile(
 	dag *digraph.DAG,
-	reqID string,
+	workflowID string,
 ) (*os.File, error) {
 	// Read the global configuration for log directory.
 	baseLogDir, err := cmdutil.EvalString(c, c.Config.Paths.LogDir)
@@ -208,7 +208,7 @@ func (c *Context) OpenLogFile(
 		BaseDir:    baseLogDir,
 		DAGLogDir:  dagLogDir,
 		Name:       dag.Name,
-		WorkflowID: reqID,
+		WorkflowID: workflowID,
 	}
 
 	if err := cfg.Validate(); err != nil {

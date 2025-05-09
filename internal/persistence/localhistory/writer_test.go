@@ -18,14 +18,14 @@ func TestWriter(t *testing.T) {
 
 	t.Run("WriteStatusToNewFile", func(t *testing.T) {
 		dag := th.DAG("test_write_status")
-		reqID := uuid.Must(uuid.NewV7()).String()
+		workflowID := uuid.Must(uuid.NewV7()).String()
 		status := models.NewStatusBuilder(dag.DAG).Create(
-			reqID, scheduler.StatusRunning, 1, time.Now(),
+			workflowID, scheduler.StatusRunning, 1, time.Now(),
 		)
-		writer := dag.Writer(t, reqID, time.Now())
+		writer := dag.Writer(t, workflowID, time.Now())
 		writer.Write(t, status)
 
-		writer.AssertContent(t, "test_write_status", reqID, scheduler.StatusRunning)
+		writer.AssertContent(t, "test_write_status", workflowID, scheduler.StatusRunning)
 	})
 
 	t.Run("WriteStatusToExistingFile", func(t *testing.T) {
@@ -83,8 +83,8 @@ func TestWriterErrorHandling(t *testing.T) {
 		require.NoError(t, writer.close())
 
 		dag := th.DAG("test_write_to_closed_writer")
-		reqID := uuid.Must(uuid.NewV7()).String()
-		status := models.NewStatusBuilder(dag.DAG).Create(reqID, scheduler.StatusRunning, 1, time.Now())
+		workflowID := uuid.Must(uuid.NewV7()).String()
+		status := models.NewStatusBuilder(dag.DAG).Create(workflowID, scheduler.StatusRunning, 1, time.Now())
 		assert.Error(t, writer.write(status))
 	})
 
@@ -101,9 +101,9 @@ func TestWriterRename(t *testing.T) {
 
 	// Create a status file with old path
 	dag := th.DAG("test_rename_old")
-	writer := dag.Writer(t, "request-id-1", time.Now())
-	reqID := uuid.Must(uuid.NewV7()).String()
-	status := models.NewStatusBuilder(dag.DAG).Create(reqID, scheduler.StatusRunning, 1, time.Now())
+	writer := dag.Writer(t, "workflow-id-1", time.Now())
+	workflowID := uuid.Must(uuid.NewV7()).String()
+	status := models.NewStatusBuilder(dag.DAG).Create(workflowID, scheduler.StatusRunning, 1, time.Now())
 	writer.Write(t, status)
 	writer.Close(t)
 	require.FileExists(t, writer.FilePath)
@@ -112,7 +112,7 @@ func TestWriterRename(t *testing.T) {
 	newDAG := th.DAG("test_rename_new")
 	err := th.Repo.Rename(context.Background(), dag.Location, newDAG.Location)
 	require.NoError(t, err)
-	newWriter := newDAG.Writer(t, "request-id-2", time.Now())
+	newWriter := newDAG.Writer(t, "workflow-id-2", time.Now())
 
 	require.NoFileExists(t, writer.FilePath)
 	require.FileExists(t, newWriter.FilePath)

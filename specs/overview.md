@@ -29,7 +29,7 @@ and managing workflows.
   * `cmd/` – CLI subcommand implementations.
   * `cmdutil/` – Shared command-line utility helpers.
   * `config/` – Configuration loading and schema validation.
-  * `digraph/` – **Core workflow engine:** parsing/validating DAG definitions, DAG and step structures, execution logic, schedules, parameter handling, and execution graph logic (DAG/step types). Includes `executor/` (task execution support incl. shell, docker, http, mail, ssh, sub-DAG, jq, etc) and `scheduler/` (dependency/schedule graph).
+  * `digraph/` – **Core workflow engine:** parsing/validating DAG definitions, DAG and step structures, execution logic, schedules, parameter handling, and execution graph logic (DAG/step types). Includes `executor/` (task execution support incl. shell, docker, http, mail, ssh, child workflow, jq, etc) and `scheduler/` (dependency/schedule graph).
   * `fileutil/` – Helpers for file system management, file path resolution, etc.
   * `frontend/` – HTTP server for the web UI and APIs; API handlers (two versions: v1, v2), asset serving, uthentication, templates, and health checks.
   * `integration/` – Integration test support logic.

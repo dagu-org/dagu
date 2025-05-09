@@ -32,7 +32,7 @@ var statusFlags = []commandLineFlag{
 }
 
 func runStatus(ctx *Context, args []string) error {
-	reqID, err := ctx.Command.Flags().GetString("workflow-id")
+	workflowID, err := ctx.Command.Flags().GetString("workflow-id")
 	if err != nil {
 		return fmt.Errorf("failed to get workflow ID: %w", err)
 	}
@@ -40,12 +40,12 @@ func runStatus(ctx *Context, args []string) error {
 	name := args[0]
 
 	var record models.Record
-	if reqID != "" {
+	if workflowID != "" {
 		// Retrieve the previous run's record for the specified workflow ID.
-		ref := digraph.NewWorkflowRef(name, reqID)
+		ref := digraph.NewWorkflowRef(name, workflowID)
 		r, err := ctx.HistoryRepo.Find(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to find the record for workflow ID %s: %w", reqID, err)
+			return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflowID, err)
 		}
 		record = r
 	} else {
@@ -61,7 +61,7 @@ func runStatus(ctx *Context, args []string) error {
 		logger.Error(ctx, "Failed to read DAG from record", "name", name, "err", err)
 	}
 
-	status, err := ctx.HistoryMgr.GetDAGRealtimeStatus(ctx, dag, reqID)
+	status, err := ctx.HistoryMgr.GetDAGRealtimeStatus(ctx, dag, workflowID)
 	if err != nil {
 		logger.Error(ctx, "Failed to retrieve current status", "dag", dag.Name, "err", err)
 		return fmt.Errorf("failed to retrieve current status: %w", err)

@@ -31,9 +31,9 @@ func TestStatusSerialization(t *testing.T) {
 		InfoMail:  &digraph.MailConfig{},
 		SMTP:      &digraph.SMTPConfig{},
 	}
-	reqID := uuid.Must(uuid.NewV7()).String()
+	workflowID := uuid.Must(uuid.NewV7()).String()
 	statusToPersist := models.NewStatusBuilder(dag).Create(
-		reqID, scheduler.StatusSuccess, 0, startedAt, models.WithFinishedAt(finishedAt),
+		workflowID, scheduler.StatusSuccess, 0, startedAt, models.WithFinishedAt(finishedAt),
 	)
 
 	rawJSON, err := json.Marshal(statusToPersist)

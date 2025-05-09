@@ -200,15 +200,15 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	}
 
 	// If the command is a child workflow, we need to set the workflow ID.
-	if childDAGExec, ok := cmd.(executor.ChildWorkflow); ok {
-		reqID, err := n.ChildExecID()
+	if childWorkflow, ok := cmd.(executor.ChildWorkflow); ok {
+		workflowID, err := n.ChildExecID()
 		if err != nil {
 			return nil, fmt.Errorf("failed to determine workflow ID for child workflow: %w", err)
 		}
-		if reqID == "" {
+		if workflowID == "" {
 			return nil, fmt.Errorf("workflow ID is empty for child workflow")
 		}
-		childDAGExec.SetWorkflowID(reqID)
+		childWorkflow.SetWorkflowID(workflowID)
 	}
 
 	return cmd, nil

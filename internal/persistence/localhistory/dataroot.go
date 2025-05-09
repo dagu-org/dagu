@@ -78,13 +78,13 @@ func NewDataRoot(baseDir, dagName string) DataRoot {
 //
 // Parameters:
 //   - ctx: Context for the operation (unused but kept for interface consistency)
-//   - reqID: The unique workflow ID to search for
+//   - workflowID: The unique workflow ID to search for
 //
 // Returns:
 //   - The matching Execution instance, or an error if not found
 func (dr *DataRoot) FindByExecID(_ context.Context, workflowID string) (*Execution, error) {
 	// Find matching files
-	matches, err := filepath.Glob(dr.GlobPatternWithReqID(workflowID))
+	matches, err := filepath.Glob(dr.GlobPatternWithWorkflowID(workflowID))
 	if err != nil {
 		return nil, fmt.Errorf("failed to make glob pattern: %w", err)
 	}
@@ -126,8 +126,8 @@ func (dr *DataRoot) ListInRange(ctx context.Context, start, end TimeInUTC) []*Ex
 	return dr.listInRange(ctx, start, end)
 }
 
-func (dr *DataRoot) CreateRun(ts TimeInUTC, reqID string) (*Execution, error) {
-	dirName := "exec_" + formatExecTimestamp(ts) + "_" + reqID
+func (dr *DataRoot) CreateRun(ts TimeInUTC, workflowID string) (*Execution, error) {
+	dirName := "exec_" + formatExecTimestamp(ts) + "_" + workflowID
 	dir := filepath.Join(dr.executionsDir, ts.Format("2006"), ts.Format("01"), ts.Format("02"), dirName)
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
@@ -137,7 +137,7 @@ func (dr *DataRoot) CreateRun(ts TimeInUTC, reqID string) (*Execution, error) {
 	return NewRun(dir)
 }
 
-func (dr DataRoot) GlobPatternWithReqID(workflowID string) string {
+func (dr DataRoot) GlobPatternWithWorkflowID(workflowID string) string {
 	return filepath.Join(dr.executionsDir, "2*", "*", "*", "exec_*"+workflowID+"*")
 }
 

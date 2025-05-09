@@ -267,7 +267,7 @@ dagu start <file or DAG name> [-- value1 value2 ...]
 dagu status <file or DAG name>
 
 # Re-runs the specified workflow
-dagu retry --request-id=<request-id> <file or DAG name>
+dagu retry --workflow-id=<workflow-id> <file or DAG name>
 
 # Stops the workflow
 dagu stop <file or DAG name>

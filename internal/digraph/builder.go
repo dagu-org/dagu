@@ -84,7 +84,7 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "executor", fn: buildExecutor},
 	{name: "command", fn: buildCommand},
 	{name: "depends", fn: buildDepends},
-	{name: "childDAG", fn: buildDAGExecStep},
+	{name: "childWorkflow", fn: buildChildWorkflow},
 	{name: "continueOn", fn: buildContinueOn},
 	{name: "retryPolicy", fn: buildRetryPolicy},
 	{name: "repeatPolicy", fn: buildRepeatPolicy},
@@ -700,8 +700,8 @@ func buildSignalOnStop(_ BuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
-// buildDAGExecStep parses the child workflow definition and sets the step fields.
-func buildDAGExecStep(_ BuildContext, def stepDef, step *Step) error {
+// buildChildWorkflow parses the child workflow definition and sets the step fields.
+func buildChildWorkflow(_ BuildContext, def stepDef, step *Step) error {
 	name, params := def.Run, def.Params
 
 	// if the run field is not set, return nil.
@@ -710,7 +710,7 @@ func buildDAGExecStep(_ BuildContext, def stepDef, step *Step) error {
 	}
 
 	// Set the step fields for the child workflow.
-	step.ChildDAG = &ChildWorkflow{Name: name, Params: params}
+	step.ChildWorkflow = &ChildWorkflow{Name: name, Params: params}
 	step.ExecutorConfig.Type = ExecutorTypeSub
 	step.Command = "run"
 	step.Args = []string{name, params}

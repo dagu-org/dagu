@@ -87,8 +87,8 @@ type Agent struct {
 	// lastErr is the last error occurred during the workflow.
 	lastErr error
 
-	// subExecution is true if the agent is running as a child workflow.
-	subExecution atomic.Bool
+	// childWorkflow is true if the agent is running as a child workflow.
+	childWorkflow atomic.Bool
 }
 
 // Options is the configuration for the Agent.
@@ -147,7 +147,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Add structured logging context
 	logFields := []any{"dag", a.dag.Name, "workflowId", a.workflowID}
-	if a.subExecution.Load() {
+	if a.childWorkflow.Load() {
 		logFields = append(logFields, "root", a.root.String(), "parent", a.parent.String())
 	}
 	ctx = logger.WithValues(ctx, logFields...)
@@ -290,7 +290,7 @@ func (a *Agent) Status() models.Status {
 		models.WithOnCancelNode(a.scheduler.HandlerNode(digraph.HandlerOnCancel)),
 	}
 
-	if a.subExecution.Load() {
+	if a.childWorkflow.Load() {
 		opts = append(opts, models.WithHierarchyRefs(a.root, a.parent))
 	}
 
@@ -360,7 +360,7 @@ func (a *Agent) setup(ctx context.Context) error {
 
 	if a.root.WorkflowID != a.workflowID {
 		logger.Debug(ctx, "Initiating child workflow", "rootRef", a.root.String())
-		a.subExecution.Store(true)
+		a.childWorkflow.Store(true)
 		if a.parent.Zero() {
 			logger.Error(ctx, "Parent workflow ID is required for child workflow")
 			return fmt.Errorf("parent workflow ID is required for child workflow")
@@ -530,7 +530,7 @@ func (a *Agent) setupRunRecord(ctx context.Context) (models.Record, error) {
 	}
 
 	opts := models.NewRecordOptions{Retry: a.retryTarget != nil}
-	if a.subExecution.Load() {
+	if a.childWorkflow.Load() {
 		opts.Root = &a.root
 	}
 
@@ -540,7 +540,7 @@ func (a *Agent) setupRunRecord(ctx context.Context) (models.Record, error) {
 // setupSocketServer create socket server instance.
 func (a *Agent) setupSocketServer(ctx context.Context) error {
 	var socketAddr string
-	if a.subExecution.Load() {
+	if a.childWorkflow.Load() {
 		// Use separate socket address for child workflows to allow them run concurrently.
 		socketAddr = a.dag.SockAddrSub(a.workflowID)
 	} else {
@@ -556,7 +556,7 @@ func (a *Agent) setupSocketServer(ctx context.Context) error {
 
 // checkIsAlreadyRunning returns error if the DAG is already running.
 func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
-	if a.subExecution.Load() {
+	if a.childWorkflow.Load() {
 		return nil // Skip the check for child workflows
 	}
 	if a.client.IsDAGRunning(ctx, a.dag, a.workflowID) {
@@ -633,10 +633,10 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error
 	return o.dagRepo.GetDetails(ctx, name)
 }
 
-func (o *dbClient) GetChildWorkflowStatus(ctx context.Context, reqID string, root digraph.WorkflowRef) (*digraph.Status, error) {
-	runRecord, err := o.historyRepo.FindChildWorkflow(ctx, root, reqID)
+func (o *dbClient) GetChildWorkflowStatus(ctx context.Context, workflowID string, root digraph.WorkflowRef) (*digraph.Status, error) {
+	runRecord, err := o.historyRepo.FindChildWorkflow(ctx, root, workflowID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find the record for workflow ID %s: %w", reqID, err)
+		return nil, fmt.Errorf("failed to find the record for workflow ID %s: %w", workflowID, err)
 	}
 	status, err := runRecord.ReadStatus(ctx)
 	if err != nil {

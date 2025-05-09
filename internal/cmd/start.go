@@ -68,7 +68,12 @@ func runStart(ctx *Context, args []string) error {
 
 	// Handle child workflow if applicable
 	if isChildWorkflow {
-		return handleChildExecution(ctx, dag, workflowID, params, root, parentRef)
+		// Parse parent execution reference
+		parent, err := digraph.ParseWorkflowRef(parentRef)
+		if err != nil {
+			return fmt.Errorf("failed to parse parent exec ref: %w", err)
+		}
+		return handleChildWorkflow(ctx, dag, workflowID, params, root, parent)
 	}
 
 	// Log root workflow
@@ -169,14 +174,8 @@ func determineRootWorkflow(isChildWorkflow bool, rootRef string, dag *digraph.DA
 	return digraph.NewWorkflowRef(dag.Name, workflowID), nil
 }
 
-// handleChildExecution processes a child workflow, checking for previous runs
-func handleChildExecution(ctx *Context, dag *digraph.DAG, workflowID string, params string, root digraph.WorkflowRef, parentRefID string) error {
-	// Parse parent execution reference
-	parent, err := digraph.ParseWorkflowRef(parentRefID)
-	if err != nil {
-		return fmt.Errorf("failed to parse parent exec ref: %w", err)
-	}
-
+// handleChildWorkflow processes a child workflow, checking for previous runs
+func handleChildWorkflow(ctx *Context, dag *digraph.DAG, workflowID string, params string, root digraph.WorkflowRef, parent digraph.WorkflowRef) error {
 	// Log child workflow
 	logger.Info(ctx, "Executing child workflow",
 		"name", dag.Name,

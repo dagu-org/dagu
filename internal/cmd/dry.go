@@ -53,12 +53,12 @@ func runDry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 	}
 
-	reqID, err := getWorkflowID()
+	workflowID, err := getWorkflowID()
 	if err != nil {
 		return fmt.Errorf("failed to generate workflow ID: %w", err)
 	}
 
-	logFile, err := ctx.OpenLogFile(dag, reqID)
+	logFile, err := ctx.OpenLogFile(dag, workflowID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
@@ -73,10 +73,10 @@ func runDry(ctx *Context, args []string) error {
 		return err
 	}
 
-	root := digraph.NewWorkflowRef(dag.Name, reqID)
+	root := digraph.NewWorkflowRef(dag.Name, workflowID)
 
 	agentInstance := agent.New(
-		reqID,
+		workflowID,
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
@@ -90,7 +90,7 @@ func runDry(ctx *Context, args []string) error {
 	listenSignals(ctx, agentInstance)
 
 	if err := agentInstance.Run(ctx); err != nil {
-		return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, reqID, err)
+		return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, workflowID, err)
 	}
 
 	agentInstance.PrintSummary(ctx)

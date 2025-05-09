@@ -75,11 +75,11 @@ type DAGTest struct {
 	*digraph.DAG
 }
 
-func (d DAGTest) Writer(t *testing.T, reqID string, startedAt time.Time) WriterTest {
+func (d DAGTest) Writer(t *testing.T, workflowID string, startedAt time.Time) WriterTest {
 	t.Helper()
 
 	root := NewDataRoot(d.th.tmpDir, d.Name)
-	run, err := root.CreateRun(NewUTC(startedAt), reqID)
+	run, err := root.CreateRun(NewUTC(startedAt), workflowID)
 	require.NoError(t, err)
 
 	obj := d.th.Repo.(*historyStorage)
@@ -96,9 +96,9 @@ func (d DAGTest) Writer(t *testing.T, reqID string, startedAt time.Time) WriterT
 	return WriterTest{
 		th: d.th,
 
-		ReqID:    reqID,
-		FilePath: record.file,
-		Writer:   writer,
+		WorkflowID: workflowID,
+		FilePath:   record.file,
+		Writer:     writer,
 	}
 }
 
@@ -129,8 +129,8 @@ func (w WriterTest) Close(t *testing.T) {
 type WriterTest struct {
 	th JSONDBTest
 
-	ReqID    string
-	FilePath string
-	Writer   *Writer
-	Closed   bool
+	WorkflowID string
+	FilePath   string
+	Writer     *Writer
+	Closed     bool
 }
