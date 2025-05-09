@@ -148,7 +148,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Add structured logging context
 	logFields := []any{"dag", a.dag.Name, "workflowId", a.workflowID}
 	if a.subExecution.Load() {
-		logFields = append(logFields, "rootRef", a.root.Name, "rootReqID", a.root.WorkflowID)
+		logFields = append(logFields, "root", a.root.String(), "parent", a.parent.String())
 	}
 	ctx = logger.WithValues(ctx, logFields...)
 
@@ -559,7 +559,7 @@ func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
 	if a.subExecution.Load() {
 		return nil // Skip the check for child DAGs
 	}
-	if a.client.IsRunning(ctx, a.dag, a.workflowID) {
+	if a.client.IsDAGRunning(ctx, a.dag, a.workflowID) {
 		return fmt.Errorf("the DAG is already running. workflowID=%s, socket=%s", a.workflowID, a.dag.SockAddr(a.workflowID))
 	}
 	return nil

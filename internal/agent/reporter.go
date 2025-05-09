@@ -96,7 +96,7 @@ var dagHeader = table.Row{
 
 func renderDAGSummary(status models.Status, err error) string {
 	dataRow := table.Row{
-		status.ExecID,
+		status.WorkflowID,
 		status.Name,
 		status.StartedAt,
 		status.FinishedAt,

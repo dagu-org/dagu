@@ -32,12 +32,12 @@ func TestJSONDB(t *testing.T) {
 		// Verify the first record is the most recent
 		status0, err := records[0].ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "request-id-3", status0.ExecID)
+		assert.Equal(t, "request-id-3", status0.WorkflowID)
 
 		// Verify the second record is the second most recent
 		status1, err := records[1].ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "request-id-2", status1.ExecID)
+		assert.Equal(t, "request-id-2", status1.WorkflowID)
 
 		// Verify all records are returned if the number requested is equal to the number of records
 		records = th.Repo.Recent(th.Context, "test_DAG", 3)
@@ -71,7 +71,7 @@ func TestJSONDB(t *testing.T) {
 		status, err := record.ReadStatus(th.Context)
 		require.NoError(t, err)
 
-		assert.Equal(t, "request-id-3", status.ExecID)
+		assert.Equal(t, "request-id-3", status.WorkflowID)
 	})
 	t.Run("FindByReqID", func(t *testing.T) {
 		th := setupTestJSONDB(t)
@@ -94,7 +94,7 @@ func TestJSONDB(t *testing.T) {
 		// Verify the record is the correct one
 		status, err := record.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "request-id-2", status.ExecID)
+		assert.Equal(t, "request-id-2", status.WorkflowID)
 
 		// Verify an error is returned if the workflow ID does not exist
 		refNonExist := digraph.NewWorkflowRef("test_DAG", "nonexistent-id")
@@ -152,7 +152,7 @@ func TestJSONDB(t *testing.T) {
 		}()
 
 		statusToWrite := models.InitialStatus(childDAG.DAG)
-		statusToWrite.ExecID = "sub-id"
+		statusToWrite.WorkflowID = "sub-id"
 		err = record.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
 
@@ -163,7 +163,7 @@ func TestJSONDB(t *testing.T) {
 
 		status, err := existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "sub-id", status.ExecID)
+		assert.Equal(t, "sub-id", status.WorkflowID)
 	})
 	t.Run("ChildExecRecord_Retry", func(t *testing.T) {
 		th := setupTestJSONDB(t)
@@ -193,7 +193,7 @@ func TestJSONDB(t *testing.T) {
 		}()
 
 		statusToWrite := models.InitialStatus(childDAG.DAG)
-		statusToWrite.ExecID = childWorkflowID
+		statusToWrite.WorkflowID = childWorkflowID
 		statusToWrite.Status = scheduler.StatusRunning
 		err = record.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
@@ -205,7 +205,7 @@ func TestJSONDB(t *testing.T) {
 		require.NoError(t, err)
 		existingRecordStatus, err := existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, childWorkflowID, existingRecordStatus.ExecID)
+		assert.Equal(t, childWorkflowID, existingRecordStatus.WorkflowID)
 		assert.Equal(t, scheduler.StatusRunning.String(), existingRecordStatus.Status.String())
 
 		// Create a retry record and write different status
@@ -224,7 +224,7 @@ func TestJSONDB(t *testing.T) {
 		require.NoError(t, err)
 		existingRecordStatus, err = existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, childWorkflowID, existingRecordStatus.ExecID)
+		assert.Equal(t, childWorkflowID, existingRecordStatus.WorkflowID)
 		assert.Equal(t, scheduler.StatusSuccess.String(), existingRecordStatus.Status.String())
 	})
 	t.Run("ReadDAG", func(t *testing.T) {
@@ -244,7 +244,7 @@ func TestJSONDB(t *testing.T) {
 		}()
 
 		statusToWrite := models.InitialStatus(rec.dag)
-		statusToWrite.ExecID = "parent-id"
+		statusToWrite.WorkflowID = "parent-id"
 
 		err = rec.Write(th.Context, statusToWrite)
 		require.NoError(t, err)

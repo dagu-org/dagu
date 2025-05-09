@@ -147,7 +147,7 @@ func (c *Context) NewServer() (*frontend.Server, error) {
 		return nil, err
 	}
 
-	return frontend.NewServer(c.Config, dr, c.HistoryMgr), nil
+	return frontend.NewServer(c.Config, dr, c.HistoryRepo, c.HistoryMgr), nil
 }
 
 // NewScheduler creates a new NewScheduler instance using the default client.
@@ -205,10 +205,10 @@ func (c *Context) OpenLogFile(
 	}
 
 	cfg := LogConfig{
-		BaseDir:   baseLogDir,
-		DAGLogDir: dagLogDir,
-		DAGName:   dag.Name,
-		ReqID:     reqID,
+		BaseDir:    baseLogDir,
+		DAGLogDir:  dagLogDir,
+		Name:       dag.Name,
+		WorkflowID: reqID,
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -295,16 +295,16 @@ func listenSignals(ctx context.Context, listener signalListener) {
 
 // LogConfig defines configuration for log file creation.
 type LogConfig struct {
-	BaseDir   string // Base directory for logs.
-	DAGLogDir string // Optional alternative log directory specified by the DAG.
-	DAGName   string // Name of the DAG; used for generating a safe directory name.
-	ReqID     string // Unique workflow ID used in the filename.
+	BaseDir    string // Base directory for logs.
+	DAGLogDir  string // Optional alternative log directory specified by the DAG definition.
+	Name       string // Name of the workflow; used for generating a safe directory name.
+	WorkflowID string // Unique workflow ID used in the filename.
 }
 
 // Validate checks that essential fields are provided.
 // It requires that DAGName is not empty and that at least one log directory is specified.
 func (cfg LogConfig) Validate() error {
-	if cfg.DAGName == "" {
+	if cfg.Name == "" {
 		return fmt.Errorf("DAGName cannot be empty")
 	}
 	if cfg.BaseDir == "" && cfg.DAGLogDir == "" {
@@ -327,8 +327,8 @@ func (cfg LogConfig) LogDir() (string, error) {
 
 	utcTimestamp := time.Now().UTC().Format("20060102_150405Z")
 
-	safeName := fileutil.SafeName(cfg.DAGName)
-	logDir := filepath.Join(baseDir, safeName, utcTimestamp+"_"+cfg.ReqID)
+	safeName := fileutil.SafeName(cfg.Name)
+	logDir := filepath.Join(baseDir, safeName, utcTimestamp+"_"+cfg.WorkflowID)
 	if err := os.MkdirAll(logDir, 0750); err != nil {
 		return "", fmt.Errorf("failed to initialize directory %s: %w", logDir, err)
 	}
@@ -340,12 +340,12 @@ func (cfg LogConfig) LogDir() (string, error) {
 // and a truncated version of the workflow ID.
 func (cfg LogConfig) LogFile() string {
 	timestamp := time.Now().Format("20060102.15:04:05.000")
-	truncReqID := stringutil.TruncString(cfg.ReqID, 8)
-	safeDagName := fileutil.SafeName(cfg.DAGName)
+	truncatedWorkflowID := stringutil.TruncString(cfg.WorkflowID, 8)
+	safeName := fileutil.SafeName(cfg.Name)
 
 	return fmt.Sprintf("scheduler_%s.%s.%s.log",
-		safeDagName,
+		safeName,
 		timestamp,
-		truncReqID,
+		truncatedWorkflowID,
 	)
 }

@@ -21,7 +21,7 @@ func TestLogDir(t *testing.T) {
 			name: "using LogDir",
 			config: cmd.LogConfig{
 				BaseDir: t.TempDir(),
-				DAGName: "test_dag",
+				Name:    "test_dag",
 			},
 			validate: func(t *testing.T, path string) {
 				assert.Contains(t, path, "test_dag")
@@ -32,7 +32,7 @@ func TestLogDir(t *testing.T) {
 			name: "using DAGLogDir",
 			config: cmd.LogConfig{
 				DAGLogDir: filepath.Join(t.TempDir(), "custom"),
-				DAGName:   "test_dag",
+				Name:      "test_dag",
 			},
 			validate: func(t *testing.T, path string) {
 				assert.Contains(t, path, "custom")
@@ -44,7 +44,7 @@ func TestLogDir(t *testing.T) {
 			name: "with special characters in DAGName",
 			config: cmd.LogConfig{
 				BaseDir: t.TempDir(),
-				DAGName: "test/dag*special",
+				Name:    "test/dag*special",
 			},
 			validate: func(t *testing.T, path string) {
 				assert.NotContains(t, path, "/dag*")
@@ -69,8 +69,8 @@ func TestLogDir(t *testing.T) {
 func TestLogFileName(t *testing.T) {
 	t.Run("filename format", func(t *testing.T) {
 		cfg := cmd.LogConfig{
-			DAGName: "test dag",
-			ReqID:   "12345678901234", // Longer than 8 chars to test truncation
+			Name:       "test dag",
+			WorkflowID: "12345678901234", // Longer than 8 chars to test truncation
 		}
 
 		filename := cfg.LogFile()
@@ -96,7 +96,7 @@ func TestLogConfigValidation(t *testing.T) {
 			name: "valid settings",
 			config: cmd.LogConfig{
 				BaseDir: "/tmp",
-				DAGName: "test",
+				Name:    "test",
 			},
 			wantErr: false,
 		},
@@ -110,7 +110,7 @@ func TestLogConfigValidation(t *testing.T) {
 		{
 			name: "no directories",
 			config: cmd.LogConfig{
-				DAGName: "test",
+				Name: "test",
 			},
 			wantErr: true,
 		},

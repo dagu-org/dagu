@@ -69,7 +69,7 @@ func toWorkflowDetails(s models.Status) api.WorkflowDetails {
 		Name:        s.Name,
 		Params:      ptrOf(s.Params),
 		Pid:         ptrOf(int(s.PID)),
-		WorkflowId:  s.ExecID,
+		WorkflowId:  s.WorkflowID,
 		StartedAt:   s.StartedAt,
 		FinishedAt:  s.FinishedAt,
 		Status:      api.Status(s.Status),

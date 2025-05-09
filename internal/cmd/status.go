@@ -61,7 +61,7 @@ func runStatus(ctx *Context, args []string) error {
 		logger.Error(ctx, "Failed to read DAG from record", "name", name, "err", err)
 	}
 
-	status, err := ctx.HistoryMgr.GetRealtimeStatus(ctx, dag, reqID)
+	status, err := ctx.HistoryMgr.GetDAGRealtimeStatus(ctx, dag, reqID)
 	if err != nil {
 		logger.Error(ctx, "Failed to retrieve current status", "dag", dag.Name, "err", err)
 		return fmt.Errorf("failed to retrieve current status: %w", err)

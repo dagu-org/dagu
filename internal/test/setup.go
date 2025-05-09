@@ -205,7 +205,7 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
 	assert.Eventually(t, func() bool {
-		curr, _ := d.HistoryMgr.GetRealtimeStatus(d.Context, d.DAG, "")
+		curr, _ := d.HistoryMgr.GetDAGRealtimeStatus(d.Context, d.DAG, "")
 		if curr == nil {
 			return false
 		}
@@ -292,7 +292,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 
 	var workflowID string
 	if helper.opts.RetryTarget != nil {
-		workflowID = helper.opts.RetryTarget.ExecID
+		workflowID = helper.opts.RetryTarget.WorkflowID
 	} else {
 		workflowID = generateWorkflowID()
 	}

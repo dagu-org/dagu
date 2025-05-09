@@ -116,7 +116,7 @@ func (f *StatusBuilder) Create(
 	opts ...StatusOption,
 ) Status {
 	statusObj := InitialStatus(f.dag)
-	statusObj.ExecID = workflowID
+	statusObj.WorkflowID = workflowID
 	statusObj.Status = status
 	statusObj.PID = PID(pid)
 	statusObj.StartedAt = formatTime(startedAt)
@@ -143,7 +143,7 @@ type Status struct {
 	Root       digraph.WorkflowRef `json:"root,omitempty"`
 	Parent     digraph.WorkflowRef `json:"parent,omitempty"`
 	Name       string              `json:"name"`
-	ExecID     string              `json:"workflowId"`
+	WorkflowID string              `json:"workflowId"`
 	Status     scheduler.Status    `json:"status"`
 	PID        PID                 `json:"pid,omitempty"`
 	Nodes      []*Node             `json:"nodes,omitempty"`
@@ -160,7 +160,7 @@ type Status struct {
 
 // Workflow returns the execution reference for the current status
 func (st *Status) Workflow() digraph.WorkflowRef {
-	return digraph.NewWorkflowRef(st.Name, st.ExecID)
+	return digraph.NewWorkflowRef(st.Name, st.WorkflowID)
 }
 
 // Errors returns a slice of errors for the current status

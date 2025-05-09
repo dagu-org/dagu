@@ -51,7 +51,7 @@ func (th JSONDBTest) CreateRecord(t *testing.T, ts time.Time, workflowID string,
 	}()
 
 	status := models.InitialStatus(dag.DAG)
-	status.ExecID = workflowID
+	status.WorkflowID = workflowID
 	status.Status = s
 
 	err = record.Write(th.Context, status)
@@ -116,7 +116,7 @@ func (w WriterTest) AssertContent(t *testing.T, name, workflowID string, status 
 	require.NoError(t, err)
 
 	assert.Equal(t, name, data.Name)
-	assert.Equal(t, workflowID, data.ExecID)
+	assert.Equal(t, workflowID, data.WorkflowID)
 	assert.Equal(t, status, data.Status)
 }
 

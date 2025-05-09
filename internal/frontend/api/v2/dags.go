@@ -22,7 +22,7 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
     command: echo hello
 `)
 
-	if err := a.dagRepository.Create(ctx, request.Body.Name, spec); err != nil {
+	if err := a.dagRepo.Create(ctx, request.Body.Name, spec); err != nil {
 		if errors.Is(err, models.ErrDAGAlreadyExists) {
 			return nil, &Error{
 				HTTPStatus: http.StatusConflict,
@@ -38,7 +38,7 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 }
 
 func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject) (api.DeleteDAGResponseObject, error) {
-	_, err := a.dagRepository.GetMetadata(ctx, request.FileName)
+	_, err := a.dagRepo.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -46,14 +46,14 @@ func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject)
 			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
 		}
 	}
-	if err := a.dagRepository.Delete(ctx, request.FileName); err != nil {
+	if err := a.dagRepo.Delete(ctx, request.FileName); err != nil {
 		return nil, fmt.Errorf("error deleting DAG: %w", err)
 	}
 	return &api.DeleteDAG204Response{}, nil
 }
 
 func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObject) (api.GetDAGSpecResponseObject, error) {
-	spec, err := a.dagRepository.GetSpec(ctx, request.FileName)
+	spec, err := a.dagRepo.GetSpec(ctx, request.FileName)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 }
 
 func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecRequestObject) (api.UpdateDAGSpecResponseObject, error) {
-	err := a.dagRepository.UpdateSpec(ctx, request.FileName, []byte(request.Body.Spec))
+	err := a.dagRepo.UpdateSpec(ctx, request.FileName, []byte(request.Body.Spec))
 
 	var loadErrs digraph.ErrorList
 	var errs []string
@@ -94,7 +94,7 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 }
 
 func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject) (api.RenameDAGResponseObject, error) {
-	dag, err := a.dagRepository.GetMetadata(ctx, request.FileName)
+	dag, err := a.dagRepo.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -120,22 +120,22 @@ func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject)
 		}
 	}
 
-	old, err := a.dagRepository.GetMetadata(ctx, request.FileName)
+	old, err := a.dagRepo.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, fmt.Errorf("error getting the DAG metadata: %w", err)
 	}
 
-	if err := a.dagRepository.Rename(ctx, request.FileName, request.Body.NewFileName); err != nil {
+	if err := a.dagRepo.Rename(ctx, request.FileName, request.Body.NewFileName); err != nil {
 		return nil, fmt.Errorf("failed to move DAG: %w", err)
 	}
 
-	renamed, err := a.dagRepository.GetMetadata(ctx, request.Body.NewFileName)
+	renamed, err := a.dagRepo.GetMetadata(ctx, request.Body.NewFileName)
 	if err != nil {
 		return nil, fmt.Errorf("error getting new DAG metadata: %w", err)
 	}
 
 	// Rename the history as well
-	if err := a.historyManager.Rename(ctx, old.Name, renamed.Name); err != nil {
+	if err := a.historyRepo.Rename(ctx, old.Name, renamed.Name); err != nil {
 		return nil, fmt.Errorf("error renaming history: %w", err)
 	}
 
@@ -143,7 +143,7 @@ func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject)
 }
 
 func (a *API) GetDAGWorkflowHistory(ctx context.Context, request api.GetDAGWorkflowHistoryRequestObject) (api.GetDAGWorkflowHistoryResponseObject, error) {
-	dag, err := a.dagRepository.GetMetadata(ctx, request.FileName)
+	dag, err := a.dagRepo.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -169,7 +169,7 @@ func (a *API) GetDAGWorkflowHistory(ctx context.Context, request api.GetDAGWorkf
 
 func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsRequestObject) (api.GetDAGDetailsResponseObject, error) {
 	fileName := request.FileName
-	dag, err := a.dagRepository.GetDetails(ctx, fileName)
+	dag, err := a.dagRepo.GetDetails(ctx, fileName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -192,7 +192,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 	return api.GetDAGDetails200JSONResponse{
 		Dag:            details,
 		LatestWorkflow: toWorkflowDetails(status),
-		Suspended:      a.dagRepository.IsSuspended(ctx, fileName),
+		Suspended:      a.dagRepo.IsSuspended(ctx, fileName),
 	}, nil
 }
 
@@ -276,7 +276,7 @@ func (a *API) readHistoryData(
 
 func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (api.ListDAGsResponseObject, error) {
 	pg := models.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
-	result, errList, err := a.dagRepository.List(ctx, models.ListOptions{
+	result, errList, err := a.dagRepo.List(ctx, models.ListOptions{
 		Paginator: &pg,
 		Name:      valueOf(request.Params.Name),
 		Tag:       valueOf(request.Params.Tag),
@@ -306,7 +306,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 			Name:        dagStatuses[i].Name,
 			Params:      ptrOf(dagStatuses[i].Params),
 			Pid:         ptrOf(int(dagStatuses[i].PID)),
-			WorkflowId:  dagStatuses[i].ExecID,
+			WorkflowId:  dagStatuses[i].WorkflowID,
 			StartedAt:   dagStatuses[i].StartedAt,
 			FinishedAt:  dagStatuses[i].FinishedAt,
 			Status:      api.Status(dagStatuses[i].Status),
@@ -317,7 +317,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 			FileName:       item.FileName(),
 			Errors:         errList,
 			LatestWorkflow: workflow,
-			Suspended:      a.dagRepository.IsSuspended(ctx, item.FileName()),
+			Suspended:      a.dagRepo.IsSuspended(ctx, item.FileName()),
 			Dag:            toDAG(item),
 		}
 
@@ -328,7 +328,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 }
 
 func (a *API) GetAllDAGTags(ctx context.Context, _ api.GetAllDAGTagsRequestObject) (api.GetAllDAGTagsResponseObject, error) {
-	tags, errs, err := a.dagRepository.TagList(ctx)
+	tags, errs, err := a.dagRepo.TagList(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error getting tags: %w", err)
 	}
@@ -342,7 +342,7 @@ func (a *API) GetDAGWorkflowDetails(ctx context.Context, request api.GetDAGWorkf
 	dagFileName := request.FileName
 	workflowId := request.WorkflowId
 
-	dag, err := a.dagRepository.GetMetadata(ctx, dagFileName)
+	dag, err := a.dagRepo.GetMetadata(ctx, dagFileName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -361,7 +361,7 @@ func (a *API) GetDAGWorkflowDetails(ctx context.Context, request api.GetDAGWorkf
 		}, nil
 	}
 
-	status, err := a.historyManager.GetRealtimeStatus(ctx, dag, workflowId)
+	status, err := a.historyManager.GetDAGRealtimeStatus(ctx, dag, workflowId)
 	if err != nil {
 		return nil, fmt.Errorf("error getting status by workflow ID: %w", err)
 	}
@@ -372,7 +372,7 @@ func (a *API) GetDAGWorkflowDetails(ctx context.Context, request api.GetDAGWorkf
 }
 
 func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObject) (api.ExecuteDAGResponseObject, error) {
-	dag, err := a.dagRepository.GetMetadata(ctx, request.FileName)
+	dag, err := a.dagRepo.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -403,10 +403,10 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		return nil, fmt.Errorf("error generating workflow ID: %w", err)
 	}
 
-	if err := a.historyManager.Start(ctx, dag, history.StartOptions{
-		Params: valueOf(request.Body.Params),
-		ReqID:  workflowId,
-		Quiet:  true,
+	if err := a.historyManager.StartDAG(ctx, dag, history.StartOptions{
+		Params:     valueOf(request.Body.Params),
+		WorkflowID: workflowId,
+		Quiet:      true,
 	}); err != nil {
 		return nil, fmt.Errorf("error starting DAG: %w", err)
 	}
@@ -424,7 +424,7 @@ waitLoop:
 		case <-ctx.Done():
 			break waitLoop
 		default:
-			status, _ := a.historyManager.GetRealtimeStatus(ctx, dag, workflowId)
+			status, _ := a.historyManager.GetDAGRealtimeStatus(ctx, dag, workflowId)
 			if status == nil {
 				continue
 			}
@@ -452,7 +452,7 @@ waitLoop:
 }
 
 func (a *API) TerminateWorkflow(ctx context.Context, request api.TerminateWorkflowRequestObject) (api.TerminateWorkflowResponseObject, error) {
-	dag, err := a.dagRepository.GetMetadata(ctx, request.FileName)
+	dag, err := a.dagRepo.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -476,14 +476,14 @@ func (a *API) TerminateWorkflow(ctx context.Context, request api.TerminateWorkfl
 			Message:    "DAG is not running",
 		}
 	}
-	if err := a.historyManager.Stop(ctx, dag, status.ExecID); err != nil {
+	if err := a.historyManager.Stop(ctx, dag, status.WorkflowID); err != nil {
 		return nil, fmt.Errorf("error stopping DAG: %w", err)
 	}
 	return api.TerminateWorkflow200Response{}, nil
 }
 
 func (a *API) RetryWorkflow(ctx context.Context, request api.RetryWorkflowRequestObject) (api.RetryWorkflowResponseObject, error) {
-	dag, err := a.dagRepository.GetMetadata(ctx, request.FileName)
+	dag, err := a.dagRepo.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -509,7 +509,7 @@ func (a *API) RetryWorkflow(ctx context.Context, request api.RetryWorkflowReques
 		}
 	}
 
-	if err := a.historyManager.Retry(ctx, dag, request.Body.WorkflowId); err != nil {
+	if err := a.historyManager.RetryDAG(ctx, dag, request.Body.WorkflowId); err != nil {
 		return nil, fmt.Errorf("error retrying DAG: %w", err)
 	}
 
@@ -517,7 +517,7 @@ func (a *API) RetryWorkflow(ctx context.Context, request api.RetryWorkflowReques
 }
 
 func (a *API) UpdateDAGSuspensionState(ctx context.Context, request api.UpdateDAGSuspensionStateRequestObject) (api.UpdateDAGSuspensionStateResponseObject, error) {
-	_, err := a.dagRepository.GetMetadata(ctx, request.FileName)
+	_, err := a.dagRepo.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -526,7 +526,7 @@ func (a *API) UpdateDAGSuspensionState(ctx context.Context, request api.UpdateDA
 		}
 	}
 
-	if err := a.dagRepository.ToggleSuspend(ctx, request.FileName, request.Body.Suspend); err != nil {
+	if err := a.dagRepo.ToggleSuspend(ctx, request.FileName, request.Body.Suspend); err != nil {
 		return nil, fmt.Errorf("error toggling suspend: %w", err)
 	}
 
@@ -534,7 +534,7 @@ func (a *API) UpdateDAGSuspensionState(ctx context.Context, request api.UpdateDA
 }
 
 func (a *API) SearchDAGs(ctx context.Context, request api.SearchDAGsRequestObject) (api.SearchDAGsResponseObject, error) {
-	ret, errs, err := a.dagRepository.Grep(ctx, request.Params.Q)
+	ret, errs, err := a.dagRepo.Grep(ctx, request.Params.Q)
 	if err != nil {
 		return nil, fmt.Errorf("error searching DAGs: %w", err)
 	}

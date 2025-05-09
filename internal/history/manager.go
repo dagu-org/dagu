@@ -28,10 +28,10 @@ func New(
 	configPath string,
 ) Manager {
 	return Manager{
-		HistoryRepository: repo,
-		executable:        executable,
-		workDir:           workDir,
-		configPath:        configPath,
+		historyRepo: repo,
+		executable:  executable,
+		workDir:     workDir,
+		configPath:  configPath,
 	}
 }
 
@@ -39,7 +39,7 @@ func New(
 // restarting, and retrieving status information. It communicates with the DAG
 // through a socket interface and manages execution history.
 type Manager struct {
-	models.HistoryRepository // Store interface for persisting run data
+	historyRepo models.HistoryRepository // Store interface for persisting run data
 
 	executable string // Path to the executable used to run DAGs
 	workDir    string // Working directory for executing commands
@@ -76,9 +76,9 @@ func (m *Manager) GenWorkflowID(_ context.Context) (string, error) {
 	return id.String(), nil
 }
 
-// Start starts a DAG by executing the configured executable with appropriate arguments.
+// StartDAG starts a workflow by executing the configured executable with the start command.
 // It sets up the command to run in its own process group and configures standard output/error.
-func (m *Manager) Start(_ context.Context, dag *digraph.DAG, opts StartOptions) error {
+func (m *Manager) StartDAG(_ context.Context, dag *digraph.DAG, opts StartOptions) error {
 	args := []string{"start"}
 	if opts.Params != "" {
 		args = append(args, "-p")
@@ -87,8 +87,8 @@ func (m *Manager) Start(_ context.Context, dag *digraph.DAG, opts StartOptions) 
 	if opts.Quiet {
 		args = append(args, "-q")
 	}
-	if opts.ReqID != "" {
-		args = append(args, fmt.Sprintf("--workflow-id=%s", opts.ReqID))
+	if opts.WorkflowID != "" {
+		args = append(args, fmt.Sprintf("--workflow-id=%s", opts.WorkflowID))
 	}
 	if m.configPath != "" {
 		args = append(args, fmt.Sprintf("--config=%s", m.configPath))
@@ -105,9 +105,9 @@ func (m *Manager) Start(_ context.Context, dag *digraph.DAG, opts StartOptions) 
 	return cmd.Start()
 }
 
-// Restart restarts a DAG by executing the configured executable with the restart command.
+// RestartDAG restarts a DAG by executing the configured executable with the restart command.
 // It sets up the command to run in its own process group.
-func (m *Manager) Restart(_ context.Context, dag *digraph.DAG, opts RestartOptions) error {
+func (m *Manager) RestartDAG(_ context.Context, dag *digraph.DAG, opts RestartOptions) error {
 	args := []string{"restart"}
 	if opts.Quiet {
 		args = append(args, "-q")
@@ -121,9 +121,9 @@ func (m *Manager) Restart(_ context.Context, dag *digraph.DAG, opts RestartOptio
 	return cmd.Start()
 }
 
-// Retry retries a workflow with the specified requestID by executing
+// RetryDAG retries a workflow with the specified requestID by executing
 // the configured executable with the retry command.
-func (m *Manager) Retry(_ context.Context, dag *digraph.DAG, reqID string) error {
+func (m *Manager) RetryDAG(_ context.Context, dag *digraph.DAG, reqID string) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--workflow-id=%s", reqID))
 	args = append(args, dag.Location)
@@ -135,17 +135,17 @@ func (m *Manager) Retry(_ context.Context, dag *digraph.DAG, reqID string) error
 	return cmd.Start()
 }
 
-// IsRunning checks if a DAG is currently running by attempting to get its current status.
+// IsDAGRunning checks if a workflow is currently running by attempting to get its current status.
 // Returns true if the status can be retrieved without error, false otherwise.
-func (m *Manager) IsRunning(ctx context.Context, dag *digraph.DAG, workflowID string) bool {
+func (m *Manager) IsDAGRunning(ctx context.Context, dag *digraph.DAG, workflowID string) bool {
 	_, err := m.currentStatus(ctx, dag, workflowID)
 	return err == nil
 }
 
-// GetRealtimeStatus retrieves the current status of a DAG.
-// If the DAG is running, it gets the status from the socket.
+// GetDAGRealtimeStatus retrieves the current status of a workflow.
+// If the workflow is running, it gets the status from the socket.
 // If the socket doesn't exist or times out, it falls back to stored status or creates an initial status.
-func (m *Manager) GetRealtimeStatus(ctx context.Context, dag *digraph.DAG, workflowID string) (*models.Status, error) {
+func (m *Manager) GetDAGRealtimeStatus(ctx context.Context, dag *digraph.DAG, workflowID string) (*models.Status, error) {
 	status, err := m.currentStatus(ctx, dag, workflowID)
 	if err != nil {
 		// No such file or directory
@@ -168,9 +168,9 @@ FALLBACK:
 	return m.findPersistedStatus(ctx, dag, workflowID)
 }
 
-// FindByWorkflowID retrieves the status of a workflow by name and requestID from the execution history.
-func (e *Manager) FindByWorkflowID(ctx context.Context, ref digraph.WorkflowRef) (*models.Status, error) {
-	record, err := e.Find(ctx, ref)
+// FindWorkflowStatus retrieves the status of a workflow by name and requestID from the execution history.
+func (e *Manager) FindWorkflowStatus(ctx context.Context, ref digraph.WorkflowRef) (*models.Status, error) {
+	record, err := e.historyRepo.Find(ctx, ref)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by workflow ID: %w", err)
 	}
@@ -188,7 +188,7 @@ func (m *Manager) findPersistedStatus(ctx context.Context, dag *digraph.DAG, req
 	*models.Status, error,
 ) {
 	ref := digraph.NewWorkflowRef(dag.Name, reqID)
-	record, err := m.Find(ctx, ref)
+	record, err := m.historyRepo.Find(ctx, ref)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by workflow ID: %w", err)
 	}
@@ -199,7 +199,7 @@ func (m *Manager) findPersistedStatus(ctx context.Context, dag *digraph.DAG, req
 
 	// If the DAG is running, query the current status
 	if latestStatus.Status == scheduler.StatusRunning {
-		currentStatus, err := m.currentStatus(ctx, dag, latestStatus.ExecID)
+		currentStatus, err := m.currentStatus(ctx, dag, latestStatus.WorkflowID)
 		if err == nil {
 			return currentStatus, nil
 		}
@@ -214,9 +214,9 @@ func (m *Manager) findPersistedStatus(ctx context.Context, dag *digraph.DAG, req
 	return latestStatus, nil
 }
 
-// FindChildExec retrieves the status of a child workflow by its workflow ID.
-func (m *Manager) FindChildExec(ctx context.Context, ref digraph.WorkflowRef, reqID string) (*models.Status, error) {
-	record, err := m.FindChildWorkflow(ctx, ref, reqID)
+// FindChildWorkflowStatus retrieves the status of a child workflow by its workflow ID.
+func (m *Manager) FindChildWorkflowStatus(ctx context.Context, ref digraph.WorkflowRef, reqID string) (*models.Status, error) {
+	record, err := m.historyRepo.FindChildWorkflow(ctx, ref, reqID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find child workflow status by workflow ID: %w", err)
 	}
@@ -247,7 +247,7 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 	var latestStatus *models.Status
 
 	// Find the latest status by name
-	record, err := m.Latest(ctx, dag.Name)
+	record, err := m.historyRepo.Latest(ctx, dag.Name)
 	if err != nil {
 		goto handleError
 	}
@@ -260,7 +260,7 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 
 	// If the DAG is running, query the current status
 	if latestStatus.Status == scheduler.StatusRunning {
-		currentStatus, err := m.currentStatus(ctx, dag, latestStatus.ExecID)
+		currentStatus, err := m.currentStatus(ctx, dag, latestStatus.WorkflowID)
 		if err == nil {
 			return *currentStatus, nil
 		}
@@ -289,7 +289,7 @@ handleError:
 // ListRecentHistory retrieves the n most recent status records for a DAG by name.
 // It returns a slice of Status objects, filtering out any that cannot be read.
 func (m *Manager) ListRecentHistory(ctx context.Context, name string, n int) []models.Status {
-	records := m.Recent(ctx, name, n)
+	records := m.historyRepo.Recent(ctx, name, n)
 
 	var runs []models.Status
 	for _, record := range records {
@@ -315,9 +315,9 @@ func (e *Manager) UpdateStatus(ctx context.Context, root digraph.WorkflowRef, st
 	// Find the execution record for the workflow
 	var historyRecord models.Record
 
-	if root.WorkflowID == status.ExecID {
+	if root.WorkflowID == status.WorkflowID {
 		// If the workflow ID matches the root workflow ID, find the execution record by the root workflow ID
-		r, err := e.Find(ctx, root)
+		r, err := e.historyRepo.Find(ctx, root)
 		if err != nil {
 			return fmt.Errorf("failed to find execution record: %w", err)
 		}
@@ -325,7 +325,7 @@ func (e *Manager) UpdateStatus(ctx context.Context, root digraph.WorkflowRef, st
 	} else {
 		// If the workflow ID does not match, find the child workflow record
 		// by the root workflow ID and the child workflow ID
-		r, err := e.FindChildWorkflow(ctx, root, status.ExecID)
+		r, err := e.historyRepo.FindChildWorkflow(ctx, root, status.WorkflowID)
 		if err != nil {
 			return fmt.Errorf("failed to find child workflow record: %w", err)
 		}
@@ -372,9 +372,9 @@ func escapeArg(input string) string {
 
 // StartOptions contains options for starting a DAG.
 type StartOptions struct {
-	Params string // Parameters to pass to the DAG
-	Quiet  bool   // Whether to run in quiet mode
-	ReqID  string // workflow ID for the workflow
+	Params     string // Parameters to pass to the DAG
+	Quiet      bool   // Whether to run in quiet mode
+	WorkflowID string // Workflow ID for the workflow
 }
 
 // RestartOptions contains options for restarting a DAG.

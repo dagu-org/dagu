@@ -154,7 +154,7 @@ func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
 }
 
 func stopDAGIfRunning(ctx context.Context, cli history.Manager, dag *digraph.DAG, requestID string) error {
-	status, err := cli.GetRealtimeStatus(ctx, dag, requestID)
+	status, err := cli.GetDAGRealtimeStatus(ctx, dag, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to get current status: %w", err)
 	}
@@ -171,7 +171,7 @@ func stopDAGIfRunning(ctx context.Context, cli history.Manager, dag *digraph.DAG
 func stopRunningDAG(ctx context.Context, cli history.Manager, dag *digraph.DAG, requestID string) error {
 	const stopPollInterval = 100 * time.Millisecond
 	for {
-		status, err := cli.GetRealtimeStatus(ctx, dag, requestID)
+		status, err := cli.GetDAGRealtimeStatus(ctx, dag, requestID)
 		if err != nil {
 			return fmt.Errorf("failed to get current status: %w", err)
 		}
