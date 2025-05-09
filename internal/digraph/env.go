@@ -42,10 +42,10 @@ func (e Env) ApplyEnvs(ctx context.Context) {
 
 // SetupEnv sets up the execution context for a DAG execution.
 // It initializes the environment variables and the DAG metadata.
-func SetupEnv(ctx context.Context, d *DAG, c DB, root ExecRef, execID, logFile string, params []string) context.Context {
+func SetupEnv(ctx context.Context, d *DAG, c DB, root ExecRef, workflowID, logFile string, params []string) context.Context {
 	var envs = map[string]string{
 		EnvKeySchedulerLogPath: logFile,
-		EnvKeyExecID:           execID,
+		EnvKeyExecID:           workflowID,
 		EnvKeyDAGName:          d.Name,
 	}
 	for _, param := range params {
@@ -62,7 +62,7 @@ func SetupEnv(ctx context.Context, d *DAG, c DB, root ExecRef, execID, logFile s
 		DAG:    d,
 		DB:     c,
 		Envs:   envs,
-		ExecID: execID,
+		ExecID: workflowID,
 	})
 }
 

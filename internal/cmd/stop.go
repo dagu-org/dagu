@@ -11,18 +11,18 @@ import (
 func CmdStop() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "stop --exec-id=abc123 dagName",
+			Use:   "stop --workflow-id=abc123 dagName",
 			Short: "Stop a running DAG",
 			Long: `Gracefully terminate an active DAG execution.
 
 Flags:
-  --exec-id string   (optional) Unique identifier for tracking the restart execution.
+  --workflow-id string   (optional) Unique identifier for tracking the restart execution.
 
 This command stops all running tasks of the specified DAG, ensuring resources are properly released.
 If execution ID is not provided, it will find the current running DAG by name.
 
 Example:
-  dagu stop --exec-id=abc123 dagName
+  dagu stop --workflow-id=abc123 dagName
 `,
 			Args: cobra.ExactArgs(1),
 		}, stopFlags, runStop,
@@ -30,11 +30,11 @@ Example:
 }
 
 var stopFlags = []commandLineFlag{
-	execIDFlagStop,
+	workflowIDFlagStop,
 }
 
 func runStop(ctx *Context, args []string) error {
-	reqID, err := ctx.Command.Flags().GetString("exec-id")
+	reqID, err := ctx.Command.Flags().GetString("workflow-id")
 	if err != nil {
 		return fmt.Errorf("failed to get execution ID: %w", err)
 	}

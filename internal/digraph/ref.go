@@ -13,14 +13,14 @@ var (
 // ExecRef represents a reference to an execution of a DAG.
 type ExecRef struct {
 	Name   string `json:"name,omitempty"`
-	ExecID string `json:"execId,omitempty"`
+	ExecID string `json:"workflowId,omitempty"`
 }
 
-// NewExecRef creates a new ExecRef with the given name and execID.
-func NewExecRef(name, execID string) ExecRef {
+// NewExecRef creates a new ExecRef with the given name and workflowID.
+func NewExecRef(name, workflowID string) ExecRef {
 	return ExecRef{
 		Name:   name,
-		ExecID: execID,
+		ExecID: workflowID,
 	}
 }
 

@@ -175,12 +175,12 @@ func TestJSONDB(t *testing.T) {
 		_ = th.CreateRecord(t, ts, "parent-id", scheduler.StatusRunning)
 
 		// Create a sub record
-		const childExecID = "child-exec-id"
+		const childWorkflowID = "child-workflow-id"
 		const parentExecID = "parent-id"
 
 		root := digraph.NewExecRef("test_DAG", parentExecID)
 		childDAG := th.DAG("sub_dag")
-		record, err := th.Repo.Create(th.Context, childDAG.DAG, ts, childExecID, models.NewRecordOptions{
+		record, err := th.Repo.Create(th.Context, childDAG.DAG, ts, childWorkflowID, models.NewRecordOptions{
 			Root: &root,
 		})
 		require.NoError(t, err)
@@ -193,7 +193,7 @@ func TestJSONDB(t *testing.T) {
 		}()
 
 		statusToWrite := models.InitialStatus(childDAG.DAG)
-		statusToWrite.ExecID = childExecID
+		statusToWrite.ExecID = childWorkflowID
 		statusToWrite.Status = scheduler.StatusRunning
 		err = record.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
@@ -201,15 +201,15 @@ func TestJSONDB(t *testing.T) {
 		// Find the child execution record
 		ts = time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
 		ref := digraph.NewExecRef("test_DAG", parentExecID)
-		existingRecord, err := th.Repo.FindChildExecution(th.Context, ref, childExecID)
+		existingRecord, err := th.Repo.FindChildExecution(th.Context, ref, childWorkflowID)
 		require.NoError(t, err)
 		existingRecordStatus, err := existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, childExecID, existingRecordStatus.ExecID)
+		assert.Equal(t, childWorkflowID, existingRecordStatus.ExecID)
 		assert.Equal(t, scheduler.StatusRunning.String(), existingRecordStatus.Status.String())
 
 		// Create a retry record and write different status
-		retryRecord, err := th.Repo.Create(th.Context, childDAG.DAG, ts, childExecID, models.NewRecordOptions{
+		retryRecord, err := th.Repo.Create(th.Context, childDAG.DAG, ts, childWorkflowID, models.NewRecordOptions{
 			Root:  &root,
 			Retry: true,
 		})
@@ -220,11 +220,11 @@ func TestJSONDB(t *testing.T) {
 		_ = retryRecord.Close(th.Context)
 
 		// Verify the retry record is created
-		existingRecord, err = th.Repo.FindChildExecution(th.Context, ref, childExecID)
+		existingRecord, err = th.Repo.FindChildExecution(th.Context, ref, childWorkflowID)
 		require.NoError(t, err)
 		existingRecordStatus, err = existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, childExecID, existingRecordStatus.ExecID)
+		assert.Equal(t, childWorkflowID, existingRecordStatus.ExecID)
 		assert.Equal(t, scheduler.StatusSuccess.String(), existingRecordStatus.Status.String())
 	})
 	t.Run("ReadDAG", func(t *testing.T) {

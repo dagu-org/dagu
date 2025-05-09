@@ -107,23 +107,23 @@ func TestManager(t *testing.T) {
 		// Get the child execution ID.
 		status, err := th.HistoryMgr.GetLatestStatus(th.Context, dag.DAG)
 		require.NoError(t, err)
-		execID := status.ExecID
-		childExec := status.Nodes[0].Children[0]
+		workflowID := status.ExecID
+		childWorkflow := status.Nodes[0].Children[0]
 
-		root := digraph.NewExecRef(dag.Name, execID)
-		childExecStatus, err := th.HistoryMgr.FindChildExec(th.Context, root, childExec.ExecID)
+		root := digraph.NewExecRef(dag.Name, workflowID)
+		childWorkflowStatus, err := th.HistoryMgr.FindChildExec(th.Context, root, childWorkflow.ExecID)
 		require.NoError(t, err)
-		require.Equal(t, scheduler.StatusSuccess.String(), childExecStatus.Status.String())
+		require.Equal(t, scheduler.StatusSuccess.String(), childWorkflowStatus.Status.String())
 
 		// Update the the child execution status.
-		childExecStatus.Nodes[0].Status = scheduler.NodeStatusError
-		err = th.HistoryMgr.UpdateStatus(th.Context, root, *childExecStatus)
+		childWorkflowStatus.Nodes[0].Status = scheduler.NodeStatusError
+		err = th.HistoryMgr.UpdateStatus(th.Context, root, *childWorkflowStatus)
 		require.NoError(t, err)
 
 		// Check if the child execution status is updated.
-		childExecStatus, err = th.HistoryMgr.FindChildExec(th.Context, root, childExec.ExecID)
+		childWorkflowStatus, err = th.HistoryMgr.FindChildExec(th.Context, root, childWorkflow.ExecID)
 		require.NoError(t, err)
-		require.Equal(t, scheduler.NodeStatusError.String(), childExecStatus.Nodes[0].Status.String())
+		require.Equal(t, scheduler.NodeStatusError.String(), childWorkflowStatus.Nodes[0].Status.String())
 	})
 	t.Run("InvalidUpdateStatusWithInvalidReqID", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "invalid_reqid.yaml"))

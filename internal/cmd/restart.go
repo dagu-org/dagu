@@ -19,15 +19,15 @@ import (
 func CmdRestart() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "restart --exec-id=abc123 dagName",
+			Use:   "restart --workflow-id=abc123 dagName",
 			Short: "Restart a running DAG",
 			Long: `Stop the currently running DAG and immediately restart it with the same configuration but with a new execution ID.
 
 Flags:
-  --exec-id string (optional) Unique identifier for tracking the restart execution.
+  --workflow-id string (optional) Unique identifier for tracking the restart execution.
 
 Example:
-  dagu restart --exec-id=abc123 dagName
+  dagu restart --workflow-id=abc123 dagName
 
 This command gracefully stops the active DAG run before restarting it.
 If the execution ID is not provided, it will find the current running DAG by name.
@@ -38,11 +38,11 @@ If the execution ID is not provided, it will find the current running DAG by nam
 }
 
 var restartFlags = []commandLineFlag{
-	execIDFlagRestart,
+	workflowIDFlagRestart,
 }
 
 func runRestart(ctx *Context, args []string) error {
-	reqID, err := ctx.Command.Flags().GetString("exec-id")
+	reqID, err := ctx.Command.Flags().GetString("workflow-id")
 	if err != nil {
 		return fmt.Errorf("failed to get execution ID: %w", err)
 	}
@@ -121,7 +121,7 @@ func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
 
 	ctx.LogToFile(logFile)
 
-	logger.Info(ctx, "DAG restart initiated", "DAG", dag.Name, "execId", reqID, "logFile", logFile.Name())
+	logger.Info(ctx, "DAG restart initiated", "DAG", dag.Name, "workflowId", reqID, "logFile", logFile.Name())
 
 	dr, err := ctx.dagRepo(nil, []string{filepath.Dir(dag.Location)})
 	if err != nil {

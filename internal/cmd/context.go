@@ -253,11 +253,11 @@ func genReqID() (string, error) {
 }
 
 // validateExecID checks if the execution ID is valid and not empty.
-func validateExecID(execID string) error {
-	if execID == "" {
+func validateExecID(workflowID string) error {
+	if workflowID == "" {
 		return fmt.Errorf("execution ID is not set")
 	}
-	if _, err := uuid.Parse(execID); err != nil {
+	if _, err := uuid.Parse(workflowID); err != nil {
 		return fmt.Errorf("invalid execution ID: %w", err)
 	}
 	return nil

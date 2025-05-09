@@ -85,8 +85,8 @@ func (e Execution) CreateRecord(_ context.Context, ts TimeInUTC, cache *fileutil
 }
 
 // CreateChildExec creates a new child execution with the given timestamp and execution ID.
-func (e Execution) CreateChildExec(_ context.Context, execID string) (*Execution, error) {
-	dirName := "child_" + execID
+func (e Execution) CreateChildExec(_ context.Context, workflowID string) (*Execution, error) {
+	dirName := "child_" + workflowID
 	dir := filepath.Join(e.baseDir, ChildExecDir, dirName)
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create child execution directory: %w", err)
@@ -95,14 +95,14 @@ func (e Execution) CreateChildExec(_ context.Context, execID string) (*Execution
 }
 
 // FindChildExec searches for a child execution with the specified execution ID.
-func (e Execution) FindChildExec(_ context.Context, execID string) (*Execution, error) {
-	globPattern := filepath.Join(e.baseDir, ChildExecDir, "child_"+execID)
+func (e Execution) FindChildExec(_ context.Context, workflowID string) (*Execution, error) {
+	globPattern := filepath.Join(e.baseDir, ChildExecDir, "child_"+workflowID)
 	matches, err := filepath.Glob(globPattern)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list child execution directories: %w", err)
 	}
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("no matching child execution found for ID %s (glob=%s): %w", execID, globPattern, models.ErrExecIDNotFound)
+		return nil, fmt.Errorf("no matching child execution found for ID %s (glob=%s): %w", workflowID, globPattern, models.ErrExecIDNotFound)
 	}
 	// Sort the matches by timestamp
 	sort.Slice(matches, func(i, j int) bool {

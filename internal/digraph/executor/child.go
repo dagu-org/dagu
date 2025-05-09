@@ -15,23 +15,23 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
-var _ Executor = (*childExec)(nil)
-var _ ChildExec = (*childExec)(nil)
+var _ Executor = (*childWorkflow)(nil)
+var _ ChildWorkflow = (*childWorkflow)(nil)
 
-type childExec struct {
-	dag         *digraph.DAG
-	lock        sync.Mutex
-	childExecID string
-	params      string
-	workDir     string
-	stdout      io.Writer
-	stderr      io.Writer
-	cmd         *exec.Cmd
+type childWorkflow struct {
+	dag             *digraph.DAG
+	lock            sync.Mutex
+	childWorkflowID string
+	params          string
+	workDir         string
+	stdout          io.Writer
+	stderr          io.Writer
+	cmd             *exec.Cmd
 }
 
 var ErrWorkingDirNotExist = fmt.Errorf("working directory does not exist")
 
-func newChildExec(
+func newChildWorkflow(
 	ctx context.Context, step digraph.Step,
 ) (Executor, error) {
 	config, err := EvalObject(ctx, struct {
@@ -60,20 +60,20 @@ func newChildExec(
 		return nil, ErrWorkingDirNotExist
 	}
 
-	return &childExec{
+	return &childWorkflow{
 		dag:     sub,
 		params:  config.Params,
 		workDir: dir,
 	}, nil
 }
 
-func (e *childExec) Run(ctx context.Context) error {
+func (e *childWorkflow) Run(ctx context.Context) error {
 	executable, err := executablePath()
 	if err != nil {
 		return fmt.Errorf("failed to find executable path: %w", err)
 	}
 
-	if e.childExecID == "" {
+	if e.childWorkflowID == "" {
 		return fmt.Errorf("execution ID is not set for child DAG")
 	}
 
@@ -89,7 +89,7 @@ func (e *childExec) Run(ctx context.Context) error {
 		"start",
 		fmt.Sprintf("--root=%s", env.Root.String()),
 		fmt.Sprintf("--parent=%s", env.ExecRef().String()),
-		fmt.Sprintf("--exec-id=%s", e.childExecID),
+		fmt.Sprintf("--workflow-id=%s", e.childWorkflowID),
 		"--quiet",
 		e.dag.Location,
 	}
@@ -118,7 +118,7 @@ func (e *childExec) Run(ctx context.Context) error {
 	e.cmd = cmd
 
 	logger.Info(ctx, "Executing child DAG",
-		"execId", e.childExecID,
+		"workflowId", e.childWorkflowID,
 		"target", e.dag.Name,
 		"args", args,
 	)
@@ -135,9 +135,9 @@ func (e *childExec) Run(ctx context.Context) error {
 	}
 
 	// get results from the child DAG
-	result, err := env.DB.GetChildExecStatus(ctx, e.childExecID, env.Root)
+	result, err := env.DB.GetChildExecStatus(ctx, e.childWorkflowID, env.Root)
 	if err != nil {
-		return fmt.Errorf("failed to collect result for the child execucion (exec ID=%s root=%s): %w", e.childExecID, env.Root, err)
+		return fmt.Errorf("failed to collect result for the child execucion (exec ID=%s root=%s): %w", e.childWorkflowID, env.Root, err)
 	}
 
 	jsonData, err := json.MarshalIndent(result, "", "  ")
@@ -154,25 +154,25 @@ func (e *childExec) Run(ctx context.Context) error {
 	return nil
 }
 
-func (e *childExec) SetExecID(id string) {
+func (e *childWorkflow) SetWorkflowID(id string) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
-	e.childExecID = id
+	e.childWorkflowID = id
 }
 
-func (e *childExec) SetStdout(out io.Writer) {
+func (e *childWorkflow) SetStdout(out io.Writer) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	e.stdout = out
 }
 
-func (e *childExec) SetStderr(out io.Writer) {
+func (e *childWorkflow) SetStderr(out io.Writer) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	e.stderr = out
 }
 
-func (e *childExec) Kill(sig os.Signal) error {
+func (e *childWorkflow) Kill(sig os.Signal) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	if e.cmd == nil || e.cmd.Process == nil {
@@ -182,8 +182,8 @@ func (e *childExec) Kill(sig os.Signal) error {
 }
 
 func init() {
-	Register(digraph.ExecutorTypeSubLegacy, newChildExec)
-	Register(digraph.ExecutorTypeSub, newChildExec)
+	Register(digraph.ExecutorTypeSubLegacy, newChildWorkflow)
+	Register(digraph.ExecutorTypeSub, newChildWorkflow)
 }
 
 func executablePath() (string, error) {

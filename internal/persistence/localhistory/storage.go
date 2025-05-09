@@ -111,7 +111,7 @@ func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestam
 }
 
 // NewSubRecord creates a new run record for the specified child execution.
-func (db *historyStorage) newSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, execID string, opts models.NewRecordOptions) (models.Record, error) {
+func (db *historyStorage) newSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewRecordOptions) (models.Record, error) {
 	dataRoot := NewDataRoot(db.baseDir, opts.Root.Name)
 	root, err := dataRoot.FindByExecID(ctx, opts.Root.ExecID)
 	if err != nil {
@@ -122,13 +122,13 @@ func (db *historyStorage) newSubRecord(ctx context.Context, dag *digraph.DAG, ti
 
 	var run *Execution
 	if opts.Retry {
-		r, err := root.FindChildExec(ctx, execID)
+		r, err := root.FindChildExec(ctx, workflowID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find child execution record: %w", err)
 		}
 		run = r
 	} else {
-		r, err := root.CreateChildExec(ctx, execID)
+		r, err := root.CreateChildExec(ctx, workflowID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create child execution: %w", err)
 		}
@@ -236,7 +236,7 @@ func (db *historyStorage) Find(ctx context.Context, ref digraph.ExecRef) (models
 }
 
 // FindChildExecution finds a run record by execution ID for a child DAG.
-func (db *historyStorage) FindChildExecution(ctx context.Context, ref digraph.ExecRef, childExecID string) (models.Record, error) {
+func (db *historyStorage) FindChildExecution(ctx context.Context, ref digraph.ExecRef, childWorkflowID string) (models.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -255,11 +255,11 @@ func (db *historyStorage) FindChildExecution(ctx context.Context, ref digraph.Ex
 		return nil, fmt.Errorf("failed to find execution: %w", err)
 	}
 
-	childExec, err := run.FindChildExec(ctx, childExecID)
+	childWorkflow, err := run.FindChildExec(ctx, childWorkflowID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find child execution: %w", err)
 	}
-	return childExec.LatestRecord(ctx, db.cache)
+	return childWorkflow.LatestRecord(ctx, db.cache)
 }
 
 // RemoveOld removes run records older than retentionDays for the specified key.

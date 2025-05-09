@@ -54,8 +54,8 @@ var (
 
 	// Unique execution ID required for retrying a DAG execution.
 	// This flag must be provided when using the retry command.
-	execIDFlagRetry = commandLineFlag{
-		name:      "exec-id",
+	workflowIDFlagRetry = commandLineFlag{
+		name:      "workflow-id",
 		shorthand: "e",
 		usage:     "Unique execution ID for retrying a DAG run (required)",
 		required:  true,
@@ -63,29 +63,29 @@ var (
 
 	// Unique execution ID used for starting a new DAG execution.
 	// This is used to track and identify the execution instance and its status.
-	execIDFlagStart = commandLineFlag{
-		name:      "exec-id",
+	workflowIDFlagStart = commandLineFlag{
+		name:      "workflow-id",
 		shorthand: "e",
 		usage:     "Unique execution ID for a DAG run",
 	}
 
 	// Unique execution ID used for stopping a DAG execution.
-	execIDFlagStop = commandLineFlag{
-		name:      "exec-id",
+	workflowIDFlagStop = commandLineFlag{
+		name:      "workflow-id",
 		shorthand: "e",
 		usage:     "execution ID for stopping a DAG run",
 	}
 
 	// Unique execution ID used for restarting a DAG execution.
-	execIDFlagRestart = commandLineFlag{
-		name:      "exec-id",
+	workflowIDFlagRestart = commandLineFlag{
+		name:      "workflow-id",
 		shorthand: "e",
 		usage:     "execution ID for restarting a DAG run",
 	}
 
 	// Unique execution ID used for checking the status of a DAG execution.
-	execIDFlagStatus = commandLineFlag{
-		name:      "exec-id",
+	workflowIDFlagStatus = commandLineFlag{
+		name:      "workflow-id",
 		shorthand: "e",
 		usage:     "execution ID for checking the status of a DAG run",
 	}

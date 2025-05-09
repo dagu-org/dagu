@@ -12,12 +12,12 @@ import (
 func CmdStatus() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "status --exec-id=abc123 dagName",
+			Use:   "status --workflow-id=abc123 dagName",
 			Short: "Display the current status of a DAG",
 			Long: `Show real-time status information for a specified DAG execution.
 
 Flags:
-	--exec-id string (optional) Unique identifier for tracking the execution.
+	--workflow-id string (optional) Unique identifier for tracking the execution.
 
 Example:
   dagu status my_dag.yaml
@@ -28,11 +28,11 @@ Example:
 }
 
 var statusFlags = []commandLineFlag{
-	execIDFlagStatus,
+	workflowIDFlagStatus,
 }
 
 func runStatus(ctx *Context, args []string) error {
-	reqID, err := ctx.Command.Flags().GetString("exec-id")
+	reqID, err := ctx.Command.Flags().GetString("workflow-id")
 	if err != nil {
 		return fmt.Errorf("failed to get execution ID: %w", err)
 	}

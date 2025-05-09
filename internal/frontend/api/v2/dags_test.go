@@ -39,7 +39,7 @@ func TestDAG(t *testing.T) {
 
 		// Check the status of the DAG execution
 		require.Eventually(t, func() bool {
-			url := fmt.Sprintf("/api/v2/dags/test_dag/runs/%s", execResp.WorkflowId)
+			url := fmt.Sprintf("/api/v2/dags/test_dag/workflows/%s", execResp.WorkflowId)
 			statusResp := server.Client().Get(url).ExpectStatus(http.StatusOK).Send(t)
 			var status api.GetDAGWorkflowDetails200JSONResponse
 			statusResp.Unmarshal(t, &status)

@@ -313,13 +313,13 @@ func (e *docker) execInContainer(ctx context.Context, cli *client.Client, args [
 	}
 
 	// Create exec instance
-	execID, err := cli.ContainerExecCreate(ctx, e.containerName, execConfig)
+	workflowID, err := cli.ContainerExecCreate(ctx, e.containerName, execConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create exec: %w", err)
 	}
 
 	// Start exec instance
-	resp, err := cli.ContainerExecAttach(ctx, execID.ID, container.ExecAttachOptions{})
+	resp, err := cli.ContainerExecAttach(ctx, workflowID.ID, container.ExecAttachOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to start exec: %w", err)
 	}
@@ -334,7 +334,7 @@ func (e *docker) execInContainer(ctx context.Context, cli *client.Client, args [
 
 	// Wait for exec to complete
 	for {
-		inspectResp, err := cli.ContainerExecInspect(ctx, execID.ID)
+		inspectResp, err := cli.ContainerExecInspect(ctx, workflowID.ID)
 		if err != nil {
 			return fmt.Errorf("failed to inspect exec: %w", err)
 		}

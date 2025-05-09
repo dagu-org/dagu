@@ -52,8 +52,8 @@ steps:
     command: echo "Hello, $PARAM"
 `)
 
-	execID := uuid.Must(uuid.NewV7()).String()
-	args := []string{"start", "--exec-id", execID, "parent"}
+	workflowID := uuid.Must(uuid.NewV7()).String()
+	args := []string{"start", "--workflow-id", workflowID, "parent"}
 	th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"DAG run finished"},
@@ -62,7 +62,7 @@ steps:
 	// Update the child_2 status to "failed" to simulate a retry
 	// First, find the child_2 execution ID to update its status
 	ctx := context.Background()
-	ref := digraph.NewExecRef("parent", execID)
+	ref := digraph.NewExecRef("parent", workflowID)
 	parentRec, err := th.HistoryRepo.Find(ctx, ref)
 	require.NoError(t, err)
 
@@ -115,7 +115,7 @@ steps:
 
 	// Retry the DAG
 
-	args = []string{"retry", "--exec-id", execID, "parent"}
+	args = []string{"retry", "--workflow-id", workflowID, "parent"}
 	th.RunCommand(t, cmd.CmdRetry(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"DAG run finished"},

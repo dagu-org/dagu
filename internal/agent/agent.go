@@ -78,8 +78,8 @@ type Agent struct {
 	// parent is the execution reference of the parent DAG execution.
 	parent digraph.ExecRef
 
-	// execID is the execution ID of the current DAG execution.
-	execID string
+	// workflowID is the execution ID of the current DAG execution.
+	workflowID string
 
 	// finished is true if the DAG run is finished.
 	finished atomic.Bool
@@ -107,7 +107,7 @@ type Options struct {
 
 // New creates a new Agent.
 func New(
-	execID string,
+	workflowID string,
 	dag *digraph.DAG,
 	logDir string,
 	logFile string,
@@ -120,7 +120,7 @@ func New(
 	return &Agent{
 		root:        root,
 		parent:      opts.Parent,
-		execID:      execID,
+		workflowID:  workflowID,
 		dag:         dag,
 		dry:         opts.Dry,
 		retryTarget: opts.RetryTarget,
@@ -143,10 +143,10 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create a new context for the DAG run with all necessary information
 	dbClient := newDBClient(a.historyRepo, a.dagRepo)
-	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.root, a.execID, a.logFile, a.dag.Params)
+	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.root, a.workflowID, a.logFile, a.dag.Params)
 
 	// Add structured logging context
-	logFields := []any{"dag", a.dag.Name, "execId", a.execID}
+	logFields := []any{"dag", a.dag.Name, "workflowId", a.workflowID}
 	if a.subExecution.Load() {
 		logFields = append(logFields, "rootDAG", a.root.Name, "rootReqID", a.root.ExecID)
 	}
@@ -239,7 +239,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	})
 
 	// Start the DAG execution.
-	logger.Debug(ctx, "DAG run started", "execId", a.execID, "name", a.dag.Name, "params", a.dag.Params)
+	logger.Debug(ctx, "DAG run started", "workflowId", a.workflowID, "name", a.dag.Name, "params", a.dag.Params)
 	lastErr := a.scheduler.Schedule(ctx, a.graph, done)
 
 	// Update the finished status to the runstore database.
@@ -297,7 +297,7 @@ func (a *Agent) Status() models.Status {
 	// Create the status object to record the current status.
 	return models.NewStatusBuilder(a.dag).
 		Create(
-			a.execID,
+			a.workflowID,
 			schedulerStatus,
 			os.Getpid(),
 			a.graph.StartAt(),
@@ -358,7 +358,7 @@ func (a *Agent) setup(ctx context.Context) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	if a.root.ExecID != a.execID {
+	if a.root.ExecID != a.workflowID {
 		logger.Debug(ctx, "Initiating child execution", "rootDAG", a.root.Name, "rootReqID", a.root.ExecID)
 		a.subExecution.Store(true)
 		if a.parent.IsZero() {
@@ -395,7 +395,7 @@ func (a *Agent) newScheduler() *scheduler.Scheduler {
 		Timeout:       a.dag.Timeout,
 		Delay:         a.dag.Delay,
 		Dry:           a.dry,
-		ExecID:        a.execID,
+		ExecID:        a.workflowID,
 	}
 
 	if a.dag.HandlerOn.Exit != nil {
@@ -435,7 +435,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 	}()
 
 	db := newDBClient(a.historyRepo, a.dagRepo)
-	dagCtx := digraph.SetupEnv(ctx, a.dag, db, a.root, a.execID, a.logFile, a.dag.Params)
+	dagCtx := digraph.SetupEnv(ctx, a.dag, db, a.root, a.workflowID, a.logFile, a.dag.Params)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 	a.lastErr = lastErr
 
@@ -534,7 +534,7 @@ func (a *Agent) setupRunRecord(ctx context.Context) (models.Record, error) {
 		opts.Root = &a.root
 	}
 
-	return a.historyRepo.Create(ctx, a.dag, time.Now(), a.execID, opts)
+	return a.historyRepo.Create(ctx, a.dag, time.Now(), a.workflowID, opts)
 }
 
 // setupSocketServer create socket server instance.
@@ -542,9 +542,9 @@ func (a *Agent) setupSocketServer(ctx context.Context) error {
 	var socketAddr string
 	if a.subExecution.Load() {
 		// Use separate socket address for child DAGs to allow them run concurrently.
-		socketAddr = a.dag.SockAddrSub(a.execID)
+		socketAddr = a.dag.SockAddrSub(a.workflowID)
 	} else {
-		socketAddr = a.dag.SockAddr(a.execID)
+		socketAddr = a.dag.SockAddr(a.workflowID)
 	}
 	socketServer, err := sock.NewServer(socketAddr, a.HandleHTTP(ctx))
 	if err != nil {
@@ -559,8 +559,8 @@ func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
 	if a.subExecution.Load() {
 		return nil // Skip the check for child DAGs
 	}
-	if a.client.IsRunning(ctx, a.dag, a.execID) {
-		return fmt.Errorf("the DAG is already running. execID=%s, socket=%s", a.execID, a.dag.SockAddr(a.execID))
+	if a.client.IsRunning(ctx, a.dag, a.workflowID) {
+		return fmt.Errorf("the DAG is already running. workflowID=%s, socket=%s", a.workflowID, a.dag.SockAddr(a.workflowID))
 	}
 	return nil
 }

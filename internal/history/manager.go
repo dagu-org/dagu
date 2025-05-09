@@ -55,9 +55,9 @@ func (m *Manager) LoadYAML(ctx context.Context, spec []byte, opts ...digraph.Loa
 
 // Stop stops a running DAG by sending a stop request to its socket.
 // If the DAG is not running, it logs a message and returns nil.
-func (m *Manager) Stop(ctx context.Context, dag *digraph.DAG, execID string) error {
+func (m *Manager) Stop(ctx context.Context, dag *digraph.DAG, workflowID string) error {
 	logger.Info(ctx, "Stopping", "name", dag.Name)
-	addr := dag.SockAddr(execID)
+	addr := dag.SockAddr(workflowID)
 	if !fileutil.FileExists(addr) {
 		logger.Info(ctx, "The DAG is not running", "name", dag.Name)
 		return nil
@@ -89,7 +89,7 @@ func (m *Manager) Start(_ context.Context, dag *digraph.DAG, opts StartOptions) 
 		args = append(args, "-q")
 	}
 	if opts.ReqID != "" {
-		args = append(args, fmt.Sprintf("--exec-id=%s", opts.ReqID))
+		args = append(args, fmt.Sprintf("--workflow-id=%s", opts.ReqID))
 	}
 	if m.configPath != "" {
 		args = append(args, fmt.Sprintf("--config=%s", m.configPath))
@@ -126,7 +126,7 @@ func (m *Manager) Restart(_ context.Context, dag *digraph.DAG, opts RestartOptio
 // the configured executable with the retry command.
 func (m *Manager) Retry(_ context.Context, dag *digraph.DAG, reqID string) error {
 	args := []string{"retry"}
-	args = append(args, fmt.Sprintf("--exec-id=%s", reqID))
+	args = append(args, fmt.Sprintf("--workflow-id=%s", reqID))
 	args = append(args, dag.Location)
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
@@ -138,16 +138,16 @@ func (m *Manager) Retry(_ context.Context, dag *digraph.DAG, reqID string) error
 
 // IsRunning checks if a DAG is currently running by attempting to get its current status.
 // Returns true if the status can be retrieved without error, false otherwise.
-func (m *Manager) IsRunning(ctx context.Context, dag *digraph.DAG, execID string) bool {
-	_, err := m.currentStatus(ctx, dag, execID)
+func (m *Manager) IsRunning(ctx context.Context, dag *digraph.DAG, workflowID string) bool {
+	_, err := m.currentStatus(ctx, dag, workflowID)
 	return err == nil
 }
 
 // GetRealtimeStatus retrieves the current status of a DAG.
 // If the DAG is running, it gets the status from the socket.
 // If the socket doesn't exist or times out, it falls back to stored status or creates an initial status.
-func (m *Manager) GetRealtimeStatus(ctx context.Context, dag *digraph.DAG, execID string) (*models.Status, error) {
-	status, err := m.currentStatus(ctx, dag, execID)
+func (m *Manager) GetRealtimeStatus(ctx context.Context, dag *digraph.DAG, workflowID string) (*models.Status, error) {
+	status, err := m.currentStatus(ctx, dag, workflowID)
 	if err != nil {
 		// No such file or directory
 		if errors.Is(err, os.ErrNotExist) {
@@ -161,12 +161,12 @@ func (m *Manager) GetRealtimeStatus(ctx context.Context, dag *digraph.DAG, execI
 	return status, nil
 
 FALLBACK:
-	if execID == "" {
+	if workflowID == "" {
 		// The DAG is not running so return the default status
 		status := models.InitialStatus(dag)
 		return &status, nil
 	}
-	return m.findPersistedStatus(ctx, dag, execID)
+	return m.findPersistedStatus(ctx, dag, workflowID)
 }
 
 // FindByReqID retrieves the status of a DAG run by name and requestID from the run store.

@@ -36,11 +36,11 @@ func setupTestJSONDB(t *testing.T) JSONDBTest {
 	return th
 }
 
-func (th JSONDBTest) CreateRecord(t *testing.T, ts time.Time, execID string, s scheduler.Status) *Record {
+func (th JSONDBTest) CreateRecord(t *testing.T, ts time.Time, workflowID string, s scheduler.Status) *Record {
 	t.Helper()
 
 	dag := th.DAG("test_DAG")
-	record, err := th.Repo.Create(th.Context, dag.DAG, ts, execID, models.NewRecordOptions{})
+	record, err := th.Repo.Create(th.Context, dag.DAG, ts, workflowID, models.NewRecordOptions{})
 	require.NoError(t, err)
 
 	err = record.Open(th.Context)
@@ -51,7 +51,7 @@ func (th JSONDBTest) CreateRecord(t *testing.T, ts time.Time, execID string, s s
 	}()
 
 	status := models.InitialStatus(dag.DAG)
-	status.ExecID = execID
+	status.ExecID = workflowID
 	status.Status = s
 
 	err = record.Write(th.Context, status)
@@ -109,14 +109,14 @@ func (w WriterTest) Write(t *testing.T, status models.Status) {
 	require.NoError(t, err)
 }
 
-func (w WriterTest) AssertContent(t *testing.T, name, execID string, status scheduler.Status) {
+func (w WriterTest) AssertContent(t *testing.T, name, workflowID string, status scheduler.Status) {
 	t.Helper()
 
 	data, err := ParseStatusFile(w.FilePath)
 	require.NoError(t, err)
 
 	assert.Equal(t, name, data.Name)
-	assert.Equal(t, execID, data.ExecID)
+	assert.Equal(t, workflowID, data.ExecID)
 	assert.Equal(t, status, data.Status)
 }
 

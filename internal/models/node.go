@@ -29,8 +29,8 @@ func FromNodes(nodes []scheduler.NodeData) []*Node {
 // FromNode converts a single scheduler NodeData to a persistence Node
 func FromNode(node scheduler.NodeData) *Node {
 	children := make([]ChildExec, len(node.State.Children))
-	for i, childExec := range node.State.Children {
-		children[i] = ChildExec(childExec)
+	for i, childWorkflow := range node.State.Children {
+		children[i] = ChildExec(childWorkflow)
 	}
 	var errText string
 	if node.State.Error != nil {
@@ -65,7 +65,7 @@ type Node struct {
 }
 
 type ChildExec struct {
-	ExecID string `json:"execId,omitempty"`
+	ExecID string `json:"workflowId,omitempty"`
 }
 
 // ToNode converts a persistence Node back to a scheduler Node

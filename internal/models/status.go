@@ -109,14 +109,14 @@ func WithLogFilePath(logFilePath string) StatusOption {
 
 // Create builds a Status object for a DAG run with the specified parameters
 func (f *StatusBuilder) Create(
-	execID string,
+	workflowID string,
 	status scheduler.Status,
 	pid int,
 	startedAt time.Time,
 	opts ...StatusOption,
 ) Status {
 	statusObj := InitialStatus(f.dag)
-	statusObj.ExecID = execID
+	statusObj.ExecID = workflowID
 	statusObj.Status = status
 	statusObj.PID = PID(pid)
 	statusObj.StartedAt = formatTime(startedAt)
@@ -143,7 +143,7 @@ type Status struct {
 	Root       digraph.ExecRef  `json:"root,omitempty"`
 	Parent     digraph.ExecRef  `json:"parent,omitempty"`
 	Name       string           `json:"name"`
-	ExecID     string           `json:"execId"`
+	ExecID     string           `json:"workflowId"`
 	Status     scheduler.Status `json:"status"`
 	PID        PID              `json:"pid,omitempty"`
 	Nodes      []*Node          `json:"nodes,omitempty"`

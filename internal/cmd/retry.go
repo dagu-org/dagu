@@ -21,7 +21,7 @@ func CmdRetry() *cobra.Command {
 			Long: `Re-execute a previously run DAG using its unique execution ID.
 
 Example:
-  dagu retry my_dag.yaml --exec-id=abc123
+  dagu retry my_dag.yaml --workflow-id=abc123
 
 This command is useful for recovering from errors or transient issues by re-running the DAG.
 `,
@@ -30,10 +30,10 @@ This command is useful for recovering from errors or transient issues by re-runn
 	)
 }
 
-var retryFlags = []commandLineFlag{execIDFlagRetry}
+var retryFlags = []commandLineFlag{workflowIDFlagRetry}
 
 func runRetry(ctx *Context, args []string) error {
-	reqID, err := ctx.Command.Flags().GetString("exec-id")
+	reqID, err := ctx.Command.Flags().GetString("workflow-id")
 	if err != nil {
 		return fmt.Errorf("failed to get execution ID: %w", err)
 	}
@@ -69,7 +69,7 @@ func runRetry(ctx *Context, args []string) error {
 }
 
 func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootRun digraph.ExecRef) error {
-	logger.Debug(ctx, "Executing retry", "name", dag.Name, "execId", status.ExecID)
+	logger.Debug(ctx, "Executing retry", "name", dag.Name, "workflowId", status.ExecID)
 
 	// We use the same log file for the retry as the original run.
 	logFile, err := fileutil.OpenOrCreateFile(status.Log)
@@ -80,7 +80,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootRun
 		_ = logFile.Close()
 	}()
 
-	logger.Info(ctx, "DAG retry initiated", "DAG", dag.Name, "execId", status.ExecID, "logFile", logFile.Name())
+	logger.Info(ctx, "DAG retry initiated", "DAG", dag.Name, "workflowId", status.ExecID, "logFile", logFile.Name())
 
 	// Update the context with the log file
 	ctx.LogToFile(logFile)

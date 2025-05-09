@@ -34,7 +34,7 @@ func TestRetryCommand(t *testing.T) {
 		require.NotNil(t, status.Status)
 
 		// Retry with the execution ID.
-		args = []string{"retry", fmt.Sprintf("--exec-id=%s", status.ExecID), dagFile.Location}
+		args = []string{"retry", fmt.Sprintf("--workflow-id=%s", status.ExecID), dagFile.Location}
 		th.RunCommand(t, cmd.CmdRetry(), test.CmdTest{
 			Args:        args,
 			ExpectedOut: []string{`[1=foo]`},

@@ -47,7 +47,7 @@ func TestStopCommand(t *testing.T) {
 		reqId := uuid.Must(uuid.NewV7()).String()
 		go func() {
 			// Start the DAG to stop.
-			args := []string{"start", "--exec-id=" + reqId, dagFile.Location}
+			args := []string{"start", "--workflow-id=" + reqId, dagFile.Location}
 			th.RunCommand(t, cmd.CmdStart(), test.CmdTest{Args: args})
 			close(done)
 		}()
@@ -59,7 +59,7 @@ func TestStopCommand(t *testing.T) {
 
 		// Stop the DAG.
 		th.RunCommand(t, cmd.CmdStop(), test.CmdTest{
-			Args:        []string{"stop", dagFile.Location, "--exec-id=" + reqId},
+			Args:        []string{"stop", dagFile.Location, "--workflow-id=" + reqId},
 			ExpectedOut: []string{"DAG stopped"}})
 
 		// Check the DAG is stopped.

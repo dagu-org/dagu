@@ -290,19 +290,19 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		opt(helper)
 	}
 
-	var execID string
+	var workflowID string
 	if helper.opts.RetryTarget != nil {
-		execID = helper.opts.RetryTarget.ExecID
+		workflowID = helper.opts.RetryTarget.ExecID
 	} else {
-		execID = genReqID()
+		workflowID = genReqID()
 	}
 
 	logDir := d.Config.Paths.LogDir
-	logFile := filepath.Join(d.Config.Paths.LogDir, execID+".log")
-	root := digraph.NewExecRef(d.Name, execID)
+	logFile := filepath.Join(d.Config.Paths.LogDir, workflowID+".log")
+	root := digraph.NewExecRef(d.Name, workflowID)
 
 	helper.Agent = agent.New(
-		execID,
+		workflowID,
 		d.DAG,
 		logDir,
 		logFile,

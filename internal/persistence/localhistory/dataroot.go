@@ -82,15 +82,15 @@ func NewDataRoot(baseDir, dagName string) DataRoot {
 //
 // Returns:
 //   - The matching Execution instance, or an error if not found
-func (dr *DataRoot) FindByExecID(_ context.Context, execID string) (*Execution, error) {
+func (dr *DataRoot) FindByExecID(_ context.Context, workflowID string) (*Execution, error) {
 	// Find matching files
-	matches, err := filepath.Glob(dr.GlobPatternWithReqID(execID))
+	matches, err := filepath.Glob(dr.GlobPatternWithReqID(workflowID))
 	if err != nil {
 		return nil, fmt.Errorf("failed to make glob pattern: %w", err)
 	}
 
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("%w: %s", models.ErrExecIDNotFound, execID)
+		return nil, fmt.Errorf("%w: %s", models.ErrExecIDNotFound, workflowID)
 	}
 
 	// Sort matches by timestamp (most recent first)
@@ -137,8 +137,8 @@ func (dr *DataRoot) CreateRun(ts TimeInUTC, reqID string) (*Execution, error) {
 	return NewRun(dir)
 }
 
-func (dr DataRoot) GlobPatternWithReqID(execID string) string {
-	return filepath.Join(dr.executionsDir, "2*", "*", "*", "exec_*"+execID+"*")
+func (dr DataRoot) GlobPatternWithReqID(workflowID string) string {
+	return filepath.Join(dr.executionsDir, "2*", "*", "*", "exec_*"+workflowID+"*")
 }
 
 func (dr DataRoot) Exists() bool {

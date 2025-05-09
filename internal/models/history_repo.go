@@ -20,7 +20,7 @@ var (
 // implementations (e.g., file-based, in-memory, etc.) to be used interchangeably.
 type HistoryRepository interface {
 	// Create creates a new history record for a DAG run
-	Create(ctx context.Context, dag *digraph.DAG, timestamp time.Time, execID string, opts NewRecordOptions) (Record, error)
+	Create(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts NewRecordOptions) (Record, error)
 	// Recent returns the most recent history records for a DAG, limited by itemLimit
 	Recent(ctx context.Context, name string, itemLimit int) []Record
 	// Latest returns the most recent history record for a DAG
@@ -28,7 +28,7 @@ type HistoryRepository interface {
 	// Find finds a history record by its execution ID
 	Find(ctx context.Context, ref digraph.ExecRef) (Record, error)
 	// FindChildExecution finds a child execution record by its execution ID
-	FindChildExecution(ctx context.Context, ref digraph.ExecRef, childExecID string) (Record, error)
+	FindChildExecution(ctx context.Context, ref digraph.ExecRef, childWorkflowID string) (Record, error)
 	// RemoveOld removes history records older than retentionDays
 	RemoveOld(ctx context.Context, name string, retentionDays int) error
 	// Rename renames all history records from oldName to newName
