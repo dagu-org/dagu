@@ -294,12 +294,12 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 	if helper.opts.RetryTarget != nil {
 		workflowID = helper.opts.RetryTarget.ExecID
 	} else {
-		workflowID = genReqID()
+		workflowID = generateWorkflowID()
 	}
 
 	logDir := d.Config.Paths.LogDir
 	logFile := filepath.Join(d.Config.Paths.LogDir, workflowID+".log")
-	root := digraph.NewExecRef(d.Name, workflowID)
+	root := digraph.NewWorkflowRef(d.Name, workflowID)
 
 	helper.Agent = agent.New(
 		workflowID,
@@ -402,7 +402,7 @@ func setShell(t *testing.T, shell string) {
 	_ = os.Setenv("SHELL", shPath)
 }
 
-func genReqID() string {
+func generateWorkflowID() string {
 	id, err := uuid.NewV7()
 	if err != nil {
 		panic(err)

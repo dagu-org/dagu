@@ -15,8 +15,8 @@ import (
 
 // Errors for start command
 var (
-	// ErrExecIDRequired is returned when a child execution is attempted without providing an workflow ID
-	ErrExecIDRequired = errors.New("workflow ID is required for child execution")
+	// ErrExecIDRequired is returned when a child workflow is attempted without providing an workflow ID
+	ErrExecIDRequired = errors.New("workflow ID is required for child workflow")
 
 	// ErrExecIDFormat is returned when the provided workflow ID has an invalid format
 	ErrExecIDFormat = errors.New("invalid workflow ID format")
@@ -44,12 +44,12 @@ This command parses the DAG specification, resolves parameters, and initiates th
 }
 
 // Command line flags for the start command
-var startFlags = []commandLineFlag{paramsFlag, workflowIDFlagStart, parentFlag, rootFlag}
+var startFlags = []commandLineFlag{paramsFlag, workflowIDFlagStart, parentWorkflowFlag, rootWorkflowFlag}
 
 // runStart handles the execution of the start command
 func runStart(ctx *Context, args []string) error {
 	// Get workflow ID and references
-	workflowID, rootRef, parentRef, isChildExec, err := getExecutionInfo(ctx)
+	workflowID, rootRef, parentRef, isChildWorkflow, err := getExecutionInfo(ctx)
 	if err != nil {
 		return err
 	}
@@ -61,13 +61,13 @@ func runStart(ctx *Context, args []string) error {
 	}
 
 	// Create or get root execution reference
-	root, err := determineRootExecRef(isChildExec, rootRef, dag, workflowID)
+	root, err := determineRootWorkflow(isChildWorkflow, rootRef, dag, workflowID)
 	if err != nil {
 		return err
 	}
 
-	// Handle child execution if applicable
-	if isChildExec {
+	// Handle child workflow if applicable
+	if isChildWorkflow {
 		return handleChildExecution(ctx, dag, workflowID, params, root, parentRef)
 	}
 
@@ -79,7 +79,7 @@ func runStart(ctx *Context, args []string) error {
 	)
 
 	// Execute the DAG
-	return executeDag(ctx, dag, digraph.ExecRef{}, workflowID, root)
+	return executeDag(ctx, dag, digraph.WorkflowRef{}, workflowID, root)
 }
 
 // getExecutionInfo extracts and validates workflow ID and references from command flags
@@ -95,19 +95,19 @@ func getExecutionInfo(ctx *Context) (workflowID string, rootRef string, parentRe
 	parentRef, _ = ctx.Command.Flags().GetString("parent")
 	isChildExec = parentRef != "" || rootRef != ""
 
-	// Validate workflow ID for child executions
+	// Validate workflow ID for child workflows
 	if isChildExec && workflowID == "" {
 		return "", "", "", false, ErrExecIDRequired
 	}
 
 	// Validate or generate workflow ID
 	if workflowID != "" {
-		if err := validateExecID(workflowID); err != nil {
+		if err := validateWorkflowID(workflowID); err != nil {
 			return "", "", "", false, ErrExecIDFormat
 		}
 	} else {
 		// Generate a new workflow ID if not provided
-		workflowID, err = genReqID()
+		workflowID, err = getWorkflowID()
 		if err != nil {
 			return "", "", "", false, fmt.Errorf("failed to generate workflow ID: %w", err)
 		}
@@ -154,25 +154,25 @@ func loadDAGWithParams(ctx *Context, args []string) (*digraph.DAG, string, error
 	return dag, params, nil
 }
 
-// determineRootExecRef creates or parses the root execution reference
-func determineRootExecRef(isChildExec bool, rootExecRefID string, dag *digraph.DAG, workflowID string) (digraph.ExecRef, error) {
-	if isChildExec {
-		// Parse the root execution reference for child execution
-		root, err := digraph.ParseExecRef(rootExecRefID)
+// determineRootWorkflow creates or parses the root execution reference
+func determineRootWorkflow(isChildWorkflow bool, rootRef string, dag *digraph.DAG, workflowID string) (digraph.WorkflowRef, error) {
+	if isChildWorkflow {
+		// Parse the root execution reference for child workflow
+		root, err := digraph.ParseWorkflowRef(rootRef)
 		if err != nil {
-			return digraph.ExecRef{}, fmt.Errorf("failed to parse root exec ref: %w", err)
+			return digraph.WorkflowRef{}, fmt.Errorf("failed to parse root exec ref: %w", err)
 		}
 		return root, nil
 	}
 
 	// Create a new root execution reference for root execution
-	return digraph.NewExecRef(dag.Name, workflowID), nil
+	return digraph.NewWorkflowRef(dag.Name, workflowID), nil
 }
 
 // handleChildExecution processes a child workflow, checking for previous runs
-func handleChildExecution(ctx *Context, dag *digraph.DAG, workflowID string, params string, root digraph.ExecRef, parentRefID string) error {
+func handleChildExecution(ctx *Context, dag *digraph.DAG, workflowID string, params string, root digraph.WorkflowRef, parentRefID string) error {
 	// Parse parent execution reference
-	parent, err := digraph.ParseExecRef(parentRefID)
+	parent, err := digraph.ParseWorkflowRef(parentRefID)
 	if err != nil {
 		return fmt.Errorf("failed to parse parent exec ref: %w", err)
 	}
@@ -188,14 +188,14 @@ func handleChildExecution(ctx *Context, dag *digraph.DAG, workflowID string, par
 
 	// Double-check workflow ID is provided (should be caught earlier, but being defensive)
 	if workflowID == "" {
-		return fmt.Errorf("workflow ID must be provided for child execution")
+		return fmt.Errorf("workflow ID must be provided for child workflow")
 	}
 
-	// Check for previous child execution with this ID
-	logger.Debug(ctx, "Checking for previous child execution with the workflow ID", "workflowId", workflowID)
+	// Check for previous child workflow with this ID
+	logger.Debug(ctx, "Checking for previous child workflow with the workflow ID", "workflowId", workflowID)
 
 	// Look for existing execution record
-	record, err := ctx.HistoryRepo.FindChildExecution(ctx, root, workflowID)
+	record, err := ctx.HistoryRepo.FindChildWorkflow(ctx, root, workflowID)
 	if errors.Is(err, models.ErrExecIDNotFound) {
 		// If the workflow ID is not found, proceed with new execution
 		return executeDag(ctx, dag, parent, workflowID, root)
@@ -215,7 +215,7 @@ func handleChildExecution(ctx *Context, dag *digraph.DAG, workflowID string, par
 }
 
 // executeDag handles the actual execution of a DAG
-func executeDag(ctx *Context, d *digraph.DAG, parent digraph.ExecRef, reqID string, rootRun digraph.ExecRef) error {
+func executeDag(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, reqID string, rootRun digraph.WorkflowRef) error {
 	// Open the log file for the scheduler. The log file will be used for future
 	// execution for the same DAG/workflow ID between attempts.
 	logFile, err := ctx.OpenLogFile(d, reqID)

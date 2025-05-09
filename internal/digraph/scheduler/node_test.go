@@ -292,5 +292,5 @@ func (n nodeHelper) AssertOutput(t *testing.T, key, value string) {
 }
 
 func (n nodeHelper) execContext(workflowID string) context.Context {
-	return digraph.SetupEnv(n.Context, &digraph.DAG{}, nil, digraph.ExecRef{}, workflowID, "logFile", nil)
+	return digraph.SetupEnv(n.Context, &digraph.DAG{}, nil, digraph.WorkflowRef{}, workflowID, "logFile", nil)
 }

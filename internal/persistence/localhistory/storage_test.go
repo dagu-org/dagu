@@ -87,7 +87,7 @@ func TestJSONDB(t *testing.T) {
 		th.CreateRecord(t, ts3, "request-id-3", scheduler.StatusSuccess)
 
 		// Find the record with workflow ID "request-id-2"
-		ref := digraph.NewExecRef("test_DAG", "request-id-2")
+		ref := digraph.NewWorkflowRef("test_DAG", "request-id-2")
 		record, err := th.Repo.Find(th.Context, ref)
 		require.NoError(t, err)
 
@@ -97,7 +97,7 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, "request-id-2", status.ExecID)
 
 		// Verify an error is returned if the workflow ID does not exist
-		refNonExist := digraph.NewExecRef("test_DAG", "nonexistent-id")
+		refNonExist := digraph.NewWorkflowRef("test_DAG", "nonexistent-id")
 		_, err = th.Repo.Find(th.Context, refNonExist)
 		assert.ErrorIs(t, err, models.ErrExecIDNotFound)
 	})
@@ -137,7 +137,7 @@ func TestJSONDB(t *testing.T) {
 		_ = th.CreateRecord(t, ts, "parent-id", scheduler.StatusRunning)
 
 		// Create a sub record
-		root := digraph.NewExecRef("test_DAG", "parent-id")
+		root := digraph.NewWorkflowRef("test_DAG", "parent-id")
 		childDAG := th.DAG("sub_dag")
 		record, err := th.Repo.Create(th.Context, childDAG.DAG, ts, "sub-id", models.NewRecordOptions{
 			Root: &root,
@@ -157,8 +157,8 @@ func TestJSONDB(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify record is created
-		ref := digraph.NewExecRef("test_DAG", "parent-id")
-		existingRecord, err := th.Repo.FindChildExecution(th.Context, ref, "sub-id")
+		ref := digraph.NewWorkflowRef("test_DAG", "parent-id")
+		existingRecord, err := th.Repo.FindChildWorkflow(th.Context, ref, "sub-id")
 		require.NoError(t, err)
 
 		status, err := existingRecord.ReadStatus(th.Context)
@@ -178,7 +178,7 @@ func TestJSONDB(t *testing.T) {
 		const childWorkflowID = "child-workflow-id"
 		const parentExecID = "parent-id"
 
-		root := digraph.NewExecRef("test_DAG", parentExecID)
+		root := digraph.NewWorkflowRef("test_DAG", parentExecID)
 		childDAG := th.DAG("sub_dag")
 		record, err := th.Repo.Create(th.Context, childDAG.DAG, ts, childWorkflowID, models.NewRecordOptions{
 			Root: &root,
@@ -198,10 +198,10 @@ func TestJSONDB(t *testing.T) {
 		err = record.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
 
-		// Find the child execution record
+		// Find the child workflow record
 		ts = time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
-		ref := digraph.NewExecRef("test_DAG", parentExecID)
-		existingRecord, err := th.Repo.FindChildExecution(th.Context, ref, childWorkflowID)
+		ref := digraph.NewWorkflowRef("test_DAG", parentExecID)
+		existingRecord, err := th.Repo.FindChildWorkflow(th.Context, ref, childWorkflowID)
 		require.NoError(t, err)
 		existingRecordStatus, err := existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)
@@ -220,7 +220,7 @@ func TestJSONDB(t *testing.T) {
 		_ = retryRecord.Close(th.Context)
 
 		// Verify the retry record is created
-		existingRecord, err = th.Repo.FindChildExecution(th.Context, ref, childWorkflowID)
+		existingRecord, err = th.Repo.FindChildWorkflow(th.Context, ref, childWorkflowID)
 		require.NoError(t, err)
 		existingRecordStatus, err = existingRecord.ReadStatus(th.Context)
 		require.NoError(t, err)

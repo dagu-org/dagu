@@ -44,10 +44,10 @@ func TestStopCommand(t *testing.T) {
 		dagFile := th.DAG(t, "cmd/stop.yaml")
 
 		done := make(chan struct{})
-		reqId := uuid.Must(uuid.NewV7()).String()
+		workflowID := uuid.Must(uuid.NewV7()).String()
 		go func() {
 			// Start the DAG to stop.
-			args := []string{"start", "--workflow-id=" + reqId, dagFile.Location}
+			args := []string{"start", "--workflow-id=" + workflowID, dagFile.Location}
 			th.RunCommand(t, cmd.CmdStart(), test.CmdTest{Args: args})
 			close(done)
 		}()
@@ -59,7 +59,7 @@ func TestStopCommand(t *testing.T) {
 
 		// Stop the workflow.
 		th.RunCommand(t, cmd.CmdStop(), test.CmdTest{
-			Args:        []string{"stop", dagFile.Location, "--workflow-id=" + reqId},
+			Args:        []string{"stop", dagFile.Location, "--workflow-id=" + workflowID},
 			ExpectedOut: []string{"workflow stopped"}})
 
 		// Check the DAG is stopped.

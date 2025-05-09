@@ -42,7 +42,7 @@ func runStatus(ctx *Context, args []string) error {
 	var record models.Record
 	if reqID != "" {
 		// Retrieve the previous run's record for the specified workflow ID.
-		ref := digraph.NewExecRef(name, reqID)
+		ref := digraph.NewWorkflowRef(name, reqID)
 		r, err := ctx.HistoryRepo.Find(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to find the record for workflow ID %s: %w", reqID, err)

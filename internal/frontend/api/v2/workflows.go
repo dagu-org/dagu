@@ -14,8 +14,8 @@ func (a *API) GetWorkflowLog(ctx context.Context, request api.GetWorkflowLogRequ
 	dagName := request.Name
 	workflowId := request.WorkflowId
 
-	ref := digraph.NewExecRef(dagName, workflowId)
-	status, err := a.historyManager.FindByReqID(ctx, ref)
+	ref := digraph.NewWorkflowRef(dagName, workflowId)
+	status, err := a.historyManager.FindByWorkflowID(ctx, ref)
 	if err != nil {
 		return api.GetWorkflowLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -50,8 +50,8 @@ func (a *API) GetWorkflowStepLog(ctx context.Context, request api.GetWorkflowSte
 	dagName := request.Name
 	workflowId := request.WorkflowId
 
-	ref := digraph.NewExecRef(dagName, workflowId)
-	status, err := a.historyManager.FindByReqID(ctx, ref)
+	ref := digraph.NewWorkflowRef(dagName, workflowId)
+	status, err := a.historyManager.FindByWorkflowID(ctx, ref)
 	if err != nil {
 		return api.GetWorkflowStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -91,8 +91,8 @@ func (a *API) GetWorkflowStepLog(ctx context.Context, request api.GetWorkflowSte
 }
 
 func (a *API) UpdateWorkflowStepStatus(ctx context.Context, request api.UpdateWorkflowStepStatusRequestObject) (api.UpdateWorkflowStepStatusResponseObject, error) {
-	ref := digraph.NewExecRef(request.Name, request.WorkflowId)
-	status, err := a.historyManager.FindByReqID(ctx, ref)
+	ref := digraph.NewWorkflowRef(request.Name, request.WorkflowId)
+	status, err := a.historyManager.FindByWorkflowID(ctx, ref)
 	if err != nil {
 		return &api.UpdateWorkflowStepStatus404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -122,7 +122,7 @@ func (a *API) UpdateWorkflowStepStatus(ctx context.Context, request api.UpdateWo
 
 	status.Nodes[idxToUpdate].Status = nodeStatusMapping[request.Body.Status]
 
-	root := digraph.NewExecRef(request.Name, request.WorkflowId)
+	root := digraph.NewWorkflowRef(request.Name, request.WorkflowId)
 	if err := a.historyManager.UpdateStatus(ctx, root, *status); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
 	}
@@ -132,8 +132,8 @@ func (a *API) UpdateWorkflowStepStatus(ctx context.Context, request api.UpdateWo
 
 // GetWorkflowDetails implements api.StrictServerInterface.
 func (a *API) GetWorkflowDetails(ctx context.Context, request api.GetWorkflowDetailsRequestObject) (api.GetWorkflowDetailsResponseObject, error) {
-	ref := digraph.NewExecRef(request.Name, request.WorkflowId)
-	status, err := a.historyManager.FindByReqID(ctx, ref)
+	ref := digraph.NewWorkflowRef(request.Name, request.WorkflowId)
+	status, err := a.historyManager.FindByWorkflowID(ctx, ref)
 	if err != nil {
 		return &api.GetWorkflowDetails404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -147,7 +147,7 @@ func (a *API) GetWorkflowDetails(ctx context.Context, request api.GetWorkflowDet
 
 // GetChildWorkflowDetails implements api.StrictServerInterface.
 func (a *API) GetChildWorkflowDetails(ctx context.Context, request api.GetChildWorkflowDetailsRequestObject) (api.GetChildWorkflowDetailsResponseObject, error) {
-	root := digraph.NewExecRef(request.Name, request.WorkflowId)
+	root := digraph.NewWorkflowRef(request.Name, request.WorkflowId)
 	status, err := a.historyManager.FindChildExec(ctx, root, request.ChildWorkflowId)
 	if err != nil {
 		return &api.GetChildWorkflowDetails404JSONResponse{
@@ -162,7 +162,7 @@ func (a *API) GetChildWorkflowDetails(ctx context.Context, request api.GetChildW
 
 // GetChildWorkflowLog implements api.StrictServerInterface.
 func (a *API) GetChildWorkflowLog(ctx context.Context, request api.GetChildWorkflowLogRequestObject) (api.GetChildWorkflowLogResponseObject, error) {
-	root := digraph.NewExecRef(request.Name, request.WorkflowId)
+	root := digraph.NewWorkflowRef(request.Name, request.WorkflowId)
 	status, err := a.historyManager.FindChildExec(ctx, root, request.ChildWorkflowId)
 	if err != nil {
 		return &api.GetChildWorkflowLog404JSONResponse{
@@ -196,7 +196,7 @@ func (a *API) GetChildWorkflowLog(ctx context.Context, request api.GetChildWorkf
 
 // GetChildWorkflowStepLog implements api.StrictServerInterface.
 func (a *API) GetChildWorkflowStepLog(ctx context.Context, request api.GetChildWorkflowStepLogRequestObject) (api.GetChildWorkflowStepLogResponseObject, error) {
-	root := digraph.NewExecRef(request.Name, request.WorkflowId)
+	root := digraph.NewWorkflowRef(request.Name, request.WorkflowId)
 	status, err := a.historyManager.FindChildExec(ctx, root, request.ChildWorkflowId)
 	if err != nil {
 		return &api.GetChildWorkflowStepLog404JSONResponse{
@@ -238,7 +238,7 @@ func (a *API) GetChildWorkflowStepLog(ctx context.Context, request api.GetChildW
 
 // UpdateChildWorkflowStepStatus implements api.StrictServerInterface.
 func (a *API) UpdateChildWorkflowStepStatus(ctx context.Context, request api.UpdateChildWorkflowStepStatusRequestObject) (api.UpdateChildWorkflowStepStatusResponseObject, error) {
-	root := digraph.NewExecRef(request.Name, request.WorkflowId)
+	root := digraph.NewWorkflowRef(request.Name, request.WorkflowId)
 	status, err := a.historyManager.FindChildExec(ctx, root, request.ChildWorkflowId)
 	if err != nil {
 		return &api.UpdateChildWorkflowStepStatus404JSONResponse{

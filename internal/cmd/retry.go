@@ -41,7 +41,7 @@ func runRetry(ctx *Context, args []string) error {
 	name := args[0]
 
 	// Retrieve the previous run data for specified workflow ID.
-	ref := digraph.NewExecRef(name, reqID)
+	ref := digraph.NewWorkflowRef(name, reqID)
 	runRecord, err := ctx.HistoryRepo.Find(ctx, ref)
 	if err != nil {
 		return fmt.Errorf("failed to find the record for workflow ID %s: %w", reqID, err)
@@ -53,14 +53,14 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 
-	// Get the DAG instance from the run record.
+	// Get the DAG instance from the execution history.
 	dag, err := runRecord.ReadDAG(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read DAG from record: %w", err)
 	}
 
 	// The retry command is currently only supported for root DAGs.
-	if err := executeRetry(ctx, dag, status, status.ExecRef()); err != nil {
+	if err := executeRetry(ctx, dag, status, status.Workflow()); err != nil {
 		logger.Error(ctx, "Failed to execute retry", "path", name, "err", err)
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
@@ -68,7 +68,7 @@ func runRetry(ctx *Context, args []string) error {
 	return nil
 }
 
-func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootRun digraph.ExecRef) error {
+func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootRun digraph.WorkflowRef) error {
 	logger.Debug(ctx, "Executing retry", "name", dag.Name, "workflowId", status.ExecID)
 
 	// We use the same log file for the retry as the original run.

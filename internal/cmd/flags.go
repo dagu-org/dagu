@@ -90,16 +90,16 @@ var (
 		usage:     "workflow ID for checking the status of a workflow",
 	}
 
-	// rootDAGNameFlag reads the root DAG name for starting a child execution.
-	rootFlag = commandLineFlag{
+	// rootRefNameFlag reads the root DAG name for starting a child workflow.
+	rootWorkflowFlag = commandLineFlag{
 		name:  "root",
-		usage: "[only for child executions] Root workflow ID for a workflow",
+		usage: "[only for child workflows] workflow-reference for the root workflow",
 	}
 
-	// parentFlag reads the parent ref for starting a child execution.
-	parentFlag = commandLineFlag{
+	// parentWorkflowFlag reads the parent ref for starting a child workflow.
+	parentWorkflowFlag = commandLineFlag{
 		name:  "parent",
-		usage: "[only for child executions] Parent workflow ID for a workflow",
+		usage: "[only for child workflows] workflow-reference for the parent workflow",
 	}
 
 	// Suppresses output during workflow (e.g., logs, status updates).

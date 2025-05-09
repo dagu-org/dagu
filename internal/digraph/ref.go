@@ -7,39 +7,43 @@ import (
 
 // Errors for ExecRef
 var (
-	ErrInvalidExecRefFormat = errors.New("invalid ExecRef format")
+	ErrInvalidWorkflowRefFormat = errors.New("invalid workflow-ref format")
 )
 
-// ExecRef represents a reference to an execution of a DAG.
-type ExecRef struct {
-	Name   string `json:"name,omitempty"`
-	ExecID string `json:"workflowId,omitempty"`
+// WorkflowRef represents a reference to a workflow execution
+type WorkflowRef struct {
+	Name       string `json:"name,omitempty"`
+	WorkflowID string `json:"workflowId,omitempty"`
 }
 
-// NewExecRef creates a new ExecRef with the given name and workflowID.
-func NewExecRef(name, workflowID string) ExecRef {
-	return ExecRef{
-		Name:   name,
-		ExecID: workflowID,
+// NewWorkflowRef creates a new WorkflowRef with the given name and workflow ID.
+// It is used to identify a specific execution of a workflow.
+func NewWorkflowRef(name, workflowID string) WorkflowRef {
+	return WorkflowRef{
+		Name:       name,
+		WorkflowID: workflowID,
 	}
 }
 
 // String returns a string representation of the ExecRef.
-func (e ExecRef) String() string {
-	return e.Name + ":" + e.ExecID
+func (e WorkflowRef) String() string {
+	return e.Name + ":" + e.WorkflowID
 }
 
-func (e ExecRef) IsZero() bool {
+// Zero checks if the WorkflowRef is a zero value.
+func (e WorkflowRef) Zero() bool {
 	return e == zeroRef
 }
 
-// ParseExecRef parses a string representation of an ExecRef and returns the ExecRef.
-func ParseExecRef(s string) (ExecRef, error) {
+// ParseWorkflowRef parses a string representation of a WorkflowRef.
+// The expected format is "name:workflowID".
+func ParseWorkflowRef(s string) (WorkflowRef, error) {
 	parts := strings.SplitN(s, ":", 2)
 	if len(parts) != 2 {
-		return ExecRef{}, ErrInvalidExecRefFormat
+		return WorkflowRef{}, ErrInvalidWorkflowRefFormat
 	}
-	return NewExecRef(parts[0], parts[1]), nil
+	return NewWorkflowRef(parts[0], parts[1]), nil
 }
 
-var zeroRef ExecRef
+// zeroRef is a zero value for WorkflowRef, used for comparison.
+var zeroRef WorkflowRef

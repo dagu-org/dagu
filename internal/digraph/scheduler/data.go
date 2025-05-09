@@ -45,12 +45,12 @@ type NodeState struct {
 	// ExitCode is the exit code that the command exited with.
 	// It only makes sense when the node is a command executor.
 	ExitCode int
-	// Child executions is the list of child executions that this node has executed.
+	// Child executions is the list of child workflows that this node has executed.
 	Children []ChildExec
 }
 
 type ChildExec struct {
-	// ExecID is the workflow ID of the child execution.
+	// ExecID is the workflow ID of the child workflow.
 	ExecID string
 }
 
@@ -142,7 +142,7 @@ func (s *Data) ChildExecID() (string, error) {
 		return s.inner.State.Children[0].ExecID, nil
 	}
 	// Generate a new workflow ID for the current node.
-	r, err := genReqID()
+	r, err := generateWorkflowID()
 	if err != nil {
 		return "", fmt.Errorf("failed to generate workflow ID: %w", err)
 	}
@@ -367,7 +367,7 @@ func (n *Data) ClearState() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	// The data of child executions need to be preserved to retain their workflow IDs
+	// The data of child workflows need to be preserved to retain their workflow IDs
 	children := n.inner.State.Children
 	n.inner.State = NodeState{}
 	n.inner.State.Children = children
@@ -381,9 +381,9 @@ func (n *Data) MarkError(err error) {
 	n.inner.State.Status = NodeStatusError
 }
 
-// genReqID generates a new workflow ID.
+// generateWorkflowID generates a new workflow ID.
 // For simplicity, we use UUIDs as workflow IDs.
-func genReqID() (string, error) {
+func generateWorkflowID() (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return "", err

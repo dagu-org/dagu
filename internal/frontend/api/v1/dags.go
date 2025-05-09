@@ -702,7 +702,7 @@ func (a *API) updateStatus(
 
 	status.Nodes[idxToUpdate].Status = to
 
-	root := digraph.NewExecRef(dag.Name, reqID)
+	root := digraph.NewWorkflowRef(dag.Name, reqID)
 	if err := a.historyManager.UpdateStatus(ctx, root, *status); err != nil {
 		return fmt.Errorf("error updating status: %w", err)
 	}

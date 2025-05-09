@@ -77,8 +77,8 @@ func TestManager(t *testing.T) {
 		_ = record.Close(ctx)
 
 		// Get the status and check if it is the same as the one we wrote.
-		ref := digraph.NewExecRef(dag.Name, reqID)
-		statusToCheck, err := cli.FindByReqID(ctx, ref)
+		ref := digraph.NewWorkflowRef(dag.Name, reqID)
+		statusToCheck, err := cli.FindByWorkflowID(ctx, ref)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.NodeStatusSuccess, statusToCheck.Nodes[0].Status)
 
@@ -86,11 +86,11 @@ func TestManager(t *testing.T) {
 		newStatus := scheduler.NodeStatusError
 		status.Nodes[0].Status = newStatus
 
-		root := digraph.NewExecRef(dag.Name, reqID)
+		root := digraph.NewWorkflowRef(dag.Name, reqID)
 		err = cli.UpdateStatus(ctx, root, status)
 		require.NoError(t, err)
 
-		statusByReqID, err := cli.FindByReqID(ctx, ref)
+		statusByReqID, err := cli.FindByWorkflowID(ctx, ref)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, len(status.Nodes))
@@ -110,17 +110,17 @@ func TestManager(t *testing.T) {
 		workflowID := status.ExecID
 		childWorkflow := status.Nodes[0].Children[0]
 
-		root := digraph.NewExecRef(dag.Name, workflowID)
+		root := digraph.NewWorkflowRef(dag.Name, workflowID)
 		childWorkflowStatus, err := th.HistoryMgr.FindChildExec(th.Context, root, childWorkflow.ExecID)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusSuccess.String(), childWorkflowStatus.Status.String())
 
-		// Update the the child execution status.
+		// Update the the child workflow status.
 		childWorkflowStatus.Nodes[0].Status = scheduler.NodeStatusError
 		err = th.HistoryMgr.UpdateStatus(th.Context, root, *childWorkflowStatus)
 		require.NoError(t, err)
 
-		// Check if the child execution status is updated.
+		// Check if the child workflow status is updated.
 		childWorkflowStatus, err = th.HistoryMgr.FindChildExec(th.Context, root, childWorkflow.ExecID)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.NodeStatusError.String(), childWorkflowStatus.Nodes[0].Status.String())
@@ -134,7 +134,7 @@ func TestManager(t *testing.T) {
 		status := testNewStatus(dag.DAG, "unknown-req-id", scheduler.StatusError, scheduler.NodeStatusError)
 
 		// Check if the update fails.
-		root := digraph.NewExecRef(dag.Name, "unknown-req-id")
+		root := digraph.NewWorkflowRef(dag.Name, "unknown-req-id")
 		err := cli.UpdateStatus(ctx, root, status)
 		require.Error(t, err)
 	})

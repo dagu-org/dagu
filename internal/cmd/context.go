@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath" // Uses OS-specific separators (backslash on Windows, slash on Unix)
+	"regexp"
 	"syscall"
 	"time"
 
@@ -243,8 +244,8 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *C
 	return cmd
 }
 
-// genReqID creates a new UUID string to be used as a workflow IDentifier.
-func genReqID() (string, error) {
+// getWorkflowID creates a new UUID string to be used as a workflow IDentifier.
+func getWorkflowID() (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return "", err
@@ -252,16 +253,20 @@ func genReqID() (string, error) {
 	return id.String(), nil
 }
 
-// validateExecID checks if the workflow ID is valid and not empty.
-func validateExecID(workflowID string) error {
+// validateWorkflowID checks if the workflow ID is valid and not empty.
+func validateWorkflowID(workflowID string) error {
 	if workflowID == "" {
 		return fmt.Errorf("workflow ID is not set")
 	}
-	if _, err := uuid.Parse(workflowID); err != nil {
-		return fmt.Errorf("invalid workflow ID: %w", err)
+	if !regexWorkflowID.MatchString(workflowID) {
+		return fmt.Errorf("invalid workflow ID format: %s", workflowID)
 	}
 	return nil
 }
+
+// regexWorkflowID is a regular expression to validate workflow IDs.
+// It allows alphanumeric characters, hyphens, and underscores.
+var regexWorkflowID = regexp.MustCompile(`^[a-zA-Z0-9-_]+$`)
 
 // signalListener is an interface for types that can receive OS signals.
 type signalListener interface {

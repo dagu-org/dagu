@@ -53,7 +53,7 @@ func runDry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 	}
 
-	reqID, err := genReqID()
+	reqID, err := getWorkflowID()
 	if err != nil {
 		return fmt.Errorf("failed to generate workflow ID: %w", err)
 	}
@@ -73,7 +73,7 @@ func runDry(ctx *Context, args []string) error {
 		return err
 	}
 
-	root := digraph.NewExecRef(dag.Name, reqID)
+	root := digraph.NewWorkflowRef(dag.Name, reqID)
 
 	agentInstance := agent.New(
 		reqID,

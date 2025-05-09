@@ -398,7 +398,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		}
 	}
 
-	workflowId, err := a.historyManager.GenReqID(ctx)
+	workflowId, err := a.historyManager.GenWorkflowID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error generating workflow ID: %w", err)
 	}

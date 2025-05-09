@@ -44,7 +44,7 @@ func runStop(ctx *Context, args []string) error {
 	var dag *digraph.DAG
 	if reqID != "" {
 		// Retrieve the previous run's history record for the specified workflow ID.
-		ref := digraph.NewExecRef(name, reqID)
+		ref := digraph.NewWorkflowRef(name, reqID)
 		rec, err := ctx.HistoryRepo.Find(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to find the record for workflow ID %s: %w", reqID, err)

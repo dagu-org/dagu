@@ -52,7 +52,7 @@ func runRestart(ctx *Context, args []string) error {
 	var record models.Record
 	if reqID != "" {
 		// Retrieve the previous run's record for the specified workflow ID.
-		ref := digraph.NewExecRef(name, reqID)
+		ref := digraph.NewWorkflowRef(name, reqID)
 		r, err := ctx.HistoryRepo.Find(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to find the record for workflow ID %s: %w", reqID, err)
@@ -61,7 +61,7 @@ func runRestart(ctx *Context, args []string) error {
 	} else {
 		r, err := ctx.HistoryRepo.Latest(ctx, name)
 		if err != nil {
-			return fmt.Errorf("failed to find the latest run record for DAG %s: %w", name, err)
+			return fmt.Errorf("failed to find the latest execution history for DAG %s: %w", name, err)
 		}
 		record = r
 	}
@@ -72,13 +72,13 @@ func runRestart(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 	if status.Status != scheduler.StatusRunning {
-		logger.Error(ctx, "DAG is not running", "name", name)
+		logger.Error(ctx, "workflow is not running", "name", name)
 	}
 
 	dag, err := record.ReadDAG(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to read DAG from run record", "err", err)
-		return fmt.Errorf("failed to read DAG from run record: %w", err)
+		logger.Error(ctx, "Failed to read DAG from execution history", "err", err)
+		return fmt.Errorf("failed to read DAG from execution history: %w", err)
 	}
 
 	if err := handleRestartProcess(ctx, dag, reqID); err != nil {
@@ -106,7 +106,7 @@ func handleRestartProcess(ctx *Context, d *digraph.DAG, reqID string) error {
 }
 
 func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
-	reqID, err := genReqID()
+	reqID, err := getWorkflowID()
 	if err != nil {
 		return fmt.Errorf("failed to generate workflow ID: %w", err)
 	}
@@ -137,7 +137,7 @@ func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
 		cli,
 		dr,
 		ctx.HistoryRepo,
-		digraph.NewExecRef(dag.Name, reqID),
+		digraph.NewWorkflowRef(dag.Name, reqID),
 		agent.Options{Dry: false})
 
 	listenSignals(ctx, agentInstance)

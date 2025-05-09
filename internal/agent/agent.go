@@ -72,11 +72,11 @@ type Agent struct {
 	dag *digraph.DAG
 
 	// root indicates the DAG name and execution reference of the root execution history.
-	// It is same as the current execution reference if it's not a child execution.
-	root digraph.ExecRef
+	// It is same as the current execution reference if it's not a child workflow.
+	root digraph.WorkflowRef
 
 	// parent is the execution reference of the parent workflow.
-	parent digraph.ExecRef
+	parent digraph.WorkflowRef
 
 	// workflowID is the workflow ID of the current workflow.
 	workflowID string
@@ -101,8 +101,8 @@ type Options struct {
 	// configuration as the specified history.
 	RetryTarget *models.Status
 	// Parent is the workflow ID of the parent workflow.
-	// It is required for child executions to identify the parent DAG.
-	Parent digraph.ExecRef
+	// It is required for child workflows to identify the parent DAG.
+	Parent digraph.WorkflowRef
 }
 
 // New creates a new Agent.
@@ -114,7 +114,7 @@ func New(
 	cli history.Manager,
 	dagRepo models.DAGRepository,
 	historyRepo models.HistoryRepository,
-	root digraph.ExecRef,
+	root digraph.WorkflowRef,
 	opts Options,
 ) *Agent {
 	return &Agent{
@@ -148,7 +148,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Add structured logging context
 	logFields := []any{"dag", a.dag.Name, "workflowId", a.workflowID}
 	if a.subExecution.Load() {
-		logFields = append(logFields, "rootDAG", a.root.Name, "rootReqID", a.root.ExecID)
+		logFields = append(logFields, "rootRef", a.root.Name, "rootReqID", a.root.WorkflowID)
 	}
 	ctx = logger.WithValues(ctx, logFields...)
 
@@ -168,10 +168,10 @@ func (a *Agent) Run(ctx context.Context) error {
 	// execution is finished.
 	historyRecord, err := a.setupRunRecord(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to setup run record: %w", err)
+		return fmt.Errorf("failed to setup execution history: %w", err)
 	}
 	if err := historyRecord.Open(ctx); err != nil {
-		return fmt.Errorf("failed to open run record: %w", err)
+		return fmt.Errorf("failed to open execution history: %w", err)
 	}
 	defer func() {
 		if err := historyRecord.Close(ctx); err != nil {
@@ -358,12 +358,12 @@ func (a *Agent) setup(ctx context.Context) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	if a.root.ExecID != a.workflowID {
-		logger.Debug(ctx, "Initiating child execution", "rootDAG", a.root.Name, "rootReqID", a.root.ExecID)
+	if a.root.WorkflowID != a.workflowID {
+		logger.Debug(ctx, "Initiating child workflow", "rootRef", a.root.String())
 		a.subExecution.Store(true)
-		if a.parent.IsZero() {
-			logger.Error(ctx, "Parent workflow ID is required for child execution")
-			return fmt.Errorf("parent workflow ID is required for child execution")
+		if a.parent.Zero() {
+			logger.Error(ctx, "Parent workflow ID is required for child workflow")
+			return fmt.Errorf("parent workflow ID is required for child workflow")
 		}
 	}
 
@@ -633,8 +633,8 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error
 	return o.dagRepo.GetDetails(ctx, name)
 }
 
-func (o *dbClient) GetChildWorkflowStatus(ctx context.Context, reqID string, root digraph.ExecRef) (*digraph.Status, error) {
-	runRecord, err := o.historyRepo.FindChildExecution(ctx, root, reqID)
+func (o *dbClient) GetChildWorkflowStatus(ctx context.Context, reqID string, root digraph.WorkflowRef) (*digraph.Status, error) {
+	runRecord, err := o.historyRepo.FindChildWorkflow(ctx, root, reqID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find the record for workflow ID %s: %w", reqID, err)
 	}

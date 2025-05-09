@@ -5,7 +5,7 @@ import "context"
 // DB gets a result of a workflow.
 type DB interface {
 	GetDAG(ctx context.Context, name string) (*DAG, error)
-	GetChildWorkflowStatus(ctx context.Context, requestID string, root ExecRef) (*Status, error)
+	GetChildWorkflowStatus(ctx context.Context, requestID string, root WorkflowRef) (*Status, error)
 }
 
 // Status is the result of a workflow.

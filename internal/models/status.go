@@ -43,7 +43,7 @@ func InitialStatus(dag *digraph.DAG) Status {
 type StatusOption func(*Status)
 
 // WithHierarchyRefs returns a StatusOption that sets the root DAG information
-func WithHierarchyRefs(root digraph.ExecRef, parent digraph.ExecRef) StatusOption {
+func WithHierarchyRefs(root digraph.WorkflowRef, parent digraph.WorkflowRef) StatusOption {
 	return func(s *Status) {
 		s.Root = root
 		s.Parent = parent
@@ -140,27 +140,27 @@ func StatusFromJSON(s string) (*Status, error) {
 
 // Status represents the complete execution state of a workflow
 type Status struct {
-	Root       digraph.ExecRef  `json:"root,omitempty"`
-	Parent     digraph.ExecRef  `json:"parent,omitempty"`
-	Name       string           `json:"name"`
-	ExecID     string           `json:"workflowId"`
-	Status     scheduler.Status `json:"status"`
-	PID        PID              `json:"pid,omitempty"`
-	Nodes      []*Node          `json:"nodes,omitempty"`
-	OnExit     *Node            `json:"onExit,omitempty"`
-	OnSuccess  *Node            `json:"onSuccess,omitempty"`
-	OnFailure  *Node            `json:"onFailure,omitempty"`
-	OnCancel   *Node            `json:"onCancel,omitempty"`
-	StartedAt  string           `json:"startedAt,omitempty"`
-	FinishedAt string           `json:"finishedAt,omitempty"`
-	Log        string           `json:"log,omitempty"`
-	Params     string           `json:"params,omitempty"`
-	ParamsList []string         `json:"paramsList,omitempty"`
+	Root       digraph.WorkflowRef `json:"root,omitempty"`
+	Parent     digraph.WorkflowRef `json:"parent,omitempty"`
+	Name       string              `json:"name"`
+	ExecID     string              `json:"workflowId"`
+	Status     scheduler.Status    `json:"status"`
+	PID        PID                 `json:"pid,omitempty"`
+	Nodes      []*Node             `json:"nodes,omitempty"`
+	OnExit     *Node               `json:"onExit,omitempty"`
+	OnSuccess  *Node               `json:"onSuccess,omitempty"`
+	OnFailure  *Node               `json:"onFailure,omitempty"`
+	OnCancel   *Node               `json:"onCancel,omitempty"`
+	StartedAt  string              `json:"startedAt,omitempty"`
+	FinishedAt string              `json:"finishedAt,omitempty"`
+	Log        string              `json:"log,omitempty"`
+	Params     string              `json:"params,omitempty"`
+	ParamsList []string            `json:"paramsList,omitempty"`
 }
 
-// ExecRef returns the execution reference for the current status
-func (st *Status) ExecRef() digraph.ExecRef {
-	return digraph.NewExecRef(st.Name, st.ExecID)
+// Workflow returns the execution reference for the current status
+func (st *Status) Workflow() digraph.WorkflowRef {
+	return digraph.NewWorkflowRef(st.Name, st.ExecID)
 }
 
 // Errors returns a slice of errors for the current status

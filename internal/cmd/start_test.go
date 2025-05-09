@@ -35,7 +35,7 @@ func TestStartCommand(t *testing.T) {
 		},
 		{
 			Name:        "StartDAGWithRequestID",
-			Args:        []string{"start", th.DAG(t, "cmd/start_with_reqid.yaml").Location, "--workflow-id", "01967be2-3bb9-78ef-a54f-5e258df2d020"},
+			Args:        []string{"start", th.DAG(t, "cmd/start_with_workflow_id.yaml").Location, "--workflow-id", "01967be2-3bb9-78ef-a54f-5e258df2d020"},
 			ExpectedOut: []string{"01967be2-3bb9-78ef-a54f-5e258df2d020"},
 		},
 	}

@@ -72,7 +72,7 @@ func New(baseDir string, opts ...HistoryStorageOption) models.HistoryRepository 
 	}
 }
 
-// Create creates a new run record for the specified workflow.
+// Create creates a new history record for the specified workflow ID.
 // If opts.Root is not nil, it creates a sub-record for the specified root DAG.
 // If opts.Retry is true, it creates a retry record for the specified workflow ID.
 func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string, opts models.NewRecordOptions) (models.Record, error) {
@@ -110,10 +110,10 @@ func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestam
 	return record, nil
 }
 
-// NewSubRecord creates a new run record for the specified child execution.
+// NewSubRecord creates a new history record for a child workflow.
 func (db *historyStorage) newSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewRecordOptions) (models.Record, error) {
 	dataRoot := NewDataRoot(db.baseDir, opts.Root.Name)
-	root, err := dataRoot.FindByExecID(ctx, opts.Root.ExecID)
+	root, err := dataRoot.FindByExecID(ctx, opts.Root.WorkflowID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find root execution: %w", err)
 	}
@@ -124,27 +124,27 @@ func (db *historyStorage) newSubRecord(ctx context.Context, dag *digraph.DAG, ti
 	if opts.Retry {
 		r, err := root.FindChildExec(ctx, workflowID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to find child execution record: %w", err)
+			return nil, fmt.Errorf("failed to find child workflow record: %w", err)
 		}
 		run = r
 	} else {
 		r, err := root.CreateChildExec(ctx, workflowID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create child execution: %w", err)
+			return nil, fmt.Errorf("failed to create child workflow: %w", err)
 		}
 		run = r
 	}
 
 	record, err := run.CreateRecord(ctx, ts, db.cache, WithDAG(dag))
 	if err != nil {
-		logger.Error(ctx, "Failed to create child execution record", "err", err)
+		logger.Error(ctx, "Failed to create child workflow record", "err", err)
 		return nil, err
 	}
 
 	return record, nil
 }
 
-// Recent returns the most recent run records for the specified key, up to itemLimit.
+// Recent returns the most recent history records for the specified workflow name.
 func (db *historyStorage) Recent(ctx context.Context, dagName string, itemLimit int) []models.Record {
 	// Check for context cancellation
 	select {
@@ -178,7 +178,8 @@ func (db *historyStorage) Recent(ctx context.Context, dagName string, itemLimit 
 	return records
 }
 
-// Latest returns the most recent run record for today.
+// Latest returns the most recent history record for the specified workflow name.
+// If latestStatusToday is true, it only returns today's status.
 func (db *historyStorage) Latest(ctx context.Context, dagName string) (models.Record, error) {
 	// Check for context cancellation
 	select {
@@ -211,8 +212,8 @@ func (db *historyStorage) Latest(ctx context.Context, dagName string) (models.Re
 	return latest[0].LatestRecord(ctx, db.cache)
 }
 
-// Find finds a run record by workflow ID.
-func (db *historyStorage) Find(ctx context.Context, ref digraph.ExecRef) (models.Record, error) {
+// Find finds a history record by workflow ID.
+func (db *historyStorage) Find(ctx context.Context, ref digraph.WorkflowRef) (models.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -221,12 +222,12 @@ func (db *historyStorage) Find(ctx context.Context, ref digraph.ExecRef) (models
 		// Continue with operation
 	}
 
-	if ref.ExecID == "" {
+	if ref.WorkflowID == "" {
 		return nil, ErrExecIDEmpty
 	}
 
 	root := NewDataRoot(db.baseDir, ref.Name)
-	run, err := root.FindByExecID(ctx, ref.ExecID)
+	run, err := root.FindByExecID(ctx, ref.WorkflowID)
 
 	if err != nil {
 		return nil, err
@@ -235,8 +236,9 @@ func (db *historyStorage) Find(ctx context.Context, ref digraph.ExecRef) (models
 	return run.LatestRecord(ctx, db.cache)
 }
 
-// FindChildExecution finds a run record by workflow ID for a child DAG.
-func (db *historyStorage) FindChildExecution(ctx context.Context, ref digraph.ExecRef, childWorkflowID string) (models.Record, error) {
+// FindChildWorkflow finds a child workflow by its ID.
+// It returns the latest record for the specified child workflow ID.
+func (db *historyStorage) FindChildWorkflow(ctx context.Context, ref digraph.WorkflowRef, childWorkflowID string) (models.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -245,24 +247,28 @@ func (db *historyStorage) FindChildExecution(ctx context.Context, ref digraph.Ex
 		// Continue with operation
 	}
 
-	if ref.ExecID == "" {
+	if ref.WorkflowID == "" {
 		return nil, ErrExecIDEmpty
 	}
 
 	root := NewDataRoot(db.baseDir, ref.Name)
-	run, err := root.FindByExecID(ctx, ref.ExecID)
+	run, err := root.FindByExecID(ctx, ref.WorkflowID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find execution: %w", err)
 	}
 
 	childWorkflow, err := run.FindChildExec(ctx, childWorkflowID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find child execution: %w", err)
+		return nil, fmt.Errorf("failed to find child workflow: %w", err)
 	}
 	return childWorkflow.LatestRecord(ctx, db.cache)
 }
 
-// RemoveOld removes run records older than retentionDays for the specified key.
+// RemoveOld removes old history records older than the specified retention days.
+// It only removes records older than the specified retention days.
+// If retentionDays is negative, no files will be removed.
+// If retentionDays is zero, all files will be removed.
+// If retentionDays is positive, only files older than the specified number of days will be removed.
 func (db *historyStorage) RemoveOld(ctx context.Context, dagName string, retentionDays int) error {
 	// Check for context cancellation
 	select {
@@ -281,7 +287,7 @@ func (db *historyStorage) RemoveOld(ctx context.Context, dagName string, retenti
 	return root.RemoveOld(ctx, retentionDays)
 }
 
-// Rename renames all run records from oldKey to newKey.
+// Rename renames all history records for the specified workflow name.
 func (db *historyStorage) Rename(ctx context.Context, oldNameOrPath, newNameOrPath string) error {
 	// Check for context cancellation
 	select {

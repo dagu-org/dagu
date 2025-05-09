@@ -19,10 +19,10 @@ var (
 	ErrInvalidRunDir = errors.New("invalid run directory")
 )
 
-// ChildExecDir is the name of the directory where status files for child execution data are stored.
+// ChildExecDir is the name of the directory where status files for child workflow data are stored.
 const ChildExecDir = "children"
 
-// ChildExecDirPrefix is the prefix for child execution directories.
+// ChildExecDirPrefix is the prefix for child workflow directories.
 const ChildExecDirPrefix = "child_"
 
 // JSONLStatusFile is the name of the status file for each execution attempt.
@@ -41,7 +41,7 @@ type Execution struct {
 // NewRun creates a new Run instance from a directory path.
 // It parses the directory name to extract the timestamp and workflow ID.
 func NewRun(dir string) (*Execution, error) {
-	// Determine if the run is a child execution
+	// Determine if the run is a child workflow
 	parentDir := filepath.Dir(dir)
 	if filepath.Base(parentDir) == ChildExecDir {
 		matches := reChild.FindStringSubmatch(filepath.Base(dir))
@@ -84,25 +84,25 @@ func (e Execution) CreateRecord(_ context.Context, ts TimeInUTC, cache *fileutil
 	return NewRecord(filepath.Join(dir, JSONLStatusFile), cache, opts...), nil
 }
 
-// CreateChildExec creates a new child execution with the given timestamp and workflow ID.
+// CreateChildExec creates a new child workflow with the given timestamp and workflow ID.
 func (e Execution) CreateChildExec(_ context.Context, workflowID string) (*Execution, error) {
 	dirName := "child_" + workflowID
 	dir := filepath.Join(e.baseDir, ChildExecDir, dirName)
 	if err := os.MkdirAll(dir, 0750); err != nil {
-		return nil, fmt.Errorf("failed to create child execution directory: %w", err)
+		return nil, fmt.Errorf("failed to create child workflow directory: %w", err)
 	}
 	return NewRun(dir)
 }
 
-// FindChildExec searches for a child execution with the specified workflow ID.
+// FindChildExec searches for a child workflow with the specified workflow ID.
 func (e Execution) FindChildExec(_ context.Context, workflowID string) (*Execution, error) {
 	globPattern := filepath.Join(e.baseDir, ChildExecDir, "child_"+workflowID)
 	matches, err := filepath.Glob(globPattern)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list child execution directories: %w", err)
+		return nil, fmt.Errorf("failed to list child workflow directories: %w", err)
 	}
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("no matching child execution found for ID %s (glob=%s): %w", workflowID, globPattern, models.ErrExecIDNotFound)
+		return nil, fmt.Errorf("no matching child workflow found for ID %s (glob=%s): %w", workflowID, globPattern, models.ErrExecIDNotFound)
 	}
 	// Sort the matches by timestamp
 	sort.Slice(matches, func(i, j int) bool {
@@ -146,7 +146,7 @@ func (e Execution) Remove() error {
 // Regular expressions for parsing directory names
 var reExecution = regexp.MustCompile(`^exec_(\d{8}_\d{6}Z)_(.*)$`)   // Matches runs directory names
 var reAttempt = regexp.MustCompile(`^attempt_(\d{8}_\d{6}_\d{3}Z)$`) // Matches attempt directory names
-var reChild = regexp.MustCompile(`^child_(.*)$`)                     // Matches child execution directory names
+var reChild = regexp.MustCompile(`^child_(.*)$`)                     // Matches child workflow directory names
 
 // formatExecTimestamp formats a TimeInUTC instance into a string representation (without milliseconds).
 // The format is "YYYYMMDD_HHMMSSZ".

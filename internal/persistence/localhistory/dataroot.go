@@ -28,12 +28,12 @@ import (
 // It handles the organization of run data in a hierarchical structure
 // based on year, month, and day.
 type DataRoot struct {
-	baseDir       string           // Base directory for all DAGs
-	dagName       string           // Name of the DAG
-	prefix        string           // Sanitized prefix for directory names
-	executionsDir string           // Path to the executions directory
-	globPattern   string           // Pattern for finding run directories
-	root          *digraph.ExecRef // Optional reference to the root DAG
+	baseDir       string               // Base directory for all DAGs
+	dagName       string               // Name of the DAG
+	prefix        string               // Sanitized prefix for directory names
+	executionsDir string               // Path to the executions directory
+	globPattern   string               // Pattern for finding run directories
+	root          *digraph.WorkflowRef // Optional reference to the root DAG
 }
 
 // NewDataRoot creates a new DataRoot instance for managing a DAG's run history.
@@ -233,6 +233,12 @@ func (dr DataRoot) Rename(ctx context.Context, newRoot DataRoot) error {
 	return nil
 }
 
+// RemoveOld removes old history records older than the specified retention days.
+// It only removes records older than the specified retention days.
+// If retentionDays is negative, no files will be removed.
+// If retentionDays is zero, all files will be removed.
+// If retentionDays is positive, only files older than the specified number of days will be removed.
+// It also removes empty directories in the hierarchy.
 func (dr DataRoot) RemoveOld(ctx context.Context, retentionDays int) error {
 	keepTime := NewUTC(time.Now().AddDate(0, 0, -retentionDays))
 	runs := dr.listInRange(ctx, TimeInUTC{}, keepTime)

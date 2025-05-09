@@ -26,9 +26,9 @@ type HistoryRepository interface {
 	// Latest returns the most recent history record for a DAG
 	Latest(ctx context.Context, name string) (Record, error)
 	// Find finds a history record by its workflow ID
-	Find(ctx context.Context, ref digraph.ExecRef) (Record, error)
-	// FindChildExecution finds a child execution record by its workflow ID
-	FindChildExecution(ctx context.Context, ref digraph.ExecRef, childWorkflowID string) (Record, error)
+	Find(ctx context.Context, ref digraph.WorkflowRef) (Record, error)
+	// FindChildWorkflow finds a child workflow record by its workflow ID
+	FindChildWorkflow(ctx context.Context, ref digraph.WorkflowRef, childWorkflowID string) (Record, error)
 	// RemoveOld removes history records older than retentionDays
 	RemoveOld(ctx context.Context, name string, retentionDays int) error
 	// Rename renames all history records from oldName to newName
@@ -37,7 +37,7 @@ type HistoryRepository interface {
 
 // NewRecordOptions contains options for creating a new history record
 type NewRecordOptions struct {
-	Root  *digraph.ExecRef
+	Root  *digraph.WorkflowRef
 	Retry bool
 }
 

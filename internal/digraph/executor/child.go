@@ -81,7 +81,7 @@ func (e *childWorkflow) Run(ctx context.Context) error {
 
 	env := GetEnv(ctx)
 
-	if env.Root.IsZero() {
+	if env.Root.Zero() {
 		return fmt.Errorf("root workflow ID is not set")
 	}
 
