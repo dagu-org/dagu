@@ -31,6 +31,11 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
   const [workflowId] = React.useState<string>('latest');
   const [stepName] = React.useState<string | null>(null);
 
+  // Function to navigate to status tab
+  const navigateToStatusTab = React.useCallback(() => {
+    setActiveTab('status');
+  }, []);
+
   const { data, isLoading, mutate } = useQuery(
     '/dags/{fileName}',
     {
@@ -199,6 +204,7 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
                     workflowId={workflowId}
                     stepName={stepName}
                     isModal={true}
+                    navigateToStatusTab={navigateToStatusTab}
                   />
                 )}
               </div>

@@ -27,6 +27,7 @@ type DAGDetailsContentProps = {
   workflowId?: string;
   stepName?: string | null;
   isModal?: boolean;
+  navigateToStatusTab?: () => void;
 };
 
 type LogViewerState = {
@@ -46,6 +47,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   workflowId = 'latest',
   stepName = null,
   isModal = false,
+  navigateToStatusTab,
 }) => {
   const baseUrl = isModal ? '#' : `/dags/${fileName}`;
   const [logViewer, setLogViewer] = useState<LogViewerState>({
@@ -99,6 +101,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             fileName={fileName || ''}
             refreshFn={refreshFn}
             formatDuration={formatDuration}
+            navigateToStatusTab={navigateToStatusTab}
           />
           <div className="my-4 flex flex-row justify-between items-center">
             <Tabs className="bg-white p-1.5 rounded-lg shadow-sm border border-gray-100/80">

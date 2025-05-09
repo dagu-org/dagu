@@ -39,6 +39,8 @@ type Props = {
   refresh?: () => void;
   /** Display mode: 'compact' for icon-only, 'full' for text+icon buttons */
   displayMode?: 'compact' | 'full';
+  /** Function to navigate to status tab after execution */
+  navigateToStatusTab?: () => void;
 };
 
 /**
@@ -50,6 +52,7 @@ function DAGActions({
   dag,
   refresh,
   displayMode = 'compact',
+  navigateToStatusTab,
 }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const [isStartModal, setIsStartModal] = React.useState(false);
@@ -457,6 +460,10 @@ function DAGActions({
               return;
             }
             reloadData();
+            // Navigate to status tab after execution
+            if (navigateToStatusTab) {
+              navigateToStatusTab();
+            }
           }}
           dismissModal={() => {
             setIsStartModal(false);

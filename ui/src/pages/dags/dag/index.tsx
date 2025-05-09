@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { components } from '../../../api/v2/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { DAGDetailsContent } from '../../../features/dags/components/dag-details';
@@ -17,6 +17,7 @@ type Params = {
 
 function DAGDetails() {
   const params = useParams<Params>();
+  const navigate = useNavigate();
   const appBarContext = React.useContext(AppBarContext);
   const { data, isLoading } = useQuery(
     '/dags/{fileName}',
@@ -50,6 +51,13 @@ function DAGDetails() {
   const tab = useMemo(() => {
     return params.tab || 'status';
   }, [params]);
+
+  // Function to navigate to the status tab
+  const navigateToStatusTab = () => {
+    if (params.fileName && tab !== 'status') {
+      navigate(`/dags/${params.fileName}`);
+    }
+  };
 
   const formatDuration = (startDate: string, endDate: string) => {
     if (!startDate || !endDate) return '--';
@@ -95,9 +103,17 @@ function DAGDetails() {
               refreshFn={() => {}}
               formatDuration={formatDuration}
               activeTab={tab}
+              onTabChange={(newTab) => {
+                if (newTab === 'status' && params.fileName) {
+                  navigate(`/dags/${params.fileName}`);
+                } else if (params.fileName) {
+                  navigate(`/dags/${params.fileName}/${newTab}`);
+                }
+              }}
               workflowId={workflowId}
               stepName={stepName}
               isModal={false}
+              navigateToStatusTab={navigateToStatusTab}
             />
           )}
         </div>

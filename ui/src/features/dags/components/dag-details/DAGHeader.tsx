@@ -13,6 +13,7 @@ interface DAGHeaderProps {
   fileName: string;
   refreshFn: () => void;
   formatDuration: (startDate: string, endDate: string) => string;
+  navigateToStatusTab?: () => void;
 }
 
 const DAGHeader: React.FC<DAGHeaderProps> = ({
@@ -21,6 +22,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
   fileName,
   refreshFn,
   formatDuration,
+  navigateToStatusTab,
 }) => (
   <>
     <div className="flex flex-row items-center justify-between">
@@ -34,6 +36,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
               fileName={fileName}
               refresh={refreshFn}
               displayMode="full"
+              navigateToStatusTab={navigateToStatusTab}
             />
           ) : null
         }
