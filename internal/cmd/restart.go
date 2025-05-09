@@ -68,21 +68,18 @@ func runRestart(ctx *Context, args []string) error {
 
 	status, err := record.ReadStatus(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to read status", "err", err)
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 	if status.Status != scheduler.StatusRunning {
-		logger.Error(ctx, "workflow is not running", "name", name)
+		return fmt.Errorf("workflow %s is not running", name)
 	}
 
 	dag, err := record.ReadDAG(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to read DAG from execution history", "err", err)
 		return fmt.Errorf("failed to read DAG from execution history: %w", err)
 	}
 
 	if err := handleRestartProcess(ctx, dag, reqID); err != nil {
-		logger.Error(ctx, "Failed to restart DAG", "name", dag.Name, "err", err)
 		return fmt.Errorf("restart process failed for DAG %s: %w", dag.Name, err)
 	}
 
@@ -106,12 +103,12 @@ func handleRestartProcess(ctx *Context, d *digraph.DAG, reqID string) error {
 }
 
 func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
-	reqID, err := getWorkflowID()
+	workflowID, err := getWorkflowID()
 	if err != nil {
 		return fmt.Errorf("failed to generate workflow ID: %w", err)
 	}
 
-	logFile, err := ctx.OpenLogFile(dag, reqID)
+	logFile, err := ctx.OpenLogFile(dag, workflowID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file: %w", err)
 	}
@@ -121,23 +118,22 @@ func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
 
 	ctx.LogToFile(logFile)
 
-	logger.Info(ctx, "DAG restart initiated", "DAG", dag.Name, "workflowId", reqID, "logFile", logFile.Name())
+	logger.Info(ctx, "workflow restart initiated", "DAG", dag.Name, "workflowId", workflowID, "logFile", logFile.Name())
 
 	dr, err := ctx.dagRepo(nil, []string{filepath.Dir(dag.Location)})
 	if err != nil {
-		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
 	agentInstance := agent.New(
-		reqID,
+		workflowID,
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
 		cli,
 		dr,
 		ctx.HistoryRepo,
-		digraph.NewWorkflowRef(dag.Name, reqID),
+		digraph.NewWorkflowRef(dag.Name, workflowID),
 		agent.Options{Dry: false})
 
 	listenSignals(ctx, agentInstance)

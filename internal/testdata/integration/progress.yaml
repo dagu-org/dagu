@@ -1,0 +1,6 @@
+steps:
+  - name: "1"
+    command: "sleep 3"
+  - name: "2"
+    command: "sleep 3"
+    depends: "1"

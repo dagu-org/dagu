@@ -189,7 +189,7 @@ func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 		}
 		t.Logf("latest status=%s errors=%v", latest.Status.String(), latest.Errors())
 		return latest.Status == expected
-	}, time.Second*3, time.Second)
+	}, time.Second*5, time.Second)
 }
 
 func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
@@ -211,7 +211,7 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 		}
 		t.Logf("current status=%s errors=%v", curr.Status.String(), curr.Errors())
 		return curr.Status == expected
-	}, time.Second*3, time.Second)
+	}, time.Second*5, time.Second)
 }
 
 // AssertOutputs checks the given outputs against the actual outputs of the DAG
@@ -361,6 +361,15 @@ func (a *Agent) RunSuccess(t *testing.T) {
 
 	status := a.Status().Status
 	require.Equal(t, scheduler.StatusSuccess.String(), status.String(), "expected status %q, got %q", scheduler.StatusSuccess, status)
+
+	// check all nodes are in success or skipped state
+	for _, node := range a.Status().Nodes {
+		status := node.Status
+		if status == scheduler.NodeStatusSkipped || status == scheduler.NodeStatusSuccess {
+			continue
+		}
+		t.Errorf("expected node %q to be in success state, got %q", node.Step.Name, status.String())
+	}
 }
 
 func (a *Agent) Abort() {

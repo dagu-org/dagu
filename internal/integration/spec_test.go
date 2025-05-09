@@ -3,9 +3,11 @@ package integration_test
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDAGExecution(t *testing.T) {
@@ -233,4 +235,54 @@ func TestComplexDependencies(t *testing.T) {
 		"MERGE":   "merge",
 		"FINAL":   "final",
 	})
+}
+
+func TestProgressingNode(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+
+	dag := th.DAG(t, filepath.Join("integration", "progress.yaml"))
+	agent := dag.Agent()
+
+	go func() {
+		err := agent.Run(agent.Context)
+		require.NoError(t, err, "failed to run agent")
+	}()
+
+	dag.AssertCurrentStatus(t, scheduler.StatusRunning)
+
+	status, err := dag.HistoryMgr.GetLatestStatus(dag.Context, dag.DAG)
+	require.NoError(t, err, "failed to get latest status")
+
+	// Check the first node is in progress
+	require.Equal(t, scheduler.NodeStatusRunning.String(), status.Nodes[0].Status.String(), "first node should be in progress")
+	// Check the second node is not started
+	require.Equal(t, scheduler.NodeStatusNone.String(), status.Nodes[1].Status.String(), "second node should not be started")
+
+	// Wait for the first node to finish
+	time.Sleep(time.Second * 2)
+
+	dag.AssertCurrentStatus(t, scheduler.StatusRunning)
+
+	// Check the progress of the nodes
+	status, err = dag.HistoryMgr.GetLatestStatus(dag.Context, dag.DAG)
+	require.NoError(t, err, "failed to get latest status")
+
+	// Assert that the workflow is still running
+	require.Equal(t, scheduler.StatusRunning.String(), status.Status.String(), "workflow should be running")
+
+	// Check the first node is finished
+	require.Equal(t, scheduler.NodeStatusSuccess.String(), status.Nodes[0].Status.String(), "first node should be finished")
+	// Check the second node is in progress
+	require.Equal(t, scheduler.NodeStatusRunning.String(), status.Nodes[1].Status.String(), "second node should be in progress")
+
+	// Wait for all nodes to finish
+	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+
+	// Check the second node is finished
+	status, err = dag.HistoryMgr.GetLatestStatus(dag.Context, dag.DAG)
+	require.NoError(t, err, "failed to get latest status")
+
+	require.Equal(t, scheduler.NodeStatusSuccess.String(), status.Nodes[1].Status.String(), "second node should be finished")
 }

@@ -108,7 +108,7 @@ type Config struct {
 }
 
 // Schedule runs the graph of steps.
-func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done chan *Node) error {
+func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progressCh chan *Node) error {
 	if err := sc.setup(ctx); err != nil {
 		return err
 	}
@@ -159,6 +159,10 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 
 			logger.Info(ctx, "Step started", "step", node.Name())
 			node.SetStatus(NodeStatusRunning)
+			if progressCh != nil {
+				progressCh <- node
+			}
+
 			go func(ctx context.Context, node *Node) {
 				nodeCtx, nodeCancel := context.WithCancel(ctx)
 				defer nodeCancel()
@@ -216,8 +220,8 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 						logger.Infof(ctx, "Pre conditions failed for \"%s\"", node.Name())
 						node.SetStatus(NodeStatusSkipped)
 						node.SetError(err)
-						if done != nil {
-							done <- node
+						if progressCh != nil {
+							progressCh <- node
 						}
 						return
 					}
@@ -280,16 +284,16 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 						if execErr == nil || node.Step().ContinueOn.Failure {
 							if !sc.isCanceled() {
 								time.Sleep(node.Step().RepeatPolicy.Interval)
-								if done != nil {
-									done <- node
+								if progressCh != nil {
+									progressCh <- node
 								}
 								continue ExecRepeat
 							}
 						}
 					}
 
-					if execErr != nil && done != nil {
-						done <- node
+					if execErr != nil && progressCh != nil {
+						progressCh <- node
 						return
 					}
 
@@ -306,8 +310,8 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 					node.SetStatus(NodeStatusError)
 				}
 
-				if done != nil {
-					done <- node
+				if progressCh != nil {
+					progressCh <- node
 				}
 			}(ctx, node)
 
@@ -359,8 +363,8 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 				sc.setLastError(err)
 			}
 
-			if done != nil {
-				done <- handlerNode
+			if progressCh != nil {
+				progressCh <- handlerNode
 			}
 		}
 	}
