@@ -28,9 +28,9 @@ func FromNodes(nodes []scheduler.NodeData) []*Node {
 
 // FromNode converts a single scheduler NodeData to a persistence Node
 func FromNode(node scheduler.NodeData) *Node {
-	children := make([]ChildExec, len(node.State.Children))
-	for i, childWorkflow := range node.State.Children {
-		children[i] = ChildExec(childWorkflow)
+	children := make([]ChildWorkflow, len(node.State.Children))
+	for i, child := range node.State.Children {
+		children[i] = ChildWorkflow(child)
 	}
 	var errText string
 	if node.State.Error != nil {
@@ -61,11 +61,11 @@ type Node struct {
 	RetryCount int                  `json:"retryCount,omitempty"`
 	DoneCount  int                  `json:"doneCount,omitempty"`
 	Error      string               `json:"error,omitempty"`
-	Children   []ChildExec          `json:"children,omitempty"`
+	Children   []ChildWorkflow      `json:"children,omitempty"`
 }
 
-type ChildExec struct {
-	ExecID string `json:"workflowId,omitempty"`
+type ChildWorkflow struct {
+	WorkflowID string `json:"workflowId,omitempty"`
 }
 
 // ToNode converts a persistence Node back to a scheduler Node
@@ -73,9 +73,9 @@ func (n *Node) ToNode() *scheduler.Node {
 	startedAt, _ := stringutil.ParseTime(n.StartedAt)
 	finishedAt, _ := stringutil.ParseTime(n.FinishedAt)
 	retriedAt, _ := stringutil.ParseTime(n.RetriedAt)
-	children := make([]scheduler.ChildExec, len(n.Children))
+	children := make([]scheduler.ChildWorkflow, len(n.Children))
 	for i, r := range n.Children {
-		children[i] = scheduler.ChildExec(r)
+		children[i] = scheduler.ChildWorkflow(r)
 	}
 	return scheduler.NewNode(n.Step, scheduler.NodeState{
 		Status:     n.Status,

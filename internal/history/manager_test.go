@@ -96,7 +96,7 @@ func TestManager(t *testing.T) {
 		require.Equal(t, 1, len(status.Nodes))
 		require.Equal(t, newStatus, statusByWorkflowID.Nodes[0].Status)
 	})
-	t.Run("UpdateChildExecStatus", func(t *testing.T) {
+	t.Run("UpdateChildWorkflowStatus", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "tree_parent.yaml"))
 
 		err := th.HistoryMgr.StartDAG(th.Context, dag.DAG, history.StartOptions{Quiet: true})
@@ -111,7 +111,7 @@ func TestManager(t *testing.T) {
 		childWorkflow := status.Nodes[0].Children[0]
 
 		root := digraph.NewWorkflowRef(dag.Name, workflowID)
-		childWorkflowStatus, err := th.HistoryMgr.FindChildWorkflowStatus(th.Context, root, childWorkflow.ExecID)
+		childWorkflowStatus, err := th.HistoryMgr.FindChildWorkflowStatus(th.Context, root, childWorkflow.WorkflowID)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusSuccess.String(), childWorkflowStatus.Status.String())
 
@@ -121,7 +121,7 @@ func TestManager(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check if the child workflow status is updated.
-		childWorkflowStatus, err = th.HistoryMgr.FindChildWorkflowStatus(th.Context, root, childWorkflow.ExecID)
+		childWorkflowStatus, err = th.HistoryMgr.FindChildWorkflowStatus(th.Context, root, childWorkflow.WorkflowID)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.NodeStatusError.String(), childWorkflowStatus.Nodes[0].Status.String())
 	})
@@ -200,12 +200,12 @@ func TestClient_RunDAG(t *testing.T) {
 		status, err := cli.GetLatestStatus(ctx, dag.DAG)
 		require.NoError(t, err)
 
-		prevExecID := status.WorkflowID
+		prevWorkflowID := status.WorkflowID
 		prevParams := status.Params
 
 		time.Sleep(1 * time.Second)
 
-		err = cli.RetryDAG(ctx, dag.DAG, prevExecID)
+		err = cli.RetryDAG(ctx, dag.DAG, prevWorkflowID)
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish
@@ -215,7 +215,7 @@ func TestClient_RunDAG(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check if the params are the same as the previous run.
-		require.Equal(t, prevExecID, status.WorkflowID)
+		require.Equal(t, prevWorkflowID, status.WorkflowID)
 		require.Equal(t, prevParams, status.Params)
 	})
 }

@@ -91,6 +91,7 @@ func runStart(ctx *Context, args []string) error {
 }
 
 // getExecutionInfo extracts and validates workflow ID and references from command flags
+// nolint:revive
 func getExecutionInfo(ctx *Context) (workflowID string, rootRef string, parentRef string, isChildWorkflow bool, err error) {
 	// Get workflow ID from flags
 	workflowID, err = ctx.Command.Flags().GetString("workflow-id")

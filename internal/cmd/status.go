@@ -58,7 +58,7 @@ func runStatus(ctx *Context, args []string) error {
 
 	dag, err := run.ReadDAG(ctx)
 	if err != nil {
-		return fmt.Errorf("Failed to read DAG from run data: %w", err)
+		return fmt.Errorf("failed to read DAG from run data: %w", err)
 	}
 
 	status, err := ctx.HistoryMgr.GetDAGRealtimeStatus(ctx, dag, workflowID)

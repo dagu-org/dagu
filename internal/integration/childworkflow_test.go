@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRetryChildExecution(t *testing.T) {
+func TestRetryChildWOrkflow(t *testing.T) {
 	// Get DAG path
 	th := test.SetupCommand(t)
 
@@ -84,7 +84,7 @@ steps:
 	updateStatus(parentRun, parentStatus)
 
 	// (2) Find the child_1 workflow ID to update its status
-	child1Run, err := th.HistoryRepo.FindChildWorkflowRun(ctx, ref, child1Node.Children[0].ExecID)
+	child1Run, err := th.HistoryRepo.FindChildWorkflowRun(ctx, ref, child1Node.Children[0].WorkflowID)
 	require.NoError(t, err)
 
 	child1Status, err := child1Run.ReadStatus(ctx)
@@ -96,7 +96,7 @@ steps:
 	updateStatus(child1Run, child1Status)
 
 	// (4) Find the child_2 workflow ID to update its status
-	child2Run, err := th.HistoryRepo.FindChildWorkflowRun(ctx, ref, child2Node.Children[0].ExecID)
+	child2Run, err := th.HistoryRepo.FindChildWorkflowRun(ctx, ref, child2Node.Children[0].WorkflowID)
 	require.NoError(t, err)
 
 	child2Status, err := child2Run.ReadStatus(ctx)
@@ -122,7 +122,7 @@ steps:
 	})
 
 	// Check if the child_2 status is now "success"
-	child2Run, err = th.HistoryRepo.FindChildWorkflowRun(ctx, ref, child2Node.Children[0].ExecID)
+	child2Run, err = th.HistoryRepo.FindChildWorkflowRun(ctx, ref, child2Node.Children[0].WorkflowID)
 	require.NoError(t, err)
 	child2Status, err = child2Run.ReadStatus(ctx)
 	require.NoError(t, err)

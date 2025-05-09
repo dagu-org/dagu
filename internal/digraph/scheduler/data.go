@@ -46,12 +46,12 @@ type NodeState struct {
 	// It only makes sense when the node is a command executor.
 	ExitCode int
 	// Child executions is the list of child workflows that this node has executed.
-	Children []ChildExec
+	Children []ChildWorkflow
 }
 
-type ChildExec struct {
-	// ExecID is the workflow ID of the child workflow.
-	ExecID string
+type ChildWorkflow struct {
+	// WorkflowID is the workflow ID of the child workflow.
+	WorkflowID string
 }
 
 type NodeStatus int
@@ -134,19 +134,19 @@ func (s *Data) Data() NodeData {
 	return s.inner
 }
 
-func (s *Data) ChildExecID() (string, error) {
+func (s *Data) ChildWorkflowID() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// If children is not empty, return the first child's workflow ID.
 	if len(s.inner.State.Children) > 0 {
-		return s.inner.State.Children[0].ExecID, nil
+		return s.inner.State.Children[0].WorkflowID, nil
 	}
 	// Generate a new workflow ID for the current node.
 	r, err := generateWorkflowID()
 	if err != nil {
 		return "", fmt.Errorf("failed to generate workflow ID: %w", err)
 	}
-	s.inner.State.Children = append(s.inner.State.Children, ChildExec{ExecID: r})
+	s.inner.State.Children = append(s.inner.State.Children, ChildWorkflow{WorkflowID: r})
 	return r, nil
 }
 

@@ -57,24 +57,6 @@ func OpenOrCreateFile(filepath string) (*os.File, error) {
 	return file, nil
 }
 
-// openFile opens file.
-func openFile(file string) (*os.File, error) {
-	outfile, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0600) //nolint:gosec
-	if err != nil {
-		return nil, err
-	}
-	return outfile, nil
-}
-
-// createFile creates file.
-func createFile(file string) (*os.File, error) {
-	outfile, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600) //nolint:gosec
-	if err != nil {
-		return nil, err
-	}
-	return outfile, nil
-}
-
 // MustTempDir returns temporary directory.
 // This function is used only for testing.
 func MustTempDir(pattern string) string {

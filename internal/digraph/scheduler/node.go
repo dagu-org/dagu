@@ -201,7 +201,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 
 	// If the command is a child workflow, we need to set the workflow ID.
 	if childWorkflow, ok := cmd.(executor.ChildWorkflow); ok {
-		workflowID, err := n.ChildExecID()
+		workflowID, err := n.ChildWorkflowID()
 		if err != nil {
 			return nil, fmt.Errorf("failed to determine workflow ID for child workflow: %w", err)
 		}
