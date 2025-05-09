@@ -87,7 +87,7 @@ type Agent struct {
 	// lastErr is the last error occurred during the workflow.
 	lastErr error
 
-	// subExecution is true if the agent is running as a child DAG.
+	// subExecution is true if the agent is running as a child workflow.
 	subExecution atomic.Bool
 }
 
@@ -212,10 +212,10 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Setup channels to receive status updates for each node in the DAG.
 	// It should receive node instance when the node status changes, for
 	// example, when started, stopped, or cancelled, etc.
-	done := make(chan *scheduler.Node)
-	defer close(done)
+	progressCh := make(chan *scheduler.Node)
+	defer close(progressCh)
 	go execWithRecovery(ctx, func() {
-		for node := range done {
+		for node := range progressCh {
 			status := a.Status()
 			if err := historyRecord.Write(ctx, status); err != nil {
 				logger.Error(ctx, "Failed to write status", "err", err)
@@ -240,7 +240,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Start the workflow.
 	logger.Debug(ctx, "workflow started", "workflowId", a.workflowID, "name", a.dag.Name, "params", a.dag.Params)
-	lastErr := a.scheduler.Schedule(ctx, a.graph, done)
+	lastErr := a.scheduler.Schedule(ctx, a.graph, progressCh)
 
 	// Update the finished status to the runstore database.
 	finishedStatus := a.Status()
@@ -420,15 +420,15 @@ func (a *Agent) newScheduler() *scheduler.Scheduler {
 // dryRun performs a dry-run of the DAG. It only simulates the execution of
 // the DAG without running the actual command.
 func (a *Agent) dryRun(ctx context.Context) error {
-	// done channel receives the node when the node is done.
+	// progressCh channel receives the node when the node is progressCh.
 	// It's a way to update the status in real-time in efficient manner.
-	done := make(chan *scheduler.Node)
+	progressCh := make(chan *scheduler.Node)
 	defer func() {
-		close(done)
+		close(progressCh)
 	}()
 
 	go func() {
-		for node := range done {
+		for node := range progressCh {
 			status := a.Status()
 			_ = a.reporter.reportStep(ctx, a.dag, status, node)
 		}
@@ -436,7 +436,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 
 	db := newDBClient(a.historyRepo, a.dagRepo)
 	dagCtx := digraph.SetupEnv(ctx, a.dag, db, a.root, a.workflowID, a.logFile, a.dag.Params)
-	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
+	lastErr := a.scheduler.Schedule(dagCtx, a.graph, progressCh)
 	a.lastErr = lastErr
 
 	logger.Info(ctx, "Dry-run finished", "params", a.dag.Params)
@@ -541,7 +541,7 @@ func (a *Agent) setupRunRecord(ctx context.Context) (models.Record, error) {
 func (a *Agent) setupSocketServer(ctx context.Context) error {
 	var socketAddr string
 	if a.subExecution.Load() {
-		// Use separate socket address for child DAGs to allow them run concurrently.
+		// Use separate socket address for child workflows to allow them run concurrently.
 		socketAddr = a.dag.SockAddrSub(a.workflowID)
 	} else {
 		socketAddr = a.dag.SockAddr(a.workflowID)
@@ -557,7 +557,7 @@ func (a *Agent) setupSocketServer(ctx context.Context) error {
 // checkIsAlreadyRunning returns error if the DAG is already running.
 func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
 	if a.subExecution.Load() {
-		return nil // Skip the check for child DAGs
+		return nil // Skip the check for child workflows
 	}
 	if a.client.IsDAGRunning(ctx, a.dag, a.workflowID) {
 		return fmt.Errorf("the DAG is already running. workflowID=%s, socket=%s", a.workflowID, a.dag.SockAddr(a.workflowID))

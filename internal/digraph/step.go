@@ -55,8 +55,8 @@ type Step struct {
 	Preconditions []Condition `json:"preconditions,omitempty"`
 	// SignalOnStop is the signal to send on stop.
 	SignalOnStop string `json:"signalOnStop,omitempty"`
-	// ChildDAG contains the information about a child DAG to be executed.
-	ChildDAG *ChildDAG `json:"child,omitempty"`
+	// ChildDAG contains the information about a child workflow to be executed.
+	ChildDAG *ChildWorkflow `json:"child,omitempty"`
 }
 
 // setup sets the default values for the step.
@@ -88,8 +88,8 @@ func (s *Step) String() string {
 	return strings.Join(parts, "\t")
 }
 
-// ChildDAG contains information about a child DAG to be executed.
-type ChildDAG struct {
+// ChildWorkflow contains information about a child workflow to be executed.
+type ChildWorkflow struct {
 	Name   string `json:"name,omitempty"`
 	Params string `json:"params,omitempty"`
 }

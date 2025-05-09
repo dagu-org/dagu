@@ -111,7 +111,7 @@ type stepDef struct {
 	Call *callFuncDef // deprecated
 	// Run is the name of a DAG to run as a child workflow
 	Run string
-	// Params specifies the parameters for the child DAG.
+	// Params specifies the parameters for the child workflow.
 	Params string
 }
 

@@ -966,19 +966,19 @@ func (gh graphHelper) Schedule(t *testing.T, expectedStatus scheduler.Status) sc
 	ctx := digraph.SetupEnv(gh.Context, dag, nil, digraph.WorkflowRef{}, gh.Config.ExecID, logFilePath, nil)
 
 	var doneNodes []*scheduler.Node
-	nodeCompletedChan := make(chan *scheduler.Node)
+	progressCh := make(chan *scheduler.Node)
 
 	done := make(chan struct{})
 	go func() {
-		for node := range nodeCompletedChan {
+		for node := range progressCh {
 			doneNodes = append(doneNodes, node)
 		}
 		done <- struct{}{}
 	}()
 
-	err := gh.Scheduler.Schedule(ctx, gh.ExecutionGraph, nodeCompletedChan)
+	err := gh.Scheduler.Schedule(ctx, gh.ExecutionGraph, progressCh)
 
-	close(nodeCompletedChan)
+	close(progressCh)
 
 	switch expectedStatus {
 	case scheduler.StatusSuccess, scheduler.StatusCancel:

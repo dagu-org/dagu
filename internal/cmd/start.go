@@ -79,7 +79,7 @@ func runStart(ctx *Context, args []string) error {
 	)
 
 	// Execute the DAG
-	return executeDag(ctx, dag, digraph.WorkflowRef{}, workflowID, root)
+	return executeWorkflow(ctx, dag, digraph.WorkflowRef{}, workflowID, root)
 }
 
 // getExecutionInfo extracts and validates workflow ID and references from command flags
@@ -178,7 +178,7 @@ func handleChildExecution(ctx *Context, dag *digraph.DAG, workflowID string, par
 	}
 
 	// Log child workflow
-	logger.Info(ctx, "Executing child DAG",
+	logger.Info(ctx, "Executing child workflow",
 		"name", dag.Name,
 		"params", params,
 		"workflowId", workflowID,
@@ -198,7 +198,7 @@ func handleChildExecution(ctx *Context, dag *digraph.DAG, workflowID string, par
 	record, err := ctx.HistoryRepo.FindChildWorkflow(ctx, root, workflowID)
 	if errors.Is(err, models.ErrExecIDNotFound) {
 		// If the workflow ID is not found, proceed with new execution
-		return executeDag(ctx, dag, parent, workflowID, root)
+		return executeWorkflow(ctx, dag, parent, workflowID, root)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflowID, err)
@@ -214,11 +214,11 @@ func handleChildExecution(ctx *Context, dag *digraph.DAG, workflowID string, par
 	return executeRetry(ctx, dag, status, root)
 }
 
-// executeDag handles the actual execution of a DAG
-func executeDag(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, reqID string, rootRun digraph.WorkflowRef) error {
+// executeWorkflow handles the actual execution of a DAG
+func executeWorkflow(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, workflowID string, root digraph.WorkflowRef) error {
 	// Open the log file for the scheduler. The log file will be used for future
 	// execution for the same DAG/workflow ID between attempts.
-	logFile, err := ctx.OpenLogFile(d, reqID)
+	logFile, err := ctx.OpenLogFile(d, workflowID)
 	if err != nil {
 		logger.Error(ctx, "failed to initialize log file", "DAG", d.Name, "err", err)
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", d.Name, err)
@@ -230,7 +230,7 @@ func executeDag(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, reqID 
 	// Configure logging to the file
 	ctx.LogToFile(logFile)
 
-	logger.Debug(ctx, "workflow initiated", "DAG", d.Name, "workflowId", reqID, "logFile", logFile.Name())
+	logger.Debug(ctx, "workflow initiated", "DAG", d.Name, "workflowId", workflowID, "logFile", logFile.Name())
 
 	// Initialize DAG repository with the DAG's directory in the search path
 	dr, err := ctx.dagRepo(nil, []string{filepath.Dir(d.Location)})
@@ -241,14 +241,14 @@ func executeDag(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, reqID 
 
 	// Create a new agent to execute the DAG
 	agentInstance := agent.New(
-		reqID,
+		workflowID,
 		d,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
 		ctx.HistoryMgr,
 		dr,
 		ctx.HistoryRepo,
-		rootRun,
+		root,
 		agent.Options{Parent: parent},
 	)
 
@@ -257,13 +257,13 @@ func executeDag(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, reqID 
 
 	// Run the DAG
 	if err := agentInstance.Run(ctx); err != nil {
-		logger.Error(ctx, "Failed to execute DAG", "DAG", d.Name, "workflowId", reqID, "err", err)
+		logger.Error(ctx, "Failed to execute DAG", "DAG", d.Name, "workflowId", workflowID, "err", err)
 
 		if ctx.Quiet {
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
-			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", d.Name, reqID, err)
+			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", d.Name, workflowID, err)
 		}
 	}
 

@@ -199,14 +199,14 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 		return nil, fmt.Errorf("failed to setup executor IO: %w", err)
 	}
 
-	// If the command is a child DAG, we need to set the workflow ID.
+	// If the command is a child workflow, we need to set the workflow ID.
 	if childDAGExec, ok := cmd.(executor.ChildWorkflow); ok {
 		reqID, err := n.ChildExecID()
 		if err != nil {
-			return nil, fmt.Errorf("failed to determine workflow ID for child DAG: %w", err)
+			return nil, fmt.Errorf("failed to determine workflow ID for child workflow: %w", err)
 		}
 		if reqID == "" {
-			return nil, fmt.Errorf("workflow ID is empty for child DAG")
+			return nil, fmt.Errorf("workflow ID is empty for child workflow")
 		}
 		childDAGExec.SetWorkflowID(reqID)
 	}

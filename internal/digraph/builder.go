@@ -700,7 +700,7 @@ func buildSignalOnStop(_ BuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
-// buildDAGExecStep parses the child DAG definition and sets the step fields.
+// buildDAGExecStep parses the child workflow definition and sets the step fields.
 func buildDAGExecStep(_ BuildContext, def stepDef, step *Step) error {
 	name, params := def.Run, def.Params
 
@@ -709,8 +709,8 @@ func buildDAGExecStep(_ BuildContext, def stepDef, step *Step) error {
 		return nil
 	}
 
-	// Set the step fields for the child DAG.
-	step.ChildDAG = &ChildDAG{Name: name, Params: params}
+	// Set the step fields for the child workflow.
+	step.ChildDAG = &ChildWorkflow{Name: name, Params: params}
 	step.ExecutorConfig.Type = ExecutorTypeSub
 	step.Command = "run"
 	step.Args = []string{name, params}

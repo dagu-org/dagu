@@ -48,7 +48,7 @@ func newChildWorkflow(
 	env := GetEnv(ctx)
 	sub, err := env.DB.GetDAG(ctx, config.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find child DAG %q: %w", config.Name, err)
+		return nil, fmt.Errorf("failed to find child workflow %q: %w", config.Name, err)
 	}
 
 	dir, err := EvalString(ctx, step.Dir)
@@ -74,7 +74,7 @@ func (e *childWorkflow) Run(ctx context.Context) error {
 	}
 
 	if e.childWorkflowID == "" {
-		return fmt.Errorf("workflow ID is not set for child DAG")
+		return fmt.Errorf("workflow ID is not set for child workflow")
 	}
 
 	e.lock.Lock()
@@ -106,7 +106,7 @@ func (e *childWorkflow) Run(ctx context.Context) error {
 		cmd.Stdout = e.stdout
 	}
 	if e.stderr != nil {
-		// TODO: Separate stderr and stdout for child DAG to avoid mixing logger output
+		// TODO: Separate stderr and stdout for child workflow to avoid mixing logger output
 		cmd.Stderr = e.stderr
 	}
 
@@ -117,7 +117,7 @@ func (e *childWorkflow) Run(ctx context.Context) error {
 
 	e.cmd = cmd
 
-	logger.Info(ctx, "Executing child DAG",
+	logger.Info(ctx, "Executing child workflow",
 		"workflowId", e.childWorkflowID,
 		"target", e.dag.Name,
 		"args", args,
@@ -127,14 +127,14 @@ func (e *childWorkflow) Run(ctx context.Context) error {
 	e.lock.Unlock()
 
 	if err != nil {
-		return fmt.Errorf("failed to start child DAG: %w", err)
+		return fmt.Errorf("failed to start child workflow: %w", err)
 	}
 
 	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("child DAG exited with error: %w", err)
+		return fmt.Errorf("child workflow exited with error: %w", err)
 	}
 
-	// get results from the child DAG
+	// get results from the child workflow
 	result, err := env.DB.GetChildWorkflowStatus(ctx, e.childWorkflowID, env.Root)
 	if err != nil {
 		return fmt.Errorf("failed to collect result for the child execucion (exec ID=%s root=%s): %w", e.childWorkflowID, env.Root, err)
