@@ -87,7 +87,7 @@ func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestam
 	dataRoot := NewDataRoot(db.baseDir, dag.Name)
 	ts := NewUTC(timestamp)
 
-	var run *Execution
+	var run *Workflow
 	if opts.Retry {
 		r, err := dataRoot.FindByWorkflowID(ctx, workflowID)
 		if err != nil {
@@ -95,7 +95,7 @@ func (db *historyStorage) Create(ctx context.Context, dag *digraph.DAG, timestam
 		}
 		run = r
 	} else {
-		r, err := dataRoot.CreateRun(ts, workflowID)
+		r, err := dataRoot.CreateWorkflow(ts, workflowID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create run: %w", err)
 		}
@@ -120,15 +120,15 @@ func (db *historyStorage) newChildRecord(ctx context.Context, dag *digraph.DAG, 
 
 	ts := NewUTC(timestamp)
 
-	var run *Execution
+	var run *Workflow
 	if opts.Retry {
-		r, err := root.FindChildExec(ctx, workflowID)
+		r, err := root.FindChildWorkflow(ctx, workflowID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find child workflow record: %w", err)
 		}
 		run = r
 	} else {
-		r, err := root.CreateChildExec(ctx, workflowID)
+		r, err := root.CreateChildWorkflow(ctx, workflowID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create child workflow: %w", err)
 		}
@@ -257,7 +257,7 @@ func (db *historyStorage) FindChildWorkflow(ctx context.Context, ref digraph.Wor
 		return nil, fmt.Errorf("failed to find execution: %w", err)
 	}
 
-	childWorkflow, err := run.FindChildExec(ctx, childWorkflowID)
+	childWorkflow, err := run.FindChildWorkflow(ctx, childWorkflowID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find child workflow: %w", err)
 	}

@@ -54,7 +54,7 @@ func TestExecution(t *testing.T) {
 
 type ExecutionTest struct {
 	DataRootTest
-	*Execution
+	*Workflow
 	TB testing.TB
 }
 

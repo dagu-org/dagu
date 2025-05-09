@@ -26,7 +26,7 @@ func TestDataRoot(t *testing.T) {
 			assert.Equal(t, dagName, dr.dagName, "dagName should be set correctly")
 			assert.Equal(t, "test-dag", dr.prefix, "prefix should be set correctly")
 			assert.Equal(t, filepath.Join(baseDir, "test-dag", "executions"), dr.executionsDir, "path should be set correctly")
-			assert.Equal(t, filepath.Join(baseDir, "test-dag", "executions", "*", "*", "*", "exec_*"), dr.globPattern, "globPattern should be set correctly")
+			assert.Equal(t, filepath.Join(baseDir, "test-dag", "executions", "*", "*", "*", WorkflowDirPrefix+"*"), dr.globPattern, "globPattern should be set correctly")
 		})
 
 		t.Run("WithYAMLExtension", func(t *testing.T) {
@@ -76,7 +76,7 @@ func TestDataRootRuns(t *testing.T) {
 		actual, err := root.FindByWorkflowID(ctx, "test-id1")
 		require.NoError(t, err)
 
-		assert.Equal(t, exec.Execution, actual, "FindByWorkflowID should return the correct run")
+		assert.Equal(t, exec.Workflow, actual, "FindByWorkflowID should return the correct run")
 	})
 
 	t.Run("Latest", func(t *testing.T) {
@@ -114,7 +114,7 @@ func TestDataRootRuns(t *testing.T) {
 		run, err := root.LatestAfter(context.Background(), ts3)
 		require.NoError(t, err)
 
-		assert.Equal(t, *latest.Execution, *run, "LatestAfter should return the most recent run after the given timestamp")
+		assert.Equal(t, *latest.Workflow, *run, "LatestAfter should return the most recent run after the given timestamp")
 	})
 
 	t.Run("ListInRange", func(t *testing.T) {
@@ -225,11 +225,11 @@ func (drt *DataRootTest) CreateTestExecution(t *testing.T, workflowID string, ts
 	err := drt.Create()
 	require.NoError(t, err)
 
-	run, err := drt.CreateRun(ts, workflowID)
+	run, err := drt.CreateWorkflow(ts, workflowID)
 	require.NoError(t, err)
 
 	return ExecutionTest{
 		DataRootTest: *drt,
-		Execution:    run,
+		Workflow:     run,
 		TB:           t}
 }

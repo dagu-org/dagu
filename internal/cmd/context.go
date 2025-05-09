@@ -343,7 +343,7 @@ func (cfg LogConfig) LogFile() string {
 	truncatedWorkflowID := stringutil.TruncString(cfg.WorkflowID, 8)
 	safeName := fileutil.SafeName(cfg.Name)
 
-	return fmt.Sprintf("scheduler_%s.%s.%s.log",
+	return fmt.Sprintf("workflow_%s.%s.%s.log",
 		safeName,
 		timestamp,
 		truncatedWorkflowID,

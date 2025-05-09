@@ -67,7 +67,7 @@ func NewDataRoot(baseDir, dagName string) DataRoot {
 
 	root.prefix = prefix
 	root.executionsDir = filepath.Join(baseDir, root.prefix, "executions")
-	root.globPattern = filepath.Join(root.executionsDir, "*", "*", "*", "exec_*")
+	root.globPattern = filepath.Join(root.executionsDir, "*", "*", "*", WorkflowDirPrefix+"*")
 
 	return root
 }
@@ -82,7 +82,7 @@ func NewDataRoot(baseDir, dagName string) DataRoot {
 //
 // Returns:
 //   - The matching Execution instance, or an error if not found
-func (dr *DataRoot) FindByWorkflowID(_ context.Context, workflowID string) (*Execution, error) {
+func (dr *DataRoot) FindByWorkflowID(_ context.Context, workflowID string) (*Workflow, error) {
 	// Find matching files
 	matches, err := filepath.Glob(dr.GlobPatternWithWorkflowID(workflowID))
 	if err != nil {
@@ -96,10 +96,10 @@ func (dr *DataRoot) FindByWorkflowID(_ context.Context, workflowID string) (*Exe
 	// Sort matches by timestamp (most recent first)
 	sort.Sort(sort.Reverse(sort.StringSlice(matches)))
 
-	return NewRun(matches[0])
+	return NewWorkflow(matches[0])
 }
 
-func (dr *DataRoot) Latest(ctx context.Context, itemLimit int) []*Execution {
+func (dr *DataRoot) Latest(ctx context.Context, itemLimit int) []*Workflow {
 	runs, err := dr.listRecentRuns(ctx, itemLimit)
 	if err != nil {
 		logger.Errorf(ctx, "failed to list recent runs: %v", err)
@@ -108,7 +108,7 @@ func (dr *DataRoot) Latest(ctx context.Context, itemLimit int) []*Execution {
 	return runs
 }
 
-func (dr *DataRoot) LatestAfter(ctx context.Context, cutoff TimeInUTC) (*Execution, error) {
+func (dr *DataRoot) LatestAfter(ctx context.Context, cutoff TimeInUTC) (*Workflow, error) {
 	runs, err := dr.listRecentRuns(ctx, 1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list recent runs: %w", err)
@@ -122,23 +122,23 @@ func (dr *DataRoot) LatestAfter(ctx context.Context, cutoff TimeInUTC) (*Executi
 	return runs[0], nil
 }
 
-func (dr *DataRoot) ListInRange(ctx context.Context, start, end TimeInUTC) []*Execution {
+func (dr *DataRoot) ListInRange(ctx context.Context, start, end TimeInUTC) []*Workflow {
 	return dr.listInRange(ctx, start, end)
 }
 
-func (dr *DataRoot) CreateRun(ts TimeInUTC, workflowID string) (*Execution, error) {
-	dirName := "exec_" + formatExecTimestamp(ts) + "_" + workflowID
+func (dr *DataRoot) CreateWorkflow(ts TimeInUTC, workflowID string) (*Workflow, error) {
+	dirName := WorkflowDirPrefix + formatWorkflowTimestamp(ts) + "_" + workflowID
 	dir := filepath.Join(dr.executionsDir, ts.Format("2006"), ts.Format("01"), ts.Format("02"), dirName)
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
-	return NewRun(dir)
+	return NewWorkflow(dir)
 }
 
 func (dr DataRoot) GlobPatternWithWorkflowID(workflowID string) string {
-	return filepath.Join(dr.executionsDir, "2*", "*", "*", "exec_*"+workflowID+"*")
+	return filepath.Join(dr.executionsDir, "2*", "*", "*", WorkflowDirPrefix+"*"+workflowID+"*")
 }
 
 func (dr DataRoot) Exists() bool {
@@ -283,8 +283,8 @@ func (dr DataRoot) removeEmptyDir(ctx context.Context, dayDir string) {
 	}
 }
 
-func (dr DataRoot) listInRange(ctx context.Context, start, end TimeInUTC) []*Execution {
-	var result []*Execution
+func (dr DataRoot) listInRange(ctx context.Context, start, end TimeInUTC) []*Workflow {
+	var result []*Workflow
 	var lock sync.Mutex
 
 	// If start time is after end time, return empty result
@@ -354,13 +354,13 @@ func (dr DataRoot) listInRange(ctx context.Context, start, end TimeInUTC) []*Exe
 				}
 
 				// Find all status files for this day
-				files, err := filepath.Glob(filepath.Join(dayPath, "exec_*"))
+				files, err := filepath.Glob(filepath.Join(dayPath, WorkflowDirPrefix+"*"))
 				if err != nil {
 					continue
 				}
 
 				_ = processFilesParallel(ctx, files, func(filePath string) error {
-					run, err := NewRun(filePath)
+					run, err := NewWorkflow(filePath)
 					if err != nil {
 						logger.Debugf(ctx, "Failed to create run from file %s: %v", filePath)
 						return err
@@ -385,7 +385,7 @@ func (dr DataRoot) listInRange(ctx context.Context, start, end TimeInUTC) []*Exe
 	return result
 }
 
-func (dr DataRoot) listRecentRuns(_ context.Context, itemLimit int) ([]*Execution, error) {
+func (dr DataRoot) listRecentRuns(_ context.Context, itemLimit int) ([]*Workflow, error) {
 	var founds []string
 
 	years, err := listDirsSorted(dr.executionsDir, true, reYear)
@@ -408,7 +408,7 @@ YEAR_LOOP:
 			}
 			for _, day := range days {
 				dayPath := filepath.Join(monthPath, day)
-				runs, err := filepath.Glob(filepath.Join(dayPath, "exec_*"))
+				runs, err := filepath.Glob(filepath.Join(dayPath, WorkflowDirPrefix+"*"))
 				if err != nil {
 					return nil, fmt.Errorf("failed to find matches for pattern %s: %w", dayPath, err)
 				}
@@ -426,9 +426,9 @@ YEAR_LOOP:
 		founds = founds[:itemLimit]
 	}
 
-	var result []*Execution
+	var result []*Workflow
 	for _, f := range founds {
-		run, err := NewRun(f)
+		run, err := NewWorkflow(f)
 		if err != nil {
 			continue
 		}
