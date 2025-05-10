@@ -151,13 +151,27 @@ function DAGDetails() {
   >(undefined);
 
   // Update root workflow data when current workflow changes
+  // But only do this on initial load or when navigating to a different workflow
+  // Don't override the context when it's updated by the DAGExecutionHistory component
   useEffect(() => {
-    if (currentWorkflow) {
-      setRootWorkflowData(currentWorkflow);
-    } else if (dagData?.latestWorkflow && !rootWorkflowData) {
-      setRootWorkflowData(dagData.latestWorkflow);
+    // Only set the initial value if rootWorkflowData is undefined
+    if (!rootWorkflowData) {
+      if (currentWorkflow) {
+        setRootWorkflowData(currentWorkflow);
+      } else if (dagData?.latestWorkflow) {
+        setRootWorkflowData(dagData.latestWorkflow);
+      }
     }
-  }, [currentWorkflow, dagData?.latestWorkflow, rootWorkflowData]);
+    // Only update if we're navigating to a different workflow (via URL)
+    else if (
+      currentWorkflow &&
+      currentWorkflow.workflowId !== rootWorkflowData.workflowId &&
+      // Make sure we're not in the history tab where the context is managed by DAGExecutionHistory
+      tab !== 'history'
+    ) {
+      setRootWorkflowData(currentWorkflow);
+    }
+  }, [currentWorkflow, dagData?.latestWorkflow, rootWorkflowData, tab]);
 
   // Determine if basic data is loading (no DAG data available at all)
   const isBasicLoading = !fileName || isLoadingDag || !dagData || !dagData.dag;

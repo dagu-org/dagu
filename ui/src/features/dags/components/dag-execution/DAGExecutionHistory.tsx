@@ -145,6 +145,13 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
     const newParams = new URLSearchParams(searchParams);
     newParams.set('idx', newIdx.toString());
     setSearchParams(newParams);
+
+    // Directly update the RootWorkflowContext when a history item is selected
+    // This ensures the header will update immediately
+    const reversedWorkflows = [...(workflows || [])].reverse();
+    if (reversedWorkflows && reversedWorkflows[newIdx]) {
+      dagStatusContext.setData(reversedWorkflows[newIdx]);
+    }
   };
 
   // Listen for URL parameter changes
@@ -153,9 +160,15 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
       const newIdx = parseInt(idxParam);
       if (!isNaN(newIdx) && newIdx !== idx) {
         setIdx(newIdx);
+
+        // Update the RootWorkflowContext when the URL parameter changes
+        const reversedWorkflows = [...(workflows || [])].reverse();
+        if (reversedWorkflows && reversedWorkflows[newIdx]) {
+          dagStatusContext.setData(reversedWorkflows[newIdx]);
+        }
       }
     }
-  }, [idxParam]);
+  }, [idxParam, workflows, dagStatusContext]);
 
   /**
    * Handle keyboard navigation with arrow keys
@@ -170,7 +183,7 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
         updateIdx(idx + 1);
       }
     },
-    [idx, workflows]
+    [idx, workflows, updateIdx]
   );
 
   // Add and remove keyboard event listener
@@ -249,7 +262,7 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
     if (reversedWorkflows && reversedWorkflows[idx]) {
       dagStatusContext.setData(reversedWorkflows[idx]);
     }
-  }, [reversedWorkflows, idx]);
+  }, [reversedWorkflows, idx, dagStatusContext]);
 
   /**
    * Handle step selection on the graph

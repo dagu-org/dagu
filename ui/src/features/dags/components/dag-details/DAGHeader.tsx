@@ -26,18 +26,22 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
   navigateToStatusTab,
 }) => {
   const navigate = useNavigate();
+  const rootWorkflowContext = React.useContext(RootWorkflowContext);
+
+  // Use the workflow from context if available, otherwise use the prop
+  const workflowToDisplay = rootWorkflowContext.data || currentWorkflow;
 
   const handleRootWorkflowClick = (e: React.MouseEvent) => {
     e.preventDefault();
     navigate(
-      `/dags/${fileName}?workflowId=${currentWorkflow.rootWorkflowId}&workflowName=${encodeURIComponent(currentWorkflow.rootWorkflowName)}`
+      `/dags/${fileName}?workflowId=${workflowToDisplay.rootWorkflowId}&workflowName=${encodeURIComponent(workflowToDisplay.rootWorkflowName)}`
     );
   };
 
   const handleParentWorkflowClick = (e: React.MouseEvent) => {
     e.preventDefault();
     navigate(
-      `/dags/${fileName}?childWorkflowId=${currentWorkflow.parentWorkflowId}&workflowId=${currentWorkflow.rootWorkflowId}&workflowName=${encodeURIComponent(currentWorkflow.rootWorkflowName)}`
+      `/dags/${fileName}?childWorkflowId=${workflowToDisplay.parentWorkflowId}&workflowId=${workflowToDisplay.rootWorkflowId}&workflowName=${encodeURIComponent(workflowToDisplay.rootWorkflowName)}`
     );
   };
 
@@ -47,14 +51,15 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
         <div className="flex flex-row items-center justify-between">
           <Title className="flex items-center">
             {/* Root workflow */}
-            {currentWorkflow.rootWorkflowId !== currentWorkflow.workflowId && (
+            {workflowToDisplay.rootWorkflowId !==
+              workflowToDisplay.workflowId && (
               <>
                 <span className="text-blue-600 hover:underline font-normal">
                   <a
-                    href={`/dags/${fileName}?workflowId=${currentWorkflow.rootWorkflowId}&workflowName=${encodeURIComponent(currentWorkflow.rootWorkflowName)}`}
+                    href={`/dags/${fileName}?workflowId=${workflowToDisplay.rootWorkflowId}&workflowName=${encodeURIComponent(workflowToDisplay.rootWorkflowName)}`}
                     onClick={handleRootWorkflowClick}
                   >
-                    {currentWorkflow.rootWorkflowName}
+                    {workflowToDisplay.rootWorkflowName}
                   </a>
                 </span>
                 <span className="mx-2 text-slate-400">/</span>
@@ -62,18 +67,19 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
             )}
 
             {/* Parent workflow (if exists and different from root and current) */}
-            {currentWorkflow.parentWorkflowName &&
-              currentWorkflow.parentWorkflowId &&
-              currentWorkflow.parentWorkflowName !==
-                currentWorkflow.rootWorkflowName &&
-              currentWorkflow.parentWorkflowName !== currentWorkflow.name && (
+            {workflowToDisplay.parentWorkflowName &&
+              workflowToDisplay.parentWorkflowId &&
+              workflowToDisplay.parentWorkflowName !==
+                workflowToDisplay.rootWorkflowName &&
+              workflowToDisplay.parentWorkflowName !==
+                workflowToDisplay.name && (
                 <>
                   <span className="text-blue-600 hover:underline font-normal">
                     <a
-                      href={`/dags/${fileName}?workflowId=${currentWorkflow.rootWorkflowId}&childWorkflowId=${currentWorkflow.parentWorkflowId}&workflowName=${encodeURIComponent(currentWorkflow.rootWorkflowName)}`}
+                      href={`/dags/${fileName}?workflowId=${workflowToDisplay.rootWorkflowId}&childWorkflowId=${workflowToDisplay.parentWorkflowId}&workflowName=${encodeURIComponent(workflowToDisplay.rootWorkflowName)}`}
                       onClick={handleParentWorkflowClick}
                     >
-                      {currentWorkflow.parentWorkflowName}
+                      {workflowToDisplay.parentWorkflowName}
                     </a>
                   </span>
                   <span className="mx-2 text-slate-400">/</span>
@@ -81,41 +87,36 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
               )}
 
             {/* Current workflow */}
-            <span>{currentWorkflow.name}</span>
+            <span>{workflowToDisplay.name}</span>
           </Title>
           {/* Only show DAG actions for root workflows, not for child workflows */}
-          {currentWorkflow.workflowId === currentWorkflow.rootWorkflowId && (
-            <RootWorkflowContext.Consumer>
-              {(status) =>
-                status.data ? (
-                  <DAGActions
-                    status={status.data}
-                    dag={dag}
-                    fileName={fileName}
-                    refresh={refreshFn}
-                    displayMode="full"
-                    navigateToStatusTab={navigateToStatusTab}
-                  />
-                ) : null
-              }
-            </RootWorkflowContext.Consumer>
+          {workflowToDisplay.workflowId ===
+            workflowToDisplay.rootWorkflowId && (
+            <DAGActions
+              status={workflowToDisplay}
+              dag={dag}
+              fileName={fileName}
+              refresh={refreshFn}
+              displayMode="full"
+              navigateToStatusTab={navigateToStatusTab}
+            />
           )}
         </div>
       </div>
-      {currentWorkflow.status != Status.NotStarted ? (
+      {workflowToDisplay.status != Status.NotStarted ? (
         <div className="flex flex-row items-center justify-between mb-4">
           <div className="flex flex-row items-center gap-4">
-            {currentWorkflow.status ? (
-              <StatusChip status={currentWorkflow.status}>
-                {currentWorkflow.statusLabel || ''}
+            {workflowToDisplay.status ? (
+              <StatusChip status={workflowToDisplay.status}>
+                {workflowToDisplay.statusLabel || ''}
               </StatusChip>
             ) : null}
 
             <div className="flex flex-row items-center text-slate-600 dark:text-slate-400">
               <Calendar className="mr-1.5 h-4 w-4" />
               <span className="text-sm">
-                {currentWorkflow?.startedAt
-                  ? dayjs(currentWorkflow.startedAt).format(
+                {workflowToDisplay?.startedAt
+                  ? dayjs(workflowToDisplay.startedAt).format(
                       'YYYY-MM-DD HH:mm:ss Z'
                     )
                   : '--'}
@@ -125,14 +126,14 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
             <div className="flex flex-row items-center text-slate-600 dark:text-slate-400">
               <Timer className="mr-1.5 h-4 w-4" />
               <span className="text-sm">
-                {currentWorkflow.finishedAt
+                {workflowToDisplay.finishedAt
                   ? formatDuration(
-                      currentWorkflow.startedAt,
-                      currentWorkflow.finishedAt
+                      workflowToDisplay.startedAt,
+                      workflowToDisplay.finishedAt
                     )
-                  : currentWorkflow.startedAt
+                  : workflowToDisplay.startedAt
                     ? formatDuration(
-                        currentWorkflow.startedAt,
+                        workflowToDisplay.startedAt,
                         dayjs().toISOString()
                       )
                     : '--'}
@@ -142,7 +143,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
 
           <div className="text-sm text-slate-600 dark:text-slate-400">
             <span className="font-medium">Workflow ID:</span>{' '}
-            {currentWorkflow.rootWorkflowId}
+            {workflowToDisplay.rootWorkflowId}
           </div>
         </div>
       ) : null}
