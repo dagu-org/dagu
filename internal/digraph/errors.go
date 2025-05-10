@@ -35,6 +35,8 @@ func wrapError(field string, value any, err error) error {
 
 // errors on building a DAG.
 var (
+	ErrNameTooLong                         = errors.New("name must be less than 40 characters")
+	ErrNameInvalidChars                    = errors.New("name must only contain alphanumeric characters, dashes, dots, and underscores")
 	ErrInvalidSchedule                     = errors.New("invalid schedule")
 	ErrScheduleMustBeStringOrArray         = errors.New("schedule must be a string or an array of strings")
 	ErrInvalidScheduleType                 = errors.New("invalid schedule type")
@@ -44,6 +46,7 @@ var (
 	ErrFuncParamsMismatch                  = errors.New("func params and args given to func command do not match")
 	ErrStepNameRequired                    = errors.New("step name must be specified")
 	ErrStepNameTooLong                     = errors.New("step name must be less than 40 characters")
+	ErrStepNameInvalidChars                = errors.New("step name must only contain alphanumeric characters, dashes, dots, underscores, and spaces")
 	ErrStepCommandIsRequired               = errors.New("step command is required")
 	ErrStepCommandIsEmpty                  = errors.New("step command is empty")
 	ErrStepCommandMustBeArrayOrString      = errors.New("step command must be an array of strings or a string")

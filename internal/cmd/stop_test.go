@@ -32,7 +32,7 @@ func TestStopCommand(t *testing.T) {
 		// Stop the DAG.
 		th.RunCommand(t, cmd.CmdStop(), test.CmdTest{
 			Args:        []string{"stop", dagFile.Location},
-			ExpectedOut: []string{"workflow stopped"}})
+			ExpectedOut: []string{"Workflow stopped"}})
 
 		// Check the DAG is stopped.
 		dagFile.AssertLatestStatus(t, scheduler.StatusCancel)
@@ -60,7 +60,7 @@ func TestStopCommand(t *testing.T) {
 		// Stop the workflow.
 		th.RunCommand(t, cmd.CmdStop(), test.CmdTest{
 			Args:        []string{"stop", dagFile.Location, "--workflow-id=" + workflowID},
-			ExpectedOut: []string{"workflow stopped"}})
+			ExpectedOut: []string{"Workflow stopped"}})
 
 		// Check the DAG is stopped.
 		dagFile.AssertLatestStatus(t, scheduler.StatusCancel)

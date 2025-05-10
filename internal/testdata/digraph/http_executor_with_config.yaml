@@ -1,6 +1,6 @@
 steps:
   - command: http://example.com
-    name: step 1
+    name: step1
     executor:
       type: http
       config:

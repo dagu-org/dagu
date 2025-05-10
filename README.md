@@ -221,10 +221,10 @@ schedule: "* * * * *" # Run the DAG every minute
 params:
   - NAME: "Dagu"
 steps:
-  - name: Hello world
+  - name: hello_world
     command: echo Hello $NAME
 
-  - name: Simulate unclean Command Output
+  - name: simulate_unclean_command_output
     command: |
       cat <<EOF
       INFO: Starting process...
@@ -234,17 +234,17 @@ steps:
       EOF
     output: raw_output
 
-  - name: Extract Relevant Data
+  - name: extract_data
     command: |
       echo "$raw_output" | grep '^DATA:' | sed 's/^DATA: //'
     output: cleaned_data
     depends:
-      - Simulate unclean Command Output
+      - simulate_unclean_command_output
 
   - name: Done
     command: echo Done!
     depends:
-      - Hello world
+      - hello_world
 ```
 
 ### 4. Execute the DAG
