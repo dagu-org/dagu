@@ -1432,7 +1432,7 @@ components:
         doneCount:
           type: integer
           description: "Number of successful completions for repeating steps"
-        subRuns:
+        children:
           type: array
           description: "List of child workflows associated with this step"
           items:

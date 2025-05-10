@@ -645,7 +645,7 @@ export interface components {
             /** @description Number of successful completions for repeating steps */
             doneCount: number;
             /** @description List of child workflows associated with this step */
-            subRuns?: components["schemas"]["ChildWorkflow"][];
+            children?: components["schemas"]["ChildWorkflow"][];
             /** @description Error message if the step failed */
             error?: string;
         };

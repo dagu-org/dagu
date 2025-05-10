@@ -106,7 +106,7 @@ func toNode(node *models.Node) api.Node {
 		StatusLabel: api.NodeStatusLabel(node.Status.String()),
 		Step:        toStep(node.Step),
 		Error:       ptrOf(node.Error),
-		SubRuns:     ptrOf(toChildWorkflows(node.Children)),
+		Children:    ptrOf(toChildWorkflows(node.Children)),
 	}
 }
 
