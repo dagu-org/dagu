@@ -74,44 +74,54 @@ function DAGStatus({ workflow, fileName }: Props) {
     }
     dismissModal();
   };
+  // Handle double-click on graph node (navigate to child workflow)
   const onSelectStepOnGraph = React.useCallback(
     async (id: string) => {
-      const status = workflow.status;
-
       // find the clicked step
       const n = workflow.nodes?.find(
         (n) => n.step.name.replace(/\s/g, '_') == id
       );
 
-      if (n) {
-        // Check if this is a child workflow node (has a 'run' property)
-        if (n.step.run) {
-          // Find the child workflow ID
-          const childWorkflow = n.children?.[0];
+      if (n && n.step.run) {
+        // Find the child workflow ID
+        const childWorkflow = n.children?.[0];
 
-          if (childWorkflow && childWorkflow.workflowId) {
-            // Navigate to the child workflow status page
-            const workflowId = workflow.rootWorkflowId;
+        if (childWorkflow && childWorkflow.workflowId) {
+          // Navigate to the child workflow status page
+          const workflowId = workflow.rootWorkflowId;
 
-            // Use React Router's navigate with search params
-            // Include workflowName parameter to avoid waiting for DAG details
-            navigate({
-              pathname: `/dags/${fileName}`,
-              search: `?childWorkflowId=${childWorkflow.workflowId}&workflowId=${workflowId}&step=${n.step.name}&workflowName=${encodeURIComponent(workflow.rootWorkflowName)}`,
-            });
-            return;
-          }
+          // Use React Router's navigate with search params
+          // Include workflowName parameter to avoid waiting for DAG details
+          navigate({
+            pathname: `/dags/${fileName}`,
+            search: `?childWorkflowId=${childWorkflow.workflowId}&workflowId=${workflowId}&step=${n.step.name}&workflowName=${encodeURIComponent(workflow.rootWorkflowName)}`,
+          });
         }
+      }
+    },
+    [workflow, navigate, fileName]
+  );
 
-        // If not a child workflow or no child workflow ID found, show the status update modal
-        // Only allow status updates for completed workflows
-        if (status !== Status.Running && status !== Status.NotStarted) {
+  // Handle right-click on graph node (show status update modal)
+  const onRightClickStepOnGraph = React.useCallback(
+    (id: string) => {
+      const status = workflow.status;
+
+      // Only allow status updates for completed workflows
+      if (status !== Status.Running && status !== Status.NotStarted) {
+        // find the right-clicked step
+        const n = workflow.nodes?.find(
+          (n) => n.step.name.replace(/\s/g, '_') == id
+        );
+
+        if (n) {
+          // Show the modal (it will be centered by default)
           setSelectedStep(n.step);
           setModal(true);
         }
       }
     },
-    [workflow, navigate, fileName]
+    [workflow]
   );
 
   const handlers = getEventHandlers(workflow);
@@ -129,7 +139,11 @@ function DAGStatus({ workflow, fileName }: Props) {
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
-        <DAGGraph workflow={workflow} onSelectStep={onSelectStepOnGraph} />
+        <DAGGraph
+          workflow={workflow}
+          onSelectStep={onSelectStepOnGraph}
+          onRightClickStep={onRightClickStepOnGraph}
+        />
       </div>
 
       <DAGContext.Consumer>

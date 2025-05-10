@@ -265,7 +265,7 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
   }, [reversedWorkflows, idx, dagStatusContext]);
 
   /**
-   * Handle step selection on the graph
+   * Handle double-click on graph node (navigate to child workflow)
    */
   const onSelectStepOnGraph = React.useCallback(
     async (id: string) => {
@@ -279,27 +279,33 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
         (n) => n.step.name.replace(/\s/g, '_') == id
       );
 
-      if (!n) return;
+      if (!n || !n.step.run) return;
 
-      // Check if this is a child workflow node (has a 'run' property)
-      const isChildWorkflow = !!n.step.run;
+      // If it's a child workflow, navigate to its details
+      const childWorkflow = n.children?.[0];
+      if (childWorkflow && childWorkflow.workflowId) {
+        // Navigate to the child workflow details using React Router with search params
+        // Include workflowName parameter to avoid waiting for DAG details
+        navigate({
+          pathname: `/dags/${fileName}`,
+          search: `?workflowId=${workflow.rootWorkflowId}&childWorkflowId=${childWorkflow.workflowId}&workflowName=${encodeURIComponent(workflow.rootWorkflowName)}`,
+        });
+      }
+    },
+    [reversedWorkflows, idx, navigate]
+  );
 
-      if (isChildWorkflow) {
-        // If it's a child workflow, navigate to its details
-        const childWorkflow = n.children?.[0];
-        if (childWorkflow && childWorkflow.workflowId && n.step.run) {
-          // Navigate to the child workflow details using React Router with search params
-          // Include workflowName parameter to avoid waiting for DAG details
-          navigate({
-            pathname: `/dags/${fileName}`,
-            search: `?workflowId=${workflow.rootWorkflowId}&childWorkflowId=${childWorkflow.workflowId}&workflowName=${encodeURIComponent(workflow.rootWorkflowName)}`,
-          });
-          return;
-        }
+  /**
+   * Handle right-click on graph node (show status update modal)
+   */
+  const onRightClickStepOnGraph = React.useCallback(
+    (id: string) => {
+      const workflow = reversedWorkflows[idx];
+      if (!workflow) {
+        return;
       }
 
-      // For non-child workflow nodes or if child workflow navigation fails,
-      // only allow status updates for completed workflows
+      // Only allow status updates for completed workflows
       if (
         workflow.status == Status.Running ||
         workflow.status == Status.NotStarted
@@ -307,10 +313,17 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
         return;
       }
 
-      setSelectedStep(n.step);
-      setModal(true);
+      // Find the right-clicked step
+      const n = workflow.nodes?.find(
+        (n) => n.step.name.replace(/\s/g, '_') == id
+      );
+
+      if (n) {
+        setSelectedStep(n.step);
+        setModal(true);
+      }
     },
-    [reversedWorkflows, idx, navigate]
+    [reversedWorkflows, idx]
   );
 
   return (
@@ -333,6 +346,7 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
                   <DAGGraph
                     workflow={reversedWorkflows[idx]}
                     onSelectStep={onSelectStepOnGraph}
+                    onRightClickStep={onRightClickStepOnGraph}
                   />
                 </div>
               </div>
