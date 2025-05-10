@@ -31,6 +31,11 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
   // Use the workflow from context if available, otherwise use the prop
   const workflowToDisplay = rootWorkflowContext.data || currentWorkflow;
 
+  console.log('workflow', {
+    root: rootWorkflowContext.data,
+    currentWorkflow,
+  });
+
   const handleRootWorkflowClick = (e: React.MouseEvent) => {
     e.preventDefault();
     navigate(

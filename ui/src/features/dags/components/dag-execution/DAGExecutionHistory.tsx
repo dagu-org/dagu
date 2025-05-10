@@ -11,7 +11,6 @@ import { useClient, useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import SubTitle from '../../../../ui/SubTitle';
 import { DAGContext } from '../../contexts/DAGContext';
-import { RootWorkflowContext } from '../../contexts/RootWorkflowContext';
 import { getEventHandlers } from '../../lib/getEventHandlers';
 import { DAGStatusOverview, NodeStatusTable } from '../dag-details';
 import { DAGGraph } from '../visualization';
@@ -113,7 +112,7 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
         : 0
   );
 
-  const dagStatusContext = React.useContext(RootWorkflowContext);
+  // Removed unused context since we're no longer directly updating it
 
   // Ensure index is valid when workflows change (e.g., when switching DAGs)
   React.useEffect(() => {
@@ -142,15 +141,21 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
     }
 
     setIdx(newIdx);
-    const newParams = new URLSearchParams(searchParams);
-    newParams.set('idx', newIdx.toString());
-    setSearchParams(newParams);
-
-    // Directly update the RootWorkflowContext when a history item is selected
-    // This ensures the header will update immediately
     const reversedWorkflows = [...(workflows || [])].reverse();
+
     if (reversedWorkflows && reversedWorkflows[newIdx]) {
-      dagStatusContext.setData(reversedWorkflows[newIdx]);
+      // Instead of directly updating the context, update the URL with the workflow ID
+      const selectedWorkflow = reversedWorkflows[newIdx];
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('idx', newIdx.toString());
+
+      // Add or update the workflowId parameter
+      newParams.set('workflowId', selectedWorkflow.workflowId);
+
+      // Add workflowName parameter to avoid waiting for DAG details
+      newParams.set('workflowName', selectedWorkflow.name);
+
+      setSearchParams(newParams);
     }
   };
 
@@ -161,14 +166,11 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
       if (!isNaN(newIdx) && newIdx !== idx) {
         setIdx(newIdx);
 
-        // Update the RootWorkflowContext when the URL parameter changes
-        const reversedWorkflows = [...(workflows || [])].reverse();
-        if (reversedWorkflows && reversedWorkflows[newIdx]) {
-          dagStatusContext.setData(reversedWorkflows[newIdx]);
-        }
+        // No longer updating the RootWorkflowContext here
+        // The status details page will handle this based on URL parameters
       }
     }
-  }, [idxParam, workflows, dagStatusContext]);
+  }, [idxParam, idx]);
 
   /**
    * Handle keyboard navigation with arrow keys
@@ -257,12 +259,8 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
     dismissModal();
   };
 
-  // Update the DAG status context when the selected workflow changes
-  React.useEffect(() => {
-    if (reversedWorkflows && reversedWorkflows[idx]) {
-      dagStatusContext.setData(reversedWorkflows[idx]);
-    }
-  }, [reversedWorkflows, idx, dagStatusContext]);
+  // Removed the effect that updates the DAG status context
+  // The status details page will handle this based on URL parameters
 
   /**
    * Handle double-click on graph node (navigate to child workflow)
