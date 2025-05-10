@@ -1349,6 +1349,12 @@ components:
         rootWorkflowId:
           type: string
           description: "ID of the root workflow"
+        parentWorkflowName:
+          type: string
+          description: "Name of the parent workflow"
+        parentWorkflowId:
+          type: string
+          description: "ID of the parent workflow"
         workflowId:
           $ref: "#/components/schemas/WorkflowId"
         name:

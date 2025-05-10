@@ -302,17 +302,19 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 
 	for i, item := range result.Items {
 		workflow := api.WorkflowSummary{
-			RootWorkflowName: dagStatuses[i].Root.Name,
-			RootWorkflowId:   dagStatuses[i].Root.WorkflowID,
-			Log:              dagStatuses[i].Log,
-			Name:             dagStatuses[i].Name,
-			Params:           ptrOf(dagStatuses[i].Params),
-			Pid:              ptrOf(int(dagStatuses[i].PID)),
-			WorkflowId:       dagStatuses[i].WorkflowID,
-			StartedAt:        dagStatuses[i].StartedAt,
-			FinishedAt:       dagStatuses[i].FinishedAt,
-			Status:           api.Status(dagStatuses[i].Status),
-			StatusLabel:      api.StatusLabel(dagStatuses[i].Status.String()),
+			RootWorkflowName:   dagStatuses[i].Root.Name,
+			RootWorkflowId:     dagStatuses[i].Root.WorkflowID,
+			ParentWorkflowName: ptrOf(dagStatuses[i].Parent.Name),
+			ParentWorkflowId:   ptrOf(dagStatuses[i].Parent.WorkflowID),
+			Log:                dagStatuses[i].Log,
+			Name:               dagStatuses[i].Name,
+			Params:             ptrOf(dagStatuses[i].Params),
+			Pid:                ptrOf(int(dagStatuses[i].PID)),
+			WorkflowId:         dagStatuses[i].WorkflowID,
+			StartedAt:          dagStatuses[i].StartedAt,
+			FinishedAt:         dagStatuses[i].FinishedAt,
+			Status:             api.Status(dagStatuses[i].Status),
+			StatusLabel:        api.StatusLabel(dagStatuses[i].Status.String()),
 		}
 
 		dag := api.DAGFile{
