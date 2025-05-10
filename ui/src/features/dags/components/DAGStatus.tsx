@@ -35,24 +35,39 @@ function DAGStatus({ workflow, fileName }: Props) {
     step: components['schemas']['Step'],
     status: NodeStatus
   ) => {
-    const { error } = await client.PATCH(
-      '/workflows/{name}/{workflowId}/steps/{stepName}/status',
-      {
-        params: {
-          path: {
-            name: workflow.name,
-            workflowId: workflow.workflowId,
-            stepName: step.name,
-          },
-          query: {
-            remoteNode: appBarContext.selectedRemoteNode || 'local',
-          },
+    // Check if this is a child workflow by checking if rootWorkflowId and rootWorkflowName exist
+    // and are different from the current workflow's ID and name
+    const isChildWorkflow =
+      workflow.rootWorkflowId &&
+      workflow.rootWorkflowName &&
+      workflow.rootWorkflowId !== workflow.workflowId;
+
+    // Define path parameters with proper typing
+    const pathParams = {
+      name: isChildWorkflow ? workflow.rootWorkflowName : workflow.name,
+      workflowId: isChildWorkflow
+        ? workflow.rootWorkflowId
+        : workflow.workflowId,
+      stepName: step.name,
+      ...(isChildWorkflow ? { childWorkflowId: workflow.workflowId } : {}),
+    };
+
+    // Use the appropriate endpoint based on whether this is a child workflow
+    const endpoint = isChildWorkflow
+      ? '/workflows/{name}/{workflowId}/children/{childWorkflowId}/steps/{stepName}/status'
+      : '/workflows/{name}/{workflowId}/steps/{stepName}/status';
+
+    const { error } = await client.PATCH(endpoint, {
+      params: {
+        path: pathParams,
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
-        body: {
-          status,
-        },
-      }
-    );
+      },
+      body: {
+        status,
+      },
+    });
     if (error) {
       alert(error.message || 'An error occurred');
       return;
