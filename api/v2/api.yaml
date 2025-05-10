@@ -1343,6 +1343,12 @@ components:
       type: object
       description: "Current status of a workflow"
       properties:
+        rootWorkflowName:
+          type: string
+          description: "Name of the root workflow"
+        rootWorkflowId:
+          type: string
+          description: "ID of the root workflow"
         workflowId:
           $ref: "#/components/schemas/WorkflowId"
         name:
@@ -1367,6 +1373,8 @@ components:
           type: string
           description: "Runtime parameters passed to the workflow in JSON format"
       required:
+        - rootWorkflowName
+        - rootWorkflowId
         - workflowId
         - name
         - status

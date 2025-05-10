@@ -601,6 +601,10 @@ export interface components {
         };
         /** @description Current status of a workflow */
         WorkflowSummary: {
+            /** @description Name of the root workflow */
+            rootWorkflowName: string;
+            /** @description ID of the root workflow */
+            rootWorkflowId: string;
             workflowId: components["schemas"]["WorkflowId"];
             name: components["schemas"]["DAGName"];
             status: components["schemas"]["Status"];

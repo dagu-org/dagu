@@ -325,10 +325,7 @@ func (a *Agent) Status() models.Status {
 		models.WithOnFailureNode(a.scheduler.HandlerNode(digraph.HandlerOnFailure)),
 		models.WithOnCancelNode(a.scheduler.HandlerNode(digraph.HandlerOnCancel)),
 		models.WithRunID(a.runID),
-	}
-
-	if a.childWorkflow.Load() {
-		opts = append(opts, models.WithHierarchyRefs(a.root, a.parent))
+		models.WithHierarchyRefs(a.root, a.parent),
 	}
 
 	// Create the status object to record the current status.

@@ -127,4 +127,7 @@ steps:
 	child2Status, err = child2Run.ReadStatus(ctx)
 	require.NoError(t, err)
 	require.Equal(t, child2Status.Nodes[0].Status.String(), scheduler.NodeStatusSuccess.String())
+
+	require.Equal(t, "parent", child2Status.Root.Name, "parent")
+	require.Equal(t, workflowID, child2Status.Root.WorkflowID)
 }
