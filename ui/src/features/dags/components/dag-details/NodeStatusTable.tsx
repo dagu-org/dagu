@@ -73,6 +73,7 @@ function NodeStatusTable({ nodes, status, fileName, onViewLog }: Props) {
               workflowId={status.workflowId}
               name={fileName}
               onViewLog={onViewLog}
+              workflow={status}
             />
           ))}
         </TableBody>

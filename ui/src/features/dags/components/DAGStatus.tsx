@@ -178,6 +178,7 @@ function DAGStatus({ workflow, fileName }: Props) {
         dagName={workflow.name}
         workflowId={logViewer.workflowId}
         stepName={logViewer.stepName}
+        workflow={workflow}
       />
     </div>
   );

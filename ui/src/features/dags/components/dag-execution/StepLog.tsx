@@ -4,6 +4,7 @@
  * @module features/dags/components/dag-execution
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { components } from '../../../../api/v2/schema';
 import { Button } from '../../../../components/ui/button';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
@@ -33,6 +34,8 @@ type Props = {
   workflowId: string;
   /** Name of the step to display logs for */
   stepName: string;
+  /** Full workflow details (optional) - used to determine if this is a child workflow */
+  workflow?: components['schemas']['WorkflowDetails'];
 };
 
 /**
@@ -48,7 +51,7 @@ const ANSI_CODES_REGEX = [
  * StepLog displays the log output for a specific step in a DAG run
  * Fetches log data from the API and refreshes every 30 seconds
  */
-function StepLog({ dagName, workflowId, stepName }: Props) {
+function StepLog({ dagName, workflowId, stepName, workflow }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const [viewMode, setViewMode] = useState<'tail' | 'head' | 'page'>('tail');
   const [pageSize, setPageSize] = useState(1000);
@@ -63,6 +66,13 @@ function StepLog({ dagName, workflowId, stepName }: Props) {
   const isInitialLoad = useRef(true);
   const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const logContainerRef = useRef<HTMLDivElement>(null);
+
+  // Determine if this is a child workflow
+  const isChildWorkflow =
+    workflow &&
+    workflow.rootWorkflowId &&
+    workflow.rootWorkflowName &&
+    workflow.rootWorkflowId !== workflow.workflowId;
 
   // Determine query parameters based on view mode
   const queryParams: Record<string, number | string> = {
@@ -79,17 +89,32 @@ function StepLog({ dagName, workflowId, stepName }: Props) {
     queryParams.limit = pageSize;
   }
 
+  // Determine the API endpoint based on whether this is a child workflow
+  const apiEndpoint = isChildWorkflow
+    ? '/workflows/{name}/{workflowId}/children/{childWorkflowId}/steps/{stepName}/log'
+    : '/workflows/{name}/{workflowId}/steps/{stepName}/log';
+
+  // Prepare path parameters based on whether this is a child workflow
+  const pathParams = isChildWorkflow
+    ? {
+        name: workflow.rootWorkflowName,
+        workflowId: workflow.rootWorkflowId,
+        childWorkflowId: workflow.workflowId,
+        stepName,
+      }
+    : {
+        name: dagName,
+        workflowId,
+        stepName,
+      };
+
   // Fetch log data with periodic refresh
   const { data, isLoading, error } = useQuery(
-    '/workflows/{name}/{workflowId}/steps/{stepName}/log',
+    apiEndpoint,
     {
       params: {
         query: queryParams,
-        path: {
-          name: dagName,
-          stepName,
-          workflowId,
-        },
+        path: pathParams,
       },
     },
     {

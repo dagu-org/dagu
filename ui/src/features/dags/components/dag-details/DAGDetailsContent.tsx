@@ -184,13 +184,18 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             </div>
           ) : null}
           {activeTab === 'workflow-log' ? (
-            <ExecutionLog name={dag?.name || ''} workflowId={workflowId} />
+            <ExecutionLog
+              name={dag?.name || ''}
+              workflowId={workflowId}
+              workflow={currentWorkflow}
+            />
           ) : null}
           {activeTab === 'log' && stepName ? (
             <StepLog
               dagName={dag?.name || ''}
               workflowId={workflowId}
               stepName={stepName}
+              workflow={currentWorkflow}
             />
           ) : null}
 
@@ -203,6 +208,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             workflowId={workflowId}
             stepName={logViewer.stepName}
             isInModal={isModal}
+            workflow={currentWorkflow}
           />
         </div>
       </div>

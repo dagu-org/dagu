@@ -32,6 +32,8 @@ type Props = {
   name: string;
   /** Function to open log viewer */
   onViewLog?: (stepName: string, workflowId: string) => void;
+  /** Full workflow details (optional) - used to determine if this is a child workflow */
+  workflow?: components['schemas']['WorkflowDetails'];
 };
 
 /**
@@ -92,6 +94,7 @@ function NodeStatusTableRow({
   node,
   workflowId,
   onViewLog,
+  workflow,
 }: Props) {
   const navigate = useNavigate();
   // State to store the current duration for running tasks
@@ -199,8 +202,25 @@ function NodeStatusTableRow({
                   // Navigate to child workflow
                   const searchParams = new URLSearchParams();
                   searchParams.set('childWorkflowId', childWorkflowId);
-                  searchParams.set('rootWorkflowName', name);
-                  searchParams.set('rootWorkflowId', workflowId || '');
+
+                  // Use root workflow information from the workflow prop if available
+                  if (
+                    workflow &&
+                    workflow.rootWorkflowName &&
+                    workflow.rootWorkflowId
+                  ) {
+                    // If this is already a child workflow, use its root information
+                    searchParams.set(
+                      'rootWorkflowName',
+                      workflow.rootWorkflowName
+                    );
+                    searchParams.set('rootWorkflowId', workflow.rootWorkflowId);
+                  } else {
+                    // Otherwise, use the current workflow as the root
+                    searchParams.set('rootWorkflowName', name);
+                    searchParams.set('rootWorkflowId', workflowId || '');
+                  }
+
                   searchParams.set('step', node.step.name);
                   navigate(`/dags/${name}?${searchParams.toString()}`);
                 }
