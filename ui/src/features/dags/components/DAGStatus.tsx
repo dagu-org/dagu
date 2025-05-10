@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { components, NodeStatus, Status } from '../../../api/v2/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { useClient } from '../../../hooks/api';
@@ -16,12 +17,11 @@ type Props = {
 
 function DAGStatus({ workflow, fileName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
+  const navigate = useNavigate();
   const [modal, setModal] = useState(false);
   const [selectedStep, setSelectedStep] = useState<
     components['schemas']['Step'] | undefined
   >(undefined);
-
-  console.log('DAGStatus', workflow);
   // State for log viewer
   const [logViewer, setLogViewer] = useState({
     isOpen: false,
@@ -62,19 +62,43 @@ function DAGStatus({ workflow, fileName }: Props) {
   const onSelectStepOnGraph = React.useCallback(
     async (id: string) => {
       const status = workflow.status;
-      if (status == Status.Running || status == Status.NotStarted) {
-        return;
-      }
+
       // find the clicked step
       const n = workflow.nodes?.find(
         (n) => n.step.name.replace(/\s/g, '_') == id
       );
+
       if (n) {
-        setSelectedStep(n.step);
-        setModal(true);
+        // Check if this is a child workflow node (has a 'run' property)
+        console.log('debug: ', n);
+        if (n.step.run) {
+          console.log('Child workflow node clicked:', n.step.run);
+          // Find the child workflow ID
+          const childWorkflow = n.children?.[0];
+
+          if (childWorkflow && childWorkflow.workflowId) {
+            // Navigate to the child workflow status page
+            const rootWorkflowName = workflow.rootWorkflowName || workflow.name;
+            const rootWorkflowId =
+              workflow.rootWorkflowId || workflow.workflowId;
+
+            // Construct the URL for the child workflow
+            const childWorkflowUrl = `/dags/${fileName}?childWorkflowId=${childWorkflow.workflowId}&rootWorkflowName=${rootWorkflowName}&rootWorkflowId=${rootWorkflowId}&step=${n.step.name}`;
+
+            navigate(childWorkflowUrl);
+            return;
+          }
+        }
+
+        // If not a child workflow or no child workflow ID found, show the status update modal
+        // Only allow status updates for completed workflows
+        if (status !== Status.Running && status !== Status.NotStarted) {
+          setSelectedStep(n.step);
+          setModal(true);
+        }
       }
     },
-    [workflow]
+    [workflow, navigate, fileName]
   );
 
   const handlers = getEventHandlers(workflow);

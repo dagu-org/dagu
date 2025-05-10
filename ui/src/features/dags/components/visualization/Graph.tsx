@@ -120,10 +120,20 @@ const Graph: React.FC<Props> = ({
     ) => {
       const id = step.name.replace(/\s/g, '_');
       const c = graphStatusMap[status] || '';
-      const label = `${step.name}`;
 
-      // Add node definition
-      dat.push(`${id}[${label}]${c};`);
+      // Check if this is a child workflow node (has a 'run' property)
+      const isChildWorkflow = !!step.run;
+
+      // Add indicator for child workflow nodes in the label only
+      // Escape any special characters in the label to prevent Mermaid parsing errors
+      let label = step.name;
+      if (isChildWorkflow && step.run) {
+        // Use a simpler format to avoid parsing issues
+        label = `${step.name} → ${step.run}`;
+      }
+
+      // Add node definition - no special styling for child workflows
+      dat.push(`${id}["${label}"]${c};`);
 
       // Process dependencies and add connections
       if (step.depends) {

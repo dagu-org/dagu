@@ -49,7 +49,7 @@ function DAGStatusOverview({
   if (workflowId) {
     searchParams.set('workflowId', workflowId);
   }
-  const url = `/dags/${fileName}/scheduler-log?${searchParams.toString()}`;
+  const url = `/dags/${fileName}/workflow-log?${searchParams.toString()}`;
 
   // Don't render if no status is provided
   if (!status) {

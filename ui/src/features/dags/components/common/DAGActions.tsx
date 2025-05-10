@@ -416,6 +416,9 @@ function DAGActions({
             <p className="mb-2">
               Do you really want to rerun the following execution?
             </p>
+            <LabeledItem label="Workflow-Name">
+              <span className="font-mono text-sm">{status?.name || 'N/A'}</span>
+            </LabeledItem>
             <LabeledItem label="Workflow-ID">
               <span className="font-mono text-sm">
                 {retryWorkflowId || status?.workflowId || 'N/A'}

@@ -83,7 +83,7 @@ const LogSideModal: React.FC<LogSideModalProps> = ({
       searchParams.set('step', stepName);
       return `${baseUrl}/log?${searchParams.toString()}`;
     } else {
-      return `${baseUrl}/scheduler-log?${searchParams.toString()}`;
+      return `${baseUrl}/workflow-log?${searchParams.toString()}`;
     }
   };
 

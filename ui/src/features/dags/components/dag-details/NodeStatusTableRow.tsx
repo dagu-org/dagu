@@ -11,8 +11,9 @@ import {
 } from '@/components/ui/tooltip';
 import dayjs from '@/lib/dayjs';
 import { cn } from '@/lib/utils';
-import { Code, FileText } from 'lucide-react';
+import { Code, FileText, GitBranch } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { components, NodeStatus } from '../../../../api/v2/schema';
 import StyledTableRow from '../../../../ui/StyledTableRow';
 import { NodeStatusChip } from '../common';
@@ -92,8 +93,13 @@ function NodeStatusTableRow({
   workflowId,
   onViewLog,
 }: Props) {
+  const navigate = useNavigate();
   // State to store the current duration for running tasks
   const [currentDuration, setCurrentDuration] = useState<string>('-');
+
+  // Check if this is a child workflow node
+  const hasChildWorkflow =
+    !!node.step.run && node.children && node.children.length > 0;
 
   // Update duration every second for running tasks
   useEffect(() => {
@@ -162,12 +168,45 @@ function NodeStatusTableRow({
       {/* Combined Step Name & Description */}
       <TableCell>
         <div className="space-y-0.5">
-          <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 text-wrap break-all">
+          <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 text-wrap break-all flex items-center gap-1.5">
             {node.step.name}
+            {hasChildWorkflow && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex items-center text-blue-500 cursor-pointer">
+                    <GitBranch className="h-4 w-4" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <span className="text-xs">
+                    Child Workflow: {node.step.run}
+                  </span>
+                </TooltipContent>
+              </Tooltip>
+            )}
           </div>
           {node.step.description && (
             <div className="text-xs text-slate-500 dark:text-slate-400 leading-tight">
               {node.step.description}
+            </div>
+          )}
+          {hasChildWorkflow && (
+            <div
+              className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline"
+              onClick={() => {
+                if (hasChildWorkflow && node.children && node.children[0]) {
+                  const childWorkflowId = node.children[0].workflowId;
+                  // Navigate to child workflow
+                  const searchParams = new URLSearchParams();
+                  searchParams.set('childWorkflowId', childWorkflowId);
+                  searchParams.set('rootWorkflowName', name);
+                  searchParams.set('rootWorkflowId', workflowId || '');
+                  searchParams.set('step', node.step.name);
+                  navigate(`/dags/${name}?${searchParams.toString()}`);
+                }
+              }}
+            >
+              View Child Workflow: {node.step.run}
             </div>
           )}
         </div>

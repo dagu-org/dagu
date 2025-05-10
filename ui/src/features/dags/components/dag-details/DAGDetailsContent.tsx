@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { components } from '../../../../api/v2/schema';
 import { DAGStatus } from '../../components';
 import { DAGContext } from '../../contexts/DAGContext';
-import { WorkflowDetailsContext } from '../../contexts/DAGStatusContext';
 import { LinkTab } from '../common';
 import ModalLinkTab from '../common/ModalLinkTab';
 import { DAGEditButtons, DAGSpec } from '../dag-editor';
@@ -19,7 +18,7 @@ import { DAGHeader } from './';
 type DAGDetailsContentProps = {
   fileName: string;
   dag: components['schemas']['DAG'];
-  latestWorkflow: components['schemas']['WorkflowDetails'];
+  currentWorkflow: components['schemas']['WorkflowDetails'];
   refreshFn: () => void;
   formatDuration: (startDate: string, endDate: string) => string;
   activeTab: string;
@@ -39,7 +38,7 @@ type LogViewerState = {
 const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   fileName,
   dag,
-  latestWorkflow,
+  currentWorkflow,
   refreshFn,
   formatDuration,
   activeTab,
@@ -62,7 +61,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
     }
 
     // Open log viewer when clicking on log tabs
-    if (tab === 'scheduler-log') {
+    if (tab === 'workflow-log') {
       setLogViewer({
         isOpen: true,
         logType: 'execution',
@@ -80,6 +79,8 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
     setLogViewer((prev) => ({ ...prev, isOpen: false }));
   };
 
+  console.log('Current workflow in DAGDetailsContent:', currentWorkflow);
+
   return (
     <DAGContext.Provider
       value={{
@@ -88,130 +89,123 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
         name: dag?.name || '',
       }}
     >
-      <WorkflowDetailsContext.Provider
-        value={{
-          data: latestWorkflow,
-          setData: () => {}, // This will be overridden by the parent component
-        }}
-      >
-        <div className="w-full flex flex-col">
-          <DAGHeader
-            dag={dag}
-            latestWorkflow={latestWorkflow}
-            fileName={fileName || ''}
-            refreshFn={refreshFn}
-            formatDuration={formatDuration}
-            navigateToStatusTab={navigateToStatusTab}
-          />
-          <div className="my-4 flex flex-row justify-between items-center">
-            <Tabs className="bg-white p-1.5 rounded-lg shadow-sm border border-gray-100/80">
-              {isModal ? (
-                <ModalLinkTab
-                  label="Status"
-                  value="status"
-                  isActive={activeTab === 'status'}
-                  icon={ActivitySquare}
-                  onClick={() => handleTabClick('status')}
-                />
-              ) : (
-                <LinkTab
-                  label="Status"
-                  value={`${baseUrl}`}
-                  isActive={activeTab === 'status'}
-                  icon={ActivitySquare}
-                />
-              )}
-
-              {isModal ? (
-                <ModalLinkTab
-                  label="Spec"
-                  value="spec"
-                  isActive={activeTab === 'spec'}
-                  icon={FileCode}
-                  onClick={() => handleTabClick('spec')}
-                />
-              ) : (
-                <LinkTab
-                  label="Spec"
-                  value={`${baseUrl}/spec`}
-                  isActive={activeTab === 'spec'}
-                  icon={FileCode}
-                />
-              )}
-
-              {isModal ? (
-                <ModalLinkTab
-                  label="History"
-                  value="history"
-                  isActive={activeTab === 'history'}
-                  icon={History}
-                  onClick={() => handleTabClick('history')}
-                />
-              ) : (
-                <LinkTab
-                  label="History"
-                  value={`${baseUrl}/history`}
-                  isActive={activeTab === 'history'}
-                  icon={History}
-                />
-              )}
-
-              {(activeTab === 'log' || activeTab === 'scheduler-log') &&
-                (isModal ? (
-                  <ModalLinkTab
-                    label="Log"
-                    value={activeTab}
-                    isActive={true}
-                    icon={ScrollText}
-                    onClick={() => {}}
-                  />
-                ) : (
-                  <LinkTab
-                    label="Log"
-                    value={baseUrl}
-                    isActive={true}
-                    icon={ScrollText}
-                  />
-                ))}
-            </Tabs>
-            {activeTab === 'spec' ? (
-              <DAGEditButtons fileName={fileName || ''} />
-            ) : null}
-          </div>
-          <div className="flex-1">
-            {activeTab === 'status' ? (
-              <DAGStatus workflow={latestWorkflow} fileName={fileName || ''} />
-            ) : null}
-            {activeTab === 'spec' ? <DAGSpec fileName={fileName} /> : null}
-            {activeTab === 'history' ? (
-              <div data-tab="history">
-                <DAGExecutionHistory fileName={fileName || ''} />
-              </div>
-            ) : null}
-            {activeTab === 'scheduler-log' ? (
-              <ExecutionLog name={dag?.name || ''} workflowId={workflowId} />
-            ) : null}
-            {activeTab === 'log' && stepName ? (
-              <StepLog
-                dagName={dag?.name || ''}
-                workflowId={workflowId}
-                stepName={stepName}
+      <div className="w-full flex flex-col">
+        <DAGHeader
+          dag={dag}
+          currentWorkflow={currentWorkflow}
+          fileName={fileName || ''}
+          refreshFn={refreshFn}
+          formatDuration={formatDuration}
+          navigateToStatusTab={navigateToStatusTab}
+        />
+        <div className="my-4 flex flex-row justify-between items-center">
+          <Tabs className="bg-white p-1.5 rounded-lg shadow-sm border border-gray-100/80">
+            {isModal ? (
+              <ModalLinkTab
+                label="Status"
+                value="status"
+                isActive={activeTab === 'status'}
+                icon={ActivitySquare}
+                onClick={() => handleTabClick('status')}
               />
-            ) : null}
+            ) : (
+              <LinkTab
+                label="Status"
+                value={`${baseUrl}`}
+                isActive={activeTab === 'status'}
+                icon={ActivitySquare}
+              />
+            )}
 
-            {/* Log viewer modal */}
-            <LogViewer
-              isOpen={logViewer.isOpen}
-              onClose={closeLogViewer}
-              logType={logViewer.logType}
+            {isModal ? (
+              <ModalLinkTab
+                label="Spec"
+                value="spec"
+                isActive={activeTab === 'spec'}
+                icon={FileCode}
+                onClick={() => handleTabClick('spec')}
+              />
+            ) : (
+              <LinkTab
+                label="Spec"
+                value={`${baseUrl}/spec`}
+                isActive={activeTab === 'spec'}
+                icon={FileCode}
+              />
+            )}
+
+            {isModal ? (
+              <ModalLinkTab
+                label="History"
+                value="history"
+                isActive={activeTab === 'history'}
+                icon={History}
+                onClick={() => handleTabClick('history')}
+              />
+            ) : (
+              <LinkTab
+                label="History"
+                value={`${baseUrl}/history`}
+                isActive={activeTab === 'history'}
+                icon={History}
+              />
+            )}
+
+            {(activeTab === 'log' || activeTab === 'workflow-log') &&
+              (isModal ? (
+                <ModalLinkTab
+                  label="Log"
+                  value={activeTab}
+                  isActive={true}
+                  icon={ScrollText}
+                  onClick={() => {}}
+                />
+              ) : (
+                <LinkTab
+                  label="Log"
+                  value={baseUrl}
+                  isActive={true}
+                  icon={ScrollText}
+                />
+              ))}
+          </Tabs>
+          {activeTab === 'spec' ? (
+            <DAGEditButtons fileName={fileName || ''} />
+          ) : null}
+        </div>
+        <div className="flex-1">
+          {activeTab === 'status' ? (
+            <DAGStatus workflow={currentWorkflow} fileName={fileName || ''} />
+          ) : null}
+          {activeTab === 'spec' ? <DAGSpec fileName={fileName} /> : null}
+          {activeTab === 'history' ? (
+            <div data-tab="history">
+              <DAGExecutionHistory fileName={fileName || ''} />
+            </div>
+          ) : null}
+          {activeTab === 'workflow-log' ? (
+            <ExecutionLog name={dag?.name || ''} workflowId={workflowId} />
+          ) : null}
+          {activeTab === 'log' && stepName ? (
+            <StepLog
               dagName={dag?.name || ''}
               workflowId={workflowId}
-              stepName={logViewer.stepName}
-              isInModal={isModal}
+              stepName={stepName}
             />
-          </div>
+          ) : null}
+
+          {/* Log viewer modal */}
+          <LogViewer
+            isOpen={logViewer.isOpen}
+            onClose={closeLogViewer}
+            logType={logViewer.logType}
+            dagName={dag?.name || ''}
+            workflowId={workflowId}
+            stepName={logViewer.stepName}
+            isInModal={isModal}
+          />
         </div>
-      </WorkflowDetailsContext.Provider>
+      </div>
     </DAGContext.Provider>
   );
 };

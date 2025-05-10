@@ -4,12 +4,12 @@ import { components, Status } from '../../../../api/v2/schema';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
 import Title from '../../../../ui/Title';
-import { WorkflowDetailsContext } from '../../contexts/DAGStatusContext';
+import { RootWorkflowContext } from '../../contexts/RootWorkflowContext';
 import { DAGActions } from '../common';
 
 interface DAGHeaderProps {
   dag: components['schemas']['DAG'] | components['schemas']['DAGDetails'];
-  latestWorkflow: components['schemas']['WorkflowDetails'];
+  currentWorkflow: components['schemas']['WorkflowDetails'];
   fileName: string;
   refreshFn: () => void;
   formatDuration: (startDate: string, endDate: string) => string;
@@ -18,7 +18,7 @@ interface DAGHeaderProps {
 
 const DAGHeader: React.FC<DAGHeaderProps> = ({
   dag,
-  latestWorkflow,
+  currentWorkflow,
   fileName,
   refreshFn,
   formatDuration,
@@ -27,7 +27,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
   <>
     <div className="flex flex-row items-center justify-between">
       <Title>{dag?.name}</Title>
-      <WorkflowDetailsContext.Consumer>
+      <RootWorkflowContext.Consumer>
         {(status) =>
           status.data ? (
             <DAGActions
@@ -40,21 +40,21 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
             />
           ) : null
         }
-      </WorkflowDetailsContext.Consumer>
+      </RootWorkflowContext.Consumer>
     </div>
-    {latestWorkflow.status != Status.NotStarted ? (
+    {currentWorkflow.status != Status.NotStarted ? (
       <div className="flex flex-row items-center gap-4">
-        {latestWorkflow.status ? (
-          <StatusChip status={latestWorkflow.status}>
-            {latestWorkflow.statusLabel || ''}
+        {currentWorkflow.status ? (
+          <StatusChip status={currentWorkflow.status}>
+            {currentWorkflow.statusLabel || ''}
           </StatusChip>
         ) : null}
 
         <div className="flex flex-row items-center text-slate-600 dark:text-slate-400">
           <Calendar className="mr-1.5 h-4 w-4" />
           <span className="text-sm">
-            {latestWorkflow?.startedAt
-              ? dayjs(latestWorkflow.startedAt).format('YYYY-MM-DD HH:mm:ss Z')
+            {currentWorkflow?.startedAt
+              ? dayjs(currentWorkflow.startedAt).format('YYYY-MM-DD HH:mm:ss Z')
               : '--'}
           </span>
         </div>
@@ -62,14 +62,14 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
         <div className="flex flex-row items-center text-slate-600 dark:text-slate-400">
           <Timer className="mr-1.5 h-4 w-4" />
           <span className="text-sm">
-            {latestWorkflow.finishedAt
+            {currentWorkflow.finishedAt
               ? formatDuration(
-                  latestWorkflow.startedAt,
-                  latestWorkflow.finishedAt
+                  currentWorkflow.startedAt,
+                  currentWorkflow.finishedAt
                 )
-              : latestWorkflow.startedAt
+              : currentWorkflow.startedAt
                 ? formatDuration(
-                    latestWorkflow.startedAt,
+                    currentWorkflow.startedAt,
                     dayjs().toISOString()
                   )
                 : '--'}

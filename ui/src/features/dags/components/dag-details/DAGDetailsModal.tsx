@@ -8,7 +8,7 @@ import { useQuery } from '../../../../hooks/api';
 import dayjs from '../../../../lib/dayjs';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
-import { WorkflowDetailsContext } from '../../contexts/DAGStatusContext';
+import { RootWorkflowContext } from '../../contexts/RootWorkflowContext';
 import DAGDetailsContent from './DAGDetailsContent';
 
 type DAGDetailsModalProps = {
@@ -143,7 +143,7 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
             name: data.dag?.name || '',
           }}
         >
-          <WorkflowDetailsContext.Provider
+          <RootWorkflowContext.Provider
             value={{
               data: currentWorkflow,
               setData: (status: components['schemas']['WorkflowDetails']) => {
@@ -196,7 +196,7 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
                   <DAGDetailsContent
                     fileName={fileName}
                     dag={data.dag}
-                    latestWorkflow={data.latestWorkflow}
+                    currentWorkflow={data.latestWorkflow}
                     refreshFn={refreshFn}
                     formatDuration={formatDuration}
                     activeTab={activeTab}
@@ -209,7 +209,7 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
                 )}
               </div>
             </div>
-          </WorkflowDetailsContext.Provider>
+          </RootWorkflowContext.Provider>
         </DAGContext.Provider>
       </div>
     </>

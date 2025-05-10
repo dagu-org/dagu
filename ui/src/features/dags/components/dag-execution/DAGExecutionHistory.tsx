@@ -10,7 +10,7 @@ import { useClient, useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import SubTitle from '../../../../ui/SubTitle';
 import { DAGContext } from '../../contexts/DAGContext';
-import { WorkflowDetailsContext } from '../../contexts/DAGStatusContext';
+import { RootWorkflowContext } from '../../contexts/RootWorkflowContext';
 import { getEventHandlers } from '../../lib/getEventHandlers';
 import { DAGStatusOverview, NodeStatusTable } from '../dag-details';
 import { DAGGraph } from '../visualization';
@@ -104,7 +104,7 @@ function DAGHistoryTable({ gridData, workflows }: HistoryTableProps) {
         : 0
   );
 
-  const dagStatusContext = React.useContext(WorkflowDetailsContext);
+  const dagStatusContext = React.useContext(RootWorkflowContext);
 
   // Ensure index is valid when workflows change (e.g., when switching DAGs)
   React.useEffect(() => {
