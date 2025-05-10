@@ -120,23 +120,10 @@ const Graph: React.FC<Props> = ({
     ) => {
       const id = step.name.replace(/\s/g, '_');
       const c = graphStatusMap[status] || '';
+      const label = `${step.name}`;
 
-      // Check if this is a child workflow node (has the 'run' property)
-      const isChildWorkflow = !!step.run;
-
-      // Create a different shape and label for child workflow nodes
-      const label = step.name;
-
-      if (isChildWorkflow) {
-        // Use a hexagon shape for child workflows with a special label
-        dat.push(`${id}{{${label}}}${c};`);
-
-        // Add a special class for child workflow nodes
-        dat.push(`class ${id} childWorkflow;`);
-      } else {
-        // Regular node with rectangle shape
-        dat.push(`${id}[${label}]${c};`);
-      }
+      // Add node definition
+      dat.push(`${id}[${label}]${c};`);
 
       // Process dependencies and add connections
       if (step.depends) {
@@ -200,11 +187,6 @@ const Graph: React.FC<Props> = ({
     );
     dat.push(
       'classDef skipped color:#333,fill:white,stroke:gray,stroke-width:1.2px'
-    );
-
-    // Special style for child workflow nodes
-    dat.push(
-      'classDef childWorkflow color:#333,fill:#f0f4ff,stroke:#818cf8,stroke-width:2px,stroke-dasharray:0'
     );
 
     // Add custom link styles
