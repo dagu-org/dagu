@@ -12,6 +12,8 @@ type DB interface {
 type Status struct {
 	// Name represents the name of the executed workflow.
 	Name string `json:"name,omitempty"`
+	// WorkflowID is the ID of the workflow.
+	WorkflowID string `json:"workflowId,omitempty"`
 	// Params is the parameters of the workflow
 	Params string `json:"params,omitempty"`
 	// Outputs is the outputs of the workflow.

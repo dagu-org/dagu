@@ -686,8 +686,9 @@ func (o *dbClient) GetChildWorkflowStatus(ctx context.Context, workflowID string
 	}
 
 	return &digraph.Status{
-		Outputs: outputVariables,
-		Name:    status.Name,
-		Params:  status.Params,
+		Outputs:    outputVariables,
+		Name:       status.Name,
+		WorkflowID: status.WorkflowID,
+		Params:     status.Params,
 	}, nil
 }
