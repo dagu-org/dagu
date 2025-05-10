@@ -70,9 +70,7 @@ function DAGStatus({ workflow, fileName }: Props) {
 
       if (n) {
         // Check if this is a child workflow node (has a 'run' property)
-        console.log('debug: ', n);
         if (n.step.run) {
-          console.log('Child workflow node clicked:', n.step.run);
           // Find the child workflow ID
           const childWorkflow = n.children?.[0];
 

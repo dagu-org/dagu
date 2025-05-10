@@ -48,6 +48,30 @@ function DAGDetails() {
     }
   );
 
+  // Fetch specific workflow data if workflowId is provided and not 'latest'
+  const { data: workflowResponse, isLoading: isLoadingWorkflow } = useQuery(
+    '/workflows/{name}/{workflowId}',
+    {
+      params: {
+        path: {
+          name: dagData?.dag?.name || '',
+          workflowId: workflowId,
+        },
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
+      },
+    },
+    {
+      enabled: !!(
+        dagData?.dag?.name &&
+        dagData.dag.name.trim() !== '' &&
+        workflowId !== 'latest'
+      ),
+      refreshInterval: 2000,
+    }
+  );
+
   // Fetch child workflow data if needed
   const { data: childWorkflowResponse, isLoading: isLoadingChildWorkflow } =
     useQuery(
@@ -65,8 +89,14 @@ function DAGDetails() {
         },
       },
       {
-        // Only fetch if all required parameters are present
-        enabled: !!(childWorkflowId && rootWorkflowName && rootWorkflowId),
+        // Only fetch if all required parameters are present and not empty strings
+        enabled: !!(
+          childWorkflowId &&
+          rootWorkflowName &&
+          rootWorkflowName.trim() !== '' &&
+          rootWorkflowId &&
+          rootWorkflowId.trim() !== ''
+        ),
         // Don't auto-refresh for child workflows
         refreshInterval: 0,
       }
@@ -135,9 +165,25 @@ function DAGDetails() {
     return `${seconds}s`;
   };
 
+  // Process workflow data
+  const workflowData = useMemo(() => {
+    if (!workflowResponse) return undefined;
+
+    try {
+      if ('workflow' in workflowResponse) {
+        return workflowResponse;
+      }
+    } catch (err) {
+      console.error('Error processing workflow data:', err);
+    }
+
+    return undefined;
+  }, [workflowResponse]);
+
   if (
     !params.fileName ||
     isLoadingDagData ||
+    (workflowId !== 'latest' && isLoadingWorkflow) ||
     (childWorkflowId && isLoadingChildWorkflow) ||
     !dagData ||
     !dagData.latestWorkflow
@@ -146,7 +192,10 @@ function DAGDetails() {
   }
 
   // Determine the current workflow to display
-  const currentWorkflow = childWorkflow || dagData.latestWorkflow;
+  const currentWorkflow =
+    childWorkflow ||
+    (workflowData?.workflow as components['schemas']['WorkflowDetails']) ||
+    dagData.latestWorkflow;
 
   return (
     <DAGContext.Provider

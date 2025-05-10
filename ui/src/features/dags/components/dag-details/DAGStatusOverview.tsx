@@ -100,11 +100,6 @@ function DAGStatusOverview({
 
   // Calculate total nodes
   const totalNodes = status.nodes?.length;
-  console.log({
-    status,
-    nodes: status.nodes,
-    nodeStatus,
-  });
 
   return (
     <div className="space-y-3">

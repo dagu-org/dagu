@@ -79,8 +79,6 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
     setLogViewer((prev) => ({ ...prev, isOpen: false }));
   };
 
-  console.log('Current workflow in DAGDetailsContent:', currentWorkflow);
-
   return (
     <DAGContext.Provider
       value={{

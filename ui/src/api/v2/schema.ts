@@ -605,6 +605,10 @@ export interface components {
             rootWorkflowName: string;
             /** @description ID of the root workflow */
             rootWorkflowId: string;
+            /** @description Name of the parent workflow */
+            parentWorkflowName?: string;
+            /** @description ID of the parent workflow */
+            parentWorkflowId?: string;
             workflowId: components["schemas"]["WorkflowId"];
             name: components["schemas"]["DAGName"];
             status: components["schemas"]["Status"];

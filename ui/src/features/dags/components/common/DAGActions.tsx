@@ -175,20 +175,6 @@ function DAGActions({
                       '.dag-modal-content [data-tab="history"]'
                     ) !== null;
 
-                  console.log(
-                    'Retry check - isInHistoryPage:',
-                    isInHistoryPage
-                  );
-                  console.log(
-                    'Retry check - isInModalHistoryTab:',
-                    isInModalHistoryTab
-                  );
-                  console.log('Retry check - idxParam:', idxParam);
-                  console.log(
-                    'Retry check - current status workflowId:',
-                    status?.workflowId
-                  );
-
                   if (
                     (isInHistoryPage || isInModalHistoryTab) &&
                     idxParam !== null
@@ -219,18 +205,8 @@ function DAGActions({
                           selectedIdx
                         ];
 
-                        console.log('Selected workflow:', selectedWorkflow);
-                        console.log(
-                          'Selected workflow workflowId:',
-                          selectedWorkflow?.workflowId
-                        );
-
                         if (selectedWorkflow && selectedWorkflow.workflowId) {
                           workflowIdToUse = selectedWorkflow.workflowId;
-                          console.log(
-                            'Using workflowId from selected workflow:',
-                            workflowIdToUse
-                          );
                         }
                       }
                     } catch (err) {
@@ -270,20 +246,6 @@ function DAGActions({
                       '.dag-modal-content [data-tab="history"]'
                     ) !== null;
 
-                  console.log(
-                    'Retry check (full) - isInHistoryPage:',
-                    isInHistoryPage
-                  );
-                  console.log(
-                    'Retry check (full) - isInModalHistoryTab:',
-                    isInModalHistoryTab
-                  );
-                  console.log('Retry check (full) - idxParam:', idxParam);
-                  console.log(
-                    'Retry check (full) - current status workflowId:',
-                    status?.workflowId
-                  );
-
                   if (
                     (isInHistoryPage || isInModalHistoryTab) &&
                     idxParam !== null
@@ -314,21 +276,8 @@ function DAGActions({
                           selectedIdx
                         ];
 
-                        console.log(
-                          'Selected workflow (full):',
-                          selectedWorkflow
-                        );
-                        console.log(
-                          'Selected workflow workflowId (full):',
-                          selectedWorkflow?.workflowId
-                        );
-
                         if (selectedWorkflow && selectedWorkflow.workflowId) {
                           workflowIdToUse = selectedWorkflow.workflowId;
-                          console.log(
-                            'Using workflowId from selected workflow (full):',
-                            workflowIdToUse
-                          );
                         }
                       }
                     } catch (err) {
@@ -375,7 +324,6 @@ function DAGActions({
               alert(error.message || 'An error occurred');
               return;
             }
-            console.log('Retry successful');
             reloadData();
           }}
         >
@@ -388,8 +336,6 @@ function DAGActions({
           dismissModal={() => setIsRetryModal(false)}
           onSubmit={async () => {
             setIsRetryModal(false);
-
-            console.log('Submitting retry with workflowId:', retryWorkflowId);
 
             const { error } = await client.POST('/dags/{fileName}/retry', {
               params: {
