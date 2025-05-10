@@ -27,6 +27,7 @@ type DAGDetailsContentProps = {
   stepName?: string | null;
   isModal?: boolean;
   navigateToStatusTab?: () => void;
+  skipHeader?: boolean; // Add this prop to optionally skip rendering the header
 };
 
 type LogViewerState = {
@@ -47,6 +48,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   stepName = null,
   isModal = false,
   navigateToStatusTab,
+  skipHeader = false,
 }) => {
   const baseUrl = isModal ? '#' : `/dags/${fileName}`;
   const [logViewer, setLogViewer] = useState<LogViewerState>({
@@ -88,15 +90,18 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
       }}
     >
       <div className="w-full flex flex-col">
-        <DAGHeader
-          dag={dag}
-          currentWorkflow={currentWorkflow}
-          fileName={fileName || ''}
-          refreshFn={refreshFn}
-          formatDuration={formatDuration}
-          navigateToStatusTab={navigateToStatusTab}
-        />
-        <div className="my-4 flex flex-row justify-between items-center">
+        {/* Only render the header if skipHeader is not true */}
+        {!skipHeader && (
+          <DAGHeader
+            dag={dag}
+            currentWorkflow={currentWorkflow}
+            fileName={fileName || ''}
+            refreshFn={refreshFn}
+            formatDuration={formatDuration}
+            navigateToStatusTab={navigateToStatusTab}
+          />
+        )}
+        <div className="flex flex-row justify-between items-center mb-4">
           <Tabs className="bg-white p-1.5 rounded-lg shadow-sm border border-gray-100/80">
             {isModal ? (
               <ModalLinkTab
