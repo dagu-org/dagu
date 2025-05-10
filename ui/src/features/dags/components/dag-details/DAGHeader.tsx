@@ -35,7 +35,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
   const handleParentWorkflowClick = (e: React.MouseEvent) => {
     e.preventDefault();
     navigate(
-      `/dags/${fileName}?childWorkflowId=${currentWorkflow.parentWorkflowId}&rootWorkflowName=${currentWorkflow.rootWorkflowName}&rootWorkflowId=${currentWorkflow.rootWorkflowId}`
+      `/dags/${fileName}?childWorkflowId=${currentWorkflow.parentWorkflowId}&workflowId=${currentWorkflow.rootWorkflowId}`
     );
   };
 
@@ -45,21 +45,19 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
         <div className="flex flex-row items-center justify-between">
           <Title className="flex items-center">
             {/* Root workflow */}
-            {currentWorkflow.rootWorkflowName &&
-              currentWorkflow.rootWorkflowId &&
-              currentWorkflow.rootWorkflowName !== currentWorkflow.name && (
-                <>
-                  <span className="text-blue-600 hover:underline font-normal">
-                    <a
-                      href={`/dags/${fileName}?workflowId=${currentWorkflow.rootWorkflowId}`}
-                      onClick={handleRootWorkflowClick}
-                    >
-                      {currentWorkflow.rootWorkflowName}
-                    </a>
-                  </span>
-                  <span className="mx-2 text-slate-400">/</span>
-                </>
-              )}
+            {currentWorkflow.rootWorkflowId !== currentWorkflow.workflowId && (
+              <>
+                <span className="text-blue-600 hover:underline font-normal">
+                  <a
+                    href={`/dags/${fileName}?workflowId=${currentWorkflow.rootWorkflowId}`}
+                    onClick={handleRootWorkflowClick}
+                  >
+                    {currentWorkflow.rootWorkflowName}
+                  </a>
+                </span>
+                <span className="mx-2 text-slate-400">/</span>
+              </>
+            )}
 
             {/* Parent workflow (if exists and different from root and current) */}
             {currentWorkflow.parentWorkflowName &&
@@ -70,7 +68,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
                 <>
                   <span className="text-blue-600 hover:underline font-normal">
                     <a
-                      href={`/dags/${fileName}?workflowId=${currentWorkflow.parentWorkflowId}&rootWorkflowName=${currentWorkflow.rootWorkflowName}&rootWorkflowId=${currentWorkflow.rootWorkflowId}`}
+                      href={`/dags/${fileName}?workflowId=${currentWorkflow.rootWorkflowId}&childWorkflowId=${currentWorkflow.parentWorkflowId}`}
                       onClick={handleParentWorkflowClick}
                     >
                       {currentWorkflow.parentWorkflowName}

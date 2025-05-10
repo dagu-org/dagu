@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { components } from '../../../api/v2/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { DAGDetailsContent } from '../../../features/dags/components/dag-details';
@@ -20,18 +20,14 @@ function DAGDetails() {
   const navigate = useNavigate();
   const appBarContext = React.useContext(AppBarContext);
 
-  // Extract query parameters
-  const query = new URLSearchParams(window.location.search);
-  const workflowId = query.get('workflowId') || 'latest';
-  const stepName = query.get('step');
-
-  // Extract child workflow parameters
-  const childWorkflowId = query.get('childWorkflowId');
-  const rootWorkflowName = query.get('rootWorkflowName');
-  const rootWorkflowId = query.get('rootWorkflowId');
+  // Use React Router's useSearchParams hook to get query parameters
+  const [searchParams] = useSearchParams();
+  const workflowId = searchParams.get('workflowId');
+  const stepName = searchParams.get('step');
+  const childWorkflowId = searchParams.get('childWorkflowId');
 
   // Fetch DAG details
-  const { data: dagData, isLoading: isLoadingDagData } = useQuery(
+  const { data: dagData } = useQuery(
     '/dags/{fileName}',
     {
       params: {
@@ -44,7 +40,7 @@ function DAGDetails() {
       },
     },
     {
-      refreshInterval: childWorkflowId ? 0 : 2000, // Don't auto-refresh for child workflows
+      refreshInterval: 2000,
     }
   );
 
@@ -55,7 +51,7 @@ function DAGDetails() {
       params: {
         path: {
           name: dagData?.dag?.name || '',
-          workflowId: workflowId,
+          workflowId: workflowId || '',
         },
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
@@ -63,12 +59,15 @@ function DAGDetails() {
       },
     },
     {
-      enabled: !!(
-        dagData?.dag?.name &&
-        dagData.dag.name.trim() !== '' &&
-        workflowId !== 'latest'
-      ),
+      isPaused: () =>
+        !(
+          dagData?.dag?.name &&
+          dagData.dag.name.trim() !== '' &&
+          workflowId &&
+          !childWorkflowId
+        ),
       refreshInterval: 2000,
+      key: `/workflows/${dagData?.dag?.name}/${workflowId}?remoteNode=${appBarContext.selectedRemoteNode || 'local'}`,
     }
   );
 
@@ -79,8 +78,8 @@ function DAGDetails() {
       {
         params: {
           path: {
-            name: rootWorkflowName || '',
-            workflowId: rootWorkflowId || '',
+            name: dagData?.dag?.name || '',
+            workflowId: workflowId || '',
             childWorkflowId: childWorkflowId || '',
           },
           query: {
@@ -89,55 +88,12 @@ function DAGDetails() {
         },
       },
       {
-        // Only fetch if all required parameters are present and not empty strings
-        enabled: !!(
-          childWorkflowId &&
-          rootWorkflowName &&
-          rootWorkflowName.trim() !== '' &&
-          rootWorkflowId &&
-          rootWorkflowId.trim() !== ''
-        ),
-        // Don't auto-refresh for child workflows
-        refreshInterval: 0,
+        refreshInterval: 2000,
+        isPaused: () => !(childWorkflowId && workflowId && dagData?.dag?.name),
+        revalidateOnMount: true,
+        revalidateIfStale: true,
       }
     );
-
-  // Process child workflow data
-  const childWorkflow = useMemo(() => {
-    if (!childWorkflowResponse) return undefined;
-
-    try {
-      // Try to handle different possible response structures
-      if ('workflowDetails' in childWorkflowResponse) {
-        // If the response has a workflowDetails property
-        return childWorkflowResponse.workflowDetails as unknown as components['schemas']['WorkflowDetails'];
-      } else if ('nodes' in childWorkflowResponse) {
-        // If the response already has the expected structure
-        return childWorkflowResponse as unknown as components['schemas']['WorkflowDetails'];
-      }
-    } catch (err) {
-      console.error('Error processing child workflow data:', err);
-    }
-
-    return undefined;
-  }, [childWorkflowResponse]);
-
-  // Update the title based on workflow data
-  React.useEffect(() => {
-    if (dagData?.dag) {
-      if (childWorkflowId && childWorkflow && dagData.latestWorkflow) {
-        // Find the parent step that has this child workflow
-        const parentStep = dagData.latestWorkflow.nodes?.find((node) =>
-          node.children?.some((child) => child.workflowId === childWorkflowId)
-        );
-        const childDagName = parentStep?.step.run || 'Child Workflow';
-        appBarContext.setTitle(`${dagData.dag.name || ''} → ${childDagName}`);
-      } else {
-        // Regular workflow (not a child)
-        appBarContext.setTitle(dagData.dag.name || '');
-      }
-    }
-  }, [dagData, childWorkflow, childWorkflowId, appBarContext]);
 
   const tab = useMemo(() => {
     return params.tab || 'status';
@@ -165,37 +121,65 @@ function DAGDetails() {
     return `${seconds}s`;
   };
 
-  // Process workflow data
-  const workflowData = useMemo(() => {
-    if (!workflowResponse) return undefined;
+  // Determine the current workflow to display
+  let currentWorkflow: components['schemas']['WorkflowDetails'] | undefined;
 
-    try {
-      if ('workflow' in workflowResponse) {
-        return workflowResponse;
-      }
-    } catch (err) {
-      console.error('Error processing workflow data:', err);
+  if (childWorkflowId && childWorkflowResponse?.workflowDetails) {
+    currentWorkflow = childWorkflowResponse.workflowDetails;
+  } else if (
+    workflowId &&
+    !childWorkflowId &&
+    workflowResponse?.workflowDetails
+  ) {
+    currentWorkflow = workflowResponse.workflowDetails;
+  } else if (!childWorkflowId) {
+    // Only use latest workflow if not trying to view a child workflow
+    currentWorkflow = dagData?.latestWorkflow;
+  }
+
+  // Create a state for the root workflow context
+  const [rootWorkflowData, setRootWorkflowData] = useState<
+    components['schemas']['WorkflowDetails'] | undefined
+  >(dagData?.latestWorkflow);
+
+  // Update the root workflow context when currentWorkflow changes
+  useEffect(() => {
+    if (currentWorkflow) {
+      setRootWorkflowData(currentWorkflow);
     }
+  }, [currentWorkflow]);
 
-    return undefined;
-  }, [workflowResponse]);
+  // Show loading indicator while data is being fetched
+  if (!params.fileName || !dagData) {
+    return <LoadingIndicator />;
+  }
 
+  // Show loading indicator for child workflow if needed
   if (
-    !params.fileName ||
-    isLoadingDagData ||
-    (workflowId !== 'latest' && isLoadingWorkflow) ||
-    (childWorkflowId && isLoadingChildWorkflow) ||
-    !dagData ||
-    !dagData.latestWorkflow
+    childWorkflowId &&
+    (!childWorkflowResponse?.workflowDetails || isLoadingChildWorkflow)
   ) {
     return <LoadingIndicator />;
   }
 
-  // Determine the current workflow to display
-  const currentWorkflow =
-    childWorkflow ||
-    (workflowData?.workflow as components['schemas']['WorkflowDetails']) ||
-    dagData.latestWorkflow;
+  // Show loading indicator for specific workflow if needed
+  if (workflowId && !childWorkflowId && isLoadingWorkflow && tab === 'status') {
+    return <LoadingIndicator />;
+  }
+
+  if (
+    workflowId &&
+    !childWorkflowId &&
+    !workflowResponse?.workflowDetails &&
+    tab === 'status'
+  ) {
+    return <LoadingIndicator />;
+  }
+
+  // Show loading indicator if no workflow data is available for status tab
+  if (!currentWorkflow && tab === 'status') {
+    return <LoadingIndicator />;
+  }
 
   return (
     <DAGContext.Provider
@@ -207,8 +191,8 @@ function DAGDetails() {
     >
       <RootWorkflowContext.Provider
         value={{
-          data: dagData.latestWorkflow, // Use the latest workflow as the root by default
-          setData: () => {}, // No-op since we're not using state
+          data: rootWorkflowData,
+          setData: setRootWorkflowData,
         }}
       >
         <div className="w-full flex flex-col">
@@ -216,7 +200,7 @@ function DAGDetails() {
             <DAGDetailsContent
               fileName={params.fileName || ''}
               dag={dagData.dag}
-              currentWorkflow={currentWorkflow}
+              currentWorkflow={currentWorkflow || dagData.latestWorkflow}
               refreshFn={() => {}}
               formatDuration={formatDuration}
               activeTab={tab}
@@ -227,7 +211,7 @@ function DAGDetails() {
                   navigate(`/dags/${params.fileName}/${newTab}`);
                 }
               }}
-              workflowId={workflowId}
+              workflowId={currentWorkflow?.workflowId}
               stepName={stepName}
               isModal={false}
               navigateToStatusTab={navigateToStatusTab}

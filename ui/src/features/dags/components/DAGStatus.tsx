@@ -76,14 +76,13 @@ function DAGStatus({ workflow, fileName }: Props) {
 
           if (childWorkflow && childWorkflow.workflowId) {
             // Navigate to the child workflow status page
-            const rootWorkflowName = workflow.rootWorkflowName || workflow.name;
-            const rootWorkflowId =
-              workflow.rootWorkflowId || workflow.workflowId;
+            const workflowId = workflow.rootWorkflowId;
 
-            // Construct the URL for the child workflow
-            const childWorkflowUrl = `/dags/${fileName}?childWorkflowId=${childWorkflow.workflowId}&rootWorkflowName=${rootWorkflowName}&rootWorkflowId=${rootWorkflowId}&step=${n.step.name}`;
-
-            navigate(childWorkflowUrl);
+            // Use React Router's navigate with search params
+            navigate({
+              pathname: `/dags/${fileName}`,
+              search: `?childWorkflowId=${childWorkflow.workflowId}&workflowId=${workflowId}&step=${n.step.name}`,
+            });
             return;
           }
         }

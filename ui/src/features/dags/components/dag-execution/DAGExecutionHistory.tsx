@@ -3,7 +3,8 @@
  *
  * @module features/dags/components/dag-execution
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { components, NodeStatus, Status } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useClient, useQuery } from '../../../../hooks/api';
@@ -64,7 +65,11 @@ function DAGExecutionHistory({
   }
 
   return (
-    <DAGHistoryTable workflows={data.workflows} gridData={data.gridData} />
+    <DAGHistoryTable
+      fileName={fileName}
+      workflows={data.workflows}
+      gridData={data.gridData}
+    />
   );
 }
 
@@ -72,6 +77,8 @@ function DAGExecutionHistory({
  * Props for the DAGHistoryTable component
  */
 type HistoryTableProps = {
+  /** DAG file ID */
+  fileName: string;
   /** Grid data for visualization */
   gridData: components['schemas']['DAGGridItem'][] | null;
   /** List of DAG workflows */
@@ -81,9 +88,10 @@ type HistoryTableProps = {
 /**
  * DAGHistoryTable displays detailed execution history with interactive elements
  */
-function DAGHistoryTable({ gridData, workflows }: HistoryTableProps) {
+function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
+  const navigate = useNavigate();
   const [modal, setModal] = React.useState(false);
 
   // State for log viewer
@@ -94,8 +102,9 @@ function DAGHistoryTable({ gridData, workflows }: HistoryTableProps) {
     workflowId: '',
   });
 
-  // Get the selected workflow index from URL parameters
-  const idxParam = new URLSearchParams(window.location.search).get('idx');
+  // Get the selected workflow index from URL parameters using React Router
+  const [searchParams, setSearchParams] = useSearchParams();
+  const idxParam = searchParams.get('idx');
   const [idx, setIdx] = React.useState(
     idxParam
       ? parseInt(idxParam)
@@ -116,13 +125,9 @@ function DAGHistoryTable({ gridData, workflows }: HistoryTableProps) {
 
     // Only update if the index needs adjustment
     if (validIdx !== idx) {
-      const params = new URLSearchParams(window.location.search);
-      params.set('idx', validIdx.toString());
-      window.history.replaceState(
-        {},
-        '',
-        `${window.location.pathname}?${params}`
-      );
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('idx', validIdx.toString());
+      setSearchParams(newParams);
       setIdx(validIdx);
     }
   }, [workflows, idx]);
@@ -137,14 +142,20 @@ function DAGHistoryTable({ gridData, workflows }: HistoryTableProps) {
     }
 
     setIdx(newIdx);
-    const params = new URLSearchParams(window.location.search);
-    params.set('idx', newIdx.toString());
-    window.history.replaceState(
-      {},
-      '',
-      `${window.location.pathname}?${params}`
-    );
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('idx', newIdx.toString());
+    setSearchParams(newParams);
   };
+
+  // Listen for URL parameter changes
+  useEffect(() => {
+    if (idxParam) {
+      const newIdx = parseInt(idxParam);
+      if (!isNaN(newIdx) && newIdx !== idx) {
+        setIdx(newIdx);
+      }
+    }
+  }, [idxParam]);
 
   /**
    * Handle keyboard navigation with arrow keys
@@ -252,7 +263,31 @@ function DAGHistoryTable({ gridData, workflows }: HistoryTableProps) {
         return;
       }
 
-      // Only allow status updates for completed workflows
+      // Find the clicked step
+      const n = workflow.nodes?.find(
+        (n) => n.step.name.replace(/\s/g, '_') == id
+      );
+
+      if (!n) return;
+
+      // Check if this is a child workflow node (has a 'run' property)
+      const isChildWorkflow = !!n.step.run;
+
+      if (isChildWorkflow) {
+        // If it's a child workflow, navigate to its details
+        const childWorkflow = n.children?.[0];
+        if (childWorkflow && childWorkflow.workflowId && n.step.run) {
+          // Navigate to the child workflow details using React Router with search params
+          navigate({
+            pathname: `/dags/${fileName}`,
+            search: `?workflowId=${workflow.rootWorkflowId}&childWorkflowId=${childWorkflow.workflowId}`,
+          });
+          return;
+        }
+      }
+
+      // For non-child workflow nodes or if child workflow navigation fails,
+      // only allow status updates for completed workflows
       if (
         workflow.status == Status.Running ||
         workflow.status == Status.NotStarted
@@ -260,16 +295,10 @@ function DAGHistoryTable({ gridData, workflows }: HistoryTableProps) {
         return;
       }
 
-      // Find the clicked step
-      const n = workflow.nodes?.find(
-        (n) => n.step.name.replace(/\s/g, '_') == id
-      );
-      if (n) {
-        setSelectedStep(n.step);
-        setModal(true);
-      }
+      setSelectedStep(n.step);
+      setModal(true);
     },
-    [reversedWorkflows, idx]
+    [reversedWorkflows, idx, navigate]
   );
 
   return (

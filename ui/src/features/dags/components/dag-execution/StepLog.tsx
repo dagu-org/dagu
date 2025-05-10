@@ -71,7 +71,6 @@ function StepLog({ dagName, workflowId, stepName, workflow }: Props) {
   const isChildWorkflow =
     workflow &&
     workflow.rootWorkflowId &&
-    workflow.rootWorkflowName &&
     workflow.rootWorkflowId !== workflow.workflowId;
 
   // Determine query parameters based on view mode

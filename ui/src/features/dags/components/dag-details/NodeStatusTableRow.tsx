@@ -204,21 +204,12 @@ function NodeStatusTableRow({
                   searchParams.set('childWorkflowId', childWorkflowId);
 
                   // Use root workflow information from the workflow prop if available
-                  if (
-                    workflow &&
-                    workflow.rootWorkflowName &&
-                    workflow.rootWorkflowId
-                  ) {
+                  if (workflow && workflow.rootWorkflowId) {
                     // If this is already a child workflow, use its root information
-                    searchParams.set(
-                      'rootWorkflowName',
-                      workflow.rootWorkflowName
-                    );
-                    searchParams.set('rootWorkflowId', workflow.rootWorkflowId);
+                    searchParams.set('workflowId', workflow.rootWorkflowId);
                   } else {
                     // Otherwise, use the current workflow as the root
-                    searchParams.set('rootWorkflowName', name);
-                    searchParams.set('rootWorkflowId', workflowId || '');
+                    searchParams.set('workflowId', workflowId || '');
                   }
 
                   searchParams.set('step', node.step.name);
