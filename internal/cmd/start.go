@@ -80,7 +80,7 @@ func runStart(ctx *Context, args []string) error {
 	}
 
 	// Log root workflow
-	logger.Info(ctx, "Executing root DAG",
+	logger.Info(ctx, "Executing root workflow",
 		"name", dag.Name,
 		"params", params,
 		"workflowId", workflowID,
@@ -232,7 +232,7 @@ func executeWorkflow(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, w
 	// Configure logging to the file
 	ctx.LogToFile(logFile)
 
-	logger.Debug(ctx, "workflow initiated", "DAG", d.Name, "workflowId", workflowID, "logFile", logFile.Name())
+	logger.Debug(ctx, "Workflow initiated", "DAG", d.Name, "workflowId", workflowID, "logFile", logFile.Name())
 
 	// Initialize DAG repository with the DAG's directory in the search path
 	dr, err := ctx.dagRepo(nil, []string{filepath.Dir(d.Location)})
@@ -258,7 +258,7 @@ func executeWorkflow(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, w
 
 	// Run the DAG
 	if err := agentInstance.Run(ctx); err != nil {
-		logger.Error(ctx, "Failed to execute the workflow", "name", d.Name, "workflowId", workflowID, "err", err)
+		logger.Error(ctx, "Failed to execute workflow", "name", d.Name, "workflowId", workflowID, "err", err)
 
 		if ctx.Quiet {
 			os.Exit(1)

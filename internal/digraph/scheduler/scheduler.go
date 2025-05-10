@@ -215,9 +215,9 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 
 				// Check preconditions
 				if len(node.Step().Preconditions) > 0 {
-					logger.Infof(ctx, "Checking pre conditions for \"%s\"", node.Name())
+					logger.Infof(ctx, "Checking preconditions for \"%s\"", node.Name())
 					if err := EvalConditions(ctx, node.Step().Preconditions); err != nil {
-						logger.Infof(ctx, "Pre conditions failed for \"%s\"", node.Name())
+						logger.Infof(ctx, "Preconditions failed for \"%s\"", node.Name())
 						node.SetStatus(NodeStatusSkipped)
 						node.SetError(err)
 						if progressCh != nil {
@@ -687,7 +687,7 @@ func (sc *Scheduler) handleNodeRetry(ctx context.Context, node *Node, execErr er
 	if exitErr, ok := execErr.(*exec.ExitError); ok {
 		exitCode = exitErr.ExitCode()
 		exitCodeFound = true
-		logger.Debug(ctx, "Found ExitError", "error", execErr, "exitCode", exitCode)
+		logger.Debug(ctx, "Found exit error", "error", execErr, "exitCode", exitCode)
 	} else {
 		// Try to parse exit code from error string
 		errStr := execErr.Error()

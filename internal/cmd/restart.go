@@ -118,7 +118,7 @@ func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
 
 	ctx.LogToFile(logFile)
 
-	logger.Info(ctx, "workflow restart initiated", "DAG", dag.Name, "workflowId", workflowID, "logFile", logFile.Name())
+	logger.Info(ctx, "Workflow restart initiated", "DAG", dag.Name, "workflowId", workflowID, "logFile", logFile.Name())
 
 	dr, err := ctx.dagRepo(nil, []string{filepath.Dir(dag.Location)})
 	if err != nil {

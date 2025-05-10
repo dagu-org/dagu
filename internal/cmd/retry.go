@@ -68,7 +68,7 @@ func runRetry(ctx *Context, args []string) error {
 }
 
 func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootRun digraph.WorkflowRef) error {
-	logger.Debug(ctx, "Executing retry", "name", dag.Name, "workflowId", status.WorkflowID)
+	logger.Debug(ctx, "Executing workflow retry", "name", dag.Name, "workflowId", status.WorkflowID)
 
 	// We use the same log file for the retry as the original run.
 	logFile, err := fileutil.OpenOrCreateFile(status.Log)
@@ -79,7 +79,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootRun
 		_ = logFile.Close()
 	}()
 
-	logger.Info(ctx, "DAG retry initiated", "DAG", dag.Name, "workflowId", status.WorkflowID, "logFile", logFile.Name())
+	logger.Info(ctx, "Workflow retry initiated", "DAG", dag.Name, "workflowId", status.WorkflowID, "logFile", logFile.Name())
 
 	// Update the context with the log file
 	ctx.LogToFile(logFile)

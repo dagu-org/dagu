@@ -97,7 +97,7 @@ func (n *Node) shouldContinue(ctx context.Context) bool {
 
 	case NodeStatusRunning:
 		// Unexpected state
-		logger.Error(ctx, "unexpected node status", "status", status.String())
+		logger.Error(ctx, "Unexpected node status", "status", status.String())
 		return false
 
 	}
@@ -115,7 +115,7 @@ func (n *Node) shouldContinue(ctx context.Context) bool {
 	if len(continueOn.Output) > 0 {
 		ok, err := n.LogContainsPattern(ctx, continueOn.Output)
 		if err != nil {
-			logger.Error(ctx, "failed to check log for pattern", "err", err)
+			logger.Error(ctx, "Failed to check log for pattern", "err", err)
 			return false
 		}
 		if ok {
@@ -337,7 +337,7 @@ func (n *Node) Cancel(ctx context.Context) {
 		n.SetStatus(NodeStatusCancel)
 	}
 	if n.cancelFunc != nil {
-		logger.Info(ctx, "canceling node", "step", n.Name())
+		logger.Info(ctx, "Canceling node", "step", n.Name())
 		n.cancelFunc()
 	}
 }

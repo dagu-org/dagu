@@ -265,7 +265,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	})
 
 	// Start the workflow.
-	logger.Debug(ctx, "workflow started", "workflowId", a.workflowID, "name", a.dag.Name, "params", a.dag.Params)
+	logger.Debug(ctx, "Workflow started", "workflowId", a.workflowID, "name", a.dag.Name, "params", a.dag.Params)
 	lastErr := a.scheduler.Schedule(ctx, a.graph, progressCh)
 
 	// Update the finished status to the runstore database.
@@ -470,7 +470,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, progressCh)
 	a.lastErr = lastErr
 
-	logger.Info(ctx, "Dry-run finished", "params", a.dag.Params)
+	logger.Info(ctx, "Dry-run completed", "params", a.dag.Params)
 
 	return lastErr
 }

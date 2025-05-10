@@ -63,12 +63,12 @@ func runStop(ctx *Context, args []string) error {
 		dag = d
 	}
 
-	logger.Info(ctx, "workflow is stopping", "dag", dag.Name)
+	logger.Info(ctx, "Workflow is stopping", "dag", dag.Name)
 
 	if err := ctx.HistoryMgr.Stop(ctx, dag, workflowID); err != nil {
 		return fmt.Errorf("failed to stop DAG: %w", err)
 	}
 
-	logger.Info(ctx, "workflow stopped", "dag", dag.Name)
+	logger.Info(ctx, "Workflow stopped", "dag", dag.Name)
 	return nil
 }
