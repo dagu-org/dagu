@@ -6,19 +6,20 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath" // Uses OS-specific separators (backslash on Windows, slash on Unix)
+	"regexp"
 	"syscall"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/dagstore"
-	"github.com/dagu-org/dagu/internal/dagstore/filestore"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/frontend"
+	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/runstore"
-	runfs "github.com/dagu-org/dagu/internal/runstore/filestore"
+	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/persistence/localdag"
+	"github.com/dagu-org/dagu/internal/persistence/localhistory"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
@@ -26,67 +27,46 @@ import (
 	"github.com/spf13/viper"
 )
 
-var _ context.Context = (*Context)(nil)
-
 // Context holds the configuration for a command.
 type Context struct {
-	*cobra.Command
+	context.Context
 
-	run   func(cmd *Context, args []string) error
-	flags []commandLineFlag
-	cfg   *config.Config
-	ctx   context.Context
-	quiet bool
-}
-
-// Deadline implements context.Context.
-func (c *Context) Deadline() (deadline time.Time, ok bool) {
-	return c.ctx.Deadline()
-}
-
-// Done implements context.Context.
-func (c *Context) Done() <-chan struct{} {
-	return c.ctx.Done()
-}
-
-// Err implements context.Context.
-func (c *Context) Err() error {
-	return c.ctx.Err()
-}
-
-// Value implements context.Context.
-func (c *Context) Value(key any) any {
-	return c.ctx.Value(key)
+	Command     *cobra.Command
+	Flags       []commandLineFlag
+	Config      *config.Config
+	Quiet       bool
+	HistoryRepo models.HistoryRepository
+	HistoryMgr  history.Manager
 }
 
 // LogToFile creates a new logger context with a file writer.
 func (c *Context) LogToFile(f *os.File) {
 	var opts []logger.Option
-	if c.cfg.Global.Debug {
+	if c.Config.Global.Debug {
 		opts = append(opts, logger.WithDebug())
 	}
-	if c.quiet {
+	if c.Quiet {
 		opts = append(opts, logger.WithQuiet())
 	}
-	if c.cfg.Global.LogFormat != "" {
-		opts = append(opts, logger.WithFormat(c.cfg.Global.LogFormat))
+	if c.Config.Global.LogFormat != "" {
+		opts = append(opts, logger.WithFormat(c.Config.Global.LogFormat))
 	}
 	if f != nil {
 		opts = append(opts, logger.WithWriter(f))
 	}
-	c.ctx = logger.WithLogger(c.ctx, logger.NewLogger(opts...))
+	c.Context = logger.WithLogger(c.Context, logger.NewLogger(opts...))
 }
 
-// init initializes the application setup by loading configuration,
+// NewContext initializes the application setup by loading configuration,
 // setting up logger context, and logging any warnings.
-func (c *Context) init(cmd *cobra.Command) error {
+func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	ctx := cmd.Context()
 
-	bindFlags(cmd, c.flags...)
+	bindFlags(cmd, flags...)
 
 	quiet, err := cmd.Flags().GetBool("quiet")
 	if err != nil {
-		return fmt.Errorf("failed to get quiet flag: %w", err)
+		return nil, fmt.Errorf("failed to get quiet flag: %w", err)
 	}
 
 	var configLoaderOpts []config.ConfigLoaderOption
@@ -98,214 +78,164 @@ func (c *Context) init(cmd *cobra.Command) error {
 
 	cfg, err := config.Load(configLoaderOpts...)
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
 	// Create a logger context based on config and quiet mode
-	opts := c.loggingOpts(cfg)
+	var opts []logger.Option
+	if cfg.Global.Debug || os.Getenv("DEBUG") != "" {
+		opts = append(opts, logger.WithDebug())
+	}
 	if quiet {
 		opts = append(opts, logger.WithQuiet())
 	}
-	ctx = setupLoggerContext(ctx, opts...)
+	if cfg.Global.LogFormat != "" {
+		opts = append(opts, logger.WithFormat(cfg.Global.LogFormat))
+	}
+	ctx = logger.WithLogger(ctx, logger.NewLogger(opts...))
 
 	// Log any warnings collected during configuration loading
 	for _, w := range cfg.Warnings {
 		logger.Warn(ctx, w)
 	}
 
-	c.Command = cmd
-	c.cfg = cfg
-	c.ctx = ctx
-	c.quiet = quiet
+	// Initialize history repository and history manager
+	hrOpts := []localhistory.HistoryStorageOption{
+		localhistory.WithLatestStatusToday(cfg.Server.LatestStatusToday),
+	}
 
-	return nil
+	switch cmd.Name() {
+	case "server", "scheduler", "start-all":
+		// For long-running process, we setup file cache for better performance
+		hc := fileutil.NewCache[*models.Status](0, time.Hour*12)
+		hc.StartEviction(ctx)
+		hrOpts = append(hrOpts, localhistory.WithHistoryFileCache(hc))
+	}
+
+	hr := localhistory.New(cfg.Paths.DataDir, hrOpts...)
+	hm := history.New(hr, cfg.Paths.Executable, cfg.Global.WorkDir, cfg.Global.ConfigPath)
+
+	return &Context{
+		Context:     ctx,
+		Command:     cmd,
+		Config:      cfg,
+		Quiet:       quiet,
+		HistoryRepo: hr,
+		HistoryMgr:  hm,
+		Flags:       flags,
+	}, nil
 }
 
-// Client initializes a Client using the provided options. If not supplied,
-// it creates default DAGStore and RunStore instances.
-func (c *Context) Client(opts ...clientOption) (runstore.Client, error) {
-	options := &clientOptions{}
-	for _, opt := range opts {
-		opt(options)
-	}
-	runStore := options.runStore
-	if runStore == nil {
-		runStore = c.runStore()
-	}
-
-	return runstore.NewClient(
-		runStore,
-		c.cfg.Paths.Executable,
-		c.cfg.Global.WorkDir,
-		c.cfg.Global.ConfigPath,
-	), nil
+// HistoryManager initializes a HistoryManager using the provided options. If not supplied,
+func (c *Context) HistoryManager(hr models.HistoryRepository) history.Manager {
+	return history.New(
+		hr,
+		c.Config.Paths.Executable,
+		c.Config.Global.WorkDir,
+		c.Config.Global.ConfigPath,
+	)
 }
 
-// DAGClient initializes a DAGClient using the provided options.
-func (c *Context) DAGClient(runClient runstore.Client, opts ...dagClientOption) (dagstore.Client, error) {
-	options := &dagClientOptions{}
-	for _, opt := range opts {
-		opt(options)
-	}
-	dagStore := options.dagStore
-	if dagStore == nil {
-		var err error
-		dagStore, err = c.dagStore(nil)
-		if err != nil {
-			return dagstore.Client{}, fmt.Errorf("failed to initialize DAG store: %w", err)
-		}
-	}
-
-	return dagstore.NewClient(
-		runClient,
-		dagStore,
-	), nil
-}
-
-// server creates and returns a new web UI server.
+// NewServer creates and returns a new web UI NewServer.
 // It initializes in-memory caches for DAGs and runstore, and uses them in the client.
-func (c *Context) server() (*frontend.Server, error) {
-	dagCache := fileutil.NewCache[*digraph.DAG](0, time.Hour*12)
-	dagCache.StartEviction(c)
-	dagStore := c.dagStoreWithCache(dagCache)
+func (c *Context) NewServer() (*frontend.Server, error) {
+	dc := fileutil.NewCache[*digraph.DAG](0, time.Hour*12)
+	dc.StartEviction(c)
 
-	statusCache := fileutil.NewCache[*runstore.Status](0, time.Hour*12)
-	statusCache.StartEviction(c)
-	runStore := c.runStoreWithCache(statusCache)
-
-	runCli, err := c.Client(withRunStore(runStore))
+	dr, err := c.dagRepo(dc, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize client: %w", err)
+		return nil, err
 	}
 
-	dagCli, err := c.DAGClient(runCli, withDAGStore(dagStore))
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize DAG client: %w", err)
-	}
-
-	return frontend.NewServer(c.cfg, dagCli, runCli), nil
+	return frontend.NewServer(c.Config, dr, c.HistoryRepo, c.HistoryMgr), nil
 }
 
-// scheduler creates a new scheduler instance using the default client.
+// NewScheduler creates a new NewScheduler instance using the default client.
 // It builds a DAG job manager to handle scheduled executions.
-func (c *Context) scheduler() (*scheduler.Scheduler, error) {
-	runCli, err := c.Client()
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize client: %w", err)
-	}
+func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
+	cache := fileutil.NewCache[*digraph.DAG](0, time.Hour*12)
+	cache.StartEviction(c)
 
-	dagCli, err := c.DAGClient(runCli)
+	dr, err := c.dagRepo(cache, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize DAG client: %w", err)
 	}
 
-	manager := scheduler.NewDAGJobManager(c.cfg.Paths.DAGsDir, dagCli, runCli, c.cfg.Paths.Executable, c.cfg.Global.WorkDir)
-	return scheduler.New(c.cfg, manager), nil
+	m := scheduler.NewDAGJobManager(c.Config.Paths.DAGsDir, dr, c.HistoryMgr, c.Config.Paths.Executable, c.Config.Global.WorkDir)
+	return scheduler.New(c.Config, m), nil
 }
 
-// dagStore returns a new DAGStore instance. It ensures that the directory exists
+// dagRepo returns a new DAGRepository instance. It ensures that the directory exists
 // (creating it if necessary) before returning the store.
-func (c *Context) dagStore(searchPaths []string) (dagstore.Store, error) {
-	baseDir := c.cfg.Paths.DAGsDir
-	_, err := os.Stat(baseDir)
+func (c *Context) dagRepo(cache *fileutil.Cache[*digraph.DAG], searchPaths []string) (models.DAGRepository, error) {
+	dir := c.Config.Paths.DAGsDir
+	_, err := os.Stat(dir)
 	if os.IsNotExist(err) {
-		if err := os.MkdirAll(baseDir, 0750); err != nil {
-			return nil, fmt.Errorf("failed to initialize directory %s: %w", baseDir, err)
+		if err := os.MkdirAll(dir, 0750); err != nil {
+			return nil, fmt.Errorf("failed to create DAGs directory %s: %w", dir, err)
 		}
 	}
 
 	// Create a flag store based on the suspend flags directory.
-	return filestore.New(
-		c.cfg.Paths.DAGsDir,
-		filestore.WithFlagsBaseDir(c.cfg.Paths.SuspendFlagsDir),
-		filestore.WithSearchPaths(searchPaths)), nil
+	return localdag.New(
+		c.Config.Paths.DAGsDir,
+		localdag.WithFlagsBaseDir(c.Config.Paths.SuspendFlagsDir),
+		localdag.WithSearchPaths(searchPaths),
+		localdag.WithFileCache(cache),
+	), nil
 }
 
-// dagStoreWithCache returns a DAGStore instance that uses an in-memory file cache.
-func (c *Context) dagStoreWithCache(cache *fileutil.Cache[*digraph.DAG]) dagstore.Store {
-	return filestore.New(c.cfg.Paths.DAGsDir, filestore.WithFlagsBaseDir(c.cfg.Paths.SuspendFlagsDir), filestore.WithFileCache(cache))
-}
-
-// runStore returns a new RunStore instance using JSON database storage.
-// It applies the "latestStatusToday" setting from the server configuration.
-func (c *Context) runStore() runstore.Store {
-	return runfs.New(c.cfg.Paths.DataDir, runfs.WithLatestStatusToday(
-		c.cfg.Server.LatestStatusToday,
-	))
-}
-
-// runStoreWithCache returns a RunStore that uses an in-memory cache.
-func (c *Context) runStoreWithCache(cache *fileutil.Cache[*runstore.Status]) runstore.Store {
-	return runfs.New(c.cfg.Paths.DataDir,
-		runfs.WithLatestStatusToday(c.cfg.Server.LatestStatusToday),
-		runfs.WithFileCache(cache),
-	)
-}
-
-// OpenLogFile creates and opens a log file for a given DAG run.
+// OpenLogFile creates and opens a log file for a given workflow.
 // It evaluates the log directory, validates settings, creates the log directory,
-// builds a filename using the current timestamp and request ID, and then opens the file.
+// builds a filename using the current timestamp and workflow ID, and then opens the file.
 func (c *Context) OpenLogFile(
 	dag *digraph.DAG,
-	requestID string,
+	workflowID string,
 ) (*os.File, error) {
-	logDir, err := cmdutil.EvalString(c, c.cfg.Paths.LogDir)
+	// Read the global configuration for log directory.
+	baseLogDir, err := cmdutil.EvalString(c, c.Config.Paths.LogDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to expand log directory: %w", err)
 	}
 
+	// Read the log directory configuration from the DAG.
 	dagLogDir, err := cmdutil.EvalString(c, dag.LogDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to expand DAG log directory: %w", err)
 	}
 
-	config := LogFileSettings{
-		LogDir:    logDir,
-		DAGLogDir: dagLogDir,
-		DAGName:   dag.Name,
-		RequestID: requestID,
+	cfg := LogConfig{
+		BaseDir:    baseLogDir,
+		DAGLogDir:  dagLogDir,
+		Name:       dag.Name,
+		WorkflowID: workflowID,
 	}
 
-	if err := ValidateSettings(config); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid log settings: %w", err)
 	}
 
-	outputDir, err := SetupLogDirectory(config)
+	d, err := cfg.LogDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup log directory: %w", err)
 	}
 
-	filename := BuildLogFilename(config)
-	return OpenOrCreateLogFile(filepath.Join(outputDir, filename))
-}
-
-func (c *Context) loggingOpts(cfg *config.Config) []logger.Option {
-	var opts []logger.Option
-	if cfg.Global.Debug || os.Getenv("DEBUG") != "" {
-		opts = append(opts, logger.WithDebug())
-	}
-	if c.quiet {
-		opts = append(opts, logger.WithQuiet())
-	}
-	if cfg.Global.LogFormat != "" {
-		opts = append(opts, logger.WithFormat(cfg.Global.LogFormat))
-	}
-	return opts
+	logPath := filepath.Join(d, cfg.LogFile())
+	return fileutil.OpenOrCreateFile(logPath)
 }
 
 // NewCommand creates a new command instance with the given cobra command and run function.
-func NewCommand(cmd *cobra.Command, flags []commandLineFlag, run func(cmd *Context, args []string) error) *cobra.Command {
+func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *Context, args []string) error) *cobra.Command {
 	initFlags(cmd, flags...)
 
-	ctx := &Context{flags: flags, run: run}
-
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		if err := ctx.init(cmd); err != nil {
+		ctx, err := NewContext(cmd, flags)
+		if err != nil {
 			fmt.Printf("Initialization error: %v\n", err)
 			os.Exit(1)
 		}
-		if err := ctx.run(ctx, args); err != nil {
-			logger.Error(ctx.ctx, "Command failed", "err", err)
+		if err := runFunc(ctx, args); err != nil {
+			logger.Error(ctx.Context, "Command failed", "err", err)
 			os.Exit(1)
 		}
 		return nil
@@ -314,51 +244,8 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, run func(cmd *Conte
 	return cmd
 }
 
-// setupLoggerContext builds a logger context using options derived from configuration.
-// It checks debug mode, quiet mode, and log format.
-func setupLoggerContext(ctx context.Context, opts ...logger.Option) context.Context {
-	return logger.WithLogger(ctx, logger.NewLogger(opts...))
-}
-
-// NewContext creates a setup instance from an existing configuration.
-func NewContext(ctx context.Context, cfg *config.Config) *Context {
-	c := &Context{cfg: cfg}
-	c.ctx = setupLoggerContext(ctx, c.loggingOpts(cfg)...)
-	return c
-}
-
-// clientOption defines functional options for configuring the client.
-type clientOption func(*clientOptions)
-
-// clientOptions holds optional dependencies for constructing a client.
-type clientOptions struct {
-	runStore runstore.Store
-}
-
-// withRunStore returns a clientOption that sets a custom RunStore.
-func withRunStore(historyStore runstore.Store) clientOption {
-	return func(o *clientOptions) {
-		o.runStore = historyStore
-	}
-}
-
-// dagClientOption defines functional options for configuring the DAG client.
-type dagClientOption func(*dagClientOptions)
-
-// dagClientOption defines functional options for configuring the DAG client.
-type dagClientOptions struct {
-	dagStore dagstore.Store
-}
-
-// withDAGStore returns a clientOption that sets a custom DAGStore.
-func withDAGStore(dagStore dagstore.Store) dagClientOption {
-	return func(o *dagClientOptions) {
-		o.dagStore = dagStore
-	}
-}
-
-// generateRequestID creates a new UUID string to be used as a request identifier.
-func generateRequestID() (string, error) {
+// getWorkflowID creates a new UUID string to be used as a workflow IDentifier.
+func getWorkflowID() (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return "", err
@@ -366,16 +253,26 @@ func generateRequestID() (string, error) {
 	return id.String(), nil
 }
 
-// validateRequestID checks if the request ID is valid and not empty.
-func validateRequestID(requestID string) error {
-	if requestID == "" {
-		return fmt.Errorf("request ID is not set")
+// validateWorkflowID checks if the workflow ID is valid and not empty.
+func validateWorkflowID(workflowID string) error {
+	if workflowID == "" {
+		return ErrWorkflowIDRequired
 	}
-	if _, err := uuid.Parse(requestID); err != nil {
-		return fmt.Errorf("invalid request ID: %w", err)
+	if !regexWorkflowID.MatchString(workflowID) {
+		return ErrWorkflowIDFormat
+	}
+	if len(workflowID) > maxWorkflowIDLen {
+		return ErrWorkflowIDTooLong
 	}
 	return nil
 }
+
+// regexWorkflowID is a regular expression to validate workflow IDs.
+// It allows alphanumeric characters, hyphens, and underscores.
+var regexWorkflowID = regexp.MustCompile(`^[a-zA-Z0-9-_]+$`)
+
+// maxWorkflowIDLen is the max length of the workflow ID
+const maxWorkflowIDLen = 60
 
 // signalListener is an interface for types that can receive OS signals.
 type signalListener interface {
@@ -402,41 +299,42 @@ func listenSignals(ctx context.Context, listener signalListener) {
 	}()
 }
 
-// LogFileSettings defines configuration for log file creation.
-type LogFileSettings struct {
-	LogDir    string // Base directory for logs.
-	DAGLogDir string // Optional alternative log directory specified by the DAG.
-	DAGName   string // Name of the DAG; used for generating a safe directory name.
-	RequestID string // Unique request ID used in the filename.
+// LogConfig defines configuration for log file creation.
+type LogConfig struct {
+	BaseDir    string // Base directory for logs.
+	DAGLogDir  string // Optional alternative log directory specified by the DAG definition.
+	Name       string // Name of the workflow; used for generating a safe directory name.
+	WorkflowID string // Unique workflow ID used in the filename.
 }
 
-// ValidateSettings checks that essential fields are provided.
+// Validate checks that essential fields are provided.
 // It requires that DAGName is not empty and that at least one log directory is specified.
-func ValidateSettings(config LogFileSettings) error {
-	if config.DAGName == "" {
+func (cfg LogConfig) Validate() error {
+	if cfg.Name == "" {
 		return fmt.Errorf("DAGName cannot be empty")
 	}
-	if config.LogDir == "" && config.DAGLogDir == "" {
+	if cfg.BaseDir == "" && cfg.DAGLogDir == "" {
 		return fmt.Errorf("either LogDir or DAGLogDir must be specified")
 	}
 	return nil
 }
 
-// SetupLogDirectory creates (if necessary) and returns the log directory based on the log file settings.
+// LogDir creates (if necessary) and returns the log directory based on the log file settings.
 // It uses a safe version of the DAG name to avoid issues with invalid filesystem characters.
-func SetupLogDirectory(config LogFileSettings) (string, error) {
-	safeName := fileutil.SafeName(config.DAGName)
-
+func (cfg LogConfig) LogDir() (string, error) {
 	// Choose the base directory: if DAGLogDir is provided, use it; otherwise use LogDir.
-	baseDir := config.LogDir
-	if config.DAGLogDir != "" {
-		baseDir = config.DAGLogDir
+	baseDir := cfg.BaseDir
+	if cfg.DAGLogDir != "" {
+		baseDir = cfg.DAGLogDir
 	}
 	if baseDir == "" {
 		return "", fmt.Errorf("base log directory is not set")
 	}
 
-	logDir := filepath.Join(baseDir, safeName)
+	utcTimestamp := time.Now().UTC().Format("20060102_150405Z")
+
+	safeName := fileutil.SafeName(cfg.Name)
+	logDir := filepath.Join(baseDir, safeName, "workflow_"+utcTimestamp+"_"+cfg.WorkflowID)
 	if err := os.MkdirAll(logDir, 0750); err != nil {
 		return "", fmt.Errorf("failed to initialize directory %s: %w", logDir, err)
 	}
@@ -444,28 +342,14 @@ func SetupLogDirectory(config LogFileSettings) (string, error) {
 	return logDir, nil
 }
 
-// BuildLogFilename constructs the log filename using the prefix, safe DAG name, current timestamp,
-// and a truncated version of the request ID.
-func BuildLogFilename(config LogFileSettings) string {
+// LogFile constructs the log filename using the prefix, safe DAG name, current timestamp,
+// and a truncated version of the workflow ID.
+func (cfg LogConfig) LogFile() string {
 	timestamp := time.Now().Format("20060102.15:04:05.000")
-	truncatedRequestID := stringutil.TruncString(config.RequestID, 8)
-	safeDagName := fileutil.SafeName(config.DAGName)
+	truncatedWorkflowID := stringutil.TruncString(cfg.WorkflowID, 8)
 
-	return fmt.Sprintf("scheduler_%s.%s.%s.log",
-		safeDagName,
+	return fmt.Sprintf("workflow_%s.%s.log",
 		timestamp,
-		truncatedRequestID,
+		truncatedWorkflowID,
 	)
-}
-
-// OpenOrCreateLogFile opens (or creates) the log file with flags for creation, write-only access,
-// appending, and synchronous I/O. It sets file permissions to 0600.
-func OpenOrCreateLogFile(filepath string) (*os.File, error) {
-	flags := os.O_CREATE | os.O_WRONLY | os.O_APPEND | os.O_SYNC
-	file, err := os.OpenFile(filepath, flags, 0600) // nolint:gosec
-	if err != nil {
-		return nil, fmt.Errorf("failed to create/open log file %s: %w", filepath, err)
-	}
-
-	return file, nil
 }

@@ -12,6 +12,9 @@ import Mermaid from '../../../../ui/Mermaid';
 /** Callback type for node click events */
 type onClickNode = (name: string) => void;
 
+/** Callback type for node right-click events */
+type onRightClickNode = (name: string) => void;
+
 /** Flowchart direction type - TD (top-down) or LR (left-right) */
 export type FlowchartType = 'TD' | 'LR';
 
@@ -26,15 +29,17 @@ type Props = {
   flowchart?: FlowchartType;
   /** Steps or nodes to visualize */
   steps?: Steps;
-  /** Callback for node click events */
+  /** Callback for node click events (double-click) */
   onClickNode?: onClickNode;
+  /** Callback for node right-click events */
+  onRightClickNode?: onRightClickNode;
   /** Whether to show status icons */
   showIcons?: boolean;
   /** Whether to animate running nodes */
   animate?: boolean;
 };
 
-/** Extend window interface to include the click handler */
+/** Extend window interface to include the click handler (kept for backward compatibility) */
 declare global {
   interface Window {
     onClickMermaidNode: onClickNode;
@@ -50,6 +55,7 @@ const Graph: React.FC<Props> = ({
   flowchart = 'TD',
   type = 'status',
   onClickNode,
+  onRightClickNode,
   showIcons = true,
 }) => {
   const [scale, setScale] = useState(1);
@@ -106,6 +112,8 @@ const Graph: React.FC<Props> = ({
     const dat: string[] = [];
     dat.push(`flowchart ${flowchart};`);
 
+    // Store the click handler in window for backward compatibility
+    // but we'll use double-click for navigation
     if (onClickNode) {
       window.onClickMermaidNode = onClickNode;
     }
@@ -120,10 +128,24 @@ const Graph: React.FC<Props> = ({
     ) => {
       const id = step.name.replace(/\s/g, '_');
       const c = graphStatusMap[status] || '';
-      const label = `${step.name}`;
 
-      // Add node definition
-      dat.push(`${id}[${label}]${c};`);
+      // Check if this is a child workflow node (has a 'run' property)
+      const isChildWorkflow = !!step.run;
+
+      // Add indicator for child workflow nodes in the label only
+      // Escape any special characters in the label to prevent Mermaid parsing errors
+      let label = step.name;
+      if (isChildWorkflow && step.run) {
+        // Use a simpler format to avoid parsing issues
+        label = `${step.name} → ${step.run}`;
+      }
+
+      // Use different shape for child workflows (hexagon) but keep the same color for status
+      if (isChildWorkflow) {
+        dat.push(`${id}{{${label}}}${c};`);
+      } else {
+        dat.push(`${id}["${label}"]${c};`);
+      }
 
       // Process dependencies and add connections
       if (step.depends) {
@@ -152,10 +174,8 @@ const Graph: React.FC<Props> = ({
         });
       }
 
-      // Add click handler if onClickNode is provided
-      if (onClickNode) {
-        dat.push(`click ${id} onClickMermaidNode`);
-      }
+      // We no longer add the standard Mermaid click handler
+      // Double-click will be handled by our custom implementation
     };
 
     // Process nodes based on type
@@ -225,7 +245,13 @@ const Graph: React.FC<Props> = ({
           </ToggleButton>
         </ToggleGroup>
       </div>
-      <Mermaid style={mermaidStyle} def={graph} scale={scale} />
+      <Mermaid
+        style={mermaidStyle}
+        def={graph}
+        scale={scale}
+        onDoubleClick={onClickNode}
+        onRightClick={onRightClickNode}
+      />
     </div>
   );
 };

@@ -311,7 +311,7 @@ func TestBuildStep(t *testing.T) {
 		assert.Equal(t, "echo 1", th.Steps[0].CmdWithArgs)
 		assert.Equal(t, "echo", th.Steps[0].Command)
 		assert.Equal(t, []string{"1"}, th.Steps[0].Args)
-		assert.Equal(t, "step 1", th.Steps[0].Name)
+		assert.Equal(t, "step1", th.Steps[0].Name)
 	})
 	t.Run("ValidCommandInArray", func(t *testing.T) {
 		t.Parallel()
@@ -323,7 +323,7 @@ func TestBuildStep(t *testing.T) {
 			th.Steps[0].CmdArgsSys)
 		assert.Equal(t, "echo", th.Steps[0].Command)
 		assert.Equal(t, []string{"1"}, th.Steps[0].Args)
-		assert.Equal(t, "step 1", th.Steps[0].Name)
+		assert.Equal(t, "step1", th.Steps[0].Name)
 	})
 	t.Run("ValidCommandInList", func(t *testing.T) {
 		t.Parallel()
@@ -335,7 +335,7 @@ func TestBuildStep(t *testing.T) {
 			th.Steps[0].CmdArgsSys)
 		assert.Equal(t, "echo", th.Steps[0].Command)
 		assert.Equal(t, []string{"1"}, th.Steps[0].Args)
-		assert.Equal(t, "step 1", th.Steps[0].Name)
+		assert.Equal(t, "step1", th.Steps[0].Name)
 	})
 	t.Run("HTTPExecutor", func(t *testing.T) {
 		t.Parallel()

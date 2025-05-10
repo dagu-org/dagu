@@ -97,7 +97,7 @@ func (n *Node) shouldContinue(ctx context.Context) bool {
 
 	case NodeStatusRunning:
 		// Unexpected state
-		logger.Error(ctx, "unexpected node status", "status", status.String())
+		logger.Error(ctx, "Unexpected node status", "status", status.String())
 		return false
 
 	}
@@ -115,7 +115,7 @@ func (n *Node) shouldContinue(ctx context.Context) bool {
 	if len(continueOn.Output) > 0 {
 		ok, err := n.LogContainsPattern(ctx, continueOn.Output)
 		if err != nil {
-			logger.Error(ctx, "failed to check log for pattern", "err", err)
+			logger.Error(ctx, "Failed to check log for pattern", "err", err)
 			return false
 		}
 		if ok {
@@ -199,16 +199,16 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 		return nil, fmt.Errorf("failed to setup executor IO: %w", err)
 	}
 
-	// If the command is a sub-DAG, we need to set the request ID.
-	if subDAG, ok := cmd.(executor.SubDAG); ok {
-		reqID, err := n.SubRunRequestID()
+	// If the command is a child workflow, we need to set the workflow ID.
+	if childWorkflow, ok := cmd.(executor.ChildWorkflow); ok {
+		workflowID, err := n.ChildWorkflowID()
 		if err != nil {
-			return nil, fmt.Errorf("failed to determine request ID for sub-DAG: %w", err)
+			return nil, fmt.Errorf("failed to determine workflow ID for child workflow: %w", err)
 		}
-		if reqID == "" {
-			return nil, fmt.Errorf("request ID is empty for sub-DAG")
+		if workflowID == "" {
+			return nil, fmt.Errorf("workflow ID is empty for child workflow")
 		}
-		subDAG.SetRequestID(reqID)
+		childWorkflow.SetWorkflowID(workflowID)
 	}
 
 	return cmd, nil
@@ -226,7 +226,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		// CmdArgsSys is a string with the command and args separated by special markers.
 		cmd, args := cmdutil.SplitCommandArgs(step.CmdArgsSys)
 		for i, arg := range args {
-			value, err := digraph.EvalString(ctx, arg, cmdutil.WithoutExpandEnv())
+			value, err := executor.EvalString(ctx, arg, cmdutil.WithoutExpandEnv())
 			if err != nil {
 				return fmt.Errorf("failed to eval command with args: %w", err)
 			}
@@ -241,7 +241,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 
 	case step.CmdWithArgs != "":
 		// In case of the command and args are defined as a string.
-		cmdWithArgs, err := digraph.EvalString(ctx, step.CmdWithArgs, cmdutil.WithoutExpandEnv())
+		cmdWithArgs, err := executor.EvalString(ctx, step.CmdWithArgs, cmdutil.WithoutExpandEnv())
 		if err != nil {
 			return err
 		}
@@ -273,7 +273,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 			return fmt.Errorf("failed to split command: %w", err)
 		}
 		for i, arg := range args {
-			value, err := digraph.EvalString(ctx, arg, cmdutil.WithoutExpandEnv())
+			value, err := executor.EvalString(ctx, arg, cmdutil.WithoutExpandEnv())
 			if err != nil {
 				return fmt.Errorf("failed to eval command args: %w", err)
 			}
@@ -288,7 +288,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		// Shouldn't reach here except for testing.
 
 		if step.Command != "" {
-			value, err := digraph.EvalString(ctx, step.Command, cmdutil.WithoutExpandEnv())
+			value, err := executor.EvalString(ctx, step.Command, cmdutil.WithoutExpandEnv())
 			if err != nil {
 				return fmt.Errorf("failed to eval command: %w", err)
 			}
@@ -296,7 +296,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		}
 
 		for i, arg := range step.Args {
-			value, err := digraph.EvalString(ctx, arg, cmdutil.WithoutExpandEnv())
+			value, err := executor.EvalString(ctx, arg, cmdutil.WithoutExpandEnv())
 			if err != nil {
 				return fmt.Errorf("failed to eval command args: %w", err)
 			}
@@ -337,7 +337,7 @@ func (n *Node) Cancel(ctx context.Context) {
 		n.SetStatus(NodeStatusCancel)
 	}
 	if n.cancelFunc != nil {
-		logger.Info(ctx, "canceling node", "step", n.Name())
+		logger.Info(ctx, "Canceling node", "step", n.Name())
 		n.cancelFunc()
 	}
 }
@@ -345,15 +345,14 @@ func (n *Node) Cancel(ctx context.Context) {
 func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	c := digraph.GetExecContext(ctx)
-	c = c.WithEnv(
-		digraph.EnvKeyLogPath, n.Log(),
-		digraph.EnvKeyStepLogPath, n.Log(),
+	env := executor.GetEnv(ctx)
+	env = env.WithEnv(
+		digraph.EnvKeyWorkflowStepLogFile, n.Log(),
 	)
-	return digraph.WithExecContext(ctx, c)
+	return executor.WithEnv(ctx, env)
 }
 
-func (n *Node) Setup(ctx context.Context, logDir string, requestID string) error {
+func (n *Node) Setup(ctx context.Context, logDir string, workflowID string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -361,7 +360,7 @@ func (n *Node) Setup(ctx context.Context, logDir string, requestID string) error
 	startedAt := time.Now()
 	safeName := fileutil.SafeName(n.Name())
 	timestamp := startedAt.Format("20060102.15:04:05.000")
-	postfix := stringutil.TruncString(requestID, 8)
+	postfix := stringutil.TruncString(workflowID, 8)
 	logFilename := fmt.Sprintf("%s.%s.%s.log", safeName, timestamp, postfix)
 	if !fileutil.FileExists(logDir) {
 		if err := os.MkdirAll(logDir, 0750); err != nil {

@@ -3,11 +3,12 @@
  *
  * @module features/dags/components/dag-execution
  */
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { components } from '../../../../api/v2/schema';
+import { Button } from '../../../../components/ui/button';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
-import { Button } from '../../../../components/ui/button';
 
 // Extended Log type with pagination fields
 interface LogWithPagination {
@@ -29,8 +30,10 @@ const calculateTotalPages = (totalLines: number, pageSize: number): number => {
 type Props = {
   /** DAG name or fileName */
   name: string;
-  /** Request ID of the execution */
-  requestId: string;
+  /** Workflow ID of the execution */
+  workflowId: string;
+  /** Full workflow details (optional) - used to determine if this is a child workflow */
+  workflow?: components['schemas']['WorkflowDetails'];
 };
 
 /**
@@ -46,7 +49,7 @@ const ANSI_CODES_REGEX = [
  * ExecutionLog displays the log output for a DAG run
  * Fetches log data from the API and refreshes every 30 seconds
  */
-function ExecutionLog({ name, requestId }: Props) {
+function ExecutionLog({ name, workflowId, workflow }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const [viewMode, setViewMode] = useState<'tail' | 'head' | 'page'>('tail');
   const [pageSize, setPageSize] = useState(1000);
@@ -61,6 +64,12 @@ function ExecutionLog({ name, requestId }: Props) {
   const isInitialLoad = useRef(true);
   const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const logContainerRef = useRef<HTMLDivElement>(null);
+
+  // Determine if this is a child workflow
+  const isChildWorkflow =
+    workflow &&
+    workflow.rootWorkflowId &&
+    workflow.rootWorkflowId !== workflow.workflowId;
 
   // Determine query parameters based on view mode
   const queryParams: Record<string, number | string> = {
@@ -77,16 +86,30 @@ function ExecutionLog({ name, requestId }: Props) {
     queryParams.limit = pageSize;
   }
 
+  // Determine the API endpoint based on whether this is a child workflow
+  const apiEndpoint = isChildWorkflow
+    ? '/workflows/{name}/{workflowId}/children/{childWorkflowId}/log'
+    : '/workflows/{name}/{workflowId}/log';
+
+  // Prepare path parameters based on whether this is a child workflow
+  const pathParams = isChildWorkflow
+    ? {
+        name: workflow.rootWorkflowName,
+        workflowId: workflow.rootWorkflowId,
+        childWorkflowId: workflow.workflowId,
+      }
+    : {
+        name,
+        workflowId,
+      };
+
   // Fetch log data with periodic refresh
   const { data, isLoading, error } = useQuery(
-    '/runs/{dagName}/{requestId}/log',
+    apiEndpoint,
     {
       params: {
         query: queryParams,
-        path: {
-          dagName: name,
-          requestId,
-        },
+        path: pathParams,
       },
     },
     {
@@ -266,31 +289,42 @@ function ExecutionLog({ name, requestId }: Props) {
       {/* Controls for log navigation */}
       <div className="flex flex-col gap-2 mb-2 p-2 bg-zinc-100 dark:bg-zinc-800 rounded">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex space-x-2">
-            <Button
-              size="sm"
-              variant={viewMode === 'tail' ? 'default' : 'outline'}
-              onClick={() => handleViewModeChange('tail')}
-              disabled={isNavigating}
-            >
-              Show End
-            </Button>
-            <Button
-              size="sm"
-              variant={viewMode === 'head' ? 'default' : 'outline'}
-              onClick={() => handleViewModeChange('head')}
-              disabled={isNavigating}
-            >
-              Show Beginning
-            </Button>
-            <Button
-              size="sm"
-              variant={viewMode === 'page' ? 'default' : 'outline'}
-              onClick={() => handleViewModeChange('page')}
-              disabled={isNavigating}
-            >
-              Page View
-            </Button>
+          {/* Fixed width container for buttons to prevent layout shift */}
+          <div className="flex space-x-2 min-h-[28px] w-[300px]">
+            {/* Using a wrapper div with fixed width for each button */}
+            <div className="w-[80px]">
+              <Button
+                size="sm"
+                variant={viewMode === 'tail' ? 'default' : 'outline'}
+                onClick={() => handleViewModeChange('tail')}
+                disabled={isNavigating}
+                className="w-full"
+              >
+                Show End
+              </Button>
+            </div>
+            <div className="w-[120px]">
+              <Button
+                size="sm"
+                variant={viewMode === 'head' ? 'default' : 'outline'}
+                onClick={() => handleViewModeChange('head')}
+                disabled={isNavigating}
+                className="w-full"
+              >
+                Show Beginning
+              </Button>
+            </div>
+            <div className="w-[80px]">
+              <Button
+                size="sm"
+                variant={viewMode === 'page' ? 'default' : 'outline'}
+                onClick={() => handleViewModeChange('page')}
+                disabled={isNavigating}
+                className="w-full"
+              >
+                Page View
+              </Button>
+            </div>
           </div>
 
           <select
@@ -386,7 +420,7 @@ function ExecutionLog({ name, requestId }: Props) {
         className="flex-1 overflow-auto rounded-lg bg-zinc-900 p-4 shadow-md relative"
       >
         {isNavigating && (
-          <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center z-10">
+          <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center z-10 pointer-events-none">
             <div className="bg-white dark:bg-zinc-800 rounded-lg p-2 shadow-lg">
               <div className="h-5 w-5 animate-spin rounded-full border-3 border-primary border-t-transparent"></div>
             </div>
@@ -399,12 +433,12 @@ function ExecutionLog({ name, requestId }: Props) {
               className="flex hover:bg-zinc-800 px-2 py-0.5 rounded"
             >
               <span
-                className="text-zinc-500 mr-4 select-none w-8 text-right"
+                className="text-zinc-500 mr-4 select-none w-8 text-right flex-shrink-0 self-start"
                 data-line-number={getLineNumber(index)}
               >
                 {getLineNumber(index)}
               </span>
-              <span className="whitespace-pre-wrap break-all">
+              <span className="whitespace-pre-wrap break-all flex-grow">
                 {line || ' '}
               </span>
             </div>

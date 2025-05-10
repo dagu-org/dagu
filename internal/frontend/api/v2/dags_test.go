@@ -14,6 +14,7 @@ import (
 
 func TestDAG(t *testing.T) {
 	server := test.SetupServer(t)
+
 	t.Run("CreateExecuteDelete", func(t *testing.T) {
 		// Create a new DAG
 		_ = server.Client().Post("/api/v2/dags", api.CreateNewDAG201JSONResponse{
@@ -34,16 +35,16 @@ func TestDAG(t *testing.T) {
 		var execResp api.ExecuteDAG200JSONResponse
 		resp.Unmarshal(t, &execResp)
 
-		require.NotEmpty(t, execResp.RequestId, "expected a non-empty request ID")
+		require.NotEmpty(t, execResp.WorkflowId, "expected a non-empty workflow ID")
 
-		// Check the status of the DAG execution
+		// Check the status of the workflow
 		require.Eventually(t, func() bool {
-			url := fmt.Sprintf("/api/v2/dags/test_dag/runs/%s", execResp.RequestId)
+			url := fmt.Sprintf("/api/v2/dags/test_dag/workflows/%s", execResp.WorkflowId)
 			statusResp := server.Client().Get(url).ExpectStatus(http.StatusOK).Send(t)
-			var status api.GetDAGRunDetails200JSONResponse
+			var status api.GetDAGWorkflowDetails200JSONResponse
 			statusResp.Unmarshal(t, &status)
 
-			return status.Run.Status == api.Status(scheduler.StatusSuccess)
+			return status.Workflow.Status == api.Status(scheduler.StatusSuccess)
 		}, 5*time.Second, 1*time.Second, "expected DAG to complete")
 
 		// Delete the created DAG

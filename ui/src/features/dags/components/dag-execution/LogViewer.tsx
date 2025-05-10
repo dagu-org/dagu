@@ -1,4 +1,5 @@
 import React from 'react';
+import { components } from '../../../../api/v2/schema';
 import ExecutionLog from './ExecutionLog';
 import LogSideModal from './LogSideModal';
 import StepLog from './StepLog';
@@ -8,9 +9,10 @@ type LogViewerProps = {
   onClose: () => void;
   logType: 'execution' | 'step';
   dagName: string;
-  requestId: string;
+  workflowId: string;
   stepName?: string;
   isInModal?: boolean;
+  workflow?: components['schemas']['WorkflowDetails'];
 };
 
 /**
@@ -22,9 +24,10 @@ const LogViewer: React.FC<LogViewerProps> = ({
   onClose,
   logType,
   dagName,
-  requestId,
+  workflowId,
   stepName,
   isInModal = true,
+  workflow,
 }) => {
   // Determine the title based on the log type
   const title =
@@ -39,19 +42,24 @@ const LogViewer: React.FC<LogViewerProps> = ({
       title={title}
       isInModal={isInModal}
       dagName={dagName}
-      requestId={requestId}
+      workflowId={workflowId}
       stepName={stepName}
       logType={logType}
     >
       <div className="h-full">
         {logType === 'execution' ? (
-          <ExecutionLog name={dagName} requestId={requestId} />
+          <ExecutionLog
+            name={dagName}
+            workflowId={workflowId}
+            workflow={workflow}
+          />
         ) : (
           stepName && (
             <StepLog
               dagName={dagName}
-              requestId={requestId}
+              workflowId={workflowId}
               stepName={stepName}
+              workflow={workflow}
             />
           )
         )}

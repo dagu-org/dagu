@@ -9,66 +9,150 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/runstore"
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
 )
 
+// Errors for start command
+var (
+	// ErrWorkflowIDRequired is returned when a child workflow is attempted without providing an workflow ID
+	ErrWorkflowIDRequired = errors.New("workflow ID is required for child workflow")
+
+	// ErrWorkflowIDFormat is returned when the provided workflow ID has an invalid format
+	ErrWorkflowIDFormat = errors.New("workflow ID must only contain alphanumeric characters, dashes, and underscores")
+
+	// ErrWorkflowIDTooLong is returned when the provided workflow ID is too long
+	ErrWorkflowIDTooLong = errors.New("workflow ID length must be less than 60 characters")
+)
+
+// CmdStart creates and returns a cobra command for starting workflow
 func CmdStart() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "start [flags] /path/to/spec.yaml [-- param1 param2 ...]",
-			Short: "Execute a DAG",
-			Long: `Begin execution of a DAG defined in a YAML file.
+			Use:   "start [flags] <DAG definition> [-- param1 param2 ...]",
+			Short: "Execute a workflow from a DAG definition",
+			Long: `Begin execution of a workflow based on the specified DAG definition.
+
+A DAG definition is a blueprint that defines the workflow structure. This command creates a new workflow 
+instance with a unique workflow ID.
 
 Parameters after the "--" separator are passed as execution parameters (either positional or key=value pairs).
-Flags can override default settings such as request ID or suppress output.
+Flags can override default settings such as workflow ID or suppress output.
 
 Example:
-  dagu start my_dag.yaml -- P1=foo P2=bar
+  dagu start my_dag -- P1=foo P2=bar
 
-This command parses the DAG specification, resolves parameters, and initiates the execution process.
+This command parses the DAG definition, resolves parameters, and initiates the workflow execution.
 `,
 			Args: cobra.MinimumNArgs(1),
 		}, startFlags, runStart,
 	)
 }
 
-var startFlags = []commandLineFlag{paramsFlag, requestIDFlagStart, rootDAGNameFlag, rootRequestIDFlag}
+// Command line flags for the start command
+var startFlags = []commandLineFlag{paramsFlag, workflowIDFlagStart, parentWorkflowFlag, rootWorkflowFlag}
 
+// runStart handles the execution of the start command
 func runStart(ctx *Context, args []string) error {
-	requestID, err := ctx.Flags().GetString("request-id")
+	// Get workflow ID and references
+	workflowID, rootRef, parentRef, isChildWorkflow, err := getExecutionInfo(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get request ID: %w", err)
+		return err
 	}
 
-	// Generate requestID if it's not specified.
-	if requestID == "" {
-		var err error
-		requestID, err = generateRequestID()
+	// Load parameters and DAG
+	dag, params, err := loadDAGWithParams(ctx, args)
+	if err != nil {
+		return err
+	}
+
+	// Create or get root execution reference
+	root, err := determineRootWorkflow(isChildWorkflow, rootRef, dag, workflowID)
+	if err != nil {
+		return err
+	}
+
+	// Handle child workflow if applicable
+	if isChildWorkflow {
+		// Parse parent execution reference
+		parent, err := digraph.ParseWorkflowRef(parentRef)
 		if err != nil {
-			logger.Error(ctx, "Failed to generate request ID", "err", err)
-			return fmt.Errorf("failed to generate request ID: %w", err)
+			return fmt.Errorf("failed to parse parent exec ref: %w", err)
 		}
-	} else if err := validateRequestID(requestID); err != nil {
-		logger.Error(ctx, "Invalid request ID format", "requestID", requestID, "err", err)
-		return fmt.Errorf("invalid request ID format: %w", err)
+		return handleChildWorkflow(ctx, dag, workflowID, params, root, parent)
 	}
 
+	// Log root workflow
+	logger.Info(ctx, "Executing root workflow",
+		"name", dag.Name,
+		"params", params,
+		"workflowId", workflowID,
+	)
+
+	// Execute the DAG
+	return executeWorkflow(ctx, dag, digraph.WorkflowRef{}, workflowID, root)
+}
+
+// getExecutionInfo extracts and validates workflow ID and references from command flags
+// nolint:revive
+func getExecutionInfo(ctx *Context) (workflowID string, rootRef string, parentRef string, isChildWorkflow bool, err error) {
+	// Get workflow ID from flags
+	workflowID, err = ctx.Command.Flags().GetString("workflow-id")
+	if err != nil {
+		return "", "", "", false, fmt.Errorf("failed to get workflow ID: %w", err)
+	}
+
+	// Get root and parent execution references
+	rootRef, _ = ctx.Command.Flags().GetString("root")
+	parentRef, _ = ctx.Command.Flags().GetString("parent")
+	isChildWorkflow = parentRef != "" || rootRef != ""
+
+	// Validate workflow ID for child workflows
+	if isChildWorkflow && workflowID == "" {
+		return "", "", "", false, ErrWorkflowIDRequired
+	}
+
+	// Validate or generate workflow ID
+	if workflowID != "" {
+		if err := validateWorkflowID(workflowID); err != nil {
+			return "", "", "", false, err
+		}
+	} else {
+		// Generate a new workflow ID if not provided
+		workflowID, err = getWorkflowID()
+		if err != nil {
+			return "", "", "", false, fmt.Errorf("failed to generate workflow ID: %w", err)
+		}
+	}
+
+	return workflowID, rootRef, parentRef, isChildWorkflow, nil
+}
+
+// loadDAGWithParams loads the DAG and its parameters from command arguments
+func loadDAGWithParams(ctx *Context, args []string) (*digraph.DAG, string, error) {
+	if len(args) == 0 {
+		return nil, "", fmt.Errorf("DAG file path is required")
+	}
+
+	// Prepare load options with base configuration
 	loadOpts := []digraph.LoadOption{
-		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
-		digraph.WithDAGsDir(ctx.cfg.Paths.DAGsDir),
+		digraph.WithBaseConfig(ctx.Config.Paths.BaseConfig),
+		digraph.WithDAGsDir(ctx.Config.Paths.DAGsDir),
 	}
 
-	// Load parameters from command line arguments.
+	// Load parameters from command line arguments
 	var params string
-	if argsLenAtDash := ctx.ArgsLenAtDash(); argsLenAtDash != -1 {
+	var err error
+
+	// Check if parameters are provided after "--"
+	if argsLenAtDash := ctx.Command.ArgsLenAtDash(); argsLenAtDash != -1 {
 		// Get parameters from command line arguments after "--"
 		loadOpts = append(loadOpts, digraph.WithParams(args[argsLenAtDash:]))
 	} else {
 		// Get parameters from flags
-		params, err = ctx.Flags().GetString("params")
+		params, err = ctx.Command.Flags().GetString("params")
 		if err != nil {
-			return fmt.Errorf("failed to get parameters: %w", err)
+			return nil, "", fmt.Errorf("failed to get parameters: %w", err)
 		}
 		loadOpts = append(loadOpts, digraph.WithParams(removeQuotes(params)))
 	}
@@ -76,114 +160,119 @@ func runStart(ctx *Context, args []string) error {
 	// Load the DAG from the specified file
 	dag, err := digraph.Load(ctx, args[0], loadOpts...)
 	if err != nil {
-		logger.Error(ctx, "Failed to load DAG", "path", args[0], "err", err)
-		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
+		return nil, "", fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 	}
 
-	rootRequestID, _ := ctx.Flags().GetString("root-request-id")
-	rootDAGName, _ := ctx.Flags().GetString("root-dag-name")
-
-	// If rootDAGName is not empty, it means current execution is a sub-DAG.
-	// Sub DAG execution requires both root-request-id and root-dag-name to be set.
-	if (rootRequestID == "" && rootDAGName != "") || (rootRequestID != "" && rootDAGName == "") {
-		return fmt.Errorf("both root-request-id and root-dag-name must be provided together or neither should be provided")
-	}
-
-	var rootDAG digraph.RootDAG
-	if rootDAGName != "" && rootRequestID != "" {
-		// The current execution is a sub-DAG
-		logger.Debug(ctx, "Sub-DAG execution detected", "rootDAGName", rootDAGName, "rootRequestID", rootRequestID)
-		rootDAG = digraph.NewRootDAG(rootDAGName, rootRequestID)
-	} else {
-		// The current execution is a root DAG
-		rootDAG = digraph.NewRootDAG(dag.Name, requestID)
-	}
-
-	// Check for previous runs with this request ID and retry it if found.
-	// This prevents duplicate execution when retrying or when sub-DAGs share the
-	// same request ID, ensuring idempotency across the the DAG from the root DAG.
-	if rootDAG.RequestID != requestID {
-		logger.Debug(ctx, "Checking for previous sub-DAG run with the request ID", "requestID", requestID)
-		var status *runstore.Status
-		record, err := ctx.runStore().FindBySubRunRequestID(ctx, requestID, rootDAG)
-		if errors.Is(err, runstore.ErrRequestIDNotFound) {
-			// If the request ID is not found, proceed with execution
-			goto EXEC
-		}
-		if err != nil {
-			logger.Error(ctx, "Failed to retrieve historical run", "requestID", requestID, "err", err)
-			return fmt.Errorf("failed to retrieve historical run for request ID %s: %w", requestID, err)
-		}
-		status, err = record.ReadStatus(ctx)
-		if err != nil {
-			logger.Error(ctx, "Failed to read previous run status", "requestID", requestID, "err", err)
-			return fmt.Errorf("failed to read previous run status for request ID %s: %w", requestID, err)
-		}
-		return executeRetry(ctx, dag, status, rootDAG)
-	}
-
-EXEC:
-	return executeDag(ctx, dag, requestID, rootDAG)
+	return dag, params, nil
 }
 
-func executeDag(ctx *Context, dag *digraph.DAG, requestID string, rootDAG digraph.RootDAG) error {
-	logger.Debug(ctx, "Executing DAG", "dagName", dag.Name, "requestID", requestID)
+// determineRootWorkflow creates or parses the root execution reference
+func determineRootWorkflow(isChildWorkflow bool, rootRef string, dag *digraph.DAG, workflowID string) (digraph.WorkflowRef, error) {
+	if isChildWorkflow {
+		// Parse the root execution reference for child workflow
+		root, err := digraph.ParseWorkflowRef(rootRef)
+		if err != nil {
+			return digraph.WorkflowRef{}, fmt.Errorf("failed to parse root exec ref: %w", err)
+		}
+		return root, nil
+	}
 
-	// Open the log file for the scheduler. The log file will be used for future
-	// execution for the same DAG/request ID between attempts.
-	logFile, err := ctx.OpenLogFile(dag, requestID)
+	// Create a new root execution reference for root execution
+	return digraph.NewWorkflowRef(dag.Name, workflowID), nil
+}
+
+// handleChildWorkflow processes a child workflow, checking for previous runs
+func handleChildWorkflow(ctx *Context, dag *digraph.DAG, workflowID string, params string, root digraph.WorkflowRef, parent digraph.WorkflowRef) error {
+	// Log child workflow
+	logger.Info(ctx, "Executing child workflow",
+		"name", dag.Name,
+		"params", params,
+		"workflowId", workflowID,
+		"root", root,
+		"parent", parent,
+	)
+
+	// Double-check workflow ID is provided (should be caught earlier, but being defensive)
+	if workflowID == "" {
+		return fmt.Errorf("workflow ID must be provided for child workflow")
+	}
+
+	// Check for previous child workflow with this ID
+	logger.Debug(ctx, "Checking for previous child workflow with the workflow ID", "workflowId", workflowID)
+
+	// Look for existing execution run
+	run, err := ctx.HistoryRepo.FindChildWorkflowRun(ctx, root, workflowID)
+	if errors.Is(err, models.ErrWorkflowIDNotFound) {
+		// If the workflow ID is not found, proceed with new execution
+		return executeWorkflow(ctx, dag, parent, workflowID, root)
+	}
 	if err != nil {
-		logger.Error(ctx, "failed to initialize log file", "DAG", dag.Name, "err", err)
-		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
+		return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflowID, err)
+	}
+
+	// Read the status of the previous run
+	status, err := run.ReadStatus(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to read previous run status for workflow ID %s: %w", workflowID, err)
+	}
+
+	// Execute as a retry of the previous run
+	return executeRetry(ctx, dag, status, root)
+}
+
+// executeWorkflow handles the actual execution of a DAG
+func executeWorkflow(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, workflowID string, root digraph.WorkflowRef) error {
+	// Open the log file for the scheduler. The log file will be used for future
+	// execution for the same DAG/workflow ID between attempts.
+	logFile, err := ctx.OpenLogFile(d, workflowID)
+	if err != nil {
+		return fmt.Errorf("failed to initialize log file for DAG %s: %w", d.Name, err)
 	}
 	defer func() {
 		_ = logFile.Close()
 	}()
 
+	// Configure logging to the file
 	ctx.LogToFile(logFile)
 
-	logger.Debug(ctx, "DAG run initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
+	logger.Debug(ctx, "Workflow initiated", "DAG", d.Name, "workflowId", workflowID, "logFile", logFile.Name())
 
-	dagStore, err := ctx.dagStore([]string{filepath.Dir(dag.Location)})
+	// Initialize DAG repository with the DAG's directory in the search path
+	dr, err := ctx.dagRepo(nil, []string{filepath.Dir(d.Location)})
 	if err != nil {
-		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	cli, err := ctx.Client()
-	if err != nil {
-		logger.Error(ctx, "Failed to initialize client", "err", err)
-		return fmt.Errorf("failed to initialize client: %w", err)
-	}
-
-	var opts agent.Options
+	// Create a new agent to execute the DAG
 	agentInstance := agent.New(
-		requestID,
-		dag,
+		workflowID,
+		d,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
-		cli,
-		dagStore,
-		ctx.runStore(),
-		rootDAG,
-		opts,
+		ctx.HistoryMgr,
+		dr,
+		ctx.HistoryRepo,
+		root,
+		agent.Options{Parent: parent},
 	)
 
+	// Set up signal handling for the agent
 	listenSignals(ctx, agentInstance)
 
+	// Run the DAG
 	if err := agentInstance.Run(ctx); err != nil {
-		logger.Error(ctx, "Failed to execute DAG", "DAG", dag.Name, "requestID", requestID, "err", err)
+		logger.Error(ctx, "Failed to execute workflow", "name", d.Name, "workflowId", workflowID, "err", err)
 
-		if ctx.quiet {
+		if ctx.Quiet {
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
-			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, requestID, err)
+			return fmt.Errorf("failed to execute the workflow %s (workflow ID: %s): %w", d.Name, workflowID, err)
 		}
 	}
 
-	// Print the summary of the execution if the quiet flag is not set.
-	if !ctx.quiet {
+	// Print the summary of the execution if the quiet flag is not set
+	if !ctx.Quiet {
 		agentInstance.PrintSummary(ctx)
 	}
 

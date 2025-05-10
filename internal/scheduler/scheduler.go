@@ -163,7 +163,7 @@ func (s *Scheduler) run(ctx context.Context, now time.Time) {
 	// Subtract a small buffer to avoid edge cases with exact timing
 	jobs, err := s.manager.Next(ctx, now.Add(-time.Second).In(s.location))
 	if err != nil {
-		logger.Error(ctx, "failed to get next jobs", "err", err)
+		logger.Error(ctx, "Failed to get next jobs", "err", err)
 		return
 	}
 

@@ -11,13 +11,21 @@ func CmdScheduler() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "scheduler [flags]",
-			Short: "Start the scheduler process",
-			Long: `Launch the scheduler process that monitors and triggers DAG runs based on cron schedules.
+			Short: "Start the scheduler for automated workflow execution",
+			Long: `Launch the scheduler process that monitors DAG definitions and automatically triggers workflows based on their defined schedules.
+
+The scheduler continuously monitors the specified directory for DAG definitions,
+evaluates their schedule expressions (cron format), and initiates workflow executions
+when their scheduled time arrives. It handles time-based dependencies and ensures
+workflows run at their specified intervals.
+
+Flags:
+  --dags string   Path to the directory containing DAG definition files
 
 Example:
   dagu scheduler --dags=/path/to/dags
 
-This process runs continuously to automatically execute scheduled DAGs.
+This process runs continuously in the foreground until terminated.
 `,
 		}, schedulerFlags, runScheduler,
 	)
@@ -26,20 +34,20 @@ This process runs continuously to automatically execute scheduled DAGs.
 var schedulerFlags = []commandLineFlag{dagsFlag}
 
 func runScheduler(ctx *Context, _ []string) error {
-	if dagsDir, _ := ctx.Flags().GetString("dags"); dagsDir != "" {
-		ctx.cfg.Paths.DAGsDir = dagsDir
+	if dagsDir, _ := ctx.Command.Flags().GetString("dags"); dagsDir != "" {
+		ctx.Config.Paths.DAGsDir = dagsDir
 	}
 
-	logger.Info(ctx, "Scheduler initialization", "specsDirectory", ctx.cfg.Paths.DAGsDir, "logFormat", ctx.cfg.Global.LogFormat)
+	logger.Info(ctx, "Scheduler initialization", "specsDirectory", ctx.Config.Paths.DAGsDir, "logFormat", ctx.Config.Global.LogFormat)
 
-	scheduler, err := ctx.scheduler()
+	scheduler, err := ctx.NewScheduler()
 	if err != nil {
 		return fmt.Errorf("failed to initialize scheduler: %w", err)
 	}
 
 	if err := scheduler.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start scheduler in directory %s: %w",
-			ctx.cfg.Paths.DAGsDir, err)
+			ctx.Config.Paths.DAGsDir, err)
 	}
 
 	return nil

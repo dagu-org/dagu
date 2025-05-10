@@ -221,10 +221,10 @@ schedule: "* * * * *" # Run the DAG every minute
 params:
   - NAME: "Dagu"
 steps:
-  - name: Hello world
+  - name: hello_world
     command: echo Hello $NAME
 
-  - name: Simulate unclean Command Output
+  - name: simulate_unclean_command_output
     command: |
       cat <<EOF
       INFO: Starting process...
@@ -234,17 +234,17 @@ steps:
       EOF
     output: raw_output
 
-  - name: Extract Relevant Data
+  - name: extract_data
     command: |
       echo "$raw_output" | grep '^DATA:' | sed 's/^DATA: //'
     output: cleaned_data
     depends:
-      - Simulate unclean Command Output
+      - simulate_unclean_command_output
 
   - name: Done
     command: echo Done!
     depends:
-      - Hello world
+      - hello_world
 ```
 
 ### 4. Execute the DAG
@@ -266,10 +266,10 @@ dagu start <file or DAG name> [-- value1 value2 ...]
 # Displays the current status of the DAG
 dagu status <file or DAG name>
 
-# Re-runs the specified DAG run
-dagu retry --request-id=<request-id> <file or DAG name>
+# Re-runs the specified workflow
+dagu retry --workflow-id=<workflow-id> <file or DAG name>
 
-# Stops the DAG run
+# Stops the workflow
 dagu stop <file or DAG name>
 
 # Restarts the current running DAG
@@ -874,7 +874,7 @@ Search across all DAG definitions.
 
 ### Execution History
 
-Review past DAG runs and logs at a glance.
+Review past workflows and logs at a glance.
 
 ![History](assets/images/ui-history.webp?raw=true)
 

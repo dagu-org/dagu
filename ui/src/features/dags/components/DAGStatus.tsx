@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { components, NodeStatus, Status } from '../../../api/v2/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { useClient } from '../../../hooks/api';
@@ -10,23 +11,23 @@ import { LogViewer, StatusUpdateModal } from './dag-execution';
 import { DAGGraph } from './visualization';
 
 type Props = {
-  run: components['schemas']['RunDetails'];
+  workflow: components['schemas']['WorkflowDetails'];
   fileName: string;
 };
 
-function DAGStatus({ run, fileName }: Props) {
+function DAGStatus({ workflow, fileName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
+  const navigate = useNavigate();
   const [modal, setModal] = useState(false);
   const [selectedStep, setSelectedStep] = useState<
     components['schemas']['Step'] | undefined
   >(undefined);
-
   // State for log viewer
   const [logViewer, setLogViewer] = useState({
     isOpen: false,
     logType: 'step' as 'execution' | 'step',
     stepName: '',
-    requestId: '',
+    workflowId: '',
   });
   const client = useClient();
   const dismissModal = () => setModal(false);
@@ -34,62 +35,115 @@ function DAGStatus({ run, fileName }: Props) {
     step: components['schemas']['Step'],
     status: NodeStatus
   ) => {
-    const { error } = await client.PATCH(
-      '/runs/{dagName}/{requestId}/steps/{stepName}/status',
-      {
-        params: {
-          path: {
-            dagName: run.name,
-            requestId: run.requestId,
-            stepName: step.name,
-          },
-          query: {
-            remoteNode: appBarContext.selectedRemoteNode || 'local',
-          },
+    // Check if this is a child workflow by checking if rootWorkflowId and rootWorkflowName exist
+    // and are different from the current workflow's ID and name
+    const isChildWorkflow =
+      workflow.rootWorkflowId &&
+      workflow.rootWorkflowName &&
+      workflow.rootWorkflowId !== workflow.workflowId;
+
+    // Define path parameters with proper typing
+    const pathParams = {
+      name: isChildWorkflow ? workflow.rootWorkflowName : workflow.name,
+      workflowId: isChildWorkflow
+        ? workflow.rootWorkflowId
+        : workflow.workflowId,
+      stepName: step.name,
+      ...(isChildWorkflow ? { childWorkflowId: workflow.workflowId } : {}),
+    };
+
+    // Use the appropriate endpoint based on whether this is a child workflow
+    const endpoint = isChildWorkflow
+      ? '/workflows/{name}/{workflowId}/children/{childWorkflowId}/steps/{stepName}/status'
+      : '/workflows/{name}/{workflowId}/steps/{stepName}/status';
+
+    const { error } = await client.PATCH(endpoint, {
+      params: {
+        path: pathParams,
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
-        body: {
-          status,
-        },
-      }
-    );
+      },
+      body: {
+        status,
+      },
+    });
     if (error) {
       alert(error.message || 'An error occurred');
       return;
     }
     dismissModal();
   };
+  // Handle double-click on graph node (navigate to child workflow)
   const onSelectStepOnGraph = React.useCallback(
     async (id: string) => {
-      const status = run.status;
-      if (status == Status.Running || status == Status.NotStarted) {
-        return;
-      }
       // find the clicked step
-      const n = run.nodes?.find((n) => n.step.name.replace(/\s/g, '_') == id);
-      if (n) {
-        setSelectedStep(n.step);
-        setModal(true);
+      const n = workflow.nodes?.find(
+        (n) => n.step.name.replace(/\s/g, '_') == id
+      );
+
+      if (n && n.step.run) {
+        // Find the child workflow ID
+        const childWorkflow = n.children?.[0];
+
+        if (childWorkflow && childWorkflow.workflowId) {
+          // Navigate to the child workflow status page
+          const workflowId = workflow.rootWorkflowId;
+
+          // Use React Router's navigate with search params
+          // Include workflowName parameter to avoid waiting for DAG details
+          navigate({
+            pathname: `/dags/${fileName}`,
+            search: `?childWorkflowId=${childWorkflow.workflowId}&workflowId=${workflowId}&step=${n.step.name}&workflowName=${encodeURIComponent(workflow.rootWorkflowName)}`,
+          });
+        }
       }
     },
-    [run]
+    [workflow, navigate, fileName]
   );
 
-  const handlers = getEventHandlers(run);
+  // Handle right-click on graph node (show status update modal)
+  const onRightClickStepOnGraph = React.useCallback(
+    (id: string) => {
+      const status = workflow.status;
+
+      // Only allow status updates for completed workflows
+      if (status !== Status.Running && status !== Status.NotStarted) {
+        // find the right-clicked step
+        const n = workflow.nodes?.find(
+          (n) => n.step.name.replace(/\s/g, '_') == id
+        );
+
+        if (n) {
+          // Show the modal (it will be centered by default)
+          setSelectedStep(n.step);
+          setModal(true);
+        }
+      }
+    },
+    [workflow]
+  );
+
+  const handlers = getEventHandlers(workflow);
 
   // Handler for opening log viewer
-  const handleViewLog = (stepName: string, requestId: string) => {
+  const handleViewLog = (stepName: string, workflowId: string) => {
     setLogViewer({
       isOpen: true,
       logType: 'step',
       stepName,
-      requestId: requestId || run.requestId,
+      workflowId: workflowId || workflow.workflowId,
     });
   };
 
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
-        <DAGGraph run={run} onSelectStep={onSelectStepOnGraph} />
+        <DAGGraph
+          workflow={workflow}
+          onSelectStep={onSelectStepOnGraph}
+          onRightClickStep={onRightClickStepOnGraph}
+        />
       </div>
 
       <DAGContext.Consumer>
@@ -98,14 +152,14 @@ function DAGStatus({ run, fileName }: Props) {
             <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
               <SubTitle className="mb-4">Status</SubTitle>
               <DAGStatusOverview
-                status={run}
+                status={workflow}
                 fileName={fileName}
-                onViewLog={(requestId) => {
+                onViewLog={(workflowId) => {
                   setLogViewer({
                     isOpen: true,
                     logType: 'execution',
                     stepName: '',
-                    requestId,
+                    workflowId,
                   });
                 }}
               />
@@ -114,8 +168,8 @@ function DAGStatus({ run, fileName }: Props) {
             <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
               <SubTitle className="mb-4">Steps</SubTitle>
               <NodeStatusTable
-                nodes={run.nodes}
-                status={run}
+                nodes={workflow.nodes}
+                status={workflow}
                 {...props}
                 onViewLog={handleViewLog}
               />
@@ -126,7 +180,7 @@ function DAGStatus({ run, fileName }: Props) {
                 <SubTitle className="mb-4">Lifecycle Hooks</SubTitle>
                 <NodeStatusTable
                   nodes={handlers}
-                  status={run}
+                  status={workflow}
                   {...props}
                   onViewLog={handleViewLog}
                 />
@@ -148,9 +202,10 @@ function DAGStatus({ run, fileName }: Props) {
         isOpen={logViewer.isOpen}
         onClose={() => setLogViewer((prev) => ({ ...prev, isOpen: false }))}
         logType={logViewer.logType}
-        dagName={run.name}
-        requestId={logViewer.requestId}
+        dagName={workflow.name}
+        workflowId={logViewer.workflowId}
         stepName={logViewer.stepName}
+        workflow={workflow}
       />
     </div>
   );

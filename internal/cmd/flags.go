@@ -42,71 +42,71 @@ var (
 		bindViper:    true,
 	}
 
-	// Additional parameters to pass to the DAG run.
+	// Additional parameters to pass to the workflow.
 	// These parameters override the default values defined in the DAG.
 	// They can be specified either inline or following a "--" separator to distinguish them from other flags.
 	// Accepted formats include positional parameters and key=value pairs (e.g., "P1=foo P2=bar").
 	paramsFlag = commandLineFlag{
 		name:      "params",
 		shorthand: "p",
-		usage:     "Parameters to pass to the DAG run (overrides DAG defaults; supports positional values and key=value pairs, e.g., P1=foo P2=bar)",
+		usage:     "Parameters to pass to the workflow (overrides DAG defaults; supports positional values and key=value pairs, e.g., P1=foo P2=bar)",
 	}
 
-	// Unique request ID required for retrying a DAG run.
+	// Unique workflow ID required for retrying a workflow.
 	// This flag must be provided when using the retry command.
-	requestIDFlagRetry = commandLineFlag{
-		name:      "request-id",
-		shorthand: "r",
-		usage:     "Unique request ID for retrying a DAG run (required)",
+	workflowIDFlagRetry = commandLineFlag{
+		name:      "workflow-id",
+		shorthand: "e",
+		usage:     "Unique workflow ID for retrying a workflow (required)",
 		required:  true,
 	}
 
-	// Unique request ID used for starting a new DAG run.
+	// Unique workflow ID used for starting a new workflow.
 	// This is used to track and identify the execution instance and its status.
-	requestIDFlagStart = commandLineFlag{
-		name:      "request-id",
-		shorthand: "r",
-		usage:     "Unique request ID for a DAG run",
+	workflowIDFlagStart = commandLineFlag{
+		name:      "workflow-id",
+		shorthand: "e",
+		usage:     "Unique workflow ID for a workflow",
 	}
 
-	// Unique request ID used for stopping a DAG run.
-	requestIDFlagStop = commandLineFlag{
-		name:      "request-id",
-		shorthand: "r",
-		usage:     "Request ID for stopping a DAG run",
+	// Unique workflow ID used for stopping a workflow.
+	workflowIDFlagStop = commandLineFlag{
+		name:      "workflow-id",
+		shorthand: "e",
+		usage:     "workflow ID for stopping a workflow",
 	}
 
-	// Unique request ID used for restarting a DAG run.
-	requestIDFlagRestart = commandLineFlag{
-		name:      "request-id",
-		shorthand: "r",
-		usage:     "Request ID for restarting a DAG run",
+	// Unique workflow ID used for restarting a workflow.
+	workflowIDFlagRestart = commandLineFlag{
+		name:      "workflow-id",
+		shorthand: "e",
+		usage:     "workflow ID for restarting a workflow",
 	}
 
-	// Unique request ID used for checking the status of a DAG run.
-	requestIDFlagStatus = commandLineFlag{
-		name:      "request-id",
-		shorthand: "r",
-		usage:     "Request ID for checking the status of a DAG run",
+	// Unique workflow ID used for checking the status of a workflow.
+	workflowIDFlagStatus = commandLineFlag{
+		name:      "workflow-id",
+		shorthand: "e",
+		usage:     "workflow ID for checking the status of a workflow",
 	}
 
-	// rootRequestIDFlag reads the root request ID for starting a sub-DAG run
-	rootRequestIDFlag = commandLineFlag{
-		name:  "root-request-id",
-		usage: "Root request ID for a DAG run",
+	// rootRefNameFlag reads the root DAG name for starting a child workflow.
+	rootWorkflowFlag = commandLineFlag{
+		name:  "root",
+		usage: "[only for child workflows] workflow-reference for the root workflow",
 	}
 
-	// rootDAGNameFlag reads the root DAG name for starting a sub-DAG run.
-	rootDAGNameFlag = commandLineFlag{
-		name:  "root-dag-name",
-		usage: "Root DAG name for a DAG run",
+	// parentWorkflowFlag reads the parent ref for starting a child workflow.
+	parentWorkflowFlag = commandLineFlag{
+		name:  "parent",
+		usage: "[only for child workflows] workflow-reference for the parent workflow",
 	}
 
-	// Suppresses output during DAG run (e.g., logs, status updates).
+	// Suppresses output during workflow (e.g., logs, status updates).
 	quietFlag = commandLineFlag{
 		name:      "quiet",
 		shorthand: "q",
-		usage:     "Suppress output during DAG run",
+		usage:     "Suppress output during workflow",
 		isBool:    true,
 	}
 )

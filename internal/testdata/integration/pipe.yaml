@@ -1,6 +1,6 @@
 params:
   - NAME: "foo"
 steps:
-  - name: step 1
+  - name: step1
     command: echo hello $NAME | xargs echo
     output: OUT1

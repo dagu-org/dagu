@@ -4,7 +4,35 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestCreateFile(t *testing.T) {
+	t.Run("file creation and permissions", func(t *testing.T) {
+		dir := t.TempDir()
+		filePath := filepath.Join(dir, "test.log")
+
+		file, err := OpenOrCreateFile(filePath)
+		require.NoError(t, err)
+		defer func() {
+			_ = file.Close()
+		}()
+
+		assert.NotNil(t, file)
+		assert.Equal(t, filePath, file.Name())
+
+		info, err := file.Stat()
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
+	})
+
+	t.Run("invalid path", func(t *testing.T) {
+		_, err := OpenOrCreateFile("/nonexistent/directory/test.log")
+		assert.Error(t, err)
+	})
+}
 
 func TestResolvePath(t *testing.T) {
 	// Save original environment to restore later

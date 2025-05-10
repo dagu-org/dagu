@@ -199,17 +199,17 @@ func (d *DAG) HasTag(tag string) bool {
 
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
-func (d *DAG) SockAddr(requestID string) string {
+func (d *DAG) SockAddr(workflowID string) string {
 	if d.Location != "" {
 		return SockAddr(d.Location, "")
 	}
-	return SockAddr(d.Name, requestID)
+	return SockAddr(d.Name, workflowID)
 }
 
-// SockAddrSub returns the unix socket address for a specific request ID.
-// This is used to control sub DAG runs.
-func (d *DAG) SockAddrSub(requestID string) string {
-	return SockAddr(d.GetName(), requestID)
+// SockAddrSub returns the unix socket address for a specific workflow ID.
+// This is used to control child workflows.
+func (d *DAG) SockAddrSub(workflowID string) string {
+	return SockAddr(d.GetName(), workflowID)
 }
 
 // GetName returns the name of the DAG.
@@ -317,13 +317,13 @@ func (d *DAG) setupHandlers(workDir string) {
 
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
-func SockAddr(name, requestId string) string {
+func SockAddr(name, workflowID string) string {
 	maxSocketNameLength := 50 // Maximum length for socket name
 	name = fileutil.SafeName(name)
-	requestId = fileutil.SafeName(requestId)
+	workflowID = fileutil.SafeName(workflowID)
 
-	// Create MD5 hash of the combined name and requestID and take first 8 chars
-	combined := name + requestId
+	// Create MD5 hash of the combined name and workflow ID and take first 8 chars
+	combined := name + workflowID
 	hashLength := 6
 	hash := fmt.Sprintf("%x", md5.Sum([]byte(combined)))[:hashLength] // nolint:gosec
 

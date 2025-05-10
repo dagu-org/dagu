@@ -5,6 +5,8 @@ type Props = {
   def: string;
   style?: CSSProperties;
   scale: number;
+  onDoubleClick?: (id: string) => void;
+  onRightClick?: (id: string) => void;
 };
 
 mermaid.initialize({
@@ -22,7 +24,13 @@ mermaid.initialize({
   logLevel: 4, // ERROR
 });
 
-function Mermaid({ def, style = {}, scale }: Props) {
+function Mermaid({
+  def,
+  style = {},
+  scale,
+  onDoubleClick,
+  onRightClick,
+}: Props) {
   const mermaidRef = React.useRef<HTMLDivElement>(null); // Ref for the inner div holding the SVG
   const scrollContainerRef = React.useRef<HTMLDivElement>(null); // Ref for the outer scrollable div
   const scrollPosRef = React.useRef({ top: 0, left: 0 }); // Ref to store scroll position
@@ -74,8 +82,42 @@ function Mermaid({ def, style = {}, scale }: Props) {
           scrollContainerRef.current.scrollLeft = scrollPosRef.current.left;
         }
 
-        // Bind event handlers
-        // Consider if this timeout is still necessary or can be reduced
+        // Attach custom event handlers if provided
+        if ((onDoubleClick || onRightClick) && mermaidRef.current) {
+          // Find all nodes in the SVG (typically these are <g> elements with class="node")
+          const nodeElements = mermaidRef.current.querySelectorAll('.node');
+
+          nodeElements.forEach((node) => {
+            // Extract the node ID from the element
+            // The ID is typically in the format "flowchart-nodeId-number"
+            const nodeId = node.id.split('-')[1];
+
+            if (nodeId) {
+              // Attach double-click event listener if provided
+              if (onDoubleClick) {
+                node.addEventListener('dblclick', () => {
+                  onDoubleClick(nodeId);
+                });
+              }
+
+              // Attach right-click (contextmenu) event listener if provided
+              if (onRightClick) {
+                node.addEventListener('contextmenu', (event) => {
+                  event.preventDefault(); // Prevent default context menu
+                  onRightClick(nodeId);
+                });
+              }
+
+              // Add pointer cursor and disable text selection
+              const nodeElement = node as HTMLElement;
+              nodeElement.style.cursor = 'pointer';
+              nodeElement.style.userSelect = 'none';
+            }
+          });
+        }
+
+        // Bind standard Mermaid event handlers
+        // This is still needed for other functionality
         setTimeout(() => {
           if (mermaidRef.current && bindFunctions) {
             bindFunctions(mermaidRef.current);
@@ -122,7 +164,7 @@ function Mermaid({ def, style = {}, scale }: Props) {
     // Attach ref to the scrollable container
     <div ref={scrollContainerRef} style={dStyle}>
       <div
-        className="mermaid"
+        className="mermaid no-text-select"
         ref={mermaidRef} // Keep ref for mermaid rendering target
         style={{
           ...mStyle,

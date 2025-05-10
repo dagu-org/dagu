@@ -45,30 +45,16 @@ func FileExists(file string) bool {
 	return !os.IsNotExist(err)
 }
 
-// OpenOrCreateFile opens file or creates it if it doesn't exist.
-func OpenOrCreateFile(file string) (*os.File, error) {
-	if FileExists(file) {
-		return openFile(file)
-	}
-	return createFile(file)
-}
-
-// openFile opens file.
-func openFile(file string) (*os.File, error) {
-	outfile, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0600) //nolint:gosec
+// OpenOrCreateFile opens (or creates) the log file with flags for creation, write-only access,
+// appending, and synchronous I/O. It sets file permissions to 0600.
+func OpenOrCreateFile(filepath string) (*os.File, error) {
+	flags := os.O_CREATE | os.O_WRONLY | os.O_APPEND | os.O_SYNC
+	file, err := os.OpenFile(filepath, flags, 0600) // nolint:gosec
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create/open log file %s: %w", filepath, err)
 	}
-	return outfile, nil
-}
 
-// createFile creates file.
-func createFile(file string) (*os.File, error) {
-	outfile, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600) //nolint:gosec
-	if err != nil {
-		return nil, err
-	}
-	return outfile, nil
+	return file, nil
 }
 
 // MustTempDir returns temporary directory.

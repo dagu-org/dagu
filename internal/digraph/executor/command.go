@@ -131,7 +131,7 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 
 	}
 
-	cmd.Env = append(cmd.Env, digraph.AllEnvs(ctx)...)
+	cmd.Env = append(cmd.Env, AllEnvs(ctx)...)
 	cmd.Dir = cfg.Dir
 	cmd.Stdout = cfg.Stdout
 	cmd.Stderr = cfg.Stderr
@@ -210,7 +210,7 @@ func setupScript(ctx context.Context, step digraph.Step) (string, error) {
 		_ = file.Close()
 	}()
 
-	script, err := digraph.EvalString(ctx, step.Script, cmdutil.OnlyReplaceVars())
+	script, err := EvalString(ctx, step.Script, cmdutil.OnlyReplaceVars())
 	if err != nil {
 		return "", fmt.Errorf("failed to evaluate script: %w", err)
 	}

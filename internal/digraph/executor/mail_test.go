@@ -75,9 +75,9 @@ func TestMail(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				ctx := context.Background()
-				ctx = digraph.NewContext(ctx, &digraph.DAG{
+				ctx = digraph.SetupEnv(ctx, &digraph.DAG{
 					SMTP: &digraph.SMTPConfig{},
-				}, nil, digraph.RootDAG{}, "", "", nil)
+				}, nil, digraph.WorkflowRef{}, "", "", nil)
 
 				exec, err := newMail(ctx, tt.step)
 

@@ -19,11 +19,11 @@ import HistoryTableRow from './HistoryTableRow';
  * Props for the HistoryTable component
  */
 type Props = {
-  /** List of DAG runs */
-  runs: components['schemas']['RunDetails'][];
+  /** List of DAG workflows */
+  workflows: components['schemas']['WorkflowDetails'][];
   /** Grid data for visualization */
   gridData: components['schemas']['DAGGridItem'][];
-  /** Callback for when a run is selected */
+  /** Callback for when a workflow is selected */
   onSelect: (idx: number) => void;
   /** Currently selected index */
   idx: number;
@@ -33,21 +33,21 @@ type Props = {
  * HistoryTable displays a grid of execution history for a DAG
  * with dates as column headers and steps as rows
  */
-function HistoryTable({ runs, gridData, onSelect, idx }: Props) {
+function HistoryTable({ workflows, gridData, onSelect, idx }: Props) {
   return (
     <div className="rounded-xl bg-white overflow-hidden shadow-md dark:bg-slate-900 dark:border dark:border-slate-800">
       <Table className="select-none border-collapse">
         <TableHeader className="bg-slate-50 dark:bg-slate-800">
           <TableRow className="border-b border-slate-200 dark:border-slate-700">
             <TableHead className="py-3"></TableHead>
-            {runs.map((_, i) => {
-              if (!runs || i >= runs.length || !runs[i]) {
+            {workflows.map((_, i) => {
+              if (!workflows || i >= workflows.length || !workflows[i]) {
                 return null;
               }
 
               // Format the date for the column header
               let date;
-              const startedAt = runs[i].startedAt;
+              const startedAt = workflows[i].startedAt;
               if (startedAt && startedAt != '-') {
                 date = dayjs(startedAt).format('M/D');
               } else {
@@ -59,8 +59,8 @@ function HistoryTable({ runs, gridData, onSelect, idx }: Props) {
               if (i == 0) {
                 flag = true;
               }
-              if (i > 0 && runs[i - 1]) {
-                flag = dayjs(runs[i - 1]!.startedAt).format('M/D') != date;
+              if (i > 0 && workflows[i - 1]) {
+                flag = dayjs(workflows[i - 1]!.startedAt).format('M/D') != date;
               }
 
               return (

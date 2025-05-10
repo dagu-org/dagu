@@ -26,6 +26,8 @@ type Props = {
   step?: components['schemas']['Step'];
   /** Function called when the user submits the status update */
   onSubmit: (step: components['schemas']['Step'], status: NodeStatus) => void;
+  /** Optional position for the modal (x, y coordinates) */
+  position?: { x: number; y: number };
 };
 
 /**
@@ -100,6 +102,9 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [visible, step, onSubmit, dismissModal]);
+
+  // We're not using the position prop anymore as we want the modal to be centered
+  // The Dialog component from shadcn/ui will center the modal by default
 
   return (
     <Dialog open={visible} onOpenChange={(open) => !open && dismissModal()}>

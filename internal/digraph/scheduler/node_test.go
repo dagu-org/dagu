@@ -254,11 +254,11 @@ func setupNode(t *testing.T, opts ...nodeOption) nodeHelper {
 func (n nodeHelper) Execute(t *testing.T) {
 	t.Helper()
 
-	reqID := uuid.Must(uuid.NewV7()).String()
-	err := n.Setup(n.Context, n.Config.Paths.LogDir, reqID)
+	workflowID := uuid.Must(uuid.NewV7()).String()
+	err := n.Setup(n.Context, n.Config.Paths.LogDir, workflowID)
 	require.NoError(t, err, "failed to setup node")
 
-	err = n.Node.Execute(n.execContext(reqID))
+	err = n.Node.Execute(n.execContext(workflowID))
 	require.NoError(t, err, "failed to execute node")
 
 	err = n.Teardown(n.Context)
@@ -268,8 +268,8 @@ func (n nodeHelper) Execute(t *testing.T) {
 func (n nodeHelper) ExecuteFail(t *testing.T, expectedErr string) {
 	t.Helper()
 
-	reqID := uuid.Must(uuid.NewV7()).String()
-	err := n.Node.Execute(n.execContext(reqID))
+	workflowID := uuid.Must(uuid.NewV7()).String()
+	err := n.Node.Execute(n.execContext(workflowID))
 	require.Error(t, err, "expected error")
 	require.Contains(t, err.Error(), expectedErr, "unexpected error")
 }
@@ -291,6 +291,6 @@ func (n nodeHelper) AssertOutput(t *testing.T, key, value string) {
 	require.Equal(t, fmt.Sprintf(`%s=%s`, key, value), data, "output variable value mismatch")
 }
 
-func (n nodeHelper) execContext(reqID string) context.Context {
-	return digraph.NewContext(n.Context, &digraph.DAG{}, nil, digraph.RootDAG{}, reqID, "logFile", nil)
+func (n nodeHelper) execContext(workflowID string) context.Context {
+	return digraph.SetupEnv(n.Context, &digraph.DAG{}, nil, digraph.WorkflowRef{}, workflowID, "logFile", nil)
 }

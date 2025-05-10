@@ -3,6 +3,7 @@ package digraph
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -84,13 +85,14 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "executor", fn: buildExecutor},
 	{name: "command", fn: buildCommand},
 	{name: "depends", fn: buildDepends},
-	{name: "sub-DAG", fn: buildSubDAG},
+	{name: "childWorkflow", fn: buildChildWorkflow},
 	{name: "continueOn", fn: buildContinueOn},
 	{name: "retryPolicy", fn: buildRetryPolicy},
 	{name: "repeatPolicy", fn: buildRepeatPolicy},
 	{name: "signalOnStop", fn: buildSignalOnStop},
 	{name: "precondition", fn: buildStepPrecondition},
 	{name: "output", fn: buildOutput},
+	{name: "validate", fn: validateStep},
 }
 
 type stepBuilderEntry struct {
@@ -122,13 +124,6 @@ func build(ctx BuildContext, spec *definition) (*DAG, error) {
 		}
 		if err := builder.fn(ctx, spec, dag); err != nil {
 			errs.Add(wrapError(builder.name, nil, err))
-		}
-	}
-
-	if !ctx.opts.OnlyMetadata {
-		// TODO: Remove functions feature.
-		if err := assertFunctions(spec.Functions); err != nil {
-			errs.Add(err)
 		}
 	}
 
@@ -304,9 +299,30 @@ func buildName(ctx BuildContext, spec *definition, dag *DAG) error {
 	if spec.Name != "" {
 		return nil
 	}
+
 	dag.Name = ctx.opts.Name
+
+	// Validate the name
+	if dag.Name == "" {
+		return nil
+	}
+
+	if len(dag.Name) > maxNameLen {
+		return wrapError("name", dag.Name, ErrNameTooLong)
+	}
+	if !regexName.MatchString(dag.Name) {
+		return wrapError("name", dag.Name, ErrNameInvalidChars)
+	}
+
 	return nil
 }
+
+// regexName is a regular expression that matches valid names.
+// It allows alphanumeric characters, underscores, hyphens, and dots.
+var regexName = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
+
+// maxNameLen is the maximum length of a name.
+var maxNameLen = 40
 
 // buildEnvs builds the environment variables for the DAG.
 // Case 1: env is an array of maps with string keys and string values.
@@ -336,28 +352,28 @@ func buildLogDir(_ BuildContext, spec *definition, dag *DAG) (err error) {
 func buildHandlers(ctx BuildContext, spec *definition, dag *DAG) (err error) {
 	if spec.HandlerOn.Exit != nil {
 		spec.HandlerOn.Exit.Name = HandlerOnExit.String()
-		if dag.HandlerOn.Exit, err = buildStep(ctx, *spec.HandlerOn.Exit, spec.Functions); err != nil {
+		if dag.HandlerOn.Exit, err = buildStep(ctx, *spec.HandlerOn.Exit); err != nil {
 			return err
 		}
 	}
 
 	if spec.HandlerOn.Success != nil {
 		spec.HandlerOn.Success.Name = HandlerOnSuccess.String()
-		if dag.HandlerOn.Success, err = buildStep(ctx, *spec.HandlerOn.Success, spec.Functions); err != nil {
+		if dag.HandlerOn.Success, err = buildStep(ctx, *spec.HandlerOn.Success); err != nil {
 			return
 		}
 	}
 
 	if spec.HandlerOn.Failure != nil {
 		spec.HandlerOn.Failure.Name = HandlerOnFailure.String()
-		if dag.HandlerOn.Failure, err = buildStep(ctx, *spec.HandlerOn.Failure, spec.Functions); err != nil {
+		if dag.HandlerOn.Failure, err = buildStep(ctx, *spec.HandlerOn.Failure); err != nil {
 			return
 		}
 	}
 
 	if spec.HandlerOn.Cancel != nil {
 		spec.HandlerOn.Cancel.Name = HandlerOnCancel.String()
-		if dag.HandlerOn.Cancel, err = buildStep(ctx, *spec.HandlerOn.Cancel, spec.Functions); err != nil {
+		if dag.HandlerOn.Cancel, err = buildStep(ctx, *spec.HandlerOn.Cancel); err != nil {
 			return
 		}
 	}
@@ -480,7 +496,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 			return wrapError("steps", v, err)
 		}
 		for _, stepDef := range stepDefs {
-			step, err := buildStep(ctx, stepDef, spec.Functions)
+			step, err := buildStep(ctx, stepDef)
 			if err != nil {
 				return err
 			}
@@ -500,7 +516,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 		}
 		for name, stepDef := range stepDefs {
 			stepDef.Name = name
-			step, err := buildStep(ctx, stepDef, spec.Functions)
+			step, err := buildStep(ctx, stepDef)
 			if err != nil {
 				return err
 			}
@@ -560,11 +576,7 @@ func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
 }
 
 // buildStep builds a step from the step definition.
-func buildStep(ctx BuildContext, def stepDef, fns []*funcDef) (*Step, error) {
-	if err := assertStepDef(def, fns); err != nil {
-		return nil, err
-	}
-
+func buildStep(ctx BuildContext, def stepDef) (*Step, error) {
 	step := &Step{
 		Name:           def.Name,
 		Description:    def.Description,
@@ -575,11 +587,6 @@ func buildStep(ctx BuildContext, def stepDef, fns []*funcDef) (*Step, error) {
 		Dir:            def.Dir,
 		MailOnError:    def.MailOnError,
 		ExecutorConfig: ExecutorConfig{Config: make(map[string]any)},
-	}
-
-	// TODO: remove the deprecated call field.
-	if err := parseFuncCall(step, def.Call, fns); err != nil {
-		return nil, err
 	}
 
 	for _, entry := range stepBuilderRegistry {
@@ -673,6 +680,37 @@ func buildOutput(_ BuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
+func validateStep(_ BuildContext, def stepDef, step *Step) error {
+	if step.Name == "" {
+		return wrapError("name", step.Name, ErrStepNameRequired)
+	}
+
+	if len(step.Name) > maxStepNameLen {
+		return wrapError("name", step.Name, ErrStepNameTooLong)
+	}
+
+	if !regexStepName.MatchString(step.Name) {
+		return wrapError("name", step.Name, ErrStepNameInvalidChars)
+	}
+
+	// TODO: Validate executor config for each executor type.
+
+	if step.Command == "" {
+		if step.ExecutorConfig.Type == "" && step.Script == "" && step.ChildWorkflow == nil {
+			return ErrStepCommandIsRequired
+		}
+	}
+
+	return nil
+}
+
+// regexStepName is a regular expression that matches valid step names.
+// It allows alphanumeric characters, underscores, hyphens, dots, and spaces.
+var regexStepName = regexp.MustCompile(`^[a-zA-Z0-9_][a-zA-Z0-9 _.-]*$`)
+
+// maxStepNameLen is the maximum length of a step name.
+const maxStepNameLen = 40
+
 func buildStepPrecondition(ctx BuildContext, def stepDef, step *Step) error {
 	// Parse both `preconditions` and `precondition` fields.
 	conditions, err := parsePrecondition(ctx, def.Preconditions)
@@ -700,8 +738,8 @@ func buildSignalOnStop(_ BuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
-// buildSubDAG parses the sub-DAG definition and sets the step fields.
-func buildSubDAG(_ BuildContext, def stepDef, step *Step) error {
+// buildChildWorkflow parses the child workflow definition and sets the step fields.
+func buildChildWorkflow(_ BuildContext, def stepDef, step *Step) error {
 	name, params := def.Run, def.Params
 
 	// if the run field is not set, return nil.
@@ -709,8 +747,8 @@ func buildSubDAG(_ BuildContext, def stepDef, step *Step) error {
 		return nil
 	}
 
-	// Set the step fields for the sub-DAG.
-	step.SubDAG = &SubDAG{Name: name, Params: params}
+	// Set the step fields for the child workflow.
+	step.ChildWorkflow = &ChildWorkflow{Name: name, Params: params}
 	step.ExecutorConfig.Type = ExecutorTypeSub
 	step.Command = "run"
 	step.Args = []string{name, params}
@@ -791,44 +829,6 @@ func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 	}
 
 	return nil
-}
-
-// assignValues Assign values to command parameters
-func assignValues(command string, params map[string]string) string {
-	updatedCommand := command
-
-	for k, v := range params {
-		updatedCommand = strings.ReplaceAll(
-			updatedCommand, fmt.Sprintf("$%v", k), v,
-		)
-	}
-
-	return updatedCommand
-}
-
-func parseKey(value any) (string, error) {
-	val, ok := value.(string)
-	if !ok {
-		return "", fmt.Errorf("%w: %T", ErrInvalidKeyType, value)
-	}
-
-	return val, nil
-}
-
-// extractParamNames extracts a slice of parameter names by removing the '$'
-// from the command string.
-func extractParamNames(command string) []string {
-	words := strings.Fields(command)
-
-	var params []string
-	for _, word := range words {
-		if strings.HasPrefix(word, "$") {
-			paramName := strings.TrimPrefix(word, "$")
-			params = append(params, paramName)
-		}
-	}
-
-	return params
 }
 
 func parseIntOrArray(v any) ([]int, error) {

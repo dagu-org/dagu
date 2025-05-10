@@ -87,10 +87,13 @@ function Dashboard(): React.ReactElement | null {
 
   dagsList.forEach((dagFile) => {
     if (
-      dagFile.latestRun &&
-      Object.prototype.hasOwnProperty.call(metrics, dagFile.latestRun.status)
+      dagFile.latestWorkflow &&
+      Object.prototype.hasOwnProperty.call(
+        metrics,
+        dagFile.latestWorkflow.status
+      )
     ) {
-      const statusKey = dagFile.latestRun.status as Status;
+      const statusKey = dagFile.latestWorkflow.status as Status;
       metrics[statusKey]! += 1;
     }
   });

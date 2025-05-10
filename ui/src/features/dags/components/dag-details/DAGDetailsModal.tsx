@@ -8,7 +8,7 @@ import { useQuery } from '../../../../hooks/api';
 import dayjs from '../../../../lib/dayjs';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
-import { RunDetailsContext } from '../../contexts/DAGStatusContext';
+import { RootWorkflowContext } from '../../contexts/RootWorkflowContext';
 import DAGDetailsContent from './DAGDetailsContent';
 
 type DAGDetailsModalProps = {
@@ -24,12 +24,17 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
 }) => {
   const navigate = useNavigate();
   const appBarContext = React.useContext(AppBarContext);
-  const [currentRun, setCurrentRun] = React.useState<
-    components['schemas']['RunDetails'] | undefined
+  const [currentWorkflow, setCurrentWorkflow] = React.useState<
+    components['schemas']['WorkflowDetails'] | undefined
   >();
   const [activeTab, setActiveTab] = React.useState('status');
-  const [requestId] = React.useState<string>('latest');
+  const [workflowId] = React.useState<string>('latest');
   const [stepName] = React.useState<string | null>(null);
+
+  // Function to navigate to status tab
+  const navigateToStatusTab = React.useCallback(() => {
+    setActiveTab('status');
+  }, []);
 
   const { data, isLoading, mutate } = useQuery(
     '/dags/{fileName}',
@@ -69,7 +74,7 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
 
   React.useEffect(() => {
     if (data) {
-      setCurrentRun(data.latestRun);
+      setCurrentWorkflow(data.latestWorkflow);
     }
   }, [data]);
 
@@ -113,7 +118,7 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
 
   if (!isOpen) return null;
 
-  if (isLoading || !data || !data.latestRun) {
+  if (isLoading || !data || !data.latestWorkflow) {
     return (
       <div className="fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-gray-100 border-l border-border shadow-xl z-50 flex items-center justify-center">
         <LoadingIndicator />
@@ -138,11 +143,11 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
             name: data.dag?.name || '',
           }}
         >
-          <RunDetailsContext.Provider
+          <RootWorkflowContext.Provider
             value={{
-              data: currentRun,
-              setData: (status: components['schemas']['RunDetails']) => {
-                setCurrentRun(status);
+              data: currentWorkflow,
+              setData: (status: components['schemas']['WorkflowDetails']) => {
+                setCurrentWorkflow(status);
               },
             }}
           >
@@ -191,19 +196,20 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
                   <DAGDetailsContent
                     fileName={fileName}
                     dag={data.dag}
-                    latestRun={data.latestRun}
+                    currentWorkflow={data.latestWorkflow}
                     refreshFn={refreshFn}
                     formatDuration={formatDuration}
                     activeTab={activeTab}
                     onTabChange={setActiveTab}
-                    requestId={requestId}
+                    workflowId={workflowId}
                     stepName={stepName}
                     isModal={true}
+                    navigateToStatusTab={navigateToStatusTab}
                   />
                 )}
               </div>
             </div>
-          </RunDetailsContext.Provider>
+          </RootWorkflowContext.Provider>
         </DAGContext.Provider>
       </div>
     </>

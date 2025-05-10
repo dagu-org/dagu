@@ -9,7 +9,7 @@ type LogSideModalProps = {
   children: React.ReactNode;
   isInModal?: boolean;
   dagName?: string;
-  requestId?: string;
+  workflowId?: string;
   stepName?: string;
   logType?: 'execution' | 'step';
 };
@@ -25,7 +25,7 @@ const LogSideModal: React.FC<LogSideModalProps> = ({
   children,
   isInModal = false,
   dagName = '',
-  requestId = '',
+  workflowId = '',
   stepName = '',
   logType = 'execution',
 }) => {
@@ -75,15 +75,15 @@ const LogSideModal: React.FC<LogSideModalProps> = ({
     const baseUrl = `/dags/${dagName}`;
     const searchParams = new URLSearchParams();
 
-    if (requestId) {
-      searchParams.set('requestId', requestId);
+    if (workflowId) {
+      searchParams.set('workflowId', workflowId);
     }
 
     if (logType === 'step' && stepName) {
       searchParams.set('step', stepName);
       return `${baseUrl}/log?${searchParams.toString()}`;
     } else {
-      return `${baseUrl}/scheduler-log?${searchParams.toString()}`;
+      return `${baseUrl}/workflow-log?${searchParams.toString()}`;
     }
   };
 

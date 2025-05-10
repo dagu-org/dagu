@@ -27,8 +27,8 @@ import { StartDAGModal } from '../dag-execution';
 type Props = {
   /** Current status of the DAG */
   status?:
-    | components['schemas']['RunSummary']
-    | components['schemas']['RunDetails'];
+    | components['schemas']['WorkflowSummary']
+    | components['schemas']['WorkflowDetails'];
   /** File ID of the DAG */
   fileName: string;
   /** DAG definition */
@@ -39,6 +39,8 @@ type Props = {
   refresh?: () => void;
   /** Display mode: 'compact' for icon-only, 'full' for text+icon buttons */
   displayMode?: 'compact' | 'full';
+  /** Function to navigate to status tab after execution */
+  navigateToStatusTab?: () => void;
 };
 
 /**
@@ -50,12 +52,13 @@ function DAGActions({
   dag,
   refresh,
   displayMode = 'compact',
+  navigateToStatusTab,
 }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const [isStartModal, setIsStartModal] = React.useState(false);
   const [isStopModal, setIsStopModal] = React.useState(false);
   const [isRetryModal, setIsRetryModal] = React.useState(false);
-  const [retryRequestId, setRetryRequestId] = React.useState<string>('');
+  const [retryWorkflowId, setRetryWorkflowId] = React.useState<string>('');
 
   const client = useClient();
 
@@ -72,7 +75,7 @@ function DAGActions({
   const buttonState = {
     start: status?.status != 1,
     stop: status?.status == 1,
-    retry: status?.status != 1 && status?.requestId != '',
+    retry: status?.status != 1 && status?.workflowId != '',
   };
 
   if (!dag) {
@@ -161,8 +164,8 @@ function DAGActions({
                   const urlParams = new URLSearchParams(window.location.search);
                   const idxParam = urlParams.get('idx');
 
-                  // Default to current status requestId
-                  let requestIdToUse = status?.requestId || '';
+                  // Default to current status workflowId
+                  let workflowIdToUse = status?.workflowId || '';
 
                   // If we're in the history page or modal history tab with a specific run selected
                   const isInHistoryPage =
@@ -172,28 +175,14 @@ function DAGActions({
                       '.dag-modal-content [data-tab="history"]'
                     ) !== null;
 
-                  console.log(
-                    'Retry check - isInHistoryPage:',
-                    isInHistoryPage
-                  );
-                  console.log(
-                    'Retry check - isInModalHistoryTab:',
-                    isInModalHistoryTab
-                  );
-                  console.log('Retry check - idxParam:', idxParam);
-                  console.log(
-                    'Retry check - current status requestId:',
-                    status?.requestId
-                  );
-
                   if (
                     (isInHistoryPage || isInModalHistoryTab) &&
                     idxParam !== null
                   ) {
                     try {
-                      // Get all runs for this DAG to find the correct requestId
+                      // Get all workflows for this DAG to find the correct workflowId
                       const { data } = await client.GET(
-                        '/dags/{fileName}/runs',
+                        '/dags/{fileName}/workflows',
                         {
                           params: {
                             path: {
@@ -207,36 +196,26 @@ function DAGActions({
                         }
                       );
 
-                      if (data?.runs && data.runs.length > 0) {
+                      if (data?.workflows && data.workflows.length > 0) {
                         // Convert idx to integer
                         const selectedIdx = parseInt(idxParam);
 
-                        // Get the run at the selected index (reversed order)
-                        const selectedRun = [...data.runs].reverse()[
+                        // Get the workflow at the selected index (reversed order)
+                        const selectedWorkflow = [...data.workflows].reverse()[
                           selectedIdx
                         ];
 
-                        console.log('Selected run:', selectedRun);
-                        console.log(
-                          'Selected run requestId:',
-                          selectedRun?.requestId
-                        );
-
-                        if (selectedRun && selectedRun.requestId) {
-                          requestIdToUse = selectedRun.requestId;
-                          console.log(
-                            'Using requestId from selected run:',
-                            requestIdToUse
-                          );
+                        if (selectedWorkflow && selectedWorkflow.workflowId) {
+                          workflowIdToUse = selectedWorkflow.workflowId;
                         }
                       }
                     } catch (err) {
-                      console.error('Error fetching runs for retry:', err);
+                      console.error('Error fetching workflows for retry:', err);
                     }
                   }
 
-                  // Set the requestId to use for retry
-                  setRetryRequestId(requestIdToUse);
+                  // Set the workflowId to use for retry
+                  setRetryWorkflowId(workflowIdToUse);
 
                   // Show the modal
                   setIsRetryModal(true);
@@ -256,8 +235,8 @@ function DAGActions({
                   const urlParams = new URLSearchParams(window.location.search);
                   const idxParam = urlParams.get('idx');
 
-                  // Default to current status requestId
-                  let requestIdToUse = status?.requestId || '';
+                  // Default to current status workflowId
+                  let workflowIdToUse = status?.workflowId || '';
 
                   // If we're in the history page or modal history tab with a specific run selected
                   const isInHistoryPage =
@@ -267,28 +246,14 @@ function DAGActions({
                       '.dag-modal-content [data-tab="history"]'
                     ) !== null;
 
-                  console.log(
-                    'Retry check (full) - isInHistoryPage:',
-                    isInHistoryPage
-                  );
-                  console.log(
-                    'Retry check (full) - isInModalHistoryTab:',
-                    isInModalHistoryTab
-                  );
-                  console.log('Retry check (full) - idxParam:', idxParam);
-                  console.log(
-                    'Retry check (full) - current status requestId:',
-                    status?.requestId
-                  );
-
                   if (
                     (isInHistoryPage || isInModalHistoryTab) &&
                     idxParam !== null
                   ) {
                     try {
-                      // Get all runs for this DAG to find the correct requestId
+                      // Get all workflows for this DAG to find the correct workflowId
                       const { data } = await client.GET(
-                        '/dags/{fileName}/runs',
+                        '/dags/{fileName}/workflows',
                         {
                           params: {
                             path: {
@@ -302,36 +267,26 @@ function DAGActions({
                         }
                       );
 
-                      if (data?.runs && data.runs.length > 0) {
+                      if (data?.workflows && data.workflows.length > 0) {
                         // Convert idx to integer
                         const selectedIdx = parseInt(idxParam);
 
-                        // Get the run at the selected index (reversed order)
-                        const selectedRun = [...data.runs].reverse()[
+                        // Get the workflow at the selected index (reversed order)
+                        const selectedWorkflow = [...data.workflows].reverse()[
                           selectedIdx
                         ];
 
-                        console.log('Selected run (full):', selectedRun);
-                        console.log(
-                          'Selected run requestId (full):',
-                          selectedRun?.requestId
-                        );
-
-                        if (selectedRun && selectedRun.requestId) {
-                          requestIdToUse = selectedRun.requestId;
-                          console.log(
-                            'Using requestId from selected run (full):',
-                            requestIdToUse
-                          );
+                        if (selectedWorkflow && selectedWorkflow.workflowId) {
+                          workflowIdToUse = selectedWorkflow.workflowId;
                         }
                       }
                     } catch (err) {
-                      console.error('Error fetching runs for retry:', err);
+                      console.error('Error fetching workflows for retry:', err);
                     }
                   }
 
-                  // Set the requestId to use for retry
-                  setRetryRequestId(requestIdToUse);
+                  // Set the workflowId to use for retry
+                  setRetryWorkflowId(workflowIdToUse);
 
                   // Show the modal
                   setIsRetryModal(true);
@@ -369,7 +324,6 @@ function DAGActions({
               alert(error.message || 'An error occurred');
               return;
             }
-            console.log('Retry successful');
             reloadData();
           }}
         >
@@ -383,8 +337,6 @@ function DAGActions({
           onSubmit={async () => {
             setIsRetryModal(false);
 
-            console.log('Submitting retry with requestId:', retryRequestId);
-
             const { error } = await client.POST('/dags/{fileName}/retry', {
               params: {
                 path: {
@@ -395,7 +347,7 @@ function DAGActions({
                 },
               },
               body: {
-                requestId: retryRequestId,
+                workflowId: retryWorkflowId,
               },
             });
             if (error) {
@@ -410,9 +362,12 @@ function DAGActions({
             <p className="mb-2">
               Do you really want to rerun the following execution?
             </p>
-            <LabeledItem label="Request-ID">
+            <LabeledItem label="Workflow-Name">
+              <span className="font-mono text-sm">{status?.name || 'N/A'}</span>
+            </LabeledItem>
+            <LabeledItem label="Workflow-ID">
               <span className="font-mono text-sm">
-                {retryRequestId || status?.requestId || 'N/A'}
+                {retryWorkflowId || status?.workflowId || 'N/A'}
               </span>
             </LabeledItem>
             {status?.startedAt && (
@@ -454,6 +409,10 @@ function DAGActions({
               return;
             }
             reloadData();
+            // Navigate to status tab after execution
+            if (navigateToStatusTab) {
+              navigateToStatusTab();
+            }
           }}
           dismissModal={() => {
             setIsStartModal(false);

@@ -209,3 +209,11 @@ a {
 .slide-in-from-right {
   animation: slideInFromRight 0.1s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+/* Disable text selection for elements with this class */
+.no-text-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}

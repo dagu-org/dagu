@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/dagstore"
 	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/runstore"
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/scheduler/filenotify"
 	"github.com/robfig/cron/v3"
 
@@ -44,25 +44,25 @@ var _ JobManager = (*dagJobManager)(nil)
 
 // dagJobManager manages DAGs on local filesystem.
 type dagJobManager struct {
-	targetDir  string
-	registry   map[string]*digraph.DAG
-	lock       sync.Mutex
-	dagClient  dagstore.Client
-	runClient  runstore.Client
-	executable string
-	workDir    string
+	targetDir      string
+	registry       map[string]*digraph.DAG
+	lock           sync.Mutex
+	dagClient      models.DAGRepository
+	historyManager history.Manager
+	executable     string
+	workDir        string
 }
 
 // NewDAGJobManager creates a new DAG manager with the given configuration.
-func NewDAGJobManager(dir string, dagCli dagstore.Client, runCli runstore.Client, executable, workDir string) JobManager {
+func NewDAGJobManager(dir string, dagCli models.DAGRepository, hm history.Manager, executable, workDir string) JobManager {
 	return &dagJobManager{
-		targetDir:  dir,
-		lock:       sync.Mutex{},
-		registry:   map[string]*digraph.DAG{},
-		dagClient:  dagCli,
-		runClient:  runCli,
-		executable: executable,
-		workDir:    workDir,
+		targetDir:      dir,
+		lock:           sync.Mutex{},
+		registry:       map[string]*digraph.DAG{},
+		dagClient:      dagCli,
+		historyManager: hm,
+		executable:     executable,
+		workDir:        workDir,
 	}
 }
 
@@ -116,7 +116,7 @@ func (m *dagJobManager) createJob(dag *digraph.DAG, next time.Time, schedule cro
 		WorkDir:    m.workDir,
 		Next:       next,
 		Schedule:   schedule,
-		Client:     m.runClient,
+		Client:     m.historyManager,
 	}
 }
 

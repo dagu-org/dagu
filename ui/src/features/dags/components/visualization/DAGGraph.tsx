@@ -1,11 +1,16 @@
 /**
- * DAGGraph component provides a tabbed interface for visualizing DAG runs as either a graph or timeline.
+ * DAGGraph component provides a tabbed interface for visualizing DAG workflows as either a graph or timeline.
  *
  * @module features/dags/components/visualization
  */
 import { Tab, Tabs } from '@/components/ui/tabs';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { GanttChart, GitGraph } from 'lucide-react';
+import { GanttChart, GitGraph, MousePointerClick } from 'lucide-react';
 import React from 'react';
 import { useCookies } from 'react-cookie';
 import { components, Status } from '../../../../api/v2/schema';
@@ -16,17 +21,19 @@ import { FlowchartSwitch, FlowchartType, Graph, TimelineChart } from './';
  * Props for the DAGGraph component
  */
 type Props = {
-  /** DAG run details containing execution information */
-  run: components['schemas']['RunDetails'];
-  /** Callback for when a step is selected in the graph */
+  /** DAG workflow details containing execution information */
+  workflow: components['schemas']['WorkflowDetails'];
+  /** Callback for when a step is selected in the graph (double-click) */
   onSelectStep?: (id: string) => void;
+  /** Callback for when a step is right-clicked in the graph */
+  onRightClickStep?: (id: string) => void;
 };
 
 /**
- * DAGGraph component provides a tabbed interface for visualizing DAG runs
+ * DAGGraph component provides a tabbed interface for visualizing DAG workflows
  * with options to switch between graph and timeline views
  */
-function DAGGraph({ run, onSelectStep }: Props) {
+function DAGGraph({ workflow, onSelectStep, onRightClickStep }: Props) {
   // Active tab state (0 = Graph, 1 = Timeline)
   const [sub, setSub] = React.useState('0');
 
@@ -77,18 +84,37 @@ function DAGGraph({ run, onSelectStep }: Props) {
       </div>
 
       <BorderedBox className="py-4 px-4 flex flex-col overflow-x-auto">
+        {sub === '0' && (
+          <div className="flex justify-end mb-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded cursor-help">
+                  <MousePointerClick className="h-3 w-3 mr-1" />
+                  Double-click to navigate / Right-click to change status
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="space-y-1">
+                  <p>Double-click: Navigate to child workflow</p>
+                  <p>Right-click: Update node status</p>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        )}
         <div className="overflow-x-auto">
           {sub === '0' ? (
             <Graph
-              steps={run.nodes}
+              steps={workflow.nodes}
               type="status"
               flowchart={flowchart}
               onClickNode={onSelectStep}
-              showIcons={run.status > Status.NotStarted}
-              animate={run.status == Status.Running}
+              onRightClickNode={onRightClickStep}
+              showIcons={workflow.status > Status.NotStarted}
+              animate={workflow.status == Status.Running}
             />
           ) : (
-            <TimelineChart status={run} />
+            <TimelineChart status={workflow} />
           )}
         </div>
       </BorderedBox>

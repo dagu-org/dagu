@@ -7,7 +7,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	pkgsc "github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/runstore"
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/robfig/cron/v3"
@@ -124,7 +124,7 @@ func TestJobReady(t *testing.T) {
 			wantErr:        scheduler.ErrJobRunning,
 		},
 		{
-			name:           "last_run_after_next_schedule",
+			name:           "last_execution_after_next_schedule",
 			schedule:       "0 * * * *",
 			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 			lastRunTime:    time.Date(2020, 1, 1, 2, 0, 0, 0, time.UTC),
@@ -158,7 +158,7 @@ func TestJobReady(t *testing.T) {
 				Next:     tt.now,
 			}
 
-			lastRunStatus := runstore.Status{
+			lastRunStatus := models.Status{
 				Status:    tt.lastStatus,
 				StartedAt: stringutil.FormatTime(tt.lastRunTime),
 			}

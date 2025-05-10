@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
 )
@@ -44,13 +45,13 @@ type NodeState struct {
 	// ExitCode is the exit code that the command exited with.
 	// It only makes sense when the node is a command executor.
 	ExitCode int
-	// SubRuns is the list of sub-runs that this node has executed.
-	SubRuns []SubRun
+	// Child executions is the list of child workflows that this node has executed.
+	Children []ChildWorkflow
 }
 
-type SubRun struct {
-	// RequestID is the request ID of the sub-run.
-	RequestID string
+type ChildWorkflow struct {
+	// WorkflowID is the workflow ID of the child workflow.
+	WorkflowID string
 }
 
 type NodeStatus int
@@ -133,19 +134,19 @@ func (s *Data) Data() NodeData {
 	return s.inner
 }
 
-func (s *Data) SubRunRequestID() (string, error) {
+func (s *Data) ChildWorkflowID() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// If subRuns is not empty, return the first child's request ID.
-	if len(s.inner.State.SubRuns) > 0 {
-		return s.inner.State.SubRuns[0].RequestID, nil
+	// If children is not empty, return the first child's workflow ID.
+	if len(s.inner.State.Children) > 0 {
+		return s.inner.State.Children[0].WorkflowID, nil
 	}
-	// Generate a new request ID for the current node.
-	r, err := generateRequestID()
+	// Generate a new workflow ID for the current node.
+	r, err := generateWorkflowID()
 	if err != nil {
-		return "", fmt.Errorf("failed to generate request ID: %w", err)
+		return "", fmt.Errorf("failed to generate workflow ID: %w", err)
 	}
-	s.inner.State.SubRuns = append(s.inner.State.SubRuns, SubRun{RequestID: r})
+	s.inner.State.Children = append(s.inner.State.Children, ChildWorkflow{WorkflowID: r})
 	return r, nil
 }
 
@@ -156,23 +157,23 @@ func (s *Data) Setup(ctx context.Context, logFile string, startedAt time.Time) e
 	s.inner.State.Log = logFile
 	s.inner.State.StartedAt = startedAt
 
-	c := digraph.GetExecContext(ctx)
+	env := executor.GetEnv(ctx)
 
 	// Evaluate the stdout and stderr fields
-	stdout, err := c.EvalString(ctx, s.inner.Step.Stdout)
+	stdout, err := env.EvalString(ctx, s.inner.Step.Stdout)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate stdout field: %w", err)
 	}
 	s.inner.Step.Stdout = stdout
 
-	stderr, err := c.EvalString(ctx, s.inner.Step.Stderr)
+	stderr, err := env.EvalString(ctx, s.inner.Step.Stderr)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate stderr field: %w", err)
 	}
 	s.inner.Step.Stderr = stderr
 
 	// Evaluate the dir field
-	dir, err := c.EvalString(ctx, s.inner.Step.Dir)
+	dir, err := env.EvalString(ctx, s.inner.Step.Dir)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate dir field: %w", err)
 	}
@@ -293,15 +294,20 @@ func (n *Data) getBoolVariable(key string) (bool, bool) {
 }
 
 func (n *Data) setBoolVariable(key string, value bool) {
+
 	if n.inner.Step.OutputVariables == nil {
+		n.mu.Lock()
 		n.inner.Step.OutputVariables = &digraph.SyncMap{}
+		n.mu.Unlock()
 	}
 	n.inner.Step.OutputVariables.Store(key, stringutil.NewKeyValue(key, strconv.FormatBool(value)).String())
 }
 
 func (n *Data) setVariable(key, value string) {
 	if n.inner.Step.OutputVariables == nil {
+		n.mu.Lock()
 		n.inner.Step.OutputVariables = &digraph.SyncMap{}
+		n.mu.Unlock()
 	}
 	n.inner.Step.OutputVariables.Store(key, stringutil.NewKeyValue(key, value).String())
 }
@@ -366,10 +372,10 @@ func (n *Data) ClearState() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	// The data of sub-runs need to be preserved to retain their request IDs
-	subRuns := n.inner.State.SubRuns
+	// The data of child workflows need to be preserved to retain their workflow IDs
+	children := n.inner.State.Children
 	n.inner.State = NodeState{}
-	n.inner.State.SubRuns = subRuns
+	n.inner.State.Children = children
 }
 
 func (n *Data) MarkError(err error) {
@@ -380,9 +386,9 @@ func (n *Data) MarkError(err error) {
 	n.inner.State.Status = NodeStatusError
 }
 
-// generateRequestID generates a new request ID.
-// For simplicity, we use UUIDs as request IDs.
-func generateRequestID() (string, error) {
+// generateWorkflowID generates a new workflow ID.
+// For simplicity, we use UUIDs as workflow IDs.
+func generateWorkflowID() (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return "", err

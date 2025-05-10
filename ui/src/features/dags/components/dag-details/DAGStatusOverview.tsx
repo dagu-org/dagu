@@ -24,14 +24,14 @@ import StatusChip from '../../../../ui/StatusChip';
  * Props for the DAGStatusOverview component
  */
 type Props = {
-  /** DAG run details */
-  status?: components['schemas']['RunDetails'];
+  /** DAG workflow details */
+  status?: components['schemas']['WorkflowDetails'];
   /** DAG file ID */
   fileName: string;
-  /** Request ID of the execution */
-  requestId?: string;
+  /** Workflow ID of the execution */
+  workflowId?: string;
   /** Function to open log viewer */
-  onViewLog?: (requestId: string) => void;
+  onViewLog?: (workflowId: string) => void;
 };
 
 /**
@@ -41,15 +41,15 @@ type Props = {
 function DAGStatusOverview({
   status,
   fileName,
-  requestId = '',
+  workflowId = '',
   onViewLog,
 }: Props) {
   // Build URL for log viewing
   const searchParams = new URLSearchParams();
-  if (requestId) {
-    searchParams.set('requestId', requestId);
+  if (workflowId) {
+    searchParams.set('workflowId', workflowId);
   }
-  const url = `/dags/${fileName}/scheduler-log?${searchParams.toString()}`;
+  const url = `/dags/${fileName}/workflow-log?${searchParams.toString()}`;
 
   // Don't render if no status is provided
   if (!status) {
@@ -89,7 +89,7 @@ function DAGStatusOverview({
   const isRunning = status.status === Status.Running;
 
   // Count nodes by status
-  const nodeStats = status.nodes?.reduce(
+  const nodeStatus = status.nodes?.reduce(
     (acc, node) => {
       const statusKey = node.statusLabel.toLowerCase().replace(' ', '_');
       acc[statusKey] = (acc[statusKey] || 0) + 1;
@@ -118,12 +118,12 @@ function DAGStatusOverview({
           )}
         </div>
 
-        {status.requestId && (
+        {status.workflowId && (
           <div className="flex items-center gap-1.5">
             <div className="flex items-center">
               <Hash className="h-3 w-3 mr-0.5 text-slate-500 dark:text-slate-400" />
               <span className="text-xs font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-300">
-                {status.requestId}
+                {status.workflowId}
               </span>
             </div>
 
@@ -132,7 +132,7 @@ function DAGStatusOverview({
               onClick={(e) => {
                 if (!(e.metaKey || e.ctrlKey) && onViewLog) {
                   e.preventDefault();
-                  onViewLog(status.requestId);
+                  onViewLog(status.workflowId);
                 }
               }}
               className="inline-flex items-center text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors duration-200 cursor-pointer"
@@ -193,56 +193,56 @@ function DAGStatusOverview({
             </span>
           </div>
 
-          {nodeStats.finished && (
+          {nodeStatus.finished && (
             <div className="flex items-center">
               <div className="h-2 w-2 mr-1 rounded-full bg-green-500"></div>
               <span className="text-xs text-slate-600 dark:text-slate-400">
-                Success: {nodeStats.finished}
+                Success: {nodeStatus.finished}
               </span>
             </div>
           )}
 
-          {nodeStats.running && (
+          {nodeStatus.running && (
             <div className="flex items-center">
               <div className="h-2 w-2 mr-1 rounded-full bg-lime-500 animate-pulse"></div>
               <span className="text-xs text-slate-600 dark:text-slate-400">
-                Running: {nodeStats.running}
+                Running: {nodeStatus.running}
               </span>
             </div>
           )}
 
-          {nodeStats.failed && (
+          {nodeStatus.failed && (
             <div className="flex items-center">
               <div className="h-2 w-2 mr-1 rounded-full bg-red-500"></div>
               <span className="text-xs text-slate-600 dark:text-slate-400">
-                Failed: {nodeStats.failed}
+                Failed: {nodeStatus.failed}
               </span>
             </div>
           )}
 
-          {nodeStats.not_started && (
+          {nodeStatus.not_started && (
             <div className="flex items-center">
               <div className="h-2 w-2 mr-1 rounded-full bg-slate-300 dark:bg-slate-600"></div>
               <span className="text-xs text-slate-600 dark:text-slate-400">
-                Not Started: {nodeStats.not_started}
+                Not Started: {nodeStatus.not_started}
               </span>
             </div>
           )}
 
-          {nodeStats.skipped && (
+          {nodeStatus.skipped && (
             <div className="flex items-center">
               <div className="h-2 w-2 mr-1 rounded-full bg-slate-400"></div>
               <span className="text-xs text-slate-600 dark:text-slate-400">
-                Skipped: {nodeStats.skipped}
+                Skipped: {nodeStatus.skipped}
               </span>
             </div>
           )}
 
-          {nodeStats.canceled && (
+          {nodeStatus.canceled && (
             <div className="flex items-center">
               <div className="h-2 w-2 mr-1 rounded-full bg-pink-400"></div>
               <span className="text-xs text-slate-600 dark:text-slate-400">
-                Canceled: {nodeStats.canceled}
+                Canceled: {nodeStatus.canceled}
               </span>
             </div>
           )}
@@ -251,34 +251,38 @@ function DAGStatusOverview({
         {/* Progress bar */}
         {totalNodes > 0 && (
           <div className="mt-1.5 h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-            {nodeStats.finished && (
+            {nodeStatus.finished && (
               <div
                 className="h-full bg-green-500 float-left"
-                style={{ width: `${(nodeStats.finished / totalNodes) * 100}%` }}
+                style={{
+                  width: `${(nodeStatus.finished / totalNodes) * 100}%`,
+                }}
               ></div>
             )}
-            {nodeStats.running && (
+            {nodeStatus.running && (
               <div
                 className="h-full bg-lime-500 float-left animate-pulse"
-                style={{ width: `${(nodeStats.running / totalNodes) * 100}%` }}
+                style={{ width: `${(nodeStatus.running / totalNodes) * 100}%` }}
               ></div>
             )}
-            {nodeStats.failed && (
+            {nodeStatus.failed && (
               <div
                 className="h-full bg-red-500 float-left"
-                style={{ width: `${(nodeStats.failed / totalNodes) * 100}%` }}
+                style={{ width: `${(nodeStatus.failed / totalNodes) * 100}%` }}
               ></div>
             )}
-            {nodeStats.skipped && (
+            {nodeStatus.skipped && (
               <div
                 className="h-full bg-slate-400 float-left"
-                style={{ width: `${(nodeStats.skipped / totalNodes) * 100}%` }}
+                style={{ width: `${(nodeStatus.skipped / totalNodes) * 100}%` }}
               ></div>
             )}
-            {nodeStats.canceled && (
+            {nodeStatus.canceled && (
               <div
                 className="h-full bg-pink-400 float-left"
-                style={{ width: `${(nodeStats.canceled / totalNodes) * 100}%` }}
+                style={{
+                  width: `${(nodeStatus.canceled / totalNodes) * 100}%`,
+                }}
               ></div>
             )}
           </div>

@@ -3,7 +3,7 @@ package api
 import (
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/runstore"
+	"github.com/dagu-org/dagu/internal/models"
 )
 
 func toDAG(dag *digraph.DAG) api.DAG {
@@ -49,9 +49,9 @@ func toStep(obj digraph.Step) api.Step {
 		Script:        ptrOf(obj.Script),
 	}
 
-	if obj.SubDAG != nil {
-		step.Run = ptrOf(obj.SubDAG.Name)
-		step.Params = ptrOf(obj.SubDAG.Params)
+	if obj.ChildWorkflow != nil {
+		step.Run = ptrOf(obj.ChildWorkflow.Name)
+		step.Params = ptrOf(obj.ChildWorkflow.Params)
 	}
 	return step
 }
@@ -63,17 +63,21 @@ func toPrecondition(obj digraph.Condition) api.Precondition {
 	}
 }
 
-func toRunDetails(s runstore.Status) api.RunDetails {
-	status := api.RunDetails{
-		Log:         s.Log,
-		Name:        s.Name,
-		Params:      ptrOf(s.Params),
-		Pid:         ptrOf(int(s.PID)),
-		RequestId:   s.RequestID,
-		StartedAt:   s.StartedAt,
-		FinishedAt:  s.FinishedAt,
-		Status:      api.Status(s.Status),
-		StatusLabel: api.StatusLabel(s.Status.String()),
+func toWorkflowDetails(s models.Status) api.WorkflowDetails {
+	status := api.WorkflowDetails{
+		RootWorkflowName:   s.Root.Name,
+		RootWorkflowId:     s.Root.WorkflowID,
+		ParentWorkflowName: ptrOf(s.Parent.Name),
+		ParentWorkflowId:   ptrOf(s.Parent.WorkflowID),
+		Log:                s.Log,
+		Name:               s.Name,
+		Params:             ptrOf(s.Params),
+		Pid:                ptrOf(int(s.PID)),
+		WorkflowId:         s.WorkflowID,
+		StartedAt:          s.StartedAt,
+		FinishedAt:         s.FinishedAt,
+		Status:             api.Status(s.Status),
+		StatusLabel:        api.StatusLabel(s.Status.String()),
 	}
 	for _, n := range s.Nodes {
 		status.Nodes = append(status.Nodes, toNode(n))
@@ -93,7 +97,7 @@ func toRunDetails(s runstore.Status) api.RunDetails {
 	return status
 }
 
-func toNode(node *runstore.Node) api.Node {
+func toNode(node *models.Node) api.Node {
 	return api.Node{
 		DoneCount:   node.DoneCount,
 		FinishedAt:  node.FinishedAt,
@@ -104,15 +108,15 @@ func toNode(node *runstore.Node) api.Node {
 		StatusLabel: api.NodeStatusLabel(node.Status.String()),
 		Step:        toStep(node.Step),
 		Error:       ptrOf(node.Error),
-		SubRuns:     ptrOf(toSubRuns(node.SubRuns)),
+		Children:    ptrOf(toChildWorkflows(node.Children)),
 	}
 }
 
-func toSubRuns(subRuns []runstore.SubRun) []api.SubRun {
-	var result []api.SubRun
-	for _, r := range subRuns {
-		result = append(result, api.SubRun{
-			RequestId: r.RequestID,
+func toChildWorkflows(childWorkflows []models.ChildWorkflow) []api.ChildWorkflow {
+	var result []api.ChildWorkflow
+	for _, w := range childWorkflows {
+		result = append(result, api.ChildWorkflow{
+			WorkflowId: w.WorkflowID,
 		})
 	}
 	return result

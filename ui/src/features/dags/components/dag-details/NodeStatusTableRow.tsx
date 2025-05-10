@@ -11,8 +11,9 @@ import {
 } from '@/components/ui/tooltip';
 import dayjs from '@/lib/dayjs';
 import { cn } from '@/lib/utils';
-import { Code, FileText } from 'lucide-react';
+import { Code, FileText, GitBranch } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { components, NodeStatus } from '../../../../api/v2/schema';
 import StyledTableRow from '../../../../ui/StyledTableRow';
 import { NodeStatusChip } from '../common';
@@ -25,12 +26,14 @@ type Props = {
   rownum: number;
   /** Node data to display */
   node: components['schemas']['Node'];
-  /** Request ID for log linking */
-  requestId?: string;
+  /** Workflow ID for log linking */
+  workflowId?: string;
   /** DAG name or file name */
   name: string;
   /** Function to open log viewer */
-  onViewLog?: (stepName: string, requestId: string) => void;
+  onViewLog?: (stepName: string, workflowId: string) => void;
+  /** Full workflow details (optional) - used to determine if this is a child workflow */
+  workflow?: components['schemas']['WorkflowDetails'];
 };
 
 /**
@@ -89,11 +92,17 @@ function NodeStatusTableRow({
   name,
   rownum,
   node,
-  requestId,
+  workflowId,
   onViewLog,
+  workflow,
 }: Props) {
+  const navigate = useNavigate();
   // State to store the current duration for running tasks
   const [currentDuration, setCurrentDuration] = useState<string>('-');
+
+  // Check if this is a child workflow node
+  const hasChildWorkflow =
+    !!node.step.run && node.children && node.children.length > 0;
 
   // Update duration every second for running tasks
   useEffect(() => {
@@ -119,8 +128,8 @@ function NodeStatusTableRow({
   if (node.step) {
     searchParams.set('step', node.step.name);
   }
-  if (requestId) {
-    searchParams.set('requestId', requestId);
+  if (workflowId) {
+    searchParams.set('workflowId', workflowId);
   }
 
   const url = `/dags/${name}/log?${searchParams.toString()}`;
@@ -162,12 +171,59 @@ function NodeStatusTableRow({
       {/* Combined Step Name & Description */}
       <TableCell>
         <div className="space-y-0.5">
-          <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 text-wrap break-all">
+          <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 text-wrap break-all flex items-center gap-1.5">
             {node.step.name}
+            {hasChildWorkflow && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex items-center text-blue-500 cursor-pointer">
+                    <GitBranch className="h-4 w-4" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <span className="text-xs">
+                    Child Workflow: {node.step.run}
+                  </span>
+                </TooltipContent>
+              </Tooltip>
+            )}
           </div>
           {node.step.description && (
             <div className="text-xs text-slate-500 dark:text-slate-400 leading-tight">
               {node.step.description}
+            </div>
+          )}
+          {hasChildWorkflow && (
+            <div
+              className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline"
+              onClick={() => {
+                if (hasChildWorkflow && node.children && node.children[0]) {
+                  const childWorkflowId = node.children[0].workflowId;
+                  // Navigate to child workflow
+                  const searchParams = new URLSearchParams();
+                  searchParams.set('childWorkflowId', childWorkflowId);
+
+                  // Use root workflow information from the workflow prop if available
+                  if (workflow && workflow.rootWorkflowId) {
+                    // If this is already a child workflow, use its root information
+                    searchParams.set('workflowId', workflow.rootWorkflowId);
+                  } else {
+                    // Otherwise, use the current workflow as the root
+                    searchParams.set('workflowId', workflowId || '');
+                  }
+
+                  // Add workflowName parameter to avoid waiting for DAG details
+                  // Use the root workflow name or current workflow name
+                  if (workflow) {
+                    searchParams.set('workflowName', workflow.rootWorkflowName);
+                  }
+
+                  searchParams.set('step', node.step.name);
+                  navigate(`/dags/${name}?${searchParams.toString()}`);
+                }
+              }}
+            >
+              View Child Workflow: {node.step.run}
             </div>
           )}
         </div>
@@ -255,7 +311,7 @@ function NodeStatusTableRow({
               // which will open the link in a new tab
               if (!(e.metaKey || e.ctrlKey) && onViewLog) {
                 e.preventDefault();
-                onViewLog(node.step.name, requestId || '');
+                onViewLog(node.step.name, workflowId || '');
               }
             }}
             className="inline-flex items-center justify-center p-2 transition-colors duration-200 rounded-md text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
