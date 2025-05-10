@@ -222,16 +222,14 @@ function DAGDetails() {
         <div className="w-full flex flex-col">
           {/* Always render the DAG Header when basic data is available */}
           {dagData?.dag && headerWorkflow && (
-            <div className="mb-2">
-              <DAGHeader
-                dag={dagData.dag}
-                currentWorkflow={headerWorkflow}
-                fileName={fileName}
-                refreshFn={refreshData}
-                formatDuration={formatDuration}
-                navigateToStatusTab={navigateToStatusTab}
-              />
-            </div>
+            <DAGHeader
+              dag={dagData.dag}
+              currentWorkflow={headerWorkflow}
+              fileName={fileName}
+              refreshFn={refreshData}
+              formatDuration={formatDuration}
+              navigateToStatusTab={navigateToStatusTab}
+            />
           )}
 
           {/* Show loading indicator for content area only */}

@@ -83,56 +83,66 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
             {/* Current workflow */}
             <span>{currentWorkflow.name}</span>
           </Title>
-          <RootWorkflowContext.Consumer>
-            {(status) =>
-              status.data ? (
-                <DAGActions
-                  status={status.data}
-                  dag={dag}
-                  fileName={fileName}
-                  refresh={refreshFn}
-                  displayMode="full"
-                  navigateToStatusTab={navigateToStatusTab}
-                />
-              ) : null
-            }
-          </RootWorkflowContext.Consumer>
+          {/* Only show DAG actions for root workflows, not for child workflows */}
+          {currentWorkflow.workflowId === currentWorkflow.rootWorkflowId && (
+            <RootWorkflowContext.Consumer>
+              {(status) =>
+                status.data ? (
+                  <DAGActions
+                    status={status.data}
+                    dag={dag}
+                    fileName={fileName}
+                    refresh={refreshFn}
+                    displayMode="full"
+                    navigateToStatusTab={navigateToStatusTab}
+                  />
+                ) : null
+              }
+            </RootWorkflowContext.Consumer>
+          )}
         </div>
       </div>
       {currentWorkflow.status != Status.NotStarted ? (
-        <div className="flex flex-row items-center gap-4">
-          {currentWorkflow.status ? (
-            <StatusChip status={currentWorkflow.status}>
-              {currentWorkflow.statusLabel || ''}
-            </StatusChip>
-          ) : null}
+        <div className="flex flex-row items-center justify-between mb-4">
+          <div className="flex flex-row items-center gap-4">
+            {currentWorkflow.status ? (
+              <StatusChip status={currentWorkflow.status}>
+                {currentWorkflow.statusLabel || ''}
+              </StatusChip>
+            ) : null}
 
-          <div className="flex flex-row items-center text-slate-600 dark:text-slate-400">
-            <Calendar className="mr-1.5 h-4 w-4" />
-            <span className="text-sm">
-              {currentWorkflow?.startedAt
-                ? dayjs(currentWorkflow.startedAt).format(
-                    'YYYY-MM-DD HH:mm:ss Z'
-                  )
-                : '--'}
-            </span>
-          </div>
-
-          <div className="flex flex-row items-center text-slate-600 dark:text-slate-400">
-            <Timer className="mr-1.5 h-4 w-4" />
-            <span className="text-sm">
-              {currentWorkflow.finishedAt
-                ? formatDuration(
-                    currentWorkflow.startedAt,
-                    currentWorkflow.finishedAt
-                  )
-                : currentWorkflow.startedAt
-                  ? formatDuration(
-                      currentWorkflow.startedAt,
-                      dayjs().toISOString()
+            <div className="flex flex-row items-center text-slate-600 dark:text-slate-400">
+              <Calendar className="mr-1.5 h-4 w-4" />
+              <span className="text-sm">
+                {currentWorkflow?.startedAt
+                  ? dayjs(currentWorkflow.startedAt).format(
+                      'YYYY-MM-DD HH:mm:ss Z'
                     )
                   : '--'}
-            </span>
+              </span>
+            </div>
+
+            <div className="flex flex-row items-center text-slate-600 dark:text-slate-400">
+              <Timer className="mr-1.5 h-4 w-4" />
+              <span className="text-sm">
+                {currentWorkflow.finishedAt
+                  ? formatDuration(
+                      currentWorkflow.startedAt,
+                      currentWorkflow.finishedAt
+                    )
+                  : currentWorkflow.startedAt
+                    ? formatDuration(
+                        currentWorkflow.startedAt,
+                        dayjs().toISOString()
+                      )
+                    : '--'}
+              </span>
+            </div>
+          </div>
+
+          <div className="text-sm text-slate-600 dark:text-slate-400">
+            <span className="font-medium">Workflow ID:</span>{' '}
+            {currentWorkflow.rootWorkflowId}
           </div>
         </div>
       ) : null}
