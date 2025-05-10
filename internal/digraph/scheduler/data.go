@@ -294,15 +294,20 @@ func (n *Data) getBoolVariable(key string) (bool, bool) {
 }
 
 func (n *Data) setBoolVariable(key string, value bool) {
+
 	if n.inner.Step.OutputVariables == nil {
+		n.mu.Lock()
 		n.inner.Step.OutputVariables = &digraph.SyncMap{}
+		n.mu.Unlock()
 	}
 	n.inner.Step.OutputVariables.Store(key, stringutil.NewKeyValue(key, strconv.FormatBool(value)).String())
 }
 
 func (n *Data) setVariable(key, value string) {
 	if n.inner.Step.OutputVariables == nil {
+		n.mu.Lock()
 		n.inner.Step.OutputVariables = &digraph.SyncMap{}
+		n.mu.Unlock()
 	}
 	n.inner.Step.OutputVariables.Store(key, stringutil.NewKeyValue(key, value).String())
 }
