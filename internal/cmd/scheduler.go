@@ -11,13 +11,21 @@ func CmdScheduler() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "scheduler [flags]",
-			Short: "Start the scheduler process",
-			Long: `Launch the scheduler process that monitors and triggers workflows based on cron schedules.
+			Short: "Start the scheduler for automated workflow execution",
+			Long: `Launch the scheduler process that monitors DAG definitions and automatically triggers workflows based on their defined schedules.
+
+The scheduler continuously monitors the specified directory for DAG definitions,
+evaluates their schedule expressions (cron format), and initiates workflow executions
+when their scheduled time arrives. It handles time-based dependencies and ensures
+workflows run at their specified intervals.
+
+Flags:
+  --dags string   Path to the directory containing DAG definition files
 
 Example:
   dagu scheduler --dags=/path/to/dags
 
-This process runs continuously to automatically execute scheduled DAGs.
+This process runs continuously in the foreground until terminated.
 `,
 		}, schedulerFlags, runScheduler,
 	)

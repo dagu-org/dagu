@@ -11,11 +11,23 @@ func CmdStartAll() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "start-all [flags]",
-			Short: "Launch both web server and scheduler concurrently",
-			Long: `Simultaneously start the Dagu web UI server and the scheduler process.
+			Short: "Launch both web UI server and scheduler in a single process",
+			Long: `Simultaneously start both the web UI server and the scheduler process in a single command.
+
+This convenience command combines the functionality of 'dagu server' and 'dagu scheduler'
+into a single process, making it easier to run a complete Dagu instance. The web UI
+provides the management interface while the scheduler handles automated workflow execution
+based on defined schedules.
+
+Flags:
+  --host string    Host address to bind the web server to (default: 127.0.0.1)
+  --port int       Port number for the web server to listen on (default: 8080)
+  --dags string    Path to the directory containing DAG definition files
 
 Example:
   dagu start-all --host=0.0.0.0 --port=8080 --dags=/path/to/dags
+
+This process runs continuously in the foreground until terminated.
 `,
 		}, startAllFlags, runStartAll,
 	)

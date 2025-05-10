@@ -11,18 +11,21 @@ import (
 func CmdStop() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "stop --workflow-id=abc123 <DAG name or workflow name>",
+			Use:   "stop [flags] <DAG definition or workflow name>",
 			Short: "Stop a running workflow",
-			Long: `Gracefully terminate an active workflow.
+			Long: `Gracefully terminate an active workflow instance.
+
+This command sends termination signals to all running tasks of the specified workflow,
+ensuring resources are properly released and cleanup handlers are executed. It waits
+for tasks to complete their shutdown procedures before exiting.
 
 Flags:
-  --workflow-id string   (optional) Unique identifier for tracking the restart execution.
-
-This command stops all running tasks of the specified workflow, ensuring resources are properly released.
-If workflow ID is not provided, it will find the dag definition by name and stop the currently running workflow.
+  --workflow-id string   (optional) Unique identifier of the workflow to stop.
+                                   If not provided, it will find and stop the currently
+                                   running workflow by the given DAG definition name.
 
 Example:
-  dagu stop --workflow-id=abc123 name
+  dagu stop --workflow-id=abc123 my_dag
 `,
 			Args: cobra.ExactArgs(1),
 		}, stopFlags, runStop,

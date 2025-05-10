@@ -17,13 +17,21 @@ func CmdRetry() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "retry [flags] <workflow name>",
-			Short: "Retry a workflow",
-			Long: `Re-execute a previously run workflow using its unique workflow ID.
+			Short: "Retry a previously executed workflow",
+			Long: `Create a new run for a previously executed workflow using the same workflow ID.
+
+Unlike restart, which creates a new workflow with a new ID, retry creates a new run within 
+the same workflow ID. This preserves the workflow history and allows for multiple attempts
+of the same workflow instance.
+
+Flags:
+  --workflow-id string (required) Unique identifier of the workflow to retry.
 
 Example:
   dagu retry --workflow-id=abc123 my_dag
 
-This command is useful for recovering from errors or transient issues by re-running the DAG.
+This command is useful for recovering from errors or transient issues by creating a new run
+of the same workflow without changing its identity.
 `,
 			Args: cobra.ExactArgs(1),
 		}, retryFlags, runRetry,

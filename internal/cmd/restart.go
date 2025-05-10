@@ -19,18 +19,20 @@ import (
 func CmdRestart() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "restart --workflow-id=abc123 <DAG name or workflow name>",
-			Short: "Restart a running DAG",
-			Long: `Stop the currently running DAG and immediately restart it with the same configuration but with a new workflow ID.
+			Use:   "restart [flags] <DAG definition or workflow name>",
+			Short: "Restart a running workflow with a new ID",
+			Long: `Stop a currently running workflow and immediately restart it with the same configuration but with a new workflow ID.
+
+This command creates a new workflow instance based on the same DAG definition as the original workflow.
+It first gracefully stops the active workflow, ensuring all resources are properly released, then
+initiates a new workflow with identical parameters.
 
 Flags:
-  --workflow-id string (optional) Unique identifier for tracking the restart execution.
+  --workflow-id string (optional) Unique identifier of the workflow to restart. If not provided,
+                                  the command will find the current running workflow by the given DAG name.
 
 Example:
   dagu restart --workflow-id=abc123 my_dag
-
-This command gracefully stops the active workflow before restarting it.
-If the workflow ID is not provided, it will find the current running workflow by the given DAG name.
 `,
 			Args: cobra.ExactArgs(1),
 		}, restartFlags, runRestart,

@@ -29,9 +29,12 @@ var (
 func CmdStart() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "start [flags] <DAG name> [-- param1 param2 ...]",
-			Short: "Execute a workflow",
-			Long: `Begin execution of a workflow.
+			Use:   "start [flags] <DAG definition> [-- param1 param2 ...]",
+			Short: "Execute a workflow from a DAG definition",
+			Long: `Begin execution of a workflow based on the specified DAG definition.
+
+A DAG definition is a blueprint that defines the workflow structure. This command creates a new workflow 
+instance with a unique workflow ID.
 
 Parameters after the "--" separator are passed as execution parameters (either positional or key=value pairs).
 Flags can override default settings such as workflow ID or suppress output.
@@ -39,7 +42,7 @@ Flags can override default settings such as workflow ID or suppress output.
 Example:
   dagu start my_dag -- P1=foo P2=bar
 
-This command parses the DAG definition, resolves parameters, and initiates the execution process.
+This command parses the DAG definition, resolves parameters, and initiates the workflow execution.
 `,
 			Args: cobra.MinimumNArgs(1),
 		}, startFlags, runStart,

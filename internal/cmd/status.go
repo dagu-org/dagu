@@ -12,15 +12,22 @@ import (
 func CmdStatus() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "status --workflow-id=abc123 <workflow name>",
+			Use:   "status [flags] <workflow name>",
 			Short: "Display the current status of a workflow",
-			Long: `Show real-time status information for a specified workflow.
+			Long: `Show real-time status information for a specified workflow instance.
+
+This command retrieves and displays the current execution status of a workflow,
+including its state (running, completed, failed), process ID, and other relevant details.
+It connects to the workflow's agent to get the most up-to-date information.
 
 Flags:
-	--workflow-id string (optional) Unique identifier for tracking the execution.
+  --workflow-id string (optional) Unique identifier of the workflow to check.
+                                 If not provided, it will show the status of the
+                                 most recent workflow for the given name.
 
 Example:
-  dagu status my_dag
+  dagu status --workflow-id=abc123 my_dag
+  dagu status my_dag  # Shows status of the most recent workflow
 `,
 			Args: cobra.ExactArgs(1),
 		}, statusFlags, runStatus,
