@@ -29,13 +29,15 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
 
   const handleRootWorkflowClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    navigate(`/dags/${fileName}?workflowId=${currentWorkflow.rootWorkflowId}`);
+    navigate(
+      `/dags/${fileName}?workflowId=${currentWorkflow.rootWorkflowId}&workflowName=${encodeURIComponent(currentWorkflow.rootWorkflowName)}`
+    );
   };
 
   const handleParentWorkflowClick = (e: React.MouseEvent) => {
     e.preventDefault();
     navigate(
-      `/dags/${fileName}?childWorkflowId=${currentWorkflow.parentWorkflowId}&workflowId=${currentWorkflow.rootWorkflowId}`
+      `/dags/${fileName}?childWorkflowId=${currentWorkflow.parentWorkflowId}&workflowId=${currentWorkflow.rootWorkflowId}&workflowName=${encodeURIComponent(currentWorkflow.rootWorkflowName)}`
     );
   };
 
@@ -49,7 +51,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
               <>
                 <span className="text-blue-600 hover:underline font-normal">
                   <a
-                    href={`/dags/${fileName}?workflowId=${currentWorkflow.rootWorkflowId}`}
+                    href={`/dags/${fileName}?workflowId=${currentWorkflow.rootWorkflowId}&workflowName=${encodeURIComponent(currentWorkflow.rootWorkflowName)}`}
                     onClick={handleRootWorkflowClick}
                   >
                     {currentWorkflow.rootWorkflowName}
@@ -68,7 +70,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
                 <>
                   <span className="text-blue-600 hover:underline font-normal">
                     <a
-                      href={`/dags/${fileName}?workflowId=${currentWorkflow.rootWorkflowId}&childWorkflowId=${currentWorkflow.parentWorkflowId}`}
+                      href={`/dags/${fileName}?workflowId=${currentWorkflow.rootWorkflowId}&childWorkflowId=${currentWorkflow.parentWorkflowId}&workflowName=${encodeURIComponent(currentWorkflow.rootWorkflowName)}`}
                       onClick={handleParentWorkflowClick}
                     >
                       {currentWorkflow.parentWorkflowName}

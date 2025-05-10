@@ -212,6 +212,12 @@ function NodeStatusTableRow({
                     searchParams.set('workflowId', workflowId || '');
                   }
 
+                  // Add workflowName parameter to avoid waiting for DAG details
+                  // Use the root workflow name or current workflow name
+                  if (workflow) {
+                    searchParams.set('workflowName', workflow.rootWorkflowName);
+                  }
+
                   searchParams.set('step', node.step.name);
                   navigate(`/dags/${name}?${searchParams.toString()}`);
                 }

@@ -3,7 +3,7 @@
  *
  * @module features/dags/components/dag-execution
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { components, NodeStatus, Status } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
@@ -188,9 +188,7 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
   }
 
   // Reverse the workflows array for display (newest first)
-  const reversedWorkflows = useMemo(() => {
-    return [...(workflows || [])].reverse();
-  }, [workflows]);
+  const reversedWorkflows = [...(workflows || [])].reverse();
 
   // State for the selected step in the status update modal
   const [selectedStep, setSelectedStep] = React.useState<
@@ -278,9 +276,10 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
         const childWorkflow = n.children?.[0];
         if (childWorkflow && childWorkflow.workflowId && n.step.run) {
           // Navigate to the child workflow details using React Router with search params
+          // Include workflowName parameter to avoid waiting for DAG details
           navigate({
             pathname: `/dags/${fileName}`,
-            search: `?workflowId=${workflow.rootWorkflowId}&childWorkflowId=${childWorkflow.workflowId}`,
+            search: `?workflowId=${workflow.rootWorkflowId}&childWorkflowId=${childWorkflow.workflowId}&workflowName=${encodeURIComponent(workflow.rootWorkflowName)}`,
           });
           return;
         }
