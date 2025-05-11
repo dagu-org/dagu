@@ -1,6 +1,9 @@
 package stringutil
 
 import (
+	"context"
+	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -34,4 +37,16 @@ func TruncString(val string, max int) string {
 		return val[:max]
 	}
 	return val
+}
+
+// ParseBool parses a boolean value from the given input.
+func ParseBool(ctx context.Context, value any) (bool, error) {
+	switch v := value.(type) {
+	case string:
+		return strconv.ParseBool(v)
+	case bool:
+		return v, nil
+	default:
+		return false, fmt.Errorf("unsupported type %T for bool (value: %+v)", value, value)
+	}
 }

@@ -106,6 +106,13 @@ func (s *Data) SetExecutorConfig(cfg digraph.ExecutorConfig) {
 	s.inner.Step.ExecutorConfig = cfg
 }
 
+func (s *Data) SetChildWorkflow(childWorkflow digraph.ChildWorkflow) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.inner.Step.ChildWorkflow = &childWorkflow
+}
+
 func (s *Data) Args() []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -127,6 +134,13 @@ func (s *Data) Step() digraph.Step {
 	defer s.mu.RUnlock()
 
 	return s.inner.Step
+}
+
+func (s *Data) SetScript(script string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.inner.Step.Script = script
 }
 
 func (s *Data) SetStep(step digraph.Step) {

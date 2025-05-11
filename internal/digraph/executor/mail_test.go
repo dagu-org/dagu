@@ -26,14 +26,12 @@ func TestMail(t *testing.T) {
 	attachFile := filepath.Join(tmpDir, "email.txt")
 	content := []byte("Test email")
 
-	_ = os.Setenv("MAIL_SUBJECT", "Test Subject")
 	err = os.WriteFile(attachFile, content, 0600)
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
 
 	t.Cleanup(func() {
-		_ = os.Unsetenv("MAIL_SUBJECT")
 		_ = os.Remove(attachFile)
 	})
 
@@ -63,7 +61,7 @@ func TestMail(t *testing.T) {
 						Config: map[string]any{
 							"from":        "test@example.com",
 							"to":          "recipient@example.com",
-							"subject":     "${MAIL_SUBJECT}",
+							"subject":     "Test Subject",
 							"message":     "Test Message",
 							"attachments": attachFile,
 						},

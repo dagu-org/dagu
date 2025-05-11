@@ -54,36 +54,10 @@ func newHTTP(ctx context.Context, step digraph.Step) (Executor, error) {
 		); err != nil {
 			return nil, err
 		}
-		body, err := EvalString(ctx, reqCfg.Body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate body: %w", err)
-		}
-		reqCfg.Body = body
-		for k, v := range reqCfg.Headers {
-			header, err := EvalString(ctx, v)
-			if err != nil {
-				return nil, fmt.Errorf("failed to evaluate header %q: %w", k, err)
-			}
-			reqCfg.Headers[k] = header
-		}
-		for k, v := range reqCfg.Query {
-			query, err := EvalString(ctx, v)
-			if err != nil {
-				return nil, fmt.Errorf("failed to evaluate query %q: %w", k, err)
-			}
-			reqCfg.Query[k] = query
-		}
 	}
 
-	url, err := EvalString(ctx, step.Args[0])
-	if err != nil {
-		return nil, fmt.Errorf("failed to evaluate url: %w", err)
-	}
-
-	method, err := EvalString(ctx, step.Command)
-	if err != nil {
-		return nil, fmt.Errorf("failed to evaluate method: %w", err)
-	}
+	url := step.Args[0]
+	method := step.Command
 
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -207,11 +181,7 @@ func decodeHTTPConfig(dat map[string]any, cfg *httpConfig) error {
 
 func decodeHTTPConfigFromString(ctx context.Context, source string, target *httpConfig) error {
 	if len(source) > 0 {
-		s, err := EvalString(ctx, source)
-		if err != nil {
-			return fmt.Errorf("failed to evaluate http config: %w", err)
-		}
-		if err := json.Unmarshal([]byte(s), &target); err != nil {
+		if err := json.Unmarshal([]byte(source), &target); err != nil {
 			return err
 		}
 	}

@@ -36,12 +36,8 @@ func newJQ(ctx context.Context, step digraph.Step) (Executor, error) {
 			return nil, err
 		}
 	}
-	script, err := EvalString(ctx, step.Script)
-	if err != nil {
-		return nil, fmt.Errorf("failed to evaluate jq input: %w", err)
-	}
 	input := map[string]any{}
-	if err := json.Unmarshal([]byte(script), &input); err != nil {
+	if err := json.Unmarshal([]byte(step.Script), &input); err != nil {
 		return nil, err
 	}
 	return &jq{

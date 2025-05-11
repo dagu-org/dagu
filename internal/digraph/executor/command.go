@@ -191,12 +191,7 @@ func setupScript(ctx context.Context, step digraph.Step) (string, error) {
 		_ = file.Close()
 	}()
 
-	script, err := EvalString(ctx, step.Script, cmdutil.OnlyReplaceVars())
-	if err != nil {
-		return "", fmt.Errorf("failed to evaluate script: %w", err)
-	}
-
-	if _, err = file.WriteString(script); err != nil {
+	if _, err = file.WriteString(step.Script); err != nil {
 		return "", fmt.Errorf("failed to write script to file: %w", err)
 	}
 

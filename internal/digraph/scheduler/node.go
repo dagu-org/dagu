@@ -198,6 +198,28 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	execConfig.Config = cfg
 	n.SetExecutorConfig(execConfig)
 
+	// Evaluate the child workflow if set
+	if w := n.Step().ChildWorkflow; w != nil {
+		w, err := executor.EvalObject(ctx, *w)
+		if err != nil {
+			return nil, fmt.Errorf("failed to eval child workflow: %w", err)
+		}
+		n.SetChildWorkflow(w)
+	}
+
+	// Evaluate script if set
+	if script := n.Step().Script; script != "" {
+		var opts []cmdutil.EvalOption
+		if n.Step().ExecutorConfig.IsCommand() {
+			opts = append(opts, cmdutil.OnlyReplaceVars())
+		}
+		script, err := executor.EvalString(ctx, script, opts...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to eval script: %w", err)
+		}
+		n.SetScript(script)
+	}
+
 	// Create the executor
 	cmd, err := executor.NewExecutor(ctx, n.Step())
 	if err != nil {
@@ -229,6 +251,14 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		return nil
 	}
 
+	var evalOptions []cmdutil.EvalOption
+
+	shellCommand := cmdutil.GetShellCommand(n.Step().Shell)
+	if n.Step().ExecutorConfig.IsCommand() && shellCommand != "" {
+		// Command executor run commands on shell, so we don't need to expand env vars
+		evalOptions = append(evalOptions, cmdutil.WithoutExpandEnv())
+	}
+
 	step := n.Step()
 	switch {
 	case step.CmdArgsSys != "":
@@ -236,7 +266,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		// CmdArgsSys is a string with the command and args separated by special markers.
 		cmd, args := cmdutil.SplitCommandArgs(step.CmdArgsSys)
 		for i, arg := range args {
-			value, err := executor.EvalString(ctx, arg, cmdutil.WithoutExpandEnv())
+			value, err := executor.EvalString(ctx, arg, evalOptions...)
 			if err != nil {
 				return fmt.Errorf("failed to eval command with args: %w", err)
 			}
@@ -251,7 +281,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 
 	case step.CmdWithArgs != "":
 		// In case of the command and args are defined as a string.
-		cmdWithArgs, err := executor.EvalString(ctx, step.CmdWithArgs, cmdutil.WithoutExpandEnv())
+		cmdWithArgs, err := executor.EvalString(ctx, step.CmdWithArgs, evalOptions...)
 		if err != nil {
 			return err
 		}
@@ -273,7 +303,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 
 	case step.Command == "":
 		// If the command is empty, use the default shell as the command
-		step.Command = cmdutil.GetShellCommand(step.Shell)
+		step.Command = shellCommand
 
 	case step.Command != "" && len(step.Args) == 0:
 		// Shouldn't reach here except for testing.
@@ -283,7 +313,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 			return fmt.Errorf("failed to split command: %w", err)
 		}
 		for i, arg := range args {
-			value, err := executor.EvalString(ctx, arg, cmdutil.WithoutExpandEnv())
+			value, err := executor.EvalString(ctx, arg, evalOptions...)
 			if err != nil {
 				return fmt.Errorf("failed to eval command args: %w", err)
 			}
@@ -298,7 +328,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		// Shouldn't reach here except for testing.
 
 		if step.Command != "" {
-			value, err := executor.EvalString(ctx, step.Command, cmdutil.WithoutExpandEnv())
+			value, err := executor.EvalString(ctx, step.Command, evalOptions...)
 			if err != nil {
 				return fmt.Errorf("failed to eval command: %w", err)
 			}
@@ -306,7 +336,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		}
 
 		for i, arg := range step.Args {
-			value, err := executor.EvalString(ctx, arg, cmdutil.WithoutExpandEnv())
+			value, err := executor.EvalString(ctx, arg, evalOptions...)
 			if err != nil {
 				return fmt.Errorf("failed to eval command args: %w", err)
 			}

@@ -183,7 +183,59 @@ func TestEvalObject(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expected, result)
 
-	// Test with a non-struct value (should return an error)
+	// Test with a non-struct type
 	_, err = EvalObject(ctx, "not a struct")
-	assert.Error(t, err)
+	assert.NoError(t, err)
+}
+
+// TestEvalObjectWithExecutorConfig tests that EvalObject works correctly with the ExecutorConfig struct
+func TestEvalObjectWithExecutorConfig(t *testing.T) {
+	// Create a test context with environment variables
+	ctx := context.Background()
+	env := NewEnv(ctx, digraph.Step{Name: "test-step"})
+	env.Variables.Store("EXECUTOR_TYPE", "EXECUTOR_TYPE=docker")
+	env.Variables.Store("HOST_VAR", "HOST_VAR=localhost")
+	env.Variables.Store("PORT_VAR", "PORT_VAR=8080")
+	ctx = WithEnv(ctx, env)
+
+	// Create an ExecutorConfig with variables
+	config := digraph.ExecutorConfig{
+		Type: "${EXECUTOR_TYPE}",
+		Config: map[string]any{
+			"host": "${HOST_VAR}",
+			"port": "${PORT_VAR}",
+			"nested": map[string]any{
+				"value": "${HOST_VAR}:${PORT_VAR}",
+			},
+		},
+	}
+
+	// Expected result
+	expected := digraph.ExecutorConfig{
+		Type: "docker",
+		Config: map[string]any{
+			"host": "localhost",
+			"port": "8080",
+			"nested": map[string]any{
+				"value": "localhost:8080",
+			},
+		},
+	}
+
+	// Test EvalObject
+	result, err := EvalObject(ctx, config.Config)
+	assert.NoError(t, err)
+
+	// Check Config map values
+	assert.Equal(t, expected.Config["host"], result["host"])
+	assert.Equal(t, expected.Config["port"], result["port"])
+
+	// Check nested map
+	nestedResult, ok := result["nested"].(map[string]any)
+	assert.True(t, ok, "nested should be a map[string]any")
+
+	nestedExpected, ok := expected.Config["nested"].(map[string]any)
+	assert.True(t, ok, "expected nested should be a map[string]any")
+
+	assert.Equal(t, nestedExpected["value"], nestedResult["value"])
 }
