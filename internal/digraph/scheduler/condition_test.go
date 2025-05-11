@@ -55,7 +55,7 @@ func TestCondition_Eval(t *testing.T) {
 			name: "CommandResultMet",
 			condition: []digraph.Condition{
 				{
-					Command: "true",
+					Condition: "true",
 				},
 			},
 		},
@@ -63,7 +63,7 @@ func TestCondition_Eval(t *testing.T) {
 			name: "CommandResultNotMet",
 			condition: []digraph.Condition{
 				{
-					Command: "false",
+					Condition: "false",
 				},
 			},
 			wantErr: true,
@@ -72,7 +72,7 @@ func TestCondition_Eval(t *testing.T) {
 			name: "ComplexCommand",
 			condition: []digraph.Condition{
 				{
-					Command: "test 1 -eq 1",
+					Condition: "test 1 -eq 1",
 				},
 			},
 		},
@@ -80,7 +80,7 @@ func TestCondition_Eval(t *testing.T) {
 			name: "EvenMoreComplexCommand",
 			condition: []digraph.Condition{
 				{
-					Command: "df / | awk 'NR==2 {exit $4 > 5000 ? 0 : 1}'",
+					Condition: "df / | awk 'NR==2 {exit $4 > 5000 ? 0 : 1}'",
 				},
 			},
 		},
@@ -88,7 +88,7 @@ func TestCondition_Eval(t *testing.T) {
 			name: "CommandResultTest",
 			condition: []digraph.Condition{
 				{
-					Command: "test 1 -eq 1",
+					Condition: "test 1 -eq 1",
 				},
 			},
 		},

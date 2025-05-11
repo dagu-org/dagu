@@ -582,7 +582,7 @@ export interface components {
             /** @description Number of days to retain historical logs */
             histRetentionDays?: number;
             /** @description Conditions that must be met before a workflow can start */
-            preconditions?: components["schemas"]["Precondition"][];
+            preconditions?: components["schemas"]["Condition"][];
             /** @description Maximum number of concurrent workflows allowed from this DAG */
             maxActiveRuns?: number;
             /** @description List of parameter names that can be passed to workflows created from this DAG */
@@ -689,7 +689,7 @@ export interface components {
             /** @description Whether to send email notifications on step failure */
             mailOnError?: boolean;
             /** @description Conditions that must be met before the step can start */
-            preconditions?: components["schemas"]["Precondition"][];
+            preconditions?: components["schemas"]["Condition"][];
         };
         /** @description Individual search result item for a DAG */
         SearchResultItem: {
@@ -729,7 +729,7 @@ export interface components {
             history: components["schemas"]["NodeStatus"][];
         };
         /** @description Precondition that must be satisfied before running a step or workflow */
-        Precondition: {
+        Condition: {
             /** @description Expression or check to evaluate */
             condition?: string;
             /** @description Expected result of the condition evaluation */

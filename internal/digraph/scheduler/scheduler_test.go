@@ -440,7 +440,7 @@ func TestScheduler(t *testing.T) {
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
 				withPrecondition(digraph.Condition{
-					Command: "true",
+					Condition: "true",
 				})),
 			successStep("3", "2"),
 		)
@@ -459,7 +459,7 @@ func TestScheduler(t *testing.T) {
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
 				withPrecondition(digraph.Condition{
-					Command: "false",
+					Condition: "false",
 				})),
 			successStep("3", "2"),
 		)

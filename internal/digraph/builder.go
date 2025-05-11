@@ -404,7 +404,7 @@ func parsePrecondition(ctx BuildContext, precondition any) ([]Condition, error) 
 		return nil, nil
 
 	case string:
-		return []Condition{{Command: v}}, nil
+		return []Condition{{Condition: v}}, nil
 
 	case map[string]any:
 		var ret Condition
@@ -429,7 +429,7 @@ func parsePrecondition(ctx BuildContext, precondition any) ([]Condition, error) 
 				if !ok {
 					return nil, wrapError("preconditions", vv, ErrPreconditionValueMustBeString)
 				}
-				ret.Command = val
+				ret.Condition = val
 
 			default:
 				return nil, wrapError("preconditions", key, fmt.Errorf("%w: %s", ErrPreconditionHasInvalidKey, key))

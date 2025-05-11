@@ -24,7 +24,7 @@ func toDAG(dag *digraph.DAG) api.DAG {
 }
 
 func toStep(obj digraph.Step) api.Step {
-	var conditions []api.Precondition
+	var conditions []api.Condition
 	for _, cond := range obj.Preconditions {
 		conditions = append(conditions, toPrecondition(cond))
 	}
@@ -56,8 +56,8 @@ func toStep(obj digraph.Step) api.Step {
 	return step
 }
 
-func toPrecondition(obj digraph.Condition) api.Precondition {
-	return api.Precondition{
+func toPrecondition(obj digraph.Condition) api.Condition {
+	return api.Condition{
 		Condition: ptrOf(obj.Condition),
 		Expected:  ptrOf(obj.Expected),
 	}
@@ -156,7 +156,7 @@ func toDAGDetails(dag *digraph.DAG) *api.DAGDetails {
 		})
 	}
 
-	var preconditions []api.Precondition
+	var preconditions []api.Condition
 	for _, p := range dag.Preconditions {
 		preconditions = append(preconditions, toPrecondition(p))
 	}

@@ -1305,7 +1305,7 @@ components:
           type: array
           description: "Conditions that must be met before a workflow can start"
           items:
-            $ref: "#/components/schemas/Precondition"
+            $ref: "#/components/schemas/Condition"
         maxActiveRuns:
           type: integer
           description: "Maximum number of concurrent workflows allowed from this DAG"
@@ -1521,7 +1521,7 @@ components:
           type: array
           description: "Conditions that must be met before the step can start"
           items:
-            $ref: "#/components/schemas/Precondition"
+            $ref: "#/components/schemas/Condition"
       required:
         - name
 
@@ -1600,7 +1600,7 @@ components:
         - name
         - history
 
-    Precondition:
+    Condition:
       type: object
       description: "Precondition that must be satisfied before running a step or workflow"
       properties:

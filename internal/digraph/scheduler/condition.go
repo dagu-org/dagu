@@ -32,14 +32,11 @@ func EvalConditions(ctx context.Context, cond []digraph.Condition) error {
 // It returns an error if the evaluation failed or the condition is invalid.
 func eval(ctx context.Context, c digraph.Condition) (bool, error) {
 	switch {
-	case c.Condition != "":
+	case c.Condition != "" && c.Expected != "":
 		return matchCondition(ctx, c)
 
-	case c.Command != "":
-		return evalCommand(ctx, c)
-
 	default:
-		return false, fmt.Errorf("invalid condition: Condition=%s", c.Condition)
+		return evalCommand(ctx, c)
 	}
 }
 
@@ -63,7 +60,7 @@ func evalCondition(ctx context.Context, c digraph.Condition) error {
 }
 
 func evalCommand(ctx context.Context, c digraph.Condition) (bool, error) {
-	commandToRun, err := EvalString(ctx, c.Command, cmdutil.OnlyReplaceVars())
+	commandToRun, err := EvalString(ctx, c.Condition, cmdutil.OnlyReplaceVars())
 	if err != nil {
 		return false, fmt.Errorf("failed to evaluate command: %w", err)
 	}
