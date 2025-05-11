@@ -392,7 +392,7 @@ func (n *Data) SetExitCode(exitCode int) {
 	n.inner.State.ExitCode = exitCode
 }
 
-func (n *Data) ClearState() {
+func (n *Data) ClearState(s digraph.Step) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -400,6 +400,9 @@ func (n *Data) ClearState() {
 	children := n.inner.State.Children
 	n.inner.State = NodeState{}
 	n.inner.State.Children = children
+
+	// Reset the state of the step
+	n.inner.Step = s
 }
 
 func (n *Data) MarkError(err error) {

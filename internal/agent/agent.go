@@ -543,7 +543,7 @@ func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 	for _, n := range a.retryTarget.Nodes {
 		nodes = append(nodes, n.ToNode())
 	}
-	graph, err := scheduler.CreateRetryExecutionGraph(ctx, nodes...)
+	graph, err := scheduler.CreateRetryExecutionGraph(ctx, a.dag, nodes...)
 	if err != nil {
 		return err
 	}
