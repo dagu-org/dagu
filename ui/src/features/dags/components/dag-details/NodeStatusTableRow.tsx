@@ -134,15 +134,6 @@ function NodeStatusTableRow({
 
   const url = `/dags/${name}/log?${searchParams.toString()}`;
 
-  // Extract arguments for display
-  let args = '';
-  if (node.step.args) {
-    // Use uninterpolated args to avoid render issues with very long params
-    args =
-      node.step.cmdWithArgs?.replace(node.step.command || '', '').trimStart() ||
-      '';
-  }
-
   // Determine row highlight based on status
   const getRowHighlight = () => {
     switch (node.status) {
@@ -250,15 +241,17 @@ function NodeStatusTableRow({
             </div>
           )}
 
-          {args && (
+          {node.step.args && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="pl-5 text-xs font-medium text-slate-500 dark:text-slate-400 truncate cursor-pointer leading-tight">
-                  {args}
+                  {node.step.args}
                 </div>
               </TooltipTrigger>
               <TooltipContent>
-                <span className="max-w-[400px] break-all text-xs">{args}</span>
+                <span className="max-w-[400px] break-all text-xs">
+                  {node.step.args}
+                </span>
               </TooltipContent>
             </Tooltip>
           )}
