@@ -154,10 +154,16 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 			cfg.Server.Auth.Basic.Enabled = def.Auth.Basic.Enabled
 			cfg.Server.Auth.Basic.Username = def.Auth.Basic.Username
 			cfg.Server.Auth.Basic.Password = def.Auth.Basic.Password
+			if def.Auth.Basic.Username != "" || def.Auth.Basic.Password != "" {
+				cfg.Server.Auth.Basic.Enabled = true
+			}
 		}
 		if def.Auth.Token != nil {
 			cfg.Server.Auth.Token.Enabled = def.Auth.Token.Enabled
 			cfg.Server.Auth.Token.Value = def.Auth.Token.Value
+			if def.Auth.Token.Value != "" {
+				cfg.Server.Auth.Token.Enabled = true
+			}
 		}
 	}
 
@@ -208,6 +214,9 @@ func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) {
 	}
 	if def.BasicAuthPassword != "" {
 		cfg.Server.Auth.Basic.Password = def.BasicAuthPassword
+	}
+	if def.BasicAuthUsername != "" || def.BasicAuthPassword != "" {
+		cfg.Server.Auth.Basic.Enabled = true
 	}
 	if def.APIBaseURL != "" {
 		cfg.Server.APIBasePath = def.APIBaseURL

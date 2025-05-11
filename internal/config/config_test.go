@@ -322,7 +322,9 @@ func TestLoadLegacyFields_AllSet(t *testing.T) {
 	// Check that legacy fields are correctly assigned.
 	assert.Equal(t, "legacyUser", cfg.Server.Auth.Basic.Username, "BasicAuthUsername should be set")
 	assert.Equal(t, "legacyPass", cfg.Server.Auth.Basic.Password, "BasicAuthPassword should be set")
+	assert.True(t, cfg.Server.Auth.Basic.Enabled, "Basic auth should be enabled when BasicAuthUsername is set")
 	assert.True(t, cfg.Server.Auth.Token.Enabled, "Auth token should be enabled when IsAuthToken is true")
+	assert.True(t, cfg.Server.Auth.Token.Enabled, "Auth token should be enabled")
 	assert.Equal(t, "legacyToken", cfg.Server.Auth.Token.Value, "Auth token value should be set")
 	// When both DAGs and DAGsDir are provided, DAGsDir takes precedence.
 	assert.Equal(t, "/usr/user/dags", cfg.Paths.DAGsDir, "DAGsDir should be set from def.DAGsDir")
