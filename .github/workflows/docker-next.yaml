@@ -1,6 +1,12 @@
 name: DockerImage (next)
 
 on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch or tag to build"
+        required: false
+        default: next
   push:
     branches:
       - next
@@ -23,6 +29,8 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
 
       - name: Set short SHA
         id: vars
