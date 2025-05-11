@@ -191,7 +191,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 
 	// Evaluate the executor config if set
 	execConfig := n.Step().ExecutorConfig
-	cfg, err := executor.EvalObject(ctx, n.Step().ExecutorConfig.Config)
+	cfg, err := EvalObject(ctx, n.Step().ExecutorConfig.Config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to eval executor config: %w", err)
 	}
@@ -200,7 +200,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 
 	// Evaluate the child workflow if set
 	if w := n.Step().ChildWorkflow; w != nil {
-		w, err := executor.EvalObject(ctx, *w)
+		w, err := EvalObject(ctx, *w)
 		if err != nil {
 			return nil, fmt.Errorf("failed to eval child workflow: %w", err)
 		}
@@ -213,7 +213,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 		if n.Step().ExecutorConfig.IsCommand() {
 			opts = append(opts, cmdutil.OnlyReplaceVars())
 		}
-		script, err := executor.EvalString(ctx, script, opts...)
+		script, err := EvalString(ctx, script, opts...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to eval script: %w", err)
 		}
@@ -266,7 +266,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		// CmdArgsSys is a string with the command and args separated by special markers.
 		cmd, args := cmdutil.SplitCommandArgs(step.CmdArgsSys)
 		for i, arg := range args {
-			value, err := executor.EvalString(ctx, arg, evalOptions...)
+			value, err := EvalString(ctx, arg, evalOptions...)
 			if err != nil {
 				return fmt.Errorf("failed to eval command with args: %w", err)
 			}
@@ -281,7 +281,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 
 	case step.CmdWithArgs != "":
 		// In case of the command and args are defined as a string.
-		cmdWithArgs, err := executor.EvalString(ctx, step.CmdWithArgs, evalOptions...)
+		cmdWithArgs, err := EvalString(ctx, step.CmdWithArgs, evalOptions...)
 		if err != nil {
 			return err
 		}
@@ -313,7 +313,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 			return fmt.Errorf("failed to split command: %w", err)
 		}
 		for i, arg := range args {
-			value, err := executor.EvalString(ctx, arg, evalOptions...)
+			value, err := EvalString(ctx, arg, evalOptions...)
 			if err != nil {
 				return fmt.Errorf("failed to eval command args: %w", err)
 			}
@@ -328,7 +328,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		// Shouldn't reach here except for testing.
 
 		if step.Command != "" {
-			value, err := executor.EvalString(ctx, step.Command, evalOptions...)
+			value, err := EvalString(ctx, step.Command, evalOptions...)
 			if err != nil {
 				return fmt.Errorf("failed to eval command: %w", err)
 			}
@@ -336,7 +336,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		}
 
 		for i, arg := range step.Args {
-			value, err := executor.EvalString(ctx, arg, evalOptions...)
+			value, err := EvalString(ctx, arg, evalOptions...)
 			if err != nil {
 				return fmt.Errorf("failed to eval command args: %w", err)
 			}
