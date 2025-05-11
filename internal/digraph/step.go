@@ -16,9 +16,6 @@ type Step struct {
 	Description string `json:"description,omitempty"`
 	// Shell is the shell program to execute the command. This is optional.
 	Shell string `json:"shell,omitempty"`
-	// OutputVariables stores the output variables for the following steps.
-	// It only contains the local output variables.
-	OutputVariables *SyncMap `json:"outputVariables,omitempty"`
 	// Dir is the working directory for the step.
 	Dir string `json:"dir,omitempty"`
 	// ExecutorConfig contains the configuration for the executor.

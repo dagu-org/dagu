@@ -673,8 +673,8 @@ func (o *dbClient) GetChildWorkflowStatus(ctx context.Context, workflowID string
 
 	outputVariables := map[string]string{}
 	for _, node := range status.Nodes {
-		if node.Step.OutputVariables != nil {
-			node.Step.OutputVariables.Range(func(_, value any) bool {
+		if node.OutputVariables != nil {
+			node.OutputVariables.Range(func(_, value any) bool {
 				// split the value by '=' to get the key and value
 				parts := strings.SplitN(value.(string), "=", 2)
 				if len(parts) == 2 {

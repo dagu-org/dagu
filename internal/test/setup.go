@@ -226,10 +226,10 @@ func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]any) {
 	// collect the actual outputs from the status
 	var actualOutputs = make(map[string]string)
 	for _, node := range status.Nodes {
-		if node.Step.OutputVariables == nil {
+		if node.OutputVariables == nil {
 			continue
 		}
-		value, ok := node.Step.OutputVariables.Load(node.Step.Output)
+		value, ok := node.OutputVariables.Load(node.Step.Output)
 		if ok {
 			actualOutputs[node.Step.Output] = value.(string)
 		}

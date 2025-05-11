@@ -47,6 +47,9 @@ type NodeState struct {
 	ExitCode int
 	// Child executions is the list of child workflows that this node has executed.
 	Children []ChildWorkflow
+	// OutputVariables stores the output variables for the following steps.
+	// It only contains the local output variables.
+	OutputVariables *executor.SyncMap
 }
 
 type ChildWorkflow struct {
@@ -249,11 +252,11 @@ func (s *Data) ClearVariable(key string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.inner.Step.OutputVariables == nil {
+	if s.inner.State.OutputVariables == nil {
 		return
 	}
 
-	s.inner.Step.OutputVariables.Delete(key)
+	s.inner.State.OutputVariables.Delete(key)
 }
 
 func (s *Data) MatchExitCode(exitCodes []int) bool {
@@ -272,11 +275,11 @@ func (n *Data) getVariable(key string) (stringutil.KeyValue, bool) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
-	if n.inner.Step.OutputVariables == nil {
+	if n.inner.State.OutputVariables == nil {
 		return "", false
 	}
 
-	v, ok := n.inner.Step.OutputVariables.Load(key)
+	v, ok := n.inner.State.OutputVariables.Load(key)
 	if !ok {
 		return "", false
 	}
@@ -295,21 +298,21 @@ func (n *Data) getBoolVariable(key string) (bool, bool) {
 
 func (n *Data) setBoolVariable(key string, value bool) {
 
-	if n.inner.Step.OutputVariables == nil {
+	if n.inner.State.OutputVariables == nil {
 		n.mu.Lock()
-		n.inner.Step.OutputVariables = &digraph.SyncMap{}
+		n.inner.State.OutputVariables = &executor.SyncMap{}
 		n.mu.Unlock()
 	}
-	n.inner.Step.OutputVariables.Store(key, stringutil.NewKeyValue(key, strconv.FormatBool(value)).String())
+	n.inner.State.OutputVariables.Store(key, stringutil.NewKeyValue(key, strconv.FormatBool(value)).String())
 }
 
 func (n *Data) setVariable(key, value string) {
-	if n.inner.Step.OutputVariables == nil {
+	if n.inner.State.OutputVariables == nil {
 		n.mu.Lock()
-		n.inner.Step.OutputVariables = &digraph.SyncMap{}
+		n.inner.State.OutputVariables = &executor.SyncMap{}
 		n.mu.Unlock()
 	}
-	n.inner.Step.OutputVariables.Store(key, stringutil.NewKeyValue(key, value).String())
+	n.inner.State.OutputVariables.Store(key, stringutil.NewKeyValue(key, value).String())
 }
 
 func (n *Data) Finish() {

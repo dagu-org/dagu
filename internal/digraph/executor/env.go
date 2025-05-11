@@ -54,7 +54,7 @@ func GetEnv(ctx context.Context) Env {
 type Env struct {
 	digraph.Env
 
-	Variables *digraph.SyncMap
+	Variables *SyncMap
 	Step      digraph.Step
 	Envs      map[string]string
 }
@@ -63,7 +63,7 @@ type Env struct {
 func NewEnv(ctx context.Context, step digraph.Step) Env {
 	return Env{
 		Env:       digraph.GetEnv(ctx),
-		Variables: &digraph.SyncMap{},
+		Variables: &SyncMap{},
 		Step:      step,
 		Envs: map[string]string{
 			digraph.EnvKeyWorkflowStepName: step.Name,
@@ -90,7 +90,7 @@ func (e Env) AllEnvs() []string {
 }
 
 // LoadOutputVariables loads the output variables from the given DAG into the
-func (e Env) LoadOutputVariables(vars *digraph.SyncMap) {
+func (e Env) LoadOutputVariables(vars *SyncMap) {
 	vars.Range(func(key, value any) bool {
 		// Skip if the key already exists
 		if _, ok := e.Variables.Load(key); ok {

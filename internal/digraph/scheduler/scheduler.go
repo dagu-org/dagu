@@ -397,11 +397,11 @@ func (sc *Scheduler) setupEnviron(ctx context.Context, graph *ExecutionGraph, no
 		queue = append(queue, graph.To[curr]...)
 
 		node := graph.nodeByID[curr]
-		if node.Step().OutputVariables == nil {
+		if node.inner.State.OutputVariables == nil {
 			continue
 		}
 
-		env.LoadOutputVariables(node.Step().OutputVariables)
+		env.LoadOutputVariables(node.inner.State.OutputVariables)
 	}
 
 	return executor.WithEnv(ctx, env)
@@ -412,12 +412,11 @@ func (sc *Scheduler) setupEnvironEventHandler(ctx context.Context, graph *Execut
 
 	// get all output variables
 	for _, node := range graph.nodes {
-		nodeStep := node.Step()
-		if nodeStep.OutputVariables == nil {
+		if node.inner.State.OutputVariables == nil {
 			continue
 		}
 
-		env.LoadOutputVariables(nodeStep.OutputVariables)
+		env.LoadOutputVariables(node.inner.State.OutputVariables)
 	}
 
 	return executor.WithEnv(ctx, env)

@@ -285,8 +285,8 @@ func (n nodeHelper) AssertLogContains(t *testing.T, expected string) {
 func (n nodeHelper) AssertOutput(t *testing.T, key, value string) {
 	t.Helper()
 
-	require.NotNil(t, n.NodeData().Step.OutputVariables, "output variables not set")
-	data, ok := n.NodeData().Step.OutputVariables.Load(key)
+	require.NotNil(t, n.NodeData().State.OutputVariables, "output variables not set")
+	data, ok := n.NodeData().State.OutputVariables.Load(key)
 	require.True(t, ok, "output variable not found")
 	require.Equal(t, fmt.Sprintf(`%s=%s`, key, value), data, "output variable value mismatch")
 }

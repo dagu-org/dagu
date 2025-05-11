@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
@@ -37,31 +38,33 @@ func FromNode(node scheduler.NodeData) *Node {
 		errText = node.State.Error.Error()
 	}
 	return &Node{
-		Step:       node.Step,
-		Log:        node.State.Log,
-		StartedAt:  stringutil.FormatTime(node.State.StartedAt),
-		FinishedAt: stringutil.FormatTime(node.State.FinishedAt),
-		Status:     node.State.Status,
-		RetriedAt:  stringutil.FormatTime(node.State.RetriedAt),
-		RetryCount: node.State.RetryCount,
-		DoneCount:  node.State.DoneCount,
-		Error:      errText,
-		Children:   children,
+		Step:            node.Step,
+		Log:             node.State.Log,
+		StartedAt:       stringutil.FormatTime(node.State.StartedAt),
+		FinishedAt:      stringutil.FormatTime(node.State.FinishedAt),
+		Status:          node.State.Status,
+		RetriedAt:       stringutil.FormatTime(node.State.RetriedAt),
+		RetryCount:      node.State.RetryCount,
+		DoneCount:       node.State.DoneCount,
+		Error:           errText,
+		Children:        children,
+		OutputVariables: node.State.OutputVariables,
 	}
 }
 
 // Node represents a DAG step with its execution state for persistence
 type Node struct {
-	Step       digraph.Step         `json:"step"`
-	Log        string               `json:"log"`
-	StartedAt  string               `json:"startedAt"`
-	FinishedAt string               `json:"finishedAt"`
-	Status     scheduler.NodeStatus `json:"status"`
-	RetriedAt  string               `json:"retriedAt,omitempty"`
-	RetryCount int                  `json:"retryCount,omitempty"`
-	DoneCount  int                  `json:"doneCount,omitempty"`
-	Error      string               `json:"error,omitempty"`
-	Children   []ChildWorkflow      `json:"children,omitempty"`
+	Step            digraph.Step         `json:"step"`
+	Log             string               `json:"log"`
+	StartedAt       string               `json:"startedAt"`
+	FinishedAt      string               `json:"finishedAt"`
+	Status          scheduler.NodeStatus `json:"status"`
+	RetriedAt       string               `json:"retriedAt,omitempty"`
+	RetryCount      int                  `json:"retryCount,omitempty"`
+	DoneCount       int                  `json:"doneCount,omitempty"`
+	Error           string               `json:"error,omitempty"`
+	Children        []ChildWorkflow      `json:"children,omitempty"`
+	OutputVariables *executor.SyncMap    `json:"outputVariables,omitempty"`
 }
 
 type ChildWorkflow struct {
@@ -78,15 +81,16 @@ func (n *Node) ToNode() *scheduler.Node {
 		children[i] = scheduler.ChildWorkflow(r)
 	}
 	return scheduler.NewNode(n.Step, scheduler.NodeState{
-		Status:     n.Status,
-		Log:        n.Log,
-		StartedAt:  startedAt,
-		FinishedAt: finishedAt,
-		RetriedAt:  retriedAt,
-		RetryCount: n.RetryCount,
-		DoneCount:  n.DoneCount,
-		Error:      errors.New(n.Error),
-		Children:   children,
+		Status:          n.Status,
+		Log:             n.Log,
+		StartedAt:       startedAt,
+		FinishedAt:      finishedAt,
+		RetriedAt:       retriedAt,
+		RetryCount:      n.RetryCount,
+		DoneCount:       n.DoneCount,
+		Error:           errors.New(n.Error),
+		Children:        children,
+		OutputVariables: n.OutputVariables,
 	})
 }
 
