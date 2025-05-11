@@ -189,6 +189,16 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 		return nil, err
 	}
 
+	// Evaluate the executor config if set
+	execConfig := n.Step().ExecutorConfig
+	cfg, err := executor.EvalObject(ctx, n.Step().ExecutorConfig.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to eval executor config: %w", err)
+	}
+	execConfig.Config = cfg
+	n.SetExecutorConfig(execConfig)
+
+	// Create the executor
 	cmd, err := executor.NewExecutor(ctx, n.Step())
 	if err != nil {
 		return nil, err

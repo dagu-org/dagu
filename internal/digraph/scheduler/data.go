@@ -99,6 +99,13 @@ func (s *Data) ResetError() {
 	s.inner.State.ExitCode = 0
 }
 
+func (s *Data) SetExecutorConfig(cfg digraph.ExecutorConfig) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.inner.Step.ExecutorConfig = cfg
+}
+
 func (s *Data) Args() []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
