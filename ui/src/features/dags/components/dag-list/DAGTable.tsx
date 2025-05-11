@@ -49,16 +49,16 @@ function formatMs(ms: number): string {
 }
 
 // Import shadcn/ui components
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Badge } from '../../../../components/ui/badge';
+import { Button } from '../../../../components/ui/button';
+import { Input } from '../../../../components/ui/input';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'; // Use shadcn Select
+} from '../../../../components/ui/select'; // Use shadcn Select
 import {
   Table,
   TableBody,
@@ -66,9 +66,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { AppBarContext } from '@/contexts/AppBarContext';
-import { useQuery } from '@/hooks/api';
+} from '../../../../components/ui/table';
+import { AppBarContext } from '../../../../contexts/AppBarContext';
+import { useQuery } from '../../../../hooks/api';
 
 /**
  * Props for the DAGTable component
@@ -387,7 +387,7 @@ const defaultColumns = [
       }
 
       const formattedStartedAt = dayjs(startedAt).format('YYYY-MM-DD HH:mm:ss');
-      let durationContent = null;
+      let durationContent: React.ReactNode = null;
 
       if (finishedAt && finishedAt !== '-') {
         const durationMs = dayjs(finishedAt).diff(dayjs(startedAt));
@@ -829,7 +829,7 @@ function DAGTable({
   const { data: uniqueTags } = useQuery('/dags/tags', {
     params: {
       query: {
-        remoteNode: appBarContext.selectedRemoteNode || 'local',
+        remoteNode: appBarContext?.selectedRemoteNode || 'local',
       },
     },
   });
@@ -858,7 +858,7 @@ function DAGTable({
               placeholder="Search DAGs..."
               value={searchText}
               onChange={(e) => handleSearchTextChange(e.target.value)}
-              className="pl-6 pr-6 py-0.5 h-6 text-xs bg-background border-muted hover:border-muted-foreground/30 focus-visible:ring-1 focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-all duration-200 rounded-md w-full"
+              className="pl-6 pr-6 py-0.5 h-6 text-xs bg-background border-[1.5px] border-muted-foreground/40 hover:border-muted-foreground/60 focus-visible:ring-1 focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-all duration-200 rounded-md w-full"
             />
             {searchText && (
               <button
