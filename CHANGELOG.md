@@ -1,3 +1,70 @@
+<a id="v1.16.8"></a>
+# [v1.16.8](https://github.com/dagu-org/dagu/releases/tag/v1.16.8) - 2025-05-01
+
+## Changelog
+* [`ada8c48f4e`](https://github.com/dagu-org/dagu/commit/ada8c48f4e68818817b0419649b80bf93df2f464) Fix build error in frontend
+
+## What's Changed
+* added zoom in zoom out for DAGs. [#774](https://github.com/dagu-org/dagu/issues/774) by [@kriyanshii](https://github.com/kriyanshii) in [#899](https://github.com/dagu-org/dagu/pull/899)
+* update Makefile build-ui [#901](https://github.com/dagu-org/dagu/issues/901) by [@kriyanshii](https://github.com/kriyanshii) in [#904](https://github.com/dagu-org/dagu/pull/904)
+* [[#905](https://github.com/dagu-org/dagu/issues/905)] DAG visualization updates by [@yottahmd](https://github.com/yottahmd) in [#906](https://github.com/dagu-org/dagu/pull/906)
+* added support for custom exit codes on retry [#792](https://github.com/dagu-org/dagu/issues/792) by [@kriyanshii](https://github.com/kriyanshii) in [#902](https://github.com/dagu-org/dagu/pull/902)
+
+## Special thanks
+Huge shout-out to [@kriyanshii](https://github.com/kriyanshii)  for multiple awesome contributions recently! 
+
+✨ Retry on Custom Exit Codes: Finer control over task retries. You can specify which exit codes trigger a retry (Resolves [#792](https://github.com/dagu-org/dagu/issues/792)).
+✨ Diagram Zoom: Zoom in/out now supported for navigating large DAGs easily (Resolves [#774](https://github.com/dagu-org/dagu/issues/774))
+✨ Build Fix: Resolved a key issue preventing the frontend (make build-ui) from building (Fixes [#901](https://github.com/dagu-org/dagu/issues/901)).
+
+**Full Changelog**: https://github.com/dagu-org/dagu/compare/v1.16.7...v1.16.8
+
+## Contributors
+
+<a href="https://github.com/kriyanshii"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fkriyanshii.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@kriyanshii"></a>
+<a href="https://github.com/yottahmd"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fyottahmd.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@yottahmd"></a>
+
+[Changes][v1.16.8]
+
+
+<a id="v1.16.7"></a>
+# [v1.16.7](https://github.com/dagu-org/dagu/releases/tag/v1.16.7) - 2025-03-28
+
+## Changelog
+* [`6c1a2d9b99`](https://github.com/dagu-org/dagu/commit/6c1a2d9b9985314d10f1567fa8119f2698994cc4) [[#893](https://github.com/dagu-org/dagu/issues/893)] fix: Multi-line Python script result in error ([#894](https://github.com/dagu-org/dagu/issues/894))
+
+## What's Changed
+* [[#893](https://github.com/dagu-org/dagu/issues/893)] fix: Multi-line Python script result in error by [@yottahmd](https://github.com/yottahmd) in [#894](https://github.com/dagu-org/dagu/pull/894)
+
+
+**Full Changelog**: https://github.com/dagu-org/dagu/compare/v1.16.6...v1.16.7
+
+## Contributors
+
+<a href="https://github.com/yottahmd"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fyottahmd.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@yottahmd"></a>
+
+[Changes][v1.16.7]
+
+
+<a id="v1.16.6"></a>
+# [v1.16.6](https://github.com/dagu-org/dagu/releases/tag/v1.16.6) - 2025-03-23
+
+## Changelog
+* [`5ab3a06ce4`](https://github.com/dagu-org/dagu/commit/5ab3a06ce4cb31764cee837056ae3c1be8aba8e2) [[#889](https://github.com/dagu-org/dagu/issues/889)] fix: config: Remote node with auth not working ([#890](https://github.com/dagu-org/dagu/issues/890))
+
+## What's Changed
+* [[#889](https://github.com/dagu-org/dagu/issues/889)] fix: config: Remote node with auth not working by [@yottahmd](https://github.com/yottahmd) in [#890](https://github.com/dagu-org/dagu/pull/890)
+
+
+**Full Changelog**: https://github.com/dagu-org/dagu/compare/v1.16.5...v1.16.6
+
+## Contributors
+
+<a href="https://github.com/yottahmd"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fyottahmd.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@yottahmd"></a>
+
+[Changes][v1.16.6]
+
+
 <a id="v1.16.5"></a>
 # [v1.16.5](https://github.com/dagu-org/dagu/releases/tag/v1.16.5) - 2025-03-22
 
@@ -6,7 +73,6 @@
 
 ## What's Changed
 * docs: bump python version for docs to 3.11.9 by [@Lewiscowles1986](https://github.com/Lewiscowles1986) in [#865](https://github.com/dagu-org/dagu/pull/865)
-* chore: add CHANGELOG.md by [@yottahmd](https://github.com/yottahmd) in [#866](https://github.com/dagu-org/dagu/pull/866)
 * fix: snapshot deprecated warning (Fixes [#869](https://github.com/dagu-org/dagu/issues/869)) by [@arky](https://github.com/arky) in [#870](https://github.com/dagu-org/dagu/pull/870)
 * docs: fixed incorrect command syntax in slack notification example by [@david-waterworth](https://github.com/david-waterworth) in [#874](https://github.com/dagu-org/dagu/pull/874)
 * [[#877](https://github.com/dagu-org/dagu/issues/877)] ui: fix: base path is not working on web by [@yottahmd](https://github.com/yottahmd) in [#878](https://github.com/dagu-org/dagu/pull/878)
@@ -138,7 +204,6 @@
 ## Contributors
 
 <a href="https://github.com/arky"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Farky.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@arky"></a>
-<a href="https://github.com/eltociear"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Feltociear.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@eltociear"></a>
 <a href="https://github.com/kennethpjdyer"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fkennethpjdyer.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@kennethpjdyer"></a>
 <a href="https://github.com/kriyanshii"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fkriyanshii.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@kriyanshii"></a>
 <a href="https://github.com/vhespanha"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fvhespanha.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@vhespanha"></a>
@@ -2200,6 +2265,9 @@ For the internal-use directory path you can set the environment variable `DAGU_H
 [Changes][v1.0.0]
 
 
+[v1.16.8]: https://github.com/dagu-org/dagu/compare/v1.16.7...v1.16.8
+[v1.16.7]: https://github.com/dagu-org/dagu/compare/v1.16.6...v1.16.7
+[v1.16.6]: https://github.com/dagu-org/dagu/compare/v1.16.5...v1.16.6
 [v1.16.5]: https://github.com/dagu-org/dagu/compare/v1.16.4...v1.16.5
 [v1.16.4]: https://github.com/dagu-org/dagu/compare/v1.16.3...v1.16.4
 [v1.16.3]: https://github.com/dagu-org/dagu/compare/v1.16.2...v1.16.3

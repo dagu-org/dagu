@@ -653,8 +653,8 @@ github.com/quasilyte/stdinfo v0.0.0-20220114132959-f7386bf02567 h1:M8mH9eK4OUR4l
 github.com/quasilyte/stdinfo v0.0.0-20220114132959-f7386bf02567/go.mod h1:DWNGW8A4Y+GyBgPuaQJuWiy0XYftx4Xm/y5Jqk9I6VQ=
 github.com/raeperd/recvcheck v0.2.0 h1:GnU+NsbiCqdC2XX5+vMZzP+jAJC5fht7rcVTAhX74UI=
 github.com/raeperd/recvcheck v0.2.0/go.mod h1:n04eYkwIR0JbgD73wT8wL4JjPC3wm0nFtzBnWNocnYU=
-github.com/rhysd/changelog-from-release/v3 v3.8.1 h1:vUC1MJG3Q8AkNwV536xOg+iniHN/L7ORqUMyG16SJ5Q=
-github.com/rhysd/changelog-from-release/v3 v3.8.1/go.mod h1:J5w/K0nhdNJORkhY/RMjSEtuL0OzM6w1DBZKljD90po=
+github.com/rhysd/changelog-from-release/v3 v3.9.0 h1:Ig1L9ECRQxiNEh2odNy7dLRI/63nCUq417TQvpXAU3Y=
+github.com/rhysd/changelog-from-release/v3 v3.9.0/go.mod h1:J5w/K0nhdNJORkhY/RMjSEtuL0OzM6w1DBZKljD90po=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
 github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=

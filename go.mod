@@ -29,7 +29,7 @@ require (
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/errors v0.9.1
-	github.com/rhysd/changelog-from-release/v3 v3.8.1
+	github.com/rhysd/changelog-from-release/v3 v3.9.0
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/samber/slog-multi v1.2.0
 	github.com/segmentio/golines v0.12.2

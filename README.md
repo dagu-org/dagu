@@ -38,7 +38,8 @@ Dagu’s design emphasizes minimal external dependencies: it operates solely as 
   - [Via Bash script](#via-bash-script)
   - [Via GitHub Releases Page](#via-github-releases-page)
   - [Via Homebrew (macOS)](#via-homebrew-macos)
-  - [Via Docker](#via-docker)
+  - [Via Docker (stable)](#via-docker-stable)
+  - [Via Docker (next preview)](#via-docker-next-preview)
   - [Quick Start](#quick-start)
 - [Building from Source](#building-from-source)
   - [Prerequisites](#prerequisites)
@@ -132,7 +133,7 @@ Upgrade to the latest version:
 brew upgrade dagu-org/brew/dagu
 ```
 
-### Via Docker
+### Via Docker (stable)
 
 ```sh
 docker run \
@@ -146,6 +147,28 @@ ghcr.io/dagu-org/dagu:latest dagu start-all
 Note: The environment variable `DAGU_TZ` is the timezone for the scheduler and server. You can set it to your local timezone (e.g. `America/New_York`).
 
 See [Environment variables](https://dagu.readthedocs.io/en/latest/config.html#environment-variables) to configure those default directories.
+
+### Via Docker (next preview)
+
+The `next` branch is published continuously as a preview image. Use this to test the upcoming version without waiting for a formal release.
+
+```sh
+docker run \
+--rm \
+-p 8080:8080 \
+-v ~/.config/dagu:/config \
+-e DAGU_TZ=`ls -l /etc/localtime | awk -F'/zoneinfo/' '{print $2}'` \
+ghcr.io/dagu-org/dagu:next dagu start-all
+```
+
+Two tags are pushed on every commit to `next`:
+
+| Tag          | Description                                                    |
+| ------------ | -------------------------------------------------------------- |
+| `next`       | Moving pointer to the latest commit on the `next` branch       |
+| `next-<sha>` | Immutable image for the specific commit (first 7 chars of SHA) |
+
+> **Heads‑up**: preview images may contain breaking changes and are **not** guaranteed to be backward‑compatible. Pin to `next-<sha>` if you need a reproducible environment.
 
 ### Quick Start
 

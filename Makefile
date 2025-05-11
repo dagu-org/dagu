@@ -11,6 +11,9 @@ VERSION=
 # This Makefile's directory
 SCRIPT_DIR=$(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
+# Remote repository for the project
+REMOTE_REPO_URL=https://github.com/dagu-org/dagu
+
 # Directories for miscellaneous files for the local environment
 LOCAL_DIR=$(SCRIPT_DIR)/.local
 LOCAL_BIN_DIR=$(LOCAL_DIR)/bin
@@ -291,7 +294,7 @@ golangci-lint:
 changelog:
 	@echo "${COLOR_GREEN}Running changelog...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_changelog-from-release)
-	@${LOCAL_BIN_DIR}/changelog-from-release -c > CHANGELOG.md
+	@${LOCAL_BIN_DIR}/changelog-from-release -r ${REMOTE_REPO_URL} -c > CHANGELOG.md
 
 ##############################################################################
 # Certificates
