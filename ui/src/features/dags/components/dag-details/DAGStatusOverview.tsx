@@ -103,8 +103,8 @@ function DAGStatusOverview({
 
   return (
     <div className="space-y-3">
-      {/* Status Section */}
-      <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
+      {/* Status Section - Desktop */}
+      <div className="hidden md:flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
         <div className="flex items-center gap-2">
           <StatusChip status={status.status} size="md">
             {status.statusLabel}
@@ -144,9 +144,53 @@ function DAGStatusOverview({
         )}
       </div>
 
+      {/* Status Section - Mobile */}
+      <div className="md:hidden border-b border-slate-200 dark:border-slate-700 pb-2 space-y-2">
+        <div>
+          <StatusChip status={status.status} size="md">
+            {status.statusLabel}
+          </StatusChip>
+        </div>
+
+        {status.pid && (
+          <div className="flex items-center text-xs text-slate-500 dark:text-slate-400">
+            <Terminal className="h-3 w-3 mr-0.5" />
+            <span>PID: {status.pid}</span>
+          </div>
+        )}
+
+        {status.workflowId && (
+          <div className="space-y-1">
+            <div className="flex items-center">
+              <Hash className="h-3 w-3 mr-0.5 text-slate-500 dark:text-slate-400" />
+              <span className="text-xs font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-300">
+                {status.workflowId}
+              </span>
+            </div>
+
+            <div>
+              <a
+                href={url}
+                onClick={(e) => {
+                  if (!(e.metaKey || e.ctrlKey) && onViewLog) {
+                    e.preventDefault();
+                    onViewLog(status.workflowId);
+                  }
+                }}
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-200 cursor-pointer"
+                title="Click to view log (Cmd/Ctrl+Click to open in new tab)"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                <span>View Log</span>
+              </a>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Timing Information */}
       <div className="border-b border-slate-200 dark:border-slate-700 pb-2">
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-col md:flex-row flex-wrap items-center md:items-start gap-4">
           <div className="flex items-center">
             <Calendar className="h-3.5 w-3.5 mr-1 text-slate-500 dark:text-slate-400" />
             <LabeledItem label="Started">

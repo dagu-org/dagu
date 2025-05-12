@@ -48,8 +48,8 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
   return (
     <>
       <div className="flex flex-col gap-2">
-        <div className="flex flex-row items-center justify-between">
-          <Title className="flex items-center">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-0">
+          <Title className="flex flex-wrap items-center">
             {/* Root workflow */}
             {workflowToDisplay.rootWorkflowId !==
               workflowToDisplay.workflowId && (
@@ -87,7 +87,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
               )}
 
             {/* Current workflow */}
-            <span>{workflowToDisplay.name}</span>
+            <span className="break-all">{workflowToDisplay.name}</span>
           </Title>
           {/* Only show DAG actions for root workflows, not for child workflows */}
           {workflowToDisplay.workflowId ===
@@ -104,46 +104,56 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
         </div>
       </div>
       {workflowToDisplay.status != Status.NotStarted ? (
-        <div className="flex flex-row items-center justify-between mb-4">
-          <div className="flex flex-row items-center gap-4">
-            {workflowToDisplay.status ? (
+        <div className="mt-4 mb-4">
+          {/* Status chip */}
+          {workflowToDisplay.status ? (
+            <div className="mb-4">
               <StatusChip status={workflowToDisplay.status}>
                 {workflowToDisplay.statusLabel || ''}
               </StatusChip>
-            ) : null}
-
-            <div className="flex flex-row items-center text-slate-600 dark:text-slate-400">
-              <Calendar className="mr-1.5 h-4 w-4" />
-              <span className="text-sm">
-                {workflowToDisplay?.startedAt
-                  ? dayjs(workflowToDisplay.startedAt).format(
-                      'YYYY-MM-DD HH:mm:ss Z'
-                    )
-                  : '--'}
-              </span>
             </div>
+          ) : null}
 
-            <div className="flex flex-row items-center text-slate-600 dark:text-slate-400">
-              <Timer className="mr-1.5 h-4 w-4" />
-              <span className="text-sm">
-                {workflowToDisplay.finishedAt
-                  ? formatDuration(
-                      workflowToDisplay.startedAt,
-                      workflowToDisplay.finishedAt
-                    )
-                  : workflowToDisplay.startedAt
-                    ? formatDuration(
-                        workflowToDisplay.startedAt,
-                        dayjs().toISOString()
+          {/* Simple flex layout for metadata */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+            {/* Left side - Date and Duration in a row on desktop, column on mobile */}
+            <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-6">
+              {/* Date with icon */}
+              <div className="flex items-center text-slate-600 dark:text-slate-400">
+                <Calendar className="mr-1.5 h-4 w-4 flex-shrink-0" />
+                <span className="text-sm">
+                  {workflowToDisplay?.startedAt
+                    ? dayjs(workflowToDisplay.startedAt).format(
+                        'YYYY-MM-DD HH:mm:ss Z'
                       )
                     : '--'}
-              </span>
-            </div>
-          </div>
+                </span>
+              </div>
 
-          <div className="text-sm text-slate-600 dark:text-slate-400">
-            <span className="font-medium">Workflow ID:</span>{' '}
-            {workflowToDisplay.rootWorkflowId}
+              {/* Duration with icon */}
+              <div className="flex items-center text-slate-600 dark:text-slate-400">
+                <Timer className="mr-1.5 h-4 w-4 flex-shrink-0" />
+                <span className="text-sm">
+                  {workflowToDisplay.finishedAt
+                    ? formatDuration(
+                        workflowToDisplay.startedAt,
+                        workflowToDisplay.finishedAt
+                      )
+                    : workflowToDisplay.startedAt
+                      ? formatDuration(
+                          workflowToDisplay.startedAt,
+                          dayjs().toISOString()
+                        )
+                      : '--'}
+                </span>
+              </div>
+            </div>
+
+            {/* Right side - Workflow ID */}
+            <div className="text-sm text-slate-600 dark:text-slate-400 break-all mt-3 md:mt-0">
+              <span className="font-medium">Workflow ID:</span>{' '}
+              {workflowToDisplay.rootWorkflowId}
+            </div>
           </div>
         </div>
       ) : null}

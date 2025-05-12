@@ -6,6 +6,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { Menu, X } from 'lucide-react';
 import * as React from 'react';
 import { AppBarContext } from '../contexts/AppBarContext';
 import { mainListItems as MainListItems } from '../menu';
@@ -76,8 +77,10 @@ type LayoutProps = {
 // Main Content component including Sidebar and AppBar logic
 function Content({ title, navbarColor, children }: LayoutProps) {
   const [scrolled, setScrolled] = React.useState(false);
-  // Sidebar is always visible in collapsed state by default
+  // Sidebar is always visible in collapsed state by default on desktop
   const [isSidebarExpanded, setIsSidebarExpanded] = React.useState(false);
+  // Mobile sidebar state (hidden by default)
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   // Effect to handle scroll shadow on AppBar
@@ -91,14 +94,15 @@ function Content({ title, navbarColor, children }: LayoutProps) {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-white">
-      {/* Sidebar - Always visible in collapsed state */}
+      {/* Desktop Sidebar - Hidden on mobile, visible in collapsed state on desktop */}
       <div
         className={cn(
           // Modern base styles with dark background
           'h-full overflow-hidden bg-[#222] text-white',
           // Shadow effect
           'shadow-lg',
-          // Always visible, not fixed
+          // Hidden on mobile, visible on desktop
+          'hidden md:block',
           'z-40 transition-all duration-50 ease-in-out',
           isSidebarExpanded ? 'w-60' : sidebarWidthCollapsed
         )}
@@ -113,10 +117,38 @@ function Content({ title, navbarColor, children }: LayoutProps) {
               // Don't collapse sidebar on navigation to prevent jarring transition
             />
           </nav>
-
-          {/* No bottom icon needed */}
         </div>
       </div>
+
+      {/* Mobile Sidebar - Overlay that appears when hamburger menu is clicked */}
+      {isMobileSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 md:hidden flex"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        >
+          <div
+            className="h-full w-60 bg-[#222] text-white shadow-lg overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-end p-4">
+              <button
+                onClick={() => setIsMobileSidebarOpen(false)}
+                className="text-white hover:text-gray-300 transition-colors"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="flex flex-col h-full">
+              <nav className="flex-1">
+                <MainListItems
+                  isOpen={true}
+                  onNavItemClick={() => setIsMobileSidebarOpen(false)}
+                />
+              </nav>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <div className="flex flex-col flex-1 h-full overflow-hidden bg-gray-100">
@@ -139,8 +171,17 @@ function Content({ title, navbarColor, children }: LayoutProps) {
           }}
         >
           <div className="flex items-center justify-between w-full h-10">
-            {/* Left side content: Title */}
+            {/* Left side content: Hamburger menu for mobile + Title */}
             <div className="flex items-center space-x-2">
+              {/* Hamburger menu - only visible on mobile */}
+              <button
+                className="md:hidden text-current p-1 -ml-1 rounded-md hover:bg-white/10 transition-colors"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                aria-label="Open menu"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+
               <NavBarTitleText
                 color={getContrastColor(
                   navbarColor && navbarColor.trim() !== ''

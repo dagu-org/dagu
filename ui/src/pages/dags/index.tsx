@@ -8,7 +8,7 @@ import { DAGErrors } from '../../features/dags/components/dag-editor';
 import { DAGTable } from '../../features/dags/components/dag-list';
 import DAGListHeader from '../../features/dags/components/dag-list/DAGListHeader';
 import { useQuery } from '../../hooks/api';
-import WithLoading from '../../ui/WithLoading';
+import LoadingIndicator from '../../ui/LoadingIndicator';
 
 function DAGs() {
   const query = new URLSearchParams(useLocation().search);
@@ -45,6 +45,7 @@ function DAGs() {
     {
       refreshInterval: 10000,
       revalidateIfStale: false,
+      keepPreviousData: true, // Keep previous data while loading new data
     }
   );
 
@@ -119,38 +120,67 @@ function DAGs() {
     debouncedAPISearchTag(searchTag);
   };
 
+  // Store the last valid data to prevent blank screens during loading
+  const [lastValidData, setLastValidData] = React.useState<typeof data | null>(
+    null
+  );
+
+  // Update lastValidData whenever we get new data
+  React.useEffect(() => {
+    if (data) {
+      setLastValidData(data);
+    }
+  }, [data]);
+
+  // Use the current data if available, otherwise use the last valid data
+  const displayData = data || lastValidData;
+
   return (
     <div className="flex flex-col">
       <DAGListHeader />
-      <div>
-        <WithLoading loaded={!isLoading}>
-          {data && (
-            <>
-              <DAGErrors
-                dags={data.dags || []}
-                errors={data.errors || []}
-                hasError={errorCount > 0 || data.errors?.length > 0}
-              />
-              <DAGTable
-                dags={dagFiles}
-                group={group}
-                refreshFn={refreshFn}
-                searchText={searchText}
-                handleSearchTextChange={searchTextChange}
-                searchTag={searchTag}
-                handleSearchTagChange={searchTagChange}
-                // Pass pagination props to DAGTable
-                pagination={{
-                  totalPages: data.pagination.totalPages,
-                  page: page,
-                  pageChange: pageChange,
-                  onPageLimitChange: handlePageLimitChange,
-                  pageLimit: preferences.pageLimit,
-                }}
-              />
-            </>
-          )}
-        </WithLoading>
+
+      {/* Loading indicator - fixed position in center of screen */}
+      {isLoading && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center">
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-lg">
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+          </div>
+        </div>
+      )}
+
+      {/* Content - always visible */}
+      <div className="w-full">
+        {displayData ? (
+          <>
+            <DAGErrors
+              dags={displayData.dags || []}
+              errors={displayData.errors || []}
+              hasError={
+                (errorCount > 0 || displayData.errors?.length > 0) && !isLoading
+              }
+            />
+            <DAGTable
+              dags={isLoading ? (lastValidData ? dagFiles : []) : dagFiles}
+              group={group}
+              refreshFn={refreshFn}
+              searchText={searchText}
+              handleSearchTextChange={searchTextChange}
+              searchTag={searchTag}
+              handleSearchTagChange={searchTagChange}
+              pagination={{
+                totalPages: displayData.pagination.totalPages,
+                page: page,
+                pageChange: pageChange,
+                onPageLimitChange: handlePageLimitChange,
+                pageLimit: preferences.pageLimit,
+              }}
+              isLoading={isLoading}
+            />
+          </>
+        ) : (
+          /* Show initial loading state if no data yet */
+          <LoadingIndicator />
+        )}
       </div>
     </div>
   );
