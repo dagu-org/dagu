@@ -1,6 +1,9 @@
 package localhistory
 
 import (
+	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -256,4 +259,116 @@ func TestJSONDB(t *testing.T) {
 		require.NotNil(t, dag)
 		require.Equal(t, *rec.dag, *dag)
 	})
+}
+
+func TestListRoot(t *testing.T) {
+	t.Parallel()
+
+	// Create a temporary directory for testing
+	tmpDir := t.TempDir()
+
+	// Create test directories
+	testDirs := []string{
+		"dag1",
+		"dag2",
+		"dag3",
+	}
+
+	for _, dir := range testDirs {
+		dirPath := filepath.Join(tmpDir, dir)
+		err := os.MkdirAll(dirPath, 0750)
+		require.NoError(t, err, "Failed to create test directory")
+	}
+
+	// Create a file (should be ignored by listRoot)
+	filePath := filepath.Join(tmpDir, "not-a-dir.txt")
+	err := os.WriteFile(filePath, []byte("test"), 0600)
+	require.NoError(t, err, "Failed to create test file")
+
+	// Create localStorage instance
+	storage := &localStorage{
+		baseDir: tmpDir,
+	}
+
+	// Call listRoot
+	ctx := context.Background()
+	roots, err := storage.listRoot(ctx)
+	require.NoError(t, err, "listRoot should not return an error")
+
+	// Verify results
+	assert.Len(t, roots, len(testDirs), "listRoot should return the correct number of directories")
+
+	// Verify each directory is in the results
+	foundDirs := make(map[string]bool)
+	for _, root := range roots {
+		foundDirs[root.prefix] = true
+	}
+
+	for _, dir := range testDirs {
+		assert.True(t, foundDirs[dir], "listRoot should include directory %s", dir)
+	}
+}
+
+func TestListRootEmptyDirectory(t *testing.T) {
+	t.Parallel()
+
+	// Create a temporary directory for testing
+	tmpDir := t.TempDir()
+
+	// Create localStorage instance
+	storage := &localStorage{
+		baseDir: tmpDir,
+	}
+
+	// Call listRoot
+	ctx := context.Background()
+	roots, err := storage.listRoot(ctx)
+	require.NoError(t, err, "listRoot should not return an error")
+
+	// Verify results
+	assert.Len(t, roots, 0, "listRoot should return an empty slice for an empty directory")
+}
+
+func TestListRootNonExistentDirectory(t *testing.T) {
+	t.Parallel()
+
+	// Create a temporary directory for testing
+	tmpDir := t.TempDir()
+	nonExistentDir := filepath.Join(tmpDir, "non-existent")
+
+	// Create localStorage instance
+	storage := &localStorage{
+		baseDir: nonExistentDir,
+	}
+
+	// Call listRoot
+	ctx := context.Background()
+	roots, err := storage.listRoot(ctx)
+	require.NoError(t, err, "listRoot should not return an error for non-existent directory")
+
+	// Verify results
+	assert.Len(t, roots, 0, "listRoot should return an empty slice for a non-existent directory")
+}
+
+func TestListRootCanceledContext(t *testing.T) {
+	t.Parallel()
+
+	// Create a temporary directory for testing
+	tmpDir := t.TempDir()
+
+	// Create localStorage instance
+	storage := &localStorage{
+		baseDir: tmpDir,
+	}
+
+	// Create a canceled context
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel the context immediately
+
+	// Call listRoot with canceled context
+	roots, err := storage.listRoot(ctx)
+
+	// The function doesn't check for context cancellation, so it should still succeed
+	require.NoError(t, err, "listRoot should not return an error for canceled context")
+	assert.Len(t, roots, 0, "listRoot should return an empty slice for an empty directory")
 }

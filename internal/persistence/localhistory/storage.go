@@ -384,8 +384,8 @@ func (db *localStorage) listRoot(ctx context.Context) ([]DataRoot, error) {
 
 	var roots []DataRoot
 	for _, dir := range rootDirs {
-		if fileutil.IsDir(dir) {
-			root := NewDataRoot(db.baseDir, filepath.Base(dir))
+		if fileutil.IsDir(filepath.Join(db.baseDir, dir)) {
+			root := NewDataRoot(db.baseDir, dir)
 			roots = append(roots, root)
 		}
 	}
