@@ -240,7 +240,6 @@ func (g *gitCheckout) getFetchOptions() (*git.FetchOptions, error) {
 	var (
 		fetchOptions = &git.FetchOptions{
 			RemoteName: git.DefaultRemoteName,
-			RemoteURL:  g.config.repo,
 			Auth:       g.authMethod,
 			Depth:      g.config.depth,
 			RefSpecs: []config.RefSpec{
@@ -281,15 +280,13 @@ func (g *gitCheckout) initRepo() (*git.Repository, error) {
 		err  error
 	)
 
-	if repo, err = git.PlainInit(g.config.path, false); err != nil {
-		return nil, fmt.Errorf("failed to init git repository: %w", err)
-	}
-
-	if _, err = repo.CreateRemote(&config.RemoteConfig{
-		Name: git.DefaultRemoteName,
-		URLs: []string{g.config.repo},
+	if repo, err = git.PlainCloneContext(context.Background(), g.config.path, false, &git.CloneOptions{
+		URL:      g.config.repo,
+		Progress: g.stdout,
+		Auth:     g.authMethod,
+		Depth:    g.config.depth,
 	}); err != nil {
-		return nil, fmt.Errorf("failed to create remote repository: %w", err)
+		return nil, err
 	}
 
 	return repo, nil
