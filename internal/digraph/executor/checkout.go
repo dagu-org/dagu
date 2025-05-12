@@ -111,18 +111,29 @@ func (g *gitCheckoutExecAuthConfigDefinition) sshAuthMethod() (transport.AuthMet
 	return publicKey, nil
 }
 
-func (g *gitCheckoutExecAuthConfigDefinition) authMethod(repo string) (transport.AuthMethod, error) {
-	if len(g.SSHUser) == 0 {
-		g.SSHUser = defaultSSHUser
+func (g *gitCheckoutExecConfigDefinition) authMethod() (transport.AuthMethod, error) {
+	var (
+		endpoint *transport.Endpoint
+		err      error
+	)
+
+	if endpoint, err = transport.NewEndpoint(g.Repo); err != nil {
+		return nil, fmt.Errorf("failed to create endpoint: %w", err)
 	}
 
-	// example: https://github.com/dagu-org/dagu.git, use http auth
-	if strings.HasPrefix(repo, "https://") {
-		return g.httpAuthMethod()
+	if len(g.Auth.SSHUser) == 0 {
+		g.Auth.SSHUser = defaultSSHUser
 	}
 
-	// example: git@github.com:dagu-org/dagu.git, use ssh auth
-	return g.sshAuthMethod()
+	if endpoint.Protocol == fileProtocol {
+		return nil, nil
+	}
+
+	if endpoint.Protocol == httpProtocol || endpoint.Protocol == httpsProtocol {
+		return g.Auth.httpAuthMethod()
+	}
+
+	return g.Auth.sshAuthMethod()
 }
 
 type gitCheckoutExecConfig struct {
