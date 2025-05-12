@@ -32,6 +32,23 @@ func (c *Condition) MarshalJSON() ([]byte, error) {
 	})
 }
 
+func (c *Condition) UnmarshalJSON(data []byte) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var tmp struct {
+		Condition    string `json:"condition,omitempty"`
+		Expected     string `json:"expected,omitempty"`
+		ErrorMessage string `json:"error,omitempty"`
+	}
+	if err := json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+	c.Condition = tmp.Condition
+	c.Expected = tmp.Expected
+	c.errorMessage = tmp.ErrorMessage
+	return nil
+}
+
 func (c *Condition) Validate() error {
 	if c.Condition == "" {
 		return fmt.Errorf("condition is required")
