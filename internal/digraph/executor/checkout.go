@@ -64,15 +64,11 @@ func (g *gitCheckoutExecConfigDefinition) getRepoCachePath() string {
 	// http://github.com/dagu-org/dagu.git -> github.com/dagu-org/dagu.git
 	// git@github.com:dagu-org/dagu.git -> github.com/dagu-org/dagu.git
 	// file://github.com/dagu-org/dagu.git -> github.com/dagu-org/dagu.git
-
-	repoName := strings.TrimPrefix(g.Repo, "https://")
-	repoName = strings.TrimPrefix(g.Repo, "http://")
-	repoName = strings.TrimPrefix(repoName, "git@")
-	repoName = strings.TrimPrefix(repoName, "file:////")
-
+	re := regexp.MustCompile(`^(https?://|git@|file:////)`)
+	cleaned := re.ReplaceAllString(g.Repo, "")
 	cacheDir := filepath.Join(homeDir, ".cache", "dagu", "git")
 
-	return filepath.Join(cacheDir, repoName)
+	return filepath.Join(cacheDir, cleaned)
 }
 
 type gitCheckoutExecAuthConfigDefinition struct {
