@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -120,60 +122,91 @@ func prepareListOptions(opts []models.ListRunOption) (models.ListRunsOptions, er
 
 // collectStatusesFromRoots gathers statuses from root directories according to the options.
 func (db *localStorage) collectStatusesFromRoots(
-	ctx context.Context,
-	rootDirs []DataRoot,
-	options models.ListRunsOptions,
+	parentCtx context.Context,
+	roots []DataRoot,
+	opts models.ListRunsOptions,
 ) ([]*models.Status, error) {
-	var results []*models.Status
-	limit := options.Limit
 
-	// Build a map for efficient status filtering
-	statusFilter := buildStatusFilter(options.Statuses)
-	hasStatusFilter := len(statusFilter) > 0
+	if len(roots) == 0 {
+		return nil, nil
+	}
+	maxWorkers := min(runtime.NumCPU(), len(roots))
 
-	// Process each root directory
-	for _, root := range rootDirs {
-		// Check for context cancellation
-		if err := ctx.Err(); err != nil {
-			return results, fmt.Errorf("ListStatuses interrupted: %w", err)
-		}
+	ctx, cancel := context.WithCancel(parentCtx)
+	defer cancel()
 
-		// Get workflows in the specified range
-		workflows := root.listInRange(ctx, options.From, options.To, &listInRangeOpts{
-			statuses: options.Statuses,
-			limit:    limit,
-		})
+	var (
+		resultsMu sync.Mutex
+		results   = make([]*models.Status, 0, opts.Limit)
+		remaining atomic.Int64
+	)
 
-		// Process each workflow
-		for _, workflow := range workflows {
-			status, err := db.getWorkflowStatus(ctx, workflow)
-			if err != nil {
-				// Log and continue to next workflow
-				logger.Error(ctx, "Failed to get workflow status",
-					"workflow", workflow.workflowID, "err", err)
-				continue
+	remaining.Store(int64(opts.Limit))
+
+	jobs := make(chan DataRoot)
+	var wg sync.WaitGroup
+
+	worker := func() {
+		defer wg.Done()
+		for root := range jobs {
+			if ctx.Err() != nil || remaining.Load() <= 0 {
+				return
 			}
 
-			// Apply status filtering if needed
-			if hasStatusFilter && !matchesStatusFilter(status.Status, statusFilter) {
-				continue
+			workflows := root.listInRange(ctx, opts.From, opts.To, &listInRangeOpts{
+				statuses: opts.Statuses,
+				limit:    int(remaining.Load()),
+			})
+
+			taken := int64(len(workflows))
+			if d := remaining.Add(-taken); d < 0 {
+				cancel()
 			}
 
-			results = append(results, status)
-			limit--
-			if limit <= 0 {
-				return results, nil
+			statuses := make([]*models.Status, 0, len(workflows))
+			for _, workflow := range workflows {
+				run, err := workflow.LatestRun(ctx, db.cache)
+				if err != nil {
+					logger.Error(ctx, "Failed to get latest run", "err", err)
+					continue
+				}
+				status, err := run.ReadStatus(ctx)
+				if err != nil {
+					logger.Error(ctx, "Failed to read status", "err", err)
+					continue
+				}
+				statuses = append(statuses, status)
 			}
+
+			resultsMu.Lock()
+			results = append(results, statuses...)
+			resultsMu.Unlock()
 		}
 	}
 
-	// Sort results by started time
-	if len(results) > 1 {
-		sort.Slice(results, func(i, j int) bool {
-			return results[i].StartedAt > results[j].StartedAt
-		})
+	// Start workers
+	for range maxWorkers {
+		wg.Add(1)
+		go worker()
 	}
 
+	// Send jobs to workers
+	for _, root := range roots {
+		if ctx.Err() != nil || remaining.Load() <= 0 {
+			break
+		}
+		jobs <- root
+	}
+	close(jobs)
+
+	wg.Wait()
+
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].StartedAt > results[j].StartedAt
+	})
+	if len(results) > opts.Limit {
+		results = results[:opts.Limit]
+	}
 	return results, nil
 }
 
