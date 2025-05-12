@@ -78,7 +78,7 @@ tls:
 	assert.Equal(t, true, cfg.Server.Headless)
 
 	// Verify authentication.
-	assert.True(t, cfg.Server.Auth.Basic.Enabled)
+	assert.True(t, cfg.Server.Auth.Basic.Enabled())
 	assert.Equal(t, "admin", cfg.Server.Auth.Basic.Username)
 	assert.Equal(t, "secret", cfg.Server.Auth.Basic.Password)
 
@@ -322,9 +322,9 @@ func TestLoadLegacyFields_AllSet(t *testing.T) {
 	// Check that legacy fields are correctly assigned.
 	assert.Equal(t, "legacyUser", cfg.Server.Auth.Basic.Username, "BasicAuthUsername should be set")
 	assert.Equal(t, "legacyPass", cfg.Server.Auth.Basic.Password, "BasicAuthPassword should be set")
-	assert.True(t, cfg.Server.Auth.Basic.Enabled, "Basic auth should be enabled when BasicAuthUsername is set")
-	assert.True(t, cfg.Server.Auth.Token.Enabled, "Auth token should be enabled when IsAuthToken is true")
-	assert.True(t, cfg.Server.Auth.Token.Enabled, "Auth token should be enabled")
+	assert.True(t, cfg.Server.Auth.Basic.Enabled(), "Basic auth should be enabled when BasicAuthUsername is set")
+	assert.True(t, cfg.Server.Auth.Token.Enabled(), "Auth token should be enabled when IsAuthToken is true")
+	assert.True(t, cfg.Server.Auth.Token.Enabled(), "Auth token should be enabled")
 	assert.Equal(t, "legacyToken", cfg.Server.Auth.Token.Value, "Auth token value should be set")
 	// When both DAGs and DAGsDir are provided, DAGsDir takes precedence.
 	assert.Equal(t, "/usr/user/dags", cfg.Paths.DAGsDir, "DAGsDir should be set from def.DAGsDir")
@@ -355,8 +355,7 @@ func TestLoadLegacyFields_NoneSet(t *testing.T) {
 					Password: "presetPass",
 				},
 				Token: config.AuthToken{
-					Enabled: false,
-					Value:   "presetToken",
+					Value: "presetToken",
 				},
 			},
 		},
@@ -382,7 +381,6 @@ func TestLoadLegacyFields_NoneSet(t *testing.T) {
 	// Verify that none of the preset values have been overwritten.
 	assert.Equal(t, "presetUser", cfg.Server.Auth.Basic.Username)
 	assert.Equal(t, "presetPass", cfg.Server.Auth.Basic.Password)
-	assert.False(t, cfg.Server.Auth.Token.Enabled)
 	assert.Equal(t, "presetToken", cfg.Server.Auth.Token.Value)
 	assert.Equal(t, "presetDags", cfg.Paths.DAGsDir)
 	assert.Equal(t, "/usr/bin/preset", cfg.Paths.Executable)
