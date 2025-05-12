@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -46,6 +47,19 @@ type gitCheckoutExecConfigDefinition struct {
 }
 
 func (g *gitCheckoutExecConfigDefinition) getRepoCachePath() string {
+	var (
+		homeDir string
+		err     error
+	)
+
+	if homeDir, err = os.UserHomeDir(); err != nil {
+		if os.PathSeparator == '\\' {
+			homeDir = "C:\\Users\\Default"
+		} else {
+			homeDir = "/home/default"
+		}
+	}
+
 	// https://github.com/dagu-org/dagu.git -> github.com/dagu-org/dagu.git
 	// http://github.com/dagu-org/dagu.git -> github.com/dagu-org/dagu.git
 	// git@github.com:dagu-org/dagu.git -> github.com/dagu-org/dagu.git
@@ -54,9 +68,11 @@ func (g *gitCheckoutExecConfigDefinition) getRepoCachePath() string {
 	repo := strings.TrimPrefix(g.Repo, "https://")
 	repo = strings.TrimPrefix(g.Repo, "http://")
 	repo = strings.TrimPrefix(repo, "git@")
-	repo = strings.TrimPrefix(repo, "file://")
+	repo = strings.TrimPrefix(repo, "file:////")
 
-	return fmt.Sprintf("~/.cache/dagu/git/%s", repo)
+	cacheDir := filepath.Join(homeDir, ".cache", "dagu", "git")
+
+	return filepath.Join(cacheDir, repo)
 }
 
 type gitCheckoutExecAuthConfigDefinition struct {
