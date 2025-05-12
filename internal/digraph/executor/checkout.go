@@ -24,10 +24,9 @@ import (
 const (
 	gitCheckOutExecutorType = "git-checkout"
 	defaultSSHUser          = "git"
-)
-
-var (
-	errGitCheckoutAuthConfigInvalid = fmt.Errorf("invalid git checkout auth config")
+	fileProtocol            = "file"
+	httpProtocol            = "http"
+	httpsProtocol           = "https"
 )
 
 var _ Executor = (*gitCheckout)(nil)
@@ -48,16 +47,19 @@ type gitCheckoutExecConfigDefinition struct {
 
 func (g *gitCheckoutExecConfigDefinition) getRepoCachePath() string {
 	// https://github.com/dagu-org/dagu.git -> github.com/dagu-org/dagu.git
+	// http://github.com/dagu-org/dagu.git -> github.com/dagu-org/dagu.git
 	// git@github.com:dagu-org/dagu.git -> github.com/dagu-org/dagu.git
+	// file://github.com/dagu-org/dagu.git -> github.com/dagu-org/dagu.git
 
 	repo := strings.TrimPrefix(g.Repo, "https://")
+	repo = strings.TrimPrefix(g.Repo, "http://")
 	repo = strings.TrimPrefix(repo, "git@")
+	repo = strings.TrimPrefix(repo, "file://")
 
 	return fmt.Sprintf("~/.cache/dagu/git/%s", repo)
 }
 
 type gitCheckoutExecAuthConfigDefinition struct {
-	Method         string
 	TokenEnv       string
 	UserName       string
 	Password       string
@@ -177,7 +179,7 @@ func newCheckout(_ context.Context, step digraph.Step) (Executor, error) {
 		return nil, fmt.Errorf("failed to decode git checkout config: %w", err)
 	}
 
-	if authMethod, err = def.Auth.authMethod(def.Repo); err != nil {
+	if authMethod, err = def.authMethod(); err != nil {
 		return nil, err
 	}
 
