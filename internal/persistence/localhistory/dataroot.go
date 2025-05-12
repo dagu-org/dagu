@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
@@ -293,8 +292,7 @@ func (dr DataRoot) removeEmptyDir(ctx context.Context, dayDir string) {
 
 // ListRunOpts contains options for listing runs
 type listInRangeOpts struct {
-	statuses []scheduler.Status
-	limit    int
+	limit int
 }
 
 func (dr DataRoot) listInRange(ctx context.Context, start, end models.TimeInUTC, opts *listInRangeOpts) []*Workflow {
@@ -309,8 +307,8 @@ func (dr DataRoot) listInRange(ctx context.Context, start, end models.TimeInUTC,
 	// Calculate the date range to search
 	var startDate, endDate time.Time
 	if start.IsZero() {
-		// If start is zero, use a very old date to include all files
-		startDate = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+		// If start is zero, use the beginning of the today
+		startDate = time.Now().UTC().Truncate(24 * time.Hour)
 	} else {
 		startDate = start.Time
 	}
@@ -388,9 +386,16 @@ func (dr DataRoot) listInRange(ctx context.Context, start, end models.TimeInUTC,
 					}
 					return nil
 				})
+
+				if opts != nil && opts.limit > 0 && len(result) >= opts.limit {
+					// Limit reached, break out of the loop
+					goto BREAK
+				}
 			}
 		}
 	}
+
+BREAK:
 
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].timestamp.After(result[j].timestamp)

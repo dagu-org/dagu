@@ -136,10 +136,16 @@ func (db *localStorage) collectStatusesFromRoots(
 	defer cancel()
 
 	var (
-		resultsMu sync.Mutex
-		results   = make([]*models.Status, 0, opts.Limit)
-		remaining atomic.Int64
+		resultsMu      sync.Mutex
+		results        = make([]*models.Status, 0, opts.Limit)
+		remaining      atomic.Int64
+		statusesFilter = make(map[scheduler.Status]struct{})
 	)
+
+	for _, status := range opts.Statuses {
+		statusesFilter[status] = struct{}{}
+	}
+	hasStatusFilter := len(statusesFilter) > 0
 
 	remaining.Store(int64(opts.Limit))
 
@@ -154,14 +160,8 @@ func (db *localStorage) collectStatusesFromRoots(
 			}
 
 			workflows := root.listInRange(ctx, opts.From, opts.To, &listInRangeOpts{
-				statuses: opts.Statuses,
-				limit:    int(remaining.Load()),
+				limit: int(remaining.Load()),
 			})
-
-			taken := int64(len(workflows))
-			if d := remaining.Add(-taken); d < 0 {
-				cancel()
-			}
 
 			statuses := make([]*models.Status, 0, len(workflows))
 			for _, workflow := range workflows {
@@ -175,7 +175,19 @@ func (db *localStorage) collectStatusesFromRoots(
 					logger.Error(ctx, "Failed to read status", "err", err)
 					continue
 				}
+				if !hasStatusFilter {
+					statuses = append(statuses, status)
+					continue
+				}
+				if _, ok := statusesFilter[status.Status]; !ok {
+					continue
+				}
 				statuses = append(statuses, status)
+			}
+
+			taken := int64(len(workflows))
+			if d := remaining.Add(-taken); d < 0 {
+				cancel()
 			}
 
 			resultsMu.Lock()
@@ -235,12 +247,6 @@ func buildStatusFilter(statuses []scheduler.Status) map[scheduler.Status]struct{
 		filter[status] = struct{}{}
 	}
 	return filter
-}
-
-// matchesStatusFilter checks if a status matches the filter.
-func matchesStatusFilter(status scheduler.Status, filter map[scheduler.Status]struct{}) bool {
-	_, ok := filter[status]
-	return ok
 }
 
 // CreateRun creates a new history record for the specified workflow ID.
