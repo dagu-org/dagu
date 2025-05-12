@@ -2,8 +2,6 @@ module github.com/dagu-org/dagu
 
 go 1.23.0
 
-toolchain go1.24.1
-
 require (
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/adrg/xdg v0.5.0
