@@ -249,9 +249,9 @@ function DAGStatusOverview({
         </div>
 
         {/* Progress bar */}
-        {totalNodes > 0 && (
+        {totalNodes && totalNodes > 0 && (
           <div className="mt-1.5 h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-            {nodeStatus.finished && (
+            {nodeStatus?.finished && (
               <div
                 className="h-full bg-green-500 float-left"
                 style={{
@@ -302,6 +302,34 @@ function DAGStatusOverview({
           </div>
         )}
       </div>
+
+      {/* Workflow-level Precondition Errors */}
+      {status.preconditions?.some(
+        (cond: components['schemas']['Condition']) => cond.error
+      ) && (
+        <div className="border-b border-slate-200 dark:border-slate-700 pb-2">
+          <div className="flex items-center mb-1">
+            <Info className="h-3.5 w-3.5 mr-1 text-amber-500 dark:text-amber-400" />
+            <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+              Workflow Precondition Errors
+            </span>
+          </div>
+          <div className="space-y-2">
+            {status.preconditions
+              ?.filter((cond: components['schemas']['Condition']) => cond.error)
+              .map((cond: components['schemas']['Condition'], idx: number) => (
+                <div
+                  key={idx}
+                  className="p-1.5 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800 rounded-md text-xs text-amber-600 dark:text-amber-400 font-medium"
+                >
+                  <div className="mb-0.5">Condition: {cond.condition}</div>
+                  <div className="mb-0.5">Expected: {cond.expected}</div>
+                  <div>Error: {cond.error}</div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
 
       {/* Parameters */}
       {status.params && (

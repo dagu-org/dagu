@@ -632,6 +632,8 @@ export interface components {
             onSuccess?: components["schemas"]["Node"];
             onFailure?: components["schemas"]["Node"];
             onCancel?: components["schemas"]["Node"];
+            /** @description List of preconditions that must be met before the workflow can start */
+            preconditions?: components["schemas"]["Condition"][];
         };
         /** @description Status of an individual step within a workflow */
         Node: {
@@ -731,9 +733,13 @@ export interface components {
         /** @description Precondition that must be satisfied before running a step or workflow */
         Condition: {
             /** @description Expression or check to evaluate */
-            condition?: string;
+            condition: string;
             /** @description Expected result of the condition evaluation */
             expected?: string;
+            /** @description Error message if the condition is not met */
+            error?: string;
+            /** @description Whether the condition was met */
+            matched?: boolean;
         };
         /** @description Configuration for step retry behavior */
         RepeatPolicy: {

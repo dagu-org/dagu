@@ -292,6 +292,25 @@ function NodeStatusTableRow({
             {node.error}
           </div>
         )}
+        {node.step.preconditions?.some((cond) => cond.error) && (
+          <div className="mt-2">
+            <div className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-1">
+              Precondition Errors:
+            </div>
+            {node.step.preconditions
+              .filter((cond) => cond.error)
+              .map((cond, idx) => (
+                <div
+                  key={idx}
+                  className="text-xs bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800 rounded-md p-1.5 mb-1 whitespace-pre-wrap break-words text-amber-600 dark:text-amber-400 leading-tight"
+                >
+                  <div className="font-medium">Condition: {cond.condition}</div>
+                  <div>Expected: {cond.expected}</div>
+                  <div>Error: {cond.error}</div>
+                </div>
+              ))}
+          </div>
+        )}
       </TableCell>
 
       {/* Log */}

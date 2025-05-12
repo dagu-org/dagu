@@ -1410,6 +1410,11 @@ components:
               $ref: "#/components/schemas/Node"
             onCancel:
               $ref: "#/components/schemas/Node"
+            preconditions:
+              type: array
+              description: "List of preconditions that must be met before the workflow can start"
+              items:
+                $ref: "#/components/schemas/Condition"
           required:
             - nodes
 

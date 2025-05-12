@@ -326,6 +326,7 @@ func (a *Agent) Status() models.Status {
 		models.WithOnCancelNode(a.scheduler.HandlerNode(digraph.HandlerOnCancel)),
 		models.WithRunID(a.runID),
 		models.WithHierarchyRefs(a.root, a.parent),
+		models.WithPreconditions(a.dag.Preconditions),
 	}
 
 	// Create the status object to record the current status.
