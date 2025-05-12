@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"runtime"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
@@ -16,6 +18,7 @@ import (
 // Error definitions for common issues
 var (
 	ErrWorkflowIDEmpty = errors.New("workflow ID is empty")
+	ErrTooManyResults  = errors.New("too many results found")
 )
 
 var _ models.HistoryRepository = (*localStorage)(nil)
@@ -72,6 +75,76 @@ func New(baseDir string, opts ...HistoryStorageOption) models.HistoryRepository 
 	}
 }
 
+func (db *localStorage) ListStatuses(ctx context.Context, opts ...models.ListRunOption) ([]*models.Status, error) {
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("ListRuns canceled: %w", ctx.Err())
+	default:
+		// Continue with operation
+	}
+
+	var options models.ListRunsOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+
+	// By default, we list today's runs
+	if options.From.IsZero() && options.To.IsZero() {
+		options.From = models.NewUTC(time.Now().Truncate(24 * time.Hour))
+	}
+
+	const maxLimit = 300
+	if options.Limit == 0 || options.Limit > maxLimit {
+		options.Limit = maxLimit
+	}
+
+	rootDirs, err := db.listRoot(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list root directories: %w", err)
+	}
+
+	statusFilter := make(map[scheduler.Status]struct{})
+	for _, status := range options.Statuses {
+		statusFilter[status] = struct{}{}
+	}
+
+	var results []*models.Status
+	limit := options.Limit
+	for _, root := range rootDirs {
+		workflows := root.listInRange(ctx, options.From, options.To, &listInRangeOpts{
+			statuses: options.Statuses,
+			limit:    limit,
+		})
+		for _, workflow := range workflows {
+			run, err := workflow.LatestRun(ctx, db.cache)
+			if err != nil {
+				logger.Error(ctx, "Failed to get latest record", "err", err)
+				continue
+			}
+			status, err := run.ReadStatus(ctx)
+			if err != nil {
+				logger.Error(ctx, "Failed to get status", "err", err)
+				continue
+			}
+			if len(statusFilter) >= 0 {
+				if _, ok := statusFilter[status.Status]; !ok {
+					continue
+				}
+			}
+			results = append(results, status)
+			limit--
+			if limit <= 0 {
+				break
+			}
+		}
+		if limit <= 0 {
+			break
+		}
+	}
+
+	return results, nil
+}
+
 // CreateRun creates a new history record for the specified workflow ID.
 // If opts.Root is not nil, it creates a new history record for a child workflow.
 // If opts.Retry is true, it creates a retry record for the specified workflow ID.
@@ -85,7 +158,7 @@ func (db *localStorage) CreateRun(ctx context.Context, dag *digraph.DAG, timesta
 	}
 
 	dataRoot := NewDataRoot(db.baseDir, dag.Name)
-	ts := NewUTC(timestamp)
+	ts := models.NewUTC(timestamp)
 
 	var run *Workflow
 	if opts.Retry {
@@ -118,7 +191,7 @@ func (db *localStorage) newChildRecord(ctx context.Context, dag *digraph.DAG, ti
 		return nil, fmt.Errorf("failed to find root execution: %w", err)
 	}
 
-	ts := NewUTC(timestamp)
+	ts := models.NewUTC(timestamp)
 
 	var run *Workflow
 	if opts.Retry {
@@ -193,7 +266,7 @@ func (db *localStorage) LatestRun(ctx context.Context, dagName string) (models.R
 
 	if db.latestStatusToday {
 		startOfDay := time.Now().Truncate(24 * time.Hour)
-		startOfDayInUTC := NewUTC(startOfDay)
+		startOfDayInUTC := models.NewUTC(startOfDay)
 
 		// Get the latest execution data after the start of the day.
 		exec, err := root.LatestAfter(ctx, startOfDayInUTC)
@@ -300,4 +373,22 @@ func (db *localStorage) RenameWorkflows(ctx context.Context, oldNameOrPath, newN
 	root := NewDataRoot(db.baseDir, oldNameOrPath)
 	newRoot := NewDataRoot(db.baseDir, newNameOrPath)
 	return root.Rename(ctx, newRoot)
+}
+
+// listRoot lists all root directories in the base directory.
+func (db *localStorage) listRoot(ctx context.Context) ([]DataRoot, error) {
+	rootDirs, err := listDirsSorted(db.baseDir, false, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list root directories: %w", err)
+	}
+
+	var roots []DataRoot
+	for _, dir := range rootDirs {
+		if fileutil.IsDir(dir) {
+			root := NewDataRoot(db.baseDir, filepath.Base(dir))
+			roots = append(roots, root)
+		}
+	}
+
+	return roots, nil
 }

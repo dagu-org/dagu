@@ -82,7 +82,7 @@ func NewWorkflow(dir string) (*Workflow, error) {
 
 // CreateRun creates a new run for the workflow with the given timestamp.
 // It creates a new run directory and initializes a record within it.
-func (e Workflow) CreateRun(_ context.Context, ts TimeInUTC, cache *fileutil.Cache[*models.Status], opts ...RunOption) (*Run, error) {
+func (e Workflow) CreateRun(_ context.Context, ts models.TimeInUTC, cache *fileutil.Cache[*models.Status], opts ...RunOption) (*Run, error) {
 	runID, err := genRunID()
 	if err != nil {
 		return nil, err
@@ -166,10 +166,10 @@ var reWorkflow = regexp.MustCompile(`^` + WorkflowDirPrefix + `(\d{8}_\d{6}Z)_(.
 var reRun = regexp.MustCompile(`^` + RunDirPrefix + `(\d{8}_\d{6}_\d{3}Z)_(.*)$`)     // Matches run directory names
 var reChildWorkflow = regexp.MustCompile(`^` + ChildWorkflowDirPrefix + `(.*)$`)      // Matches child workflow directory names
 
-// formatWorkflowTimestamp formats a TimeInUTC instance into a string representation (without milliseconds).
+// formatWorkflowTimestamp formats a models.TimeInUTC instance into a string representation (without milliseconds).
 // The format is "YYYYMMDD_HHMMSSZ".
 // This is used for generating 'run' directory names.
-func formatWorkflowTimestamp(t TimeInUTC) string {
+func formatWorkflowTimestamp(t models.TimeInUTC) string {
 	return t.Format(dateTimeFormatUTC)
 }
 
@@ -186,10 +186,10 @@ func parseRunTimestamp(s string) (time.Time, error) {
 // dateTimeFormatUTC is the format for run timestamps.
 const dateTimeFormatUTC = "20060102_150405Z"
 
-// formatRunTimestamp formats a TimeInUTC instance into a string representation with milliseconds.
+// formatRunTimestamp formats a models.TimeInUTC instance into a string representation with milliseconds.
 // The format is "YYYYMMDD_HHMMSS_mmmZ" where "mmm" is the milliseconds part.
 // This is used for generating 'run' directory names.
-func formatRunTimestamp(t TimeInUTC) string {
+func formatRunTimestamp(t models.TimeInUTC) string {
 	const format = "20060102_150405"
 	mill := t.UnixMilli()
 	return t.Format(format) + "_" + fmt.Sprintf("%03d", mill%1000) + "Z"

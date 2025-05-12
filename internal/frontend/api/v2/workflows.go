@@ -11,7 +11,7 @@ import (
 )
 
 func (a *API) ListWorkflows(ctx context.Context, request api.ListWorkflowsRequestObject) (api.ListWorkflowsResponseObject, error) {
-	panic("unimplemented")
+	panic("not implemented")
 }
 
 func (a *API) GetWorkflowLog(ctx context.Context, request api.GetWorkflowLogRequestObject) (api.GetWorkflowLogResponseObject, error) {
