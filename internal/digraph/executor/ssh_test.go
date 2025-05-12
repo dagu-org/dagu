@@ -2,7 +2,6 @@ package executor
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -36,37 +35,6 @@ func TestSSHExecutor(t *testing.T) {
 		assert.Equal(t, "testuser", sshExec.config.User)
 		assert.Equal(t, "testip", sshExec.config.IP)
 		assert.Equal(t, "25", sshExec.config.Port)
-		assert.Equal(t, "testpassword", sshExec.config.Password)
-	})
-
-	t.Run("ExpandEnv", func(t *testing.T) {
-		_ = os.Setenv("TEST_SSH_EXEC_USER", "testuser")
-		_ = os.Setenv("TEST_SSH_EXEC_IP", "testip")
-		_ = os.Setenv("TEST_SSH_EXEC_PORT", "23")
-		_ = os.Setenv("TEST_SSH_EXEC_PASSWORD", "testpassword")
-
-		step := digraph.Step{
-			Name: "ssh-exec",
-			ExecutorConfig: digraph.ExecutorConfig{
-				Type: "ssh",
-				Config: map[string]any{
-					"User":     "${TEST_SSH_EXEC_USER}",
-					"IP":       "${TEST_SSH_EXEC_IP}",
-					"Port":     "${TEST_SSH_EXEC_PORT}",
-					"Password": "${TEST_SSH_EXEC_PASSWORD}",
-				},
-			},
-		}
-		ctx := context.Background()
-		exec, err := newSSHExec(ctx, step)
-		require.NoError(t, err)
-
-		sshExec, ok := exec.(*sshExec)
-		require.True(t, ok)
-
-		assert.Equal(t, "testuser", sshExec.config.User)
-		assert.Equal(t, "testip", sshExec.config.IP)
-		assert.Equal(t, "23", sshExec.config.Port)
 		assert.Equal(t, "testpassword", sshExec.config.Password)
 	})
 }

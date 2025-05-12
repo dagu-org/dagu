@@ -75,7 +75,7 @@ func TestAgent_Run(t *testing.T) {
 		dag := th.DAG(t, "agent/multiple_steps.yaml")
 
 		// Set a precondition that always fails
-		dag.Preconditions = []digraph.Condition{
+		dag.Preconditions = []*digraph.Condition{
 			{Condition: "`echo 1`", Expected: "0"},
 		}
 
@@ -176,8 +176,8 @@ func TestAgent_Retry(t *testing.T) {
 
 		// Modify the DAG to make it successful
 		status := dagAgent.Status()
-		for i := range status.Nodes {
-			status.Nodes[i].Step.CmdArgsSys = "true"
+		for i := range dag.Steps {
+			dag.Steps[i].CmdWithArgs = "true"
 		}
 
 		// Retry the DAG and check if it is successful

@@ -34,12 +34,12 @@ function FlowchartSwitch({ value = 'TD', onChange }: Props) {
           groupValue={value}
           onClick={() => handleChange('LR')}
           aria-label="horizontal layout"
-          className="px-2 py-1 w-18 cursor-pointer"
+          className="px-2 py-1 sm:w-18 w-12 cursor-pointer"
           position="first"
         >
           <div className="flex flex-col items-center">
             <ArrowRightLeft className="h-4 w-4" />
-            <span className="text-xs mt-1">Horizontal</span>
+            <span className="text-xs mt-1 hidden sm:inline">Horizontal</span>
           </div>
         </ToggleButton>
 
@@ -48,12 +48,12 @@ function FlowchartSwitch({ value = 'TD', onChange }: Props) {
           groupValue={value}
           onClick={() => handleChange('TD')}
           aria-label="vertical layout"
-          className="px-2 py-1 w-18 cursor-pointer"
+          className="px-2 py-1 sm:w-18 w-12 cursor-pointer"
           position="last"
         >
           <div className="flex flex-col items-center">
             <ArrowDownUp className="h-4 w-4" />
-            <span className="text-xs mt-1">Vertical</span>
+            <span className="text-xs mt-1 hidden sm:inline">Vertical</span>
           </div>
         </ToggleButton>
       </ToggleGroup>

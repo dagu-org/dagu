@@ -101,77 +101,163 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             navigateToStatusTab={navigateToStatusTab}
           />
         )}
-        <div className="flex flex-row justify-between items-center mb-4">
-          <Tabs className="bg-white p-1.5 rounded-lg shadow-sm border border-gray-100/80">
-            {isModal ? (
-              <ModalLinkTab
-                label="Status"
-                value="status"
-                isActive={activeTab === 'status'}
-                icon={ActivitySquare}
-                onClick={() => handleTabClick('status')}
-              />
-            ) : (
-              <LinkTab
-                label="Status"
-                value={`${baseUrl}`}
-                isActive={activeTab === 'status'}
-                icon={ActivitySquare}
-              />
-            )}
-
-            {isModal ? (
-              <ModalLinkTab
-                label="Spec"
-                value="spec"
-                isActive={activeTab === 'spec'}
-                icon={FileCode}
-                onClick={() => handleTabClick('spec')}
-              />
-            ) : (
-              <LinkTab
-                label="Spec"
-                value={`${baseUrl}/spec`}
-                isActive={activeTab === 'spec'}
-                icon={FileCode}
-              />
-            )}
-
-            {isModal ? (
-              <ModalLinkTab
-                label="History"
-                value="history"
-                isActive={activeTab === 'history'}
-                icon={History}
-                onClick={() => handleTabClick('history')}
-              />
-            ) : (
-              <LinkTab
-                label="History"
-                value={`${baseUrl}/history`}
-                isActive={activeTab === 'history'}
-                icon={History}
-              />
-            )}
-
-            {(activeTab === 'log' || activeTab === 'workflow-log') &&
-              (isModal ? (
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-0 mb-4">
+          {/* Desktop Tabs (md and up) */}
+          <div className="hidden md:block overflow-x-auto">
+            <Tabs className="bg-white p-1.5 rounded-lg shadow-sm border border-gray-100/80 whitespace-nowrap">
+              {isModal ? (
                 <ModalLinkTab
-                  label="Log"
-                  value={activeTab}
-                  isActive={true}
-                  icon={ScrollText}
-                  onClick={() => {}}
+                  label="Status"
+                  value="status"
+                  isActive={activeTab === 'status'}
+                  icon={ActivitySquare}
+                  onClick={() => handleTabClick('status')}
                 />
               ) : (
                 <LinkTab
-                  label="Log"
-                  value={baseUrl}
-                  isActive={true}
-                  icon={ScrollText}
+                  label="Status"
+                  value={`${baseUrl}`}
+                  isActive={activeTab === 'status'}
+                  icon={ActivitySquare}
                 />
-              ))}
-          </Tabs>
+              )}
+
+              {isModal ? (
+                <ModalLinkTab
+                  label="Spec"
+                  value="spec"
+                  isActive={activeTab === 'spec'}
+                  icon={FileCode}
+                  onClick={() => handleTabClick('spec')}
+                />
+              ) : (
+                <LinkTab
+                  label="Spec"
+                  value={`${baseUrl}/spec`}
+                  isActive={activeTab === 'spec'}
+                  icon={FileCode}
+                />
+              )}
+
+              {isModal ? (
+                <ModalLinkTab
+                  label="History"
+                  value="history"
+                  isActive={activeTab === 'history'}
+                  icon={History}
+                  onClick={() => handleTabClick('history')}
+                />
+              ) : (
+                <LinkTab
+                  label="History"
+                  value={`${baseUrl}/history`}
+                  isActive={activeTab === 'history'}
+                  icon={History}
+                />
+              )}
+
+              {(activeTab === 'log' || activeTab === 'workflow-log') &&
+                (isModal ? (
+                  <ModalLinkTab
+                    label="Log"
+                    value={activeTab}
+                    isActive={true}
+                    icon={ScrollText}
+                    onClick={() => {}}
+                  />
+                ) : (
+                  <LinkTab
+                    label="Log"
+                    value={baseUrl}
+                    isActive={true}
+                    icon={ScrollText}
+                  />
+                ))}
+            </Tabs>
+          </div>
+
+          {/* Mobile/Tablet Tabs (sm to md) */}
+          <div className="md:hidden w-full overflow-x-auto">
+            <div className="flex space-x-1 bg-white p-1.5 rounded-lg shadow-sm border border-gray-100/80 w-full">
+              {isModal ? (
+                <ModalLinkTab
+                  label=""
+                  value="status"
+                  isActive={activeTab === 'status'}
+                  icon={ActivitySquare}
+                  onClick={() => handleTabClick('status')}
+                  className="flex-1 justify-center"
+                />
+              ) : (
+                <LinkTab
+                  label=""
+                  value={`${baseUrl}`}
+                  isActive={activeTab === 'status'}
+                  icon={ActivitySquare}
+                  className="flex-1 justify-center"
+                />
+              )}
+
+              {isModal ? (
+                <ModalLinkTab
+                  label=""
+                  value="spec"
+                  isActive={activeTab === 'spec'}
+                  icon={FileCode}
+                  onClick={() => handleTabClick('spec')}
+                  className="flex-1 justify-center"
+                />
+              ) : (
+                <LinkTab
+                  label=""
+                  value={`${baseUrl}/spec`}
+                  isActive={activeTab === 'spec'}
+                  icon={FileCode}
+                  className="flex-1 justify-center"
+                />
+              )}
+
+              {isModal ? (
+                <ModalLinkTab
+                  label=""
+                  value="history"
+                  isActive={activeTab === 'history'}
+                  icon={History}
+                  onClick={() => handleTabClick('history')}
+                  className="flex-1 justify-center"
+                />
+              ) : (
+                <LinkTab
+                  label=""
+                  value={`${baseUrl}/history`}
+                  isActive={activeTab === 'history'}
+                  icon={History}
+                  className="flex-1 justify-center"
+                />
+              )}
+
+              {(activeTab === 'log' || activeTab === 'workflow-log') &&
+                (isModal ? (
+                  <ModalLinkTab
+                    label=""
+                    value={activeTab}
+                    isActive={true}
+                    icon={ScrollText}
+                    onClick={() => {}}
+                    className="flex-1 justify-center"
+                  />
+                ) : (
+                  <LinkTab
+                    label=""
+                    value={baseUrl}
+                    isActive={true}
+                    icon={ScrollText}
+                    className="flex-1 justify-center"
+                  />
+                ))}
+            </div>
+          </div>
+
           {activeTab === 'spec' ? (
             <DAGEditButtons fileName={fileName || ''} />
           ) : null}

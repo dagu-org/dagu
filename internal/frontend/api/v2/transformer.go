@@ -24,9 +24,9 @@ func toDAG(dag *digraph.DAG) api.DAG {
 }
 
 func toStep(obj digraph.Step) api.Step {
-	var conditions []api.Precondition
-	for _, cond := range obj.Preconditions {
-		conditions = append(conditions, toPrecondition(cond))
+	var conditions []api.Condition
+	for i := range obj.Preconditions {
+		conditions = append(conditions, toPrecondition(obj.Preconditions[i]))
 	}
 
 	repeatPolicy := api.RepeatPolicy{
@@ -56,15 +56,24 @@ func toStep(obj digraph.Step) api.Step {
 	return step
 }
 
-func toPrecondition(obj digraph.Condition) api.Precondition {
-	return api.Precondition{
-		Condition: ptrOf(obj.Condition),
+func toPrecondition(obj *digraph.Condition) api.Condition {
+	return api.Condition{
+		Condition: obj.Condition,
 		Expected:  ptrOf(obj.Expected),
+		Error:     ptrOf(obj.GetErrorMessage()),
 	}
 }
 
 func toWorkflowDetails(s models.Status) api.WorkflowDetails {
-	status := api.WorkflowDetails{
+	preconditions := make([]api.Condition, len(s.Preconditions))
+	for i, p := range s.Preconditions {
+		preconditions[i] = toPrecondition(p)
+	}
+	nodes := make([]api.Node, len(s.Nodes))
+	for i, n := range s.Nodes {
+		nodes[i] = toNode(n)
+	}
+	return api.WorkflowDetails{
 		RootWorkflowName:   s.Root.Name,
 		RootWorkflowId:     s.Root.WorkflowID,
 		ParentWorkflowName: ptrOf(s.Parent.Name),
@@ -78,26 +87,19 @@ func toWorkflowDetails(s models.Status) api.WorkflowDetails {
 		FinishedAt:         s.FinishedAt,
 		Status:             api.Status(s.Status),
 		StatusLabel:        api.StatusLabel(s.Status.String()),
+		Preconditions:      ptrOf(preconditions),
+		Nodes:              nodes,
+		OnSuccess:          ptrOf(toNode(s.OnSuccess)),
+		OnFailure:          ptrOf(toNode(s.OnFailure)),
+		OnCancel:           ptrOf(toNode(s.OnCancel)),
+		OnExit:             ptrOf(toNode(s.OnExit)),
 	}
-	for _, n := range s.Nodes {
-		status.Nodes = append(status.Nodes, toNode(n))
-	}
-	if s.OnSuccess != nil {
-		status.OnSuccess = ptrOf(toNode(s.OnSuccess))
-	}
-	if s.OnFailure != nil {
-		status.OnFailure = ptrOf(toNode(s.OnFailure))
-	}
-	if s.OnCancel != nil {
-		status.OnCancel = ptrOf(toNode(s.OnCancel))
-	}
-	if s.OnExit != nil {
-		status.OnExit = ptrOf(toNode(s.OnExit))
-	}
-	return status
 }
 
 func toNode(node *models.Node) api.Node {
+	if node == nil {
+		return api.Node{}
+	}
 	return api.Node{
 		DoneCount:   node.DoneCount,
 		FinishedAt:  node.FinishedAt,
@@ -156,7 +158,7 @@ func toDAGDetails(dag *digraph.DAG) *api.DAGDetails {
 		})
 	}
 
-	var preconditions []api.Precondition
+	var preconditions []api.Condition
 	for _, p := range dag.Preconditions {
 		preconditions = append(preconditions, toPrecondition(p))
 	}

@@ -27,7 +27,7 @@ type jqConfig struct {
 	Raw bool `mapstructure:"raw"`
 }
 
-func newJQ(ctx context.Context, step digraph.Step) (Executor, error) {
+func newJQ(_ context.Context, step digraph.Step) (Executor, error) {
 	var jqCfg jqConfig
 	if step.ExecutorConfig.Config != nil {
 		if err := decodeJqConfig(
@@ -36,12 +36,8 @@ func newJQ(ctx context.Context, step digraph.Step) (Executor, error) {
 			return nil, err
 		}
 	}
-	script, err := EvalString(ctx, step.Script)
-	if err != nil {
-		return nil, fmt.Errorf("failed to evaluate jq input: %w", err)
-	}
 	input := map[string]any{}
-	if err := json.Unmarshal([]byte(script), &input); err != nil {
+	if err := json.Unmarshal([]byte(step.Script), &input); err != nil {
 		return nil, err
 	}
 	return &jq{

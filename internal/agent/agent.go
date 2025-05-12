@@ -326,6 +326,7 @@ func (a *Agent) Status() models.Status {
 		models.WithOnCancelNode(a.scheduler.HandlerNode(digraph.HandlerOnCancel)),
 		models.WithRunID(a.runID),
 		models.WithHierarchyRefs(a.root, a.parent),
+		models.WithPreconditions(a.dag.Preconditions),
 	}
 
 	// Create the status object to record the current status.
@@ -543,7 +544,7 @@ func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 	for _, n := range a.retryTarget.Nodes {
 		nodes = append(nodes, n.ToNode())
 	}
-	graph, err := scheduler.CreateRetryExecutionGraph(ctx, nodes...)
+	graph, err := scheduler.CreateRetryExecutionGraph(ctx, a.dag, nodes...)
 	if err != nil {
 		return err
 	}
@@ -673,8 +674,8 @@ func (o *dbClient) GetChildWorkflowStatus(ctx context.Context, workflowID string
 
 	outputVariables := map[string]string{}
 	for _, node := range status.Nodes {
-		if node.Step.OutputVariables != nil {
-			node.Step.OutputVariables.Range(func(_, value any) bool {
+		if node.OutputVariables != nil {
+			node.OutputVariables.Range(func(_, value any) bool {
 				// split the value by '=' to get the key and value
 				parts := strings.SplitN(value.(string), "=", 2)
 				if len(parts) == 2 {

@@ -16,6 +16,7 @@ import cronParser, { CronDate } from 'cron-parser';
 import {
   ArrowDown, // Use lucide-react icons
   ArrowUp,
+  Calendar,
   ChevronDown,
   ChevronUp, // Icon for search input
   Filter,
@@ -49,16 +50,16 @@ function formatMs(ms: number): string {
 }
 
 // Import shadcn/ui components
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Badge } from '../../../../components/ui/badge';
+import { Button } from '../../../../components/ui/button';
+import { Input } from '../../../../components/ui/input';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'; // Use shadcn Select
+} from '../../../../components/ui/select'; // Use shadcn Select
 import {
   Table,
   TableBody,
@@ -66,9 +67,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { AppBarContext } from '@/contexts/AppBarContext';
-import { useQuery } from '@/hooks/api';
+} from '../../../../components/ui/table';
+import { AppBarContext } from '../../../../contexts/AppBarContext';
+import { useQuery } from '../../../../hooks/api';
 
 /**
  * Props for the DAGTable component
@@ -88,6 +89,8 @@ type Props = {
   searchTag: string;
   /** Handler for tag filter changes */
   handleSearchTagChange: (tag: string) => void;
+  /** Loading state */
+  isLoading?: boolean;
   /** Pagination props */
   pagination?: {
     /** Total number of pages */
@@ -387,7 +390,7 @@ const defaultColumns = [
       }
 
       const formattedStartedAt = dayjs(startedAt).format('YYYY-MM-DD HH:mm:ss');
-      let durationContent = null;
+      let durationContent: React.ReactNode = null;
 
       if (finishedAt && finishedAt !== '-') {
         const durationMs = dayjs(finishedAt).diff(dayjs(startedAt));
@@ -629,6 +632,7 @@ function DAGTable({
   handleSearchTextChange,
   searchTag,
   handleSearchTagChange,
+  isLoading = false,
   pagination,
 }: Props) {
   const navigate = useNavigate();
@@ -829,7 +833,7 @@ function DAGTable({
   const { data: uniqueTags } = useQuery('/dags/tags', {
     params: {
       query: {
-        remoteNode: appBarContext.selectedRemoteNode || 'local',
+        remoteNode: appBarContext?.selectedRemoteNode || 'local',
       },
     },
   });
@@ -845,31 +849,34 @@ function DAGTable({
         />
       )}
 
-      {/* Compact Filter and Pagination Controls */}
-      <div className="py-1.5 px-2 border border-border rounded-lg bg-card mb-2 shadow-sm">
-        <div className="flex items-center gap-2">
-          {/* Search Input */}
-          <div className="relative w-[180px]">
-            <div className="absolute left-1.5 top-1/2 -translate-y-1/2 text-muted-foreground/70">
-              <Search className="h-3 w-3" />
+      {/* Search, Filter and Pagination Controls */}
+      <div
+        className={`mb-2 ${isLoading ? 'opacity-70 pointer-events-none' : ''}`}
+      >
+        {/* Desktop layout */}
+        <div className="hidden md:flex items-center gap-4 mb-2">
+          {/* Search input */}
+          <div className="relative w-[300px]">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+              <Search className="h-4 w-4" />
             </div>
             <Input
               type="search"
               placeholder="Search DAGs..."
               value={searchText}
               onChange={(e) => handleSearchTextChange(e.target.value)}
-              className="pl-6 pr-6 py-0.5 h-6 text-xs bg-background border-muted hover:border-muted-foreground/30 focus-visible:ring-1 focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-all duration-200 rounded-md w-full"
+              className="pl-10 h-9 bg-background border border-input rounded-md w-full"
             />
             {searchText && (
               <button
                 onClick={() => handleSearchTextChange('')}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground/70 hover:text-muted-foreground transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 aria-label="Clear search"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  width="10"
-                  height="10"
+                  width="14"
+                  height="14"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -884,7 +891,7 @@ function DAGTable({
             )}
           </div>
 
-          {/* Tag Filter */}
+          {/* Tag filter */}
           <div className="relative">
             <Select
               value={searchTag}
@@ -892,33 +899,41 @@ function DAGTable({
                 handleSearchTagChange(value === 'all' ? '' : value)
               }
             >
-              <SelectTrigger className="w-[120px] h-6 bg-background border-muted hover:border-muted-foreground/30 focus:ring-1 focus:ring-primary/30 focus:border-primary/50 transition-all duration-200 rounded-md cursor-pointer text-xs">
-                <div className="flex items-center gap-1">
-                  <Filter className="h-2.5 w-2.5 text-muted-foreground/70" />
+              <SelectTrigger className="w-[180px] h-9 bg-background border border-input rounded-md">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
                   <SelectValue placeholder="Filter by tag" />
                 </div>
               </SelectTrigger>
-              <SelectContent className="max-h-[280px] overflow-y-auto">
-                <SelectItem
-                  value="all"
-                  className="flex items-center cursor-pointer"
-                >
-                  <span className="font-medium">All Tags</span>
-                </SelectItem>
-
-                <div className="my-1 h-px bg-muted"></div>
-
-                {uniqueTags?.tags?.map((tag) => (
+              <SelectContent
+                className="max-h-[280px] overflow-y-auto bg-white border border-gray-300 shadow-lg rounded-md"
+                style={{
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                  borderWidth: '1px',
+                  borderStyle: 'solid',
+                  borderColor: '#d1d5db',
+                }}
+              >
+                <div className="py-1 bg-white rounded-md">
                   <SelectItem
-                    key={tag}
-                    value={tag}
-                    className="flex items-center cursor-pointer"
+                    value="all"
+                    className="flex items-center cursor-pointer hover:bg-gray-100 border-b border-gray-200 py-2 px-3"
                   >
-                    <div className="flex items-center gap-2">
-                      <span>{tag}</span>
-                    </div>
+                    <span className="font-medium">All Tags</span>
                   </SelectItem>
-                ))}
+
+                  {uniqueTags?.tags?.map((tag) => (
+                    <SelectItem
+                      key={tag}
+                      value={tag}
+                      className="flex items-center cursor-pointer hover:bg-gray-100 border-b border-gray-200 py-2 px-3"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>{tag}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </div>
               </SelectContent>
             </Select>
           </div>
@@ -926,7 +941,7 @@ function DAGTable({
           {/* Spacer */}
           <div className="flex-1"></div>
 
-          {/* Pagination Controls */}
+          {/* Pagination */}
           {pagination && (
             <DAGPagination
               totalPages={pagination.totalPages}
@@ -937,11 +952,110 @@ function DAGTable({
             />
           )}
         </div>
+
+        {/* Mobile layout */}
+        <div className="md:hidden space-y-2">
+          {/* Search input */}
+          <div className="relative w-full">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+              <Search className="h-4 w-4" />
+            </div>
+            <Input
+              type="search"
+              placeholder="Search DAGs..."
+              value={searchText}
+              onChange={(e) => handleSearchTextChange(e.target.value)}
+              className="pl-10 h-10 bg-background border border-input rounded-md w-full"
+            />
+            {searchText && (
+              <button
+                onClick={() => handleSearchTextChange('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Clear search"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* Tag filter */}
+          <div className="relative w-full">
+            <Select
+              value={searchTag}
+              onValueChange={(value) =>
+                handleSearchTagChange(value === 'all' ? '' : value)
+              }
+            >
+              <SelectTrigger className="w-full h-10 bg-background border border-input rounded-md">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <SelectValue placeholder="Filter by tag" />
+                </div>
+              </SelectTrigger>
+              <SelectContent
+                className="max-h-[280px] overflow-y-auto bg-white border border-gray-400 shadow-xl rounded-md"
+                style={{
+                  boxShadow: '0 6px 16px rgba(0, 0, 0, 0.25)',
+                  borderWidth: '1px',
+                  borderStyle: 'solid',
+                  borderColor: '#9ca3af',
+                }}
+              >
+                <div className="py-1 bg-white rounded-md">
+                  <SelectItem
+                    value="all"
+                    className="flex items-center cursor-pointer hover:bg-gray-100 border-b border-gray-200 py-2 px-3 last:border-b-0"
+                  >
+                    <span className="font-medium">All Tags</span>
+                  </SelectItem>
+
+                  {uniqueTags?.tags?.map((tag) => (
+                    <SelectItem
+                      key={tag}
+                      value={tag}
+                      className="flex items-center cursor-pointer hover:bg-gray-100 border-b border-gray-200 py-2 px-3 last:border-b-0"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>{tag}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </div>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Pagination */}
+          {pagination && (
+            <div className="flex justify-center">
+              <DAGPagination
+                totalPages={pagination.totalPages}
+                page={pagination.page}
+                pageChange={pagination.pageChange}
+                onPageLimitChange={pagination.onPageLimitChange}
+                pageLimit={pagination.pageLimit}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Table */}
+      {/* Desktop Table View - Hidden on mobile */}
       <div
-        className="rounded-xl w-full max-w-full min-w-0 overflow-x-auto transition-all duration-300"
+        className="hidden md:block rounded-xl w-full max-w-full min-w-0 overflow-x-auto transition-all duration-300"
         style={{
           fontFamily:
             'ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"',
@@ -953,7 +1067,7 @@ function DAGTable({
           borderRadius: '0.75rem',
         }}
       >
-        <Table className="w-full text-xs">
+        <Table className={`w-full text-xs ${isLoading ? 'opacity-70' : ''}`}>
           <TableHeader>
             {instance.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -1076,6 +1190,126 @@ function DAGTable({
             )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* Mobile Card View - Visible only on mobile */}
+      <div className="md:hidden space-y-2">
+        {instance.getRowModel().rows.length ? (
+          instance.getRowModel().rows.map((row) => {
+            // Skip rendering group rows in card view
+            if (row.original?.kind === ItemKind.Group) {
+              return null;
+            }
+
+            // Only render DAG rows
+            if (row.original?.kind === ItemKind.DAG && 'dag' in row.original) {
+              const dagRow = row.original as DAGRow;
+              const dag = dagRow.dag;
+              const fileName = dag.fileName;
+              const status = dag.latestWorkflow.status;
+              const statusLabel = dag.latestWorkflow.statusLabel;
+              const tags = dag.dag.tags || [];
+              const description = dag.dag.description;
+
+              return (
+                <div
+                  key={row.id}
+                  className={`p-3 rounded-lg border min-h-[80px] flex flex-col ${
+                    selectedDAG === fileName
+                      ? 'bg-primary/10 border-primary'
+                      : 'bg-card border-border'
+                  } cursor-pointer shadow-sm`}
+                  onClick={(e) => {
+                    // If Cmd (Mac) or Ctrl (Windows/Linux) key is pressed, open in new tab
+                    if (e.metaKey || e.ctrlKey) {
+                      window.open(`/dags/${fileName}`, '_blank');
+                    } else {
+                      openModal(fileName);
+                    }
+                  }}
+                >
+                  {/* Header with name and status */}
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="font-medium text-sm">{dag.dag.name}</div>
+                    <StatusChip status={status} size="xs">
+                      {statusLabel}
+                    </StatusChip>
+                  </div>
+
+                  {/* Description */}
+                  <div className="text-xs text-muted-foreground mb-2 line-clamp-2">
+                    {description || (
+                      <span className="text-muted-foreground/50">
+                        No description
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Spacer to push content to bottom */}
+                  <div className="flex-grow"></div>
+
+                  {/* Schedule */}
+                  {dag.dag.schedule && dag.dag.schedule.length > 0 ? (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {dag.dag.schedule.map((schedule, idx) => (
+                        <Badge
+                          key={idx}
+                          variant="outline"
+                          className="text-[10px] font-normal px-1 py-0 h-3.5"
+                        >
+                          {schedule.expression}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground/50 mb-2">
+                      No schedule
+                    </div>
+                  )}
+
+                  {/* Last run info */}
+                  {dag.latestWorkflow.startedAt &&
+                    dag.latestWorkflow.startedAt !== '-' && (
+                      <div className="flex items-center text-xs text-muted-foreground mb-2">
+                        <Calendar className="h-3 w-3 mr-1" />
+                        <span>
+                          {dayjs(dag.latestWorkflow.startedAt).format(
+                            'YYYY-MM-DD HH:mm:ss'
+                          )}
+                        </span>
+                      </div>
+                    )}
+
+                  {/* Tags */}
+                  {tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {tags.map((tag) => (
+                        <Badge
+                          key={tag}
+                          variant="outline"
+                          className="text-[10px] px-1 py-0 h-3.5 rounded-sm border-primary/20 bg-primary/5 text-primary/90 hover:bg-primary/10 hover:text-primary transition-colors duration-200 cursor-pointer font-normal"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSearchTagChange(tag);
+                          }}
+                        >
+                          <div className="h-1 w-1 rounded-full bg-primary/70 mr-0.5"></div>
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            return null;
+          })
+        ) : (
+          <div className="p-4 text-center text-muted-foreground">
+            No DAGs found
+          </div>
+        )}
       </div>
     </div>
   );

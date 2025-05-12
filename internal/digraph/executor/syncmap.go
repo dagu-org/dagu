@@ -1,4 +1,4 @@
-package digraph
+package executor
 
 import (
 	"encoding/json"

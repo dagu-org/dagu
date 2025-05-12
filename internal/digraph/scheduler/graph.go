@@ -44,12 +44,16 @@ func NewExecutionGraph(steps ...digraph.Step) (*ExecutionGraph, error) {
 
 // CreateRetryExecutionGraph creates a new execution graph for retry with
 // given nodes.
-func CreateRetryExecutionGraph(ctx context.Context, nodes ...*Node) (*ExecutionGraph, error) {
+func CreateRetryExecutionGraph(ctx context.Context, dag *digraph.DAG, nodes ...*Node) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
 		nodeByID: make(map[int]*Node),
 		From:     make(map[int][]int),
 		To:       make(map[int][]int),
 		nodes:    []*Node{},
+	}
+	steps := make(map[string]digraph.Step)
+	for _, step := range dag.Steps {
+		steps[step.Name] = step
 	}
 	for _, node := range nodes {
 		node.Init()
@@ -59,7 +63,7 @@ func CreateRetryExecutionGraph(ctx context.Context, nodes ...*Node) (*ExecutionG
 	if err := graph.setup(); err != nil {
 		return nil, err
 	}
-	if err := graph.setupRetry(ctx); err != nil {
+	if err := graph.setupRetry(ctx, steps); err != nil {
 		return nil, err
 	}
 	return graph, nil
@@ -145,7 +149,7 @@ func (g *ExecutionGraph) NodeByName(name string) *Node {
 	return nil
 }
 
-func (g *ExecutionGraph) setupRetry(ctx context.Context) error {
+func (g *ExecutionGraph) setupRetry(ctx context.Context, steps map[string]digraph.Step) error {
 	dict := map[int]NodeStatus{}
 	retry := map[int]bool{}
 	for _, node := range g.nodes {
@@ -164,7 +168,12 @@ func (g *ExecutionGraph) setupRetry(ctx context.Context) error {
 			if retry[u] || dict[u] == NodeStatusError ||
 				dict[u] == NodeStatusCancel {
 				logger.Debug(ctx, "Clearing node state", "step", g.nodeByID[u].Name())
-				g.nodeByID[u].ClearState()
+				step, ok := steps[g.nodeByID[u].Name()]
+				if !ok {
+					// This should never happen, but just in case
+					return fmt.Errorf("%w: %s", errStepNotFound, g.nodeByID[u].Name())
+				}
+				g.nodeByID[u].ClearState(step)
 				retry[u] = true
 			}
 			for _, v := range g.From[u] {

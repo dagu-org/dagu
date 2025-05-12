@@ -11,6 +11,7 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -70,14 +71,9 @@ func boolToPullPolicy(b bool) PullPolicy {
 	return PullPolicyNever
 }
 
-func parsePullPolicy(ctx context.Context, raw any) (PullPolicy, error) {
+func parsePullPolicy(_ context.Context, raw any) (PullPolicy, error) {
 	switch value := raw.(type) {
 	case string:
-		value, err := EvalString(ctx, value)
-		if err != nil {
-			return PullPolicyMissing, fmt.Errorf("failed to evaluate pull policy: %w", err)
-		}
-
 		// Try to parse the string as a pull policy
 		pull, ok := pullPolicyMap[value]
 		if ok {
@@ -207,18 +203,8 @@ func (e *docker) Run(ctx context.Context) error {
 		_ = cli.Close()
 	}()
 
-	// Evaluate args
-	var args []string
-	for _, arg := range e.step.Args {
-		val, err := EvalString(ctx, arg)
-		if err != nil {
-			return fmt.Errorf("failed to evaluate arg %s: %w", arg, err)
-		}
-		args = append(args, val)
-	}
-
 	if e.image == "" {
-		return e.execInContainer(ctx, cli, args)
+		return e.execInContainer(ctx, cli, e.step.Args)
 	}
 
 	platform, err := e.getPlatform(ctx, cli)
@@ -242,17 +228,8 @@ func (e *docker) Run(ctx context.Context) error {
 	}
 
 	containerConfig := *e.containerConfig
-	containerConfig.Cmd = append([]string{e.step.Command}, args...)
+	containerConfig.Cmd = append([]string{e.step.Command}, e.step.Args...)
 	containerConfig.Image = e.image
-
-	env := make([]string, len(containerConfig.Env))
-	for i, e := range containerConfig.Env {
-		env[i], err = EvalString(ctx, e)
-		if err != nil {
-			return fmt.Errorf("failed to evaluate env %s: %w", e, err)
-		}
-	}
-	containerConfig.Env = env
 
 	resp, err := cli.ContainerCreate(
 		ctx, &containerConfig, e.hostConfig, e.networkConfig, &platform, e.containerName,
@@ -413,11 +390,6 @@ func newDocker(
 		if err := md.Decode(cfg); err != nil {
 			return nil, fmt.Errorf("failed to decode config: %w", err)
 		}
-		replaced, err := EvalObject(ctx, *containerConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate string fields: %w", err)
-		}
-		containerConfig = &replaced
 	}
 
 	if cfg, ok := execCfg.Config["host"]; ok {
@@ -430,11 +402,6 @@ func newDocker(
 		if err := md.Decode(cfg); err != nil {
 			return nil, fmt.Errorf("failed to decode config: %w", err)
 		}
-		replaced, err := EvalObject(ctx, *hostConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate string fields: %w", err)
-		}
-		hostConfig = &replaced
 	}
 
 	if cfg, ok := execCfg.Config["network"]; ok {
@@ -447,11 +414,6 @@ func newDocker(
 		if err := md.Decode(cfg); err != nil {
 			return nil, fmt.Errorf("failed to decode config: %w", err)
 		}
-		replaced, err := EvalObject(ctx, *networkConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate string fields: %w", err)
-		}
-		networkConfig = &replaced
 	}
 
 	if cfg, ok := execCfg.Config["exec"]; ok {
@@ -464,11 +426,6 @@ func newDocker(
 		if err := md.Decode(cfg); err != nil {
 			return nil, fmt.Errorf("failed to decode config: %w", err)
 		}
-		replaced, err := EvalObject(ctx, *execConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate string fields: %w", err)
-		}
-		execConfig = &replaced
 	}
 
 	autoRemove := false
@@ -479,7 +436,7 @@ func newDocker(
 
 	if a, ok := execCfg.Config["autoRemove"]; ok {
 		var err error
-		autoRemove, err = EvalBool(ctx, a)
+		autoRemove, err = stringutil.ParseBool(ctx, a)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate autoRemove value: %w", err)
 		}
@@ -496,20 +453,12 @@ func newDocker(
 
 	platform := ""
 	if value, ok := execCfg.Config["platform"].(string); ok {
-		var err error
-		platform, err = EvalString(ctx, value)
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate platform: %w", err)
-		}
+		platform = value
 	}
 
 	containerName := ""
 	if value, ok := execCfg.Config["containerName"].(string); ok {
-		var err error
-		containerName, err = EvalString(ctx, value)
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate containerName: %w", err)
-		}
+		containerName = value
 	}
 
 	exec := &docker{
@@ -527,11 +476,7 @@ func newDocker(
 
 	// If image is provided, we don't care about containerName and will create a new container
 	if img, ok := execCfg.Config["image"].(string); ok {
-		value, err := EvalString(ctx, img)
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate image: %w", err)
-		}
-		exec.image = value
+		exec.image = img
 		return exec, nil
 	}
 

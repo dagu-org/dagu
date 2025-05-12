@@ -34,6 +34,8 @@ type Props = {
   onViewLog?: (stepName: string, workflowId: string) => void;
   /** Full workflow details (optional) - used to determine if this is a child workflow */
   workflow?: components['schemas']['WorkflowDetails'];
+  /** View mode: desktop or mobile */
+  view?: 'desktop' | 'mobile';
 };
 
 /**
@@ -95,6 +97,7 @@ function NodeStatusTableRow({
   workflowId,
   onViewLog,
   workflow,
+  view = 'desktop',
 }: Props) {
   const navigate = useNavigate();
   // State to store the current duration for running tasks
@@ -122,6 +125,7 @@ function NodeStatusTableRow({
       setCurrentDuration(calculateDuration(node.startedAt, node.finishedAt));
     }
   }, [node.status, node.startedAt, node.finishedAt]);
+
   // Build URL for log viewing
   const searchParams = new URLSearchParams();
   searchParams.set('remoteNode', 'local');
@@ -133,15 +137,6 @@ function NodeStatusTableRow({
   }
 
   const url = `/dags/${name}/log?${searchParams.toString()}`;
-
-  // Extract arguments for display
-  let args = '';
-  if (node.step.args) {
-    // Use uninterpolated args to avoid render issues with very long params
-    args =
-      node.step.cmdWithArgs?.replace(node.step.command || '', '').trimStart() ||
-      '';
-  }
 
   // Determine row highlight based on status
   const getRowHighlight = () => {
@@ -155,82 +150,258 @@ function NodeStatusTableRow({
     }
   };
 
-  return (
-    <StyledTableRow
-      className={cn(
-        'hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-200 h-auto',
-        getRowHighlight()
-      )}
-    >
-      <TableCell className="text-center py-2">
-        <span className="font-semibold text-slate-700 dark:text-slate-300 text-xs">
-          {rownum}
-        </span>
-      </TableCell>
+  // Handle child workflow navigation
+  const handleChildWorkflowNavigation = () => {
+    if (hasChildWorkflow && node.children && node.children[0]) {
+      const childWorkflowId = node.children[0].workflowId;
+      // Navigate to child workflow
+      const searchParams = new URLSearchParams();
+      searchParams.set('childWorkflowId', childWorkflowId);
 
-      {/* Combined Step Name & Description */}
-      <TableCell>
-        <div className="space-y-0.5">
-          <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 text-wrap break-all flex items-center gap-1.5">
-            {node.step.name}
+      // Use root workflow information from the workflow prop if available
+      if (workflow && workflow.rootWorkflowId) {
+        // If this is already a child workflow, use its root information
+        searchParams.set('workflowId', workflow.rootWorkflowId);
+      } else {
+        // Otherwise, use the current workflow as the root
+        searchParams.set('workflowId', workflowId || '');
+      }
+
+      // Add workflowName parameter to avoid waiting for DAG details
+      // Use the root workflow name or current workflow name
+      if (workflow) {
+        searchParams.set('workflowName', workflow.rootWorkflowName);
+      }
+
+      searchParams.set('step', node.step.name);
+      navigate(`/dags/${name}?${searchParams.toString()}`);
+    }
+  };
+
+  // Handle log viewing
+  const handleViewLog = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    // If Cmd (Mac) or Ctrl (Windows/Linux) key is pressed, let the default behavior happen
+    // which will open the link in a new tab
+    if (!(e.metaKey || e.ctrlKey) && onViewLog) {
+      e.preventDefault();
+      onViewLog(node.step.name, workflowId || '');
+    }
+  };
+
+  // Render desktop view (table row)
+  if (view === 'desktop') {
+    return (
+      <StyledTableRow
+        className={cn(
+          'hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-200 h-auto',
+          getRowHighlight()
+        )}
+      >
+        <TableCell className="text-center py-2">
+          <span className="font-semibold text-slate-700 dark:text-slate-300 text-xs">
+            {rownum}
+          </span>
+        </TableCell>
+
+        {/* Combined Step Name & Description */}
+        <TableCell>
+          <div className="space-y-0.5">
+            <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 text-wrap break-all flex items-center gap-1.5">
+              {node.step.name}
+              {hasChildWorkflow && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex items-center text-blue-500 cursor-pointer">
+                      <GitBranch className="h-4 w-4" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <span className="text-xs">
+                      Child Workflow: {node.step.run}
+                    </span>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+            {node.step.description && (
+              <div className="text-xs text-slate-500 dark:text-slate-400 leading-tight">
+                {node.step.description}
+              </div>
+            )}
             {hasChildWorkflow && (
+              <div
+                className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline"
+                onClick={handleChildWorkflowNavigation}
+              >
+                View Child Workflow: {node.step.run}
+              </div>
+            )}
+          </div>
+        </TableCell>
+
+        {/* Combined Command & Args */}
+        <TableCell>
+          <div className="space-y-1.5">
+            {!node.step.command && node.step.cmdWithArgs ? (
+              <div className="flex items-center gap-1.5 text-xs font-medium">
+                <Code className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+                <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-1.5 py-0.5 text-slate-700 dark:text-slate-300">
+                  {node.step.cmdWithArgs}
+                </span>
+              </div>
+            ) : null}
+
+            {node.step.command && (
+              <div className="flex items-center gap-1.5 text-xs font-medium">
+                <Code className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+                <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-1.5 py-0.5 text-slate-700 dark:text-slate-300">
+                  {node.step.command}
+                </span>
+              </div>
+            )}
+
+            {node.step.args && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="inline-flex items-center text-blue-500 cursor-pointer">
-                    <GitBranch className="h-4 w-4" />
-                  </span>
+                  <div className="pl-5 text-xs font-medium text-slate-500 dark:text-slate-400 truncate cursor-pointer leading-tight">
+                    {node.step.args}
+                  </div>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <span className="text-xs">
-                    Child Workflow: {node.step.run}
+                  <span className="max-w-[400px] break-all text-xs">
+                    {node.step.args}
                   </span>
                 </TooltipContent>
               </Tooltip>
             )}
           </div>
-          {node.step.description && (
-            <div className="text-xs text-slate-500 dark:text-slate-400 leading-tight">
-              {node.step.description}
+        </TableCell>
+
+        {/* Last Run & Duration */}
+        <TableCell>
+          <div className="space-y-0.5">
+            <div className="font-medium text-slate-700 dark:text-slate-300 text-sm">
+              {formatTimestamp(node.startedAt)}
+            </div>
+            {node.startedAt && (
+              <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 leading-tight">
+                <span className="font-medium flex items-center">
+                  Duration:
+                  {node.status === NodeStatus.Running && (
+                    <span className="inline-block w-2 h-2 rounded-full bg-lime-500 ml-1.5 animate-pulse" />
+                  )}
+                </span>
+                {currentDuration}
+              </div>
+            )}
+          </div>
+        </TableCell>
+
+        {/* Status */}
+        <TableCell className="text-center">
+          <NodeStatusChip status={node.status} size="sm">
+            {node.statusLabel}
+          </NodeStatusChip>
+        </TableCell>
+
+        {/* Error */}
+        <TableCell>
+          {node.error && (
+            <div className="text-xs bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800 rounded-md p-1.5 max-h-[80px] overflow-y-auto whitespace-pre-wrap break-words text-red-600 dark:text-red-400 leading-tight">
+              {node.error}
             </div>
           )}
-          {hasChildWorkflow && (
-            <div
-              className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline"
-              onClick={() => {
-                if (hasChildWorkflow && node.children && node.children[0]) {
-                  const childWorkflowId = node.children[0].workflowId;
-                  // Navigate to child workflow
-                  const searchParams = new URLSearchParams();
-                  searchParams.set('childWorkflowId', childWorkflowId);
+          {node.step.preconditions?.some((cond) => cond.error) && (
+            <div className="mt-2">
+              <div className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-1">
+                Precondition Unmet:
+              </div>
+              {node.step.preconditions
+                .filter((cond) => cond.error)
+                .map((cond, idx) => (
+                  <div
+                    key={idx}
+                    className="text-xs bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800 rounded-md p-1.5 mb-1 whitespace-pre-wrap break-words text-amber-600 dark:text-amber-400 leading-tight"
+                  >
+                    <div className="font-medium">
+                      Condition: {cond.condition}
+                    </div>
+                    <div>Expected: {cond.expected}</div>
+                    <div>Error: {cond.error}</div>
+                  </div>
+                ))}
+            </div>
+          )}
+        </TableCell>
 
-                  // Use root workflow information from the workflow prop if available
-                  if (workflow && workflow.rootWorkflowId) {
-                    // If this is already a child workflow, use its root information
-                    searchParams.set('workflowId', workflow.rootWorkflowId);
-                  } else {
-                    // Otherwise, use the current workflow as the root
-                    searchParams.set('workflowId', workflowId || '');
-                  }
-
-                  // Add workflowName parameter to avoid waiting for DAG details
-                  // Use the root workflow name or current workflow name
-                  if (workflow) {
-                    searchParams.set('workflowName', workflow.rootWorkflowName);
-                  }
-
-                  searchParams.set('step', node.step.name);
-                  navigate(`/dags/${name}?${searchParams.toString()}`);
-                }
-              }}
+        {/* Log */}
+        <TableCell className="text-center">
+          {node.log ? (
+            <a
+              href={url}
+              onClick={handleViewLog}
+              className="inline-flex items-center justify-center p-2 transition-colors duration-200 rounded-md text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              title="Click to view log (Cmd/Ctrl+Click to open in new tab)"
             >
-              View Child Workflow: {node.step.run}
-            </div>
-          )}
-        </div>
-      </TableCell>
+              <span className="sr-only">View Log</span>
+              <FileText className="h-4 w-4" />
+            </a>
+          ) : null}
+        </TableCell>
+      </StyledTableRow>
+    );
+  }
 
-      {/* Combined Command & Args */}
-      <TableCell>
+  // Render mobile view (card)
+  return (
+    <div
+      className={cn(
+        'p-4 rounded-lg border border-slate-200 dark:border-slate-700',
+        getRowHighlight()
+      )}
+    >
+      {/* Header with number and status */}
+      <div className="flex justify-between items-center mb-3">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-slate-700 dark:text-slate-300 text-sm bg-slate-100 dark:bg-slate-800 rounded-full w-6 h-6 flex items-center justify-center">
+            {rownum}
+          </span>
+          <h3 className="font-semibold text-slate-800 dark:text-slate-200">
+            {node.step.name}
+            {hasChildWorkflow && (
+              <span className="inline-flex items-center text-blue-500 ml-1.5">
+                <GitBranch className="h-4 w-4" />
+              </span>
+            )}
+          </h3>
+        </div>
+        <NodeStatusChip status={node.status} size="sm">
+          {node.statusLabel}
+        </NodeStatusChip>
+      </div>
+
+      {/* Description */}
+      {node.step.description && (
+        <div className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+          {node.step.description}
+        </div>
+      )}
+
+      {/* Child workflow link */}
+      {hasChildWorkflow && (
+        <div
+          className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline mb-3"
+          onClick={handleChildWorkflowNavigation}
+        >
+          View Child Workflow: {node.step.run}
+        </div>
+      )}
+
+      {/* Command section */}
+      <div className="mb-3">
+        <div className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+          Command:
+        </div>
         <div className="space-y-1.5">
           {!node.step.command && node.step.cmdWithArgs ? (
             <div className="flex items-center gap-1.5 text-xs font-medium">
@@ -250,29 +421,25 @@ function NodeStatusTableRow({
             </div>
           )}
 
-          {args && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="pl-5 text-xs font-medium text-slate-500 dark:text-slate-400 truncate cursor-pointer leading-tight">
-                  {args}
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <span className="max-w-[400px] break-all text-xs">{args}</span>
-              </TooltipContent>
-            </Tooltip>
+          {node.step.args && (
+            <div className="pl-5 text-xs font-medium text-slate-500 dark:text-slate-400 break-words leading-tight">
+              {node.step.args}
+            </div>
           )}
         </div>
-      </TableCell>
+      </div>
 
-      {/* Last Run & Duration */}
-      <TableCell>
+      {/* Timing section */}
+      <div className="mb-3">
+        <div className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+          Timing:
+        </div>
         <div className="space-y-0.5">
-          <div className="font-medium text-slate-700 dark:text-slate-300 text-sm">
-            {formatTimestamp(node.startedAt)}
+          <div className="text-xs text-slate-600 dark:text-slate-400">
+            Started: {formatTimestamp(node.startedAt)}
           </div>
           {node.startedAt && (
-            <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 leading-tight">
+            <div className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
               <span className="font-medium flex items-center">
                 Duration:
                 {node.status === NodeStatus.Running && (
@@ -283,46 +450,60 @@ function NodeStatusTableRow({
             </div>
           )}
         </div>
-      </TableCell>
+      </div>
 
-      {/* Status */}
-      <TableCell className="text-center">
-        <NodeStatusChip status={node.status} size="sm">
-          {node.statusLabel}
-        </NodeStatusChip>
-      </TableCell>
-
-      {/* Error */}
-      <TableCell>
-        {node.error && (
-          <div className="text-xs bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800 rounded-md p-1.5 max-h-[80px] overflow-y-auto whitespace-pre-wrap break-words text-red-600 dark:text-red-400 leading-tight">
-            {node.error}
+      {/* Error section */}
+      {(node.error || node.step.preconditions?.some((cond) => cond.error)) && (
+        <div className="mb-3">
+          <div className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+            Errors:
           </div>
-        )}
-      </TableCell>
 
-      {/* Log */}
-      <TableCell className="text-center">
-        {node.log ? (
+          {node.error && (
+            <div className="text-xs bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800 rounded-md p-1.5 mb-2 whitespace-pre-wrap break-words text-red-600 dark:text-red-400 leading-tight">
+              {node.error}
+            </div>
+          )}
+
+          {node.step.preconditions?.some((cond) => cond.error) && (
+            <div>
+              <div className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-1">
+                Precondition Unmet:
+              </div>
+              {node.step.preconditions
+                .filter((cond) => cond.error)
+                .map((cond, idx) => (
+                  <div
+                    key={idx}
+                    className="text-xs bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800 rounded-md p-1.5 mb-1 whitespace-pre-wrap break-words text-amber-600 dark:text-amber-400 leading-tight"
+                  >
+                    <div className="font-medium">
+                      Condition: {cond.condition}
+                    </div>
+                    <div>Expected: {cond.expected}</div>
+                    <div>Error: {cond.error}</div>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Log button */}
+      {node.log && (
+        <div className="flex justify-end">
           <a
             href={url}
-            onClick={(e) => {
-              // If Cmd (Mac) or Ctrl (Windows/Linux) key is pressed, let the default behavior happen
-              // which will open the link in a new tab
-              if (!(e.metaKey || e.ctrlKey) && onViewLog) {
-                e.preventDefault();
-                onViewLog(node.step.name, workflowId || '');
-              }
-            }}
-            className="inline-flex items-center justify-center p-2 transition-colors duration-200 rounded-md text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+            onClick={handleViewLog}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors duration-200 rounded-md text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
             title="Click to view log (Cmd/Ctrl+Click to open in new tab)"
           >
-            <span className="sr-only">View Log</span>
-            <FileText className="h-4 w-4" />
+            <FileText className="h-3.5 w-3.5" />
+            View Log
           </a>
-        ) : null}
-      </TableCell>
-    </StyledTableRow>
+        </div>
+      )}
+    </div>
   );
 }
 

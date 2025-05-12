@@ -135,7 +135,7 @@ func TestScheduler(t *testing.T) {
 			newStep("2",
 				withDepends("1"),
 				withCommand("false"),
-				withPrecondition(digraph.Condition{
+				withPrecondition(&digraph.Condition{
 					Condition: "`echo 1`",
 					Expected:  "0",
 				}),
@@ -397,7 +397,7 @@ func TestScheduler(t *testing.T) {
 		graph := sc.newGraph(t,
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
-				withPrecondition(digraph.Condition{
+				withPrecondition(&digraph.Condition{
 					Condition: "`echo 1`",
 					Expected:  "1",
 				}),
@@ -418,7 +418,7 @@ func TestScheduler(t *testing.T) {
 		graph := sc.newGraph(t,
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
-				withPrecondition(digraph.Condition{
+				withPrecondition(&digraph.Condition{
 					Condition: "`echo 1`",
 					Expected:  "0",
 				})),
@@ -439,8 +439,8 @@ func TestScheduler(t *testing.T) {
 		graph := sc.newGraph(t,
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
-				withPrecondition(digraph.Condition{
-					Command: "true",
+				withPrecondition(&digraph.Condition{
+					Condition: "true",
 				})),
 			successStep("3", "2"),
 		)
@@ -458,8 +458,8 @@ func TestScheduler(t *testing.T) {
 		graph := sc.newGraph(t,
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
-				withPrecondition(digraph.Condition{
-					Command: "false",
+				withPrecondition(&digraph.Condition{
+					Condition: "false",
 				})),
 			successStep("3", "2"),
 		)
@@ -642,7 +642,7 @@ func TestScheduler(t *testing.T) {
 		node := result.Node(t, "2")
 
 		// check if RESULT variable is set to "hello"
-		output, ok := node.NodeData().Step.OutputVariables.Load("RESULT")
+		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
 		require.Equal(t, "RESULT=hello", output, "expected output %q, got %q", "hello", output)
 	})
@@ -665,11 +665,11 @@ func TestScheduler(t *testing.T) {
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 
 		node := result.Node(t, "3")
-		output, _ := node.NodeData().Step.OutputVariables.Load("RESULT")
+		output, _ := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.Equal(t, "RESULT=hello world", output, "expected output %q, got %q", "hello world", output)
 
 		node2 := result.Node(t, "5")
-		output2, _ := node2.NodeData().Step.OutputVariables.Load("RESULT2")
+		output2, _ := node2.NodeData().State.OutputVariables.Load("RESULT2")
 		require.Equal(t, "RESULT2=", output2, "expected output %q, got %q", "", output)
 	})
 	t.Run("OutputJSONReference", func(t *testing.T) {
@@ -686,7 +686,7 @@ func TestScheduler(t *testing.T) {
 		// check if RESULT variable is set to "value"
 		node := result.Node(t, "2")
 
-		output, _ := node.NodeData().Step.OutputVariables.Load("RESULT")
+		output, _ := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.Equal(t, "RESULT=value", output, "expected output %q, got %q", "value", output)
 	})
 	t.Run("HandlingJSONWithSpecialChars", func(t *testing.T) {
@@ -703,7 +703,7 @@ func TestScheduler(t *testing.T) {
 		// check if RESULT variable is set to "value"
 		node := result.Node(t, "2")
 
-		output, _ := node.NodeData().Step.OutputVariables.Load("RESULT")
+		output, _ := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.Equal(t, "RESULT=value", output, "expected output %q, got %q", "value", output)
 	})
 	t.Run("SpecialVars_WORKFLOW_LOG_FILE", func(t *testing.T) {
@@ -716,7 +716,7 @@ func TestScheduler(t *testing.T) {
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		node := result.Node(t, "1")
 
-		output, ok := node.NodeData().Step.OutputVariables.Load("RESULT")
+		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
 		require.Regexp(t, `^RESULT=/.*/.*\.log$`, output, "unexpected output %q", output)
 	})
@@ -730,7 +730,7 @@ func TestScheduler(t *testing.T) {
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		node := result.Node(t, "1")
 
-		output, ok := node.NodeData().Step.OutputVariables.Load("RESULT")
+		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
 		require.Regexp(t, `^RESULT=/.*/.*\.log$`, output, "unexpected output %q", output)
 	})
@@ -744,7 +744,7 @@ func TestScheduler(t *testing.T) {
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		node := result.Node(t, "1")
 
-		output, ok := node.NodeData().Step.OutputVariables.Load("RESULT")
+		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
 		require.Regexp(t, `RESULT=[a-f0-9-]+`, output, "unexpected output %q", output)
 	})
@@ -758,7 +758,7 @@ func TestScheduler(t *testing.T) {
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		node := result.Node(t, "1")
 
-		output, ok := node.NodeData().Step.OutputVariables.Load("RESULT")
+		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
 		require.Equal(t, "RESULT=test_dag", output, "unexpected output %q", output)
 	})
@@ -772,7 +772,7 @@ func TestScheduler(t *testing.T) {
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		node := result.Node(t, "step_test")
 
-		output, ok := node.NodeData().Step.OutputVariables.Load("RESULT")
+		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
 		require.Equal(t, "RESULT=step_test", output, "unexpected output %q", output)
 	})
@@ -814,9 +814,9 @@ func withRepeatPolicy(repeat bool, interval time.Duration) stepOption {
 	}
 }
 
-func withPrecondition(condition digraph.Condition) stepOption {
+func withPrecondition(condition *digraph.Condition) stepOption {
 	return func(step *digraph.Step) {
-		step.Preconditions = []digraph.Condition{condition}
+		step.Preconditions = []*digraph.Condition{condition}
 	}
 }
 

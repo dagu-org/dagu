@@ -2,13 +2,11 @@ package scheduler
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os/exec"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
@@ -17,88 +15,85 @@ var (
 	ErrConditionNotMet = fmt.Errorf("condition was not met")
 )
 
+// Error message for the case not all condition was not met
+const ErrMsgOtherConditionNotMet = "other condition was not met"
+
 // EvalConditions evaluates a list of conditions and checks the results.
 // It returns an error if any of the conditions were not met.
-func EvalConditions(ctx context.Context, cond []digraph.Condition) error {
-	for _, c := range cond {
-		if err := evalCondition(ctx, c); err != nil {
-			return err
+func EvalConditions(ctx context.Context, shell string, cond []*digraph.Condition) error {
+	var lastErr error
+
+	for i := range cond {
+		if err := evalCondition(ctx, shell, cond[i]); err != nil {
+			cond[i].SetErrorMessage(err.Error())
+			lastErr = err
 		}
 	}
 
-	return nil
+	if lastErr != nil {
+		// Set error message
+		for i := range cond {
+			if cond[i].GetErrorMessage() != "" {
+				continue
+			}
+			cond[i].SetErrorMessage(ErrMsgOtherConditionNotMet)
+		}
+	}
+
+	return lastErr
 }
 
-// eval evaluates the condition and returns the actual value.
+// evalCondition evaluates the condition and returns the actual value.
 // It returns an error if the evaluation failed or the condition is invalid.
-func eval(ctx context.Context, c digraph.Condition) (bool, error) {
+func evalCondition(ctx context.Context, shell string, c *digraph.Condition) error {
 	switch {
-	case c.Condition != "":
+	case c.Condition != "" && c.Expected != "":
 		return matchCondition(ctx, c)
 
-	case c.Command != "":
-		return evalCommand(ctx, c)
-
 	default:
-		return false, fmt.Errorf("invalid condition: Condition=%s", c.Condition)
+		return evalCommand(ctx, shell, c)
 	}
 }
 
-// evalCondition evaluates a single condition and checks the result.
+// matchCondition evaluates the condition and checks if it matches the expected value.
 // It returns an error if the condition was not met.
-func evalCondition(ctx context.Context, c digraph.Condition) error {
-	matched, err := eval(ctx, c)
+func matchCondition(ctx context.Context, c *digraph.Condition) error {
+	evaluatedVal, err := EvalString(ctx, c.Condition)
 	if err != nil {
-		if errors.Is(err, ErrConditionNotMet) {
-			return err
-		}
-		return fmt.Errorf("failed to evaluate condition: Condition=%s Error=%v", c.Condition, err)
+		return fmt.Errorf("failed to evaluate the value: Error=%v", err)
 	}
-
-	if !matched {
-		return fmt.Errorf("%w: Condition=%s Expected=%s", ErrConditionNotMet, c.Condition, c.Expected)
+	if stringutil.MatchPattern(ctx, evaluatedVal, []string{c.Expected}, stringutil.WithExactMatch()) {
+		return nil
 	}
-
-	// Condition was met
-	return nil
+	// Return an helpful error message if the condition is not met
+	return fmt.Errorf("%w: expected %q, got %q", ErrConditionNotMet, c.Expected, evaluatedVal)
 }
 
-func evalCommand(ctx context.Context, c digraph.Condition) (bool, error) {
-	commandToRun, err := executor.EvalString(ctx, c.Command, cmdutil.OnlyReplaceVars())
+func evalCommand(ctx context.Context, shell string, c *digraph.Condition) error {
+	commandToRun, err := EvalString(ctx, c.Condition, cmdutil.OnlyReplaceVars())
 	if err != nil {
-		return false, fmt.Errorf("failed to evaluate command: %w", err)
+		return fmt.Errorf("failed to evaluate command: %w", err)
 	}
-	if shell := cmdutil.GetShellCommand(""); shell != "" {
+	if shell != "" {
 		return runShellCommand(ctx, shell, commandToRun)
 	}
 	return runDirectCommand(ctx, commandToRun)
 }
 
-func runShellCommand(ctx context.Context, shell, commandToRun string) (bool, error) {
+func runShellCommand(ctx context.Context, shell, commandToRun string) error {
 	cmd := exec.CommandContext(ctx, shell, "-c", commandToRun)
 	_, err := cmd.Output()
 	if err != nil {
-		return false, fmt.Errorf("%w: %s", ErrConditionNotMet, err)
+		return fmt.Errorf("%w: %s", ErrConditionNotMet, err)
 	}
-	return true, nil
+	return nil
 }
 
-func runDirectCommand(ctx context.Context, commandToRun string) (bool, error) {
+func runDirectCommand(ctx context.Context, commandToRun string) error {
 	cmd := exec.CommandContext(ctx, commandToRun)
 	_, err := cmd.Output()
 	if err != nil {
-		return false, fmt.Errorf("%w: %s", ErrConditionNotMet, err)
+		return fmt.Errorf("%w: %s", ErrConditionNotMet, err)
 	}
-	return true, nil
-}
-
-func matchCondition(ctx context.Context, c digraph.Condition) (bool, error) {
-	evaluatedVal, err := executor.EvalString(ctx, c.Condition)
-	if err != nil {
-		return false, fmt.Errorf("failed to evaluate condition: Condition=%s Error=%v", c.Condition, err)
-	}
-	if stringutil.MatchPattern(ctx, evaluatedVal, []string{c.Expected}, stringutil.WithExactMatch()) {
-		return true, nil
-	}
-	return false, fmt.Errorf("%w: Condition=%s Expected=%s", ErrConditionNotMet, c.Condition, c.Expected)
+	return nil
 }

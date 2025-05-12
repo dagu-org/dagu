@@ -54,8 +54,8 @@ function DAGGraph({ workflow, onSelectStep, onRightClickStep }: Props) {
 
   return (
     <div>
-      <div className="flex justify-between items-start mb-4">
-        <Tabs className="w-auto">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-4 gap-2">
+        <Tabs className="w-auto self-center sm:self-auto">
           <Tab
             isActive={sub === '0'}
             onClick={() => setSub('0')}
@@ -80,7 +80,9 @@ function DAGGraph({ workflow, onSelectStep, onRightClickStep }: Props) {
           </Tab>
         </Tabs>
 
-        <FlowchartSwitch value={flowchart} onChange={onChangeFlowchart} />
+        <div className="self-center sm:self-auto">
+          <FlowchartSwitch value={flowchart} onChange={onChangeFlowchart} />
+        </div>
       </div>
 
       <BorderedBox className="py-4 px-4 flex flex-col overflow-x-auto">

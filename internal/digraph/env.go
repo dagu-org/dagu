@@ -69,12 +69,12 @@ func SetupEnv(ctx context.Context, d *DAG, c DB, root WorkflowRef, workflowID, l
 func GetEnv(ctx context.Context) Env {
 	value := ctx.Value(envCtxKey{})
 	if value == nil {
-		logger.Error(ctx, "failed to get the DAG context")
+		logger.Error(ctx, "failed to get the env")
 		return Env{}
 	}
 	execEnv, ok := value.(Env)
 	if !ok {
-		logger.Error(ctx, "failed to get the DAG context")
+		logger.Error(ctx, "failed to get the env")
 		return Env{}
 	}
 	return execEnv

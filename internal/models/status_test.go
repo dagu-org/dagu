@@ -23,7 +23,7 @@ func TestStatusSerialization(t *testing.T) {
 				Dir: "dir", Command: "echo 1", Args: []string{},
 				Depends: []string{}, ContinueOn: digraph.ContinueOn{},
 				RetryPolicy: digraph.RetryPolicy{}, MailOnError: false,
-				RepeatPolicy: digraph.RepeatPolicy{}, Preconditions: []digraph.Condition{},
+				RepeatPolicy: digraph.RepeatPolicy{}, Preconditions: []*digraph.Condition{},
 			},
 		},
 		MailOn:    &digraph.MailOn{},
@@ -45,16 +45,4 @@ func TestStatusSerialization(t *testing.T) {
 	require.Equal(t, statusToPersist.Name, statusObject.Name)
 	require.Equal(t, 1, len(statusObject.Nodes))
 	require.Equal(t, dag.Steps[0].Name, statusObject.Nodes[0].Step.Name)
-}
-
-func TestJsonMarshal(t *testing.T) {
-	step := digraph.Step{
-		OutputVariables: &digraph.SyncMap{},
-	}
-	step.OutputVariables.Store("A", "B")
-	rawJSON, err := json.Marshal(step)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	t.Log(string(rawJSON))
 }

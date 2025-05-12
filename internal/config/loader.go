@@ -151,19 +151,11 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	// Process authentication settings.
 	if def.Auth != nil {
 		if def.Auth.Basic != nil {
-			cfg.Server.Auth.Basic.Enabled = def.Auth.Basic.Enabled
 			cfg.Server.Auth.Basic.Username = def.Auth.Basic.Username
 			cfg.Server.Auth.Basic.Password = def.Auth.Basic.Password
-			if def.Auth.Basic.Username != "" || def.Auth.Basic.Password != "" {
-				cfg.Server.Auth.Basic.Enabled = true
-			}
 		}
 		if def.Auth.Token != nil {
-			cfg.Server.Auth.Token.Enabled = def.Auth.Token.Enabled
 			cfg.Server.Auth.Token.Value = def.Auth.Token.Value
-			if def.Auth.Token.Value != "" {
-				cfg.Server.Auth.Token.Enabled = true
-			}
 		}
 	}
 
@@ -215,14 +207,10 @@ func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) {
 	if def.BasicAuthPassword != "" {
 		cfg.Server.Auth.Basic.Password = def.BasicAuthPassword
 	}
-	if def.BasicAuthUsername != "" || def.BasicAuthPassword != "" {
-		cfg.Server.Auth.Basic.Enabled = true
-	}
 	if def.APIBaseURL != "" {
 		cfg.Server.APIBasePath = def.APIBaseURL
 	}
 	if def.IsAuthToken {
-		cfg.Server.Auth.Token.Enabled = true
 		cfg.Server.Auth.Token.Value = def.AuthToken
 	}
 	// For DAGs directory, if both legacy fields are present, def.DAGsDir takes precedence.
@@ -372,17 +360,13 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("ui.navbarTitle", "NAVBAR_TITLE")
 
 	// Authentication configurations
-	l.bindEnv("auth.basic.enabled", "AUTH_BASIC_ENABLED")
 	l.bindEnv("auth.basic.username", "AUTH_BASIC_USERNAME")
 	l.bindEnv("auth.basic.password", "AUTH_BASIC_PASSWORD")
-	l.bindEnv("auth.token.enabled", "AUTH_TOKEN_ENABLED")
 	l.bindEnv("auth.token.value", "AUTH_TOKEN")
 
 	// Authentication configurations (legacy keys)
-	l.bindEnv("auth.basic.enabled", "IS_BASICAUTH")
 	l.bindEnv("auth.basic.username", "BASICAUTH_USERNAME")
 	l.bindEnv("auth.basic.password", "BASICAUTH_PASSWORD")
-	l.bindEnv("auth.token.enabled", "IS_AUTHTOKEN")
 	l.bindEnv("auth.token.value", "AUTHTOKEN")
 
 	// TLS configurations
@@ -476,14 +460,6 @@ func (l *ConfigLoader) setExecutable(cfg *Config) error {
 // validateConfig performs basic validation on the configuration to ensure required fields are set
 // and that numerical values fall within acceptable ranges.
 func (l *ConfigLoader) validateConfig(cfg *Config) error {
-	if cfg.Server.Auth.Basic.Enabled && (cfg.Server.Auth.Basic.Username == "" || cfg.Server.Auth.Basic.Password == "") {
-		return fmt.Errorf("basic auth enabled but username or password is not set")
-	}
-
-	if cfg.Server.Auth.Token.Enabled && cfg.Server.Auth.Token.Value == "" {
-		return fmt.Errorf("auth token enabled but token is not set")
-	}
-
 	if cfg.Server.Port < 0 || cfg.Server.Port > 65535 {
 		return fmt.Errorf("invalid port number: %d", cfg.Server.Port)
 	}

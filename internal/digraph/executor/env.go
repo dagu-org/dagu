@@ -16,24 +16,6 @@ func AllEnvs(ctx context.Context) []string {
 	return GetEnv(ctx).AllEnvs()
 }
 
-// EvalString evaluates the given string with the variables within the execution context.
-func EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
-	return GetEnv(ctx).EvalString(ctx, s, opts...)
-}
-
-// EvalBool evaluates the given value with the variables within the execution context
-// and parses it as a boolean.
-func EvalBool(ctx context.Context, value any) (bool, error) {
-	return GetEnv(ctx).EvalBool(ctx, value)
-}
-
-// EvalObject recursively evaluates the string fields of the given object
-// with the variables within the execution context.
-func EvalObject[T any](ctx context.Context, obj T) (T, error) {
-	env := GetEnv(ctx).Variables.Variables()
-	return cmdutil.EvalStringFields(ctx, obj, cmdutil.WithVariables(env))
-}
-
 // WithEnv returns a new context with the given execution context.
 func WithEnv(ctx context.Context, e Env) context.Context {
 	return context.WithValue(ctx, envCtxKey{}, e)
@@ -54,7 +36,7 @@ func GetEnv(ctx context.Context) Env {
 type Env struct {
 	digraph.Env
 
-	Variables *digraph.SyncMap
+	Variables *SyncMap
 	Step      digraph.Step
 	Envs      map[string]string
 }
@@ -63,7 +45,7 @@ type Env struct {
 func NewEnv(ctx context.Context, step digraph.Step) Env {
 	return Env{
 		Env:       digraph.GetEnv(ctx),
-		Variables: &digraph.SyncMap{},
+		Variables: &SyncMap{},
 		Step:      step,
 		Envs: map[string]string{
 			digraph.EnvKeyWorkflowStepName: step.Name,
@@ -90,7 +72,7 @@ func (e Env) AllEnvs() []string {
 }
 
 // LoadOutputVariables loads the output variables from the given DAG into the
-func (e Env) LoadOutputVariables(vars *digraph.SyncMap) {
+func (e Env) LoadOutputVariables(vars *SyncMap) {
 	vars.Range(func(key, value any) bool {
 		// Skip if the key already exists
 		if _, ok := e.Variables.Load(key); ok {

@@ -1305,7 +1305,7 @@ components:
           type: array
           description: "Conditions that must be met before a workflow can start"
           items:
-            $ref: "#/components/schemas/Precondition"
+            $ref: "#/components/schemas/Condition"
         maxActiveRuns:
           type: integer
           description: "Maximum number of concurrent workflows allowed from this DAG"
@@ -1410,6 +1410,11 @@ components:
               $ref: "#/components/schemas/Node"
             onCancel:
               $ref: "#/components/schemas/Node"
+            preconditions:
+              type: array
+              description: "List of preconditions that must be met before the workflow can start"
+              items:
+                $ref: "#/components/schemas/Condition"
           required:
             - nodes
 
@@ -1521,7 +1526,7 @@ components:
           type: array
           description: "Conditions that must be met before the step can start"
           items:
-            $ref: "#/components/schemas/Precondition"
+            $ref: "#/components/schemas/Condition"
       required:
         - name
 
@@ -1600,7 +1605,7 @@ components:
         - name
         - history
 
-    Precondition:
+    Condition:
       type: object
       description: "Precondition that must be satisfied before running a step or workflow"
       properties:
@@ -1610,6 +1615,14 @@ components:
         expected:
           type: string
           description: "Expected result of the condition evaluation"
+        error:
+          type: string
+          description: "Error message if the condition is not met"
+        matched:
+          type: boolean
+          description: "Whether the condition was met"
+      required:
+        - condition
 
     RepeatPolicy:
       type: object

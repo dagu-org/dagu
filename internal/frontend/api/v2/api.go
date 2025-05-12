@@ -88,9 +88,9 @@ func (a *API) ConfigureRoutes(r chi.Router, baseURL string) error {
 	r.Group(func(r chi.Router) {
 		authOptions := auth.Options{
 			Realm:            "restricted",
-			APITokenEnabled:  a.config.Server.Auth.Token.Enabled,
+			APITokenEnabled:  a.config.Server.Auth.Token.Enabled(),
 			APIToken:         a.config.Server.Auth.Token.Value,
-			BasicAuthEnabled: a.config.Server.Auth.Basic.Enabled,
+			BasicAuthEnabled: a.config.Server.Auth.Basic.Enabled(),
 			Creds: map[string]string{
 				a.config.Server.Auth.Basic.Username: a.config.Server.Auth.Basic.Password,
 			},

@@ -47,6 +47,9 @@ type NodeState struct {
 	ExitCode int
 	// Child executions is the list of child workflows that this node has executed.
 	Children []ChildWorkflow
+	// OutputVariables stores the output variables for the following steps.
+	// It only contains the local output variables.
+	OutputVariables *executor.SyncMap
 }
 
 type ChildWorkflow struct {
@@ -96,6 +99,20 @@ func (s *Data) ResetError() {
 	s.inner.State.ExitCode = 0
 }
 
+func (s *Data) SetExecutorConfig(cfg digraph.ExecutorConfig) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.inner.Step.ExecutorConfig = cfg
+}
+
+func (s *Data) SetChildWorkflow(childWorkflow digraph.ChildWorkflow) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.inner.Step.ChildWorkflow = &childWorkflow
+}
+
 func (s *Data) Args() []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -117,6 +134,13 @@ func (s *Data) Step() digraph.Step {
 	defer s.mu.RUnlock()
 
 	return s.inner.Step
+}
+
+func (s *Data) SetScript(script string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.inner.Step.Script = script
 }
 
 func (s *Data) SetStep(step digraph.Step) {
@@ -249,11 +273,11 @@ func (s *Data) ClearVariable(key string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.inner.Step.OutputVariables == nil {
+	if s.inner.State.OutputVariables == nil {
 		return
 	}
 
-	s.inner.Step.OutputVariables.Delete(key)
+	s.inner.State.OutputVariables.Delete(key)
 }
 
 func (s *Data) MatchExitCode(exitCodes []int) bool {
@@ -272,11 +296,11 @@ func (n *Data) getVariable(key string) (stringutil.KeyValue, bool) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
-	if n.inner.Step.OutputVariables == nil {
+	if n.inner.State.OutputVariables == nil {
 		return "", false
 	}
 
-	v, ok := n.inner.Step.OutputVariables.Load(key)
+	v, ok := n.inner.State.OutputVariables.Load(key)
 	if !ok {
 		return "", false
 	}
@@ -295,21 +319,21 @@ func (n *Data) getBoolVariable(key string) (bool, bool) {
 
 func (n *Data) setBoolVariable(key string, value bool) {
 
-	if n.inner.Step.OutputVariables == nil {
+	if n.inner.State.OutputVariables == nil {
 		n.mu.Lock()
-		n.inner.Step.OutputVariables = &digraph.SyncMap{}
+		n.inner.State.OutputVariables = &executor.SyncMap{}
 		n.mu.Unlock()
 	}
-	n.inner.Step.OutputVariables.Store(key, stringutil.NewKeyValue(key, strconv.FormatBool(value)).String())
+	n.inner.State.OutputVariables.Store(key, stringutil.NewKeyValue(key, strconv.FormatBool(value)).String())
 }
 
 func (n *Data) setVariable(key, value string) {
-	if n.inner.Step.OutputVariables == nil {
+	if n.inner.State.OutputVariables == nil {
 		n.mu.Lock()
-		n.inner.Step.OutputVariables = &digraph.SyncMap{}
+		n.inner.State.OutputVariables = &executor.SyncMap{}
 		n.mu.Unlock()
 	}
-	n.inner.Step.OutputVariables.Store(key, stringutil.NewKeyValue(key, value).String())
+	n.inner.State.OutputVariables.Store(key, stringutil.NewKeyValue(key, value).String())
 }
 
 func (n *Data) Finish() {
@@ -368,7 +392,7 @@ func (n *Data) SetExitCode(exitCode int) {
 	n.inner.State.ExitCode = exitCode
 }
 
-func (n *Data) ClearState() {
+func (n *Data) ClearState(s digraph.Step) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -376,6 +400,9 @@ func (n *Data) ClearState() {
 	children := n.inner.State.Children
 	n.inner.State = NodeState{}
 	n.inner.State.Children = children
+
+	// Reset the state of the step
+	n.inner.Step = s
 }
 
 func (n *Data) MarkError(err error) {

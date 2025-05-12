@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -131,7 +133,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 
 	// If one of the conditions does not met, cancel the execution.
 	env := digraph.GetEnv(ctx)
-	if err := EvalConditions(ctx, env.DAG.Preconditions); err != nil {
+	if err := EvalConditions(ctx, cmdutil.GetShellCommand(""), env.DAG.Preconditions); err != nil {
 		logger.Info(ctx, "Preconditions are not met", "err", err)
 		sc.Cancel(ctx, graph)
 	}
@@ -216,10 +218,13 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 				// Check preconditions
 				if len(node.Step().Preconditions) > 0 {
 					logger.Infof(ctx, "Checking preconditions for \"%s\"", node.Name())
-					if err := EvalConditions(ctx, node.Step().Preconditions); err != nil {
+					shell := cmdutil.GetShellCommand(node.Step().Shell)
+					if err := EvalConditions(ctx, shell, node.Step().Preconditions); err != nil {
 						logger.Infof(ctx, "Preconditions failed for \"%s\"", node.Name())
 						node.SetStatus(NodeStatusSkipped)
-						node.SetError(err)
+						if !errors.Is(err, ErrConditionNotMet) {
+							node.SetError(err)
+						}
 						if progressCh != nil {
 							progressCh <- node
 						}
@@ -397,11 +402,11 @@ func (sc *Scheduler) setupEnviron(ctx context.Context, graph *ExecutionGraph, no
 		queue = append(queue, graph.To[curr]...)
 
 		node := graph.nodeByID[curr]
-		if node.Step().OutputVariables == nil {
+		if node.inner.State.OutputVariables == nil {
 			continue
 		}
 
-		env.LoadOutputVariables(node.Step().OutputVariables)
+		env.LoadOutputVariables(node.inner.State.OutputVariables)
 	}
 
 	return executor.WithEnv(ctx, env)
@@ -412,12 +417,11 @@ func (sc *Scheduler) setupEnvironEventHandler(ctx context.Context, graph *Execut
 
 	// get all output variables
 	for _, node := range graph.nodes {
-		nodeStep := node.Step()
-		if nodeStep.OutputVariables == nil {
+		if node.inner.State.OutputVariables == nil {
 			continue
 		}
 
-		env.LoadOutputVariables(nodeStep.OutputVariables)
+		env.LoadOutputVariables(node.inner.State.OutputVariables)
 	}
 
 	return executor.WithEnv(ctx, env)

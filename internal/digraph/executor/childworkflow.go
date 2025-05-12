@@ -34,26 +34,18 @@ var ErrWorkingDirNotExist = fmt.Errorf("working directory does not exist")
 func newChildWorkflow(
 	ctx context.Context, step digraph.Step,
 ) (Executor, error) {
-	config, err := EvalObject(ctx, struct {
+	cfg := struct {
 		Name   string
 		Params string
 	}{
 		Name:   step.ChildWorkflow.Name,
 		Params: step.ChildWorkflow.Params,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to substitute string fields: %w", err)
 	}
 
 	env := GetEnv(ctx)
-	dag, err := env.DB.GetDAG(ctx, config.Name)
+	dag, err := env.DB.GetDAG(ctx, cfg.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find child workflow %q: %w", config.Name, err)
-	}
-
-	dir, err := EvalString(ctx, step.Dir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to evaluate working directory: %w", err)
+		return nil, fmt.Errorf("failed to find child workflow %q: %w", cfg.Name, err)
 	}
 
 	if step.Dir != "" && !fileutil.FileExists(step.Dir) {
@@ -62,8 +54,8 @@ func newChildWorkflow(
 
 	return &childWorkflow{
 		dag:     dag,
-		params:  config.Params,
-		workDir: dir,
+		params:  cfg.Params,
+		workDir: step.Dir,
 	}, nil
 }
 

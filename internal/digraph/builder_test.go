@@ -132,7 +132,7 @@ func TestBuild(t *testing.T) {
 
 		th := testLoad(t, "preconditions.yaml")
 		assert.Len(t, th.Preconditions, 1)
-		assert.Equal(t, digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Preconditions[0])
+		assert.Equal(t, &digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Preconditions[0])
 	})
 	t.Run("MaxActiveRuns", func(t *testing.T) {
 		t.Parallel()
@@ -408,7 +408,7 @@ func TestBuildStep(t *testing.T) {
 		th := testLoad(t, "step_preconditions.yaml")
 		assert.Len(t, th.Steps, 1)
 		assert.Len(t, th.Steps[0].Preconditions, 1)
-		assert.Equal(t, digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Steps[0].Preconditions[0])
+		assert.Equal(t, &digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Steps[0].Preconditions[0])
 	})
 }
 

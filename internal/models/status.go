@@ -24,18 +24,19 @@ func NewStatusBuilder(dag *digraph.DAG) *StatusBuilder {
 // InitialStatus creates an initial Status object for the given DAG
 func InitialStatus(dag *digraph.DAG) Status {
 	return Status{
-		Name:       dag.Name,
-		Status:     scheduler.StatusNone,
-		PID:        PID(0),
-		Nodes:      FromSteps(dag.Steps),
-		OnExit:     nodeOrNil(dag.HandlerOn.Exit),
-		OnSuccess:  nodeOrNil(dag.HandlerOn.Success),
-		OnFailure:  nodeOrNil(dag.HandlerOn.Failure),
-		OnCancel:   nodeOrNil(dag.HandlerOn.Cancel),
-		Params:     strings.Join(dag.Params, " "),
-		ParamsList: dag.Params,
-		StartedAt:  stringutil.FormatTime(time.Time{}),
-		FinishedAt: stringutil.FormatTime(time.Time{}),
+		Name:          dag.Name,
+		Status:        scheduler.StatusNone,
+		PID:           PID(0),
+		Nodes:         FromSteps(dag.Steps),
+		OnExit:        nodeOrNil(dag.HandlerOn.Exit),
+		OnSuccess:     nodeOrNil(dag.HandlerOn.Success),
+		OnFailure:     nodeOrNil(dag.HandlerOn.Failure),
+		OnCancel:      nodeOrNil(dag.HandlerOn.Cancel),
+		Params:        strings.Join(dag.Params, " "),
+		ParamsList:    dag.Params,
+		StartedAt:     stringutil.FormatTime(time.Time{}),
+		FinishedAt:    stringutil.FormatTime(time.Time{}),
+		Preconditions: dag.Preconditions,
 	}
 }
 
@@ -113,6 +114,13 @@ func WithLogFilePath(logFilePath string) StatusOption {
 	}
 }
 
+// WithPreconditions returns a StatusOption that sets the preconditions
+func WithPreconditions(conditions []*digraph.Condition) StatusOption {
+	return func(s *Status) {
+		s.Preconditions = conditions
+	}
+}
+
 // Create builds a Status object for a workflow with the specified parameters
 func (f *StatusBuilder) Create(
 	workflowID string,
@@ -146,23 +154,24 @@ func StatusFromJSON(s string) (*Status, error) {
 
 // Status represents the complete execution state of a workflow
 type Status struct {
-	Root       digraph.WorkflowRef `json:"root,omitempty"`
-	Parent     digraph.WorkflowRef `json:"parent,omitempty"`
-	Name       string              `json:"name"`
-	WorkflowID string              `json:"workflowId"`
-	RunID      string              `json:"runId"`
-	Status     scheduler.Status    `json:"status"`
-	PID        PID                 `json:"pid,omitempty"`
-	Nodes      []*Node             `json:"nodes,omitempty"`
-	OnExit     *Node               `json:"onExit,omitempty"`
-	OnSuccess  *Node               `json:"onSuccess,omitempty"`
-	OnFailure  *Node               `json:"onFailure,omitempty"`
-	OnCancel   *Node               `json:"onCancel,omitempty"`
-	StartedAt  string              `json:"startedAt,omitempty"`
-	FinishedAt string              `json:"finishedAt,omitempty"`
-	Log        string              `json:"log,omitempty"`
-	Params     string              `json:"params,omitempty"`
-	ParamsList []string            `json:"paramsList,omitempty"`
+	Root          digraph.WorkflowRef  `json:"root,omitempty"`
+	Parent        digraph.WorkflowRef  `json:"parent,omitempty"`
+	Name          string               `json:"name"`
+	WorkflowID    string               `json:"workflowId"`
+	RunID         string               `json:"runId"`
+	Status        scheduler.Status     `json:"status"`
+	PID           PID                  `json:"pid,omitempty"`
+	Nodes         []*Node              `json:"nodes,omitempty"`
+	OnExit        *Node                `json:"onExit,omitempty"`
+	OnSuccess     *Node                `json:"onSuccess,omitempty"`
+	OnFailure     *Node                `json:"onFailure,omitempty"`
+	OnCancel      *Node                `json:"onCancel,omitempty"`
+	StartedAt     string               `json:"startedAt,omitempty"`
+	FinishedAt    string               `json:"finishedAt,omitempty"`
+	Log           string               `json:"log,omitempty"`
+	Params        string               `json:"params,omitempty"`
+	ParamsList    []string             `json:"paramsList,omitempty"`
+	Preconditions []*digraph.Condition `json:"preconditions,omitempty"`
 }
 
 // Workflow returns the execution reference for the current status

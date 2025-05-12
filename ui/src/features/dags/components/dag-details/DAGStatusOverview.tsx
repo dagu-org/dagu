@@ -103,8 +103,8 @@ function DAGStatusOverview({
 
   return (
     <div className="space-y-3">
-      {/* Status Section */}
-      <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
+      {/* Status Section - Desktop */}
+      <div className="hidden md:flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
         <div className="flex items-center gap-2">
           <StatusChip status={status.status} size="md">
             {status.statusLabel}
@@ -144,11 +144,55 @@ function DAGStatusOverview({
         )}
       </div>
 
+      {/* Status Section - Mobile */}
+      <div className="md:hidden border-b border-slate-200 dark:border-slate-700 pb-2 space-y-2">
+        <div>
+          <StatusChip status={status.status} size="md">
+            {status.statusLabel}
+          </StatusChip>
+        </div>
+
+        {status.pid && (
+          <div className="flex items-center text-xs text-slate-500 dark:text-slate-400">
+            <Terminal className="h-3 w-3 mr-0.5" />
+            <span>PID: {status.pid}</span>
+          </div>
+        )}
+
+        {status.workflowId && (
+          <div className="space-y-1">
+            <div className="flex items-center">
+              <Hash className="h-3 w-3 mr-0.5 text-slate-500 dark:text-slate-400" />
+              <span className="text-xs font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-300">
+                {status.workflowId}
+              </span>
+            </div>
+
+            <div>
+              <a
+                href={url}
+                onClick={(e) => {
+                  if (!(e.metaKey || e.ctrlKey) && onViewLog) {
+                    e.preventDefault();
+                    onViewLog(status.workflowId);
+                  }
+                }}
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-200 cursor-pointer"
+                title="Click to view log (Cmd/Ctrl+Click to open in new tab)"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                <span>View Log</span>
+              </a>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Timing Information */}
       <div className="border-b border-slate-200 dark:border-slate-700 pb-2">
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-col md:flex-row flex-wrap items-start gap-1">
           <div className="flex items-center">
-            <Calendar className="h-3.5 w-3.5 mr-1 text-slate-500 dark:text-slate-400" />
+            <Calendar className="w-3.5 mr-1 text-slate-500 dark:text-slate-400" />
             <LabeledItem label="Started">
               <span className="font-medium text-slate-700 dark:text-slate-300 text-xs">
                 {formatTimestamp(status.startedAt)}
@@ -157,7 +201,7 @@ function DAGStatusOverview({
           </div>
 
           <div className="flex items-center">
-            <Clock className="h-3.5 w-3.5 mr-1 text-slate-500 dark:text-slate-400" />
+            <Clock className="w-3.5 mr-1 text-slate-500 dark:text-slate-400" />
             <LabeledItem label="Finished">
               <span className="font-medium text-slate-700 dark:text-slate-300 text-xs">
                 {formatTimestamp(status.finishedAt)}
@@ -166,7 +210,7 @@ function DAGStatusOverview({
           </div>
 
           <div className="flex items-center">
-            <Timer className="h-3.5 w-3.5 mr-1 text-slate-500 dark:text-slate-400" />
+            <Timer className="w-3.5 mr-1 text-slate-500 dark:text-slate-400" />
             <LabeledItem label="Duration">
               <span className="font-medium text-slate-700 dark:text-slate-300 text-xs">
                 {calculateDuration()}
@@ -249,9 +293,9 @@ function DAGStatusOverview({
         </div>
 
         {/* Progress bar */}
-        {totalNodes > 0 && (
+        {totalNodes && totalNodes > 0 && (
           <div className="mt-1.5 h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-            {nodeStatus.finished && (
+            {nodeStatus?.finished && (
               <div
                 className="h-full bg-green-500 float-left"
                 style={{
@@ -302,6 +346,34 @@ function DAGStatusOverview({
           </div>
         )}
       </div>
+
+      {/* Workflow-level Precondition Errors */}
+      {status.preconditions?.some(
+        (cond: components['schemas']['Condition']) => cond.error
+      ) && (
+        <div className="border-b border-slate-200 dark:border-slate-700 pb-2">
+          <div className="flex items-center mb-1">
+            <Info className="h-3.5 w-3.5 mr-1 text-amber-500 dark:text-amber-400" />
+            <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+              Workflow Precondition Unmet
+            </span>
+          </div>
+          <div className="space-y-2">
+            {status.preconditions
+              ?.filter((cond: components['schemas']['Condition']) => cond.error)
+              .map((cond: components['schemas']['Condition'], idx: number) => (
+                <div
+                  key={idx}
+                  className="p-1.5 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800 rounded-md text-xs text-amber-600 dark:text-amber-400 font-medium"
+                >
+                  <div className="mb-0.5">Condition: {cond.condition}</div>
+                  <div className="mb-0.5">Expected: {cond.expected}</div>
+                  <div>Error: {cond.error}</div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
 
       {/* Parameters */}
       {status.params && (
