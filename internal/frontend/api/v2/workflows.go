@@ -10,6 +10,10 @@ import (
 	"github.com/dagu-org/dagu/internal/fileutil"
 )
 
+func (a *API) ListWorkflows(ctx context.Context, request api.ListWorkflowsRequestObject) (api.ListWorkflowsResponseObject, error) {
+	panic("unimplemented")
+}
+
 func (a *API) GetWorkflowLog(ctx context.Context, request api.GetWorkflowLogRequestObject) (api.GetWorkflowLogResponseObject, error) {
 	dagName := request.Name
 	workflowId := request.WorkflowId
