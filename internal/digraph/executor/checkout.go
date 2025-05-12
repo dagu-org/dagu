@@ -74,10 +74,6 @@ func (g *gitCheckoutExecAuthConfigDefinition) httpAuthMethod() (transport.AuthMe
 		g.Password = os.Getenv(g.TokenEnv)
 	}
 
-	if len(g.UserName) == 0 || len(g.Password) == 0 {
-		return nil, errGitCheckoutAuthConfigInvalid
-	}
-
 	return &gitHttp.BasicAuth{
 		Username: g.UserName,
 		Password: g.Password,
