@@ -66,6 +66,7 @@ func (g *gitCheckoutExecConfigDefinition) getRepoCachePath() string {
 	// file://github.com/dagu-org/dagu.git -> github.com/dagu-org/dagu.git
 	re := regexp.MustCompile(`^(https?://|git@|file:////)`)
 	cleaned := re.ReplaceAllString(g.Repo, "")
+	cleaned = strings.ReplaceAll(cleaned, ":", "/")
 	cacheDir := filepath.Join(homeDir, ".cache", "dagu", "git")
 
 	return filepath.Join(cacheDir, cleaned)
