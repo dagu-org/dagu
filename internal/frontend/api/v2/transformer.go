@@ -58,8 +58,9 @@ func toStep(obj digraph.Step) api.Step {
 
 func toPrecondition(obj digraph.Condition) api.Condition {
 	return api.Condition{
-		Condition: ptrOf(obj.Condition),
+		Condition: obj.Condition,
 		Expected:  ptrOf(obj.Expected),
+		Error:     ptrOf(obj.Error),
 	}
 }
 

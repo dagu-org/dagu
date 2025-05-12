@@ -111,10 +111,11 @@ func TestCondition_Eval(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := scheduler.EvalConditions(context.Background(), tt.condition)
+			err := scheduler.EvalConditions(context.Background(), "", tt.condition)
 			require.Equal(t, tt.wantErr, err != nil)
 			if err != nil {
 				require.ErrorIs(t, err, scheduler.ErrConditionNotMet)
+				require.NotEmpty(t, tt.condition[0].Error)
 			}
 		})
 	}

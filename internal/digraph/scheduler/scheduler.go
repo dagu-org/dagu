@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -131,7 +132,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 
 	// If one of the conditions does not met, cancel the execution.
 	env := digraph.GetEnv(ctx)
-	if err := EvalConditions(ctx, env.DAG.Preconditions); err != nil {
+	if err := EvalConditions(ctx, cmdutil.GetShellCommand(""), env.DAG.Preconditions); err != nil {
 		logger.Info(ctx, "Preconditions are not met", "err", err)
 		sc.Cancel(ctx, graph)
 	}
@@ -216,7 +217,8 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 				// Check preconditions
 				if len(node.Step().Preconditions) > 0 {
 					logger.Infof(ctx, "Checking preconditions for \"%s\"", node.Name())
-					if err := EvalConditions(ctx, node.Step().Preconditions); err != nil {
+					shell := cmdutil.GetShellCommand(node.Step().Shell)
+					if err := EvalConditions(ctx, shell, node.Step().Preconditions); err != nil {
 						logger.Infof(ctx, "Preconditions failed for \"%s\"", node.Name())
 						node.SetStatus(NodeStatusSkipped)
 						node.SetError(err)

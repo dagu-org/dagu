@@ -11,6 +11,7 @@ import (
 type Condition struct {
 	Condition string `json:"condition,omitempty"` // Condition to evaluate
 	Expected  string `json:"expected,omitempty"`  // Expected value
+	Error     string `json:"error,omitempty"`     // Error message if the condition is not met
 }
 
 func (c Condition) Validate() error {
