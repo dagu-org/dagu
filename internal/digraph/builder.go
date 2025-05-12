@@ -398,13 +398,13 @@ func buildPrecondition(ctx BuildContext, spec *definition, dag *DAG) error {
 	return nil
 }
 
-func parsePrecondition(ctx BuildContext, precondition any) ([]Condition, error) {
+func parsePrecondition(ctx BuildContext, precondition any) ([]*Condition, error) {
 	switch v := precondition.(type) {
 	case nil:
 		return nil, nil
 
 	case string:
-		return []Condition{{Condition: v}}, nil
+		return []*Condition{{Condition: v}}, nil
 
 	case map[string]any:
 		var ret Condition
@@ -441,10 +441,10 @@ func parsePrecondition(ctx BuildContext, precondition any) ([]Condition, error) 
 			return nil, wrapError("preconditions", v, err)
 		}
 
-		return []Condition{ret}, nil
+		return []*Condition{&ret}, nil
 
 	case []any:
-		var ret []Condition
+		var ret []*Condition
 		for _, vv := range v {
 			parsed, err := parsePrecondition(ctx, vv)
 			if err != nil {

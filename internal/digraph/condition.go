@@ -1,7 +1,9 @@
 package digraph
 
 import (
+	"encoding/json"
 	"fmt"
+	"sync"
 )
 
 // Condition contains a condition and the expected value.
@@ -9,14 +11,42 @@ import (
 // The condition can be a command substitution or an environment variable.
 // The expected value must be a string without any substitutions.
 type Condition struct {
-	Condition string `json:"condition,omitempty"` // Condition to evaluate
-	Expected  string `json:"expected,omitempty"`  // Expected value
-	Error     string `json:"error,omitempty"`     // Error message if the condition is not met
+	mu sync.Mutex
+
+	Condition    string // Condition to evaluate
+	Expected     string // Expected value
+	errorMessage string // Error message if the condition is not met
 }
 
-func (c Condition) Validate() error {
+func (c *Condition) MarshalJSON() ([]byte, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return json.Marshal(struct {
+		Condition    string `json:"condition,omitempty"`
+		Expected     string `json:"expected,omitempty"`
+		ErrorMessage string `json:"error,omitempty"`
+	}{
+		Condition:    c.Condition,
+		Expected:     c.Expected,
+		ErrorMessage: c.errorMessage,
+	})
+}
+
+func (c *Condition) Validate() error {
 	if c.Condition == "" {
 		return fmt.Errorf("condition is required")
 	}
 	return nil
+}
+
+func (c *Condition) SetErrorMessage(msg string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.errorMessage = msg
+}
+
+func (c *Condition) GetErrorMessage() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.errorMessage
 }

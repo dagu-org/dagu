@@ -28,6 +28,7 @@ func EvalObject[T any](ctx context.Context, obj T) (T, error) {
 	v := reflect.ValueOf(obj)
 
 	// Handle different types
+	// nolint:exhaustive
 	switch v.Kind() {
 	case reflect.Struct:
 		// Use the existing cmdutil.EvalStringFields for structs
@@ -66,6 +67,7 @@ func processMap(ctx context.Context, v reflect.Value, vars map[string]string) (r
 		var newVal reflect.Value
 		var err error
 
+		// nolint:exhaustive
 		switch val.Kind() {
 		case reflect.String:
 			// Evaluate string values using cmdutil.EvalString

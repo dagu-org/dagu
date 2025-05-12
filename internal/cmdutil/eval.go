@@ -151,6 +151,7 @@ func EvalStringFields[T any](ctx context.Context, obj T, opts ...EvalOption) (T,
 	v := reflect.ValueOf(obj)
 
 	// Handle different types
+	// nolint:exhaustive
 	switch v.Kind() {
 	case reflect.Struct:
 		modified := reflect.New(v.Type()).Elem()

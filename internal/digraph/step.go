@@ -49,7 +49,7 @@ type Step struct {
 	// MailOnError is the flag to send mail on error.
 	MailOnError bool `json:"mailOnError,omitempty"`
 	// Preconditions contains the conditions to be met before running the step.
-	Preconditions []Condition `json:"preconditions,omitempty"`
+	Preconditions []*Condition `json:"preconditions,omitempty"`
 	// SignalOnStop is the signal to send on stop.
 	SignalOnStop string `json:"signalOnStop,omitempty"`
 	// ChildWorkflow contains the information about a child workflow to be executed.

@@ -135,7 +135,7 @@ func TestScheduler(t *testing.T) {
 			newStep("2",
 				withDepends("1"),
 				withCommand("false"),
-				withPrecondition(digraph.Condition{
+				withPrecondition(&digraph.Condition{
 					Condition: "`echo 1`",
 					Expected:  "0",
 				}),
@@ -397,7 +397,7 @@ func TestScheduler(t *testing.T) {
 		graph := sc.newGraph(t,
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
-				withPrecondition(digraph.Condition{
+				withPrecondition(&digraph.Condition{
 					Condition: "`echo 1`",
 					Expected:  "1",
 				}),
@@ -418,7 +418,7 @@ func TestScheduler(t *testing.T) {
 		graph := sc.newGraph(t,
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
-				withPrecondition(digraph.Condition{
+				withPrecondition(&digraph.Condition{
 					Condition: "`echo 1`",
 					Expected:  "0",
 				})),
@@ -439,7 +439,7 @@ func TestScheduler(t *testing.T) {
 		graph := sc.newGraph(t,
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
-				withPrecondition(digraph.Condition{
+				withPrecondition(&digraph.Condition{
 					Condition: "true",
 				})),
 			successStep("3", "2"),
@@ -458,7 +458,7 @@ func TestScheduler(t *testing.T) {
 		graph := sc.newGraph(t,
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
-				withPrecondition(digraph.Condition{
+				withPrecondition(&digraph.Condition{
 					Condition: "false",
 				})),
 			successStep("3", "2"),
@@ -814,9 +814,9 @@ func withRepeatPolicy(repeat bool, interval time.Duration) stepOption {
 	}
 }
 
-func withPrecondition(condition digraph.Condition) stepOption {
+func withPrecondition(condition *digraph.Condition) stepOption {
 	return func(step *digraph.Step) {
-		step.Preconditions = []digraph.Condition{condition}
+		step.Preconditions = []*digraph.Condition{condition}
 	}
 }
 

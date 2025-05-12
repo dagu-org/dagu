@@ -25,8 +25,8 @@ func toDAG(dag *digraph.DAG) api.DAG {
 
 func toStep(obj digraph.Step) api.Step {
 	var conditions []api.Condition
-	for _, cond := range obj.Preconditions {
-		conditions = append(conditions, toPrecondition(cond))
+	for i := range obj.Preconditions {
+		conditions = append(conditions, toPrecondition(obj.Preconditions[i]))
 	}
 
 	repeatPolicy := api.RepeatPolicy{
@@ -56,11 +56,11 @@ func toStep(obj digraph.Step) api.Step {
 	return step
 }
 
-func toPrecondition(obj digraph.Condition) api.Condition {
+func toPrecondition(obj *digraph.Condition) api.Condition {
 	return api.Condition{
 		Condition: obj.Condition,
 		Expected:  ptrOf(obj.Expected),
-		Error:     ptrOf(obj.Error),
+		Error:     ptrOf(obj.GetErrorMessage()),
 	}
 }
 

@@ -75,7 +75,7 @@ func TestAgent_Run(t *testing.T) {
 		dag := th.DAG(t, "agent/multiple_steps.yaml")
 
 		// Set a precondition that always fails
-		dag.Preconditions = []digraph.Condition{
+		dag.Preconditions = []*digraph.Condition{
 			{Condition: "`echo 1`", Expected: "0"},
 		}
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"sync"
 	"time"
 )
 
@@ -129,22 +130,28 @@ type Auth struct {
 
 // AuthBasic represents the basic authentication configuration
 type AuthBasic struct {
+	mu       sync.RWMutex
 	Username string
 	Password string
 }
 
 // Enabled checks if basic authentication is enabled
 func (cfg *AuthBasic) Enabled() bool {
+	cfg.mu.RLock()
+	defer cfg.mu.RUnlock()
 	return cfg.Username != "" && cfg.Password != ""
 }
 
 // AuthToken represents the authentication token configuration
 type AuthToken struct {
+	mu    sync.RWMutex
 	Value string
 }
 
 // Enabled checks if the authentication token is enabled
 func (cfg *AuthToken) Enabled() bool {
+	cfg.mu.RLock()
+	defer cfg.mu.RUnlock()
 	return cfg.Value != ""
 }
 

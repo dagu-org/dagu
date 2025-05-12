@@ -128,8 +128,8 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 	}
 
 	var preconditions []api.Precondition
-	for _, p := range dag.Preconditions {
-		preconditions = append(preconditions, toPrecondition(p))
+	for i := range dag.Preconditions {
+		preconditions = append(preconditions, toPrecondition(dag.Preconditions[i]))
 	}
 
 	details := api.DAGDetails{
@@ -769,8 +769,8 @@ func toDAG(dag *digraph.DAG) api.DAG {
 
 func toStep(obj digraph.Step) api.Step {
 	var conditions []api.Precondition
-	for _, cond := range obj.Preconditions {
-		conditions = append(conditions, toPrecondition(cond))
+	for i := range obj.Preconditions {
+		conditions = append(conditions, toPrecondition(obj.Preconditions[i]))
 	}
 
 	repeatPolicy := api.RepeatPolicy{
@@ -800,7 +800,7 @@ func toStep(obj digraph.Step) api.Step {
 	return step
 }
 
-func toPrecondition(obj digraph.Condition) api.Precondition {
+func toPrecondition(obj *digraph.Condition) api.Precondition {
 	return api.Precondition{
 		Condition: ptrOf(obj.Condition),
 		Expected:  ptrOf(obj.Expected),

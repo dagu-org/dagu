@@ -23,7 +23,7 @@ func TestStatusSerialization(t *testing.T) {
 				Dir: "dir", Command: "echo 1", Args: []string{},
 				Depends: []string{}, ContinueOn: digraph.ContinueOn{},
 				RetryPolicy: digraph.RetryPolicy{}, MailOnError: false,
-				RepeatPolicy: digraph.RepeatPolicy{}, Preconditions: []digraph.Condition{},
+				RepeatPolicy: digraph.RepeatPolicy{}, Preconditions: []*digraph.Condition{},
 			},
 		},
 		MailOn:    &digraph.MailOn{},

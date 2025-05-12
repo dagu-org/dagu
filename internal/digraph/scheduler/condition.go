@@ -20,24 +20,23 @@ const ErrMsgOtherConditionNotMet = "other condition was not met"
 
 // EvalConditions evaluates a list of conditions and checks the results.
 // It returns an error if any of the conditions were not met.
-func EvalConditions(ctx context.Context, shell string, cond []digraph.Condition) error {
+func EvalConditions(ctx context.Context, shell string, cond []*digraph.Condition) error {
 	var lastErr error
 
-	for i, c := range cond {
-		if err := evalCondition(ctx, shell, c); err != nil {
-			cond[i].Error = err.Error()
-			c.Error = err.Error()
+	for i := range cond {
+		if err := evalCondition(ctx, shell, cond[i]); err != nil {
+			cond[i].SetErrorMessage(err.Error())
 			lastErr = err
 		}
 	}
 
 	if lastErr != nil {
 		// Set error message
-		for i, c := range cond {
-			if c.Error != "" {
+		for i := range cond {
+			if cond[i].GetErrorMessage() != "" {
 				continue
 			}
-			cond[i].Error = ErrMsgOtherConditionNotMet
+			cond[i].SetErrorMessage(ErrMsgOtherConditionNotMet)
 		}
 	}
 
@@ -46,7 +45,7 @@ func EvalConditions(ctx context.Context, shell string, cond []digraph.Condition)
 
 // evalCondition evaluates the condition and returns the actual value.
 // It returns an error if the evaluation failed or the condition is invalid.
-func evalCondition(ctx context.Context, shell string, c digraph.Condition) error {
+func evalCondition(ctx context.Context, shell string, c *digraph.Condition) error {
 	switch {
 	case c.Condition != "" && c.Expected != "":
 		return matchCondition(ctx, c)
@@ -58,7 +57,7 @@ func evalCondition(ctx context.Context, shell string, c digraph.Condition) error
 
 // matchCondition evaluates the condition and checks if it matches the expected value.
 // It returns an error if the condition was not met.
-func matchCondition(ctx context.Context, c digraph.Condition) error {
+func matchCondition(ctx context.Context, c *digraph.Condition) error {
 	evaluatedVal, err := EvalString(ctx, c.Condition)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate the value: Error=%v", err)
@@ -70,7 +69,7 @@ func matchCondition(ctx context.Context, c digraph.Condition) error {
 	return fmt.Errorf("%w: expected %q, got %q", ErrConditionNotMet, c.Expected, evaluatedVal)
 }
 
-func evalCommand(ctx context.Context, shell string, c digraph.Condition) error {
+func evalCommand(ctx context.Context, shell string, c *digraph.Condition) error {
 	commandToRun, err := EvalString(ctx, c.Condition, cmdutil.OnlyReplaceVars())
 	if err != nil {
 		return fmt.Errorf("failed to evaluate command: %w", err)

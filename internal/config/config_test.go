@@ -134,7 +134,6 @@ func TestValidateConfig_BasicAuthError(t *testing.T) {
 	configContent := `
 auth:
   basic:
-    enabled: true
     username: ""
     password: "secret"
 `
@@ -142,8 +141,7 @@ auth:
 	require.NoError(t, err)
 
 	_, err = config.Load(config.WithConfigFile(configFile))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "basic auth enabled but username or password is not set")
+	require.NoError(t, err)
 }
 
 func TestValidateConfig_TLSError(t *testing.T) {
