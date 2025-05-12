@@ -307,3 +307,71 @@ func TestGitCheckoutWithCache(t *testing.T) {
 		t.Fatalf("failed to clean up: %v", err)
 	}
 }
+
+type repoCachePathTestcase struct {
+	msg        string
+	repo       string
+	expectRepo string
+}
+
+func getRepoCachePathTestcaseList() []*repoCachePathTestcase {
+	var (
+		err        error
+		homeDir    string
+		expectRepo string
+	)
+
+	if homeDir, err = os.UserHomeDir(); err != nil {
+		if os.PathSeparator == '\\' {
+			homeDir = "C:\\Users\\Default"
+		} else {
+			homeDir = "/home/default"
+		}
+	}
+
+	expectRepo = filepath.Join(homeDir, ".cache", "dagu", "git", "github.com", "dagu", "dagu.git")
+
+	return []*repoCachePathTestcase{
+		{
+			msg:        "https protocol",
+			repo:       "https://github.com/dagu/dagu.git",
+			expectRepo: expectRepo,
+		},
+		{
+			msg:        "http protocol",
+			repo:       "http://github.com/dagu/dagu.git",
+			expectRepo: expectRepo,
+		},
+		{
+			msg:        "ssh protocol",
+			repo:       "git@github.com:dagu/dagu.git",
+			expectRepo: expectRepo,
+		},
+		{
+			msg:        "file protocol",
+			repo:       "file:////github.com/dagu/dagu.git",
+			expectRepo: expectRepo,
+		},
+	}
+}
+
+func TestGetRepoCachePath(t *testing.T) {
+	var (
+		testCases = getRepoCachePathTestcaseList()
+	)
+
+	for _, testCase := range testCases {
+		t.Run(testCase.msg, func(t *testing.T) {
+			var (
+				def = &gitCheckoutExecConfigDefinition{
+					Repo: testCase.repo,
+				}
+				result = def.getRepoCachePath()
+			)
+
+			if result != testCase.expectRepo {
+				t.Fatalf("expected %s, got %s", testCase.expectRepo, result)
+			}
+		})
+	}
+}
