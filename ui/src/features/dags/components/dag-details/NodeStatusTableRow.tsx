@@ -314,7 +314,7 @@ function NodeStatusTableRow({
           {node.step.preconditions?.some((cond) => cond.error) && (
             <div className="mt-2">
               <div className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-1">
-                Precondition Errors:
+                Precondition Unmet:
               </div>
               {node.step.preconditions
                 .filter((cond) => cond.error)
@@ -468,7 +468,7 @@ function NodeStatusTableRow({
           {node.step.preconditions?.some((cond) => cond.error) && (
             <div>
               <div className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-1">
-                Precondition Errors:
+                Precondition Unmet:
               </div>
               {node.step.preconditions
                 .filter((cond) => cond.error)

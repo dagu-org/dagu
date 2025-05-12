@@ -190,9 +190,9 @@ function DAGStatusOverview({
 
       {/* Timing Information */}
       <div className="border-b border-slate-200 dark:border-slate-700 pb-2">
-        <div className="flex flex-col md:flex-row flex-wrap items-center md:items-start gap-4">
+        <div className="flex flex-col md:flex-row flex-wrap items-start gap-1">
           <div className="flex items-center">
-            <Calendar className="h-3.5 w-3.5 mr-1 text-slate-500 dark:text-slate-400" />
+            <Calendar className="w-3.5 mr-1 text-slate-500 dark:text-slate-400" />
             <LabeledItem label="Started">
               <span className="font-medium text-slate-700 dark:text-slate-300 text-xs">
                 {formatTimestamp(status.startedAt)}
@@ -201,7 +201,7 @@ function DAGStatusOverview({
           </div>
 
           <div className="flex items-center">
-            <Clock className="h-3.5 w-3.5 mr-1 text-slate-500 dark:text-slate-400" />
+            <Clock className="w-3.5 mr-1 text-slate-500 dark:text-slate-400" />
             <LabeledItem label="Finished">
               <span className="font-medium text-slate-700 dark:text-slate-300 text-xs">
                 {formatTimestamp(status.finishedAt)}
@@ -210,7 +210,7 @@ function DAGStatusOverview({
           </div>
 
           <div className="flex items-center">
-            <Timer className="h-3.5 w-3.5 mr-1 text-slate-500 dark:text-slate-400" />
+            <Timer className="w-3.5 mr-1 text-slate-500 dark:text-slate-400" />
             <LabeledItem label="Duration">
               <span className="font-medium text-slate-700 dark:text-slate-300 text-xs">
                 {calculateDuration()}
@@ -355,7 +355,7 @@ function DAGStatusOverview({
           <div className="flex items-center mb-1">
             <Info className="h-3.5 w-3.5 mr-1 text-amber-500 dark:text-amber-400" />
             <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
-              Workflow Precondition Errors
+              Workflow Precondition Unmet
             </span>
           </div>
           <div className="space-y-2">

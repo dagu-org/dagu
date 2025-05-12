@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -221,7 +222,9 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 					if err := EvalConditions(ctx, shell, node.Step().Preconditions); err != nil {
 						logger.Infof(ctx, "Preconditions failed for \"%s\"", node.Name())
 						node.SetStatus(NodeStatusSkipped)
-						node.SetError(err)
+						if !errors.Is(err, ErrConditionNotMet) {
+							node.SetError(err)
+						}
 						if progressCh != nil {
 							progressCh <- node
 						}
