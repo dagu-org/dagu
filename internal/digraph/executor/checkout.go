@@ -16,7 +16,7 @@ import (
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport"
-	gitHttp "github.com/go-git/go-git/v5/plumbing/transport/http"
+	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/go-git/go-git/v5/storage/filesystem"
 	"github.com/go-viper/mapstructure/v2"
@@ -65,14 +65,14 @@ func (g *gitCheckoutExecConfigDefinition) getRepoCachePath() string {
 	// git@github.com:dagu-org/dagu.git -> github.com/dagu-org/dagu.git
 	// file://github.com/dagu-org/dagu.git -> github.com/dagu-org/dagu.git
 
-	repo := strings.TrimPrefix(g.Repo, "https://")
-	repo = strings.TrimPrefix(g.Repo, "http://")
-	repo = strings.TrimPrefix(repo, "git@")
-	repo = strings.TrimPrefix(repo, "file:////")
+	repoName := strings.TrimPrefix(g.Repo, "https://")
+	repoName = strings.TrimPrefix(g.Repo, "http://")
+	repoName = strings.TrimPrefix(repoName, "git@")
+	repoName = strings.TrimPrefix(repoName, "file:////")
 
 	cacheDir := filepath.Join(homeDir, ".cache", "dagu", "git")
 
-	return filepath.Join(cacheDir, repo)
+	return filepath.Join(cacheDir, repoName)
 }
 
 type gitCheckoutExecAuthConfigDefinition struct {
@@ -92,7 +92,7 @@ func (g *gitCheckoutExecAuthConfigDefinition) httpAuthMethod() (transport.AuthMe
 		g.Password = os.Getenv(g.TokenEnv)
 	}
 
-	return &gitHttp.BasicAuth{
+	return &githttp.BasicAuth{
 		Username: g.UserName,
 		Password: g.Password,
 	}, nil
@@ -482,9 +482,5 @@ func (g *gitCheckout) Run(ctx context.Context) error {
 		return err
 	}
 
-	if err = g.saveCache(); err != nil {
-		return err
-	}
-
-	return nil
+	return g.saveCache()
 }
