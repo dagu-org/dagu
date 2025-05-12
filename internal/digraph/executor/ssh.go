@@ -63,7 +63,7 @@ func selectSSHAuthMethod(cfg *sshExecConfig) (ssh.AuthMethod, error) {
 	return ssh.Password(cfg.Password), nil
 }
 
-func newSSHExec(ctx context.Context, step digraph.Step) (Executor, error) {
+func newSSHExec(_ context.Context, step digraph.Step) (Executor, error) {
 	def := new(sshExecConfigDefinition)
 	md, err := mapstructure.NewDecoder(
 		&mapstructure.DecoderConfig{Result: def, WeaklyTypedInput: true},

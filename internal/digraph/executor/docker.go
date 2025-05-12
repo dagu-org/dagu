@@ -71,7 +71,7 @@ func boolToPullPolicy(b bool) PullPolicy {
 	return PullPolicyNever
 }
 
-func parsePullPolicy(ctx context.Context, raw any) (PullPolicy, error) {
+func parsePullPolicy(_ context.Context, raw any) (PullPolicy, error) {
 	switch value := raw.(type) {
 	case string:
 		// Try to parse the string as a pull policy

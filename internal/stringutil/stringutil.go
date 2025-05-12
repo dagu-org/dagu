@@ -40,7 +40,7 @@ func TruncString(val string, max int) string {
 }
 
 // ParseBool parses a boolean value from the given input.
-func ParseBool(ctx context.Context, value any) (bool, error) {
+func ParseBool(_ context.Context, value any) (bool, error) {
 	switch v := value.(type) {
 	case string:
 		return strconv.ParseBool(v)

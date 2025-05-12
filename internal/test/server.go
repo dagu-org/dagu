@@ -68,8 +68,7 @@ type APIClient struct {
 
 // baseURL returns the base URL for the server
 func (c *APIClient) baseURL() string {
-	cfg := c.server.Config.Server
-	return fmt.Sprintf("http://%s:%d", cfg.Host, cfg.Port)
+	return fmt.Sprintf("http://%s:%d", c.server.Config.Server.Host, c.server.Config.Server.Port)
 }
 
 // Request represents an HTTP request being prepared

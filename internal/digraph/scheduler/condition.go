@@ -74,7 +74,7 @@ func evalCommand(ctx context.Context, shell string, c *digraph.Condition) error 
 	if err != nil {
 		return fmt.Errorf("failed to evaluate command: %w", err)
 	}
-	if shell := cmdutil.GetShellCommand(""); shell != "" {
+	if shell != "" {
 		return runShellCommand(ctx, shell, commandToRun)
 	}
 	return runDirectCommand(ctx, commandToRun)

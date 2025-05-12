@@ -248,6 +248,7 @@ func processMap(ctx context.Context, v reflect.Value, opts *EvalOptions) (reflec
 			val = val.Elem()
 		}
 
+		// nolint:exhaustive
 		switch val.Kind() {
 		case reflect.String:
 			// Evaluate string values

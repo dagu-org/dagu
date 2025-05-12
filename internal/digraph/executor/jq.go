@@ -27,7 +27,7 @@ type jqConfig struct {
 	Raw bool `mapstructure:"raw"`
 }
 
-func newJQ(ctx context.Context, step digraph.Step) (Executor, error) {
+func newJQ(_ context.Context, step digraph.Step) (Executor, error) {
 	var jqCfg jqConfig
 	if step.ExecutorConfig.Config != nil {
 		if err := decodeJqConfig(

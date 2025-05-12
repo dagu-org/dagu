@@ -179,7 +179,7 @@ func decodeHTTPConfig(dat map[string]any, cfg *httpConfig) error {
 	return md.Decode(dat)
 }
 
-func decodeHTTPConfigFromString(ctx context.Context, source string, target *httpConfig) error {
+func decodeHTTPConfigFromString(_ context.Context, source string, target *httpConfig) error {
 	if len(source) > 0 {
 		if err := json.Unmarshal([]byte(source), &target); err != nil {
 			return err
