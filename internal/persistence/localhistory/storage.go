@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -75,74 +76,138 @@ func New(baseDir string, opts ...HistoryStorageOption) models.HistoryRepository 
 	}
 }
 
+// ListStatuses retrieves status records based on the provided options.
+// It supports filtering by time range, status, and limiting the number of results.
 func (db *localStorage) ListStatuses(ctx context.Context, opts ...models.ListRunOption) ([]*models.Status, error) {
-	select {
-	case <-ctx.Done():
-		return nil, fmt.Errorf("ListRuns canceled: %w", ctx.Err())
-	default:
-		// Continue with operation
+	// Apply options and set defaults
+	options, err := prepareListOptions(opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare options: %w", err)
 	}
 
-	var options models.ListRunsOptions
-	for _, opt := range opts {
-		opt(&options)
-	}
-
-	// By default, we list today's runs
-	if options.From.IsZero() && options.To.IsZero() {
-		options.From = models.NewUTC(time.Now().Truncate(24 * time.Hour))
-	}
-
-	const maxLimit = 300
-	if options.Limit == 0 || options.Limit > maxLimit {
-		options.Limit = maxLimit
-	}
-
+	// Get all root directories
 	rootDirs, err := db.listRoot(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list root directories: %w", err)
 	}
 
-	statusFilter := make(map[scheduler.Status]struct{})
-	for _, status := range options.Statuses {
-		statusFilter[status] = struct{}{}
+	// Collect and filter results
+	return db.collectStatusesFromRoots(ctx, rootDirs, options)
+}
+
+// prepareListOptions processes the provided options and sets default values.
+func prepareListOptions(opts []models.ListRunOption) (models.ListRunsOptions, error) {
+	var options models.ListRunsOptions
+
+	// Apply all options
+	for _, opt := range opts {
+		opt(&options)
 	}
 
+	// Set default time range if not specified
+	if options.From.IsZero() && options.To.IsZero() {
+		options.From = models.NewUTC(time.Now().Truncate(24 * time.Hour))
+	}
+
+	// Enforce a reasonable limit on the number of results
+	const maxLimit = 300
+	if options.Limit == 0 || options.Limit > maxLimit {
+		options.Limit = maxLimit
+	}
+
+	return options, nil
+}
+
+// collectStatusesFromRoots gathers statuses from root directories according to the options.
+func (db *localStorage) collectStatusesFromRoots(
+	ctx context.Context,
+	rootDirs []DataRoot,
+	options models.ListRunsOptions,
+) ([]*models.Status, error) {
 	var results []*models.Status
 	limit := options.Limit
+
+	// Build a map for efficient status filtering
+	statusFilter := buildStatusFilter(options.Statuses)
+	hasStatusFilter := len(statusFilter) > 0
+
+	// Process each root directory
 	for _, root := range rootDirs {
+		// Check for context cancellation
+		if err := ctx.Err(); err != nil {
+			return results, fmt.Errorf("ListStatuses interrupted: %w", err)
+		}
+
+		// Get workflows in the specified range
 		workflows := root.listInRange(ctx, options.From, options.To, &listInRangeOpts{
 			statuses: options.Statuses,
 			limit:    limit,
 		})
+
+		// Process each workflow
 		for _, workflow := range workflows {
-			run, err := workflow.LatestRun(ctx, db.cache)
+			status, err := db.getWorkflowStatus(ctx, workflow)
 			if err != nil {
-				logger.Error(ctx, "Failed to get latest record", "err", err)
+				// Log and continue to next workflow
+				logger.Error(ctx, "Failed to get workflow status",
+					"workflow", workflow.workflowID, "err", err)
 				continue
 			}
-			status, err := run.ReadStatus(ctx)
-			if err != nil {
-				logger.Error(ctx, "Failed to get status", "err", err)
+
+			// Apply status filtering if needed
+			if hasStatusFilter && !matchesStatusFilter(status.Status, statusFilter) {
 				continue
 			}
-			if len(statusFilter) >= 0 {
-				if _, ok := statusFilter[status.Status]; !ok {
-					continue
-				}
-			}
+
 			results = append(results, status)
 			limit--
 			if limit <= 0 {
-				break
+				return results, nil
 			}
-		}
-		if limit <= 0 {
-			break
 		}
 	}
 
+	// Sort results by started time
+	if len(results) > 1 {
+		sort.Slice(results, func(i, j int) bool {
+			return results[i].StartedAt > results[j].StartedAt
+		})
+	}
+
 	return results, nil
+}
+
+// getWorkflowStatus retrieves the status for a single workflow.
+func (db *localStorage) getWorkflowStatus(
+	ctx context.Context,
+	workflow *Workflow,
+) (*models.Status, error) {
+	run, err := workflow.LatestRun(ctx, db.cache)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest run: %w", err)
+	}
+
+	status, err := run.ReadStatus(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read status: %w", err)
+	}
+
+	return status, nil
+}
+
+// buildStatusFilter creates a map for efficient status lookup.
+func buildStatusFilter(statuses []scheduler.Status) map[scheduler.Status]struct{} {
+	filter := make(map[scheduler.Status]struct{})
+	for _, status := range statuses {
+		filter[status] = struct{}{}
+	}
+	return filter
+}
+
+// matchesStatusFilter checks if a status matches the filter.
+func matchesStatusFilter(status scheduler.Status, filter map[scheduler.Status]struct{}) bool {
+	_, ok := filter[status]
+	return ok
 }
 
 // CreateRun creates a new history record for the specified workflow ID.
