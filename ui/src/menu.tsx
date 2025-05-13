@@ -71,16 +71,16 @@ export const mainListItems = React.forwardRef<
           onClick={onNavItemClick}
         />
         <NavItem
-          to="/dags"
-          text="DAGs"
-          icon={<GitBranch size={18} />}
+          to="/workflows"
+          text="Workflows"
+          icon={<List size={18} />}
           isOpen={isOpen}
           onClick={onNavItemClick}
         />
         <NavItem
-          to="/workflows"
-          text="Workflows"
-          icon={<List size={18} />}
+          to="/dags"
+          text="DAGs"
+          icon={<GitBranch size={18} />}
           isOpen={isOpen}
           onClick={onNavItemClick}
         />
