@@ -40,6 +40,7 @@ type HistoryRepository interface {
 
 // ListStatusesOptions contains options for listing runs
 type ListStatusesOptions struct {
+	Name     string
 	From     TimeInUTC
 	To       TimeInUTC
 	Statuses []scheduler.Status
@@ -49,24 +50,31 @@ type ListStatusesOptions struct {
 // ListRunsOption is a functional option for configuring ListRunsOptions
 type ListStatusesOption func(*ListStatusesOptions)
 
-// WithFrom sets the start time for listing runs
+// WithFrom sets the start time for listing workflows
 func WithFrom(from TimeInUTC) ListStatusesOption {
 	return func(o *ListStatusesOptions) {
 		o.From = from
 	}
 }
 
-// WithTo sets the end time for listing runs
+// WithTo sets the end time for listing workflows
 func WithTo(to TimeInUTC) ListStatusesOption {
 	return func(o *ListStatusesOptions) {
 		o.To = to
 	}
 }
 
-// WithStatuses sets the statuses for listing runs
+// WithStatuses sets the statuses for listing workflows
 func WithStatuses(statuses []scheduler.Status) ListStatusesOption {
 	return func(o *ListStatusesOptions) {
 		o.Statuses = statuses
+	}
+}
+
+// WithName sets the name for listing workflows
+func WithName(name string) ListStatusesOption {
+	return func(o *ListStatusesOptions) {
+		o.Name = name
 	}
 }
 

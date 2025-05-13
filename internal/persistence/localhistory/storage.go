@@ -87,10 +87,16 @@ func (db *localStorage) ListStatuses(ctx context.Context, opts ...models.ListSta
 		return nil, fmt.Errorf("failed to prepare options: %w", err)
 	}
 
-	// Get all root directories
-	rootDirs, err := db.listRoot(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list root directories: %w", err)
+	var rootDirs []DataRoot
+	if options.Name == "" {
+		// Get all root directories
+		d, err := db.listRoot(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list root directories: %w", err)
+		}
+		rootDirs = d
+	} else {
+		rootDirs = append(rootDirs, NewDataRootWithPrefix(db.baseDir, options.Name))
 	}
 
 	// Collect and filter results

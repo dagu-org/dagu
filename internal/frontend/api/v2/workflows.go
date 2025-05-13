@@ -26,6 +26,47 @@ func (a *API) ListWorkflows(ctx context.Context, request api.ListWorkflowsReques
 		dt := models.NewUTC(*request.Params.To)
 		opts = append(opts, models.WithTo(dt))
 	}
+
+	workflows, err := a.listWorkflows(ctx, opts)
+	if err != nil {
+		return nil, fmt.Errorf("error listing workflows: %w", err)
+	}
+
+	return api.ListWorkflows200JSONResponse{
+		Workflows: workflows,
+	}, nil
+}
+
+func (a *API) ListWorkflowsByName(ctx context.Context, request api.ListWorkflowsByNameRequestObject) (api.ListWorkflowsByNameResponseObject, error) {
+	opts := []models.ListStatusesOption{
+		models.WithName(request.Name),
+	}
+
+	if request.Params.Status != nil {
+		opts = append(opts, models.WithStatuses([]scheduler.Status{
+			scheduler.Status(*request.Params.Status),
+		}))
+	}
+	if request.Params.From != nil {
+		dt := models.NewUTC(*request.Params.From)
+		opts = append(opts, models.WithFrom(dt))
+	}
+	if request.Params.To != nil {
+		dt := models.NewUTC(*request.Params.To)
+		opts = append(opts, models.WithTo(dt))
+	}
+
+	workflows, err := a.listWorkflows(ctx, opts)
+	if err != nil {
+		return nil, fmt.Errorf("error listing workflows: %w", err)
+	}
+
+	return api.ListWorkflowsByName200JSONResponse{
+		Workflows: workflows,
+	}, nil
+}
+
+func (a *API) listWorkflows(ctx context.Context, opts []models.ListStatusesOption) ([]api.WorkflowSummary, error) {
 	statuses, err := a.historyRepo.ListStatuses(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("error listing workflows: %w", err)
@@ -34,10 +75,7 @@ func (a *API) ListWorkflows(ctx context.Context, request api.ListWorkflowsReques
 	for _, status := range statuses {
 		workflows = append(workflows, toWorkflowSummary(*status))
 	}
-
-	return api.ListWorkflows200JSONResponse{
-		Workflows: workflows,
-	}, nil
+	return workflows, nil
 }
 
 func (a *API) GetWorkflowLog(ctx context.Context, request api.GetWorkflowLogRequestObject) (api.GetWorkflowLogResponseObject, error) {

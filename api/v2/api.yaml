@@ -608,6 +608,42 @@ paths:
         - $ref: "#/components/parameters/Status"
         - $ref: "#/components/parameters/DateTimeFrom"
         - $ref: "#/components/parameters/DateTimeTo"
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workflows:
+                    type: array
+                    description: "List of workflows with their status and metadata"
+                    items:
+                      $ref: "#/components/schemas/WorkflowSummary"
+                required:
+                  - workflows
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /workflows/{name}:
+    get:
+      summary: "List all workflows with a specific name"
+      description: "Retrieves a list of all workflows with optional filtering by name and status"
+      operationId: "listWorkflowsByName"
+      tags:
+        - "workflows"
+      parameters:
+        - $ref: "#/components/parameters/Status"
+        - $ref: "#/components/parameters/DateTimeFrom"
+        - $ref: "#/components/parameters/DateTimeTo"
+        - $ref: "#/components/parameters/WorkflowName"
+        - $ref: "#/components/parameters/RemoteNode"
       responses:
         "200":
           description: "A successful response"
