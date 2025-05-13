@@ -240,15 +240,6 @@ func (db *localStorage) getWorkflowStatus(
 	return status, nil
 }
 
-// buildStatusFilter creates a map for efficient status lookup.
-func buildStatusFilter(statuses []scheduler.Status) map[scheduler.Status]struct{} {
-	filter := make(map[scheduler.Status]struct{})
-	for _, status := range statuses {
-		filter[status] = struct{}{}
-	}
-	return filter
-}
-
 // CreateRun creates a new history record for the specified workflow ID.
 // If opts.Root is not nil, it creates a new history record for a child workflow.
 // If opts.Retry is true, it creates a retry record for the specified workflow ID.
