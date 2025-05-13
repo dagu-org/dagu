@@ -1,7 +1,14 @@
 import React from 'react';
 // Assuming the path alias is correct and the component exists
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, ListChecks, Play, XCircle } from 'lucide-react';
+import { CheckCircle, Filter, ListChecks, Play, XCircle } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { AppBarContext } from '../contexts/AppBarContext';
 import { useConfig } from '../contexts/ConfigContext';
 import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
@@ -40,6 +47,8 @@ function Dashboard(): React.ReactElement | null {
   // All hooks must be called unconditionally at the top level.
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
+  const [selectedWorkflow, setSelectedWorkflow] = React.useState<string>('all');
+
   // Calculate the start of today in the configured timezone
   const getStartOfTodayTimestamp = (): number => {
     const now = dayjs();
@@ -58,11 +67,33 @@ function Dashboard(): React.ReactElement | null {
       query: {
         remoteNode: appBarContext.selectedRemoteNode || 'local',
         fromDate: getStartOfTodayTimestamp(),
+        name: selectedWorkflow !== 'all' ? selectedWorkflow : undefined,
       },
     },
     // Refresh every 5 seconds to keep the dashboard up-to-date
     refreshInterval: 5000,
   });
+
+  // Extract unique workflow names for the select dropdown - must be before conditional returns
+  const workflowsList: WorkflowSummary[] = data?.workflows || [];
+
+  // This useMemo hook must be called unconditionally
+  const uniqueWorkflowNames = React.useMemo(() => {
+    const names = new Set<string>();
+    if (data && data.workflows) {
+      data.workflows.forEach((workflow) => {
+        if (workflow.name) {
+          names.add(workflow.name);
+        }
+      });
+    }
+    return Array.from(names).sort();
+  }, [data]);
+
+  // Handle workflow selection change
+  const handleWorkflowChange = (value: string) => {
+    setSelectedWorkflow(value);
+  };
 
   // Effect for setting AppBar title - MUST be called before conditional returns
   React.useEffect(() => {
@@ -93,11 +124,11 @@ function Dashboard(): React.ReactElement | null {
   }
 
   // --- Calculate metrics ---
-  // This logic runs only if data is available (after conditional returns)
+  // Initialize metrics
   const metrics = initializeMetrics();
-  const workflowsList: WorkflowSummary[] = data.workflows || []; // Access workflows from the successfully loaded data
   const totalWorkflows = workflowsList.length;
 
+  // Calculate metrics from workflow data
   workflowsList.forEach((workflow) => {
     if (
       workflow &&
@@ -140,6 +171,50 @@ function Dashboard(): React.ReactElement | null {
   // --- Render the dashboard UI ---
   return (
     <div className="flex flex-col space-y-6 w-full">
+      {/* Workflow Filter */}
+      <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-2">
+            <Filter className="h-5 w-5 text-primary" />
+            <span className="text-sm font-medium">Filter by workflow:</span>
+          </div>
+          <Select
+            value={selectedWorkflow}
+            onValueChange={handleWorkflowChange}
+            disabled={isLoading}
+          >
+            <SelectTrigger className="w-full sm:w-[250px] bg-background">
+              <SelectValue
+                placeholder={
+                  isLoading ? 'Loading workflows...' : 'Select workflow'
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="font-medium">
+                All Workflows
+              </SelectItem>
+              {uniqueWorkflowNames.map((name) => (
+                <SelectItem key={name} value={name}>
+                  {name}
+                </SelectItem>
+              ))}
+              {uniqueWorkflowNames.length === 0 && !isLoading && (
+                <div className="py-2 px-2 text-sm text-muted-foreground">
+                  No workflows found
+                </div>
+              )}
+            </SelectContent>
+          </Select>
+          {selectedWorkflow !== 'all' && (
+            <div className="text-xs text-muted-foreground ml-auto">
+              Showing data for{' '}
+              <span className="font-semibold">{selectedWorkflow}</span> workflow
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Metric Cards Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {metricCards.map((card) => (
