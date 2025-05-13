@@ -1,8 +1,8 @@
 import React from 'react';
 import { components } from '../../../../api/v2/schema';
 import { DAGStatus } from '../../../../features/dags/components';
-import Title from '../../../../ui/Title';
 import { WorkflowContext } from '../../contexts/WorkflowContext';
+import WorkflowHeader from './WorkflowHeader';
 
 type WorkflowDetailsContentProps = {
   name: string;
@@ -26,12 +26,9 @@ const WorkflowDetailsContent: React.FC<WorkflowDetailsContentProps> = ({
       }}
     >
       <div className="w-full flex flex-col">
+        {/* Display breadcrumbs and workflow details in the header */}
         <div className="mb-6">
-          <Title>{workflow.name}</Title>
-          <p className="text-sm text-muted-foreground">
-            Workflow ID:{' '}
-            <span className="font-mono">{workflow.workflowId}</span>
-          </p>
+          <WorkflowHeader workflow={workflow} refreshFn={refreshFn} />
         </div>
 
         <div className="flex-1">

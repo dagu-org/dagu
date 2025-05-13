@@ -24,18 +24,35 @@ const WorkflowDetailsModal: React.FC<WorkflowDetailsModalProps> = ({
   const navigate = useNavigate();
   const appBarContext = React.useContext(AppBarContext);
 
+  // Check for child workflow ID in URL search params
+  const searchParams = new URLSearchParams(window.location.search);
+  const childWorkflowId = searchParams.get('childWorkflowId');
+  const parentWorkflowId = searchParams.get('workflowId');
+  const parentName = searchParams.get('workflowName') || name;
+
+  // Determine the API endpoint based on whether this is a child workflow
+  const endpoint = childWorkflowId
+    ? '/workflows/{name}/{workflowId}/children/{childWorkflowId}'
+    : '/workflows/{name}/{workflowId}';
+
   // Fetch workflow details
   const { data, isLoading, mutate } = useQuery(
-    '/workflows/{name}/{workflowId}',
+    endpoint,
     {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
-        path: {
-          name: name || '',
-          workflowId: workflowId || 'latest',
-        },
+        path: childWorkflowId
+          ? {
+              name: parentName || '',
+              workflowId: parentWorkflowId || '',
+              childWorkflowId: childWorkflowId,
+            }
+          : {
+              name: name || '',
+              workflowId: workflowId || 'latest',
+            },
       },
     },
     { refreshInterval: 2000 }
