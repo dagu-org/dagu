@@ -137,12 +137,6 @@ declare module '@tanstack/react-table' {
 
 const columnHelper = createColumnHelper<Data>();
 
-// --- Helper Functions (moved from bottom for clarity) ---
-function getConfig() {
-  // Assuming getConfig is defined elsewhere or replace with actual config access
-  return { tz: dayjs.tz.guess() };
-}
-
 function getNextSchedule(
   data: components['schemas']['DAGFile']
 ): CronDate | undefined {
