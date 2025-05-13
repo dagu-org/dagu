@@ -307,8 +307,8 @@ func (dr DataRoot) listInRange(ctx context.Context, start, end models.TimeInUTC,
 	// Calculate the date range to search
 	var startDate, endDate time.Time
 	if start.IsZero() {
-		// If start is zero, use the beginning of the today
-		startDate = time.Now().UTC().Truncate(24 * time.Hour)
+		// If start is zero, use a very old date to include all files
+		startDate = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 	} else {
 		startDate = start.Time
 	}
