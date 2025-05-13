@@ -383,7 +383,7 @@ const defaultColumns = [
         return <span className="font-normal text-muted-foreground">-</span>;
       }
 
-      const formattedStartedAt = dayjs(startedAt).format('YYYY-MM-DD HH:mm:ss');
+      const formattedStartedAt = startedAt;
       let durationContent: React.ReactNode = null;
 
       if (finishedAt && finishedAt !== '-') {
@@ -1266,11 +1266,7 @@ function DAGTable({
                     dag.latestWorkflow.startedAt !== '-' && (
                       <div className="flex items-center text-xs text-muted-foreground mb-2">
                         <Calendar className="h-3 w-3 mr-1" />
-                        <span>
-                          {dayjs(dag.latestWorkflow.startedAt).format(
-                            'YYYY-MM-DD HH:mm:ss'
-                          )}
-                        </span>
+                        <span>{dag.latestWorkflow.startedAt}</span>
                       </div>
                     )}
 

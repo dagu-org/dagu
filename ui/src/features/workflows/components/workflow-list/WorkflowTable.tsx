@@ -7,7 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../../../components/ui/table';
-import dayjs from '../../../../lib/dayjs';
+import { useConfig } from '../../../../contexts/ConfigContext';
 import StatusChip from '../../../../ui/StatusChip';
 
 interface WorkflowTableProps {
@@ -15,6 +15,26 @@ interface WorkflowTableProps {
 }
 
 function WorkflowTable({ workflows }: WorkflowTableProps) {
+  const config = useConfig();
+
+  // Format timezone information for display
+  const getTimezoneInfo = (): string => {
+    if (config.tzOffsetInSec === undefined) return 'Local Timezone';
+
+    // Convert seconds to hours and minutes
+    const offsetInMinutes = config.tzOffsetInSec / 60;
+    const hours = Math.floor(Math.abs(offsetInMinutes) / 60);
+    const minutes = Math.abs(offsetInMinutes) % 60;
+
+    // Format with sign and padding
+    const sign = offsetInMinutes >= 0 ? '+' : '-';
+    const formattedHours = hours.toString().padStart(2, '0');
+    const formattedMinutes = minutes.toString().padStart(2, '0');
+
+    return `${sign}${formattedHours}:${formattedMinutes}`;
+  };
+
+  const timezoneInfo = getTimezoneInfo();
   return (
     <div className="border rounded-md bg-white">
       <Table className="w-full text-xs">
@@ -30,10 +50,16 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
               Status
             </TableHead>
             <TableHead className="text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
-              Started At
+              <div>Started At</div>
+              <div className="text-[10px] text-muted-foreground font-normal">
+                {timezoneInfo}
+              </div>
             </TableHead>
             <TableHead className="text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
-              Finished At
+              <div>Finished At</div>
+              <div className="text-[10px] text-muted-foreground font-normal">
+                {timezoneInfo}
+              </div>
             </TableHead>
           </TableRow>
         </TableHeader>
@@ -47,13 +73,9 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
                   {workflow.statusLabel}
                 </StatusChip>
               </TableCell>
+              <TableCell className="text-xs">{workflow.startedAt}</TableCell>
               <TableCell className="text-xs">
-                {dayjs(workflow.startedAt).format('YYYY-MM-DD HH:mm:ss')}
-              </TableCell>
-              <TableCell className="text-xs">
-                {workflow.finishedAt
-                  ? dayjs(workflow.finishedAt).format('YYYY-MM-DD HH:mm:ss')
-                  : '-'}
+                {workflow.finishedAt || '-'}
               </TableCell>
             </TableRow>
           ))}
