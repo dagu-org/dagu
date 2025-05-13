@@ -31,6 +31,7 @@ import Ticker from '../../../../ui/Ticker';
 import VisuallyHidden from '../../../../ui/VisuallyHidden';
 import { DAGDetailsModal } from '../../components/dag-details';
 import { DAGPagination } from '../common';
+import CreateDAGButton from '../common/CreateDAGButton';
 import DAGActions from '../common/DAGActions';
 import LiveSwitch from '../common/LiveSwitch';
 
@@ -1176,9 +1177,19 @@ function DAGTable({
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center"
+                  className="h-64 text-center"
                 >
-                  No results.
+                  <div className="flex flex-col items-center justify-center py-8">
+                    <div className="text-6xl mb-4">🔍</div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      No DAGs found
+                    </h3>
+                    <p className="text-sm text-gray-500 text-center max-w-md mb-4">
+                      There are no DAGs matching your current filters. Try
+                      adjusting your search criteria or tags.
+                    </p>
+                    <CreateDAGButton />
+                  </div>
                 </TableCell>
               </TableRow>
             )}
@@ -1296,8 +1307,16 @@ function DAGTable({
             return null;
           })
         ) : (
-          <div className="p-4 text-center text-muted-foreground">
-            No DAGs found
+          <div className="flex flex-col items-center justify-center py-12 px-4 border rounded-md bg-white">
+            <div className="text-6xl mb-4">🔍</div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              No DAGs found
+            </h3>
+            <p className="text-sm text-gray-500 text-center max-w-md mb-4">
+              There are no DAGs matching your current filters. Try adjusting
+              your search criteria or tags.
+            </p>
+            <CreateDAGButton />
           </div>
         )}
       </div>

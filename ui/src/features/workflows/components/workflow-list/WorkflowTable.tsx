@@ -200,6 +200,25 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
 
   const timezoneInfo = getTimezoneInfo();
 
+  // Empty state component
+  const EmptyState = () => (
+    <div className="flex flex-col items-center justify-center py-12 px-4 border rounded-md bg-white">
+      <div className="text-6xl mb-4">🔍</div>
+      <h3 className="text-lg font-medium text-gray-900 mb-2">
+        No workflows found
+      </h3>
+      <p className="text-sm text-gray-500 text-center max-w-md mb-4">
+        There are no workflows matching your current filters. Try adjusting your
+        search criteria or date range.
+      </p>
+    </div>
+  );
+
+  // If there are no workflows, show empty state
+  if (workflows.length === 0) {
+    return <EmptyState />;
+  }
+
   // Card view for small screens - Direct navigation without modal
   if (isSmallScreen) {
     return (
