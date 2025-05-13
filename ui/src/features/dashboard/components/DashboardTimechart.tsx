@@ -6,7 +6,7 @@ import { statusColorMapping } from '../../../consts';
 import { useConfig } from '../../../contexts/ConfigContext';
 import dayjs from '../../../lib/dayjs';
 
-type Props = { data: components['schemas']['DAGFile'][] };
+type Props = { data: components['schemas']['WorkflowSummary'][] };
 
 type TimelineItem = {
   id: string;
@@ -52,9 +52,7 @@ function DashboardTimeChart({ data: input }: Props) {
     const now = dayjs();
     const startOfDay = dayjs().startOf('day');
 
-    input.forEach((item) => {
-      const dag = item.dag;
-      const workflow = item.latestWorkflow;
+    input.forEach((workflow) => {
       const status = workflow.status;
       const start = workflow.startedAt;
       if (start && start !== '-') {
@@ -63,8 +61,8 @@ function DashboardTimeChart({ data: input }: Props) {
           workflow.finishedAt !== '-' ? dayjs(workflow.finishedAt) : now;
 
         items.push({
-          id: dag.name + `_${workflow.workflowId}`,
-          content: dag.name,
+          id: workflow.name + `_${workflow.workflowId}`,
+          content: workflow.name,
           start: startMoment.tz(validTimezone).toDate(),
           end: end.tz(validTimezone).toDate(),
           group: 'main',

@@ -10,10 +10,10 @@ import Title from '../ui/Title';
 // Import the main 'components' type and Status enum
 import type { components } from '../api/v2/schema'; // Import the main components interface
 import { Status } from '../api/v2/schema'; // Import the Status enum
+import dayjs from '../lib/dayjs';
 
 // Define types using the imported components structure
-type DAGFile = components['schemas']['DAGFile'];
-// type Pagination = components['schemas']['Pagination']; // Not used in this component currently
+type WorkflowSummary = components['schemas']['WorkflowSummary'];
 
 type Metrics = Record<Status, number>;
 
@@ -40,15 +40,28 @@ function Dashboard(): React.ReactElement | null {
   // All hooks must be called unconditionally at the top level.
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
-  const { data, error, isLoading } = useQuery('/dags', {
+  // Calculate the start of today in the configured timezone
+  const getStartOfTodayTimestamp = (): number => {
+    const now = dayjs();
+    // Apply timezone offset and set to beginning of day (00:00)
+    const startOfDay =
+      config.tzOffsetInSec !== undefined
+        ? now.utcOffset(config.tzOffsetInSec / 60).startOf('day')
+        : now.startOf('day');
+
+    // Return as Unix timestamp (seconds)
+    return startOfDay.unix();
+  };
+
+  const { data, error, isLoading } = useQuery('/workflows', {
     params: {
       query: {
-        perPage: config.maxDashboardPageLimit || 200,
         remoteNode: appBarContext.selectedRemoteNode || 'local',
+        fromDate: getStartOfTodayTimestamp(),
       },
     },
-    // Optional SWR configuration can go here if needed
-    // e.g., refreshInterval: 5000,
+    // Refresh every 5 seconds to keep the dashboard up-to-date
+    refreshInterval: 5000,
   });
 
   // Effect for setting AppBar title - MUST be called before conditional returns
@@ -82,18 +95,15 @@ function Dashboard(): React.ReactElement | null {
   // --- Calculate metrics ---
   // This logic runs only if data is available (after conditional returns)
   const metrics = initializeMetrics();
-  const dagsList: DAGFile[] = data.dags || []; // Access dags from the successfully loaded data
-  const totalDags = dagsList.length;
+  const workflowsList: WorkflowSummary[] = data.workflows || []; // Access workflows from the successfully loaded data
+  const totalWorkflows = workflowsList.length;
 
-  dagsList.forEach((dagFile) => {
+  workflowsList.forEach((workflow) => {
     if (
-      dagFile.latestWorkflow &&
-      Object.prototype.hasOwnProperty.call(
-        metrics,
-        dagFile.latestWorkflow.status
-      )
+      workflow &&
+      Object.prototype.hasOwnProperty.call(metrics, workflow.status)
     ) {
-      const statusKey = dagFile.latestWorkflow.status as Status;
+      const statusKey = workflow.status as Status;
       metrics[statusKey]! += 1;
     }
   });
@@ -101,8 +111,8 @@ function Dashboard(): React.ReactElement | null {
   // --- Define metric cards data ---
   const metricCards = [
     {
-      title: 'Total DAGs',
-      value: totalDags,
+      title: 'Total Workflows',
+      value: totalWorkflows,
       icon: <ListChecks className="h-5 w-5 text-muted-foreground" />,
     },
     {
@@ -156,7 +166,7 @@ function Dashboard(): React.ReactElement | null {
         <div className="mt-4 overflow-x-auto">
           {' '}
           {/* Adjust height as needed */}
-          <DashboardTimeChart data={dagsList} />
+          <DashboardTimeChart data={workflowsList} />
         </div>
       </div>
     </div>
