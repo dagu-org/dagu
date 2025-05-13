@@ -62,8 +62,21 @@ function Workflows() {
   const [status, setStatus] = React.useState<string>(
     query.get('status') || 'all'
   );
+
+  // Default "From" date to the start of current day in the configured timezone
+  const getDefaultFromDate = (): string => {
+    const now = dayjs();
+    // Apply timezone offset and set to beginning of day (00:00)
+    const startOfDay =
+      config.tzOffsetInSec !== undefined
+        ? now.utcOffset(config.tzOffsetInSec / 60).startOf('day')
+        : now.startOf('day');
+    // Format for datetime-local input (YYYY-MM-DDTHH:mm)
+    return startOfDay.format('YYYY-MM-DDTHH:mm');
+  };
+
   const [fromDate, setFromDate] = React.useState<string | undefined>(
-    parseDateFromUrl(query.get('fromDate'))
+    parseDateFromUrl(query.get('fromDate')) || getDefaultFromDate()
   );
   const [toDate, setToDate] = React.useState<string | undefined>(
     parseDateFromUrl(query.get('toDate'))
@@ -80,7 +93,7 @@ function Workflows() {
     query.get('status') || 'all'
   );
   const [apiFromDate, setApiFromDate] = React.useState<string | undefined>(
-    query.get('fromDate') || undefined
+    query.get('fromDate') || getDefaultFromDate()
   );
   const [apiToDate, setApiToDate] = React.useState<string | undefined>(
     query.get('toDate') || undefined
@@ -127,16 +140,19 @@ function Workflows() {
     );
   };
 
-  const handleSearch = () => {
+  const handleSearch = (overrideStatus?: string) => {
     // Format dates for API and URL
     const timestampFromDate = formatDateForApi(fromDate);
     const timestampToDate = formatDateForApi(toDate);
+
+    // Use override status if provided, otherwise use current status
+    const statusToUse = overrideStatus !== undefined ? overrideStatus : status;
 
     // Console log for debugging
     console.log('Search with parameters:', {
       name: searchText,
       workflowId: workflowId,
-      status: status,
+      status: statusToUse,
       from: fromDate,
       to: toDate,
       timestampFrom: timestampFromDate,
@@ -147,14 +163,14 @@ function Workflows() {
     // Update API state with values
     setAPISearchText(searchText);
     setApiWorkflowId(workflowId);
-    setApiStatus(status);
+    setApiStatus(statusToUse);
     setApiFromDate(fromDate);
     setApiToDate(toDate);
 
     // Update URL parameters
     addSearchParam('name', searchText);
     addSearchParam('workflowId', workflowId);
-    addSearchParam('status', status);
+    addSearchParam('status', statusToUse);
     addSearchParam(
       'fromDate',
       timestampFromDate ? timestampFromDate.toString() : ''
@@ -174,6 +190,8 @@ function Workflows() {
 
   const handleStatusChange = (value: string) => {
     setStatus(value);
+    // Automatically trigger search when status changes
+    handleSearch(value);
   };
 
   const handleInputKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -281,7 +299,7 @@ function Workflows() {
           </SelectContent>
         </Select>
         <div className="flex items-center justify-start">
-          <Button onClick={handleSearch} className="w-full sm:w-auto">
+          <Button onClick={() => handleSearch()} className="w-full sm:w-auto">
             <Search size={18} className="mr-2" />
             Search
           </Button>
