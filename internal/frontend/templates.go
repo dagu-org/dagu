@@ -55,6 +55,7 @@ type funcsConfig struct {
 	BasePath              string
 	APIBasePath           string
 	TZ                    string
+	TzOffsetInSec         int
 	MaxDashboardPageLimit int
 	RemoteNodes           []string
 }
@@ -85,6 +86,9 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 		},
 		"tz": func() string {
 			return cfg.TZ
+		},
+		"tzOffsetInSec": func() int {
+			return cfg.TzOffsetInSec
 		},
 		"maxDashboardPageLimit": func() int {
 			return cfg.MaxDashboardPageLimit
