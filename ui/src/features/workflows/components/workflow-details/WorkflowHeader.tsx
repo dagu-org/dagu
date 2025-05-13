@@ -5,6 +5,7 @@ import { components, Status } from '../../../../api/v2/schema';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
 import Title from '../../../../ui/Title';
+import { WorkflowActions } from '../common';
 
 interface WorkflowHeaderProps {
   workflow: components['schemas']['WorkflowDetails'];
@@ -93,12 +94,18 @@ const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
       </div>
       {workflow.status != Status.NotStarted ? (
         <div className="mt-4 mb-4">
-          {/* Status chip */}
+          {/* Status chip and actions */}
           {workflow.status ? (
-            <div className="mb-4">
+            <div className="mb-4 flex items-center gap-2">
               <StatusChip status={workflow.status}>
                 {workflow.statusLabel || ''}
               </StatusChip>
+              <WorkflowActions
+                workflow={workflow}
+                name={workflow.name}
+                refresh={refreshFn}
+                displayMode="compact"
+              />
             </div>
           ) : null}
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { AppBarContext } from '../../../contexts/AppBarContext';
+import { WorkflowActions } from '../../../features/workflows/components/common';
 import { WorkflowDetailsContent } from '../../../features/workflows/components/workflow-details';
 import { WorkflowContext } from '../../../features/workflows/contexts/WorkflowContext';
 import { useQuery } from '../../../hooks/api';
@@ -76,6 +77,14 @@ function WorkflowDetailsPage() {
           workflowId: displayWorkflowId || '',
         }}
       >
+        <div className="flex justify-end mb-4">
+          <WorkflowActions
+            workflow={workflowDetails}
+            name={displayName}
+            refresh={refreshFn}
+            displayMode="full"
+          />
+        </div>
         <WorkflowDetailsContent
           name={displayName}
           workflow={workflowDetails}

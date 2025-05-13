@@ -103,7 +103,7 @@ function Workflows() {
     appBarContext.setTitle('Workflows');
   }, [appBarContext]);
 
-  const { data, isLoading } = useQuery(
+  const { data, isLoading, mutate } = useQuery(
     '/workflows',
     {
       params: {
@@ -176,6 +176,9 @@ function Workflows() {
       timestampFromDate ? timestampFromDate.toString() : ''
     );
     addSearchParam('toDate', timestampToDate ? timestampToDate.toString() : '');
+
+    // Force revalidation of the query even if parameters haven't changed
+    mutate();
   };
 
   const handleNameInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -10,6 +10,7 @@ import {
   TableRow,
 } from '../../../../components/ui/table';
 import { useConfig } from '../../../../contexts/ConfigContext';
+import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
 import { WorkflowDetailsModal } from '../../components/workflow-details';
 
@@ -157,6 +158,46 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
     return `${sign}${formattedHours}:${formattedMinutes}`;
   };
 
+  // Calculate duration between start and finish times
+  const calculateDuration = (
+    startedAt: string,
+    finishedAt: string | null
+  ): string => {
+    if (!finishedAt) {
+      // If workflow is still running, calculate duration from start until now
+      const start = dayjs(startedAt);
+      const now = dayjs();
+      const durationMs = now.diff(start);
+      return formatDuration(durationMs);
+    }
+
+    const start = dayjs(startedAt);
+    const end = dayjs(finishedAt);
+    const durationMs = end.diff(start);
+    return formatDuration(durationMs);
+  };
+
+  // Format duration in a human-readable format
+  const formatDuration = (durationMs: number): string => {
+    const seconds = Math.floor(durationMs / 1000);
+
+    if (seconds < 60) {
+      return `${seconds}s`;
+    }
+
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+
+    if (minutes < 60) {
+      return `${minutes}m ${remainingSeconds}s`;
+    }
+
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+
+    return `${hours}h ${remainingMinutes}m ${remainingSeconds}s`;
+  };
+
   const timezoneInfo = getTimezoneInfo();
 
   // Card view for small screens - Direct navigation without modal
@@ -210,6 +251,12 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
               </div>
             </div>
 
+            {/* Duration */}
+            <div className="text-xs mt-1 text-left">
+              <span className="text-muted-foreground">Duration: </span>
+              {calculateDuration(workflow.startedAt, workflow.finishedAt)}
+            </div>
+
             {/* Timezone info */}
             <div className="text-[10px] text-muted-foreground text-right pt-1">
               {timezoneInfo}
@@ -247,6 +294,9 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
                 {timezoneInfo}
               </div>
             </TableHead>
+            <TableHead className="text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
+              Duration
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -255,8 +305,8 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
               key={workflow.workflowId}
               className={`cursor-pointer ${
                 selectedIndex === index
-                  ? 'bg-primary/10 hover:bg-primary/15 border-l-4 border-primary border-b-0'
-                  : 'hover:bg-muted/50'
+                  ? 'bg-primary/10 hover:bg-primary/15 border-l-4 border-primary border-b-0 border-t-0'
+                  : 'hover:bg-muted/50 border-0'
               }`}
               style={{ fontSize: '0.8125rem' }}
               onClick={() => {
@@ -278,9 +328,14 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
                   {workflow.statusLabel}
                 </StatusChip>
               </TableCell>
-              <TableCell className="py-1 px-2">{workflow.startedAt}</TableCell>
-              <TableCell className="py-1 px-2">
+              <TableCell className="py-1 px-2 text-left">
+                {workflow.startedAt}
+              </TableCell>
+              <TableCell className="py-1 px-2 text-left">
                 {workflow.finishedAt || '-'}
+              </TableCell>
+              <TableCell className="py-1 px-2 text-left">
+                {calculateDuration(workflow.startedAt, workflow.finishedAt)}
               </TableCell>
             </TableRow>
           ))}
