@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -157,6 +158,14 @@ func TestDAGExecution(t *testing.T) {
 			dag:  "perl-script.yaml",
 			expectedOutputs: map[string]any{
 				"OUT1": "Hello World",
+			},
+		},
+		{
+			name: "Workdir",
+			dag:  "workdir.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": os.ExpandEnv("$HOME"),
+				"OUT2": os.ExpandEnv("$HOME"),
 			},
 		},
 		{
