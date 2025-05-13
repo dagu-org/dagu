@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -88,15 +89,15 @@ func (db *localStorage) ListStatuses(ctx context.Context, opts ...models.ListSta
 	}
 
 	var rootDirs []DataRoot
-	if options.Name == "" {
+	if options.ExactName == "" {
 		// Get all root directories
-		d, err := db.listRoot(ctx)
+		d, err := db.listRoot(ctx, options.Name)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list root directories: %w", err)
 		}
 		rootDirs = d
 	} else {
-		rootDirs = append(rootDirs, NewDataRootWithPrefix(db.baseDir, options.Name))
+		rootDirs = append(rootDirs, NewDataRootWithPrefix(db.baseDir, options.ExactName))
 	}
 
 	// Collect and filter results
@@ -477,7 +478,7 @@ func (db *localStorage) RenameWorkflows(ctx context.Context, oldNameOrPath, newN
 }
 
 // listRoot lists all root directories in the base directory.
-func (db *localStorage) listRoot(ctx context.Context) ([]DataRoot, error) {
+func (db *localStorage) listRoot(_ context.Context, include string) ([]DataRoot, error) {
 	rootDirs, err := listDirsSorted(db.baseDir, false, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list root directories: %w", err)
@@ -485,6 +486,9 @@ func (db *localStorage) listRoot(ctx context.Context) ([]DataRoot, error) {
 
 	var roots []DataRoot
 	for _, dir := range rootDirs {
+		if include != "" && !strings.Contains(dir, include) {
+			continue
+		}
 		if fileutil.IsDir(filepath.Join(db.baseDir, dir)) {
 			root := NewDataRoot(db.baseDir, dir)
 			roots = append(roots, root)

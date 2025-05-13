@@ -293,7 +293,7 @@ func TestListRoot(t *testing.T) {
 
 	// Call listRoot
 	ctx := context.Background()
-	roots, err := storage.listRoot(ctx)
+	roots, err := storage.listRoot(ctx, "")
 	require.NoError(t, err, "listRoot should not return an error")
 
 	// Verify results
@@ -323,7 +323,7 @@ func TestListRootEmptyDirectory(t *testing.T) {
 
 	// Call listRoot
 	ctx := context.Background()
-	roots, err := storage.listRoot(ctx)
+	roots, err := storage.listRoot(ctx, "")
 	require.NoError(t, err, "listRoot should not return an error")
 
 	// Verify results
@@ -344,7 +344,7 @@ func TestListRootNonExistentDirectory(t *testing.T) {
 
 	// Call listRoot
 	ctx := context.Background()
-	roots, err := storage.listRoot(ctx)
+	roots, err := storage.listRoot(ctx, "")
 	require.NoError(t, err, "listRoot should not return an error for non-existent directory")
 
 	// Verify results
@@ -367,7 +367,7 @@ func TestListRootCanceledContext(t *testing.T) {
 	cancel() // Cancel the context immediately
 
 	// Call listRoot with canceled context
-	roots, err := storage.listRoot(ctx)
+	roots, err := storage.listRoot(ctx, "")
 
 	// The function doesn't check for context cancellation, so it should still succeed
 	require.NoError(t, err, "listRoot should not return an error for canceled context")

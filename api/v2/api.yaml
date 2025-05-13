@@ -609,6 +609,12 @@ paths:
         - $ref: "#/components/parameters/DateTimeFrom"
         - $ref: "#/components/parameters/DateTimeTo"
         - $ref: "#/components/parameters/RemoteNode"
+        - name: "name"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter workflows by name"
       responses:
         "200":
           description: "A successful response"

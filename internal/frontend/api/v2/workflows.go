@@ -26,6 +26,9 @@ func (a *API) ListWorkflows(ctx context.Context, request api.ListWorkflowsReques
 		dt := models.NewUTC(*request.Params.To)
 		opts = append(opts, models.WithTo(dt))
 	}
+	if request.Params.Name != nil {
+		opts = append(opts, models.WithName(*request.Params.Name))
+	}
 
 	workflows, err := a.listWorkflows(ctx, opts)
 	if err != nil {
@@ -39,7 +42,7 @@ func (a *API) ListWorkflows(ctx context.Context, request api.ListWorkflowsReques
 
 func (a *API) ListWorkflowsByName(ctx context.Context, request api.ListWorkflowsByNameRequestObject) (api.ListWorkflowsByNameResponseObject, error) {
 	opts := []models.ListStatusesOption{
-		models.WithName(request.Name),
+		models.WithExactName(request.Name),
 	}
 
 	if request.Params.Status != nil {
