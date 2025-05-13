@@ -45,8 +45,11 @@ function Workflows() {
     }
   };
 
-  // State for search input and date ranges
+  // State for search input, workflow ID, and date ranges
   const [searchText, setSearchText] = React.useState(query.get('name') || '');
+  const [workflowId, setWorkflowId] = React.useState(
+    query.get('workflowId') || ''
+  );
   const [fromDate, setFromDate] = React.useState<string | undefined>(
     parseDateFromUrl(query.get('fromDate'))
   );
@@ -57,6 +60,9 @@ function Workflows() {
   // State for API parameters - these will be formatted with timezone
   const [apiSearchText, setAPISearchText] = React.useState(
     query.get('name') || ''
+  );
+  const [apiWorkflowId, setApiWorkflowId] = React.useState(
+    query.get('workflowId') || ''
   );
   const [apiFromDate, setApiFromDate] = React.useState<string | undefined>(
     query.get('fromDate') || undefined
@@ -76,6 +82,7 @@ function Workflows() {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
           name: apiSearchText ? apiSearchText : undefined,
+          workflowId: apiWorkflowId ? apiWorkflowId : undefined,
           fromDate: formatDateForApi(apiFromDate),
           toDate: formatDateForApi(apiToDate),
         },
@@ -109,7 +116,9 @@ function Workflows() {
     const timestampToDate = formatDateForApi(toDate);
 
     // Console log for debugging
-    console.log('Search with dates:', {
+    console.log('Search with parameters:', {
+      name: searchText,
+      workflowId: workflowId,
       from: fromDate,
       to: toDate,
       timestampFrom: timestampFromDate,
@@ -117,13 +126,15 @@ function Workflows() {
       tzOffset: config.tzOffsetInSec,
     });
 
-    // Update API state with raw datetime values
+    // Update API state with values
     setAPISearchText(searchText);
+    setApiWorkflowId(workflowId);
     setApiFromDate(fromDate);
     setApiToDate(toDate);
 
-    // Update URL parameters with timestamp values
+    // Update URL parameters
     addSearchParam('name', searchText);
+    addSearchParam('workflowId', workflowId);
     addSearchParam(
       'fromDate',
       timestampFromDate ? timestampFromDate.toString() : ''
@@ -131,8 +142,14 @@ function Workflows() {
     addSearchParam('toDate', timestampToDate ? timestampToDate.toString() : '');
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNameInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchText(e.target.value);
+  };
+
+  const handleWorkflowIdInputChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    setWorkflowId(e.target.value);
   };
 
   const handleInputKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -163,27 +180,38 @@ function Workflows() {
   return (
     <div className="flex flex-col">
       <Title>Workflows</Title>
-      <div className="flex items-center gap-2 mb-4">
-        <Input
-          placeholder="Filter by workflow name..."
-          value={searchText}
-          onChange={handleInputChange}
-          onKeyPress={handleInputKeyPress}
-          className="max-w-sm"
-        />
-        <DateRangePicker
-          fromDate={fromDate}
-          toDate={toDate}
-          onFromDateChange={setFromDate}
-          onToDateChange={setToDate}
-          fromLabel={`From ${tzLabel}`}
-          toLabel={`To ${tzLabel}`}
-          className="w-auto min-w-[340px]"
-        />
-        <Button onClick={handleSearch}>
-          <Search size={18} className="mr-2" />
-          Search
-        </Button>
+      <div className="flex flex-col gap-2 mb-4">
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Filter by workflow name..."
+            value={searchText}
+            onChange={handleNameInputChange}
+            onKeyPress={handleInputKeyPress}
+            className="max-w-sm"
+          />
+          <Input
+            placeholder="Filter by workflow ID..."
+            value={workflowId}
+            onChange={handleWorkflowIdInputChange}
+            onKeyPress={handleInputKeyPress}
+            className="max-w-sm"
+          />
+          <Button onClick={handleSearch}>
+            <Search size={18} className="mr-2" />
+            Search
+          </Button>
+        </div>
+        <div className="flex items-center gap-2">
+          <DateRangePicker
+            fromDate={fromDate}
+            toDate={toDate}
+            onFromDateChange={setFromDate}
+            onToDateChange={setToDate}
+            fromLabel={`From ${tzLabel}`}
+            toLabel={`To ${tzLabel}`}
+            className="w-auto min-w-[340px]"
+          />
+        </div>
       </div>
       {isLoading ? (
         <LoadingIndicator />

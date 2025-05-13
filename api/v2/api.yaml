@@ -608,6 +608,7 @@ paths:
         - $ref: "#/components/parameters/Status"
         - $ref: "#/components/parameters/DateTimeFrom"
         - $ref: "#/components/parameters/DateTimeTo"
+        - $ref: "#/components/parameters/WorkflowIdSearch"
         - $ref: "#/components/parameters/RemoteNode"
         - name: "name"
           in: "query"
@@ -649,6 +650,7 @@ paths:
         - $ref: "#/components/parameters/DateTimeFrom"
         - $ref: "#/components/parameters/DateTimeTo"
         - $ref: "#/components/parameters/WorkflowName"
+        - $ref: "#/components/parameters/WorkflowIdSearch"
         - $ref: "#/components/parameters/RemoteNode"
       responses:
         "200":
@@ -1070,6 +1072,14 @@ components:
       in: path
       description: ID of the workflow or 'latest' to get the most recent workflow
       required: true
+      schema:
+        $ref: "#/components/schemas/WorkflowId"
+
+    WorkflowIdSearch:
+      name: workflowId
+      in: query
+      description: ID of the workflow or 'latest' to get the most recent workflow
+      required: false
       schema:
         $ref: "#/components/schemas/WorkflowId"
 

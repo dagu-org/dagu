@@ -494,11 +494,11 @@ export interface components {
          */
         ErrorCode: ErrorCode;
         /**
-         * Format: date-time
-         * @description Date and time in ISO 8601 format with timezone
-         * @example 2023-10-01T00:00:00+09:00
+         * Format: int64
+         * @description Unix timestamp in seconds
+         * @example 1672531199
          */
-        DateTime: string;
+        UnixTimestamp: number;
         /**
          * Format: regex
          * @description Name of the DAG file
@@ -818,20 +818,16 @@ export interface components {
         RemoteNode: string;
         /** @description ID of the workflow or 'latest' to get the most recent workflow */
         WorkflowId: components["schemas"]["WorkflowId"];
+        /** @description ID of the workflow or 'latest' to get the most recent workflow */
+        WorkflowIdSearch: components["schemas"]["WorkflowId"];
         /** @description name of the workflow */
         WorkflowName: string;
         /** @description status of the workflow */
         Status: components["schemas"]["Status"];
-        /**
-         * @description start datetime for filtering workflows in ISO 8601 format with timezone
-         * @example 2023-10-01T00:00:00+09:00
-         */
-        DateTimeFrom: components["schemas"]["DateTime"];
-        /**
-         * @description end datetime for filtering workflows in ISO 8601 format with timezone
-         * @example 2023-10-01T00:00:00+09:00
-         */
-        DateTimeTo: components["schemas"]["DateTime"];
+        /** @description start datetime for filtering workflows in ISO 8601 format with timezone */
+        DateTimeFrom: components["schemas"]["UnixTimestamp"];
+        /** @description end datetime for filtering workflows in ISO 8601 format with timezone */
+        DateTimeTo: components["schemas"]["UnixTimestamp"];
         /** @description Number of lines to return from the end of the file */
         Tail: number;
         /** @description Number of lines to return from the beginning of the file */
@@ -1511,16 +1507,12 @@ export interface operations {
             query?: {
                 /** @description status of the workflow */
                 status?: components["parameters"]["Status"];
-                /**
-                 * @description start datetime for filtering workflows in ISO 8601 format with timezone
-                 * @example 2023-10-01T00:00:00+09:00
-                 */
-                from?: components["parameters"]["DateTimeFrom"];
-                /**
-                 * @description end datetime for filtering workflows in ISO 8601 format with timezone
-                 * @example 2023-10-01T00:00:00+09:00
-                 */
-                to?: components["parameters"]["DateTimeTo"];
+                /** @description start datetime for filtering workflows in ISO 8601 format with timezone */
+                fromDate?: components["parameters"]["DateTimeFrom"];
+                /** @description end datetime for filtering workflows in ISO 8601 format with timezone */
+                toDate?: components["parameters"]["DateTimeTo"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId?: components["parameters"]["WorkflowIdSearch"];
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description Filter workflows by name */
@@ -1560,16 +1552,12 @@ export interface operations {
             query?: {
                 /** @description status of the workflow */
                 status?: components["parameters"]["Status"];
-                /**
-                 * @description start datetime for filtering workflows in ISO 8601 format with timezone
-                 * @example 2023-10-01T00:00:00+09:00
-                 */
-                from?: components["parameters"]["DateTimeFrom"];
-                /**
-                 * @description end datetime for filtering workflows in ISO 8601 format with timezone
-                 * @example 2023-10-01T00:00:00+09:00
-                 */
-                to?: components["parameters"]["DateTimeTo"];
+                /** @description start datetime for filtering workflows in ISO 8601 format with timezone */
+                fromDate?: components["parameters"]["DateTimeFrom"];
+                /** @description end datetime for filtering workflows in ISO 8601 format with timezone */
+                toDate?: components["parameters"]["DateTimeTo"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId?: components["parameters"]["WorkflowIdSearch"];
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
             };

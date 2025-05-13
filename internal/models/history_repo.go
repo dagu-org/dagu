@@ -40,12 +40,13 @@ type HistoryRepository interface {
 
 // ListStatusesOptions contains options for listing runs
 type ListStatusesOptions struct {
-	Name      string
-	ExactName string
-	From      TimeInUTC
-	To        TimeInUTC
-	Statuses  []scheduler.Status
-	Limit     int
+	WorkflowID string
+	Name       string
+	ExactName  string
+	From       TimeInUTC
+	To         TimeInUTC
+	Statuses   []scheduler.Status
+	Limit      int
 }
 
 // ListRunsOption is a functional option for configuring ListRunsOptions
@@ -83,6 +84,13 @@ func WithExactName(name string) ListStatusesOption {
 func WithName(name string) ListStatusesOption {
 	return func(o *ListStatusesOptions) {
 		o.Name = name
+	}
+}
+
+// WithWorkflowID sets the workflow ID for listing workflows
+func WithWorkflowID(workflowID string) ListStatusesOption {
+	return func(o *ListStatusesOptions) {
+		o.WorkflowID = workflowID
 	}
 }
 

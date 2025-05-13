@@ -30,6 +30,9 @@ func (a *API) ListWorkflows(ctx context.Context, request api.ListWorkflowsReques
 	if request.Params.Name != nil {
 		opts = append(opts, models.WithName(*request.Params.Name))
 	}
+	if request.Params.WorkflowId != nil {
+		opts = append(opts, models.WithWorkflowID(*request.Params.WorkflowId))
+	}
 
 	workflows, err := a.listWorkflows(ctx, opts)
 	if err != nil {
@@ -58,6 +61,9 @@ func (a *API) ListWorkflowsByName(ctx context.Context, request api.ListWorkflows
 	if request.Params.ToDate != nil {
 		dt := models.NewUTC(time.Unix(*request.Params.ToDate, 0))
 		opts = append(opts, models.WithTo(dt))
+	}
+	if request.Params.WorkflowId != nil {
+		opts = append(opts, models.WithWorkflowID(*request.Params.WorkflowId))
 	}
 
 	workflows, err := a.listWorkflows(ctx, opts)

@@ -172,11 +172,16 @@ func (db *localStorage) collectStatusesFromRoots(
 
 			statuses := make([]*models.Status, 0, len(workflows))
 			for _, workflow := range workflows {
+				if opts.WorkflowID != "" && !strings.Contains(workflow.workflowID, opts.WorkflowID) {
+					continue
+				}
+
 				run, err := workflow.LatestRun(ctx, db.cache)
 				if err != nil {
 					logger.Error(ctx, "Failed to get latest run", "err", err)
 					continue
 				}
+
 				status, err := run.ReadStatus(ctx)
 				if err != nil {
 					logger.Error(ctx, "Failed to read status", "err", err)
