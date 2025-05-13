@@ -49,7 +49,8 @@ export function DateRangePicker({
           />
         </div>
 
-        <div className="flex items-center px-1 text-muted-foreground bg-slate-50 dark:bg-slate-800">
+        {/* Arrow only visible on sm screens and above */}
+        <div className="hidden sm:flex items-center px-1 text-muted-foreground bg-slate-50 dark:bg-slate-800">
           →
         </div>
 

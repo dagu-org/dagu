@@ -180,28 +180,26 @@ function Workflows() {
   return (
     <div className="flex flex-col">
       <Title>Workflows</Title>
-      <div className="flex flex-col gap-2 mb-4">
-        <div className="flex items-center gap-2">
-          <Input
-            placeholder="Filter by workflow name..."
-            value={searchText}
-            onChange={handleNameInputChange}
-            onKeyPress={handleInputKeyPress}
-            className="max-w-sm"
-          />
-          <Input
-            placeholder="Filter by workflow ID..."
-            value={workflowId}
-            onChange={handleWorkflowIdInputChange}
-            onKeyPress={handleInputKeyPress}
-            className="max-w-sm"
-          />
-          <Button onClick={handleSearch}>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
+        <Input
+          placeholder="Filter by workflow name..."
+          value={searchText}
+          onChange={handleNameInputChange}
+          onKeyPress={handleInputKeyPress}
+        />
+        <Input
+          placeholder="Filter by workflow ID..."
+          value={workflowId}
+          onChange={handleWorkflowIdInputChange}
+          onKeyPress={handleInputKeyPress}
+        />
+        <div className="flex items-center justify-start">
+          <Button onClick={handleSearch} className="w-full sm:w-auto">
             <Search size={18} className="mr-2" />
             Search
           </Button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="col-span-1 md:col-span-2 lg:col-span-3">
           <DateRangePicker
             fromDate={fromDate}
             toDate={toDate}
@@ -209,7 +207,7 @@ function Workflows() {
             onToDateChange={setToDate}
             fromLabel={`From ${tzLabel}`}
             toLabel={`To ${tzLabel}`}
-            className="w-auto min-w-[340px]"
+            className="w-full md:w-auto md:min-w-[340px] md:max-w-[500px]"
           />
         </div>
       </div>
