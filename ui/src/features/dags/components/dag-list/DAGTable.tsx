@@ -30,8 +30,7 @@ import StatusChip from '../../../../ui/StatusChip'; // Re-add StatusChip import
 import Ticker from '../../../../ui/Ticker';
 import VisuallyHidden from '../../../../ui/VisuallyHidden';
 import { DAGDetailsModal } from '../../components/dag-details';
-import { DAGPagination } from '../common';
-import CreateDAGButton from '../common/CreateDAGButton';
+import { CreateDAGModal, DAGPagination } from '../common';
 import DAGActions from '../common/DAGActions';
 import LiveSwitch from '../common/LiveSwitch';
 
@@ -1188,7 +1187,7 @@ function DAGTable({
                       There are no DAGs matching your current filters. Try
                       adjusting your search criteria or tags.
                     </p>
-                    <CreateDAGButton />
+                    <CreateDAGModal />
                   </div>
                 </TableCell>
               </TableRow>
@@ -1316,7 +1315,7 @@ function DAGTable({
               There are no DAGs matching your current filters. Try adjusting
               your search criteria or tags.
             </p>
-            <CreateDAGButton />
+            <CreateDAGModal />
           </div>
         )}
       </div>
