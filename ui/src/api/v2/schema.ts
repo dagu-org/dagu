@@ -1523,6 +1523,8 @@ export interface operations {
                 to?: components["parameters"]["DateTimeTo"];
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Filter workflows by name */
+                name?: string;
             };
             header?: never;
             path?: never;
