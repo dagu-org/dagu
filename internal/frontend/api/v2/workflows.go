@@ -8,10 +8,36 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/models"
 )
 
 func (a *API) ListWorkflows(ctx context.Context, request api.ListWorkflowsRequestObject) (api.ListWorkflowsResponseObject, error) {
-	panic("not implemented")
+	var opts []models.ListStatusesOption
+	if request.Params.Status != nil {
+		opts = append(opts, models.WithStatuses([]scheduler.Status{
+			scheduler.Status(*request.Params.Status),
+		}))
+	}
+	if request.Params.From != nil {
+		dt := models.NewUTC(*request.Params.From)
+		opts = append(opts, models.WithFrom(dt))
+	}
+	if request.Params.To != nil {
+		dt := models.NewUTC(*request.Params.To)
+		opts = append(opts, models.WithTo(dt))
+	}
+	statuses, err := a.historyRepo.ListStatuses(ctx, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("error listing workflows: %w", err)
+	}
+	var workflows []api.WorkflowSummary
+	for _, status := range statuses {
+		workflows = append(workflows, toWorkflowSummary(*status))
+	}
+
+	return api.ListWorkflows200JSONResponse{
+		Workflows: workflows,
+	}, nil
 }
 
 func (a *API) GetWorkflowLog(ctx context.Context, request api.GetWorkflowLogRequestObject) (api.GetWorkflowLogResponseObject, error) {

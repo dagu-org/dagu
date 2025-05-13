@@ -432,8 +432,8 @@ func TestListStatuses(t *testing.T) {
 		}
 
 		// Limit to 3 results
-		options := &models.ListRunsOptions{Limit: 3}
-		statuses, err := th.HistoryRepo.ListStatuses(th.Context, func(o *models.ListRunsOptions) {
+		options := &models.ListStatusesOptions{Limit: 3}
+		statuses, err := th.HistoryRepo.ListStatuses(th.Context, func(o *models.ListStatusesOptions) {
 			o.Limit = options.Limit
 		}, models.WithFrom(models.NewUTC(ts)))
 

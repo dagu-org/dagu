@@ -80,7 +80,7 @@ func New(baseDir string, opts ...HistoryStorageOption) models.HistoryRepository 
 
 // ListStatuses retrieves status records based on the provided options.
 // It supports filtering by time range, status, and limiting the number of results.
-func (db *localStorage) ListStatuses(ctx context.Context, opts ...models.ListRunOption) ([]*models.Status, error) {
+func (db *localStorage) ListStatuses(ctx context.Context, opts ...models.ListStatusesOption) ([]*models.Status, error) {
 	// Apply options and set defaults
 	options, err := prepareListOptions(opts)
 	if err != nil {
@@ -98,8 +98,8 @@ func (db *localStorage) ListStatuses(ctx context.Context, opts ...models.ListRun
 }
 
 // prepareListOptions processes the provided options and sets default values.
-func prepareListOptions(opts []models.ListRunOption) (models.ListRunsOptions, error) {
-	var options models.ListRunsOptions
+func prepareListOptions(opts []models.ListStatusesOption) (models.ListStatusesOptions, error) {
+	var options models.ListStatusesOptions
 
 	// Apply all options
 	for _, opt := range opts {
@@ -124,7 +124,7 @@ func prepareListOptions(opts []models.ListRunOption) (models.ListRunsOptions, er
 func (db *localStorage) collectStatusesFromRoots(
 	parentCtx context.Context,
 	roots []DataRoot,
-	opts models.ListRunsOptions,
+	opts models.ListStatusesOptions,
 ) ([]*models.Status, error) {
 
 	if len(roots) == 0 {

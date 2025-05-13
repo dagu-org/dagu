@@ -621,11 +621,8 @@ paths:
                     description: "List of workflows with their status and metadata"
                     items:
                       $ref: "#/components/schemas/WorkflowSummary"
-                  pagination:
-                    $ref: "#/components/schemas/Pagination"
                 required:
                   - workflows
-                  - pagination
         default:
           description: "Generic error response"
           content:

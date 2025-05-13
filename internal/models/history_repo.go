@@ -27,7 +27,7 @@ type HistoryRepository interface {
 	// LatestRun returns the most recent workflows for the given name
 	LatestRun(ctx context.Context, name string) (Run, error)
 	// ListStatuses returns a list of statuses for the given workflow ID
-	ListStatuses(ctx context.Context, opts ...ListRunOption) ([]*Status, error)
+	ListStatuses(ctx context.Context, opts ...ListStatusesOption) ([]*Status, error)
 	// FindRun finds a run by it's workflow ID
 	FindRun(ctx context.Context, workflow digraph.WorkflowRef) (Run, error)
 	// FindChildWorkflowRun finds a child workflow record by its workflow ID
@@ -38,8 +38,8 @@ type HistoryRepository interface {
 	RenameWorkflows(ctx context.Context, oldName, newName string) error
 }
 
-// ListRunsOptions contains options for listing runs
-type ListRunsOptions struct {
+// ListStatusesOptions contains options for listing runs
+type ListStatusesOptions struct {
 	From     TimeInUTC
 	To       TimeInUTC
 	Statuses []scheduler.Status
@@ -47,25 +47,25 @@ type ListRunsOptions struct {
 }
 
 // ListRunsOption is a functional option for configuring ListRunsOptions
-type ListRunOption func(*ListRunsOptions)
+type ListStatusesOption func(*ListStatusesOptions)
 
 // WithFrom sets the start time for listing runs
-func WithFrom(from TimeInUTC) ListRunOption {
-	return func(o *ListRunsOptions) {
+func WithFrom(from TimeInUTC) ListStatusesOption {
+	return func(o *ListStatusesOptions) {
 		o.From = from
 	}
 }
 
 // WithTo sets the end time for listing runs
-func WithTo(to TimeInUTC) ListRunOption {
-	return func(o *ListRunsOptions) {
+func WithTo(to TimeInUTC) ListStatusesOption {
+	return func(o *ListStatusesOptions) {
 		o.To = to
 	}
 }
 
 // WithStatuses sets the statuses for listing runs
-func WithStatuses(statuses []scheduler.Status) ListRunOption {
-	return func(o *ListRunsOptions) {
+func WithStatuses(statuses []scheduler.Status) ListStatusesOption {
+	return func(o *ListStatusesOptions) {
 		o.Statuses = statuses
 	}
 }
