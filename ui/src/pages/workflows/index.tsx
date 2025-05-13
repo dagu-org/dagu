@@ -1,9 +1,12 @@
+import dayjs from 'dayjs';
 import { Search } from 'lucide-react';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
+import { DateRangePicker } from '../../components/ui/date-range-picker';
 import { Input } from '../../components/ui/input';
 import { AppBarContext } from '../../contexts/AppBarContext';
+import { useConfig } from '../../contexts/ConfigContext';
 import WorkflowTable from '../../features/workflows/components/workflow-list/WorkflowTable';
 import { useQuery } from '../../hooks/api';
 import LoadingIndicator from '../../ui/LoadingIndicator';
@@ -12,9 +15,54 @@ import Title from '../../ui/Title';
 function Workflows() {
   const query = new URLSearchParams(useLocation().search);
   const appBarContext = React.useContext(AppBarContext);
+  const config = useConfig();
+
+  // Extract short datetime format from URL if present
+  const parseDateFromUrl = (dateParam: string | null): string | undefined => {
+    if (!dateParam) return undefined;
+    // For datetime-local input, we need the format YYYY-MM-DDTHH:mm
+    const match = dateParam.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})/);
+    return match ? match[1] : undefined;
+  };
+
+  // Convert datetime to unix timestamp (seconds) for API calls
+  const formatDateForApi = (
+    dateString: string | undefined
+  ): number | undefined => {
+    if (!dateString) return undefined;
+
+    // Add seconds if they're missing (datetime-local inputs only have HH:mm)
+    const dateWithSeconds =
+      dateString.split(':').length < 3 ? `${dateString}:00` : dateString;
+
+    // Apply timezone offset and convert to unix timestamp (seconds)
+    if (config.tzOffsetInSec !== undefined) {
+      return dayjs(dateWithSeconds)
+        .utcOffset(config.tzOffsetInSec / 60)
+        .unix();
+    } else {
+      return dayjs(dateWithSeconds).unix();
+    }
+  };
+
+  // State for search input and date ranges
   const [searchText, setSearchText] = React.useState(query.get('name') || '');
+  const [fromDate, setFromDate] = React.useState<string | undefined>(
+    parseDateFromUrl(query.get('fromDate'))
+  );
+  const [toDate, setToDate] = React.useState<string | undefined>(
+    parseDateFromUrl(query.get('toDate'))
+  );
+
+  // State for API parameters - these will be formatted with timezone
   const [apiSearchText, setAPISearchText] = React.useState(
     query.get('name') || ''
+  );
+  const [apiFromDate, setApiFromDate] = React.useState<string | undefined>(
+    query.get('fromDate') || undefined
+  );
+  const [apiToDate, setApiToDate] = React.useState<string | undefined>(
+    query.get('toDate') || undefined
   );
 
   React.useEffect(() => {
@@ -28,12 +76,13 @@ function Workflows() {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
           name: apiSearchText ? apiSearchText : undefined,
+          fromDate: formatDateForApi(apiFromDate),
+          toDate: formatDateForApi(apiToDate),
         },
       },
     },
     {
-      // This ensures the query only runs when apiSearchText changes
-      // which is controlled by the search button or Enter key
+      // This ensures the query only runs when apiSearchText or date range changes
       revalidateIfStale: true,
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
@@ -55,8 +104,31 @@ function Workflows() {
   };
 
   const handleSearch = () => {
+    // Format dates for API and URL
+    const timestampFromDate = formatDateForApi(fromDate);
+    const timestampToDate = formatDateForApi(toDate);
+
+    // Console log for debugging
+    console.log('Search with dates:', {
+      from: fromDate,
+      to: toDate,
+      timestampFrom: timestampFromDate,
+      timestampTo: timestampToDate,
+      tzOffset: config.tzOffsetInSec,
+    });
+
+    // Update API state with raw datetime values
     setAPISearchText(searchText);
+    setApiFromDate(fromDate);
+    setApiToDate(toDate);
+
+    // Update URL parameters with timestamp values
     addSearchParam('name', searchText);
+    addSearchParam(
+      'fromDate',
+      timestampFromDate ? timestampFromDate.toString() : ''
+    );
+    addSearchParam('toDate', timestampToDate ? timestampToDate.toString() : '');
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -69,6 +141,25 @@ function Workflows() {
     }
   };
 
+  // Format timezone offset for display
+  const formatTimezoneOffset = (): string => {
+    if (config.tzOffsetInSec === undefined) return '';
+
+    // Convert seconds to hours and minutes
+    const offsetInMinutes = config.tzOffsetInSec / 60;
+    const hours = Math.floor(Math.abs(offsetInMinutes) / 60);
+    const minutes = Math.abs(offsetInMinutes) % 60;
+
+    // Format with sign and padding
+    const sign = offsetInMinutes >= 0 ? '+' : '-';
+    const formattedHours = hours.toString().padStart(2, '0');
+    const formattedMinutes = minutes.toString().padStart(2, '0');
+
+    return `(${sign}${formattedHours}:${formattedMinutes})`;
+  };
+
+  const tzLabel = formatTimezoneOffset();
+
   return (
     <div className="flex flex-col">
       <Title>Workflows</Title>
@@ -79,6 +170,15 @@ function Workflows() {
           onChange={handleInputChange}
           onKeyPress={handleInputKeyPress}
           className="max-w-sm"
+        />
+        <DateRangePicker
+          fromDate={fromDate}
+          toDate={toDate}
+          onFromDateChange={setFromDate}
+          onToDateChange={setToDate}
+          fromLabel={`From ${tzLabel}`}
+          toLabel={`To ${tzLabel}`}
+          className="w-auto min-w-[340px]"
         />
         <Button onClick={handleSearch}>
           <Search size={18} className="mr-2" />

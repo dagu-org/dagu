@@ -1090,22 +1090,20 @@ components:
         $ref: "#/components/schemas/Status"
 
     DateTimeFrom:
-      name: from
+      name: fromDate
       in: query
       description: start datetime for filtering workflows in ISO 8601 format with timezone
-      example: "2023-10-01T00:00:00+09:00"
       required: false
       schema:
-        $ref: "#/components/schemas/DateTime"
+        $ref: "#/components/schemas/UnixTimestamp"
 
     DateTimeTo:
-      name: to
+      name: toDate
       in: query
       description: end datetime for filtering workflows in ISO 8601 format with timezone
-      example: "2023-10-01T00:00:00+09:00"
       required: false
       schema:
-        $ref: "#/components/schemas/DateTime"
+        $ref: "#/components/schemas/UnixTimestamp"
 
     Tail:
       name: tail
@@ -1175,11 +1173,11 @@ components:
         - "not_running"
         - "already_exists"
 
-    DateTime:
-      type: string
-      format: date-time
-      description: "Date and time in ISO 8601 format with timezone"
-      example: "2023-10-01T00:00:00+09:00"
+    UnixTimestamp:
+      type: integer
+      format: "int64"
+      description: "Unix timestamp in seconds"
+      example: 1672531199
 
     DAGFileName:
       type: string

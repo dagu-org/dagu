@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -18,12 +19,12 @@ func (a *API) ListWorkflows(ctx context.Context, request api.ListWorkflowsReques
 			scheduler.Status(*request.Params.Status),
 		}))
 	}
-	if request.Params.From != nil {
-		dt := models.NewUTC(*request.Params.From)
+	if request.Params.FromDate != nil {
+		dt := models.NewUTC(time.Unix(*request.Params.FromDate, 0))
 		opts = append(opts, models.WithFrom(dt))
 	}
-	if request.Params.To != nil {
-		dt := models.NewUTC(*request.Params.To)
+	if request.Params.ToDate != nil {
+		dt := models.NewUTC(time.Unix(*request.Params.ToDate, 0))
 		opts = append(opts, models.WithTo(dt))
 	}
 	if request.Params.Name != nil {
@@ -50,12 +51,12 @@ func (a *API) ListWorkflowsByName(ctx context.Context, request api.ListWorkflows
 			scheduler.Status(*request.Params.Status),
 		}))
 	}
-	if request.Params.From != nil {
-		dt := models.NewUTC(*request.Params.From)
+	if request.Params.FromDate != nil {
+		dt := models.NewUTC(time.Unix(*request.Params.FromDate, 0))
 		opts = append(opts, models.WithFrom(dt))
 	}
-	if request.Params.To != nil {
-		dt := models.NewUTC(*request.Params.To)
+	if request.Params.ToDate != nil {
+		dt := models.NewUTC(time.Unix(*request.Params.ToDate, 0))
 		opts = append(opts, models.WithTo(dt))
 	}
 
