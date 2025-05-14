@@ -6,6 +6,8 @@ import { statusColorMapping } from '../../../consts';
 import { useConfig } from '../../../contexts/ConfigContext';
 import dayjs from '../../../lib/dayjs';
 import WorkflowDetailsModal from '../../workflows/components/workflow-details/WorkflowDetailsModal';
+import { Button } from '@/components/ui/button';
+import { ZoomIn, ZoomOut, Maximize, Clock, RotateCcw } from 'lucide-react';
 
 type Props = {
   data: components['schemas']['WorkflowSummary'][];
@@ -72,6 +74,15 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
       ? dayjs.unix(selectedDate.endTimestamp)
       : now.endOf('day');
 
+    // Store the initial view range for reset functionality
+    if (!timelineInstance.current) {
+      // Store initial view range in a ref
+      initialViewRef.current = {
+        start: viewStartDate.toDate(),
+        end: viewEndDate.toDate(),
+      };
+    }
+
     input.forEach((workflow) => {
       const status = workflow.status;
       const start = workflow.startedAt;
@@ -103,7 +114,7 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
         showMajorLabels: true,
         showMinorLabels: true,
         showTooltips: true,
-        zoomable: false,
+        zoomable: true,
         verticalScroll: true,
         timeAxis: { scale: 'hour', step: 1 },
         format: {
@@ -178,8 +189,103 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
     setIsModalOpen(false);
   };
 
+  // Reference to store initial view range for reset functionality
+  const initialViewRef = useRef<{ start: Date; end: Date } | null>(null);
+
+  // Timeline navigation handlers
+  const handleZoomIn = () => {
+    if (timelineInstance.current) {
+      timelineInstance.current.zoomIn(0.5);
+    }
+  };
+
+  const handleZoomOut = () => {
+    if (timelineInstance.current) {
+      timelineInstance.current.zoomOut(0.5);
+    }
+  };
+
+  const handleFit = () => {
+    if (timelineInstance.current) {
+      timelineInstance.current.fit();
+    }
+  };
+
+  const handleCurrent = () => {
+    if (timelineInstance.current) {
+      const now = dayjs();
+      // Move to current time with a 2-hour window
+      timelineInstance.current.setWindow(
+        now.subtract(1, 'hour').toDate(),
+        now.add(1, 'hour').toDate()
+      );
+    }
+  };
+
+  const handleReset = () => {
+    if (timelineInstance.current && initialViewRef.current) {
+      // Reset to the initial view range
+      timelineInstance.current.setWindow(
+        initialViewRef.current.start,
+        initialViewRef.current.end
+      );
+    }
+  };
+
   return (
     <TimelineWrapper>
+      <div className="flex justify-end gap-2 my-2 mr-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleCurrent}
+          title="Go to current time"
+          className="flex items-center gap-1"
+        >
+          <Clock className="h-4 w-4" />
+          <span>Current</span>
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleFit}
+          title="Fit all items in view"
+          className="flex items-center gap-1"
+        >
+          <Maximize className="h-4 w-4" />
+          <span>Fit</span>
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleZoomIn}
+          title="Zoom in"
+          className="flex items-center gap-1"
+        >
+          <ZoomIn className="h-4 w-4" />
+          <span>Zoom In</span>
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleZoomOut}
+          title="Zoom out"
+          className="flex items-center gap-1"
+        >
+          <ZoomOut className="h-4 w-4" />
+          <span>Zoom Out</span>
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleReset}
+          title="Reset view to initial state"
+          className="flex items-center gap-1"
+        >
+          <RotateCcw className="h-4 w-4" />
+          <span>Reset</span>
+        </Button>
+      </div>
       <div ref={timelineRef} style={{ width: '100%', height: '100%' }} />
       {selectedWorkflow && (
         <WorkflowDetailsModal
