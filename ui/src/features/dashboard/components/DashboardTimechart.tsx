@@ -1,10 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { DataSet, Timeline } from 'vis-timeline/standalone';
 import 'vis-timeline/styles/vis-timeline-graph2d.css';
 import { components } from '../../../api/v2/schema';
 import { statusColorMapping } from '../../../consts';
 import { useConfig } from '../../../contexts/ConfigContext';
 import dayjs from '../../../lib/dayjs';
+import WorkflowDetailsModal from '../../workflows/components/workflow-details/WorkflowDetailsModal';
 
 type Props = { data: components['schemas']['WorkflowSummary'][] };
 
@@ -21,6 +22,11 @@ function DashboardTimeChart({ data: input }: Props) {
   const timelineRef = useRef<HTMLDivElement>(null);
   const timelineInstance = useRef<Timeline | null>(null);
   const config = useConfig();
+  const [selectedWorkflow, setSelectedWorkflow] = useState<{
+    name: string;
+    workflowId: string;
+  } | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Helper function to ensure we have a valid IANA timezone
   const getValidTimezone = React.useCallback((tz: string): string => {
@@ -112,9 +118,58 @@ function DashboardTimeChart({ data: input }: Props) {
     };
   }, [input, config.tz, getValidTimezone]);
 
+  // Add click event handler whenever the timeline instance is created or updated
+  useEffect(() => {
+    const timeline = timelineInstance.current;
+    if (timeline) {
+      // Remove any existing click handlers to avoid duplicates
+      timeline.off('click');
+
+      // Add the click handler
+      timeline.on('click', (properties) => {
+        if (properties.item) {
+          const itemId = properties.item.toString();
+
+          // Find the original workflow item that matches this ID
+          const matchingWorkflow = input.find(
+            (workflow) => itemId === workflow.name + `_${workflow.workflowId}`
+          );
+
+          if (matchingWorkflow) {
+            setSelectedWorkflow({
+              name: matchingWorkflow.name,
+              workflowId: matchingWorkflow.workflowId,
+            });
+            setIsModalOpen(true);
+          }
+        }
+      });
+    }
+
+    return () => {
+      // Clean up the event handler when the component unmounts or timeline changes
+      if (timeline) {
+        timeline.off('click');
+      }
+    };
+  }, [input]); // Re-run when input data changes, as that's when timeline might be recreated
+
+  // Handle modal close
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+  };
+
   return (
     <TimelineWrapper>
       <div ref={timelineRef} style={{ width: '100%', height: '100%' }} />
+      {selectedWorkflow && (
+        <WorkflowDetailsModal
+          name={selectedWorkflow.name}
+          workflowId={selectedWorkflow.workflowId}
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+        />
+      )}
       <style>
         {`
         .vis-item .vis-item-overflow {
