@@ -36,6 +36,16 @@ func init() {
 	Register(gitCheckOutExecutorType, newCheckout)
 }
 
+type refType string
+
+const (
+	refTypeEmpty  refType = ""
+	refTypeBranch refType = "branch"
+	refTypeTag    refType = "tag"
+	refTypeCommit refType = "commit"
+	refTypeRefs   refType = "refs"
+)
+
 type gitCheckoutExecConfigDefinition struct {
 	Repo     string
 	Ref      string
@@ -70,6 +80,31 @@ func (g *gitCheckoutExecConfigDefinition) getRepoCachePath() string {
 	cacheDir := filepath.Join(homeDir, ".cache", "dagu", "git")
 
 	return filepath.Join(cacheDir, cleaned)
+}
+
+func (g *gitCheckoutExecConfigDefinition) getRefType() (refType, error) {
+	var (
+		tagRegex  = regexp.MustCompile(`^v(\d+\.)+\d+$`)
+		hashRegex = regexp.MustCompile(`^[0-9a-f]{40}$`)
+	)
+
+	if g.Ref == "" {
+		return refTypeEmpty, errors.New("ref is required")
+	}
+
+	if strings.HasPrefix(g.Ref, "refs") {
+		return refTypeRefs, nil
+	}
+
+	if tagRegex.MatchString(g.Ref) {
+		return refTypeTag, nil
+	}
+
+	if hashRegex.MatchString(g.Ref) {
+		return refTypeCommit, nil
+	}
+
+	return refTypeBranch, nil
 }
 
 type gitCheckoutExecAuthConfigDefinition struct {
@@ -150,6 +185,7 @@ func (g *gitCheckoutExecConfigDefinition) authMethod() (transport.AuthMethod, er
 type gitCheckoutExecConfig struct {
 	repo          string
 	ref           string
+	refType       refType
 	path          string
 	depth         int
 	progress      bool
@@ -164,7 +200,7 @@ type gitCheckout struct {
 	config     *gitCheckoutExecConfig
 }
 
-func convertFromDef(def *gitCheckoutExecConfigDefinition, authMethod transport.AuthMethod) *gitCheckout {
+func convertFromDef(def *gitCheckoutExecConfigDefinition, authMethod transport.AuthMethod, executorRefType refType) *gitCheckout {
 	return &gitCheckout{
 		stdout: os.Stdout,
 		stderr: os.Stderr,
@@ -176,6 +212,7 @@ func convertFromDef(def *gitCheckoutExecConfigDefinition, authMethod transport.A
 			progress:      def.Progress,
 			cache:         def.Cache,
 			repoCachePath: def.getRepoCachePath(),
+			refType:       executorRefType,
 		},
 		authMethod: authMethod,
 	}
@@ -183,9 +220,10 @@ func convertFromDef(def *gitCheckoutExecConfigDefinition, authMethod transport.A
 
 func newCheckout(_ context.Context, step digraph.Step) (Executor, error) {
 	var (
-		def        = &gitCheckoutExecConfigDefinition{}
-		authMethod transport.AuthMethod
-		err        error
+		def             = &gitCheckoutExecConfigDefinition{}
+		authMethod      transport.AuthMethod
+		executorRefType refType
+		err             error
 	)
 
 	if err = decodeGitCheckoutConfig(step.ExecutorConfig.Config, def); err != nil {
@@ -196,7 +234,11 @@ func newCheckout(_ context.Context, step digraph.Step) (Executor, error) {
 		return nil, err
 	}
 
-	return convertFromDef(def, authMethod), nil
+	if executorRefType, err = def.getRefType(); err != nil {
+		return nil, fmt.Errorf("failed to parse ref type: %w", err)
+	}
+
+	return convertFromDef(def, authMethod, executorRefType), nil
 }
 
 func decodeGitCheckoutConfig(data map[string]any, config *gitCheckoutExecConfigDefinition) error {
@@ -266,19 +308,15 @@ func (g *gitCheckout) getFetchOptions() (*git.FetchOptions, error) {
 		fetchOptions.Progress = g.stdout
 	}
 
-	if len(g.config.ref) == 0 {
-		return nil, fmt.Errorf("ref is empty")
+	if g.config.refType == refTypeRefs {
+		fetchOptions.RefSpecs = []config.RefSpec{config.RefSpec(fmt.Sprintf("+%s:%s", g.config.ref, g.config.ref))}
 	}
 
-	if strings.HasPrefix(g.config.ref, "refs/") {
-		fetchOptions.RefSpecs = []config.RefSpec{config.RefSpec(g.config.ref)}
-	}
-
-	if g.isTag() {
+	if g.config.refType == refTypeTag {
 		fetchOptions.RefSpecs = []config.RefSpec{config.RefSpec(fmt.Sprintf("+refs/tags/%s:refs/tags/%s", g.config.ref, g.config.ref))}
 	}
 
-	if g.isHash() {
+	if g.config.refType == refTypeCommit {
 		hash := plumbing.NewHash(g.config.ref)
 		fetchOptions.RefSpecs = []config.RefSpec{config.RefSpec(fmt.Sprintf("+%[1]s:%[1]s", hash, hash))}
 		fetchOptions.Tags = git.NoTags
@@ -363,35 +401,17 @@ func (g *gitCheckout) fetch(ctx context.Context, repo *git.Repository) error {
 	return nil
 }
 
-// isTag checks if the ref is a tag or a short tag
-func (g *gitCheckout) isTag() bool {
-	var (
-		tagRegex      = regexp.MustCompile(`^refs/tags/.*$`)
-		shortTagRegex = regexp.MustCompile(`^v(\d+\.)+\d+$`)
-	)
-
-	return tagRegex.MatchString(g.config.ref) || shortTagRegex.MatchString(g.config.ref)
-}
-
-// isHash checks if the ref is a hash
-func (g *gitCheckout) isHash() bool {
-	var (
-		hashRegex = regexp.MustCompile(`^[0-9a-f]{40}$`)
-	)
-
-	return hashRegex.MatchString(g.config.ref)
-}
-
 func (g *gitCheckout) getCheckoutOptions(repo *git.Repository) (*git.CheckoutOptions, error) {
 	var (
-		isHash          = g.isHash()
-		isTag           = g.isTag()
+		isHash          = g.config.refType == refTypeCommit
+		isTag           = g.config.refType == refTypeTag
+		isRefs          = g.config.refType == refTypeRefs
 		checkoutOptions = &git.CheckoutOptions{}
 		revHash         *plumbing.Hash
 		err             error
 	)
 
-	if !isHash && !isTag {
+	if !isHash && !isTag && !isRefs {
 		checkoutOptions.Force = true
 
 		localBranchReferenceName := plumbing.NewBranchReferenceName(g.config.ref)
