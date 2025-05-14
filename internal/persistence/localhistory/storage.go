@@ -4,10 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"runtime"
+	"sort"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
@@ -16,6 +22,7 @@ import (
 // Error definitions for common issues
 var (
 	ErrWorkflowIDEmpty = errors.New("workflow ID is empty")
+	ErrTooManyResults  = errors.New("too many results found")
 )
 
 var _ models.HistoryRepository = (*localStorage)(nil)
@@ -72,6 +79,179 @@ func New(baseDir string, opts ...HistoryStorageOption) models.HistoryRepository 
 	}
 }
 
+// ListStatuses retrieves status records based on the provided options.
+// It supports filtering by time range, status, and limiting the number of results.
+func (db *localStorage) ListStatuses(ctx context.Context, opts ...models.ListStatusesOption) ([]*models.Status, error) {
+	// Apply options and set defaults
+	options, err := prepareListOptions(opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare options: %w", err)
+	}
+
+	var rootDirs []DataRoot
+	if options.ExactName == "" {
+		// Get all root directories
+		d, err := db.listRoot(ctx, options.Name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list root directories: %w", err)
+		}
+		rootDirs = d
+	} else {
+		rootDirs = append(rootDirs, NewDataRootWithPrefix(db.baseDir, options.ExactName))
+	}
+
+	// Collect and filter results
+	return db.collectStatusesFromRoots(ctx, rootDirs, options)
+}
+
+// prepareListOptions processes the provided options and sets default values.
+func prepareListOptions(opts []models.ListStatusesOption) (models.ListStatusesOptions, error) {
+	var options models.ListStatusesOptions
+
+	// Apply all options
+	for _, opt := range opts {
+		opt(&options)
+	}
+
+	// Set default time range if not specified
+	if options.From.IsZero() && options.To.IsZero() {
+		options.From = models.NewUTC(time.Now().Truncate(24 * time.Hour))
+	}
+
+	// Enforce a reasonable limit on the number of results
+	const maxLimit = 1000
+	if options.Limit == 0 || options.Limit > maxLimit {
+		options.Limit = maxLimit
+	}
+
+	return options, nil
+}
+
+// collectStatusesFromRoots gathers statuses from root directories according to the options.
+func (db *localStorage) collectStatusesFromRoots(
+	parentCtx context.Context,
+	roots []DataRoot,
+	opts models.ListStatusesOptions,
+) ([]*models.Status, error) {
+
+	if len(roots) == 0 {
+		return nil, nil
+	}
+	maxWorkers := min(runtime.NumCPU(), len(roots))
+
+	ctx, cancel := context.WithCancel(parentCtx)
+	defer cancel()
+
+	var (
+		resultsMu      sync.Mutex
+		results        = make([]*models.Status, 0, opts.Limit)
+		remaining      atomic.Int64
+		statusesFilter = make(map[scheduler.Status]struct{})
+	)
+
+	for _, status := range opts.Statuses {
+		statusesFilter[status] = struct{}{}
+	}
+	hasStatusFilter := len(statusesFilter) > 0
+
+	remaining.Store(int64(opts.Limit))
+
+	jobs := make(chan DataRoot)
+	var wg sync.WaitGroup
+
+	worker := func() {
+		defer wg.Done()
+		for root := range jobs {
+			if ctx.Err() != nil || remaining.Load() <= 0 {
+				return
+			}
+
+			workflows := root.listInRange(ctx, opts.From, opts.To, &listInRangeOpts{
+				limit: int(remaining.Load()),
+			})
+
+			statuses := make([]*models.Status, 0, len(workflows))
+			for _, workflow := range workflows {
+				if opts.WorkflowID != "" && !strings.Contains(workflow.workflowID, opts.WorkflowID) {
+					continue
+				}
+
+				run, err := workflow.LatestRun(ctx, db.cache)
+				if err != nil {
+					logger.Error(ctx, "Failed to get latest run", "err", err)
+					continue
+				}
+
+				status, err := run.ReadStatus(ctx)
+				if err != nil {
+					logger.Error(ctx, "Failed to read status", "err", err)
+					continue
+				}
+				if !hasStatusFilter {
+					statuses = append(statuses, status)
+					continue
+				}
+				if _, ok := statusesFilter[status.Status]; !ok {
+					continue
+				}
+				statuses = append(statuses, status)
+			}
+
+			taken := int64(len(workflows))
+			if d := remaining.Add(-taken); d < 0 {
+				cancel()
+			}
+
+			resultsMu.Lock()
+			results = append(results, statuses...)
+			resultsMu.Unlock()
+		}
+	}
+
+	// Start workers
+	for range maxWorkers {
+		wg.Add(1)
+		go worker()
+	}
+
+	// Send jobs to workers
+	for _, root := range roots {
+		if ctx.Err() != nil || remaining.Load() <= 0 {
+			break
+		}
+		jobs <- root
+	}
+	close(jobs)
+
+	wg.Wait()
+
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].StartedAt > results[j].StartedAt
+	})
+	if len(results) > opts.Limit {
+		results = results[:opts.Limit]
+	}
+	return results, nil
+}
+
+// getWorkflowStatus retrieves the status for a single workflow.
+func (db *localStorage) getWorkflowStatus(
+	ctx context.Context,
+	workflow *Workflow,
+) (*models.Status, error) {
+	run, err := workflow.LatestRun(ctx, db.cache)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest run: %w", err)
+	}
+
+	status, err := run.ReadStatus(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read status: %w", err)
+	}
+
+	return status, nil
+}
+
 // CreateRun creates a new history record for the specified workflow ID.
 // If opts.Root is not nil, it creates a new history record for a child workflow.
 // If opts.Retry is true, it creates a retry record for the specified workflow ID.
@@ -85,7 +265,7 @@ func (db *localStorage) CreateRun(ctx context.Context, dag *digraph.DAG, timesta
 	}
 
 	dataRoot := NewDataRoot(db.baseDir, dag.Name)
-	ts := NewUTC(timestamp)
+	ts := models.NewUTC(timestamp)
 
 	var run *Workflow
 	if opts.Retry {
@@ -118,7 +298,7 @@ func (db *localStorage) newChildRecord(ctx context.Context, dag *digraph.DAG, ti
 		return nil, fmt.Errorf("failed to find root execution: %w", err)
 	}
 
-	ts := NewUTC(timestamp)
+	ts := models.NewUTC(timestamp)
 
 	var run *Workflow
 	if opts.Retry {
@@ -193,7 +373,7 @@ func (db *localStorage) LatestRun(ctx context.Context, dagName string) (models.R
 
 	if db.latestStatusToday {
 		startOfDay := time.Now().Truncate(24 * time.Hour)
-		startOfDayInUTC := NewUTC(startOfDay)
+		startOfDayInUTC := models.NewUTC(startOfDay)
 
 		// Get the latest execution data after the start of the day.
 		exec, err := root.LatestAfter(ctx, startOfDayInUTC)
@@ -300,4 +480,25 @@ func (db *localStorage) RenameWorkflows(ctx context.Context, oldNameOrPath, newN
 	root := NewDataRoot(db.baseDir, oldNameOrPath)
 	newRoot := NewDataRoot(db.baseDir, newNameOrPath)
 	return root.Rename(ctx, newRoot)
+}
+
+// listRoot lists all root directories in the base directory.
+func (db *localStorage) listRoot(_ context.Context, include string) ([]DataRoot, error) {
+	rootDirs, err := listDirsSorted(db.baseDir, false, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list root directories: %w", err)
+	}
+
+	var roots []DataRoot
+	for _, dir := range rootDirs {
+		if include != "" && !strings.Contains(dir, include) {
+			continue
+		}
+		if fileutil.IsDir(filepath.Join(db.baseDir, dir)) {
+			root := NewDataRoot(db.baseDir, dir)
+			roots = append(roots, root)
+		}
+	}
+
+	return roots, nil
 }

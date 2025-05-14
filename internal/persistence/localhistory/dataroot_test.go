@@ -23,7 +23,6 @@ func TestDataRoot(t *testing.T) {
 
 			dr := NewDataRoot(baseDir, dagName)
 
-			assert.Equal(t, dagName, dr.dagName, "dagName should be set correctly")
 			assert.Equal(t, "test-dag", dr.prefix, "prefix should be set correctly")
 			assert.Equal(t, filepath.Join(baseDir, "test-dag", "executions"), dr.executionsDir, "path should be set correctly")
 			assert.Equal(t, filepath.Join(baseDir, "test-dag", "executions", "*", "*", "*", WorkflowDirPrefix+"*"), dr.globPattern, "globPattern should be set correctly")
@@ -35,7 +34,6 @@ func TestDataRoot(t *testing.T) {
 
 			dr := NewDataRoot(baseDir, dagName)
 
-			assert.Equal(t, dagName, dr.dagName, "dagName should be set correctly")
 			assert.Equal(t, "test-dag", dr.prefix, "prefix should have extension removed")
 		})
 
@@ -44,8 +42,6 @@ func TestDataRoot(t *testing.T) {
 			dagName := "test/dag with spaces.yaml"
 
 			dr := NewDataRoot(baseDir, dagName)
-
-			assert.Equal(t, dagName, dr.dagName, "dagName should be set correctly")
 
 			// Check that the prefix is sanitized (doesn't contain unsafe characters)
 			// The SafeName function converts to lowercase and replaces unsafe chars with _
@@ -66,7 +62,7 @@ func TestDataRootRuns(t *testing.T) {
 	t.Parallel()
 
 	t.Run("FindByWorkflowID", func(t *testing.T) {
-		ts := NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
+		ts := models.NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
 		ctx := context.Background()
 
 		root := setupTestDataRoot(t)
@@ -82,9 +78,9 @@ func TestDataRootRuns(t *testing.T) {
 	t.Run("Latest", func(t *testing.T) {
 		root := setupTestDataRoot(t)
 
-		ts1 := NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
-		ts2 := NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
-		ts3 := NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC))
+		ts1 := models.NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
+		ts2 := models.NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
+		ts3 := models.NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC))
 
 		_ = root.CreateTestExecution(t, "test-id1", ts1)
 		_ = root.CreateTestExecution(t, "test-id2", ts2)
@@ -99,10 +95,10 @@ func TestDataRootRuns(t *testing.T) {
 	t.Run("LatestAfter", func(t *testing.T) {
 		root := setupTestDataRoot(t)
 
-		ts1 := NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
-		ts2 := NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
-		ts3 := NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC))
-		ts4 := NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 1, time.UTC))
+		ts1 := models.NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
+		ts2 := models.NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
+		ts3 := models.NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC))
+		ts4 := models.NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 1, time.UTC))
 
 		_ = root.CreateTestExecution(t, "test-id1", ts1)
 		_ = root.CreateTestExecution(t, "test-id2", ts2)
@@ -122,16 +118,16 @@ func TestDataRootRuns(t *testing.T) {
 
 		for date := 1; date <= 31; date++ {
 			for hour := 0; hour < 24; hour++ {
-				ts := NewUTC(time.Date(2021, 1, date, hour, 0, 0, 0, time.UTC))
+				ts := models.NewUTC(time.Date(2021, 1, date, hour, 0, 0, 0, time.UTC))
 				_ = root.CreateTestExecution(t, fmt.Sprintf("test-id-%d-%d", date, hour), ts)
 			}
 		}
 
 		// list between 2021-01-01 05:00 and 2021-01-02 02:00
-		start := NewUTC(time.Date(2021, 1, 1, 5, 0, 0, 0, time.UTC))
-		end := NewUTC(time.Date(2021, 1, 2, 2, 0, 0, 0, time.UTC))
+		start := models.NewUTC(time.Date(2021, 1, 1, 5, 0, 0, 0, time.UTC))
+		end := models.NewUTC(time.Date(2021, 1, 2, 2, 0, 0, 0, time.UTC))
 
-		result := root.ListInRange(context.Background(), start, end)
+		result := root.listInRange(context.Background(), start, end, nil)
 		require.Len(t, result, 21, "ListInRange should return the correct")
 
 		// Check the first and last timestamps
@@ -151,7 +147,7 @@ func TestDataRootRename(t *testing.T) {
 	root := setupTestDataRoot(t)
 
 	for date := 1; date <= 3; date++ {
-		ts := NewUTC(time.Date(2021, 1, date, 0, 0, 0, 0, time.UTC))
+		ts := models.NewUTC(time.Date(2021, 1, date, 0, 0, 0, 0, time.UTC))
 		_ = root.CreateTestExecution(t, fmt.Sprintf("test-id-%d", date), ts)
 	}
 
@@ -190,7 +186,7 @@ func TestDataRootUtils(t *testing.T) {
 	assert.True(t, isEmpty, "IsEmpty should return true for empty directory")
 
 	// Add a file to the directory
-	root.CreateTestExecution(t, "test-id", NewUTC(time.Now()))
+	root.CreateTestExecution(t, "test-id", models.NewUTC(time.Now()))
 	require.NoError(t, err)
 
 	// IsEmpty should return false for non-empty directory
@@ -219,7 +215,7 @@ type DataRootTest struct {
 	Context context.Context
 }
 
-func (drt *DataRootTest) CreateTestExecution(t *testing.T, workflowID string, ts TimeInUTC) ExecutionTest {
+func (drt *DataRootTest) CreateTestExecution(t *testing.T, workflowID string, ts models.TimeInUTC) ExecutionTest {
 	t.Helper()
 
 	err := drt.Create()

@@ -64,6 +64,24 @@ func toPrecondition(obj *digraph.Condition) api.Condition {
 	}
 }
 
+func toWorkflowSummary(s models.Status) api.WorkflowSummary {
+	return api.WorkflowSummary{
+		RootWorkflowName:   s.Root.Name,
+		RootWorkflowId:     s.Root.WorkflowID,
+		ParentWorkflowName: ptrOf(s.Parent.Name),
+		ParentWorkflowId:   ptrOf(s.Parent.WorkflowID),
+		Log:                s.Log,
+		Name:               s.Name,
+		Params:             ptrOf(s.Params),
+		Pid:                ptrOf(int(s.PID)),
+		WorkflowId:         s.WorkflowID,
+		StartedAt:          s.StartedAt,
+		FinishedAt:         s.FinishedAt,
+		Status:             api.Status(s.Status),
+		StatusLabel:        api.StatusLabel(s.Status.String()),
+	}
+}
+
 func toWorkflowDetails(s models.Status) api.WorkflowDetails {
 	preconditions := make([]api.Condition, len(s.Preconditions))
 	for i, p := range s.Preconditions {

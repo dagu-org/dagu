@@ -154,27 +154,58 @@ function NodeStatusTableRow({
   const handleChildWorkflowNavigation = () => {
     if (hasChildWorkflow && node.children && node.children[0]) {
       const childWorkflowId = node.children[0].workflowId;
-      // Navigate to child workflow
-      const searchParams = new URLSearchParams();
-      searchParams.set('childWorkflowId', childWorkflowId);
 
-      // Use root workflow information from the workflow prop if available
-      if (workflow && workflow.rootWorkflowId) {
-        // If this is already a child workflow, use its root information
-        searchParams.set('workflowId', workflow.rootWorkflowId);
+      // Check if we're in a workflow context or a DAG context
+      // More reliable detection by checking the current URL path or the workflow object
+      const currentPath = window.location.pathname;
+      const isModal =
+        document.querySelector('.workflow-modal-content') !== null;
+      const isWorkflowContext =
+        workflow && (currentPath.startsWith('/workflows/') || isModal);
+
+      if (isWorkflowContext) {
+        // For workflows, use query parameters to navigate to the workflow details page
+        const searchParams = new URLSearchParams();
+        searchParams.set('childWorkflowId', childWorkflowId);
+
+        // Use root workflow information from the workflow prop if available
+        if (workflow && workflow.rootWorkflowId) {
+          // If this is already a child workflow, use its root information
+          searchParams.set('workflowId', workflow.rootWorkflowId);
+          searchParams.set('workflowName', workflow.rootWorkflowName);
+        } else {
+          // Otherwise, use the current workflow as the root
+          searchParams.set('workflowId', workflowId || '');
+          searchParams.set('workflowName', workflow?.name || name);
+        }
+
+        searchParams.set('step', node.step.name);
+        navigate(
+          `/workflows/${workflow?.name || name}?${searchParams.toString()}`
+        );
       } else {
-        // Otherwise, use the current workflow as the root
-        searchParams.set('workflowId', workflowId || '');
-      }
+        // For DAGs, use the existing approach with query parameters
+        const searchParams = new URLSearchParams();
+        searchParams.set('childWorkflowId', childWorkflowId);
 
-      // Add workflowName parameter to avoid waiting for DAG details
-      // Use the root workflow name or current workflow name
-      if (workflow) {
-        searchParams.set('workflowName', workflow.rootWorkflowName);
-      }
+        // Use root workflow information from the workflow prop if available
+        if (workflow && workflow.rootWorkflowId) {
+          // If this is already a child workflow, use its root information
+          searchParams.set('workflowId', workflow.rootWorkflowId);
+        } else {
+          // Otherwise, use the current workflow as the root
+          searchParams.set('workflowId', workflowId || '');
+        }
 
-      searchParams.set('step', node.step.name);
-      navigate(`/dags/${name}?${searchParams.toString()}`);
+        // Add workflowName parameter to avoid waiting for DAG details
+        // Use the root workflow name or current workflow name
+        if (workflow) {
+          searchParams.set('workflowName', workflow.rootWorkflowName);
+        }
+
+        searchParams.set('step', node.step.name);
+        navigate(`/dags/${name}?${searchParams.toString()}`);
+      }
     }
   };
 

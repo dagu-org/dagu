@@ -90,12 +90,36 @@ function DAGStatus({ workflow, fileName }: Props) {
           // Navigate to the child workflow status page
           const workflowId = workflow.rootWorkflowId;
 
-          // Use React Router's navigate with search params
-          // Include workflowName parameter to avoid waiting for DAG details
-          navigate({
-            pathname: `/dags/${fileName}`,
-            search: `?childWorkflowId=${childWorkflow.workflowId}&workflowId=${workflowId}&step=${n.step.name}&workflowName=${encodeURIComponent(workflow.rootWorkflowName)}`,
-          });
+          // Check if we're in a workflow context or a DAG context
+          // More reliable detection by checking the current URL path or the workflow object
+          const currentPath = window.location.pathname;
+          const isModal =
+            document.querySelector('.workflow-modal-content') !== null;
+          const isWorkflowContext =
+            currentPath.startsWith('/workflows/') || isModal;
+          if (isWorkflowContext) {
+            // For workflows, use query parameters to navigate to the workflow details page
+            const searchParams = new URLSearchParams();
+            searchParams.set('childWorkflowId', childWorkflow.workflowId);
+
+            // Use root workflow information
+            if (workflow.rootWorkflowId) {
+              searchParams.set('workflowId', workflow.rootWorkflowId);
+              searchParams.set('workflowName', workflow.rootWorkflowName);
+            } else {
+              searchParams.set('workflowId', workflow.workflowId);
+              searchParams.set('workflowName', workflow.name);
+            }
+
+            searchParams.set('step', n.step.name);
+            navigate(`/workflows/${workflow.name}?${searchParams.toString()}`);
+          } else {
+            // For DAGs, use the existing approach with query parameters
+            navigate({
+              pathname: `/dags/${fileName}`,
+              search: `?childWorkflowId=${childWorkflow.workflowId}&workflowId=${workflowId}&step=${n.step.name}&workflowName=${encodeURIComponent(workflow.rootWorkflowName)}`,
+            });
+          }
         }
       }
     },

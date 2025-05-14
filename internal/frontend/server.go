@@ -53,6 +53,7 @@ func NewServer(cfg *config.Config, dr models.DAGRepository, hr models.HistoryRep
 			BasePath:              cfg.Server.BasePath,
 			APIBasePath:           cfg.Server.APIBasePath,
 			TZ:                    cfg.Global.TZ,
+			TzOffsetInSec:         cfg.Global.TzOffsetInSec,
 			MaxDashboardPageLimit: cfg.UI.MaxDashboardPageLimit,
 			RemoteNodes:           remoteNodes,
 		},

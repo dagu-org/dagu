@@ -1,7 +1,7 @@
 import logoDark from '@/assets/images/logo_dark.png';
 import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils'; // Assuming cn utility is available
-import { BarChart2, List, Search } from 'lucide-react';
+import { BarChart2, GitBranch, List, Search } from 'lucide-react';
 import * as React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -71,9 +71,16 @@ export const mainListItems = React.forwardRef<
           onClick={onNavItemClick}
         />
         <NavItem
+          to="/workflows"
+          text="Workflows"
+          icon={<List size={18} />}
+          isOpen={isOpen}
+          onClick={onNavItemClick}
+        />
+        <NavItem
           to="/dags"
           text="DAGs"
-          icon={<List size={18} />}
+          icon={<GitBranch size={18} />}
           isOpen={isOpen}
           onClick={onNavItemClick}
         />

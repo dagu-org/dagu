@@ -1,4 +1,4 @@
-package localhistory
+package models
 
 import "time"
 

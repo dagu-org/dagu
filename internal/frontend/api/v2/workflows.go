@@ -3,12 +3,90 @@ package api
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/models"
 )
+
+func (a *API) ListWorkflows(ctx context.Context, request api.ListWorkflowsRequestObject) (api.ListWorkflowsResponseObject, error) {
+	var opts []models.ListStatusesOption
+	if request.Params.Status != nil {
+		opts = append(opts, models.WithStatuses([]scheduler.Status{
+			scheduler.Status(*request.Params.Status),
+		}))
+	}
+	if request.Params.FromDate != nil {
+		dt := models.NewUTC(time.Unix(*request.Params.FromDate, 0))
+		opts = append(opts, models.WithFrom(dt))
+	}
+	if request.Params.ToDate != nil {
+		dt := models.NewUTC(time.Unix(*request.Params.ToDate, 0))
+		opts = append(opts, models.WithTo(dt))
+	}
+	if request.Params.Name != nil {
+		opts = append(opts, models.WithName(*request.Params.Name))
+	}
+	if request.Params.WorkflowId != nil {
+		opts = append(opts, models.WithWorkflowID(*request.Params.WorkflowId))
+	}
+
+	workflows, err := a.listWorkflows(ctx, opts)
+	if err != nil {
+		return nil, fmt.Errorf("error listing workflows: %w", err)
+	}
+
+	return api.ListWorkflows200JSONResponse{
+		Workflows: workflows,
+	}, nil
+}
+
+func (a *API) ListWorkflowsByName(ctx context.Context, request api.ListWorkflowsByNameRequestObject) (api.ListWorkflowsByNameResponseObject, error) {
+	opts := []models.ListStatusesOption{
+		models.WithExactName(request.Name),
+	}
+
+	if request.Params.Status != nil {
+		opts = append(opts, models.WithStatuses([]scheduler.Status{
+			scheduler.Status(*request.Params.Status),
+		}))
+	}
+	if request.Params.FromDate != nil {
+		dt := models.NewUTC(time.Unix(*request.Params.FromDate, 0))
+		opts = append(opts, models.WithFrom(dt))
+	}
+	if request.Params.ToDate != nil {
+		dt := models.NewUTC(time.Unix(*request.Params.ToDate, 0))
+		opts = append(opts, models.WithTo(dt))
+	}
+	if request.Params.WorkflowId != nil {
+		opts = append(opts, models.WithWorkflowID(*request.Params.WorkflowId))
+	}
+
+	workflows, err := a.listWorkflows(ctx, opts)
+	if err != nil {
+		return nil, fmt.Errorf("error listing workflows: %w", err)
+	}
+
+	return api.ListWorkflowsByName200JSONResponse{
+		Workflows: workflows,
+	}, nil
+}
+
+func (a *API) listWorkflows(ctx context.Context, opts []models.ListStatusesOption) ([]api.WorkflowSummary, error) {
+	statuses, err := a.historyRepo.ListStatuses(ctx, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("error listing workflows: %w", err)
+	}
+	var workflows []api.WorkflowSummary
+	for _, status := range statuses {
+		workflows = append(workflows, toWorkflowSummary(*status))
+	}
+	return workflows, nil
+}
 
 func (a *API) GetWorkflowLog(ctx context.Context, request api.GetWorkflowLogRequestObject) (api.GetWorkflowLogResponseObject, error) {
 	dagName := request.Name

@@ -1,6 +1,10 @@
 package localhistory
 
 import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -255,5 +259,211 @@ func TestJSONDB(t *testing.T) {
 
 		require.NotNil(t, dag)
 		require.Equal(t, *rec.dag, *dag)
+	})
+}
+
+func TestListRoot(t *testing.T) {
+	t.Parallel()
+
+	// Create a temporary directory for testing
+	tmpDir := t.TempDir()
+
+	// Create test directories
+	testDirs := []string{
+		"dag1",
+		"dag2",
+		"dag3",
+	}
+
+	for _, dir := range testDirs {
+		dirPath := filepath.Join(tmpDir, dir)
+		err := os.MkdirAll(dirPath, 0750)
+		require.NoError(t, err, "Failed to create test directory")
+	}
+
+	// Create a file (should be ignored by listRoot)
+	filePath := filepath.Join(tmpDir, "not-a-dir.txt")
+	err := os.WriteFile(filePath, []byte("test"), 0600)
+	require.NoError(t, err, "Failed to create test file")
+
+	// Create localStorage instance
+	storage := &localStorage{
+		baseDir: tmpDir,
+	}
+
+	// Call listRoot
+	ctx := context.Background()
+	roots, err := storage.listRoot(ctx, "")
+	require.NoError(t, err, "listRoot should not return an error")
+
+	// Verify results
+	assert.Len(t, roots, len(testDirs), "listRoot should return the correct number of directories")
+
+	// Verify each directory is in the results
+	foundDirs := make(map[string]bool)
+	for _, root := range roots {
+		foundDirs[root.prefix] = true
+	}
+
+	for _, dir := range testDirs {
+		assert.True(t, foundDirs[dir], "listRoot should include directory %s", dir)
+	}
+}
+
+func TestListRootEmptyDirectory(t *testing.T) {
+	t.Parallel()
+
+	// Create a temporary directory for testing
+	tmpDir := t.TempDir()
+
+	// Create localStorage instance
+	storage := &localStorage{
+		baseDir: tmpDir,
+	}
+
+	// Call listRoot
+	ctx := context.Background()
+	roots, err := storage.listRoot(ctx, "")
+	require.NoError(t, err, "listRoot should not return an error")
+
+	// Verify results
+	assert.Len(t, roots, 0, "listRoot should return an empty slice for an empty directory")
+}
+
+func TestListRootNonExistentDirectory(t *testing.T) {
+	t.Parallel()
+
+	// Create a temporary directory for testing
+	tmpDir := t.TempDir()
+	nonExistentDir := filepath.Join(tmpDir, "non-existent")
+
+	// Create localStorage instance
+	storage := &localStorage{
+		baseDir: nonExistentDir,
+	}
+
+	// Call listRoot
+	ctx := context.Background()
+	roots, err := storage.listRoot(ctx, "")
+	require.NoError(t, err, "listRoot should not return an error for non-existent directory")
+
+	// Verify results
+	assert.Len(t, roots, 0, "listRoot should return an empty slice for a non-existent directory")
+}
+
+func TestListRootCanceledContext(t *testing.T) {
+	t.Parallel()
+
+	// Create a temporary directory for testing
+	tmpDir := t.TempDir()
+
+	// Create localStorage instance
+	storage := &localStorage{
+		baseDir: tmpDir,
+	}
+
+	// Create a canceled context
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel the context immediately
+
+	// Call listRoot with canceled context
+	roots, err := storage.listRoot(ctx, "")
+
+	// The function doesn't check for context cancellation, so it should still succeed
+	require.NoError(t, err, "listRoot should not return an error for canceled context")
+	assert.Len(t, roots, 0, "listRoot should return an empty slice for an empty directory")
+}
+
+func TestListStatuses(t *testing.T) {
+	t.Run("FilterByTimeRange", func(t *testing.T) {
+		th := setupTestLocalStorage(t)
+
+		// Create records with different timestamps
+		ts1 := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+		ts2 := time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
+		ts3 := time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC)
+
+		th.CreateRun(t, ts1, "workflow-id-1", scheduler.StatusSuccess)
+		th.CreateRun(t, ts2, "workflow-id-2", scheduler.StatusSuccess)
+		th.CreateRun(t, ts3, "workflow-id-3", scheduler.StatusSuccess)
+
+		// Filter by time range (only ts2 should be included)
+		from := models.NewUTC(time.Date(2021, 1, 1, 12, 0, 0, 0, time.UTC))
+		to := models.NewUTC(time.Date(2021, 1, 2, 12, 0, 0, 0, time.UTC))
+
+		statuses, err := th.HistoryRepo.ListStatuses(th.Context,
+			models.WithFrom(from),
+			models.WithTo(to),
+		)
+
+		require.NoError(t, err)
+		require.Len(t, statuses, 1)
+		assert.Equal(t, "workflow-id-2", statuses[0].WorkflowID)
+	})
+
+	t.Run("FilterByStatus", func(t *testing.T) {
+		th := setupTestLocalStorage(t)
+
+		// Create records with different statuses
+		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+		th.CreateRun(t, ts, "workflow-id-1", scheduler.StatusRunning)
+		th.CreateRun(t, ts, "workflow-id-2", scheduler.StatusError)
+		th.CreateRun(t, ts, "workflow-id-3", scheduler.StatusSuccess)
+
+		// Filter by status (only StatusError should be included)
+		statuses, err := th.HistoryRepo.ListStatuses(th.Context,
+			models.WithStatuses([]scheduler.Status{scheduler.StatusError}),
+			models.WithFrom(models.NewUTC(ts)),
+		)
+
+		require.NoError(t, err)
+		require.Len(t, statuses, 1)
+		assert.Equal(t, "workflow-id-2", statuses[0].WorkflowID)
+		assert.Equal(t, scheduler.StatusError, statuses[0].Status)
+	})
+
+	t.Run("LimitResults", func(t *testing.T) {
+		th := setupTestLocalStorage(t)
+
+		// Create multiple records
+		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+		for i := 1; i <= 5; i++ {
+			th.CreateRun(t, ts, fmt.Sprintf("workflow-id-%d", i), scheduler.StatusSuccess)
+		}
+
+		// Limit to 3 results
+		options := &models.ListStatusesOptions{Limit: 3}
+		statuses, err := th.HistoryRepo.ListStatuses(th.Context, func(o *models.ListStatusesOptions) {
+			o.Limit = options.Limit
+		}, models.WithFrom(models.NewUTC(ts)))
+
+		require.NoError(t, err)
+		require.Len(t, statuses, 3)
+	})
+
+	t.Run("SortByStartedAt", func(t *testing.T) {
+		th := setupTestLocalStorage(t)
+
+		// Create records with different timestamps
+		ts1 := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+		ts2 := time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
+		ts3 := time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC)
+
+		th.CreateRun(t, ts1, "workflow-id-1", scheduler.StatusSuccess)
+		th.CreateRun(t, ts2, "workflow-id-2", scheduler.StatusSuccess)
+		th.CreateRun(t, ts3, "workflow-id-3", scheduler.StatusSuccess)
+
+		// Get all statuses
+		statuses, err := th.HistoryRepo.ListStatuses(
+			th.Context, models.WithFrom(models.NewUTC(ts1)),
+		)
+
+		require.NoError(t, err)
+		require.Len(t, statuses, 3)
+
+		// Verify they are sorted by StartedAt in descending order
+		assert.Equal(t, "workflow-id-3", statuses[0].WorkflowID)
+		assert.Equal(t, "workflow-id-2", statuses[1].WorkflowID)
+		assert.Equal(t, "workflow-id-1", statuses[2].WorkflowID)
 	})
 }

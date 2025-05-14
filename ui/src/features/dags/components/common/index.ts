@@ -5,6 +5,7 @@
  */
 
 export { default as CreateDAGButton } from './CreateDAGButton';
+export { default as CreateDAGModal } from './CreateDAGModal';
 export { default as DAGActions } from './DAGActions';
 export { default as DAGPagination } from './DAGPagination';
 export { default as LinkTab } from './LinkTab';

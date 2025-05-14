@@ -29,7 +29,6 @@ import (
 // based on year, month, and day.
 type DataRoot struct {
 	baseDir       string               // Base directory for all DAGs
-	dagName       string               // Name of the DAG
 	prefix        string               // Sanitized prefix for directory names
 	executionsDir string               // Path to the executions directory
 	globPattern   string               // Pattern for finding run directories
@@ -48,7 +47,7 @@ type DataRoot struct {
 //   - A configured DataRoot instance
 func NewDataRoot(baseDir, dagName string) DataRoot {
 	ext := filepath.Ext(dagName)
-	root := DataRoot{baseDir: baseDir, dagName: dagName}
+	root := DataRoot{baseDir: baseDir}
 
 	base := filepath.Base(dagName)
 	if fileutil.IsYAMLFile(dagName) {
@@ -70,6 +69,18 @@ func NewDataRoot(baseDir, dagName string) DataRoot {
 	root.globPattern = filepath.Join(root.executionsDir, "*", "*", "*", WorkflowDirPrefix+"*")
 
 	return root
+}
+
+// NewDataRootWithPrefix creates a new DataRoot instance with a specified prefix.
+// This is useful for creating a DataRoot with a specific directory structure
+func NewDataRootWithPrefix(baseDir, prefix string) DataRoot {
+	executionsDir := filepath.Join(baseDir, prefix, "executions")
+	return DataRoot{
+		baseDir:       baseDir,
+		prefix:        prefix,
+		executionsDir: executionsDir,
+		globPattern:   filepath.Join(executionsDir, "*", "*", "*", WorkflowDirPrefix+"*"),
+	}
 }
 
 // FindByWorkflowID locates an runs by its workflow ID.
@@ -108,7 +119,7 @@ func (dr *DataRoot) Latest(ctx context.Context, itemLimit int) []*Workflow {
 	return runs
 }
 
-func (dr *DataRoot) LatestAfter(ctx context.Context, cutoff TimeInUTC) (*Workflow, error) {
+func (dr *DataRoot) LatestAfter(ctx context.Context, cutoff models.TimeInUTC) (*Workflow, error) {
 	runs, err := dr.listRecentRuns(ctx, 1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list recent runs: %w", err)
@@ -122,11 +133,7 @@ func (dr *DataRoot) LatestAfter(ctx context.Context, cutoff TimeInUTC) (*Workflo
 	return runs[0], nil
 }
 
-func (dr *DataRoot) ListInRange(ctx context.Context, start, end TimeInUTC) []*Workflow {
-	return dr.listInRange(ctx, start, end)
-}
-
-func (dr *DataRoot) CreateWorkflow(ts TimeInUTC, workflowID string) (*Workflow, error) {
+func (dr *DataRoot) CreateWorkflow(ts models.TimeInUTC, workflowID string) (*Workflow, error) {
 	dirName := WorkflowDirPrefix + formatWorkflowTimestamp(ts) + "_" + workflowID
 	dir := filepath.Join(dr.executionsDir, ts.Format("2006"), ts.Format("01"), ts.Format("02"), dirName)
 
@@ -240,8 +247,8 @@ func (dr DataRoot) Rename(ctx context.Context, newRoot DataRoot) error {
 // If retentionDays is positive, only files older than the specified number of days will be removed.
 // It also removes empty directories in the hierarchy.
 func (dr DataRoot) RemoveOld(ctx context.Context, retentionDays int) error {
-	keepTime := NewUTC(time.Now().AddDate(0, 0, -retentionDays))
-	runs := dr.listInRange(ctx, TimeInUTC{}, keepTime)
+	keepTime := models.NewUTC(time.Now().AddDate(0, 0, -retentionDays))
+	runs := dr.listInRange(ctx, models.TimeInUTC{}, keepTime, &listInRangeOpts{})
 
 	for _, r := range runs {
 		lastUpdate, err := r.LastUpdated(ctx)
@@ -283,7 +290,12 @@ func (dr DataRoot) removeEmptyDir(ctx context.Context, dayDir string) {
 	}
 }
 
-func (dr DataRoot) listInRange(ctx context.Context, start, end TimeInUTC) []*Workflow {
+// ListRunOpts contains options for listing runs
+type listInRangeOpts struct {
+	limit int
+}
+
+func (dr DataRoot) listInRange(ctx context.Context, start, end models.TimeInUTC, opts *listInRangeOpts) []*Workflow {
 	var result []*Workflow
 	var lock sync.Mutex
 
@@ -374,9 +386,16 @@ func (dr DataRoot) listInRange(ctx context.Context, start, end TimeInUTC) []*Wor
 					}
 					return nil
 				})
+
+				if opts != nil && opts.limit > 0 && len(result) >= opts.limit {
+					// Limit reached, break out of the loop
+					goto BREAK
+				}
 			}
 		}
 	}
+
+BREAK:
 
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].timestamp.After(result[j].timestamp)

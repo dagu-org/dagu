@@ -342,7 +342,7 @@ func createTempDir(t *testing.T) string {
 	runID, err := genRunID()
 	require.NoError(t, err)
 
-	dir, err := os.MkdirTemp("", "run_"+formatRunTimestamp(NewUTC(time.Now()))+"_"+runID)
+	dir, err := os.MkdirTemp("", "run_"+formatRunTimestamp(models.NewUTC(time.Now()))+"_"+runID)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = os.RemoveAll(dir)

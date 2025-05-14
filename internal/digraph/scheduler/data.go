@@ -9,6 +9,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
 )
@@ -183,13 +184,14 @@ func (s *Data) Setup(ctx context.Context, logFile string, startedAt time.Time) e
 
 	env := executor.GetEnv(ctx)
 
-	// Evaluate the stdout and stderr fields
+	// Evaluate the stdout field
 	stdout, err := env.EvalString(ctx, s.inner.Step.Stdout)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate stdout field: %w", err)
 	}
 	s.inner.Step.Stdout = stdout
 
+	// Evaluate the stderr field
 	stderr, err := env.EvalString(ctx, s.inner.Step.Stderr)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate stderr field: %w", err)
@@ -201,6 +203,13 @@ func (s *Data) Setup(ctx context.Context, logFile string, startedAt time.Time) e
 	if err != nil {
 		return fmt.Errorf("failed to evaluate dir field: %w", err)
 	}
+
+	// Resolve the path to the directory
+	dir, err = fileutil.ResolvePath(dir)
+	if err != nil {
+		return fmt.Errorf("failed to evaluate dir field: %w", err)
+	}
+
 	s.inner.Step.Dir = dir
 
 	return nil

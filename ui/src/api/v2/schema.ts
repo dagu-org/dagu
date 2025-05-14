@@ -276,6 +276,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all workflows
+         * @description Retrieves a list of all workflows with optional filtering by name and status
+         */
+        get: operations["listWorkflows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflows/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all workflows with a specific name
+         * @description Retrieves a list of all workflows with optional filtering by name and status
+         */
+        get: operations["listWorkflowsByName"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflows/{name}/{workflowId}": {
         parameters: {
             query?: never;
@@ -453,6 +493,12 @@ export interface components {
          * @enum {string}
          */
         ErrorCode: ErrorCode;
+        /**
+         * Format: int64
+         * @description Unix timestamp in seconds
+         * @example 1672531199
+         */
+        UnixTimestamp: number;
         /**
          * Format: regex
          * @description Name of the DAG file
@@ -772,6 +818,16 @@ export interface components {
         RemoteNode: string;
         /** @description ID of the workflow or 'latest' to get the most recent workflow */
         WorkflowId: components["schemas"]["WorkflowId"];
+        /** @description ID of the workflow or 'latest' to get the most recent workflow */
+        WorkflowIdSearch: components["schemas"]["WorkflowId"];
+        /** @description name of the workflow */
+        WorkflowName: string;
+        /** @description status of the workflow */
+        Status: components["schemas"]["Status"];
+        /** @description start datetime for filtering workflows in ISO 8601 format with timezone */
+        DateTimeFrom: components["schemas"]["UnixTimestamp"];
+        /** @description end datetime for filtering workflows in ISO 8601 format with timezone */
+        DateTimeTo: components["schemas"]["UnixTimestamp"];
         /** @description Number of lines to return from the end of the file */
         Tail: number;
         /** @description Number of lines to return from the beginning of the file */
@@ -1433,6 +1489,97 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListTagResponse"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listWorkflows: {
+        parameters: {
+            query?: {
+                /** @description status of the workflow */
+                status?: components["parameters"]["Status"];
+                /** @description start datetime for filtering workflows in ISO 8601 format with timezone */
+                fromDate?: components["parameters"]["DateTimeFrom"];
+                /** @description end datetime for filtering workflows in ISO 8601 format with timezone */
+                toDate?: components["parameters"]["DateTimeTo"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId?: components["parameters"]["WorkflowIdSearch"];
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Filter workflows by name */
+                name?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description List of workflows with their status and metadata */
+                        workflows: components["schemas"]["WorkflowSummary"][];
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listWorkflowsByName: {
+        parameters: {
+            query?: {
+                /** @description status of the workflow */
+                status?: components["parameters"]["Status"];
+                /** @description start datetime for filtering workflows in ISO 8601 format with timezone */
+                fromDate?: components["parameters"]["DateTimeFrom"];
+                /** @description end datetime for filtering workflows in ISO 8601 format with timezone */
+                toDate?: components["parameters"]["DateTimeTo"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId?: components["parameters"]["WorkflowIdSearch"];
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the workflow */
+                name: components["parameters"]["WorkflowName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description List of workflows with their status and metadata */
+                        workflows: components["schemas"]["WorkflowSummary"][];
+                    };
                 };
             };
             /** @description Generic error response */

@@ -14,11 +14,11 @@ import (
 func TestExecution(t *testing.T) {
 	t.Run("Basic", func(t *testing.T) {
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestExecution(t, "test-id-1", NewUTC(time.Now()))
+		exec := root.CreateTestExecution(t, "test-id-1", models.NewUTC(time.Now()))
 
-		ts1 := NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
-		ts2 := NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
-		ts3 := NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC))
+		ts1 := models.NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
+		ts2 := models.NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
+		ts3 := models.NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC))
 
 		_ = exec.WriteStatus(t, ts1, scheduler.StatusRunning)
 		_ = exec.WriteStatus(t, ts2, scheduler.StatusSuccess)
@@ -34,10 +34,10 @@ func TestExecution(t *testing.T) {
 	})
 	t.Run("LastUpdated", func(t *testing.T) {
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestExecution(t, "test-id-1", NewUTC(time.Now()))
+		exec := root.CreateTestExecution(t, "test-id-1", models.NewUTC(time.Now()))
 
-		ts1 := NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
-		ts2 := NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
+		ts1 := models.NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
+		ts2 := models.NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
 
 		_ = exec.WriteStatus(t, ts1, scheduler.StatusRunning)
 		run := exec.WriteStatus(t, ts2, scheduler.StatusSuccess)
@@ -58,7 +58,7 @@ type ExecutionTest struct {
 	TB testing.TB
 }
 
-func (et ExecutionTest) WriteStatus(t *testing.T, ts TimeInUTC, s scheduler.Status) *Run {
+func (et ExecutionTest) WriteStatus(t *testing.T, ts models.TimeInUTC, s scheduler.Status) *Run {
 	t.Helper()
 
 	dag := &digraph.DAG{Name: "test-dag"}

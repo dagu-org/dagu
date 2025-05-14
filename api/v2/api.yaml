@@ -597,6 +597,83 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /workflows:
+    get:
+      summary: "List all workflows"
+      description: "Retrieves a list of all workflows with optional filtering by name and status"
+      operationId: "listWorkflows"
+      tags:
+        - "workflows"
+      parameters:
+        - $ref: "#/components/parameters/Status"
+        - $ref: "#/components/parameters/DateTimeFrom"
+        - $ref: "#/components/parameters/DateTimeTo"
+        - $ref: "#/components/parameters/WorkflowIdSearch"
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: "name"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter workflows by name"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workflows:
+                    type: array
+                    description: "List of workflows with their status and metadata"
+                    items:
+                      $ref: "#/components/schemas/WorkflowSummary"
+                required:
+                  - workflows
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /workflows/{name}:
+    get:
+      summary: "List all workflows with a specific name"
+      description: "Retrieves a list of all workflows with optional filtering by name and status"
+      operationId: "listWorkflowsByName"
+      tags:
+        - "workflows"
+      parameters:
+        - $ref: "#/components/parameters/Status"
+        - $ref: "#/components/parameters/DateTimeFrom"
+        - $ref: "#/components/parameters/DateTimeTo"
+        - $ref: "#/components/parameters/WorkflowName"
+        - $ref: "#/components/parameters/WorkflowIdSearch"
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workflows:
+                    type: array
+                    description: "List of workflows with their status and metadata"
+                    items:
+                      $ref: "#/components/schemas/WorkflowSummary"
+                required:
+                  - workflows
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /workflows/{name}/{workflowId}:
     get:
       summary: "Retrieve detailed status of a workflow"
@@ -998,6 +1075,46 @@ components:
       schema:
         $ref: "#/components/schemas/WorkflowId"
 
+    WorkflowIdSearch:
+      name: workflowId
+      in: query
+      description: ID of the workflow or 'latest' to get the most recent workflow
+      required: false
+      schema:
+        $ref: "#/components/schemas/WorkflowId"
+
+    WorkflowName:
+      name: name
+      in: path
+      description: name of the workflow
+      required: true
+      schema:
+        type: string
+
+    Status:
+      name: status
+      in: query
+      description: status of the workflow
+      required: false
+      schema:
+        $ref: "#/components/schemas/Status"
+
+    DateTimeFrom:
+      name: fromDate
+      in: query
+      description: start datetime for filtering workflows in ISO 8601 format with timezone
+      required: false
+      schema:
+        $ref: "#/components/schemas/UnixTimestamp"
+
+    DateTimeTo:
+      name: toDate
+      in: query
+      description: end datetime for filtering workflows in ISO 8601 format with timezone
+      required: false
+      schema:
+        $ref: "#/components/schemas/UnixTimestamp"
+
     Tail:
       name: tail
       in: query
@@ -1065,6 +1182,12 @@ components:
         - "already_running"
         - "not_running"
         - "already_exists"
+
+    UnixTimestamp:
+      type: integer
+      format: "int64"
+      description: "Unix timestamp in seconds"
+      example: 1672531199
 
     DAGFileName:
       type: string
