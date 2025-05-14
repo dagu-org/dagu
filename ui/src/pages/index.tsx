@@ -9,6 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { AppBarContext } from '../contexts/AppBarContext';
 import { useConfig } from '../contexts/ConfigContext';
 import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
@@ -48,25 +50,37 @@ function Dashboard(): React.ReactElement | null {
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
   const [selectedWorkflow, setSelectedWorkflow] = React.useState<string>('all');
-
-  // Calculate the start of today in the configured timezone
-  const getStartOfTodayTimestamp = (): number => {
+  const [dateRange, setDateRange] = React.useState<{
+    startDate: number;
+    endDate: number | undefined;
+  }>(() => {
+    // Initialize with today's date range
     const now = dayjs();
-    // Apply timezone offset and set to beginning of day (00:00)
     const startOfDay =
       config.tzOffsetInSec !== undefined
         ? now.utcOffset(config.tzOffsetInSec / 60).startOf('day')
         : now.startOf('day');
 
-    // Return as Unix timestamp (seconds)
-    return startOfDay.unix();
+    return {
+      startDate: startOfDay.unix(),
+      endDate: undefined, // No end date by default to get all workflows until now
+    };
+  });
+
+  // Handle date change from the timeline component
+  const handleDateChange = (startTimestamp: number, endTimestamp: number) => {
+    setDateRange({
+      startDate: startTimestamp,
+      endDate: endTimestamp,
+    });
   };
 
   const { data, error, isLoading } = useQuery('/workflows', {
     params: {
       query: {
         remoteNode: appBarContext.selectedRemoteNode || 'local',
-        fromDate: getStartOfTodayTimestamp(),
+        fromDate: dateRange.startDate,
+        toDate: dateRange.endDate,
         name: selectedWorkflow !== 'all' ? selectedWorkflow : undefined,
       },
     },
@@ -206,8 +220,58 @@ function Dashboard(): React.ReactElement | null {
               )}
             </SelectContent>
           </Select>
+
+          <div className="flex items-center gap-4 ml-auto">
+            <span className="text-sm font-medium">Date:</span>
+            <div className="relative flex items-center">
+              <Input
+                type="date"
+                value={dayjs.unix(dateRange.startDate).format('YYYY-MM-DD')}
+                onChange={(e) => {
+                  const newDate = e.target.value;
+                  const date = dayjs(newDate);
+
+                  // Apply timezone offset and set to beginning of day (00:00)
+                  const startOfDay =
+                    config.tzOffsetInSec !== undefined
+                      ? date.utcOffset(config.tzOffsetInSec / 60).startOf('day')
+                      : date.startOf('day');
+
+                  // End of day (23:59:59)
+                  const endOfDay =
+                    config.tzOffsetInSec !== undefined
+                      ? date.utcOffset(config.tzOffsetInSec / 60).endOf('day')
+                      : date.endOf('day');
+
+                  handleDateChange(startOfDay.unix(), endOfDay.unix());
+                }}
+                className="h-9 w-[150px] text-center"
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const now = dayjs();
+                const startOfDay =
+                  config.tzOffsetInSec !== undefined
+                    ? now.utcOffset(config.tzOffsetInSec / 60).startOf('day')
+                    : now.startOf('day');
+
+                const endOfDay =
+                  config.tzOffsetInSec !== undefined
+                    ? now.utcOffset(config.tzOffsetInSec / 60).endOf('day')
+                    : now.endOf('day');
+
+                handleDateChange(startOfDay.unix(), endOfDay.unix());
+              }}
+            >
+              Today
+            </Button>
+          </div>
+
           {selectedWorkflow !== 'all' && (
-            <div className="text-xs text-muted-foreground ml-auto">
+            <div className="text-xs text-muted-foreground">
               Showing data for{' '}
               <span className="font-semibold">{selectedWorkflow}</span> workflow
             </div>
@@ -241,7 +305,13 @@ function Dashboard(): React.ReactElement | null {
         <div className="mt-4 overflow-x-auto">
           {' '}
           {/* Adjust height as needed */}
-          <DashboardTimeChart data={workflowsList} />
+          <DashboardTimeChart
+            data={workflowsList}
+            selectedDate={{
+              startTimestamp: dateRange.startDate,
+              endTimestamp: dateRange.endDate,
+            }}
+          />
         </div>
       </div>
     </div>

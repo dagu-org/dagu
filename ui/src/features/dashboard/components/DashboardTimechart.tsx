@@ -7,7 +7,13 @@ import { useConfig } from '../../../contexts/ConfigContext';
 import dayjs from '../../../lib/dayjs';
 import WorkflowDetailsModal from '../../workflows/components/workflow-details/WorkflowDetailsModal';
 
-type Props = { data: components['schemas']['WorkflowSummary'][] };
+type Props = {
+  data: components['schemas']['WorkflowSummary'][];
+  selectedDate?: {
+    startTimestamp: number;
+    endTimestamp?: number;
+  };
+};
 
 type TimelineItem = {
   id: string;
@@ -18,7 +24,7 @@ type TimelineItem = {
   className: string;
 };
 
-function DashboardTimeChart({ data: input }: Props) {
+function DashboardTimeChart({ data: input, selectedDate }: Props) {
   const timelineRef = useRef<HTMLDivElement>(null);
   const timelineInstance = useRef<Timeline | null>(null);
   const config = useConfig();
@@ -56,7 +62,15 @@ function DashboardTimeChart({ data: input }: Props) {
 
     const items: TimelineItem[] = [];
     const now = dayjs();
-    const startOfDay = dayjs().startOf('day');
+
+    // Use selected date for timeline view range if provided, otherwise use today
+    const viewStartDate = selectedDate
+      ? dayjs.unix(selectedDate.startTimestamp)
+      : dayjs().startOf('day');
+
+    const viewEndDate = selectedDate?.endTimestamp
+      ? dayjs.unix(selectedDate.endTimestamp)
+      : now.endOf('day');
 
     input.forEach((workflow) => {
       const status = workflow.status;
@@ -82,8 +96,8 @@ function DashboardTimeChart({ data: input }: Props) {
     if (!timelineInstance.current) {
       // For vis-timeline, we need to use the Timeline constructor with options
       timelineInstance.current = new Timeline(timelineRef.current, dataset, {
-        start: startOfDay.toDate(),
-        end: now.endOf('day').toDate(),
+        start: viewStartDate.toDate(),
+        end: viewEndDate.toDate(),
         orientation: 'top',
         stack: true,
         showMajorLabels: true,
@@ -108,6 +122,11 @@ function DashboardTimeChart({ data: input }: Props) {
       });
     } else {
       timelineInstance.current.setItems(dataset);
+      // Update the timeline window when selectedDate changes
+      timelineInstance.current.setWindow(
+        viewStartDate.toDate(),
+        viewEndDate.toDate()
+      );
     }
 
     return () => {
@@ -116,7 +135,7 @@ function DashboardTimeChart({ data: input }: Props) {
         timelineInstance.current = null;
       }
     };
-  }, [input, config.tz, getValidTimezone]);
+  }, [input, config.tz, getValidTimezone, selectedDate]);
 
   // Add click event handler whenever the timeline instance is created or updated
   useEffect(() => {
