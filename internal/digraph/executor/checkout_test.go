@@ -19,8 +19,8 @@ import (
 
 const (
 	testTagRef    = "v1.0.0"
-	testBranchRef = "main"
-	testCommitRef = "e2f9e8b0f3574ad7e12aa82c5b7c4c203fd0c4b0"
+	testBranchRef = "master"
+	testCommitRef = "e25aed53c630415498734a05f6d76011e32acdea"
 )
 
 var (
