@@ -119,7 +119,7 @@ func prepareListOptions(opts []models.ListStatusesOption) (models.ListStatusesOp
 	}
 
 	// Enforce a reasonable limit on the number of results
-	const maxLimit = 300
+	const maxLimit = 1000
 	if options.Limit == 0 || options.Limit > maxLimit {
 		options.Limit = maxLimit
 	}
