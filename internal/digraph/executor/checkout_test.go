@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"os"
 	"path/filepath"
 	"runtime"
@@ -12,6 +13,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -207,13 +209,8 @@ func TestGitCheckout_Run(t *testing.T) {
 				cacheIsExists   = true
 			)
 
-			if err = testGitCheckout.Run(ctx); err != nil {
-				t.Fatalf("failed to run git checkout: %v", err)
-			}
-
-			if err = testCase.judge(testGitCheckout.config.path); err != nil {
-				t.Fatalf("failed to judge git checkout: %v", err)
-			}
+			assert.NoError(t, testGitCheckout.Run(ctx))
+			assert.NoError(t, testCase.judge(testGitCheckout.config.path))
 
 			if _, err = os.Stat(testGitCheckout.config.repoCachePath); err != nil {
 				if errors.Is(err, os.ErrNotExist) {
@@ -223,13 +220,8 @@ func TestGitCheckout_Run(t *testing.T) {
 				}
 			}
 
-			if testCase.cache != cacheIsExists {
-				t.Fatalf("cache path exists: %v, expected: %v", cacheIsExists, testCase.cache)
-			}
-
-			if err = testCase.cleanUp(testGitCheckout); err != nil {
-				t.Fatalf("failed to clean up: %v", err)
-			}
+			assert.Equal(t, testCase.cache, cacheIsExists)
+			assert.NoError(t, testCase.cleanUp(testGitCheckout))
 		})
 	}
 }
@@ -262,62 +254,42 @@ func TestGitCheckoutWithCache(t *testing.T) {
 		repo           string
 		err            error
 	)
-
-	if repo, err = getFileRemotePath(rootPath); err != nil {
-		t.Fatalf("failed to get file remote path: %v", err)
-	}
+	repo, err = getFileRemotePath(rootPath)
+	assert.NoError(t, err)
 
 	repo = fmt.Sprintf("file:///%s", filepath.ToSlash(repo))
 
 	firstExecutor = getTestGitCheckout(repo, firstRun.ref, firstRun.cache)
 
 	// first run
-	if err = firstExecutor.Run(context.Background()); err != nil {
-		t.Fatalf("failed to run git checkout: %v", err)
-	}
+	assert.NoError(t, firstExecutor.Run(context.Background()))
 
 	// check first run
-	if err = firstRun.judge(firstExecutor.config.path); err != nil {
-		t.Fatalf("failed to judge git checkout: %v", err)
-	}
+	assert.NoError(t, firstRun.judge(firstExecutor.config.path))
 
 	// check if the cache path exists
-	if _, err = os.Stat(firstExecutor.config.repoCachePath); err != nil {
-		t.Fatalf("failed to check cache path: %v", err)
-	}
+	_, err = os.Stat(firstExecutor.config.repoCachePath)
+	assert.NoError(t, err)
 
 	// check first run cache path
-	if err = firstRun.judge(firstExecutor.config.repoCachePath); err != nil {
-		t.Fatalf("failed to judge git checkout cache: %v", err)
-	}
+	assert.NoError(t, firstRun.judge(firstExecutor.config.repoCachePath))
 
 	// second run
 	secondExecutor = getTestGitCheckout(repo, secondRun.ref, secondRun.cache)
-	if err = secondExecutor.Run(context.Background()); err != nil {
-		t.Fatalf("failed to run git checkout: %v", err)
-	}
+	assert.NoError(t, secondExecutor.Run(context.Background()))
 
-	if err = secondRun.judge(secondExecutor.config.path); err != nil {
-		t.Fatalf("failed to judge git checkout: %v", err)
-	}
+	assert.NoError(t, secondRun.judge(secondExecutor.config.path))
 
 	// check if the cache path exists
-	if _, err = os.Stat(secondExecutor.config.repoCachePath); err != nil {
-		t.Fatalf("failed to check cache path: %v", err)
-	}
+	_, err = os.Stat(secondExecutor.config.repoCachePath)
+	assert.NoError(t, err)
 
 	// check second run cache path
-	if err = firstRun.judge(secondExecutor.config.repoCachePath); err != nil {
-		t.Fatalf("failed to judge git checkout cache: %v", err)
-	}
+	assert.NoError(t, firstRun.judge(secondExecutor.config.repoCachePath))
 
-	if err = firstRun.cleanUp(firstExecutor); err != nil {
-		t.Fatalf("failed to clean up: %v", err)
-	}
-
-	if err = secondRun.cleanUp(secondExecutor); err != nil {
-		t.Fatalf("failed to clean up: %v", err)
-	}
+	// clean up
+	assert.NoError(t, firstRun.cleanUp(firstExecutor))
+	assert.NoError(t, secondRun.cleanUp(secondExecutor))
 }
 
 type repoCachePathTestcase struct {
