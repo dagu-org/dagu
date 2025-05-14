@@ -18,13 +18,15 @@ import (
 )
 
 const (
-	testTagRef    = "v1.0.0"
-	testBranchRef = "master"
-	testCommitRef = "e25aed53c630415498734a05f6d76011e32acdea"
+	testTagRef             = "v1.0.0"
+	testBranchRef          = "master"
+	testCommitRef          = "e25aed53c630415498734a05f6d76011e32acdea"
+	testBranchStartWithRef = "refs/heads/master"
+	testTagStartWithRef    = "refs/tags/v1.0.0"
 )
 
 var (
-	testPath = os.TempDir() + "/test-git-checkout"
+	testPath = "." + "/test-git-checkout"
 )
 
 func getTestGitCheckout(repo string, ref string, cache bool) *gitCheckout {
@@ -38,6 +40,7 @@ func getTestGitCheckout(repo string, ref string, cache bool) *gitCheckout {
 			Cache:    cache,
 		}
 		defAuthMethod transport.AuthMethod
+		defRefType    refType
 		err           error
 	)
 
@@ -45,7 +48,11 @@ func getTestGitCheckout(repo string, ref string, cache bool) *gitCheckout {
 		panic(err)
 	}
 
-	return convertFromDef(def, defAuthMethod)
+	if defRefType, err = def.getRefType(); err != nil {
+		panic(err)
+	}
+
+	return convertFromDef(def, defAuthMethod, defRefType)
 }
 
 type gitCheckoutCheckoutJudgeFunc func(path string) error
@@ -138,6 +145,35 @@ func commitRefJudgeFunc(path string) error {
 	return nil
 }
 
+// startWithRefJudgeFunc is a judge function for branch reference start with refs
+func startWithRefJudgeFunc(path string, ref string) error {
+	var (
+		repo *git.Repository
+		err  error
+	)
+
+	if repo, err = git.PlainOpen(path); err != nil {
+		return err
+	}
+
+	// Check if the branch reference exists
+	if _, err = repo.Reference(plumbing.ReferenceName(ref), false); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// branchStartWithRefJudgeFunc is a judge function for branch reference start with refs
+func branchStartWithRefJudgeFunc(path string) error {
+	return startWithRefJudgeFunc(path, testBranchStartWithRef)
+}
+
+// tagStartWithRefJudgeFunc is a judge function for tag reference start with refs
+func tagStartWithRefJudgeFunc(path string) error {
+	return startWithRefJudgeFunc(path, testTagStartWithRef)
+}
+
 func getTestGitCheckoutTestCases() []TestGitCheckoutTestCase {
 	return []TestGitCheckoutTestCase{
 		{
@@ -157,6 +193,18 @@ func getTestGitCheckoutTestCases() []TestGitCheckoutTestCase {
 			ref:   testCommitRef,
 			cache: false,
 			judge: commitRefJudgeFunc,
+		},
+		{
+			msg:   "branch reference start with refs",
+			ref:   testBranchStartWithRef,
+			cache: false,
+			judge: branchStartWithRefJudgeFunc,
+		},
+		{
+			msg:   "tag reference start with refs",
+			ref:   testTagStartWithRef,
+			cache: false,
+			judge: tagStartWithRefJudgeFunc,
 		},
 	}
 }
