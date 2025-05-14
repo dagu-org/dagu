@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -157,32 +159,41 @@ func getTestGitCheckoutTestCases() []TestGitCheckoutTestCase {
 	}
 }
 
-func getFileRemotePath() (string, error) {
+func getFileRemotePath(rootPath string) (string, error) {
 	var (
-		currentDir string
-		err        error
+		err error
 	)
 
-	if currentDir, err = os.Getwd(); err != nil {
+	testRepoPath := filepath.Join(rootPath, "testdata", "test-repo.git")
+
+	if _, err = os.Stat(testRepoPath); os.IsNotExist(err) {
 		return "", err
 	}
 
-	// Get the current working directory,currentDir : "workspace/internal/digraph/executor"
-	// return the path of "workspace/internal/testdata/testrepo.git"
-	currentDir = currentDir[:len(currentDir)-len("/internal/digraph/executor")]
+	return testRepoPath, nil
+}
 
-	return currentDir + "/internal/testdata/test-repo.git", nil
+// getProjectRoot returns the root directory of the project.
+func getProjectRoot(t *testing.T) string {
+	t.Helper()
+
+	_, filename, _, ok := runtime.Caller(1)
+	require.True(t, ok, "failed to get caller information")
+	rootDir := filepath.Join(filepath.Dir(filename), "..", "..")
+
+	return filepath.Clean(rootDir)
 }
 
 // TestGitCheckout_Run is a test function for the GitCheckout executor. By git file protocol
 func TestGitCheckout_Run(t *testing.T) {
 	var (
 		testCases = getTestGitCheckoutTestCases()
+		rootPath  = getProjectRoot(t)
 		repo      string
 		err       error
 	)
 
-	if repo, err = getFileRemotePath(); err != nil {
+	if repo, err = getFileRemotePath(rootPath); err != nil {
 		t.Fatalf("failed to get file remote path: %v", err)
 	}
 
@@ -243,6 +254,7 @@ func getCacheTestCache() []*TestGitCheckoutTestCase {
 func TestGitCheckoutWithCache(t *testing.T) {
 	var (
 		testcaseList   = getCacheTestCache()
+		rootPath       = getProjectRoot(t)
 		firstRun       = testcaseList[0]
 		secondRun      = testcaseList[1]
 		firstExecutor  *gitCheckout
@@ -251,7 +263,7 @@ func TestGitCheckoutWithCache(t *testing.T) {
 		err            error
 	)
 
-	if repo, err = getFileRemotePath(); err != nil {
+	if repo, err = getFileRemotePath(rootPath); err != nil {
 		t.Fatalf("failed to get file remote path: %v", err)
 	}
 
