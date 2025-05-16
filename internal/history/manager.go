@@ -22,7 +22,7 @@ import (
 // New creates a new Manager instance.
 // The Manager is used to interact with the DAG.
 func New(
-	repo models.HistoryRepository,
+	repo models.HistoryStorage,
 	executable string,
 	workDir string,
 	configPath string,
@@ -39,7 +39,7 @@ func New(
 // restarting, and retrieving status information. It communicates with the DAG
 // through a socket interface and manages execution history.
 type Manager struct {
-	historyRepo models.HistoryRepository // Store interface for persisting run data
+	historyRepo models.HistoryStorage // Store interface for persisting run data
 
 	executable string // Path to the executable used to run DAGs
 	workDir    string // Working directory for executing commands

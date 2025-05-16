@@ -136,8 +136,8 @@ type Helper struct {
 	Cancel        context.CancelFunc
 	Config        *config.Config
 	LoggingOutput *SyncBuffer
-	DAGRepo       models.DAGRepository
-	HistoryRepo   models.HistoryRepository
+	DAGRepo       models.DAStorage
+	HistoryRepo   models.HistoryStorage
 	HistoryMgr    history.Manager
 
 	tmpDir string

@@ -16,7 +16,7 @@ import (
 
 type LocalStorageTest struct {
 	Context     context.Context
-	HistoryRepo models.HistoryRepository
+	HistoryRepo models.HistoryStorage
 	TmpDir      string
 }
 
@@ -82,7 +82,7 @@ func (d DAGTest) Writer(t *testing.T, workflowID string, startedAt time.Time) Wr
 	workflow, err := root.CreateWorkflow(models.NewUTC(startedAt), workflowID)
 	require.NoError(t, err)
 
-	obj := d.th.HistoryRepo.(*localStorage)
+	obj := d.th.HistoryRepo.(*Storage)
 	run, err := workflow.CreateRun(d.th.Context, models.NewUTC(startedAt), obj.cache, WithDAG(d.DAG))
 	require.NoError(t, err)
 

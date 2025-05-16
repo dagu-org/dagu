@@ -23,8 +23,8 @@ import (
 var _ api.StrictServerInterface = (*API)(nil)
 
 type API struct {
-	dagRepo            models.DAGRepository
-	historyRepo        models.HistoryRepository
+	dagRepo            models.DAStorage
+	historyRepo        models.HistoryStorage
 	historyManager     history.Manager
 	remoteNodes        map[string]config.RemoteNode
 	apiBasePath        string
@@ -33,8 +33,8 @@ type API struct {
 }
 
 func New(
-	dr models.DAGRepository,
-	hr models.HistoryRepository,
+	dr models.DAStorage,
+	hr models.HistoryStorage,
 	hm history.Manager,
 	cfg *config.Config,
 ) *API {

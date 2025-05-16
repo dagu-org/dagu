@@ -35,7 +35,7 @@ type Context struct {
 	Flags       []commandLineFlag
 	Config      *config.Config
 	Quiet       bool
-	HistoryRepo models.HistoryRepository
+	HistoryRepo models.HistoryStorage
 	HistoryMgr  history.Manager
 }
 
@@ -127,7 +127,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 }
 
 // HistoryManager initializes a HistoryManager using the provided options. If not supplied,
-func (c *Context) HistoryManager(hr models.HistoryRepository) history.Manager {
+func (c *Context) HistoryManager(hr models.HistoryStorage) history.Manager {
 	return history.New(
 		hr,
 		c.Config.Paths.Executable,
@@ -167,7 +167,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 
 // dagRepo returns a new DAGRepository instance. It ensures that the directory exists
 // (creating it if necessary) before returning the store.
-func (c *Context) dagRepo(cache *fileutil.Cache[*digraph.DAG], searchPaths []string) (models.DAGRepository, error) {
+func (c *Context) dagRepo(cache *fileutil.Cache[*digraph.DAG], searchPaths []string) (models.DAStorage, error) {
 	dir := c.Config.Paths.DAGsDir
 	_, err := os.Stat(dir)
 	if os.IsNotExist(err) {

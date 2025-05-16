@@ -66,7 +66,7 @@ func TestJSONDB(t *testing.T) {
 
 		// Set the database to return the latest status (even if it was created today)
 		// Verify that record created before today is returned
-		obj := th.HistoryRepo.(*localStorage)
+		obj := th.HistoryRepo.(*Storage)
 		obj.latestStatusToday = false
 		run, err := th.HistoryRepo.LatestRun(th.Context, "test_DAG")
 		require.NoError(t, err)
@@ -287,7 +287,7 @@ func TestListRoot(t *testing.T) {
 	require.NoError(t, err, "Failed to create test file")
 
 	// Create localStorage instance
-	storage := &localStorage{
+	storage := &Storage{
 		baseDir: tmpDir,
 	}
 
@@ -317,7 +317,7 @@ func TestListRootEmptyDirectory(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create localStorage instance
-	storage := &localStorage{
+	storage := &Storage{
 		baseDir: tmpDir,
 	}
 
@@ -338,7 +338,7 @@ func TestListRootNonExistentDirectory(t *testing.T) {
 	nonExistentDir := filepath.Join(tmpDir, "non-existent")
 
 	// Create localStorage instance
-	storage := &localStorage{
+	storage := &Storage{
 		baseDir: nonExistentDir,
 	}
 
@@ -358,7 +358,7 @@ func TestListRootCanceledContext(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create localStorage instance
-	storage := &localStorage{
+	storage := &Storage{
 		baseDir: tmpDir,
 	}
 

@@ -6,9 +6,9 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 )
 
-// JobQueueRepository provides an interface for interacting with the underlying database
+// JobQueueStorage provides an interface for interacting with the underlying database
 // for storing and retrieving queued workflows.
-type JobQueueRepository interface {
+type JobQueueStorage interface {
 	// Enqueue adds a workflow to the queue
 	Enqueue(ctx context.Context, name string, ref digraph.WorkflowRef) error
 	// Dequeue removes a workflow from the queue

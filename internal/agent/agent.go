@@ -42,10 +42,10 @@ type Agent struct {
 	retryTarget *models.Status
 
 	// dagRepo is the database to store the DAG definitions.
-	dagRepo models.DAGRepository
+	dagRepo models.DAStorage
 
 	// historyRepo is the database to store the run history.
-	historyRepo models.HistoryRepository
+	historyRepo models.HistoryStorage
 
 	// client is the runstore client to communicate with the history.
 	client history.Manager
@@ -116,8 +116,8 @@ func New(
 	logDir string,
 	logFile string,
 	cli history.Manager,
-	dagRepo models.DAGRepository,
-	historyRepo models.HistoryRepository,
+	dagRepo models.DAStorage,
+	historyRepo models.HistoryStorage,
 	root digraph.WorkflowRef,
 	opts Options,
 ) *Agent {
@@ -646,11 +646,11 @@ func encodeError(w http.ResponseWriter, err error) {
 var _ digraph.DB = &dbClient{}
 
 type dbClient struct {
-	dagRepo     models.DAGRepository
-	historyRepo models.HistoryRepository
+	dagRepo     models.DAStorage
+	historyRepo models.HistoryStorage
 }
 
-func newDBClient(h models.HistoryRepository, d models.DAGRepository) *dbClient {
+func newDBClient(h models.HistoryStorage, d models.DAStorage) *dbClient {
 	return &dbClient{
 		historyRepo: h,
 		dagRepo:     d,

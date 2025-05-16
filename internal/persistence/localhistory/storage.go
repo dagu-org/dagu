@@ -25,10 +25,10 @@ var (
 	ErrTooManyResults  = errors.New("too many results found")
 )
 
-var _ models.HistoryRepository = (*localStorage)(nil)
+var _ models.HistoryStorage = (*Storage)(nil)
 
-// localStorage manages DAGs status files in local localStorage with high performance and reliability.
-type localStorage struct {
+// Storage manages DAGs status files in local Storage with high performance and reliability.
+type Storage struct {
 	baseDir           string                          // Base directory for all status files
 	latestStatusToday bool                            // Whether to only return today's status
 	cache             *fileutil.Cache[*models.Status] // Optional cache for read operations
@@ -61,7 +61,7 @@ func WithLatestStatusToday(latestStatusToday bool) HistoryStorageOption {
 }
 
 // New creates a new JSONDB instance with the specified options.
-func New(baseDir string, opts ...HistoryStorageOption) models.HistoryRepository {
+func New(baseDir string, opts ...HistoryStorageOption) models.HistoryStorage {
 	options := &HistoryStorageOptions{
 		LatestStatusToday: true,
 		MaxWorkers:        runtime.NumCPU(),
@@ -71,7 +71,7 @@ func New(baseDir string, opts ...HistoryStorageOption) models.HistoryRepository 
 		opt(options)
 	}
 
-	return &localStorage{
+	return &Storage{
 		baseDir:           baseDir,
 		latestStatusToday: options.LatestStatusToday,
 		cache:             options.FileCache,
@@ -81,7 +81,7 @@ func New(baseDir string, opts ...HistoryStorageOption) models.HistoryRepository 
 
 // ListStatuses retrieves status records based on the provided options.
 // It supports filtering by time range, status, and limiting the number of results.
-func (db *localStorage) ListStatuses(ctx context.Context, opts ...models.ListStatusesOption) ([]*models.Status, error) {
+func (store *Storage) ListStatuses(ctx context.Context, opts ...models.ListStatusesOption) ([]*models.Status, error) {
 	// Apply options and set defaults
 	options, err := prepareListOptions(opts)
 	if err != nil {
@@ -91,17 +91,17 @@ func (db *localStorage) ListStatuses(ctx context.Context, opts ...models.ListSta
 	var rootDirs []DataRoot
 	if options.ExactName == "" {
 		// Get all root directories
-		d, err := db.listRoot(ctx, options.Name)
+		d, err := store.listRoot(ctx, options.Name)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list root directories: %w", err)
 		}
 		rootDirs = d
 	} else {
-		rootDirs = append(rootDirs, NewDataRootWithPrefix(db.baseDir, options.ExactName))
+		rootDirs = append(rootDirs, NewDataRootWithPrefix(store.baseDir, options.ExactName))
 	}
 
 	// Collect and filter results
-	return db.collectStatusesFromRoots(ctx, rootDirs, options)
+	return store.collectStatusesFromRoots(ctx, rootDirs, options)
 }
 
 // prepareListOptions processes the provided options and sets default values.
@@ -128,7 +128,7 @@ func prepareListOptions(opts []models.ListStatusesOption) (models.ListStatusesOp
 }
 
 // collectStatusesFromRoots gathers statuses from root directories according to the options.
-func (db *localStorage) collectStatusesFromRoots(
+func (store *Storage) collectStatusesFromRoots(
 	parentCtx context.Context,
 	roots []DataRoot,
 	opts models.ListStatusesOptions,
@@ -176,7 +176,7 @@ func (db *localStorage) collectStatusesFromRoots(
 					continue
 				}
 
-				run, err := workflow.LatestRun(ctx, db.cache)
+				run, err := workflow.LatestRun(ctx, store.cache)
 				if err != nil {
 					logger.Error(ctx, "Failed to get latest run", "err", err)
 					continue
@@ -235,11 +235,11 @@ func (db *localStorage) collectStatusesFromRoots(
 }
 
 // getWorkflowStatus retrieves the status for a single workflow.
-func (db *localStorage) getWorkflowStatus(
+func (store *Storage) getWorkflowStatus(
 	ctx context.Context,
 	workflow *Workflow,
 ) (*models.Status, error) {
-	run, err := workflow.LatestRun(ctx, db.cache)
+	run, err := workflow.LatestRun(ctx, store.cache)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest run: %w", err)
 	}
@@ -255,16 +255,16 @@ func (db *localStorage) getWorkflowStatus(
 // CreateRun creates a new history record for the specified workflow ID.
 // If opts.Root is not nil, it creates a new history record for a child workflow.
 // If opts.Retry is true, it creates a retry record for the specified workflow ID.
-func (db *localStorage) CreateRun(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewRunOptions) (models.Run, error) {
+func (store *Storage) CreateRun(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewRunOptions) (models.Run, error) {
 	if workflowID == "" {
 		return nil, ErrWorkflowIDEmpty
 	}
 
 	if opts.Root != nil {
-		return db.newChildRecord(ctx, dag, timestamp, workflowID, opts)
+		return store.newChildRecord(ctx, dag, timestamp, workflowID, opts)
 	}
 
-	dataRoot := NewDataRoot(db.baseDir, dag.Name)
+	dataRoot := NewDataRoot(store.baseDir, dag.Name)
 	ts := models.NewUTC(timestamp)
 
 	var run *Workflow
@@ -282,7 +282,7 @@ func (db *localStorage) CreateRun(ctx context.Context, dag *digraph.DAG, timesta
 		run = r
 	}
 
-	record, err := run.CreateRun(ctx, ts, db.cache, WithDAG(dag))
+	record, err := run.CreateRun(ctx, ts, store.cache, WithDAG(dag))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create record: %w", err)
 	}
@@ -291,8 +291,8 @@ func (db *localStorage) CreateRun(ctx context.Context, dag *digraph.DAG, timesta
 }
 
 // newChildRecord creates a new history record for a child workflow.
-func (db *localStorage) newChildRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewRunOptions) (models.Run, error) {
-	dataRoot := NewDataRoot(db.baseDir, opts.Root.Name)
+func (b *Storage) newChildRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewRunOptions) (models.Run, error) {
+	dataRoot := NewDataRoot(b.baseDir, opts.Root.Name)
 	root, err := dataRoot.FindByWorkflowID(ctx, opts.Root.WorkflowID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find root execution: %w", err)
@@ -315,7 +315,7 @@ func (db *localStorage) newChildRecord(ctx context.Context, dag *digraph.DAG, ti
 		run = r
 	}
 
-	record, err := run.CreateRun(ctx, ts, db.cache, WithDAG(dag))
+	record, err := run.CreateRun(ctx, ts, b.cache, WithDAG(dag))
 	if err != nil {
 		logger.Error(ctx, "Failed to create child workflow record", "err", err)
 		return nil, err
@@ -325,7 +325,7 @@ func (db *localStorage) newChildRecord(ctx context.Context, dag *digraph.DAG, ti
 }
 
 // RecentRuns returns the most recent history records for the specified workflow name.
-func (db *localStorage) RecentRuns(ctx context.Context, dagName string, itemLimit int) []models.Run {
+func (store *Storage) RecentRuns(ctx context.Context, dagName string, itemLimit int) []models.Run {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -341,13 +341,13 @@ func (db *localStorage) RecentRuns(ctx context.Context, dagName string, itemLimi
 	}
 
 	// Get the latest matches
-	root := NewDataRoot(db.baseDir, dagName)
+	root := NewDataRoot(store.baseDir, dagName)
 	items := root.Latest(ctx, itemLimit)
 
 	// Get the latest record for each item
 	records := make([]models.Run, 0, len(items))
 	for _, item := range items {
-		record, err := item.LatestRun(ctx, db.cache)
+		record, err := item.LatestRun(ctx, store.cache)
 		if err != nil {
 			logger.Error(ctx, "Failed to get latest record", "err", err)
 			continue
@@ -360,7 +360,7 @@ func (db *localStorage) RecentRuns(ctx context.Context, dagName string, itemLimi
 
 // LatestRun returns the most recent history record for the specified workflow name.
 // If latestStatusToday is true, it only returns today's status.
-func (db *localStorage) LatestRun(ctx context.Context, dagName string) (models.Run, error) {
+func (store *Storage) LatestRun(ctx context.Context, dagName string) (models.Run, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -369,9 +369,9 @@ func (db *localStorage) LatestRun(ctx context.Context, dagName string) (models.R
 		// Continue with operation
 	}
 
-	root := NewDataRoot(db.baseDir, dagName)
+	root := NewDataRoot(store.baseDir, dagName)
 
-	if db.latestStatusToday {
+	if store.latestStatusToday {
 		startOfDay := time.Now().Truncate(24 * time.Hour)
 		startOfDayInUTC := models.NewUTC(startOfDay)
 
@@ -381,7 +381,7 @@ func (db *localStorage) LatestRun(ctx context.Context, dagName string) (models.R
 			return nil, fmt.Errorf("failed to get latest after: %w", err)
 		}
 
-		return exec.LatestRun(ctx, db.cache)
+		return exec.LatestRun(ctx, store.cache)
 	}
 
 	// Get the latest execution data.
@@ -389,11 +389,11 @@ func (db *localStorage) LatestRun(ctx context.Context, dagName string) (models.R
 	if len(latest) == 0 {
 		return nil, models.ErrNoStatusData
 	}
-	return latest[0].LatestRun(ctx, db.cache)
+	return latest[0].LatestRun(ctx, store.cache)
 }
 
 // FindRun finds a history record by workflow ID.
-func (db *localStorage) FindRun(ctx context.Context, ref digraph.WorkflowRef) (models.Run, error) {
+func (store *Storage) FindRun(ctx context.Context, ref digraph.WorkflowRef) (models.Run, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -406,19 +406,19 @@ func (db *localStorage) FindRun(ctx context.Context, ref digraph.WorkflowRef) (m
 		return nil, ErrWorkflowIDEmpty
 	}
 
-	root := NewDataRoot(db.baseDir, ref.Name)
+	root := NewDataRoot(store.baseDir, ref.Name)
 	run, err := root.FindByWorkflowID(ctx, ref.WorkflowID)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return run.LatestRun(ctx, db.cache)
+	return run.LatestRun(ctx, store.cache)
 }
 
 // FindChildWorkflowRun finds a child workflow by its ID.
 // It returns the latest record for the specified child workflow ID.
-func (db *localStorage) FindChildWorkflowRun(ctx context.Context, ref digraph.WorkflowRef, childWorkflowID string) (models.Run, error) {
+func (store *Storage) FindChildWorkflowRun(ctx context.Context, ref digraph.WorkflowRef, childWorkflowID string) (models.Run, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -431,7 +431,7 @@ func (db *localStorage) FindChildWorkflowRun(ctx context.Context, ref digraph.Wo
 		return nil, ErrWorkflowIDEmpty
 	}
 
-	root := NewDataRoot(db.baseDir, ref.Name)
+	root := NewDataRoot(store.baseDir, ref.Name)
 	run, err := root.FindByWorkflowID(ctx, ref.WorkflowID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find execution: %w", err)
@@ -441,7 +441,7 @@ func (db *localStorage) FindChildWorkflowRun(ctx context.Context, ref digraph.Wo
 	if err != nil {
 		return nil, fmt.Errorf("failed to find child workflow: %w", err)
 	}
-	return childWorkflow.LatestRun(ctx, db.cache)
+	return childWorkflow.LatestRun(ctx, store.cache)
 }
 
 // RemoveOldWorkflows removes old history records older than the specified retention days.
@@ -449,7 +449,7 @@ func (db *localStorage) FindChildWorkflowRun(ctx context.Context, ref digraph.Wo
 // If retentionDays is negative, no files will be removed.
 // If retentionDays is zero, all files will be removed.
 // If retentionDays is positive, only files older than the specified number of days will be removed.
-func (db *localStorage) RemoveOldWorkflows(ctx context.Context, dagName string, retentionDays int) error {
+func (store *Storage) RemoveOldWorkflows(ctx context.Context, dagName string, retentionDays int) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -463,12 +463,12 @@ func (db *localStorage) RemoveOldWorkflows(ctx context.Context, dagName string, 
 		return nil
 	}
 
-	root := NewDataRoot(db.baseDir, dagName)
+	root := NewDataRoot(store.baseDir, dagName)
 	return root.RemoveOld(ctx, retentionDays)
 }
 
 // RenameWorkflows renames all history records for the specified workflow name.
-func (db *localStorage) RenameWorkflows(ctx context.Context, oldNameOrPath, newNameOrPath string) error {
+func (store *Storage) RenameWorkflows(ctx context.Context, oldNameOrPath, newNameOrPath string) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -477,14 +477,14 @@ func (db *localStorage) RenameWorkflows(ctx context.Context, oldNameOrPath, newN
 		// Continue with operation
 	}
 
-	root := NewDataRoot(db.baseDir, oldNameOrPath)
-	newRoot := NewDataRoot(db.baseDir, newNameOrPath)
+	root := NewDataRoot(store.baseDir, oldNameOrPath)
+	newRoot := NewDataRoot(store.baseDir, newNameOrPath)
 	return root.Rename(ctx, newRoot)
 }
 
 // listRoot lists all root directories in the base directory.
-func (db *localStorage) listRoot(_ context.Context, include string) ([]DataRoot, error) {
-	rootDirs, err := listDirsSorted(db.baseDir, false, nil)
+func (store *Storage) listRoot(_ context.Context, include string) ([]DataRoot, error) {
+	rootDirs, err := listDirsSorted(store.baseDir, false, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list root directories: %w", err)
 	}
@@ -494,8 +494,8 @@ func (db *localStorage) listRoot(_ context.Context, include string) ([]DataRoot,
 		if include != "" && !strings.Contains(dir, include) {
 			continue
 		}
-		if fileutil.IsDir(filepath.Join(db.baseDir, dir)) {
-			root := NewDataRoot(db.baseDir, dir)
+		if fileutil.IsDir(filepath.Join(store.baseDir, dir)) {
+			root := NewDataRoot(store.baseDir, dir)
 			roots = append(roots, root)
 		}
 	}

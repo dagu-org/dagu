@@ -38,7 +38,7 @@ func TestMain(m *testing.M) {
 type testHelper struct {
 	manager        scheduler.JobManager
 	historyManager history.Manager
-	dagRepo        models.DAGRepository
+	dagRepo        models.DAStorage
 	config         *config.Config
 }
 
