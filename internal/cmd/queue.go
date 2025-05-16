@@ -16,6 +16,6 @@ func CmdQueue() *cobra.Command {
 
 var queueFlags = []commandLineFlag{}
 
-func runQueue(ctx *Context, _ []string) error {
+func runQueue(_ *Context, _ []string) error {
 	panic("unimplemented")
 }
