@@ -168,6 +168,8 @@ type PathsConfig struct {
 	SuspendFlagsDir string
 	AdminLogsDir    string
 	BaseConfig      string
+	HistoryDir      string
+	QueueDir        string
 }
 
 type UI struct {

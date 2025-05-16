@@ -60,6 +60,7 @@ func setupTest(t *testing.T) testHelper {
 			DataDir:         filepath.Join(tempDir, "."+build.Slug, "data"),
 			DAGsDir:         testdataDir,
 			SuspendFlagsDir: tempDir,
+			HistoryDir:      filepath.Join(tempDir, "."+build.Slug, "data", "history"),
 		},
 		Global: config.Global{WorkDir: tempDir},
 	}

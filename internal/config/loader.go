@@ -186,10 +186,15 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	// Load legacy environment variable overrides.
 	l.LoadLegacyEnv(&cfg)
 
+	// Setup the directory inside the datadir.
+	cfg.Paths.HistoryDir = filepath.Join(cfg.Paths.DataDir, "history")
+	cfg.Paths.QueueDir = filepath.Join(cfg.Paths.DataDir, "queue")
+
 	// Ensure the executable path is set.
 	if err := l.setExecutable(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to set executable: %w", err)
 	}
+
 	// Validate the final configuration.
 	if err := l.validateConfig(&cfg); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
