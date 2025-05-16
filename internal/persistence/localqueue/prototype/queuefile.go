@@ -109,7 +109,7 @@ func (q *QueueFile) AddJob(ctx context.Context, workflow digraph.WorkflowRef) er
 	return nil
 }
 
-func (q *QueueFile) Pop(ctx context.Context) (*job, error) {
+func (q *QueueFile) Pop(ctx context.Context) (*Job, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 

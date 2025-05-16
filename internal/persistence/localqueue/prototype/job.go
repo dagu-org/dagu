@@ -5,24 +5,24 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 )
 
-var _ models.QueuedItem = (*job)(nil)
+var _ models.QueuedItem = (*Job)(nil)
 
-type job struct {
+type Job struct {
 	ItemData
 }
 
-func NewJob(data ItemData) *job {
-	return &job{
+func NewJob(data ItemData) *Job {
+	return &Job{
 		ItemData: data,
 	}
 }
 
 // ID implements models.QueuedJob.
-func (j *job) ID() string {
+func (j *Job) ID() string {
 	return j.ItemData.Workflow.WorkflowID
 }
 
 // Data implements models.QueuedItem.
-func (j *job) Data() (*digraph.WorkflowRef, error) {
+func (j *Job) Data() (*digraph.WorkflowRef, error) {
 	return &j.ItemData.Workflow, nil
 }
