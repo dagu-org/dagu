@@ -113,8 +113,24 @@ Dagu can be installed in multiple ways, such as using Homebrew or downloading a 
 
 ### Via Bash script
 
+**Install the latest version:**
+
 ```sh
 curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
+```
+
+**Install a specific version:**
+
+```sh
+curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash -s -- --version <version>
+```
+
+The `<version>` can be a specific version (e.g. `v1.16.10`)
+
+**Install to a custom directory:**
+
+```sh
+curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash -s -- --install-dir <path>
 ```
 
 ### Via GitHub Releases Page
