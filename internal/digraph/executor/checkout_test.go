@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
 	"os"
 	"path/filepath"
 	"runtime"
@@ -13,6 +12,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -403,6 +403,187 @@ func TestGetRepoCachePath(t *testing.T) {
 
 			if result != testCase.expectRepo {
 				t.Fatalf("expected %s, got %s", testCase.expectRepo, result)
+			}
+		})
+	}
+}
+
+type authMethodTestcase struct {
+	msg              string
+	def              *gitCheckoutExecConfigDefinition
+	expectAuthName   string
+	expectAuthMethod bool
+	expectErr        bool
+}
+
+const testRSAPrivateKey = `
+-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEAovxthlB+eWsz4Vboz5wN1LzdXMroFsKZIJ70hNqKO0VK0eGP
+9Ndigg+eAyHIFHdsJIIPQUUKLoSNkcR+PTDit7eXkIOf65kjMG5Pycj8z+eCE2Cz
+xVmzLM6ZkKLYO/K8ROwJihKRGmdmPa6bGM1kWhXvrnPLK82KsJYUM3Ku7MLIedkw
+5uKdWLaTniUgRaHoulOa7+1QTnZuK/KxW6U3Dhci43EOvEQ3ZJHpvio+jn1vC86R
+PlkgaKUd+eOmSEDdGihs1CQvfQZMLVuiSUkFEkIacbA0QsQfZzZIJ0N6Q7oqjroO
+gkw1sDE8pIaAJz7aNBi+kRaFMiFbgpsMrZltHQIDAQABAoIBACs131evuYg5Srzg
+TMLV7bjMBagXR2bZWr2SRuN+CQ3jtg1kzsSr4br3pv3Pk/sRGkOnk6HLSwLAM8RE
+ou9YKZNpgi5XJyvQIssxQ8gMmDIKf6rhhWe5+03SzFXTRp7GIPHo3jKT75JffXS2
++PmfYo6bqDrJCkFnsfBVKa/mJMgyA45NUoZc3iAW7KMJhJWDLuJ+ZHJj85r+iAxG
+Aszmu9soXdMBaA5l8YYICoTCM2hTcbVAGrtCT69o/VOEgZSG5ykSrRxBFmwMhjJY
+R8XcaeOgI5pfKLMb/CJ/qUSsAovNpc7BLzcVYBIY3AOMTtbGTnobxWjKCAYc+QB2
+C0K5PSECgYEA1FKRWVE5T9lwP6hD2SMX74mPxEZbuxgzcedrs53raITmoMS1naDi
+0ZqaTYOi4VYYgyojsP07ALow14QUMtBRLythl9z/CM5qtI61mkfJEkCNAxlRrxeQ
+NmqND9jP591ymkPjFnhn3cp/Hx3SJdfodrxUkDPgHhkSaBLaPMGdkYUCgYEAxIOt
+nHKeWSq/AH51zN+P/mGtWwi+RURf6EMVII7z66bJU+E+nbWGjrSBqHInLeq/zI/a
+d2r9k9yXLvtUpK3PiOv3BgPqmov4KUPwr46DrgqJCKIhVGGTP79MNXU6DEA75nMj
+BnlM5GgbE8+Dpt2XHEhdLyMB6K384rUPc14PdLkCgYEAnye9eHxgP7C4aZ9SLKQX
+vyEYuYIcJOUBOzLEEwIfgluNHZoWobAGFiST4eL453zIJxohYvyPi/4FuqdxFJ3/
+HSKhp1qreghxCCOpkZqZ6KqmiVojVuKM4Z2BXA2j2ySuUWDuCtv6z9CI9eQ+sMtl
+oAuQQAAC0cztdUIcgUqJOJkCgYAOzcChXX0SSIcU+XHUWi8VwbP2fKUgwLLc41jP
+GBXF9c2K1RgLd2ZIj86IqvjKm7mRJnEVt+icX+y/rE1HDpTowqXcPSVKOSsbqLOT
+9g9zZ/XEwbnzClq2XanXCRqzW49nn9rOnQqu1izcBDDtvBmrFsR2TZPSPHElfvBI
+B5jweQKBgDth1kPUitS9Lvcrc8YHklxizQ0J3zUTBJUAjwPU25RhtG7qia6lNCUr
+Clcy8Xl3GK8Gv72Sv1VMJsg0mjYSFa2eMLdnoKlN3oIOZ4238V4p+ZgG22/R1Kmr
+lyln/UHGhbpjOyuBlhqm26eURqB1jlOC39vwPsvrwAa273Mw/kQN
+-----END RSA PRIVATE KEY-----
+`
+
+func getAuthMethodTestcaseList() ([]*authMethodTestcase, error) {
+	var (
+		err                   error
+		testCaseList          = make([]*authMethodTestcase, 0, 4)
+		tempRSAPrivateKeyFile *os.File
+	)
+
+	if tempRSAPrivateKeyFile, err = os.CreateTemp(".", "test_rsa"); err != nil {
+		return nil, err
+	}
+
+	if _, err = tempRSAPrivateKeyFile.WriteString(testRSAPrivateKey); err != nil {
+		return nil, err
+	}
+
+	testCaseList = append(testCaseList, &authMethodTestcase{})
+
+	return []*authMethodTestcase{
+		{
+			msg: "ssh protocol with ssh agent",
+			def: &gitCheckoutExecConfigDefinition{
+				Repo: "git@github.com:dagu/dagu.git",
+				Auth: gitCheckoutExecAuthConfigDefinition{
+					SSHAgent: true,
+					SSHUser:  "dagu",
+				},
+			},
+			expectAuthName:   ssh.PublicKeysCallbackName,
+			expectAuthMethod: true,
+			expectErr:        false,
+		},
+		{
+			msg: "ssh protocol with ssh key file not exist",
+			def: &gitCheckoutExecConfigDefinition{
+				Repo: "git@github.com:dagu/dagu.git",
+				Auth: gitCheckoutExecAuthConfigDefinition{
+					SSHKey: "not_exist",
+				},
+			},
+			expectAuthMethod: false,
+			expectErr:        true,
+		},
+		{
+			msg: "ssh protocol with ssh key file exist",
+			def: &gitCheckoutExecConfigDefinition{
+				Repo: "git@github.com:dagu/dagu.git",
+				Auth: gitCheckoutExecAuthConfigDefinition{
+					SSHKey: tempRSAPrivateKeyFile.Name(),
+				},
+			},
+			expectAuthName:   ssh.PublicKeysName,
+			expectAuthMethod: true,
+			expectErr:        false,
+		},
+		{
+			msg: "https protocol with username and password",
+			def: &gitCheckoutExecConfigDefinition{
+				Repo: "https://github.com/dagu/dagu.git",
+				Auth: gitCheckoutExecAuthConfigDefinition{
+					UserName: "dagu",
+					Password: "dagu",
+				},
+			},
+			expectAuthName:   "http-basic-auth",
+			expectAuthMethod: true,
+			expectErr:        false,
+		},
+		{
+			msg: "https protocol with username and token",
+			def: &gitCheckoutExecConfigDefinition{
+				Repo: "https://github.com/dagu/dagu.git",
+				Auth: gitCheckoutExecAuthConfigDefinition{
+					UserName: "dagu",
+					TokenEnv: "DAGU_TOKEN",
+				},
+			},
+			expectAuthName:   "http-basic-auth",
+			expectAuthMethod: true,
+			expectErr:        false,
+		},
+		{
+			msg: "http protocol with username and password",
+			def: &gitCheckoutExecConfigDefinition{
+				Repo: "http://github.com/dagu/dagu.git",
+				Auth: gitCheckoutExecAuthConfigDefinition{
+					UserName: "dagu",
+					Password: "dagu",
+				},
+			},
+			expectAuthName:   "http-basic-auth",
+			expectAuthMethod: true,
+			expectErr:        false,
+		},
+		{
+			msg: "http protocol with username and token",
+			def: &gitCheckoutExecConfigDefinition{
+				Repo: "http://github.com/dagu/dagu.git",
+				Auth: gitCheckoutExecAuthConfigDefinition{
+					UserName: "dagu",
+					TokenEnv: "DAGU_TOKEN",
+				},
+			},
+			expectAuthName:   "http-basic-auth",
+			expectAuthMethod: true,
+			expectErr:        false,
+		},
+		{
+			msg: "file protocol",
+			def: &gitCheckoutExecConfigDefinition{
+				Repo: "file:///tmp/dagu",
+			},
+			expectAuthMethod: false,
+			expectErr:        false,
+		},
+	}, nil
+}
+
+func TestAuthMethod(t *testing.T) {
+	assert.NoError(t, os.Setenv("DAGU_TOKEN", "dagu"))
+	defer func() {
+		assert.NoError(t, os.Unsetenv("DAGU_TOKEN"))
+	}()
+
+	testCaseList, err := getAuthMethodTestcaseList()
+	require.NoError(t, err)
+
+	for _, testCase := range testCaseList {
+		t.Run(testCase.msg, func(t *testing.T) {
+			var (
+				authMethod transport.AuthMethod
+			)
+
+			authMethod, err = testCase.def.authMethod()
+
+			assert.Equal(t, testCase.expectAuthMethod, authMethod != nil)
+			assert.Equal(t, testCase.expectErr, err != nil)
+			if testCase.expectAuthMethod {
+				assert.Equal(t, testCase.expectAuthName, authMethod.Name())
 			}
 		})
 	}
