@@ -12,7 +12,6 @@ To enable API token for Dagu, follow these steps:
   
    .. code-block:: bash
   
-       export DAGU_AUTH_TOKEN_ENABLED=1
        export DAGU_AUTH_TOKEN="<arbitrary token string>"
   
    Replace ``<arbitrary token string>`` with a random string of your choice. This string will be used as the API token for Dagu.
@@ -41,7 +40,6 @@ To enable API token for Dagu, follow these steps:
 
    .. code-block:: bash
   
-       export AUTH_BASIC_ENABLED=1
        export AUTH_BASIC_USERNAME="<username>"
        export AUTH_BASIC_PASSWORD="<password>"
   

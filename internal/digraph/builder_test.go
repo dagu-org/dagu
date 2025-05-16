@@ -15,8 +15,6 @@ import (
 )
 
 func TestBuild(t *testing.T) {
-	t.Parallel()
-
 	t.Run("SkipIfSuccessful", func(t *testing.T) {
 		t.Parallel()
 
@@ -27,7 +25,7 @@ func TestBuild(t *testing.T) {
 		t.Parallel()
 
 		th := testLoad(t, "params_with_substitution.yaml")
-		th.AssertParam(t, "1=x", "2=x")
+		th.AssertParam(t, "1=TEST_PARAM", "2=TEST_PARAM")
 	})
 	t.Run("ParamsWithQuotedValues", func(t *testing.T) {
 		t.Parallel()
@@ -134,7 +132,7 @@ func TestBuild(t *testing.T) {
 
 		th := testLoad(t, "preconditions.yaml")
 		assert.Len(t, th.Preconditions, 1)
-		assert.Equal(t, digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Preconditions[0])
+		assert.Equal(t, &digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Preconditions[0])
 	})
 	t.Run("MaxActiveRuns", func(t *testing.T) {
 		t.Parallel()
@@ -313,7 +311,7 @@ func TestBuildStep(t *testing.T) {
 		assert.Equal(t, "echo 1", th.Steps[0].CmdWithArgs)
 		assert.Equal(t, "echo", th.Steps[0].Command)
 		assert.Equal(t, []string{"1"}, th.Steps[0].Args)
-		assert.Equal(t, "step 1", th.Steps[0].Name)
+		assert.Equal(t, "step1", th.Steps[0].Name)
 	})
 	t.Run("ValidCommandInArray", func(t *testing.T) {
 		t.Parallel()
@@ -325,7 +323,7 @@ func TestBuildStep(t *testing.T) {
 			th.Steps[0].CmdArgsSys)
 		assert.Equal(t, "echo", th.Steps[0].Command)
 		assert.Equal(t, []string{"1"}, th.Steps[0].Args)
-		assert.Equal(t, "step 1", th.Steps[0].Name)
+		assert.Equal(t, "step1", th.Steps[0].Name)
 	})
 	t.Run("ValidCommandInList", func(t *testing.T) {
 		t.Parallel()
@@ -337,7 +335,7 @@ func TestBuildStep(t *testing.T) {
 			th.Steps[0].CmdArgsSys)
 		assert.Equal(t, "echo", th.Steps[0].Command)
 		assert.Equal(t, []string{"1"}, th.Steps[0].Args)
-		assert.Equal(t, "step 1", th.Steps[0].Name)
+		assert.Equal(t, "step1", th.Steps[0].Name)
 	})
 	t.Run("HTTPExecutor", func(t *testing.T) {
 		t.Parallel()
@@ -359,12 +357,12 @@ func TestBuildStep(t *testing.T) {
 			},
 		}, th.Steps[0].ExecutorConfig.Config)
 	})
-	t.Run("SubWorkflow", func(t *testing.T) {
+	t.Run("CallingSub", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "subworkflow.yaml")
+		th := testLoad(t, "calling_sub.yaml")
 		assert.Len(t, th.Steps, 1)
-		assert.Equal(t, "subworkflow", th.Steps[0].ExecutorConfig.Type)
+		assert.Equal(t, "sub", th.Steps[0].ExecutorConfig.Type)
 		assert.Equal(t, "run", th.Steps[0].Command)
 		assert.Equal(t, []string{
 			"sub_dag",
@@ -410,7 +408,7 @@ func TestBuildStep(t *testing.T) {
 		th := testLoad(t, "step_preconditions.yaml")
 		assert.Len(t, th.Steps, 1)
 		assert.Len(t, th.Steps[0].Preconditions, 1)
-		assert.Equal(t, digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Steps[0].Preconditions[0])
+		assert.Equal(t, &digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Steps[0].Preconditions[0])
 	})
 }
 

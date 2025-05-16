@@ -1,225 +1,277 @@
-import React, { useMemo } from 'react';
-import { Link, useParams, useLocation } from 'react-router-dom';
-import { GetDAGResponse } from '../../../models/api';
-import DAGStatus from '../../../components/organizations/DAGStatus';
-import { DAGContext } from '../../../contexts/DAGContext';
-import DAGSpec from '../../../components/organizations/DAGSpec';
-import ExecutionHistory from '../../../components/organizations/ExecutionHistory';
-import ExecutionLog from '../../../components/organizations/ExecutionLog';
-import { Box, Stack, Tab, Tabs } from '@mui/material';
-import Title from '../../../components/atoms/Title';
-import DAGActions from '../../../components/molecules/DAGActions';
-import DAGEditButtons from '../../../components/molecules/DAGEditButtons';
-import LoadingIndicator from '../../../components/atoms/LoadingIndicator';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { components } from '../../../api/v2/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
-import useSWR from 'swr';
-import StatusChip from '../../../components/atoms/StatusChip';
-import { CalendarToday, TimerSharp } from '@mui/icons-material';
-import moment from 'moment-timezone';
-import { SchedulerStatus, Status } from '../../../models';
-import { DAGStatusContext } from '../../../contexts/DAGStatusContext';
+import {
+  DAGDetailsContent,
+  DAGHeader,
+} from '../../../features/dags/components/dag-details';
+import { DAGContext } from '../../../features/dags/contexts/DAGContext';
+import { RootWorkflowContext } from '../../../features/dags/contexts/RootWorkflowContext';
+import { useQuery } from '../../../hooks/api';
+import dayjs from '../../../lib/dayjs';
+import LoadingIndicator from '../../../ui/LoadingIndicator';
 
 type Params = {
+  fileName: string;
   name: string;
   tab?: string;
 };
 
+type WorkflowDetails = components['schemas']['WorkflowDetails'];
+
 function DAGDetails() {
   const params = useParams<Params>();
+  const navigate = useNavigate();
   const appBarContext = React.useContext(AppBarContext);
-  const { pathname } = useLocation();
+  const [searchParams] = useSearchParams();
 
-  const baseUrl = `/dags/${encodeURI(params.name!)}`;
-  const { data, isValidating, mutate } = useSWR<GetDAGResponse>(
-    `/dags/${params.name}?tab=${params.tab ?? ''}&${new URLSearchParams(
-      window.location.search
-    ).toString()}&remoteNode=${appBarContext.selectedRemoteNode || 'local'}`,
-    null,
+  // Extract query parameters
+  const workflowId = searchParams.get('workflowId');
+  const stepName = searchParams.get('step');
+  const childWorkflowId = searchParams.get('childWorkflowId');
+  const queriedWorkflowName = searchParams.get('workflowName');
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const fileName = params.fileName || '';
+
+  // Determine active tab
+  const tab = params.tab || 'status';
+
+  // Format duration utility function
+  const formatDuration = useCallback(
+    (startDate: string, endDate: string): string => {
+      if (!startDate || !endDate) return '--';
+
+      const duration = dayjs.duration(dayjs(endDate).diff(dayjs(startDate)));
+      const hours = Math.floor(duration.asHours());
+      const minutes = duration.minutes();
+      const seconds = duration.seconds();
+
+      if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+      if (minutes > 0) return `${minutes}m ${seconds}s`;
+      return `${seconds}s`;
+    },
+    []
+  );
+
+  // Navigate to status tab
+  const navigateToStatusTab = useCallback(() => {
+    if (fileName && tab !== 'status') {
+      navigate(`/dags/${fileName}`);
+    }
+  }, [fileName, tab, navigate]);
+
+  // Handle tab changes
+  const handleTabChange = useCallback(
+    (newTab: string) => {
+      if (newTab === 'status' && fileName) {
+        navigate(`/dags/${fileName}`);
+      } else if (fileName) {
+        navigate(`/dags/${fileName}/${newTab}`);
+      }
+    },
+    [fileName, navigate]
+  );
+
+  // Fetch DAG details
+  const { data: dagData, isLoading: isLoadingDag } = useQuery(
+    '/dags/{fileName}',
+    {
+      params: {
+        query: { remoteNode },
+        path: { fileName },
+      },
+    },
     {
       refreshInterval: 2000,
     }
   );
-  const [status, setStatus] = React.useState<Status | undefined>();
 
-  const refreshFn = React.useCallback(() => {
-    setTimeout(() => mutate(), 500);
-  }, [mutate, params.name]);
+  // Use workflowName from URL if available, otherwise use the name from dagData
+  const workflowName = queriedWorkflowName || dagData?.dag?.name || '';
 
-  React.useEffect(() => {
-    if (data) {
-      appBarContext.setTitle(data.Title);
-      setStatus(data.DAG?.Status);
+  // Fetch specific workflow data if workflowId is provided
+  const { data: workflowResponse, isLoading: isLoadingWorkflow } = useQuery(
+    '/workflows/{name}/{workflowId}',
+    {
+      params: {
+        path: {
+          name: workflowName,
+          workflowId: workflowId || '',
+        },
+        query: { remoteNode },
+      },
+    },
+    {
+      isPaused: () =>
+        (!workflowName && !queriedWorkflowName) ||
+        !workflowId ||
+        !!childWorkflowId,
+      refreshInterval: 2000,
     }
-  }, [data, appBarContext]);
+  );
 
-  const tab = useMemo(() => {
-    return params.tab || 'status';
-  }, [params]);
+  // Fetch child workflow data if needed
+  const { data: childWorkflowResponse, isLoading: isLoadingChildWorkflow } =
+    useQuery(
+      '/workflows/{name}/{workflowId}/children/{childWorkflowId}',
+      {
+        params: {
+          path: {
+            name: workflowName,
+            workflowId: workflowId || '',
+            childWorkflowId: childWorkflowId || '',
+          },
+          query: { remoteNode },
+        },
+      },
+      {
+        refreshInterval: 2000,
+        isPaused: () => !childWorkflowId || !workflowId || !workflowName,
+      }
+    );
 
-  if (!params.name || !data || !data.DAG) {
+  // Determine the current workflow to display
+  let currentWorkflow: WorkflowDetails | undefined;
+  if (childWorkflowId && childWorkflowResponse?.workflowDetails) {
+    currentWorkflow = childWorkflowResponse.workflowDetails;
+  } else if (
+    workflowId &&
+    !childWorkflowId &&
+    workflowResponse?.workflowDetails
+  ) {
+    currentWorkflow = workflowResponse.workflowDetails;
+  } else if (!childWorkflowId) {
+    currentWorkflow = dagData?.latestWorkflow;
+  }
+
+  // Root workflow context state
+  const [rootWorkflowData, setRootWorkflowData] = useState<
+    WorkflowDetails | undefined
+  >(undefined);
+
+  // Update root workflow data when current workflow changes
+  // This is now the only place that updates the rootWorkflowContext
+  // The history page only changes the URL parameters
+  useEffect(() => {
+    // Set the initial value if rootWorkflowData is undefined
+    if (!rootWorkflowData) {
+      if (currentWorkflow) {
+        setRootWorkflowData(currentWorkflow);
+      } else if (dagData?.latestWorkflow) {
+        setRootWorkflowData(dagData.latestWorkflow);
+      }
+    }
+    // Always update when currentWorkflow changes, regardless of the tab
+    // This ensures the header is updated when navigating through history
+    else if (currentWorkflow) {
+      setRootWorkflowData(currentWorkflow);
+    } else if (dagData?.latestWorkflow) {
+      setRootWorkflowData(dagData.latestWorkflow);
+    }
+  }, [currentWorkflow, dagData?.latestWorkflow, rootWorkflowData]);
+
+  // Determine if basic data is loading (no DAG data available at all)
+  const isBasicLoading = !fileName || isLoadingDag || !dagData || !dagData.dag;
+
+  // Determine if content is loading (DAG data is available but workflow details are loading)
+  let isContentLoading = false;
+
+  // For non-status tabs, we don't need to wait for workflow data
+  if (tab === 'status') {
+    // Child workflow loading state
+    if (
+      childWorkflowId &&
+      (isLoadingChildWorkflow || !childWorkflowResponse?.workflowDetails)
+    ) {
+      isContentLoading = true;
+    }
+
+    // Specific workflow loading state (only for status tab)
+    else if (
+      workflowId &&
+      !childWorkflowId &&
+      (isLoadingWorkflow || !workflowResponse?.workflowDetails)
+    ) {
+      isContentLoading = true;
+    }
+
+    // No workflow data available
+    else if (!currentWorkflow && !dagData?.latestWorkflow) {
+      isContentLoading = true;
+    }
+  }
+
+  // Refresh function (placeholder for now)
+  const refreshData = useCallback(() => {
+    // This could be implemented to trigger a refresh of the data
+    // For now it's a placeholder
+  }, []);
+
+  // If basic data is loading, show full page loading indicator
+  if (isBasicLoading) {
     return <LoadingIndicator />;
   }
 
-  const ctx = {
-    data: data,
-    refresh: refreshFn,
-    name: params.name,
-  };
-
-  const statusCtx = {
-    data: status,
-    setData: setStatus,
-  };
-
-  const formatDuration = (startDate: string, endDate: string) => {
-    if (!startDate || !endDate) return '--';
-    const duration = moment.duration(moment(endDate).diff(moment(startDate)));
-    const hours = Math.floor(duration.asHours());
-    const minutes = duration.minutes();
-    const seconds = duration.seconds();
-
-    if (hours > 0) {
-      return `${hours}h ${minutes}m ${seconds}s`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${seconds}s`;
-    }
-    return `${seconds}s`;
-  };
+  // Determine which workflow to display in the header
+  // We want to show the header even when content is loading
+  const headerWorkflow = currentWorkflow || dagData?.latestWorkflow;
 
   return (
-    <DAGContext.Provider value={ctx}>
-      <DAGStatusContext.Provider value={statusCtx}>
-        <Stack
-          sx={{
-            width: '100%',
-            direction: 'column',
-          }}
-        >
-          <Box
-            sx={{
-              mx: 4,
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <Title>{data.Title}</Title>
-            <DAGStatusContext.Consumer>
-              {(status) => (
-                <DAGActions
-                  status={status.data}
-                  dag={data?.DAG?.DAG}
-                  name={params.name!}
-                  refresh={refreshFn}
-                  redirectTo={`${baseUrl}`}
-                />
-              )}
-            </DAGStatusContext.Consumer>
-          </Box>
+    <DAGContext.Provider
+      value={{
+        refresh: refreshData,
+        fileName,
+        name: workflowName,
+      }}
+    >
+      <RootWorkflowContext.Provider
+        value={{
+          data: rootWorkflowData,
+          setData: setRootWorkflowData,
+        }}
+      >
+        <div className="w-full flex flex-col">
+          {/* Always render the DAG Header when basic data is available */}
+          {dagData?.dag && headerWorkflow && (
+            <DAGHeader
+              dag={dagData.dag}
+              currentWorkflow={headerWorkflow}
+              fileName={fileName}
+              refreshFn={refreshData}
+              formatDuration={formatDuration}
+              navigateToStatusTab={navigateToStatusTab}
+            />
+          )}
 
-          {data.DAG?.Status?.Status != SchedulerStatus.None ? (
-            <Stack
-              direction="row"
-              spacing={2}
-              sx={{ mx: 4, alignItems: 'center' }}
-            >
-              {data.DAG?.Status?.Status ? (
-                <StatusChip status={data.DAG.Status.Status}>
-                  {data.DAG.Status.StatusText || ''}
-                </StatusChip>
-              ) : null}
-
-              <Stack
-                direction="row"
-                color={'text.secondary'}
-                sx={{ alignItems: 'center', ml: 1 }}
-              >
-                <CalendarToday sx={{ mr: 0.5 }} />
-                {data?.DAG?.Status?.FinishedAt
-                  ? moment(data.DAG.Status.FinishedAt).format(
-                      'MMM D, YYYY HH:mm:ss Z'
-                    )
-                  : '--'}
-              </Stack>
-
-              <Stack
-                direction="row"
-                color={'text.secondary'}
-                sx={{ alignItems: 'center', ml: 1 }}
-              >
-                <TimerSharp sx={{ mr: 0.5 }} />
-                {data?.DAG?.Status?.FinishedAt
-                  ? formatDuration(
-                      data?.DAG?.Status?.StartedAt,
-                      data?.DAG?.Status?.FinishedAt
-                    )
-                  : data?.DAG?.Status?.StartedAt
-                  ? formatDuration(
-                      data?.DAG?.Status?.StartedAt,
-                      moment().toISOString()
-                    )
-                  : '--'}
-              </Stack>
-            </Stack>
-          ) : null}
-
-          <Stack
-            sx={{
-              mx: 4,
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <Tabs value={`${pathname}`}>
-              <LinkTab label="Status" value={`${baseUrl}`} />
-              <LinkTab label="Spec" value={`${baseUrl}/spec`} />
-              <LinkTab label="History" value={`${baseUrl}/history`} />
-              {pathname == `${baseUrl}/log` ||
-              pathname == `${baseUrl}/scheduler-log` ? (
-                <Tab label="Log" value={pathname} />
-              ) : null}
-            </Tabs>
-            {pathname == `${baseUrl}/spec` ? (
-              <DAGEditButtons name={params.name} />
-            ) : null}
-          </Stack>
-
-          <Box sx={{ mx: 4, flex: 1 }}>
-            {tab == 'status' ? (
-              <DAGStatus
-                DAG={data.DAG}
-                name={params.name}
-                refresh={refreshFn}
+          {/* Show loading indicator for content area only */}
+          {isContentLoading ? (
+            <div className="flex justify-center py-8">
+              <LoadingIndicator />
+            </div>
+          ) : (
+            dagData?.dag &&
+            headerWorkflow && (
+              <DAGDetailsContent
+                fileName={fileName}
+                dag={dagData.dag}
+                currentWorkflow={headerWorkflow}
+                refreshFn={refreshData}
+                formatDuration={formatDuration}
+                activeTab={tab}
+                onTabChange={handleTabChange}
+                workflowId={currentWorkflow?.workflowId}
+                stepName={stepName}
+                isModal={false}
+                navigateToStatusTab={navigateToStatusTab}
+                skipHeader={true} // Skip header since we're rendering it separately
               />
-            ) : null}
-            {tab == 'spec' ? <DAGSpec data={data} /> : null}
-            {tab == 'history' ? (
-              <ExecutionHistory
-                logData={data.LogData}
-                isLoading={isValidating}
-              />
-            ) : null}
-            {tab == 'scheduler-log' ? <ExecutionLog log={data.ScLog} /> : null}
-            {tab == 'log' ? <ExecutionLog log={data.StepLog} /> : null}
-          </Box>
-        </Stack>
-      </DAGStatusContext.Provider>
+            )
+          )}
+        </div>
+      </RootWorkflowContext.Provider>
     </DAGContext.Provider>
   );
 }
+
 export default DAGDetails;
-
-interface LinkTabProps {
-  label?: string;
-  value: string;
-}
-
-function LinkTab({ value, ...props }: LinkTabProps) {
-  return (
-    <Link to={value}>
-      <Tab value={value} {...props} />
-    </Link>
-  );
-}

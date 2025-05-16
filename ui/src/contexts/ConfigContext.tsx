@@ -6,7 +6,8 @@ export type Config = {
   title: string;
   navbarColor: string;
   tz: string;
-  version: string;  
+  tzOffsetInSec: number | undefined;
+  version: string;
   maxDashboardPageLimit: number;
   remoteNodes: string;
 };

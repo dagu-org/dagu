@@ -63,7 +63,7 @@ func selectSSHAuthMethod(cfg *sshExecConfig) (ssh.AuthMethod, error) {
 	return ssh.Password(cfg.Password), nil
 }
 
-func newSSHExec(ctx context.Context, step digraph.Step) (Executor, error) {
+func newSSHExec(_ context.Context, step digraph.Step) (Executor, error) {
 	def := new(sshExecConfigDefinition)
 	md, err := mapstructure.NewDecoder(
 		&mapstructure.DecoderConfig{Result: def, WeaklyTypedInput: true},
@@ -81,26 +81,17 @@ func newSSHExec(ctx context.Context, step digraph.Step) (Executor, error) {
 		def.Port = "22"
 	}
 
-	stepContext := digraph.GetStepContext(ctx)
-	cfg, err := digraph.EvalStringFields(stepContext, sshExecConfig{
+	cfg := sshExecConfig{
 		User:     def.User,
 		IP:       def.IP,
 		Key:      def.Key,
 		Password: def.Password,
 		Port:     def.Port,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to substitute string fields for ssh config: %w", err)
 	}
 
 	// StrictHostKeyChecking is not supported yet.
 	if def.StrictHostKeyChecking {
 		return nil, errStrictHostKey
-	}
-
-	cfg, err = digraph.EvalStringFields(stepContext, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to substitute string fields for ssh config: %w", err)
 	}
 
 	// Select the authentication method.
@@ -155,7 +146,9 @@ func (e *sshExec) Run(_ context.Context) error {
 		return err
 	}
 	e.session = session
-	defer session.Close()
+	defer func() {
+		_ = session.Close()
+	}()
 
 	// Once a Session is created, you can execute a single command on
 	// the remote side using the Run method.
@@ -177,7 +170,7 @@ func getPublicKeySigner(path string) (ssh.Signer, error) {
 	//
 	// If you have an encrypted private key, the crypto/x509 package
 	// can be used to decrypt it.
-	key, err := os.ReadFile(path)
+	key, err := os.ReadFile(path) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}

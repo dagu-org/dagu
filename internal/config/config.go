@@ -35,12 +35,18 @@ type Global struct {
 	// TZ represents the timezone setting for the application (for example, "UTC" or "America/New_York").
 	TZ string
 
+	// TzOffsetInSec is the offset from UTC in seconds.
+	TzOffsetInSec int
+
 	// Location represents the time location for the application based on the TZ setting.
 	Location *time.Location
 
 	// WorkDir specifies the default working directory for DAG (Directed Acyclic Graph) files.
 	// If not explicitly provided, it defaults to the directory where the DAG file resides.
 	WorkDir string
+
+	// ConfigPath is the path to the configuration file used to load settings.
+	ConfigPath string
 }
 
 func (cfg *Global) setTimezone() error {
@@ -50,16 +56,24 @@ func (cfg *Global) setTimezone() error {
 			return fmt.Errorf("failed to load timezone: %w", err)
 		}
 		cfg.Location = loc
-		os.Setenv("TZ", cfg.TZ)
+
+		t := time.Now().In(loc)
+		_, offset := t.Zone()
+		cfg.TzOffsetInSec = offset
+
+		_ = os.Setenv("TZ", cfg.TZ)
 	} else {
 		_, offset := time.Now().Zone()
 		if offset == 0 {
 			cfg.TZ = "UTC"
+			cfg.TzOffsetInSec = 0
 		} else {
 			cfg.TZ = fmt.Sprintf("UTC%+d", offset/3600)
+			cfg.TzOffsetInSec = offset
 		}
 		cfg.Location = time.Local
 	}
+
 	return nil
 }
 
@@ -126,15 +140,23 @@ type Auth struct {
 
 // AuthBasic represents the basic authentication configuration
 type AuthBasic struct {
-	Enabled  bool
 	Username string
 	Password string
 }
 
+// Enabled checks if basic authentication is enabled
+func (cfg *AuthBasic) Enabled() bool {
+	return cfg.Username != "" && cfg.Password != ""
+}
+
 // AuthToken represents the authentication token configuration
 type AuthToken struct {
-	Enabled bool
-	Value   string
+	Value string
+}
+
+// Enabled checks if the authentication token is enabled
+func (cfg *AuthToken) Enabled() bool {
+	return cfg.Value != ""
 }
 
 // Paths represents the file system paths configuration

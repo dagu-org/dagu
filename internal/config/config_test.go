@@ -1,9 +1,11 @@
 package config_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/spf13/viper"
@@ -54,7 +56,7 @@ tls:
   certFile: "/path/to/cert.pem"
   keyFile: "/path/to/key.pem"
 `
-	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	err := os.WriteFile(configFile, []byte(configContent), 0600)
 	require.NoError(t, err)
 
 	// Load the configuration using the provided config file option.
@@ -68,6 +70,7 @@ tls:
 	assert.Equal(t, "UTC", cfg.Global.TZ)
 	assert.Equal(t, "/var/dagu/work", cfg.Global.WorkDir)
 	assert.NotNil(t, cfg.Global.Location)
+	assert.Equal(t, 0, cfg.Global.TzOffsetInSec)
 
 	// Verify server settings.
 	assert.Equal(t, "0.0.0.0", cfg.Server.Host)
@@ -78,7 +81,7 @@ tls:
 	assert.Equal(t, true, cfg.Server.Headless)
 
 	// Verify authentication.
-	assert.True(t, cfg.Server.Auth.Basic.Enabled)
+	assert.True(t, cfg.Server.Auth.Basic.Enabled())
 	assert.Equal(t, "admin", cfg.Server.Auth.Basic.Username)
 	assert.Equal(t, "secret", cfg.Server.Auth.Basic.Password)
 
@@ -134,16 +137,14 @@ func TestValidateConfig_BasicAuthError(t *testing.T) {
 	configContent := `
 auth:
   basic:
-    enabled: true
     username: ""
     password: "secret"
 `
-	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	err := os.WriteFile(configFile, []byte(configContent), 0600)
 	require.NoError(t, err)
 
 	_, err = config.Load(config.WithConfigFile(configFile))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "basic auth enabled but username or password is not set")
+	require.NoError(t, err)
 }
 
 func TestValidateConfig_TLSError(t *testing.T) {
@@ -156,7 +157,7 @@ tls:
   certFile: "/path/to/cert.pem"
   keyFile: ""
 `
-	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	err := os.WriteFile(configFile, []byte(configContent), 0600)
 	require.NoError(t, err)
 
 	_, err = config.Load(config.WithConfigFile(configFile))
@@ -252,7 +253,7 @@ func TestSetExecutable(t *testing.T) {
 paths:
   executable: ""
 `
-	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	err := os.WriteFile(configFile, []byte(configContent), 0600)
 	require.NoError(t, err)
 
 	cfg, err := config.Load(config.WithConfigFile(configFile))
@@ -270,7 +271,7 @@ func TestCleanBasePath(t *testing.T) {
 	configContent := `
 basePath: "////dagu//"
 `
-	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	err := os.WriteFile(configFile, []byte(configContent), 0600)
 	require.NoError(t, err)
 
 	cfg, err := config.Load(config.WithConfigFile(configFile))
@@ -322,9 +323,9 @@ func TestLoadLegacyFields_AllSet(t *testing.T) {
 	// Check that legacy fields are correctly assigned.
 	assert.Equal(t, "legacyUser", cfg.Server.Auth.Basic.Username, "BasicAuthUsername should be set")
 	assert.Equal(t, "legacyPass", cfg.Server.Auth.Basic.Password, "BasicAuthPassword should be set")
-	assert.True(t, cfg.Server.Auth.Basic.Enabled, "Basic auth should be enabled when BasicAuthUsername is set")
-	assert.True(t, cfg.Server.Auth.Token.Enabled, "Auth token should be enabled when IsAuthToken is true")
-	assert.True(t, cfg.Server.Auth.Token.Enabled, "Auth token should be enabled")
+	assert.True(t, cfg.Server.Auth.Basic.Enabled(), "Basic auth should be enabled when BasicAuthUsername is set")
+	assert.True(t, cfg.Server.Auth.Token.Enabled(), "Auth token should be enabled when IsAuthToken is true")
+	assert.True(t, cfg.Server.Auth.Token.Enabled(), "Auth token should be enabled")
 	assert.Equal(t, "legacyToken", cfg.Server.Auth.Token.Value, "Auth token value should be set")
 	// When both DAGs and DAGsDir are provided, DAGsDir takes precedence.
 	assert.Equal(t, "/usr/user/dags", cfg.Paths.DAGsDir, "DAGsDir should be set from def.DAGsDir")
@@ -355,8 +356,7 @@ func TestLoadLegacyFields_NoneSet(t *testing.T) {
 					Password: "presetPass",
 				},
 				Token: config.AuthToken{
-					Enabled: false,
-					Value:   "presetToken",
+					Value: "presetToken",
 				},
 			},
 		},
@@ -382,7 +382,6 @@ func TestLoadLegacyFields_NoneSet(t *testing.T) {
 	// Verify that none of the preset values have been overwritten.
 	assert.Equal(t, "presetUser", cfg.Server.Auth.Basic.Username)
 	assert.Equal(t, "presetPass", cfg.Server.Auth.Basic.Password)
-	assert.False(t, cfg.Server.Auth.Token.Enabled)
 	assert.Equal(t, "presetToken", cfg.Server.Auth.Token.Value)
 	assert.Equal(t, "presetDags", cfg.Paths.DAGsDir)
 	assert.Equal(t, "/usr/bin/preset", cfg.Paths.Executable)
@@ -395,4 +394,99 @@ func TestLoadLegacyFields_NoneSet(t *testing.T) {
 	assert.Equal(t, "green", cfg.UI.NavbarColor)
 	assert.Equal(t, "Preset Dagu", cfg.UI.NavbarTitle)
 	assert.Equal(t, 100, cfg.UI.MaxDashboardPageLimit)
+}
+
+// TestSetTimezone tests the setTimezone method of the Global struct.
+func TestSetTimezone(t *testing.T) {
+	// Save the original TZ environment variable to restore it later
+	originalTZ := os.Getenv("TZ")
+	defer os.Setenv("TZ", originalTZ)
+
+	// Test case 1: When TZ is set to a valid timezone
+	t.Run("ValidTimezone", func(t *testing.T) {
+		viper.Reset()
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+tz: "America/New_York"
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// Verify that the timezone was set correctly
+		assert.Equal(t, "America/New_York", cfg.Global.TZ)
+		assert.NotNil(t, cfg.Global.Location)
+		assert.Equal(t, "America/New_York", cfg.Global.Location.String())
+
+		// Verify that the TZ environment variable was set
+		assert.Equal(t, "America/New_York", os.Getenv("TZ"))
+
+		// Verify that the offset was calculated correctly
+		// Note: This test might fail during daylight saving time changes
+		// We'll check that the offset is a non-empty string
+		assert.NotEmpty(t, cfg.Global.TzOffsetInSec)
+
+		// Get the expected offset for verification
+		nyLoc, _ := time.LoadLocation("America/New_York")
+		currentTime := time.Now().In(nyLoc)
+		_, expectedOffset := currentTime.Zone()
+
+		assert.Equal(t, expectedOffset, cfg.Global.TzOffsetInSec)
+	})
+
+	// Test case 2: When TZ is set to an invalid timezone
+	t.Run("InvalidTimezone", func(t *testing.T) {
+		viper.Reset()
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+tz: "NonExistentTimezone"
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		_, err = config.Load(config.WithConfigFile(configFile))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to load timezone")
+	})
+
+	// Test case 3: When TZ is not set
+	t.Run("NoTimezone", func(t *testing.T) {
+		viper.Reset()
+		// Unset the TZ environment variable to ensure it doesn't affect the test
+		os.Unsetenv("TZ")
+
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+# No TZ setting
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// When TZ is not set, it should use the local timezone
+		// If offset is 0, it should set TZ to "UTC"
+		// Otherwise, it should set TZ to "UTC+X" where X is the offset in hours
+
+		_, expectedOffset := time.Now().Zone()
+		if expectedOffset == 0 {
+			assert.Equal(t, "UTC", cfg.Global.TZ)
+			assert.Equal(t, 0, cfg.Global.TzOffsetInSec)
+		} else {
+			expectedTZ := fmt.Sprintf("UTC%+d", expectedOffset/3600)
+			assert.Equal(t, expectedTZ, cfg.Global.TZ)
+			assert.Equal(t, expectedOffset, cfg.Global.TzOffsetInSec)
+		}
+
+		// Verify that the Location is set to time.Local
+		assert.Equal(t, time.Local, cfg.Global.Location)
+	})
 }

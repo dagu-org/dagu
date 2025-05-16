@@ -26,7 +26,9 @@ func TestMain(m *testing.M) {
 func TestStartAndShutdownServer(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test_server_start_shutdown")
 	require.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
 
 	unixServer, err := sock.NewServer(
 		tmpFile.Name(),
@@ -65,7 +67,9 @@ func TestStartAndShutdownServer(t *testing.T) {
 func TestNoResponse(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test_error_response")
 	require.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
 
 	unixServer, err := sock.NewServer(
 		tmpFile.Name(),

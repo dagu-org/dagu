@@ -26,6 +26,18 @@ func TestCycleDetection(t *testing.T) {
 }
 
 func TestRetryExecution(t *testing.T) {
+	dag := &digraph.DAG{
+		Steps: []digraph.Step{
+			{Name: "1", Command: "true"},
+			{Name: "2", Command: "true", Depends: []string{"1"}},
+			{Name: "3", Command: "true", Depends: []string{"2"}},
+			{Name: "4", Command: "true", Depends: []string{}},
+			{Name: "5", Command: "true", Depends: []string{"4"}},
+			{Name: "6", Command: "true", Depends: []string{"5"}},
+			{Name: "7", Command: "true", Depends: []string{"6"}},
+		},
+	}
+
 	nodes := []*scheduler.Node{
 		scheduler.NodeWithData(
 			scheduler.NodeData{
@@ -92,7 +104,7 @@ func TestRetryExecution(t *testing.T) {
 		),
 	}
 	ctx := context.Background()
-	_, err := scheduler.CreateRetryExecutionGraph(ctx, nodes...)
+	_, err := scheduler.CreateRetryExecutionGraph(ctx, dag, nodes...)
 	require.NoError(t, err)
 	require.Equal(t, scheduler.NodeStatusSuccess, nodes[0].State().Status)
 	require.Equal(t, scheduler.NodeStatusNone, nodes[1].State().Status)

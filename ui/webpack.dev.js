@@ -1,11 +1,12 @@
-const HtmlWebpackPlugin = require("html-webpack-plugin");
-const { merge } = require("webpack-merge");
-const common = require("./webpack.common.js");
-const path = require("path");
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const { merge } = require('webpack-merge');
+const common = require('./webpack.common.js');
+const path = require('path');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 module.exports = merge(common, {
-  mode: "development",
-  devtool: "eval-source-map",
+  mode: 'development',
+  devtool: 'eval-source-map',
   profile: true,
   devServer: {
     historyApiFallback: true,
@@ -17,21 +18,29 @@ module.exports = merge(common, {
         test: /\.tsx?$/,
         use: [
           {
-            loader: "esbuild-loader",
+            loader: 'esbuild-loader',
             options: {
-              loader: "tsx",
-              target: "es2015",
+              loader: 'tsx',
+              target: 'es2015',
             },
           },
         ],
-        include: path.resolve(__dirname, "src"),
-        exclude: path.resolve(__dirname, "node_modules"),
+        include: path.resolve(__dirname, 'src'),
+        exclude: path.resolve(__dirname, 'node_modules'),
       },
     ],
   },
   plugins: [
     new HtmlWebpackPlugin({
-      template: "index.html",
+      template: 'index.html',
+    }),
+    new CopyWebpackPlugin({
+      patterns: [
+        {
+          from: 'favicon.ico',
+          to: 'assets/favicon.ico',
+        },
+      ],
     }),
   ],
   optimization: {

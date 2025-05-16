@@ -8,11 +8,11 @@ Special Environment Variables
 
 Inside a DAG, you can use the following environment variables to access special values:
 
-- ``DAG_NAME``: The name of the current DAG.
-- ``DAG_STEP_NAME``: The name of the current step.
-- ``DAG_REQUEST_ID``: The unique ID for the current execution request.
-- ``DAG_EXECUTION_LOG_PATH``: The path to the log file for the current step.
-- ``DAG_STEP_LOG_PATH``: The path to the log file for the scheduler.
+- ``WORKFLOW_NAME``: The name of the current DAG.
+- ``WORKFLOW_STEP_NAME``: The name of the current step.
+- ``WORKFLOW_ID``: The unique ID for the current execution request.
+- ``WORKFLOW_LOG_FILE``: The path to the log file for the current step.
+- ``WORKFLOW_STEP_LOG_FILE``: The path to the log file for the scheduler.
 
 Example Usage
 ~~~~~~~~~~~~~
@@ -24,16 +24,16 @@ Example Usage
   - name: print values
     command: bash
     script: |
-      echo DAG_NAME=$DAG_NAME
-      echo DAG_REQUEST_ID=$DAG_REQUEST_ID
-      echo DAG_EXECUTION_LOG_PATH=$DAG_EXECUTION_LOG_PATH
-      echo DAG_STEP_LOG_PATH=$DAG_STEP_LOG_PATH
+      echo WORKFLOW_NAME=$WORKFLOW_NAME
+      echo WORKFLOW_ID=$WORKFLOW_ID
+      echo WORKFLOW_LOG_FILE=$WORKFLOW_LOG_FILE
+      echo WORKFLOW_STEP_LOG_FILE=$WORKFLOW_STEP_LOG_FILE
 
 **Example Output**
 
 .. code-block:: bash
 
-  DAG_NAME=special-envs
-  DAG_REQUEST_ID=0cf64f67-a1d6-4764-b5e0-0ea92c3089e2
-  DAG_EXECUTION_LOG_PATH=/path/to/logs/special-envs/step1.20241001.22:31:29.167.0cf64f67.log
-  DAG_STEP_LOG_PATH=/path/to/logs/special-envs/start_special-envs.20241001.22:31:29.163.0cf64f67.log
+  WORKFLOW_NAME=special-envs
+  WORKFLOW_ID=0cf64f67-a1d6-4764-b5e0-0ea92c3089e2
+  WORKFLOW_LOG_FILE=/path/to/logs/special-envs/step1.20241001.22:31:29.167.0cf64f67.log
+  WORKFLOW_STEP_LOG_FILE=/path/to/logs/special-envs/start_special-envs.20241001.22:31:29.163.0cf64f67.log

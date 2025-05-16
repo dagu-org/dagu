@@ -1,4 +1,4 @@
 steps:
   - command: GET http://example.com
-    name: step 1
+    name: step1
     executor: http

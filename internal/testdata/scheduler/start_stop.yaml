@@ -2,5 +2,5 @@ schedule:
   start: "0 * * * *"
   stop: "1 * * * *"
 steps:
-  - name: step 1
+  - name: step1
     command: "sleep 10"

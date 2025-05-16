@@ -62,7 +62,7 @@ Dagu’s design emphasizes minimal external dependencies: it operates solely as 
   - [Script Execution](#script-execution)
   - [Variable Passing](#variable-passing)
   - [Scheduling](#scheduling)
-  - [Calling a sub-DAG](#calling-a-sub-dag)
+  - [Nested DAGs](#nested-dags)
   - [Running a docker image](#running-a-docker-image)
   - [Environment Variables](#environment-variables)
   - [Notifications on Failure or Success](#notifications-on-failure-or-success)
@@ -200,7 +200,7 @@ Make sure you have the following installed on your system:
 
 - [Go 1.23 or later](https://go.dev/doc/install)
 - [Node.js (Latest LTS or Current)](https://nodejs.org/en/download/)
-- [Yarn](https://yarnpkg.com/)
+- [pnpm](https://pnpm.io/installation)
 
 ### Steps to Build Locally
 
@@ -213,27 +213,16 @@ Make sure you have the following installed on your system:
   ```
 
 #### 2. Build the UI
-- Navigate to the `ui` directory.
+
+- Build the UI assets. This step is necessary to generate frontend files and copy them to the `internal/frontend/assets` directory.
   ```sh
-  cd ui
-  ```
-- Install / Update Dependencies
-  ```sh
-  yarn
-  ```
-- Go back to the root directory.
-  ```sh
-  cd ..
-  ```
-- Build the UI
-  ```sh
-  make build-ui
+  make ui
   ```
 
 #### 3. Build the Binary
 - Build the binary
   ```sh
-  make build-bin
+  make bin
   ```
   This produces the `dagu` binary in the `.local/bin` directory.
 
@@ -271,10 +260,10 @@ schedule: "* * * * *" # Run the DAG every minute
 params:
   - NAME: "Dagu"
 steps:
-  - name: Hello world
+  - name: hello_world
     command: echo Hello $NAME
 
-  - name: Simulate unclean Command Output
+  - name: simulate_unclean_command_output
     command: |
       cat <<EOF
       INFO: Starting process...
@@ -284,17 +273,17 @@ steps:
       EOF
     output: raw_output
 
-  - name: Extract Relevant Data
+  - name: extract_data
     command: |
       echo "$raw_output" | grep '^DATA:' | sed 's/^DATA: //'
     output: cleaned_data
     depends:
-      - Simulate unclean Command Output
+      - simulate_unclean_command_output
 
   - name: Done
     command: echo Done!
     depends:
-      - Hello world
+      - hello_world
 ```
 
 ### 4. Execute the DAG
@@ -316,10 +305,10 @@ dagu start <file or DAG name> [-- value1 value2 ...]
 # Displays the current status of the DAG
 dagu status <file or DAG name>
 
-# Re-runs the specified DAG run
-dagu retry --request-id=<request-id> <file or DAG name>
+# Re-runs the specified workflow
+dagu retry --workflow-id=<workflow-id> <file or DAG name>
 
-# Stops the DAG execution
+# Stops the workflow
 dagu stop <file or DAG name>
 
 # Restarts the current running DAG
@@ -549,21 +538,23 @@ steps:
     command: job.sh
 ```
 
-### Calling a sub-DAG
+### Nested DAGs
 
-You can call another DAG from a parent DAG.
+You can specifies another DAG as a step in the parent DAG. This allows you to create reusable components or sub-DAGs. Sub DAGs can be multiple levels deep.
+
+Here is an example of a parent DAG that calls a sub-DAG:
 
 ```yaml
 steps:
-  - name: parent
+  - name: run_sub-dag
     run: sub-dag
     output: OUT
   - name: use output
     command: echo ${OUT.outputs.result}
-    depends: parent
+    depends: run_sub-dag
 ```
 
-The sub-DAG `sub-dag.yaml`:
+And here is the sub-DAG:
 
 ```yaml
 steps:
@@ -922,7 +913,7 @@ Search across all DAG definitions.
 
 ### Execution History
 
-Review past DAG executions and logs at a glance.
+Review past workflows and logs at a glance.
 
 ![History](assets/images/ui-history.webp?raw=true)
 

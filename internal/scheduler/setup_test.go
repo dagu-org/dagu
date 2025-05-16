@@ -1,4 +1,4 @@
-package scheduler
+package scheduler_test
 
 import (
 	"os"
@@ -6,12 +6,13 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/build"
-	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/persistence/jsondb"
-	"github.com/dagu-org/dagu/internal/persistence/local"
-	"github.com/dagu-org/dagu/internal/persistence/local/storage"
+	"github.com/dagu-org/dagu/internal/history"
+	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/persistence/localdag"
+	"github.com/dagu-org/dagu/internal/persistence/localhistory"
+	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
@@ -35,9 +36,10 @@ func TestMain(m *testing.M) {
 }
 
 type testHelper struct {
-	manager JobManager
-	client  client.Client
-	config  *config.Config
+	manager        scheduler.JobManager
+	historyManager history.Manager
+	dagRepo        models.DAGRepository
+	config         *config.Config
 }
 
 func setupTest(t *testing.T) testHelper {
@@ -59,20 +61,18 @@ func setupTest(t *testing.T) testHelper {
 			DAGsDir:         testdataDir,
 			SuspendFlagsDir: tempDir,
 		},
-		Global: config.Global{
-			WorkDir: tempDir,
-		},
+		Global: config.Global{WorkDir: tempDir},
 	}
 
-	dagStore := local.NewDAGStore(cfg.Paths.DAGsDir)
-	historyStore := jsondb.New(cfg.Paths.DataDir)
-	flagStore := local.NewFlagStore(storage.NewStorage(cfg.Paths.SuspendFlagsDir))
-	cli := client.New(dagStore, historyStore, flagStore, "", cfg.Global.WorkDir)
-	jobManager := NewDAGJobManager(testdataDir, cli, "", "")
+	dr := localdag.New(cfg.Paths.DAGsDir, localdag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
+	hr := localhistory.New(cfg.Paths.DataDir)
+	hm := history.New(hr, "", cfg.Global.WorkDir, "")
+	jobManager := scheduler.NewDAGJobManager(testdataDir, dr, hm, "", "")
 
 	return testHelper{
-		manager: jobManager,
-		client:  cli,
-		config:  cfg,
+		manager:        jobManager,
+		dagRepo:        dr,
+		historyManager: hm,
+		config:         cfg,
 	}
 }

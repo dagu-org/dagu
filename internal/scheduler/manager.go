@@ -9,9 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/scheduler/filenotify"
 	"github.com/robfig/cron/v3"
 
@@ -43,23 +44,25 @@ var _ JobManager = (*dagJobManager)(nil)
 
 // dagJobManager manages DAGs on local filesystem.
 type dagJobManager struct {
-	targetDir  string
-	registry   map[string]*digraph.DAG
-	lock       sync.Mutex
-	client     client.Client
-	executable string
-	workDir    string
+	targetDir      string
+	registry       map[string]*digraph.DAG
+	lock           sync.Mutex
+	dagClient      models.DAGRepository
+	historyManager history.Manager
+	executable     string
+	workDir        string
 }
 
 // NewDAGJobManager creates a new DAG manager with the given configuration.
-func NewDAGJobManager(dir string, client client.Client, executable, workDir string) JobManager {
+func NewDAGJobManager(dir string, dagCli models.DAGRepository, hm history.Manager, executable, workDir string) JobManager {
 	return &dagJobManager{
-		targetDir:  dir,
-		lock:       sync.Mutex{},
-		registry:   map[string]*digraph.DAG{},
-		client:     client,
-		executable: executable,
-		workDir:    workDir,
+		targetDir:      dir,
+		lock:           sync.Mutex{},
+		registry:       map[string]*digraph.DAG{},
+		dagClient:      dagCli,
+		historyManager: hm,
+		executable:     executable,
+		workDir:        workDir,
 	}
 }
 
@@ -81,7 +84,7 @@ func (m *dagJobManager) Next(ctx context.Context, now time.Time) ([]*ScheduledJo
 
 	for _, dag := range m.registry {
 		dagName := strings.TrimSuffix(filepath.Base(dag.Location), filepath.Ext(dag.Location))
-		if m.client.IsSuspended(ctx, dagName) {
+		if m.dagClient.IsSuspended(ctx, dagName) {
 			continue
 		}
 
@@ -107,13 +110,13 @@ func (m *dagJobManager) Next(ctx context.Context, now time.Time) ([]*ScheduledJo
 }
 
 func (m *dagJobManager) createJob(dag *digraph.DAG, next time.Time, schedule cron.Schedule) Job {
-	return &dagJob{
+	return &DAG{
 		DAG:        dag,
 		Executable: m.executable,
 		WorkDir:    m.workDir,
 		Next:       next,
 		Schedule:   schedule,
-		Client:     m.client,
+		Client:     m.historyManager,
 	}
 }
 

@@ -3,7 +3,7 @@ env:
   - "E2": bar
 
 steps:
-  - name: step 1
+  - name: step1
     output: OUT1
     script: |
       echo E1 is $E1, E2 is $E2

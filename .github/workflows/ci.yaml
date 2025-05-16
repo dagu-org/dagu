@@ -40,9 +40,9 @@ jobs:
           go-version-file: go.mod
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
-          version: v1.62
+          version: v2.0.2
           args: --timeout=10m
 
   # Test Go code
@@ -70,7 +70,7 @@ jobs:
 
       - name: Build
         run: |
-          make build-bin
+          make bin
 
       - name: Test
         run: |

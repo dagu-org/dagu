@@ -1,22 +1,21 @@
-// Copyright (C) 2025 Yota Hamada
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 package digraph
 
 import "context"
 
-// DBClient gets a result of a DAG execution.
-type DBClient interface {
+// DB gets a result of a workflow.
+type DB interface {
 	GetDAG(ctx context.Context, name string) (*DAG, error)
-	GetStatus(ctx context.Context, name string, requestID string) (*Status, error)
+	GetChildWorkflowStatus(ctx context.Context, workflowID string, root WorkflowRef) (*Status, error)
 }
 
-// Status is the result of a DAG execution.
+// Status is the result of a workflow.
 type Status struct {
-	// Name represents the name of the executed DAG.
+	// Name represents the name of the executed workflow.
 	Name string `json:"name,omitempty"`
-	// Params is the parameters of the DAG execution
+	// WorkflowID is the ID of the workflow.
+	WorkflowID string `json:"workflowId,omitempty"`
+	// Params is the parameters of the workflow
 	Params string `json:"params,omitempty"`
-	// Outputs is the outputs of the DAG execution.
+	// Outputs is the outputs of the workflow.
 	Outputs map[string]string `json:"outputs,omitempty"`
 }

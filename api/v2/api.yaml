@@ -1,0 +1,1783 @@
+# yaml-language-server: $schema=oapi_20241018_mod.json
+openapi: "3.0.0"
+info:
+  version: "2.0.0"
+  title: "Dagu"
+  contact:
+    name: "Yota Hamada"
+    url: "https://github.com/yottahmd"
+  description: API for controlling and monitoring Dagu server.
+  license:
+    name: "GPL-3.0"
+    url: "https://github.com/dagu-org/dagu/blob/main/LICENSE.md"
+
+servers:
+  - url: "{schema}://{host}/api/v2"
+    description: "Dagu API server"
+    variables:
+      schema:
+        default: http
+        enum: [http, https]
+      host:
+        default: localhost
+        description: "Host name of the server"
+
+tags:
+  - name: "dags"
+    description: "Operations for managing and creating DAG definitions"
+  - name: "workflows"
+    description: "Operations for retrieving historical data and logs of workflow executions"
+  - name: "system"
+    description: "System operations for monitoring and managing the Dagu server"
+
+paths:
+  /health:
+    get:
+      summary: "Check server health status"
+      description: "Returns health information about the Dagu server"
+      operationId: "getHealthStatus"
+      tags:
+        - "system"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        default:
+          description: "Unexpected error"
+
+  /dags:
+    get:
+      summary: "List all available DAGs"
+      description: "Retrieves DAG definitions with optional filtering by name and tags"
+      operationId: "listDAGs"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: "name"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter DAGs by name"
+        - name: "tag"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter DAGs by tag"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dags:
+                    type: array
+                    description: "List of DAG definitions with their status and metadata"
+                    items:
+                      $ref: "#/components/schemas/DAGFile"
+                  errors:
+                    type: array
+                    description: "List of errors encountered during the request"
+                    items:
+                      type: string
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+                required:
+                  - dags
+                  - errors
+                  - pagination
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: "Create a new DAG definition"
+      description: "Creates a new empty DAG file with the specified name"
+      operationId: "createNewDAG"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  $ref: "#/components/schemas/DAGName"
+              required:
+                - name
+      responses:
+        "201":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: "Name of the newly created DAG"
+                required:
+                  - name
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /dags/{fileName}:
+    get:
+      summary: "Retrieve comprehensive DAG information"
+      description: "Fetches detailed information about a specific DAG definition"
+      operationId: "getDAGDetails"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                description: "Response object for getting details of a DAG"
+                properties:
+                  dag:
+                    $ref: "#/components/schemas/DAGDetails"
+                  latestWorkflow:
+                    $ref: "#/components/schemas/WorkflowDetails"
+                  suspended:
+                    type: boolean
+                    description: "Whether the DAG is suspended"
+                  errors:
+                    type: array
+                    description: "List of errors encountered during the request"
+                    items:
+                      type: string
+                required:
+                  - latestWorkflow
+                  - suspended
+                  - errors
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Delete an existing DAG"
+      description: "Permanently removes a DAG definition from the system"
+      operationId: "deleteDAG"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "204":
+          description: "DAG successfully deleted"
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/start:
+    post:
+      summary: "Create and execute a workflow from DAG"
+      description: "Creates a workflow from the DAG definition and starts its execution with optional parameters"
+      operationId: "executeDAG"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                params:
+                  type: string
+                  description: "Parameters to pass to the workflow in JSON format"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workflowId:
+                    type: string
+                    description: "ID of the created workflow"
+                required:
+                  - workflowId
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/stop:
+    post:
+      summary: "Terminate a running workflow"
+      description: "Forcefully stops a running workflow created from this DAG"
+      operationId: "terminateWorkflow"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "A successful response"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/retry:
+    post:
+      summary: "Retry workflow execution"
+      description: "Creates a new workflow based on a previous execution"
+      operationId: "retryWorkflow"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                workflowId:
+                  type: string
+                  description: "ID of the workflow to retry"
+              required:
+                - workflowId
+      responses:
+        "200":
+          description: "A successful response"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/workflows:
+    get:
+      summary: "Retrieve execution history of a DAG"
+      description: "Fetches history of workflows created from this DAG definition"
+      operationId: "getDAGWorkflowHistory"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workflows:
+                    type: array
+                    description: "List of historical workflows created from this DAG"
+                    items:
+                      $ref: "#/components/schemas/WorkflowDetails"
+                  gridData:
+                    type: array
+                    description: "Grid data for visualization"
+                    items:
+                      $ref: "#/components/schemas/DAGGridItem"
+                required:
+                  - workflows
+                  - gridData
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/workflows/{workflowId}:
+    get:
+      summary: "Get detailed status of a specific workflow"
+      description: "Retrieves status information about a particular workflow created from this DAG"
+      tags:
+        - "dags"
+      operationId: "getDAGWorkflowDetails"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+        - $ref: "#/components/parameters/WorkflowId"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workflow:
+                    $ref: "#/components/schemas/WorkflowDetails"
+                required:
+                  - workflow
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/spec:
+    get:
+      summary: "Retrieve DAG specification"
+      description: "Fetches the YAML specification of a DAG definition"
+      operationId: "getDAGSpec"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dag:
+                    $ref: "#/components/schemas/DAGDetails"
+                  spec:
+                    type: string
+                    description: "The DAG spec in YAML format"
+                  errors:
+                    type: array
+                    description: "List of errors in the spec"
+                    items:
+                      type: string
+                required:
+                  - spec
+                  - errors
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      summary: "Update DAG spec"
+      description: "Modifies the YAML specification of a DAG definition"
+      operationId: "updateDAGSpec"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                spec:
+                  type: string
+                  description: "The new DAG spec in YAML format"
+              required:
+                - spec
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: array
+                    description: "List of errors in the spec"
+                    items:
+                      type: string
+                required:
+                  - errors
+
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/suspend:
+    post:
+      summary: "Toggle DAG suspension state"
+      description: "Controls whether the scheduler should create workflows from this DAG according to its defined cron schedule"
+      operationId: "updateDAGSuspensionState"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                suspend:
+                  type: boolean
+                  description: "Suspend status to set for the DAG"
+              required:
+                - suspend
+      responses:
+        "200":
+          description: "A successful response"
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/rename:
+    post:
+      summary: "Change DAG file ID"
+      description: "Changes the file ID of the DAG definition"
+      operationId: "renameDAG"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                newFileName:
+                  type: string
+                  description: "New file name for the DAG"
+              required:
+                - newFileName
+      responses:
+        "200":
+          description: "A successful response"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/search:
+    get:
+      summary: "Search DAGs"
+      description: "Performs a full-text search across all DAG definitions"
+      operationId: "searchDAGs"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: "q"
+          in: "query"
+          required: true
+          schema:
+            type: "string"
+          description: "A search query string"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                description: "Response object for searching DAGs"
+                properties:
+                  results:
+                    type: array
+                    description: "Search results matching the query"
+                    items:
+                      $ref: "#/components/schemas/SearchResultItem"
+                  errors:
+                    type: array
+                    description: "Errors encountered during the search"
+                    items:
+                      type: string
+                required:
+                  - results
+                  - errors
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/tags:
+    get:
+      summary: "List all available DAG tags"
+      description: "Retrieves all unique tags used across DAG definitions"
+      operationId: "getAllDAGTags"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListTagResponse"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /workflows:
+    get:
+      summary: "List all workflows"
+      description: "Retrieves a list of all workflows with optional filtering by name and status"
+      operationId: "listWorkflows"
+      tags:
+        - "workflows"
+      parameters:
+        - $ref: "#/components/parameters/Status"
+        - $ref: "#/components/parameters/DateTimeFrom"
+        - $ref: "#/components/parameters/DateTimeTo"
+        - $ref: "#/components/parameters/WorkflowIdSearch"
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: "name"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter workflows by name"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workflows:
+                    type: array
+                    description: "List of workflows with their status and metadata"
+                    items:
+                      $ref: "#/components/schemas/WorkflowSummary"
+                required:
+                  - workflows
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /workflows/{name}:
+    get:
+      summary: "List all workflows with a specific name"
+      description: "Retrieves a list of all workflows with optional filtering by name and status"
+      operationId: "listWorkflowsByName"
+      tags:
+        - "workflows"
+      parameters:
+        - $ref: "#/components/parameters/Status"
+        - $ref: "#/components/parameters/DateTimeFrom"
+        - $ref: "#/components/parameters/DateTimeTo"
+        - $ref: "#/components/parameters/WorkflowName"
+        - $ref: "#/components/parameters/WorkflowIdSearch"
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workflows:
+                    type: array
+                    description: "List of workflows with their status and metadata"
+                    items:
+                      $ref: "#/components/schemas/WorkflowSummary"
+                required:
+                  - workflows
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /workflows/{name}/{workflowId}:
+    get:
+      summary: "Retrieve detailed status of a workflow"
+      description: "Fetches detailed status information about a specific workflow"
+      operationId: "getWorkflowDetails"
+      tags:
+        - "workflows"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/WorkflowId"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workflowDetails:
+                    $ref: "#/components/schemas/WorkflowDetails"
+                required:
+                  - workflowDetails
+        "404":
+          description: "Workflow not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /workflows/{name}/{workflowId}/log:
+    get:
+      summary: "Retrieve full execution log of a workflow"
+      description: "Fetches the execution log for a workflow"
+      operationId: "getWorkflowLog"
+      tags:
+        - "workflows"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/WorkflowId"
+        - $ref: "#/components/parameters/Tail"
+        - $ref: "#/components/parameters/Head"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Log"
+        "404":
+          description: "Log file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /workflows/{name}/{workflowId}/steps/{stepName}/log:
+    get:
+      summary: "Retrieve log for a specific step in a workflow"
+      description: "Fetches the log for an individual step in a workflow"
+      operationId: "getWorkflowStepLog"
+      tags:
+        - "workflows"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/WorkflowId"
+        - $ref: "#/components/parameters/StepName"
+        - $ref: "#/components/parameters/Tail"
+        - $ref: "#/components/parameters/Head"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Log"
+        "404":
+          description: "Log file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /workflows/{name}/{workflowId}/steps/{stepName}/status:
+    patch:
+      summary: "Manually update a step's execution status"
+      description: "Changes the status of a specific step within a workflow"
+      operationId: "updateWorkflowStepStatus"
+      tags:
+        - "workflows"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/WorkflowId"
+        - $ref: "#/components/parameters/StepName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  $ref: "#/components/schemas/NodeStatus"
+              required:
+                - status
+      responses:
+        "200":
+          description: "A successful response"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Workflow or step not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /workflows/{name}/{workflowId}/children/{childWorkflowId}:
+    get:
+      summary: "Retrieve detailed status of a child workflow"
+      description: "Fetches detailed status information about a specific child workflow"
+      operationId: "getChildWorkflowDetails"
+      tags:
+        - "workflows"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/WorkflowId"
+        - name: "childWorkflowId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the child workflow to retrieve details for"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workflowDetails:
+                    $ref: "#/components/schemas/WorkflowDetails"
+                required:
+                  - workflowDetails
+        "404":
+          description: "Child workflow not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /workflows/{name}/{workflowId}/children/{childWorkflowId}/log:
+    get:
+      summary: "Retrieve log for a specific child workflow"
+      description: "Fetches the log for an individual child workflow"
+      operationId: "getChildWorkflowLog"
+      tags:
+        - "workflows"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/WorkflowId"
+        - $ref: "#/components/parameters/Tail"
+        - $ref: "#/components/parameters/Head"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+        - name: "childWorkflowId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the child workflow to retrieve the log for"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Log"
+        "404":
+          description: "Log file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /workflows/{name}/{workflowId}/children/{childWorkflowId}/steps/{stepName}/log:
+    get:
+      summary: "Retrieve log for a specific step in a child workflow"
+      description: "Fetches the log for an individual step in a child workflow"
+      operationId: "getChildWorkflowStepLog"
+      tags:
+        - "workflows"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/WorkflowId"
+        - $ref: "#/components/parameters/Tail"
+        - $ref: "#/components/parameters/Head"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+        - name: "childWorkflowId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the child workflow to retrieve the log for"
+        - $ref: "#/components/parameters/StepName"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Log"
+        "404":
+          description: "Log file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /workflows/{name}/{workflowId}/children/{childWorkflowId}/steps/{stepName}/status:
+    patch:
+      summary: "Manually update a step's execution status in a child workflow"
+      description: "Changes the status of a specific step within a child workflow"
+      operationId: "updateChildWorkflowStepStatus"
+      tags:
+        - "workflows"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/WorkflowId"
+        - name: "childWorkflowId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the child workflow to update the step status for"
+        - $ref: "#/components/parameters/StepName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  $ref: "#/components/schemas/NodeStatus"
+              required:
+                - status
+      responses:
+        "200":
+          description: "A successful response"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Workflow or step not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+    apiToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: page number of items to fetch (default is 1)
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    PerPage:
+      name: perPage
+      in: query
+      description: number of items per page (default is 30, max is 100)
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 50
+
+    DAGFileName:
+      name: fileName
+      in: path
+      description: the name of the DAG file
+      required: true
+      schema:
+        $ref: "#/components/schemas/DAGFileName"
+
+    DAGName:
+      name: name
+      in: path
+      description: name of the DAG
+      required: true
+      schema:
+        $ref: "#/components/schemas/DAGName"
+
+    StepName:
+      name: stepName
+      in: path
+      description: name of the step
+      required: true
+      schema:
+        type: string
+
+    RemoteNode:
+      name: remoteNode
+      in: query
+      description: name of the remote node
+      required: false
+      schema:
+        type: string
+        default: "local"
+
+    WorkflowId:
+      name: workflowId
+      in: path
+      description: ID of the workflow or 'latest' to get the most recent workflow
+      required: true
+      schema:
+        $ref: "#/components/schemas/WorkflowId"
+
+    WorkflowIdSearch:
+      name: workflowId
+      in: query
+      description: ID of the workflow or 'latest' to get the most recent workflow
+      required: false
+      schema:
+        $ref: "#/components/schemas/WorkflowId"
+
+    WorkflowName:
+      name: name
+      in: path
+      description: name of the workflow
+      required: true
+      schema:
+        type: string
+
+    Status:
+      name: status
+      in: query
+      description: status of the workflow
+      required: false
+      schema:
+        $ref: "#/components/schemas/Status"
+
+    DateTimeFrom:
+      name: fromDate
+      in: query
+      description: start datetime for filtering workflows in ISO 8601 format with timezone
+      required: false
+      schema:
+        $ref: "#/components/schemas/UnixTimestamp"
+
+    DateTimeTo:
+      name: toDate
+      in: query
+      description: end datetime for filtering workflows in ISO 8601 format with timezone
+      required: false
+      schema:
+        $ref: "#/components/schemas/UnixTimestamp"
+
+    Tail:
+      name: tail
+      in: query
+      description: Number of lines to return from the end of the file
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+
+    Head:
+      name: head
+      in: query
+      description: Number of lines to return from the beginning of the file
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+
+    Offset:
+      name: offset
+      in: query
+      description: Line number to start reading from (1-based)
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+
+    Limit:
+      name: limit
+      in: query
+      description: Maximum number of lines to return
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 10000
+
+  schemas:
+    Error:
+      type: object
+      description: "Generic error response object"
+      properties:
+        code:
+          $ref: "#/components/schemas/ErrorCode"
+        message:
+          type: string
+          description: "Short error message"
+        details:
+          type: object
+          description: "Additional error details"
+      required:
+        - code
+        - message
+
+    ErrorCode:
+      type: string
+      description: "Error code indicating the type of error"
+      enum:
+        - "bad_request"
+        - "not_found"
+        - "internal_error"
+        - "unauthorized"
+        - "bad_gateway"
+        - "remote_node_error"
+        - "already_running"
+        - "not_running"
+        - "already_exists"
+
+    UnixTimestamp:
+      type: integer
+      format: "int64"
+      description: "Unix timestamp in seconds"
+      example: 1672531199
+
+    DAGFileName:
+      type: string
+      # only allows alphanumeric characters, underscores, and hyphens
+      format: "regex"
+      pattern: "^[a-zA-Z0-9_-]+$"
+      description: "Name of the DAG file"
+
+    DAGName:
+      type: string
+      # only allows alphanumeric characters, underscores, and hyphens
+      format: "regex"
+      pattern: "^[a-zA-Z0-9_-]+$"
+      description: "Name of the DAG"
+
+    Pagination:
+      type: object
+      properties:
+        totalRecords:
+          type: integer
+          description: total number of records
+        currentPage:
+          type: integer
+          description: current page number
+        totalPages:
+          type: integer
+          description: total number of pages
+        nextPage:
+          type: integer
+          description: next page number
+        prevPage:
+          type: integer
+          description: previous page number
+      required:
+        - totalRecords
+        - currentPage
+        - totalPages
+        - nextPage
+        - prevPage
+
+    WorkflowId:
+      type: string
+      description: "Unique identifier for the workflow"
+      example: "latest"
+      pattern: "^[a-zA-Z0-9_-]+$"
+
+    HealthResponse:
+      type: object
+      description: "Response object for the health check endpoint"
+      properties:
+        status:
+          type: string
+          enum: ["healthy", "unhealthy"]
+          description: "Overall health status of the server"
+        version:
+          type: string
+          description: "Current version of the server"
+        uptime:
+          type: integer
+          description: "Server uptime in seconds"
+        timestamp:
+          type: string
+          description: "Current server time"
+      required:
+        - status
+        - version
+        - uptime
+        - timestamp
+
+    DAGFile:
+      type: object
+      description: "DAG file with its status information"
+      properties:
+        fileName:
+          type: string
+          description: "File ID of the DAG file"
+        dag:
+          $ref: "#/components/schemas/DAG"
+        latestWorkflow:
+          $ref: "#/components/schemas/WorkflowSummary"
+        suspended:
+          type: boolean
+          description: "Whether the DAG is suspended"
+        errors:
+          type: array
+          description: "List of errors encountered during the request"
+          items:
+            type: string
+      required:
+        - fileName
+        - dag
+        - latestWorkflow
+        - suspended
+        - errors
+
+    DAG:
+      type: object
+      description: "Core DAG configuration containing definition and metadata"
+      properties:
+        group:
+          type: string
+          description: "Logical grouping of related DAGs for organizational purposes"
+        name:
+          type: string
+          description: "Logical name of the DAG"
+        schedule:
+          type: array
+          description: "List of scheduling expressions defining when workflows should be created from this DAG"
+          items:
+            $ref: "#/components/schemas/Schedule"
+        description:
+          type: string
+          description: "Human-readable description of the DAG's purpose and behavior"
+        params:
+          type: array
+          description: "List of parameter names that can be passed to workflows created from this DAG"
+          items:
+            type: string
+        defaultParams:
+          type: string
+          description: "Default parameter values in JSON format if not specified at workflow creation"
+        tags:
+          type: array
+          description: "List of tags for categorizing and filtering DAGs"
+          items:
+            type: string
+      required:
+        - name
+        - location
+
+    Schedule:
+      type: object
+      description: "Schedule configuration for workflow creation"
+      properties:
+        expression:
+          type: string
+          description: "Cron expression or schedule pattern"
+      required:
+        - expression
+
+    Status:
+      type: integer
+      enum: [0, 1, 2, 3, 4]
+      x-enum-varnames:
+        - "NotStarted"
+        - "Running"
+        - "Failed"
+        - "Cancelled"
+        - "Success"
+      description: |
+        Numeric status code indicating current workflow state:
+        0: "Not started"
+        1: "Running"
+        2: "Failed"
+        3: "Cancelled"
+        4: "Success"
+
+    StatusLabel:
+      type: string
+      description: "Human-readable status description for the workflow"
+      enum:
+        - "not started"
+        - "running"
+        - "failed"
+        - "cancelled"
+        - "finished"
+
+    NodeStatus:
+      type: integer
+      enum: [0, 1, 2, 3, 4, 5]
+      x-enum-varnames:
+        - "NotStarted"
+        - "Running"
+        - "Failed"
+        - "Cancelled"
+        - "Success"
+        - "Skipped"
+      description: |
+        Numeric status code indicating current node state:
+        0: "Not started"
+        1: "Running"
+        2: "Failed"
+        3: "Cancelled"
+        4: "Success"
+        5: "Skipped"
+
+    NodeStatusLabel:
+      type: string
+      description: "Human-readable status description for the node"
+      enum:
+        - "not started"
+        - "running"
+        - "failed"
+        - "canceled"
+        - "finished"
+        - "skipped"
+
+    DAGDetails:
+      type: object
+      description: "Detailed DAG configuration information"
+      properties:
+        group:
+          type: string
+          description: "Logical grouping of related DAGs for organizational purposes"
+        name:
+          type: string
+          description: "Unique identifier for the DAG within its group"
+        schedule:
+          type: array
+          description: "List of scheduling expressions defining when workflows should be created from this DAG"
+          items:
+            $ref: "#/components/schemas/Schedule"
+        description:
+          type: string
+          description: "Human-readable description of the DAG's purpose and behavior"
+        env:
+          type: array
+          description: "List of environment variables to set before executing a workflow"
+          items:
+            type: string
+        logDir:
+          type: string
+          description: "Directory path for storing log files"
+        handlerOn:
+          $ref: "#/components/schemas/HandlerOn"
+        steps:
+          type: array
+          description: "List of steps to execute in workflows created from this DAG"
+          items:
+            $ref: "#/components/schemas/Step"
+        delay:
+          type: integer
+          description: "Time in seconds to wait before starting a workflow"
+        histRetentionDays:
+          type: integer
+          description: "Number of days to retain historical logs"
+        preconditions:
+          type: array
+          description: "Conditions that must be met before a workflow can start"
+          items:
+            $ref: "#/components/schemas/Condition"
+        maxActiveRuns:
+          type: integer
+          description: "Maximum number of concurrent workflows allowed from this DAG"
+        params:
+          type: array
+          description: "List of parameter names that can be passed to workflows created from this DAG"
+          items:
+            type: string
+        defaultParams:
+          type: string
+          description: "Default parameter values in JSON format if not specified at workflow creation"
+        tags:
+          type: array
+          description: "List of tags for categorizing and filtering DAGs"
+          items:
+            type: string
+      required:
+        - name
+        - location
+
+    HandlerOn:
+      type: object
+      description: "Configuration for event handlers in a workflow"
+      properties:
+        failure:
+          $ref: "#/components/schemas/Step"
+        success:
+          $ref: "#/components/schemas/Step"
+        cancel:
+          $ref: "#/components/schemas/Step"
+        exit:
+          $ref: "#/components/schemas/Step"
+
+    WorkflowSummary:
+      type: object
+      description: "Current status of a workflow"
+      properties:
+        rootWorkflowName:
+          type: string
+          description: "Name of the root workflow"
+        rootWorkflowId:
+          type: string
+          description: "ID of the root workflow"
+        parentWorkflowName:
+          type: string
+          description: "Name of the parent workflow"
+        parentWorkflowId:
+          type: string
+          description: "ID of the parent workflow"
+        workflowId:
+          $ref: "#/components/schemas/WorkflowId"
+        name:
+          $ref: "#/components/schemas/DAGName"
+        status:
+          $ref: "#/components/schemas/Status"
+        statusLabel:
+          $ref: "#/components/schemas/StatusLabel"
+        pid:
+          type: integer
+          description: "Process ID of the workflow"
+        startedAt:
+          type: string
+          description: "RFC 3339 timestamp when the workflow started"
+        finishedAt:
+          type: string
+          description: "RFC 3339 timestamp when the workflow finished"
+        log:
+          type: string
+          description: "Path to the log file"
+        params:
+          type: string
+          description: "Runtime parameters passed to the workflow in JSON format"
+      required:
+        - rootWorkflowName
+        - rootWorkflowId
+        - workflowId
+        - name
+        - status
+        - statusLabel
+        - startedAt
+        - finishedAt
+        - log
+
+    WorkflowDetails:
+      type: object
+      description: "Detailed status of a workflow including child workflow nodes"
+      allOf:
+        - $ref: "#/components/schemas/WorkflowSummary"
+        - type: object
+          description: "Detailed status information for the steps within a workflow."
+          properties:
+            nodes:
+              type: array
+              description: "Status of individual steps within the workflow"
+              items:
+                $ref: "#/components/schemas/Node"
+            onExit:
+              $ref: "#/components/schemas/Node"
+            onSuccess:
+              $ref: "#/components/schemas/Node"
+            onFailure:
+              $ref: "#/components/schemas/Node"
+            onCancel:
+              $ref: "#/components/schemas/Node"
+            preconditions:
+              type: array
+              description: "List of preconditions that must be met before the workflow can start"
+              items:
+                $ref: "#/components/schemas/Condition"
+          required:
+            - nodes
+
+    Node:
+      type: object
+      description: "Status of an individual step within a workflow"
+      properties:
+        step:
+          $ref: "#/components/schemas/Step"
+        log:
+          type: string
+          description: "Path to step-specific log file"
+        startedAt:
+          type: string
+          description: "RFC3339 timestamp when the step started"
+        finishedAt:
+          type: string
+          description: "RFC3339 timestamp when the step finished"
+        status:
+          $ref: "#/components/schemas/NodeStatus"
+        statusLabel:
+          $ref: "#/components/schemas/NodeStatusLabel"
+        retryCount:
+          type: integer
+          description: "Number of retry attempts made for this step"
+        doneCount:
+          type: integer
+          description: "Number of successful completions for repeating steps"
+        children:
+          type: array
+          description: "List of child workflows associated with this step"
+          items:
+            $ref: "#/components/schemas/ChildWorkflow"
+        error:
+          type: string
+          description: "Error message if the step failed"
+      required:
+        - step
+        - log
+        - startedAt
+        - finishedAt
+        - status
+        - statusLabel
+        - retryCount
+        - doneCount
+
+    ChildWorkflow:
+      type: object
+      description: "Metadata for a child workflow"
+      properties:
+        workflowId:
+          $ref: "#/components/schemas/WorkflowId"
+      required:
+        - workflowId
+
+    Step:
+      type: object
+      description: "Individual task definition that performs a specific operation in a workflow"
+      properties:
+        name:
+          type: string
+          description: "Unique identifier for the step within the workflow"
+        description:
+          type: string
+          description: "Human-readable description of what the step does"
+        dir:
+          type: string
+          description: "Working directory for executing the step's command"
+        cmdWithArgs:
+          type: string
+          description: "Complete command string including arguments to execute"
+        command:
+          type: string
+          description: "Base command to execute without arguments"
+        script:
+          type: string
+          description: "Script content if the step executes a script file"
+        stdout:
+          type: string
+          description: "File path for capturing standard output"
+        stderr:
+          type: string
+          description: "File path for capturing standard error"
+        output:
+          type: string
+          description: "Variable name to store the step's output"
+        args:
+          type: array
+          description: "List of arguments to pass to the command"
+          items:
+            type: string
+        run:
+          type: string
+          description: "The name of the DAG to run as a child workflow"
+        params:
+          type: string
+          description: "Parameters to pass to the child workflow in JSON format"
+        depends:
+          type: array
+          description: "List of step names that must complete before this step can start"
+          items:
+            type: string
+        repeatPolicy:
+          $ref: "#/components/schemas/RepeatPolicy"
+        mailOnError:
+          type: boolean
+          description: "Whether to send email notifications on step failure"
+        preconditions:
+          type: array
+          description: "Conditions that must be met before the step can start"
+          items:
+            $ref: "#/components/schemas/Condition"
+      required:
+        - name
+
+    SearchResultItem:
+      type: object
+      description: "Individual search result item for a DAG"
+      properties:
+        name:
+          type: string
+          description: "Name of the matching DAG"
+        dag:
+          $ref: "#/components/schemas/DAG"
+        matches:
+          type: array
+          description: "Details of where matches were found"
+          items:
+            $ref: "#/components/schemas/SearchDAGsMatchItem"
+      required:
+        - name
+        - dag
+        - matches
+
+    SearchDAGsMatchItem:
+      type: object
+      description: "Details of a search match within a DAG definition"
+      properties:
+        line:
+          type: string
+          description: "Matching line content"
+        lineNumber:
+          type: integer
+          description: "Line number where match was found"
+        startLine:
+          type: integer
+          description: "Start line for context"
+      required:
+        - line
+        - lineNumber
+        - startLine
+
+    Log:
+      type: object
+      description: "Log information for the execution"
+      properties:
+        content:
+          type: string
+          description: "Log content"
+        lineCount:
+          type: integer
+          description: "Number of lines returned"
+        totalLines:
+          type: integer
+          description: "Total number of lines in the log file"
+        hasMore:
+          type: boolean
+          description: "Whether there are more lines available"
+        isEstimate:
+          type: boolean
+          description: "Whether the line count is an estimate"
+      required:
+        - content
+
+    DAGGridItem:
+      type: object
+      description: "Grid item for visualizing workflow execution history"
+      properties:
+        name:
+          type: string
+          description: "Name of the step"
+        history:
+          type: array
+          description: "Status of the step ordered by time"
+          items:
+            $ref: "#/components/schemas/NodeStatus"
+      required:
+        - name
+        - history
+
+    Condition:
+      type: object
+      description: "Precondition that must be satisfied before running a step or workflow"
+      properties:
+        condition:
+          type: string
+          description: "Expression or check to evaluate"
+        expected:
+          type: string
+          description: "Expected result of the condition evaluation"
+        error:
+          type: string
+          description: "Error message if the condition is not met"
+        matched:
+          type: boolean
+          description: "Whether the condition was met"
+      required:
+        - condition
+
+    RepeatPolicy:
+      type: object
+      description: "Configuration for step retry behavior"
+      properties:
+        repeat:
+          type: boolean
+          description: "Whether the step should be retried on failure"
+        interval:
+          type: integer
+          description: "Time in seconds to wait between retry attempts"
+
+    ListTagResponse:
+      type: object
+      description: "Response object for listing all tags"
+      properties:
+        tags:
+          type: array
+          description: "List of unique tags"
+          items:
+            type: string
+        errors:
+          type: array
+          description: "List of errors encountered during the request"
+          items:
+            type: string
+      required:
+        - tags
+        - errors
+
+# Apply security requirements globally
+security:
+  - apiToken: []
+  - basicAuth: []
+  - {}

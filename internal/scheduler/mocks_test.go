@@ -1,4 +1,4 @@
-package scheduler
+package scheduler_test
 
 import (
 	"context"
@@ -6,15 +6,16 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/scheduler"
 )
 
-var _ JobManager = (*mockJobManager)(nil)
+var _ scheduler.JobManager = (*mockJobManager)(nil)
 
 type mockJobManager struct {
-	Entries []*ScheduledJob
+	Entries []*scheduler.ScheduledJob
 }
 
-func (er *mockJobManager) Next(_ context.Context, _ time.Time) ([]*ScheduledJob, error) {
+func (er *mockJobManager) Next(_ context.Context, _ time.Time) ([]*scheduler.ScheduledJob, error) {
 	return er.Entries, nil
 }
 
@@ -22,7 +23,7 @@ func (er *mockJobManager) Start(_ context.Context, _ chan any) error {
 	return nil
 }
 
-var _ Job = (*mockJob)(nil)
+var _ scheduler.Job = (*mockJob)(nil)
 
 type mockJob struct {
 	DAG          *digraph.DAG
