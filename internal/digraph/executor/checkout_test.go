@@ -449,7 +449,6 @@ lyln/UHGhbpjOyuBlhqm26eURqB1jlOC39vwPsvrwAa273Mw/kQN
 func getAuthMethodTestcaseList() ([]*authMethodTestcase, error) {
 	var (
 		err                   error
-		testCaseList          = make([]*authMethodTestcase, 0, 4)
 		tempRSAPrivateKeyFile *os.File
 	)
 
@@ -460,8 +459,6 @@ func getAuthMethodTestcaseList() ([]*authMethodTestcase, error) {
 	if _, err = tempRSAPrivateKeyFile.WriteString(testRSAPrivateKey); err != nil {
 		return nil, err
 	}
-
-	testCaseList = append(testCaseList, &authMethodTestcase{})
 
 	return []*authMethodTestcase{
 		{
