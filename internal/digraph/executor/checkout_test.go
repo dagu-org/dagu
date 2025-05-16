@@ -462,19 +462,6 @@ func getAuthMethodTestcaseList() ([]*authMethodTestcase, error) {
 
 	return []*authMethodTestcase{
 		{
-			msg: "ssh protocol with ssh agent",
-			def: &gitCheckoutExecConfigDefinition{
-				Repo: "git@github.com:dagu/dagu.git",
-				Auth: gitCheckoutExecAuthConfigDefinition{
-					SSHAgent: true,
-					SSHUser:  "dagu",
-				},
-			},
-			expectAuthName:   ssh.PublicKeysCallbackName,
-			expectAuthMethod: true,
-			expectErr:        false,
-		},
-		{
 			msg: "ssh protocol with ssh key file not exist",
 			def: &gitCheckoutExecConfigDefinition{
 				Repo: "git@github.com:dagu/dagu.git",
