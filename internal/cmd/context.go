@@ -112,7 +112,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		hrOpts = append(hrOpts, localhistory.WithHistoryFileCache(hc))
 	}
 
-	hr := localhistory.New(cfg.Paths.DataDir, hrOpts...)
+	hr := localhistory.New(cfg.Paths.HistoryDir, hrOpts...)
 	hm := history.New(hr, cfg.Paths.Executable, cfg.Global.WorkDir, cfg.Global.ConfigPath)
 
 	return &Context{

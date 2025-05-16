@@ -95,7 +95,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	}
 
 	dagRepo := localdag.New(cfg.Paths.DAGsDir, localdag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
-	runStore := localhistory.New(cfg.Paths.DataDir)
+	runStore := localhistory.New(cfg.Paths.HistoryDir)
 
 	historyManager := history.New(runStore, cfg.Paths.Executable, cfg.Global.WorkDir, "")
 
