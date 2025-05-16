@@ -24,9 +24,22 @@ RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags="${LDFLAGS}" -o ./bin/da
 
 # Stage 3: Final Image
 FROM --platform=$TARGETPLATFORM ubuntu:24.04
+
 ARG USER="dagu"
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
+
+# WORKAROUND — Ubuntu 24.04 switched repo signatures to Ed25519.
+# Older base images ship an outdated ubuntu-keyring that cannot verify
+# these signatures, causing “invalid signature” errors on apt update.
+# Temporarily disable signature checking just long enough to install the
+# new keyring, then re-enable normal verification for everything else.
+RUN set -eux; \
+    apt-get update -o Acquire::AllowInsecureRepositories=true \
+                   -o Acquire::AllowDowngradeToInsecureRepositories=true; \
+    DEBIAN_FRONTEND=noninteractive \
+      apt-get install -y --no-install-recommends ubuntu-keyring ca-certificates; \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install common tools
 ENV DEBIAN_FRONTEND=noninteractive
@@ -58,8 +71,16 @@ RUN set -eux; \
     chmod +x /entrypoint.sh
 
 # Create user and set permissions
-RUN echo "dagu ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/99-dagu \
-    && chmod 440 /etc/sudoers.d/99-dagu
+RUN set -eux; \
+    { \
+        echo 'dagu ALL=(ALL) NOPASSWD:ALL'; \
+        echo 'Defaults:dagu !requiretty'; \
+    } > /etc/sudoers.d/99-dagu && \
+    chmod 0440 /etc/sudoers.d/99-dagu && \
+    visudo -cf /etc/sudoers.d/99-dagu
+
+# Delete the default ubuntu user
+RUN userdel -f ubuntu
 
 WORKDIR /config
 ENV DAGU_HOST=0.0.0.0
@@ -68,6 +89,7 @@ ENV DAGU_TZ="Etc/UTC"
 ENV PUID=${USER_UID}
 ENV PGID=${USER_GID}
 ENV DOCKER_GID=-1
+ENV DEBIAN_FRONTEND=noninteractive
 EXPOSE 8080
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["dagu", "start-all"]
