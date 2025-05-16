@@ -33,12 +33,12 @@ type QueuedJob interface {
 type JobQueueState int
 
 const (
-	// QueueStatusNone indicates that the workflow is not in the queue
-	QueueStatusNone JobQueueState = iota
-	// QueueStatusQueued indicates that the workflow is in the queue
-	QueueStatusQueued
-	// QueueStatusRunning indicates that the workflow is currently running
-	QueueStatusRunning
-	// QueueStatusCompleted indicates that the workflow has completed
-	QueueStatusCompleted
+	// JobQueueStatusNone indicates that the workflow is not in the queue
+	JobQueueStatusNone JobQueueState = iota
+	// JobQueueStatusQueued indicates that the workflow is in the queue
+	JobQueueStatusQueued
+	// JobQueueStatusRunning indicates that the workflow is currently running
+	JobQueueStatusRunning
+	// JobQueueStatusCompleted indicates that the workflow has completed
+	JobQueueStatusCompleted
 )
