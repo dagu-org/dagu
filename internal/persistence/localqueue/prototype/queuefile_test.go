@@ -38,7 +38,7 @@ func TestQueueFile(t *testing.T) {
 	require.NoError(t, err, "expected no error when getting queue length")
 	require.Equal(t, 1, queueLen, "expected queue length to be 1")
 
-	// Dequeue the job
+	// Check if pop returns the job
 	job, err := qf.Pop(th.Context)
 	require.NoError(t, err, "expected no error when popping job from queue")
 
@@ -87,7 +87,7 @@ func TestQueueFile_FindByWorkflowID(t *testing.T) {
 	require.Regexp(t, "^priority_", job.FileName, "expected job file name to start with 'priority_'")
 }
 
-func TestQueueFile_RemoveJob(t *testing.T) {
+func TestQueueFile_Pop(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
@@ -106,7 +106,7 @@ func TestQueueFile_RemoveJob(t *testing.T) {
 	require.NoError(t, err, "expected no error when adding job to queue")
 
 	// Remove the job from the queue
-	removedJobs, err := qf.DequeueByWorkflowID(th.Context, "test-workflow")
+	removedJobs, err := qf.PopByWorkflowID(th.Context, "test-workflow")
 	require.NoError(t, err, "expected no error when removing job from queue")
 	require.Len(t, removedJobs, 1, "expected one job to be removed")
 	require.Equal(t, "test-name", removedJobs[0].Workflow.Name, "expected job name to be 'test-name'")

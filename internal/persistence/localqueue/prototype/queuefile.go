@@ -19,7 +19,8 @@ import (
 
 // Errors for the queue file
 var (
-	ErrQueueFileEmpty = fmt.Errorf("queue file is empty")
+	ErrQueueFileEmpty        = fmt.Errorf("queue file is empty")
+	ErrQueueFileItemNotFound = fmt.Errorf("queue file item not found")
 )
 
 // QueueFile is a simple queue implementation using files
@@ -117,8 +118,8 @@ func (q *QueueFile) Push(ctx context.Context, workflow digraph.WorkflowRef) erro
 	return nil
 }
 
-// DequeueByWorkflowID removes jobs from the queue by workflow ID
-func (q *QueueFile) DequeueByWorkflowID(ctx context.Context, workflowID string) ([]*Job, error) {
+// PopByWorkflowID removes jobs from the queue by workflow ID
+func (q *QueueFile) PopByWorkflowID(ctx context.Context, workflowID string) ([]*Job, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -186,7 +187,7 @@ func (q *QueueFile) FindByWorkflowID(ctx context.Context, workflowID string) (*J
 
 	// Check if the base directory exists
 	if _, err := os.Stat(q.baseDir); os.IsNotExist(err) {
-		return nil, ErrQueueFileEmpty
+		return nil, ErrQueueFileItemNotFound
 	}
 
 	// List all files in the base directory
@@ -201,7 +202,7 @@ func (q *QueueFile) FindByWorkflowID(ctx context.Context, workflowID string) (*J
 		}
 	}
 
-	return nil, fmt.Errorf("workflow ID %s not found in queue", workflowID)
+	return nil, ErrQueueFileItemNotFound
 }
 
 // Len returns the number of items in the queue
