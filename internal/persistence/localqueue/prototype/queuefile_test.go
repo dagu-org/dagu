@@ -46,6 +46,9 @@ func TestQueueFile(t *testing.T) {
 	require.Equal(t, "test-name", job.Workflow.Name, "expected job name to be 'test-name'")
 	require.Equal(t, "test-workflow", job.Workflow.WorkflowID, "expected job ID to be 'test'")
 
+	// Check if the item has the correct prefix
+	require.Regexp(t, "^priority_", job.FileName, "expected job file name to start with 'priority_'")
+
 	// Check if the queue is empty again
 	queueLen, err = qf.Len(th.Context)
 	require.NoError(t, err, "expected no error when getting queue length")
