@@ -21,6 +21,7 @@ var (
 
 var _ models.Proc = (*Proc)(nil)
 
+// Proc is a struct that implements the Proc interface.
 type Proc struct {
 	fileName string
 	started  atomic.Bool
