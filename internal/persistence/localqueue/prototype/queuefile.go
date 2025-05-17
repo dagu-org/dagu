@@ -63,6 +63,7 @@ func (q *QueueFile) Push(ctx context.Context, workflow digraph.WorkflowRef) erro
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
+	// Sanity check for the workflow name
 	if workflow.Name != q.name {
 		return fmt.Errorf("workflow name %s does not match queue name %s", workflow.Name, q.name)
 	}

@@ -2,17 +2,28 @@ package models
 
 import (
 	"context"
+	"errors"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+)
+
+// Errors for the queue
+var (
+	ErrQueueEmpty        = errors.New("queue is empty")
+	ErrQueueItemNotFound = errors.New("queue item not found")
 )
 
 // QueueStorage provides an interface for interacting with the underlying database
 // for storing and retrieving queued workflows.
 type QueueStorage interface {
 	// Enqueue adds an item to the queue
-	Enqueue(ctx context.Context, priority QueuePriority, name string, workflow digraph.WorkflowRef) error
+	Enqueue(ctx context.Context, name string, priority QueuePriority, workflow digraph.WorkflowRef) error
 	// Dequeue retrieves an item from the queue and removes it
-	Dequeue(ctx context.Context, name, id string) (QueuedItem, error)
+	Dequeue(ctx context.Context, name string) (QueuedItem, error)
+	// Len returns the number of items in the queue
+	Len(ctx context.Context, name string) (int, error)
+	// DequeueByWorkflowID retrieves a workflow from the queue by its ID and removes it
+	DequeueByWorkflowID(ctx context.Context, workflowID string) ([]QueuedItem, error)
 }
 
 // QueuePriority represents the priority of a queued item
