@@ -14,7 +14,7 @@ func TestQueue(t *testing.T) {
 
 	th := test.Setup(t)
 
-	queue := NewQueue(th.Config.Paths.QueueDir, "test-name")
+	queue := NewDualQueue(th.Config.Paths.QueueDir, "test-name")
 
 	// Check if the queue is empty
 	queueLen, err := queue.Len(th.Context)
@@ -68,7 +68,7 @@ func TestQueue_FindByWorkflowID(t *testing.T) {
 
 	th := test.Setup(t)
 
-	queue := NewQueue(th.Config.Paths.QueueDir, "test-name")
+	queue := NewDualQueue(th.Config.Paths.QueueDir, "test-name")
 
 	// Add a low priority job to the queue
 	err := queue.Enqueue(th.Context, models.QueuePriorityLow, digraph.WorkflowRef{
