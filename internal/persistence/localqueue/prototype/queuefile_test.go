@@ -106,8 +106,11 @@ func TestQueueFile_RemoveJob(t *testing.T) {
 	require.NoError(t, err, "expected no error when adding job to queue")
 
 	// Remove the job from the queue
-	err = qf.DeleteByWorkflowID(th.Context, "test-workflow")
+	removedJobs, err := qf.DequeueByWorkflowID(th.Context, "test-workflow")
 	require.NoError(t, err, "expected no error when removing job from queue")
+	require.Len(t, removedJobs, 1, "expected one job to be removed")
+	require.Equal(t, "test-name", removedJobs[0].Workflow.Name, "expected job name to be 'test-name'")
+	require.Equal(t, "test-workflow", removedJobs[0].Workflow.WorkflowID, "expected job ID to be 'test'")
 
 	// Check if the queue is empty
 	queueLen, err := qf.Len(th.Context)

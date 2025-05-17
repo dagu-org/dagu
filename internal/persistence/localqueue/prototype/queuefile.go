@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 )
 
@@ -109,31 +110,33 @@ func (q *QueueFile) Push(ctx context.Context, workflow digraph.WorkflowRef) erro
 	return nil
 }
 
-// DeleteByWorkflowID removes jobs from the queue by workflow ID
-func (q *QueueFile) DeleteByWorkflowID(ctx context.Context, workflowID string) error {
+// DequeueByWorkflowID removes jobs from the queue by workflow ID
+func (q *QueueFile) DequeueByWorkflowID(ctx context.Context, workflowID string) ([]*Job, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
 	// Check if the base directory exists
 	if _, err := os.Stat(q.baseDir); os.IsNotExist(err) {
-		return nil
+		return nil, nil
 	}
 
 	// List all files in the base directory
 	items, err := q.listItems(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to list jobs: %w", err)
+		return nil, fmt.Errorf("failed to list jobs: %w", err)
 	}
 
+	var removedJobs []*Job
 	for _, item := range items {
 		if item.Workflow.WorkflowID == workflowID {
+			removedJobs = append(removedJobs, NewJob(item))
 			if err := os.Remove(filepath.Join(q.baseDir, item.FileName)); err != nil {
-				return fmt.Errorf("failed to remove queue file %s: %w", item.FileName, err)
+				logger.Error(ctx, "failed to remove queue file %s: %w", item.FileName, err)
 			}
 		}
 	}
 
-	return nil
+	return removedJobs, nil
 }
 
 func (q *QueueFile) Pop(ctx context.Context) (*Job, error) {
@@ -226,9 +229,15 @@ func (q *QueueFile) listItems(ctx context.Context) ([]ItemData, error) {
 	var items []ItemData
 	for _, file := range files {
 		fileName := filepath.Base(file)
+		// Check the file name matches the expected pattern
+		if !q.regex.MatchString(fileName) {
+			continue
+		}
+		// Parse the file name to get the workflow ID and timestamp
 		item, err := q.parseQueueFileName(ctx, fileName)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse queue file name %s: %w", file, err)
+			logger.Error(ctx, "failed to parse queue file name %s: %w", fileName, err)
+			continue
 		}
 		items = append(items, item)
 	}
