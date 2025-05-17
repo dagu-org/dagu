@@ -13,14 +13,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestProcFiles(t *testing.T) {
+func TestProcGroup(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
 
 	baseDir := th.Config.Paths.ProcDir
 	name := "test_proc"
-	procFiles := NewProcFiles(baseDir, name)
+	procFiles := NewProcGroup(baseDir, name, time.Hour)
 
 	// Create a proc file
 	proc, err := procFiles.GetProc(th.Context, digraph.WorkflowRef{
@@ -56,14 +56,14 @@ func TestProcFiles(t *testing.T) {
 	require.Equal(t, 0, count, "expected 0 proc files")
 }
 
-func TestProcFiles_Empty(t *testing.T) {
+func TestProcGroup_Empty(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
 
 	baseDir := th.Config.Paths.ProcDir
 	name := "test_proc"
-	procFiles := NewProcFiles(baseDir, name)
+	procFiles := NewProcGroup(baseDir, name, time.Hour)
 
 	// Check if the count is 0
 	count, err := procFiles.Count(th.Context, name)
@@ -71,14 +71,14 @@ func TestProcFiles_Empty(t *testing.T) {
 	require.Equal(t, 0, count, "expected 0 proc files")
 }
 
-func TestProcFiles_Stale(t *testing.T) {
+func TestProcGroup_IsStale(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
 
 	baseDir := th.Config.Paths.ProcDir
 	name := "test_proc"
-	procFiles := NewProcFiles(baseDir, name)
+	procFiles := NewProcGroup(baseDir, name, time.Second*5)
 
 	// create a proc
 	proc, err := procFiles.GetProc(th.Context, digraph.WorkflowRef{

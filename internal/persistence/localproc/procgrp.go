@@ -16,8 +16,8 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 )
 
-// ProcFiles is a struct that manages process files for a given workflow name.
-type ProcFiles struct {
+// ProcGroup is a struct that manages process files for a given workflow name.
+type ProcGroup struct {
 	name      string
 	baseDir   string
 	staleTime time.Duration
@@ -30,27 +30,27 @@ const procFilePrefix = "proc_"
 // procFileRegex is a regex pattern to match the proc file name format
 var procFileRegex = regexp.MustCompile(`^proc_\d{8}_\d{6}Z_.*\.proc$`)
 
-// NewProcFiles creates a new instance of ProcFiles with the specified base directory and workflow name.
-func NewProcFiles(baseDir, name string) *ProcFiles {
-	return &ProcFiles{
+// NewProcGroup creates a new instance of a ProcGroup with the specified base directory and workflow name.
+func NewProcGroup(baseDir, name string, staleTime time.Duration) *ProcGroup {
+	return &ProcGroup{
 		baseDir:   baseDir,
 		name:      name,
-		staleTime: time.Second * 45,
+		staleTime: staleTime,
 	}
 }
 
 // Count retrieves the count of alive proc files for the specified workflow name.
-func (pf *ProcFiles) Count(ctx context.Context, name string) (int, error) {
-	pf.mu.Lock()
-	defer pf.mu.Unlock()
+func (pg *ProcGroup) Count(ctx context.Context, name string) (int, error) {
+	pg.mu.Lock()
+	defer pg.mu.Unlock()
 
 	// If directory does not exist, return 0
-	if _, err := os.Stat(pf.baseDir); errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(pg.baseDir); errors.Is(err, os.ErrNotExist) {
 		return 0, nil
 	}
 
 	// Grep for all proc files in the directory
-	files, err := filepath.Glob(filepath.Join(pf.baseDir, procFilePrefix+"*.proc"))
+	files, err := filepath.Glob(filepath.Join(pg.baseDir, procFilePrefix+"*.proc"))
 	if err != nil {
 		return 0, err
 	}
@@ -69,8 +69,8 @@ func (pf *ProcFiles) Count(ctx context.Context, name string) (int, error) {
 			logger.Error(ctx, "failed to stat file %s: %v", file, err)
 			continue
 		}
-		if time.Since(fileInfo.ModTime()) > pf.staleTime {
-			isStale, err := pf.isStale(ctx, file)
+		if time.Since(fileInfo.ModTime()) > pg.staleTime {
+			isStale, err := pg.isStale(ctx, file)
 			if err != nil {
 				logger.Error(ctx, "failed to check if file %s is stale: %v", file, err)
 				aliveCount++ // Let's assume it's alive
@@ -94,7 +94,7 @@ func (pf *ProcFiles) Count(ctx context.Context, name string) (int, error) {
 }
 
 // isStale checks if the proc file is stale based on its content (timestamp).
-func (pf *ProcFiles) isStale(_ context.Context, file string) (bool, error) {
+func (pg *ProcGroup) isStale(_ context.Context, file string) (bool, error) {
 	// Check if the file exists
 	if _, err := os.Stat(file); errors.Is(err, os.ErrNotExist) {
 		return false, nil
@@ -115,7 +115,7 @@ func (pf *ProcFiles) isStale(_ context.Context, file string) (bool, error) {
 
 	// Parse the timestamp from the file
 	unixTime = int64(binary.BigEndian.Uint64(data[:8]))
-	if time.Since(time.Unix(0, unixTime)) < pf.staleTime {
+	if time.Since(time.Unix(0, unixTime)) < pg.staleTime {
 		// File is not stale
 		return false, nil
 	}
@@ -125,21 +125,21 @@ func (pf *ProcFiles) isStale(_ context.Context, file string) (bool, error) {
 
 // GetProc retrieves a proc file for the specified workflow reference.
 // It returns a new Proc instance with the generated file name.
-func (pf *ProcFiles) GetProc(ctx context.Context, workflow digraph.WorkflowRef) (*Proc, error) {
+func (pg *ProcGroup) GetProc(ctx context.Context, workflow digraph.WorkflowRef) (*Proc, error) {
 	// Sanity check the workflow reference
-	if pf.name != workflow.Name {
-		return nil, fmt.Errorf("workflow name %s does not match proc file name %s", workflow.Name, pf.name)
+	if pg.name != workflow.Name {
+		return nil, fmt.Errorf("workflow name %s does not match proc file name %s", workflow.Name, pg.name)
 	}
 	// Generate the proc file name
-	fileName := pf.getFileName(models.NewUTC(time.Now()), workflow)
+	fileName := pg.getFileName(models.NewUTC(time.Now()), workflow)
 	return NewProc(fileName), nil
 }
 
 // getFileName generates a proc file name based on the workflow reference.
-func (pf *ProcFiles) getFileName(t models.TimeInUTC, workflow digraph.WorkflowRef) string {
+func (pg *ProcGroup) getFileName(t models.TimeInUTC, workflow digraph.WorkflowRef) string {
 	timestamp := t.Format(dateTimeFormatUTC)
 	fileName := procFilePrefix + timestamp + "Z_" + workflow.WorkflowID + ".proc"
-	return filepath.Join(pf.baseDir, fileName)
+	return filepath.Join(pg.baseDir, fileName)
 }
 
 // dateTimeFormat is the format used for the timestamp in the queue file name
