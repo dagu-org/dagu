@@ -148,6 +148,29 @@ func (q *QueueFile) PopByWorkflowID(ctx context.Context, workflowID string) ([]*
 	return removedJobs, nil
 }
 
+func (q *QueueFile) List(ctx context.Context) ([]*Job, error) {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+
+	// Check if the base directory exists
+	if _, err := os.Stat(q.baseDir); os.IsNotExist(err) {
+		return nil, nil
+	}
+
+	// List all files in the base directory
+	items, err := q.listItems(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list jobs: %w", err)
+	}
+
+	var jobs []*Job
+	for _, item := range items {
+		jobs = append(jobs, NewJob(item))
+	}
+
+	return jobs, nil
+}
+
 func (q *QueueFile) Pop(ctx context.Context) (*Job, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()

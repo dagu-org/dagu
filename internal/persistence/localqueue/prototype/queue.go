@@ -16,6 +16,11 @@ var (
 	ErrQueueItemNotFound = errors.New("queue item not found")
 )
 
+// priorities is a list of queue priorities
+var priorities = []models.QueuePriority{
+	models.QueuePriorityHigh, models.QueuePriorityLow,
+}
+
 // DualQueue represents a queue for storing workflows with two priorities:
 // high and low. It uses two queue files to store the workflows.
 type DualQueue struct {
@@ -44,7 +49,8 @@ func NewDualQueue(baseDir, name string) *DualQueue {
 // without removing it. It returns the first found item in the queue files.
 // If the workflow is not found, it returns ErrQueueItemNotFound.
 func (q *DualQueue) FindByWorkflowID(ctx context.Context, workflowID string) (models.QueuedItem, error) {
-	for _, qf := range q.files {
+	for _, priority := range priorities {
+		qf := q.files[priority]
 		item, err := qf.FindByWorkflowID(ctx, workflowID)
 		if errors.Is(err, ErrQueueFileItemNotFound) {
 			continue
@@ -60,7 +66,8 @@ func (q *DualQueue) FindByWorkflowID(ctx context.Context, workflowID string) (mo
 // DequeueByWorkflowID retrieves a workflow from the queue by its ID and removes it
 func (q *DualQueue) DequeueByWorkflowID(ctx context.Context, workflowID string) ([]models.QueuedItem, error) {
 	var items []models.QueuedItem
-	for _, qf := range q.files {
+	for _, priority := range priorities {
+		qf := q.files[priority]
 		popped, err := qf.PopByWorkflowID(ctx, workflowID)
 		if errors.Is(err, ErrQueueFileEmpty) {
 			continue
@@ -75,10 +82,27 @@ func (q *DualQueue) DequeueByWorkflowID(ctx context.Context, workflowID string) 
 	return items, nil
 }
 
+// List returns all items in the queue
+func (q *DualQueue) List(ctx context.Context) ([]models.QueuedItem, error) {
+	var items []models.QueuedItem
+	for _, priority := range priorities {
+		qf := q.files[priority]
+		qItems, err := qf.List(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list workflows: %w", err)
+		}
+		for _, item := range qItems {
+			items = append(items, item)
+		}
+	}
+	return items, nil
+}
+
 // Len returns the total number of items in the queue
 func (q *DualQueue) Len(ctx context.Context) (int, error) {
 	var total int
-	for _, qf := range q.files {
+	for _, priority := range priorities {
+		qf := q.files[priority]
 		l, err := qf.Len(ctx)
 		if err != nil {
 			return 0, err
@@ -90,6 +114,9 @@ func (q *DualQueue) Len(ctx context.Context) (int, error) {
 
 // Enqueue adds a workflow to the queue with the specified priority
 func (q *DualQueue) Enqueue(ctx context.Context, priority models.QueuePriority, workflow digraph.WorkflowRef) error {
+	if _, ok := q.files[priority]; !ok {
+		return fmt.Errorf("invalid queue priority: %d", priority)
+	}
 	qf := q.files[priority]
 	if err := qf.Push(ctx, workflow); err != nil {
 		return err
@@ -101,7 +128,7 @@ func (q *DualQueue) Enqueue(ctx context.Context, priority models.QueuePriority, 
 // Dequeue retrieves a workflow from the queue and removes it
 // It checks the high-priority queue first, then the low-priority queue
 func (q *DualQueue) Dequeue(ctx context.Context) (models.QueuedItem, error) {
-	for _, priority := range []models.QueuePriority{models.QueuePriorityHigh, models.QueuePriorityLow} {
+	for _, priority := range priorities {
 		qf := q.files[priority]
 		item, err := qf.Pop(ctx)
 		if errors.Is(err, ErrQueueFileEmpty) {

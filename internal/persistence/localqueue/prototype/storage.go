@@ -55,6 +55,23 @@ func (s *Storage) Len(ctx context.Context, name string) (int, error) {
 	return q.Len(ctx)
 }
 
+func (s *Storage) List(ctx context.Context, name string) ([]models.QueuedItem, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.queues[name]; !ok {
+		s.queues[name] = s.createDualQueue(name)
+	}
+
+	q := s.queues[name]
+	items, err := q.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list workflows %s: %w", name, err)
+	}
+
+	return items, nil
+}
+
 // DequeueByWorkflowID implements models.QueueStorage.
 func (s *Storage) DequeueByWorkflowID(ctx context.Context, workflowID string) ([]models.QueuedItem, error) {
 	s.mu.Lock()

@@ -24,6 +24,8 @@ type QueueStorage interface {
 	Len(ctx context.Context, name string) (int, error)
 	// DequeueByWorkflowID retrieves a workflow from the queue by its ID and removes it
 	DequeueByWorkflowID(ctx context.Context, workflowID string) ([]QueuedItem, error)
+	// List returns all items in the queue
+	List(ctx context.Context, name string) ([]QueuedItem, error)
 }
 
 // QueuePriority represents the priority of a queued item

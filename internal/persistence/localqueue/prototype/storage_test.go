@@ -85,3 +85,31 @@ func TestStorage_DequeueByWorkflowID(t *testing.T) {
 	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
 	require.Equal(t, "test-workflow-2", jobData.WorkflowID, "expected job ID to be 'test-workflow-2'")
 }
+
+func TestStorage_List(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	// Create a new storage
+	storage := New(th.Config.Paths.QueueDir)
+
+	// Add a job to the storage
+	err := storage.Enqueue(th.Context, "test-name", models.QueuePriorityLow, digraph.WorkflowRef{
+		Name:       "test-name",
+		WorkflowID: "test-workflow",
+	})
+	require.NoError(t, err, "expected no error when adding job to storage")
+
+	// Add another job to the storage
+	err = storage.Enqueue(th.Context, "test-name", models.QueuePriorityLow, digraph.WorkflowRef{
+		Name:       "test-name",
+		WorkflowID: "test-workflow-2",
+	})
+	require.NoError(t, err, "expected no error when adding job to storage")
+
+	// Check if list returns the jobs
+	jobs, err := storage.List(th.Context, "test-name")
+	require.NoError(t, err, "expected no error when listing jobs from storage")
+	require.Len(t, jobs, 2, "expected to list two jobs")
+}
