@@ -22,6 +22,12 @@ var (
 	ErrQueueFileEmpty = fmt.Errorf("queue file is empty")
 )
 
+// QueueFile is a simple queue implementation using files
+// It stores the queued items in JSON files in a specified directory
+// File name format: prefix_YYYYMMDD_HHMMSS_millisZ_workflowID.json
+// The timestamp is in UTC and the milliseconds are added to the filename
+// Since this relies on the file system, it is not thread-safe and should be
+// accessed by a single process at a time.
 type QueueFile struct {
 	// name is the name of the workflow
 	name string
