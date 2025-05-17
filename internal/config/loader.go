@@ -189,6 +189,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	// Setup the directory inside the datadir.
 	cfg.Paths.HistoryDir = filepath.Join(cfg.Paths.DataDir, "history")
 	cfg.Paths.QueueDir = filepath.Join(cfg.Paths.DataDir, "queue")
+	cfg.Paths.ProcDir = filepath.Join(cfg.Paths.DataDir, "proc")
 
 	// Ensure the executable path is set.
 	if err := l.setExecutable(&cfg); err != nil {

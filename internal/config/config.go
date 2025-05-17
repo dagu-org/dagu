@@ -170,6 +170,7 @@ type PathsConfig struct {
 	BaseConfig      string
 	HistoryDir      string
 	QueueDir        string
+	ProcDir         string
 }
 
 type UI struct {
