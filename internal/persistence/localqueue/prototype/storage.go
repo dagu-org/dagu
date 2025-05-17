@@ -13,6 +13,10 @@ import (
 
 var _ models.QueueStorage = (*Storage)(nil)
 
+// Storage implements models.QueueStorage.
+// It provides a dead-simple queue implementation using files.
+// Since implementing a queue is not trivial, this implementation provides
+// as a prototype for a more complex queue implementation.
 type Storage struct {
 	baseDir string
 	// queues is a map of queues, where the key is the queue name (workflow name)
@@ -55,6 +59,7 @@ func (s *Storage) Len(ctx context.Context, name string) (int, error) {
 	return q.Len(ctx)
 }
 
+// List implements models.QueueStorage.
 func (s *Storage) List(ctx context.Context, name string) ([]models.QueuedItem, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
