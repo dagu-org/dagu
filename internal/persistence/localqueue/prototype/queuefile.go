@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -39,7 +40,7 @@ func NewQueueFile(baseDir, name, prefix string) *QueueFile {
 		baseDir: baseDir,
 		name:    name,
 		prefix:  prefix,
-		regex:   regexp.MustCompile(fmt.Sprintf(`^%s(\d{8}_\d{6})_\d{3}Z_(.*)\.json$`, prefix)),
+		regex:   regexp.MustCompile(fmt.Sprintf(`^%s(\d{8}_\d{6})_(\d{3})Z_(.*)\.json$`, prefix)),
 	}
 }
 
@@ -253,7 +254,7 @@ func (q *QueueFile) listItems(ctx context.Context) ([]ItemData, error) {
 func (q *QueueFile) parseQueueFileName(_ context.Context, fileName string) (ItemData, error) {
 	// Extract the workflow ID and timestamp from the file name
 	matches := q.regex.FindStringSubmatch(fileName)
-	if len(matches) != 3 {
+	if len(matches) != 4 {
 		return ItemData{}, fmt.Errorf("invalid queue file name format: %s", fileName)
 	}
 
@@ -263,12 +264,19 @@ func (q *QueueFile) parseQueueFileName(_ context.Context, fileName string) (Item
 		return ItemData{}, fmt.Errorf("failed to parse timestamp from file name %s: %w", fileName, err)
 	}
 
+	// Parse the milliseconds
+	millis, err := strconv.Atoi(matches[2])
+	if err != nil {
+		return ItemData{}, fmt.Errorf("failed to parse milliseconds from file name %s: %w", fileName, err)
+	}
+	timestamp = timestamp.Add(time.Duration(millis) * time.Millisecond)
+
 	// Create the ItemData struct
 	item := ItemData{
 		FileName: fileName,
 		Workflow: digraph.WorkflowRef{
 			Name:       q.name,
-			WorkflowID: matches[2],
+			WorkflowID: matches[3],
 		},
 		QueuedAt: timestamp,
 	}
