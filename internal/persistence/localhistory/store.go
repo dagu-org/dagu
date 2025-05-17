@@ -25,21 +25,21 @@ var (
 	ErrTooManyResults  = errors.New("too many results found")
 )
 
-var _ models.HistoryStorage = (*Storage)(nil)
+var _ models.HistoryStore = (*Store)(nil)
 
-// Storage manages DAGs status files in local Storage with high performance and reliability.
-type Storage struct {
+// Store manages DAGs status files in local Store with high performance and reliability.
+type Store struct {
 	baseDir           string                          // Base directory for all status files
 	latestStatusToday bool                            // Whether to only return today's status
 	cache             *fileutil.Cache[*models.Status] // Optional cache for read operations
 	maxWorkers        int                             // Maximum number of parallel workers
 }
 
-// HistoryStorageOption defines functional options for configuring local.
-type HistoryStorageOption func(*HistoryStorageOptions)
+// HistoryStoreOption defines functional options for configuring local.
+type HistoryStoreOption func(*HistoryStoreOptions)
 
-// HistoryStorageOptions holds configuration options for local.
-type HistoryStorageOptions struct {
+// HistoryStoreOptions holds configuration options for local.
+type HistoryStoreOptions struct {
 	FileCache         *fileutil.Cache[*models.Status] // Optional cache for status files
 	LatestStatusToday bool                            // Whether to only return today's status
 	MaxWorkers        int                             // Maximum number of parallel workers
@@ -47,22 +47,22 @@ type HistoryStorageOptions struct {
 }
 
 // WithHistoryFileCache sets the file cache for local.
-func WithHistoryFileCache(cache *fileutil.Cache[*models.Status]) HistoryStorageOption {
-	return func(o *HistoryStorageOptions) {
+func WithHistoryFileCache(cache *fileutil.Cache[*models.Status]) HistoryStoreOption {
+	return func(o *HistoryStoreOptions) {
 		o.FileCache = cache
 	}
 }
 
 // WithLatestStatusToday sets whether to only return today's status.
-func WithLatestStatusToday(latestStatusToday bool) HistoryStorageOption {
-	return func(o *HistoryStorageOptions) {
+func WithLatestStatusToday(latestStatusToday bool) HistoryStoreOption {
+	return func(o *HistoryStoreOptions) {
 		o.LatestStatusToday = latestStatusToday
 	}
 }
 
 // New creates a new JSONDB instance with the specified options.
-func New(baseDir string, opts ...HistoryStorageOption) models.HistoryStorage {
-	options := &HistoryStorageOptions{
+func New(baseDir string, opts ...HistoryStoreOption) models.HistoryStore {
+	options := &HistoryStoreOptions{
 		LatestStatusToday: true,
 		MaxWorkers:        runtime.NumCPU(),
 	}
@@ -71,7 +71,7 @@ func New(baseDir string, opts ...HistoryStorageOption) models.HistoryStorage {
 		opt(options)
 	}
 
-	return &Storage{
+	return &Store{
 		baseDir:           baseDir,
 		latestStatusToday: options.LatestStatusToday,
 		cache:             options.FileCache,
@@ -81,7 +81,7 @@ func New(baseDir string, opts ...HistoryStorageOption) models.HistoryStorage {
 
 // ListStatuses retrieves status records based on the provided options.
 // It supports filtering by time range, status, and limiting the number of results.
-func (store *Storage) ListStatuses(ctx context.Context, opts ...models.ListStatusesOption) ([]*models.Status, error) {
+func (store *Store) ListStatuses(ctx context.Context, opts ...models.ListStatusesOption) ([]*models.Status, error) {
 	// Apply options and set defaults
 	options, err := prepareListOptions(opts)
 	if err != nil {
@@ -128,7 +128,7 @@ func prepareListOptions(opts []models.ListStatusesOption) (models.ListStatusesOp
 }
 
 // collectStatusesFromRoots gathers statuses from root directories according to the options.
-func (store *Storage) collectStatusesFromRoots(
+func (store *Store) collectStatusesFromRoots(
 	parentCtx context.Context,
 	roots []DataRoot,
 	opts models.ListStatusesOptions,
@@ -235,7 +235,7 @@ func (store *Storage) collectStatusesFromRoots(
 }
 
 // getWorkflowStatus retrieves the status for a single workflow.
-func (store *Storage) getWorkflowStatus(
+func (store *Store) getWorkflowStatus(
 	ctx context.Context,
 	workflow *Workflow,
 ) (*models.Status, error) {
@@ -255,7 +255,7 @@ func (store *Storage) getWorkflowStatus(
 // CreateRun creates a new history record for the specified workflow ID.
 // If opts.Root is not nil, it creates a new history record for a child workflow.
 // If opts.Retry is true, it creates a retry record for the specified workflow ID.
-func (store *Storage) CreateRun(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewRunOptions) (models.Run, error) {
+func (store *Store) CreateRun(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewRunOptions) (models.Run, error) {
 	if workflowID == "" {
 		return nil, ErrWorkflowIDEmpty
 	}
@@ -291,7 +291,7 @@ func (store *Storage) CreateRun(ctx context.Context, dag *digraph.DAG, timestamp
 }
 
 // newChildRecord creates a new history record for a child workflow.
-func (b *Storage) newChildRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewRunOptions) (models.Run, error) {
+func (b *Store) newChildRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewRunOptions) (models.Run, error) {
 	dataRoot := NewDataRoot(b.baseDir, opts.Root.Name)
 	root, err := dataRoot.FindByWorkflowID(ctx, opts.Root.WorkflowID)
 	if err != nil {
@@ -325,7 +325,7 @@ func (b *Storage) newChildRecord(ctx context.Context, dag *digraph.DAG, timestam
 }
 
 // RecentRuns returns the most recent history records for the specified workflow name.
-func (store *Storage) RecentRuns(ctx context.Context, dagName string, itemLimit int) []models.Run {
+func (store *Store) RecentRuns(ctx context.Context, dagName string, itemLimit int) []models.Run {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -360,7 +360,7 @@ func (store *Storage) RecentRuns(ctx context.Context, dagName string, itemLimit 
 
 // LatestRun returns the most recent history record for the specified workflow name.
 // If latestStatusToday is true, it only returns today's status.
-func (store *Storage) LatestRun(ctx context.Context, dagName string) (models.Run, error) {
+func (store *Store) LatestRun(ctx context.Context, dagName string) (models.Run, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -393,7 +393,7 @@ func (store *Storage) LatestRun(ctx context.Context, dagName string) (models.Run
 }
 
 // FindRun finds a history record by workflow ID.
-func (store *Storage) FindRun(ctx context.Context, ref digraph.WorkflowRef) (models.Run, error) {
+func (store *Store) FindRun(ctx context.Context, ref digraph.WorkflowRef) (models.Run, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -418,7 +418,7 @@ func (store *Storage) FindRun(ctx context.Context, ref digraph.WorkflowRef) (mod
 
 // FindChildWorkflowRun finds a child workflow by its ID.
 // It returns the latest record for the specified child workflow ID.
-func (store *Storage) FindChildWorkflowRun(ctx context.Context, ref digraph.WorkflowRef, childWorkflowID string) (models.Run, error) {
+func (store *Store) FindChildWorkflowRun(ctx context.Context, ref digraph.WorkflowRef, childWorkflowID string) (models.Run, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -449,7 +449,7 @@ func (store *Storage) FindChildWorkflowRun(ctx context.Context, ref digraph.Work
 // If retentionDays is negative, no files will be removed.
 // If retentionDays is zero, all files will be removed.
 // If retentionDays is positive, only files older than the specified number of days will be removed.
-func (store *Storage) RemoveOldWorkflows(ctx context.Context, dagName string, retentionDays int) error {
+func (store *Store) RemoveOldWorkflows(ctx context.Context, dagName string, retentionDays int) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -468,7 +468,7 @@ func (store *Storage) RemoveOldWorkflows(ctx context.Context, dagName string, re
 }
 
 // RenameWorkflows renames all history records for the specified workflow name.
-func (store *Storage) RenameWorkflows(ctx context.Context, oldNameOrPath, newNameOrPath string) error {
+func (store *Store) RenameWorkflows(ctx context.Context, oldNameOrPath, newNameOrPath string) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -483,7 +483,7 @@ func (store *Storage) RenameWorkflows(ctx context.Context, oldNameOrPath, newNam
 }
 
 // listRoot lists all root directories in the base directory.
-func (store *Storage) listRoot(_ context.Context, include string) ([]DataRoot, error) {
+func (store *Store) listRoot(_ context.Context, include string) ([]DataRoot, error) {
 	rootDirs, err := listDirsSorted(store.baseDir, false, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list root directories: %w", err)

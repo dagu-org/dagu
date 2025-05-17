@@ -11,21 +11,21 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 )
 
-var _ models.QueueStorage = (*Storage)(nil)
+var _ models.QueueStore = (*Store)(nil)
 
-// Storage implements models.QueueStorage.
+// Store implements models.QueueStore.
 // It provides a dead-simple queue implementation using files.
 // Since implementing a queue is not trivial, this implementation provides
 // as a prototype for a more complex queue implementation.
-type Storage struct {
+type Store struct {
 	baseDir string
 	// queues is a map of queues, where the key is the queue name (workflow name)
 	queues map[string]*DualQueue
 	mu     sync.Mutex
 }
 
-// Dequeue implements models.QueueStorage.
-func (s *Storage) Dequeue(ctx context.Context, name string) (models.QueuedItem, error) {
+// Dequeue implements models.QueueStore.
+func (s *Store) Dequeue(ctx context.Context, name string) (models.QueuedItem, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -46,8 +46,8 @@ func (s *Storage) Dequeue(ctx context.Context, name string) (models.QueuedItem, 
 	return item, nil
 }
 
-// Len implements models.QueueStorage.
-func (s *Storage) Len(ctx context.Context, name string) (int, error) {
+// Len implements models.QueueStore.
+func (s *Store) Len(ctx context.Context, name string) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -59,8 +59,8 @@ func (s *Storage) Len(ctx context.Context, name string) (int, error) {
 	return q.Len(ctx)
 }
 
-// List implements models.QueueStorage.
-func (s *Storage) List(ctx context.Context, name string) ([]models.QueuedItem, error) {
+// List implements models.QueueStore.
+func (s *Store) List(ctx context.Context, name string) ([]models.QueuedItem, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -77,8 +77,8 @@ func (s *Storage) List(ctx context.Context, name string) ([]models.QueuedItem, e
 	return items, nil
 }
 
-// DequeueByWorkflowID implements models.QueueStorage.
-func (s *Storage) DequeueByWorkflowID(ctx context.Context, workflowID string) ([]models.QueuedItem, error) {
+// DequeueByWorkflowID implements models.QueueStore.
+func (s *Store) DequeueByWorkflowID(ctx context.Context, workflowID string) ([]models.QueuedItem, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -98,8 +98,8 @@ func (s *Storage) DequeueByWorkflowID(ctx context.Context, workflowID string) ([
 	return items, nil
 }
 
-// Enqueue implements models.QueueStorage.
-func (s *Storage) Enqueue(ctx context.Context, name string, p models.QueuePriority, workflow digraph.WorkflowRef) error {
+// Enqueue implements models.QueueStore.
+func (s *Store) Enqueue(ctx context.Context, name string, p models.QueuePriority, workflow digraph.WorkflowRef) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -115,13 +115,13 @@ func (s *Storage) Enqueue(ctx context.Context, name string, p models.QueuePriori
 	return nil
 }
 
-func (s *Storage) createDualQueue(name string) *DualQueue {
+func (s *Store) createDualQueue(name string) *DualQueue {
 	queueBaseDir := filepath.Join(s.baseDir, name)
 	return NewDualQueue(queueBaseDir, name)
 }
 
-func New(baseDir string) models.QueueStorage {
-	return &Storage{
+func New(baseDir string) models.QueueStore {
+	return &Store{
 		baseDir: baseDir,
 		queues:  make(map[string]*DualQueue),
 	}

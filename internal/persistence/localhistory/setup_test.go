@@ -14,20 +14,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type LocalStorageTest struct {
-	Context     context.Context
-	HistoryRepo models.HistoryStorage
-	TmpDir      string
+type LocalStoreTest struct {
+	Context      context.Context
+	HistoryStore models.HistoryStore
+	TmpDir       string
 }
 
-func setupTestLocalStorage(t *testing.T) LocalStorageTest {
+func setupTestLocalStore(t *testing.T) LocalStoreTest {
 	tmpDir, err := os.MkdirTemp("", "test")
 	require.NoError(t, err)
 
-	th := LocalStorageTest{
-		Context:     context.Background(),
-		HistoryRepo: New(tmpDir),
-		TmpDir:      tmpDir,
+	th := LocalStoreTest{
+		Context:      context.Background(),
+		HistoryStore: New(tmpDir),
+		TmpDir:       tmpDir,
 	}
 
 	t.Cleanup(func() {
@@ -36,11 +36,11 @@ func setupTestLocalStorage(t *testing.T) LocalStorageTest {
 	return th
 }
 
-func (th LocalStorageTest) CreateRun(t *testing.T, ts time.Time, workflowID string, s scheduler.Status) *Run {
+func (th LocalStoreTest) CreateRun(t *testing.T, ts time.Time, workflowID string, s scheduler.Status) *Run {
 	t.Helper()
 
 	dag := th.DAG("test_DAG")
-	run, err := th.HistoryRepo.CreateRun(th.Context, dag.DAG, ts, workflowID, models.NewRunOptions{})
+	run, err := th.HistoryStore.CreateRun(th.Context, dag.DAG, ts, workflowID, models.NewRunOptions{})
 	require.NoError(t, err)
 
 	err = run.Open(th.Context)
@@ -60,7 +60,7 @@ func (th LocalStorageTest) CreateRun(t *testing.T, ts time.Time, workflowID stri
 	return run.(*Run)
 }
 
-func (th LocalStorageTest) DAG(name string) DAGTest {
+func (th LocalStoreTest) DAG(name string) DAGTest {
 	return DAGTest{
 		th: th,
 		DAG: &digraph.DAG{
@@ -71,7 +71,7 @@ func (th LocalStorageTest) DAG(name string) DAGTest {
 }
 
 type DAGTest struct {
-	th LocalStorageTest
+	th LocalStoreTest
 	*digraph.DAG
 }
 
@@ -82,7 +82,7 @@ func (d DAGTest) Writer(t *testing.T, workflowID string, startedAt time.Time) Wr
 	workflow, err := root.CreateWorkflow(models.NewUTC(startedAt), workflowID)
 	require.NoError(t, err)
 
-	obj := d.th.HistoryRepo.(*Storage)
+	obj := d.th.HistoryStore.(*Store)
 	run, err := workflow.CreateRun(d.th.Context, models.NewUTC(startedAt), obj.cache, WithDAG(d.DAG))
 	require.NoError(t, err)
 
@@ -127,7 +127,7 @@ func (w WriterTest) Close(t *testing.T) {
 }
 
 type WriterTest struct {
-	th LocalStorageTest
+	th LocalStoreTest
 
 	WorkflowID string
 	FilePath   string

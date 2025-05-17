@@ -9,13 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestStorage(t *testing.T) {
+func TestStore(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
 
 	baseDir := th.Config.Paths.ProcDir
-	storage := New(baseDir)
+	store := New(baseDir)
 
 	// Create a workflow reference
 	workflow := digraph.WorkflowRef{
@@ -24,7 +24,7 @@ func TestStorage(t *testing.T) {
 	}
 
 	// Get the process for the workflow
-	proc, err := storage.Get(th.Context, workflow)
+	proc, err := store.Get(th.Context, workflow)
 	require.NoError(t, err, "failed to get proc")
 
 	// Start the process
@@ -41,7 +41,7 @@ func TestStorage(t *testing.T) {
 	}()
 
 	// Check if the count is 1
-	count, err := storage.Count(th.Context, workflow.Name)
+	count, err := store.Count(th.Context, workflow.Name)
 	require.NoError(t, err, "failed to count proc files")
 	require.Equal(t, 1, count, "expected 1 proc file")
 
@@ -49,7 +49,7 @@ func TestStorage(t *testing.T) {
 	<-done
 
 	// Check if the count is 0
-	count, err = storage.Count(th.Context, workflow.Name)
+	count, err = store.Count(th.Context, workflow.Name)
 	require.NoError(t, err, "failed to count proc files")
 	require.Equal(t, 0, count, "expected 0 proc files")
 }

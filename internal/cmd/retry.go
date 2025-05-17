@@ -50,7 +50,7 @@ func runRetry(ctx *Context, args []string) error {
 
 	// Retrieve the previous run data for specified workflow ID.
 	ref := digraph.NewWorkflowRef(name, workflowID)
-	runRecord, err := ctx.HistoryRepo.FindRun(ctx, ref)
+	runRecord, err := ctx.HistoryStore.FindRun(ctx, ref)
 	if err != nil {
 		return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflowID, err)
 	}
@@ -92,7 +92,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootRun
 	// Update the context with the log file
 	ctx.LogToFile(logFile)
 
-	dr, err := ctx.dagRepo(nil, []string{filepath.Dir(dag.Location)})
+	dr, err := ctx.dagStore(nil, []string{filepath.Dir(dag.Location)})
 	if err != nil {
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
@@ -104,7 +104,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootRun
 		logFile.Name(),
 		ctx.HistoryMgr,
 		dr,
-		ctx.HistoryRepo,
+		ctx.HistoryStore,
 		rootRun,
 		agent.Options{
 			RetryTarget: status,

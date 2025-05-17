@@ -22,7 +22,7 @@ func TestRetryCommand(t *testing.T) {
 		th.RunCommand(t, cmd.CmdStart(), test.CmdTest{Args: args})
 
 		// Find the workflow ID.
-		cli := th.DAGRepo
+		cli := th.DAGStore
 		ctx := context.Background()
 
 		dag, err := cli.GetMetadata(ctx, dagFile.Location)

@@ -77,7 +77,7 @@ func (a *API) ListWorkflowsByName(ctx context.Context, request api.ListWorkflows
 }
 
 func (a *API) listWorkflows(ctx context.Context, opts []models.ListStatusesOption) ([]api.WorkflowSummary, error) {
-	statuses, err := a.historyRepo.ListStatuses(ctx, opts...)
+	statuses, err := a.historyStore.ListStatuses(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("error listing workflows: %w", err)
 	}

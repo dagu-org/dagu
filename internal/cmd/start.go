@@ -201,7 +201,7 @@ func handleChildWorkflow(ctx *Context, dag *digraph.DAG, workflowID string, para
 	logger.Debug(ctx, "Checking for previous child workflow with the workflow ID", "workflowId", workflowID)
 
 	// Look for existing execution run
-	run, err := ctx.HistoryRepo.FindChildWorkflowRun(ctx, root, workflowID)
+	run, err := ctx.HistoryStore.FindChildWorkflowRun(ctx, root, workflowID)
 	if errors.Is(err, models.ErrWorkflowIDNotFound) {
 		// If the workflow ID is not found, proceed with new execution
 		return executeWorkflow(ctx, dag, parent, workflowID, root)
@@ -238,7 +238,7 @@ func executeWorkflow(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, w
 	logger.Debug(ctx, "Workflow initiated", "DAG", d.Name, "workflowId", workflowID, "logFile", logFile.Name())
 
 	// Initialize DAG repository with the DAG's directory in the search path
-	dr, err := ctx.dagRepo(nil, []string{filepath.Dir(d.Location)})
+	dr, err := ctx.dagStore(nil, []string{filepath.Dir(d.Location)})
 	if err != nil {
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
@@ -251,7 +251,7 @@ func executeWorkflow(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, w
 		logFile.Name(),
 		ctx.HistoryMgr,
 		dr,
-		ctx.HistoryRepo,
+		ctx.HistoryStore,
 		root,
 		agent.Options{Parent: parent},
 	)

@@ -6,8 +6,8 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 )
 
-// ProcStorage is an interface for managing process storage.
-type ProcStorage interface {
+// ProcStore is an interface for managing process storage.
+type ProcStore interface {
 	// Get retrieves a process by its workflow reference.
 	Get(ctx context.Context, workflow digraph.WorkflowRef) (Proc, error)
 	// Count retrieves the number of processes associated with a given workflow name.

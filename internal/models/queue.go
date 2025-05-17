@@ -13,9 +13,9 @@ var (
 	ErrQueueItemNotFound = errors.New("queue item not found")
 )
 
-// QueueStorage provides an interface for interacting with the underlying database
+// QueueStore provides an interface for interacting with the underlying database
 // for storing and retrieving queued workflows.
-type QueueStorage interface {
+type QueueStore interface {
 	// Enqueue adds an item to the queue
 	Enqueue(ctx context.Context, name string, priority QueuePriority, workflow digraph.WorkflowRef) error
 	// Dequeue retrieves an item from the queue and removes it

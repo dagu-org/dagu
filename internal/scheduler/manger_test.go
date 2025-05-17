@@ -56,7 +56,7 @@ func TestReadEntries(t *testing.T) {
 		dagJob, ok := job.(*scheduler.DAG)
 		require.True(t, ok)
 
-		err = th.dagRepo.ToggleSuspend(ctx, dagJob.DAG.Name, true)
+		err = th.dagStore.ToggleSuspend(ctx, dagJob.DAG.Name, true)
 		require.NoError(t, err)
 
 		// check if the job is suspended and not returned

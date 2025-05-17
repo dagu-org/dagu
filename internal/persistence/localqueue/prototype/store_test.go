@@ -1,0 +1,115 @@
+package prototype
+
+import (
+	"testing"
+
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/test"
+	"github.com/stretchr/testify/require"
+)
+
+func TestStore(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	// Create a new store
+	store := New(th.Config.Paths.QueueDir)
+
+	// Check if the store is empty
+	length, err := store.Len(th.Context, "test-name")
+	require.NoError(t, err, "expected no error when getting store length")
+	require.Equal(t, 0, length, "expected store length to be 0")
+
+	// Add a job to thestore
+	err = store.Enqueue(th.Context, "test-name", models.QueuePriorityLow, digraph.WorkflowRef{
+		Name:       "test-name",
+		WorkflowID: "test-workflow",
+	})
+	require.NoError(t, err, "expected no error when adding job to store")
+
+	// Check if the store length is 1
+	length, err = store.Len(th.Context, "test-name")
+	require.NoError(t, err, "expected no error when getting store length")
+	require.Equal(t, 1, length, "expected store length to be 1")
+
+	// Check if other queue is empty
+	length, err = store.Len(th.Context, "other-name")
+	require.NoError(t, err, "expected no error when getting store length")
+	require.Equal(t, 0, length, "expected store length to be 0")
+
+	// Check if dequeue returns the job
+	job, err := store.Dequeue(th.Context, "test-name")
+	require.NoError(t, err, "expected no error when dequeueing job from store")
+	require.NotNil(t, job, "expected job to be not nil")
+	require.Contains(t, job.ID(), "test-workflow", "expected job ID to contain 'test-workflow'")
+	jobData, err := job.Data()
+	require.NoError(t, err, "expected no error when getting job data")
+	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
+
+	// Check if the queue is empty again
+	length, err = store.Len(th.Context, "test-name")
+	require.NoError(t, err, "expected no error when getting store length")
+	require.Equal(t, 0, length, "expected store length to be 0")
+}
+
+func TestStore_DequeueByWorkflowID(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	// Create a newstore
+	store := New(th.Config.Paths.QueueDir)
+
+	// Add a job to thestore
+	err := store.Enqueue(th.Context, "test-name", models.QueuePriorityLow, digraph.WorkflowRef{
+		Name:       "test-name",
+		WorkflowID: "test-workflow",
+	})
+	require.NoError(t, err, "expected no error when adding job to store")
+
+	// Add another job to thestore
+	err = store.Enqueue(th.Context, "test-name", models.QueuePriorityLow, digraph.WorkflowRef{
+		Name:       "test-name",
+		WorkflowID: "test-workflow-2",
+	})
+
+	// Check if dequeue by workflow ID returns the job
+	jobs, err := store.DequeueByWorkflowID(th.Context, "test-workflow-2")
+	require.NoError(t, err, "expected no error when dequeueing job by workflow ID from store")
+	require.Len(t, jobs, 1, "expected to dequeue one job")
+	require.Contains(t, jobs[0].ID(), "test-workflow-2", "expected job ID to contain 'test-workflow-2'")
+	jobData, err := jobs[0].Data()
+	require.NoError(t, err, "expected no error when getting job data")
+	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
+	require.Equal(t, "test-workflow-2", jobData.WorkflowID, "expected job ID to be 'test-workflow-2'")
+}
+
+func TestStore_List(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	// Create a newstore
+	store := New(th.Config.Paths.QueueDir)
+
+	// Add a job to thestore
+	err := store.Enqueue(th.Context, "test-name", models.QueuePriorityLow, digraph.WorkflowRef{
+		Name:       "test-name",
+		WorkflowID: "test-workflow",
+	})
+	require.NoError(t, err, "expected no error when adding job to store")
+
+	// Add another job to thestore
+	err = store.Enqueue(th.Context, "test-name", models.QueuePriorityLow, digraph.WorkflowRef{
+		Name:       "test-name",
+		WorkflowID: "test-workflow-2",
+	})
+	require.NoError(t, err, "expected no error when adding job to store")
+
+	// Check if list returns the jobs
+	jobs, err := store.List(th.Context, "test-name")
+	require.NoError(t, err, "expected no error when listing jobs from store")
+	require.Len(t, jobs, 2, "expected to list two jobs")
+}

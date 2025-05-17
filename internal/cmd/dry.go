@@ -73,7 +73,7 @@ func runDry(ctx *Context, args []string) error {
 
 	ctx.LogToFile(logFile)
 
-	dr, err := ctx.dagRepo(nil, []string{filepath.Dir(dag.Location)})
+	dr, err := ctx.dagStore(nil, []string{filepath.Dir(dag.Location)})
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func runDry(ctx *Context, args []string) error {
 		logFile.Name(),
 		ctx.HistoryMgr,
 		dr,
-		ctx.HistoryRepo,
+		ctx.HistoryStore,
 		root,
 		agent.Options{Dry: true},
 	)

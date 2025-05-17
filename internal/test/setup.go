@@ -94,17 +94,17 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		cfg.Server = *options.ServerConfig
 	}
 
-	dagRepo := localdag.New(cfg.Paths.DAGsDir, localdag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
+	dagStore := localdag.New(cfg.Paths.DAGsDir, localdag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
 	runStore := localhistory.New(cfg.Paths.HistoryDir)
 
 	historyManager := history.New(runStore, cfg.Paths.Executable, cfg.Global.WorkDir, "")
 
 	helper := Helper{
-		Context:     createDefaultContext(),
-		Config:      cfg,
-		HistoryMgr:  historyManager,
-		DAGRepo:     dagRepo,
-		HistoryRepo: runStore,
+		Context:      createDefaultContext(),
+		Config:       cfg,
+		HistoryMgr:   historyManager,
+		DAGStore:     dagStore,
+		HistoryStore: runStore,
 
 		tmpDir: tmpDir,
 	}
@@ -136,8 +136,8 @@ type Helper struct {
 	Cancel        context.CancelFunc
 	Config        *config.Config
 	LoggingOutput *SyncBuffer
-	DAGRepo       models.DAStorage
-	HistoryRepo   models.HistoryStorage
+	DAGStore      models.DAGStore
+	HistoryStore  models.HistoryStore
 	HistoryMgr    history.Manager
 
 	tmpDir string
@@ -307,8 +307,8 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		logDir,
 		logFile,
 		d.HistoryMgr,
-		d.DAGRepo,
-		d.HistoryRepo,
+		d.DAGStore,
+		d.HistoryStore,
 		root,
 		helper.opts,
 	)

@@ -15,11 +15,11 @@ var (
 	ErrNoStatusData       = errors.New("no status data")
 )
 
-// HistoryStorage provides an interface for interacting with the underlying database
+// HistoryStore provides an interface for interacting with the underlying database
 // for storing and retrieving workflow run data.
 // It abstracts the details of the storage mechanism, allowing for different
 // implementations (e.g., file-based, in-memory, etc.) to be used interchangeably.
-type HistoryStorage interface {
+type HistoryStore interface {
 	// CreateRun creates a new execution record for a workflow
 	CreateRun(ctx context.Context, dag *digraph.DAG, ts time.Time, workflowID string, opts NewRunOptions) (Run, error)
 	// RecentRuns returns the most recent workflows for the given name, limited by itemLimit

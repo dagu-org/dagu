@@ -20,14 +20,14 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 )
 
-var _ models.DAStorage = (*Storage)(nil)
+var _ models.DAGStore = (*Storage)(nil)
 
 // Option is a functional option for configuring the DAG repository
 type Option func(*Options)
 
 // Options contains configuration options for the DAG repository
 type Options struct {
-	FlagsBaseDir string                        // Base directory for flag storage
+	FlagsBaseDir string                        // Base directory for flag store
 	FileCache    *fileutil.Cache[*digraph.DAG] // Optional cache for DAG objects
 	SearchPaths  []string                      // Additional search paths for DAG files
 }
@@ -39,7 +39,7 @@ func WithFileCache(cache *fileutil.Cache[*digraph.DAG]) Option {
 	}
 }
 
-// WithFlagsBaseDir returns a DAGRepositoryOption that sets the base directory for flag storage
+// WithFlagsBaseDir returns a DAGRepositoryOption that sets the base directory for flag store
 func WithFlagsBaseDir(dir string) Option {
 	return func(o *Options) {
 		o.FlagsBaseDir = dir
@@ -54,7 +54,7 @@ func WithSearchPaths(paths []string) Option {
 }
 
 // New creates a new DAG store implementation using the local filesystem
-func New(baseDir string, opts ...Option) models.DAStorage {
+func New(baseDir string, opts ...Option) models.DAGStore {
 	options := &Options{}
 	for _, opt := range opts {
 		opt(options)
@@ -84,7 +84,7 @@ func New(baseDir string, opts ...Option) models.DAStorage {
 // Storage implements the DAGRepository interface using the local filesystem
 type Storage struct {
 	baseDir      string                        // Base directory for DAG storage
-	flagsBaseDir string                        // Base directory for flag storage
+	flagsBaseDir string                        // Base directory for flag store
 	fileCache    *fileutil.Cache[*digraph.DAG] // Optional cache for DAG objects
 	searchPaths  []string                      // Additional search paths for DAG files
 	lock         sync.Mutex

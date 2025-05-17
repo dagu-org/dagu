@@ -50,13 +50,13 @@ func runStatus(ctx *Context, args []string) error {
 	if workflowID != "" {
 		// Retrieve the previous run's record for the specified workflow ID.
 		ref := digraph.NewWorkflowRef(name, workflowID)
-		r, err := ctx.HistoryRepo.FindRun(ctx, ref)
+		r, err := ctx.HistoryStore.FindRun(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to find run data for workflow ID %s: %w", workflowID, err)
 		}
 		run = r
 	} else {
-		r, err := ctx.HistoryRepo.LatestRun(ctx, name)
+		r, err := ctx.HistoryStore.LatestRun(ctx, name)
 		if err != nil {
 			return fmt.Errorf("failed to find the latest run data for DAG %s: %w", name, err)
 		}
