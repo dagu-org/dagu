@@ -39,6 +39,8 @@ func NewProc(file string) *Proc {
 
 // Stop implements models.Proc.
 func (p *Proc) Stop(ctx context.Context) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if !p.started.Load() {
 		return fmt.Errorf("heartbeat not started")
 	}

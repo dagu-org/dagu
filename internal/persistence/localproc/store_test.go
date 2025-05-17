@@ -35,7 +35,7 @@ func TestStore(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		time.Sleep(time.Millisecond * 100) // Give some time for the file to be created
-		err = proc.Stop(th.Context)
+		err := proc.Stop(th.Context)
 		require.NoError(t, err, "failed to stop proc")
 		close(done)
 	}()
