@@ -99,8 +99,10 @@ func (q *DualQueue) Enqueue(ctx context.Context, priority models.QueuePriority, 
 }
 
 // Dequeue retrieves a workflow from the queue and removes it
+// It checks the high-priority queue first, then the low-priority queue
 func (q *DualQueue) Dequeue(ctx context.Context) (models.QueuedItem, error) {
-	for priority, qf := range q.files {
+	for _, priority := range []models.QueuePriority{models.QueuePriorityHigh, models.QueuePriorityLow} {
+		qf := q.files[priority]
 		item, err := qf.Pop(ctx)
 		if errors.Is(err, ErrQueueFileEmpty) {
 			continue
