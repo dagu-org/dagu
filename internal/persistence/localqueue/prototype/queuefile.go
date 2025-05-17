@@ -48,9 +48,9 @@ type ItemData struct {
 	QueuedAt time.Time           `json:"queued_at"`
 }
 
-// AddJob adds a job to the queue
+// Push adds a job to the queue
 // Since it's a prototype, it just create a json file with the job ID and workflow reference
-func (q *QueueFile) AddJob(ctx context.Context, workflow digraph.WorkflowRef) error {
+func (q *QueueFile) Push(ctx context.Context, workflow digraph.WorkflowRef) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -104,6 +104,33 @@ func (q *QueueFile) AddJob(ctx context.Context, workflow digraph.WorkflowRef) er
 	// Rename the temporary file to the final name (this is atomic)
 	if err := os.Rename(tmpFile.Name(), fullPath); err != nil {
 		return fmt.Errorf("failed to rename temporary file %s to %s: %w", tmpFile.Name(), fullPath, err)
+	}
+
+	return nil
+}
+
+// DeleteByWorkflowID removes jobs from the queue by workflow ID
+func (q *QueueFile) DeleteByWorkflowID(ctx context.Context, workflowID string) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	// Check if the base directory exists
+	if _, err := os.Stat(q.baseDir); os.IsNotExist(err) {
+		return nil
+	}
+
+	// List all files in the base directory
+	items, err := q.listItems(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list jobs: %w", err)
+	}
+
+	for _, item := range items {
+		if item.Workflow.WorkflowID == workflowID {
+			if err := os.Remove(filepath.Join(q.baseDir, item.FileName)); err != nil {
+				return fmt.Errorf("failed to remove queue file %s: %w", item.FileName, err)
+			}
+		}
 	}
 
 	return nil
@@ -186,6 +213,9 @@ func (q *QueueFile) Len(ctx context.Context) (int, error) {
 	return len(items), nil
 }
 
+// listItems lists all items in the queue directory
+// It is not thread-safe and should be called with the mutex locked
+// to ensure that no other operations are modifying the queue at the same time.
 func (q *QueueFile) listItems(ctx context.Context) ([]ItemData, error) {
 	pattern := filepath.Join(q.baseDir, q.prefix+"*")
 	files, err := filepath.Glob(pattern)
