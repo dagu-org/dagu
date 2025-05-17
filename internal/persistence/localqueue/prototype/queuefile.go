@@ -142,6 +142,31 @@ func (q *QueueFile) Pop(ctx context.Context) (*Job, error) {
 	return NewJob(item), nil
 }
 
+// FindByWorkflowID finds a job by its workflow ID
+func (q *QueueFile) FindByWorkflowID(ctx context.Context, workflowID string) (*Job, error) {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+
+	// Check if the base directory exists
+	if _, err := os.Stat(q.baseDir); os.IsNotExist(err) {
+		return nil, ErrQueueFileEmpty
+	}
+
+	// List all files in the base directory
+	items, err := q.listItems(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list jobs: %w", err)
+	}
+
+	for _, item := range items {
+		if item.Workflow.WorkflowID == workflowID {
+			return NewJob(item), nil
+		}
+	}
+
+	return nil, fmt.Errorf("workflow ID %s not found in queue", workflowID)
+}
+
 // Len returns the number of items in the queue
 func (q *QueueFile) Len(ctx context.Context) (int, error) {
 	q.mu.RLock()
