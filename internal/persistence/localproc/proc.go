@@ -30,6 +30,7 @@ type Proc struct {
 	wg       sync.WaitGroup
 }
 
+// NewProc creates a new instance of Proc with the specified file name.
 func NewProc(file string) *Proc {
 	return &Proc{
 		fileName: file,
@@ -85,6 +86,12 @@ func (p *Proc) Start(ctx context.Context) error {
 
 	p.wg.Add(1)
 
+	// Start the heartbeat goroutine
+	// It will write the current timestamp to the file every 15 seconds
+	// and flush the file every 30 seconds.
+	// The goroutine will stop when the context is canceled.
+	// A proc file can be deemed stale if it has not been updated for 45 seconds
+	// and also the content of the timestamp is older than 45 seconds.
 	go func() {
 		defer func() {
 			_ = fd.Close()
