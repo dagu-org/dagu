@@ -103,6 +103,9 @@ tls:
 	assert.Equal(t, "/var/dagu/adminlogs", cfg.Paths.AdminLogsDir)
 	assert.Equal(t, "/var/dagu/base.yaml", cfg.Paths.BaseConfig)
 	assert.Equal(t, "/usr/local/bin/dagu", cfg.Paths.Executable)
+	assert.Equal(t, "/var/dagu/data/history", cfg.Paths.HistoryDir)
+	assert.Equal(t, "/var/dagu/data/queue", cfg.Paths.QueueDir)
+	assert.Equal(t, "/var/dagu/data/proc", cfg.Paths.ProcDir)
 
 	// Verify UI settings.
 	assert.Equal(t, "Test Dagu", cfg.UI.NavbarTitle)

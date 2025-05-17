@@ -64,7 +64,7 @@ func TestManager(t *testing.T) {
 		cli := th.HistoryMgr
 
 		// Open the run data and write a status before updating it.
-		run, err := th.HistoryRepo.CreateRun(ctx, dag.DAG, now, workflowID, models.NewRunOptions{})
+		run, err := th.HistoryStore.CreateRun(ctx, dag.DAG, now, workflowID, models.NewRunOptions{})
 		require.NoError(t, err)
 
 		err = run.Open(ctx)

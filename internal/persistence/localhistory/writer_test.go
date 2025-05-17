@@ -14,7 +14,7 @@ import (
 )
 
 func TestWriter(t *testing.T) {
-	th := setupTestLocalStorage(t)
+	th := setupTestLocalStore(t)
 
 	t.Run("WriteStatusToNewFile", func(t *testing.T) {
 		dag := th.DAG("test_write_status")
@@ -69,7 +69,7 @@ func TestWriter(t *testing.T) {
 }
 
 func TestWriterErrorHandling(t *testing.T) {
-	th := setupTestLocalStorage(t)
+	th := setupTestLocalStore(t)
 
 	t.Run("OpenNonExistentDirectory", func(t *testing.T) {
 		writer := NewWriter("/nonexistent/dir/file.dat")
@@ -97,7 +97,7 @@ func TestWriterErrorHandling(t *testing.T) {
 }
 
 func TestWriterRename(t *testing.T) {
-	th := setupTestLocalStorage(t)
+	th := setupTestLocalStore(t)
 
 	// Create a status file with old path
 	dag := th.DAG("test_rename_old")
@@ -110,7 +110,7 @@ func TestWriterRename(t *testing.T) {
 
 	// Rename and verify the file
 	newDAG := th.DAG("test_rename_new")
-	err := th.HistoryRepo.RenameWorkflows(context.Background(), dag.Location, newDAG.Location)
+	err := th.HistoryStore.RenameWorkflows(context.Background(), dag.Location, newDAG.Location)
 	require.NoError(t, err)
 	newWriter := newDAG.Writer(t, "workflow-id-2", time.Now())
 

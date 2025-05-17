@@ -38,7 +38,7 @@ type Server struct {
 }
 
 // NewServer creates a new Server instance with the given configuration and client
-func NewServer(cfg *config.Config, dr models.DAGRepository, hr models.HistoryRepository, hm history.Manager) *Server {
+func NewServer(cfg *config.Config, dr models.DAGStore, hr models.HistoryStore, hm history.Manager) *Server {
 	var remoteNodes []string
 	for _, n := range cfg.Server.RemoteNodes {
 		remoteNodes = append(remoteNodes, n.Name)

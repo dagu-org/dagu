@@ -13,9 +13,9 @@ var (
 	ErrDAGNotFound      = errors.New("DAG is not found")
 )
 
-// DAGRepository is an interface for interacting with underlying DAG storage systems.
+// DAGStore is an interface for interacting with underlying DAG storage systems.
 // It allows for different implementations (e.g., local file system, database) to be used interchangeably.
-type DAGRepository interface {
+type DAGStore interface {
 	// Create stores a new DAG definition with the given name and returns its file name
 	Create(ctx context.Context, fileName string, spec []byte) error
 	// Delete removes a DAG definition by name

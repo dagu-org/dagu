@@ -38,7 +38,7 @@ func TestMain(m *testing.M) {
 type testHelper struct {
 	manager        scheduler.JobManager
 	historyManager history.Manager
-	dagRepo        models.DAGRepository
+	dagStore       models.DAGStore
 	config         *config.Config
 }
 
@@ -60,18 +60,19 @@ func setupTest(t *testing.T) testHelper {
 			DataDir:         filepath.Join(tempDir, "."+build.Slug, "data"),
 			DAGsDir:         testdataDir,
 			SuspendFlagsDir: tempDir,
+			HistoryDir:      filepath.Join(tempDir, "."+build.Slug, "data", "history"),
 		},
 		Global: config.Global{WorkDir: tempDir},
 	}
 
 	dr := localdag.New(cfg.Paths.DAGsDir, localdag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
-	hr := localhistory.New(cfg.Paths.DataDir)
+	hr := localhistory.New(cfg.Paths.HistoryDir)
 	hm := history.New(hr, "", cfg.Global.WorkDir, "")
 	jobManager := scheduler.NewDAGJobManager(testdataDir, dr, hm, "", "")
 
 	return testHelper{
 		manager:        jobManager,
-		dagRepo:        dr,
+		dagStore:       dr,
 		historyManager: hm,
 		config:         cfg,
 	}

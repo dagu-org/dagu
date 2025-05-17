@@ -47,14 +47,14 @@ type dagJobManager struct {
 	targetDir      string
 	registry       map[string]*digraph.DAG
 	lock           sync.Mutex
-	dagClient      models.DAGRepository
+	dagClient      models.DAGStore
 	historyManager history.Manager
 	executable     string
 	workDir        string
 }
 
 // NewDAGJobManager creates a new DAG manager with the given configuration.
-func NewDAGJobManager(dir string, dagCli models.DAGRepository, hm history.Manager, executable, workDir string) JobManager {
+func NewDAGJobManager(dir string, dagCli models.DAGStore, hm history.Manager, executable, workDir string) JobManager {
 	return &dagJobManager{
 		targetDir:      dir,
 		lock:           sync.Mutex{},
