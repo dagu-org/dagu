@@ -1429,6 +1429,9 @@ components:
           description: "Conditions that must be met before a workflow can start"
           items:
             $ref: "#/components/schemas/Condition"
+        maxActiveWorkflows:
+          type: integer
+          description: "Maximum number of concurrent workflows allowed from this DAG"
         maxActiveSteps:
           type: integer
           description: "Maximum number of concurrent workflows allowed from this DAG"

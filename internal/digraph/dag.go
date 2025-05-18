@@ -68,6 +68,8 @@ type DAG struct {
 	Delay time.Duration `json:"delay,omitempty"`
 	// RestartWait is the time to wait before restarting the DAG.
 	RestartWait time.Duration `json:"restartWait,omitempty"`
+	// MaxActiveWorkflows specifies the maximum number of concurrent workflows.
+	MaxActiveWorkflows int `json:"maxActiveWorkflows,omitempty"`
 	// MaxActiveSteps specifies the maximum concurrent steps to run in an execution.
 	MaxActiveSteps int `json:"maxActiveSteps,omitempty"`
 	// MaxCleanUpTime is the maximum time to wait for cleanup when the DAG is stopped.
