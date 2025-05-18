@@ -88,6 +88,7 @@ func runDry(ctx *Context, args []string) error {
 		ctx.HistoryMgr,
 		dr,
 		ctx.HistoryStore,
+		ctx.ProcStore,
 		root,
 		agent.Options{Dry: true},
 	)

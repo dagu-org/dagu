@@ -26,8 +26,8 @@ func New(baseDir string) *Store {
 	}
 }
 
-// Count implements models.ProcStore.
-func (s *Store) Count(ctx context.Context, name string) (int, error) {
+// CountAlive implements models.ProcStore.
+func (s *Store) CountAlive(ctx context.Context, name string) (int, error) {
 	if _, ok := s.procGroups.Load(name); !ok {
 		s.procGroups.Store(name, NewProcGroup(s.baseDir, name, s.staleTime))
 	}
@@ -35,11 +35,18 @@ func (s *Store) Count(ctx context.Context, name string) (int, error) {
 	return pg.(*ProcGroup).Count(ctx, name)
 }
 
-// Get implements models.ProcStore.
-func (s *Store) Get(ctx context.Context, workflow digraph.WorkflowRef) (models.Proc, error) {
+// Acquire implements models.ProcStore.
+func (s *Store) Acquire(ctx context.Context, workflow digraph.WorkflowRef) (models.ProcHandle, error) {
 	if _, ok := s.procGroups.Load(workflow.Name); !ok {
 		s.procGroups.Store(workflow.Name, NewProcGroup(s.baseDir, workflow.Name, s.staleTime))
 	}
 	pg, _ := s.procGroups.Load(workflow.Name)
-	return pg.(*ProcGroup).GetProc(ctx, workflow)
+	proc, err := pg.(*ProcGroup).Acquire(ctx, workflow)
+	if err != nil {
+		return nil, err
+	}
+	if err := proc.startHeartbeat(ctx); err != nil {
+		return nil, err
+	}
+	return proc, nil
 }

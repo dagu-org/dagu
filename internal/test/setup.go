@@ -25,6 +25,7 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/localdag"
 	"github.com/dagu-org/dagu/internal/persistence/localhistory"
+	"github.com/dagu-org/dagu/internal/persistence/localproc"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -96,6 +97,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 
 	dagStore := localdag.New(cfg.Paths.DAGsDir, localdag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
 	runStore := localhistory.New(cfg.Paths.HistoryDir)
+	procStore := localproc.New(cfg.Paths.ProcDir)
 
 	historyManager := history.New(runStore, cfg.Paths.Executable, cfg.Global.WorkDir, "")
 
@@ -105,6 +107,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		HistoryMgr:   historyManager,
 		DAGStore:     dagStore,
 		HistoryStore: runStore,
+		ProcStore:    procStore,
 
 		tmpDir: tmpDir,
 	}
@@ -139,6 +142,7 @@ type Helper struct {
 	DAGStore      models.DAGStore
 	HistoryStore  models.HistoryStore
 	HistoryMgr    history.Manager
+	ProcStore     models.ProcStore
 
 	tmpDir string
 }
@@ -309,6 +313,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		d.HistoryMgr,
 		d.DAGStore,
 		d.HistoryStore,
+		d.ProcStore,
 		root,
 		helper.opts,
 	)

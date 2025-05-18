@@ -135,6 +135,7 @@ func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
 		cli,
 		dr,
 		ctx.HistoryStore,
+		ctx.ProcStore,
 		digraph.NewWorkflowRef(dag.Name, workflowID),
 		agent.Options{Dry: false})
 

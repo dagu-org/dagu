@@ -252,6 +252,7 @@ func executeWorkflow(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, w
 		ctx.HistoryMgr,
 		dr,
 		ctx.HistoryStore,
+		ctx.ProcStore,
 		root,
 		agent.Options{Parent: parent},
 	)

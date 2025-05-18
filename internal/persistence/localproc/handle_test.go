@@ -1,24 +1,25 @@
 package localproc
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/test"
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/stretchr/testify/require"
 )
 
-func TestProc(t *testing.T) {
+func TestProcHandle(t *testing.T) {
 	t.Parallel()
 
-	th := test.Setup(t)
+	tmpDir := t.TempDir()
 
-	fileName := filepath.Join(th.Config.Paths.ProcDir, "test_proc")
-	proc := NewProc(fileName)
+	fileName := filepath.Join(tmpDir, "test_proc")
+	proc := NewProcHandler(fileName, models.ProcMeta{})
 
-	ctx := th.Context
-	err := proc.Start(ctx)
+	ctx := context.Background()
+	err := proc.startHeartbeat(ctx)
 	require.NoError(t, err)
 
 	done := make(chan struct{})
@@ -41,23 +42,23 @@ func TestProc(t *testing.T) {
 	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
-func TestProc_Restart(t *testing.T) {
+func TestProcHandle_Restart(t *testing.T) {
 	t.Parallel()
 
-	th := test.Setup(t)
+	tmpDir := t.TempDir()
+	ctx := context.Background()
 
-	fileName := filepath.Join(th.Config.Paths.ProcDir, "test_proc")
-	proc := NewProc(fileName)
+	fileName := filepath.Join(tmpDir, "test_proc")
+	proc := NewProcHandler(fileName, models.ProcMeta{})
 
-	ctx := th.Context
-	err := proc.Start(ctx)
+	err := proc.startHeartbeat(ctx)
 	require.NoError(t, err)
 
 	// Restart the process
 	err = proc.Stop(ctx)
 	require.NoError(t, err)
 
-	err = proc.Start(ctx)
+	err = proc.startHeartbeat(ctx)
 	require.NoError(t, err)
 
 	// Check if the file is created again

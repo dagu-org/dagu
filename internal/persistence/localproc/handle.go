@@ -19,26 +19,35 @@ var (
 	ErrHeartbeatAlreadyStarted = fmt.Errorf("heartbeat already started")
 )
 
-var _ models.Proc = (*Proc)(nil)
+var _ models.ProcHandle = (*ProcHandle)(nil)
 
-// Proc is a struct that implements the Proc interface.
-type Proc struct {
+// ProcHandle is a struct that implements the ProcHandle interface.
+type ProcHandle struct {
 	fileName string
 	started  atomic.Bool
 	cancel   context.CancelFunc
 	mu       sync.Mutex
 	wg       sync.WaitGroup
+	meta     models.ProcMeta
 }
 
-// NewProc creates a new instance of Proc with the specified file name.
-func NewProc(file string) *Proc {
-	return &Proc{
+// GetMeta implements models.ProcHandle.
+func (p *ProcHandle) GetMeta() models.ProcMeta {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.meta
+}
+
+// NewProcHandler creates a new instance of Proc with the specified file name.
+func NewProcHandler(file string, meta models.ProcMeta) *ProcHandle {
+	return &ProcHandle{
 		fileName: file,
+		meta:     meta,
 	}
 }
 
 // Stop implements models.Proc.
-func (p *Proc) Stop(ctx context.Context) error {
+func (p *ProcHandle) Stop(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if !p.started.Load() {
@@ -52,8 +61,8 @@ func (p *Proc) Stop(ctx context.Context) error {
 	return nil
 }
 
-// Start implements models.Proc.
-func (p *Proc) Start(ctx context.Context) error {
+// startHeartbeat starts the heartbeat for the process.
+func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 	if !p.started.CompareAndSwap(false, true) {
 		return ErrHeartbeatAlreadyStarted
 	}
@@ -74,9 +83,8 @@ func (p *Proc) Start(ctx context.Context) error {
 	p.cancel = cancel
 
 	// Write the initial heartbeat timestamp
-	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, uint64(time.Now().UnixNano()))
-	if _, err := fd.WriteAt(buf, 0); err != nil {
+	body := fmt.Sprintf("%d", time.Now().Unix())
+	if _, err := fd.WriteAt([]byte(body), 0); err != nil {
 		_ = fd.Close()
 		if err := os.Remove(p.fileName); err != nil {
 			logger.Error(ctx, "Failed to remove heartbeat file", "err", err)
@@ -95,6 +103,13 @@ func (p *Proc) Start(ctx context.Context) error {
 	// A proc file can be deemed stale if it has not been updated for 45 seconds
 	// and also the content of the timestamp is older than 45 seconds.
 	go func() {
+		// recovery
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error(ctx, "Heartbeat goroutine panicked", "err", r)
+			}
+		}()
+
 		defer func() {
 			_ = fd.Close()
 			if err := os.Remove(p.fileName); err != nil {

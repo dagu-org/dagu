@@ -61,78 +61,64 @@ func (pg *ProcGroup) Count(ctx context.Context, name string) (int, error) {
 			continue
 		}
 		// Check if the file is stale
-		fileInfo, err := os.Stat(file)
-		if errors.Is(err, os.ErrNotExist) {
+		if !pg.isStale(ctx, file) {
+			aliveCount++
 			continue
 		}
-		if err != nil {
-			logger.Error(ctx, "failed to stat file %s: %v", file, err)
-			continue
+		// File is stale, remove it
+		if err := os.Remove(file); err != nil {
+			logger.Error(ctx, "failed to remove stale file %s: %v", file, err)
 		}
-		if time.Since(fileInfo.ModTime()) > pg.staleTime {
-			isStale, err := pg.isStale(ctx, file)
-			if err != nil {
-				logger.Error(ctx, "failed to check if file %s is stale: %v", file, err)
-				aliveCount++ // Let's assume it's alive
-				continue
-			}
-			if !isStale {
-				aliveCount++
-				continue
-			}
-			// File is stale, remove it
-			if err := os.Remove(file); err != nil {
-				logger.Error(ctx, "failed to remove stale file %s: %v", file, err)
-			}
-			continue
-		}
-		// File is alive, increment the count
-		aliveCount++
+		continue
 	}
 
 	return aliveCount, nil
 }
 
 // isStale checks if the proc file is stale based on its content (timestamp).
-func (pg *ProcGroup) isStale(_ context.Context, file string) (bool, error) {
+func (pg *ProcGroup) isStale(ctx context.Context, file string) bool {
 	// Check if the file exists
-	if _, err := os.Stat(file); errors.Is(err, os.ErrNotExist) {
-		return false, nil
+	fileInfo, err := os.Stat(file)
+	if err != nil {
+		return true // File does not exist, consider it stale
+	}
+
+	if time.Since(fileInfo.ModTime()) < pg.staleTime {
+		return false // File is not stale
 	}
 
 	// Check if the file is stale by checking its content (timestamp).
 	data, err := os.ReadFile(file)
 	if err != nil {
-		return false, fmt.Errorf("failed to read file %s: %w", file, err)
+		logger.Warn(ctx, "failed to read file %s: %v", file, err)
+		return false
 	}
 
 	var unixTime int64
 
 	// It is assumed that the first 8 bytes of the file contain a timestamp in nanoseconds (unix time).
 	if len(data) < 8 {
-		return false, fmt.Errorf("file %s is too short to contain a timestamp", file)
+		logger.Warn(ctx, "file %s is too short, expected at least 8 bytes", file)
+		return false
 	}
 
 	// Parse the timestamp from the file
 	unixTime = int64(binary.BigEndian.Uint64(data[:8]))
-	if time.Since(time.Unix(0, unixTime)) < pg.staleTime {
-		// File is not stale
-		return false, nil
-	}
-	// File is stale
-	return true, nil
+	return time.Since(time.Unix(0, unixTime)) >= pg.staleTime
 }
 
 // GetProc retrieves a proc file for the specified workflow reference.
 // It returns a new Proc instance with the generated file name.
-func (pg *ProcGroup) GetProc(ctx context.Context, workflow digraph.WorkflowRef) (*Proc, error) {
+func (pg *ProcGroup) Acquire(ctx context.Context, workflow digraph.WorkflowRef) (*ProcHandle, error) {
 	// Sanity check the workflow reference
 	if pg.name != workflow.Name {
 		return nil, fmt.Errorf("workflow name %s does not match proc file name %s", workflow.Name, pg.name)
 	}
 	// Generate the proc file name
 	fileName := pg.getFileName(models.NewUTC(time.Now()), workflow)
-	return NewProc(fileName), nil
+	return NewProcHandler(fileName, models.ProcMeta{
+		StartedAt: time.Now().Unix(),
+	}), nil
 }
 
 // getFileName generates a proc file name based on the workflow reference.

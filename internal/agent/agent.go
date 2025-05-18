@@ -47,6 +47,9 @@ type Agent struct {
 	// historyStore is the database to store the run history.
 	historyStore models.HistoryStore
 
+	// procStore is the database to store the process information.
+	procStore models.ProcStore
+
 	// client is the runstore client to communicate with the history.
 	client history.Manager
 
@@ -118,6 +121,7 @@ func New(
 	cli history.Manager,
 	ds models.DAGStore,
 	hs models.HistoryStore,
+	ps models.ProcStore,
 	root digraph.WorkflowRef,
 	opts Options,
 ) *Agent {
@@ -133,6 +137,7 @@ func New(
 		client:       cli,
 		dagStore:     ds,
 		historyStore: hs,
+		procStore:    ps,
 	}
 }
 
@@ -196,6 +201,19 @@ func (a *Agent) Run(ctx context.Context) error {
 		return err
 	}
 
+	// Create a process for heartbeat.
+	proc, err := a.procStore.Acquire(ctx, digraph.NewWorkflowRef(a.dag.Name, a.workflowID))
+	if err != nil {
+		return fmt.Errorf("failed to get process: %w", err)
+	}
+	defer func() {
+		// Stop the process and remove it from the store.
+		if err := proc.Stop(ctx); err != nil {
+			logger.Error(ctx, "Failed to close process", "err", err)
+		}
+	}()
+
+	// Open the run file to write the status.
 	if err := run.Open(ctx); err != nil {
 		return fmt.Errorf("failed to open execution history: %w", err)
 	}

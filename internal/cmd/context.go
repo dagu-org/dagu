@@ -20,6 +20,7 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/localdag"
 	"github.com/dagu-org/dagu/internal/persistence/localhistory"
+	"github.com/dagu-org/dagu/internal/persistence/localproc"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
@@ -37,6 +38,7 @@ type Context struct {
 	Quiet        bool
 	HistoryStore models.HistoryStore
 	HistoryMgr   history.Manager
+	ProcStore    models.ProcStore
 }
 
 // LogToFile creates a new logger context with a file writer.
@@ -115,6 +117,9 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	hr := localhistory.New(cfg.Paths.HistoryDir, hrOpts...)
 	hm := history.New(hr, cfg.Paths.Executable, cfg.Global.WorkDir, cfg.Global.ConfigPath)
 
+	// Initialize ProcStore
+	ps := localproc.New(cfg.Paths.ProcDir)
+
 	return &Context{
 		Context:      ctx,
 		Command:      cmd,
@@ -123,6 +128,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		HistoryStore: hr,
 		HistoryMgr:   hm,
 		Flags:        flags,
+		ProcStore:    ps,
 	}, nil
 }
 
