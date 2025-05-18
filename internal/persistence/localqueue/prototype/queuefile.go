@@ -23,6 +23,9 @@ var (
 	ErrQueueFileItemNotFound = fmt.Errorf("queue file item not found")
 )
 
+// itemPrefix is the prefix for the queue file name
+const itemPrefix = "item_"
+
 // QueueFile is a simple queue implementation using files
 // It stores the queued items in JSON files in a specified directory
 // File name format: prefix_YYYYMMDD_HHMMSS_millisZ_workflowID.json
@@ -30,24 +33,21 @@ var (
 // Since this relies on the file system, it is not thread-safe and should be
 // accessed by a single process at a time.
 type QueueFile struct {
-	// name is the name of the workflow
-	name string
 	// baseDir is the base directory for the queue files
 	baseDir string
-	// Prefix is the prefix for the queue files
-	prefix string
-	// regex is the regex for matching the queue file name
-	regex *regexp.Regexp
+	// priority is the priority for the queue files
+	priority string
+	// match is the match for matching the queue file name
+	match *regexp.Regexp
 	// mu is the mutex for synchronizing access to the queue
 	mu sync.RWMutex
 }
 
-func NewQueueFile(baseDir, name, prefix string) *QueueFile {
+func NewQueueFile(baseDir, priority string) *QueueFile {
 	return &QueueFile{
-		baseDir: baseDir,
-		name:    name,
-		prefix:  prefix,
-		regex:   regexp.MustCompile(fmt.Sprintf(`^%s(\d{8}_\d{6})_(\d{3})Z_(.*)\.json$`, prefix)),
+		baseDir:  baseDir,
+		priority: priority,
+		match:    regexp.MustCompile(fmt.Sprintf(`^%s%s(\d{8}_\d{6})_(\d{3})Z_(.*)\.json$`, itemPrefix, priority)),
 	}
 }
 
@@ -63,15 +63,10 @@ func (q *QueueFile) Push(ctx context.Context, workflow digraph.WorkflowRef) erro
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	// Sanity check for the workflow name
-	if workflow.Name != q.name {
-		return fmt.Errorf("workflow name %s does not match queue name %s", workflow.Name, q.name)
-	}
-
 	timestamp := models.NewUTC(time.Now())
 
 	// Create the queue file name
-	fileName := queueFileName(q.prefix, workflow.WorkflowID, timestamp)
+	fileName := queueFileName(q.priority, workflow.WorkflowID, timestamp)
 
 	// Create the full path for the queue file
 	fullPath := filepath.Join(q.baseDir, fileName)
@@ -252,7 +247,7 @@ func (q *QueueFile) Len(ctx context.Context) (int, error) {
 // It is not thread-safe and should be called with the mutex locked
 // to ensure that no other operations are modifying the queue at the same time.
 func (q *QueueFile) listItems(ctx context.Context) ([]ItemData, error) {
-	pattern := filepath.Join(q.baseDir, q.prefix+"*")
+	pattern := filepath.Join(q.baseDir, itemPrefix+q.priority+"*")
 	files, err := filepath.Glob(pattern)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list files in %s: %w", q.baseDir, err)
@@ -262,11 +257,11 @@ func (q *QueueFile) listItems(ctx context.Context) ([]ItemData, error) {
 	for _, file := range files {
 		fileName := filepath.Base(file)
 		// Check the file name matches the expected pattern
-		if !q.regex.MatchString(fileName) {
+		if !q.match.MatchString(fileName) {
 			continue
 		}
 		// Parse the file name to get the workflow ID and timestamp
-		item, err := q.parseQueueFileName(ctx, fileName)
+		item, err := parseQueueFileName(file, fileName)
 		if err != nil {
 			logger.Error(ctx, "failed to parse queue file name %s: %w", fileName, err)
 			continue
@@ -282,21 +277,21 @@ func (q *QueueFile) listItems(ctx context.Context) ([]ItemData, error) {
 	return items, nil
 }
 
-func (q *QueueFile) parseQueueFileName(_ context.Context, fileName string) (ItemData, error) {
+func parseQueueFileName(path, fileName string) (ItemData, error) {
 	// Extract the workflow ID and timestamp from the file name
-	matches := q.regex.FindStringSubmatch(fileName)
-	if len(matches) != 4 {
+	matches := parseRegex.FindStringSubmatch(fileName)
+	if len(matches) != 5 {
 		return ItemData{}, fmt.Errorf("invalid queue file name format: %s", fileName)
 	}
 
 	// Parse the timestamp
-	timestamp, err := time.Parse(dateTimeFormatUTC, matches[1])
+	timestamp, err := time.Parse(dateTimeFormatUTC, matches[2])
 	if err != nil {
 		return ItemData{}, fmt.Errorf("failed to parse timestamp from file name %s: %w", fileName, err)
 	}
 
 	// Parse the milliseconds
-	millis, err := strconv.Atoi(matches[2])
+	millis, err := strconv.Atoi(matches[3])
 	if err != nil {
 		return ItemData{}, fmt.Errorf("failed to parse milliseconds from file name %s: %w", fileName, err)
 	}
@@ -306,8 +301,8 @@ func (q *QueueFile) parseQueueFileName(_ context.Context, fileName string) (Item
 	item := ItemData{
 		FileName: fileName,
 		Workflow: digraph.WorkflowRef{
-			Name:       q.name,
-			WorkflowID: matches[3],
+			Name:       filepath.Base(filepath.Dir(path)),
+			WorkflowID: matches[4],
 		},
 		QueuedAt: timestamp,
 	}
@@ -315,10 +310,13 @@ func (q *QueueFile) parseQueueFileName(_ context.Context, fileName string) (Item
 	return item, nil
 }
 
-func queueFileName(prefix, workflowID string, t models.TimeInUTC) string {
+// parseRegex is the regex used to parse the queue file name
+var parseRegex = regexp.MustCompile(`^item_(high|low)_(\d{8}_\d{6})_(\d{3})Z_(.*)\.json$`)
+
+func queueFileName(priority, workflowID string, t models.TimeInUTC) string {
 	mill := t.UnixMilli()
 	timestamp := t.Format(dateTimeFormatUTC) + "_" + fmt.Sprintf("%03d", mill%1000) + "Z"
-	return prefix + timestamp + "_" + workflowID + ".json"
+	return itemPrefix + priority + timestamp + "_" + workflowID + ".json"
 }
 
 // dateTimeFormat is the format used for the timestamp in the queue file name

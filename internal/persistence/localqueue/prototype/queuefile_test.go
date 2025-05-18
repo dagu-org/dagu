@@ -1,6 +1,7 @@
 package prototype
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -13,8 +14,10 @@ func TestQueueFile(t *testing.T) {
 
 	th := test.Setup(t)
 
+	queueDir := filepath.Join(th.Config.Paths.QueueDir, "test-name")
+
 	// Create a new queue file
-	qf := NewQueueFile(th.Config.Paths.QueueDir, "test-name", "priority_")
+	qf := NewQueueFile(queueDir, "high_")
 	if qf == nil {
 		t.Fatal("expected queue file to be created")
 	}
@@ -47,7 +50,7 @@ func TestQueueFile(t *testing.T) {
 	require.Equal(t, "test-workflow", job.Workflow.WorkflowID, "expected job ID to be 'test'")
 
 	// Check if the item has the correct prefix
-	require.Regexp(t, "^priority_", job.FileName, "expected job file name to start with 'priority_'")
+	require.Regexp(t, "^item_high_", job.FileName, "expected job file name to start with 'item_priority_'")
 
 	// Check if the queue is empty again
 	queueLen, err = qf.Len(th.Context)
@@ -63,8 +66,10 @@ func TestQueueFile_FindByWorkflowID(t *testing.T) {
 
 	th := test.Setup(t)
 
+	queueDir := filepath.Join(th.Config.Paths.QueueDir, "test-name")
+
 	// Create a new queue file
-	qf := NewQueueFile(th.Config.Paths.QueueDir, "test-name", "priority_")
+	qf := NewQueueFile(queueDir, "high_")
 	if qf == nil {
 		t.Fatal("expected queue file to be created")
 	}
@@ -84,7 +89,7 @@ func TestQueueFile_FindByWorkflowID(t *testing.T) {
 	require.Equal(t, "test-workflow", job.Workflow.WorkflowID, "expected job ID to be 'test'")
 
 	// Check if the item has the correct prefix
-	require.Regexp(t, "^priority_", job.FileName, "expected job file name to start with 'priority_'")
+	require.Regexp(t, "^item_high_", job.FileName, "expected job file name to start with 'high_'")
 }
 
 func TestQueueFile_Pop(t *testing.T) {
@@ -92,8 +97,10 @@ func TestQueueFile_Pop(t *testing.T) {
 
 	th := test.Setup(t)
 
+	queueDir := filepath.Join(th.Config.Paths.QueueDir, "test-name")
+
 	// Create a new queue file
-	qf := NewQueueFile(th.Config.Paths.QueueDir, "test-name", "priority_")
+	qf := NewQueueFile(queueDir, "high_")
 	if qf == nil {
 		t.Fatal("expected queue file to be created")
 	}
@@ -123,8 +130,10 @@ func TestQueueFile_Error(t *testing.T) {
 
 	th := test.Setup(t)
 
+	queueDir := filepath.Join(th.Config.Paths.QueueDir, "test-name")
+
 	// Create a new queue file
-	qf := NewQueueFile(th.Config.Paths.QueueDir, "test-name", "priority_")
+	qf := NewQueueFile(queueDir, "high_")
 	if qf == nil {
 		t.Fatal("expected queue file to be created")
 	}
@@ -138,14 +147,5 @@ func TestQueueFile_Error(t *testing.T) {
 		// Check if pop returns an error when the queue is empty
 		_, err = qf.Pop(th.Context)
 		require.ErrorIs(t, err, ErrQueueFileEmpty, "expected error when popping from empty queue")
-	})
-
-	t.Run("InvalidWorkflowID", func(t *testing.T) {
-		// Try to add a job with an invalid workflow name
-		err := qf.Push(th.Context, digraph.WorkflowRef{
-			Name:       "invalid-name",
-			WorkflowID: "test-workflow",
-		})
-		require.Error(t, err, "expected error when adding job with invalid workflow name")
 	})
 }

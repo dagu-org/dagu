@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"sync"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -30,6 +32,8 @@ type DualQueue struct {
 	name string
 	// queueFiles is a map of queue files, where the key is the priority
 	files map[models.QueuePriority]*QueueFile
+	// mu is the mutex for synchronizing access to the queue
+	mu sync.Mutex
 }
 
 // NewDualQueue creates a new queue with the specified base directory and name
@@ -39,8 +43,8 @@ func NewDualQueue(baseDir, name string) *DualQueue {
 		baseDir: baseDir,
 		name:    name,
 		files: map[models.QueuePriority]*QueueFile{
-			models.QueuePriorityHigh: NewQueueFile(baseDir, name, "high"),
-			models.QueuePriorityLow:  NewQueueFile(baseDir, name, "low"),
+			models.QueuePriorityHigh: NewQueueFile(baseDir, "high_"),
+			models.QueuePriorityLow:  NewQueueFile(baseDir, "low_"),
 		},
 	}
 }
@@ -65,6 +69,9 @@ func (q *DualQueue) FindByWorkflowID(ctx context.Context, workflowID string) (mo
 
 // DequeueByWorkflowID retrieves a workflow from the queue by its ID and removes it
 func (q *DualQueue) DequeueByWorkflowID(ctx context.Context, workflowID string) ([]models.QueuedItem, error) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
 	var items []models.QueuedItem
 	for _, priority := range priorities {
 		qf := q.files[priority]
@@ -114,6 +121,9 @@ func (q *DualQueue) Len(ctx context.Context) (int, error) {
 
 // Enqueue adds a workflow to the queue with the specified priority
 func (q *DualQueue) Enqueue(ctx context.Context, priority models.QueuePriority, workflow digraph.WorkflowRef) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
 	if _, ok := q.files[priority]; !ok {
 		return fmt.Errorf("invalid queue priority: %d", priority)
 	}
@@ -128,6 +138,9 @@ func (q *DualQueue) Enqueue(ctx context.Context, priority models.QueuePriority, 
 // Dequeue retrieves a workflow from the queue and removes it
 // It checks the high-priority queue first, then the low-priority queue
 func (q *DualQueue) Dequeue(ctx context.Context) (models.QueuedItem, error) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
 	for _, priority := range priorities {
 		qf := q.files[priority]
 		item, err := qf.Pop(ctx)
@@ -142,5 +155,10 @@ func (q *DualQueue) Dequeue(ctx context.Context) (models.QueuedItem, error) {
 			return item, nil
 		}
 	}
+
+	// Delete the directory if it's empty
+	// It fails silently if the directory
+	_ = os.Remove(q.baseDir)
+
 	return nil, ErrQueueEmpty
 }

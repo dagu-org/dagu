@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 )
 
@@ -22,6 +24,41 @@ type Store struct {
 	// queues is a map of queues, where the key is the queue name (workflow name)
 	queues map[string]*DualQueue
 	mu     sync.Mutex
+}
+
+// All implements models.QueueStore.
+func (s *Store) All(ctx context.Context) ([]models.QueuedItem, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var items []models.QueuedItem
+
+	patterns := []string{
+		filepath.Join(s.baseDir, "*", "item_high_*.json"),
+		filepath.Join(s.baseDir, "*", "item_low_*.json"),
+	}
+
+	for _, pattern := range patterns {
+		// Grep high priority items in the directory
+		files, err := filepath.Glob(pattern)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list high priority workflows: %w", err)
+		}
+
+		// Sort the files by name which reflects the order of the items
+		sort.Strings(files)
+
+		for _, file := range files {
+			data, err := parseQueueFileName(file, filepath.Base(file))
+			if err != nil {
+				logger.Error(ctx, "Failed to parse queue file name", "file", file, "err", err)
+				continue
+			}
+			items = append(items, NewJob(data))
+		}
+	}
+
+	return items, nil
 }
 
 // Dequeue implements models.QueueStore.

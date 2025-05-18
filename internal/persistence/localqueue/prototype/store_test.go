@@ -113,3 +113,45 @@ func TestStore_List(t *testing.T) {
 	require.NoError(t, err, "expected no error when listing jobs from store")
 	require.Len(t, jobs, 2, "expected to list two jobs")
 }
+
+func TestStore_All(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	// Create a newstore
+	store := New(th.Config.Paths.QueueDir)
+
+	// Add a job to thestore
+	err := store.Enqueue(th.Context, "test-name", models.QueuePriorityLow, digraph.WorkflowRef{
+		Name:       "test-name",
+		WorkflowID: "test-workflow",
+	})
+	require.NoError(t, err, "expected no error when adding job to store")
+
+	// Add another job to thestore
+	err = store.Enqueue(th.Context, "test-name2", models.QueuePriorityHigh, digraph.WorkflowRef{
+		Name:       "test-name2",
+		WorkflowID: "test-workflow-2",
+	})
+	require.NoError(t, err, "expected no error when adding job to store")
+
+	// Check if all returns the jobs
+	jobs, err := store.All(th.Context)
+	require.NoError(t, err, "expected no error when listing all jobs from store")
+	require.Len(t, jobs, 2, "expected to list two jobs")
+
+	// Check if the jobs are sorted by priority
+	data1, err := jobs[0].Data()
+	require.NoError(t, err, "expected no error when getting job data")
+
+	// Check if the jobs are sorted by priority
+	data2, err := jobs[1].Data()
+	require.NoError(t, err, "expected no error when getting job data")
+
+	// Check if the jobs are sorted by priority
+	require.Equal(t, "test-name2", data1.Name, "expected job name to be 'test-name'")
+	require.Equal(t, "test-workflow-2", data1.WorkflowID, "expected job ID to be 'test-workflow-2'")
+	require.Equal(t, "test-name", data2.Name, "expected job name to be 'test-name'")
+	require.Equal(t, "test-workflow", data2.WorkflowID, "expected job ID to be 'test-workflow'")
+}

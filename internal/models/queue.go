@@ -26,6 +26,8 @@ type QueueStore interface {
 	DequeueByWorkflowID(ctx context.Context, workflowID string) ([]QueuedItem, error)
 	// List returns all items in the queue
 	List(ctx context.Context, name string) ([]QueuedItem, error)
+	// All returns all items in the queue
+	All(ctx context.Context) ([]QueuedItem, error)
 }
 
 // QueuePriority represents the priority of a queued item
