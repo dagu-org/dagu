@@ -1,6 +1,7 @@
 package prototype
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -14,7 +15,8 @@ func TestQueue(t *testing.T) {
 
 	th := test.Setup(t)
 
-	queue := NewDualQueue(th.Config.Paths.QueueDir, "test-name")
+	queueDir := filepath.Join(th.Config.Paths.QueueDir, "test-name")
+	queue := NewDualQueue(queueDir, "test-name")
 
 	// Check if the queue is empty
 	queueLen, err := queue.Len(th.Context)
@@ -68,7 +70,8 @@ func TestQueue_FindByWorkflowID(t *testing.T) {
 
 	th := test.Setup(t)
 
-	queue := NewDualQueue(th.Config.Paths.QueueDir, "test-name")
+	queueDir := filepath.Join(th.Config.Paths.QueueDir, "test-name")
+	queue := NewDualQueue(queueDir, "test-name")
 
 	// Add a low priority job to the queue
 	err := queue.Enqueue(th.Context, models.QueuePriorityLow, digraph.WorkflowRef{

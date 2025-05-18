@@ -16,6 +16,7 @@ import (
 
 func TestScheduler(t *testing.T) {
 	t.Parallel()
+
 	t.Run("Start", func(t *testing.T) {
 		now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 		scheduler.SetFixedTime(now)
@@ -28,7 +29,7 @@ func TestScheduler(t *testing.T) {
 		}
 
 		th := setupTest(t)
-		sc := scheduler.New(th.config, entryReader)
+		sc := scheduler.New(th.config, entryReader, th.queueStore, th.procStore)
 
 		go func() {
 			_ = sc.Start(context.Background())
@@ -51,7 +52,7 @@ func TestScheduler(t *testing.T) {
 		}
 
 		th := setupTest(t)
-		sc := scheduler.New(th.config, entryReader)
+		sc := scheduler.New(th.config, entryReader, th.queueStore, th.procStore)
 
 		go func() {
 			_ = sc.Start(context.Background())
@@ -66,7 +67,7 @@ func TestScheduler(t *testing.T) {
 		scheduler.SetFixedTime(now)
 
 		th := setupTest(t)
-		schedulerInstance := scheduler.New(th.config, &mockJobManager{})
+		schedulerInstance := scheduler.New(th.config, &mockJobManager{}, th.queueStore, th.procStore)
 
 		next := schedulerInstance.NextTick(now)
 		require.Equal(t, time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC), next)

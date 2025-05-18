@@ -21,6 +21,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/localdag"
 	"github.com/dagu-org/dagu/internal/persistence/localhistory"
 	"github.com/dagu-org/dagu/internal/persistence/localproc"
+	"github.com/dagu-org/dagu/internal/persistence/localqueue/prototype"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
@@ -39,6 +40,7 @@ type Context struct {
 	HistoryStore models.HistoryStore
 	HistoryMgr   history.Manager
 	ProcStore    models.ProcStore
+	QueueStore   models.QueueStore
 }
 
 // LogToFile creates a new logger context with a file writer.
@@ -114,21 +116,21 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		hrOpts = append(hrOpts, localhistory.WithHistoryFileCache(hc))
 	}
 
-	hr := localhistory.New(cfg.Paths.HistoryDir, hrOpts...)
-	hm := history.New(hr, cfg.Paths.Executable, cfg.Global.WorkDir, cfg.Global.ConfigPath)
-
-	// Initialize ProcStore
+	hs := localhistory.New(cfg.Paths.HistoryDir, hrOpts...)
+	hm := history.New(hs, cfg.Paths.Executable, cfg.Global.WorkDir, cfg.Global.ConfigPath)
 	ps := localproc.New(cfg.Paths.ProcDir)
+	qs := prototype.New(cfg.Paths.QueueDir)
 
 	return &Context{
 		Context:      ctx,
 		Command:      cmd,
 		Config:       cfg,
 		Quiet:        quiet,
-		HistoryStore: hr,
+		HistoryStore: hs,
 		HistoryMgr:   hm,
 		Flags:        flags,
 		ProcStore:    ps,
+		QueueStore:   qs,
 	}, nil
 }
 
@@ -168,7 +170,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	}
 
 	m := scheduler.NewDAGJobManager(c.Config.Paths.DAGsDir, dr, c.HistoryMgr, c.Config.Paths.Executable, c.Config.Global.WorkDir)
-	return scheduler.New(c.Config, m), nil
+	return scheduler.New(c.Config, m, c.QueueStore, c.ProcStore), nil
 }
 
 // dagStore returns a new DAGRepository instance. It ensures that the directory exists

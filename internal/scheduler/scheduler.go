@@ -14,6 +14,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/models"
 )
 
 // Job is the interface for the actual DAG.
@@ -27,24 +28,33 @@ type Job interface {
 }
 
 type Scheduler struct {
-	manager  JobManager
-	logDir   string
-	stopChan chan struct{}
-	running  atomic.Bool
-	location *time.Location
+	manager    JobManager
+	logDir     string
+	stopChan   chan struct{}
+	running    atomic.Bool
+	location   *time.Location
+	queueStore models.QueueStore
+	procStore  models.ProcStore
 }
 
-func New(cfg *config.Config, manager JobManager) *Scheduler {
+func New(
+	cfg *config.Config,
+	manager JobManager,
+	qs models.QueueStore,
+	ps models.ProcStore,
+) *Scheduler {
 	timeLoc := cfg.Global.Location
 	if timeLoc == nil {
 		timeLoc = time.Local
 	}
 
 	return &Scheduler{
-		logDir:   cfg.Paths.LogDir,
-		stopChan: make(chan struct{}),
-		location: timeLoc,
-		manager:  manager,
+		logDir:     cfg.Paths.LogDir,
+		stopChan:   make(chan struct{}),
+		location:   timeLoc,
+		manager:    manager,
+		queueStore: qs,
+		procStore:  ps,
 	}
 }
 

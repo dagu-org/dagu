@@ -12,6 +12,8 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/localdag"
 	"github.com/dagu-org/dagu/internal/persistence/localhistory"
+	"github.com/dagu-org/dagu/internal/persistence/localproc"
+	"github.com/dagu-org/dagu/internal/persistence/localqueue/prototype"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -39,6 +41,8 @@ type testHelper struct {
 	manager        scheduler.JobManager
 	historyManager history.Manager
 	dagStore       models.DAGStore
+	procStore      models.ProcStore
+	queueStore     models.QueueStore
 	config         *config.Config
 }
 
@@ -65,15 +69,20 @@ func setupTest(t *testing.T) testHelper {
 		Global: config.Global{WorkDir: tempDir},
 	}
 
-	dr := localdag.New(cfg.Paths.DAGsDir, localdag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
-	hr := localhistory.New(cfg.Paths.HistoryDir)
-	hm := history.New(hr, "", cfg.Global.WorkDir, "")
-	jobManager := scheduler.NewDAGJobManager(testdataDir, dr, hm, "", "")
+	ds := localdag.New(cfg.Paths.DAGsDir, localdag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
+	hs := localhistory.New(cfg.Paths.HistoryDir)
+	ps := localproc.New(cfg.Paths.ProcDir)
+	qs := prototype.New(cfg.Paths.QueueDir)
+
+	hm := history.New(hs, "", cfg.Global.WorkDir, "")
+	jm := scheduler.NewDAGJobManager(testdataDir, ds, hm, "", "")
 
 	return testHelper{
-		manager:        jobManager,
-		dagStore:       dr,
+		manager:        jm,
+		dagStore:       ds,
 		historyManager: hm,
 		config:         cfg,
+		procStore:      ps,
+		queueStore:     qs,
 	}
 }
