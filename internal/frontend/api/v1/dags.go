@@ -143,7 +143,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 		HistRetentionDays: ptrOf(dag.HistRetentionDays),
 		Location:          ptrOf(dag.Location),
 		LogDir:            ptrOf(dag.LogDir),
-		MaxActiveRuns:     ptrOf(dag.MaxActiveRuns),
+		MaxActiveSteps:    ptrOf(dag.MaxActiveSteps),
 		Params:            ptrOf(dag.Params),
 		Preconditions:     ptrOf(preconditions),
 		Schedule:          ptrOf(schedules),

@@ -437,12 +437,12 @@ func (a *Agent) newScheduler() *scheduler.Scheduler {
 	schedulerLogDir := filepath.Join(a.logDir, "run_"+ts+"_"+a.runID)
 
 	cfg := &scheduler.Config{
-		LogDir:        schedulerLogDir,
-		MaxActiveRuns: a.dag.MaxActiveRuns,
-		Timeout:       a.dag.Timeout,
-		Delay:         a.dag.Delay,
-		Dry:           a.dry,
-		WorkflowID:    a.workflowID,
+		LogDir:         schedulerLogDir,
+		MaxActiveSteps: a.dag.MaxActiveSteps,
+		Timeout:        a.dag.Timeout,
+		Delay:          a.dag.Delay,
+		Dry:            a.dry,
+		WorkflowID:     a.workflowID,
 	}
 
 	if a.dag.HandlerOn.Exit != nil {

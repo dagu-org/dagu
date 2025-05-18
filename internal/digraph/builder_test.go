@@ -106,9 +106,9 @@ func TestBuild(t *testing.T) {
 		assert.Len(t, th.Preconditions, 1)
 		assert.Equal(t, &digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Preconditions[0])
 	})
-	t.Run("MaxActiveRuns", func(t *testing.T) {
-		th := testLoad(t, "max_active_runs.yaml")
-		assert.Equal(t, 3, th.MaxActiveRuns)
+	t.Run("MaxActiveSteps", func(t *testing.T) {
+		th := testLoad(t, "max_active_steps.yaml")
+		assert.Equal(t, 3, th.MaxActiveSteps)
 	})
 
 	t.Run("ValidationError", func(t *testing.T) {

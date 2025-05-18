@@ -630,7 +630,7 @@ export interface components {
             /** @description Conditions that must be met before a workflow can start */
             preconditions?: components["schemas"]["Condition"][];
             /** @description Maximum number of concurrent workflows allowed from this DAG */
-            maxActiveRuns?: number;
+            maxActiveSteps?: number;
             /** @description List of parameter names that can be passed to workflows created from this DAG */
             params?: string[];
             /** @description Default parameter values in JSON format if not specified at workflow creation */

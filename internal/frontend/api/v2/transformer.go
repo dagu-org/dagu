@@ -191,7 +191,7 @@ func toDAGDetails(dag *digraph.DAG) *api.DAGDetails {
 		HandlerOn:         ptrOf(handlerOn),
 		HistRetentionDays: ptrOf(dag.HistRetentionDays),
 		LogDir:            ptrOf(dag.LogDir),
-		MaxActiveRuns:     ptrOf(dag.MaxActiveRuns),
+		MaxActiveSteps:    ptrOf(dag.MaxActiveSteps),
 		Params:            ptrOf(dag.Params),
 		Preconditions:     ptrOf(preconditions),
 		Schedule:          ptrOf(schedules),

@@ -876,7 +876,7 @@ func withTimeout(d time.Duration) schedulerOption {
 
 func withMaxActiveRuns(n int) schedulerOption {
 	return func(cfg *scheduler.Config) {
-		cfg.MaxActiveRuns = n
+		cfg.MaxActiveSteps = n
 	}
 }
 
