@@ -12,8 +12,8 @@ func TestJob(t *testing.T) {
 
 	// Create a new job
 	job := NewJob(ItemData{
-		FileName: "/tmp/test-file.json",
-		Workflow: digraph.WorkflowRef{
+		fileName: "/tmp/test-file.json",
+		workflow: digraph.WorkflowRef{
 			Name:       "test-name",
 			WorkflowID: "test-workflow",
 		},

@@ -15,7 +15,7 @@ type Job struct {
 }
 
 func NewJob(data ItemData) *Job {
-	base := filepath.Base(data.FileName)
+	base := filepath.Base(data.fileName)
 	ext := filepath.Ext(base)
 	name := base[:len(base)-len(ext)]
 	return &Job{
@@ -31,5 +31,5 @@ func (j *Job) ID() string {
 
 // Data implements models.QueuedItem.
 func (j *Job) Data() digraph.WorkflowRef {
-	return j.ItemData.Workflow
+	return j.ItemData.workflow
 }

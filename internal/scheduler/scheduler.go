@@ -58,92 +58,74 @@ func New(
 	}
 }
 
-// ScheduleType is the type of schedule (start, stop, restart).
-type ScheduleType int
-
-const (
-	ScheduleTypeStart ScheduleType = iota
-	ScheduleTypeStop
-	ScheduleTypeRestart
-)
-
-func (s ScheduleType) String() string {
-	switch s {
-	case ScheduleTypeStart:
-		return "Start"
-
-	case ScheduleTypeStop:
-		return "Stop"
-
-	case ScheduleTypeRestart:
-		return "Restart"
-
-	default:
-		// Should never happen.
-		return "Unknown"
-
-	}
-}
-
-// invoke invokes the job based on the schedule type.
-func (s *ScheduledJob) invoke(ctx context.Context) error {
-	if s.Job == nil {
-		logger.Error(ctx, "job is nil", "job", s.Job)
-		return nil
-	}
-
-	logger.Info(ctx, "starting operation", "type", s.Type.String(), "job", s.Job)
-
-	switch s.Type {
-	case ScheduleTypeStart:
-		return s.Job.Start(ctx)
-
-	case ScheduleTypeStop:
-		return s.Job.Stop(ctx)
-
-	case ScheduleTypeRestart:
-		return s.Job.Restart(ctx)
-
-	default:
-		return fmt.Errorf("unknown schedule type: %v", s.Type)
-
-	}
-}
-
 func (s *Scheduler) Start(ctx context.Context) error {
 	sig := make(chan os.Signal, 1)
 
 	done := make(chan any)
 	defer close(done)
 
+	// Start the DAG file watcher
 	if err := s.manager.Start(ctx, done); err != nil {
 		return fmt.Errorf("failed to start manager: %w", err)
 	}
 
+	// Start queue reader
+	queueCh := make(chan models.QueuedItem, 1)
+	go s.handleQueue(ctx, queueCh)
+
+	qr := s.queueStore.Reader(ctx)
+	qr.Start(ctx, queueCh)
+
+	// Handle OS signals for graceful shutdown
 	signal.Notify(
 		sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT,
 	)
 
+	// Go routine to handle OS signals and context cancellation
 	go func() {
 		select {
 		case <-done:
 			return
 
 		case <-sig:
+			qr.Stop(ctx)
 			s.Stop(ctx)
 
 		case <-ctx.Done():
+			qr.Stop(ctx)
 			s.Stop(ctx)
 
 		}
 	}()
 
 	logger.Info(ctx, "Scheduler started")
+
+	// Start the scheduler loop (it blocks)
 	s.start(ctx)
 
 	return nil
 }
 
+func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem) {
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info(ctx, "Stopping queue handler due to context cancellation")
+			return
+
+		case item := <-ch:
+			if item == nil {
+				logger.Info(ctx, "Received nil item from queue")
+				continue
+			}
+			data := item.Data()
+			logger.Info(ctx, "Received item from queue", "data", data)
+		}
+	}
+}
+
+// start starts the scheduler.
+// It runs in a loop, checking for jobs to run every minute.
 func (s *Scheduler) start(ctx context.Context) {
 	t := Now().Truncate(time.Minute)
 	timer := time.NewTimer(0)
@@ -168,6 +150,26 @@ func (s *Scheduler) start(ctx context.Context) {
 	}
 }
 
+// NextTick returns the next tick time for the scheduler.
+func (*Scheduler) NextTick(now time.Time) time.Time {
+	return now.Add(time.Minute).Truncate(time.Second * 60)
+}
+
+// Stop stops the scheduler.
+func (s *Scheduler) Stop(ctx context.Context) {
+	if !s.running.Load() {
+		return
+	}
+
+	if s.stopChan != nil {
+		close(s.stopChan)
+	}
+
+	s.running.Store(false)
+	logger.Info(ctx, "Scheduler stopped")
+}
+
+// run executes the scheduled jobs at the current time.
 func (s *Scheduler) run(ctx context.Context, now time.Time) {
 	// Get jobs scheduled to run at or before the current time
 	// Subtract a small buffer to avoid edge cases with exact timing
@@ -215,21 +217,29 @@ func (s *Scheduler) run(ctx context.Context, now time.Time) {
 	}
 }
 
-func (*Scheduler) NextTick(now time.Time) time.Time {
-	return now.Add(time.Minute).Truncate(time.Second * 60)
-}
-
-func (s *Scheduler) Stop(ctx context.Context) {
-	if !s.running.Load() {
-		return
+// invoke invokes the job based on the schedule type.
+func (s *ScheduledJob) invoke(ctx context.Context) error {
+	if s.Job == nil {
+		logger.Error(ctx, "job is nil", "job", s.Job)
+		return nil
 	}
 
-	if s.stopChan != nil {
-		close(s.stopChan)
-	}
+	logger.Info(ctx, "starting operation", "type", s.Type.String(), "job", s.Job)
 
-	s.running.Store(false)
-	logger.Info(ctx, "Scheduler stopped")
+	switch s.Type {
+	case ScheduleTypeStart:
+		return s.Job.Start(ctx)
+
+	case ScheduleTypeStop:
+		return s.Job.Stop(ctx)
+
+	case ScheduleTypeRestart:
+		return s.Job.Restart(ctx)
+
+	default:
+		return fmt.Errorf("unknown schedule type: %v", s.Type)
+
+	}
 }
 
 var (
