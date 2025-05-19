@@ -45,8 +45,7 @@ func TestQueue(t *testing.T) {
 	require.NoError(t, err, "expected no error when popping job from queue")
 	require.NotNil(t, job, "expected job to be not nil")
 
-	jobData, err := job.Data()
-	require.NoError(t, err, "expected no error when getting job data")
+	jobData := job.Data()
 	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
 	require.Equal(t, "high-priority-workflow", jobData.WorkflowID, "expected job ID to be 'high-priority-workflow'")
 
@@ -59,8 +58,7 @@ func TestQueue(t *testing.T) {
 	job, err = queue.Dequeue(th.Context)
 	require.NoError(t, err, "expected no error when popping job from queue")
 	require.NotNil(t, job, "expected job to be not nil")
-	jobData, err = job.Data()
-	require.NoError(t, err, "expected no error when getting job data")
+	jobData = job.Data()
 	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
 	require.Equal(t, "low-priority-workflow", jobData.WorkflowID, "expected job ID to be 'low-priority-workflow'")
 }
@@ -91,8 +89,7 @@ func TestQueue_FindByWorkflowID(t *testing.T) {
 	job, err := queue.FindByWorkflowID(th.Context, "high-priority-workflow")
 	require.NoError(t, err, "expected no error when finding job by workflow ID")
 	require.NotNil(t, job, "expected job to be not nil")
-	jobData, err := job.Data()
-	require.NoError(t, err, "expected no error when getting job data")
+	jobData := job.Data()
 	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
 	require.Equal(t, "high-priority-workflow", jobData.WorkflowID, "expected job ID to be 'high-priority-workflow'")
 
@@ -100,8 +97,7 @@ func TestQueue_FindByWorkflowID(t *testing.T) {
 	job, err = queue.FindByWorkflowID(th.Context, "low-priority-workflow")
 	require.NoError(t, err, "expected no error when finding job by workflow ID")
 	require.NotNil(t, job, "expected job to be not nil")
-	jobData, err = job.Data()
-	require.NoError(t, err, "expected no error when getting job data")
+	jobData = job.Data()
 	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
 	require.Equal(t, "low-priority-workflow", jobData.WorkflowID, "expected job ID to be 'low-priority-workflow'")
 }

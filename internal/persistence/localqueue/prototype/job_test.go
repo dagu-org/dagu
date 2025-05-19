@@ -23,8 +23,7 @@ func TestJob(t *testing.T) {
 	require.Equal(t, "test-file", job.ID(), "expected job ID to be 'test-file'")
 
 	// Check if the job data is correct
-	jobData, err := job.Data()
-	require.NoError(t, err, "expected no error when getting job data")
+	jobData := job.Data()
 	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
 	require.Equal(t, "test-workflow", jobData.WorkflowID, "expected job ID to be 'test-workflow'")
 }

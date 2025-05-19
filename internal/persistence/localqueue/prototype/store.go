@@ -120,18 +120,21 @@ func (s *Store) List(ctx context.Context, name string) ([]models.QueuedItem, err
 }
 
 // DequeueByWorkflowID implements models.QueueStore.
-func (s *Store) DequeueByWorkflowID(ctx context.Context, workflowID string) ([]models.QueuedItem, error) {
+func (s *Store) DequeueByWorkflowID(ctx context.Context, name, workflowID string) ([]models.QueuedItem, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	var items []models.QueuedItem
-	for _, q := range s.queues {
-		item, err := q.DequeueByWorkflowID(ctx, workflowID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to dequeue workflow %s: %w", workflowID, err)
-		}
-		items = append(items, item...)
+	if _, ok := s.queues[name]; !ok {
+		s.queues[name] = s.createDualQueue(name)
 	}
+
+	q := s.queues[name]
+	item, err := q.DequeueByWorkflowID(ctx, workflowID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to dequeue workflow %s: %w", workflowID, err)
+	}
+	items = append(items, item...)
 
 	if len(items) == 0 {
 		return nil, models.ErrQueueItemNotFound
@@ -155,6 +158,11 @@ func (s *Store) Enqueue(ctx context.Context, name string, p models.QueuePriority
 	}
 
 	return nil
+}
+
+// Reader implements models.QueueStore.
+func (s *Store) Reader(ctx context.Context) models.QueueReader {
+	return newQueueReader(s)
 }
 
 func (s *Store) createDualQueue(name string) *DualQueue {

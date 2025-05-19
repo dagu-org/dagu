@@ -21,13 +21,25 @@ type QueueStore interface {
 	// DequeueByName retrieves an item from the queue and removes it
 	DequeueByName(ctx context.Context, name string) (QueuedItem, error)
 	// Len returns the number of items in the queue
-	DequeueByWorkflowID(ctx context.Context, workflowID string) ([]QueuedItem, error)
+	DequeueByWorkflowID(ctx context.Context, name, workflowID string) ([]QueuedItem, error)
 	// List returns all items in the queue
 	Len(ctx context.Context, name string) (int, error)
 	// DequeueByWorkflowID retrieves a workflow from the queue by its ID and removes it
 	List(ctx context.Context, name string) ([]QueuedItem, error)
 	// All returns all items in the queue
 	All(ctx context.Context) ([]QueuedItem, error)
+	// Reader returns a QueueReader for reading from the queue
+	Reader(ctx context.Context) QueueReader
+}
+
+// QueueReader provides an interface for reading from the queue
+type QueueReader interface {
+	// Start starts the queue reader
+	Start(ctx context.Context, ch chan<- QueuedItem) error
+	// Stop stops the queue reader
+	Stop(ctx context.Context)
+	// IsRunning returns true if the queue reader is running
+	IsRunning() bool
 }
 
 // QueuePriority represents the priority of a queued item
@@ -43,5 +55,5 @@ type QueuedItem interface {
 	// ID returns the ID of the queued item
 	ID() string
 	// Data returns the data of the queued item
-	Data() (*digraph.WorkflowRef, error)
+	Data() digraph.WorkflowRef
 }

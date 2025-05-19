@@ -133,9 +133,12 @@ func (q *QueueFile) PopByWorkflowID(ctx context.Context, workflowID string) ([]*
 	var removedJobs []*Job
 	for _, item := range items {
 		if item.Workflow.WorkflowID == workflowID {
-			removedJobs = append(removedJobs, NewJob(item))
 			if err := os.Remove(filepath.Join(q.baseDir, item.FileName)); err != nil {
-				logger.Error(ctx, "failed to remove queue file %s: %w", item.FileName, err)
+				// Log the error but continue processing other items
+				logger.Warn(ctx, "failed to remove queue file %s: %w", item.FileName, err)
+			} else {
+				// Add the job to the removed jobs list
+				removedJobs = append(removedJobs, NewJob(item))
 			}
 		}
 	}

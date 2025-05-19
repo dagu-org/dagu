@@ -44,8 +44,7 @@ func TestStore(t *testing.T) {
 	require.NoError(t, err, "expected no error when dequeueing job from store")
 	require.NotNil(t, job, "expected job to be not nil")
 	require.Contains(t, job.ID(), "test-workflow", "expected job ID to contain 'test-workflow'")
-	jobData, err := job.Data()
-	require.NoError(t, err, "expected no error when getting job data")
+	jobData := job.Data()
 	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
 
 	// Check if the queue is empty again
@@ -76,12 +75,11 @@ func TestStore_DequeueByWorkflowID(t *testing.T) {
 	})
 
 	// Check if dequeue by workflow ID returns the job
-	jobs, err := store.DequeueByWorkflowID(th.Context, "test-workflow-2")
+	jobs, err := store.DequeueByWorkflowID(th.Context, "test-name", "test-workflow-2")
 	require.NoError(t, err, "expected no error when dequeueing job by workflow ID from store")
 	require.Len(t, jobs, 1, "expected to dequeue one job")
 	require.Contains(t, jobs[0].ID(), "test-workflow-2", "expected job ID to contain 'test-workflow-2'")
-	jobData, err := jobs[0].Data()
-	require.NoError(t, err, "expected no error when getting job data")
+	jobData := jobs[0].Data()
 	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
 	require.Equal(t, "test-workflow-2", jobData.WorkflowID, "expected job ID to be 'test-workflow-2'")
 }
@@ -142,12 +140,8 @@ func TestStore_All(t *testing.T) {
 	require.Len(t, jobs, 2, "expected to list two jobs")
 
 	// Check if the jobs are sorted by priority
-	data1, err := jobs[0].Data()
-	require.NoError(t, err, "expected no error when getting job data")
-
-	// Check if the jobs are sorted by priority
-	data2, err := jobs[1].Data()
-	require.NoError(t, err, "expected no error when getting job data")
+	data1 := jobs[0].Data()
+	data2 := jobs[1].Data()
 
 	// Check if the jobs are sorted by priority
 	require.Equal(t, "test-name2", data1.Name, "expected job name to be 'test-name'")

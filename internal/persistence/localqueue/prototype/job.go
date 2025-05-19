@@ -30,6 +30,6 @@ func (j *Job) ID() string {
 }
 
 // Data implements models.QueuedItem.
-func (j *Job) Data() (*digraph.WorkflowRef, error) {
-	return &j.ItemData.Workflow, nil
+func (j *Job) Data() digraph.WorkflowRef {
+	return j.ItemData.Workflow
 }
