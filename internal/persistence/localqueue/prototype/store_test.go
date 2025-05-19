@@ -40,7 +40,7 @@ func TestStore(t *testing.T) {
 	require.Equal(t, 0, length, "expected store length to be 0")
 
 	// Check if dequeue returns the job
-	job, err := store.Dequeue(th.Context, "test-name")
+	job, err := store.DequeueByName(th.Context, "test-name")
 	require.NoError(t, err, "expected no error when dequeueing job from store")
 	require.NotNil(t, job, "expected job to be not nil")
 	require.Contains(t, job.ID(), "test-workflow", "expected job ID to contain 'test-workflow'")

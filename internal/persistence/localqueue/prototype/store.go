@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -24,6 +25,10 @@ type Store struct {
 	// queues is a map of queues, where the key is the queue name (workflow name)
 	queues map[string]*DualQueue
 	mu     sync.Mutex
+
+	// cache for the last fetched items
+	lastFetched time.Time
+	cache       []models.QueuedItem
 }
 
 // All implements models.QueueStore.
@@ -61,8 +66,8 @@ func (s *Store) All(ctx context.Context) ([]models.QueuedItem, error) {
 	return items, nil
 }
 
-// Dequeue implements models.QueueStore.
-func (s *Store) Dequeue(ctx context.Context, name string) (models.QueuedItem, error) {
+// DequeueByName implements models.QueueStore.
+func (s *Store) DequeueByName(ctx context.Context, name string) (models.QueuedItem, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
