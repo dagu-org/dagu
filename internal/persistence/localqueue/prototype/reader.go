@@ -121,7 +121,7 @@ func (q *queueReaderImpl) startWatch(ctx context.Context, ch chan<- models.Queue
 						}
 						logger.Warn(ctx, "Failed to return item to queue", "err", err, "data", data, "retry", retryCount, "maxRetries", maxRetries)
 
-						// backoff multipler = 2^retryCount (max: 2^3 = 8)
+						// backoff multiplier = 2^retryCount (max: 2^3 = 8)
 						// max backoff = 2^3 * 500ms * 1.25(jitter) = 4s * 1.25 = 5s
 						backoffMultiplier := math.Pow(2, float64(retryCount))
 						backoff := initialBackoff * time.Duration(backoffMultiplier)
