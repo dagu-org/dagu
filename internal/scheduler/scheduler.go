@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 )
@@ -28,20 +29,23 @@ type Job interface {
 }
 
 type Scheduler struct {
-	manager    JobManager
-	logDir     string
-	stopChan   chan struct{}
-	running    atomic.Bool
-	location   *time.Location
-	queueStore models.QueueStore
-	procStore  models.ProcStore
-	cancel     context.CancelFunc
-	lock       sync.Mutex
+	client       history.Manager
+	manager      JobManager
+	logDir       string
+	stopChan     chan struct{}
+	running      atomic.Bool
+	location     *time.Location
+	historyStore models.HistoryStore
+	queueStore   models.QueueStore
+	procStore    models.ProcStore
+	cancel       context.CancelFunc
+	lock         sync.Mutex
 }
 
 func New(
 	cfg *config.Config,
 	manager JobManager,
+	hs models.HistoryStore,
 	qs models.QueueStore,
 	ps models.ProcStore,
 ) *Scheduler {
@@ -51,12 +55,13 @@ func New(
 	}
 
 	return &Scheduler{
-		logDir:     cfg.Paths.LogDir,
-		stopChan:   make(chan struct{}),
-		location:   timeLoc,
-		manager:    manager,
-		queueStore: qs,
-		procStore:  ps,
+		logDir:       cfg.Paths.LogDir,
+		stopChan:     make(chan struct{}),
+		location:     timeLoc,
+		manager:      manager,
+		historyStore: hs,
+		queueStore:   qs,
+		procStore:    ps,
 	}
 }
 
@@ -139,8 +144,27 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				logger.Info(ctx, "Received nil item from queue")
 				continue
 			}
+
 			data := item.Data()
 			logger.Info(ctx, "Received item from queue", "data", data)
+
+			// Fetch the dag of the workflow
+			history, err := s.historyStore.FindRun(ctx, data)
+			if err != nil {
+				logger.Error(ctx, "Failed to find run", "err", err, "data", data)
+				continue
+			}
+
+			dag, err := history.ReadDAG(ctx)
+			if err != nil {
+				logger.Error(ctx, "Failed to read dag", "err", err, "data", data)
+				continue
+			}
+
+			if err := s.client.RetryDAG(ctx, dag, data.WorkflowID); err != nil {
+				logger.Error(ctx, "Failed to retry dag", "err", err, "data", data)
+				continue
+			}
 		}
 	}
 }

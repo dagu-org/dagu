@@ -40,6 +40,7 @@ func TestMain(m *testing.M) {
 type testHelper struct {
 	manager        scheduler.JobManager
 	historyManager history.Manager
+	historyStore   models.HistoryStore
 	dagStore       models.DAGStore
 	procStore      models.ProcStore
 	queueStore     models.QueueStore
@@ -80,6 +81,7 @@ func setupTest(t *testing.T) testHelper {
 	return testHelper{
 		manager:        jm,
 		dagStore:       ds,
+		historyStore:   hs,
 		historyManager: hm,
 		config:         cfg,
 		procStore:      ps,

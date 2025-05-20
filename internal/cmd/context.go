@@ -169,7 +169,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	}
 
 	m := scheduler.NewDAGJobManager(c.Config.Paths.DAGsDir, dr, c.HistoryMgr, c.Config.Paths.Executable, c.Config.Global.WorkDir)
-	return scheduler.New(c.Config, m, c.QueueStore, c.ProcStore), nil
+	return scheduler.New(c.Config, m, c.HistoryStore, c.QueueStore, c.ProcStore), nil
 }
 
 // dagStore returns a new DAGRepository instance. It ensures that the directory exists
