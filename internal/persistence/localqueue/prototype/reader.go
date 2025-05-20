@@ -85,7 +85,7 @@ func (q *queueReaderImpl) startWatch(ctx context.Context, ch chan<- models.Queue
 			for _, item := range items {
 				if ctx.Err() != nil {
 					// Context is cancelled, stop processing
-					break
+					return
 				}
 
 				data := item.Data()
@@ -134,7 +134,7 @@ func (q *queueReaderImpl) startWatch(ctx context.Context, ch chan<- models.Queue
 							// Context is cancelled, stop retrying
 							logger.Warn(ctx, "Context cancelled, stopping retry", "data", data)
 							break
-						case <-time.After(backoff):
+							// case <-time.After(backoff):
 							// Continue to the next retry
 						}
 					}
@@ -153,7 +153,7 @@ func (q *queueReaderImpl) startWatch(ctx context.Context, ch chan<- models.Queue
 				q.mu.Unlock()
 			} else {
 				// Sleep for a short duration to avoid busy waiting
-				time.Sleep(500 * time.Millisecond)
+				// time.Sleep(500 * time.Millisecond)
 			}
 		}
 	}

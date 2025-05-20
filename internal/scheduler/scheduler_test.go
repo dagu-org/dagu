@@ -31,12 +31,13 @@ func TestScheduler(t *testing.T) {
 		th := setupTest(t)
 		sc := scheduler.New(th.config, entryReader, th.queueStore, th.procStore)
 
+		ctx := context.Background()
 		go func() {
-			_ = sc.Start(context.Background())
+			_ = sc.Start(ctx)
 		}()
 
 		time.Sleep(time.Second + time.Millisecond*100)
-		sc.Stop(context.Background())
+		sc.Stop(ctx)
 
 		require.Equal(t, int32(1), entryReader.Entries[0].Job.(*mockJob).RunCount.Load())
 		require.Equal(t, int32(0), entryReader.Entries[1].Job.(*mockJob).RunCount.Load())
@@ -61,6 +62,7 @@ func TestScheduler(t *testing.T) {
 
 		time.Sleep(time.Second + time.Millisecond*100)
 		require.Equal(t, int32(1), entryReader.Entries[0].Job.(*mockJob).RestartCount.Load())
+
 	})
 	t.Run("NextTick", func(t *testing.T) {
 		now := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)

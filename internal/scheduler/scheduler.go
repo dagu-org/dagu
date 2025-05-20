@@ -35,6 +35,8 @@ type Scheduler struct {
 	location   *time.Location
 	queueStore models.QueueStore
 	procStore  models.ProcStore
+	cancel     context.CancelFunc
+	lock       sync.Mutex
 }
 
 func New(
@@ -61,6 +63,10 @@ func New(
 func (s *Scheduler) Start(ctx context.Context) error {
 	sig := make(chan os.Signal, 1)
 
+	ctx, cancel := context.WithCancel(ctx)
+	s.cancel = cancel
+	defer cancel()
+
 	done := make(chan any)
 	defer close(done)
 
@@ -71,7 +77,13 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 	// Start queue reader
 	queueCh := make(chan models.QueuedItem, 1)
-	go s.handleQueue(ctx, queueCh)
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		s.handleQueue(ctx, queueCh, done)
+	}()
 
 	qr := s.queueStore.Reader(ctx)
 	qr.Start(ctx, queueCh)
@@ -85,6 +97,8 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	go func() {
 		select {
 		case <-done:
+			qr.Stop(ctx)
+			s.Stop(ctx)
 			return
 
 		case <-sig:
@@ -103,12 +117,17 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	// Start the scheduler loop (it blocks)
 	s.start(ctx)
 
+	wg.Wait()
 	return nil
 }
 
-func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem) {
+func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, done chan any) {
 	for {
 		select {
+		case <-done:
+			logger.Info(ctx, "Stopping queue handler due to manager shutdown")
+			return
+
 		case <-ctx.Done():
 			logger.Info(ctx, "Stopping queue handler due to context cancellation")
 			return
@@ -164,6 +183,13 @@ func (s *Scheduler) Stop(ctx context.Context) {
 	if s.stopChan != nil {
 		close(s.stopChan)
 	}
+
+	s.lock.Lock()
+	if s.cancel != nil {
+		s.cancel()
+		s.cancel = nil
+	}
+	s.lock.Unlock()
 
 	s.running.Store(false)
 	logger.Info(ctx, "Scheduler stopped")

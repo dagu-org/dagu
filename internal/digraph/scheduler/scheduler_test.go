@@ -268,7 +268,7 @@ func TestScheduler(t *testing.T) {
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 300) // wait for step 2 to start
+			time.Sleep(time.Millisecond * 500) // wait for step 2 to start
 			graph.Cancel(t)
 		}()
 

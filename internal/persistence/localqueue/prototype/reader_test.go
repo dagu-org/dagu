@@ -12,8 +12,6 @@ import (
 )
 
 func TestQueueReader(t *testing.T) {
-	t.Parallel()
-
 	th := test.Setup(t)
 	ctx, cancel := context.WithTimeout(th.Context, 5*time.Second)
 	defer cancel()
@@ -73,8 +71,6 @@ func TestQueueReader(t *testing.T) {
 }
 
 func TestQueueReaderChannelFull(t *testing.T) {
-	t.Parallel()
-
 	th := test.Setup(t)
 	ctx, cancel := context.WithTimeout(th.Context, 5*time.Second)
 	defer cancel()
@@ -113,8 +109,6 @@ func TestQueueReaderChannelFull(t *testing.T) {
 }
 
 func TestQueueReaderStartStop(t *testing.T) {
-	t.Parallel()
-
 	th := test.Setup(t)
 	ctx, cancel := context.WithTimeout(th.Context, 5*time.Second)
 	defer cancel()
@@ -144,8 +138,6 @@ func TestQueueReaderStartStop(t *testing.T) {
 }
 
 func TestQueueReaderContextCancellation(t *testing.T) {
-	t.Parallel()
-
 	th := test.Setup(t)
 	ctx, cancel := context.WithTimeout(th.Context, 5*time.Second)
 	defer cancel()
