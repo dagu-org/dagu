@@ -113,6 +113,18 @@ func TestLoadBaseConfig(t *testing.T) {
 		require.NotNil(t, dag)
 		require.NoError(t, err)
 	})
+	t.Run("InheritBaseConfig", func(t *testing.T) {
+		t.Parallel()
+
+		baseDAG := test.TestdataPath(t, filepath.Join("digraph", "inherit_base.yaml"))
+		testDAG := test.TestdataPath(t, filepath.Join("digraph", "inherit_child.yaml"))
+		dag, err := digraph.Load(context.Background(), testDAG, digraph.WithBaseConfig(baseDAG))
+		require.NotNil(t, dag)
+		require.NoError(t, err)
+
+		// Check if fields are inherited correctly
+		assert.Equal(t, "/base/logs", dag.LogDir)
+	})
 }
 
 func TestLoadYAML(t *testing.T) {
