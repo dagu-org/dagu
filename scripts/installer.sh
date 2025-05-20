@@ -1,62 +1,96 @@
 #!/bin/sh
 
-# Set up constants and URLs
+# Set up constants
 RELEASES_URL="https://github.com/dagu-org/dagu/releases"
 FILE_BASENAME="dagu"
 
-echo "Downloading the latest binary to the current directory..."
+# Default values
+INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 
-# Check for curl and tar availability
+# Parse CLI arguments
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --version)
+      shift
+      VERSION="$1"
+      ;;
+    --install-dir)
+      shift
+      INSTALL_DIR="$1"
+      ;;
+    *)
+      ;;
+  esac
+  shift
+done
+
+# Check dependencies
 command -v curl >/dev/null 2>&1 || { echo "curl is not installed. Aborting." >&2; exit 1; }
 command -v tar >/dev/null 2>&1 || { echo "tar is not installed. Aborting." >&2; exit 1; }
 
-# Retrieve the latest version if not specified
+# Determine version
 if [ -z "$VERSION" ]; then
-    VERSION="$(curl -sfL -o /dev/null -w %{url_effective} "$RELEASES_URL/latest" | rev | cut -f1 -d'/' | rev)"
+  VERSION="$(curl -sfL -o /dev/null -w '%{url_effective}' "$RELEASES_URL/latest" | rev | cut -d'/' -f1 | rev)"
 fi
 
-# Exit if VERSION is still empty
 if [ -z "$VERSION" ]; then
-    echo "Unable to get Dagu version." >&2
-    exit 1
+  echo "Failed to determine the Dagu version to install." >&2
+  exit 1
 fi
 
-# Determine architecture
-case "$(uname -m)" in
-    x86_64)
-        ARCHITECTURE="amd64"
-        ;;
-    aarch64)
-        ARCHITECTURE="arm64"
-        ;;
-    *)
-        ARCHITECTURE="$(uname -m)"
-        ;;
+echo "Installing Dagu version: $VERSION"
+
+# Determine system and architecture
+SYSTEM="$(uname -s | awk '{print tolower($0)}')"
+ARCHITECTURE="$(uname -m)"
+case "$ARCHITECTURE" in
+  x86_64) ARCHITECTURE="amd64" ;;
+  aarch64) ARCHITECTURE="arm64" ;;
 esac
 
-# Create a temporary directory for the download
-TMPDIR=$(mktemp -d)
-export TAR_FILE="${TMPDIR}/${FILE_BASENAME}_$(uname -s)_${ARCHITECTURE}.tar.gz"
+# Create temporary working directory
+TMPDIR="$(mktemp -d)"
+TAR_FILE="${TMPDIR}/${FILE_BASENAME}_${SYSTEM}_${ARCHITECTURE}.tar.gz"
 
-# Get system type (Linux | Freebsd | Darwin ) as lowercase
-SYSTEM=$(uname -s | awk '{print tolower($0)}')
+# Build download URL
+DOWNLOAD_URL="${RELEASES_URL}/download/${VERSION}/${FILE_BASENAME}_${VERSION#v}_${SYSTEM}_${ARCHITECTURE}.tar.gz"
 
-# Download the binary
-echo "Downloading Dagu $VERSION..."
-curl -sfLo "$TAR_FILE" "$RELEASES_URL/download/$VERSION/${FILE_BASENAME}_${VERSION#v}_${SYSTEM}_${ARCHITECTURE}.tar.gz" || {
-    echo "Failed to download the file. Check your internet connection and the URL." >&2
-    exit 1
+# Download tarball
+echo "Downloading: $DOWNLOAD_URL"
+curl -sfLo "$TAR_FILE" "$DOWNLOAD_URL" || {
+  echo "Failed to download the release archive." >&2
+  exit 1
 }
 
-# Unpack and install
-tar -xf "$TAR_FILE" -C "$TMPDIR" && sudo mv "${TMPDIR}/dagu" /usr/local/bin/dagu && sudo chmod +x /usr/local/bin/dagu || {
-    echo "Failed to install Dagu." >&2
-    exit 1
+# Extract archive
+tar -xf "$TAR_FILE" -C "$TMPDIR" || {
+  echo "Failed to extract the archive." >&2
+  exit 1
 }
 
-# Cleanup
+# Ensure installation directory exists
+mkdir -p "$INSTALL_DIR" || {
+  echo "Failed to create installation directory: $INSTALL_DIR" >&2
+  exit 1
+}
+
+# Move binary to destination
+INSTALL_PATH="${INSTALL_DIR}/dagu"
+if [ -w "$INSTALL_DIR" ]; then
+  mv "${TMPDIR}/dagu" "$INSTALL_PATH"
+else
+  echo "$INSTALL_DIR is not writable. Using sudo to install."
+  sudo mv "${TMPDIR}/dagu" "$INSTALL_PATH"
+fi
+
+# Make binary executable
+chmod +x "$INSTALL_PATH" || {
+  echo "Failed to set executable permission on: $INSTALL_PATH" >&2
+  exit 1
+}
+
+# Clean up
 rm -rf "$TMPDIR"
-echo "Dagu installed successfully and is available at /usr/local/bin/dagu"
 
-# Execute the binary with any provided arguments
-"/usr/local/bin/dagu" "$@"
+echo "Dagu $VERSION has been installed to: $INSTALL_PATH"
+echo "Ensure that $INSTALL_DIR is included in your PATH."

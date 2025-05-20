@@ -4,11 +4,28 @@
 RELEASES_URL="https://github.com/dagu-org/dagu/releases"
 FILE_BASENAME="dagu"
 
-echo "Downloading the latest binary to the current directory..."
+# Parse CLI arguments
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --version)
+      shift
+      VERSION="$1"
+      ;;
+    --install-dir)
+      shift
+      INSTALL_DIR="$1"
+      ;;
+    *)
+      ;;
+  esac
+  shift
+done
 
 # Check for curl and tar availability
 command -v curl >/dev/null 2>&1 || { echo "curl is not installed. Aborting." >&2; exit 1; }
 command -v tar >/dev/null 2>&1 || { echo "tar is not installed. Aborting." >&2; exit 1; }
+
+echo "Downloading Dagu version: $VERSION"
 
 # Retrieve the latest version if not specified
 if [ -z "$VERSION" ]; then
