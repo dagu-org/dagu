@@ -10,6 +10,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/google/uuid"
@@ -37,7 +38,7 @@ func newSubWorkflow(
 
 	stepContext := digraph.GetStepContext(ctx)
 
-	config, err := digraph.EvalStringFields(stepContext, struct {
+	cfg, err := digraph.EvalStringFields(stepContext, struct {
 		Name   string
 		Params string
 	}{
@@ -48,10 +49,10 @@ func newSubWorkflow(
 		return nil, fmt.Errorf("failed to substitute string fields: %w", err)
 	}
 
-	subDAG, err := stepContext.GetDAGByName(config.Name)
+	subDAG, err := stepContext.GetDAGByName(cfg.Name)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed to find subworkflow %q: %w", config.Name, err,
+			"failed to find subworkflow %q: %w", cfg.Name, err,
 		)
 	}
 
@@ -67,9 +68,16 @@ func newSubWorkflow(
 		subDAG.Location,
 	}
 
-	if config.Params != "" {
+	if cfg.Params != "" {
 		args = append(args, "--")
-		args = append(args, config.Params)
+		args = append(args, cfg.Params)
+	}
+
+	if configFile := config.UsedConfigFile.Load(); configFile != nil {
+		if configFile, ok := configFile.(string); ok {
+			args = append(args, "--config")
+			args = append(args, configFile)
+		}
 	}
 
 	cmd := exec.CommandContext(ctx, executable, args...)
