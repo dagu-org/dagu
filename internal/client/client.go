@@ -148,6 +148,12 @@ func (e *client) Restart(_ context.Context, dag *digraph.DAG, opts RestartOption
 	if opts.Quiet {
 		args = append(args, "-q")
 	}
+	if configFile := config.UsedConfigFile.Load(); configFile != nil {
+		if configFile, ok := configFile.(string); ok {
+			args = append(args, "--config")
+			args = append(args, configFile)
+		}
+	}
 	args = append(args, dag.Location)
 	// nolint:gosec
 	cmd := exec.Command(e.executable, args...)
@@ -164,6 +170,12 @@ func (e *client) Restart(_ context.Context, dag *digraph.DAG, opts RestartOption
 func (e *client) Retry(_ context.Context, dag *digraph.DAG, requestID string) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--request-id=%s", requestID))
+	if configFile := config.UsedConfigFile.Load(); configFile != nil {
+		if configFile, ok := configFile.(string); ok {
+			args = append(args, "--config")
+			args = append(args, configFile)
+		}
+	}
 	args = append(args, dag.Location)
 	// nolint:gosec
 	cmd := exec.Command(e.executable, args...)
