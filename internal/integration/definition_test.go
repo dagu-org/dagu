@@ -98,13 +98,6 @@ func TestDAGExecution(t *testing.T) {
 			},
 		},
 		{
-			name: "CallSub",
-			dag:  "call-sub.yaml",
-			expectedOutputs: map[string]any{
-				"OUT2": "foo",
-			},
-		},
-		{
 			name: "EnvVar",
 			dag:  "environment-var.yaml",
 			expectedOutputs: map[string]any{
@@ -147,13 +140,6 @@ func TestDAGExecution(t *testing.T) {
 			},
 		},
 		{
-			name: "NestedGraph",
-			dag:  "nested_parent.yaml",
-			expectedOutputs: map[string]any{
-				"OUT1": "value is 123",
-			},
-		},
-		{
 			name: "Script",
 			dag:  "perl-script.yaml",
 			expectedOutputs: map[string]any{
@@ -176,6 +162,45 @@ func TestDAGExecution(t *testing.T) {
 				"OUT2": "foo",
 				"OUT3": "bar",
 				"OUT4": "baz",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+
+			dag := th.DAG(t, filepath.Join("integration", tc.dag))
+			agent := dag.Agent()
+
+			agent.RunSuccess(t)
+
+			dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+			dag.AssertOutputs(t, tc.expectedOutputs)
+		})
+	}
+}
+
+func TestNestedDAG(t *testing.T) {
+	type testCase struct {
+		name            string
+		dag             string
+		expectedOutputs map[string]any
+	}
+
+	testCases := []testCase{
+		{
+			name: "CallSub",
+			dag:  "call-sub.yaml",
+			expectedOutputs: map[string]any{
+				"OUT2": "foo",
+			},
+		},
+		{
+			name: "NestedGraph",
+			dag:  "nested_parent.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": "value is 123",
 			},
 		},
 	}

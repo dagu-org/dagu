@@ -99,7 +99,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	runStore := localhistory.New(cfg.Paths.HistoryDir)
 	procStore := localproc.New(cfg.Paths.ProcDir)
 
-	historyManager := history.New(runStore, cfg.Paths.Executable, cfg.Global.WorkDir, "")
+	historyManager := history.New(runStore, cfg.Paths.Executable, cfg.Global.WorkDir)
 
 	helper := Helper{
 		Context:      createDefaultContext(),

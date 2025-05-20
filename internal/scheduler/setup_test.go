@@ -74,7 +74,7 @@ func setupTest(t *testing.T) testHelper {
 	ps := localproc.New(cfg.Paths.ProcDir)
 	qs := prototype.New(cfg.Paths.QueueDir)
 
-	hm := history.New(hs, "", cfg.Global.WorkDir, "")
+	hm := history.New(hs, "", cfg.Global.WorkDir)
 	jm := scheduler.NewDAGJobManager(testdataDir, ds, hm, "", "")
 
 	return testHelper{

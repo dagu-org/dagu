@@ -117,7 +117,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	}
 
 	hs := localhistory.New(cfg.Paths.HistoryDir, hrOpts...)
-	hm := history.New(hs, cfg.Paths.Executable, cfg.Global.WorkDir, cfg.Global.ConfigPath)
+	hm := history.New(hs, cfg.Paths.Executable, cfg.Global.WorkDir)
 	ps := localproc.New(cfg.Paths.ProcDir)
 	qs := prototype.New(cfg.Paths.QueueDir)
 
@@ -140,7 +140,6 @@ func (c *Context) HistoryManager(hr models.HistoryStore) history.Manager {
 		hr,
 		c.Config.Paths.Executable,
 		c.Config.Global.WorkDir,
-		c.Config.Global.ConfigPath,
 	)
 }
 
