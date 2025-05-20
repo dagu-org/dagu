@@ -66,7 +66,7 @@ func setupTest(t *testing.T) testHelper {
 
 	dr := localdag.New(cfg.Paths.DAGsDir, localdag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
 	hr := localhistory.New(cfg.Paths.DataDir)
-	hm := history.New(hr, "", cfg.Global.WorkDir, "")
+	hm := history.New(hr, "", cfg.Global.WorkDir)
 	jobManager := scheduler.NewDAGJobManager(testdataDir, dr, hm, "", "")
 
 	return testHelper{

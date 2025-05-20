@@ -113,7 +113,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	}
 
 	hr := localhistory.New(cfg.Paths.DataDir, hrOpts...)
-	hm := history.New(hr, cfg.Paths.Executable, cfg.Global.WorkDir, cfg.Global.ConfigPath)
+	hm := history.New(hr, cfg.Paths.Executable, cfg.Global.WorkDir)
 
 	return &Context{
 		Context:     ctx,
@@ -132,7 +132,6 @@ func (c *Context) HistoryManager(hr models.HistoryRepository) history.Manager {
 		hr,
 		c.Config.Paths.Executable,
 		c.Config.Global.WorkDir,
-		c.Config.Global.ConfigPath,
 	)
 }
 

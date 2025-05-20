@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
@@ -25,13 +26,11 @@ func New(
 	repo models.HistoryRepository,
 	executable string,
 	workDir string,
-	configPath string,
 ) Manager {
 	return Manager{
 		historyRepo: repo,
 		executable:  executable,
 		workDir:     workDir,
-		configPath:  configPath,
 	}
 }
 
@@ -43,7 +42,6 @@ type Manager struct {
 
 	executable string // Path to the executable used to run DAGs
 	workDir    string // Working directory for executing commands
-	configPath string // Path to the configuration file
 }
 
 // LoadYAML loads a DAG from YAML specification bytes without evaluating it.
@@ -90,8 +88,11 @@ func (m *Manager) StartDAG(_ context.Context, dag *digraph.DAG, opts StartOption
 	if opts.WorkflowID != "" {
 		args = append(args, fmt.Sprintf("--workflow-id=%s", opts.WorkflowID))
 	}
-	if m.configPath != "" {
-		args = append(args, fmt.Sprintf("--config=%s", m.configPath))
+	if configFile := config.UsedConfigFile.Load(); configFile != nil {
+		if configFile, ok := configFile.(string); ok {
+			args = append(args, "--config")
+			args = append(args, configFile)
+		}
 	}
 	args = append(args, dag.Location)
 	// nolint:gosec

@@ -10,6 +10,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -84,6 +85,13 @@ func (e *childWorkflow) Run(ctx context.Context) error {
 		fmt.Sprintf("--workflow-id=%s", e.childWorkflowID),
 		"--quiet",
 		e.dag.Location,
+	}
+
+	if configFile := config.UsedConfigFile.Load(); configFile != nil {
+		if configFile, ok := configFile.(string); ok {
+			args = append(args, "--config")
+			args = append(args, configFile)
+		}
 	}
 
 	if e.params != "" {
