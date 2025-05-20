@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/go-chi/chi/v5"
@@ -28,8 +29,14 @@ func (svr *Server) defaultRoutes(ctx context.Context, r *chi.Mux) *chi.Mux {
 
 func (svr *Server) handleRequest(ctx context.Context) http.HandlerFunc {
 	renderFunc := svr.useTemplate(ctx, "index.gohtml", "index")
-	return func(w http.ResponseWriter, _ *http.Request) {
-		renderFunc(w, nil)
+	return func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, ".js") {
+			// Insert "/assets" to the URL path for JavaScript files
+			r.URL.Path = "/assets" + r.URL.Path
+			svr.handleGetAssets()(w, r)
+		} else {
+			renderFunc(w, nil)
+		}
 	}
 }
 
