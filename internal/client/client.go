@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
@@ -119,6 +120,12 @@ func (e *client) Start(_ context.Context, dag *digraph.DAG, opts StartOptions) e
 	}
 	if opts.Quiet {
 		args = append(args, "-q")
+	}
+	if configFile := config.UsedConfigFile.Load(); configFile != nil {
+		if configFile, ok := configFile.(string); ok {
+			args = append(args, "--config")
+			args = append(args, configFile)
+		}
 	}
 	args = append(args, dag.Location)
 	// nolint:gosec
