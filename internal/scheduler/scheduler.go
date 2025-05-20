@@ -165,6 +165,8 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				logger.Error(ctx, "Failed to retry dag", "err", err, "data", data)
 				continue
 			}
+
+			logger.Info(ctx, "Successfully processed item from queue", "data", data)
 		}
 	}
 }
