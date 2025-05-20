@@ -133,13 +133,13 @@ func (m *Manager) RestartDAG(_ context.Context, dag *digraph.DAG, opts RestartOp
 func (m *Manager) RetryDAG(_ context.Context, dag *digraph.DAG, workflowID string) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--workflow-id=%s", workflowID))
-	args = append(args, dag.Location)
 	if configFile := config.UsedConfigFile.Load(); configFile != nil {
 		if configFile, ok := configFile.(string); ok {
 			args = append(args, "--config")
 			args = append(args, configFile)
 		}
 	}
+	args = append(args, dag.Location)
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
