@@ -86,7 +86,9 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	}()
 
 	qr := s.queueStore.Reader(ctx)
-	qr.Start(ctx, queueCh)
+	if err := qr.Start(ctx, queueCh); err != nil {
+		return fmt.Errorf("failed to start queue reader: %w", err)
+	}
 
 	// Handle OS signals for graceful shutdown
 	signal.Notify(
