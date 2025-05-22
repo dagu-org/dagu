@@ -46,11 +46,11 @@ func TestQueueFile(t *testing.T) {
 	require.NoError(t, err, "expected no error when popping job from queue")
 
 	require.NotNil(t, job, "expected job to be not nil")
-	require.Equal(t, "test-name", job.workflow.Name, "expected job name to be 'test-name'")
-	require.Equal(t, "test-workflow", job.workflow.WorkflowID, "expected job ID to be 'test'")
+	require.Equal(t, "test-name", job.Workflow.Name, "expected job name to be 'test-name'")
+	require.Equal(t, "test-workflow", job.Workflow.WorkflowID, "expected job ID to be 'test'")
 
 	// Check if the item has the correct prefix
-	require.Regexp(t, "^item_high_", job.fileName, "expected job file name to start with 'item_priority_'")
+	require.Regexp(t, "^item_high_", job.FileName, "expected job file name to start with 'item_priority_'")
 
 	// Check if the queue is empty again
 	queueLen, err = qf.Len(th.Context)
@@ -85,11 +85,11 @@ func TestQueueFile_FindByWorkflowID(t *testing.T) {
 	job, err := qf.FindByWorkflowID(th.Context, "test-workflow")
 	require.NoError(t, err, "expected no error when finding job by workflow ID")
 	require.NotNil(t, job, "expected job to be not nil")
-	require.Equal(t, "test-name", job.workflow.Name, "expected job name to be 'test-name'")
-	require.Equal(t, "test-workflow", job.workflow.WorkflowID, "expected job ID to be 'test'")
+	require.Equal(t, "test-name", job.Workflow.Name, "expected job name to be 'test-name'")
+	require.Equal(t, "test-workflow", job.Workflow.WorkflowID, "expected job ID to be 'test'")
 
 	// Check if the item has the correct prefix
-	require.Regexp(t, "^item_high_", job.fileName, "expected job file name to start with 'high_'")
+	require.Regexp(t, "^item_high_", job.FileName, "expected job file name to start with 'high_'")
 }
 
 func TestQueueFile_Pop(t *testing.T) {
@@ -116,8 +116,8 @@ func TestQueueFile_Pop(t *testing.T) {
 	removedJobs, err := qf.PopByWorkflowID(th.Context, "test-workflow")
 	require.NoError(t, err, "expected no error when removing job from queue")
 	require.Len(t, removedJobs, 1, "expected one job to be removed")
-	require.Equal(t, "test-name", removedJobs[0].workflow.Name, "expected job name to be 'test-name'")
-	require.Equal(t, "test-workflow", removedJobs[0].workflow.WorkflowID, "expected job ID to be 'test'")
+	require.Equal(t, "test-name", removedJobs[0].Workflow.Name, "expected job name to be 'test-name'")
+	require.Equal(t, "test-workflow", removedJobs[0].Workflow.WorkflowID, "expected job ID to be 'test'")
 
 	// Check if the queue is empty
 	queueLen, err := qf.Len(th.Context)

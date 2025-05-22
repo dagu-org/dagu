@@ -52,9 +52,9 @@ func NewQueueFile(baseDir, priority string) *QueueFile {
 }
 
 type ItemData struct {
-	fileName string
-	workflow digraph.WorkflowRef
-	queuedAt time.Time
+	FileName string              `json:"file_name"`
+	Workflow digraph.WorkflowRef `json:"workflow"`
+	QueuedAt time.Time           `json:"queued_at"`
 }
 
 // Push adds a job to the queue
@@ -87,9 +87,9 @@ func (q *QueueFile) Push(ctx context.Context, workflow digraph.WorkflowRef) erro
 	}()
 
 	data, err := json.Marshal(ItemData{
-		fileName: fileName,
-		workflow: workflow,
-		queuedAt: timestamp.Time,
+		FileName: fileName,
+		Workflow: workflow,
+		QueuedAt: timestamp.Time,
 	})
 
 	if err != nil {
@@ -132,10 +132,10 @@ func (q *QueueFile) PopByWorkflowID(ctx context.Context, workflowID string) ([]*
 
 	var removedJobs []*Job
 	for _, item := range items {
-		if item.workflow.WorkflowID == workflowID {
-			if err := os.Remove(filepath.Join(q.baseDir, item.fileName)); err != nil {
+		if item.Workflow.WorkflowID == workflowID {
+			if err := os.Remove(filepath.Join(q.baseDir, item.FileName)); err != nil {
 				// Log the error but continue processing other items
-				logger.Warn(ctx, "failed to remove queue file %s: %w", item.fileName, err)
+				logger.Warn(ctx, "failed to remove queue file %s: %w", item.FileName, err)
 			} else {
 				// Add the job to the removed jobs list
 				removedJobs = append(removedJobs, NewJob(item))
@@ -194,8 +194,8 @@ func (q *QueueFile) Pop(ctx context.Context) (*Job, error) {
 	// Delete the file
 	// Currently, we don't need the content of the file, so we just remove it
 
-	if err := os.Remove(filepath.Join(q.baseDir, item.fileName)); err != nil {
-		return nil, fmt.Errorf("failed to remove queue file %s: %w", item.fileName, err)
+	if err := os.Remove(filepath.Join(q.baseDir, item.FileName)); err != nil {
+		return nil, fmt.Errorf("failed to remove queue file %s: %w", item.FileName, err)
 	}
 
 	// Return the item data
@@ -219,7 +219,7 @@ func (q *QueueFile) FindByWorkflowID(ctx context.Context, workflowID string) (*J
 	}
 
 	for _, item := range items {
-		if item.workflow.WorkflowID == workflowID {
+		if item.Workflow.WorkflowID == workflowID {
 			return NewJob(item), nil
 		}
 	}
@@ -274,7 +274,7 @@ func (q *QueueFile) listItems(ctx context.Context) ([]ItemData, error) {
 
 	// Sort the items by queued time
 	sort.Slice(items, func(i, j int) bool {
-		return items[i].queuedAt.Before(items[j].queuedAt)
+		return items[i].QueuedAt.Before(items[j].QueuedAt)
 	})
 
 	return items, nil
@@ -302,12 +302,12 @@ func parseQueueFileName(path, fileName string) (ItemData, error) {
 
 	// Create the ItemData struct
 	item := ItemData{
-		fileName: fileName,
-		workflow: digraph.WorkflowRef{
+		FileName: fileName,
+		Workflow: digraph.WorkflowRef{
 			Name:       filepath.Base(filepath.Dir(path)),
 			WorkflowID: matches[4],
 		},
-		queuedAt: timestamp,
+		QueuedAt: timestamp,
 	}
 
 	return item, nil
