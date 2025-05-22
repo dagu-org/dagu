@@ -139,7 +139,7 @@ func (m *Manager) RetryDAG(_ context.Context, dag *digraph.DAG, workflowID strin
 			args = append(args, configFile)
 		}
 	}
-	args = append(args, dag.Location)
+	args = append(args, dag.Name)
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
