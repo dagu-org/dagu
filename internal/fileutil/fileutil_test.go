@@ -165,7 +165,7 @@ func TestMustResolvePath(t *testing.T) {
 		path := "test.txt"
 		expected := filepath.Join(cwd, path)
 
-		result := MustResolvePath(path)
+		result := ResolvePathOrBlank(path)
 		if result != expected {
 			t.Errorf("MustResolvePath(%q) = %q, want %q", path, result, expected)
 		}
@@ -180,7 +180,7 @@ func TestMustResolvePath(t *testing.T) {
 			t.Fatalf("ResolvePath failed: %v", err)
 		}
 
-		mustResolved := MustResolvePath(path)
+		mustResolved := ResolvePathOrBlank(path)
 		if mustResolved != resolved {
 			t.Errorf("MustResolvePath(%q) = %q, but ResolvePath(%q) = %q",
 				path, mustResolved, path, resolved)

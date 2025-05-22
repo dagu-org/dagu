@@ -168,9 +168,9 @@ func ResolvePath(path string) (string, error) {
 	return cleanPath, nil
 }
 
-// MustResolvePath works like ResolvePath but panics on error.
+// ResolvePathOrBlank works like ResolvePath but panics on error.
 // Useful when you're confident the path resolution will succeed.
-func MustResolvePath(path string) string {
+func ResolvePathOrBlank(path string) string {
 	resolvedPath, err := ResolvePath(path)
 	if err != nil {
 		log.Println("Failed to resolve path:", err)

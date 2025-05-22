@@ -38,6 +38,8 @@ paths:
   adminLogsDir: "/var/dagu/adminlogs"
   baseConfig: "/var/dagu/base.yaml"
   executable: "/usr/local/bin/dagu"
+  queueDir: "/var/dagu/queue"
+  procDir: "/var/dagu/proc"
 ui:
   navbarTitle: "Test Dagu"
   maxDashboardPageLimit: 50
@@ -104,8 +106,8 @@ tls:
 	assert.Equal(t, "/var/dagu/base.yaml", cfg.Paths.BaseConfig)
 	assert.Equal(t, "/usr/local/bin/dagu", cfg.Paths.Executable)
 	assert.Equal(t, "/var/dagu/data/history", cfg.Paths.HistoryDir)
-	assert.Equal(t, "/var/dagu/data/queue", cfg.Paths.QueueDir)
-	assert.Equal(t, "/var/dagu/data/proc", cfg.Paths.ProcDir)
+	assert.Equal(t, "/var/dagu/queue", cfg.Paths.QueueDir)
+	assert.Equal(t, "/var/dagu/proc", cfg.Paths.ProcDir)
 
 	// Verify UI settings.
 	assert.Equal(t, "Test Dagu", cfg.UI.NavbarTitle)
