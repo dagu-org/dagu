@@ -102,7 +102,9 @@ func (q *queueReaderImpl) startWatch(ctx context.Context, ch chan<- models.Queue
 					continue
 				}
 				if _, ok := processed.Load(items[i].Data().Name); ok {
-					// Skip already processed items
+					// Skip queue items that has the same name
+					// This is necessary to avoid sending items in different order
+					// For example, if we have two items with the same name, we need to process them in the order they were added
 					continue
 				}
 
