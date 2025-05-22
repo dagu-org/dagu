@@ -65,7 +65,7 @@ func TestContext_StringParam(t *testing.T) {
 			}
 			if tt.flagName != "non-existent-param" { // Only add flag if it's expected to exist
 				cmd.Flags().String(tt.flagName, "", "test flag")
-				cmd.Flags().Set(tt.flagName, tt.flagValue)
+				_ = cmd.Flags().Set(tt.flagName, tt.flagValue)
 			}
 
 			ctx := &Context{

@@ -78,7 +78,9 @@ func enqueueWorkflow(ctx *Context, dag *digraph.DAG, workflowID string) error {
 	if err := run.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open run: %w", err)
 	}
-	defer run.Close(ctx.Context)
+	defer func() {
+		_ = run.Close(ctx.Context)
+	}()
 	if err := run.Write(ctx.Context, status); err != nil {
 		return fmt.Errorf("failed to save status: %w", err)
 	}

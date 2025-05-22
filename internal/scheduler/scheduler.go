@@ -202,7 +202,8 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			for {
 				select {
 				case <-time.After(5 * time.Second):
-					break
+					break WAIT_FOR_RUN
+
 				default:
 					// Check if the dag is running
 					history, err = s.historyStore.FindRun(ctx, data)
@@ -253,6 +254,14 @@ func (s *Scheduler) start(ctx context.Context) {
 			}
 			return
 
+		default:
+			if !s.running.Load() {
+				// If the scheduler is not running, stop the timer
+				if !timer.Stop() {
+					<-timer.C
+				}
+				return
+			}
 		}
 	}
 }
@@ -268,11 +277,12 @@ func (s *Scheduler) Stop(ctx context.Context) {
 		return
 	}
 
+	s.lock.Lock()
 	if s.stopChan != nil {
 		close(s.stopChan)
+		s.stopChan = nil
 	}
 
-	s.lock.Lock()
 	if s.cancel != nil {
 		s.cancel()
 		s.cancel = nil

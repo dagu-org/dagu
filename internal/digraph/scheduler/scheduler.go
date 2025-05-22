@@ -345,7 +345,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 	case StatusCancel:
 		eventHandlers = append(eventHandlers, digraph.HandlerOnCancel)
 
-	case StatusNone, StatusRunning:
+	case StatusNone, StatusRunning, StatusQueued:
 		// These states should not occur at this point
 		logger.Warn(ctx, "Unexpected final status",
 			"status", sc.Status(graph).String(),

@@ -971,7 +971,7 @@ func (gh graphHelper) Schedule(t *testing.T, expectedStatus scheduler.Status) sc
 	case scheduler.StatusError:
 		require.Error(t, err)
 
-	case scheduler.StatusRunning, scheduler.StatusNone:
+	case scheduler.StatusRunning, scheduler.StatusNone, scheduler.StatusQueued:
 		t.Errorf("unexpected status %s", expectedStatus)
 
 	}

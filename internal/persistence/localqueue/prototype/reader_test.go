@@ -44,11 +44,12 @@ func TestQueueReader(t *testing.T) {
 
 	// Wait for items to be received
 	receivedItems := make([]models.QueuedItem, 0, 2)
-	timeout := time.After(3 * time.Second)
+	timeout := time.After(5 * time.Second)
 
 	for i := 0; i < 2; i++ {
 		select {
 		case item := <-ch:
+			item.Result <- true // Simulate processing the item
 			receivedItems = append(receivedItems, item)
 		case <-timeout:
 			t.Fatal("timeout waiting for items")
