@@ -22,8 +22,13 @@ type queueReaderImpl struct {
 	running atomic.Bool
 	cancel  context.CancelFunc
 	mu      sync.Mutex
-	items   []models.QueuedItem
+	items   []*queuedItem
 	updated atomic.Bool
+}
+
+type queuedItem struct {
+	models.QueuedItem
+	processed bool
 }
 
 func newQueueReader(s *Store) *queueReaderImpl {
@@ -82,27 +87,36 @@ func (q *queueReaderImpl) startWatch(ctx context.Context, ch chan<- models.Queue
 			q.setItems(items)
 
 		default:
-			// TODO: remove processed item from the list
-			for _, item := range items {
+			for i := 0; i < len(items); i++ {
 				if ctx.Err() != nil {
 					// Context is cancelled, stop processing
 					return
 				}
+				if items[i].processed {
+					// Skip already processed items
+					continue
+				}
 
+				item := items[i]
 				data := item.Data()
 				_, err := q.store.DequeueByWorkflowID(ctx, data.Name, data.WorkflowID)
 				if err != nil {
 					if errors.Is(err, models.ErrQueueItemNotFound) {
 						// Perhaps the item was already processed
+						items[i].processed = true
 						continue
 					}
 					// Unexpected error, log it
 					logger.Error(ctx, "Failed to dequeue item", "err", err, "name", data.Name, "workflowID", data.WorkflowID)
 					continue
 				}
+
 				// Send the item to the channel
 				select {
 				case ch <- item:
+					// Item sent successfully, mark it as processed
+					items[i].processed = true
+
 				default:
 					// Return it to the queue with retries
 					maxRetries := 3
@@ -162,7 +176,12 @@ func (q *queueReaderImpl) startWatch(ctx context.Context, ch chan<- models.Queue
 
 func (q *queueReaderImpl) setItems(items []models.QueuedItem) {
 	q.mu.Lock()
-	q.items = items
+	// clear the items
+	q.items = q.items[:0]
+	for i := 0; i < len(items); i++ {
+		q.items = append(q.items, &queuedItem{QueuedItem: items[i]})
+	}
+
 	q.updated.Store(true)
 	q.mu.Unlock()
 }
