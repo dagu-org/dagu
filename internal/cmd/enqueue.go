@@ -73,7 +73,7 @@ func enqueueWorkflow(ctx *Context, dag *digraph.DAG, workflowID string) error {
 
 	// As a prototype, we save the status to the database to enqueue the workflow
 	// This could be changed to save to a queue file in the future
-	status := models.NewStatusBuilder(dag).Create(workflowID, scheduler.StatusNone, 0, time.Now(), opts...)
+	status := models.NewStatusBuilder(dag).Create(workflowID, scheduler.StatusQueued, 0, time.Now(), opts...)
 
 	if err := run.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open run: %w", err)

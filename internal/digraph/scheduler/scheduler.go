@@ -26,6 +26,7 @@ const (
 	StatusError
 	StatusCancel
 	StatusSuccess
+	StatusQueued
 )
 
 func (s Status) String() string {
@@ -38,6 +39,8 @@ func (s Status) String() string {
 		return "canceled"
 	case StatusSuccess:
 		return "finished"
+	case StatusQueued:
+		return "queued"
 	case StatusNone:
 		fallthrough
 	default:

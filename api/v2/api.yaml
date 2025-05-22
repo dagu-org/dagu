@@ -1330,13 +1330,14 @@ components:
 
     Status:
       type: integer
-      enum: [0, 1, 2, 3, 4]
+      enum: [0, 1, 2, 3, 4, 5]
       x-enum-varnames:
         - "NotStarted"
         - "Running"
         - "Failed"
         - "Cancelled"
         - "Success"
+        - "Queued"
       description: |
         Numeric status code indicating current workflow state:
         0: "Not started"
@@ -1344,6 +1345,7 @@ components:
         2: "Failed"
         3: "Cancelled"
         4: "Success"
+        5: "Queued"
 
     StatusLabel:
       type: string
@@ -1354,6 +1356,7 @@ components:
         - "failed"
         - "cancelled"
         - "finished"
+        - "queued"
 
     NodeStatus:
       type: integer

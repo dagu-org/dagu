@@ -580,6 +580,7 @@ export interface components {
          *     2: "Failed"
          *     3: "Cancelled"
          *     4: "Success"
+         *     5: "Queued"
          *
          * @enum {integer}
          */
@@ -629,6 +630,8 @@ export interface components {
             histRetentionDays?: number;
             /** @description Conditions that must be met before a workflow can start */
             preconditions?: components["schemas"]["Condition"][];
+            /** @description Maximum number of concurrent workflows allowed from this DAG */
+            maxActiveWorkflows?: number;
             /** @description Maximum number of concurrent workflows allowed from this DAG */
             maxActiveSteps?: number;
             /** @description List of parameter names that can be passed to workflows created from this DAG */
@@ -2060,14 +2063,16 @@ export enum Status {
     Running = 1,
     Failed = 2,
     Cancelled = 3,
-    Success = 4
+    Success = 4,
+    Queued = 5
 }
 export enum StatusLabel {
     not_started = "not started",
     running = "running",
     failed = "failed",
     cancelled = "cancelled",
-    finished = "finished"
+    finished = "finished",
+    queued = "queued"
 }
 export enum NodeStatus {
     NotStarted = 0,
