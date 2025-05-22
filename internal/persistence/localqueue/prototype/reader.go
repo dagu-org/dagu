@@ -149,12 +149,12 @@ func (q *queueReaderImpl) startWatch(ctx context.Context, ch chan<- models.Queue
 			if q.updated.Load() {
 				q.mu.Lock()
 				items = q.items
-				q.updated.Store(false)
+				q.updated.Store(false) // Reset the updated flag
 				q.mu.Unlock()
-			} else {
-				// Sleep for a short duration to avoid busy waiting
-				// time.Sleep(500 * time.Millisecond)
 			}
+
+			// Sleep for a short duration to avoid busy waiting
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 }
