@@ -38,7 +38,7 @@ func TestMain(m *testing.M) {
 }
 
 type testHelper struct {
-	manager        scheduler.JobManager
+	manager        scheduler.EntryReader
 	historyManager history.Manager
 	historyStore   models.HistoryStore
 	dagStore       models.DAGStore
@@ -75,8 +75,8 @@ func setupTest(t *testing.T) testHelper {
 	ps := localproc.New(cfg.Paths.ProcDir)
 	qs := prototype.New(cfg.Paths.QueueDir)
 
-	hm := history.New(hs, "", cfg.Global.WorkDir)
-	jm := scheduler.NewDAGJobManager(testdataDir, ds, hm, "", "")
+	hm := history.New(hs, cfg.Paths.Executable, cfg.Global.WorkDir)
+	jm := scheduler.NewEntryReader(testdataDir, ds, hm, "", "")
 
 	return testHelper{
 		manager:        jm,

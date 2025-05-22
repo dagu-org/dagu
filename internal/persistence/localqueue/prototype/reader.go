@@ -82,6 +82,7 @@ func (q *queueReaderImpl) startWatch(ctx context.Context, ch chan<- models.Queue
 			q.setItems(items)
 
 		default:
+			// TODO: remove processed item from the list
 			for _, item := range items {
 				if ctx.Err() != nil {
 					// Context is cancelled, stop processing

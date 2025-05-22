@@ -15,7 +15,7 @@ func TestReadEntries(t *testing.T) {
 	now := expectedNext.Add(-time.Second)
 
 	t.Run("InvalidDirectory", func(t *testing.T) {
-		manager := scheduler.NewDAGJobManager("invalid_directory", nil, history.Manager{}, "", "")
+		manager := scheduler.NewEntryReader("invalid_directory", nil, history.Manager{}, "", "")
 		jobs, err := manager.Next(context.Background(), expectedNext)
 		require.NoError(t, err)
 		require.Len(t, jobs, 0)

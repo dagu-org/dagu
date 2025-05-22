@@ -168,8 +168,8 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 		return nil, fmt.Errorf("failed to initialize DAG client: %w", err)
 	}
 
-	m := scheduler.NewDAGJobManager(c.Config.Paths.DAGsDir, dr, c.HistoryMgr, c.Config.Paths.Executable, c.Config.Global.WorkDir)
-	return scheduler.New(c.Config, m, c.HistoryStore, c.QueueStore, c.ProcStore), nil
+	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.HistoryMgr, c.Config.Paths.Executable, c.Config.Global.WorkDir)
+	return scheduler.New(c.Config, m, c.HistoryMgr, c.HistoryStore, c.QueueStore, c.ProcStore), nil
 }
 
 // StringParam retrieves a string parameter from the command line flags.

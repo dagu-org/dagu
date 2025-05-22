@@ -20,8 +20,8 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-// JobManager is responsible for managing scheduled Jobs.
-type JobManager interface {
+// EntryReader is responsible for managing scheduled Jobs.
+type EntryReader interface {
 	// Start initializes and starts the process of managing scheduled Jobs.
 	Start(ctx context.Context, done chan any) error
 	// Next returns the next scheduled jobs.
@@ -40,10 +40,10 @@ func NewScheduledJob(next time.Time, job Job, typ ScheduleType) *ScheduledJob {
 	return &ScheduledJob{next, job, typ}
 }
 
-var _ JobManager = (*dagJobManager)(nil)
+var _ EntryReader = (*entryReaderImpl)(nil)
 
-// dagJobManager manages DAGs on local filesystem.
-type dagJobManager struct {
+// entryReaderImpl manages DAGs on local filesystem.
+type entryReaderImpl struct {
 	targetDir      string
 	registry       map[string]*digraph.DAG
 	lock           sync.Mutex
@@ -53,9 +53,9 @@ type dagJobManager struct {
 	workDir        string
 }
 
-// NewDAGJobManager creates a new DAG manager with the given configuration.
-func NewDAGJobManager(dir string, dagCli models.DAGStore, hm history.Manager, executable, workDir string) JobManager {
-	return &dagJobManager{
+// NewEntryReader creates a new DAG manager with the given configuration.
+func NewEntryReader(dir string, dagCli models.DAGStore, hm history.Manager, executable, workDir string) EntryReader {
+	return &entryReaderImpl{
 		targetDir:      dir,
 		lock:           sync.Mutex{},
 		registry:       map[string]*digraph.DAG{},
@@ -66,7 +66,7 @@ func NewDAGJobManager(dir string, dagCli models.DAGStore, hm history.Manager, ex
 	}
 }
 
-func (m *dagJobManager) Start(ctx context.Context, done chan any) error {
+func (m *entryReaderImpl) Start(ctx context.Context, done chan any) error {
 	if err := m.initialize(ctx); err != nil {
 		return fmt.Errorf("failed to initialize DAGs: %w", err)
 	}
@@ -76,7 +76,7 @@ func (m *dagJobManager) Start(ctx context.Context, done chan any) error {
 	return nil
 }
 
-func (m *dagJobManager) Next(ctx context.Context, now time.Time) ([]*ScheduledJob, error) {
+func (m *entryReaderImpl) Next(ctx context.Context, now time.Time) ([]*ScheduledJob, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -109,7 +109,7 @@ func (m *dagJobManager) Next(ctx context.Context, now time.Time) ([]*ScheduledJo
 	return jobs, nil
 }
 
-func (m *dagJobManager) createJob(dag *digraph.DAG, next time.Time, schedule cron.Schedule) Job {
+func (m *entryReaderImpl) createJob(dag *digraph.DAG, next time.Time, schedule cron.Schedule) Job {
 	return &DAG{
 		DAG:        dag,
 		Executable: m.executable,
@@ -120,7 +120,7 @@ func (m *dagJobManager) createJob(dag *digraph.DAG, next time.Time, schedule cro
 	}
 }
 
-func (m *dagJobManager) initialize(ctx context.Context) error {
+func (m *entryReaderImpl) initialize(ctx context.Context) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -147,7 +147,7 @@ func (m *dagJobManager) initialize(ctx context.Context) error {
 	return nil
 }
 
-func (m *dagJobManager) watchDags(ctx context.Context, done chan any) {
+func (m *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
 	watcher, err := filenotify.New(time.Minute)
 	if err != nil {
 		logger.Error(ctx, "Watcher creation failed", "err", err)

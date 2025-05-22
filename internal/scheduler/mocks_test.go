@@ -9,7 +9,7 @@ import (
 	"github.com/dagu-org/dagu/internal/scheduler"
 )
 
-var _ scheduler.JobManager = (*mockJobManager)(nil)
+var _ scheduler.EntryReader = (*mockJobManager)(nil)
 
 type mockJobManager struct {
 	Entries []*scheduler.ScheduledJob

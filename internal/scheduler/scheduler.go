@@ -29,8 +29,8 @@ type Job interface {
 }
 
 type Scheduler struct {
-	client       history.Manager
-	manager      JobManager
+	hm           history.Manager
+	er           EntryReader
 	logDir       string
 	stopChan     chan struct{}
 	running      atomic.Bool
@@ -44,7 +44,8 @@ type Scheduler struct {
 
 func New(
 	cfg *config.Config,
-	manager JobManager,
+	er EntryReader,
+	hm history.Manager,
 	hs models.HistoryStore,
 	qs models.QueueStore,
 	ps models.ProcStore,
@@ -58,7 +59,8 @@ func New(
 		logDir:       cfg.Paths.LogDir,
 		stopChan:     make(chan struct{}),
 		location:     timeLoc,
-		manager:      manager,
+		er:           er,
+		hm:           hm,
 		historyStore: hs,
 		queueStore:   qs,
 		procStore:    ps,
@@ -76,7 +78,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	defer close(done)
 
 	// Start the DAG file watcher
-	if err := s.manager.Start(ctx, done); err != nil {
+	if err := s.er.Start(ctx, done); err != nil {
 		return fmt.Errorf("failed to start manager: %w", err)
 	}
 
@@ -161,7 +163,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				continue
 			}
 
-			if err := s.client.RetryDAG(ctx, dag, data.WorkflowID); err != nil {
+			if err := s.hm.RetryDAG(ctx, dag, data.WorkflowID); err != nil {
 				logger.Error(ctx, "Failed to retry dag", "err", err, "data", data)
 				continue
 			}
@@ -227,7 +229,7 @@ func (s *Scheduler) Stop(ctx context.Context) {
 func (s *Scheduler) run(ctx context.Context, now time.Time) {
 	// Get jobs scheduled to run at or before the current time
 	// Subtract a small buffer to avoid edge cases with exact timing
-	jobs, err := s.manager.Next(ctx, now.Add(-time.Second).In(s.location))
+	jobs, err := s.er.Next(ctx, now.Add(-time.Second).In(s.location))
 	if err != nil {
 		logger.Error(ctx, "Failed to get next jobs", "err", err)
 		return
