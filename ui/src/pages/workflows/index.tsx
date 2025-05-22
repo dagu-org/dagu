@@ -265,6 +265,10 @@ function Workflows() {
                 <StatusChip status={Status.Success} size="sm">
                   finished
                 </StatusChip>
+              ) : status === String(Status.Queued) ? (
+                <StatusChip status={Status.Queued} size="sm">
+                  queued
+                </StatusChip>
               ) : null}
             </SelectValue>
           </SelectTrigger>

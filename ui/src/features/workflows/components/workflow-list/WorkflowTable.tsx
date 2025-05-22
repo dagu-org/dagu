@@ -342,7 +342,7 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
               <TableCell className="py-1 px-2 font-mono text-slate-600">
                 {workflow.workflowId}
               </TableCell>
-              <TableCell className="py-1 px-2">
+              <TableCell className="py-1 px-2 flex items-center">
                 <StatusChip status={workflow.status} size="xs">
                   {workflow.statusLabel}
                 </StatusChip>
