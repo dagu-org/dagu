@@ -52,9 +52,9 @@ func NewQueueFile(baseDir, priority string) *QueueFile {
 }
 
 type ItemData struct {
-	fileName string              `json:"file_name"`
-	workflow digraph.WorkflowRef `json:"workflow"`
-	queuedAt time.Time           `json:"queued_at"`
+	fileName string
+	workflow digraph.WorkflowRef
+	queuedAt time.Time
 }
 
 // Push adds a job to the queue
