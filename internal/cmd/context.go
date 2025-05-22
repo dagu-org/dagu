@@ -172,6 +172,19 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	return scheduler.New(c.Config, m, c.HistoryStore, c.QueueStore, c.ProcStore), nil
 }
 
+// StringParam retrieves a string parameter from the command line flags.
+// It checks if the parameter is wrapped in quotes and removes them if necessary.
+func (c *Context) StringParam(name string) (string, error) {
+	val, err := c.Command.Flags().GetString(name)
+	if err != nil {
+		return "", fmt.Errorf("failed to get flag %s: %w", name, err)
+	}
+
+	// If it's wrapped in quotes, remove them
+	val = stringutil.RemoveQuotes(val)
+	return val, nil
+}
+
 // dagStore returns a new DAGRepository instance. It ensures that the directory exists
 // (creating it if necessary) before returning the store.
 func (c *Context) dagStore(cache *fileutil.Cache[*digraph.DAG], searchPaths []string) (models.DAGStore, error) {
@@ -199,16 +212,25 @@ func (c *Context) OpenLogFile(
 	dag *digraph.DAG,
 	workflowID string,
 ) (*os.File, error) {
+	logPath, err := c.GenLogFileName(dag, workflowID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate log file name: %w", err)
+	}
+	return fileutil.OpenOrCreateFile(logPath)
+}
+
+// GenLogFileName generates a log file name based on the DAG and workflow ID.
+func (c *Context) GenLogFileName(dag *digraph.DAG, workflowID string) (string, error) {
 	// Read the global configuration for log directory.
 	baseLogDir, err := cmdutil.EvalString(c, c.Config.Paths.LogDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to expand log directory: %w", err)
+		return "", fmt.Errorf("failed to expand log directory: %w", err)
 	}
 
 	// Read the log directory configuration from the DAG.
 	dagLogDir, err := cmdutil.EvalString(c, dag.LogDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to expand DAG log directory: %w", err)
+		return "", fmt.Errorf("failed to expand DAG log directory: %w", err)
 	}
 
 	cfg := LogConfig{
@@ -219,16 +241,15 @@ func (c *Context) OpenLogFile(
 	}
 
 	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid log settings: %w", err)
+		return "", fmt.Errorf("invalid log settings: %w", err)
 	}
 
 	d, err := cfg.LogDir()
 	if err != nil {
-		return nil, fmt.Errorf("failed to setup log directory: %w", err)
+		return "", fmt.Errorf("failed to setup log directory: %w", err)
 	}
 
-	logPath := filepath.Join(d, cfg.LogFile())
-	return fileutil.OpenOrCreateFile(logPath)
+	return filepath.Join(d, cfg.LogFile()), nil
 }
 
 // NewCommand creates a new command instance with the given cobra command and run function.
@@ -251,8 +272,8 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *C
 	return cmd
 }
 
-// getWorkflowID creates a new UUID string to be used as a workflow IDentifier.
-func getWorkflowID() (string, error) {
+// genWorkflowID creates a new UUID string to be used as a workflow IDentifier.
+func genWorkflowID() (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return "", err
@@ -276,7 +297,7 @@ func validateWorkflowID(workflowID string) error {
 
 // regexWorkflowID is a regular expression to validate workflow IDs.
 // It allows alphanumeric characters, hyphens, and underscores.
-var regexWorkflowID = regexp.MustCompile(`^[a-zA-Z0-9-_]+$`)
+var regexWorkflowID = regexp.MustCompile(`^[-a-zA-Z0-9_]+$`)
 
 // maxWorkflowIDLen is the max length of the workflow ID
 const maxWorkflowIDLen = 60

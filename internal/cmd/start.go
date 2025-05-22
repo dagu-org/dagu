@@ -11,6 +11,8 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
+
+	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
 // Errors for start command
@@ -97,7 +99,7 @@ func runStart(ctx *Context, args []string) error {
 // nolint:revive
 func getExecutionInfo(ctx *Context) (workflowID string, rootRef string, parentRef string, isChildWorkflow bool, err error) {
 	// Get workflow ID from flags
-	workflowID, err = ctx.Command.Flags().GetString("workflow-id")
+	workflowID, err = ctx.StringParam("workflow-id")
 	if err != nil {
 		return "", "", "", false, fmt.Errorf("failed to get workflow ID: %w", err)
 	}
@@ -119,7 +121,7 @@ func getExecutionInfo(ctx *Context) (workflowID string, rootRef string, parentRe
 		}
 	} else {
 		// Generate a new workflow ID if not provided
-		workflowID, err = getWorkflowID()
+		workflowID, err = genWorkflowID()
 		if err != nil {
 			return "", "", "", false, fmt.Errorf("failed to generate workflow ID: %w", err)
 		}
@@ -154,7 +156,7 @@ func loadDAGWithParams(ctx *Context, args []string) (*digraph.DAG, string, error
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to get parameters: %w", err)
 		}
-		loadOpts = append(loadOpts, digraph.WithParams(removeQuotes(params)))
+		loadOpts = append(loadOpts, digraph.WithParams(stringutil.RemoveQuotes(params)))
 	}
 
 	// Load the DAG from the specified file
@@ -278,12 +280,4 @@ func executeWorkflow(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, w
 	}
 
 	return nil
-}
-
-// removeQuotes removes the surrounding quotes from the string.
-func removeQuotes(s string) string {
-	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
-		return s[1 : len(s)-1]
-	}
-	return s
 }

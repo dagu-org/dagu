@@ -6,6 +6,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/spf13/cobra"
 )
 
@@ -50,7 +51,7 @@ func runDry(ctx *Context, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to get parameters: %w", err)
 		}
-		loadOpts = append(loadOpts, digraph.WithParams(removeQuotes(params)))
+		loadOpts = append(loadOpts, digraph.WithParams(stringutil.RemoveQuotes(params)))
 	}
 
 	dag, err := digraph.Load(ctx, args[0], loadOpts...)
@@ -58,7 +59,7 @@ func runDry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 	}
 
-	workflowID, err := getWorkflowID()
+	workflowID, err := genWorkflowID()
 	if err != nil {
 		return fmt.Errorf("failed to generate workflow ID: %w", err)
 	}

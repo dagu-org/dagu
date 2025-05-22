@@ -19,9 +19,15 @@ import (
 // UsedConfigFile is a global variable that stores the path to the configuration file
 var UsedConfigFile = atomic.Value{}
 
+// loadLock synchronizes access to the Load function to ensure that only one configuration load occurs at a time.
+var loadLock sync.Mutex
+
 // Load creates a new configuration by instantiating a ConfigLoader with the provided options
 // and then invoking its Load method.
 func Load(opts ...ConfigLoaderOption) (*Config, error) {
+	loadLock.Lock()
+	defer loadLock.Unlock()
+
 	loader := NewConfigLoader(opts...)
 	cfg, err := loader.Load()
 	if err != nil {

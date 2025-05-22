@@ -44,7 +44,7 @@ var restartFlags = []commandLineFlag{
 }
 
 func runRestart(ctx *Context, args []string) error {
-	workflowID, err := ctx.Command.Flags().GetString("workflow-id")
+	workflowID, err := ctx.StringParam("workflow-id")
 	if err != nil {
 		return fmt.Errorf("failed to get workflow ID: %w", err)
 	}
@@ -105,7 +105,7 @@ func handleRestartProcess(ctx *Context, d *digraph.DAG, workflowID string) error
 }
 
 func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
-	workflowID, err := getWorkflowID()
+	workflowID, err := genWorkflowID()
 	if err != nil {
 		return fmt.Errorf("failed to generate workflow ID: %w", err)
 	}
