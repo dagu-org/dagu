@@ -166,6 +166,7 @@ type pathsConfigDef struct {
 	SuspendFlagsDir string `mapstructure:"suspendFlagsDir"`
 	AdminLogsDir    string `mapstructure:"adminLogsDir"`
 	BaseConfig      string `mapstructure:"baseConfig"`
+	QueueDir        string `mapstructure:"queueDir"`
 }
 
 // uiDef holds the user interface configuration settings.

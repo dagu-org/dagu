@@ -8,8 +8,6 @@ import (
 )
 
 func TestEnqueueCommand(t *testing.T) {
-	t.Parallel()
-
 	th := test.SetupCommand(t)
 
 	tests := []test.CmdTest{

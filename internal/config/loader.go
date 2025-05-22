@@ -186,6 +186,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		cfg.Paths.AdminLogsDir = fileutil.MustResolvePath(def.Paths.AdminLogsDir)
 		cfg.Paths.BaseConfig = fileutil.MustResolvePath(def.Paths.BaseConfig)
 		cfg.Paths.Executable = fileutil.MustResolvePath(def.Paths.Executable)
+		cfg.Paths.QueueDir = fileutil.MustResolvePath(def.Paths.QueueDir)
 	}
 
 	// Set UI configuration if provided.
@@ -368,6 +369,9 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("debug", "DEBUG")
 	l.bindEnv("headless", "HEADLESS")
 
+	// Global configurations
+	l.bindEnv("workDir", "WORK_DIR")
+
 	// UI configurations
 	l.bindEnv("ui.maxDashboardPageLimit", "UI_MAX_DASHBOARD_PAGE_LIMIT")
 	l.bindEnv("ui.logEncodingCharset", "UI_LOG_ENCODING_CHARSET")
@@ -395,15 +399,15 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("tls.keyFile", "KEY_FILE")
 
 	// File paths
-	l.bindEnv("dags", "DAGS")
-	l.bindEnv("dags", "DAGS_DIR")
-	l.bindEnv("workDir", "WORK_DIR")
-	l.bindEnv("baseConfig", "BASE_CONFIG")
-	l.bindEnv("logDir", "LOG_DIR")
-	l.bindEnv("dataDir", "DATA_DIR")
-	l.bindEnv("suspendFlagsDir", "SUSPEND_FLAGS_DIR")
-	l.bindEnv("adminLogsDir", "ADMIN_LOG_DIR")
-	l.bindEnv("executable", "EXECUTABLE")
+	l.bindEnv("paths.dags", "DAGS")
+	l.bindEnv("paths.dags", "DAGS_DIR")
+	l.bindEnv("paths.executable", "EXECUTABLE")
+	l.bindEnv("paths.logDir", "LOG_DIR")
+	l.bindEnv("paths.dataDir", "DATA_DIR")
+	l.bindEnv("paths.suspendFlagsDir", "SUSPEND_FLAGS_DIR")
+	l.bindEnv("paths.adminLogsDir", "ADMIN_LOG_DIR")
+	l.bindEnv("paths.baseConfig", "BASE_CONFIG")
+	l.bindEnv("paths.queueDir", "QUEUE_DIR")
 
 	// UI customization
 	l.bindEnv("latestStatusToday", "LATEST_STATUS_TODAY")
