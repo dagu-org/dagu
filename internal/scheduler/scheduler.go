@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
@@ -142,33 +144,89 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			return
 
 		case item := <-ch:
-			if item == nil {
-				logger.Info(ctx, "Received nil item from queue")
-				continue
-			}
-
 			data := item.Data()
 			logger.Info(ctx, "Received item from queue", "data", data)
+			var (
+				dag     *digraph.DAG
+				history models.Run
+				status  *models.Status
+				err     error
+				done    bool
+			)
 
-			// Fetch the dag of the workflow
-			history, err := s.historyStore.FindRun(ctx, data)
+			alive, err := s.procStore.CountAlive(ctx, data.Name)
 			if err != nil {
-				logger.Error(ctx, "Failed to find run", "err", err, "data", data)
-				continue
+				logger.Error(ctx, "Failed to count alive processes", "err", err, "data", data)
+				goto SEND_RESULT
 			}
 
-			dag, err := history.ReadDAG(ctx)
+			if alive > 0 {
+				// If there are alive processes, skip this item
+				// TODO: Fix this to check the last processed setting
+				goto SEND_RESULT
+			}
+
+			// Fetch the dag of the workflow
+			history, err = s.historyStore.FindRun(ctx, data)
+			if err != nil {
+				logger.Error(ctx, "Failed to find run", "err", err, "data", data)
+				goto SEND_RESULT
+			}
+
+			status, err = history.ReadStatus(ctx)
+			if err != nil {
+				logger.Error(ctx, "Failed to read status", "err", err, "data", data)
+				goto SEND_RESULT
+			}
+
+			if status.Status != scheduler.StatusQueued {
+				// If the status is not queued, skip this item
+				logger.Info(ctx, "Skipping item from queue", "data", data, "status", status.Status)
+				done = true
+				goto SEND_RESULT
+			}
+
+			dag, err = history.ReadDAG(ctx)
 			if err != nil {
 				logger.Error(ctx, "Failed to read dag", "err", err, "data", data)
-				continue
+				goto SEND_RESULT
 			}
 
 			if err := s.hm.RetryDAG(ctx, dag, data.WorkflowID); err != nil {
 				logger.Error(ctx, "Failed to retry dag", "err", err, "data", data)
-				continue
+				goto SEND_RESULT
 			}
 
-			logger.Info(ctx, "Successfully processed item from queue", "data", data)
+			// For now we need to wait for the DAG started
+		WAIT_FOR_RUN:
+			for {
+				select {
+				case <-time.After(5 * time.Second):
+					break
+				default:
+					// Check if the dag is running
+					history, err = s.historyStore.FindRun(ctx, data)
+					if err != nil {
+						logger.Error(ctx, "Failed to find run", "err", err, "data", data)
+					}
+					status, err := history.ReadStatus(ctx)
+					if err != nil {
+						logger.Error(ctx, "Failed to read status", "err", err, "data", data)
+						goto SEND_RESULT
+					}
+					if status.Status != scheduler.StatusQueued {
+						done = true
+						break WAIT_FOR_RUN
+					}
+				}
+			}
+
+			if done {
+				logger.Info(ctx, "Successfully processed item from queue", "data", data)
+			}
+
+		SEND_RESULT:
+			item.Result <- done
 		}
 	}
 }

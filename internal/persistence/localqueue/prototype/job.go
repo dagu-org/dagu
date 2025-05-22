@@ -7,7 +7,7 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 )
 
-var _ models.QueuedItem = (*Job)(nil)
+var _ models.QueuedItemData = (*Job)(nil)
 
 type Job struct {
 	id string

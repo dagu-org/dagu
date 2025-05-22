@@ -28,15 +28,15 @@ type Store struct {
 
 	// cache for the last fetched items
 	lastFetched time.Time
-	cache       []models.QueuedItem
+	cache       []models.QueuedItemData
 }
 
 // All implements models.QueueStore.
-func (s *Store) All(ctx context.Context) ([]models.QueuedItem, error) {
+func (s *Store) All(ctx context.Context) ([]models.QueuedItemData, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	var items []models.QueuedItem
+	var items []models.QueuedItemData
 
 	patterns := []string{
 		filepath.Join(s.baseDir, "*", "item_high_*.json"),
@@ -67,7 +67,7 @@ func (s *Store) All(ctx context.Context) ([]models.QueuedItem, error) {
 }
 
 // DequeueByName implements models.QueueStore.
-func (s *Store) DequeueByName(ctx context.Context, name string) (models.QueuedItem, error) {
+func (s *Store) DequeueByName(ctx context.Context, name string) (models.QueuedItemData, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -102,7 +102,7 @@ func (s *Store) Len(ctx context.Context, name string) (int, error) {
 }
 
 // List implements models.QueueStore.
-func (s *Store) List(ctx context.Context, name string) ([]models.QueuedItem, error) {
+func (s *Store) List(ctx context.Context, name string) ([]models.QueuedItemData, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -120,11 +120,11 @@ func (s *Store) List(ctx context.Context, name string) ([]models.QueuedItem, err
 }
 
 // DequeueByWorkflowID implements models.QueueStore.
-func (s *Store) DequeueByWorkflowID(ctx context.Context, name, workflowID string) ([]models.QueuedItem, error) {
+func (s *Store) DequeueByWorkflowID(ctx context.Context, name, workflowID string) ([]models.QueuedItemData, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	var items []models.QueuedItem
+	var items []models.QueuedItemData
 	if _, ok := s.queues[name]; !ok {
 		s.queues[name] = s.createDualQueue(name)
 	}

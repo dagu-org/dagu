@@ -52,7 +52,7 @@ func NewDualQueue(baseDir, name string) *DualQueue {
 // FindByWorkflowID retrieves a workflow from the queue by its ID
 // without removing it. It returns the first found item in the queue files.
 // If the workflow is not found, it returns ErrQueueItemNotFound.
-func (q *DualQueue) FindByWorkflowID(ctx context.Context, workflowID string) (models.QueuedItem, error) {
+func (q *DualQueue) FindByWorkflowID(ctx context.Context, workflowID string) (models.QueuedItemData, error) {
 	for _, priority := range priorities {
 		qf := q.files[priority]
 		item, err := qf.FindByWorkflowID(ctx, workflowID)
@@ -68,11 +68,11 @@ func (q *DualQueue) FindByWorkflowID(ctx context.Context, workflowID string) (mo
 }
 
 // DequeueByWorkflowID retrieves a workflow from the queue by its ID and removes it
-func (q *DualQueue) DequeueByWorkflowID(ctx context.Context, workflowID string) ([]models.QueuedItem, error) {
+func (q *DualQueue) DequeueByWorkflowID(ctx context.Context, workflowID string) ([]models.QueuedItemData, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	var items []models.QueuedItem
+	var items []models.QueuedItemData
 	for _, priority := range priorities {
 		qf := q.files[priority]
 		popped, err := qf.PopByWorkflowID(ctx, workflowID)
@@ -90,8 +90,8 @@ func (q *DualQueue) DequeueByWorkflowID(ctx context.Context, workflowID string) 
 }
 
 // List returns all items in the queue
-func (q *DualQueue) List(ctx context.Context) ([]models.QueuedItem, error) {
-	var items []models.QueuedItem
+func (q *DualQueue) List(ctx context.Context) ([]models.QueuedItemData, error) {
+	var items []models.QueuedItemData
 	for _, priority := range priorities {
 		qf := q.files[priority]
 		qItems, err := qf.List(ctx)
@@ -137,7 +137,7 @@ func (q *DualQueue) Enqueue(ctx context.Context, priority models.QueuePriority, 
 
 // Dequeue retrieves a workflow from the queue and removes it
 // It checks the high-priority queue first, then the low-priority queue
-func (q *DualQueue) Dequeue(ctx context.Context) (models.QueuedItem, error) {
+func (q *DualQueue) Dequeue(ctx context.Context) (models.QueuedItemData, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 

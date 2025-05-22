@@ -19,15 +19,15 @@ type QueueStore interface {
 	// Enqueue adds an item to the queue
 	Enqueue(ctx context.Context, name string, priority QueuePriority, workflow digraph.WorkflowRef) error
 	// DequeueByName retrieves an item from the queue and removes it
-	DequeueByName(ctx context.Context, name string) (QueuedItem, error)
+	DequeueByName(ctx context.Context, name string) (QueuedItemData, error)
 	// Len returns the number of items in the queue
-	DequeueByWorkflowID(ctx context.Context, name, workflowID string) ([]QueuedItem, error)
+	DequeueByWorkflowID(ctx context.Context, name, workflowID string) ([]QueuedItemData, error)
 	// List returns all items in the queue
 	Len(ctx context.Context, name string) (int, error)
 	// DequeueByWorkflowID retrieves a workflow from the queue by its ID and removes it
-	List(ctx context.Context, name string) ([]QueuedItem, error)
+	List(ctx context.Context, name string) ([]QueuedItemData, error)
 	// All returns all items in the queue
-	All(ctx context.Context) ([]QueuedItem, error)
+	All(ctx context.Context) ([]QueuedItemData, error)
 	// Reader returns a QueueReader for reading from the queue
 	Reader(ctx context.Context) QueueReader
 }
@@ -50,8 +50,22 @@ const (
 	QueuePriorityLow
 )
 
-// QueuedItem represents a workflow that is in the queue for execution
-type QueuedItem interface {
+// QueuedItem is a wrapper for QueuedItem with additional fields
+type QueuedItem struct {
+	QueuedItemData
+	Result chan bool
+}
+
+// NewQueuedItem creates a new QueuedItem
+func NewQueuedItem(data QueuedItemData) *QueuedItem {
+	return &QueuedItem{
+		QueuedItemData: data,
+		Result:         make(chan bool, 1),
+	}
+}
+
+// QueuedItemData represents a workflow that is in the queue for execution
+type QueuedItemData interface {
 	// ID returns the ID of the queued item
 	ID() string
 	// Data returns the data of the queued item

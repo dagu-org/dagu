@@ -2,11 +2,8 @@ package prototype
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/binary"
 	"errors"
 	"fmt"
-	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -22,14 +19,20 @@ type queueReaderImpl struct {
 	running atomic.Bool
 	cancel  context.CancelFunc
 	mu      sync.Mutex
-	items   []*queuedItem
+	items   []queuedItem
 	updated atomic.Bool
 }
 
 type queuedItem struct {
-	models.QueuedItem
-	processed bool
+	*models.QueuedItem
+	status int
 }
+
+const (
+	statusNone = iota
+	statusProcessing
+	statusDone
+)
 
 func newQueueReader(s *Store) *queueReaderImpl {
 	return &queueReaderImpl{store: s}
@@ -87,73 +90,58 @@ func (q *queueReaderImpl) startWatch(ctx context.Context, ch chan<- models.Queue
 			q.setItems(items)
 
 		default:
+			var processed sync.Map
+
 			for i := 0; i < len(items); i++ {
 				if ctx.Err() != nil {
 					// Context is cancelled, stop processing
 					return
 				}
-				if items[i].processed {
+				if items[i].status != statusNone {
+					// Skip already processed items
+					continue
+				}
+				if _, ok := processed.Load(items[i].Data().Name); ok {
 					// Skip already processed items
 					continue
 				}
 
 				item := items[i]
 				data := item.Data()
-				_, err := q.store.DequeueByWorkflowID(ctx, data.Name, data.WorkflowID)
-				if err != nil {
-					if errors.Is(err, models.ErrQueueItemNotFound) {
-						// Perhaps the item was already processed
-						items[i].processed = true
-						continue
-					}
-					// Unexpected error, log it
-					logger.Error(ctx, "Failed to dequeue item", "err", err, "name", data.Name, "workflowID", data.WorkflowID)
-					continue
-				}
+
+				items[i].status = statusProcessing
 
 				// Send the item to the channel
 				select {
-				case ch <- item:
-					// Item sent successfully, mark it as processed
-					items[i].processed = true
-
-				default:
-					// Return it to the queue with retries
-					maxRetries := 3
-					initialBackoff := 500 * time.Millisecond
-
-					for retryCount := 0; retryCount < maxRetries; retryCount++ {
-						err := q.store.Enqueue(ctx, data.Name, models.QueuePriorityHigh, data)
-						if err == nil {
-							// Success, break out of the retry loop
-							break
+				case ch <- *item.QueuedItem:
+					select {
+					case res := <-item.Result:
+						if !res {
+							// Item processing failed
+							continue
 						}
-						if retryCount == maxRetries-1 {
-							// For now, just log the error and forget about it
-							// TODO: Implement a dead-letter queue or similar mechanism
-							logger.Error(ctx, "Failed to return item to queue after multiple retries", "err", err, "data", data, "retries", maxRetries)
-							break
-						}
-						logger.Warn(ctx, "Failed to return item to queue", "err", err, "data", data, "retry", retryCount, "maxRetries", maxRetries)
 
-						// backoff multiplier = 2^retryCount (max: 2^3 = 8)
-						// max backoff = 2^3 * 500ms * 1.25(jitter) = 4s * 1.25 = 5s
-						backoffMultiplier := math.Pow(2, float64(retryCount))
-						backoff := initialBackoff * time.Duration(backoffMultiplier)
-						jitter := getSecureRandomDuration(backoff / 4)
-						backoff += jitter
+						// Item was processed successfully
+						logger.Info(ctx, "Item processed successfully", "item", item)
+						item.status = statusDone
+						processed.Store(data.Name, true)
 
-						// Wait for the backoff duration before retrying
-						select {
-						case <-ctx.Done():
-							// Context is cancelled, stop retrying
-							logger.Warn(ctx, "Context cancelled, stopping retry", "data", data)
-							break
-							// case <-time.After(backoff):
-							// Continue to the next retry
+						// Remove the item from the queue
+						_, err := q.store.DequeueByWorkflowID(ctx, data.Name, data.WorkflowID)
+						if err != nil {
+							if errors.Is(err, models.ErrQueueItemNotFound) {
+								continue
+							}
+							// Unexpected error, log it
+							logger.Error(ctx, "Failed to dequeue item", "err", err, "name", data.Name, "workflowID", data.WorkflowID)
+							continue
 						}
 					}
+				default:
+					// Channel is full, skip sending the item
+					items[i].status = statusNone
 				}
+
 				// Check if the item list has been updated
 				if q.updated.Load() {
 					break
@@ -174,12 +162,14 @@ func (q *queueReaderImpl) startWatch(ctx context.Context, ch chan<- models.Queue
 	}
 }
 
-func (q *queueReaderImpl) setItems(items []models.QueuedItem) {
+func (q *queueReaderImpl) setItems(items []models.QueuedItemData) {
 	q.mu.Lock()
 	// clear the items
 	q.items = q.items[:0]
 	for i := 0; i < len(items); i++ {
-		q.items = append(q.items, &queuedItem{QueuedItem: items[i]})
+		q.items = append(q.items, queuedItem{
+			QueuedItem: models.NewQueuedItem(items[i]),
+		})
 	}
 
 	q.updated.Store(true)
@@ -204,26 +194,4 @@ func (q *queueReaderImpl) Stop(ctx context.Context) {
 // IsRunning checks if the queue reader is running.
 func (q *queueReaderImpl) IsRunning() bool {
 	return q.running.Load()
-}
-
-// getSecureRandomDuration generates a random duration between 0 and maxDuration
-// using crypto/rand for true randomness
-func getSecureRandomDuration(maxDuration time.Duration) time.Duration {
-	// Create a buffer to hold 8 bytes (uint64)
-	var buf [8]byte
-
-	// Read random bytes from crypto/rand
-	_, err := rand.Read(buf[:])
-	if err != nil {
-		// If crypto/rand fails, return a simple fraction of maxDuration
-		// This is a fallback that shouldn't normally be needed
-		return maxDuration / 2
-	}
-
-	// Convert bytes to uint64
-	randomUint64 := binary.BigEndian.Uint64(buf[:])
-
-	// Scale the random value to be between 0 and maxDuration
-	randomFraction := float64(randomUint64) / float64(math.MaxUint64)
-	return time.Duration(float64(maxDuration) * randomFraction)
 }
