@@ -664,6 +664,8 @@ export interface components {
             statusLabel: components["schemas"]["StatusLabel"];
             /** @description Process ID of the workflow */
             pid?: number;
+            /** @description RFC 3339 timestamp when the workflow was queued */
+            queuedAt?: string;
             /** @description RFC 3339 timestamp when the workflow started */
             startedAt: string;
             /** @description RFC 3339 timestamp when the workflow finished */
