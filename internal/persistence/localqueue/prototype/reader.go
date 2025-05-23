@@ -157,7 +157,12 @@ func (q *queueReaderImpl) startWatch(ctx context.Context, ch chan<- models.Queue
 
 			default:
 				items = q.processItems(ctx, ch, items)
-				time.Sleep(processingDelay)
+				select {
+				case <-ctx.Done():
+					logger.Info(ctx, "Stopping queue reader due to context cancellation")
+					return
+				case <-time.After(processingDelay):
+				}
 			}
 		} else {
 			// Fallback to polling only when no watcher is available
@@ -176,7 +181,12 @@ func (q *queueReaderImpl) startWatch(ctx context.Context, ch chan<- models.Queue
 
 			default:
 				items = q.processItems(ctx, ch, items)
-				time.Sleep(processingDelay)
+				select {
+				case <-ctx.Done():
+					logger.Info(ctx, "Stopping queue reader due to context cancellation")
+					return
+				case <-time.After(processingDelay):
+				}
 			}
 		}
 	}

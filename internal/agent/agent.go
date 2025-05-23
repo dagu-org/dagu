@@ -352,6 +352,7 @@ func (a *Agent) Status() models.Status {
 	if a.retryTarget != nil {
 		// QueuedAt is the time when the workflow was queued.
 		opts = append(opts, models.WithQueuedAt(a.retryTarget.QueuedAt))
+		opts = append(opts, models.WithCreatedAt(a.retryTarget.CreatedAt))
 	}
 
 	// Create the status object to record the current status.

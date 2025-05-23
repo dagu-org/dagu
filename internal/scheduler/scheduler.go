@@ -110,7 +110,9 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	)
 
 	// Go routine to handle OS signals and context cancellation
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		select {
 		case <-done:
 			qr.Stop(ctx)
@@ -297,23 +299,19 @@ func (*Scheduler) NextTick(now time.Time) time.Time {
 
 // Stop stops the scheduler.
 func (s *Scheduler) Stop(ctx context.Context) {
-	if !s.running.Load() {
+	if !s.running.CompareAndSwap(true, false) {
 		return
 	}
 
-	s.lock.Lock()
-	if s.stopChan != nil {
-		close(s.stopChan)
-		s.stopChan = nil
-	}
+	close(s.stopChan)
 
+	s.lock.Lock()
 	if s.cancel != nil {
 		s.cancel()
 		s.cancel = nil
 	}
 	s.lock.Unlock()
 
-	s.running.Store(false)
 	logger.Info(ctx, "Scheduler stopped")
 }
 

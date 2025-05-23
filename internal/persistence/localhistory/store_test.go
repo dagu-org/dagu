@@ -433,13 +433,12 @@ func TestListStatuses(t *testing.T) {
 		require.Len(t, statuses, 3)
 	})
 
-	t.Run("SortByStartedAt", func(t *testing.T) {
+	t.Run("SortByCreatedAt", func(t *testing.T) {
 		th := setupTestLocalStore(t)
 
-		// Create records with different timestamps
 		ts1 := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
-		ts2 := time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
-		ts3 := time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC)
+		ts2 := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+		ts3 := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 
 		th.CreateRun(t, ts1, "workflow-id-1", scheduler.StatusSuccess)
 		th.CreateRun(t, ts2, "workflow-id-2", scheduler.StatusSuccess)
