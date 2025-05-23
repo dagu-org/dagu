@@ -75,6 +75,7 @@ func toWorkflowSummary(s models.Status) api.WorkflowSummary {
 		Params:             ptrOf(s.Params),
 		Pid:                ptrOf(int(s.PID)),
 		WorkflowId:         s.WorkflowID,
+		QueuedAt:           ptrOf(s.QueuedAt),
 		StartedAt:          s.StartedAt,
 		FinishedAt:         s.FinishedAt,
 		Status:             api.Status(s.Status),

@@ -1495,6 +1495,9 @@ components:
         pid:
           type: integer
           description: "Process ID of the workflow"
+        queuedAt:
+          type: string
+          description: "RFC 3339 timestamp when the workflow was queued"
         startedAt:
           type: string
           description: "RFC 3339 timestamp when the workflow started"

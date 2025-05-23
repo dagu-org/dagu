@@ -226,6 +226,15 @@ func (store *Store) collectStatusesFromRoots(
 	wg.Wait()
 
 	sort.Slice(results, func(i, j int) bool {
+		if results[i].StartedAt == "" && results[j].StartedAt == "" {
+			return results[i].QueuedAt > results[j].QueuedAt
+		}
+		if results[i].StartedAt == "" {
+			return true
+		}
+		if results[j].StartedAt == "" {
+			return false
+		}
 		return results[i].StartedAt > results[j].StartedAt
 	})
 	if len(results) > opts.Limit {

@@ -64,6 +64,13 @@ func WithRunID(runID string) StatusOption {
 	}
 }
 
+// WithQueuedAt returns a StatusOption that sets the finished time
+func WithQueuedAt(formattedTime string) StatusOption {
+	return func(s *Status) {
+		s.QueuedAt = formattedTime
+	}
+}
+
 // WithFinishedAt returns a StatusOption that sets the finished time
 func WithFinishedAt(t time.Time) StatusOption {
 	return func(s *Status) {
@@ -166,6 +173,7 @@ type Status struct {
 	OnSuccess     *Node                `json:"onSuccess,omitempty"`
 	OnFailure     *Node                `json:"onFailure,omitempty"`
 	OnCancel      *Node                `json:"onCancel,omitempty"`
+	QueuedAt      string               `json:"queuedAt,omitempty"`
 	StartedAt     string               `json:"startedAt,omitempty"`
 	FinishedAt    string               `json:"finishedAt,omitempty"`
 	Log           string               `json:"log,omitempty"`

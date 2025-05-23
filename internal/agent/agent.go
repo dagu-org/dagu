@@ -347,6 +347,13 @@ func (a *Agent) Status() models.Status {
 		models.WithPreconditions(a.dag.Preconditions),
 	}
 
+	// If the current execution is a retry execution, we need to copy some data
+	// from the retry target to the current status.
+	if a.retryTarget != nil {
+		// QueuedAt is the time when the workflow was queued.
+		opts = append(opts, models.WithQueuedAt(a.retryTarget.QueuedAt))
+	}
+
 	// Create the status object to record the current status.
 	return models.NewStatusBuilder(a.dag).
 		Create(

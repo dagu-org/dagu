@@ -8,6 +8,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/spf13/cobra"
 )
 
@@ -69,11 +70,12 @@ func enqueueWorkflow(ctx *Context, dag *digraph.DAG, workflowID string) error {
 		models.WithLogFilePath(logFile),
 		models.WithRunID(run.ID()),
 		models.WithPreconditions(dag.Preconditions),
+		models.WithQueuedAt(stringutil.FormatTime(time.Now())),
 	}
 
 	// As a prototype, we save the status to the database to enqueue the workflow
 	// This could be changed to save to a queue file in the future
-	status := models.NewStatusBuilder(dag).Create(workflowID, scheduler.StatusQueued, 0, time.Now(), opts...)
+	status := models.NewStatusBuilder(dag).Create(workflowID, scheduler.StatusQueued, 0, time.Time{}, opts...)
 
 	if err := run.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open run: %w", err)
