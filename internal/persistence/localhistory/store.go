@@ -234,24 +234,6 @@ func (store *Store) collectStatusesFromRoots(
 	return results, nil
 }
 
-// getWorkflowStatus retrieves the status for a single workflow.
-func (store *Store) getWorkflowStatus(
-	ctx context.Context,
-	workflow *Workflow,
-) (*models.Status, error) {
-	run, err := workflow.LatestRun(ctx, store.cache)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get latest run: %w", err)
-	}
-
-	status, err := run.ReadStatus(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read status: %w", err)
-	}
-
-	return status, nil
-}
-
 // CreateRun creates a new history record for the specified workflow ID.
 // If opts.Root is not nil, it creates a new history record for a child workflow.
 // If opts.Retry is true, it creates a retry record for the specified workflow ID.
