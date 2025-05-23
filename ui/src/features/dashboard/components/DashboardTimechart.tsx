@@ -116,6 +116,7 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
         showTooltips: true,
         zoomable: true,
         verticalScroll: true,
+        zoomKey: 'ctrlKey',
         timeAxis: { scale: 'hour', step: 1 },
         format: {
           minorLabels: {
