@@ -227,6 +227,9 @@ func (store *Store) collectStatusesFromRoots(
 
 	sort.Slice(results, func(i, j int) bool {
 		if results[i].StartedAt == "" && results[j].StartedAt == "" {
+			if results[i].QueuedAt == results[j].QueuedAt {
+				return results[i].WorkflowID < results[j].WorkflowID
+			}
 			return results[i].QueuedAt > results[j].QueuedAt
 		}
 		if results[i].StartedAt == "" {

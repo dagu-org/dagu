@@ -11,11 +11,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/scheduler/filenotify"
+	"github.com/fsnotify/fsnotify"
 )
 
 var _ models.QueueReader = (*queueReaderImpl)(nil)
@@ -45,9 +45,10 @@ const (
 const (
 	// Longer intervals since we use file events as primary notification
 	reloadInterval    = 30 * time.Second // Backup polling interval
-	processingDelay   = 500 * time.Millisecond
+	processingDelay   = 1 * time.Second
 	shutdownTimeout   = 5 * time.Second
 	pollingInterval   = 2 * time.Second // For filenotify poller fallback
+	processingTimeout = 8 * time.Second
 )
 
 func newQueueReader(s *Store) *queueReaderImpl {
@@ -114,7 +115,7 @@ func (q *queueReaderImpl) startWatch(ctx context.Context, ch chan<- models.Queue
 	// Get watcher channels safely
 	var eventsCh <-chan fsnotify.Event
 	var errorsCh <-chan error
-	
+
 	q.mu.RLock()
 	if q.watcher != nil {
 		eventsCh = q.watcher.Events()
@@ -246,9 +247,8 @@ func (q *queueReaderImpl) processItems(ctx context.Context, ch chan<- models.Que
 			continue
 		}
 
-		if q.tryProcessItem(ctx, ch, item, data, processed) {
-			processed[data.Name] = true
-		}
+		q.tryProcessItem(ctx, ch, item, data, processed)
+		processed[data.Name] = true
 
 		// Check for updates after each item
 		if q.updated.Load() {
@@ -259,7 +259,7 @@ func (q *queueReaderImpl) processItems(ctx context.Context, ch chan<- models.Que
 	return items
 }
 
-func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.QueuedItem, item *queuedItem, data digraph.WorkflowRef, _ map[string]bool) bool {
+func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.QueuedItem, item *queuedItem, data digraph.WorkflowRef, _ map[string]bool) {
 	item.status = statusProcessing
 
 	select {
@@ -270,19 +270,23 @@ func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.Q
 				logger.Info(ctx, "Item processed successfully", "name", data.Name, "workflowID", data.WorkflowID)
 				item.status = statusDone
 				q.removeProcessedItem(ctx, data)
-				return true
+				return
 			}
-			logger.Warn(ctx, "Item processing failed", "name", data.Name, "workflowID", data.WorkflowID)
+			// Item was not processed successfully
 			item.status = statusNone
-			return false
+
+		case <-time.After(processingTimeout):
+			// Timeout waiting for result
+			logger.Warn(ctx, "Timeout waiting for item processing result", "name", data.Name, "workflowID", data.WorkflowID)
+			item.status = statusNone
+
 		case <-ctx.Done():
 			item.status = statusNone
-			return false
 		}
 	default:
 		// Channel is full, reset status and try later
 		item.status = statusNone
-		return false
+		return
 	}
 }
 
@@ -383,7 +387,7 @@ func (q *queueReaderImpl) handleFileEvent(ctx context.Context, event fsnotify.Ev
 				q.mu.RLock()
 				watcher := q.watcher
 				q.mu.RUnlock()
-				
+
 				if watcher != nil {
 					if err := watcher.Add(event.Name); err != nil {
 						logger.Warn(ctx, "Failed to watch new workflow directory", "dir", event.Name, "err", err)

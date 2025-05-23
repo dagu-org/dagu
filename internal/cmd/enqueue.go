@@ -50,6 +50,7 @@ func runEnqueue(ctx *Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	dag.Location = "" // Queued workflows must not have a location
 
 	return enqueueWorkflow(ctx, dag, workflowID)
 }

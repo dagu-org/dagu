@@ -42,6 +42,11 @@ type Scheduler struct {
 	procStore    models.ProcStore
 	cancel       context.CancelFunc
 	lock         sync.Mutex
+	queueConfigs sync.Map
+}
+
+type queueConfig struct {
+	MaxConcurrency int
 }
 
 func New(
@@ -91,7 +96,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 	go func() {
 		defer wg.Done()
-		s.handleQueue(ctx, queueCh, done)
+		go s.handleQueue(ctx, queueCh, done)
 	}()
 
 	qr := s.queueStore.Reader(ctx)
@@ -147,11 +152,12 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			data := item.Data()
 			logger.Info(ctx, "Received item from queue", "data", data)
 			var (
-				dag     *digraph.DAG
-				history models.Run
-				status  *models.Status
-				err     error
-				done    bool
+				dag       *digraph.DAG
+				history   models.Run
+				status    *models.Status
+				err       error
+				done      bool
+				startedAt time.Time
 			)
 
 			alive, err := s.procStore.CountAlive(ctx, data.Name)
@@ -160,9 +166,8 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				goto SEND_RESULT
 			}
 
-			if alive > 0 {
+			if alive >= s.getQueueConfig(data.Name).MaxConcurrency {
 				// If there are alive processes, skip this item
-				// TODO: Fix this to check the last processed setting
 				goto SEND_RESULT
 			}
 
@@ -192,6 +197,12 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				goto SEND_RESULT
 			}
 
+			// Update the queue configuration with the latest execution
+			s.queueConfigs.Store(data.Name, queueConfig{
+				MaxConcurrency: max(dag.MaxActiveWorkflows, 1),
+			})
+
+			startedAt = time.Now()
 			if err := s.hm.RetryDAG(ctx, dag, data.WorkflowID); err != nil {
 				logger.Error(ctx, "Failed to retry dag", "err", err, "data", data)
 				goto SEND_RESULT
@@ -200,25 +211,23 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			// For now we need to wait for the DAG started
 		WAIT_FOR_RUN:
 			for {
-				select {
-				case <-time.After(5 * time.Second):
+				// Check if the dag is running
+				history, err = s.historyStore.FindRun(ctx, data)
+				if err != nil {
+					logger.Error(ctx, "Failed to find run", "err", err, "data", data)
+				}
+				status, err := history.ReadStatus(ctx)
+				if err != nil {
+					logger.Error(ctx, "Failed to read status", "err", err, "data", data)
+					goto SEND_RESULT
+				}
+				if status.Status != scheduler.StatusQueued {
+					done = true
 					break WAIT_FOR_RUN
-
-				default:
-					// Check if the dag is running
-					history, err = s.historyStore.FindRun(ctx, data)
-					if err != nil {
-						logger.Error(ctx, "Failed to find run", "err", err, "data", data)
-					}
-					status, err := history.ReadStatus(ctx)
-					if err != nil {
-						logger.Error(ctx, "Failed to read status", "err", err, "data", data)
-						goto SEND_RESULT
-					}
-					if status.Status != scheduler.StatusQueued {
-						done = true
-						break WAIT_FOR_RUN
-					}
+				}
+				if time.Since(startedAt) > 5*time.Second {
+					logger.Error(ctx, "Timeout waiting for run to start", "data", data)
+					break WAIT_FOR_RUN
 				}
 			}
 
@@ -230,6 +239,21 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			item.Result <- done
 		}
 	}
+}
+
+// SetQueueConfig sets the queue configuration for a specific queue.
+func (s *Scheduler) getQueueConfig(name string) queueConfig {
+	cfg, ok := s.queueConfigs.Load(name)
+	if !ok {
+		return queueConfig{MaxConcurrency: 1}
+	}
+
+	queueCfg, ok := cfg.(queueConfig)
+	if !ok {
+		return queueConfig{MaxConcurrency: 1}
+	}
+
+	return queueCfg
 }
 
 // start starts the scheduler.
