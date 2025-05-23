@@ -170,6 +170,11 @@ func (s *Store) createDualQueue(name string) *DualQueue {
 	return NewDualQueue(queueBaseDir, name)
 }
 
+// BaseDir returns the base directory of the queue store
+func (s *Store) BaseDir() string {
+	return s.baseDir
+}
+
 func New(baseDir string) models.QueueStore {
 	return &Store{
 		baseDir: baseDir,

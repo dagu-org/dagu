@@ -4,13 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/scheduler/filenotify"
 )
 
 var _ models.QueueReader = (*queueReaderImpl)(nil)
@@ -23,6 +28,7 @@ type queueReaderImpl struct {
 	items   []queuedItem
 	updated atomic.Bool
 	done    chan struct{}
+	watcher filenotify.FileWatcher
 }
 
 type queuedItem struct {
@@ -37,9 +43,11 @@ const (
 )
 
 const (
-	reloadInterval   = 2 * time.Second
-	processingDelay  = 500 * time.Millisecond
-	shutdownTimeout  = 5 * time.Second
+	// Longer intervals since we use file events as primary notification
+	reloadInterval    = 30 * time.Second // Backup polling interval
+	processingDelay   = 500 * time.Millisecond
+	shutdownTimeout   = 5 * time.Second
+	pollingInterval   = 2 * time.Second // For filenotify poller fallback
 )
 
 func newQueueReader(s *Store) *queueReaderImpl {
@@ -57,13 +65,31 @@ func (q *queueReaderImpl) Start(ctx context.Context, ch chan<- models.QueuedItem
 
 	ctx, cancel := context.WithCancel(ctx)
 
+	// Initialize file watcher (optional - fallback to polling if it fails)
+	watcher, err := filenotify.New(pollingInterval)
+	if err != nil {
+		logger.Warn(ctx, "Failed to create file watcher, falling back to polling only", "err", err)
+	} else {
+		// Add the base directory and existing subdirectories to watch
+		baseDir := q.store.BaseDir()
+		if err := q.setupWatcher(ctx, watcher, baseDir); err != nil {
+			logger.Warn(ctx, "Failed to setup file watcher, falling back to polling only", "err", err)
+			watcher.Close()
+			watcher = nil
+		}
+	}
+
 	q.mu.Lock()
 	q.cancel = cancel
+	q.watcher = watcher
 	q.mu.Unlock()
 
 	allItems, err := q.store.All(ctx)
 	if err != nil {
 		q.running.Store(false)
+		if watcher != nil {
+			watcher.Close()
+		}
 		return fmt.Errorf("failed to read initial items: %w", err)
 	}
 
@@ -85,22 +111,72 @@ func (q *queueReaderImpl) startWatch(ctx context.Context, ch chan<- models.Queue
 
 	items := q.getItems()
 
+	// Get watcher channels safely
+	var eventsCh <-chan fsnotify.Event
+	var errorsCh <-chan error
+	
+	q.mu.RLock()
+	if q.watcher != nil {
+		eventsCh = q.watcher.Events()
+		errorsCh = q.watcher.Errors()
+	}
+	q.mu.RUnlock()
+
 	for {
-		select {
-		case <-ctx.Done():
-			logger.Info(ctx, "Stopping queue reader due to context cancellation")
-			return
+		if eventsCh != nil && errorsCh != nil {
+			// Use file system events when watcher is available
+			select {
+			case <-ctx.Done():
+				logger.Info(ctx, "Stopping queue reader due to context cancellation")
+				return
 
-		case <-reloadTicker.C:
-			if err := q.reloadItems(ctx); err != nil {
-				logger.Error(ctx, "Failed to reload queue items", "err", err)
-				continue
+			case event := <-eventsCh:
+				// File system event occurred - handle it
+				logger.Debug(ctx, "File system event detected", "event", event.String())
+				if q.handleFileEvent(ctx, event) {
+					if err := q.reloadItems(ctx); err != nil {
+						logger.Error(ctx, "Failed to reload queue items after file event", "err", err)
+						continue
+					}
+					items = q.getItems()
+				}
+
+			case err := <-errorsCh:
+				// File watcher error
+				logger.Error(ctx, "File watcher error", "err", err)
+
+			case <-reloadTicker.C:
+				// Backup polling mechanism
+				logger.Debug(ctx, "Backup polling reload")
+				if err := q.reloadItems(ctx); err != nil {
+					logger.Error(ctx, "Failed to reload queue items", "err", err)
+					continue
+				}
+				items = q.getItems()
+
+			default:
+				items = q.processItems(ctx, ch, items)
+				time.Sleep(processingDelay)
 			}
-			items = q.getItems()
+		} else {
+			// Fallback to polling only when no watcher is available
+			select {
+			case <-ctx.Done():
+				logger.Info(ctx, "Stopping queue reader due to context cancellation")
+				return
 
-		default:
-			items = q.processItems(ctx, ch, items)
-			time.Sleep(processingDelay)
+			case <-reloadTicker.C:
+				// Polling mechanism
+				if err := q.reloadItems(ctx); err != nil {
+					logger.Error(ctx, "Failed to reload queue items", "err", err)
+					continue
+				}
+				items = q.getItems()
+
+			default:
+				items = q.processItems(ctx, ch, items)
+				time.Sleep(processingDelay)
+			}
 		}
 	}
 }
@@ -183,7 +259,7 @@ func (q *queueReaderImpl) processItems(ctx context.Context, ch chan<- models.Que
 	return items
 }
 
-func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.QueuedItem, item *queuedItem, data digraph.WorkflowRef, processed map[string]bool) bool {
+func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.QueuedItem, item *queuedItem, data digraph.WorkflowRef, _ map[string]bool) bool {
 	item.status = statusProcessing
 
 	select {
@@ -222,8 +298,12 @@ func (q *queueReaderImpl) removeProcessedItem(ctx context.Context, data digraph.
 func (q *queueReaderImpl) Stop(ctx context.Context) {
 	q.mu.Lock()
 	cancel := q.cancel
+	watcher := q.watcher
 	if cancel != nil {
 		q.cancel = nil
+	}
+	if watcher != nil {
+		q.watcher = nil
 	}
 	q.mu.Unlock()
 
@@ -236,9 +316,92 @@ func (q *queueReaderImpl) Stop(ctx context.Context) {
 			logger.Warn(ctx, "Queue reader did not stop gracefully within timeout")
 		}
 	}
+
+	// Close the file watcher
+	if watcher != nil {
+		if err := watcher.Close(); err != nil {
+			logger.Error(ctx, "Failed to close file watcher", "err", err)
+		}
+	}
 }
 
 // IsRunning checks if the queue reader is running.
 func (q *queueReaderImpl) IsRunning() bool {
 	return q.running.Load()
+}
+
+// setupWatcher sets up the file watcher for the base directory and existing subdirectories
+func (q *queueReaderImpl) setupWatcher(ctx context.Context, watcher filenotify.FileWatcher, baseDir string) error {
+	// Watch the base directory for new workflow directories
+	if err := watcher.Add(baseDir); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to watch base directory %s: %w", baseDir, err)
+	}
+
+	// Create base directory if it doesn't exist
+	if err := os.MkdirAll(baseDir, 0755); err != nil {
+		return fmt.Errorf("failed to create base directory %s: %w", baseDir, err)
+	}
+
+	// Watch existing workflow subdirectories
+	entries, err := os.ReadDir(baseDir)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read base directory %s: %w", baseDir, err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			subDir := filepath.Join(baseDir, entry.Name())
+			if err := watcher.Add(subDir); err != nil {
+				logger.Warn(ctx, "Failed to watch workflow directory", "dir", subDir, "err", err)
+			} else {
+				logger.Debug(ctx, "Watching workflow directory", "dir", subDir)
+			}
+		}
+	}
+
+	return nil
+}
+
+// handleFileEvent processes a file system event and returns true if items should be reloaded
+func (q *queueReaderImpl) handleFileEvent(ctx context.Context, event fsnotify.Event) bool {
+	// Only care about Create, Write, and Remove events
+	if event.Op&(fsnotify.Create|fsnotify.Write|fsnotify.Remove) == 0 {
+		return false
+	}
+
+	baseDir := q.store.BaseDir()
+	relPath, err := filepath.Rel(baseDir, event.Name)
+	if err != nil {
+		return false
+	}
+
+	// If it's a directory creation in the base directory, add it to the watcher
+	if event.Op&fsnotify.Create != 0 {
+		if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
+			// Check if it's a direct subdirectory of baseDir
+			if strings.Count(relPath, string(filepath.Separator)) == 0 {
+				q.mu.RLock()
+				watcher := q.watcher
+				q.mu.RUnlock()
+				
+				if watcher != nil {
+					if err := watcher.Add(event.Name); err != nil {
+						logger.Warn(ctx, "Failed to watch new workflow directory", "dir", event.Name, "err", err)
+					} else {
+						logger.Debug(ctx, "Started watching new workflow directory", "dir", event.Name)
+					}
+				}
+				return true
+			}
+		}
+	}
+
+	// Check if it's a queue file (item_*.json)
+	filename := filepath.Base(event.Name)
+	if strings.HasPrefix(filename, "item_") && strings.HasSuffix(filename, ".json") {
+		logger.Debug(ctx, "Queue file event", "file", event.Name, "op", event.Op.String())
+		return true
+	}
+
+	return false
 }
