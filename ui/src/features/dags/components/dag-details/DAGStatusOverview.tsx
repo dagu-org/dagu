@@ -191,6 +191,17 @@ function DAGStatusOverview({
       {/* Timing Information */}
       <div className="border-b border-slate-200 dark:border-slate-700 pb-2">
         <div className="flex flex-col md:flex-row flex-wrap items-start gap-1">
+          {status.queuedAt && (
+            <div className="flex items-center">
+              <Clock className="w-3.5 mr-1 text-slate-500 dark:text-slate-400" />
+              <LabeledItem label="Queued">
+                <span className="font-medium text-slate-700 dark:text-slate-300 text-xs">
+                  {formatTimestamp(status.queuedAt)}
+                </span>
+              </LabeledItem>
+            </div>
+          )}
+
           <div className="flex items-center">
             <Calendar className="w-3.5 mr-1 text-slate-500 dark:text-slate-400" />
             <LabeledItem label="Started">
@@ -264,6 +275,15 @@ function DAGStatusOverview({
             </div>
           )}
 
+          {nodeStatus.queued && (
+            <div className="flex items-center">
+              <div className="h-2 w-2 mr-1 rounded-full bg-purple-500"></div>
+              <span className="text-xs text-slate-600 dark:text-slate-400">
+                Queued: {nodeStatus.queued}
+              </span>
+            </div>
+          )}
+
           {nodeStatus.not_started && (
             <div className="flex items-center">
               <div className="h-2 w-2 mr-1 rounded-full bg-slate-300 dark:bg-slate-600"></div>
@@ -309,6 +329,12 @@ function DAGStatusOverview({
                 style={{ width: `${(nodeStatus.running / totalNodes) * 100}%` }}
               ></div>
             )}
+            {nodeStatus.queued && (
+              <div
+                className="h-full bg-purple-500 float-left"
+                style={{ width: `${(nodeStatus.queued / totalNodes) * 100}%` }}
+              ></div>
+            )}
             {nodeStatus.failed && (
               <div
                 className="h-full bg-red-500 float-left"
@@ -337,6 +363,12 @@ function DAGStatusOverview({
           <div className="mt-1.5 flex items-center text-xs text-slate-600 dark:text-slate-400">
             <PlayCircle className="h-3 w-3 mr-1 text-lime-500" />
             <span>Execution in progress</span>
+          </div>
+        )}
+        {status.status === Status.Queued && (
+          <div className="mt-1.5 flex items-center text-xs text-slate-600 dark:text-slate-400">
+            <Clock className="h-3 w-3 mr-1 text-purple-500" />
+            <span>Workflow is queued for execution</span>
           </div>
         )}
         {status.status === Status.Cancelled && (
