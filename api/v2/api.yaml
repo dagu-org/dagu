@@ -227,6 +227,9 @@ paths:
                 params:
                   type: string
                   description: "Parameters to pass to the workflow in JSON format"
+                workflowId:
+                  type: string
+                  description: "Optional ID for the workflow, if not provided a new one will be generated"
       responses:
         "200":
           description: "A successful response"
@@ -267,6 +270,9 @@ paths:
                 params:
                   type: string
                   description: "Parameters to pass to the workflow in JSON format"
+                workflowId:
+                  type: string
+                  description: "Optional ID for the workflow, if not provided a new one will be generated"
       responses:
         "200":
           description: "A successful response"

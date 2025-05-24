@@ -32,7 +32,7 @@ type Props = {
   /** Function to close the modal */
   dismissModal: () => void;
   /** Function called when the user submits the form */
-  onSubmit: (params: string) => void;
+  onSubmit: (params: string, workflowId?: string) => void;
   /** Action type: 'start' or 'enqueue' */
   action?: 'start' | 'enqueue';
 };
@@ -58,6 +58,7 @@ function StartDAGModal({
   }, [dag.defaultParams]);
 
   const [params, setParams] = React.useState<Parameter[]>([]);
+  const [workflowId, setWorkflowId] = React.useState<string>('');
 
   // Update params when default params change
   React.useEffect(() => {
@@ -103,7 +104,7 @@ function StartDAGModal({
 
         // If no specific element is focused, trigger the primary action
         e.preventDefault();
-        onSubmit(stringifyParams(params));
+        onSubmit(stringifyParams(params), workflowId || undefined);
       }
     };
 
@@ -111,7 +112,7 @@ function StartDAGModal({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [visible, params, onSubmit, dismissModal]);
+  }, [visible, params, workflowId, onSubmit, dismissModal]);
 
   return (
     <Dialog open={visible} onOpenChange={(open) => !open && dismissModal()}>
@@ -123,6 +124,16 @@ function StartDAGModal({
         </DialogHeader>
 
         <div className="py-4 space-y-4">
+          {/* Optional Workflow ID field */}
+          <div className="space-y-2">
+            <Label htmlFor="workflow-id">Workflow ID (optional)</Label>
+            <Input
+              id="workflow-id"
+              placeholder="Enter custom workflow ID"
+              value={workflowId}
+              onChange={(e) => setWorkflowId(e.target.value)}
+            />
+          </div>
           {parsedParams.map((p, i) => {
             if (p.Name != undefined) {
               return (
@@ -193,7 +204,7 @@ function StartDAGModal({
           <Button
             ref={submitButtonRef}
             onClick={() => {
-              onSubmit(stringifyParams(params));
+              onSubmit(stringifyParams(params), workflowId || undefined);
             }}
           >
             {action === 'enqueue' ? 'Enqueue' : 'Start'}

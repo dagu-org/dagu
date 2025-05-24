@@ -424,8 +424,12 @@ function DAGActions({
           dag={dag}
           visible={isStartModal}
           action="start"
-          onSubmit={async (params) => {
+          onSubmit={async (params, workflowId) => {
             setIsStartModal(false);
+            const body: { params: string; workflowId?: string } = { params };
+            if (workflowId) {
+              body.workflowId = workflowId;
+            }
             const { error } = await client.POST('/dags/{fileName}/start', {
               params: {
                 path: {
@@ -435,9 +439,7 @@ function DAGActions({
                   remoteNode: appBarContext.selectedRemoteNode || 'local',
                 },
               },
-              body: {
-                params: params,
-              },
+              body,
             });
             if (error) {
               alert(error.message || 'An error occurred');
@@ -457,8 +459,12 @@ function DAGActions({
           dag={dag}
           visible={isEnqueueModal}
           action="enqueue"
-          onSubmit={async (params) => {
+          onSubmit={async (params, workflowId) => {
             setIsEnqueueModal(false);
+            const body: { params: string; workflowId?: string } = { params };
+            if (workflowId) {
+              body.workflowId = workflowId;
+            }
             const { error } = await client.POST('/dags/{fileName}/enqueue', {
               params: {
                 path: {
@@ -468,9 +474,7 @@ function DAGActions({
                   remoteNode: appBarContext.selectedRemoteNode || 'local',
                 },
               },
-              body: {
-                params: params,
-              },
+              body,
             });
             if (error) {
               alert(error.message || 'An error occurred');
