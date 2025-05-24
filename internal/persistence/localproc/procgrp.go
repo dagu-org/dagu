@@ -104,7 +104,14 @@ func (pg *ProcGroup) isStale(ctx context.Context, file string) bool {
 
 	// Parse the timestamp from the file
 	unixTime = int64(binary.BigEndian.Uint64(data[:8]))
-	return time.Since(time.Unix(0, unixTime)) >= pg.staleTime
+	parsedTime := time.Unix
+	duration := time.Since(time.Unix(unixTime, 0))
+	if duration < pg.staleTime {
+		logger.Debug(ctx, "proc file %s is not stale, last modified at %s", file, parsedTime)
+		return false
+	}
+	logger.Debug(ctx, "proc file %s is stale, last modified at %s", file, parsedTime)
+	return true
 }
 
 // GetProc retrieves a proc file for the specified workflow reference.
