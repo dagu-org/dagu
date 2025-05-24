@@ -1,7 +1,7 @@
 import { Calendar, Timer } from 'lucide-react';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { components, Status } from '../../../../api/v2/schema';
+import { components } from '../../../../api/v2/schema';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
 import { RootWorkflowContext } from '../../contexts/RootWorkflowContext';
@@ -102,7 +102,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
       </div>
 
       {/* Status and metadata row */}
-      {workflowToDisplay.status != Status.NotStarted && (
+      {(workflowToDisplay.status !== undefined && workflowToDisplay.status !== null) && (
         <div className="flex flex-wrap items-center gap-4 text-sm">
           {/* Status */}
           {workflowToDisplay.status && (

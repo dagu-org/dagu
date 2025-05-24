@@ -74,10 +74,10 @@ function DAGActions({
 
   // Determine which buttons should be enabled based on current status
   const buttonState = {
-    start: status?.status != 1,
-    enqueue: status?.status != 1,
+    start: status?.status != 1, // Disable only when running (1)
+    enqueue: true, // Always allow enqueuing
     stop: status?.status == 1,
-    retry: status?.status != 1 && status?.workflowId != '',
+    retry: status?.status != 1 && status?.status != 5 && status?.workflowId != '', // Disable when running (1) or queued (5)
   };
 
   if (!dag) {

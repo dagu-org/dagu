@@ -72,6 +72,10 @@ func enqueueWorkflow(ctx *Context, dag *digraph.DAG, workflowID string) error {
 		models.WithRunID(run.ID()),
 		models.WithPreconditions(dag.Preconditions),
 		models.WithQueuedAt(stringutil.FormatTime(time.Now())),
+		models.WithHierarchyRefs(
+			digraph.NewWorkflowRef(dag.Name, workflowID),
+			digraph.WorkflowRef{},
+		),
 	}
 
 	// As a prototype, we save the status to the database to enqueue the workflow
