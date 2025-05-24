@@ -1,0 +1,6 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = true
+[uploadpack]
+	allowReachableSHA1InWant = true
