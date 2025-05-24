@@ -154,8 +154,13 @@ func (a *API) GetWorkflowStepLog(ctx context.Context, request api.GetWorkflowSte
 		Limit:  valueOf(request.Params.Limit),
 	}
 
+	var logFile = node.Stdout
+	if *request.Params.StdoutOrStderr == api.StdoutOrStderrStderr {
+		logFile = node.Stderr
+	}
+
 	// Use the new log utility function
-	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(node.Stdout, options)
+	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(logFile, options)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %w", node.Stdout, err)
 	}
@@ -300,8 +305,13 @@ func (a *API) GetChildWorkflowStepLog(ctx context.Context, request api.GetChildW
 		Limit:  valueOf(request.Params.Limit),
 	}
 
+	var logFile = node.Stdout
+	if *request.Params.StdoutOrStderr == api.StdoutOrStderrStderr {
+		logFile = node.Stderr
+	}
+
 	// Use the new log utility function
-	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(node.Stdout, options)
+	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(logFile, options)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %w", node.Stdout, err)
 	}

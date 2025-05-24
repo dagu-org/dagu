@@ -815,6 +815,7 @@ paths:
         - $ref: "#/components/parameters/Head"
         - $ref: "#/components/parameters/Offset"
         - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/StdoutOrStderr"
       responses:
         "200":
           description: "A successful response"
@@ -978,6 +979,7 @@ paths:
         - $ref: "#/components/parameters/Head"
         - $ref: "#/components/parameters/Offset"
         - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/StdoutOrStderr"
         - name: "childWorkflowId"
           in: "path"
           required: true
@@ -1206,6 +1208,14 @@ components:
         minimum: 1
         maximum: 10000
 
+    StdoutOrStderr:
+      name: stdoutOrStderr
+      in: query
+      description: "Whether to return stdout or stderr logs"
+      required: false
+      schema:
+        $ref: "#/components/schemas/StdoutOrStderr"
+
   schemas:
     Error:
       type: object
@@ -1236,6 +1246,13 @@ components:
         - "already_running"
         - "not_running"
         - "already_exists"
+
+    StdoutOrStderr:
+      type: string
+      format: string
+      enum:
+        - stdout
+        - stderr
 
     UnixTimestamp:
       type: integer
