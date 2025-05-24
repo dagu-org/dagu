@@ -387,7 +387,8 @@ func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
 	defer n.mu.RUnlock()
 	env := executor.GetEnv(ctx)
 	env = env.WithEnv(
-		digraph.EnvKeyWorkflowStepLogFile, n.Log(),
+		digraph.EnvKeyWorkflowStepStdoutFile, n.GetStdout(),
+		digraph.EnvKeyWorkflowStepStderrFile, n.GetStderr(),
 	)
 	return executor.WithEnv(ctx, env)
 }
@@ -627,7 +628,10 @@ func (oc *OutputCoordinator) setupExecutorIO(_ context.Context, cmd executor.Exe
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
-	var stdout io.Writer = oc.stdoutWriter
+	var stdout io.Writer = os.Stdout
+	if oc.stdoutWriter != nil {
+		stdout = oc.stdoutWriter
+	}
 
 	// Output to both log and stdout
 	if oc.stdoutRedirectWriter != nil {
@@ -646,7 +650,10 @@ func (oc *OutputCoordinator) setupExecutorIO(_ context.Context, cmd executor.Exe
 	cmd.SetStdout(stdout)
 
 	// If stdoutRedirectWriter is set, we write to it as well
-	var stderr io.Writer = oc.stderrWriter
+	var stderr io.Writer = os.Stderr
+	if oc.stderrWriter != nil {
+		stderr = oc.stderrWriter
+	}
 	if oc.stderrRedirectWriter != nil {
 		stderr = io.MultiWriter(oc.stderrWriter, oc.stderrRedirectWriter)
 	}

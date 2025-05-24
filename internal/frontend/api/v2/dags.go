@@ -169,7 +169,7 @@ func (a *API) GetDAGWorkflowHistory(ctx context.Context, request api.GetDAGWorkf
 
 func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsRequestObject) (api.GetDAGDetailsResponseObject, error) {
 	fileName := request.FileName
-	dag, err := a.dagStore.GetDetails(ctx, fileName)
+	dag, err := a.dagStore.GetDetails(ctx, fileName, digraph.WithAllowBuildErrors())
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,

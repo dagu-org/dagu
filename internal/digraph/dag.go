@@ -76,6 +76,8 @@ type DAG struct {
 	MaxCleanUpTime time.Duration `json:"maxCleanUpTime,omitempty"`
 	// HistRetentionDays is the number of days to keep the history.
 	HistRetentionDays int `json:"histRetentionDays,omitempty"`
+	// BuildErrors contains any errors encountered while building the DAG.
+	BuildErrors []error
 }
 
 // FileName returns the filename of the DAG without the extension.

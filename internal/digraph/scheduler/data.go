@@ -246,11 +246,18 @@ func (s *Data) ContinueOn() digraph.ContinueOn {
 	return s.inner.Step.ContinueOn
 }
 
-func (s *Data) Log() string {
+func (s *Data) GetStdout() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.inner.State.Stdout
+}
+
+func (s *Data) GetStderr() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.inner.State.Stderr
 }
 
 func (s *Data) SignalOnStop() string {

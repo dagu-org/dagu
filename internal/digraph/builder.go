@@ -54,6 +54,8 @@ type BuildOpts struct {
 	Name string
 	// DAGsDir is the directory containing the DAG files.
 	DAGsDir string
+	// AllowBuildErrors specifies whether to allow build errors.
+	AllowBuildErrors bool
 }
 
 var builderRegistry = []builderEntry{
@@ -65,6 +67,7 @@ var builderRegistry = []builderEntry{
 	{name: "dotenv", fn: buildDotenv},
 	{name: "mailOn", fn: buildMailOn},
 	{name: "steps", fn: buildSteps},
+	{name: "validateSteps", fn: validateSteps},
 	{name: "logDir", fn: buildLogDir},
 	{name: "handlers", fn: buildHandlers},
 	{name: "smtpConfig", fn: buildSMTPConfig},
@@ -134,7 +137,14 @@ func build(ctx BuildContext, spec *definition) (*DAG, error) {
 	}
 
 	if len(errs) > 0 {
-		return nil, errs
+		if ctx.opts.AllowBuildErrors {
+			// If we are allowing build errors, return the DAG with the errors.
+			dag.BuildErrors = errs
+			dag.Steps = nil // Clear steps if there are build errors
+		} else {
+			// If we are not allowing build errors, return an error.
+			return nil, fmt.Errorf("failed to build DAG: %w", errs)
+		}
 	}
 
 	return dag, nil
@@ -535,6 +545,24 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 		return wrapError("steps", v, ErrStepsMustBeArrayOrMap)
 
 	}
+}
+
+// validateSteps validates the steps in the DAG.
+func validateSteps(ctx BuildContext, spec *definition, dag *DAG) error {
+	// No duplicate step names are allowed.
+	stepNames := make(map[string]struct{})
+	for _, step := range dag.Steps {
+		if step.Name == "" {
+			return wrapError("steps", step, ErrStepNameRequired)
+		}
+
+		if _, exists := stepNames[step.Name]; exists {
+			return wrapError("steps", step.Name, ErrStepNameDuplicate)
+		}
+		stepNames[step.Name] = struct{}{}
+	}
+
+	return nil
 }
 
 // buildSMTPConfig builds the SMTP configuration for the DAG.
