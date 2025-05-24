@@ -82,7 +82,7 @@ function DAGAttributes({ dag }: Props) {
         )}
 
         {/* Max Active Runs */}
-        {dag.maxActiveRuns && (
+        {dag.maxActiveSteps && (
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
               <Settings className="h-4 w-4" />
@@ -90,7 +90,7 @@ function DAGAttributes({ dag }: Props) {
             </div>
 
             <div className="font-medium text-slate-800 dark:text-slate-200">
-              {dag.maxActiveRuns}
+              {dag.maxActiveSteps}
             </div>
           </div>
         )}

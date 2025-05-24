@@ -845,12 +845,13 @@ function DAGTable({
 
       {/* Search, Filter and Pagination Controls */}
       <div
-        className={`mb-2 ${isLoading ? 'opacity-70 pointer-events-none' : ''}`}
+        className={`bg-gray-50 rounded-lg p-3 mb-4 space-y-3 ${
+          isLoading ? 'opacity-70 pointer-events-none' : ''
+        }`}
       >
-        {/* Desktop layout */}
-        <div className="hidden md:flex items-center gap-4 mb-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Search input */}
-          <div className="relative w-[300px]">
+          <div className="relative flex-1 min-w-[200px]">
             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
               <Search className="h-4 w-4" />
             </div>
@@ -886,155 +887,33 @@ function DAGTable({
           </div>
 
           {/* Tag filter */}
-          <div className="relative">
-            <Select
-              value={searchTag}
-              onValueChange={(value) =>
-                handleSearchTagChange(value === 'all' ? '' : value)
-              }
-            >
-              <SelectTrigger className="w-[180px] h-9 bg-background border border-input rounded-md">
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
-                  <SelectValue placeholder="Filter by tag" />
-                </div>
-              </SelectTrigger>
-              <SelectContent
-                className="max-h-[280px] overflow-y-auto bg-white border border-gray-300 shadow-lg rounded-md"
-                style={{
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                  borderWidth: '1px',
-                  borderStyle: 'solid',
-                  borderColor: '#d1d5db',
-                }}
-              >
-                <div className="py-1 bg-white rounded-md">
-                  <SelectItem
-                    value="all"
-                    className="flex items-center cursor-pointer hover:bg-gray-100 border-b border-gray-200 py-2 px-3"
-                  >
-                    <span className="font-medium">All Tags</span>
-                  </SelectItem>
-
-                  {uniqueTags?.tags?.map((tag) => (
-                    <SelectItem
-                      key={tag}
-                      value={tag}
-                      className="flex items-center cursor-pointer hover:bg-gray-100 border-b border-gray-200 py-2 px-3"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{tag}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </div>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Spacer */}
-          <div className="flex-1"></div>
+          <Select
+            value={searchTag}
+            onValueChange={(value) =>
+              handleSearchTagChange(value === 'all' ? '' : value)
+            }
+          >
+            <SelectTrigger className="w-auto min-w-[160px] h-9 bg-background border border-input rounded-md">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <SelectValue placeholder="Filter by tag" />
+              </div>
+            </SelectTrigger>
+            <SelectContent className="max-h-[280px] overflow-y-auto">
+              <SelectItem value="all">
+                <span className="font-medium">All Tags</span>
+              </SelectItem>
+              {uniqueTags?.tags?.map((tag) => (
+                <SelectItem key={tag} value={tag}>
+                  {tag}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           {/* Pagination */}
           {pagination && (
-            <DAGPagination
-              totalPages={pagination.totalPages}
-              page={pagination.page}
-              pageChange={pagination.pageChange}
-              onPageLimitChange={pagination.onPageLimitChange}
-              pageLimit={pagination.pageLimit}
-            />
-          )}
-        </div>
-
-        {/* Mobile layout */}
-        <div className="md:hidden space-y-2">
-          {/* Search input */}
-          <div className="relative w-full">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-              <Search className="h-4 w-4" />
-            </div>
-            <Input
-              type="search"
-              placeholder="Search DAGs..."
-              value={searchText}
-              onChange={(e) => handleSearchTextChange(e.target.value)}
-              className="pl-10 h-10 bg-background border border-input rounded-md w-full"
-            />
-            {searchText && (
-              <button
-                onClick={() => handleSearchTextChange('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Clear search"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            )}
-          </div>
-
-          {/* Tag filter */}
-          <div className="relative w-full">
-            <Select
-              value={searchTag}
-              onValueChange={(value) =>
-                handleSearchTagChange(value === 'all' ? '' : value)
-              }
-            >
-              <SelectTrigger className="w-full h-10 bg-background border border-input rounded-md">
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
-                  <SelectValue placeholder="Filter by tag" />
-                </div>
-              </SelectTrigger>
-              <SelectContent
-                className="max-h-[280px] overflow-y-auto bg-white border border-gray-400 shadow-xl rounded-md"
-                style={{
-                  boxShadow: '0 6px 16px rgba(0, 0, 0, 0.25)',
-                  borderWidth: '1px',
-                  borderStyle: 'solid',
-                  borderColor: '#9ca3af',
-                }}
-              >
-                <div className="py-1 bg-white rounded-md">
-                  <SelectItem
-                    value="all"
-                    className="flex items-center cursor-pointer hover:bg-gray-100 border-b border-gray-200 py-2 px-3 last:border-b-0"
-                  >
-                    <span className="font-medium">All Tags</span>
-                  </SelectItem>
-
-                  {uniqueTags?.tags?.map((tag) => (
-                    <SelectItem
-                      key={tag}
-                      value={tag}
-                      className="flex items-center cursor-pointer hover:bg-gray-100 border-b border-gray-200 py-2 px-3 last:border-b-0"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{tag}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </div>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Pagination */}
-          {pagination && (
-            <div className="flex justify-center">
+            <div className="ml-auto">
               <DAGPagination
                 totalPages={pagination.totalPages}
                 page={pagination.page}
@@ -1053,8 +932,6 @@ function DAGTable({
         style={{
           fontFamily:
             'ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"',
-          boxShadow:
-            '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03)',
           background:
             'linear-gradient(to bottom, var(--background) 0%, var(--background) 100%)',
           border: '1px solid var(--border)',
@@ -1222,7 +1099,7 @@ function DAGTable({
                     selectedDAG === fileName
                       ? 'bg-primary/10 border-primary'
                       : 'bg-card border-border'
-                  } cursor-pointer shadow-sm`}
+                  } cursor-pointer`}
                   onClick={(e) => {
                     // If Cmd (Mac) or Ctrl (Windows/Linux) key is pressed, open in new tab
                     if (e.metaKey || e.ctrlKey) {

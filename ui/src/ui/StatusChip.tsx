@@ -13,49 +13,45 @@ function StatusChip({ status, children, size = 'md' }: Props) {
   let bgColorClass = '';
   let textColorClass = '';
   let borderColorClass = '';
-  let pulseAnimation = '';
-  let statusIcon = '';
-
   switch (status) {
     case Status.Success: // done -> green
       bgColorClass = 'bg-[rgba(0,128,0,0.1)] dark:bg-[rgba(0,100,0,0.2)]';
       borderColorClass = 'border-[green] dark:border-[darkgreen]';
       textColorClass = 'text-[green] dark:text-[lightgreen]';
-      statusIcon = '✓'; // Checkmark
       break;
     case Status.Failed: // error -> red
       bgColorClass = 'bg-[rgba(255,0,0,0.1)] dark:bg-[rgba(139,0,0,0.2)]';
       borderColorClass = 'border-[red] dark:border-[darkred]';
       textColorClass = 'text-[red] dark:text-[lightcoral]';
-      statusIcon = '✕'; // X mark
       break;
     case Status.Running: // running -> lime
       bgColorClass = 'bg-[rgba(0,255,0,0.1)] dark:bg-[rgba(50,205,50,0.2)]';
       borderColorClass = 'border-[lime] dark:border-[limegreen]';
       textColorClass = 'text-[limegreen] dark:text-[lime]';
-      pulseAnimation = 'animate-pulse';
-      statusIcon = '●'; // Dot
       break;
     case Status.Cancelled: // cancel -> pink
       bgColorClass =
         'bg-[rgba(255,192,203,0.1)] dark:bg-[rgba(255,20,147,0.2)]';
       borderColorClass = 'border-[pink] dark:border-[deeppink]';
       textColorClass = 'text-[deeppink] dark:text-[pink]';
-      statusIcon = '■'; // Square
       break;
     case Status.NotStarted: // none -> lightblue
       bgColorClass =
         'bg-[rgba(173,216,230,0.1)] dark:bg-[rgba(70,130,180,0.2)]';
       borderColorClass = 'border-[lightblue] dark:border-[steelblue]';
       textColorClass = 'text-[steelblue] dark:text-[lightblue]';
-      statusIcon = '○'; // Circle
+      break;
+    case Status.Queued: // queued -> purple
+      bgColorClass =
+        'bg-[rgba(221,160,221,0.1)] dark:bg-[rgba(147,112,219,0.2)]';
+      borderColorClass = 'border-[plum] dark:border-[mediumpurple]';
+      textColorClass = 'text-[purple] dark:text-[plum]';
       break;
     default: // Fallback to gray for any other status (including undefined)
       bgColorClass =
         'bg-[rgba(128,128,128,0.1)] dark:bg-[rgba(169,169,169,0.2)]';
       borderColorClass = 'border-[gray] dark:border-[darkgray]';
       textColorClass = 'text-[gray] dark:text-[lightgray]';
-      statusIcon = '○'; // Circle
   }
 
   // Size classes
@@ -80,25 +76,12 @@ function StatusChip({ status, children, size = 'md' }: Props) {
         bgColorClass,
         borderColorClass,
         textColorClass,
-        'transition-all duration-200 ease-in-out',
-        'shadow-sm hover:shadow',
         sizeClasses[size]
       )}
     >
       <span
         className={cn(
-          size === 'xs' ? 'mr-1 text-[8px]' : 'mr-1.5',
-          'inline-flex',
-          pulseAnimation,
-          textColorClass
-        )}
-        aria-hidden="true"
-      >
-        {statusIcon}
-      </span>
-      <span
-        className={cn(
-          'font-medium break-keep text-nowrap whitespace-nowrap',
+          'font-normal break-keep text-nowrap whitespace-nowrap',
           textColorClass
         )}
       >

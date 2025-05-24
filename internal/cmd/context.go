@@ -20,6 +20,8 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/localdag"
 	"github.com/dagu-org/dagu/internal/persistence/localhistory"
+	"github.com/dagu-org/dagu/internal/persistence/localproc"
+	"github.com/dagu-org/dagu/internal/persistence/localqueue/prototype"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
@@ -31,12 +33,14 @@ import (
 type Context struct {
 	context.Context
 
-	Command     *cobra.Command
-	Flags       []commandLineFlag
-	Config      *config.Config
-	Quiet       bool
-	HistoryRepo models.HistoryRepository
-	HistoryMgr  history.Manager
+	Command      *cobra.Command
+	Flags        []commandLineFlag
+	Config       *config.Config
+	Quiet        bool
+	HistoryStore models.HistoryStore
+	HistoryMgr   history.Manager
+	ProcStore    models.ProcStore
+	QueueStore   models.QueueStore
 }
 
 // LogToFile creates a new logger context with a file writer.
@@ -100,7 +104,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	}
 
 	// Initialize history repository and history manager
-	hrOpts := []localhistory.HistoryStorageOption{
+	hrOpts := []localhistory.HistoryStoreOption{
 		localhistory.WithLatestStatusToday(cfg.Server.LatestStatusToday),
 	}
 
@@ -112,22 +116,26 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		hrOpts = append(hrOpts, localhistory.WithHistoryFileCache(hc))
 	}
 
-	hr := localhistory.New(cfg.Paths.DataDir, hrOpts...)
-	hm := history.New(hr, cfg.Paths.Executable, cfg.Global.WorkDir)
+	hs := localhistory.New(cfg.Paths.HistoryDir, hrOpts...)
+	hm := history.New(hs, cfg.Paths.Executable, cfg.Global.WorkDir)
+	ps := localproc.New(cfg.Paths.ProcDir)
+	qs := prototype.New(cfg.Paths.QueueDir)
 
 	return &Context{
-		Context:     ctx,
-		Command:     cmd,
-		Config:      cfg,
-		Quiet:       quiet,
-		HistoryRepo: hr,
-		HistoryMgr:  hm,
-		Flags:       flags,
+		Context:      ctx,
+		Command:      cmd,
+		Config:       cfg,
+		Quiet:        quiet,
+		HistoryStore: hs,
+		HistoryMgr:   hm,
+		Flags:        flags,
+		ProcStore:    ps,
+		QueueStore:   qs,
 	}, nil
 }
 
 // HistoryManager initializes a HistoryManager using the provided options. If not supplied,
-func (c *Context) HistoryManager(hr models.HistoryRepository) history.Manager {
+func (c *Context) HistoryManager(hr models.HistoryStore) history.Manager {
 	return history.New(
 		hr,
 		c.Config.Paths.Executable,
@@ -141,12 +149,12 @@ func (c *Context) NewServer() (*frontend.Server, error) {
 	dc := fileutil.NewCache[*digraph.DAG](0, time.Hour*12)
 	dc.StartEviction(c)
 
-	dr, err := c.dagRepo(dc, nil)
+	dr, err := c.dagStore(dc, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return frontend.NewServer(c.Config, dr, c.HistoryRepo, c.HistoryMgr), nil
+	return frontend.NewServer(c.Config, dr, c.HistoryStore, c.HistoryMgr), nil
 }
 
 // NewScheduler creates a new NewScheduler instance using the default client.
@@ -155,18 +163,31 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	cache := fileutil.NewCache[*digraph.DAG](0, time.Hour*12)
 	cache.StartEviction(c)
 
-	dr, err := c.dagRepo(cache, nil)
+	dr, err := c.dagStore(cache, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize DAG client: %w", err)
 	}
 
-	m := scheduler.NewDAGJobManager(c.Config.Paths.DAGsDir, dr, c.HistoryMgr, c.Config.Paths.Executable, c.Config.Global.WorkDir)
-	return scheduler.New(c.Config, m), nil
+	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.HistoryMgr, c.Config.Paths.Executable, c.Config.Global.WorkDir)
+	return scheduler.New(c.Config, m, c.HistoryMgr, c.HistoryStore, c.QueueStore, c.ProcStore), nil
 }
 
-// dagRepo returns a new DAGRepository instance. It ensures that the directory exists
+// StringParam retrieves a string parameter from the command line flags.
+// It checks if the parameter is wrapped in quotes and removes them if necessary.
+func (c *Context) StringParam(name string) (string, error) {
+	val, err := c.Command.Flags().GetString(name)
+	if err != nil {
+		return "", fmt.Errorf("failed to get flag %s: %w", name, err)
+	}
+
+	// If it's wrapped in quotes, remove them
+	val = stringutil.RemoveQuotes(val)
+	return val, nil
+}
+
+// dagStore returns a new DAGRepository instance. It ensures that the directory exists
 // (creating it if necessary) before returning the store.
-func (c *Context) dagRepo(cache *fileutil.Cache[*digraph.DAG], searchPaths []string) (models.DAGRepository, error) {
+func (c *Context) dagStore(cache *fileutil.Cache[*digraph.DAG], searchPaths []string) (models.DAGStore, error) {
 	dir := c.Config.Paths.DAGsDir
 	_, err := os.Stat(dir)
 	if os.IsNotExist(err) {
@@ -191,16 +212,25 @@ func (c *Context) OpenLogFile(
 	dag *digraph.DAG,
 	workflowID string,
 ) (*os.File, error) {
+	logPath, err := c.GenLogFileName(dag, workflowID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate log file name: %w", err)
+	}
+	return fileutil.OpenOrCreateFile(logPath)
+}
+
+// GenLogFileName generates a log file name based on the DAG and workflow ID.
+func (c *Context) GenLogFileName(dag *digraph.DAG, workflowID string) (string, error) {
 	// Read the global configuration for log directory.
 	baseLogDir, err := cmdutil.EvalString(c, c.Config.Paths.LogDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to expand log directory: %w", err)
+		return "", fmt.Errorf("failed to expand log directory: %w", err)
 	}
 
 	// Read the log directory configuration from the DAG.
 	dagLogDir, err := cmdutil.EvalString(c, dag.LogDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to expand DAG log directory: %w", err)
+		return "", fmt.Errorf("failed to expand DAG log directory: %w", err)
 	}
 
 	cfg := LogConfig{
@@ -211,16 +241,15 @@ func (c *Context) OpenLogFile(
 	}
 
 	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid log settings: %w", err)
+		return "", fmt.Errorf("invalid log settings: %w", err)
 	}
 
 	d, err := cfg.LogDir()
 	if err != nil {
-		return nil, fmt.Errorf("failed to setup log directory: %w", err)
+		return "", fmt.Errorf("failed to setup log directory: %w", err)
 	}
 
-	logPath := filepath.Join(d, cfg.LogFile())
-	return fileutil.OpenOrCreateFile(logPath)
+	return filepath.Join(d, cfg.LogFile()), nil
 }
 
 // NewCommand creates a new command instance with the given cobra command and run function.
@@ -243,8 +272,8 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *C
 	return cmd
 }
 
-// getWorkflowID creates a new UUID string to be used as a workflow IDentifier.
-func getWorkflowID() (string, error) {
+// genWorkflowID creates a new UUID string to be used as a workflow IDentifier.
+func genWorkflowID() (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return "", err
@@ -268,7 +297,7 @@ func validateWorkflowID(workflowID string) error {
 
 // regexWorkflowID is a regular expression to validate workflow IDs.
 // It allows alphanumeric characters, hyphens, and underscores.
-var regexWorkflowID = regexp.MustCompile(`^[a-zA-Z0-9-_]+$`)
+var regexWorkflowID = regexp.MustCompile(`^[-a-zA-Z0-9_]+$`)
 
 // maxWorkflowIDLen is the max length of the workflow ID
 const maxWorkflowIDLen = 60

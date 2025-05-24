@@ -19,8 +19,6 @@ import (
 )
 
 func TestScheduler(t *testing.T) {
-	t.Parallel()
-
 	testScript := test.TestdataPath(t, filepath.Join("digraph", "scheduler", "testfile.sh"))
 
 	t.Run("SequentialStepsSuccess", func(t *testing.T) {
@@ -270,7 +268,7 @@ func TestScheduler(t *testing.T) {
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 300) // wait for step 2 to start
+			time.Sleep(time.Millisecond * 500) // wait for step 2 to start
 			graph.Cancel(t)
 		}()
 
@@ -876,7 +874,7 @@ func withTimeout(d time.Duration) schedulerOption {
 
 func withMaxActiveRuns(n int) schedulerOption {
 	return func(cfg *scheduler.Config) {
-		cfg.MaxActiveRuns = n
+		cfg.MaxActiveSteps = n
 	}
 }
 
@@ -973,7 +971,7 @@ func (gh graphHelper) Schedule(t *testing.T, expectedStatus scheduler.Status) sc
 	case scheduler.StatusError:
 		require.Error(t, err)
 
-	case scheduler.StatusRunning, scheduler.StatusNone:
+	case scheduler.StatusRunning, scheduler.StatusNone, scheduler.StatusQueued:
 		t.Errorf("unexpected status %s", expectedStatus)
 
 	}

@@ -41,11 +41,14 @@ type Agent struct {
 	// It is nil if it's not a retry execution.
 	retryTarget *models.Status
 
-	// dagRepo is the database to store the DAG definitions.
-	dagRepo models.DAGRepository
+	// dagStore is the database to store the DAG definitions.
+	dagStore models.DAGStore
 
-	// historyRepo is the database to store the run history.
-	historyRepo models.HistoryRepository
+	// historyStore is the database to store the run history.
+	historyStore models.HistoryStore
+
+	// procStore is the database to store the process information.
+	procStore models.ProcStore
 
 	// client is the runstore client to communicate with the history.
 	client history.Manager
@@ -116,23 +119,25 @@ func New(
 	logDir string,
 	logFile string,
 	cli history.Manager,
-	dagRepo models.DAGRepository,
-	historyRepo models.HistoryRepository,
+	ds models.DAGStore,
+	hs models.HistoryStore,
+	ps models.ProcStore,
 	root digraph.WorkflowRef,
 	opts Options,
 ) *Agent {
 	return &Agent{
-		root:        root,
-		parent:      opts.Parent,
-		workflowID:  workflowID,
-		dag:         dag,
-		dry:         opts.Dry,
-		retryTarget: opts.RetryTarget,
-		logDir:      logDir,
-		logFile:     logFile,
-		client:      cli,
-		dagRepo:     dagRepo,
-		historyRepo: historyRepo,
+		root:         root,
+		parent:       opts.Parent,
+		workflowID:   workflowID,
+		dag:          dag,
+		dry:          opts.Dry,
+		retryTarget:  opts.RetryTarget,
+		logDir:       logDir,
+		logFile:      logFile,
+		client:       cli,
+		dagStore:     ds,
+		historyStore: hs,
+		procStore:    ps,
 	}
 }
 
@@ -175,7 +180,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Create a new environment for the workflow execution.
-	dbClient := newDBClient(a.historyRepo, a.dagRepo)
+	dbClient := newDBClient(a.historyStore, a.dagStore)
 	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.root, a.workflowID, a.logFile, a.dag.Params)
 
 	// Add structured logging context
@@ -196,6 +201,19 @@ func (a *Agent) Run(ctx context.Context) error {
 		return err
 	}
 
+	// Create a process for heartbeat.
+	proc, err := a.procStore.Acquire(ctx, digraph.NewWorkflowRef(a.dag.Name, a.workflowID))
+	if err != nil {
+		return fmt.Errorf("failed to get process: %w", err)
+	}
+	defer func() {
+		// Stop the process and remove it from the store.
+		if err := proc.Stop(ctx); err != nil {
+			logger.Error(ctx, "Failed to close process", "err", err)
+		}
+	}()
+
+	// Open the run file to write the status.
 	if err := run.Open(ctx); err != nil {
 		return fmt.Errorf("failed to open execution history: %w", err)
 	}
@@ -329,6 +347,14 @@ func (a *Agent) Status() models.Status {
 		models.WithPreconditions(a.dag.Preconditions),
 	}
 
+	// If the current execution is a retry execution, we need to copy some data
+	// from the retry target to the current status.
+	if a.retryTarget != nil {
+		// QueuedAt is the time when the workflow was queued.
+		opts = append(opts, models.WithQueuedAt(a.retryTarget.QueuedAt))
+		opts = append(opts, models.WithCreatedAt(a.retryTarget.CreatedAt))
+	}
+
 	// Create the status object to record the current status.
 	return models.NewStatusBuilder(a.dag).
 		Create(
@@ -419,12 +445,12 @@ func (a *Agent) newScheduler() *scheduler.Scheduler {
 	schedulerLogDir := filepath.Join(a.logDir, "run_"+ts+"_"+a.runID)
 
 	cfg := &scheduler.Config{
-		LogDir:        schedulerLogDir,
-		MaxActiveRuns: a.dag.MaxActiveRuns,
-		Timeout:       a.dag.Timeout,
-		Delay:         a.dag.Delay,
-		Dry:           a.dry,
-		WorkflowID:    a.workflowID,
+		LogDir:         schedulerLogDir,
+		MaxActiveSteps: a.dag.MaxActiveSteps,
+		Timeout:        a.dag.Timeout,
+		Delay:          a.dag.Delay,
+		Dry:            a.dry,
+		WorkflowID:     a.workflowID,
 	}
 
 	if a.dag.HandlerOn.Exit != nil {
@@ -463,7 +489,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 		}
 	}()
 
-	db := newDBClient(a.historyRepo, a.dagRepo)
+	db := newDBClient(a.historyStore, a.dagStore)
 	dagCtx := digraph.SetupEnv(ctx, a.dag, db, a.root, a.workflowID, a.logFile, a.dag.Params)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, progressCh)
 	a.lastErr = lastErr
@@ -554,7 +580,7 @@ func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 
 func (a *Agent) setupRun(ctx context.Context) (models.Run, error) {
 	retentionDays := a.dag.HistRetentionDays
-	if err := a.historyRepo.RemoveOldWorkflows(ctx, a.dag.Name, retentionDays); err != nil {
+	if err := a.historyStore.RemoveOldWorkflows(ctx, a.dag.Name, retentionDays); err != nil {
 		logger.Error(ctx, "History data cleanup failed", "err", err)
 	}
 
@@ -563,7 +589,7 @@ func (a *Agent) setupRun(ctx context.Context) (models.Run, error) {
 		opts.Root = &a.root
 	}
 
-	return a.historyRepo.CreateRun(ctx, a.dag, time.Now(), a.workflowID, opts)
+	return a.historyStore.CreateRun(ctx, a.dag, time.Now(), a.workflowID, opts)
 }
 
 // setupSocketServer create socket server instance.
@@ -646,24 +672,24 @@ func encodeError(w http.ResponseWriter, err error) {
 var _ digraph.DB = &dbClient{}
 
 type dbClient struct {
-	dagRepo     models.DAGRepository
-	historyRepo models.HistoryRepository
+	ds models.DAGStore
+	hs models.HistoryStore
 }
 
-func newDBClient(h models.HistoryRepository, d models.DAGRepository) *dbClient {
+func newDBClient(hs models.HistoryStore, ds models.DAGStore) *dbClient {
 	return &dbClient{
-		historyRepo: h,
-		dagRepo:     d,
+		hs: hs,
+		ds: ds,
 	}
 }
 
 // GetDAG implements digraph.DBClient.
 func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error) {
-	return o.dagRepo.GetDetails(ctx, name)
+	return o.ds.GetDetails(ctx, name)
 }
 
 func (o *dbClient) GetChildWorkflowStatus(ctx context.Context, workflowID string, root digraph.WorkflowRef) (*digraph.Status, error) {
-	run, err := o.historyRepo.FindChildWorkflowRun(ctx, root, workflowID)
+	run, err := o.hs.FindChildWorkflowRun(ctx, root, workflowID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find run for workflow ID %s: %w", workflowID, err)
 	}

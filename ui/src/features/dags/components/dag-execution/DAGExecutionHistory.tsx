@@ -340,7 +340,7 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
           {reversedWorkflows && reversedWorkflows[idx] ? (
             <React.Fragment>
               <div className="space-y-6 pt-2">
-                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-4 overflow-hidden">
+                <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 overflow-hidden">
                   <DAGGraph
                     workflow={reversedWorkflows[idx]}
                     onSelectStep={onSelectStepOnGraph}
@@ -349,7 +349,7 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-4 overflow-hidden">
+              <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 overflow-hidden">
                 <SubTitle className="mb-4">Status</SubTitle>
                 <DAGStatusOverview
                   status={reversedWorkflows[idx]}
@@ -366,7 +366,7 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
                 />
               </div>
 
-              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-4 overflow-hidden">
+              <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 overflow-hidden">
                 <SubTitle className="mb-4">Steps</SubTitle>
                 <NodeStatusTable
                   nodes={reversedWorkflows[idx].nodes}
@@ -385,7 +385,7 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
               </div>
 
               {handlers && handlers.length ? (
-                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-4 overflow-hidden">
+                <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 overflow-hidden">
                   <SubTitle className="mb-4">Lifecycle Hooks</SubTitle>
                   <NodeStatusTable
                     nodes={getEventHandlers(reversedWorkflows[idx])}

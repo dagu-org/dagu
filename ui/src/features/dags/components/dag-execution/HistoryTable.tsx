@@ -35,7 +35,7 @@ type Props = {
  */
 function HistoryTable({ workflows, gridData, onSelect, idx }: Props) {
   return (
-    <div className="rounded-xl bg-white overflow-hidden shadow-md dark:bg-slate-900 dark:border dark:border-slate-800">
+    <div className="rounded-xl bg-white overflow-hidden border dark:bg-slate-900 dark:border-slate-800">
       <Table className="select-none border-collapse">
         <TableHeader className="bg-slate-50 dark:bg-slate-800">
           <TableRow className="border-b border-slate-200 dark:border-slate-700">

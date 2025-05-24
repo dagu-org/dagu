@@ -106,15 +106,21 @@ type StepBuilderFn func(ctx BuildContext, def stepDef, step *Step) error
 // build builds a DAG from the specification.
 func build(ctx BuildContext, spec *definition) (*DAG, error) {
 	dag := &DAG{
-		Location:      ctx.file,
-		Name:          spec.Name,
-		Group:         spec.Group,
-		Description:   spec.Description,
-		Timeout:       time.Second * time.Duration(spec.TimeoutSec),
-		Delay:         time.Second * time.Duration(spec.DelaySec),
-		RestartWait:   time.Second * time.Duration(spec.RestartWaitSec),
-		Tags:          parseTags(spec.Tags),
-		MaxActiveRuns: spec.MaxActiveRuns,
+		Location:           ctx.file,
+		Name:               spec.Name,
+		Group:              spec.Group,
+		Description:        spec.Description,
+		Timeout:            time.Second * time.Duration(spec.TimeoutSec),
+		Delay:              time.Second * time.Duration(spec.DelaySec),
+		RestartWait:        time.Second * time.Duration(spec.RestartWaitSec),
+		Tags:               parseTags(spec.Tags),
+		MaxActiveWorkflows: spec.MaxActiveWorkflows,
+		MaxActiveSteps:     spec.MaxActiveSteps,
+	}
+
+	// For backward compatibility, set MaxActiveSteps to MaxActiveRuns
+	if spec.MaxActiveRuns > 0 {
+		dag.MaxActiveSteps = spec.MaxActiveRuns
 	}
 
 	var errs ErrorList

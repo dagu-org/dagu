@@ -25,7 +25,7 @@ export function DateRangePicker({
   return (
     <div
       className={cn(
-        'relative flex items-center rounded-md border px-1 bg-slate-50 dark:bg-slate-800 shadow-xs',
+        'relative flex items-center rounded-md border px-1 bg-background shadow-xs',
         className
       )}
       {...props}
@@ -36,7 +36,7 @@ export function DateRangePicker({
         <div className="relative flex-1">
           <label
             htmlFor="fromDate"
-            className="absolute -top-2 left-2 px-1 text-xs text-muted-foreground bg-slate-50 dark:bg-slate-800"
+            className="absolute -top-2 left-2 px-1 text-xs text-muted-foreground bg-background"
           >
             {fromLabel}
           </label>
@@ -50,14 +50,14 @@ export function DateRangePicker({
         </div>
 
         {/* Arrow only visible on sm screens and above */}
-        <div className="hidden sm:flex items-center px-1 text-muted-foreground bg-slate-50 dark:bg-slate-800">
+        <div className="hidden sm:flex items-center px-1 text-muted-foreground bg-background">
           →
         </div>
 
         <div className="relative flex-1">
           <label
             htmlFor="toDate"
-            className="absolute -top-2 left-2 px-1 text-xs text-muted-foreground bg-slate-50 dark:bg-slate-800"
+            className="absolute -top-2 left-2 px-1 text-xs text-muted-foreground bg-background"
           >
             {toLabel}
           </label>

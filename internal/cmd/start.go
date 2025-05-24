@@ -11,6 +11,8 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
+
+	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
 // Errors for start command
@@ -50,7 +52,7 @@ This command parses the DAG definition, resolves parameters, and initiates the w
 }
 
 // Command line flags for the start command
-var startFlags = []commandLineFlag{paramsFlag, workflowIDFlagStart, parentWorkflowFlag, rootWorkflowFlag}
+var startFlags = []commandLineFlag{paramsFlag, workflowIDFlag, parentWorkflowFlag, rootWorkflowFlag}
 
 // runStart handles the execution of the start command
 func runStart(ctx *Context, args []string) error {
@@ -97,7 +99,7 @@ func runStart(ctx *Context, args []string) error {
 // nolint:revive
 func getExecutionInfo(ctx *Context) (workflowID string, rootRef string, parentRef string, isChildWorkflow bool, err error) {
 	// Get workflow ID from flags
-	workflowID, err = ctx.Command.Flags().GetString("workflow-id")
+	workflowID, err = ctx.StringParam("workflow-id")
 	if err != nil {
 		return "", "", "", false, fmt.Errorf("failed to get workflow ID: %w", err)
 	}
@@ -119,7 +121,7 @@ func getExecutionInfo(ctx *Context) (workflowID string, rootRef string, parentRe
 		}
 	} else {
 		// Generate a new workflow ID if not provided
-		workflowID, err = getWorkflowID()
+		workflowID, err = genWorkflowID()
 		if err != nil {
 			return "", "", "", false, fmt.Errorf("failed to generate workflow ID: %w", err)
 		}
@@ -154,7 +156,7 @@ func loadDAGWithParams(ctx *Context, args []string) (*digraph.DAG, string, error
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to get parameters: %w", err)
 		}
-		loadOpts = append(loadOpts, digraph.WithParams(removeQuotes(params)))
+		loadOpts = append(loadOpts, digraph.WithParams(stringutil.RemoveQuotes(params)))
 	}
 
 	// Load the DAG from the specified file
@@ -201,7 +203,7 @@ func handleChildWorkflow(ctx *Context, dag *digraph.DAG, workflowID string, para
 	logger.Debug(ctx, "Checking for previous child workflow with the workflow ID", "workflowId", workflowID)
 
 	// Look for existing execution run
-	run, err := ctx.HistoryRepo.FindChildWorkflowRun(ctx, root, workflowID)
+	run, err := ctx.HistoryStore.FindChildWorkflowRun(ctx, root, workflowID)
 	if errors.Is(err, models.ErrWorkflowIDNotFound) {
 		// If the workflow ID is not found, proceed with new execution
 		return executeWorkflow(ctx, dag, parent, workflowID, root)
@@ -238,7 +240,7 @@ func executeWorkflow(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, w
 	logger.Debug(ctx, "Workflow initiated", "DAG", d.Name, "workflowId", workflowID, "logFile", logFile.Name())
 
 	// Initialize DAG repository with the DAG's directory in the search path
-	dr, err := ctx.dagRepo(nil, []string{filepath.Dir(d.Location)})
+	dr, err := ctx.dagStore(nil, []string{filepath.Dir(d.Location)})
 	if err != nil {
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
@@ -251,7 +253,8 @@ func executeWorkflow(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, w
 		logFile.Name(),
 		ctx.HistoryMgr,
 		dr,
-		ctx.HistoryRepo,
+		ctx.HistoryStore,
+		ctx.ProcStore,
 		root,
 		agent.Options{Parent: parent},
 	)
@@ -277,12 +280,4 @@ func executeWorkflow(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, w
 	}
 
 	return nil
-}
-
-// removeQuotes removes the surrounding quotes from the string.
-func removeQuotes(s string) string {
-	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
-		return s[1 : len(s)-1]
-	}
-	return s
 }

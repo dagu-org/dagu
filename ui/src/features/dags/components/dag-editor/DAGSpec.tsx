@@ -122,7 +122,7 @@ function DAGSpec({ fileName }: Props) {
         data?.dag && (
           <React.Fragment>
             <div className="space-y-4" ref={containerRef}>
-              <div className="overflow-x-auto rounded-xl shadow-md bg-white dark:bg-slate-900 p-6">
+              <div className="overflow-x-auto rounded-xl border bg-white dark:bg-slate-900 p-6">
                 <div className="flex justify-between items-center mb-4">
                   <SubTitle className="mb-0">Graph</SubTitle>
                   <FlowchartSwitch
@@ -140,13 +140,13 @@ function DAGSpec({ fileName }: Props) {
                 </BorderedBox>
               </div>
 
-              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
+              <div className="bg-white dark:bg-slate-900 rounded-xl border p-6 overflow-hidden">
                 <SubTitle className="mb-4">Attributes</SubTitle>
                 <DAGAttributes dag={data.dag!} />
               </div>
 
               {data.errors?.length ? (
-                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 border-l-4 border-red-500 dark:border-red-700">
+                <div className="bg-white dark:bg-slate-900 rounded-xl border border-l-4 border-red-500 dark:border-red-700 p-6">
                   <div className="flex items-center gap-2 mb-4 text-red-600 dark:text-red-400">
                     <AlertTriangle className="h-5 w-5" />
                     <h3 className="font-semibold">Configuration Errors</h3>
@@ -166,21 +166,21 @@ function DAGSpec({ fileName }: Props) {
               ) : null}
 
               {data.dag.steps ? (
-                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
+                <div className="bg-white dark:bg-slate-900 rounded-xl border p-6 overflow-hidden">
                   <SubTitle className="mb-4">Steps</SubTitle>
                   <DAGStepTable steps={data.dag.steps} />
                 </div>
               ) : null}
 
               {handlers?.length ? (
-                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
+                <div className="bg-white dark:bg-slate-900 rounded-xl border p-6 overflow-hidden">
                   <SubTitle className="mb-4">Lifecycle Hooks</SubTitle>
                   <DAGStepTable steps={handlers} />
                 </div>
               ) : null}
 
               <div
-                className={`rounded-xl shadow-md p-6 overflow-hidden transition-all duration-300 ${
+                className={`rounded-xl border p-6 overflow-hidden transition-all duration-300 ${
                   editing
                     ? 'bg-white dark:bg-slate-900 border-2 border-blue-400 dark:border-blue-600'
                     : 'bg-white dark:bg-slate-900'

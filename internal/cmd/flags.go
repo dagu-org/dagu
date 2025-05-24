@@ -63,7 +63,7 @@ var (
 
 	// Unique workflow ID used for starting a new workflow.
 	// This is used to track and identify the execution instance and its status.
-	workflowIDFlagStart = commandLineFlag{
+	workflowIDFlag = commandLineFlag{
 		name:      "workflow-id",
 		shorthand: "e",
 		usage:     "Unique workflow ID for a workflow",
@@ -88,6 +88,22 @@ var (
 		name:      "workflow-id",
 		shorthand: "e",
 		usage:     "workflow ID for checking the status of a workflow",
+	}
+
+	// Workflow name to dequeue a workflow.
+	workflowNameFlagDequeue = commandLineFlag{
+		name:      "workflow-name",
+		shorthand: "n",
+		usage:     "workflow name to dequeue a workflow",
+		required:  true,
+	}
+
+	// Unique workflow ID to dequeue a workflow.
+	workflowIDFlagDequeue = commandLineFlag{
+		name:      "workflow-id",
+		shorthand: "e",
+		usage:     "workflow ID to dequeue a workflow",
+		required:  true,
 	}
 
 	// rootRefNameFlag reads the root DAG name for starting a child workflow.

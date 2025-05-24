@@ -34,6 +34,7 @@ func InitialStatus(dag *digraph.DAG) Status {
 		OnCancel:      nodeOrNil(dag.HandlerOn.Cancel),
 		Params:        strings.Join(dag.Params, " "),
 		ParamsList:    dag.Params,
+		CreatedAt:     time.Now().UnixMilli(),
 		StartedAt:     stringutil.FormatTime(time.Time{}),
 		FinishedAt:    stringutil.FormatTime(time.Time{}),
 		Preconditions: dag.Preconditions,
@@ -61,6 +62,23 @@ func WithNodes(nodes []scheduler.NodeData) StatusOption {
 func WithRunID(runID string) StatusOption {
 	return func(s *Status) {
 		s.RunID = runID
+	}
+}
+
+// WithQueuedAt returns a StatusOption that sets the finished time
+func WithQueuedAt(formattedTime string) StatusOption {
+	return func(s *Status) {
+		s.QueuedAt = formattedTime
+	}
+}
+
+// WithCreatedAt returns a StatusOption that sets the created time
+func WithCreatedAt(t int64) StatusOption {
+	return func(s *Status) {
+		if t == 0 {
+			t = time.Now().UnixMilli()
+		}
+		s.CreatedAt = t
 	}
 }
 
@@ -134,6 +152,7 @@ func (f *StatusBuilder) Create(
 	statusObj.Status = status
 	statusObj.PID = PID(pid)
 	statusObj.StartedAt = formatTime(startedAt)
+	statusObj.CreatedAt = time.Now().UnixMilli()
 
 	for _, opt := range opts {
 		opt(&statusObj)
@@ -166,6 +185,8 @@ type Status struct {
 	OnSuccess     *Node                `json:"onSuccess,omitempty"`
 	OnFailure     *Node                `json:"onFailure,omitempty"`
 	OnCancel      *Node                `json:"onCancel,omitempty"`
+	CreatedAt     int64                `json:"createdAt,omitempty"`
+	QueuedAt      string               `json:"queuedAt,omitempty"`
 	StartedAt     string               `json:"startedAt,omitempty"`
 	FinishedAt    string               `json:"finishedAt,omitempty"`
 	Log           string               `json:"log,omitempty"`

@@ -26,6 +26,7 @@ const (
 	StatusError
 	StatusCancel
 	StatusSuccess
+	StatusQueued
 )
 
 func (s Status) String() string {
@@ -38,6 +39,8 @@ func (s Status) String() string {
 		return "canceled"
 	case StatusSuccess:
 		return "finished"
+	case StatusQueued:
+		return "queued"
 	case StatusNone:
 		fallthrough
 	default:
@@ -83,7 +86,7 @@ type Scheduler struct {
 func New(cfg *Config) *Scheduler {
 	return &Scheduler{
 		logDir:        cfg.LogDir,
-		maxActiveRuns: cfg.MaxActiveRuns,
+		maxActiveRuns: cfg.MaxActiveSteps,
 		timeout:       cfg.Timeout,
 		delay:         cfg.Delay,
 		dry:           cfg.Dry,
@@ -97,16 +100,16 @@ func New(cfg *Config) *Scheduler {
 }
 
 type Config struct {
-	LogDir        string
-	MaxActiveRuns int
-	Timeout       time.Duration
-	Delay         time.Duration
-	Dry           bool
-	OnExit        *digraph.Step
-	OnSuccess     *digraph.Step
-	OnFailure     *digraph.Step
-	OnCancel      *digraph.Step
-	WorkflowID    string
+	LogDir         string
+	MaxActiveSteps int
+	Timeout        time.Duration
+	Delay          time.Duration
+	Dry            bool
+	OnExit         *digraph.Step
+	OnSuccess      *digraph.Step
+	OnFailure      *digraph.Step
+	OnCancel       *digraph.Step
+	WorkflowID     string
 }
 
 // Schedule runs the graph of steps.
@@ -342,7 +345,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 	case StatusCancel:
 		eventHandlers = append(eventHandlers, digraph.HandlerOnCancel)
 
-	case StatusNone, StatusRunning:
+	case StatusNone, StatusRunning, StatusQueued:
 		// These states should not occur at this point
 		logger.Warn(ctx, "Unexpected final status",
 			"status", sc.Status(graph).String(),

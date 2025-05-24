@@ -44,7 +44,7 @@ var restartFlags = []commandLineFlag{
 }
 
 func runRestart(ctx *Context, args []string) error {
-	workflowID, err := ctx.Command.Flags().GetString("workflow-id")
+	workflowID, err := ctx.StringParam("workflow-id")
 	if err != nil {
 		return fmt.Errorf("failed to get workflow ID: %w", err)
 	}
@@ -55,13 +55,13 @@ func runRestart(ctx *Context, args []string) error {
 	if workflowID != "" {
 		// Retrieve the previous run for the specified workflow ID.
 		ref := digraph.NewWorkflowRef(name, workflowID)
-		r, err := ctx.HistoryRepo.FindRun(ctx, ref)
+		r, err := ctx.HistoryStore.FindRun(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to find the run for workflow ID %s: %w", workflowID, err)
 		}
 		run = r
 	} else {
-		r, err := ctx.HistoryRepo.LatestRun(ctx, name)
+		r, err := ctx.HistoryStore.LatestRun(ctx, name)
 		if err != nil {
 			return fmt.Errorf("failed to find the latest execution history for DAG %s: %w", name, err)
 		}
@@ -105,7 +105,7 @@ func handleRestartProcess(ctx *Context, d *digraph.DAG, workflowID string) error
 }
 
 func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
-	workflowID, err := getWorkflowID()
+	workflowID, err := genWorkflowID()
 	if err != nil {
 		return fmt.Errorf("failed to generate workflow ID: %w", err)
 	}
@@ -122,7 +122,7 @@ func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
 
 	logger.Info(ctx, "Workflow restart initiated", "DAG", dag.Name, "workflowId", workflowID, "logFile", logFile.Name())
 
-	dr, err := ctx.dagRepo(nil, []string{filepath.Dir(dag.Location)})
+	dr, err := ctx.dagStore(nil, []string{filepath.Dir(dag.Location)})
 	if err != nil {
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
@@ -134,7 +134,8 @@ func executeDAG(ctx *Context, cli history.Manager, dag *digraph.DAG) error {
 		logFile.Name(),
 		cli,
 		dr,
-		ctx.HistoryRepo,
+		ctx.HistoryStore,
+		ctx.ProcStore,
 		digraph.NewWorkflowRef(dag.Name, workflowID),
 		agent.Options{Dry: false})
 

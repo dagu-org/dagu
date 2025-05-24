@@ -45,8 +45,13 @@ type definition struct {
 	Precondition any
 	// Preconditions is the condition to run the DAG.
 	Preconditions any
+	// MaxActiveWorkflows is the maximum number of concurrent workflows.
+	MaxActiveWorkflows int
 	// MaxActiveRuns is the maximum number of concurrent steps.
+	// deprecated: use MaxActiveSteps instead.
 	MaxActiveRuns int
+	// MaxActiveSteps is the maximum number of concurrent steps.
+	MaxActiveSteps int
 	// Params is the default parameters for the steps.
 	Params any
 	// MaxCleanUpTimeSec is the maximum time in seconds to clean up the DAG.

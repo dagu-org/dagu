@@ -163,6 +163,11 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
     startedAt: string,
     finishedAt: string | null
   ): string => {
+    // If workflow hasn't started yet, return dash
+    if (!startedAt) {
+      return '-';
+    }
+
     if (!finishedAt) {
       // If workflow is still running, calculate duration from start until now
       const start = dayjs(startedAt);
@@ -204,7 +209,7 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
   const EmptyState = () => (
     <div className="flex flex-col items-center justify-center py-12 px-4 border rounded-md bg-white">
       <div className="text-6xl mb-4">🔍</div>
-      <h3 className="text-lg font-medium text-gray-900 mb-2">
+      <h3 className="text-lg font-normal text-gray-900 mb-2">
         No workflows found
       </h3>
       <p className="text-sm text-gray-500 text-center max-w-md mb-4">
@@ -247,7 +252,7 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
           >
             {/* Header with name and status */}
             <div className="flex justify-between items-start mb-2">
-              <div className="font-medium text-sm">{workflow.name}</div>
+              <div className="font-normal text-sm">{workflow.name}</div>
               <StatusChip status={workflow.status} size="xs">
                 {workflow.statusLabel}
               </StatusChip>
@@ -259,21 +264,26 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
             </div>
 
             {/* Timestamps */}
-            <div className="flex justify-between items-center text-xs mt-2">
-              <div>
-                <span className="text-muted-foreground">Started: </span>
-                {workflow.startedAt}
+            <div className="space-y-1 text-xs mt-2">
+              <div className="flex justify-between items-center">
+                <div>
+                  <span className="text-muted-foreground">Queued: </span>
+                  {workflow.queuedAt || '-'}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Started: </span>
+                  {workflow.startedAt || '-'}
+                </div>
               </div>
-              <div>
-                <span className="text-muted-foreground">Finished: </span>
-                {workflow.finishedAt || '-'}
+              <div className="text-left flex items-center gap-1.5">
+                <span className="text-muted-foreground">Duration: </span>
+                <span className="flex items-center gap-1">
+                  {calculateDuration(workflow.startedAt, workflow.finishedAt)}
+                  {workflow.status === 1 && workflow.startedAt && (
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-lime-500 animate-pulse" />
+                  )}
+                </span>
               </div>
-            </div>
-
-            {/* Duration */}
-            <div className="text-xs mt-1 text-left">
-              <span className="text-muted-foreground">Duration: </span>
-              {calculateDuration(workflow.startedAt, workflow.finishedAt)}
             </div>
 
             {/* Timezone info */}
@@ -292,28 +302,28 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
       <Table className="w-full text-xs">
         <TableHeader>
           <TableRow>
-            <TableHead className="text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
+            <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
               Workflow Name
             </TableHead>
-            <TableHead className="text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
+            <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
               Workflow ID
             </TableHead>
-            <TableHead className="text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
+            <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
               Status
             </TableHead>
-            <TableHead className="text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
+            <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
+              <div>Queued At</div>
+              <div className="text-[10px] text-muted-foreground font-normal">
+                {timezoneInfo}
+              </div>
+            </TableHead>
+            <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
               <div>Started At</div>
               <div className="text-[10px] text-muted-foreground font-normal">
                 {timezoneInfo}
               </div>
             </TableHead>
-            <TableHead className="text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
-              <div>Finished At</div>
-              <div className="text-[10px] text-muted-foreground font-normal">
-                {timezoneInfo}
-              </div>
-            </TableHead>
-            <TableHead className="text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
+            <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
               Duration
             </TableHead>
           </TableRow>
@@ -336,25 +346,32 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
                 });
               }}
             >
-              <TableCell className="py-1 px-2 font-medium">
+              <TableCell className="py-1 px-2 font-normal">
                 {workflow.name}
               </TableCell>
-              <TableCell className="py-1 px-2 font-mono text-slate-600">
+              <TableCell className="py-1 px-2 font-mono text-muted-foreground">
                 {workflow.workflowId}
               </TableCell>
               <TableCell className="py-1 px-2">
-                <StatusChip status={workflow.status} size="xs">
-                  {workflow.statusLabel}
-                </StatusChip>
+                <div className="flex items-center">
+                  <StatusChip status={workflow.status} size="xs">
+                    {workflow.statusLabel}
+                  </StatusChip>
+                </div>
               </TableCell>
               <TableCell className="py-1 px-2 text-left">
-                {workflow.startedAt}
+                {workflow.queuedAt || '-'}
               </TableCell>
               <TableCell className="py-1 px-2 text-left">
-                {workflow.finishedAt || '-'}
+                {workflow.startedAt || '-'}
               </TableCell>
               <TableCell className="py-1 px-2 text-left">
-                {calculateDuration(workflow.startedAt, workflow.finishedAt)}
+                <div className="flex items-center gap-1">
+                  {calculateDuration(workflow.startedAt, workflow.finishedAt)}
+                  {workflow.status === 1 && workflow.startedAt && (
+                    <span className="inline-block w-2 h-2 rounded-full bg-lime-500 animate-pulse" />
+                  )}
+                </div>
               </TableCell>
             </TableRow>
           ))}

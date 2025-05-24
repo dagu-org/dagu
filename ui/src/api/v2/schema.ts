@@ -105,7 +105,7 @@ export interface paths {
          * Terminate a running workflow
          * @description Forcefully stops a running workflow created from this DAG
          */
-        post: operations["terminateWorkflow"];
+        post: operations["terminateDAGWorkflow"];
         delete?: never;
         options?: never;
         head?: never;
@@ -125,7 +125,7 @@ export interface paths {
          * Retry workflow execution
          * @description Creates a new workflow based on a previous execution
          */
-        post: operations["retryWorkflow"];
+        post: operations["retryDAGWorkflow"];
         delete?: never;
         options?: never;
         head?: never;
@@ -356,6 +356,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflows/{name}/{workflowId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry workflow execution
+         * @description Creates a new workflow based on a previous execution
+         */
+        post: operations["retryWorkflow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflows/{name}/{workflowId}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Terminate a running workflow
+         * @description Forcefully stops a running workflow created from this DAG
+         */
+        post: operations["terminateWorkflow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflows/{name}/{workflowId}/steps/{stepName}/log": {
         parameters: {
             query?: never;
@@ -580,6 +620,7 @@ export interface components {
          *     2: "Failed"
          *     3: "Cancelled"
          *     4: "Success"
+         *     5: "Queued"
          *
          * @enum {integer}
          */
@@ -630,7 +671,9 @@ export interface components {
             /** @description Conditions that must be met before a workflow can start */
             preconditions?: components["schemas"]["Condition"][];
             /** @description Maximum number of concurrent workflows allowed from this DAG */
-            maxActiveRuns?: number;
+            maxActiveWorkflows?: number;
+            /** @description Maximum number of concurrent workflows allowed from this DAG */
+            maxActiveSteps?: number;
             /** @description List of parameter names that can be passed to workflows created from this DAG */
             params?: string[];
             /** @description Default parameter values in JSON format if not specified at workflow creation */
@@ -661,6 +704,8 @@ export interface components {
             statusLabel: components["schemas"]["StatusLabel"];
             /** @description Process ID of the workflow */
             pid?: number;
+            /** @description RFC 3339 timestamp when the workflow was queued */
+            queuedAt?: string;
             /** @description RFC 3339 timestamp when the workflow started */
             startedAt: string;
             /** @description RFC 3339 timestamp when the workflow finished */
@@ -1086,7 +1131,7 @@ export interface operations {
             };
         };
     };
-    terminateWorkflow: {
+    terminateDAGWorkflow: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -1119,7 +1164,7 @@ export interface operations {
             };
         };
     };
-    retryWorkflow: {
+    retryDAGWorkflow: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -1695,6 +1740,83 @@ export interface operations {
             };
         };
     };
+    retryWorkflow: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId: components["parameters"]["WorkflowId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description ID of the workflow to retry */
+                    workflowId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    terminateWorkflow: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId: components["parameters"]["WorkflowId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getWorkflowStepLog: {
         parameters: {
             query?: {
@@ -2060,14 +2182,16 @@ export enum Status {
     Running = 1,
     Failed = 2,
     Cancelled = 3,
-    Success = 4
+    Success = 4,
+    Queued = 5
 }
 export enum StatusLabel {
     not_started = "not started",
     running = "running",
     failed = "failed",
     cancelled = "cancelled",
-    finished = "finished"
+    finished = "finished",
+    queued = "queued"
 }
 export enum NodeStatus {
     NotStarted = 0,

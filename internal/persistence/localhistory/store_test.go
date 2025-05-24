@@ -17,7 +17,7 @@ import (
 
 func TestJSONDB(t *testing.T) {
 	t.Run("RecentRecords", func(t *testing.T) {
-		th := setupTestLocalStorage(t)
+		th := setupTestLocalStore(t)
 
 		// Create timestamps for the records
 		ts1 := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -30,7 +30,7 @@ func TestJSONDB(t *testing.T) {
 		th.CreateRun(t, ts3, "workflow-id-3", scheduler.StatusSuccess)
 
 		// Request 2 most recent runs
-		runs := th.HistoryRepo.RecentRuns(th.Context, "test_DAG", 2)
+		runs := th.HistoryStore.RecentRuns(th.Context, "test_DAG", 2)
 		require.Len(t, runs, 2)
 
 		// Verify the first record is the most recent
@@ -44,15 +44,15 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, "workflow-id-2", status1.WorkflowID)
 
 		// Verify all records are returned if the number requested is equal to the number of records
-		runs = th.HistoryRepo.RecentRuns(th.Context, "test_DAG", 3)
+		runs = th.HistoryStore.RecentRuns(th.Context, "test_DAG", 3)
 		require.Len(t, runs, 3)
 
 		// Verify all records are returned if the number requested is greater than the number of records
-		runs = th.HistoryRepo.RecentRuns(th.Context, "test_DAG", 4)
+		runs = th.HistoryStore.RecentRuns(th.Context, "test_DAG", 4)
 		require.Len(t, runs, 3)
 	})
 	t.Run("LatestRecord", func(t *testing.T) {
-		th := setupTestLocalStorage(t)
+		th := setupTestLocalStore(t)
 
 		// Create timestamps for the records
 		ts1 := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -66,9 +66,9 @@ func TestJSONDB(t *testing.T) {
 
 		// Set the database to return the latest status (even if it was created today)
 		// Verify that record created before today is returned
-		obj := th.HistoryRepo.(*localStorage)
+		obj := th.HistoryStore.(*Store)
 		obj.latestStatusToday = false
-		run, err := th.HistoryRepo.LatestRun(th.Context, "test_DAG")
+		run, err := th.HistoryStore.LatestRun(th.Context, "test_DAG")
 		require.NoError(t, err)
 
 		// Verify the record is the most recent
@@ -78,7 +78,7 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, "workflow-id-3", status.WorkflowID)
 	})
 	t.Run("FindByWorkflowID", func(t *testing.T) {
-		th := setupTestLocalStorage(t)
+		th := setupTestLocalStore(t)
 
 		// Create timestamps for the records
 		ts1 := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -92,7 +92,7 @@ func TestJSONDB(t *testing.T) {
 
 		// Find the record with workflow ID "workflow-id-2"
 		ref := digraph.NewWorkflowRef("test_DAG", "workflow-id-2")
-		run, err := th.HistoryRepo.FindRun(th.Context, ref)
+		run, err := th.HistoryStore.FindRun(th.Context, ref)
 		require.NoError(t, err)
 
 		// Verify the record is the correct one
@@ -102,11 +102,11 @@ func TestJSONDB(t *testing.T) {
 
 		// Verify an error is returned if the workflow ID does not exist
 		refNonExist := digraph.NewWorkflowRef("test_DAG", "nonexistent-id")
-		_, err = th.HistoryRepo.FindRun(th.Context, refNonExist)
+		_, err = th.HistoryStore.FindRun(th.Context, refNonExist)
 		assert.ErrorIs(t, err, models.ErrWorkflowIDNotFound)
 	})
 	t.Run("RemoveOld", func(t *testing.T) {
-		th := setupTestLocalStorage(t)
+		th := setupTestLocalStore(t)
 
 		// Create timestamps for the records
 		ts1 := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -119,20 +119,20 @@ func TestJSONDB(t *testing.T) {
 		th.CreateRun(t, ts3, "workflow-id-3", scheduler.StatusSuccess)
 
 		// Verify runs are present
-		runs := th.HistoryRepo.RecentRuns(th.Context, "test_DAG", 3)
+		runs := th.HistoryStore.RecentRuns(th.Context, "test_DAG", 3)
 		require.Len(t, runs, 3)
 
 		// Remove records older than 0 days
 		// It should remove all records
-		err := th.HistoryRepo.RemoveOldWorkflows(th.Context, "test_DAG", 0)
+		err := th.HistoryStore.RemoveOldWorkflows(th.Context, "test_DAG", 0)
 		require.NoError(t, err)
 
 		// Verify records are removed
-		runs = th.HistoryRepo.RecentRuns(th.Context, "test_DAG", 3)
+		runs = th.HistoryStore.RecentRuns(th.Context, "test_DAG", 3)
 		require.Len(t, runs, 0)
 	})
 	t.Run("ChildWorkflow", func(t *testing.T) {
-		th := setupTestLocalStorage(t)
+		th := setupTestLocalStore(t)
 
 		// Create a timestamp for the parent record
 		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -143,7 +143,7 @@ func TestJSONDB(t *testing.T) {
 		// Create a child run
 		root := digraph.NewWorkflowRef("test_DAG", "parent-id")
 		childWorkflowDAG := th.DAG("child")
-		childRun, err := th.HistoryRepo.CreateRun(th.Context, childWorkflowDAG.DAG, ts, "sub-id", models.NewRunOptions{
+		childRun, err := th.HistoryStore.CreateRun(th.Context, childWorkflowDAG.DAG, ts, "sub-id", models.NewRunOptions{
 			Root: &root,
 		})
 		require.NoError(t, err)
@@ -162,7 +162,7 @@ func TestJSONDB(t *testing.T) {
 
 		// Verify record is created
 		workflowRef := digraph.NewWorkflowRef("test_DAG", "parent-id")
-		existingRun, err := th.HistoryRepo.FindChildWorkflowRun(th.Context, workflowRef, "sub-id")
+		existingRun, err := th.HistoryStore.FindChildWorkflowRun(th.Context, workflowRef, "sub-id")
 		require.NoError(t, err)
 
 		status, err := existingRun.ReadStatus(th.Context)
@@ -170,7 +170,7 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, "sub-id", status.WorkflowID)
 	})
 	t.Run("ChildWorkflow_Retry", func(t *testing.T) {
-		th := setupTestLocalStorage(t)
+		th := setupTestLocalStore(t)
 
 		// Create a timestamp for the parent record
 		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -184,7 +184,7 @@ func TestJSONDB(t *testing.T) {
 
 		root := digraph.NewWorkflowRef("test_DAG", parentExecID)
 		childWorkflowDAG := th.DAG("child")
-		run, err := th.HistoryRepo.CreateRun(th.Context, childWorkflowDAG.DAG, ts, childWorkflowID, models.NewRunOptions{
+		run, err := th.HistoryStore.CreateRun(th.Context, childWorkflowDAG.DAG, ts, childWorkflowID, models.NewRunOptions{
 			Root: &root,
 		})
 		require.NoError(t, err)
@@ -205,7 +205,7 @@ func TestJSONDB(t *testing.T) {
 		// Find the child workflow record
 		ts = time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
 		workflowRef := digraph.NewWorkflowRef("test_DAG", parentExecID)
-		existingRun, err := th.HistoryRepo.FindChildWorkflowRun(th.Context, workflowRef, childWorkflowID)
+		existingRun, err := th.HistoryStore.FindChildWorkflowRun(th.Context, workflowRef, childWorkflowID)
 		require.NoError(t, err)
 		existingRunStatus, err := existingRun.ReadStatus(th.Context)
 		require.NoError(t, err)
@@ -213,7 +213,7 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, scheduler.StatusRunning.String(), existingRunStatus.Status.String())
 
 		// Create a retry record and write different status
-		retryRun, err := th.HistoryRepo.CreateRun(th.Context, childWorkflowDAG.DAG, ts, childWorkflowID, models.NewRunOptions{
+		retryRun, err := th.HistoryStore.CreateRun(th.Context, childWorkflowDAG.DAG, ts, childWorkflowID, models.NewRunOptions{
 			Root:  &root,
 			Retry: true,
 		})
@@ -224,7 +224,7 @@ func TestJSONDB(t *testing.T) {
 		_ = retryRun.Close(th.Context)
 
 		// Verify the retry record is created
-		existingRun, err = th.HistoryRepo.FindChildWorkflowRun(th.Context, workflowRef, childWorkflowID)
+		existingRun, err = th.HistoryStore.FindChildWorkflowRun(th.Context, workflowRef, childWorkflowID)
 		require.NoError(t, err)
 		existingRunStatus, err = existingRun.ReadStatus(th.Context)
 		require.NoError(t, err)
@@ -232,7 +232,7 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, scheduler.StatusSuccess.String(), existingRunStatus.Status.String())
 	})
 	t.Run("ReadDAG", func(t *testing.T) {
-		th := setupTestLocalStorage(t)
+		th := setupTestLocalStore(t)
 
 		// Create a timestamp for the parent record
 		ts := time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
@@ -286,14 +286,12 @@ func TestListRoot(t *testing.T) {
 	err := os.WriteFile(filePath, []byte("test"), 0600)
 	require.NoError(t, err, "Failed to create test file")
 
-	// Create localStorage instance
-	storage := &localStorage{
-		baseDir: tmpDir,
-	}
+	// Create localStore instance
+	store := &Store{baseDir: tmpDir}
 
 	// Call listRoot
 	ctx := context.Background()
-	roots, err := storage.listRoot(ctx, "")
+	roots, err := store.listRoot(ctx, "")
 	require.NoError(t, err, "listRoot should not return an error")
 
 	// Verify results
@@ -316,14 +314,12 @@ func TestListRootEmptyDirectory(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := t.TempDir()
 
-	// Create localStorage instance
-	storage := &localStorage{
-		baseDir: tmpDir,
-	}
+	// Create localStore instance
+	store := &Store{baseDir: tmpDir}
 
 	// Call listRoot
 	ctx := context.Background()
-	roots, err := storage.listRoot(ctx, "")
+	roots, err := store.listRoot(ctx, "")
 	require.NoError(t, err, "listRoot should not return an error")
 
 	// Verify results
@@ -337,14 +333,12 @@ func TestListRootNonExistentDirectory(t *testing.T) {
 	tmpDir := t.TempDir()
 	nonExistentDir := filepath.Join(tmpDir, "non-existent")
 
-	// Create localStorage instance
-	storage := &localStorage{
-		baseDir: nonExistentDir,
-	}
+	// Create localStore instance
+	store := &Store{baseDir: nonExistentDir}
 
 	// Call listRoot
 	ctx := context.Background()
-	roots, err := storage.listRoot(ctx, "")
+	roots, err := store.listRoot(ctx, "")
 	require.NoError(t, err, "listRoot should not return an error for non-existent directory")
 
 	// Verify results
@@ -357,17 +351,15 @@ func TestListRootCanceledContext(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := t.TempDir()
 
-	// Create localStorage instance
-	storage := &localStorage{
-		baseDir: tmpDir,
-	}
+	// Create localStore instance
+	store := &Store{baseDir: tmpDir}
 
 	// Create a canceled context
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel the context immediately
 
 	// Call listRoot with canceled context
-	roots, err := storage.listRoot(ctx, "")
+	roots, err := store.listRoot(ctx, "")
 
 	// The function doesn't check for context cancellation, so it should still succeed
 	require.NoError(t, err, "listRoot should not return an error for canceled context")
@@ -376,7 +368,7 @@ func TestListRootCanceledContext(t *testing.T) {
 
 func TestListStatuses(t *testing.T) {
 	t.Run("FilterByTimeRange", func(t *testing.T) {
-		th := setupTestLocalStorage(t)
+		th := setupTestLocalStore(t)
 
 		// Create records with different timestamps
 		ts1 := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -391,7 +383,7 @@ func TestListStatuses(t *testing.T) {
 		from := models.NewUTC(time.Date(2021, 1, 1, 12, 0, 0, 0, time.UTC))
 		to := models.NewUTC(time.Date(2021, 1, 2, 12, 0, 0, 0, time.UTC))
 
-		statuses, err := th.HistoryRepo.ListStatuses(th.Context,
+		statuses, err := th.HistoryStore.ListStatuses(th.Context,
 			models.WithFrom(from),
 			models.WithTo(to),
 		)
@@ -402,7 +394,7 @@ func TestListStatuses(t *testing.T) {
 	})
 
 	t.Run("FilterByStatus", func(t *testing.T) {
-		th := setupTestLocalStorage(t)
+		th := setupTestLocalStore(t)
 
 		// Create records with different statuses
 		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -411,7 +403,7 @@ func TestListStatuses(t *testing.T) {
 		th.CreateRun(t, ts, "workflow-id-3", scheduler.StatusSuccess)
 
 		// Filter by status (only StatusError should be included)
-		statuses, err := th.HistoryRepo.ListStatuses(th.Context,
+		statuses, err := th.HistoryStore.ListStatuses(th.Context,
 			models.WithStatuses([]scheduler.Status{scheduler.StatusError}),
 			models.WithFrom(models.NewUTC(ts)),
 		)
@@ -423,7 +415,7 @@ func TestListStatuses(t *testing.T) {
 	})
 
 	t.Run("LimitResults", func(t *testing.T) {
-		th := setupTestLocalStorage(t)
+		th := setupTestLocalStore(t)
 
 		// Create multiple records
 		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -433,7 +425,7 @@ func TestListStatuses(t *testing.T) {
 
 		// Limit to 3 results
 		options := &models.ListStatusesOptions{Limit: 3}
-		statuses, err := th.HistoryRepo.ListStatuses(th.Context, func(o *models.ListStatusesOptions) {
+		statuses, err := th.HistoryStore.ListStatuses(th.Context, func(o *models.ListStatusesOptions) {
 			o.Limit = options.Limit
 		}, models.WithFrom(models.NewUTC(ts)))
 
@@ -441,20 +433,19 @@ func TestListStatuses(t *testing.T) {
 		require.Len(t, statuses, 3)
 	})
 
-	t.Run("SortByStartedAt", func(t *testing.T) {
-		th := setupTestLocalStorage(t)
+	t.Run("SortByCreatedAt", func(t *testing.T) {
+		th := setupTestLocalStore(t)
 
-		// Create records with different timestamps
 		ts1 := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
-		ts2 := time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
-		ts3 := time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC)
+		ts2 := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+		ts3 := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 
 		th.CreateRun(t, ts1, "workflow-id-1", scheduler.StatusSuccess)
 		th.CreateRun(t, ts2, "workflow-id-2", scheduler.StatusSuccess)
 		th.CreateRun(t, ts3, "workflow-id-3", scheduler.StatusSuccess)
 
 		// Get all statuses
-		statuses, err := th.HistoryRepo.ListStatuses(
+		statuses, err := th.HistoryStore.ListStatuses(
 			th.Context, models.WithFrom(models.NewUTC(ts1)),
 		)
 

@@ -251,7 +251,7 @@ paths:
     post:
       summary: "Terminate a running workflow"
       description: "Forcefully stops a running workflow created from this DAG"
-      operationId: "terminateWorkflow"
+      operationId: "terminateDAGWorkflow"
       tags:
         - "dags"
       parameters:
@@ -271,7 +271,7 @@ paths:
     post:
       summary: "Retry workflow execution"
       description: "Creates a new workflow based on a previous execution"
-      operationId: "retryWorkflow"
+      operationId: "retryDAGWorkflow"
       tags:
         - "dags"
       parameters:
@@ -738,6 +738,60 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /workflows/{name}/{workflowId}/retry:
+    post:
+      summary: "Retry workflow execution"
+      description: "Creates a new workflow based on a previous execution"
+      operationId: "retryWorkflow"
+      tags:
+        - "workflows"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/WorkflowId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                workflowId:
+                  type: string
+                  description: "ID of the workflow to retry"
+              required:
+                - workflowId
+      responses:
+        "200":
+          description: "A successful response"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /workflows/{name}/{workflowId}/stop:
+    post:
+      summary: "Terminate a running workflow"
+      description: "Forcefully stops a running workflow created from this DAG"
+      operationId: "terminateWorkflow"
+      tags:
+        - "workflows"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/WorkflowId"
+      responses:
+        "200":
+          description: "A successful response"
         default:
           description: "Generic error response"
           content:
@@ -1330,13 +1384,14 @@ components:
 
     Status:
       type: integer
-      enum: [0, 1, 2, 3, 4]
+      enum: [0, 1, 2, 3, 4, 5]
       x-enum-varnames:
         - "NotStarted"
         - "Running"
         - "Failed"
         - "Cancelled"
         - "Success"
+        - "Queued"
       description: |
         Numeric status code indicating current workflow state:
         0: "Not started"
@@ -1344,6 +1399,7 @@ components:
         2: "Failed"
         3: "Cancelled"
         4: "Success"
+        5: "Queued"
 
     StatusLabel:
       type: string
@@ -1354,6 +1410,7 @@ components:
         - "failed"
         - "cancelled"
         - "finished"
+        - "queued"
 
     NodeStatus:
       type: integer
@@ -1429,7 +1486,10 @@ components:
           description: "Conditions that must be met before a workflow can start"
           items:
             $ref: "#/components/schemas/Condition"
-        maxActiveRuns:
+        maxActiveWorkflows:
+          type: integer
+          description: "Maximum number of concurrent workflows allowed from this DAG"
+        maxActiveSteps:
           type: integer
           description: "Maximum number of concurrent workflows allowed from this DAG"
         params:
@@ -1489,6 +1549,9 @@ components:
         pid:
           type: integer
           description: "Process ID of the workflow"
+        queuedAt:
+          type: string
+          description: "RFC 3339 timestamp when the workflow was queued"
         startedAt:
           type: string
           description: "RFC 3339 timestamp when the workflow started"

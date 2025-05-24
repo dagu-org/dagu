@@ -23,14 +23,14 @@ import (
 // New creates a new Manager instance.
 // The Manager is used to interact with the DAG.
 func New(
-	repo models.HistoryRepository,
+	hs models.HistoryStore,
 	executable string,
 	workDir string,
 ) Manager {
 	return Manager{
-		historyRepo: repo,
-		executable:  executable,
-		workDir:     workDir,
+		historyStore: hs,
+		executable:   executable,
+		workDir:      workDir,
 	}
 }
 
@@ -38,7 +38,7 @@ func New(
 // restarting, and retrieving status information. It communicates with the DAG
 // through a socket interface and manages execution history.
 type Manager struct {
-	historyRepo models.HistoryRepository // Store interface for persisting run data
+	historyStore models.HistoryStore // Store interface for persisting run data
 
 	executable string // Path to the executable used to run DAGs
 	workDir    string // Working directory for executing commands
@@ -113,6 +113,12 @@ func (m *Manager) RestartDAG(_ context.Context, dag *digraph.DAG, opts RestartOp
 	if opts.Quiet {
 		args = append(args, "-q")
 	}
+	if configFile := config.UsedConfigFile.Load(); configFile != nil {
+		if configFile, ok := configFile.(string); ok {
+			args = append(args, "--config")
+			args = append(args, configFile)
+		}
+	}
 	args = append(args, dag.Location)
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
@@ -127,7 +133,13 @@ func (m *Manager) RestartDAG(_ context.Context, dag *digraph.DAG, opts RestartOp
 func (m *Manager) RetryDAG(_ context.Context, dag *digraph.DAG, workflowID string) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--workflow-id=%s", workflowID))
-	args = append(args, dag.Location)
+	if configFile := config.UsedConfigFile.Load(); configFile != nil {
+		if configFile, ok := configFile.(string); ok {
+			args = append(args, "--config")
+			args = append(args, configFile)
+		}
+	}
+	args = append(args, dag.Name)
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
@@ -171,7 +183,7 @@ FALLBACK:
 
 // FindWorkflowStatus retrieves the status of a workflow by name and workflow ID from the execution history.
 func (e *Manager) FindWorkflowStatus(ctx context.Context, ref digraph.WorkflowRef) (*models.Status, error) {
-	run, err := e.historyRepo.FindRun(ctx, ref)
+	run, err := e.historyStore.FindRun(ctx, ref)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by workflow ID: %w", err)
 	}
@@ -189,7 +201,7 @@ func (m *Manager) findPersistedStatus(ctx context.Context, dag *digraph.DAG, wor
 	*models.Status, error,
 ) {
 	ref := digraph.NewWorkflowRef(dag.Name, workflowID)
-	run, err := m.historyRepo.FindRun(ctx, ref)
+	run, err := m.historyStore.FindRun(ctx, ref)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by workflow ID: %w", err)
 	}
@@ -217,7 +229,7 @@ func (m *Manager) findPersistedStatus(ctx context.Context, dag *digraph.DAG, wor
 
 // FindChildWorkflowStatus retrieves the status of a child workflow by its workflow ID.
 func (m *Manager) FindChildWorkflowStatus(ctx context.Context, ref digraph.WorkflowRef, workflowID string) (*models.Status, error) {
-	run, err := m.historyRepo.FindChildWorkflowRun(ctx, ref, workflowID)
+	run, err := m.historyStore.FindChildWorkflowRun(ctx, ref, workflowID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find child workflow status by workflow ID: %w", err)
 	}
@@ -248,7 +260,7 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 	var latestStatus *models.Status
 
 	// Find the latest status by name
-	run, err := m.historyRepo.LatestRun(ctx, dag.Name)
+	run, err := m.historyStore.LatestRun(ctx, dag.Name)
 	if err != nil {
 		goto handleError
 	}
@@ -290,7 +302,7 @@ handleError:
 // ListRecentStatus retrieves the n most recent statuses for a DAG by name.
 // It returns a slice of Status objects, filtering out any that cannot be read.
 func (m *Manager) ListRecentStatus(ctx context.Context, name string, n int) []models.Status {
-	runs := m.historyRepo.RecentRuns(ctx, name, n)
+	runs := m.historyStore.RecentRuns(ctx, name, n)
 
 	var statuses []models.Status
 	for _, run := range runs {
@@ -318,7 +330,7 @@ func (e *Manager) UpdateStatus(ctx context.Context, root digraph.WorkflowRef, st
 
 	if root.WorkflowID == status.WorkflowID {
 		// If the workflow ID matches the root workflow ID, find the run by the root workflow ID
-		r, err := e.historyRepo.FindRun(ctx, root)
+		r, err := e.historyStore.FindRun(ctx, root)
 		if err != nil {
 			return fmt.Errorf("failed to find the run: %w", err)
 		}
@@ -326,7 +338,7 @@ func (e *Manager) UpdateStatus(ctx context.Context, root digraph.WorkflowRef, st
 	} else {
 		// If the workflow ID does not match, find the child workflow run
 		// by the root workflow ID and the child workflow ID
-		r, err := e.historyRepo.FindChildWorkflowRun(ctx, root, status.WorkflowID)
+		r, err := e.historyStore.FindChildWorkflowRun(ctx, root, status.WorkflowID)
 		if err != nil {
 			return fmt.Errorf("failed to find child workflow run: %w", err)
 		}

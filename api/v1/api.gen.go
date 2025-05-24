@@ -171,8 +171,8 @@ type DAGDetails struct {
 	// LogDir Directory path for storing log files
 	LogDir *string `json:"LogDir,omitempty"`
 
-	// MaxActiveRuns Maximum number of concurrent steps to run
-	MaxActiveRuns *int `json:"MaxActiveRuns,omitempty"`
+	// MaxActiveSteps Maximum number of concurrent steps to run
+	MaxActiveSteps *int `json:"MaxActiveSteps,omitempty"`
 
 	// Name Unique identifier for the DAG within its group
 	Name string `json:"Name"`

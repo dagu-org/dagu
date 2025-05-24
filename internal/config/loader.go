@@ -19,9 +19,15 @@ import (
 // UsedConfigFile is a global variable that stores the path to the configuration file
 var UsedConfigFile = atomic.Value{}
 
+// loadLock synchronizes access to the Load function to ensure that only one configuration load occurs at a time.
+var loadLock sync.Mutex
+
 // Load creates a new configuration by instantiating a ConfigLoader with the provided options
 // and then invoking its Load method.
 func Load(opts ...ConfigLoaderOption) (*Config, error) {
+	loadLock.Lock()
+	defer loadLock.Unlock()
+
 	loader := NewConfigLoader(opts...)
 	cfg, err := loader.Load()
 	if err != nil {
@@ -173,13 +179,16 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 
 	// Set file system paths from the definition.
 	if def.Paths != nil {
-		cfg.Paths.DAGsDir = fileutil.MustResolvePath(def.Paths.DAGsDir)
-		cfg.Paths.SuspendFlagsDir = fileutil.MustResolvePath(def.Paths.SuspendFlagsDir)
-		cfg.Paths.DataDir = fileutil.MustResolvePath(def.Paths.DataDir)
-		cfg.Paths.LogDir = fileutil.MustResolvePath(def.Paths.LogDir)
-		cfg.Paths.AdminLogsDir = fileutil.MustResolvePath(def.Paths.AdminLogsDir)
-		cfg.Paths.BaseConfig = fileutil.MustResolvePath(def.Paths.BaseConfig)
-		cfg.Paths.Executable = fileutil.MustResolvePath(def.Paths.Executable)
+		cfg.Paths.DAGsDir = fileutil.ResolvePathOrBlank(def.Paths.DAGsDir)
+		cfg.Paths.SuspendFlagsDir = fileutil.ResolvePathOrBlank(def.Paths.SuspendFlagsDir)
+		cfg.Paths.DataDir = fileutil.ResolvePathOrBlank(def.Paths.DataDir)
+		cfg.Paths.LogDir = fileutil.ResolvePathOrBlank(def.Paths.LogDir)
+		cfg.Paths.AdminLogsDir = fileutil.ResolvePathOrBlank(def.Paths.AdminLogsDir)
+		cfg.Paths.BaseConfig = fileutil.ResolvePathOrBlank(def.Paths.BaseConfig)
+		cfg.Paths.Executable = fileutil.ResolvePathOrBlank(def.Paths.Executable)
+		cfg.Paths.HistoryDir = fileutil.ResolvePathOrBlank(def.Paths.HistoryDir)
+		cfg.Paths.QueueDir = fileutil.ResolvePathOrBlank(def.Paths.QueueDir)
+		cfg.Paths.ProcDir = fileutil.ResolvePathOrBlank(def.Paths.ProcDir)
 	}
 
 	// Set UI configuration if provided.
@@ -195,10 +204,22 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	// Load legacy environment variable overrides.
 	l.LoadLegacyEnv(&cfg)
 
+	// Setup the directory inside the datadir.
+	if cfg.Paths.HistoryDir == "" {
+		cfg.Paths.HistoryDir = filepath.Join(cfg.Paths.DataDir, "history")
+	}
+	if cfg.Paths.ProcDir == "" {
+		cfg.Paths.ProcDir = filepath.Join(cfg.Paths.DataDir, "proc")
+	}
+	if cfg.Paths.QueueDir == "" {
+		cfg.Paths.QueueDir = filepath.Join(cfg.Paths.DataDir, "queue")
+	}
+
 	// Ensure the executable path is set.
 	if err := l.setExecutable(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to set executable: %w", err)
 	}
+
 	// Validate the final configuration.
 	if err := l.validateConfig(&cfg); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
@@ -224,28 +245,28 @@ func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) {
 	}
 	// For DAGs directory, if both legacy fields are present, def.DAGsDir takes precedence.
 	if def.DAGs != "" {
-		cfg.Paths.DAGsDir = fileutil.MustResolvePath(def.DAGs)
+		cfg.Paths.DAGsDir = fileutil.ResolvePathOrBlank(def.DAGs)
 	}
 	if def.DAGsDir != "" {
-		cfg.Paths.DAGsDir = fileutil.MustResolvePath(def.DAGsDir)
+		cfg.Paths.DAGsDir = fileutil.ResolvePathOrBlank(def.DAGsDir)
 	}
 	if def.Executable != "" {
-		cfg.Paths.Executable = fileutil.MustResolvePath(def.Executable)
+		cfg.Paths.Executable = fileutil.ResolvePathOrBlank(def.Executable)
 	}
 	if def.LogDir != "" {
-		cfg.Paths.LogDir = fileutil.MustResolvePath(def.LogDir)
+		cfg.Paths.LogDir = fileutil.ResolvePathOrBlank(def.LogDir)
 	}
 	if def.DataDir != "" {
-		cfg.Paths.DataDir = fileutil.MustResolvePath(def.DataDir)
+		cfg.Paths.DataDir = fileutil.ResolvePathOrBlank(def.DataDir)
 	}
 	if def.SuspendFlagsDir != "" {
-		cfg.Paths.SuspendFlagsDir = fileutil.MustResolvePath(def.SuspendFlagsDir)
+		cfg.Paths.SuspendFlagsDir = fileutil.ResolvePathOrBlank(def.SuspendFlagsDir)
 	}
 	if def.AdminLogsDir != "" {
-		cfg.Paths.AdminLogsDir = fileutil.MustResolvePath(def.AdminLogsDir)
+		cfg.Paths.AdminLogsDir = fileutil.ResolvePathOrBlank(def.AdminLogsDir)
 	}
 	if def.BaseConfig != "" {
-		cfg.Paths.BaseConfig = fileutil.MustResolvePath(def.BaseConfig)
+		cfg.Paths.BaseConfig = fileutil.ResolvePathOrBlank(def.BaseConfig)
 	}
 	if def.LogEncodingCharset != "" {
 		cfg.UI.LogEncodingCharset = def.LogEncodingCharset
@@ -356,6 +377,9 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("debug", "DEBUG")
 	l.bindEnv("headless", "HEADLESS")
 
+	// Global configurations
+	l.bindEnv("workDir", "WORK_DIR")
+
 	// UI configurations
 	l.bindEnv("ui.maxDashboardPageLimit", "UI_MAX_DASHBOARD_PAGE_LIMIT")
 	l.bindEnv("ui.logEncodingCharset", "UI_LOG_ENCODING_CHARSET")
@@ -383,15 +407,17 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("tls.keyFile", "KEY_FILE")
 
 	// File paths
-	l.bindEnv("dags", "DAGS")
-	l.bindEnv("dags", "DAGS_DIR")
-	l.bindEnv("workDir", "WORK_DIR")
-	l.bindEnv("baseConfig", "BASE_CONFIG")
-	l.bindEnv("logDir", "LOG_DIR")
-	l.bindEnv("dataDir", "DATA_DIR")
-	l.bindEnv("suspendFlagsDir", "SUSPEND_FLAGS_DIR")
-	l.bindEnv("adminLogsDir", "ADMIN_LOG_DIR")
-	l.bindEnv("executable", "EXECUTABLE")
+	l.bindEnv("paths.dags", "DAGS")
+	l.bindEnv("paths.dags", "DAGS_DIR")
+	l.bindEnv("paths.executable", "EXECUTABLE")
+	l.bindEnv("paths.logDir", "LOG_DIR")
+	l.bindEnv("paths.dataDir", "DATA_DIR")
+	l.bindEnv("paths.suspendFlagsDir", "SUSPEND_FLAGS_DIR")
+	l.bindEnv("paths.adminLogsDir", "ADMIN_LOG_DIR")
+	l.bindEnv("paths.baseConfig", "BASE_CONFIG")
+	l.bindEnv("paths.historyDir", "HISTORY_DIR")
+	l.bindEnv("paths.procDir", "PROC_DIR")
+	l.bindEnv("paths.queueDir", "QUEUE_DIR")
 
 	// UI customization
 	l.bindEnv("latestStatusToday", "LATEST_STATUS_TODAY")

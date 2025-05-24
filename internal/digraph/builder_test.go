@@ -16,26 +16,18 @@ import (
 
 func TestBuild(t *testing.T) {
 	t.Run("SkipIfSuccessful", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "skip_if_successful.yaml")
 		assert.True(t, th.SkipIfSuccessful)
 	})
 	t.Run("ParamsWithSubstitution", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "params_with_substitution.yaml")
 		th.AssertParam(t, "1=TEST_PARAM", "2=TEST_PARAM")
 	})
 	t.Run("ParamsWithQuotedValues", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "params_with_quoted_values.yaml")
 		th.AssertParam(t, "x=a b c", "y=d e f")
 	})
 	t.Run("ParamsAsMap", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "params_as_map.yaml")
 		th.AssertParam(t,
 			"FOO=foo",
@@ -44,8 +36,6 @@ func TestBuild(t *testing.T) {
 		)
 	})
 	t.Run("ParamsAsMapOverride", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "params_as_map.yaml", withBuildOpts(
 			digraph.BuildOpts{Parameters: "FOO=X BAZ=Y"},
 		))
@@ -56,8 +46,6 @@ func TestBuild(t *testing.T) {
 		)
 	})
 	t.Run("ParamsWithComplexValues", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "params_with_complex_values.yaml")
 		th.AssertParam(t,
 			"1=first",
@@ -70,35 +58,25 @@ func TestBuild(t *testing.T) {
 		)
 	})
 	t.Run("mailOn", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "valid_mail_on.yaml")
 		assert.True(t, th.MailOn.Failure)
 		assert.True(t, th.MailOn.Success)
 	})
 	t.Run("ValidTags", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "valid_tags.yaml")
 		assert.True(t, th.HasTag("daily"))
 		assert.True(t, th.HasTag("monthly"))
 	})
 	t.Run("ValidTagsList", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "valid_tags_list.yaml")
 		assert.True(t, th.HasTag("daily"))
 		assert.True(t, th.HasTag("monthly"))
 	})
 	t.Run("LogDir", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "valid_log_dir.yaml")
 		assert.Equal(t, "/tmp/logs", th.LogDir)
 	})
 	t.Run("MailConfig", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "valid_mail_config.yaml")
 		assert.Equal(t, "smtp.example.com", th.SMTP.Host)
 		assert.Equal(t, "587", th.SMTP.Port)
@@ -116,34 +94,27 @@ func TestBuild(t *testing.T) {
 		assert.True(t, th.InfoMail.AttachLogs)
 	})
 	t.Run("MaxHistRetentionDays", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "hist_retention_days.yaml")
 		assert.Equal(t, 365, th.HistRetentionDays)
 	})
 	t.Run("CleanUpTime", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "max_cleanup_time.yaml")
 		assert.Equal(t, time.Duration(10*time.Second), th.MaxCleanUpTime)
 	})
 	t.Run("Preconditions", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "preconditions.yaml")
 		assert.Len(t, th.Preconditions, 1)
 		assert.Equal(t, &digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Preconditions[0])
 	})
-	t.Run("MaxActiveRuns", func(t *testing.T) {
-		t.Parallel()
-
-		th := testLoad(t, "max_active_runs.yaml")
-		assert.Equal(t, 3, th.MaxActiveRuns)
+	t.Run("MaxActiveWorkflows", func(t *testing.T) {
+		th := testLoad(t, "max_active_workflows.yaml")
+		assert.Equal(t, 5, th.MaxActiveWorkflows)
 	})
-
+	t.Run("MaxActiveSteps", func(t *testing.T) {
+		th := testLoad(t, "max_active_steps.yaml")
+		assert.Equal(t, 3, th.MaxActiveSteps)
+	})
 	t.Run("ValidationError", func(t *testing.T) {
-		t.Parallel()
-
 		type testCase struct {
 			name        string
 			dag         string
