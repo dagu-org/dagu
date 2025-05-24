@@ -307,13 +307,23 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 		currentStatus, err := m.currentStatus(ctx, dag, latestStatus.WorkflowID)
 		if err == nil {
 			return *currentStatus, nil
+		} else {
+			logger.Debug(ctx, "Failed to get current status from socket", "error", err)
 		}
 	}
 
-	// If querying the current status fails, even if the status is running,
-	// set the status to error
+	// If querying the current status fails, ensure if the status is running,
 	if latestStatus.Status == scheduler.StatusRunning {
-		latestStatus.Status = scheduler.StatusError
+		// Check the PID is still alive
+		pid := int(latestStatus.PID)
+		if pid > 0 {
+			_, err := os.FindProcess(pid)
+			if err != nil {
+				// If we cannot find the process, mark the status as error
+				latestStatus.Status = scheduler.StatusError
+				logger.Warn(ctx, "No PID set for running status, marking status as error")
+			}
+		}
 	}
 
 	return *latestStatus, nil

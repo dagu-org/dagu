@@ -2,6 +2,7 @@ package localproc
 
 import (
 	"context"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -29,7 +30,8 @@ func New(baseDir string) *Store {
 // CountAlive implements models.ProcStore.
 func (s *Store) CountAlive(ctx context.Context, name string) (int, error) {
 	if _, ok := s.procGroups.Load(name); !ok {
-		s.procGroups.Store(name, NewProcGroup(s.baseDir, name, s.staleTime))
+		pgBaseDir := filepath.Join(s.baseDir, name)
+		s.procGroups.Store(name, NewProcGroup(pgBaseDir, name, s.staleTime))
 	}
 	pg, _ := s.procGroups.Load(name)
 	return pg.(*ProcGroup).Count(ctx, name)
@@ -38,7 +40,8 @@ func (s *Store) CountAlive(ctx context.Context, name string) (int, error) {
 // Acquire implements models.ProcStore.
 func (s *Store) Acquire(ctx context.Context, workflow digraph.WorkflowRef) (models.ProcHandle, error) {
 	if _, ok := s.procGroups.Load(workflow.Name); !ok {
-		s.procGroups.Store(workflow.Name, NewProcGroup(s.baseDir, workflow.Name, s.staleTime))
+		pgBaseDir := filepath.Join(s.baseDir, workflow.Name)
+		s.procGroups.Store(workflow.Name, NewProcGroup(pgBaseDir, workflow.Name, s.staleTime))
 	}
 	pg, _ := s.procGroups.Load(workflow.Name)
 	proc, err := pg.(*ProcGroup).Acquire(ctx, workflow)
