@@ -129,6 +129,9 @@ func (e Workflow) ListChildWorkflows(ctx context.Context) ([]*Workflow, error) {
 	childDir := filepath.Join(e.baseDir, ChildWorkflowsDir)
 	entries, err := os.ReadDir(childDir)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return []*Workflow{}, nil
+		}
 		return nil, fmt.Errorf("failed to read child workflows directory: %w", err)
 	}
 
@@ -137,6 +140,12 @@ func (e Workflow) ListChildWorkflows(ctx context.Context) ([]*Workflow, error) {
 		if !entry.IsDir() {
 			continue
 		}
+
+		// check if the directory name matches the child workflow pattern
+		if !reChildWorkflow.MatchString(entry.Name()) {
+			continue
+		}
+
 		childWorkflow, err := NewWorkflow(filepath.Join(childDir, entry.Name()))
 		if err != nil {
 			logger.Error(ctx, "failed to read child workflow data: %w", err)
