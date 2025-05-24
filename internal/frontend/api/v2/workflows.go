@@ -155,9 +155,9 @@ func (a *API) GetWorkflowStepLog(ctx context.Context, request api.GetWorkflowSte
 	}
 
 	// Use the new log utility function
-	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(node.Log, options)
+	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(node.Stdout, options)
 	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %w", node.Log, err)
+		return nil, fmt.Errorf("error reading %s: %w", node.Stdout, err)
 	}
 
 	return api.GetWorkflowStepLog200JSONResponse{
@@ -301,9 +301,9 @@ func (a *API) GetChildWorkflowStepLog(ctx context.Context, request api.GetChildW
 	}
 
 	// Use the new log utility function
-	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(node.Log, options)
+	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(node.Stdout, options)
 	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %w", node.Log, err)
+		return nil, fmt.Errorf("error reading %s: %w", node.Stdout, err)
 	}
 
 	return &api.GetChildWorkflowStepLog200JSONResponse{

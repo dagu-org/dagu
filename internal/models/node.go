@@ -39,7 +39,8 @@ func FromNode(node scheduler.NodeData) *Node {
 	}
 	return &Node{
 		Step:            node.Step,
-		Log:             node.State.Log,
+		Stdout:          node.State.Stdout,
+		Stderr:          node.State.Stderr,
 		StartedAt:       stringutil.FormatTime(node.State.StartedAt),
 		FinishedAt:      stringutil.FormatTime(node.State.FinishedAt),
 		Status:          node.State.Status,
@@ -55,7 +56,8 @@ func FromNode(node scheduler.NodeData) *Node {
 // Node represents a DAG step with its execution state for persistence
 type Node struct {
 	Step            digraph.Step         `json:"step"`
-	Log             string               `json:"log"`
+	Stdout          string               `json:"stdout"` // standard output log file path
+	Stderr          string               `json:"stderr"` // standard error log file path
 	StartedAt       string               `json:"startedAt"`
 	FinishedAt      string               `json:"finishedAt"`
 	Status          scheduler.NodeStatus `json:"status"`
@@ -82,7 +84,8 @@ func (n *Node) ToNode() *scheduler.Node {
 	}
 	return scheduler.NewNode(n.Step, scheduler.NodeState{
 		Status:          n.Status,
-		Log:             n.Log,
+		Stdout:          n.Stdout,
+		Stderr:          n.Stderr,
 		StartedAt:       startedAt,
 		FinishedAt:      finishedAt,
 		RetriedAt:       retriedAt,

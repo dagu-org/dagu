@@ -397,13 +397,13 @@ func (a *API) readStepLog(
 		decoder = japanese.EUCJP.NewDecoder()
 	}
 
-	logContent, err := readFileContent(node.Log, decoder)
+	logContent, err := readFileContent(node.Stdout, decoder)
 	if err != nil {
-		return nil, fmt.Errorf("error reading log file %s: %w", node.Log, err)
+		return nil, fmt.Errorf("error reading log file %s: %w", node.Stdout, err)
 	}
 
 	return &api.StepLog{
-		LogFile: node.Log,
+		LogFile: node.Stdout,
 		Step:    toNode(node),
 		Content: string(logContent),
 	}, nil
@@ -841,7 +841,7 @@ func toNode(node *models.Node) api.Node {
 	return api.Node{
 		DoneCount:  node.DoneCount,
 		FinishedAt: node.FinishedAt,
-		Log:        node.Log,
+		Log:        node.Stdout,
 		RetryCount: node.RetryCount,
 		StartedAt:  node.StartedAt,
 		Status:     api.NodeStatus(node.Status),

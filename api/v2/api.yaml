@@ -1610,9 +1610,12 @@ components:
       properties:
         step:
           $ref: "#/components/schemas/Step"
-        log:
+        stdout:
           type: string
-          description: "Path to step-specific log file"
+          description: "Path to the standard output log file for this step"
+        stderr:
+          type: string
+          description: "Path to the standard error log file for this step"
         startedAt:
           type: string
           description: "RFC3339 timestamp when the step started"
@@ -1639,7 +1642,8 @@ components:
           description: "Error message if the step failed"
       required:
         - step
-        - log
+        - stdout
+        - stderr
         - startedAt
         - finishedAt
         - status

@@ -277,8 +277,8 @@ func (n nodeHelper) ExecuteFail(t *testing.T, expectedErr string) {
 func (n nodeHelper) AssertLogContains(t *testing.T, expected string) {
 	t.Helper()
 
-	dat, err := os.ReadFile(n.LogFile())
-	require.NoErrorf(t, err, "failed to read log file %q", n.LogFile())
+	dat, err := os.ReadFile(n.StdoutFile())
+	require.NoErrorf(t, err, "failed to read log file %q", n.StdoutFile())
 	require.Contains(t, string(dat), expected, "log file does not contain expected string")
 }
 

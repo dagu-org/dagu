@@ -122,7 +122,8 @@ func toNode(node *models.Node) api.Node {
 	return api.Node{
 		DoneCount:   node.DoneCount,
 		FinishedAt:  node.FinishedAt,
-		Log:         node.Log,
+		Stdout:      node.Stdout,
+		Stderr:      node.Stderr,
 		RetryCount:  node.RetryCount,
 		StartedAt:   node.StartedAt,
 		Status:      api.NodeStatus(node.Status),
