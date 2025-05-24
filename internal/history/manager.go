@@ -106,6 +106,37 @@ func (m *Manager) StartDAG(_ context.Context, dag *digraph.DAG, opts StartOption
 	return cmd.Start()
 }
 
+// EnqueueWorkflow enqueues a workflow for execution by executing the configured executable.
+func (m *Manager) EnqueueWorkflow(_ context.Context, dag *digraph.DAG, opts EnqueueOptions) error {
+	args := []string{"enqueue"}
+	if opts.Params != "" {
+		args = append(args, "-p")
+		args = append(args, fmt.Sprintf(`"%s"`, escapeArg(opts.Params)))
+	}
+	if opts.Quiet {
+		args = append(args, "-q")
+	}
+	if opts.WorkflowID != "" {
+		args = append(args, fmt.Sprintf("--workflow-id=%s", opts.WorkflowID))
+	}
+	if configFile := config.UsedConfigFile.Load(); configFile != nil {
+		if configFile, ok := configFile.(string); ok {
+			args = append(args, "--config")
+			args = append(args, configFile)
+		}
+	}
+	args = append(args, dag.Location)
+	// nolint:gosec
+	cmd := exec.Command(m.executable, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
+	cmd.Dir = m.workDir
+	cmd.Env = os.Environ()
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Start()
+}
+
 // RestartDAG restarts a DAG by executing the configured executable with the restart command.
 // It sets up the command to run in its own process group.
 func (m *Manager) RestartDAG(_ context.Context, dag *digraph.DAG, opts RestartOptions) error {
@@ -385,6 +416,13 @@ func escapeArg(input string) string {
 
 // StartOptions contains options for starting a DAG.
 type StartOptions struct {
+	Params     string // Parameters to pass to the DAG
+	Quiet      bool   // Whether to run in quiet mode
+	WorkflowID string // Workflow ID for the workflow
+}
+
+// EnqueueOptions contains options for enqueuing a DAG.
+type EnqueueOptions struct {
 	Params     string // Parameters to pass to the DAG
 	Quiet      bool   // Whether to run in quiet mode
 	WorkflowID string // Workflow ID for the workflow
