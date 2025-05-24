@@ -802,11 +802,7 @@ func (h *DAG) postAction(
 				fmt.Errorf("request-id is required"),
 			)
 		}
-		if err := h.client.Retry(ctx, dagStatus.DAG, params.Body.RequestID); err != nil {
-			return nil, newInternalError(
-				fmt.Errorf("error trying to retry the DAG: %w", err),
-			)
-		}
+		h.client.RetryAsync(ctx, dagStatus.DAG, params.Body.RequestID)
 		return &models.PostDAGActionResponse{}, nil
 
 	case "mark-success":

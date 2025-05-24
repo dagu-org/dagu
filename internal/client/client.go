@@ -189,6 +189,14 @@ func (e *client) Retry(_ context.Context, dag *digraph.DAG, requestID string) er
 	return cmd.Wait()
 }
 
+func (e *client) RetryAsync(ctx context.Context, dag *digraph.DAG, requestID string) {
+	go func() {
+		if err := e.Retry(ctx, dag, requestID); err != nil {
+			logger.Error(ctx, "DAG retry operation failed", "err", err)
+		}
+	}()
+}
+
 func (*client) GetCurrentStatus(_ context.Context, dag *digraph.DAG) (*model.Status, error) {
 	client := sock.NewClient(dag.SockAddr())
 	ret, err := client.Request("GET", "/status")

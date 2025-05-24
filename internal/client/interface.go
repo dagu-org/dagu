@@ -20,6 +20,7 @@ type Client interface {
 	Start(ctx context.Context, dag *digraph.DAG, opts StartOptions) error
 	Restart(ctx context.Context, dag *digraph.DAG, opts RestartOptions) error
 	Retry(ctx context.Context, dag *digraph.DAG, requestID string) error
+	RetryAsync(ctx context.Context, dag *digraph.DAG, requestID string)
 	GetCurrentStatus(ctx context.Context, dag *digraph.DAG) (*model.Status, error)
 	GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, requestID string) (*model.Status, error)
 	GetLatestStatus(ctx context.Context, dag *digraph.DAG) (model.Status, error)
