@@ -27,5 +27,6 @@ __debug_bin*
 # Misc files
 .aider*
 
-# Local markdown files
+# Local configuration files
 *.local.md
+*.local.json

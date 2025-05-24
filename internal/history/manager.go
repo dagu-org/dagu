@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"slices"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -80,7 +81,7 @@ func (m *Manager) StartDAG(_ context.Context, dag *digraph.DAG, opts StartOption
 	args := []string{"start"}
 	if opts.Params != "" {
 		args = append(args, "-p")
-		args = append(args, fmt.Sprintf(`"%s"`, escapeArg(opts.Params)))
+		args = append(args, fmt.Sprintf(`%s`, strconv.Quote(opts.Params)))
 	}
 	if opts.Quiet {
 		args = append(args, "-q")
@@ -111,7 +112,7 @@ func (m *Manager) EnqueueWorkflow(_ context.Context, dag *digraph.DAG, opts Enqu
 	args := []string{"enqueue"}
 	if opts.Params != "" {
 		args = append(args, "-p")
-		args = append(args, fmt.Sprintf(`"%s"`, escapeArg(opts.Params)))
+		args = append(args, fmt.Sprintf(`%s`, strconv.Quote(opts.Params)))
 	}
 	if opts.Quiet {
 		args = append(args, "-q")

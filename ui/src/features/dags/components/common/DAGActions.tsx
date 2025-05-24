@@ -343,25 +343,77 @@ function DAGActions({
           dismissModal={() => setIsStopModal(false)}
           onSubmit={async () => {
             setIsStopModal(false);
-            const { error } = await client.POST('/dags/{fileName}/stop', {
-              params: {
-                query: {
-                  remoteNode: appBarContext.selectedRemoteNode || 'local',
+            
+            // Use workflow API if we have workflow name and ID, otherwise use DAG API
+            if (status?.name && status?.workflowId) {
+              const { error } = await client.POST('/workflows/{name}/{workflowId}/stop', {
+                params: {
+                  query: {
+                    remoteNode: appBarContext.selectedRemoteNode || 'local',
+                  },
+                  path: {
+                    name: status.name,
+                    workflowId: status.workflowId,
+                  },
                 },
-                path: {
-                  fileName: fileName,
+              });
+              if (error) {
+                console.error('Stop workflow API error:', error);
+                alert(error.message || 'An error occurred');
+                return;
+              }
+            } else {
+              const { error } = await client.POST('/dags/{fileName}/stop', {
+                params: {
+                  query: {
+                    remoteNode: appBarContext.selectedRemoteNode || 'local',
+                  },
+                  path: {
+                    fileName: fileName,
+                  },
                 },
-              },
-            });
-            if (error) {
-              console.error('Retry API error:', error);
-              alert(error.message || 'An error occurred');
-              return;
+              });
+              if (error) {
+                console.error('Stop DAG API error:', error);
+                alert(error.message || 'An error occurred');
+                return;
+              }
             }
             reloadData();
           }}
         >
-          <div>Do you really want to cancel the DAG?</div>
+          <div>
+            <p className="mb-2">
+              {status?.name && status?.workflowId 
+                ? `Do you really want to stop the workflow "${status.name}"?`
+                : 'Do you really want to cancel the DAG?'
+              }
+            </p>
+            {status?.name && (
+              <LabeledItem label="Workflow-Name">
+                <span className="font-mono text-sm">{status.name}</span>
+              </LabeledItem>
+            )}
+            {status?.workflowId && (
+              <LabeledItem label="Workflow-ID">
+                <span className="font-mono text-sm">{status.workflowId}</span>
+              </LabeledItem>
+            )}
+            {status?.startedAt && (
+              <LabeledItem label="Started At">
+                <span className="text-sm">
+                  {dayjs(status.startedAt).format('YYYY-MM-DD HH:mm:ss Z')}
+                </span>
+              </LabeledItem>
+            )}
+            {status?.status !== undefined && (
+              <LabeledItem label="Status">
+                <StatusChip status={status.status} size="sm">
+                  {status.statusLabel || ''}
+                </StatusChip>
+              </LabeledItem>
+            )}
+          </div>
         </ConfirmModal>
         <ConfirmModal
           title="Confirmation"
@@ -371,22 +423,44 @@ function DAGActions({
           onSubmit={async () => {
             setIsRetryModal(false);
 
-            const { error } = await client.POST('/dags/{fileName}/retry', {
-              params: {
-                path: {
-                  fileName: fileName,
+            // Use workflow API if we have workflow name and ID, otherwise use DAG API
+            if (status?.name && retryWorkflowId) {
+              const { error } = await client.POST('/workflows/{name}/{workflowId}/retry', {
+                params: {
+                  path: {
+                    name: status.name,
+                    workflowId: retryWorkflowId,
+                  },
+                  query: {
+                    remoteNode: appBarContext.selectedRemoteNode || 'local',
+                  },
                 },
-                query: {
-                  remoteNode: appBarContext.selectedRemoteNode || 'local',
+                body: {
+                  workflowId: retryWorkflowId,
                 },
-              },
-              body: {
-                workflowId: retryWorkflowId,
-              },
-            });
-            if (error) {
-              alert(error.message || 'An error occurred');
-              return;
+              });
+              if (error) {
+                alert(error.message || 'An error occurred');
+                return;
+              }
+            } else {
+              const { error } = await client.POST('/dags/{fileName}/retry', {
+                params: {
+                  path: {
+                    fileName: fileName,
+                  },
+                  query: {
+                    remoteNode: appBarContext.selectedRemoteNode || 'local',
+                  },
+                },
+                body: {
+                  workflowId: retryWorkflowId,
+                },
+              });
+              if (error) {
+                alert(error.message || 'An error occurred');
+                return;
+              }
             }
             reloadData();
           }}
@@ -394,7 +468,10 @@ function DAGActions({
           {/* Keep modal content structure */}
           <div>
             <p className="mb-2">
-              Do you really want to rerun the following execution?
+              {status?.name && retryWorkflowId
+                ? `Do you really want to retry the workflow "${status.name}"?`
+                : 'Do you really want to rerun the following execution?'
+              }
             </p>
             <LabeledItem label="Workflow-Name">
               <span className="font-mono text-sm">{status?.name || 'N/A'}</span>
