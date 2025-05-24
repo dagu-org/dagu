@@ -25,7 +25,7 @@ Example:
 
 var dequeueFlags = []commandLineFlag{paramsFlag, workflowNameFlagDequeue, workflowIDFlagDequeue}
 
-func runDequeue(ctx *Context, args []string) error {
+func runDequeue(ctx *Context, _ []string) error {
 	// Get workflow ID from flags
 	workflowName, _ := ctx.StringParam("workflow-name")
 	workflowID, _ := ctx.StringParam("workflow-id")
