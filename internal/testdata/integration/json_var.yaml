@@ -1,10 +1,10 @@
 steps:
-  - name: get config
+  - name: get_config
     command: |
       echo '{"port": 8080, "host": "localhost"}'
     output: CONFIG
 
-  - name: start server
+  - name: start_server
     command: echo "Starting server at ${CONFIG.host}:${CONFIG.port}"
     output: OUT1
-    depends: get config
+    depends: get_config

@@ -4,22 +4,50 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestCreateFile(t *testing.T) {
+	t.Run("file creation and permissions", func(t *testing.T) {
+		dir := t.TempDir()
+		filePath := filepath.Join(dir, "test.log")
+
+		file, err := OpenOrCreateFile(filePath)
+		require.NoError(t, err)
+		defer func() {
+			_ = file.Close()
+		}()
+
+		assert.NotNil(t, file)
+		assert.Equal(t, filePath, file.Name())
+
+		info, err := file.Stat()
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
+	})
+
+	t.Run("invalid path", func(t *testing.T) {
+		_, err := OpenOrCreateFile("/nonexistent/directory/test.log")
+		assert.Error(t, err)
+	})
+}
 
 func TestResolvePath(t *testing.T) {
 	// Save original environment to restore later
 	origHome := os.Getenv("HOME")
 	origTempDir := os.Getenv("TEMP_DIR")
 	defer func() {
-		os.Setenv("HOME", origHome)
-		os.Setenv("TEMP_DIR", origTempDir)
+		_ = os.Setenv("HOME", origHome)
+		_ = os.Setenv("TEMP_DIR", origTempDir)
 	}()
 
 	// Set up test environment variables
 	testHome := "/test/home"
 	testTempDir := "/test/temp"
-	os.Setenv("HOME", testHome)
-	os.Setenv("TEMP_DIR", testTempDir)
+	_ = os.Setenv("HOME", testHome)
+	_ = os.Setenv("TEMP_DIR", testTempDir)
 
 	// Get current working directory for absolute path tests
 	cwd, err := os.Getwd()
@@ -137,7 +165,7 @@ func TestMustResolvePath(t *testing.T) {
 		path := "test.txt"
 		expected := filepath.Join(cwd, path)
 
-		result := MustResolvePath(path)
+		result := ResolvePathOrBlank(path)
 		if result != expected {
 			t.Errorf("MustResolvePath(%q) = %q, want %q", path, result, expected)
 		}
@@ -152,7 +180,7 @@ func TestMustResolvePath(t *testing.T) {
 			t.Fatalf("ResolvePath failed: %v", err)
 		}
 
-		mustResolved := MustResolvePath(path)
+		mustResolved := ResolvePathOrBlank(path)
 		if mustResolved != resolved {
 			t.Errorf("MustResolvePath(%q) = %q, but ResolvePath(%q) = %q",
 				path, mustResolved, path, resolved)

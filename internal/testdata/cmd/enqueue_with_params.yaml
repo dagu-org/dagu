@@ -1,0 +1,4 @@
+params: "p1 p2"
+steps:
+  - name: "1"
+    command: "echo \"params is $1 and $2\""

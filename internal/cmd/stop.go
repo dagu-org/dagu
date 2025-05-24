@@ -11,42 +11,67 @@ import (
 func CmdStop() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "stop [flags] /path/to/spec.yaml",
-			Short: "Stop a running DAG",
-			Long: `Gracefully terminate an active DAG execution.
+			Use:   "stop [flags] <DAG definition or workflow name>",
+			Short: "Stop a running workflow",
+			Long: `Gracefully terminate an active workflow instance.
 
-This command stops all running tasks of the specified DAG, ensuring resources are properly released.
+This command sends termination signals to all running tasks of the specified workflow,
+ensuring resources are properly released and cleanup handlers are executed. It waits
+for tasks to complete their shutdown procedures before exiting.
+
+Flags:
+  --workflow-id string   (optional) Unique identifier of the workflow to stop.
+                                   If not provided, it will find and stop the currently
+                                   running workflow by the given DAG definition name.
 
 Example:
-  dagu stop my_dag.yaml
+  dagu stop --workflow-id=abc123 my_dag
 `,
 			Args: cobra.ExactArgs(1),
 		}, stopFlags, runStop,
 	)
 }
 
-var stopFlags = []commandLineFlag{}
+var stopFlags = []commandLineFlag{
+	workflowIDFlagStop,
+}
 
 func runStop(ctx *Context, args []string) error {
-	dag, err := digraph.Load(ctx, args[0], digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig))
+	workflowID, err := ctx.StringParam("workflow-id")
 	if err != nil {
-		logger.Error(ctx, "Failed to load DAG", "err", err)
-		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
+		return fmt.Errorf("failed to get workflow ID: %w", err)
 	}
 
-	logger.Info(ctx, "DAG is stopping", "dag", dag.Name)
+	name := args[0]
 
-	cli, err := ctx.Client()
-	if err != nil {
-		logger.Error(ctx, "failed to initialize client", "err", err)
-		return fmt.Errorf("failed to initialize client: %w", err)
+	var dag *digraph.DAG
+	if workflowID != "" {
+		// Retrieve the previous run's history record for the specified workflow ID.
+		ref := digraph.NewWorkflowRef(name, workflowID)
+		rec, err := ctx.HistoryStore.FindRun(ctx, ref)
+		if err != nil {
+			return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflowID, err)
+		}
+
+		d, err := rec.ReadDAG(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to read DAG from history record: %w", err)
+		}
+		dag = d
+	} else {
+		d, err := digraph.Load(ctx, args[0], digraph.WithBaseConfig(ctx.Config.Paths.BaseConfig))
+		if err != nil {
+			return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
+		}
+		dag = d
 	}
 
-	if err := cli.Stop(ctx, dag); err != nil {
-		logger.Error(ctx, "Failed to stop DAG", "dag", dag.Name, "err", err)
+	logger.Info(ctx, "Workflow is stopping", "dag", dag.Name)
+
+	if err := ctx.HistoryMgr.Stop(ctx, dag, workflowID); err != nil {
 		return fmt.Errorf("failed to stop DAG: %w", err)
 	}
 
-	logger.Info(ctx, "DAG stopped", "dag", dag.Name)
+	logger.Info(ctx, "Workflow stopped", "dag", dag.Name)
 	return nil
 }

@@ -14,7 +14,7 @@ func TestDryCommand(t *testing.T) {
 			{
 				Name:        "DryRunDAG",
 				Args:        []string{"dry", th.DAG(t, "cmd/dry.yaml").Location},
-				ExpectedOut: []string{"Dry-run finished"},
+				ExpectedOut: []string{"Dry-run completed"},
 			},
 			{
 				Name:        "DryRunDAGWithParams",

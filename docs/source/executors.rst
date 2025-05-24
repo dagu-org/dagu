@@ -45,7 +45,7 @@ By default, Dagu will try to pull the Docker image. For images built locally thi
           type: docker
           config:
             image: alpine
-            pull: false
+            pull: never
             autoRemove: true
         command: echo "hello"
 
@@ -62,7 +62,7 @@ For example:
           type: docker
           config:
             image: alpine
-            pull: false
+            pull: never
             host:
               binds:
                 - /app:/app
@@ -82,7 +82,7 @@ The container's network can be configured as well.
           type: docker
           config:
             image: alpine
-            pull: false
+            pull: never
             network:
               EndpointsConfig:
                 my-network:
@@ -103,14 +103,26 @@ Note that the environment variables of the host (where `dagu` is running) will n
           type: docker
           config:
             image: alpine
-            pull: false
+            pull: never
             container:
               env:
                 - TEST_ENV=${TEST_ENV}
             autoRemove: true
         command: printenv
 
-See the Docker's API documentation for all available options.
+Available creating container configuration options:
+
+- `image`: Name or ID of the image to create the container (required)
+- `containerName`: Name of the newly created container (optional)
+- `pull`:
+  - `always`: Always pull the image from the internet
+  - `missing`: Only pull the image if it is not available locally (default)
+  - `never`: Never pull any image
+  - `true`: Same effect as `always` and only kept for backward compatibility.
+  - `false`: Same effect as `never` and only kept for backward compatibility.
+- `platform`: Create and run a container on specific platform, default to the platform of the current docker host
+
+For further customizing the newly created container, check the Docker's API document:
 
 - For `container`, see `ContainerConfig <https://pkg.go.dev/github.com/docker/docker/api/types/container#Config>`_.
 - For `host`, see `HostConfig <https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig>`_.

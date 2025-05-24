@@ -7,130 +7,121 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
 )
 
 func CmdRetry() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "retry [flags] /path/to/spec.yaml",
-			Short: "Retry a DAG execution",
-			Long: `Re-execute a previously run DAG using its unique request ID.
+			Use:   "retry [flags] <workflow name>",
+			Short: "Retry a previously executed workflow",
+			Long: `Create a new run for a previously executed workflow using the same workflow ID.
+
+Unlike restart, which creates a new workflow with a new ID, retry creates a new run within 
+the same workflow ID. This preserves the workflow history and allows for multiple attempts
+of the same workflow instance.
+
+Flags:
+  --workflow-id string (required) Unique identifier of the workflow to retry.
 
 Example:
-  dagu retry my_dag.yaml --request-id=abc123
+  dagu retry --workflow-id=abc123 my_dag
 
-This command is useful for recovering from errors or transient issues by re-running the DAG.
+This command is useful for recovering from errors or transient issues by creating a new run
+of the same workflow without changing its identity.
 `,
 			Args: cobra.ExactArgs(1),
 		}, retryFlags, runRetry,
 	)
 }
 
-var retryFlags = []commandLineFlag{requestIDFlagRetry}
+var retryFlags = []commandLineFlag{workflowIDFlagRetry}
 
 func runRetry(ctx *Context, args []string) error {
-	requestID, err := ctx.Flags().GetString("request-id")
+	workflowID, _ := ctx.StringParam("workflow-id")
+	name := args[0]
+
+	// Retrieve the previous run data for specified workflow ID.
+	ref := digraph.NewWorkflowRef(name, workflowID)
+	runRecord, err := ctx.HistoryStore.FindRun(ctx, ref)
 	if err != nil {
-		return fmt.Errorf("failed to get request ID: %w", err)
+		return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflowID, err)
 	}
 
-	specFilePath := args[0]
-
-	absolutePath, err := filepath.Abs(specFilePath)
+	// Read the detailed status of the previous status.
+	status, err := runRecord.ReadStatus(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to resolve absolute path", "path", specFilePath, "err", err)
-		return fmt.Errorf("failed to resolve absolute path for %s: %w", specFilePath, err)
+		return fmt.Errorf("failed to read status: %w", err)
 	}
 
-	status, err := ctx.historyStore().FindByRequestID(ctx, absolutePath, requestID)
+	// Get the DAG instance from the execution history.
+	dag, err := runRecord.ReadDAG(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to retrieve historical execution", "requestID", requestID, "err", err)
-		return fmt.Errorf("failed to retrieve historical execution for request ID %s: %w", requestID, err)
+		return fmt.Errorf("failed to read DAG from record: %w", err)
 	}
 
-	loadOpts := []digraph.LoadOption{
-		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
-	}
-
-	if status.Status.Params != "" {
-		// backward compatibility
-		loadOpts = append(loadOpts, digraph.WithParams(status.Status.Params))
-	} else {
-		loadOpts = append(loadOpts, digraph.WithParams(status.Status.ParamsList))
-	}
-
-	dag, err := digraph.Load(ctx, absolutePath, loadOpts...)
-	if err != nil {
-		logger.Error(ctx, "Failed to load DAG specification", "path", specFilePath, "err", err)
-		// nolint : staticcheck
-		return fmt.Errorf("failed to load DAG specification from %s with params %s: %w",
-			specFilePath, status.Status.Params, err)
-	}
-
-	// Execute DAG retry
-	if err := executeRetry(ctx, dag, status); err != nil {
-		logger.Error(ctx, "Failed to execute retry", "path", specFilePath, "err", err)
+	// The retry command is currently only supported for root DAGs.
+	if err := executeRetry(ctx, dag, status, status.Workflow()); err != nil {
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
 
 	return nil
 }
 
-func executeRetry(ctx *Context, dag *digraph.DAG, originalStatus *model.StatusFile) error {
-	newRequestID, err := generateRequestID()
+func executeRetry(ctx *Context, dag *digraph.DAG, status *models.Status, rootRun digraph.WorkflowRef) error {
+	logger.Debug(ctx, "Executing workflow retry", "name", dag.Name, "workflowId", status.WorkflowID)
+
+	// We use the same log file for the retry as the original run.
+	logFile, err := fileutil.OpenOrCreateFile(status.Log)
 	if err != nil {
-		return fmt.Errorf("failed to generate new request ID: %w", err)
+		return fmt.Errorf("failed to open log file: %w", err)
 	}
+	defer func() {
+		_ = logFile.Close()
+	}()
 
-	const logPrefix = "retry_"
-	logFile, err := ctx.OpenLogFile(logPrefix, dag, newRequestID)
-	if err != nil {
-		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
-	}
-	defer logFile.Close()
+	logger.Info(ctx, "Workflow retry initiated", "DAG", dag.Name, "workflowId", status.WorkflowID, "logFile", logFile.Name())
 
-	logger.Info(ctx, "DAG retry initiated", "DAG", dag.Name, "originalRequestID", originalStatus.Status.RequestID, "newRequestID", newRequestID, "logFile", logFile.Name())
-
+	// Update the context with the log file
 	ctx.LogToFile(logFile)
 
-	dagStore, err := ctx.dagStore()
+	dr, err := ctx.dagStore(nil, []string{filepath.Dir(dag.Location)})
 	if err != nil {
-		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	cli, err := ctx.Client()
-	if err != nil {
-		logger.Error(ctx, "Failed to initialize client", "err", err)
-		return fmt.Errorf("failed to initialize client: %w", err)
-	}
-
 	agentInstance := agent.New(
-		newRequestID,
+		status.WorkflowID,
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
-		cli,
-		dagStore,
-		ctx.historyStore(),
-		agent.Options{RetryTarget: &originalStatus.Status},
+		ctx.HistoryMgr,
+		dr,
+		ctx.HistoryStore,
+		ctx.ProcStore,
+		rootRun,
+		agent.Options{
+			RetryTarget: status,
+			Parent:      status.Parent,
+		},
 	)
 
 	listenSignals(ctx, agentInstance)
 
 	if err := agentInstance.Run(ctx); err != nil {
-		if ctx.quiet {
+		if ctx.Quiet {
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
-			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, newRequestID, err)
+			return fmt.Errorf("failed to execute the workflow %s (workflow ID: %s): %w", dag.Name, status.WorkflowID, err)
 		}
 	}
 
-	if !ctx.quiet {
+	// Print the summary of the execution if the quiet flag is not set.
+	if !ctx.Quiet {
 		agentInstance.PrintSummary(ctx)
 	}
 

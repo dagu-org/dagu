@@ -55,6 +55,7 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 		e.mu.Unlock()
 		return fmt.Errorf("failed to create command: %w", err)
 	}
+
 	e.cmd = cmd
 
 	if err := e.cmd.Start(); err != nil {
@@ -99,21 +100,24 @@ type commandConfig struct {
 	Script           string
 	ShellCommand     string
 	ShellCommandArgs string
+	ShellPackages    []string
 	Stdout           io.Writer
 	Stderr           io.Writer
 }
 
 func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.Cmd, error) {
-	stepContext := digraph.GetStepContext(ctx)
-
 	var cmd *exec.Cmd
 	switch {
 	case cfg.Command != "" && scriptFile != "":
-		args, err := cfg.evalArgs()
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate command args: %w", err)
+		builder := &shellCommandBuilder{
+			Command:          cfg.Command,
+			Args:             cfg.Args,
+			ShellCommand:     cfg.ShellCommand,
+			ShellCommandArgs: cfg.ShellCommandArgs,
+			Packages:         cfg.ShellPackages,
+			Script:           scriptFile,
 		}
-		cmd = exec.CommandContext(cfg.Ctx, cfg.Command, append(args, scriptFile)...) // nolint: gosec
+		cmd = builder.Build(ctx)
 
 	case cfg.ShellCommand != "" && scriptFile != "":
 		// If script is provided ignore the shell command args
@@ -121,19 +125,19 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 		cmd = exec.CommandContext(cfg.Ctx, cfg.ShellCommand, scriptFile) // nolint: gosec
 
 	case cfg.ShellCommand != "" && cfg.ShellCommandArgs != "":
-		// nolint: gosec
-		cmd = exec.CommandContext(cfg.Ctx, cfg.ShellCommand, "-c", cfg.ShellCommandArgs)
+		builder := &shellCommandBuilder{
+			ShellCommand:     cfg.ShellCommand,
+			ShellCommandArgs: cfg.ShellCommandArgs,
+			Packages:         cfg.ShellPackages,
+		}
+		cmd = builder.Build(ctx)
 
 	default:
-		args, err := cfg.evalArgs()
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate command args: %w", err)
-		}
-		cmd = createDirectCommand(cfg.Ctx, cfg.Command, args, scriptFile)
+		cmd = createDirectCommand(cfg.Ctx, cfg.Command, cfg.Args, scriptFile)
 
 	}
 
-	cmd.Env = append(cmd.Env, stepContext.AllEnvs()...)
+	cmd.Env = append(cmd.Env, AllEnvs(ctx)...)
 	cmd.Dir = cfg.Dir
 	cmd.Stdout = cfg.Stdout
 	cmd.Stderr = cfg.Stderr
@@ -143,18 +147,6 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 	}
 
 	return cmd, nil
-}
-
-func (cfg *commandConfig) evalArgs() ([]string, error) {
-	args := make([]string, len(cfg.Args))
-	for i, arg := range cfg.Args {
-		arg, err := cmdutil.EvalString(cfg.Ctx, arg)
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate command args: %w", err)
-		}
-		args[i] = arg
-	}
-	return args, nil
 }
 
 func init() {
@@ -173,6 +165,42 @@ func exitCodeFromError(err error) int {
 		exitCode = 1
 	}
 	return exitCode
+}
+
+type shellCommandBuilder struct {
+	Command          string
+	Args             []string
+	ShellCommand     string
+	ShellCommandArgs string
+	Packages         []string
+	Script           string
+}
+
+func (b *shellCommandBuilder) Build(ctx context.Context) *exec.Cmd {
+	switch b.ShellCommand {
+	case "nix-shell":
+		var args []string
+
+		// If the shell command is nix-shell, we need to pass the packages as arguments
+		for _, pkg := range b.Packages {
+			args = append(args, "-p", pkg)
+		}
+		args = append(args, "--pure", "--run")
+
+		if b.Command != "" && b.Script != "" {
+			return exec.CommandContext(ctx, b.Command, append(args, b.Script)...) // nolint: gosec
+		}
+
+		// Construct the command with the shell command and the packages
+		return exec.CommandContext(ctx, b.ShellCommand, append(args, b.ShellCommandArgs)...) // nolint: gosec
+	}
+
+	if b.Command != "" && b.Script != "" {
+		return exec.CommandContext(ctx, b.Command, append(b.Args, b.Script)...) // nolint: gosec
+	}
+
+	// nolint: gosec
+	return exec.CommandContext(ctx, b.ShellCommand, "-c", b.ShellCommandArgs)
 }
 
 func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
@@ -200,10 +228,11 @@ func createCommandConfig(ctx context.Context, step digraph.Step) (*commandConfig
 		Script:           step.Script,
 		ShellCommand:     shellCommand,
 		ShellCommandArgs: shellCmdArgs,
+		ShellPackages:    step.ShellPackages,
 	}, nil
 }
 
-func setupScript(ctx context.Context, step digraph.Step) (string, error) {
+func setupScript(_ context.Context, step digraph.Step) (string, error) {
 	file, err := os.CreateTemp(step.Dir, "dagu_script-")
 	if err != nil {
 		return "", fmt.Errorf("failed to create script file: %w", err)
@@ -212,18 +241,17 @@ func setupScript(ctx context.Context, step digraph.Step) (string, error) {
 		_ = file.Close()
 	}()
 
-	stepContext := digraph.GetStepContext(ctx)
-	script, err := stepContext.EvalString(ctx, step.Script, cmdutil.OnlyReplaceVars())
-	if err != nil {
-		return "", fmt.Errorf("failed to evaluate script: %w", err)
-	}
-
-	if _, err = file.WriteString(script); err != nil {
+	if _, err = file.WriteString(step.Script); err != nil {
 		return "", fmt.Errorf("failed to write script to file: %w", err)
 	}
 
 	if err = file.Sync(); err != nil {
 		return "", fmt.Errorf("failed to sync script file: %w", err)
+	}
+
+	// Add execute permissions to the script file
+	if err = os.Chmod(file.Name(), 0755); err != nil { // nolint: gosec
+		return "", fmt.Errorf("failed to set execute permissions on script file: %w", err)
 	}
 
 	return file.Name(), nil

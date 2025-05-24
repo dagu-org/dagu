@@ -12,7 +12,6 @@ To enable basic authentication for Dagu, follow these steps:
   
    .. code-block:: bash
   
-       export DAGU_AUTH_BASIC_ENABLED=1
        export DAGU_AUTH_BASIC_USERNAME="<your-username>"
        export DAGU_AUTH_BASIC_PASSWORD="<your-password>"
   

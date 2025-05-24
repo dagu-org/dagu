@@ -1,120 +1,207 @@
 package digraph_test
 
 import (
-	"context"
-	"os"
+	"encoding/json"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestCondition_Eval(t *testing.T) {
+func TestCondition_MarshalJSON(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name      string
-		condition []digraph.Condition
-		wantErr   bool
+		condition *digraph.Condition
+		expected  string
 	}{
 		{
-			name:      "CommandSubstitution",
-			condition: []digraph.Condition{{Condition: "`echo 1`", Expected: "1"}},
-		},
-		{
-			name:      "EnvVar",
-			condition: []digraph.Condition{{Condition: "${TEST_CONDITION}", Expected: "100"}},
-		},
-		{
-			name: "MultipleCond",
-			condition: []digraph.Condition{
-				{
-					Condition: "`echo 1`",
-					Expected:  "1",
-				},
-				{
-					Condition: "`echo 100`",
-					Expected:  "100",
-				},
+			name: "Basic",
+			condition: &digraph.Condition{
+				Condition: "test -f file.txt",
+				Expected:  "true",
 			},
+			expected: `{"condition":"test -f file.txt","expected":"true"}`,
 		},
 		{
-			name: "MultipleCondOneMet",
-			condition: []digraph.Condition{
-				{
-					Condition: "`echo 1`",
-					Expected:  "1",
-				},
-				{
-					Condition: "`echo 100`",
-					Expected:  "1",
-				},
-			},
-			wantErr: true,
+			name: "WithErrorMessage",
+			condition: func() *digraph.Condition {
+				c := &digraph.Condition{
+					Condition: "test -f file.txt",
+					Expected:  "true",
+				}
+				c.SetErrorMessage("file not found")
+				return c
+			}(),
+			expected: `{"condition":"test -f file.txt","expected":"true","error":"file not found"}`,
 		},
 		{
-			name: "CommandResultMet",
-			condition: []digraph.Condition{
-				{
-					Command: "true",
-				},
-			},
-		},
-		{
-			name: "CommandResultNotMet",
-			condition: []digraph.Condition{
-				{
-					Command: "false",
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "ComplexCommand",
-			condition: []digraph.Condition{
-				{
-					Command: "test 1 -eq 1",
-				},
-			},
-		},
-		{
-			name: "EvenMoreComplexCommand",
-			condition: []digraph.Condition{
-				{
-					Command: "df / | awk 'NR==2 {exit $4 > 5000 ? 0 : 1}'",
-				},
-			},
-		},
-		{
-			name: "CommandResultTest",
-			condition: []digraph.Condition{
-				{
-					Command: "test 1 -eq 1",
-				},
-			},
-		},
-		{
-			name: "RegexMatch",
-			condition: []digraph.Condition{
-				{
-					Condition: "test",
-					Expected:  "re:^test$",
-				},
-			},
+			name:      "EmptyFields",
+			condition: &digraph.Condition{},
+			expected:  `{}`,
 		},
 	}
-
-	// Set environment variable for testing
-	_ = os.Setenv("TEST_CONDITION", "100")
-	t.Cleanup(func() {
-		_ = os.Unsetenv("TEST_CONDITION")
-	})
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := digraph.EvalConditions(context.Background(), tt.condition)
-			require.Equal(t, tt.wantErr, err != nil)
-			if err != nil {
-				require.ErrorIs(t, err, digraph.ErrConditionNotMet)
+			t.Parallel()
+
+			data, err := json.Marshal(tt.condition)
+			require.NoError(t, err)
+			assert.JSONEq(t, tt.expected, string(data))
+		})
+	}
+}
+
+func TestCondition_UnmarshalJSON(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		json     string
+		expected *digraph.Condition
+	}{
+		{
+			name: "Basic",
+			json: `{"condition":"test -f file.txt","expected":"true"}`,
+			expected: &digraph.Condition{
+				Condition: "test -f file.txt",
+				Expected:  "true",
+			},
+		},
+		{
+			name: "WithErrorMessage",
+			json: `{"condition":"test -f file.txt","expected":"true","error":"file not found"}`,
+			expected: func() *digraph.Condition {
+				c := &digraph.Condition{
+					Condition: "test -f file.txt",
+					Expected:  "true",
+				}
+				c.SetErrorMessage("file not found")
+				return c
+			}(),
+		},
+		{
+			name:     "EmptyFields",
+			json:     `{}`,
+			expected: &digraph.Condition{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var condition digraph.Condition
+			err := json.Unmarshal([]byte(tt.json), &condition)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expected.Condition, condition.Condition)
+			assert.Equal(t, tt.expected.Expected, condition.Expected)
+			assert.Equal(t, tt.expected.GetErrorMessage(), condition.GetErrorMessage())
+		})
+	}
+}
+
+func TestCondition_Validate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		condition *digraph.Condition
+		wantErr   bool
+	}{
+		{
+			name: "Valid",
+			condition: &digraph.Condition{
+				Condition: "test -f file.txt",
+				Expected:  "true",
+			},
+			wantErr: false,
+		},
+		{
+			name: "EmptyCondition",
+			condition: &digraph.Condition{
+				Expected: "true",
+			},
+			wantErr: true,
+		},
+		{
+			name: "EmptyExpected",
+			condition: &digraph.Condition{
+				Condition: "test -f file.txt",
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.condition.Validate()
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
+}
+
+func TestCondition_ErrorMessage(t *testing.T) {
+	t.Parallel()
+
+	condition := &digraph.Condition{
+		Condition: "test -f file.txt",
+		Expected:  "true",
+	}
+
+	// Initial error message should be empty
+	assert.Empty(t, condition.GetErrorMessage())
+
+	// Set error message
+	errorMsg := "file not found"
+	condition.SetErrorMessage(errorMsg)
+	assert.Equal(t, errorMsg, condition.GetErrorMessage())
+
+	// Update error message
+	newErrorMsg := "permission denied"
+	condition.SetErrorMessage(newErrorMsg)
+	assert.Equal(t, newErrorMsg, condition.GetErrorMessage())
+}
+
+func TestCondition_ConcurrentAccess(t *testing.T) {
+	t.Parallel()
+
+	condition := &digraph.Condition{
+		Condition: "test -f file.txt",
+		Expected:  "true",
+	}
+
+	// Test concurrent access to error message
+	done := make(chan bool)
+	go func() {
+		for i := 0; i < 100; i++ {
+			condition.SetErrorMessage("message 1")
+			_ = condition.GetErrorMessage()
+		}
+		done <- true
+	}()
+
+	go func() {
+		for i := 0; i < 100; i++ {
+			condition.SetErrorMessage("message 2")
+			_ = condition.GetErrorMessage()
+		}
+		done <- true
+	}()
+
+	// Wait for goroutines to finish
+	<-done
+	<-done
+
+	// No assertion needed, we're just testing that there's no race condition
 }

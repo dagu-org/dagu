@@ -25,7 +25,7 @@ preconditions:
   - condition: "`printf 1`"
     expected: "1"
 steps:
-  - name: step 1
+  - name: step1
     dir: ${HOME}
     command: "true"
     mailOnError: true
@@ -37,10 +37,10 @@ steps:
     preconditions:
       - condition: "`printf test`"
         expected: test
-  - name: step 2
+  - name: step2
     dir: ${HOME}
     command: "false"
     continueOn:
       failure: true
     depends:
-      - step 1
+      - step1

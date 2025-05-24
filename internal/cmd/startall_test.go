@@ -18,7 +18,7 @@ func TestStartAllCommand(t *testing.T) {
 		}()
 		th.RunCommand(t, cmd.CmdStartAll(), test.CmdTest{
 			Args:        []string{"start-all", fmt.Sprintf("--port=%s", findPort(t))},
-			ExpectedOut: []string{"Serving"},
+			ExpectedOut: []string{"Server is starting"},
 		})
 
 	})

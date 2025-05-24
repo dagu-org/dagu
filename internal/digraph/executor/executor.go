@@ -21,6 +21,11 @@ type ExitCoder interface {
 	ExitCode() int
 }
 
+// ChildWorkflow is an interface for child workflows.
+type ChildWorkflow interface {
+	SetWorkflowID(string)
+}
+
 type Creator func(ctx context.Context, step digraph.Step) (Executor, error)
 
 var (

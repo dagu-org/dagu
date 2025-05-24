@@ -23,3 +23,9 @@ coverage.*
 
 # Debug files
 __debug_bin*
+
+# Misc files
+.aider*
+
+# Local markdown files
+*.local.md

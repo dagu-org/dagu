@@ -43,9 +43,9 @@ Directory Paths
 
 Authentication
 ~~~~~~~~~~~~
-- ``AUTH_BASIC_ENABLED`` (``0``): Enable basic authentication (1=enabled)
-- ``AUTH_BASIC_USERNAME`` (``""``): Basic auth username
-- ``AUTH_BASIC_PASSWORD`` (``""``): Basic auth password
+- ``DAGU_AUTH_BASIC_USERNAME`` (``""``): Basic auth username
+- ``DAGU_AUTH_BASIC_PASSWORD`` (``""``): Basic auth password
+- ``DAGU_AUTH_TOKEN`` (``""``): API token value
 
 UI Customization
 ~~~~~~~~~~~~~~
@@ -88,11 +88,9 @@ Create ``config.yaml`` in ``~/.config/dagu/`` to override default settings. Belo
     # Authentication
     auth:
       basic:
-        enabled: true              # Enable basic auth
         username: "admin"          # Basic auth username
         password: "secret"         # Basic auth password
       token:
-        enabled: true              # Enable API token
         value: "your-secret-token" # API token value
     
     # SSL Configuration

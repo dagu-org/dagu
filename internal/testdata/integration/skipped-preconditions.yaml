@@ -8,7 +8,7 @@ steps:
       - condition: "`echo no`"
         expected: "yes"
     output: OUT_SKIP1
-  - name: skip-step
+  - name: skip-step2
     command: echo "should execute"
     preconditions:
       - condition: "`echo yes`"

@@ -11,20 +11,29 @@ import (
 	"reflect"
 	"strings"
 
+	"dario.cat/mergo"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/go-viper/mapstructure/v2"
-	"github.com/imdario/mergo"
 
-	"gopkg.in/yaml.v2"
+	"github.com/goccy/go-yaml"
+)
+
+// Errors for loading DAGs
+var (
+	ErrNameOrPathRequired = errors.New("name or path is required")
+	ErrInvalidJSONFile    = errors.New("invalid JSON file")
 )
 
 // LoadOptions contains options for loading a DAG.
 type LoadOptions struct {
-	baseConfig   string   // Path to the base DAG configuration file.
-	params       string   // Parameters to override default parameters in the DAG.
-	paramsList   []string // List of parameters to override default parameters in the DAG.
-	noEval       bool     // Flag to disable evaluation of dynamic fields.
-	onlyMetadata bool     // Flag to load only metadata without full DAG details.
+	name             string   // Name of the DAG.
+	baseConfig       string   // Path to the base DAG configuration file.
+	params           string   // Parameters to override default parameters in the DAG.
+	paramsList       []string // List of parameters to override default parameters in the DAG.
+	noEval           bool     // Flag to disable evaluation of dynamic fields.
+	onlyMetadata     bool     // Flag to load only metadata without full DAG details.
+	dagsDir          string   // Directory containing the DAG files.
+	allowBuildErrors bool     // Flag to allow build errors.
 }
 
 // LoadOption is a function type for setting LoadOptions.
@@ -65,8 +74,54 @@ func OnlyMetadata() LoadOption {
 	}
 }
 
-// Load loads the DAG from the given file with the specified options.
-func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
+// WithName sets the name of the DAG.
+func WithName(name string) LoadOption {
+	return func(o *LoadOptions) {
+		o.name = name
+	}
+}
+
+// WithDAGsDir sets the directory containing the DAG files.
+// This directory is used as the base path for resolving relative DAG file paths.
+// When a DAG is loaded by name rather than absolute path, the system will look
+// for the DAG file in this directory. If not specified, the current working
+// directory is used as the default.
+func WithDAGsDir(dagsDir string) LoadOption {
+	return func(o *LoadOptions) {
+		o.dagsDir = dagsDir
+	}
+}
+
+// WithAllowBuildErrors allows build errors to be ignored during DAG loading.
+// This is required for loading DAGs that may have errors in their definitions,
+// such as missing steps or invalid configurations. When this option is set,
+// the loader will return a DAG with the errors included in the DAG's `BuildErrors` field,
+// and will not fail the loading process.
+func WithAllowBuildErrors() LoadOption {
+	return func(o *LoadOptions) {
+		o.allowBuildErrors = true
+	}
+}
+
+// Load loads a Directed Acyclic Graph (DAG) from a file path or name with the given options.
+//
+// The function handles different input formats:
+//
+// 1. Absolute paths:
+//   - YAML files (.yaml/.yml): Processed with dynamic evaluation, including base configs,
+//     parameters, and environment variables
+//
+// 2. Relative paths or filenames:
+//   - Resolved against the DAGsDir specified in options
+//   - If DAGsDir is not provided, the current working directory is used
+//   - For YAML files, the extension is optional
+//
+// This approach provides a flexible way to load DAG definitions from multiple sources
+// while supporting customization through the LoadOptions.
+func Load(ctx context.Context, nameOrPath string, opts ...LoadOption) (*DAG, error) {
+	if nameOrPath == "" {
+		return nil, ErrNameOrPathRequired
+	}
 	var options LoadOptions
 	for _, opt := range opts {
 		opt(&options)
@@ -74,14 +129,17 @@ func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
 	buildContext := BuildContext{
 		ctx: ctx,
 		opts: BuildOpts{
-			Base:           options.baseConfig,
-			Parameters:     options.params,
-			ParametersList: options.paramsList,
-			OnlyMetadata:   options.onlyMetadata,
-			NoEval:         options.noEval,
+			Base:             options.baseConfig,
+			Parameters:       options.params,
+			ParametersList:   options.paramsList,
+			OnlyMetadata:     options.onlyMetadata,
+			NoEval:           options.noEval,
+			Name:             options.name,
+			DAGsDir:          options.dagsDir,
+			AllowBuildErrors: options.allowBuildErrors,
 		},
 	}
-	return loadDAG(buildContext, dag)
+	return loadDAG(buildContext, nameOrPath)
 }
 
 // LoadYAML loads the DAG from the given YAML data with the specified options.
@@ -91,11 +149,14 @@ func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*DAG, error
 		opt(&options)
 	}
 	return LoadYAMLWithOpts(ctx, data, BuildOpts{
-		Base:           options.baseConfig,
-		Parameters:     options.params,
-		ParametersList: options.paramsList,
-		OnlyMetadata:   options.onlyMetadata,
-		NoEval:         options.noEval,
+		Base:             options.baseConfig,
+		Parameters:       options.params,
+		ParametersList:   options.paramsList,
+		OnlyMetadata:     options.onlyMetadata,
+		NoEval:           options.noEval,
+		Name:             options.name,
+		DAGsDir:          options.dagsDir,
+		AllowBuildErrors: options.allowBuildErrors,
 	})
 }
 
@@ -103,12 +164,12 @@ func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*DAG, error
 func LoadYAMLWithOpts(ctx context.Context, data []byte, opts BuildOpts) (*DAG, error) {
 	raw, err := unmarshalData(data)
 	if err != nil {
-		return nil, err
+		return nil, ErrorList{err}
 	}
 
 	def, err := decode(raw)
 	if err != nil {
-		return nil, err
+		return nil, ErrorList{err}
 	}
 
 	return build(BuildContext{ctx: ctx, opts: opts}, def)
@@ -123,7 +184,7 @@ func LoadBaseConfig(ctx BuildContext, file string) (*DAG, error) {
 	}
 
 	// Load the raw data from the file.
-	raw, err := readFile(file)
+	raw, err := readYAMLFile(file)
 	if err != nil {
 		return nil, err
 	}
@@ -131,16 +192,21 @@ func LoadBaseConfig(ctx BuildContext, file string) (*DAG, error) {
 	// Decode the raw data into a config definition.
 	def, err := decode(raw)
 	if err != nil {
-		return nil, err
+		return nil, ErrorList{err}
 	}
 
 	ctx = ctx.WithOpts(BuildOpts{NoEval: ctx.opts.NoEval}).WithFile(file)
-	return build(ctx, def)
+	dag, err := build(ctx, def)
+
+	if err != nil {
+		return nil, ErrorList{err}
+	}
+	return dag, nil
 }
 
 // loadDAG loads the DAG from the given file.
-func loadDAG(ctx BuildContext, dag string) (*DAG, error) {
-	filePath, err := resolveYamlFilePath(dag)
+func loadDAG(ctx BuildContext, nameOrPath string) (*DAG, error) {
+	filePath, err := resolveYamlFilePath(ctx, nameOrPath)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +218,7 @@ func loadDAG(ctx BuildContext, dag string) (*DAG, error) {
 		return nil, err
 	}
 
-	raw, err := readFile(filePath)
+	raw, err := readYAMLFile(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -168,18 +234,13 @@ func loadDAG(ctx BuildContext, dag string) (*DAG, error) {
 	}
 
 	// Merge the target DAG into the dest DAG.
+	dest.Location = "" // No need to set the location for the base config.
 	err = merge(dest, target)
 	if err != nil {
 		return nil, err
 	}
 
-	// Set the name if not set.
-	if dest.Name == "" {
-		dest.Name = defaultName(filePath)
-	}
-
-	// Set defaults
-	dest.setup()
+	dest.initializeDefaults()
 
 	return dest, nil
 }
@@ -187,14 +248,35 @@ func loadDAG(ctx BuildContext, dag string) (*DAG, error) {
 // defaultName returns the default name for the given file.
 // The default name is the filename without the extension.
 func defaultName(file string) string {
+	if file == "" {
+		return ""
+	}
 	return strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 }
 
 // resolveYamlFilePath resolves the YAML file path.
 // If the file name does not have an extension, it appends ".yaml".
-func resolveYamlFilePath(file string) (string, error) {
+func resolveYamlFilePath(ctx BuildContext, file string) (string, error) {
 	if file == "" {
 		return "", errors.New("file path is required")
+	}
+
+	if filepath.IsAbs(file) {
+		// If the file is an absolute path, return it as is.
+		return file, nil
+	}
+
+	// Check if the file exists in the current Directory.
+	absFile, err := filepath.Abs(file)
+	if err == nil && fileutil.FileExists(absFile) {
+		// If	the file exists, return the absolute path.
+		return absFile, nil
+	}
+
+	// If the file does not exist, check if it exists in the DAGsDir.
+	if ctx.opts.DAGsDir != "" {
+		// If the file is not an absolute path, prepend the DAGsDir to the file name.
+		file = filepath.Join(ctx.opts.DAGsDir, file)
 	}
 
 	// The file name can be specified without the extension.
@@ -246,9 +328,9 @@ func (*mergeTransformer) Transformer(
 	return nil
 }
 
-// readFile reads the contents of the file into a map.
-func readFile(file string) (cfg map[string]any, err error) {
-	data, err := os.ReadFile(file)
+// readYAMLFile reads the contents of the file into a map.
+func readYAMLFile(file string) (cfg map[string]any, err error) {
+	data, err := os.ReadFile(file) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %q: %v", file, err)
 	}

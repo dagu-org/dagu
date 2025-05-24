@@ -34,15 +34,10 @@ func newMail(ctx context.Context, step digraph.Step) (Executor, error) {
 		return nil, fmt.Errorf("failed to decode mail config: %w", err)
 	}
 
-	stepContext := digraph.GetStepContext(ctx)
-
-	cfg, err := digraph.EvalStringFields(stepContext, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to substitute string fields: %w", err)
-	}
+	env := NewEnv(ctx, step)
 
 	exec := &mail{cfg: &cfg}
-	mailerConfig, err := stepContext.MailerConfig()
+	mailerConfig, err := env.MailerConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to substitute string fields: %w", err)
 	}
@@ -74,15 +69,7 @@ message: %s
 `
 
 func (e *mail) Run(ctx context.Context) error {
-	_, _ = e.stdout.Write(
-		[]byte(fmt.Sprintf(
-			mailLogTemplate,
-			e.cfg.From,
-			e.cfg.To,
-			e.cfg.Subject,
-			e.cfg.Message,
-		)),
-	)
+	_, _ = fmt.Fprintf(e.stdout, mailLogTemplate, e.cfg.From, e.cfg.To, e.cfg.Subject, e.cfg.Message)
 	err := e.mailer.Send(
 		ctx,
 		e.cfg.From,

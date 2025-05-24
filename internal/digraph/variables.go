@@ -17,7 +17,7 @@ func loadVariables(ctx BuildContext, strVariables any) (
 ) {
 	var pairs []pair
 	switch a := strVariables.(type) {
-	case map[any]any:
+	case map[string]any:
 		// Case 1. env is a map.
 		if err := parseKeyValue(a, &pairs); err != nil {
 			return nil, wrapError("env", a, err)
@@ -26,7 +26,7 @@ func loadVariables(ctx BuildContext, strVariables any) (
 	case []any:
 		// Case 2. env is an array of maps.
 		for _, v := range a {
-			if aa, ok := v.(map[any]any); ok {
+			if aa, ok := v.(map[string]any); ok {
 				if err := parseKeyValue(aa, &pairs); err != nil {
 					return nil, wrapError("env", v, err)
 				}
@@ -67,13 +67,8 @@ type pair struct {
 
 // parseKeyValue parse a key-value pair from a map and appends it to the pairs
 // slice. Each entry in the map must have a string key and a string value.
-func parseKeyValue(m map[any]any, pairs *[]pair) error {
-	for k, v := range m {
-		key, ok := k.(string)
-		if !ok {
-			return wrapError("env", k, ErrInvalidKeyType)
-		}
-
+func parseKeyValue(m map[string]any, pairs *[]pair) error {
+	for key, v := range m {
 		var val string
 		switch v := v.(type) {
 		case string:

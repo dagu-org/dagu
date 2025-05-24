@@ -1,37 +1,22 @@
 import { CSSProperties } from 'react';
-import { NodeStatus } from './models';
-import { SchedulerStatus } from './models';
+import { NodeStatus, Status } from './api/v2/schema';
 
 type statusColorMapping = {
   [key: number]: CSSProperties;
 };
 export const statusColorMapping: statusColorMapping = {
-  [SchedulerStatus.None]: { backgroundColor: 'lightblue' },
-  [SchedulerStatus.Running]: { backgroundColor: 'lime' },
-  [SchedulerStatus.Error]: { backgroundColor: 'red', color: 'white' },
-  [SchedulerStatus.Cancel]: { backgroundColor: 'pink' },
-  [SchedulerStatus.Success]: { backgroundColor: 'green', color: 'white' },
-  [SchedulerStatus.Skipped_Unused]: { backgroundColor: 'gray', color: 'white' },
+  [Status.NotStarted]: { backgroundColor: 'lightblue' },
+  [Status.Running]: { backgroundColor: 'lime' },
+  [Status.Failed]: { backgroundColor: 'red', color: 'white' },
+  [Status.Cancelled]: { backgroundColor: 'pink' },
+  [Status.Success]: { backgroundColor: 'green', color: 'white' },
 };
 
 export const nodeStatusColorMapping = {
-  [NodeStatus.None]: statusColorMapping[SchedulerStatus.None],
-  [NodeStatus.Running]: statusColorMapping[SchedulerStatus.Running],
-  [NodeStatus.Error]: statusColorMapping[SchedulerStatus.Error],
-  [NodeStatus.Cancel]: statusColorMapping[SchedulerStatus.Cancel],
-  [NodeStatus.Success]: statusColorMapping[SchedulerStatus.Success],
-  [NodeStatus.Skipped]: statusColorMapping[SchedulerStatus.Skipped_Unused],
+  [NodeStatus.NotStarted]: statusColorMapping[Status.NotStarted],
+  [NodeStatus.Running]: statusColorMapping[Status.Running],
+  [NodeStatus.Failed]: statusColorMapping[Status.Failed],
+  [NodeStatus.Cancelled]: statusColorMapping[Status.Cancelled],
+  [NodeStatus.Success]: statusColorMapping[Status.Success],
+  [NodeStatus.Skipped]: { backgroundColor: 'gray', color: 'white' },
 };
-
-export const stepTabColStyles = [
-  { maxWidth: '60px' },
-  { maxWidth: '200px' },
-  { maxWidth: '150px' },
-  { maxWidth: '150px' },
-  { maxWidth: '150px' },
-  { maxWidth: '130px' },
-  { maxWidth: '130px' },
-  { maxWidth: '100px' },
-  { maxWidth: '100px' },
-  {},
-];
