@@ -440,7 +440,7 @@ waitLoop:
 	}, nil
 }
 
-func (a *API) TerminateWorkflow(ctx context.Context, request api.TerminateWorkflowRequestObject) (api.TerminateWorkflowResponseObject, error) {
+func (a *API) TerminateDAGWorkflow(ctx context.Context, request api.TerminateDAGWorkflowRequestObject) (api.TerminateDAGWorkflowResponseObject, error) {
 	dag, err := a.dagStore.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
@@ -468,7 +468,7 @@ func (a *API) TerminateWorkflow(ctx context.Context, request api.TerminateWorkfl
 	if err := a.historyManager.Stop(ctx, dag, status.WorkflowID); err != nil {
 		return nil, fmt.Errorf("error stopping DAG: %w", err)
 	}
-	return api.TerminateWorkflow200Response{}, nil
+	return api.TerminateDAGWorkflow200Response{}, nil
 }
 
 func (a *API) RetryDAGWorkflow(ctx context.Context, request api.RetryDAGWorkflowRequestObject) (api.RetryDAGWorkflowResponseObject, error) {

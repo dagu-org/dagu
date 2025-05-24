@@ -385,3 +385,42 @@ func (a *API) RetryWorkflow(ctx context.Context, request api.RetryWorkflowReques
 
 	return api.RetryWorkflow200Response{}, nil
 }
+
+func (a *API) TerminateWorkflow(ctx context.Context, request api.TerminateWorkflowRequestObject) (api.TerminateWorkflowResponseObject, error) {
+	run, err := a.historyStore.FindRun(ctx, digraph.NewWorkflowRef(request.Name, request.WorkflowId))
+	if err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("workflow ID %s not found for DAG %s", request.WorkflowId, request.Name),
+		}
+	}
+
+	dag, err := run.ReadDAG(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error reading DAG: %w", err)
+	}
+
+	status, err := a.historyManager.GetLatestStatus(ctx, dag)
+	if err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("DAG %s not found", request.Name),
+		}
+	}
+
+	if status.Status != scheduler.StatusRunning {
+		return nil, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeNotRunning,
+			Message:    "DAG is not running",
+		}
+	}
+
+	if err := a.historyManager.Stop(ctx, dag, status.WorkflowID); err != nil {
+		return nil, fmt.Errorf("error stopping DAG: %w", err)
+	}
+
+	return api.TerminateWorkflow200Response{}, nil
+}
