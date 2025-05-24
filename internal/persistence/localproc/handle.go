@@ -130,7 +130,7 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 		for {
 			select {
 			case <-ticker.C:
-				binary.BigEndian.PutUint64(buf, uint64(time.Now().UnixNano()))
+				binary.BigEndian.PutUint64(buf, uint64(time.Now().Unix()))
 				if _, err := fd.WriteAt(buf, 0); err != nil {
 					logger.Error(ctx, "Failed to write heartbeat", "err", err)
 				}
