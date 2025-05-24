@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { components, NodeStatus, Status } from '../../../api/v2/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { useClient } from '../../../hooks/api';
-import SubTitle from '../../../ui/SubTitle';
 import { DAGContext } from '../contexts/DAGContext';
 import { getEventHandlers } from '../lib/getEventHandlers';
 import { DAGStatusOverview, NodeStatusTable } from './dag-details';
@@ -167,57 +166,96 @@ function DAGStatus({ workflow, fileName }: Props) {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="bg-white dark:bg-slate-900 rounded-xl border p-6 overflow-hidden">
-        <DAGGraph
-          workflow={workflow}
-          onSelectStep={onSelectStepOnGraph}
-          onRightClickStep={onRightClickStepOnGraph}
-        />
+    <div className="space-y-6">
+      {/* DAG Visualization Card */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+        <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            Workflow Visualization
+          </h2>
+        </div>
+        <div className="p-6">
+          <DAGGraph
+            workflow={workflow}
+            onSelectStep={onSelectStepOnGraph}
+            onRightClickStep={onRightClickStepOnGraph}
+          />
+        </div>
       </div>
 
       <DAGContext.Consumer>
         {(props) => (
-          <React.Fragment>
-            <div className="bg-white dark:bg-slate-900 rounded-xl border p-6 overflow-hidden">
-              <SubTitle className="mb-4">Status</SubTitle>
-              <DAGStatusOverview
-                status={workflow}
-                fileName={fileName}
-                onViewLog={(workflowId) => {
-                  setLogViewer({
-                    isOpen: true,
-                    logType: 'execution',
-                    stepName: '',
-                    workflowId,
-                    stream: 'stdout',
-                  });
-                }}
-              />
-            </div>
+          <>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              {/* Status Overview Card */}
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    Execution Status
+                  </h2>
+                </div>
+                <div className="p-6">
+                  <DAGStatusOverview
+                    status={workflow}
+                    fileName={fileName}
+                    onViewLog={(workflowId) => {
+                      setLogViewer({
+                        isOpen: true,
+                        logType: 'execution',
+                        stepName: '',
+                        workflowId,
+                        stream: 'stdout',
+                      });
+                    }}
+                  />
+                </div>
+              </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-xl border p-6 overflow-hidden">
-              <SubTitle className="mb-4">Steps</SubTitle>
-              <NodeStatusTable
-                nodes={workflow.nodes}
-                status={workflow}
-                {...props}
-                onViewLog={handleViewLog}
-              />
+              {/* Steps Table Card */}
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden xl:col-span-2">
+                <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                    <span>Execution Steps</span>
+                    {workflow.nodes && (
+                      <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                        {workflow.nodes.length} step{workflow.nodes.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <NodeStatusTable
+                    nodes={workflow.nodes}
+                    status={workflow}
+                    {...props}
+                    onViewLog={handleViewLog}
+                  />
+                </div>
+              </div>
             </div>
-
+            
+            {/* Lifecycle Hooks Card */}
             {handlers?.length ? (
-              <div className="bg-white dark:bg-slate-900 rounded-xl border p-6 overflow-hidden">
-                <SubTitle className="mb-4">Lifecycle Hooks</SubTitle>
-                <NodeStatusTable
-                  nodes={handlers}
-                  status={workflow}
-                  {...props}
-                  onViewLog={handleViewLog}
-                />
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                    <span>Lifecycle Hooks</span>
+                    <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                      {handlers.length} hook{handlers.length !== 1 ? 's' : ''}
+                    </span>
+                  </h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <NodeStatusTable
+                    nodes={handlers}
+                    status={workflow}
+                    {...props}
+                    onViewLog={handleViewLog}
+                  />
+                </div>
               </div>
             ) : null}
-          </React.Fragment>
+          </>
         )}
       </DAGContext.Consumer>
 

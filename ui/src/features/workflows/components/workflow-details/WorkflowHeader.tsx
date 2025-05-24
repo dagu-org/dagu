@@ -52,22 +52,22 @@ const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
   };
 
   return (
-    <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-4 mb-4 border border-gray-200">
+    <div className="bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 rounded-2xl p-6 mb-6 border border-slate-200 dark:border-slate-700 shadow-sm">
       {/* Header with title and actions */}
-      <div className="flex items-start justify-between gap-4 mb-3">
+      <div className="flex items-start justify-between gap-6 mb-4">
         <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-1 text-sm text-gray-600 mb-1">
-            {/* Breadcrumb navigation */}
+          {/* Breadcrumb navigation */}
+          <nav className="flex flex-wrap items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400 mb-2">
             {workflow.rootWorkflowId !== workflow.workflowId && (
               <>
                 <a
                   href={`/workflows/${workflow.rootWorkflowName}/${workflow.rootWorkflowId}`}
                   onClick={handleRootWorkflowClick}
-                  className="text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                  className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline transition-colors font-medium"
                 >
                   {workflow.rootWorkflowName}
                 </a>
-                <span className="text-gray-400 mx-1">/</span>
+                <span className="text-slate-400 dark:text-slate-500 mx-1">/</span>
               </>
             )}
             
@@ -79,16 +79,16 @@ const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
                   <a
                     href="#"
                     onClick={handleParentWorkflowClick}
-                    className="text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                    className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline transition-colors font-medium"
                   >
                     {workflow.parentWorkflowName}
                   </a>
-                  <span className="text-gray-400 mx-1">/</span>
+                  <span className="text-slate-400 dark:text-slate-500 mx-1">/</span>
                 </>
               )}
-          </div>
+          </nav>
           
-          <h1 className="text-xl font-semibold text-gray-900 truncate">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 truncate">
             {workflow.name}
           </h1>
         </div>
@@ -96,11 +96,11 @@ const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
 
       {/* Status and metadata row */}
       {workflow.status != Status.NotStarted && (
-        <div className="flex flex-wrap items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-4 lg:gap-6">
           {/* Status and actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {workflow.status && (
-              <StatusChip status={workflow.status} size="sm">
+              <StatusChip status={workflow.status} size="md">
                 {workflow.statusLabel || ''}
               </StatusChip>
             )}
@@ -114,31 +114,40 @@ const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
           </div>
           
           {/* Metadata items */}
-          <div className="flex items-center text-gray-600">
-            <Calendar className="h-4 w-4 mr-1.5" />
-            <span>
-              {workflow?.startedAt
-                ? dayjs(workflow.startedAt).format('MMM D, HH:mm:ss')
-                : '--'}
-            </span>
-          </div>
-          
-          <div className="flex items-center text-gray-600">
-            <Timer className="h-4 w-4 mr-1.5" />
-            <span>
-              {workflow.finishedAt
-                ? formatDuration(workflow.startedAt, workflow.finishedAt)
-                : workflow.startedAt
-                  ? formatDuration(workflow.startedAt, dayjs().toISOString())
-                  : '--'}
-            </span>
-          </div>
-          
-          <div className="flex items-center text-gray-600 ml-auto">
-            <span className="font-medium mr-1">ID:</span>
-            <code className="bg-gray-200 px-2 py-1 rounded text-xs font-mono">
-              {workflow.workflowId}
-            </code>
+          <div className="flex flex-wrap items-center gap-4 lg:gap-6 text-sm">
+            <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-2">
+              <Calendar className="h-4 w-4 text-slate-500" />
+              <div className="flex flex-col">
+                <span className="font-medium">
+                  {workflow?.startedAt
+                    ? dayjs(workflow.startedAt).format('MMM D, HH:mm:ss')
+                    : '--'}
+                </span>
+                {workflow?.startedAt && (
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    {dayjs(workflow.startedAt).format('z')}
+                  </span>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-2">
+              <Timer className="h-4 w-4 text-slate-500" />
+              <span className="font-medium">
+                {workflow.finishedAt
+                  ? formatDuration(workflow.startedAt, workflow.finishedAt)
+                  : workflow.startedAt
+                    ? formatDuration(workflow.startedAt, dayjs().toISOString())
+                    : '--'}
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 ml-auto">
+              <span className="font-medium text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Workflow ID</span>
+              <code className="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-3 py-1.5 rounded-md text-xs font-mono border">
+                {workflow.workflowId}
+              </code>
+            </div>
           </div>
         </div>
       )}
