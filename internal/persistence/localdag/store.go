@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -216,13 +215,15 @@ func (store *Storage) List(ctx context.Context, opts models.ListOptions) (models
 		opts.Paginator = &p
 	}
 
-	err := filepath.WalkDir(store.baseDir, func(_ string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
+	entries, err := os.ReadDir(store.baseDir)
+	if err != nil {
+		errList = append(errList, fmt.Sprintf("failed to read directory %s: %s", store.baseDir, err))
+		return models.NewPaginatedResult(dags, totalCount, *opts.Paginator), errList, err
+	}
 
+	for _, entry := range entries {
 		if entry.IsDir() || !fileutil.IsYAMLFile(entry.Name()) {
-			return nil
+			continue
 		}
 
 		baseName := path.Base(entry.Name())
@@ -232,7 +233,7 @@ func (store *Storage) List(ctx context.Context, opts models.ListOptions) (models
 			// unnecessary file read and parsing.
 			if !containsSearchText(dagName, opts.Name) {
 				// Return early if the name does not match the search text.
-				return nil
+				continue
 			}
 		}
 
@@ -240,33 +241,28 @@ func (store *Storage) List(ctx context.Context, opts models.ListOptions) (models
 		dag, err := store.GetMetadata(ctx, dagName)
 		if err != nil {
 			errList = append(errList, fmt.Sprintf("reading %s failed: %s", dagName, err))
-			return nil
+			continue
 		}
 
 		if opts.Name != "" && !containsSearchText(dagName, opts.Name) {
-			return nil
+			continue
 		}
 
 		if opts.Tag != "" && !containsTag(dag.Tags, opts.Tag) {
-			return nil
+			continue
 		}
 
 		totalCount++
 		if totalCount > opts.Paginator.Offset() && len(dags) < opts.Paginator.Limit() {
 			dags = append(dags, dag)
 		}
-
-		return nil
-	})
+	}
 
 	result := models.NewPaginatedResult(
 		dags, totalCount, *opts.Paginator,
 	)
-	if err != nil {
-		errList = append(errList, err.Error())
-	}
 
-	return result, errList, err
+	return result, errList, nil
 }
 
 // Grep searches for a pattern in all DAGs.
@@ -396,28 +392,29 @@ func (store *Storage) TagList(ctx context.Context) ([]string, []string, error) {
 		tagSet  = make(map[string]struct{})
 	)
 
-	if err := filepath.WalkDir(store.baseDir, func(_ string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
+	entries, err := os.ReadDir(store.baseDir)
+	if err != nil {
+		errList = append(errList, fmt.Sprintf("failed to read directory %s: %s", store.baseDir, err))
+		return nil, errList, err
+	}
 
+	for _, entry := range entries {
 		if entry.IsDir() || !fileutil.IsYAMLFile(entry.Name()) {
-			return nil
+			continue
 		}
 
-		parsedDAG, err := store.GetMetadata(ctx, entry.Name())
+		baseName := path.Base(entry.Name())
+		dagName := strings.TrimSuffix(baseName, path.Ext(baseName))
+
+		parsedDAG, err := store.GetMetadata(ctx, dagName)
 		if err != nil {
 			errList = append(errList, fmt.Sprintf("reading %s failed: %s", entry.Name(), err))
-			return nil
+			continue
 		}
 
 		for _, tag := range parsedDAG.Tags {
 			tagSet[tag] = struct{}{}
 		}
-
-		return nil
-	}); err != nil {
-		return nil, append(errList, err.Error()), err
 	}
 
 	tagList := make([]string, 0, len(tagSet))
