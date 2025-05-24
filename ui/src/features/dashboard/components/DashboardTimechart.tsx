@@ -124,13 +124,16 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
             hour: 'HH:mm',
           },
           majorLabels: {
-            hour: 'ddd D MMMM',
-            day: 'ddd D MMMM',
+            hour: 'ddd D MMM',
+            day: 'ddd D MMM',
           },
         },
         height: '100%',
         maxHeight: '100%',
-        margin: { item: { vertical: 10 } },
+        margin: { 
+          item: { vertical: 4, horizontal: 2 },
+          axis: 2
+        },
       });
     } else {
       timelineInstance.current.setItems(dataset);
@@ -235,56 +238,51 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
 
   return (
     <TimelineWrapper>
-      <div className="flex justify-end gap-2 my-2 mr-2">
+      <div className="flex justify-end gap-1 p-2 border-b bg-muted/30">
         <Button
-          variant="outline"
+          variant="ghost"
           size="sm"
           onClick={handleCurrent}
           title="Go to current time"
-          className="flex items-center gap-1"
+          className="h-6 px-2 text-xs"
         >
-          <Clock className="h-4 w-4" />
-          <span>Current</span>
+          <Clock className="h-3 w-3" />
         </Button>
         <Button
-          variant="outline"
+          variant="ghost"
           size="sm"
           onClick={handleFit}
           title="Fit all items in view"
-          className="flex items-center gap-1"
+          className="h-6 px-2 text-xs"
         >
-          <Maximize className="h-4 w-4" />
-          <span>Fit</span>
+          <Maximize className="h-3 w-3" />
         </Button>
         <Button
-          variant="outline"
+          variant="ghost"
           size="sm"
           onClick={handleZoomIn}
           title="Zoom in"
-          className="flex items-center gap-1"
+          className="h-6 px-2 text-xs"
         >
-          <ZoomIn className="h-4 w-4" />
-          <span>Zoom In</span>
+          <ZoomIn className="h-3 w-3" />
         </Button>
         <Button
-          variant="outline"
+          variant="ghost"
           size="sm"
           onClick={handleZoomOut}
           title="Zoom out"
-          className="flex items-center gap-1"
+          className="h-6 px-2 text-xs"
         >
-          <ZoomOut className="h-4 w-4" />
-          <span>Zoom Out</span>
+          <ZoomOut className="h-3 w-3" />
         </Button>
         <Button
-          variant="outline"
+          variant="ghost"
           size="sm"
           onClick={handleReset}
           title="Reset view to initial state"
-          className="flex items-center gap-1"
+          className="h-6 px-2 text-xs"
         >
-          <RotateCcw className="h-4 w-4" />
-          <span>Reset</span>
+          <RotateCcw className="h-3 w-3" />
         </Button>
       </div>
       <div ref={timelineRef} style={{ width: '100%', height: '100%' }} />
@@ -298,6 +296,9 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
       )}
       <style>
         {`
+        .vis-timeline {
+          font-size: 12px !important;
+        }
         .vis-item .vis-item-overflow {
           overflow: visible;
           color: black;
@@ -317,13 +318,32 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
         .vis-item .vis-item-content {
           position: absolute;
           left: 100% !important;
-          padding-left: 5px;
+          padding-left: 4px;
           transform: translateY(-50%);
           top: 50%;
           white-space: nowrap;
+          font-size: 12px !important;
+          font-weight: 500;
         }
         .vis-item {
           overflow: visible !important;
+          height: 18px !important;
+        }
+        .vis-time-axis .vis-text {
+          font-size: 11px !important;
+        }
+        .vis-time-axis .vis-text.vis-major {
+          font-size: 12px !important;
+          font-weight: 600;
+        }
+        .vis-time-axis .vis-text.vis-minor {
+          font-size: 10px !important;
+        }
+        .vis-time-axis .vis-grid.vis-minor {
+          border-color: #f0f0f0;
+        }
+        .vis-time-axis .vis-grid.vis-major {
+          border-color: #ddd;
         }
         `}
       </style>
@@ -346,7 +366,7 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
 
 function TimelineWrapper({ children }: { children: React.ReactNode }) {
   return (
-    <div className="w-[95%] max-w-[95%] h-[60vh] overflow-auto bg-gray-200">
+    <div className="w-full h-[60vh] overflow-auto bg-background border-t">
       {children}
     </div>
   );

@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { components, Status } from '../../../../api/v2/schema';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
-import Title from '../../../../ui/Title';
 import { RootWorkflowContext } from '../../contexts/RootWorkflowContext';
 import { DAGActions } from '../common';
 
@@ -46,52 +45,50 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
   };
 
   return (
-    <>
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-0">
-          <Title className="flex flex-wrap items-center">
-            {/* Root workflow */}
-            {workflowToDisplay.rootWorkflowId !==
-              workflowToDisplay.workflowId && (
+    <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-4 mb-4 border border-gray-200">
+      {/* Header with title and actions */}
+      <div className="flex items-start justify-between gap-4 mb-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-1 text-sm text-gray-600 mb-1">
+            {/* Breadcrumb navigation */}
+            {workflowToDisplay.rootWorkflowId !== workflowToDisplay.workflowId && (
               <>
-                <span className="text-blue-600 hover:underline font-normal">
-                  <a
-                    href={`/dags/${fileName}?workflowId=${workflowToDisplay.rootWorkflowId}&workflowName=${encodeURIComponent(workflowToDisplay.rootWorkflowName)}`}
-                    onClick={handleRootWorkflowClick}
-                  >
-                    {workflowToDisplay.rootWorkflowName}
-                  </a>
-                </span>
-                <span className="mx-2 text-slate-400">/</span>
+                <a
+                  href={`/dags/${fileName}?workflowId=${workflowToDisplay.rootWorkflowId}&workflowName=${encodeURIComponent(workflowToDisplay.rootWorkflowName)}`}
+                  onClick={handleRootWorkflowClick}
+                  className="text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                >
+                  {workflowToDisplay.rootWorkflowName}
+                </a>
+                <span className="text-gray-400 mx-1">/</span>
               </>
             )}
-
-            {/* Parent workflow (if exists and different from root and current) */}
+            
             {workflowToDisplay.parentWorkflowName &&
               workflowToDisplay.parentWorkflowId &&
-              workflowToDisplay.parentWorkflowName !==
-                workflowToDisplay.rootWorkflowName &&
-              workflowToDisplay.parentWorkflowName !==
-                workflowToDisplay.name && (
+              workflowToDisplay.parentWorkflowName !== workflowToDisplay.rootWorkflowName &&
+              workflowToDisplay.parentWorkflowName !== workflowToDisplay.name && (
                 <>
-                  <span className="text-blue-600 hover:underline font-normal">
-                    <a
-                      href={`/dags/${fileName}?workflowId=${workflowToDisplay.rootWorkflowId}&childWorkflowId=${workflowToDisplay.parentWorkflowId}&workflowName=${encodeURIComponent(workflowToDisplay.rootWorkflowName)}`}
-                      onClick={handleParentWorkflowClick}
-                    >
-                      {workflowToDisplay.parentWorkflowName}
-                    </a>
-                  </span>
-                  <span className="mx-2 text-slate-400">/</span>
+                  <a
+                    href={`/dags/${fileName}?workflowId=${workflowToDisplay.rootWorkflowId}&childWorkflowId=${workflowToDisplay.parentWorkflowId}&workflowName=${encodeURIComponent(workflowToDisplay.rootWorkflowName)}`}
+                    onClick={handleParentWorkflowClick}
+                    className="text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                  >
+                    {workflowToDisplay.parentWorkflowName}
+                  </a>
+                  <span className="text-gray-400 mx-1">/</span>
                 </>
               )}
-
-            {/* Current workflow */}
-            <span className="break-all">{workflowToDisplay.name}</span>
-          </Title>
-          {/* Only show DAG actions for root workflows, not for child workflows */}
-          {workflowToDisplay.workflowId ===
-            workflowToDisplay.rootWorkflowId && (
+          </div>
+          
+          <h1 className="text-xl font-semibold text-gray-900 truncate">
+            {workflowToDisplay.name}
+          </h1>
+        </div>
+        
+        {/* Actions */}
+        {workflowToDisplay.workflowId === workflowToDisplay.rootWorkflowId && (
+          <div className="flex-shrink-0">
             <DAGActions
               status={workflowToDisplay}
               dag={dag}
@@ -100,64 +97,50 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
               displayMode="full"
               navigateToStatusTab={navigateToStatusTab}
             />
-          )}
-        </div>
+          </div>
+        )}
       </div>
-      {workflowToDisplay.status != Status.NotStarted ? (
-        <div className="mt-4 mb-4">
-          {/* Status chip */}
-          {workflowToDisplay.status ? (
-            <div className="mb-4">
-              <StatusChip status={workflowToDisplay.status}>
-                {workflowToDisplay.statusLabel || ''}
-              </StatusChip>
-            </div>
-          ) : null}
 
-          {/* Simple flex layout for metadata */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-            {/* Left side - Date and Duration in a row on desktop, column on mobile */}
-            <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-6">
-              {/* Date with icon */}
-              <div className="flex items-center text-slate-600 dark:text-slate-400">
-                <Calendar className="mr-1.5 h-4 w-4 flex-shrink-0" />
-                <span className="text-sm">
-                  {workflowToDisplay?.startedAt
-                    ? dayjs(workflowToDisplay.startedAt).format(
-                        'YYYY-MM-DD HH:mm:ss Z'
-                      )
-                    : '--'}
-                </span>
-              </div>
-
-              {/* Duration with icon */}
-              <div className="flex items-center text-slate-600 dark:text-slate-400">
-                <Timer className="mr-1.5 h-4 w-4 flex-shrink-0" />
-                <span className="text-sm">
-                  {workflowToDisplay.finishedAt
-                    ? formatDuration(
-                        workflowToDisplay.startedAt,
-                        workflowToDisplay.finishedAt
-                      )
-                    : workflowToDisplay.startedAt
-                      ? formatDuration(
-                          workflowToDisplay.startedAt,
-                          dayjs().toISOString()
-                        )
-                      : '--'}
-                </span>
-              </div>
-            </div>
-
-            {/* Right side - Workflow ID */}
-            <div className="text-sm text-slate-600 dark:text-slate-400 break-all mt-3 md:mt-0">
-              <span className="font-medium">Workflow ID:</span>{' '}
+      {/* Status and metadata row */}
+      {workflowToDisplay.status != Status.NotStarted && (
+        <div className="flex flex-wrap items-center gap-4 text-sm">
+          {/* Status */}
+          {workflowToDisplay.status && (
+            <StatusChip status={workflowToDisplay.status} size="sm">
+              {workflowToDisplay.statusLabel || ''}
+            </StatusChip>
+          )}
+          
+          {/* Metadata items */}
+          <div className="flex items-center text-gray-600">
+            <Calendar className="h-4 w-4 mr-1.5" />
+            <span>
+              {workflowToDisplay?.startedAt
+                ? dayjs(workflowToDisplay.startedAt).format('MMM D, HH:mm:ss')
+                : '--'}
+            </span>
+          </div>
+          
+          <div className="flex items-center text-gray-600">
+            <Timer className="h-4 w-4 mr-1.5" />
+            <span>
+              {workflowToDisplay.finishedAt
+                ? formatDuration(workflowToDisplay.startedAt, workflowToDisplay.finishedAt)
+                : workflowToDisplay.startedAt
+                  ? formatDuration(workflowToDisplay.startedAt, dayjs().toISOString())
+                  : '--'}
+            </span>
+          </div>
+          
+          <div className="flex items-center text-gray-600 ml-auto">
+            <span className="font-medium mr-1">ID:</span>
+            <code className="bg-gray-200 px-2 py-1 rounded text-xs font-mono">
               {workflowToDisplay.rootWorkflowId}
-            </div>
+            </code>
           </div>
         </div>
-      ) : null}
-    </>
+      )}
+    </div>
   );
 };
 

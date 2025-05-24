@@ -83,6 +83,7 @@ function WorkflowDetailsPage() {
             name={displayName}
             refresh={refreshFn}
             displayMode="full"
+            isRootLevel={workflowDetails?.rootWorkflowId === workflowDetails?.workflowId}
           />
         </div>
         <WorkflowDetailsContent

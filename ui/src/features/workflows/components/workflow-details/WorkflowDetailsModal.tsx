@@ -143,6 +143,7 @@ const WorkflowDetailsModal: React.FC<WorkflowDetailsModalProps> = ({
                     name={data.workflowDetails.name}
                     refresh={refreshFn}
                     displayMode="compact"
+                    isRootLevel={data.workflowDetails?.rootWorkflowId === data.workflowDetails?.workflowId}
                   />
                 )}
                 <Button

@@ -100,8 +100,6 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
         bgColorClass,
         borderColorClass,
         textColorClass,
-        'transition-all duration-200 ease-in-out',
-        'shadow-sm hover:shadow',
         sizeClasses[size]
       )}
     >
@@ -113,7 +111,7 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
       </span>
       <span
         className={cn(
-          'font-medium break-keep text-nowrap whitespace-nowrap',
+          'font-normal break-keep text-nowrap whitespace-nowrap',
           textColorClass
         )}
       >

@@ -36,6 +36,8 @@ type Props = {
   refresh?: () => void;
   /** Display mode: 'compact' for icon-only, 'full' for text+icon buttons */
   displayMode?: 'compact' | 'full';
+  /** Whether this is a root level workflow (controls availability of retry/stop actions) */
+  isRootLevel?: boolean;
 };
 
 /**
@@ -46,6 +48,7 @@ function WorkflowActions({
   name,
   refresh,
   displayMode = 'compact',
+  isRootLevel = true,
 }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const [isStopModal, setIsStopModal] = React.useState(false);
@@ -62,10 +65,10 @@ function WorkflowActions({
     }
   };
 
-  // Determine which buttons should be enabled based on current status
+  // Determine which buttons should be enabled based on current status and root level
   const buttonState = {
-    stop: workflow?.status === 1, // Running
-    retry: workflow?.status !== 1 && workflow?.workflowId !== '', // Not running and has a workflowId
+    stop: isRootLevel && workflow?.status === 1, // Running and at root level
+    retry: isRootLevel && workflow?.status !== 1 && workflow?.workflowId !== '', // Not running, has workflowId, and at root level
   };
 
   if (!workflow) {
@@ -80,64 +83,68 @@ function WorkflowActions({
         {/* Stop Button */}
         <Tooltip>
           <TooltipTrigger asChild>
-            {displayMode === 'compact' ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled={!buttonState['stop']}
-                onClick={() => setIsStopModal(true)}
-                className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
-              >
-                <Square className="h-4 w-4" />
-                <span className="sr-only">Stop</span>
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!buttonState['stop']}
-                onClick={() => setIsStopModal(true)}
-                className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
-              >
-                <Square className="mr-2 h-4 w-4" />
-                Stop
-              </Button>
-            )}
+            <span>
+              {displayMode === 'compact' ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled={!buttonState['stop']}
+                  onClick={() => setIsStopModal(true)}
+                  className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+                >
+                  <Square className="h-4 w-4" />
+                  <span className="sr-only">Stop</span>
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!buttonState['stop']}
+                  onClick={() => setIsStopModal(true)}
+                  className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+                >
+                  <Square className="mr-2 h-4 w-4" />
+                  Stop
+                </Button>
+              )}
+            </span>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Stop Workflow execution</p>
+            <p>{isRootLevel ? 'Stop Workflow execution' : 'Stop action only available at root workflow level'}</p>
           </TooltipContent>
         </Tooltip>
 
         {/* Retry Button */}
         <Tooltip>
           <TooltipTrigger asChild>
-            {displayMode === 'compact' ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled={!buttonState['retry']}
-                onClick={() => setIsRetryModal(true)}
-                className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
-              >
-                <RefreshCw className="h-4 w-4" />
-                <span className="sr-only">Retry</span>
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!buttonState['retry']}
-                onClick={() => setIsRetryModal(true)}
-                className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
-              >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Retry
-              </Button>
-            )}
+            <span>
+              {displayMode === 'compact' ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled={!buttonState['retry']}
+                  onClick={() => setIsRetryModal(true)}
+                  className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  <span className="sr-only">Retry</span>
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!buttonState['retry']}
+                  onClick={() => setIsRetryModal(true)}
+                  className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Retry
+                </Button>
+              )}
+            </span>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Retry Workflow execution</p>
+            <p>{isRootLevel ? 'Retry Workflow execution' : 'Retry action only available at root workflow level'}</p>
           </TooltipContent>
         </Tooltip>
 

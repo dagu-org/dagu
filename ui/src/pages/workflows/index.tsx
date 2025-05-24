@@ -226,103 +226,108 @@ function Workflows() {
   return (
     <div className="flex flex-col">
       <Title>Workflows</Title>
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-2 mb-4">
-        <Input
-          placeholder="Filter by workflow name..."
-          value={searchText}
-          onChange={handleNameInputChange}
-          onKeyPress={handleInputKeyPress}
-        />
-        <Input
-          placeholder="Filter by workflow ID..."
-          value={workflowId}
-          onChange={handleWorkflowIdInputChange}
-          onKeyPress={handleInputKeyPress}
-        />
-        <Select value={status} onValueChange={handleStatusChange}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Filter by status">
-              {status === 'all' ? (
+      <div className="bg-gray-50 rounded-lg p-3 mb-4 space-y-3">
+        <div className="flex flex-wrap gap-2">
+          <Input
+            placeholder="Filter by workflow name..."
+            value={searchText}
+            onChange={handleNameInputChange}
+            onKeyDown={handleInputKeyPress}
+            className="flex-1 min-w-[200px] bg-background"
+          />
+          <Input
+            placeholder="Filter by workflow ID..."
+            value={workflowId}
+            onChange={handleWorkflowIdInputChange}
+            onKeyDown={handleInputKeyPress}
+            className="flex-1 min-w-[180px] bg-background"
+          />
+          <Select value={status} onValueChange={handleStatusChange}>
+            <SelectTrigger className="w-auto min-w-[140px] bg-background">
+              <SelectValue placeholder="Status">
+                {status === 'all' ? (
+                  <div className="inline-flex items-center rounded-full border bg-gray-100 border-gray-300 text-gray-700 py-0.5 px-2 text-xs font-medium">
+                    All
+                  </div>
+                ) : status === String(Status.NotStarted) ? (
+                  <StatusChip status={Status.NotStarted} size="sm">
+                    not started
+                  </StatusChip>
+                ) : status === String(Status.Running) ? (
+                  <StatusChip status={Status.Running} size="sm">
+                    running
+                  </StatusChip>
+                ) : status === String(Status.Failed) ? (
+                  <StatusChip status={Status.Failed} size="sm">
+                    failed
+                  </StatusChip>
+                ) : status === String(Status.Cancelled) ? (
+                  <StatusChip status={Status.Cancelled} size="sm">
+                    cancelled
+                  </StatusChip>
+                ) : status === String(Status.Success) ? (
+                  <StatusChip status={Status.Success} size="sm">
+                    finished
+                  </StatusChip>
+                ) : status === String(Status.Queued) ? (
+                  <StatusChip status={Status.Queued} size="sm">
+                    queued
+                  </StatusChip>
+                ) : null}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">
                 <div className="inline-flex items-center rounded-full border bg-gray-100 border-gray-300 text-gray-700 py-0.5 px-2 text-xs font-medium">
                   All Statuses
                 </div>
-              ) : status === String(Status.NotStarted) ? (
+              </SelectItem>
+              <SelectItem value={String(Status.NotStarted)}>
                 <StatusChip status={Status.NotStarted} size="sm">
                   not started
                 </StatusChip>
-              ) : status === String(Status.Running) ? (
+              </SelectItem>
+              <SelectItem value={String(Status.Running)}>
                 <StatusChip status={Status.Running} size="sm">
                   running
                 </StatusChip>
-              ) : status === String(Status.Failed) ? (
+              </SelectItem>
+              <SelectItem value={String(Status.Failed)}>
                 <StatusChip status={Status.Failed} size="sm">
                   failed
                 </StatusChip>
-              ) : status === String(Status.Cancelled) ? (
+              </SelectItem>
+              <SelectItem value={String(Status.Cancelled)}>
                 <StatusChip status={Status.Cancelled} size="sm">
                   cancelled
                 </StatusChip>
-              ) : status === String(Status.Success) ? (
+              </SelectItem>
+              <SelectItem value={String(Status.Success)}>
                 <StatusChip status={Status.Success} size="sm">
                   finished
                 </StatusChip>
-              ) : status === String(Status.Queued) ? (
+              </SelectItem>
+              <SelectItem value={String(Status.Queued)}>
                 <StatusChip status={Status.Queued} size="sm">
                   queued
                 </StatusChip>
-              ) : null}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">
-              <div className="inline-flex items-center rounded-full border bg-gray-100 border-gray-300 text-gray-700 py-0.5 px-2 text-xs font-medium">
-                All Statuses
-              </div>
-            </SelectItem>
-            <SelectItem value={String(Status.NotStarted)}>
-              <StatusChip status={Status.NotStarted} size="sm">
-                not started
-              </StatusChip>
-            </SelectItem>
-            <SelectItem value={String(Status.Running)}>
-              <StatusChip status={Status.Running} size="sm">
-                running
-              </StatusChip>
-            </SelectItem>
-            <SelectItem value={String(Status.Failed)}>
-              <StatusChip status={Status.Failed} size="sm">
-                failed
-              </StatusChip>
-            </SelectItem>
-            <SelectItem value={String(Status.Cancelled)}>
-              <StatusChip status={Status.Cancelled} size="sm">
-                cancelled
-              </StatusChip>
-            </SelectItem>
-            <SelectItem value={String(Status.Success)}>
-              <StatusChip status={Status.Success} size="sm">
-                finished
-              </StatusChip>
-            </SelectItem>
-          </SelectContent>
-        </Select>
-        <div className="flex items-center justify-start">
-          <Button onClick={() => handleSearch()} className="w-full sm:w-auto">
-            <Search size={18} className="mr-2" />
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={() => handleSearch()} size="sm" className="px-4">
+            <Search size={16} className="mr-1" />
             Search
           </Button>
         </div>
-        <div className="col-span-1 md:col-span-3 lg:col-span-4">
-          <DateRangePicker
-            fromDate={fromDate}
-            toDate={toDate}
-            onFromDateChange={setFromDate}
-            onToDateChange={setToDate}
-            fromLabel={`From ${tzLabel}`}
-            toLabel={`To ${tzLabel}`}
-            className="w-full md:w-auto md:min-w-[340px] md:max-w-[500px]"
-          />
-        </div>
+        <DateRangePicker
+          fromDate={fromDate}
+          toDate={toDate}
+          onFromDateChange={setFromDate}
+          onToDateChange={setToDate}
+          fromLabel={`From ${tzLabel}`}
+          toLabel={`To ${tzLabel}`}
+          className="w-full md:w-auto"
+        />
       </div>
       {isLoading ? (
         <LoadingIndicator />

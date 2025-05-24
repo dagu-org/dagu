@@ -162,7 +162,7 @@ function DAGStatus({ workflow, fileName }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border p-6 overflow-hidden">
         <DAGGraph
           workflow={workflow}
           onSelectStep={onSelectStepOnGraph}
@@ -173,7 +173,7 @@ function DAGStatus({ workflow, fileName }: Props) {
       <DAGContext.Consumer>
         {(props) => (
           <React.Fragment>
-            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
+            <div className="bg-white dark:bg-slate-900 rounded-xl border p-6 overflow-hidden">
               <SubTitle className="mb-4">Status</SubTitle>
               <DAGStatusOverview
                 status={workflow}
@@ -189,7 +189,7 @@ function DAGStatus({ workflow, fileName }: Props) {
               />
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
+            <div className="bg-white dark:bg-slate-900 rounded-xl border p-6 overflow-hidden">
               <SubTitle className="mb-4">Steps</SubTitle>
               <NodeStatusTable
                 nodes={workflow.nodes}
@@ -200,7 +200,7 @@ function DAGStatus({ workflow, fileName }: Props) {
             </div>
 
             {handlers?.length ? (
-              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 overflow-hidden">
+              <div className="bg-white dark:bg-slate-900 rounded-xl border p-6 overflow-hidden">
                 <SubTitle className="mb-4">Lifecycle Hooks</SubTitle>
                 <NodeStatusTable
                   nodes={handlers}

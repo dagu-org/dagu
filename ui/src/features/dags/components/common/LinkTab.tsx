@@ -27,7 +27,7 @@ const LinkTab: React.FC<LinkTabProps> = ({
         'group relative rounded-md px-4 py-2 transition-all duration-200 ease-in-out',
         'flex items-center gap-2 text-sm font-medium cursor-pointer',
         isActive
-          ? 'bg-primary/10 text-primary border border-primary/30 shadow-sm font-semibold'
+          ? 'bg-primary/10 text-primary border border-primary/30 font-semibold'
           : 'hover:bg-primary/5 hover:text-primary border border-transparent',
         className
       )}

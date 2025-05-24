@@ -209,7 +209,7 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
   const EmptyState = () => (
     <div className="flex flex-col items-center justify-center py-12 px-4 border rounded-md bg-white">
       <div className="text-6xl mb-4">🔍</div>
-      <h3 className="text-lg font-medium text-gray-900 mb-2">
+      <h3 className="text-lg font-normal text-gray-900 mb-2">
         No workflows found
       </h3>
       <p className="text-sm text-gray-500 text-center max-w-md mb-4">
@@ -252,7 +252,7 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
           >
             {/* Header with name and status */}
             <div className="flex justify-between items-start mb-2">
-              <div className="font-medium text-sm">{workflow.name}</div>
+              <div className="font-normal text-sm">{workflow.name}</div>
               <StatusChip status={workflow.status} size="xs">
                 {workflow.statusLabel}
               </StatusChip>
@@ -302,28 +302,28 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
       <Table className="w-full text-xs">
         <TableHeader>
           <TableRow>
-            <TableHead className="text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
+            <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
               Workflow Name
             </TableHead>
-            <TableHead className="text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
+            <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
               Workflow ID
             </TableHead>
-            <TableHead className="text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
+            <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
               Status
             </TableHead>
-            <TableHead className="text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
+            <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
               <div>Queued At</div>
               <div className="text-[10px] text-muted-foreground font-normal">
                 {timezoneInfo}
               </div>
             </TableHead>
-            <TableHead className="text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
+            <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
               <div>Started At</div>
               <div className="text-[10px] text-muted-foreground font-normal">
                 {timezoneInfo}
               </div>
             </TableHead>
-            <TableHead className="text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
+            <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
               Duration
             </TableHead>
           </TableRow>
@@ -346,10 +346,10 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
                 });
               }}
             >
-              <TableCell className="py-1 px-2 font-medium">
+              <TableCell className="py-1 px-2 font-normal">
                 {workflow.name}
               </TableCell>
-              <TableCell className="py-1 px-2 font-mono text-slate-600">
+              <TableCell className="py-1 px-2 font-mono text-muted-foreground">
                 {workflow.workflowId}
               </TableCell>
               <TableCell className="py-1 px-2">

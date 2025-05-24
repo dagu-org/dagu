@@ -1,7 +1,5 @@
 import React from 'react';
-// Assuming the path alias is correct and the component exists
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, Filter, ListChecks, Play, XCircle } from 'lucide-react';
+import { CheckCircle, Filter, ListChecks, Play, XCircle, StopCircle, Clock } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -15,7 +13,6 @@ import { AppBarContext } from '../contexts/AppBarContext';
 import { useConfig } from '../contexts/ConfigContext';
 import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
 import { useQuery } from '../hooks/api';
-import Title from '../ui/Title';
 // Import the main 'components' type and Status enum
 import type { components } from '../api/v2/schema'; // Import the main components interface
 import { Status } from '../api/v2/schema'; // Import the Status enum
@@ -35,6 +32,7 @@ const initializeMetrics = (): Metrics => {
     Status.Failed,
     Status.Running,
     Status.Cancelled,
+    Status.Queued,
     Status.NotStarted, // Include NotStarted if relevant
   ];
   relevantStatuses.forEach((status: Status) => {
@@ -156,24 +154,34 @@ function Dashboard(): React.ReactElement | null {
   // --- Define metric cards data ---
   const metricCards = [
     {
-      title: 'Total Workflows',
+      title: 'Total',
       value: totalWorkflows,
-      icon: <ListChecks className="h-5 w-5 text-muted-foreground" />,
+      icon: <ListChecks className="h-5 w-5 text-gray-600" />,
     },
     {
       title: 'Running',
       value: metrics[Status.Running],
-      icon: <Play className="h-5 w-5 text-muted-foreground" />,
+      icon: <Play className="h-5 w-5 text-[limegreen]" />,
     },
     {
-      title: 'Successful',
+      title: 'Queued',
+      value: metrics[Status.Queued],
+      icon: <Clock className="h-5 w-5 text-[purple]" />,
+    },
+    {
+      title: 'Success',
       value: metrics[Status.Success],
-      icon: <CheckCircle className="h-5 w-5 text-muted-foreground" />,
+      icon: <CheckCircle className="h-5 w-5 text-[green]" />,
     },
     {
       title: 'Failed',
       value: metrics[Status.Failed],
-      icon: <XCircle className="h-5 w-5 text-muted-foreground" />,
+      icon: <XCircle className="h-5 w-5 text-[red]" />,
+    },
+    {
+      title: 'Cancelled',
+      value: metrics[Status.Cancelled],
+      icon: <StopCircle className="h-5 w-5 text-[deeppink]" />,
     },
   ];
 
@@ -184,127 +192,114 @@ function Dashboard(): React.ReactElement | null {
 
   // --- Render the dashboard UI ---
   return (
-    <div className="flex flex-col space-y-6 w-full">
-      {/* Workflow Filter */}
-      <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
-          <div className="flex items-center gap-2">
-            <Filter className="h-5 w-5 text-primary" />
-            <span className="text-sm font-medium">Filter by workflow:</span>
-          </div>
-          <Select
-            value={selectedWorkflow}
-            onValueChange={handleWorkflowChange}
-            disabled={isLoading}
-          >
-            <SelectTrigger className="w-full sm:w-[250px] bg-background">
-              <SelectValue
-                placeholder={
-                  isLoading ? 'Loading workflows...' : 'Select workflow'
-                }
-              />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" className="font-medium">
-                All Workflows
-              </SelectItem>
-              {uniqueWorkflowNames.map((name) => (
-                <SelectItem key={name} value={name}>
-                  {name}
-                </SelectItem>
-              ))}
-              {uniqueWorkflowNames.length === 0 && !isLoading && (
-                <div className="py-2 px-2 text-sm text-muted-foreground">
-                  No workflows found
-                </div>
+    <div className="flex flex-col gap-3 w-full p-0">
+      {/* Dense Header with Filters and Metrics */}
+      <div className="border rounded bg-card">
+        {/* Top row: Filters */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 border-b">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <span className="text-xs font-medium text-muted-foreground">Workflow:</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select
+                value={selectedWorkflow}
+                onValueChange={handleWorkflowChange}
+                disabled={isLoading}
+              >
+                <SelectTrigger className="h-7 w-full sm:w-[180px] text-xs">
+                  <SelectValue
+                    placeholder={
+                      isLoading ? 'Loading...' : 'All workflows'
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-xs">
+                    All Workflows
+                  </SelectItem>
+                  {uniqueWorkflowNames.map((name) => (
+                    <SelectItem key={name} value={name} className="text-xs">
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedWorkflow !== 'all' && (
+                <span className="text-xs text-muted-foreground px-2 py-1 bg-muted rounded whitespace-nowrap">
+                  {selectedWorkflow}
+                </span>
               )}
-            </SelectContent>
-          </Select>
-
-          <div className="flex items-center gap-4 ml-auto">
-            <span className="text-sm font-medium">Date:</span>
-            <div className="relative flex items-center">
+            </div>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Date:</span>
               <Input
                 type="date"
                 value={dayjs.unix(dateRange.startDate).format('YYYY-MM-DD')}
                 onChange={(e) => {
                   const newDate = e.target.value;
                   const date = dayjs(newDate);
-
-                  // Apply timezone offset and set to beginning of day (00:00)
                   const startOfDay =
                     config.tzOffsetInSec !== undefined
                       ? date.utcOffset(config.tzOffsetInSec / 60).startOf('day')
                       : date.startOf('day');
-
-                  // End of day (23:59:59)
                   const endOfDay =
                     config.tzOffsetInSec !== undefined
                       ? date.utcOffset(config.tzOffsetInSec / 60).endOf('day')
                       : date.endOf('day');
-
                   handleDateChange(startOfDay.unix(), endOfDay.unix());
                 }}
-                className="h-9 w-[150px] text-center"
+                className="h-7 w-[140px] text-xs pr-8"
               />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const now = dayjs();
+                  const startOfDay =
+                    config.tzOffsetInSec !== undefined
+                      ? now.utcOffset(config.tzOffsetInSec / 60).startOf('day')
+                      : now.startOf('day');
+                  const endOfDay =
+                    config.tzOffsetInSec !== undefined
+                      ? now.utcOffset(config.tzOffsetInSec / 60).endOf('day')
+                      : now.endOf('day');
+                  handleDateChange(startOfDay.unix(), endOfDay.unix());
+                }}
+                className="h-7 px-2 text-xs"
+              >
+                Today
+              </Button>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const now = dayjs();
-                const startOfDay =
-                  config.tzOffsetInSec !== undefined
-                    ? now.utcOffset(config.tzOffsetInSec / 60).startOf('day')
-                    : now.startOf('day');
-
-                const endOfDay =
-                  config.tzOffsetInSec !== undefined
-                    ? now.utcOffset(config.tzOffsetInSec / 60).endOf('day')
-                    : now.endOf('day');
-
-                handleDateChange(startOfDay.unix(), endOfDay.unix());
-              }}
-            >
-              Today
-            </Button>
           </div>
-
-          {selectedWorkflow !== 'all' && (
-            <div className="text-xs text-muted-foreground">
-              Showing data for{' '}
-              <span className="font-semibold">{selectedWorkflow}</span> workflow
+        </div>
+        
+        {/* Bottom row: Dense metrics */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-x divide-y lg:divide-y-0">
+          {metricCards.map((card) => (
+            <div key={card.title} className="p-2 sm:p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
+              <div className="flex items-center gap-1 sm:gap-2">
+                {React.cloneElement(card.icon, { className: card.icon.props.className.replace('h-5 w-5', 'h-3 w-3') })}
+                <span className="text-xs font-medium text-muted-foreground">{card.title}</span>
+              </div>
+              <span className="text-lg font-bold">{card.value}</span>
             </div>
-          )}
+          ))}
         </div>
       </div>
 
-      {/* Metric Cards Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {metricCards.map((card) => (
-          <Card key={card.title}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {card.title}
-              </CardTitle>
-              {card.icon}
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{card.value}</div>
-              {/* Optional: Add description or trend */}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Timeline Chart Section */}
-      <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4 md:p-6">
-        <Title>{title}</Title>
-        {/* Remove fixed height (h-[300px]) to allow vertical expansion */}
-        {/* Add overflow-x-auto to allow horizontal scrolling if chart is too wide */}
-        <div className="mt-4 overflow-x-auto">
-          {' '}
-          {/* Adjust height as needed */}
+      {/* Compact Timeline Chart */}
+      <div className="border rounded bg-card">
+        <div className="flex items-center justify-between p-3 border-b">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold">{title}</span>
+          </div>
+        </div>
+        <div className="p-0">
           <DashboardTimeChart
             data={workflowsList}
             selectedDate={{
