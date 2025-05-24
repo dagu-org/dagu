@@ -100,6 +100,7 @@ type commandConfig struct {
 	Script           string
 	ShellCommand     string
 	ShellCommandArgs string
+	ShellPackages    []string
 	Stdout           io.Writer
 	Stderr           io.Writer
 }
@@ -108,7 +109,15 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 	var cmd *exec.Cmd
 	switch {
 	case cfg.Command != "" && scriptFile != "":
-		cmd = exec.CommandContext(cfg.Ctx, cfg.Command, append(cfg.Args, scriptFile)...) // nolint: gosec
+		builder := &shellCommandBuilder{
+			Command:          cfg.Command,
+			Args:             cfg.Args,
+			ShellCommand:     cfg.ShellCommand,
+			ShellCommandArgs: cfg.ShellCommandArgs,
+			Packages:         cfg.ShellPackages,
+			Script:           scriptFile,
+		}
+		cmd = builder.Build(ctx)
 
 	case cfg.ShellCommand != "" && scriptFile != "":
 		// If script is provided ignore the shell command args
@@ -116,8 +125,12 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 		cmd = exec.CommandContext(cfg.Ctx, cfg.ShellCommand, scriptFile) // nolint: gosec
 
 	case cfg.ShellCommand != "" && cfg.ShellCommandArgs != "":
-		// nolint: gosec
-		cmd = exec.CommandContext(cfg.Ctx, cfg.ShellCommand, "-c", cfg.ShellCommandArgs)
+		builder := &shellCommandBuilder{
+			ShellCommand:     cfg.ShellCommand,
+			ShellCommandArgs: cfg.ShellCommandArgs,
+			Packages:         cfg.ShellPackages,
+		}
+		cmd = builder.Build(ctx)
 
 	default:
 		cmd = createDirectCommand(cfg.Ctx, cfg.Command, cfg.Args, scriptFile)
@@ -154,6 +167,42 @@ func exitCodeFromError(err error) int {
 	return exitCode
 }
 
+type shellCommandBuilder struct {
+	Command          string
+	Args             []string
+	ShellCommand     string
+	ShellCommandArgs string
+	Packages         []string
+	Script           string
+}
+
+func (b *shellCommandBuilder) Build(ctx context.Context) *exec.Cmd {
+	switch b.ShellCommand {
+	case "nix-shell":
+		var args []string
+
+		// If the shell command is nix-shell, we need to pass the packages as arguments
+		for _, pkg := range b.Packages {
+			args = append(args, "-p", pkg)
+		}
+		args = append(args, "--pure", "--run")
+
+		if b.Command != "" && b.Script != "" {
+			return exec.CommandContext(ctx, b.Command, append(args, b.Script)...) // nolint: gosec
+		}
+
+		// Construct the command with the shell command and the packages
+		return exec.CommandContext(ctx, b.ShellCommand, append(args, b.ShellCommandArgs)...) // nolint: gosec
+	}
+
+	if b.Command != "" && b.Script != "" {
+		return exec.CommandContext(ctx, b.Command, append(b.Args, b.Script)...) // nolint: gosec
+	}
+
+	// nolint: gosec
+	return exec.CommandContext(ctx, b.ShellCommand, "-c", b.ShellCommandArgs)
+}
+
 func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
 	if len(step.Dir) > 0 && !fileutil.FileExists(step.Dir) {
 		return nil, fmt.Errorf("directory does not exist: %s", step.Dir)
@@ -179,6 +228,7 @@ func createCommandConfig(ctx context.Context, step digraph.Step) (*commandConfig
 		Script:           step.Script,
 		ShellCommand:     shellCommand,
 		ShellCommandArgs: shellCmdArgs,
+		ShellPackages:    step.ShellPackages,
 	}, nil
 }
 
@@ -197,6 +247,11 @@ func setupScript(_ context.Context, step digraph.Step) (string, error) {
 
 	if err = file.Sync(); err != nil {
 		return "", fmt.Errorf("failed to sync script file: %w", err)
+	}
+
+	// Add execute permissions to the script file
+	if err = os.Chmod(file.Name(), 0755); err != nil { // nolint: gosec
+		return "", fmt.Errorf("failed to set execute permissions on script file: %w", err)
 	}
 
 	return file.Name(), nil

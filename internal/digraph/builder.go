@@ -587,6 +587,7 @@ func buildStep(ctx BuildContext, def stepDef) (*Step, error) {
 		Name:           def.Name,
 		Description:    def.Description,
 		Shell:          def.Shell,
+		ShellPackages:  def.Packages,
 		Script:         def.Script,
 		Stdout:         def.Stdout,
 		Stderr:         def.Stderr,
