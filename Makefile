@@ -262,8 +262,8 @@ build-ui:
 	@echo "${COLOR_GREEN}Building UI...${COLOR_RESET}"
 	@cd ui; \
 		pnpm install; \
-		NODE_OPTIONS="--max-old-space-size=8192" pnpm webpack --config webpack.dev.js; \
-		pnpm webpack --config webpack.prod.js
+		NODE_OPTIONS="--max-old-space-size=8192" pnpm webpack --config webpack.dev.js --progress --color; \
+		pnpm webpack --config webpack.prod.js --progress --color
 	@echo "${COLOR_GREEN}Waiting for the build to finish...${COLOR_RESET}"
 	@sleep 3 # wait for the build to finish
 

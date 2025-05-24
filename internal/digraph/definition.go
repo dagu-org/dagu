@@ -73,50 +73,50 @@ type handlerOnDef struct {
 // stepDef defines a step in the DAG.
 type stepDef struct {
 	// Name is the name of the step.
-	Name string
+	Name string `yaml:"name,omitempty"`
 	// Description is the description of the step.
-	Description string
+	Description string `yaml:"description,omitempty"`
 	// Dir is the working directory of the step.
-	Dir string
+	Dir string `yaml:"dir,omitempty"`
 	// Executor is the executor configuration.
-	Executor any
+	Executor any `yaml:"executor,omitempty"`
 	// Command is the command to run (on shell).
-	Command any
+	Command any `yaml:"command,omitempty"`
 	// Shell is the shell to run the command. Default is `$SHELL` or `sh`.
-	Shell string
+	Shell string `yaml:"shell,omitempty"`
 	// Packages is the list of packages to install.
 	// This is used only when the shell is `nix-shell`.
-	Packages []string
+	Packages []string `yaml:"packages,omitempty"`
 	// Script is the script to run.
-	Script string
+	Script string `yaml:"script,omitempty"`
 	// Stdout is the file to write the stdout.
-	Stdout string
+	Stdout string `yaml:"stdout,omitempty"`
 	// Stderr is the file to write the stderr.
-	Stderr string
+	Stderr string `yaml:"stderr,omitempty"`
 	// Output is the variable name to store the output.
-	Output string
+	Output string `yaml:"output,omitempty"`
 	// Depends is the list of steps to depend on.
-	Depends any // string or []string
+	Depends any `yaml:"depends,omitempty"` // string or []string
 	// ContinueOn is the condition to continue on.
-	ContinueOn *continueOnDef
+	ContinueOn *continueOnDef `yaml:"continueOn,omitempty"`
 	// RetryPolicy is the retry policy.
-	RetryPolicy *retryPolicyDef
+	RetryPolicy *retryPolicyDef `yaml:"retryPolicy,omitempty"`
 	// RepeatPolicy is the repeat policy.
-	RepeatPolicy *repeatPolicyDef
+	RepeatPolicy *repeatPolicyDef `yaml:"repeatPolicy,omitempty"`
 	// MailOnError is the flag to send mail on error.
-	MailOnError bool
+	MailOnError bool `yaml:"mailOnError,omitempty"`
 	// Precondition is the condition to run the step.
-	Precondition any
+	Precondition any `yaml:"precondition,omitempty"`
 	// Preconditions is the condition to run the step.
-	Preconditions any
+	Preconditions any `yaml:"preconditions,omitempty"`
 	// SignalOnStop is the signal when the step is requested to stop.
 	// When it is empty, the same signal as the parent process is sent.
 	// It can be KILL when the process does not stop over the timeout.
-	SignalOnStop *string
+	SignalOnStop *string `yaml:"signalOnStop,omitempty"`
 	// Run is the name of a DAG to run as a child workflow
-	Run string
+	Run string `yaml:"run,omitempty"`
 	// Params specifies the parameters for the child workflow.
-	Params string
+	Params string `yaml:"params,omitempty"`
 }
 
 // continueOnDef defines the conditions to continue on failure or skipped.
@@ -130,8 +130,11 @@ type continueOnDef struct {
 
 // repeatPolicyDef defines the repeat policy for a step.
 type repeatPolicyDef struct {
-	Repeat      bool // Flag to indicate if the step should be repeated
-	IntervalSec int  // Interval in seconds between repeats
+	Repeat      bool   `yaml:"repeat,omitempty"`      // Flag to indicate if the step should be repeated
+	IntervalSec int    `yaml:"intervalSec,omitempty"` // Interval in seconds to wait before repeating the step
+	Condition   string `yaml:"condition,omitempty"`   // Condition to check before repeating
+	Expected    string `yaml:"expected,omitempty"`    // Expected output to match before repeating
+	ExitCode    []int  `yaml:"exitCode,omitempty"`    // List of exit codes to consider for repeating the step
 }
 
 // retryPolicyDef defines the retry policy for a step.

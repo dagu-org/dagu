@@ -267,3 +267,42 @@ Customizing Signal Handling on Stop
         for s in {1..64}; do trap "echo trap $s" $s; done
         sleep 60
       signalOnStop: "SIGINT"
+
+Advanced Step Repetition (repeatPolicy)
+---------------------------------------
+
+Dagu supports advanced repeat-until logic for steps using the ``repeatPolicy`` field. You can repeat a step until a command output matches a string or regex, or until a specific exit code is returned.
+
+.. code-block:: yaml
+
+  steps:
+    - name: repeat-until-string-match
+      command: echo hello 
+      repeatPolicy:
+        condition: "hello"
+        expected: "hello"
+        intervalSec: 10
+
+    - name: repeat-until-exitcode
+      command: bash check_status.sh
+      repeatPolicy:
+        exitCode: [42]
+        intervalSec: 5
+
+    - name: repeat-until-shell-output
+      command: echo "triggering repeat"
+      repeatPolicy:
+        condition: "`echo foo`"
+        expected: "foo"
+        intervalSec: 30
+
+    - name: repeat-forever
+      command: echo 'hello'
+      repeatPolicy:
+        repeat: true
+        intervalSec: 60
+
+- ``condition``: Command or expression to evaluate after each run.
+- ``expected``: Value or regex to match the output of ``condition``.
+- ``exitCode``: Integer or list of integers; repeat if the last command exits with one of these codes.
+- ``repeat``/``intervalSec``: repeat unconditionally at the given interval.

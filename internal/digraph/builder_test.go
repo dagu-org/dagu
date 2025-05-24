@@ -366,6 +366,14 @@ func TestBuildStep(t *testing.T) {
 		assert.True(t, th.Steps[0].RepeatPolicy.Repeat)
 		assert.Equal(t, 60*time.Second, th.Steps[0].RepeatPolicy.Interval)
 	})
+	t.Run("RepeatPolicyCondition", func(t *testing.T) {
+		th := testLoad(t, "repeat_policy_condition.yaml")
+		assert.Len(t, th.Steps, 1)
+		repeatPolicy := th.Steps[0].RepeatPolicy
+		assert.Equal(t, "echo hello", repeatPolicy.Condition)
+		assert.Equal(t, "hello", repeatPolicy.Expected)
+		assert.Equal(t, 1*time.Second, repeatPolicy.Interval)
+	})
 	t.Run("SignalOnStop", func(t *testing.T) {
 		t.Parallel()
 
@@ -380,6 +388,13 @@ func TestBuildStep(t *testing.T) {
 		assert.Len(t, th.Steps, 1)
 		assert.Len(t, th.Steps[0].Preconditions, 1)
 		assert.Equal(t, &digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Steps[0].Preconditions[0])
+	})
+	t.Run("RepeatPolicyExitCode", func(t *testing.T) {
+		th := testLoad(t, "repeat_policy_exitcode.yaml")
+		assert.Len(t, th.Steps, 1)
+		repeatPolicy := th.Steps[0].RepeatPolicy
+		assert.Equal(t, []int{42}, repeatPolicy.ExitCode)
+		assert.Equal(t, 2*time.Second, repeatPolicy.Interval)
 	})
 }
 
