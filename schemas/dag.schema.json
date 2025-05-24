@@ -286,6 +286,13 @@
           "type": "string",
           "description": "Specific shell to use for executing the command. Defaults to $SHELL or sh if not specified."
         },
+        "packages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of packages to install before executing the step. Useful for ensuring dependencies are available. It's only available when the shell is nix-shell."
+        },
         "script": {
           "type": "string",
           "description": "Multi-line script content that will be executed. Gets piped into the command if specified, otherwise uses default shell."

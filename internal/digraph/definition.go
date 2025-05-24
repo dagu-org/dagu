@@ -84,6 +84,9 @@ type stepDef struct {
 	Command any
 	// Shell is the shell to run the command. Default is `$SHELL` or `sh`.
 	Shell string
+	// Packages is the list of packages to install.
+	// This is used only when the shell is `nix-shell`.
+	Packages []string
 	// Script is the script to run.
 	Script string
 	// Stdout is the file to write the stdout.

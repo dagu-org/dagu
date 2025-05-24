@@ -16,6 +16,8 @@ type Step struct {
 	Description string `json:"description,omitempty"`
 	// Shell is the shell program to execute the command. This is optional.
 	Shell string `json:"shell,omitempty"`
+	// ShellPackages is the list of packages to install. This is used only when the shell is `nix-shell`.
+	ShellPackages []string `json:"shellPackages,omitempty"`
 	// Dir is the working directory for the step.
 	Dir string `json:"dir,omitempty"`
 	// ExecutorConfig contains the configuration for the executor.
