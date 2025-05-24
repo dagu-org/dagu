@@ -387,9 +387,26 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		}
 	}
 
-	workflowId, err := a.historyManager.GenWorkflowID(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error generating workflow ID: %w", err)
+	workflowId := valueOf(request.Body.WorkflowId)
+	if workflowId == "" {
+		var err error
+		workflowId, err = a.historyManager.GenWorkflowID(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("error generating workflow ID: %w", err)
+		}
+	}
+
+	// Check the workflow ID is not already in use
+	_, err = a.historyStore.FindRun(ctx, digraph.WorkflowRef{
+		Name:       dag.Name,
+		WorkflowID: workflowId,
+	})
+	if !errors.Is(err, models.ErrWorkflowIDNotFound) {
+		return nil, &Error{
+			HTTPStatus: http.StatusConflict,
+			Code:       api.ErrorCodeAlreadyExists,
+			Message:    fmt.Sprintf("Workflow ID %s already exists for DAG %s", workflowId, dag.Name),
+		}
 	}
 
 	if err := a.startWorkflow(ctx, dag, valueOf(request.Body.Params), workflowId); err != nil {
@@ -458,9 +475,13 @@ func (a *API) EnqueueDAGWorkflow(ctx context.Context, request api.EnqueueDAGWork
 		}
 	}
 
-	workflowId, err := a.historyManager.GenWorkflowID(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error generating workflow ID: %w", err)
+	workflowId := valueOf(request.Body.WorkflowId)
+	if workflowId == "" {
+		var err error
+		workflowId, err = a.historyManager.GenWorkflowID(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("error generating workflow ID: %w", err)
+		}
 	}
 
 	if err := a.enqueueWorkflow(ctx, dag, valueOf(request.Body.Params), workflowId); err != nil {

@@ -1133,6 +1133,8 @@ export interface operations {
                 "application/json": {
                     /** @description Parameters to pass to the workflow in JSON format */
                     params?: string;
+                    /** @description Optional ID for the workflow, if not provided a new one will be generated */
+                    workflowId?: string;
                 };
             };
         };
@@ -1178,6 +1180,8 @@ export interface operations {
                 "application/json": {
                     /** @description Parameters to pass to the workflow in JSON format */
                     params?: string;
+                    /** @description Optional ID for the workflow, if not provided a new one will be generated */
+                    workflowId?: string;
                 };
             };
         };
