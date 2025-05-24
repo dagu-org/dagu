@@ -9,7 +9,6 @@ import { components, NodeStatus, Status } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useClient, useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
-import SubTitle from '../../../../ui/SubTitle';
 import { DAGContext } from '../../contexts/DAGContext';
 import { getEventHandlers } from '../../lib/getEventHandlers';
 import { DAGStatusOverview, NodeStatusTable } from '../dag-details';
@@ -328,20 +327,32 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
   return (
     <DAGContext.Consumer>
       {(props) => (
-        <div className="space-y-4">
-          <div className="mb-2">
-            <HistoryTable
-              workflows={reversedWorkflows || []}
-              gridData={gridData || []}
-              onSelect={updateIdx}
-              idx={idx}
-            />
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+            <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                Execution History
+              </h2>
+            </div>
+            <div className="p-6">
+              <HistoryTable
+                workflows={reversedWorkflows || []}
+                gridData={gridData || []}
+                onSelect={updateIdx}
+                idx={idx}
+              />
+            </div>
           </div>
 
           {reversedWorkflows && reversedWorkflows[idx] ? (
             <React.Fragment>
-              <div className="space-y-6 pt-2">
-                <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 overflow-hidden">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    Workflow Visualization
+                  </h2>
+                </div>
+                <div className="p-6">
                   <DAGGraph
                     workflow={reversedWorkflows[idx]}
                     onSelectStep={onSelectStepOnGraph}
@@ -350,52 +361,44 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 overflow-hidden">
-                <SubTitle className="mb-4">Status</SubTitle>
-                <DAGStatusOverview
-                  status={reversedWorkflows[idx]}
-                  workflowId={reversedWorkflows[idx].workflowId}
-                  {...props}
-                  onViewLog={(workflowId) => {
-                    setLogViewer({
-                      isOpen: true,
-                      logType: 'execution',
-                      stepName: '',
-                      workflowId,
-                      stream: 'stdout',
-                    });
-                  }}
-                />
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    Execution Status
+                  </h2>
+                </div>
+                <div className="p-6">
+                  <DAGStatusOverview
+                    status={reversedWorkflows[idx]}
+                    workflowId={reversedWorkflows[idx].workflowId}
+                    {...props}
+                    onViewLog={(workflowId) => {
+                      setLogViewer({
+                        isOpen: true,
+                        logType: 'execution',
+                        stepName: '',
+                        workflowId,
+                        stream: 'stdout',
+                      });
+                    }}
+                  />
+                </div>
               </div>
 
-              <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 overflow-hidden">
-                <SubTitle className="mb-4">Steps</SubTitle>
-                <NodeStatusTable
-                  nodes={reversedWorkflows[idx].nodes}
-                  status={reversedWorkflows[idx]}
-                  {...props}
-                  onViewLog={(stepName, workflowId) => {
-                    // Check if this is a stderr log (indicated by _stderr suffix)
-                    const isStderr = stepName.endsWith('_stderr');
-                    const actualStepName = isStderr ? stepName.slice(0, -7) : stepName; // Remove '_stderr' suffix
-                    
-                    setLogViewer({
-                      isOpen: true,
-                      logType: 'step',
-                      stepName: actualStepName,
-                      workflowId:
-                        workflowId || reversedWorkflows[idx]?.workflowId || '',
-                      stream: isStderr ? 'stderr' : 'stdout',
-                    });
-                  }}
-                />
-              </div>
-
-              {handlers && handlers.length ? (
-                <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 overflow-hidden">
-                  <SubTitle className="mb-4">Lifecycle Hooks</SubTitle>
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                    <span>Execution Steps</span>
+                    {reversedWorkflows[idx].nodes && (
+                      <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                        {reversedWorkflows[idx].nodes.length} step{reversedWorkflows[idx].nodes.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </h2>
+                </div>
+                <div className="overflow-x-auto">
                   <NodeStatusTable
-                    nodes={getEventHandlers(reversedWorkflows[idx])}
+                    nodes={reversedWorkflows[idx].nodes}
                     status={reversedWorkflows[idx]}
                     {...props}
                     onViewLog={(stepName, workflowId) => {
@@ -408,13 +411,47 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
                         logType: 'step',
                         stepName: actualStepName,
                         workflowId:
-                          workflowId ||
-                          reversedWorkflows[idx]?.workflowId ||
-                          '',
+                          workflowId || reversedWorkflows[idx]?.workflowId || '',
                         stream: isStderr ? 'stderr' : 'stdout',
                       });
                     }}
                   />
+                </div>
+              </div>
+
+              {handlers && handlers.length ? (
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                  <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                      <span>Lifecycle Hooks</span>
+                      <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                        {handlers.length} hook{handlers.length !== 1 ? 's' : ''}
+                      </span>
+                    </h2>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <NodeStatusTable
+                      nodes={getEventHandlers(reversedWorkflows[idx])}
+                      status={reversedWorkflows[idx]}
+                      {...props}
+                      onViewLog={(stepName, workflowId) => {
+                        // Check if this is a stderr log (indicated by _stderr suffix)
+                        const isStderr = stepName.endsWith('_stderr');
+                        const actualStepName = isStderr ? stepName.slice(0, -7) : stepName; // Remove '_stderr' suffix
+                        
+                        setLogViewer({
+                          isOpen: true,
+                          logType: 'step',
+                          stepName: actualStepName,
+                          workflowId:
+                            workflowId ||
+                            reversedWorkflows[idx]?.workflowId ||
+                            '',
+                          stream: isStderr ? 'stderr' : 'stdout',
+                        });
+                      }}
+                    />
+                  </div>
                 </div>
               ) : null}
 
