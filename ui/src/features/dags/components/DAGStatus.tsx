@@ -211,8 +211,8 @@ function DAGStatus({ workflow, fileName }: Props) {
                 </div>
               </div>
 
-              {/* Steps Table Card */}
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+              {/* Desktop Steps Table Card */}
+              <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
                 <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
                     <span>Execution Steps</span>
@@ -232,20 +232,61 @@ function DAGStatus({ workflow, fileName }: Props) {
                   />
                 </div>
               </div>
-            </div>
-            
-            {/* Lifecycle Hooks Card */}
-            {handlers?.length ? (
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-                <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+
+              {/* Mobile Steps - No Card Container */}
+              <div className="md:hidden">
+                <div className="mb-4">
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
-                    <span>Lifecycle Hooks</span>
-                    <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
-                      {handlers.length} hook{handlers.length !== 1 ? 's' : ''}
-                    </span>
+                    <span>Execution Steps</span>
+                    {workflow.nodes && (
+                      <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                        {workflow.nodes.length} step{workflow.nodes.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
                   </h2>
                 </div>
-                <div className="overflow-x-auto">
+                <NodeStatusTable
+                  nodes={workflow.nodes}
+                  status={workflow}
+                  {...props}
+                  onViewLog={handleViewLog}
+                />
+              </div>
+            </div>
+            
+            {/* Lifecycle Hooks */}
+            {handlers?.length ? (
+              <>
+                {/* Desktop Lifecycle Hooks Card */}
+                <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                  <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                      <span>Lifecycle Hooks</span>
+                      <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                        {handlers.length} hook{handlers.length !== 1 ? 's' : ''}
+                      </span>
+                    </h2>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <NodeStatusTable
+                      nodes={handlers}
+                      status={workflow}
+                      {...props}
+                      onViewLog={handleViewLog}
+                    />
+                  </div>
+                </div>
+
+                {/* Mobile Lifecycle Hooks - No Card Container */}
+                <div className="md:hidden">
+                  <div className="mb-4">
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                      <span>Lifecycle Hooks</span>
+                      <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                        {handlers.length} hook{handlers.length !== 1 ? 's' : ''}
+                      </span>
+                    </h2>
+                  </div>
                   <NodeStatusTable
                     nodes={handlers}
                     status={workflow}
@@ -253,7 +294,7 @@ function DAGStatus({ workflow, fileName }: Props) {
                     onViewLog={handleViewLog}
                   />
                 </div>
-              </div>
+              </>
             ) : null}
           </>
         )}

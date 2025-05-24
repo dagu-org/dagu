@@ -219,7 +219,7 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
    * Update the status of a step
    */
   const onUpdateStatus = async (
-    step: components['schemas']['Step'],
+    _step: components['schemas']['Step'],
     status: NodeStatus
   ) => {
     if (
@@ -385,7 +385,8 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+              {/* Desktop Steps - Card Container */}
+              <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
                 <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
                     <span>Execution Steps</span>
@@ -419,17 +420,86 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
                 </div>
               </div>
 
-              {handlers && handlers.length ? (
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-                  <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
-                      <span>Lifecycle Hooks</span>
+              {/* Mobile Steps - No Card Container */}
+              <div className="md:hidden">
+                <div className="mb-4">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                    <span>Execution Steps</span>
+                    {reversedWorkflows[idx].nodes && (
                       <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
-                        {handlers.length} hook{handlers.length !== 1 ? 's' : ''}
+                        {reversedWorkflows[idx].nodes.length} step{reversedWorkflows[idx].nodes.length !== 1 ? 's' : ''}
                       </span>
-                    </h2>
+                    )}
+                  </h2>
+                </div>
+                <NodeStatusTable
+                  nodes={reversedWorkflows[idx].nodes}
+                  status={reversedWorkflows[idx]}
+                  {...props}
+                  onViewLog={(stepName, workflowId) => {
+                    // Check if this is a stderr log (indicated by _stderr suffix)
+                    const isStderr = stepName.endsWith('_stderr');
+                    const actualStepName = isStderr ? stepName.slice(0, -7) : stepName; // Remove '_stderr' suffix
+                    
+                    setLogViewer({
+                      isOpen: true,
+                      logType: 'step',
+                      stepName: actualStepName,
+                      workflowId:
+                        workflowId || reversedWorkflows[idx]?.workflowId || '',
+                      stream: isStderr ? 'stderr' : 'stdout',
+                    });
+                  }}
+                />
+              </div>
+
+              {handlers && handlers.length ? (
+                <>
+                  {/* Desktop Lifecycle Hooks - Card Container */}
+                  <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                    <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+                      <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                        <span>Lifecycle Hooks</span>
+                        <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                          {handlers.length} hook{handlers.length !== 1 ? 's' : ''}
+                        </span>
+                      </h2>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <NodeStatusTable
+                        nodes={getEventHandlers(reversedWorkflows[idx])}
+                        status={reversedWorkflows[idx]}
+                        {...props}
+                        onViewLog={(stepName, workflowId) => {
+                          // Check if this is a stderr log (indicated by _stderr suffix)
+                          const isStderr = stepName.endsWith('_stderr');
+                          const actualStepName = isStderr ? stepName.slice(0, -7) : stepName; // Remove '_stderr' suffix
+                          
+                          setLogViewer({
+                            isOpen: true,
+                            logType: 'step',
+                            stepName: actualStepName,
+                            workflowId:
+                              workflowId ||
+                              reversedWorkflows[idx]?.workflowId ||
+                              '',
+                            stream: isStderr ? 'stderr' : 'stdout',
+                          });
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div className="overflow-x-auto">
+
+                  {/* Mobile Lifecycle Hooks - No Card Container */}
+                  <div className="md:hidden">
+                    <div className="mb-4">
+                      <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                        <span>Lifecycle Hooks</span>
+                        <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                          {handlers.length} hook{handlers.length !== 1 ? 's' : ''}
+                        </span>
+                      </h2>
+                    </div>
                     <NodeStatusTable
                       nodes={getEventHandlers(reversedWorkflows[idx])}
                       status={reversedWorkflows[idx]}
@@ -452,7 +522,7 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
                       }}
                     />
                   </div>
-                </div>
+                </>
               ) : null}
 
               {/* Log viewer modal - moved outside to handle all log viewing */}
