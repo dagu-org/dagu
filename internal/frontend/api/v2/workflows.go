@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
@@ -361,4 +362,26 @@ var nodeStatusMapping = map[api.NodeStatus]scheduler.NodeStatus{
 	api.NodeStatusCancelled:  scheduler.NodeStatusCancel,
 	api.NodeStatusSuccess:    scheduler.NodeStatusSuccess,
 	api.NodeStatusSkipped:    scheduler.NodeStatusSkipped,
+}
+
+func (a *API) RetryWorkflow(ctx context.Context, request api.RetryWorkflowRequestObject) (api.RetryWorkflowResponseObject, error) {
+	run, err := a.historyStore.FindRun(ctx, digraph.NewWorkflowRef(request.Name, request.WorkflowId))
+	if err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("workflow ID %s not found for DAG %s", request.WorkflowId, request.Name),
+		}
+	}
+
+	dag, err := run.ReadDAG(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error reading DAG: %w", err)
+	}
+
+	if err := a.historyManager.RetryDAG(ctx, dag, request.Body.WorkflowId); err != nil {
+		return nil, fmt.Errorf("error retrying DAG: %w", err)
+	}
+
+	return api.RetryWorkflow200Response{}, nil
 }

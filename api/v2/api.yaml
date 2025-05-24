@@ -271,7 +271,7 @@ paths:
     post:
       summary: "Retry workflow execution"
       description: "Creates a new workflow based on a previous execution"
-      operationId: "retryWorkflow"
+      operationId: "retryDAGWorkflow"
       tags:
         - "dags"
       parameters:
@@ -738,6 +738,39 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /workflows/{name}/{workflowId}/retry:
+    post:
+      summary: "Retry workflow execution"
+      description: "Creates a new workflow based on a previous execution"
+      operationId: "retryWorkflow"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/WorkflowId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                workflowId:
+                  type: string
+                  description: "ID of the workflow to retry"
+              required:
+                - workflowId
+      responses:
+        "200":
+          description: "A successful response"
         default:
           description: "Generic error response"
           content:

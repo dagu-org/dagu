@@ -471,7 +471,7 @@ func (a *API) TerminateWorkflow(ctx context.Context, request api.TerminateWorkfl
 	return api.TerminateWorkflow200Response{}, nil
 }
 
-func (a *API) RetryWorkflow(ctx context.Context, request api.RetryWorkflowRequestObject) (api.RetryWorkflowResponseObject, error) {
+func (a *API) RetryDAGWorkflow(ctx context.Context, request api.RetryDAGWorkflowRequestObject) (api.RetryDAGWorkflowResponseObject, error) {
 	dag, err := a.dagStore.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
@@ -502,7 +502,7 @@ func (a *API) RetryWorkflow(ctx context.Context, request api.RetryWorkflowReques
 		return nil, fmt.Errorf("error retrying DAG: %w", err)
 	}
 
-	return api.RetryWorkflow200Response{}, nil
+	return api.RetryDAGWorkflow200Response{}, nil
 }
 
 func (a *API) UpdateDAGSuspensionState(ctx context.Context, request api.UpdateDAGSuspensionStateRequestObject) (api.UpdateDAGSuspensionStateResponseObject, error) {
