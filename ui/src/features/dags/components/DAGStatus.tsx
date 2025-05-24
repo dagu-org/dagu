@@ -28,6 +28,7 @@ function DAGStatus({ workflow, fileName }: Props) {
     logType: 'step' as 'execution' | 'step',
     stepName: '',
     workflowId: '',
+    stream: 'stdout' as 'stdout' | 'stderr',
   });
   const client = useClient();
   const dismissModal = () => setModal(false);
@@ -152,11 +153,16 @@ function DAGStatus({ workflow, fileName }: Props) {
 
   // Handler for opening log viewer
   const handleViewLog = (stepName: string, workflowId: string) => {
+    // Check if this is a stderr log (indicated by _stderr suffix)
+    const isStderr = stepName.endsWith('_stderr');
+    const actualStepName = isStderr ? stepName.slice(0, -7) : stepName; // Remove '_stderr' suffix
+
     setLogViewer({
       isOpen: true,
       logType: 'step',
-      stepName,
+      stepName: actualStepName,
       workflowId: workflowId || workflow.workflowId,
+      stream: isStderr ? 'stderr' : 'stdout',
     });
   };
 
@@ -184,6 +190,7 @@ function DAGStatus({ workflow, fileName }: Props) {
                     logType: 'execution',
                     stepName: '',
                     workflowId,
+                    stream: 'stdout',
                   });
                 }}
               />
@@ -230,6 +237,7 @@ function DAGStatus({ workflow, fileName }: Props) {
         workflowId={logViewer.workflowId}
         stepName={logViewer.stepName}
         workflow={workflow}
+        stream={logViewer.stream}
       />
     </div>
   );

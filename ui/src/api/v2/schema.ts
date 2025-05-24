@@ -534,6 +534,11 @@ export interface components {
          */
         ErrorCode: ErrorCode;
         /**
+         * Format: string
+         * @enum {string}
+         */
+        StdoutOrStderr: StdoutOrStderr;
+        /**
          * Format: int64
          * @description Unix timestamp in seconds
          * @example 1672531199
@@ -729,8 +734,10 @@ export interface components {
         /** @description Status of an individual step within a workflow */
         Node: {
             step: components["schemas"]["Step"];
-            /** @description Path to step-specific log file */
-            log: string;
+            /** @description Path to the standard output log file for this step */
+            stdout: string;
+            /** @description Path to the standard error log file for this step */
+            stderr: string;
             /** @description RFC3339 timestamp when the step started */
             startedAt: string;
             /** @description RFC3339 timestamp when the step finished */
@@ -881,6 +888,8 @@ export interface components {
         Offset: number;
         /** @description Maximum number of lines to return */
         Limit: number;
+        /** @description Whether to return stdout or stderr logs */
+        StdoutOrStderr: components["schemas"]["StdoutOrStderr"];
     };
     requestBodies: never;
     headers: never;
@@ -1830,6 +1839,8 @@ export interface operations {
                 offset?: components["parameters"]["Offset"];
                 /** @description Maximum number of lines to return */
                 limit?: components["parameters"]["Limit"];
+                /** @description Whether to return stdout or stderr logs */
+                stdoutOrStderr?: components["parameters"]["StdoutOrStderr"];
             };
             header?: never;
             path: {
@@ -2053,6 +2064,8 @@ export interface operations {
                 offset?: components["parameters"]["Offset"];
                 /** @description Maximum number of lines to return */
                 limit?: components["parameters"]["Limit"];
+                /** @description Whether to return stdout or stderr logs */
+                stdoutOrStderr?: components["parameters"]["StdoutOrStderr"];
             };
             header?: never;
             path: {
@@ -2172,6 +2185,10 @@ export enum ErrorCode {
     already_running = "already_running",
     not_running = "not_running",
     already_exists = "already_exists"
+}
+export enum StdoutOrStderr {
+    stdout = "stdout",
+    stderr = "stderr"
 }
 export enum HealthResponseStatus {
     healthy = "healthy",

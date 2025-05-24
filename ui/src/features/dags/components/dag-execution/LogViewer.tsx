@@ -13,6 +13,7 @@ type LogViewerProps = {
   stepName?: string;
   isInModal?: boolean;
   workflow?: components['schemas']['WorkflowDetails'];
+  stream?: 'stdout' | 'stderr';
 };
 
 /**
@@ -28,12 +29,13 @@ const LogViewer: React.FC<LogViewerProps> = ({
   stepName,
   isInModal = true,
   workflow,
+  stream = 'stdout',
 }) => {
   // Determine the title based on the log type
   const title =
     logType === 'execution'
       ? `Execution Log: ${dagName}`
-      : `Step Log: ${stepName}`;
+      : `Step Log (${stream}): ${stepName}`;
 
   return (
     <LogSideModal
@@ -52,6 +54,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
             name={dagName}
             workflowId={workflowId}
             workflow={workflow}
+            stream={stream}
           />
         ) : (
           stepName && (
@@ -60,6 +63,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
               workflowId={workflowId}
               stepName={stepName}
               workflow={workflow}
+              stream={stream}
             />
           )
         )}

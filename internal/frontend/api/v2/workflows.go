@@ -155,7 +155,7 @@ func (a *API) GetWorkflowStepLog(ctx context.Context, request api.GetWorkflowSte
 	}
 
 	var logFile = node.Stdout
-	if *request.Params.StdoutOrStderr == api.StdoutOrStderrStderr {
+	if *request.Params.Stream == api.StreamStderr {
 		logFile = node.Stderr
 	}
 
@@ -306,7 +306,7 @@ func (a *API) GetChildWorkflowStepLog(ctx context.Context, request api.GetChildW
 	}
 
 	var logFile = node.Stdout
-	if *request.Params.StdoutOrStderr == api.StdoutOrStderrStderr {
+	if *request.Params.Stream == api.StreamStderr {
 		logFile = node.Stderr
 	}
 

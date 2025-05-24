@@ -815,7 +815,7 @@ paths:
         - $ref: "#/components/parameters/Head"
         - $ref: "#/components/parameters/Offset"
         - $ref: "#/components/parameters/Limit"
-        - $ref: "#/components/parameters/StdoutOrStderr"
+        - $ref: "#/components/parameters/Stream"
       responses:
         "200":
           description: "A successful response"
@@ -979,7 +979,7 @@ paths:
         - $ref: "#/components/parameters/Head"
         - $ref: "#/components/parameters/Offset"
         - $ref: "#/components/parameters/Limit"
-        - $ref: "#/components/parameters/StdoutOrStderr"
+        - $ref: "#/components/parameters/Stream"
         - name: "childWorkflowId"
           in: "path"
           required: true
@@ -1208,13 +1208,13 @@ components:
         minimum: 1
         maximum: 10000
 
-    StdoutOrStderr:
-      name: stdoutOrStderr
+    Stream:
+      name: stream
       in: query
       description: "Whether to return stdout or stderr logs"
       required: false
       schema:
-        $ref: "#/components/schemas/StdoutOrStderr"
+        $ref: "#/components/schemas/Stream"
 
   schemas:
     Error:
@@ -1247,7 +1247,7 @@ components:
         - "not_running"
         - "already_exists"
 
-    StdoutOrStderr:
+    Stream:
       type: string
       format: string
       enum:

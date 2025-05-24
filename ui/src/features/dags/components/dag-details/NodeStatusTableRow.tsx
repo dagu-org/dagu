@@ -367,17 +367,79 @@ function NodeStatusTableRow({
 
         {/* Log */}
         <TableCell className="text-center">
-          {node.log ? (
-            <a
-              href={url}
-              onClick={handleViewLog}
-              className="inline-flex items-center justify-center p-2 transition-colors duration-200 rounded-md text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-              title="Click to view log (Cmd/Ctrl+Click to open in new tab)"
-            >
-              <span className="sr-only">View Log</span>
-              <FileText className="h-4 w-4" />
-            </a>
-          ) : null}
+          {(node.stdout || node.stderr) && (
+            <div className="relative inline-flex">
+              {/* Single log file - show simple button */}
+              {(node.stdout && !node.stderr) || (!node.stdout && node.stderr) ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <a
+                      href={node.stderr ? `${url}&stream=stderr` : url}
+                      onClick={node.stderr ? (e) => {
+                        if (!(e.metaKey || e.ctrlKey) && onViewLog) {
+                          e.preventDefault();
+                          onViewLog(`${node.step.name}_stderr`, workflowId || '');
+                        }
+                      } : handleViewLog}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 rounded-md cursor-pointer ${
+                        node.stderr 
+                          ? 'text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200 hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-200 dark:border-red-800'
+                          : 'text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700'
+                      }`}
+                      title={`Click to view ${node.stderr ? 'stderr' : 'stdout'} log (Cmd/Ctrl+Click to open in new tab)`}
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      {node.stderr ? 'stderr' : 'stdout'}
+                    </a>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <span className="text-xs">{node.stderr ? 'Error' : 'Output'} Log</span>
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                /* Both stdout and stderr - show combined button with split design */
+                <div className="inline-flex rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <a
+                        href={url}
+                        onClick={handleViewLog}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer border-r border-slate-200 dark:border-slate-700"
+                        title="Click to view stdout log (Cmd/Ctrl+Click to open in new tab)"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        stdout
+                      </a>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <span className="text-xs">Output Log</span>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <a
+                        href={`${url}&stream=stderr`}
+                        onClick={(e) => {
+                          if (!(e.metaKey || e.ctrlKey) && onViewLog) {
+                            e.preventDefault();
+                            onViewLog(`${node.step.name}_stderr`, workflowId || '');
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
+                        title="Click to view stderr log (Cmd/Ctrl+Click to open in new tab)"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        stderr
+                      </a>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <span className="text-xs">Error Log</span>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              )}
+            </div>
+          )}
         </TableCell>
       </StyledTableRow>
     );
@@ -520,18 +582,57 @@ function NodeStatusTableRow({
         </div>
       )}
 
-      {/* Log button */}
-      {node.log && (
+      {/* Log buttons */}
+      {(node.stdout || node.stderr) && (
         <div className="flex justify-end">
-          <a
-            href={url}
-            onClick={handleViewLog}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors duration-200 rounded-md text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-            title="Click to view log (Cmd/Ctrl+Click to open in new tab)"
-          >
-            <FileText className="h-3.5 w-3.5" />
-            View Log
-          </a>
+          {/* Single log file - show simple button */}
+          {(node.stdout && !node.stderr) || (!node.stdout && node.stderr) ? (
+            <a
+              href={node.stderr ? `${url}&stream=stderr` : url}
+              onClick={node.stderr ? (e) => {
+                if (!(e.metaKey || e.ctrlKey) && onViewLog) {
+                  e.preventDefault();
+                  onViewLog(`${node.step.name}_stderr`, workflowId || '');
+                }
+              } : handleViewLog}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 rounded-md cursor-pointer ${
+                node.stderr 
+                  ? 'text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200 hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-200 dark:border-red-800'
+                  : 'text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700'
+              }`}
+              title={`Click to view ${node.stderr ? 'stderr' : 'stdout'} log (Cmd/Ctrl+Click to open in new tab)`}
+            >
+              <FileText className="h-3.5 w-3.5" />
+              {node.stderr ? 'stderr' : 'stdout'}
+            </a>
+          ) : (
+            /* Both stdout and stderr - show combined button with split design */
+            <div className="inline-flex rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <a
+                href={url}
+                onClick={handleViewLog}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer border-r border-slate-200 dark:border-slate-700"
+                title="Click to view stdout log (Cmd/Ctrl+Click to open in new tab)"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                stdout
+              </a>
+              <a
+                href={`${url}&stream=stderr`}
+                onClick={(e) => {
+                  if (!(e.metaKey || e.ctrlKey) && onViewLog) {
+                    e.preventDefault();
+                    onViewLog(`${node.step.name}_stderr`, workflowId || '');
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
+                title="Click to view stderr log (Cmd/Ctrl+Click to open in new tab)"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                stderr
+              </a>
+            </div>
+          )}
         </div>
       )}
     </div>

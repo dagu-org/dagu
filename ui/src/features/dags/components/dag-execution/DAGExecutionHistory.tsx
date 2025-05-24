@@ -99,6 +99,7 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
     logType: 'step' as 'execution' | 'step',
     stepName: '',
     workflowId: '',
+    stream: 'stdout' as 'stdout' | 'stderr',
   });
 
   // Get the selected workflow index from URL parameters using React Router
@@ -361,6 +362,7 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
                       logType: 'execution',
                       stepName: '',
                       workflowId,
+                      stream: 'stdout',
                     });
                   }}
                 />
@@ -373,12 +375,17 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
                   status={reversedWorkflows[idx]}
                   {...props}
                   onViewLog={(stepName, workflowId) => {
+                    // Check if this is a stderr log (indicated by _stderr suffix)
+                    const isStderr = stepName.endsWith('_stderr');
+                    const actualStepName = isStderr ? stepName.slice(0, -7) : stepName; // Remove '_stderr' suffix
+                    
                     setLogViewer({
                       isOpen: true,
                       logType: 'step',
-                      stepName,
+                      stepName: actualStepName,
                       workflowId:
                         workflowId || reversedWorkflows[idx]?.workflowId || '',
+                      stream: isStderr ? 'stderr' : 'stdout',
                     });
                   }}
                 />
@@ -392,35 +399,42 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
                     status={reversedWorkflows[idx]}
                     {...props}
                     onViewLog={(stepName, workflowId) => {
+                      // Check if this is a stderr log (indicated by _stderr suffix)
+                      const isStderr = stepName.endsWith('_stderr');
+                      const actualStepName = isStderr ? stepName.slice(0, -7) : stepName; // Remove '_stderr' suffix
+                      
                       setLogViewer({
                         isOpen: true,
                         logType: 'step',
-                        stepName,
+                        stepName: actualStepName,
                         workflowId:
                           workflowId ||
                           reversedWorkflows[idx]?.workflowId ||
                           '',
+                        stream: isStderr ? 'stderr' : 'stdout',
                       });
                     }}
                   />
-
-                  {/* Log viewer modal */}
-                  <LogViewer
-                    isOpen={logViewer.isOpen}
-                    onClose={() =>
-                      setLogViewer((prev) => ({ ...prev, isOpen: false }))
-                    }
-                    logType={logViewer.logType}
-                    dagName={
-                      reversedWorkflows && reversedWorkflows[idx]
-                        ? reversedWorkflows[idx].name
-                        : ''
-                    }
-                    workflowId={logViewer.workflowId}
-                    stepName={logViewer.stepName}
-                  />
                 </div>
               ) : null}
+
+              {/* Log viewer modal - moved outside to handle all log viewing */}
+              <LogViewer
+                isOpen={logViewer.isOpen}
+                onClose={() =>
+                  setLogViewer((prev) => ({ ...prev, isOpen: false }))
+                }
+                logType={logViewer.logType}
+                dagName={
+                  reversedWorkflows && reversedWorkflows[idx]
+                    ? reversedWorkflows[idx].name
+                    : ''
+                }
+                workflowId={logViewer.workflowId}
+                stepName={logViewer.stepName}
+                workflow={reversedWorkflows[idx]}
+                stream={logViewer.stream}
+              />
             </React.Fragment>
           ) : null}
 
