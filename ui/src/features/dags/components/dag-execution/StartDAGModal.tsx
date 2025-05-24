@@ -1,5 +1,5 @@
 /**
- * StartDAGModal component provides a modal dialog for starting a DAG with parameters.
+ * StartDAGModal component provides a modal dialog for starting or enqueuing a DAG with parameters.
  *
  * @module features/dags/components/dag-execution
  */
@@ -33,12 +33,20 @@ type Props = {
   dismissModal: () => void;
   /** Function called when the user submits the form */
   onSubmit: (params: string) => void;
+  /** Action type: 'start' or 'enqueue' */
+  action?: 'start' | 'enqueue';
 };
 
 /**
- * Modal dialog for starting a DAG with parameters
+ * Modal dialog for starting or enqueuing a DAG with parameters
  */
-function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
+function StartDAGModal({
+  visible,
+  dag,
+  dismissModal,
+  onSubmit,
+  action = 'start',
+}: Props) {
   const ref = React.useRef<HTMLInputElement>(null);
 
   // Parse default parameters from the DAG definition
@@ -109,7 +117,9 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
     <Dialog open={visible} onOpenChange={(open) => !open && dismissModal()}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Start the DAG</DialogTitle>
+          <DialogTitle>
+            {action === 'enqueue' ? 'Enqueue the DAG' : 'Start the DAG'}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="py-4 space-y-4">
@@ -186,7 +196,7 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
               onSubmit(stringifyParams(params));
             }}
           >
-            Start
+            {action === 'enqueue' ? 'Enqueue' : 'Start'}
           </Button>
         </DialogFooter>
       </DialogContent>
