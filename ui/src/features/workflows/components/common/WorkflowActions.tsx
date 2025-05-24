@@ -149,13 +149,14 @@ function WorkflowActions({
           dismissModal={() => setIsStopModal(false)}
           onSubmit={async () => {
             setIsStopModal(false);
-            const { error } = await client.POST('/dags/{fileName}/stop', {
+            const { error } = await client.POST('/workflows/{name}/{workflowId}/stop', {
               params: {
                 query: {
                   remoteNode: appBarContext.selectedRemoteNode || 'local',
                 },
                 path: {
-                  fileName: name,
+                  name: name,
+                  workflowId: workflow.workflowId,
                 },
               },
             });
@@ -179,10 +180,11 @@ function WorkflowActions({
           onSubmit={async () => {
             setIsRetryModal(false);
 
-            const { error } = await client.POST('/dags/{fileName}/retry', {
+            const { error } = await client.POST('/workflows/{name}/{workflowId}/retry', {
               params: {
                 path: {
-                  fileName: name,
+                  name: name,
+                  workflowId: workflow.workflowId,
                 },
                 query: {
                   remoteNode: appBarContext.selectedRemoteNode || 'local',

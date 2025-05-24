@@ -105,7 +105,7 @@ export interface paths {
          * Terminate a running workflow
          * @description Forcefully stops a running workflow created from this DAG
          */
-        post: operations["terminateWorkflow"];
+        post: operations["terminateDAGWorkflow"];
         delete?: never;
         options?: never;
         head?: never;
@@ -125,7 +125,7 @@ export interface paths {
          * Retry workflow execution
          * @description Creates a new workflow based on a previous execution
          */
-        post: operations["retryWorkflow"];
+        post: operations["retryDAGWorkflow"];
         delete?: never;
         options?: never;
         head?: never;
@@ -350,6 +350,46 @@ export interface paths {
         get: operations["getWorkflowLog"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflows/{name}/{workflowId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry workflow execution
+         * @description Creates a new workflow based on a previous execution
+         */
+        post: operations["retryWorkflow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflows/{name}/{workflowId}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Terminate a running workflow
+         * @description Forcefully stops a running workflow created from this DAG
+         */
+        post: operations["terminateWorkflow"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1091,7 +1131,7 @@ export interface operations {
             };
         };
     };
-    terminateWorkflow: {
+    terminateDAGWorkflow: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -1124,7 +1164,7 @@ export interface operations {
             };
         };
     };
-    retryWorkflow: {
+    retryDAGWorkflow: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -1688,6 +1728,83 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    retryWorkflow: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId: components["parameters"]["WorkflowId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description ID of the workflow to retry */
+                    workflowId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    terminateWorkflow: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId: components["parameters"]["WorkflowId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Generic error response */
             default: {
