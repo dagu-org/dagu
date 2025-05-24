@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/tooltip'; // Import Shadcn Tooltip
 import dayjs from '@/lib/dayjs';
 import StatusChip from '@/ui/StatusChip';
-import { Play, RefreshCw, Square } from 'lucide-react'; // Import lucide icons
+import { Play, RefreshCw, Square, Clock } from 'lucide-react'; // Import lucide icons
 import React from 'react';
 import { components } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
@@ -56,6 +56,7 @@ function DAGActions({
 }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const [isStartModal, setIsStartModal] = React.useState(false);
+  const [isEnqueueModal, setIsEnqueueModal] = React.useState(false);
   const [isStopModal, setIsStopModal] = React.useState(false);
   const [isRetryModal, setIsRetryModal] = React.useState(false);
   const [retryWorkflowId, setRetryWorkflowId] = React.useState<string>('');
@@ -74,6 +75,7 @@ function DAGActions({
   // Determine which buttons should be enabled based on current status
   const buttonState = {
     start: status?.status != 1,
+    enqueue: status?.status != 1,
     stop: status?.status == 1,
     retry: status?.status != 1 && status?.workflowId != '',
   };
@@ -116,6 +118,38 @@ function DAGActions({
           </TooltipTrigger>
           <TooltipContent>
             <p>Start DAG execution</p>
+          </TooltipContent>
+        </Tooltip>
+
+        {/* Enqueue Button */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            {displayMode === 'compact' ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={!buttonState['enqueue']}
+                onClick={() => setIsEnqueueModal(true)}
+                className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+              >
+                <Clock className="h-4 w-4" />
+                <span className="sr-only">Enqueue</span>
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!buttonState['enqueue']}
+                onClick={() => setIsEnqueueModal(true)}
+                className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+              >
+                <Clock className="mr-2 h-4 w-4" />
+                Enqueue
+              </Button>
+            )}
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Enqueue DAG execution</p>
           </TooltipContent>
         </Tooltip>
 
@@ -389,6 +423,7 @@ function DAGActions({
         <StartDAGModal
           dag={dag}
           visible={isStartModal}
+          action="start"
           onSubmit={async (params) => {
             setIsStartModal(false);
             const { error } = await client.POST('/dags/{fileName}/start', {
@@ -416,6 +451,39 @@ function DAGActions({
           }}
           dismissModal={() => {
             setIsStartModal(false);
+          }}
+        />
+        <StartDAGModal
+          dag={dag}
+          visible={isEnqueueModal}
+          action="enqueue"
+          onSubmit={async (params) => {
+            setIsEnqueueModal(false);
+            const { error } = await client.POST('/dags/{fileName}/enqueue', {
+              params: {
+                path: {
+                  fileName: fileName,
+                },
+                query: {
+                  remoteNode: appBarContext.selectedRemoteNode || 'local',
+                },
+              },
+              body: {
+                params: params,
+              },
+            });
+            if (error) {
+              alert(error.message || 'An error occurred');
+              return;
+            }
+            reloadData();
+            // Navigate to status tab after execution
+            if (navigateToStatusTab) {
+              navigateToStatusTab();
+            }
+          }}
+          dismissModal={() => {
+            setIsEnqueueModal(false);
           }}
         />
       </div>
