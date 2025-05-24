@@ -28,6 +28,7 @@ func main() {
 func init() {
 	rootCmd.AddCommand(cmd.CmdStart())
 	rootCmd.AddCommand(cmd.CmdEnqueue())
+	rootCmd.AddCommand(cmd.CmdDequeue())
 	rootCmd.AddCommand(cmd.CmdStop())
 	rootCmd.AddCommand(cmd.CmdRestart())
 	rootCmd.AddCommand(cmd.CmdDry())

@@ -20,13 +20,13 @@ func CmdEnqueue() *cobra.Command {
 			Long: `Enqueue a workflow to the queue.
 
 Example:
-	dagu enqueue --workflow-id my_workflow_id my_dag -- P1=foo P2=bar
+	dagu enqueue --workflow-id=my_workflow_id my_dag -- P1=foo P2=bar
 `,
 		}, enqueueFlags, runEnqueue,
 	)
 }
 
-var enqueueFlags = []commandLineFlag{paramsFlag, workflowIDFlagStart}
+var enqueueFlags = []commandLineFlag{paramsFlag, workflowIDFlag}
 
 func runEnqueue(ctx *Context, args []string) error {
 	// Get workflow ID from flags
@@ -94,8 +94,8 @@ func enqueueWorkflow(ctx *Context, dag *digraph.DAG, workflowID string) error {
 	}
 
 	logger.Info(ctx.Context, "Enqueued workflow",
+		"workflowName", dag.Name,
 		"workflowId", workflowID,
-		"dagName", dag.Name,
 		"params", dag.Params,
 	)
 

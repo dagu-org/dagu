@@ -41,11 +41,7 @@ of the same workflow without changing its identity.
 var retryFlags = []commandLineFlag{workflowIDFlagRetry}
 
 func runRetry(ctx *Context, args []string) error {
-	workflowID, err := ctx.StringParam("workflow-id")
-	if err != nil {
-		return fmt.Errorf("failed to get workflow ID: %w", err)
-	}
-
+	workflowID, _ := ctx.StringParam("workflow-id")
 	name := args[0]
 
 	// Retrieve the previous run data for specified workflow ID.

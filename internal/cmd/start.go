@@ -52,7 +52,7 @@ This command parses the DAG definition, resolves parameters, and initiates the w
 }
 
 // Command line flags for the start command
-var startFlags = []commandLineFlag{paramsFlag, workflowIDFlagStart, parentWorkflowFlag, rootWorkflowFlag}
+var startFlags = []commandLineFlag{paramsFlag, workflowIDFlag, parentWorkflowFlag, rootWorkflowFlag}
 
 // runStart handles the execution of the start command
 func runStart(ctx *Context, args []string) error {
