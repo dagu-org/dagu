@@ -186,7 +186,7 @@ function DAGStatus({ workflow, fileName }: Props) {
       <DAGContext.Consumer>
         {(props) => (
           <>
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6">
               {/* Status Overview Card */}
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
                 <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
@@ -212,7 +212,7 @@ function DAGStatus({ workflow, fileName }: Props) {
               </div>
 
               {/* Steps Table Card */}
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden xl:col-span-2">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
                 <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
                     <span>Execution Steps</span>

@@ -6,7 +6,6 @@ import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { WorkflowContext } from '../../contexts/WorkflowContext';
-import { WorkflowActions } from '../common';
 import WorkflowDetailsContent from './WorkflowDetailsContent';
 
 type WorkflowDetailsModalProps = {
@@ -137,15 +136,6 @@ const WorkflowDetailsModal: React.FC<WorkflowDetailsModalProps> = ({
                 to navigate histories
               </p>
               <div className="flex gap-2 items-center">
-                {data.workflowDetails && (
-                  <WorkflowActions
-                    workflow={data.workflowDetails}
-                    name={data.workflowDetails.name}
-                    refresh={refreshFn}
-                    displayMode="compact"
-                    isRootLevel={data.workflowDetails?.rootWorkflowId === data.workflowDetails?.workflowId}
-                  />
-                )}
                 <Button
                   variant="outline"
                   size="icon"

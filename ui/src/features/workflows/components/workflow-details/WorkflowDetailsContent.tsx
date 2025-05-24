@@ -27,9 +27,7 @@ const WorkflowDetailsContent: React.FC<WorkflowDetailsContentProps> = ({
     >
       <div className="w-full flex flex-col">
         {/* Display breadcrumbs and workflow details in the header */}
-        <div className="mb-6">
-          <WorkflowHeader workflow={workflow} refreshFn={refreshFn} />
-        </div>
+        <WorkflowHeader workflow={workflow} refreshFn={refreshFn} />
 
         <div className="flex-1">
           <DAGStatus workflow={workflow} fileName={name || ''} />

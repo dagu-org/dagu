@@ -67,10 +67,12 @@ const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
                 >
                   {workflow.rootWorkflowName}
                 </a>
-                <span className="text-slate-400 dark:text-slate-500 mx-1">/</span>
+                <span className="text-slate-400 dark:text-slate-500 mx-1">
+                  /
+                </span>
               </>
             )}
-            
+
             {workflow.parentWorkflowName &&
               workflow.parentWorkflowId &&
               workflow.parentWorkflowName !== workflow.rootWorkflowName &&
@@ -83,11 +85,13 @@ const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
                   >
                     {workflow.parentWorkflowName}
                   </a>
-                  <span className="text-slate-400 dark:text-slate-500 mx-1">/</span>
+                  <span className="text-slate-400 dark:text-slate-500 mx-1">
+                    /
+                  </span>
                 </>
               )}
           </nav>
-          
+
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 truncate">
             {workflow.name}
           </h1>
@@ -96,7 +100,7 @@ const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
 
       {/* Status and metadata row */}
       {workflow.status != Status.NotStarted && (
-        <div className="flex flex-wrap items-center gap-4 lg:gap-6">
+        <div className="flex flex-wrap items-center gap-2 lg:gap-6">
           {/* Status and actions */}
           <div className="flex items-center gap-3">
             {workflow.status && (
@@ -112,7 +116,7 @@ const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
               isRootLevel={workflow.rootWorkflowId === workflow.workflowId}
             />
           </div>
-          
+
           {/* Metadata items */}
           <div className="flex flex-wrap items-center gap-4 lg:gap-6 text-sm">
             <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-2">
@@ -130,7 +134,7 @@ const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
                 )}
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-2">
               <Timer className="h-4 w-4 text-slate-500" />
               <span className="font-medium">
@@ -141,9 +145,11 @@ const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
                     : '--'}
               </span>
             </div>
-            
+
             <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 ml-auto">
-              <span className="font-medium text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Workflow ID</span>
+              <span className="font-medium text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                Workflow ID
+              </span>
               <code className="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-3 py-1.5 rounded-md text-xs font-mono border">
                 {workflow.workflowId}
               </code>

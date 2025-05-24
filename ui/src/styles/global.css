@@ -172,12 +172,6 @@
   }
 }
 
-a {
-  color: #485fc7;
-  cursor: pointer;
-  text-decoration: none;
-}
-
 @keyframes spin {
   0% {
     transform: rotate(0deg);

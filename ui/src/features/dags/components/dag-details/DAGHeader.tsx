@@ -94,7 +94,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
               dag={dag}
               fileName={fileName}
               refresh={refreshFn}
-              displayMode="full"
+              displayMode="compact"
               navigateToStatusTab={navigateToStatusTab}
             />
           </div>
