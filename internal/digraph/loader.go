@@ -26,13 +26,14 @@ var (
 
 // LoadOptions contains options for loading a DAG.
 type LoadOptions struct {
-	name         string   // Name of the DAG.
-	baseConfig   string   // Path to the base DAG configuration file.
-	params       string   // Parameters to override default parameters in the DAG.
-	paramsList   []string // List of parameters to override default parameters in the DAG.
-	noEval       bool     // Flag to disable evaluation of dynamic fields.
-	onlyMetadata bool     // Flag to load only metadata without full DAG details.
-	dagsDir      string   // Directory containing the DAG files.
+	name             string   // Name of the DAG.
+	baseConfig       string   // Path to the base DAG configuration file.
+	params           string   // Parameters to override default parameters in the DAG.
+	paramsList       []string // List of parameters to override default parameters in the DAG.
+	noEval           bool     // Flag to disable evaluation of dynamic fields.
+	onlyMetadata     bool     // Flag to load only metadata without full DAG details.
+	dagsDir          string   // Directory containing the DAG files.
+	allowBuildErrors bool     // Flag to allow build errors.
 }
 
 // LoadOption is a function type for setting LoadOptions.
@@ -91,6 +92,17 @@ func WithDAGsDir(dagsDir string) LoadOption {
 	}
 }
 
+// WithAllowBuildErrors allows build errors to be ignored during DAG loading.
+// This is required for loading DAGs that may have errors in their definitions,
+// such as missing steps or invalid configurations. When this option is set,
+// the loader will return a DAG with the errors included in the DAG's `BuildErrors` field,
+// and will not fail the loading process.
+func WithAllowBuildErrors() LoadOption {
+	return func(o *LoadOptions) {
+		o.allowBuildErrors = true
+	}
+}
+
 // Load loads a Directed Acyclic Graph (DAG) from a file path or name with the given options.
 //
 // The function handles different input formats:
@@ -117,13 +129,14 @@ func Load(ctx context.Context, nameOrPath string, opts ...LoadOption) (*DAG, err
 	buildContext := BuildContext{
 		ctx: ctx,
 		opts: BuildOpts{
-			Base:           options.baseConfig,
-			Parameters:     options.params,
-			ParametersList: options.paramsList,
-			OnlyMetadata:   options.onlyMetadata,
-			NoEval:         options.noEval,
-			Name:           options.name,
-			DAGsDir:        options.dagsDir,
+			Base:             options.baseConfig,
+			Parameters:       options.params,
+			ParametersList:   options.paramsList,
+			OnlyMetadata:     options.onlyMetadata,
+			NoEval:           options.noEval,
+			Name:             options.name,
+			DAGsDir:          options.dagsDir,
+			AllowBuildErrors: options.allowBuildErrors,
 		},
 	}
 	return loadDAG(buildContext, nameOrPath)
@@ -136,13 +149,14 @@ func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*DAG, error
 		opt(&options)
 	}
 	return LoadYAMLWithOpts(ctx, data, BuildOpts{
-		Base:           options.baseConfig,
-		Parameters:     options.params,
-		ParametersList: options.paramsList,
-		OnlyMetadata:   options.onlyMetadata,
-		NoEval:         options.noEval,
-		Name:           options.name,
-		DAGsDir:        options.dagsDir,
+		Base:             options.baseConfig,
+		Parameters:       options.params,
+		ParametersList:   options.paramsList,
+		OnlyMetadata:     options.onlyMetadata,
+		NoEval:           options.noEval,
+		Name:             options.name,
+		DAGsDir:          options.dagsDir,
+		AllowBuildErrors: options.allowBuildErrors,
 	})
 }
 

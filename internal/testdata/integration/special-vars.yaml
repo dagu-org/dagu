@@ -3,7 +3,7 @@ steps:
     command: echo $WORKFLOW_LOG_FILE
     output: OUT1
   - name: step2
-    command: echo $WORKFLOW_STEP_LOG_FILE
+    command: echo $WORKFLOW_STEP_STDOUT_FILE
     output: OUT2
   - name: step3
     command: echo $WORKFLOW_STEP_NAME

@@ -259,7 +259,7 @@ func (dr DataRoot) RemoveOld(ctx context.Context, retentionDays int) error {
 		if lastUpdate.After(keepTime.Time) {
 			continue
 		}
-		if err := r.Remove(); err != nil {
+		if err := r.Remove(ctx); err != nil {
 			logger.Errorf(ctx, "failed to remove run %s: %v", r.baseDir, err)
 		}
 		dr.removeEmptyDir(ctx, filepath.Dir(r.baseDir))

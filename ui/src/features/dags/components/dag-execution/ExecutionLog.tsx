@@ -34,6 +34,8 @@ type Props = {
   workflowId: string;
   /** Full workflow details (optional) - used to determine if this is a child workflow */
   workflow?: components['schemas']['WorkflowDetails'];
+  /** Whether to show stdout or stderr logs */
+  stream?: 'stdout' | 'stderr';
 };
 
 /**
@@ -49,7 +51,12 @@ const ANSI_CODES_REGEX = [
  * ExecutionLog displays the log output for a DAG run
  * Fetches log data from the API and refreshes every 30 seconds
  */
-function ExecutionLog({ name, workflowId, workflow }: Props) {
+function ExecutionLog({
+  name,
+  workflowId,
+  workflow,
+  stream = 'stdout',
+}: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const [viewMode, setViewMode] = useState<'tail' | 'head' | 'page'>('tail');
   const [pageSize, setPageSize] = useState(1000);
@@ -74,6 +81,7 @@ function ExecutionLog({ name, workflowId, workflow }: Props) {
   // Determine query parameters based on view mode
   const queryParams: Record<string, number | string> = {
     remoteNode: appBarContext.selectedRemoteNode || 'local',
+    stream,
   };
 
   // Add pagination parameters based on view mode
@@ -289,46 +297,39 @@ function ExecutionLog({ name, workflowId, workflow }: Props) {
       {/* Controls for log navigation */}
       <div className="flex flex-col gap-2 mb-2 p-2 bg-zinc-100 dark:bg-zinc-800 rounded">
         <div className="flex flex-wrap items-center gap-2">
-          {/* Fixed width container for buttons to prevent layout shift */}
-          <div className="flex space-x-2 min-h-[28px] w-[300px]">
-            {/* Using a wrapper div with fixed width for each button */}
-            <div className="w-[80px]">
-              <Button
-                size="sm"
-                variant={viewMode === 'tail' ? 'default' : 'outline'}
-                onClick={() => handleViewModeChange('tail')}
-                disabled={isNavigating}
-                className="w-full"
-              >
-                Show End
-              </Button>
-            </div>
-            <div className="w-[120px]">
-              <Button
-                size="sm"
-                variant={viewMode === 'head' ? 'default' : 'outline'}
-                onClick={() => handleViewModeChange('head')}
-                disabled={isNavigating}
-                className="w-full"
-              >
-                Show Beginning
-              </Button>
-            </div>
-            <div className="w-[80px]">
-              <Button
-                size="sm"
-                variant={viewMode === 'page' ? 'default' : 'outline'}
-                onClick={() => handleViewModeChange('page')}
-                disabled={isNavigating}
-                className="w-full"
-              >
-                Page View
-              </Button>
-            </div>
+          {/* Responsive button container */}
+          <div className="flex flex-wrap gap-2 min-h-[28px]">
+            <Button
+              size="sm"
+              variant={viewMode === 'tail' ? 'default' : 'outline'}
+              onClick={() => handleViewModeChange('tail')}
+              disabled={isNavigating}
+              className="flex-shrink-0"
+            >
+              Show End
+            </Button>
+            <Button
+              size="sm"
+              variant={viewMode === 'head' ? 'default' : 'outline'}
+              onClick={() => handleViewModeChange('head')}
+              disabled={isNavigating}
+              className="flex-shrink-0"
+            >
+              Show Beginning
+            </Button>
+            <Button
+              size="sm"
+              variant={viewMode === 'page' ? 'default' : 'outline'}
+              onClick={() => handleViewModeChange('page')}
+              disabled={isNavigating}
+              className="flex-shrink-0"
+            >
+              Page View
+            </Button>
           </div>
 
           <select
-            className="px-2 py-1 text-xs border rounded bg-white dark:bg-zinc-700 dark:text-white"
+            className="px-2 py-1 text-xs border rounded bg-white dark:bg-zinc-700 dark:text-white flex-shrink-0"
             value={pageSize}
             onChange={(e) => setPageSize(Number(e.target.value))}
             disabled={isNavigating}
@@ -339,12 +340,13 @@ function ExecutionLog({ name, workflowId, workflow }: Props) {
             <option value="5000">5000 lines</option>
             <option value="10000">10000 lines</option>
           </select>
-
-          <div className="ml-4 text-xs text-zinc-500 dark:text-zinc-400 flex items-center">
-            Showing {lineCount} of {totalLines} lines{' '}
-            {isEstimate ? '(estimated)' : ''}{' '}
-            {hasMore ? '(more available)' : ''}
-          </div>
+        </div>
+        
+        {/* Stats line - full width on mobile */}
+        <div className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center">
+          Showing {lineCount} of {totalLines} lines{' '}
+          {isEstimate ? '(estimated)' : ''}{' '}
+          {hasMore ? '(more available)' : ''}
         </div>
 
         {/* Page navigation controls */}

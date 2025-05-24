@@ -53,11 +53,11 @@ func (n *Node) NodeData() NodeData {
 	return n.Data.Data()
 }
 
-func (n *Node) LogFile() string {
+func (n *Node) StdoutFile() string {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
-	return n.outputs.LogFile()
+	return n.outputs.StdoutFile()
 }
 
 func (n *Node) shouldMarkSuccess(ctx context.Context) bool {
@@ -387,7 +387,8 @@ func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
 	defer n.mu.RUnlock()
 	env := executor.GetEnv(ctx)
 	env = env.WithEnv(
-		digraph.EnvKeyWorkflowStepLogFile, n.Log(),
+		digraph.EnvKeyWorkflowStepStdoutFile, n.GetStdout(),
+		digraph.EnvKeyWorkflowStepStderrFile, n.GetStderr(),
 	)
 	return executor.WithEnv(ctx, env)
 }
@@ -401,7 +402,7 @@ func (n *Node) Setup(ctx context.Context, logDir string, workflowID string) erro
 	safeName := fileutil.SafeName(n.Name())
 	timestamp := startedAt.Format("20060102.15:04:05.000")
 	postfix := stringutil.TruncString(workflowID, 8)
-	logFilename := fmt.Sprintf("%s.%s.%s.log", safeName, timestamp, postfix)
+	logFilename := fmt.Sprintf("%s.%s.%s", safeName, timestamp, postfix)
 	if !fileutil.FileExists(logDir) {
 		if err := os.MkdirAll(logDir, 0750); err != nil {
 			return fmt.Errorf("failed to create log directory %q: %w", logDir, err)
@@ -449,7 +450,7 @@ func (n *Node) LogContainsPattern(ctx context.Context, patterns []string) (bool,
 	}
 
 	// Get the log filename and check if it exists
-	logFilename := n.outputs.LogFile()
+	logFilename := n.outputs.StdoutFile()
 	if logFilename == "" {
 		return false, nil
 	}
@@ -579,23 +580,30 @@ func (n *Node) setupRetryPolicy(ctx context.Context) error {
 }
 
 type OutputCoordinator struct {
-	mu           sync.Mutex
-	logFilename  string
-	logFile      *os.File
-	logWriter    *bufio.Writer
-	stdoutFile   *os.File
-	stdoutWriter *bufio.Writer
-	stderrFile   *os.File
-	stderrWriter *bufio.Writer
+	mu sync.Mutex
+
+	stdoutFileName string
+	stdoutFile     *os.File
+	stdoutWriter   *bufio.Writer
+
+	stderrFileName string
+	stderrFile     *os.File
+	stderrWriter   *bufio.Writer
+
+	stdoutRedirectFile   *os.File
+	stdoutRedirectWriter *bufio.Writer
+	StderrRedirectFile   *os.File
+	stderrRedirectWriter *bufio.Writer
+
 	outputWriter *os.File
 	outputReader *os.File
 }
 
-func (oc *OutputCoordinator) LogFile() string {
+func (oc *OutputCoordinator) StdoutFile() string {
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
-	return oc.logFilename
+	return oc.stdoutFileName
 }
 
 func (oc *OutputCoordinator) lock() {
@@ -607,30 +615,27 @@ func (oc *OutputCoordinator) unlock() {
 }
 
 func (oc *OutputCoordinator) setup(ctx context.Context, data NodeData) error {
-	if err := oc.setupLog(ctx, data); err != nil {
+	if err := oc.setupWriters(ctx, data); err != nil {
 		return err
 	}
-	if err := oc.setupStdout(ctx, data); err != nil {
+	if err := oc.setupStdoutRedirect(ctx, data); err != nil {
 		return err
 	}
-	return oc.setupStderr(ctx, data)
+	return oc.setupStderrRedirect(ctx, data)
 }
 
 func (oc *OutputCoordinator) setupExecutorIO(_ context.Context, cmd executor.Executor, data NodeData) error {
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
-	var stdout io.Writer
-
-	// Output to log only
-	if oc.logWriter != nil {
-		stdout = oc.logWriter
-		cmd.SetStderr(stdout)
+	var stdout io.Writer = os.Stdout
+	if oc.stdoutWriter != nil {
+		stdout = oc.stdoutWriter
 	}
 
 	// Output to both log and stdout
-	if oc.stdoutWriter != nil {
-		stdout = io.MultiWriter(oc.logWriter, oc.stdoutWriter)
+	if oc.stdoutRedirectWriter != nil {
+		stdout = io.MultiWriter(oc.stdoutWriter, oc.stdoutRedirectWriter)
 	}
 
 	// Setup output capture
@@ -644,12 +649,15 @@ func (oc *OutputCoordinator) setupExecutorIO(_ context.Context, cmd executor.Exe
 
 	cmd.SetStdout(stdout)
 
+	// If stdoutRedirectWriter is set, we write to it as well
+	var stderr io.Writer = os.Stderr
 	if oc.stderrWriter != nil {
-		cmd.SetStderr(oc.stderrWriter)
-	} else {
-		// If stderr output is not set, use stdout for stderr as well
-		cmd.SetStderr(stdout)
+		stderr = oc.stderrWriter
 	}
+	if oc.stderrRedirectWriter != nil {
+		stderr = io.MultiWriter(oc.stderrWriter, oc.stderrRedirectWriter)
+	}
+	cmd.SetStderr(stderr)
 
 	return nil
 }
@@ -659,14 +667,14 @@ func (oc *OutputCoordinator) closeResources(_ context.Context) error {
 	defer oc.mu.Unlock()
 
 	var lastErr error
-	for _, w := range []*bufio.Writer{oc.logWriter, oc.stdoutWriter, oc.stderrWriter} {
+	for _, w := range []*bufio.Writer{oc.stdoutWriter, oc.stdoutRedirectWriter, oc.stderrRedirectWriter} {
 		if w != nil {
 			if err := w.Flush(); err != nil {
 				lastErr = err
 			}
 		}
 	}
-	for _, f := range []*os.File{oc.logFile, oc.stdoutFile, oc.stderrFile} {
+	for _, f := range []*os.File{oc.stdoutFile, oc.stdoutRedirectFile, oc.StderrRedirectFile} {
 		if f != nil {
 			if err := f.Sync(); err != nil {
 				lastErr = err
@@ -677,7 +685,7 @@ func (oc *OutputCoordinator) closeResources(_ context.Context) error {
 	return lastErr
 }
 
-func (oc *OutputCoordinator) setupStdout(ctx context.Context, data NodeData) error {
+func (oc *OutputCoordinator) setupStdoutRedirect(ctx context.Context, data NodeData) error {
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
@@ -690,13 +698,13 @@ func (oc *OutputCoordinator) setupStdout(ctx context.Context, data NodeData) err
 		return fmt.Errorf("failed to setup stdout file: %w", err)
 	}
 
-	oc.stdoutFile = file
-	oc.stdoutWriter = bufio.NewWriter(oc.stdoutFile)
+	oc.stdoutRedirectFile = file
+	oc.stdoutRedirectWriter = bufio.NewWriter(oc.stdoutRedirectFile)
 
 	return nil
 }
 
-func (oc *OutputCoordinator) setupStderr(ctx context.Context, data NodeData) error {
+func (oc *OutputCoordinator) setupStderrRedirect(ctx context.Context, data NodeData) error {
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
@@ -709,23 +717,32 @@ func (oc *OutputCoordinator) setupStderr(ctx context.Context, data NodeData) err
 		return fmt.Errorf("failed to setup stderr file: %w", err)
 	}
 
-	oc.stderrFile = file
-	oc.stderrWriter = bufio.NewWriter(oc.stderrFile)
+	oc.StderrRedirectFile = file
+	oc.stderrRedirectWriter = bufio.NewWriter(oc.StderrRedirectFile)
 
 	return nil
 }
 
-func (oc *OutputCoordinator) setupLog(_ context.Context, data NodeData) error {
+func (oc *OutputCoordinator) setupWriters(_ context.Context, data NodeData) error {
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
+	// stdout
 	var err error
-	oc.logFile, err = fileutil.OpenOrCreateFile(data.State.Log)
+	oc.stdoutFile, err = fileutil.OpenOrCreateFile(data.State.Stdout)
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %w", err)
 	}
-	oc.logWriter = bufio.NewWriter(oc.logFile)
-	oc.logFilename = data.State.Log
+	oc.stdoutWriter = bufio.NewWriter(oc.stdoutFile)
+	oc.stdoutFileName = data.State.Stdout
+
+	// stderr
+	oc.stderrFile, err = fileutil.OpenOrCreateFile(data.State.Stderr)
+	if err != nil {
+		return fmt.Errorf("failed to open stderr file: %w", err)
+	}
+	oc.stderrWriter = bufio.NewWriter(oc.stderrFile)
+	oc.stderrFileName = data.State.Stderr
 
 	return nil
 }

@@ -125,6 +125,57 @@ func (e Workflow) FindChildWorkflow(_ context.Context, workflowID string) (*Work
 	return NewWorkflow(matches[0])
 }
 
+func (e Workflow) ListChildWorkflows(ctx context.Context) ([]*Workflow, error) {
+	childDir := filepath.Join(e.baseDir, ChildWorkflowsDir)
+	entries, err := os.ReadDir(childDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []*Workflow{}, nil
+		}
+		return nil, fmt.Errorf("failed to read child workflows directory: %w", err)
+	}
+
+	var workflows []*Workflow
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		// check if the directory name matches the child workflow pattern
+		if !reChildWorkflow.MatchString(entry.Name()) {
+			continue
+		}
+
+		childWorkflow, err := NewWorkflow(filepath.Join(childDir, entry.Name()))
+		if err != nil {
+			logger.Error(ctx, "failed to read child workflow data: %w", err)
+			continue
+		}
+		workflows = append(workflows, childWorkflow)
+	}
+	return workflows, nil
+}
+
+// ListRuns returns a list of all runs for the workflow.
+func (e Workflow) ListRuns(ctx context.Context) ([]*Run, error) {
+	runDirs, err := listDirsSorted(e.baseDir, true, reRun)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list run directories: %w", err)
+	}
+	var runs []*Run
+	for _, runDir := range runDirs {
+		run, err := NewRun(filepath.Join(e.baseDir, runDir, JSONLStatusFile), nil)
+		if err != nil {
+			logger.Error(ctx, "failed to read a run data: %w", err)
+			continue
+		}
+		if run.Exists() {
+			runs = append(runs, run)
+		}
+	}
+	return runs, nil
+}
+
 // LatestRun returns the most recent run for the workflow.
 // It searches through all run directories and returns the first valid runs found.
 func (e Workflow) LatestRun(ctx context.Context, cache *fileutil.Cache[*models.Status]) (*Run, error) {
@@ -157,8 +208,63 @@ func (e Workflow) LastUpdated(ctx context.Context) (time.Time, error) {
 }
 
 // Remove deletes the entire run directory and all its contents.
-func (e Workflow) Remove() error {
+func (e Workflow) Remove(ctx context.Context) error {
+	if err := e.removeLogFiles(ctx); err != nil {
+		logger.Error(ctx, "failed to remove log files", "err", err, "workflow", e.workflowID)
+	}
 	return os.RemoveAll(e.baseDir)
+}
+
+func (e Workflow) removeLogFiles(ctx context.Context) error {
+	// Remove the log files
+	deleteFiles, err := e.listLogFiles(ctx)
+	if err != nil {
+		logger.Error(ctx, "failed to list log files to remove", "err", err, "workflow", e.workflowID)
+	}
+
+	children, err := e.ListChildWorkflows(ctx)
+	if err != nil {
+		logger.Error(ctx, "failed to list child workflows to remove", "err", err, "workflow", e.workflowID)
+	}
+	for _, child := range children {
+		childLogFiles, err := child.listLogFiles(ctx)
+		if err != nil {
+			logger.Error(ctx, "failed to list log files for child workflow", "err", err, "workflow", child.workflowID)
+		}
+		deleteFiles = append(deleteFiles, childLogFiles...)
+	}
+
+	// Remove all log files
+	for _, file := range deleteFiles {
+		if err := os.Remove(file); err != nil {
+			logger.Error(ctx, "failed to remove log file", "err", err, "workflow", e.workflowID, "file", file)
+		}
+	}
+
+	return nil
+}
+
+func (e Workflow) listLogFiles(ctx context.Context) ([]string, error) {
+	// List all log files in the workflow directory
+	runs, err := e.ListRuns(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list runs: %w", err)
+	}
+
+	var logFiles []string
+	for _, run := range runs {
+		status, err := run.ReadStatus(ctx)
+		if err != nil {
+			logger.Error(ctx, "failed to read status for run", "err", err, "workflow", e.workflowID, "run", run.ID())
+			continue
+		}
+		logFiles = append(logFiles, status.Log)
+		for _, n := range status.Nodes {
+			logFiles = append(logFiles, n.Stdout, n.Stderr)
+		}
+	}
+
+	return logFiles, nil
 }
 
 // Regular expressions for parsing directory names

@@ -104,12 +104,16 @@ func (store *Storage) GetMetadata(ctx context.Context, name string) (*digraph.DA
 }
 
 // GetDetails retrieves the details of a DAG by its name.
-func (store *Storage) GetDetails(ctx context.Context, name string) (*digraph.DAG, error) {
+func (store *Storage) GetDetails(ctx context.Context, name string, opts ...digraph.LoadOption) (*digraph.DAG, error) {
 	filePath, err := store.locateDAG(name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to locate DAG %s: %w", name, err)
 	}
-	dat, err := digraph.Load(ctx, filePath, digraph.WithoutEval())
+	var loadOpts []digraph.LoadOption
+	loadOpts = append(loadOpts, opts...)
+	loadOpts = append(loadOpts, digraph.WithoutEval())
+
+	dat, err := digraph.Load(ctx, filePath, loadOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load DAG %s: %w", name, err)
 	}

@@ -31,6 +31,23 @@ const LogSideModal: React.FC<LogSideModalProps> = ({
 }) => {
   // State to track whether the modal is expanded
   const [isExpanded, setIsExpanded] = useState(false);
+  
+  // State to track if we're on mobile
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Check if screen is mobile size
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768); // md breakpoint
+    };
+
+    checkIsMobile();
+    window.addEventListener('resize', checkIsMobile);
+
+    return () => {
+      window.removeEventListener('resize', checkIsMobile);
+    };
+  }, []);
 
   // Add keyboard shortcuts
   useEffect(() => {
@@ -55,8 +72,9 @@ const LogSideModal: React.FC<LogSideModalProps> = ({
   // Calculate z-index and positioning based on whether it's in a modal or not
   const zIndex = isInModal ? 60 : 50; // Higher z-index when in modal
 
-  // Determine width based on expanded state
-  const width = isExpanded ? 'w-full' : isInModal ? 'w-1/2' : 'w-2/5';
+  // Determine width and positioning based on mobile/expanded state
+  const width = isMobile || isExpanded ? 'w-full' : isInModal ? 'w-1/2' : 'w-2/5';
+  const positioning = isMobile ? 'inset-0' : 'top-0 bottom-0 right-0';
 
   // Handle clicks outside the modal
   const handleOutsideClick = (e: React.MouseEvent) => {
@@ -96,33 +114,42 @@ const LogSideModal: React.FC<LogSideModalProps> = ({
     <>
       {/* Invisible backdrop for capturing clicks outside the modal - always present */}
       <div
-        className={`fixed inset-0 h-screen w-screen ${!isInModal ? 'bg-black/20' : 'bg-transparent'}`}
+        className={`fixed inset-0 h-screen w-screen ${!isInModal || isMobile ? 'bg-black/50' : 'bg-transparent'}`}
         style={{ zIndex: zIndex }}
-        onClick={handleOutsideClick}
+        onClick={isMobile ? onClose : handleOutsideClick}
       />
 
-      {/* Side Modal */}
+      {/* Modal - full screen on mobile, side panel on desktop */}
       <div
-        className={`fixed top-0 bottom-0 right-0 ${width} h-screen bg-background border-l border-border shadow-xl overflow-hidden flex flex-col slide-in-from-right`}
+        className={`fixed ${positioning} ${width} h-screen bg-background ${
+          isMobile 
+            ? 'border border-border rounded-none' 
+            : 'border-l border-border'
+        } shadow-xl overflow-hidden flex flex-col ${
+          isMobile ? 'animate-in fade-in-0 slide-in-from-bottom-10' : 'slide-in-from-right'
+        }`}
         style={{ zIndex: zIndex + 1 }} // Make sure modal is above backdrop
         onClick={(e) => e.stopPropagation()} // Prevent clicks inside the modal from closing it
       >
-        <div className="flex justify-between items-center p-4 border-b">
-          <h2 className="text-lg font-semibold">{title}</h2>
+        <div className={`flex justify-between items-center ${isMobile ? 'p-3' : 'p-4'} border-b`}>
+          <h2 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold`}>{title}</h2>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={toggleExpand}
-              title={isExpanded ? 'Minimize' : 'Expand'}
-              className="relative group"
-            >
-              {isExpanded ? (
-                <Minimize2 className="h-4 w-4" />
-              ) : (
-                <Maximize2 className="h-4 w-4" />
-              )}
-            </Button>
+            {/* Hide expand/minimize button on mobile since it's always full screen */}
+            {!isMobile && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={toggleExpand}
+                title={isExpanded ? 'Minimize' : 'Expand'}
+                className="relative group"
+              >
+                {isExpanded ? (
+                  <Minimize2 className="h-4 w-4" />
+                ) : (
+                  <Maximize2 className="h-4 w-4" />
+                )}
+              </Button>
+            )}
             <Button
               variant="outline"
               size="icon"
@@ -140,13 +167,15 @@ const LogSideModal: React.FC<LogSideModalProps> = ({
               className="relative group"
             >
               <X className="h-4 w-4" />
-              <span className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-[10px] font-medium px-1 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                Esc
-              </span>
+              {!isMobile && (
+                <span className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-[10px] font-medium px-1 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                  Esc
+                </span>
+              )}
             </Button>
           </div>
         </div>
-        <div className="flex-1 overflow-auto p-4">{children}</div>
+        <div className={`flex-1 overflow-auto ${isMobile ? 'p-2' : 'p-4'}`}>{children}</div>
       </div>
 
       {/* Animation is handled via CSS classes in global.css */}

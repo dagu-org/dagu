@@ -25,7 +25,7 @@ type DAGStore interface {
 	// GetMetadata retrieves only the metadata of a DAG definition (faster than full load)
 	GetMetadata(ctx context.Context, fileName string) (*digraph.DAG, error)
 	// GetDetails retrieves the complete DAG definition including all fields
-	GetDetails(ctx context.Context, fileName string) (*digraph.DAG, error)
+	GetDetails(ctx context.Context, fileName string, opts ...digraph.LoadOption) (*digraph.DAG, error)
 	// Grep searches for a pattern in all DAG definitions and returns matching results
 	Grep(ctx context.Context, pattern string) (ret []*GrepResult, errs []string, err error)
 	// Rename changes a DAG's identifier from oldID to newID

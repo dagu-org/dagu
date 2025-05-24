@@ -4,7 +4,7 @@
  * @module features/dags/components/visualization
  */
 import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
-import { RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
+import { Maximize2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 import React, { useState } from 'react';
 import { components, NodeStatus } from '../../../../api/v2/schema';
 import Mermaid from '../../../../ui/Mermaid';
@@ -59,6 +59,7 @@ const Graph: React.FC<Props> = ({
   showIcons = true,
 }) => {
   const [scale, setScale] = useState(1);
+  const containerRef = React.useRef<HTMLDivElement>(null);
 
   /** Increase zoom level */
   const zoomIn = () => {
@@ -67,12 +68,19 @@ const Graph: React.FC<Props> = ({
 
   /** Decrease zoom level */
   const zoomOut = () => {
-    setScale((prevScale) => Math.max(prevScale - 0.1, 0.5));
+    setScale((prevScale) => Math.max(prevScale - 0.1, 0.1));
   };
 
   /** Reset zoom to default */
   const resetZoom = () => {
     setScale(1);
+  };
+
+  /** Fit graph to container - zoom out to show entire graph */
+  const fitToScreen = () => {
+    // Simple approach: set to a small scale that typically shows the full graph
+    // This is more reliable than trying to calculate exact dimensions
+    setScale(0.3);
   };
 
   // Calculate width based on flowchart type and graph breadth
@@ -216,7 +224,7 @@ const Graph: React.FC<Props> = ({
   }, [steps, onClickNode, flowchart, showIcons]);
 
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <div className="absolute right-2 top-2 z-10 bg-white">
         <ToggleGroup aria-label="Zoom controls">
           <ToggleButton
@@ -234,6 +242,14 @@ const Graph: React.FC<Props> = ({
             position="middle"
           >
             <ZoomOut className="h-4 w-4" />
+          </ToggleButton>
+          <ToggleButton
+            value="fit"
+            onClick={() => fitToScreen()}
+            aria-label="Fit to screen"
+            position="middle"
+          >
+            <Maximize2 className="h-4 w-4" />
           </ToggleButton>
           <ToggleButton
             value="reset"

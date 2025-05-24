@@ -121,74 +121,111 @@ function DAGSpec({ fileName }: Props) {
       {(props) =>
         data?.dag && (
           <React.Fragment>
-            <div className="space-y-4" ref={containerRef}>
-              <div className="overflow-x-auto rounded-xl border bg-white dark:bg-slate-900 p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <SubTitle className="mb-0">Graph</SubTitle>
+            <div className="space-y-6" ref={containerRef}>
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4 flex justify-between items-center">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    Graph
+                  </h2>
                   <FlowchartSwitch
                     value={cookie['flowchart']}
                     onChange={onChangeFlowchart}
                   />
                 </div>
-                <BorderedBox className="mt-4 py-4 px-4 flex flex-col overflow-x-auto">
-                  <Graph
-                    steps={data.dag.steps}
-                    type="config"
-                    flowchart={flowchart}
-                    showIcons={false}
-                  />
-                </BorderedBox>
+                <div className="p-6">
+                  <BorderedBox className="py-4 px-4 flex flex-col overflow-x-auto">
+                    <Graph
+                      steps={data.dag.steps}
+                      type="config"
+                      flowchart={flowchart}
+                      showIcons={false}
+                    />
+                  </BorderedBox>
+                </div>
               </div>
 
-              <div className="bg-white dark:bg-slate-900 rounded-xl border p-6 overflow-hidden">
-                <SubTitle className="mb-4">Attributes</SubTitle>
-                <DAGAttributes dag={data.dag!} />
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    Attributes
+                  </h2>
+                </div>
+                <div className="p-6">
+                  <DAGAttributes dag={data.dag!} />
+                </div>
               </div>
 
               {data.errors?.length ? (
-                <div className="bg-white dark:bg-slate-900 rounded-xl border border-l-4 border-red-500 dark:border-red-700 p-6">
-                  <div className="flex items-center gap-2 mb-4 text-red-600 dark:text-red-400">
-                    <AlertTriangle className="h-5 w-5" />
-                    <h3 className="font-semibold">Configuration Errors</h3>
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-l-4 border-red-500 dark:border-red-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                  <div className="border-b border-slate-100 dark:border-slate-800 bg-red-50 dark:bg-red-900/10 px-6 py-4">
+                    <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5" />
+                      Configuration Errors
+                    </h2>
                   </div>
-
-                  <div className="space-y-3">
-                    {data.errors?.map((e, i) => (
-                      <div
-                        key={i}
-                        className="p-3 bg-red-50 dark:bg-red-900/20 rounded-md text-red-600 dark:text-red-400 font-mono text-sm"
-                      >
-                        {e}
-                      </div>
-                    ))}
+                  <div className="p-6">
+                    <div className="space-y-3">
+                      {data.errors?.map((e, i) => (
+                        <div
+                          key={i}
+                          className="p-3 bg-red-50 dark:bg-red-900/20 rounded-md text-red-600 dark:text-red-400 font-mono text-sm"
+                        >
+                          {e}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               ) : null}
 
               {data.dag.steps ? (
-                <div className="bg-white dark:bg-slate-900 rounded-xl border p-6 overflow-hidden">
-                  <SubTitle className="mb-4">Steps</SubTitle>
-                  <DAGStepTable steps={data.dag.steps} />
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                  <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                      <span>Steps</span>
+                      <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                        {data.dag.steps.length} step{data.dag.steps.length !== 1 ? 's' : ''}
+                      </span>
+                    </h2>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <DAGStepTable steps={data.dag.steps} />
+                  </div>
                 </div>
               ) : null}
 
               {handlers?.length ? (
-                <div className="bg-white dark:bg-slate-900 rounded-xl border p-6 overflow-hidden">
-                  <SubTitle className="mb-4">Lifecycle Hooks</SubTitle>
-                  <DAGStepTable steps={handlers} />
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                  <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                      <span>Lifecycle Hooks</span>
+                      <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                        {handlers.length} hook{handlers.length !== 1 ? 's' : ''}
+                      </span>
+                    </h2>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <DAGStepTable steps={handlers} />
+                  </div>
                 </div>
               ) : null}
 
               <div
-                className={`rounded-xl border p-6 overflow-hidden transition-all duration-300 ${
+                className={`rounded-2xl border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden ${
                   editing
                     ? 'bg-white dark:bg-slate-900 border-2 border-blue-400 dark:border-blue-600'
-                    : 'bg-white dark:bg-slate-900'
+                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
                 }`}
               >
-                <div className="flex justify-between items-center mb-4">
+                <div className={`border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex justify-between items-center ${
+                  editing
+                    ? 'bg-blue-50 dark:bg-blue-900/10'
+                    : 'bg-slate-50 dark:bg-slate-800/50'
+                }`}>
                   <div className="flex items-center">
-                    <SubTitle className="mb-0 mr-2">Definition</SubTitle>
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mr-3">
+                      Definition
+                    </h2>
                     <div
                       className={`text-xs font-medium px-2 py-1 rounded-full transition-all duration-300 ${
                         editing
@@ -289,19 +326,20 @@ function DAGSpec({ fileName }: Props) {
                   )}
                 </div>
 
-                <DAGEditor
-                  value={data.spec}
-                  readOnly={!editing}
-                  lineNumbers={true}
-                  className="mt-2"
-                  onChange={
-                    editing
-                      ? (newValue) => {
-                          setCurrentValue(newValue || '');
-                        }
-                      : undefined
-                  }
-                />
+                <div className="p-6">
+                  <DAGEditor
+                    value={data.spec}
+                    readOnly={!editing}
+                    lineNumbers={true}
+                    onChange={
+                      editing
+                        ? (newValue) => {
+                            setCurrentValue(newValue || '');
+                          }
+                        : undefined
+                    }
+                  />
+                </div>
               </div>
             </div>
           </React.Fragment>

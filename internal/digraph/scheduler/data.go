@@ -29,8 +29,10 @@ type NodeData struct {
 type NodeState struct {
 	// Status represents the state of the node.
 	Status NodeStatus
-	// Log is the log file path from the node.
-	Log string
+	// Stdout is the log file path from the node.
+	Stdout string
+	// Stderr is the log file path for the error log (stderr).
+	Stderr string
 	// StartedAt is the time when the node started.
 	StartedAt time.Time
 	// FinishedAt is the time when the node finished.
@@ -179,7 +181,8 @@ func (s *Data) Setup(ctx context.Context, logFile string, startedAt time.Time) e
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.inner.State.Log = logFile
+	s.inner.State.Stdout = logFile + ".out"
+	s.inner.State.Stderr = logFile + ".err"
 	s.inner.State.StartedAt = startedAt
 
 	env := executor.GetEnv(ctx)
@@ -243,11 +246,18 @@ func (s *Data) ContinueOn() digraph.ContinueOn {
 	return s.inner.Step.ContinueOn
 }
 
-func (s *Data) Log() string {
+func (s *Data) GetStdout() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return s.inner.State.Log
+	return s.inner.State.Stdout
+}
+
+func (s *Data) GetStderr() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.inner.State.Stderr
 }
 
 func (s *Data) SignalOnStop() string {

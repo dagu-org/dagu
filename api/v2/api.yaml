@@ -815,6 +815,7 @@ paths:
         - $ref: "#/components/parameters/Head"
         - $ref: "#/components/parameters/Offset"
         - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Stream"
       responses:
         "200":
           description: "A successful response"
@@ -978,6 +979,7 @@ paths:
         - $ref: "#/components/parameters/Head"
         - $ref: "#/components/parameters/Offset"
         - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Stream"
         - name: "childWorkflowId"
           in: "path"
           required: true
@@ -1206,6 +1208,14 @@ components:
         minimum: 1
         maximum: 10000
 
+    Stream:
+      name: stream
+      in: query
+      description: "Whether to return stdout or stderr logs"
+      required: false
+      schema:
+        $ref: "#/components/schemas/Stream"
+
   schemas:
     Error:
       type: object
@@ -1236,6 +1246,13 @@ components:
         - "already_running"
         - "not_running"
         - "already_exists"
+
+    Stream:
+      type: string
+      format: string
+      enum:
+        - stdout
+        - stderr
 
     UnixTimestamp:
       type: integer
@@ -1610,9 +1627,12 @@ components:
       properties:
         step:
           $ref: "#/components/schemas/Step"
-        log:
+        stdout:
           type: string
-          description: "Path to step-specific log file"
+          description: "Path to the standard output log file for this step"
+        stderr:
+          type: string
+          description: "Path to the standard error log file for this step"
         startedAt:
           type: string
           description: "RFC3339 timestamp when the step started"
@@ -1639,7 +1659,8 @@ components:
           description: "Error message if the step failed"
       required:
         - step
-        - log
+        - stdout
+        - stderr
         - startedAt
         - finishedAt
         - status

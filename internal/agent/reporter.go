@@ -202,7 +202,7 @@ func addAttachments(
 ) (attachments []string) {
 	if trigger {
 		for _, n := range nodes {
-			attachments = append(attachments, n.Log)
+			attachments = append(attachments, n.Stdout)
 		}
 	}
 	return attachments
