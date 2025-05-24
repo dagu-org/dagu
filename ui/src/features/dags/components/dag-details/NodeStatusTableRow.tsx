@@ -274,36 +274,49 @@ function NodeStatusTableRow({
         <TableCell>
           <div className="space-y-1.5">
             {!node.step.command && node.step.cmdWithArgs ? (
-              <div className="flex items-center gap-1.5 text-xs font-medium">
-                <Code className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-                <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-1.5 py-0.5 text-slate-700 dark:text-slate-300">
-                  {node.step.cmdWithArgs}
-                </span>
-              </div>
-            ) : null}
-
-            {node.step.command && (
-              <div className="flex items-center gap-1.5 text-xs font-medium">
-                <Code className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-                <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-1.5 py-0.5 text-slate-700 dark:text-slate-300">
-                  {node.step.command}
-                </span>
-              </div>
-            )}
-
-            {node.step.args && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="pl-5 text-xs font-medium text-slate-500 dark:text-slate-400 truncate cursor-pointer leading-tight">
-                    {node.step.args}
+                  <div className="flex items-center gap-1.5 text-xs font-medium cursor-pointer">
+                    <Code className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+                    <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-1.5 py-0.5 text-slate-700 dark:text-slate-300 break-all">
+                      {node.step.cmdWithArgs}
+                    </span>
                   </div>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <span className="max-w-[400px] break-all text-xs">
-                    {node.step.args}
-                  </span>
+                  <pre className="max-w-[500px] whitespace-pre-wrap break-all text-xs">
+                    {node.step.cmdWithArgs}
+                  </pre>
                 </TooltipContent>
               </Tooltip>
+            ) : null}
+
+            {node.step.command && (
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-xs font-medium">
+                  <Code className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+                  <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-1.5 py-0.5 text-slate-700 dark:text-slate-300 break-all">
+                    {node.step.command}
+                  </span>
+                </div>
+                
+                {node.step.args && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="pl-5 text-xs font-medium text-slate-500 dark:text-slate-400 cursor-pointer leading-tight">
+                        <span className="break-all whitespace-pre-wrap">
+                          {Array.isArray(node.step.args) ? node.step.args.join(' ') : node.step.args}
+                        </span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <pre className="max-w-[500px] whitespace-pre-wrap break-all text-xs">
+                        {Array.isArray(node.step.args) ? node.step.args.join(' ') : node.step.args}
+                      </pre>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
             )}
           </div>
         </TableCell>
@@ -508,24 +521,28 @@ function NodeStatusTableRow({
           {!node.step.command && node.step.cmdWithArgs ? (
             <div className="flex items-center gap-1.5 text-xs font-medium">
               <Code className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-              <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-1.5 py-0.5 text-slate-700 dark:text-slate-300">
+              <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-1.5 py-0.5 text-slate-700 dark:text-slate-300 break-all whitespace-pre-wrap">
                 {node.step.cmdWithArgs}
               </span>
             </div>
           ) : null}
 
           {node.step.command && (
-            <div className="flex items-center gap-1.5 text-xs font-medium">
-              <Code className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-              <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-1.5 py-0.5 text-slate-700 dark:text-slate-300">
-                {node.step.command}
-              </span>
-            </div>
-          )}
-
-          {node.step.args && (
-            <div className="pl-5 text-xs font-medium text-slate-500 dark:text-slate-400 break-words leading-tight">
-              {node.step.args}
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-medium">
+                <Code className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+                <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-1.5 py-0.5 text-slate-700 dark:text-slate-300 break-all whitespace-pre-wrap">
+                  {node.step.command}
+                </span>
+              </div>
+              
+              {node.step.args && (
+                <div className="pl-5 text-xs font-medium text-slate-500 dark:text-slate-400 leading-tight">
+                  <span className="break-all whitespace-pre-wrap">
+                    {Array.isArray(node.step.args) ? node.step.args.join(' ') : node.step.args}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>
