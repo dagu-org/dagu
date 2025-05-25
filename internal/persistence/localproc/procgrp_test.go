@@ -97,7 +97,7 @@ func TestProcGroup_IsStale(t *testing.T) {
 
 	// Write a timestamp that is older than the stale time
 	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, uint64(time.Now().Add(-pg.staleTime).UnixNano()))
+	binary.BigEndian.PutUint64(buf, uint64(time.Now().Add(-pg.staleTime).Unix()))
 	_, err = fd.WriteAt(buf, 0)
 
 	// Close the file
