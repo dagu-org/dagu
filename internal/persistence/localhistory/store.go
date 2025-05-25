@@ -172,11 +172,11 @@ func (store *Store) collectStatusesFromRoots(
 
 			statuses := make([]*models.DAGRunStatus, 0, len(workflows))
 			for _, workflow := range workflows {
-				if opts.DAGRunID != "" && !strings.Contains(workflow.workflowID, opts.DAGRunID) {
+				if opts.DAGRunID != "" && !strings.Contains(workflow.dagRunID, opts.DAGRunID) {
 					continue
 				}
 
-				run, err := workflow.LatestRun(ctx, store.cache)
+				run, err := workflow.LatestAttempt(ctx, store.cache)
 				if err != nil {
 					logger.Error(ctx, "Failed to get latest run", "err", err)
 					continue
@@ -249,7 +249,7 @@ func (store *Store) CreateAttempt(ctx context.Context, dag *digraph.DAG, timesta
 	dataRoot := NewDataRoot(store.baseDir, dag.Name)
 	ts := models.NewUTC(timestamp)
 
-	var run *Workflow
+	var run *DAGRun
 	if opts.Retry {
 		r, err := dataRoot.FindByWorkflowID(ctx, workflowID)
 		if err != nil {
@@ -264,7 +264,7 @@ func (store *Store) CreateAttempt(ctx context.Context, dag *digraph.DAG, timesta
 		run = r
 	}
 
-	record, err := run.CreateRun(ctx, ts, store.cache, WithDAG(dag))
+	record, err := run.CreateAttempt(ctx, ts, store.cache, WithDAG(dag))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create record: %w", err)
 	}
@@ -282,22 +282,22 @@ func (b *Store) newChildRecord(ctx context.Context, dag *digraph.DAG, timestamp 
 
 	ts := models.NewUTC(timestamp)
 
-	var run *Workflow
+	var run *DAGRun
 	if opts.Retry {
-		r, err := root.FindChildWorkflow(ctx, workflowID)
+		r, err := root.FindChildDAGRun(ctx, workflowID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find child workflow record: %w", err)
 		}
 		run = r
 	} else {
-		r, err := root.CreateChildWorkflow(ctx, workflowID)
+		r, err := root.CreateChildDAGRun(ctx, workflowID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create child workflow: %w", err)
 		}
 		run = r
 	}
 
-	record, err := run.CreateRun(ctx, ts, b.cache, WithDAG(dag))
+	record, err := run.CreateAttempt(ctx, ts, b.cache, WithDAG(dag))
 	if err != nil {
 		logger.Error(ctx, "Failed to create child workflow record", "err", err)
 		return nil, err
@@ -329,7 +329,7 @@ func (store *Store) RecentAttempts(ctx context.Context, dagName string, itemLimi
 	// Get the latest record for each item
 	records := make([]models.DAGRunAttempt, 0, len(items))
 	for _, item := range items {
-		record, err := item.LatestRun(ctx, store.cache)
+		record, err := item.LatestAttempt(ctx, store.cache)
 		if err != nil {
 			logger.Error(ctx, "Failed to get latest record", "err", err)
 			continue
@@ -363,7 +363,7 @@ func (store *Store) LatestAttempt(ctx context.Context, dagName string) (models.D
 			return nil, fmt.Errorf("failed to get latest after: %w", err)
 		}
 
-		return exec.LatestRun(ctx, store.cache)
+		return exec.LatestAttempt(ctx, store.cache)
 	}
 
 	// Get the latest execution data.
@@ -371,7 +371,7 @@ func (store *Store) LatestAttempt(ctx context.Context, dagName string) (models.D
 	if len(latest) == 0 {
 		return nil, models.ErrNoStatusData
 	}
-	return latest[0].LatestRun(ctx, store.cache)
+	return latest[0].LatestAttempt(ctx, store.cache)
 }
 
 // FindAttempt finds a history record by workflow ID.
@@ -395,7 +395,7 @@ func (store *Store) FindAttempt(ctx context.Context, ref digraph.DAGRunRef) (mod
 		return nil, err
 	}
 
-	return run.LatestRun(ctx, store.cache)
+	return run.LatestAttempt(ctx, store.cache)
 }
 
 // FindChildAttempt finds a child workflow by its ID.
@@ -419,11 +419,11 @@ func (store *Store) FindChildAttempt(ctx context.Context, ref digraph.DAGRunRef,
 		return nil, fmt.Errorf("failed to find execution: %w", err)
 	}
 
-	childWorkflow, err := run.FindChildWorkflow(ctx, childWorkflowID)
+	childWorkflow, err := run.FindChildDAGRun(ctx, childWorkflowID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find child workflow: %w", err)
 	}
-	return childWorkflow.LatestRun(ctx, store.cache)
+	return childWorkflow.LatestAttempt(ctx, store.cache)
 }
 
 // RemoveOldDAGRuns removes old history records older than the specified retention days.

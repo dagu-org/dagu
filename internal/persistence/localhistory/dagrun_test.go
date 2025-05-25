@@ -14,10 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestExecution(t *testing.T) {
+func TestDAGRun(t *testing.T) {
 	t.Run("Basic", func(t *testing.T) {
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestExecution(t, "test-id-1", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "test-id-1", models.NewUTC(time.Now()))
 
 		ts1 := models.NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
 		ts2 := models.NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
@@ -27,7 +27,7 @@ func TestExecution(t *testing.T) {
 		_ = exec.WriteStatus(t, ts2, scheduler.StatusSuccess)
 		_ = exec.WriteStatus(t, ts3, scheduler.StatusError)
 
-		latestRun, err := exec.LatestRun(exec.Context, nil)
+		latestRun, err := exec.LatestAttempt(exec.Context, nil)
 		require.NoError(t, err)
 
 		status, err := latestRun.ReadStatus(exec.Context)
@@ -37,7 +37,7 @@ func TestExecution(t *testing.T) {
 	})
 	t.Run("LastUpdated", func(t *testing.T) {
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestExecution(t, "test-id-1", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "test-id-1", models.NewUTC(time.Now()))
 
 		ts1 := models.NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
 		ts2 := models.NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
@@ -55,13 +55,13 @@ func TestExecution(t *testing.T) {
 	})
 }
 
-type ExecutionTest struct {
+type DAGRunTest struct {
 	DataRootTest
-	*Workflow
+	*DAGRun
 	TB testing.TB
 }
 
-func (et ExecutionTest) WriteStatus(t *testing.T, ts models.TimeInUTC, s scheduler.Status) *Attempt {
+func (dr DAGRunTest) WriteStatus(t *testing.T, ts models.TimeInUTC, s scheduler.Status) *Attempt {
 	t.Helper()
 
 	dag := &digraph.DAG{Name: "test-dag"}
@@ -69,42 +69,42 @@ func (et ExecutionTest) WriteStatus(t *testing.T, ts models.TimeInUTC, s schedul
 	status.RunID = "test-id-1"
 	status.Status = s
 
-	run, err := et.CreateRun(et.Context, ts, nil)
+	run, err := dr.CreateAttempt(dr.Context, ts, nil)
 	require.NoError(t, err)
-	err = run.Open(et.Context)
+	err = run.Open(dr.Context)
 	require.NoError(t, err)
 
 	defer func() {
-		_ = run.Close(et.Context)
+		_ = run.Close(dr.Context)
 	}()
 
-	err = run.Write(et.Context, status)
+	err = run.Write(dr.Context, status)
 	require.NoError(t, err)
 
 	return run
 }
 
-func TestWorkflowListChildWorkflows(t *testing.T) {
-	t.Run("NoChildWorkflows", func(t *testing.T) {
+func TestListChildDAGRuns(t *testing.T) {
+	t.Run("NoChildDAGRuns", func(t *testing.T) {
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestExecution(t, "test-workflow", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "test-workflow", models.NewUTC(time.Now()))
 
-		children, err := exec.ListChildWorkflows(exec.Context)
+		children, err := exec.ListChildDAGRuns(exec.Context)
 		require.NoError(t, err)
-		assert.Empty(t, children, "should return empty list when no child workflows exist")
+		assert.Empty(t, children, "should return empty list when no child DAG-run exist")
 	})
 
-	t.Run("WithChildWorkflows", func(t *testing.T) {
+	t.Run("WithChildDAGRuns", func(t *testing.T) {
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestExecution(t, "parent-workflow", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "parent-workflow", models.NewUTC(time.Now()))
 
-		// Create child workflows directory and some child workflows
-		childDir := filepath.Join(exec.baseDir, ChildWorkflowsDir)
+		// Create child DAG-run directory and some child DAG-run directories
+		childDir := filepath.Join(exec.baseDir, ChildDAGRunsDir)
 		require.NoError(t, os.MkdirAll(childDir, 0755))
 
-		// Create two child workflow directories
-		child1Dir := filepath.Join(childDir, ChildWorkflowDirPrefix+"child1")
-		child2Dir := filepath.Join(childDir, ChildWorkflowDirPrefix+"child2")
+		// Create two child DAG-run directories
+		child1Dir := filepath.Join(childDir, ChildDAGRunDirPrefix+"child1")
+		child2Dir := filepath.Join(childDir, ChildDAGRunDirPrefix+"child2")
 		require.NoError(t, os.MkdirAll(child1Dir, 0755))
 		require.NoError(t, os.MkdirAll(child2Dir, 0755))
 
@@ -112,14 +112,14 @@ func TestWorkflowListChildWorkflows(t *testing.T) {
 		nonDirFile := filepath.Join(childDir, "not-a-directory.txt")
 		require.NoError(t, os.WriteFile(nonDirFile, []byte("test"), 0644))
 
-		children, err := exec.ListChildWorkflows(exec.Context)
+		children, err := exec.ListChildDAGRuns(exec.Context)
 		require.NoError(t, err)
-		assert.Len(t, children, 2, "should return two child workflows")
+		assert.Len(t, children, 2, "should return two child DAG-runs")
 
-		// Verify child workflow IDs
+		// Verify child DAG-run directories
 		childIDs := make([]string, len(children))
 		for i, child := range children {
-			childIDs[i] = child.workflowID
+			childIDs[i] = child.dagRunID
 		}
 		assert.Contains(t, childIDs, "child1")
 		assert.Contains(t, childIDs, "child2")
@@ -129,20 +129,20 @@ func TestWorkflowListChildWorkflows(t *testing.T) {
 func TestWorkflowListRuns(t *testing.T) {
 	t.Run("NoRuns", func(t *testing.T) {
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestExecution(t, "test-workflow", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "test-workflow", models.NewUTC(time.Now()))
 
 		// Remove the run that was created by CreateTestExecution
 		require.NoError(t, os.RemoveAll(exec.baseDir))
 		require.NoError(t, os.MkdirAll(exec.baseDir, 0755))
 
-		runs, err := exec.ListRuns(exec.Context)
+		runs, err := exec.ListAttempts(exec.Context)
 		require.NoError(t, err)
 		assert.Empty(t, runs, "should return empty list when no runs exist")
 	})
 
 	t.Run("WithMultipleRuns", func(t *testing.T) {
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestExecution(t, "test-workflow", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "test-workflow", models.NewUTC(time.Now()))
 
 		// Create additional runs
 		ts1 := models.NewUTC(time.Date(2021, 1, 1, 12, 0, 0, 0, time.UTC))
@@ -150,7 +150,7 @@ func TestWorkflowListRuns(t *testing.T) {
 		exec.WriteStatus(t, ts1, scheduler.StatusSuccess)
 		exec.WriteStatus(t, ts2, scheduler.StatusError)
 
-		runs, err := exec.ListRuns(exec.Context)
+		runs, err := exec.ListAttempts(exec.Context)
 		require.NoError(t, err)
 		assert.GreaterOrEqual(t, len(runs), 2, "should return at least the runs we created")
 
@@ -161,10 +161,10 @@ func TestWorkflowListRuns(t *testing.T) {
 	})
 }
 
-func TestWorkflowListLogFiles(t *testing.T) {
+func TestListLogFiles(t *testing.T) {
 	t.Run("WithLogFiles", func(t *testing.T) {
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestExecution(t, "test-workflow", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "test-workflow", models.NewUTC(time.Now()))
 
 		// Create a run with log files
 		dag := &digraph.DAG{Name: "test-dag"}
@@ -186,7 +186,7 @@ func TestWorkflowListLogFiles(t *testing.T) {
 		}
 
 		ts := models.NewUTC(time.Now())
-		run, err := exec.CreateRun(exec.Context, ts, nil)
+		run, err := exec.CreateAttempt(exec.Context, ts, nil)
 		require.NoError(t, err)
 		require.NoError(t, run.Open(exec.Context))
 		require.NoError(t, run.Write(exec.Context, status))
@@ -208,8 +208,8 @@ func TestWorkflowListLogFiles(t *testing.T) {
 	})
 }
 
-func TestWorkflowRemoveLogFiles(t *testing.T) {
-	t.Run("RemoveMainWorkflowLogFiles", func(t *testing.T) {
+func TestRemoveLogFiles(t *testing.T) {
+	t.Run("RemoveMainDAGRunLogFiles", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// Create test log files
@@ -224,7 +224,7 @@ func TestWorkflowRemoveLogFiles(t *testing.T) {
 		}
 
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestExecution(t, "test-workflow", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "test-workflow", models.NewUTC(time.Now()))
 
 		// Create a run with log files pointing to our test files
 		dag := &digraph.DAG{Name: "test-dag"}
@@ -241,7 +241,7 @@ func TestWorkflowRemoveLogFiles(t *testing.T) {
 		}
 
 		ts := models.NewUTC(time.Now())
-		run, err := exec.CreateRun(exec.Context, ts, nil)
+		run, err := exec.CreateAttempt(exec.Context, ts, nil)
 		require.NoError(t, err)
 		require.NoError(t, run.Open(exec.Context))
 		require.NoError(t, run.Write(exec.Context, status))
@@ -264,7 +264,7 @@ func TestWorkflowRemoveLogFiles(t *testing.T) {
 		}
 	})
 
-	t.Run("RemoveChildWorkflowLogFiles", func(t *testing.T) {
+	t.Run("RemoveChildDAGRunLogFiles", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// Create test log files for parent and child
@@ -283,9 +283,9 @@ func TestWorkflowRemoveLogFiles(t *testing.T) {
 		}
 
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestExecution(t, "parent-workflow", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "parent-workflow", models.NewUTC(time.Now()))
 
-		// Create parent workflow with log files
+		// Create parent DAG-run with log files
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
 		status.RunID = "parent-workflow"
@@ -296,20 +296,20 @@ func TestWorkflowRemoveLogFiles(t *testing.T) {
 		}}
 
 		ts := models.NewUTC(time.Now())
-		run, err := exec.CreateRun(exec.Context, ts, nil)
+		run, err := exec.CreateAttempt(exec.Context, ts, nil)
 		require.NoError(t, err)
 		require.NoError(t, run.Open(exec.Context))
 		require.NoError(t, run.Write(exec.Context, status))
 		require.NoError(t, run.Close(exec.Context))
 
-		// Create child workflow
-		childDir := filepath.Join(exec.baseDir, ChildWorkflowsDir)
+		// Create child DAG-run directory
+		childDir := filepath.Join(exec.baseDir, ChildDAGRunsDir)
 		require.NoError(t, os.MkdirAll(childDir, 0755))
 
-		childWorkflowDir := filepath.Join(childDir, ChildWorkflowDirPrefix+"child1")
-		require.NoError(t, os.MkdirAll(childWorkflowDir, 0755))
+		childDAGRunDir := filepath.Join(childDir, ChildDAGRunDirPrefix+"child1")
+		require.NoError(t, os.MkdirAll(childDAGRunDir, 0755))
 
-		childWorkflow, err := NewWorkflow(childWorkflowDir)
+		childDAGRun, err := NewDAGRun(childDAGRunDir)
 		require.NoError(t, err)
 
 		// Create child run with log files
@@ -321,7 +321,7 @@ func TestWorkflowRemoveLogFiles(t *testing.T) {
 			Stdout: childLogFiles[1],
 		}}
 
-		childRun, err := childWorkflow.CreateRun(exec.Context, ts, nil)
+		childRun, err := childDAGRun.CreateAttempt(exec.Context, ts, nil)
 		require.NoError(t, err)
 		require.NoError(t, childRun.Open(exec.Context))
 		require.NoError(t, childRun.Write(exec.Context, childStatus))
@@ -345,8 +345,8 @@ func TestWorkflowRemoveLogFiles(t *testing.T) {
 	})
 }
 
-func TestWorkflowRemove(t *testing.T) {
-	t.Run("RemoveWorkflowWithLogFiles", func(t *testing.T) {
+func TestDAGRunRemove(t *testing.T) {
+	t.Run("RemoveDAGRunWithLogFiles", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// Create test log files
@@ -361,7 +361,7 @@ func TestWorkflowRemove(t *testing.T) {
 		}
 
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestExecution(t, "test-workflow", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "test-workflow", models.NewUTC(time.Now()))
 
 		// Create a run with log files
 		dag := &digraph.DAG{Name: "test-dag"}
@@ -378,13 +378,13 @@ func TestWorkflowRemove(t *testing.T) {
 		}
 
 		ts := models.NewUTC(time.Now())
-		run, err := exec.CreateRun(exec.Context, ts, nil)
+		run, err := exec.CreateAttempt(exec.Context, ts, nil)
 		require.NoError(t, err)
 		require.NoError(t, run.Open(exec.Context))
 		require.NoError(t, run.Write(exec.Context, status))
 		require.NoError(t, run.Close(exec.Context))
 
-		// Verify workflow directory and log files exist
+		// Verify DAG-run directory and log files exist
 		_, err = os.Stat(exec.baseDir)
 		require.NoError(t, err, "workflow directory should exist")
 
@@ -393,13 +393,13 @@ func TestWorkflowRemove(t *testing.T) {
 			require.NoError(t, err, "log file should exist: %s", logFile)
 		}
 
-		// Remove the workflow
+		// Remove the DAG-run
 		err = exec.Remove(exec.Context)
 		require.NoError(t, err)
 
-		// Verify workflow directory is removed
+		// Verify the DAG-run directory is removed
 		_, err = os.Stat(exec.baseDir)
-		assert.True(t, os.IsNotExist(err), "workflow directory should be removed")
+		assert.True(t, os.IsNotExist(err), "DAG-run directory should be removed")
 
 		// Verify log files are removed
 		for _, logFile := range logFiles {
@@ -408,7 +408,7 @@ func TestWorkflowRemove(t *testing.T) {
 		}
 	})
 
-	t.Run("RemoveWorkflowWithChildWorkflows", func(t *testing.T) {
+	t.Run("RemoveWithChildDAGRuns", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// Create test log files for parent and children
@@ -431,9 +431,9 @@ func TestWorkflowRemove(t *testing.T) {
 		}
 
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestExecution(t, "parent-workflow", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "parent-workflow", models.NewUTC(time.Now()))
 
-		// Create parent workflow with log files
+		// Create parent DAG-run with log files
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
 		status.RunID = "parent-workflow"
@@ -444,41 +444,41 @@ func TestWorkflowRemove(t *testing.T) {
 		}}
 
 		ts := models.NewUTC(time.Now())
-		run, err := exec.CreateRun(exec.Context, ts, nil)
+		run, err := exec.CreateAttempt(exec.Context, ts, nil)
 		require.NoError(t, err)
 		require.NoError(t, run.Open(exec.Context))
 		require.NoError(t, run.Write(exec.Context, status))
 		require.NoError(t, run.Close(exec.Context))
 
-		// Create child workflows
-		childDir := filepath.Join(exec.baseDir, ChildWorkflowsDir)
+		// Create child DAG-run directory
+		childDir := filepath.Join(exec.baseDir, ChildDAGRunsDir)
 		require.NoError(t, os.MkdirAll(childDir, 0755))
 
-		// Create two child workflows with their own log files
-		childWorkflows := []struct {
-			workflowID string
-			logFiles   []string
+		// Create two child DAG-run with their own log files
+		childDAGRuns := []struct {
+			dagRunID string
+			logFiles []string
 		}{
 			{"child1", child1LogFiles},
 			{"child2", child2LogFiles},
 		}
 
-		for _, child := range childWorkflows {
-			childWorkflowDir := filepath.Join(childDir, ChildWorkflowDirPrefix+child.workflowID)
-			require.NoError(t, os.MkdirAll(childWorkflowDir, 0755))
+		for _, child := range childDAGRuns {
+			childDAGRunDir := filepath.Join(childDir, ChildDAGRunDirPrefix+child.dagRunID)
+			require.NoError(t, os.MkdirAll(childDAGRunDir, 0755))
 
-			childWorkflow, err := NewWorkflow(childWorkflowDir)
+			childDAGRun, err := NewDAGRun(childDAGRunDir)
 			require.NoError(t, err)
 
 			childStatus := models.InitialStatus(dag)
-			childStatus.RunID = child.workflowID
+			childStatus.RunID = child.dagRunID
 			childStatus.Log = child.logFiles[0]
 			childStatus.Nodes = []*models.Node{{
-				Step:   digraph.Step{Name: fmt.Sprintf("%s-step", child.workflowID)},
+				Step:   digraph.Step{Name: fmt.Sprintf("%s-step", child.dagRunID)},
 				Stdout: child.logFiles[1],
 			}}
 
-			childRun, err := childWorkflow.CreateRun(exec.Context, ts, nil)
+			childRun, err := childDAGRun.CreateAttempt(exec.Context, ts, nil)
 			require.NoError(t, err)
 			require.NoError(t, childRun.Open(exec.Context))
 			require.NoError(t, childRun.Write(exec.Context, childStatus))
@@ -491,13 +491,13 @@ func TestWorkflowRemove(t *testing.T) {
 			require.NoError(t, err, "log file should exist before removal: %s", logFile)
 		}
 
-		// Remove the parent workflow (should remove all log files including child workflows)
+		// Remove the parent DAG-run (should remove all log files including child DAG-runs)
 		err = exec.Remove(exec.Context)
 		require.NoError(t, err)
 
-		// Verify workflow directory is removed
+		// Verify DAG-run directory is removed
 		_, err = os.Stat(exec.baseDir)
-		assert.True(t, os.IsNotExist(err), "workflow directory should be removed")
+		assert.True(t, os.IsNotExist(err), "DAG-run directory should be removed")
 
 		// Verify all log files are removed (parent and children)
 		for _, logFile := range allLogFiles {
@@ -508,7 +508,7 @@ func TestWorkflowRemove(t *testing.T) {
 
 	t.Run("RemoveHandlesNonExistentLogFiles", func(t *testing.T) {
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestExecution(t, "test-workflow", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "test-workflow", models.NewUTC(time.Now()))
 
 		// Create a run with log files that don't exist
 		dag := &digraph.DAG{Name: "test-dag"}
@@ -524,7 +524,7 @@ func TestWorkflowRemove(t *testing.T) {
 		}
 
 		ts := models.NewUTC(time.Now())
-		run, err := exec.CreateRun(exec.Context, ts, nil)
+		run, err := exec.CreateAttempt(exec.Context, ts, nil)
 		require.NoError(t, err)
 		require.NoError(t, run.Open(exec.Context))
 		require.NoError(t, run.Write(exec.Context, status))
@@ -534,8 +534,8 @@ func TestWorkflowRemove(t *testing.T) {
 		err = exec.Remove(exec.Context)
 		require.NoError(t, err)
 
-		// Verify workflow directory is removed
+		// Verify DAG-run directory is removed
 		_, err = os.Stat(exec.baseDir)
-		assert.True(t, os.IsNotExist(err), "workflow directory should be removed")
+		assert.True(t, os.IsNotExist(err), "DAG-run directory should be removed")
 	})
 }

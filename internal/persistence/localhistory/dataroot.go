@@ -66,7 +66,7 @@ func NewDataRoot(baseDir, dagName string) DataRoot {
 
 	root.prefix = prefix
 	root.executionsDir = filepath.Join(baseDir, root.prefix, "executions")
-	root.globPattern = filepath.Join(root.executionsDir, "*", "*", "*", WorkflowDirPrefix+"*")
+	root.globPattern = filepath.Join(root.executionsDir, "*", "*", "*", DAGRunDirPrefix+"*")
 
 	return root
 }
@@ -79,7 +79,7 @@ func NewDataRootWithPrefix(baseDir, prefix string) DataRoot {
 		baseDir:       baseDir,
 		prefix:        prefix,
 		executionsDir: executionsDir,
-		globPattern:   filepath.Join(executionsDir, "*", "*", "*", WorkflowDirPrefix+"*"),
+		globPattern:   filepath.Join(executionsDir, "*", "*", "*", DAGRunDirPrefix+"*"),
 	}
 }
 
@@ -93,7 +93,7 @@ func NewDataRootWithPrefix(baseDir, prefix string) DataRoot {
 //
 // Returns:
 //   - The matching Execution instance, or an error if not found
-func (dr *DataRoot) FindByWorkflowID(_ context.Context, workflowID string) (*Workflow, error) {
+func (dr *DataRoot) FindByWorkflowID(_ context.Context, workflowID string) (*DAGRun, error) {
 	// Find matching files
 	matches, err := filepath.Glob(dr.GlobPatternWithWorkflowID(workflowID))
 	if err != nil {
@@ -107,10 +107,10 @@ func (dr *DataRoot) FindByWorkflowID(_ context.Context, workflowID string) (*Wor
 	// Sort matches by timestamp (most recent first)
 	sort.Sort(sort.Reverse(sort.StringSlice(matches)))
 
-	return NewWorkflow(matches[0])
+	return NewDAGRun(matches[0])
 }
 
-func (dr *DataRoot) Latest(ctx context.Context, itemLimit int) []*Workflow {
+func (dr *DataRoot) Latest(ctx context.Context, itemLimit int) []*DAGRun {
 	runs, err := dr.listRecentRuns(ctx, itemLimit)
 	if err != nil {
 		logger.Errorf(ctx, "failed to list recent runs: %v", err)
@@ -119,7 +119,7 @@ func (dr *DataRoot) Latest(ctx context.Context, itemLimit int) []*Workflow {
 	return runs
 }
 
-func (dr *DataRoot) LatestAfter(ctx context.Context, cutoff models.TimeInUTC) (*Workflow, error) {
+func (dr *DataRoot) LatestAfter(ctx context.Context, cutoff models.TimeInUTC) (*DAGRun, error) {
 	runs, err := dr.listRecentRuns(ctx, 1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list recent runs: %w", err)
@@ -133,19 +133,19 @@ func (dr *DataRoot) LatestAfter(ctx context.Context, cutoff models.TimeInUTC) (*
 	return runs[0], nil
 }
 
-func (dr *DataRoot) CreateWorkflow(ts models.TimeInUTC, workflowID string) (*Workflow, error) {
-	dirName := WorkflowDirPrefix + formatWorkflowTimestamp(ts) + "_" + workflowID
+func (dr *DataRoot) CreateWorkflow(ts models.TimeInUTC, workflowID string) (*DAGRun, error) {
+	dirName := DAGRunDirPrefix + formatDAGRunTimestamp(ts) + "_" + workflowID
 	dir := filepath.Join(dr.executionsDir, ts.Format("2006"), ts.Format("01"), ts.Format("02"), dirName)
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
-	return NewWorkflow(dir)
+	return NewDAGRun(dir)
 }
 
 func (dr DataRoot) GlobPatternWithWorkflowID(workflowID string) string {
-	return filepath.Join(dr.executionsDir, "2*", "*", "*", WorkflowDirPrefix+"*"+workflowID+"*")
+	return filepath.Join(dr.executionsDir, "2*", "*", "*", DAGRunDirPrefix+"*"+workflowID+"*")
 }
 
 func (dr DataRoot) Exists() bool {
@@ -295,8 +295,8 @@ type listInRangeOpts struct {
 	limit int
 }
 
-func (dr DataRoot) listInRange(ctx context.Context, start, end models.TimeInUTC, opts *listInRangeOpts) []*Workflow {
-	var result []*Workflow
+func (dr DataRoot) listInRange(ctx context.Context, start, end models.TimeInUTC, opts *listInRangeOpts) []*DAGRun {
+	var result []*DAGRun
 	var lock sync.Mutex
 
 	// If start time is after end time, return empty result
@@ -366,13 +366,13 @@ func (dr DataRoot) listInRange(ctx context.Context, start, end models.TimeInUTC,
 				}
 
 				// Find all status files for this day
-				files, err := filepath.Glob(filepath.Join(dayPath, WorkflowDirPrefix+"*"))
+				files, err := filepath.Glob(filepath.Join(dayPath, DAGRunDirPrefix+"*"))
 				if err != nil {
 					continue
 				}
 
 				_ = processFilesParallel(ctx, files, func(filePath string) error {
-					run, err := NewWorkflow(filePath)
+					run, err := NewDAGRun(filePath)
 					if err != nil {
 						logger.Debugf(ctx, "Failed to create run from file %s: %v", filePath)
 						return err
@@ -404,7 +404,7 @@ BREAK:
 	return result
 }
 
-func (dr DataRoot) listRecentRuns(_ context.Context, itemLimit int) ([]*Workflow, error) {
+func (dr DataRoot) listRecentRuns(_ context.Context, itemLimit int) ([]*DAGRun, error) {
 	var founds []string
 
 	years, err := listDirsSorted(dr.executionsDir, true, reYear)
@@ -427,7 +427,7 @@ YEAR_LOOP:
 			}
 			for _, day := range days {
 				dayPath := filepath.Join(monthPath, day)
-				runs, err := filepath.Glob(filepath.Join(dayPath, WorkflowDirPrefix+"*"))
+				runs, err := filepath.Glob(filepath.Join(dayPath, DAGRunDirPrefix+"*"))
 				if err != nil {
 					return nil, fmt.Errorf("failed to find matches for pattern %s: %w", dayPath, err)
 				}
@@ -445,9 +445,9 @@ YEAR_LOOP:
 		founds = founds[:itemLimit]
 	}
 
-	var result []*Workflow
+	var result []*DAGRun
 	for _, f := range founds {
-		run, err := NewWorkflow(f)
+		run, err := NewDAGRun(f)
 		if err != nil {
 			continue
 		}

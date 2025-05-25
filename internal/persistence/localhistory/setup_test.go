@@ -83,7 +83,7 @@ func (d DAGTest) Writer(t *testing.T, workflowID string, startedAt time.Time) Wr
 	require.NoError(t, err)
 
 	obj := d.th.HistoryStore.(*Store)
-	run, err := workflow.CreateRun(d.th.Context, models.NewUTC(startedAt), obj.cache, WithDAG(d.DAG))
+	run, err := workflow.CreateAttempt(d.th.Context, models.NewUTC(startedAt), obj.cache, WithDAG(d.DAG))
 	require.NoError(t, err)
 
 	writer := NewWriter(run.file)

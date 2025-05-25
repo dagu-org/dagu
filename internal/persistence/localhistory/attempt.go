@@ -64,7 +64,7 @@ func (r *Attempt) ID() string {
 
 // NewAttempt creates a new Run for the specified file.
 func NewAttempt(file string, cache *fileutil.Cache[*models.DAGRunStatus], opts ...AttemptOption) (*Attempt, error) {
-	matches := reRun.FindStringSubmatch(filepath.Base(filepath.Dir(file)))
+	matches := reAttemptDir.FindStringSubmatch(filepath.Base(filepath.Dir(file)))
 	if len(matches) != 3 {
 		return nil, fmt.Errorf("invalid file path for run data: %s", file)
 	}

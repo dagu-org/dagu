@@ -49,7 +49,7 @@ func TestWriter(t *testing.T) {
 		run, err := dataRoot.FindByWorkflowID(th.Context, workflowID)
 		require.NoError(t, err)
 
-		latestRun, err := run.LatestRun(th.Context, nil)
+		latestRun, err := run.LatestAttempt(th.Context, nil)
 		require.NoError(t, err)
 
 		err = latestRun.Open(th.Context)
