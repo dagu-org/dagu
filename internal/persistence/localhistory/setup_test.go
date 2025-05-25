@@ -15,9 +15,9 @@ import (
 )
 
 type LocalStoreTest struct {
-	Context      context.Context
-	HistoryStore models.DAGRunStore
-	TmpDir       string
+	Context     context.Context
+	DAGRunStore models.DAGRunStore
+	TmpDir      string
 }
 
 func setupTestLocalStore(t *testing.T) LocalStoreTest {
@@ -25,9 +25,9 @@ func setupTestLocalStore(t *testing.T) LocalStoreTest {
 	require.NoError(t, err)
 
 	th := LocalStoreTest{
-		Context:      context.Background(),
-		HistoryStore: New(tmpDir),
-		TmpDir:       tmpDir,
+		Context:     context.Background(),
+		DAGRunStore: New(tmpDir),
+		TmpDir:      tmpDir,
 	}
 
 	t.Cleanup(func() {
@@ -36,28 +36,28 @@ func setupTestLocalStore(t *testing.T) LocalStoreTest {
 	return th
 }
 
-func (th LocalStoreTest) CreateRun(t *testing.T, ts time.Time, workflowID string, s scheduler.Status) *Attempt {
+func (th LocalStoreTest) CreateAttempt(t *testing.T, ts time.Time, dagRunID string, s scheduler.Status) *Attempt {
 	t.Helper()
 
 	dag := th.DAG("test_DAG")
-	run, err := th.HistoryStore.CreateAttempt(th.Context, dag.DAG, ts, workflowID, models.NewDAGRunAttemptOptions{})
+	attempt, err := th.DAGRunStore.CreateAttempt(th.Context, dag.DAG, ts, dagRunID, models.NewDAGRunAttemptOptions{})
 	require.NoError(t, err)
 
-	err = run.Open(th.Context)
+	err = attempt.Open(th.Context)
 	require.NoError(t, err)
 
 	defer func() {
-		_ = run.Close(th.Context)
+		_ = attempt.Close(th.Context)
 	}()
 
 	status := models.InitialStatus(dag.DAG)
-	status.RunID = workflowID
+	status.RunID = dagRunID
 	status.Status = s
 
-	err = run.Write(th.Context, status)
+	err = attempt.Write(th.Context, status)
 	require.NoError(t, err)
 
-	return run.(*Attempt)
+	return attempt.(*Attempt)
 }
 
 func (th LocalStoreTest) DAG(name string) DAGTest {
@@ -75,18 +75,18 @@ type DAGTest struct {
 	*digraph.DAG
 }
 
-func (d DAGTest) Writer(t *testing.T, workflowID string, startedAt time.Time) WriterTest {
+func (d DAGTest) Writer(t *testing.T, dagRunID string, startedAt time.Time) WriterTest {
 	t.Helper()
 
 	root := NewDataRoot(d.th.TmpDir, d.Name)
-	workflow, err := root.CreateDAGRun(models.NewUTC(startedAt), workflowID)
+	dagRun, err := root.CreateDAGRun(models.NewUTC(startedAt), dagRunID)
 	require.NoError(t, err)
 
-	obj := d.th.HistoryStore.(*Store)
-	run, err := workflow.CreateAttempt(d.th.Context, models.NewUTC(startedAt), obj.cache, WithDAG(d.DAG))
+	obj := d.th.DAGRunStore.(*Store)
+	attempt, err := dagRun.CreateAttempt(d.th.Context, models.NewUTC(startedAt), obj.cache, WithDAG(d.DAG))
 	require.NoError(t, err)
 
-	writer := NewWriter(run.file)
+	writer := NewWriter(attempt.file)
 	require.NoError(t, writer.Open())
 
 	t.Cleanup(func() {
@@ -96,9 +96,9 @@ func (d DAGTest) Writer(t *testing.T, workflowID string, startedAt time.Time) Wr
 	return WriterTest{
 		th: d.th,
 
-		WorkflowID: workflowID,
-		FilePath:   run.file,
-		Writer:     writer,
+		DAGRunID: dagRunID,
+		FilePath: attempt.file,
+		Writer:   writer,
 	}
 }
 
@@ -109,14 +109,14 @@ func (w WriterTest) Write(t *testing.T, status models.DAGRunStatus) {
 	require.NoError(t, err)
 }
 
-func (w WriterTest) AssertContent(t *testing.T, name, workflowID string, status scheduler.Status) {
+func (w WriterTest) AssertContent(t *testing.T, name, dagRunID string, status scheduler.Status) {
 	t.Helper()
 
 	data, err := ParseStatusFile(w.FilePath)
 	require.NoError(t, err)
 
 	assert.Equal(t, name, data.Name)
-	assert.Equal(t, workflowID, data.RunID)
+	assert.Equal(t, dagRunID, data.RunID)
 	assert.Equal(t, status, data.Status)
 }
 
@@ -129,8 +129,8 @@ func (w WriterTest) Close(t *testing.T) {
 type WriterTest struct {
 	th LocalStoreTest
 
-	WorkflowID string
-	FilePath   string
-	Writer     *Writer
-	Closed     bool
+	DAGRunID string
+	FilePath string
+	Writer   *Writer
+	Closed   bool
 }

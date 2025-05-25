@@ -153,7 +153,7 @@ func TestJobReady(t *testing.T) {
 
 			scheduler.SetFixedTime(tt.now)
 
-			job := &scheduler.DAG{
+			job := &scheduler.DAGRunJob{
 				DAG: &digraph.DAG{
 					SkipIfSuccessful: tt.skipSuccessful,
 				},
@@ -205,7 +205,7 @@ func TestPrevExecTime(t *testing.T) {
 			schedule, err := cronParser.Parse(tt.schedule)
 			require.NoError(t, err)
 
-			job := &scheduler.DAG{Schedule: schedule, Next: tt.now}
+			job := &scheduler.DAGRunJob{Schedule: schedule, Next: tt.now}
 			got := job.PrevExecTime(context.Background())
 			require.Equal(t, tt.want, got)
 		})

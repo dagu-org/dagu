@@ -586,7 +586,7 @@ func (a *Agent) setupDAGRunAttempt(ctx context.Context) (models.DAGRunAttempt, e
 
 	opts := models.NewDAGRunAttemptOptions{Retry: a.retryTarget != nil}
 	if a.isChildDAGRun.Load() {
-		opts.Root = &a.rootDAGRun
+		opts.RootDAGRun = &a.rootDAGRun
 	}
 
 	return a.dagRunStore.CreateAttempt(ctx, a.dag, time.Now(), a.dagRunID, opts)

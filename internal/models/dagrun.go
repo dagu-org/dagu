@@ -98,8 +98,8 @@ func WithDAGRunID(dagRunID string) ListDAGRunStatusesOption {
 
 // NewDAGRunAttemptOptions contains options for creating a new run record
 type NewDAGRunAttemptOptions struct {
-	Root  *digraph.DAGRunRef
-	Retry bool
+	RootDAGRun *digraph.DAGRunRef
+	Retry      bool
 }
 
 // DAGRunAttempt represents a single execution of a workflow that can be read and written

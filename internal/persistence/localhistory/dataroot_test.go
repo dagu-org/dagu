@@ -127,7 +127,7 @@ func TestDataRootRuns(t *testing.T) {
 		start := models.NewUTC(time.Date(2021, 1, 1, 5, 0, 0, 0, time.UTC))
 		end := models.NewUTC(time.Date(2021, 1, 2, 2, 0, 0, 0, time.UTC))
 
-		result := root.listDAGRunsInRange(context.Background(), start, end, nil)
+		result := root.listDAGRunsInRange(context.Background(), start, end, &listDAGRunsInRangeOpts{})
 		require.Len(t, result, 21, "ListInRange should return the correct")
 
 		// Check the first and last timestamps
@@ -140,7 +140,7 @@ func TestDataRootRuns(t *testing.T) {
 }
 
 func TestDataRootRemoveOld(_ *testing.T) {
-	// TODO: Implement
+	// TODO: Implement test for RemoveOld method that removes old DAG-runs based on retention days
 }
 
 func TestDataRootRename(t *testing.T) {
@@ -201,6 +201,7 @@ func TestDataRootUtils(t *testing.T) {
 	assert.False(t, root.Exists(), "Exists should return false when directory does not exist")
 }
 
+// setupTestDataRoot creates a DataRootTest instance for testing purposes.
 func setupTestDataRoot(t *testing.T) *DataRootTest {
 	t.Helper()
 
@@ -209,12 +210,15 @@ func setupTestDataRoot(t *testing.T) *DataRootTest {
 	return &DataRootTest{DataRoot: root, TB: t, Context: context.Background()}
 }
 
+// DataRootTest extends DataRoot with testing utilities and context.
 type DataRootTest struct {
 	DataRoot
 	TB      testing.TB
 	Context context.Context
 }
 
+// CreateTestDAGRun creates a test DAG-run with the specified ID and timestamp.
+// It ensures the DataRoot directory exists before creating the DAG-run.
 func (drt *DataRootTest) CreateTestDAGRun(t *testing.T, dagRunID string, ts models.TimeInUTC) DAGRunTest {
 	t.Helper()
 
@@ -227,5 +231,6 @@ func (drt *DataRootTest) CreateTestDAGRun(t *testing.T, dagRunID string, ts mode
 	return DAGRunTest{
 		DataRootTest: *drt,
 		DAGRun:       run,
-		TB:           t}
+		TB:           t,
+	}
 }

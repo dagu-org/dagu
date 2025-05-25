@@ -53,7 +53,7 @@ func TestReadEntries(t *testing.T) {
 
 		// find the job and suspend it
 		job := findJobByName(t, beforeSuspend, "scheduled_job").Job
-		dagJob, ok := job.(*scheduler.DAG)
+		dagJob, ok := job.(*scheduler.DAGRunJob)
 		require.True(t, ok)
 
 		err = th.dagStore.ToggleSuspend(ctx, dagJob.DAG.Name, true)
@@ -70,7 +70,7 @@ func findJobByName(t *testing.T, jobs []*scheduler.ScheduledJob, name string) *s
 	t.Helper()
 
 	for _, job := range jobs {
-		dagJob, ok := job.Job.(*scheduler.DAG)
+		dagJob, ok := job.Job.(*scheduler.DAGRunJob)
 		if ok && dagJob.DAG.Name == name {
 			return job
 		}

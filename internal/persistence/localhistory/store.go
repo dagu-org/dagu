@@ -21,8 +21,8 @@ import (
 
 // Error definitions for common issues
 var (
-	ErrWorkflowIDEmpty = errors.New("workflow ID is empty")
-	ErrTooManyResults  = errors.New("too many results found")
+	ErrDAGRunIDEmpty  = errors.New("DAG-run ID is empty")
+	ErrTooManyResults = errors.New("too many results found")
 )
 
 var _ models.DAGRunStore = (*Store)(nil)
@@ -166,17 +166,17 @@ func (store *Store) collectStatusesFromRoots(
 				return
 			}
 
-			workflows := root.listDAGRunsInRange(ctx, opts.From, opts.To, &listDAGRunsInRangeOpts{
+			dagRuns := root.listDAGRunsInRange(ctx, opts.From, opts.To, &listDAGRunsInRangeOpts{
 				limit: int(remaining.Load()),
 			})
 
-			statuses := make([]*models.DAGRunStatus, 0, len(workflows))
-			for _, workflow := range workflows {
-				if opts.DAGRunID != "" && !strings.Contains(workflow.dagRunID, opts.DAGRunID) {
+			statuses := make([]*models.DAGRunStatus, 0, len(dagRuns))
+			for _, dagRun := range dagRuns {
+				if opts.DAGRunID != "" && !strings.Contains(dagRun.dagRunID, opts.DAGRunID) {
 					continue
 				}
 
-				run, err := workflow.LatestAttempt(ctx, store.cache)
+				run, err := dagRun.LatestAttempt(ctx, store.cache)
 				if err != nil {
 					logger.Error(ctx, "Failed to get latest run", "err", err)
 					continue
@@ -197,7 +197,7 @@ func (store *Store) collectStatusesFromRoots(
 				statuses = append(statuses, status)
 			}
 
-			taken := int64(len(workflows))
+			taken := int64(len(dagRuns))
 			if d := remaining.Add(-taken); d < 0 {
 				cancel()
 			}
@@ -234,16 +234,16 @@ func (store *Store) collectStatusesFromRoots(
 	return results, nil
 }
 
-// CreateAttempt creates a new history record for the specified workflow ID.
-// If opts.Root is not nil, it creates a new history record for a child workflow.
-// If opts.Retry is true, it creates a retry record for the specified workflow ID.
-func (store *Store) CreateAttempt(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewDAGRunAttemptOptions) (models.DAGRunAttempt, error) {
-	if workflowID == "" {
-		return nil, ErrWorkflowIDEmpty
+// CreateAttempt creates a new history record for the specified DAG-run ID.
+// If opts.Root is not nil, it creates a new history record for a child DAG-run.
+// If opts.Retry is true, it creates a retry record for the specified DAG-run ID.
+func (store *Store) CreateAttempt(ctx context.Context, dag *digraph.DAG, timestamp time.Time, dagRunID string, opts models.NewDAGRunAttemptOptions) (models.DAGRunAttempt, error) {
+	if dagRunID == "" {
+		return nil, ErrDAGRunIDEmpty
 	}
 
-	if opts.Root != nil {
-		return store.newChildRecord(ctx, dag, timestamp, workflowID, opts)
+	if opts.RootDAGRun != nil {
+		return store.newChildRecord(ctx, dag, timestamp, dagRunID, opts)
 	}
 
 	dataRoot := NewDataRoot(store.baseDir, dag.Name)
@@ -251,13 +251,13 @@ func (store *Store) CreateAttempt(ctx context.Context, dag *digraph.DAG, timesta
 
 	var run *DAGRun
 	if opts.Retry {
-		r, err := dataRoot.FindByDAGRunID(ctx, workflowID)
+		r, err := dataRoot.FindByDAGRunID(ctx, dagRunID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find execution: %w", err)
 		}
 		run = r
 	} else {
-		r, err := dataRoot.CreateDAGRun(ts, workflowID)
+		r, err := dataRoot.CreateDAGRun(ts, dagRunID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create run: %w", err)
 		}
@@ -272,10 +272,10 @@ func (store *Store) CreateAttempt(ctx context.Context, dag *digraph.DAG, timesta
 	return record, nil
 }
 
-// newChildRecord creates a new history record for a child workflow.
-func (b *Store) newChildRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewDAGRunAttemptOptions) (models.DAGRunAttempt, error) {
-	dataRoot := NewDataRoot(b.baseDir, opts.Root.Name)
-	root, err := dataRoot.FindByDAGRunID(ctx, opts.Root.ID)
+// newChildRecord creates a new history record for a child DAG-run.
+func (b *Store) newChildRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, dagRunID string, opts models.NewDAGRunAttemptOptions) (models.DAGRunAttempt, error) {
+	dataRoot := NewDataRoot(b.baseDir, opts.RootDAGRun.Name)
+	root, err := dataRoot.FindByDAGRunID(ctx, opts.RootDAGRun.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find root execution: %w", err)
 	}
@@ -284,29 +284,29 @@ func (b *Store) newChildRecord(ctx context.Context, dag *digraph.DAG, timestamp 
 
 	var run *DAGRun
 	if opts.Retry {
-		r, err := root.FindChildDAGRun(ctx, workflowID)
+		r, err := root.FindChildDAGRun(ctx, dagRunID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to find child workflow record: %w", err)
+			return nil, fmt.Errorf("failed to find child DAG-run record: %w", err)
 		}
 		run = r
 	} else {
-		r, err := root.CreateChildDAGRun(ctx, workflowID)
+		r, err := root.CreateChildDAGRun(ctx, dagRunID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create child workflow: %w", err)
+			return nil, fmt.Errorf("failed to create child DAG-run: %w", err)
 		}
 		run = r
 	}
 
 	record, err := run.CreateAttempt(ctx, ts, b.cache, WithDAG(dag))
 	if err != nil {
-		logger.Error(ctx, "Failed to create child workflow record", "err", err)
+		logger.Error(ctx, "Failed to create child DAG-run record", "err", err)
 		return nil, err
 	}
 
 	return record, nil
 }
 
-// RecentAttempts returns the most recent history records for the specified workflow name.
+// RecentAttempts returns the most recent history records for the specified DAG name.
 func (store *Store) RecentAttempts(ctx context.Context, dagName string, itemLimit int) []models.DAGRunAttempt {
 	// Check for context cancellation
 	select {
@@ -340,7 +340,7 @@ func (store *Store) RecentAttempts(ctx context.Context, dagName string, itemLimi
 	return records
 }
 
-// LatestAttempt returns the most recent history record for the specified workflow name.
+// LatestAttempt returns the most recent history record for the specified DAG name.
 // If latestStatusToday is true, it only returns today's status.
 func (store *Store) LatestAttempt(ctx context.Context, dagName string) (models.DAGRunAttempt, error) {
 	// Check for context cancellation
@@ -374,7 +374,7 @@ func (store *Store) LatestAttempt(ctx context.Context, dagName string) (models.D
 	return latest[0].LatestAttempt(ctx, store.cache)
 }
 
-// FindAttempt finds a history record by workflow ID.
+// FindAttempt finds a history record by DAG-run ID.
 func (store *Store) FindAttempt(ctx context.Context, ref digraph.DAGRunRef) (models.DAGRunAttempt, error) {
 	// Check for context cancellation
 	select {
@@ -385,7 +385,7 @@ func (store *Store) FindAttempt(ctx context.Context, ref digraph.DAGRunRef) (mod
 	}
 
 	if ref.ID == "" {
-		return nil, ErrWorkflowIDEmpty
+		return nil, ErrDAGRunIDEmpty
 	}
 
 	root := NewDataRoot(store.baseDir, ref.Name)
@@ -398,32 +398,32 @@ func (store *Store) FindAttempt(ctx context.Context, ref digraph.DAGRunRef) (mod
 	return run.LatestAttempt(ctx, store.cache)
 }
 
-// FindChildAttempt finds a child workflow by its ID.
-// It returns the latest record for the specified child workflow ID.
-func (store *Store) FindChildAttempt(ctx context.Context, ref digraph.DAGRunRef, childWorkflowID string) (models.DAGRunAttempt, error) {
+// FindChildAttempt finds a child DAG-run by its ID.
+// It returns the latest record for the specified child DAG-run ID.
+func (store *Store) FindChildAttempt(ctx context.Context, ref digraph.DAGRunRef, childDAGRunID string) (models.DAGRunAttempt, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
-		return nil, fmt.Errorf("FindChildWorkflow canceled: %w", ctx.Err())
+		return nil, fmt.Errorf("FindChildDAGRun canceled: %w", ctx.Err())
 	default:
 		// Continue with operation
 	}
 
 	if ref.ID == "" {
-		return nil, ErrWorkflowIDEmpty
+		return nil, ErrDAGRunIDEmpty
 	}
 
 	root := NewDataRoot(store.baseDir, ref.Name)
-	run, err := root.FindByDAGRunID(ctx, ref.ID)
+	dagRun, err := root.FindByDAGRunID(ctx, ref.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find execution: %w", err)
 	}
 
-	childWorkflow, err := run.FindChildDAGRun(ctx, childWorkflowID)
+	childDAGRun, err := dagRun.FindChildDAGRun(ctx, childDAGRunID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find child workflow: %w", err)
+		return nil, fmt.Errorf("failed to find child DAG-run: %w", err)
 	}
-	return childWorkflow.LatestAttempt(ctx, store.cache)
+	return childDAGRun.LatestAttempt(ctx, store.cache)
 }
 
 // RemoveOldDAGRuns removes old history records older than the specified retention days.
@@ -449,7 +449,7 @@ func (store *Store) RemoveOldDAGRuns(ctx context.Context, dagName string, retent
 	return root.RemoveOld(ctx, retentionDays)
 }
 
-// RenameDAGRuns renames all history records for the specified workflow name.
+// RenameDAGRuns renames all history records for the specified DAG name.
 func (store *Store) RenameDAGRuns(ctx context.Context, oldNameOrPath, newNameOrPath string) error {
 	// Check for context cancellation
 	select {
