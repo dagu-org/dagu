@@ -135,11 +135,17 @@ func (m *Manager) EnqueueWorkflow(_ context.Context, dag *digraph.DAG, opts Enqu
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	return cmd.Start()
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start enqueue command: %w", err)
+	}
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("failed to enqueue workflow: %w", err)
+	}
+	return nil
 }
 
 func (m *Manager) DequeueWorkflow(_ context.Context, workflow digraph.WorkflowRef) error {
-	args := []string{"dequeue", workflow.String()}
+	args := []string{"dequeue", fmt.Sprintf("--workflow=%s", workflow.String())}
 	if configFile := config.UsedConfigFile.Load(); configFile != nil {
 		if configFile, ok := configFile.(string); ok {
 			args = append(args, "--config")
@@ -154,7 +160,13 @@ func (m *Manager) DequeueWorkflow(_ context.Context, workflow digraph.WorkflowRe
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	return cmd.Start()
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start dequeue command: %w", err)
+	}
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("failed to dequeue workflow: %w", err)
+	}
+	return nil
 }
 
 // RestartDAG restarts a DAG by executing the configured executable with the restart command.

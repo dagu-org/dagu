@@ -411,7 +411,7 @@ func (a *API) TerminateWorkflow(ctx context.Context, request api.TerminateWorkfl
 		return nil, fmt.Errorf("error reading DAG: %w", err)
 	}
 
-	status, err := a.historyManager.GetLatestStatus(ctx, dag)
+	status, err := a.historyManager.GetDAGRealtimeStatus(ctx, dag, request.WorkflowId)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -451,7 +451,7 @@ func (a *API) DequeueWorkflow(ctx context.Context, request api.DequeueWorkflowRe
 		return nil, fmt.Errorf("error reading DAG: %w", err)
 	}
 
-	latestStatus, err := a.historyManager.GetLatestStatus(ctx, dag)
+	latestStatus, err := a.historyManager.GetDAGRealtimeStatus(ctx, dag, workflow.WorkflowID)
 	if err != nil {
 		return nil, fmt.Errorf("error getting latest status: %w", err)
 	}

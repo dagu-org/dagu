@@ -58,7 +58,7 @@ func dequeueWorkflow(ctx *Context, workflow digraph.WorkflowRef) error {
 	}
 
 	// Make sure the workflow is not running at least locally
-	latestStatus, err := ctx.HistoryMgr.GetLatestStatus(ctx, dag)
+	latestStatus, err := ctx.HistoryMgr.GetDAGRealtimeStatus(ctx, dag, workflow.WorkflowID)
 	if err != nil {
 		return fmt.Errorf("failed to get latest status: %w", err)
 	}
