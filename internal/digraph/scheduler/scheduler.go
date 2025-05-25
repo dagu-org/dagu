@@ -290,29 +290,19 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 
 					shouldRepeat := false
 					step := node.Step()
-					if step.RepeatPolicy.Condition != "" {
-						cond := step.RepeatPolicy.Condition
-						expected := step.RepeatPolicy.Expected
-						if strings.HasPrefix(cond, "`") && strings.HasSuffix(cond, "`") && len(cond) > 2 {
-							// Command substitution: run the command, compare output or exit code
-							cmdStr := cond[1 : len(cond)-1]
-							cmdOut, cmdExit, err := "", 0, error(nil)
-							if out, exit, e := runShellCommandWithExitCode(ctx, cmdStr, step.Shell); true {
-								cmdOut, cmdExit, err = out, exit, e
-							}
-							if err == nil {
-								if expected != "" {
-									shouldRepeat = (strings.TrimSpace(cmdOut) != expected)
-								} else {
-									shouldRepeat = (cmdExit != 0)
-								}
-							} else {
-								shouldRepeat = true // repeat on error
+					if step.RepeatPolicy.Condition != nil {
+						shell := cmdutil.GetShellCommand(step.Shell)
+						err := EvalCondition(ctx, shell, step.RepeatPolicy.Condition)
+						if step.RepeatPolicy.Condition.Expected != "" {
+							// Repeat as long as condition does NOT match expected (err != nil)
+							if err != nil {
+								shouldRepeat = true
 							}
 						} else {
-							// Simple string match: compare last step output to expected
-							output := node.LastOutput()
-							shouldRepeat = (expected != "" && strings.TrimSpace(output) != expected)
+							// Repeat as long as it returns exit code 0 (err == nil)
+							if err == nil {
+								shouldRepeat = true
+							}
 						}
 					} else if len(step.RepeatPolicy.ExitCode) > 0 {
 						// Repeat if last exit code matches any in ExitCode
@@ -324,7 +314,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 							}
 						}
 					} else if step.RepeatPolicy.Repeat {
-						// Legacy unconditional repeat
+						// Unconditional repeat
 						shouldRepeat = (execErr == nil || step.ContinueOn.Failure)
 					}
 

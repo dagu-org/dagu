@@ -800,8 +800,10 @@ func TestScheduler(t *testing.T) {
 			newStep("1",
 				withCommand(fmt.Sprintf("cat %s || true", file)),
 				func(step *digraph.Step) {
-					step.RepeatPolicy.Condition = fmt.Sprintf("`cat %s || true`", file)
-					step.RepeatPolicy.Expected = "ready"
+					step.RepeatPolicy.Condition = &digraph.Condition{
+						Condition: fmt.Sprintf("`cat %s || true`", file),
+						Expected:  "ready",
+					}
 					step.RepeatPolicy.Interval = 100 * time.Millisecond
 				},
 			),
@@ -829,13 +831,16 @@ func TestScheduler(t *testing.T) {
 			newStep("1",
 				withCommand("echo hello"),
 				func(step *digraph.Step) {
-					step.RepeatPolicy.Condition = "`test -f " + file + "`"
-					step.RepeatPolicy.Interval = 200 * time.Millisecond
+					step.RepeatPolicy.Condition = &digraph.Condition{
+						Condition: "test ! -f " + file,
+					}
+					step.RepeatPolicy.Interval = 100 * time.Millisecond
 				},
 			),
 		)
+		// Create file 100 ms after step runs
 		go func() {
-			time.Sleep(350 * time.Millisecond)
+			time.Sleep(200 * time.Millisecond)
 			f, _ := os.Create(file)
 			f.Close()
 		}()

@@ -24,7 +24,7 @@ func EvalConditions(ctx context.Context, shell string, cond []*digraph.Condition
 	var lastErr error
 
 	for i := range cond {
-		if err := evalCondition(ctx, shell, cond[i]); err != nil {
+		if err := EvalCondition(ctx, shell, cond[i]); err != nil {
 			cond[i].SetErrorMessage(err.Error())
 			lastErr = err
 		}
@@ -43,9 +43,9 @@ func EvalConditions(ctx context.Context, shell string, cond []*digraph.Condition
 	return lastErr
 }
 
-// evalCondition evaluates the condition and returns the actual value.
+// EvalCondition evaluates the condition and returns the actual value.
 // It returns an error if the evaluation failed or the condition is invalid.
-func evalCondition(ctx context.Context, shell string, c *digraph.Condition) error {
+func EvalCondition(ctx context.Context, shell string, c *digraph.Condition) error {
 	switch {
 	case c.Condition != "" && c.Expected != "":
 		return matchCondition(ctx, c)
