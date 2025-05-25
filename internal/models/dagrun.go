@@ -40,8 +40,8 @@ type DAGRunStore interface {
 	RenameDAGRuns(ctx context.Context, oldName, newName string) error
 }
 
-// ListStatusesOptions contains options for listing runs
-type ListStatusesOptions struct {
+// ListDAGRunStatusesOptions contains options for listing runs
+type ListDAGRunStatusesOptions struct {
 	DAGRunID  string
 	Name      string
 	ExactName string
@@ -52,46 +52,46 @@ type ListStatusesOptions struct {
 }
 
 // ListRunsOption is a functional option for configuring ListRunsOptions
-type ListDAGRunStatusesOption func(*ListStatusesOptions)
+type ListDAGRunStatusesOption func(*ListDAGRunStatusesOptions)
 
 // WithFrom sets the start time for listing DAG runs
 func WithFrom(from TimeInUTC) ListDAGRunStatusesOption {
-	return func(o *ListStatusesOptions) {
+	return func(o *ListDAGRunStatusesOptions) {
 		o.From = from
 	}
 }
 
 // WithTo sets the end time for listing DAG runs
 func WithTo(to TimeInUTC) ListDAGRunStatusesOption {
-	return func(o *ListStatusesOptions) {
+	return func(o *ListDAGRunStatusesOptions) {
 		o.To = to
 	}
 }
 
 // WithStatuses sets the statuses for listing DAG runs
 func WithStatuses(statuses []scheduler.Status) ListDAGRunStatusesOption {
-	return func(o *ListStatusesOptions) {
+	return func(o *ListDAGRunStatusesOptions) {
 		o.Statuses = statuses
 	}
 }
 
 // WithExactName sets the name for listing DAG runs
 func WithExactName(name string) ListDAGRunStatusesOption {
-	return func(o *ListStatusesOptions) {
+	return func(o *ListDAGRunStatusesOptions) {
 		o.ExactName = name
 	}
 }
 
 // WithName sets the name for listing DAG runs
 func WithName(name string) ListDAGRunStatusesOption {
-	return func(o *ListStatusesOptions) {
+	return func(o *ListDAGRunStatusesOptions) {
 		o.Name = name
 	}
 }
 
 // WithDAGRunID sets the workflow ID for listing DAG runs
 func WithDAGRunID(dagRunID string) ListDAGRunStatusesOption {
-	return func(o *ListStatusesOptions) {
+	return func(o *ListDAGRunStatusesOptions) {
 		o.DAGRunID = dagRunID
 	}
 }

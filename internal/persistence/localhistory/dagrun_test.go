@@ -66,7 +66,7 @@ func (dr DAGRunTest) WriteStatus(t *testing.T, ts models.TimeInUTC, s scheduler.
 
 	dag := &digraph.DAG{Name: "test-dag"}
 	status := models.InitialStatus(dag)
-	status.RunID = "test-id-1"
+	status.DAGRunID = "test-id-1"
 	status.Status = s
 
 	run, err := dr.CreateAttempt(dr.Context, ts, nil)
@@ -169,7 +169,7 @@ func TestListLogFiles(t *testing.T) {
 		// Create a run with log files
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
-		status.RunID = "test-dag-run"
+		status.DAGRunID = "test-dag-run"
 		status.Status = scheduler.StatusSuccess
 		status.Log = "/tmp/test.log"
 		status.Nodes = []*models.Node{
@@ -229,7 +229,7 @@ func TestRemoveLogFiles(t *testing.T) {
 		// Create a run with log files pointing to our test files
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
-		status.RunID = "test-dag-run"
+		status.DAGRunID = "test-dag-run"
 		status.Status = scheduler.StatusSuccess
 		status.Log = logFiles[0]
 		status.Nodes = []*models.Node{
@@ -288,7 +288,7 @@ func TestRemoveLogFiles(t *testing.T) {
 		// Create parent DAG-run with log files
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
-		status.RunID = "parent-dag-run"
+		status.DAGRunID = "parent-dag-run"
 		status.Log = parentLogFiles[0]
 		status.Nodes = []*models.Node{{
 			Step:   digraph.Step{Name: "parent-step"},
@@ -314,7 +314,7 @@ func TestRemoveLogFiles(t *testing.T) {
 
 		// Create child run with log files
 		childStatus := models.InitialStatus(dag)
-		childStatus.RunID = "child1"
+		childStatus.DAGRunID = "child1"
 		childStatus.Log = childLogFiles[0]
 		childStatus.Nodes = []*models.Node{{
 			Step:   digraph.Step{Name: "child-step"},
@@ -366,7 +366,7 @@ func TestDAGRunRemove(t *testing.T) {
 		// Create a run with log files
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
-		status.RunID = "test-dag-run"
+		status.DAGRunID = "test-dag-run"
 		status.Status = scheduler.StatusSuccess
 		status.Log = logFiles[0]
 		status.Nodes = []*models.Node{
@@ -436,7 +436,7 @@ func TestDAGRunRemove(t *testing.T) {
 		// Create parent DAG-run with log files
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
-		status.RunID = "parent-dag-run"
+		status.DAGRunID = "parent-dag-run"
 		status.Log = parentLogFiles[0]
 		status.Nodes = []*models.Node{{
 			Step:   digraph.Step{Name: "parent-step"},
@@ -471,7 +471,7 @@ func TestDAGRunRemove(t *testing.T) {
 			require.NoError(t, err)
 
 			childStatus := models.InitialStatus(dag)
-			childStatus.RunID = child.dagRunID
+			childStatus.DAGRunID = child.dagRunID
 			childStatus.Log = child.logFiles[0]
 			childStatus.Nodes = []*models.Node{{
 				Step:   digraph.Step{Name: fmt.Sprintf("%s-step", child.dagRunID)},
@@ -513,7 +513,7 @@ func TestDAGRunRemove(t *testing.T) {
 		// Create a run with log files that don't exist
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
-		status.RunID = "test-dag-run"
+		status.DAGRunID = "test-dag-run"
 		status.Log = "/non/existent/path/dag-run.log"
 		status.Nodes = []*models.Node{
 			{

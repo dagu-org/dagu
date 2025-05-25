@@ -273,7 +273,7 @@ func (m *DAGRunManager) getPersistedOrCurrentStatus(ctx context.Context, dag *di
 
 	// If the DAG is running, query the current status
 	if status.Status == scheduler.StatusRunning {
-		currentStatus, err := m.currentStatus(ctx, dag, status.RunID)
+		currentStatus, err := m.currentStatus(ctx, dag, status.DAGRunID)
 		if err == nil {
 			return currentStatus, nil
 		}
@@ -335,7 +335,7 @@ func (m *DAGRunManager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (
 
 	// If the DAG is running, query the current status
 	if latestStatus.Status == scheduler.StatusRunning {
-		currentStatus, err := m.currentStatus(ctx, dag, latestStatus.RunID)
+		currentStatus, err := m.currentStatus(ctx, dag, latestStatus.DAGRunID)
 		if err == nil {
 			return *currentStatus, nil
 		} else {
@@ -399,7 +399,7 @@ func (e *DAGRunManager) UpdateStatus(ctx context.Context, rootDAGRun digraph.DAG
 	// Find the run for the status.
 	var run models.DAGRunAttempt
 
-	if rootDAGRun.ID == newStatus.RunID {
+	if rootDAGRun.ID == newStatus.DAGRunID {
 		// If the DAG-run ID matches the root DAG-run ID, find the attempt by the root DAG-run ID
 		r, err := e.dagRunStore.FindAttempt(ctx, rootDAGRun)
 		if err != nil {
@@ -409,7 +409,7 @@ func (e *DAGRunManager) UpdateStatus(ctx context.Context, rootDAGRun digraph.DAG
 	} else {
 		// If the DAG-run ID does not match the root DAG-run ID,
 		// find the attempt by the child DAG-run ID
-		r, err := e.dagRunStore.FindChildAttempt(ctx, rootDAGRun, newStatus.RunID)
+		r, err := e.dagRunStore.FindChildAttempt(ctx, rootDAGRun, newStatus.DAGRunID)
 		if err != nil {
 			return fmt.Errorf("failed to find child DAG-run: %w", err)
 		}

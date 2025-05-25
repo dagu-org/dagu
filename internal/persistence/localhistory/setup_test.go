@@ -51,7 +51,7 @@ func (th LocalStoreTest) CreateAttempt(t *testing.T, ts time.Time, dagRunID stri
 	}()
 
 	status := models.InitialStatus(dag.DAG)
-	status.RunID = dagRunID
+	status.DAGRunID = dagRunID
 	status.Status = s
 
 	err = attempt.Write(th.Context, status)
@@ -116,7 +116,7 @@ func (w WriterTest) AssertContent(t *testing.T, name, dagRunID string, status sc
 	require.NoError(t, err)
 
 	assert.Equal(t, name, data.Name)
-	assert.Equal(t, dagRunID, data.RunID)
+	assert.Equal(t, dagRunID, data.DAGRunID)
 	assert.Equal(t, status, data.Status)
 }
 

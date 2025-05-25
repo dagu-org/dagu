@@ -107,7 +107,7 @@ func TestManager(t *testing.T) {
 		// Get the child workflow ID.
 		status, err := th.HistoryMgr.GetLatestStatus(th.Context, dag.DAG)
 		require.NoError(t, err)
-		workflowID := status.RunID
+		workflowID := status.DAGRunID
 		childWorkflow := status.Nodes[0].Children[0]
 
 		root := digraph.NewDAGRunRef(dag.Name, workflowID)
@@ -200,7 +200,7 @@ func TestClient_RunDAG(t *testing.T) {
 		status, err := cli.GetLatestStatus(ctx, dag.DAG)
 		require.NoError(t, err)
 
-		prevWorkflowID := status.RunID
+		prevWorkflowID := status.DAGRunID
 		prevParams := status.Params
 
 		time.Sleep(1 * time.Second)
@@ -215,7 +215,7 @@ func TestClient_RunDAG(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check if the params are the same as the previous run.
-		require.Equal(t, prevWorkflowID, status.RunID)
+		require.Equal(t, prevWorkflowID, status.DAGRunID)
 		require.Equal(t, prevParams, status.Params)
 	})
 }

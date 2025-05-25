@@ -712,7 +712,7 @@ func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, ro
 	return &digraph.Status{
 		Outputs:  outputVariables,
 		Name:     status.Name,
-		DAGRunID: status.RunID,
+		DAGRunID: status.DAGRunID,
 		Params:   status.Params,
 	}, nil
 }

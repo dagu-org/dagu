@@ -60,7 +60,7 @@ func TestAttempt_Write(t *testing.T) {
 	// Verify file content
 	actual, err := hr.ReadStatus(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, "test", actual.RunID)
+	assert.Equal(t, "test", actual.DAGRunID)
 	assert.Equal(t, scheduler.StatusRunning, actual.Status)
 
 	// Close
@@ -215,7 +215,7 @@ func TestAttempt_HandleNonExistentFile(t *testing.T) {
 	// Verify the file was created with correct data
 	status, err := hr.ReadStatus(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, "test", status.RunID)
+	assert.Equal(t, "test", status.DAGRunID)
 
 	// Cleanup
 	err = hr.Close(context.Background())
@@ -388,7 +388,7 @@ func createTestStatus(status scheduler.Status) models.DAGRunStatus {
 
 	return models.DAGRunStatus{
 		Name:      dag.Name,
-		RunID:     "test",
+		DAGRunID:  "test",
 		Status:    status,
 		PID:       models.PID(12345),
 		StartedAt: stringutil.FormatTime(time.Now()),

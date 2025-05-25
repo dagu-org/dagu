@@ -9,23 +9,23 @@ import (
 
 func TestWorkflowConfigSet(t *testing.T) {
 	t.Run("NewWorkflowConfigSet", func(t *testing.T) {
-		configSet := NewWorkflowConfigSet()
+		configSet := NewConfigSet()
 		assert.NotNil(t, configSet)
 		assert.NotNil(t, configSet.configs)
 		assert.Empty(t, configSet.configs)
 	})
 
 	t.Run("Get_NonExistentConfig", func(t *testing.T) {
-		configSet := NewWorkflowConfigSet()
+		configSet := NewConfigSet()
 		config := configSet.Get("non-existent")
 		// Should return zero value of WorkflowConfig
 		assert.Equal(t, 0, config.ConcurrencyLimit)
 	})
 
 	t.Run("Set_And_Get", func(t *testing.T) {
-		configSet := NewWorkflowConfigSet()
+		configSet := NewConfigSet()
 		workflowName := "test-workflow"
-		expectedConfig := WorkflowConfig{
+		expectedConfig := Config{
 			ConcurrencyLimit: 5,
 		}
 
@@ -36,11 +36,11 @@ func TestWorkflowConfigSet(t *testing.T) {
 	})
 
 	t.Run("DefaultWorkflowConfig", func(t *testing.T) {
-		assert.Equal(t, 1, DefaultWorkflowConfig.ConcurrencyLimit)
+		assert.Equal(t, 1, DefaultConfig.ConcurrencyLimit)
 	})
 
 	t.Run("Concurrent_Access", func(t *testing.T) {
-		configSet := NewWorkflowConfigSet()
+		configSet := NewConfigSet()
 		workflowName := "concurrent-workflow"
 
 		// Test concurrent reads and writes
@@ -51,7 +51,7 @@ func TestWorkflowConfigSet(t *testing.T) {
 		for i := 0; i < 5; i++ {
 			go func(val int) {
 				defer wg.Done()
-				configSet.Set(workflowName, WorkflowConfig{ConcurrencyLimit: val})
+				configSet.Set(workflowName, Config{ConcurrencyLimit: val})
 			}(i)
 		}
 
@@ -71,13 +71,13 @@ func TestWorkflowConfigSet(t *testing.T) {
 	})
 
 	t.Run("Multiple_Workflows", func(t *testing.T) {
-		configSet := NewWorkflowConfigSet()
+		configSet := NewConfigSet()
 
 		workflow1 := "workflow-1"
-		config1 := WorkflowConfig{ConcurrencyLimit: 3}
+		config1 := Config{ConcurrencyLimit: 3}
 
 		workflow2 := "workflow-2"
-		config2 := WorkflowConfig{ConcurrencyLimit: 7}
+		config2 := Config{ConcurrencyLimit: 7}
 
 		configSet.Set(workflow1, config1)
 		configSet.Set(workflow2, config2)

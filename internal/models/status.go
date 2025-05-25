@@ -148,7 +148,7 @@ func (f *StatusBuilder) Create(
 	opts ...StatusOption,
 ) DAGRunStatus {
 	statusObj := InitialStatus(f.dag)
-	statusObj.RunID = workflowID
+	statusObj.DAGRunID = workflowID
 	statusObj.Status = status
 	statusObj.PID = PID(pid)
 	statusObj.StartedAt = formatTime(startedAt)
@@ -176,7 +176,7 @@ type DAGRunStatus struct {
 	Root          digraph.DAGRunRef    `json:"root,omitempty"`
 	Parent        digraph.DAGRunRef    `json:"parent,omitempty"`
 	Name          string               `json:"name"`
-	RunID         string               `json:"runId"`
+	DAGRunID      string               `json:"dagRunId"`
 	AttemptID     string               `json:"attemptId"`
 	Status        scheduler.Status     `json:"status"`
 	PID           PID                  `json:"pid,omitempty"`
@@ -197,7 +197,7 @@ type DAGRunStatus struct {
 
 // Workflow returns the execution reference for the current status
 func (st *DAGRunStatus) Workflow() digraph.DAGRunRef {
-	return digraph.NewDAGRunRef(st.Name, st.RunID)
+	return digraph.NewDAGRunRef(st.Name, st.DAGRunID)
 }
 
 // Errors returns a slice of errors for the current status

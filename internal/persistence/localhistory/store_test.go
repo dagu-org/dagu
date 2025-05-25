@@ -36,12 +36,12 @@ func TestJSONDB(t *testing.T) {
 		// Verify the first record is the most recent
 		status0, err := attempts[0].ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "dagrun-id-3", status0.RunID)
+		assert.Equal(t, "dagrun-id-3", status0.DAGRunID)
 
 		// Verify the second record is the second most recent
 		status1, err := attempts[1].ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "dagrun-id-2", status1.RunID)
+		assert.Equal(t, "dagrun-id-2", status1.DAGRunID)
 
 		// Verify all records are returned if the number requested is equal to the number of records
 		attempts = th.DAGRunStore.RecentAttempts(th.Context, "test_DAG", 3)
@@ -75,7 +75,7 @@ func TestJSONDB(t *testing.T) {
 		status, err := attempt.ReadStatus(th.Context)
 		require.NoError(t, err)
 
-		assert.Equal(t, "dagrun-id-3", status.RunID)
+		assert.Equal(t, "dagrun-id-3", status.DAGRunID)
 	})
 	t.Run("FindByDAGRunID", func(t *testing.T) {
 		th := setupTestLocalStore(t)
@@ -98,7 +98,7 @@ func TestJSONDB(t *testing.T) {
 		// Verify the record is the correct one
 		status, err := attempt.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "dagrun-id-2", status.RunID)
+		assert.Equal(t, "dagrun-id-2", status.DAGRunID)
 
 		// Verify an error is returned if the DAG-run ID does not exist
 		refNonExist := digraph.NewDAGRunRef("test_DAG", "nonexistent-id")
@@ -156,7 +156,7 @@ func TestJSONDB(t *testing.T) {
 		}()
 
 		statusToWrite := models.InitialStatus(childDAG.DAG)
-		statusToWrite.RunID = "sub-id"
+		statusToWrite.DAGRunID = "sub-id"
 		err = childAttempt.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
 
@@ -167,7 +167,7 @@ func TestJSONDB(t *testing.T) {
 
 		status, err := existingAttempt.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "sub-id", status.RunID)
+		assert.Equal(t, "sub-id", status.DAGRunID)
 	})
 	t.Run("ChildDAGRun_Retry", func(t *testing.T) {
 		th := setupTestLocalStore(t)
@@ -197,7 +197,7 @@ func TestJSONDB(t *testing.T) {
 		}()
 
 		statusToWrite := models.InitialStatus(childDAG.DAG)
-		statusToWrite.RunID = childDAGRunID
+		statusToWrite.DAGRunID = childDAGRunID
 		statusToWrite.Status = scheduler.StatusRunning
 		err = attempt.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
@@ -209,7 +209,7 @@ func TestJSONDB(t *testing.T) {
 		require.NoError(t, err)
 		existingAttemptStatus, err := existingAttempt.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, childDAGRunID, existingAttemptStatus.RunID)
+		assert.Equal(t, childDAGRunID, existingAttemptStatus.DAGRunID)
 		assert.Equal(t, scheduler.StatusRunning.String(), existingAttemptStatus.Status.String())
 
 		// Create a retry record and write different status
@@ -228,7 +228,7 @@ func TestJSONDB(t *testing.T) {
 		require.NoError(t, err)
 		existingAttemptStatus, err = existingAttempt.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, childDAGRunID, existingAttemptStatus.RunID)
+		assert.Equal(t, childDAGRunID, existingAttemptStatus.DAGRunID)
 		assert.Equal(t, scheduler.StatusSuccess.String(), existingAttemptStatus.Status.String())
 	})
 	t.Run("ReadDAG", func(t *testing.T) {
@@ -248,7 +248,7 @@ func TestJSONDB(t *testing.T) {
 		}()
 
 		statusToWrite := models.InitialStatus(rec.dag)
-		statusToWrite.RunID = "parent-id"
+		statusToWrite.DAGRunID = "parent-id"
 
 		err = rec.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
@@ -390,7 +390,7 @@ func TestListStatuses(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, statuses, 1)
-		assert.Equal(t, "dagrun-id-2", statuses[0].RunID)
+		assert.Equal(t, "dagrun-id-2", statuses[0].DAGRunID)
 	})
 
 	t.Run("FilterByStatus", func(t *testing.T) {
@@ -410,7 +410,7 @@ func TestListStatuses(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, statuses, 1)
-		assert.Equal(t, "dagrun-id-2", statuses[0].RunID)
+		assert.Equal(t, "dagrun-id-2", statuses[0].DAGRunID)
 		assert.Equal(t, scheduler.StatusError, statuses[0].Status)
 	})
 
@@ -424,8 +424,8 @@ func TestListStatuses(t *testing.T) {
 		}
 
 		// Limit to 3 results
-		options := &models.ListStatusesOptions{Limit: 3}
-		statuses, err := th.DAGRunStore.ListStatuses(th.Context, func(o *models.ListStatusesOptions) {
+		options := &models.ListDAGRunStatusesOptions{Limit: 3}
+		statuses, err := th.DAGRunStore.ListStatuses(th.Context, func(o *models.ListDAGRunStatusesOptions) {
 			o.Limit = options.Limit
 		}, models.WithFrom(models.NewUTC(ts)))
 
@@ -453,8 +453,8 @@ func TestListStatuses(t *testing.T) {
 		require.Len(t, statuses, 3)
 
 		// Verify they are sorted by StartedAt in descending order
-		assert.Equal(t, "dagrun-id-3", statuses[0].RunID)
-		assert.Equal(t, "dagrun-id-2", statuses[1].RunID)
-		assert.Equal(t, "dagrun-id-1", statuses[2].RunID)
+		assert.Equal(t, "dagrun-id-3", statuses[0].DAGRunID)
+		assert.Equal(t, "dagrun-id-2", statuses[1].DAGRunID)
+		assert.Equal(t, "dagrun-id-1", statuses[2].DAGRunID)
 	})
 }

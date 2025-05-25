@@ -72,7 +72,7 @@ func runRetry(ctx *Context, args []string) error {
 }
 
 func executeRetry(ctx *Context, dag *digraph.DAG, status *models.DAGRunStatus, rootRun digraph.DAGRunRef) error {
-	logger.Debug(ctx, "Executing workflow retry", "name", dag.Name, "dagRunId", status.RunID)
+	logger.Debug(ctx, "Executing workflow retry", "name", dag.Name, "dagRunId", status.DAGRunID)
 
 	// We use the same log file for the retry as the original run.
 	logFile, err := fileutil.OpenOrCreateFile(status.Log)
@@ -83,7 +83,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.DAGRunStatus, r
 		_ = logFile.Close()
 	}()
 
-	logger.Info(ctx, "Workflow retry initiated", "DAG", dag.Name, "dagRunId", status.RunID, "logFile", logFile.Name())
+	logger.Info(ctx, "Workflow retry initiated", "DAG", dag.Name, "dagRunId", status.DAGRunID, "logFile", logFile.Name())
 
 	// Update the context with the log file
 	ctx.LogToFile(logFile)
@@ -94,7 +94,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.DAGRunStatus, r
 	}
 
 	agentInstance := agent.New(
-		status.RunID,
+		status.DAGRunID,
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
@@ -116,7 +116,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.DAGRunStatus, r
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
-			return fmt.Errorf("failed to execute the workflow %s (workflow ID: %s): %w", dag.Name, status.RunID, err)
+			return fmt.Errorf("failed to execute the workflow %s (workflow ID: %s): %w", dag.Name, status.DAGRunID, err)
 		}
 	}
 

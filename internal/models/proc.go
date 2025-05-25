@@ -26,7 +26,7 @@ type ProcHandle interface {
 
 // ProcMeta is a struct that holds metadata for a process.
 type ProcMeta struct {
-	StartedAt  int64
-	Name       string
-	WorkflowID string
+	StartedAt int64
+	Name      string
+	DAGRunID  string
 }

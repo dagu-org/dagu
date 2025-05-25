@@ -105,8 +105,8 @@ func (store *Store) ListStatuses(ctx context.Context, opts ...models.ListDAGRunS
 }
 
 // prepareListOptions processes the provided options and sets default values.
-func prepareListOptions(opts []models.ListDAGRunStatusesOption) (models.ListStatusesOptions, error) {
-	var options models.ListStatusesOptions
+func prepareListOptions(opts []models.ListDAGRunStatusesOption) (models.ListDAGRunStatusesOptions, error) {
+	var options models.ListDAGRunStatusesOptions
 
 	// Apply all options
 	for _, opt := range opts {
@@ -131,7 +131,7 @@ func prepareListOptions(opts []models.ListDAGRunStatusesOption) (models.ListStat
 func (store *Store) collectStatusesFromRoots(
 	parentCtx context.Context,
 	roots []DataRoot,
-	opts models.ListStatusesOptions,
+	opts models.ListDAGRunStatusesOptions,
 ) ([]*models.DAGRunStatus, error) {
 
 	if len(roots) == 0 {

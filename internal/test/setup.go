@@ -296,7 +296,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 
 	var workflowID string
 	if helper.opts.RetryTarget != nil {
-		workflowID = helper.opts.RetryTarget.RunID
+		workflowID = helper.opts.RetryTarget.DAGRunID
 	} else {
 		workflowID = generateWorkflowID()
 	}

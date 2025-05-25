@@ -428,7 +428,7 @@ func (a *API) TerminateWorkflow(ctx context.Context, request api.TerminateWorkfl
 		}
 	}
 
-	if err := a.historyManager.Stop(ctx, dag, status.RunID); err != nil {
+	if err := a.historyManager.Stop(ctx, dag, status.DAGRunID); err != nil {
 		return nil, fmt.Errorf("error stopping DAG: %w", err)
 	}
 
