@@ -429,7 +429,7 @@ func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
 // ListDAGs implements api.StrictServerInterface.
 func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (api.ListDAGsResponseObject, error) {
 	pg := models.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.Limit))
-	result, errList, err := a.dagStore.List(ctx, models.ListOptions{
+	result, errList, err := a.dagStore.List(ctx, models.ListDAGsOptions{
 		Paginator: &pg,
 		Name:      valueOf(request.Params.SearchName),
 		Tag:       valueOf(request.Params.SearchTag),

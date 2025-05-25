@@ -155,7 +155,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			logger.Info(ctx, "Received item from queue", "data", data)
 			var (
 				dag       *digraph.DAG
-				history   models.DAGRunAttempt
+				attempt   models.DAGRunAttempt
 				status    *models.DAGRunStatus
 				err       error
 				done      bool
@@ -174,13 +174,13 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			}
 
 			// Fetch the dag of the workflow
-			history, err = s.historyStore.FindAttempt(ctx, data)
+			attempt, err = s.historyStore.FindAttempt(ctx, data)
 			if err != nil {
 				logger.Error(ctx, "Failed to find run", "err", err, "data", data)
 				goto SEND_RESULT
 			}
 
-			status, err = history.ReadStatus(ctx)
+			status, err = attempt.ReadStatus(ctx)
 			if err != nil {
 				logger.Error(ctx, "Failed to read status", "err", err, "data", data)
 				goto SEND_RESULT
@@ -193,7 +193,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				goto SEND_RESULT
 			}
 
-			dag, err = history.ReadDAG(ctx)
+			dag, err = attempt.ReadDAG(ctx)
 			if err != nil {
 				logger.Error(ctx, "Failed to read dag", "err", err, "data", data)
 				goto SEND_RESULT
@@ -214,11 +214,11 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 		WAIT_FOR_RUN:
 			for {
 				// Check if the dag is running
-				history, err = s.historyStore.FindAttempt(ctx, data)
+				attempt, err = s.historyStore.FindAttempt(ctx, data)
 				if err != nil {
 					logger.Error(ctx, "Failed to find run", "err", err, "data", data)
 				}
-				status, err := history.ReadStatus(ctx)
+				status, err := attempt.ReadStatus(ctx)
 				if err != nil {
 					logger.Error(ctx, "Failed to read status", "err", err, "data", data)
 					goto SEND_RESULT

@@ -244,11 +244,11 @@ FALLBACK:
 
 // GetSavedStatus retrieves the saved status of a DAG run by its digraph.DAGRun reference.
 func (e *DAGRunManager) GetSavedStatus(ctx context.Context, dagRun digraph.DAGRunRef) (*models.DAGRunStatus, error) {
-	run, err := e.dagRunStore.FindAttempt(ctx, dagRun)
+	attempt, err := e.dagRunStore.FindAttempt(ctx, dagRun)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by run reference: %w", err)
 	}
-	status, err := run.ReadStatus(ctx)
+	status, err := attempt.ReadStatus(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}
@@ -261,12 +261,12 @@ func (e *DAGRunManager) GetSavedStatus(ctx context.Context, dagRun digraph.DAGRu
 func (m *DAGRunManager) getPersistedOrCurrentStatus(ctx context.Context, dag *digraph.DAG, dagRunID string) (
 	*models.DAGRunStatus, error,
 ) {
-	ref := digraph.NewDAGRunRef(dag.Name, dagRunID)
-	att, err := m.dagRunStore.FindAttempt(ctx, ref)
+	dagRunRef := digraph.NewDAGRunRef(dag.Name, dagRunID)
+	attempt, err := m.dagRunStore.FindAttempt(ctx, dagRunRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by DAG run ID: %w", err)
 	}
-	status, err := att.ReadStatus(ctx)
+	status, err := attempt.ReadStatus(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}
@@ -291,11 +291,11 @@ func (m *DAGRunManager) getPersistedOrCurrentStatus(ctx context.Context, dag *di
 // FindChildDAGRunStatus retrieves the status of a child DAG run by its ID.
 // It looks up the child attempt in the history store and reads its status.
 func (m *DAGRunManager) FindChildDAGRunStatus(ctx context.Context, rootDAGRun digraph.DAGRunRef, childRunID string) (*models.DAGRunStatus, error) {
-	att, err := m.dagRunStore.FindChildAttempt(ctx, rootDAGRun, childRunID)
+	attempt, err := m.dagRunStore.FindChildAttempt(ctx, rootDAGRun, childRunID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find child DAG run attempt: %w", err)
 	}
-	status, err := att.ReadStatus(ctx)
+	status, err := attempt.ReadStatus(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}
@@ -322,13 +322,13 @@ func (m *DAGRunManager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (
 	var latestStatus *models.DAGRunStatus
 
 	// Find the latest status by name
-	run, err := m.dagRunStore.LatestAttempt(ctx, dag.Name)
+	attempt, err := m.dagRunStore.LatestAttempt(ctx, dag.Name)
 	if err != nil {
 		goto handleError
 	}
 
 	// Read the latest status
-	latestStatus, err = run.ReadStatus(ctx)
+	latestStatus, err = attempt.ReadStatus(ctx)
 	if err != nil {
 		goto handleError
 	}
@@ -374,11 +374,11 @@ handleError:
 // ListRecentStatus retrieves the n most recent statuses for a DAG by name.
 // It returns a slice of Status objects, filtering out any that cannot be read.
 func (m *DAGRunManager) ListRecentStatus(ctx context.Context, name string, n int) []models.DAGRunStatus {
-	runs := m.dagRunStore.RecentAttempts(ctx, name, n)
+	attempts := m.dagRunStore.RecentAttempts(ctx, name, n)
 
 	var statuses []models.DAGRunStatus
-	for _, run := range runs {
-		if status, err := run.ReadStatus(ctx); err == nil {
+	for _, att := range attempts {
+		if status, err := att.ReadStatus(ctx); err == nil {
 			statuses = append(statuses, *status)
 		}
 	}
@@ -396,39 +396,39 @@ func (e *DAGRunManager) UpdateStatus(ctx context.Context, rootDAGRun digraph.DAG
 		// Continue with operation
 	}
 
-	// Find the run for the status.
-	var run models.DAGRunAttempt
+	// Find the attempt for the status.
+	var attempt models.DAGRunAttempt
 
 	if rootDAGRun.ID == newStatus.DAGRunID {
 		// If the DAG-run ID matches the root DAG-run ID, find the attempt by the root DAG-run ID
-		r, err := e.dagRunStore.FindAttempt(ctx, rootDAGRun)
+		att, err := e.dagRunStore.FindAttempt(ctx, rootDAGRun)
 		if err != nil {
 			return fmt.Errorf("failed to find the DAG-run: %w", err)
 		}
-		run = r
+		attempt = att
 	} else {
 		// If the DAG-run ID does not match the root DAG-run ID,
 		// find the attempt by the child DAG-run ID
-		r, err := e.dagRunStore.FindChildAttempt(ctx, rootDAGRun, newStatus.DAGRunID)
+		att, err := e.dagRunStore.FindChildAttempt(ctx, rootDAGRun, newStatus.DAGRunID)
 		if err != nil {
 			return fmt.Errorf("failed to find child DAG-run: %w", err)
 		}
-		run = r
+		attempt = att
 	}
 
 	// Open, write, and close the run
-	if err := run.Open(ctx); err != nil {
+	if err := attempt.Open(ctx); err != nil {
 		return fmt.Errorf("failed to open DAG-run data: %w", err)
 	}
 
 	// Ensure the run data is closed even if write fails
 	defer func() {
-		if closeErr := run.Close(ctx); closeErr != nil {
+		if closeErr := attempt.Close(ctx); closeErr != nil {
 			logger.Errorf(ctx, "Failed to close DAG-run data: %v", closeErr)
 		}
 	}()
 
-	if err := run.Write(ctx, newStatus); err != nil {
+	if err := attempt.Write(ctx, newStatus); err != nil {
 		return fmt.Errorf("failed to write status: %w", err)
 	}
 

@@ -375,7 +375,7 @@ var nodeStatusMapping = map[api.NodeStatus]scheduler.NodeStatus{
 }
 
 func (a *API) RetryWorkflow(ctx context.Context, request api.RetryWorkflowRequestObject) (api.RetryWorkflowResponseObject, error) {
-	run, err := a.historyStore.FindAttempt(ctx, digraph.NewDAGRunRef(request.Name, request.WorkflowId))
+	attempt, err := a.historyStore.FindAttempt(ctx, digraph.NewDAGRunRef(request.Name, request.WorkflowId))
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -384,7 +384,7 @@ func (a *API) RetryWorkflow(ctx context.Context, request api.RetryWorkflowReques
 		}
 	}
 
-	dag, err := run.ReadDAG(ctx)
+	dag, err := attempt.ReadDAG(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error reading DAG: %w", err)
 	}
@@ -397,7 +397,7 @@ func (a *API) RetryWorkflow(ctx context.Context, request api.RetryWorkflowReques
 }
 
 func (a *API) TerminateWorkflow(ctx context.Context, request api.TerminateWorkflowRequestObject) (api.TerminateWorkflowResponseObject, error) {
-	run, err := a.historyStore.FindAttempt(ctx, digraph.NewDAGRunRef(request.Name, request.WorkflowId))
+	attempt, err := a.historyStore.FindAttempt(ctx, digraph.NewDAGRunRef(request.Name, request.WorkflowId))
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -406,7 +406,7 @@ func (a *API) TerminateWorkflow(ctx context.Context, request api.TerminateWorkfl
 		}
 	}
 
-	dag, err := run.ReadDAG(ctx)
+	dag, err := attempt.ReadDAG(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error reading DAG: %w", err)
 	}
@@ -437,7 +437,7 @@ func (a *API) TerminateWorkflow(ctx context.Context, request api.TerminateWorkfl
 
 func (a *API) DequeueWorkflow(ctx context.Context, request api.DequeueWorkflowRequestObject) (api.DequeueWorkflowResponseObject, error) {
 	workflow := digraph.NewDAGRunRef(request.Name, request.WorkflowId)
-	run, err := a.historyStore.FindAttempt(ctx, workflow)
+	attempt, err := a.historyStore.FindAttempt(ctx, workflow)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -446,7 +446,7 @@ func (a *API) DequeueWorkflow(ctx context.Context, request api.DequeueWorkflowRe
 		}
 	}
 
-	dag, err := run.ReadDAG(ctx)
+	dag, err := attempt.ReadDAG(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error reading DAG: %w", err)
 	}

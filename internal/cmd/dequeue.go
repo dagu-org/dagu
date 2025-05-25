@@ -37,12 +37,12 @@ func runDequeue(ctx *Context, _ []string) error {
 
 // dequeueWorkflow dequeues a workflow to the queue.
 func dequeueWorkflow(ctx *Context, workflow digraph.DAGRunRef) error {
-	run, err := ctx.HistoryStore.FindAttempt(ctx, workflow)
+	attempt, err := ctx.HistoryStore.FindAttempt(ctx, workflow)
 	if err != nil {
 		return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflow.ID, err)
 	}
 
-	status, err := run.ReadStatus(ctx)
+	status, err := attempt.ReadStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read status: %w", err)
 	}
@@ -52,7 +52,7 @@ func dequeueWorkflow(ctx *Context, workflow digraph.DAGRunRef) error {
 		return fmt.Errorf("workflow %s is not in queued status but %s", workflow.ID, status.Status)
 	}
 
-	dag, err := run.ReadDAG(ctx)
+	dag, err := attempt.ReadDAG(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read dag: %w", err)
 	}
@@ -69,13 +69,13 @@ func dequeueWorkflow(ctx *Context, workflow digraph.DAGRunRef) error {
 	// Make the workflow status to cancelled
 	status.Status = scheduler.StatusCancel
 
-	if err := run.Open(ctx.Context); err != nil {
+	if err := attempt.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open run: %w", err)
 	}
 	defer func() {
-		_ = run.Close(ctx.Context)
+		_ = attempt.Close(ctx.Context)
 	}()
-	if err := run.Write(ctx.Context, *status); err != nil {
+	if err := attempt.Write(ctx.Context, *status); err != nil {
 		return fmt.Errorf("failed to save status: %w", err)
 	}
 

@@ -69,14 +69,14 @@ func enqueueWorkflow(ctx *Context, dag *digraph.DAG, workflowID string) error {
 		return fmt.Errorf("workflow %q with ID %q already exists", dag.Name, workflowID)
 	}
 
-	run, err := ctx.HistoryStore.CreateAttempt(ctx.Context, dag, time.Now(), workflowID, models.NewDAGRunAttemptOptions{})
+	att, err := ctx.HistoryStore.CreateAttempt(ctx.Context, dag, time.Now(), workflowID, models.NewDAGRunAttemptOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create run: %w", err)
 	}
 
 	opts := []models.StatusOption{
 		models.WithLogFilePath(logFile),
-		models.WithAttemptID(run.ID()),
+		models.WithAttemptID(att.ID()),
 		models.WithPreconditions(dag.Preconditions),
 		models.WithQueuedAt(stringutil.FormatTime(time.Now())),
 		models.WithHierarchyRefs(
@@ -89,13 +89,13 @@ func enqueueWorkflow(ctx *Context, dag *digraph.DAG, workflowID string) error {
 	// This could be changed to save to a queue file in the future
 	status := models.NewStatusBuilder(dag).Create(workflowID, scheduler.StatusQueued, 0, time.Time{}, opts...)
 
-	if err := run.Open(ctx.Context); err != nil {
+	if err := att.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open run: %w", err)
 	}
 	defer func() {
-		_ = run.Close(ctx.Context)
+		_ = att.Close(ctx.Context)
 	}()
-	if err := run.Write(ctx.Context, status); err != nil {
+	if err := att.Write(ctx.Context, status); err != nil {
 		return fmt.Errorf("failed to save status: %w", err)
 	}
 

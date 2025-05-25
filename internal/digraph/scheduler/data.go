@@ -49,15 +49,15 @@ type NodeState struct {
 	// It only makes sense when the node is a command executor.
 	ExitCode int
 	// Child executions is the list of child workflows that this node has executed.
-	Children []ChildWorkflow
+	Children []ChildDAGRun
 	// OutputVariables stores the output variables for the following steps.
 	// It only contains the local output variables.
 	OutputVariables *executor.SyncMap
 }
 
-type ChildWorkflow struct {
-	// WorkflowID is the workflow ID of the child workflow.
-	WorkflowID string
+type ChildDAGRun struct {
+	// DAGRunID is the run ID of the child DAG run.
+	DAGRunID string
 }
 
 type NodeStatus int
@@ -166,14 +166,14 @@ func (s *Data) ChildWorkflowID() (string, error) {
 	defer s.mu.Unlock()
 	// If children is not empty, return the first child's workflow ID.
 	if len(s.inner.State.Children) > 0 {
-		return s.inner.State.Children[0].WorkflowID, nil
+		return s.inner.State.Children[0].DAGRunID, nil
 	}
 	// Generate a new workflow ID for the current node.
 	r, err := generateWorkflowID()
 	if err != nil {
 		return "", fmt.Errorf("failed to generate workflow ID: %w", err)
 	}
-	s.inner.State.Children = append(s.inner.State.Children, ChildWorkflow{WorkflowID: r})
+	s.inner.State.Children = append(s.inner.State.Children, ChildDAGRun{DAGRunID: r})
 	return r, nil
 }
 

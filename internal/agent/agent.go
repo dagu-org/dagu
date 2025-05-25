@@ -161,11 +161,11 @@ func (a *Agent) Run(ctx context.Context) error {
 	if !a.dry {
 		// Setup the attempt for the DAG-run.
 		// It's not required for dry-run mode.
-		at, err := a.setupDAGRunAttempt(ctx)
+		att, err := a.setupDAGRunAttempt(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to setup execution history: %w", err)
 		}
-		attempt = at
+		attempt = att
 		a.dagRunAttemptID = attempt.ID()
 	}
 
@@ -686,11 +686,11 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error
 }
 
 func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) (*digraph.Status, error) {
-	run, err := o.drs.FindChildAttempt(ctx, rootDAGRun, dagRunID)
+	childAttempt, err := o.drs.FindChildAttempt(ctx, rootDAGRun, dagRunID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find run for DAG-run ID %s: %w", dagRunID, err)
 	}
-	status, err := run.ReadStatus(ctx)
+	status, err := childAttempt.ReadStatus(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}

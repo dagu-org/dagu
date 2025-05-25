@@ -63,18 +63,18 @@ func TestManager(t *testing.T) {
 		ctx := th.Context
 		cli := th.HistoryMgr
 
-		// Open the run data and write a status before updating it.
-		run, err := th.HistoryStore.CreateAttempt(ctx, dag.DAG, now, workflowID, models.NewDAGRunAttemptOptions{})
+		// Open the Attempt data and write a status before updating it.
+		att, err := th.HistoryStore.CreateAttempt(ctx, dag.DAG, now, workflowID, models.NewDAGRunAttemptOptions{})
 		require.NoError(t, err)
 
-		err = run.Open(ctx)
+		err = att.Open(ctx)
 		require.NoError(t, err)
 
 		status := testNewStatus(dag.DAG, workflowID, scheduler.StatusSuccess, scheduler.NodeStatusSuccess)
 
-		err = run.Write(ctx, status)
+		err = att.Write(ctx, status)
 		require.NoError(t, err)
-		_ = run.Close(ctx)
+		_ = att.Close(ctx)
 
 		// Get the status and check if it is the same as the one we wrote.
 		ref := digraph.NewDAGRunRef(dag.Name, workflowID)
@@ -111,7 +111,7 @@ func TestManager(t *testing.T) {
 		childWorkflow := status.Nodes[0].Children[0]
 
 		root := digraph.NewDAGRunRef(dag.Name, workflowID)
-		childWorkflowStatus, err := th.HistoryMgr.FindChildDAGRunStatus(th.Context, root, childWorkflow.WorkflowID)
+		childWorkflowStatus, err := th.HistoryMgr.FindChildDAGRunStatus(th.Context, root, childWorkflow.DAGRunID)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusSuccess.String(), childWorkflowStatus.Status.String())
 
@@ -121,7 +121,7 @@ func TestManager(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check if the child workflow status is updated.
-		childWorkflowStatus, err = th.HistoryMgr.FindChildDAGRunStatus(th.Context, root, childWorkflow.WorkflowID)
+		childWorkflowStatus, err = th.HistoryMgr.FindChildDAGRunStatus(th.Context, root, childWorkflow.DAGRunID)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.NodeStatusError.String(), childWorkflowStatus.Nodes[0].Status.String())
 	})

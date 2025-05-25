@@ -134,11 +134,11 @@ func toNode(node *models.Node) api.Node {
 	}
 }
 
-func toChildWorkflows(childWorkflows []models.ChildWorkflow) []api.ChildWorkflow {
+func toChildWorkflows(childWorkflows []models.ChildDAGRun) []api.ChildWorkflow {
 	var result []api.ChildWorkflow
 	for _, w := range childWorkflows {
 		result = append(result, api.ChildWorkflow{
-			WorkflowId: w.WorkflowID,
+			WorkflowId: w.DAGRunID,
 		})
 	}
 	return result

@@ -63,7 +63,7 @@ steps:
 	// First, find the child_2 workflow ID to update its status
 	ctx := context.Background()
 	ref := digraph.NewDAGRunRef("parent", workflowID)
-	parentRun, err := th.HistoryStore.FindAttempt(ctx, ref)
+	parentAttempt, err := th.HistoryStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
 
 	updateStatus := func(rec models.DAGRunAttempt, status *models.DAGRunStatus) {
@@ -76,40 +76,40 @@ steps:
 	}
 
 	// (1) Find the child_1 node and update its status to "failed"
-	parentStatus, err := parentRun.ReadStatus(ctx)
+	parentStatus, err := parentAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
 
 	child1Node := parentStatus.Nodes[0]
 	child1Node.Status = scheduler.NodeStatusError
-	updateStatus(parentRun, parentStatus)
+	updateStatus(parentAttempt, parentStatus)
 
 	// (2) Find the child_1 workflow ID to update its status
-	child1Run, err := th.HistoryStore.FindChildAttempt(ctx, ref, child1Node.Children[0].WorkflowID)
+	child1Attempt, err := th.HistoryStore.FindChildAttempt(ctx, ref, child1Node.Children[0].DAGRunID)
 	require.NoError(t, err)
 
-	child1Status, err := child1Run.ReadStatus(ctx)
+	child1Status, err := child1Attempt.ReadStatus(ctx)
 	require.NoError(t, err)
 
 	// (3) Find the child_2 node and update its status to "failed"
 	child2Node := child1Status.Nodes[0]
 	child2Node.Status = scheduler.NodeStatusError
-	updateStatus(child1Run, child1Status)
+	updateStatus(child1Attempt, child1Status)
 
 	// (4) Find the child_2 workflow ID to update its status
-	child2Run, err := th.HistoryStore.FindChildAttempt(ctx, ref, child2Node.Children[0].WorkflowID)
+	child2Attempt, err := th.HistoryStore.FindChildAttempt(ctx, ref, child2Node.Children[0].DAGRunID)
 	require.NoError(t, err)
 
-	child2Status, err := child2Run.ReadStatus(ctx)
+	child2Status, err := child2Attempt.ReadStatus(ctx)
 	require.NoError(t, err)
 
 	require.Equal(t, child2Status.Status.String(), scheduler.NodeStatusSuccess.String())
 
 	// (5) Update the step in child_2 to "failed" to simulate a retry
 	child2Status.Nodes[0].Status = scheduler.NodeStatusError
-	updateStatus(child2Run, child2Status)
+	updateStatus(child2Attempt, child2Status)
 
 	// (6) Check if the child_2 status is now "failed"
-	child2Status, err = child2Run.ReadStatus(ctx)
+	child2Status, err = child2Attempt.ReadStatus(ctx)
 	require.NoError(t, err)
 	require.Equal(t, child2Status.Nodes[0].Status.String(), scheduler.NodeStatusError.String())
 
@@ -122,9 +122,9 @@ steps:
 	})
 
 	// Check if the child_2 status is now "success"
-	child2Run, err = th.HistoryStore.FindChildAttempt(ctx, ref, child2Node.Children[0].WorkflowID)
+	child2Attempt, err = th.HistoryStore.FindChildAttempt(ctx, ref, child2Node.Children[0].DAGRunID)
 	require.NoError(t, err)
-	child2Status, err = child2Run.ReadStatus(ctx)
+	child2Status, err = child2Attempt.ReadStatus(ctx)
 	require.NoError(t, err)
 	require.Equal(t, child2Status.Nodes[0].Status.String(), scheduler.NodeStatusSuccess.String())
 

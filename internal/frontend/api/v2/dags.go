@@ -276,7 +276,7 @@ func (a *API) readHistoryData(
 
 func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (api.ListDAGsResponseObject, error) {
 	pg := models.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
-	result, errList, err := a.dagStore.List(ctx, models.ListOptions{
+	result, errList, err := a.dagStore.List(ctx, models.ListDAGsOptions{
 		Paginator: &pg,
 		Name:      valueOf(request.Params.Name),
 		Tag:       valueOf(request.Params.Tag),

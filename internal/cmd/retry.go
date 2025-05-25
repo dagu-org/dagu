@@ -46,19 +46,19 @@ func runRetry(ctx *Context, args []string) error {
 
 	// Retrieve the previous run data for specified workflow ID.
 	ref := digraph.NewDAGRunRef(name, workflowID)
-	runRecord, err := ctx.HistoryStore.FindAttempt(ctx, ref)
+	attempt, err := ctx.HistoryStore.FindAttempt(ctx, ref)
 	if err != nil {
 		return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflowID, err)
 	}
 
 	// Read the detailed status of the previous status.
-	status, err := runRecord.ReadStatus(ctx)
+	status, err := attempt.ReadStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 
 	// Get the DAG instance from the execution history.
-	dag, err := runRecord.ReadDAG(ctx)
+	dag, err := attempt.ReadDAG(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read DAG from record: %w", err)
 	}

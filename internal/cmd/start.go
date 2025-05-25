@@ -202,8 +202,8 @@ func handleChildWorkflow(ctx *Context, dag *digraph.DAG, workflowID string, para
 	// Check for previous child workflow with this ID
 	logger.Debug(ctx, "Checking for previous child workflow with the workflow ID", "dagRunId", workflowID)
 
-	// Look for existing execution run
-	run, err := ctx.HistoryStore.FindChildAttempt(ctx, root, workflowID)
+	// Look for existing execution childAttempt
+	childAttempt, err := ctx.HistoryStore.FindChildAttempt(ctx, root, workflowID)
 	if errors.Is(err, models.ErrDAGRunIDNotFound) {
 		// If the workflow ID is not found, proceed with new execution
 		return executeWorkflow(ctx, dag, parent, workflowID, root)
@@ -213,7 +213,7 @@ func handleChildWorkflow(ctx *Context, dag *digraph.DAG, workflowID string, para
 	}
 
 	// Read the status of the previous run
-	status, err := run.ReadStatus(ctx)
+	status, err := childAttempt.ReadStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read previous run status for workflow ID %s: %w", workflowID, err)
 	}
