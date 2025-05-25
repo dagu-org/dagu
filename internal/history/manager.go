@@ -138,6 +138,25 @@ func (m *Manager) EnqueueWorkflow(_ context.Context, dag *digraph.DAG, opts Enqu
 	return cmd.Start()
 }
 
+func (m *Manager) DequeueWorkflow(_ context.Context, workflow digraph.WorkflowRef) error {
+	args := []string{"dequeue", workflow.String()}
+	if configFile := config.UsedConfigFile.Load(); configFile != nil {
+		if configFile, ok := configFile.(string); ok {
+			args = append(args, "--config")
+			args = append(args, configFile)
+		}
+	}
+	// nolint:gosec
+	cmd := exec.Command(m.executable, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
+	cmd.Dir = m.workDir
+	cmd.Env = os.Environ()
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Start()
+}
+
 // RestartDAG restarts a DAG by executing the configured executable with the restart command.
 // It sets up the command to run in its own process group.
 func (m *Manager) RestartDAG(_ context.Context, dag *digraph.DAG, opts RestartOptions) error {

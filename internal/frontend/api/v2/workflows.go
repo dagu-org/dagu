@@ -434,3 +434,39 @@ func (a *API) TerminateWorkflow(ctx context.Context, request api.TerminateWorkfl
 
 	return api.TerminateWorkflow200Response{}, nil
 }
+
+func (a *API) DequeueWorkflow(ctx context.Context, request api.DequeueWorkflowRequestObject) (api.DequeueWorkflowResponseObject, error) {
+	workflow := digraph.NewWorkflowRef(request.Name, request.WorkflowId)
+	run, err := a.historyStore.FindRun(ctx, workflow)
+	if err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("workflow ID %s not found for DAG %s", request.WorkflowId, request.Name),
+		}
+	}
+
+	dag, err := run.ReadDAG(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error reading DAG: %w", err)
+	}
+
+	latestStatus, err := a.historyManager.GetLatestStatus(ctx, dag)
+	if err != nil {
+		return nil, fmt.Errorf("error getting latest status: %w", err)
+	}
+
+	if latestStatus.Status != scheduler.StatusQueued {
+		return nil, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    fmt.Sprintf("Workflow status is not queued: %s", latestStatus.Status),
+		}
+	}
+
+	if err := a.historyManager.DequeueWorkflow(ctx, workflow); err != nil {
+		return nil, fmt.Errorf("error dequeueing workflow: %w", err)
+	}
+
+	return api.DequeueWorkflow200Response{}, nil
+}

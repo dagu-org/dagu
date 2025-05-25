@@ -756,6 +756,33 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /workflows/{name}/{workflowId}/dequeue:
+    get:
+      summary: "Dequeue a queued workflow"
+      description: "Dequeue a workflow execution that is currently queued"
+      operationId: "dequeueWorkflow"
+      tags:
+        - "workflows"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/WorkflowId"
+      responses:
+        "200":
+          description: "A successful response"
+        "404":
+          description: "Workflow not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /workflows/{name}/{workflowId}/log:
     get:
       summary: "Retrieve full execution log of a workflow"
