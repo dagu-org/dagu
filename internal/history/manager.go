@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"slices"
 	"strconv"
-	"strings"
 	"syscall"
 
 	"github.com/dagu-org/dagu/internal/config"
@@ -81,7 +80,7 @@ func (m *Manager) StartDAG(_ context.Context, dag *digraph.DAG, opts StartOption
 	args := []string{"start"}
 	if opts.Params != "" {
 		args = append(args, "-p")
-		args = append(args, fmt.Sprintf(`%s`, strconv.Quote(opts.Params)))
+		args = append(args, strconv.Quote(opts.Params))
 	}
 	if opts.Quiet {
 		args = append(args, "-q")
@@ -112,7 +111,7 @@ func (m *Manager) EnqueueWorkflow(_ context.Context, dag *digraph.DAG, opts Enqu
 	args := []string{"enqueue"}
 	if opts.Params != "" {
 		args = append(args, "-p")
-		args = append(args, fmt.Sprintf(`%s`, strconv.Quote(opts.Params)))
+		args = append(args, strconv.Quote(opts.Params))
 	}
 	if opts.Quiet {
 		args = append(args, "-q")
@@ -435,25 +434,6 @@ func (e *Manager) UpdateStatus(ctx context.Context, root digraph.WorkflowRef, st
 	}
 
 	return nil
-}
-
-// escapeArg escapes special characters in command arguments.
-// Currently handles carriage returns and newlines by adding backslashes.
-func escapeArg(input string) string {
-	escaped := strings.Builder{}
-
-	for _, char := range input {
-		switch char {
-		case '\r':
-			_, _ = escaped.WriteString("\\r")
-		case '\n':
-			_, _ = escaped.WriteString("\\n")
-		default:
-			_, _ = escaped.WriteRune(char)
-		}
-	}
-
-	return escaped.String()
 }
 
 // StartOptions contains options for starting a DAG.
