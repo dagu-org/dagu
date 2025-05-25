@@ -127,9 +127,15 @@ func TestJSONDB(t *testing.T) {
 		err := th.DAGRunStore.RemoveOldDAGRuns(th.Context, "test_DAG", 0)
 		require.NoError(t, err)
 
-		// Verify records are removed
+		// Verify non active attempts are removed
 		attempts = th.DAGRunStore.RecentAttempts(th.Context, "test_DAG", 3)
-		require.Len(t, attempts, 0)
+		require.Len(t, attempts, 1)
+
+		// Verify the remaining attempt is the active one
+		status, err := attempts[0].ReadStatus(th.Context)
+		require.NoError(t, err)
+		assert.Equal(t, "dagrun-id-1", status.DAGRunID)
+		assert.Equal(t, scheduler.StatusRunning, status.Status)
 	})
 	t.Run("ChildDAGRun", func(t *testing.T) {
 		th := setupTestLocalStore(t)

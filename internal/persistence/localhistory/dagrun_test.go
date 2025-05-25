@@ -35,24 +35,6 @@ func TestDAGRun(t *testing.T) {
 
 		require.Equal(t, scheduler.StatusError.String(), status.Status.String())
 	})
-	t.Run("LastUpdated", func(t *testing.T) {
-		root := setupTestDataRoot(t)
-		exec := root.CreateTestDAGRun(t, "test-id-1", models.NewUTC(time.Now()))
-
-		ts1 := models.NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
-		ts2 := models.NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
-
-		_ = exec.WriteStatus(t, ts1, scheduler.StatusRunning)
-		run := exec.WriteStatus(t, ts2, scheduler.StatusSuccess)
-
-		lastUpdate, err := exec.LastUpdated(exec.Context)
-		require.NoError(t, err)
-
-		info, err := os.Stat(run.file)
-		require.NoError(t, err)
-
-		require.Equal(t, info.ModTime(), lastUpdate)
-	})
 }
 
 type DAGRunTest struct {

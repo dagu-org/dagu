@@ -269,9 +269,24 @@ func (dr DataRoot) RemoveOld(ctx context.Context, retentionDays int) error {
 	dagRuns := dr.listDAGRunsInRange(ctx, models.TimeInUTC{}, keepTime, &listDAGRunsInRangeOpts{})
 
 	for _, r := range dagRuns {
-		lastUpdate, err := r.LastUpdated(ctx)
+		latestAttempt, err := r.LatestAttempt(ctx, nil)
 		if err != nil {
-			logger.Errorf(ctx, "failed to get last update time for %s: %v", r.baseDir, err)
+			logger.Errorf(ctx, "failed to get latest attempt for %s: %v", r.baseDir, err)
+			continue
+		}
+		lastUpdate, err := latestAttempt.ModTime()
+		if err != nil {
+			logger.Errorf(ctx, "failed to get last modified time for %s: %v", r.baseDir, err)
+			continue
+		}
+		latestStatus, err := latestAttempt.ReadStatus(ctx)
+		if err != nil {
+			logger.Errorf(ctx, "failed to read status for %s: %v", r.baseDir, err)
+			continue
+		}
+		if latestStatus.Status.IsActive() {
+			// If the run is still active, skip it
+			logger.Debugf(ctx, "Skipping active run %s with status %s", r.baseDir, latestStatus.Status)
 			continue
 		}
 		if lastUpdate.After(keepTime.Time) {

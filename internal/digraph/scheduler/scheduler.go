@@ -48,6 +48,11 @@ func (s Status) String() string {
 	}
 }
 
+// IsActive checks if the status is active.
+func (s Status) IsActive() bool {
+	return s == StatusRunning || s == StatusQueued
+}
+
 var (
 	ErrUpstreamFailed  = fmt.Errorf("upstream failed")
 	ErrUpstreamSkipped = fmt.Errorf("upstream skipped")

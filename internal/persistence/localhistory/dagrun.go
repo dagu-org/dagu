@@ -197,16 +197,6 @@ func (e DAGRun) LatestAttempt(ctx context.Context, cache *fileutil.Cache[*models
 	return nil, models.ErrNoStatusData
 }
 
-// LastUpdated returns the last modification time of the latest record.
-// This is used to determine when the DAG-run was last updated.
-func (e DAGRun) LastUpdated(ctx context.Context) (time.Time, error) {
-	att, err := e.LatestAttempt(ctx, nil)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return att.ModTime()
-}
-
 // Remove deletes the entire DAG-run directory and all its contents.
 func (e DAGRun) Remove(ctx context.Context) error {
 	if err := e.removeLogFiles(ctx); err != nil {
