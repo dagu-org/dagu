@@ -288,16 +288,52 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 						node.IncDoneCount()
 					}
 
-					if node.Step().RepeatPolicy.Repeat {
-						if execErr == nil || node.Step().ContinueOn.Failure {
-							if !sc.isCanceled() {
-								time.Sleep(node.Step().RepeatPolicy.Interval)
-								if progressCh != nil {
-									progressCh <- node
+					shouldRepeat := false
+					step := node.Step()
+					if step.RepeatPolicy.Condition != "" {
+						cond := step.RepeatPolicy.Condition
+						expected := step.RepeatPolicy.Expected
+						if strings.HasPrefix(cond, "`") && strings.HasSuffix(cond, "`") && len(cond) > 2 {
+							// Command substitution: run the command, compare output or exit code
+							cmdStr := cond[1 : len(cond)-1]
+							cmdOut, cmdExit, err := "", 0, error(nil)
+							if out, exit, e := runShellCommandWithExitCode(ctx, cmdStr, step.Shell); true {
+								cmdOut, cmdExit, err = out, exit, e
+							}
+							if err == nil {
+								if expected != "" {
+									shouldRepeat = (strings.TrimSpace(cmdOut) != expected)
+								} else {
+									shouldRepeat = (cmdExit != 0)
 								}
-								continue ExecRepeat
+							} else {
+								shouldRepeat = true // repeat on error
+							}
+						} else {
+							// Simple string match: compare last step output to expected
+							output := node.LastOutput()
+							shouldRepeat = (expected != "" && strings.TrimSpace(output) != expected)
+						}
+					} else if len(step.RepeatPolicy.ExitCode) > 0 {
+						// Repeat if last exit code matches any in ExitCode
+						lastExit := node.State().ExitCode
+						for _, code := range step.RepeatPolicy.ExitCode {
+							if lastExit == code {
+								shouldRepeat = true
+								break
 							}
 						}
+					} else if step.RepeatPolicy.Repeat {
+						// Legacy unconditional repeat
+						shouldRepeat = (execErr == nil || step.ContinueOn.Failure)
+					}
+
+					if shouldRepeat && !sc.isCanceled() {
+						time.Sleep(step.RepeatPolicy.Interval)
+						if progressCh != nil {
+							progressCh <- node
+						}
+						continue
 					}
 
 					if execErr != nil && progressCh != nil {
@@ -741,4 +777,26 @@ func (sc *Scheduler) handleNodeRetry(ctx context.Context, node *Node, execErr er
 	node.SetRetriedAt(time.Now())
 	node.SetStatus(NodeStatusNone)
 	return true
+}
+
+// Helper for repeatPolicy: run a shell command and get output and exit code
+func runShellCommandWithExitCode(ctx context.Context, cmdStr string, shell string) (string, int, error) {
+	sh := shell
+	if sh == "" {
+		sh = "/bin/sh"
+	}
+	cmd := exec.CommandContext(ctx, sh, "-c", cmdStr)
+	var outBuf strings.Builder
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &outBuf
+	err := cmd.Run()
+	exitCode := 0
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+		} else {
+			exitCode = 1
+		}
+	}
+	return outBuf.String(), exitCode, err
 }

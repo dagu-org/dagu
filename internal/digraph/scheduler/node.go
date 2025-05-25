@@ -35,6 +35,8 @@ type Node struct {
 	done         atomic.Bool
 	retryPolicy  RetryPolicy
 	cmdEvaluated atomic.Bool
+
+	lastOutput string // Stores the last command output when `output` field is set
 }
 
 func NewNode(step digraph.Step, state NodeState) *Node {
@@ -151,15 +153,24 @@ func (n *Node) Execute(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
+	value, err := n.outputs.capturedOutput(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to capture output: %w", err)
+	}
+	n.lastOutput = value
+
 	if output := n.Step().Output; output != "" {
-		value, err := n.outputs.capturedOutput(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to capture output: %w", err)
-		}
 		n.setVariable(output, value)
 	}
 
 	return n.Error()
+}
+
+// LastOutput returns the last captured output of the node's command.
+func (n *Node) LastOutput() string {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.lastOutput
 }
 
 func (n *Node) clearVariable(key string) {
@@ -638,10 +649,10 @@ func (oc *OutputCoordinator) setupExecutorIO(_ context.Context, cmd executor.Exe
 		stdout = io.MultiWriter(oc.stdoutWriter, oc.stdoutRedirectWriter)
 	}
 
-	// Setup output capture
-	if data.Step.Output != "" {
+	if shouldRecordOutput(data) {
 		var err error
-		if oc.outputReader, oc.outputWriter, err = os.Pipe(); err != nil {
+		oc.outputReader, oc.outputWriter, err = os.Pipe()
+		if err != nil {
 			return fmt.Errorf("failed to create pipe: %w", err)
 		}
 		stdout = io.MultiWriter(stdout, oc.outputWriter)
@@ -780,4 +791,18 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 		return "", fmt.Errorf("io: failed to read output: %w", err)
 	}
 	return strings.TrimSpace(buf.String()), nil
+}
+
+func shouldRecordOutput(data NodeData) bool {
+	// If the output is set, we should record it
+	if data.Step.Output != "" {
+		return true
+	}
+
+	// If repeatPolicy.condition set, we should record it
+	if data.Step.RepeatPolicy.Condition != "" {
+		return true
+	}
+
+	return false
 }

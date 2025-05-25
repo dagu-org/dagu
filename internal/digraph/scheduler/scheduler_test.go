@@ -788,6 +788,88 @@ func TestScheduler(t *testing.T) {
 		require.True(t, ok, "output variable not found")
 		require.Equal(t, "RESULT=step_test", output, "unexpected output %q", output)
 	})
+
+	t.Run("RepeatPolicy_ConditionExpected", func(t *testing.T) {
+		sc := setup(t)
+
+		// This step will repeat until the file contains 'ready'
+		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_test_%s.txt", uuid.Must(uuid.NewV7()).String()))
+		_ = os.Remove(file)
+		graph := sc.newGraph(t,
+			newStep("1",
+				withCommand(fmt.Sprintf("cat %s || true", file)),
+				func(step *digraph.Step) {
+					step.RepeatPolicy.Condition = fmt.Sprintf("cat %s || true", file)
+					step.RepeatPolicy.Expected = "ready"
+					step.RepeatPolicy.Interval = 200 * time.Millisecond
+				},
+			),
+		)
+
+		go func() {
+			time.Sleep(350 * time.Millisecond)
+			_ = os.WriteFile(file, []byte("ready"), 0644)
+			defer os.Remove(file)
+		}()
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
+		// Should have run at least twice (first: not ready, second: ready)
+		node := result.Node(t, "1")
+		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+	})
+
+	t.Run("RepeatPolicy_ConditionExit0", func(t *testing.T) {
+		sc := setup(t)
+		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_exit0_%s", uuid.Must(uuid.NewV7()).String()))
+		_ = os.Remove(file)
+		graph := sc.newGraph(t,
+			newStep("1",
+				withCommand("test -f "+file),
+				func(step *digraph.Step) {
+					step.RepeatPolicy.Condition = "test -f " + file
+					step.RepeatPolicy.Interval = 200 * time.Millisecond
+				},
+			),
+		)
+		go func() {
+			time.Sleep(350 * time.Millisecond)
+			f, _ := os.Create(file)
+			f.Close()
+			defer os.Remove(file)
+		}()
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
+		node := result.Node(t, "1")
+		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+	})
+
+	t.Run("RepeatPolicy_ExitCode", func(t *testing.T) {
+		sc := setup(t)
+		countFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_exitcode_%s", uuid.Must(uuid.NewV7()).String()))
+		_ = os.Remove(countFile)
+		// Script: fail with exit 42 until file exists, then exit 0
+		script := fmt.Sprintf(`if [ ! -f %[1]s ]; then exit 42; else exit 0; fi`, countFile)
+		graph := sc.newGraph(t,
+			newStep("1",
+				withScript(script),
+				func(step *digraph.Step) {
+					step.RepeatPolicy.ExitCode = []int{42}
+					step.RepeatPolicy.Interval = 200 * time.Millisecond
+				},
+			),
+		)
+		go func() {
+			time.Sleep(350 * time.Millisecond)
+			f, _ := os.Create(countFile)
+			f.Close()
+			defer os.Remove(countFile)
+		}()
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
+		node := result.Node(t, "1")
+		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+	})
 }
 
 func successStep(name string, depends ...string) digraph.Step {

@@ -131,6 +131,12 @@ type RepeatPolicy struct {
 	Repeat bool `json:"repeat,omitempty"`
 	// Interval is the time to wait between repeats.
 	Interval time.Duration `json:"interval,omitempty"`
+	// Condition is the condition to be met for the repeat.
+	Condition string `json:"condition,omitempty"`
+	// Expected is the expected result of the condition.
+	Expected string `json:"expected,omitempty"`
+	// ExitCode is the list of exit codes that should trigger a repeat.
+	ExitCode []int `json:"exitCode,omitempty"`
 }
 
 // ContinueOn contains the conditions to continue on failure or skipped.

@@ -417,9 +417,24 @@
             "intervalSec": {
               "type": "integer",
               "description": "Interval in seconds between repetitions"
+            },
+            "condition": {
+              "type": "string",
+              "description": "Command or expression to evaluate for repeat-until. Can include shell commands, environment variables, or command substitutions."
+            },
+            "expected": {
+              "type": "string",
+              "description": "Expected value or pattern to match against the condition result. Supports regex patterns with 're:' prefix."
+            },
+            "exitCode": {
+              "oneOf": [
+                { "type": "integer" },
+                { "type": "array", "items": { "type": "integer" } }
+              ],
+              "description": "Exit code or list of exit codes that will stop repetition. If not specified, all non-zero exit codes will trigger repetition."
             }
           },
-          "description": "Configuration for repeatedly executing this step at fixed intervals."
+          "description": "Configuration for repeatedly executing this step at fixed intervals or until a condition is met. Supports string matching, command substitution, and exit code checks."
         },
         "mailOnError": {
           "type": "boolean",
