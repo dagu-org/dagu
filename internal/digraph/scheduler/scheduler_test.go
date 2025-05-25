@@ -824,6 +824,7 @@ func TestScheduler(t *testing.T) {
 
 	t.Run("RepeatPolicy_ConditionExit0", func(t *testing.T) {
 		sc := setup(t)
+		// This step will repeat until the file exists
 		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_exit0_%s", uuid.Must(uuid.NewV7()).String()))
 		_ = os.Remove(file)
 		defer os.Remove(file)
@@ -852,6 +853,7 @@ func TestScheduler(t *testing.T) {
 
 	t.Run("RepeatPolicy_ExitCode", func(t *testing.T) {
 		sc := setup(t)
+		// This step will repeat until exit code is not 42.
 		countFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_exitcode_%s", uuid.Must(uuid.NewV7()).String()))
 		_ = os.Remove(countFile)
 		defer os.Remove(countFile)
@@ -875,6 +877,63 @@ func TestScheduler(t *testing.T) {
 			time.Sleep(350 * time.Millisecond)
 			f, _ := os.Create(countFile)
 			f.Close()
+		}()
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
+		node := result.Node(t, "1")
+		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+	})
+
+	t.Run("RepeatPolicy_ConditionStringMatch_Expression", func(t *testing.T) {
+		sc := setup(t)
+		// This step will repeat until the environment variable TEST_REPEAT_MATCH_EXPR equals 'done'
+		os.Setenv("TEST_REPEAT_MATCH_EXPR", "notyet")
+		t.Cleanup(func() { os.Unsetenv("TEST_REPEAT_MATCH_EXPR") })
+		graph := sc.newGraph(t,
+			newStep("1",
+				withCommand("echo $TEST_REPEAT_MATCH_EXPR"),
+				func(step *digraph.Step) {
+					step.RepeatPolicy.Condition = &digraph.Condition{
+						Condition: "$TEST_REPEAT_MATCH_EXPR",
+						Expected:  "done",
+					}
+					step.RepeatPolicy.Interval = 100 * time.Millisecond
+				},
+			),
+		)
+		go func() {
+			time.Sleep(300 * time.Millisecond)
+			os.Setenv("TEST_REPEAT_MATCH_EXPR", "done")
+		}()
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
+		node := result.Node(t, "1")
+		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+	})
+
+	t.Run("RepeatPolicy_ConditionStringMatchWithOutputVar", func(t *testing.T) {
+		sc := setup(t)
+		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_outputvar_%s", uuid.Must(uuid.NewV7()).String()))
+		_ = os.Remove(file)
+		t.Cleanup(func() { os.Remove(file) })
+		// Write initial value
+		os.WriteFile(file, []byte("notyet"), 0644)
+		graph := sc.newGraph(t,
+			newStep("1",
+				withCommand(fmt.Sprintf("cat %s", file)),
+				withOutput("OUT"),
+				func(step *digraph.Step) {
+					step.RepeatPolicy.Condition = &digraph.Condition{
+						Condition: "$OUT",
+						Expected:  "done",
+					}
+					step.RepeatPolicy.Interval = 100 * time.Millisecond
+				},
+			),
+		)
+		go func() {
+			time.Sleep(300 * time.Millisecond)
+			os.WriteFile(file, []byte("done"), 0644)
 		}()
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)

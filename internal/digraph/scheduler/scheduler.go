@@ -291,6 +291,13 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 					shouldRepeat := false
 					step := node.Step()
 					if step.RepeatPolicy.Condition != nil {
+						// Ensure node's own output variables are reloaded
+						// before evaluating the condition.
+						if node.inner.State.OutputVariables != nil {
+							env := executor.GetEnv(ctx)
+							env.ForceLoadOutputVariables(node.inner.State.OutputVariables)
+							ctx = executor.WithEnv(ctx, env)
+						}
 						shell := cmdutil.GetShellCommand(step.Shell)
 						err := EvalCondition(ctx, shell, step.RepeatPolicy.Condition)
 						if step.RepeatPolicy.Condition.Expected != "" {

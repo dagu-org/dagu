@@ -73,10 +73,24 @@ func (e Env) AllEnvs() []string {
 
 // LoadOutputVariables loads the output variables from the given DAG into the
 func (e Env) LoadOutputVariables(vars *SyncMap) {
+	e.loadOutputVariables(vars, false)
+}
+
+// ForceLoadOutputVariables forces loading of output variables into the execution context.
+// This is the same as LoadOutputVariables, but it does not check if the key already exists.
+func (e Env) ForceLoadOutputVariables(vars *SyncMap) {
+	e.loadOutputVariables(vars, true)
+}
+
+// loadOutputVariables loads the output variables from the given SyncMap into the execution context.
+// If force is true, it will overwrite existing variables in the execution context.
+// If force is false, it will only load variables that are not already present in the execution context.
+func (e Env) loadOutputVariables(vars *SyncMap, force bool) {
 	vars.Range(func(key, value any) bool {
-		// Skip if the key already exists
-		if _, ok := e.Variables.Load(key); ok {
-			return true
+		if !force {
+			if _, ok := e.Variables.Load(key); ok {
+				return true
+			}
 		}
 		e.Variables.Store(key, value)
 		return true
