@@ -61,18 +61,18 @@ func TestDataRoot(t *testing.T) {
 func TestDataRootRuns(t *testing.T) {
 	t.Parallel()
 
-	t.Run("FindByWorkflowID", func(t *testing.T) {
+	t.Run("FindByDAGRunID", func(t *testing.T) {
 		ts := models.NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
 		ctx := context.Background()
 
-		root := setupTestDataRoot(t)
-		dagRun := root.CreateTestDAGRun(t, "test-id1", ts)
-		_ = root.CreateTestDAGRun(t, "test-id2", ts)
+		dr := setupTestDataRoot(t)
+		dagRun := dr.CreateTestDAGRun(t, "test-id1", ts)
+		_ = dr.CreateTestDAGRun(t, "test-id2", ts)
 
-		actual, err := root.FindByDAGRunID(ctx, "test-id1")
+		actual, err := dr.FindByDAGRunID(ctx, "test-id1")
 		require.NoError(t, err)
 
-		assert.Equal(t, dagRun.DAGRun, actual, "FindByWorkflowID should return the correct run")
+		assert.Equal(t, dagRun.DAGRun, actual, "FindByDAGRunID should return the correct run")
 	})
 
 	t.Run("Latest", func(t *testing.T) {
@@ -127,7 +127,7 @@ func TestDataRootRuns(t *testing.T) {
 		start := models.NewUTC(time.Date(2021, 1, 1, 5, 0, 0, 0, time.UTC))
 		end := models.NewUTC(time.Date(2021, 1, 2, 2, 0, 0, 0, time.UTC))
 
-		result := root.listInRange(context.Background(), start, end, nil)
+		result := root.listDAGRunsInRange(context.Background(), start, end, nil)
 		require.Len(t, result, 21, "ListInRange should return the correct")
 
 		// Check the first and last timestamps
@@ -215,13 +215,13 @@ type DataRootTest struct {
 	Context context.Context
 }
 
-func (drt *DataRootTest) CreateTestDAGRun(t *testing.T, workflowID string, ts models.TimeInUTC) DAGRunTest {
+func (drt *DataRootTest) CreateTestDAGRun(t *testing.T, dagRunID string, ts models.TimeInUTC) DAGRunTest {
 	t.Helper()
 
 	err := drt.Create()
 	require.NoError(t, err)
 
-	run, err := drt.CreateDAGRun(ts, workflowID)
+	run, err := drt.CreateDAGRun(ts, dagRunID)
 	require.NoError(t, err)
 
 	return DAGRunTest{

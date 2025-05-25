@@ -166,7 +166,7 @@ func (store *Store) collectStatusesFromRoots(
 				return
 			}
 
-			workflows := root.listInRange(ctx, opts.From, opts.To, &listInRangeOpts{
+			workflows := root.listDAGRunsInRange(ctx, opts.From, opts.To, &listDAGRunsInRangeOpts{
 				limit: int(remaining.Load()),
 			})
 
