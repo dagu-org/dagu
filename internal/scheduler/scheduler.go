@@ -31,13 +31,13 @@ type Job interface {
 }
 
 type Scheduler struct {
-	hm           history.Manager
+	hm           history.DAGRunManager
 	er           EntryReader
 	logDir       string
 	stopChan     chan struct{}
 	running      atomic.Bool
 	location     *time.Location
-	historyStore models.HistoryStore
+	historyStore models.DAGRunStore
 	queueStore   models.QueueStore
 	procStore    models.ProcStore
 	cancel       context.CancelFunc
@@ -52,8 +52,8 @@ type queueConfig struct {
 func New(
 	cfg *config.Config,
 	er EntryReader,
-	hm history.Manager,
-	hs models.HistoryStore,
+	hm history.DAGRunManager,
+	hs models.DAGRunStore,
 	qs models.QueueStore,
 	ps models.ProcStore,
 ) *Scheduler {
@@ -155,8 +155,8 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			logger.Info(ctx, "Received item from queue", "data", data)
 			var (
 				dag       *digraph.DAG
-				history   models.Run
-				status    *models.Status
+				history   models.DAGRunAttempt
+				status    *models.DAGRunStatus
 				err       error
 				done      bool
 				startedAt time.Time
@@ -174,7 +174,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			}
 
 			// Fetch the dag of the workflow
-			history, err = s.historyStore.FindRun(ctx, data)
+			history, err = s.historyStore.FindAttempt(ctx, data)
 			if err != nil {
 				logger.Error(ctx, "Failed to find run", "err", err, "data", data)
 				goto SEND_RESULT
@@ -205,7 +205,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			})
 
 			startedAt = time.Now()
-			if err := s.hm.RetryDAG(ctx, dag, data.WorkflowID); err != nil {
+			if err := s.hm.RetryDAGRun(ctx, dag, data.ID); err != nil {
 				logger.Error(ctx, "Failed to retry dag", "err", err, "data", data)
 				goto SEND_RESULT
 			}
@@ -214,7 +214,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 		WAIT_FOR_RUN:
 			for {
 				// Check if the dag is running
-				history, err = s.historyStore.FindRun(ctx, data)
+				history, err = s.historyStore.FindAttempt(ctx, data)
 				if err != nil {
 					logger.Error(ctx, "Failed to find run", "err", err, "data", data)
 				}

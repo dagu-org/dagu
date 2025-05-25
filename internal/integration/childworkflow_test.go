@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRetryChildWOrkflow(t *testing.T) {
+func TestRetryChildDAGRun(t *testing.T) {
 	// Get DAG path
 	th := test.SetupCommand(t)
 
@@ -56,17 +56,17 @@ steps:
 	args := []string{"start", "--workflow-id", workflowID, "parent"}
 	th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
 		Args:        args,
-		ExpectedOut: []string{"Workflow finished"},
+		ExpectedOut: []string{"DAG-run finished"},
 	})
 
 	// Update the child_2 status to "failed" to simulate a retry
 	// First, find the child_2 workflow ID to update its status
 	ctx := context.Background()
-	ref := digraph.NewWorkflowRef("parent", workflowID)
-	parentRun, err := th.HistoryStore.FindRun(ctx, ref)
+	ref := digraph.NewDAGRunRef("parent", workflowID)
+	parentRun, err := th.HistoryStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
 
-	updateStatus := func(rec models.Run, status *models.Status) {
+	updateStatus := func(rec models.DAGRunAttempt, status *models.DAGRunStatus) {
 		err = rec.Open(ctx)
 		require.NoError(t, err)
 		err = rec.Write(ctx, *status)
@@ -84,7 +84,7 @@ steps:
 	updateStatus(parentRun, parentStatus)
 
 	// (2) Find the child_1 workflow ID to update its status
-	child1Run, err := th.HistoryStore.FindChildWorkflowRun(ctx, ref, child1Node.Children[0].WorkflowID)
+	child1Run, err := th.HistoryStore.FindChildAttempt(ctx, ref, child1Node.Children[0].WorkflowID)
 	require.NoError(t, err)
 
 	child1Status, err := child1Run.ReadStatus(ctx)
@@ -96,7 +96,7 @@ steps:
 	updateStatus(child1Run, child1Status)
 
 	// (4) Find the child_2 workflow ID to update its status
-	child2Run, err := th.HistoryStore.FindChildWorkflowRun(ctx, ref, child2Node.Children[0].WorkflowID)
+	child2Run, err := th.HistoryStore.FindChildAttempt(ctx, ref, child2Node.Children[0].WorkflowID)
 	require.NoError(t, err)
 
 	child2Status, err := child2Run.ReadStatus(ctx)
@@ -118,16 +118,16 @@ steps:
 	args = []string{"retry", "--workflow-id", workflowID, "parent"}
 	th.RunCommand(t, cmd.CmdRetry(), test.CmdTest{
 		Args:        args,
-		ExpectedOut: []string{"Workflow finished"},
+		ExpectedOut: []string{"DAG-run finished"},
 	})
 
 	// Check if the child_2 status is now "success"
-	child2Run, err = th.HistoryStore.FindChildWorkflowRun(ctx, ref, child2Node.Children[0].WorkflowID)
+	child2Run, err = th.HistoryStore.FindChildAttempt(ctx, ref, child2Node.Children[0].WorkflowID)
 	require.NoError(t, err)
 	child2Status, err = child2Run.ReadStatus(ctx)
 	require.NoError(t, err)
 	require.Equal(t, child2Status.Nodes[0].Status.String(), scheduler.NodeStatusSuccess.String())
 
 	require.Equal(t, "parent", child2Status.Root.Name, "parent")
-	require.Equal(t, workflowID, child2Status.Root.WorkflowID)
+	require.Equal(t, workflowID, child2Status.Root.ID)
 }

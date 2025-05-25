@@ -110,7 +110,7 @@ func TestWriterRename(t *testing.T) {
 
 	// Rename and verify the file
 	newDAG := th.DAG("test_rename_new")
-	err := th.HistoryStore.RenameWorkflows(context.Background(), dag.Location, newDAG.Location)
+	err := th.HistoryStore.RenameDAGRuns(context.Background(), dag.Location, newDAG.Location)
 	require.NoError(t, err)
 	newWriter := newDAG.Writer(t, "workflow-id-2", time.Now())
 

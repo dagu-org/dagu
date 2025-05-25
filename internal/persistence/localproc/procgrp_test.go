@@ -23,9 +23,9 @@ func TestProcGroup(t *testing.T) {
 	procFiles := NewProcGroup(baseDir, name, time.Hour)
 
 	// Create a proc file
-	proc, err := procFiles.Acquire(ctx, digraph.WorkflowRef{
-		Name:       "test_proc",
-		WorkflowID: "test_id",
+	proc, err := procFiles.Acquire(ctx, digraph.DAGRunRef{
+		Name: "test_proc",
+		ID:   "test_id",
 	})
 	require.NoError(t, err, "failed to get proc")
 
@@ -81,9 +81,9 @@ func TestProcGroup_IsStale(t *testing.T) {
 	pg := NewProcGroup(baseDir, name, time.Second*5)
 
 	// create a proc
-	proc, err := pg.Acquire(ctx, digraph.WorkflowRef{
-		Name:       "test_proc",
-		WorkflowID: "test_id",
+	proc, err := pg.Acquire(ctx, digraph.DAGRunRef{
+		Name: "test_proc",
+		ID:   "test_id",
 	})
 	require.NoError(t, err, "failed to get proc")
 

@@ -16,7 +16,7 @@ import (
 
 type LocalStoreTest struct {
 	Context      context.Context
-	HistoryStore models.HistoryStore
+	HistoryStore models.DAGRunStore
 	TmpDir       string
 }
 
@@ -36,11 +36,11 @@ func setupTestLocalStore(t *testing.T) LocalStoreTest {
 	return th
 }
 
-func (th LocalStoreTest) CreateRun(t *testing.T, ts time.Time, workflowID string, s scheduler.Status) *Run {
+func (th LocalStoreTest) CreateRun(t *testing.T, ts time.Time, workflowID string, s scheduler.Status) *Attempt {
 	t.Helper()
 
 	dag := th.DAG("test_DAG")
-	run, err := th.HistoryStore.CreateRun(th.Context, dag.DAG, ts, workflowID, models.NewRunOptions{})
+	run, err := th.HistoryStore.CreateAttempt(th.Context, dag.DAG, ts, workflowID, models.NewDAGRunAttemptOptions{})
 	require.NoError(t, err)
 
 	err = run.Open(th.Context)
@@ -51,13 +51,13 @@ func (th LocalStoreTest) CreateRun(t *testing.T, ts time.Time, workflowID string
 	}()
 
 	status := models.InitialStatus(dag.DAG)
-	status.WorkflowID = workflowID
+	status.RunID = workflowID
 	status.Status = s
 
 	err = run.Write(th.Context, status)
 	require.NoError(t, err)
 
-	return run.(*Run)
+	return run.(*Attempt)
 }
 
 func (th LocalStoreTest) DAG(name string) DAGTest {
@@ -102,7 +102,7 @@ func (d DAGTest) Writer(t *testing.T, workflowID string, startedAt time.Time) Wr
 	}
 }
 
-func (w WriterTest) Write(t *testing.T, status models.Status) {
+func (w WriterTest) Write(t *testing.T, status models.DAGRunStatus) {
 	t.Helper()
 
 	err := w.Writer.write(status)
@@ -116,7 +116,7 @@ func (w WriterTest) AssertContent(t *testing.T, name, workflowID string, status 
 	require.NoError(t, err)
 
 	assert.Equal(t, name, data.Name)
-	assert.Equal(t, workflowID, data.WorkflowID)
+	assert.Equal(t, workflowID, data.RunID)
 	assert.Equal(t, status, data.Status)
 }
 

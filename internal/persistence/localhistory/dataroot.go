@@ -28,11 +28,11 @@ import (
 // It handles the organization of run data in a hierarchical structure
 // based on year, month, and day.
 type DataRoot struct {
-	baseDir       string               // Base directory for all DAGs
-	prefix        string               // Sanitized prefix for directory names
-	executionsDir string               // Path to the executions directory
-	globPattern   string               // Pattern for finding run directories
-	root          *digraph.WorkflowRef // Optional reference to the root DAG
+	baseDir       string             // Base directory for all DAGs
+	prefix        string             // Sanitized prefix for directory names
+	executionsDir string             // Path to the executions directory
+	globPattern   string             // Pattern for finding run directories
+	root          *digraph.DAGRunRef // Optional reference to the root DAG
 }
 
 // NewDataRoot creates a new DataRoot instance for managing a DAG's run history.
@@ -101,7 +101,7 @@ func (dr *DataRoot) FindByWorkflowID(_ context.Context, workflowID string) (*Wor
 	}
 
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("%w: %s", models.ErrWorkflowIDNotFound, workflowID)
+		return nil, fmt.Errorf("%w: %s", models.ErrDAGRunIDNotFound, workflowID)
 	}
 
 	// Sort matches by timestamp (most recent first)

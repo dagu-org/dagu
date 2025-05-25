@@ -14,7 +14,7 @@ import (
 )
 
 func (a *API) ListWorkflows(ctx context.Context, request api.ListWorkflowsRequestObject) (api.ListWorkflowsResponseObject, error) {
-	var opts []models.ListStatusesOption
+	var opts []models.ListDAGRunStatusesOption
 	if request.Params.Status != nil {
 		opts = append(opts, models.WithStatuses([]scheduler.Status{
 			scheduler.Status(*request.Params.Status),
@@ -32,7 +32,7 @@ func (a *API) ListWorkflows(ctx context.Context, request api.ListWorkflowsReques
 		opts = append(opts, models.WithName(*request.Params.Name))
 	}
 	if request.Params.WorkflowId != nil {
-		opts = append(opts, models.WithWorkflowID(*request.Params.WorkflowId))
+		opts = append(opts, models.WithDAGRunID(*request.Params.WorkflowId))
 	}
 
 	workflows, err := a.listWorkflows(ctx, opts)
@@ -46,7 +46,7 @@ func (a *API) ListWorkflows(ctx context.Context, request api.ListWorkflowsReques
 }
 
 func (a *API) ListWorkflowsByName(ctx context.Context, request api.ListWorkflowsByNameRequestObject) (api.ListWorkflowsByNameResponseObject, error) {
-	opts := []models.ListStatusesOption{
+	opts := []models.ListDAGRunStatusesOption{
 		models.WithExactName(request.Name),
 	}
 
@@ -64,7 +64,7 @@ func (a *API) ListWorkflowsByName(ctx context.Context, request api.ListWorkflows
 		opts = append(opts, models.WithTo(dt))
 	}
 	if request.Params.WorkflowId != nil {
-		opts = append(opts, models.WithWorkflowID(*request.Params.WorkflowId))
+		opts = append(opts, models.WithDAGRunID(*request.Params.WorkflowId))
 	}
 
 	workflows, err := a.listWorkflows(ctx, opts)
@@ -77,7 +77,7 @@ func (a *API) ListWorkflowsByName(ctx context.Context, request api.ListWorkflows
 	}, nil
 }
 
-func (a *API) listWorkflows(ctx context.Context, opts []models.ListStatusesOption) ([]api.WorkflowSummary, error) {
+func (a *API) listWorkflows(ctx context.Context, opts []models.ListDAGRunStatusesOption) ([]api.WorkflowSummary, error) {
 	statuses, err := a.historyStore.ListStatuses(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("error listing workflows: %w", err)
@@ -93,8 +93,8 @@ func (a *API) GetWorkflowLog(ctx context.Context, request api.GetWorkflowLogRequ
 	dagName := request.Name
 	workflowId := request.WorkflowId
 
-	ref := digraph.NewWorkflowRef(dagName, workflowId)
-	status, err := a.historyManager.FindWorkflowStatus(ctx, ref)
+	ref := digraph.NewDAGRunRef(dagName, workflowId)
+	status, err := a.historyManager.GetSavedStatus(ctx, ref)
 	if err != nil {
 		return api.GetWorkflowLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -129,8 +129,8 @@ func (a *API) GetWorkflowStepLog(ctx context.Context, request api.GetWorkflowSte
 	dagName := request.Name
 	workflowId := request.WorkflowId
 
-	ref := digraph.NewWorkflowRef(dagName, workflowId)
-	status, err := a.historyManager.FindWorkflowStatus(ctx, ref)
+	ref := digraph.NewDAGRunRef(dagName, workflowId)
+	status, err := a.historyManager.GetSavedStatus(ctx, ref)
 	if err != nil {
 		return api.GetWorkflowStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -175,8 +175,8 @@ func (a *API) GetWorkflowStepLog(ctx context.Context, request api.GetWorkflowSte
 }
 
 func (a *API) UpdateWorkflowStepStatus(ctx context.Context, request api.UpdateWorkflowStepStatusRequestObject) (api.UpdateWorkflowStepStatusResponseObject, error) {
-	ref := digraph.NewWorkflowRef(request.Name, request.WorkflowId)
-	status, err := a.historyManager.FindWorkflowStatus(ctx, ref)
+	ref := digraph.NewDAGRunRef(request.Name, request.WorkflowId)
+	status, err := a.historyManager.GetSavedStatus(ctx, ref)
 	if err != nil {
 		return &api.UpdateWorkflowStepStatus404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -206,7 +206,7 @@ func (a *API) UpdateWorkflowStepStatus(ctx context.Context, request api.UpdateWo
 
 	status.Nodes[idxToUpdate].Status = nodeStatusMapping[request.Body.Status]
 
-	root := digraph.NewWorkflowRef(request.Name, request.WorkflowId)
+	root := digraph.NewDAGRunRef(request.Name, request.WorkflowId)
 	if err := a.historyManager.UpdateStatus(ctx, root, *status); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
 	}
@@ -216,8 +216,8 @@ func (a *API) UpdateWorkflowStepStatus(ctx context.Context, request api.UpdateWo
 
 // GetWorkflowDetails implements api.StrictServerInterface.
 func (a *API) GetWorkflowDetails(ctx context.Context, request api.GetWorkflowDetailsRequestObject) (api.GetWorkflowDetailsResponseObject, error) {
-	ref := digraph.NewWorkflowRef(request.Name, request.WorkflowId)
-	status, err := a.historyManager.FindWorkflowStatus(ctx, ref)
+	ref := digraph.NewDAGRunRef(request.Name, request.WorkflowId)
+	status, err := a.historyManager.GetSavedStatus(ctx, ref)
 	if err != nil {
 		return &api.GetWorkflowDetails404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -231,8 +231,8 @@ func (a *API) GetWorkflowDetails(ctx context.Context, request api.GetWorkflowDet
 
 // GetChildWorkflowDetails implements api.StrictServerInterface.
 func (a *API) GetChildWorkflowDetails(ctx context.Context, request api.GetChildWorkflowDetailsRequestObject) (api.GetChildWorkflowDetailsResponseObject, error) {
-	root := digraph.NewWorkflowRef(request.Name, request.WorkflowId)
-	status, err := a.historyManager.FindChildWorkflowStatus(ctx, root, request.ChildWorkflowId)
+	root := digraph.NewDAGRunRef(request.Name, request.WorkflowId)
+	status, err := a.historyManager.FindChildDAGRunStatus(ctx, root, request.ChildWorkflowId)
 	if err != nil {
 		return &api.GetChildWorkflowDetails404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -246,8 +246,8 @@ func (a *API) GetChildWorkflowDetails(ctx context.Context, request api.GetChildW
 
 // GetChildWorkflowLog implements api.StrictServerInterface.
 func (a *API) GetChildWorkflowLog(ctx context.Context, request api.GetChildWorkflowLogRequestObject) (api.GetChildWorkflowLogResponseObject, error) {
-	root := digraph.NewWorkflowRef(request.Name, request.WorkflowId)
-	status, err := a.historyManager.FindChildWorkflowStatus(ctx, root, request.ChildWorkflowId)
+	root := digraph.NewDAGRunRef(request.Name, request.WorkflowId)
+	status, err := a.historyManager.FindChildDAGRunStatus(ctx, root, request.ChildWorkflowId)
 	if err != nil {
 		return &api.GetChildWorkflowLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -280,8 +280,8 @@ func (a *API) GetChildWorkflowLog(ctx context.Context, request api.GetChildWorkf
 
 // GetChildWorkflowStepLog implements api.StrictServerInterface.
 func (a *API) GetChildWorkflowStepLog(ctx context.Context, request api.GetChildWorkflowStepLogRequestObject) (api.GetChildWorkflowStepLogResponseObject, error) {
-	root := digraph.NewWorkflowRef(request.Name, request.WorkflowId)
-	status, err := a.historyManager.FindChildWorkflowStatus(ctx, root, request.ChildWorkflowId)
+	root := digraph.NewDAGRunRef(request.Name, request.WorkflowId)
+	status, err := a.historyManager.FindChildDAGRunStatus(ctx, root, request.ChildWorkflowId)
 	if err != nil {
 		return &api.GetChildWorkflowStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -327,8 +327,8 @@ func (a *API) GetChildWorkflowStepLog(ctx context.Context, request api.GetChildW
 
 // UpdateChildWorkflowStepStatus implements api.StrictServerInterface.
 func (a *API) UpdateChildWorkflowStepStatus(ctx context.Context, request api.UpdateChildWorkflowStepStatusRequestObject) (api.UpdateChildWorkflowStepStatusResponseObject, error) {
-	root := digraph.NewWorkflowRef(request.Name, request.WorkflowId)
-	status, err := a.historyManager.FindChildWorkflowStatus(ctx, root, request.ChildWorkflowId)
+	root := digraph.NewDAGRunRef(request.Name, request.WorkflowId)
+	status, err := a.historyManager.FindChildDAGRunStatus(ctx, root, request.ChildWorkflowId)
 	if err != nil {
 		return &api.UpdateChildWorkflowStepStatus404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -375,7 +375,7 @@ var nodeStatusMapping = map[api.NodeStatus]scheduler.NodeStatus{
 }
 
 func (a *API) RetryWorkflow(ctx context.Context, request api.RetryWorkflowRequestObject) (api.RetryWorkflowResponseObject, error) {
-	run, err := a.historyStore.FindRun(ctx, digraph.NewWorkflowRef(request.Name, request.WorkflowId))
+	run, err := a.historyStore.FindAttempt(ctx, digraph.NewDAGRunRef(request.Name, request.WorkflowId))
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -389,7 +389,7 @@ func (a *API) RetryWorkflow(ctx context.Context, request api.RetryWorkflowReques
 		return nil, fmt.Errorf("error reading DAG: %w", err)
 	}
 
-	if err := a.historyManager.RetryDAG(ctx, dag, request.Body.WorkflowId); err != nil {
+	if err := a.historyManager.RetryDAGRun(ctx, dag, request.Body.WorkflowId); err != nil {
 		return nil, fmt.Errorf("error retrying DAG: %w", err)
 	}
 
@@ -397,7 +397,7 @@ func (a *API) RetryWorkflow(ctx context.Context, request api.RetryWorkflowReques
 }
 
 func (a *API) TerminateWorkflow(ctx context.Context, request api.TerminateWorkflowRequestObject) (api.TerminateWorkflowResponseObject, error) {
-	run, err := a.historyStore.FindRun(ctx, digraph.NewWorkflowRef(request.Name, request.WorkflowId))
+	run, err := a.historyStore.FindAttempt(ctx, digraph.NewDAGRunRef(request.Name, request.WorkflowId))
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -411,7 +411,7 @@ func (a *API) TerminateWorkflow(ctx context.Context, request api.TerminateWorkfl
 		return nil, fmt.Errorf("error reading DAG: %w", err)
 	}
 
-	status, err := a.historyManager.GetDAGRealtimeStatus(ctx, dag, request.WorkflowId)
+	status, err := a.historyManager.GetCurrentStatus(ctx, dag, request.WorkflowId)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -428,7 +428,7 @@ func (a *API) TerminateWorkflow(ctx context.Context, request api.TerminateWorkfl
 		}
 	}
 
-	if err := a.historyManager.Stop(ctx, dag, status.WorkflowID); err != nil {
+	if err := a.historyManager.Stop(ctx, dag, status.RunID); err != nil {
 		return nil, fmt.Errorf("error stopping DAG: %w", err)
 	}
 
@@ -436,8 +436,8 @@ func (a *API) TerminateWorkflow(ctx context.Context, request api.TerminateWorkfl
 }
 
 func (a *API) DequeueWorkflow(ctx context.Context, request api.DequeueWorkflowRequestObject) (api.DequeueWorkflowResponseObject, error) {
-	workflow := digraph.NewWorkflowRef(request.Name, request.WorkflowId)
-	run, err := a.historyStore.FindRun(ctx, workflow)
+	workflow := digraph.NewDAGRunRef(request.Name, request.WorkflowId)
+	run, err := a.historyStore.FindAttempt(ctx, workflow)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -451,7 +451,7 @@ func (a *API) DequeueWorkflow(ctx context.Context, request api.DequeueWorkflowRe
 		return nil, fmt.Errorf("error reading DAG: %w", err)
 	}
 
-	latestStatus, err := a.historyManager.GetDAGRealtimeStatus(ctx, dag, workflow.WorkflowID)
+	latestStatus, err := a.historyManager.GetCurrentStatus(ctx, dag, workflow.ID)
 	if err != nil {
 		return nil, fmt.Errorf("error getting latest status: %w", err)
 	}
@@ -464,7 +464,7 @@ func (a *API) DequeueWorkflow(ctx context.Context, request api.DequeueWorkflowRe
 		}
 	}
 
-	if err := a.historyManager.DequeueWorkflow(ctx, workflow); err != nil {
+	if err := a.historyManager.DequeueDAGRun(ctx, workflow); err != nil {
 		return nil, fmt.Errorf("error dequeueing workflow: %w", err)
 	}
 

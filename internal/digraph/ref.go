@@ -5,45 +5,46 @@ import (
 	"strings"
 )
 
-// Errors for ExecRef
+// Errors for RunRef parsing
 var (
-	ErrInvalidWorkflowRefFormat = errors.New("invalid workflow-ref format")
+	ErrInvalidRunRefFormat = errors.New("invalid DAG-run reference format")
 )
 
-// WorkflowRef represents a reference to a workflow execution
-type WorkflowRef struct {
-	Name       string `json:"name,omitempty"`
-	WorkflowID string `json:"workflowId,omitempty"`
+// DAGRunRef represents a reference to a DAG-run
+type DAGRunRef struct {
+	Name string `json:"name,omitempty"`
+	ID   string `json:"id,omitempty"`
 }
 
-// NewWorkflowRef creates a new WorkflowRef with the given name and workflow ID.
-// It is used to identify a specific execution of a workflow.
-func NewWorkflowRef(name, workflowID string) WorkflowRef {
-	return WorkflowRef{
-		Name:       name,
-		WorkflowID: workflowID,
+// NewDAGRunRef creates a new reference to DAG-run with the given DAG name and run ID.
+// It is used to identify a specific DAG-run.
+func NewDAGRunRef(name, runID string) DAGRunRef {
+	return DAGRunRef{
+		Name: name,
+		ID:   runID,
 	}
 }
 
-// String returns a string representation of the ExecRef.
-func (e WorkflowRef) String() string {
-	return e.Name + ":" + e.WorkflowID
+// String returns a string representation of the DAG-run reference.
+func (e DAGRunRef) String() string {
+	return e.Name + ":" + e.ID
 }
 
-// Zero checks if the WorkflowRef is a zero value.
-func (e WorkflowRef) Zero() bool {
+// Zero checks if the DAGRunRef is a zero value.
+func (e DAGRunRef) Zero() bool {
 	return e == zeroRef
 }
 
-// ParseWorkflowRef parses a string representation of a WorkflowRef.
-// The expected format is "name:workflowID".
-func ParseWorkflowRef(s string) (WorkflowRef, error) {
+// ParseDAGRunRef parses a string into a DAGRunRef.
+// The expected format is "name:runId".
+// If the format is invalid, it returns an error.
+func ParseDAGRunRef(s string) (DAGRunRef, error) {
 	parts := strings.SplitN(s, ":", 2)
 	if len(parts) != 2 {
-		return WorkflowRef{}, ErrInvalidWorkflowRefFormat
+		return DAGRunRef{}, ErrInvalidRunRefFormat
 	}
-	return NewWorkflowRef(parts[0], parts[1]), nil
+	return NewDAGRunRef(parts[0], parts[1]), nil
 }
 
-// zeroRef is a zero value for WorkflowRef, used for comparison.
-var zeroRef WorkflowRef
+// zeroRef is a zero value for DAGRunRef.
+var zeroRef DAGRunRef

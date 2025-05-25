@@ -30,9 +30,9 @@ func TestQueueFile(t *testing.T) {
 	require.Equal(t, 0, queueLen, "expected queue length to be 0")
 
 	// Add a job to the queue
-	err = qf.Push(th.Context, digraph.WorkflowRef{
-		Name:       "test-name",
-		WorkflowID: "test-workflow",
+	err = qf.Push(th.Context, digraph.DAGRunRef{
+		Name: "test-name",
+		ID:   "test-workflow",
 	})
 	require.NoError(t, err, "expected no error when adding job to queue")
 
@@ -47,7 +47,7 @@ func TestQueueFile(t *testing.T) {
 
 	require.NotNil(t, job, "expected job to be not nil")
 	require.Equal(t, "test-name", job.Workflow.Name, "expected job name to be 'test-name'")
-	require.Equal(t, "test-workflow", job.Workflow.WorkflowID, "expected job ID to be 'test'")
+	require.Equal(t, "test-workflow", job.Workflow.ID, "expected job ID to be 'test'")
 
 	// Check if the item has the correct prefix
 	require.Regexp(t, "^item_high_", job.FileName, "expected job file name to start with 'item_priority_'")
@@ -75,9 +75,9 @@ func TestQueueFile_FindByWorkflowID(t *testing.T) {
 	}
 
 	// Add a job to the queue
-	err := qf.Push(th.Context, digraph.WorkflowRef{
-		Name:       "test-name",
-		WorkflowID: "test-workflow",
+	err := qf.Push(th.Context, digraph.DAGRunRef{
+		Name: "test-name",
+		ID:   "test-workflow",
 	})
 	require.NoError(t, err, "expected no error when adding job to queue")
 
@@ -86,7 +86,7 @@ func TestQueueFile_FindByWorkflowID(t *testing.T) {
 	require.NoError(t, err, "expected no error when finding job by workflow ID")
 	require.NotNil(t, job, "expected job to be not nil")
 	require.Equal(t, "test-name", job.Workflow.Name, "expected job name to be 'test-name'")
-	require.Equal(t, "test-workflow", job.Workflow.WorkflowID, "expected job ID to be 'test'")
+	require.Equal(t, "test-workflow", job.Workflow.ID, "expected job ID to be 'test'")
 
 	// Check if the item has the correct prefix
 	require.Regexp(t, "^item_high_", job.FileName, "expected job file name to start with 'high_'")
@@ -106,9 +106,9 @@ func TestQueueFile_Pop(t *testing.T) {
 	}
 
 	// Add a job to the queue
-	err := qf.Push(th.Context, digraph.WorkflowRef{
-		Name:       "test-name",
-		WorkflowID: "test-workflow",
+	err := qf.Push(th.Context, digraph.DAGRunRef{
+		Name: "test-name",
+		ID:   "test-workflow",
 	})
 	require.NoError(t, err, "expected no error when adding job to queue")
 
@@ -117,7 +117,7 @@ func TestQueueFile_Pop(t *testing.T) {
 	require.NoError(t, err, "expected no error when removing job from queue")
 	require.Len(t, removedJobs, 1, "expected one job to be removed")
 	require.Equal(t, "test-name", removedJobs[0].Workflow.Name, "expected job name to be 'test-name'")
-	require.Equal(t, "test-workflow", removedJobs[0].Workflow.WorkflowID, "expected job ID to be 'test'")
+	require.Equal(t, "test-workflow", removedJobs[0].Workflow.ID, "expected job ID to be 'test'")
 
 	// Check if the queue is empty
 	queueLen, err := qf.Len(th.Context)

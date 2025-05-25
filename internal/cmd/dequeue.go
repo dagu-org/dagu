@@ -28,7 +28,7 @@ var dequeueFlags = []commandLineFlag{paramsFlag, workflowFlagDequeue}
 func runDequeue(ctx *Context, _ []string) error {
 	// Get workflow ID from flags
 	workflowRef, _ := ctx.StringParam("workflow")
-	workflow, err := digraph.ParseWorkflowRef(workflowRef)
+	workflow, err := digraph.ParseDAGRunRef(workflowRef)
 	if err != nil {
 		return fmt.Errorf("failed to parse workflow reference %s: %w", workflowRef, err)
 	}
@@ -36,10 +36,10 @@ func runDequeue(ctx *Context, _ []string) error {
 }
 
 // dequeueWorkflow dequeues a workflow to the queue.
-func dequeueWorkflow(ctx *Context, workflow digraph.WorkflowRef) error {
-	run, err := ctx.HistoryStore.FindRun(ctx, workflow)
+func dequeueWorkflow(ctx *Context, workflow digraph.DAGRunRef) error {
+	run, err := ctx.HistoryStore.FindAttempt(ctx, workflow)
 	if err != nil {
-		return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflow.WorkflowID, err)
+		return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflow.ID, err)
 	}
 
 	status, err := run.ReadStatus(ctx)
@@ -49,7 +49,7 @@ func dequeueWorkflow(ctx *Context, workflow digraph.WorkflowRef) error {
 
 	if status.Status != scheduler.StatusQueued {
 		// If the status is not queued, return an error
-		return fmt.Errorf("workflow %s is not in queued status but %s", workflow.WorkflowID, status.Status)
+		return fmt.Errorf("workflow %s is not in queued status but %s", workflow.ID, status.Status)
 	}
 
 	dag, err := run.ReadDAG(ctx)
@@ -58,12 +58,12 @@ func dequeueWorkflow(ctx *Context, workflow digraph.WorkflowRef) error {
 	}
 
 	// Make sure the workflow is not running at least locally
-	latestStatus, err := ctx.HistoryMgr.GetDAGRealtimeStatus(ctx, dag, workflow.WorkflowID)
+	latestStatus, err := ctx.HistoryMgr.GetCurrentStatus(ctx, dag, workflow.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get latest status: %w", err)
 	}
 	if latestStatus.Status != scheduler.StatusQueued {
-		return fmt.Errorf("workflow %s is not in queued status but %s", workflow.WorkflowID, latestStatus.Status)
+		return fmt.Errorf("workflow %s is not in queued status but %s", workflow.ID, latestStatus.Status)
 	}
 
 	// Make the workflow status to cancelled
@@ -80,13 +80,13 @@ func dequeueWorkflow(ctx *Context, workflow digraph.WorkflowRef) error {
 	}
 
 	// Dequeue the workflow
-	if _, err = ctx.QueueStore.DequeueByWorkflowID(ctx.Context, workflow.Name, workflow.WorkflowID); err != nil {
-		return fmt.Errorf("failed to dequeue workflow %s: %w", workflow.WorkflowID, err)
+	if _, err = ctx.QueueStore.DequeueByWorkflowID(ctx.Context, workflow.Name, workflow.ID); err != nil {
+		return fmt.Errorf("failed to dequeue workflow %s: %w", workflow.ID, err)
 	}
 
 	logger.Info(ctx.Context, "Dequeued workflow",
 		"workflowName", workflow.Name,
-		"workflowId", workflow.WorkflowID,
+		"dagRunId", workflow.ID,
 	)
 
 	return nil

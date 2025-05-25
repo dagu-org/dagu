@@ -118,7 +118,7 @@ func (e *childWorkflow) Run(ctx context.Context) error {
 	e.cmd = cmd
 
 	logger.Info(ctx, "Executing child workflow",
-		"workflowId", e.childWorkflowID,
+		"dagRunId", e.childWorkflowID,
 		"target", e.dag.Name,
 		"args", args,
 	)
@@ -135,7 +135,7 @@ func (e *childWorkflow) Run(ctx context.Context) error {
 	}
 
 	// get results from the child workflow
-	result, err := env.DB.GetChildWorkflowStatus(ctx, e.childWorkflowID, env.Root)
+	result, err := env.DB.GetChildDAGRunStatus(ctx, e.childWorkflowID, env.Root)
 	if err != nil {
 		return fmt.Errorf("failed to find result for the child workflow (workflow ID=%s root=%s): %w", e.childWorkflowID, env.Root, err)
 	}

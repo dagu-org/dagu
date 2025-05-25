@@ -82,8 +82,8 @@ func NewWorkflow(dir string) (*Workflow, error) {
 
 // CreateRun creates a new run for the workflow with the given timestamp.
 // It creates a new run directory and initializes a record within it.
-func (e Workflow) CreateRun(_ context.Context, ts models.TimeInUTC, cache *fileutil.Cache[*models.Status], opts ...RunOption) (*Run, error) {
-	runID, err := genRunID()
+func (e Workflow) CreateRun(_ context.Context, ts models.TimeInUTC, cache *fileutil.Cache[*models.DAGRunStatus], opts ...AttemptOption) (*Attempt, error) {
+	runID, err := genAttemptID()
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (e Workflow) CreateRun(_ context.Context, ts models.TimeInUTC, cache *fileu
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create the run directory: %w", err)
 	}
-	return NewRun(filepath.Join(dir, JSONLStatusFile), cache, opts...)
+	return NewAttempt(filepath.Join(dir, JSONLStatusFile), cache, opts...)
 }
 
 // CreateChildWorkflow creates a new child workflow with the given timestamp and workflow ID.
@@ -116,7 +116,7 @@ func (e Workflow) FindChildWorkflow(_ context.Context, workflowID string) (*Work
 		return nil, fmt.Errorf("failed to list child workflow directories: %w", err)
 	}
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("no matching child workflow found for ID %s (glob=%s): %w", workflowID, globPattern, models.ErrWorkflowIDNotFound)
+		return nil, fmt.Errorf("no matching child workflow found for ID %s (glob=%s): %w", workflowID, globPattern, models.ErrDAGRunIDNotFound)
 	}
 	// Sort the matches by timestamp
 	sort.Slice(matches, func(i, j int) bool {
@@ -157,14 +157,14 @@ func (e Workflow) ListChildWorkflows(ctx context.Context) ([]*Workflow, error) {
 }
 
 // ListRuns returns a list of all runs for the workflow.
-func (e Workflow) ListRuns(ctx context.Context) ([]*Run, error) {
+func (e Workflow) ListRuns(ctx context.Context) ([]*Attempt, error) {
 	runDirs, err := listDirsSorted(e.baseDir, true, reRun)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list run directories: %w", err)
 	}
-	var runs []*Run
+	var runs []*Attempt
 	for _, runDir := range runDirs {
-		run, err := NewRun(filepath.Join(e.baseDir, runDir, JSONLStatusFile), nil)
+		run, err := NewAttempt(filepath.Join(e.baseDir, runDir, JSONLStatusFile), nil)
 		if err != nil {
 			logger.Error(ctx, "failed to read a run data: %w", err)
 			continue
@@ -178,14 +178,14 @@ func (e Workflow) ListRuns(ctx context.Context) ([]*Run, error) {
 
 // LatestRun returns the most recent run for the workflow.
 // It searches through all run directories and returns the first valid runs found.
-func (e Workflow) LatestRun(ctx context.Context, cache *fileutil.Cache[*models.Status]) (*Run, error) {
+func (e Workflow) LatestRun(ctx context.Context, cache *fileutil.Cache[*models.DAGRunStatus]) (*Attempt, error) {
 	runDirs, err := listDirsSorted(e.baseDir, true, reRun)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list run directories: %w", err)
 	}
 	// Return the first valid run
 	for _, runDir := range runDirs {
-		run, err := NewRun(filepath.Join(e.baseDir, runDir, JSONLStatusFile), cache)
+		run, err := NewAttempt(filepath.Join(e.baseDir, runDir, JSONLStatusFile), cache)
 		if err != nil {
 			logger.Error(ctx, "failed to read a run data: %w", err)
 			continue
@@ -317,8 +317,8 @@ func formatRunTimestamp(t models.TimeInUTC) string {
 	return t.Format(format) + "_" + fmt.Sprintf("%03d", mill%1000) + "Z"
 }
 
-// genRunID generates unique run ID
-func genRunID() (string, error) {
+// genAttemptID generates unique run ID
+func genAttemptID() (string, error) {
 	// 3 bytes → 6 hex characters
 	b := make([]byte, 3)
 	if _, err := rand.Read(b); err != nil {

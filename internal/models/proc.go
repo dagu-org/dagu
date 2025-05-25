@@ -10,7 +10,7 @@ import (
 type ProcStore interface {
 	// Acquire creates a new process for a given workflow.
 	// It automatically starts the heartbeat for the process.
-	Acquire(ctx context.Context, workflow digraph.WorkflowRef) (ProcHandle, error)
+	Acquire(ctx context.Context, workflow digraph.DAGRunRef) (ProcHandle, error)
 	// CountAlive retrieves the number of processes associated with a given workflow name.
 	// It only counts the processes that are alive.
 	CountAlive(ctx context.Context, name string) (int, error)

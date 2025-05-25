@@ -38,8 +38,8 @@ type Context struct {
 	Flags        []commandLineFlag
 	Config       *config.Config
 	Quiet        bool
-	HistoryStore models.HistoryStore
-	HistoryMgr   history.Manager
+	HistoryStore models.DAGRunStore
+	HistoryMgr   history.DAGRunManager
 	ProcStore    models.ProcStore
 	QueueStore   models.QueueStore
 }
@@ -112,7 +112,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	switch cmd.Name() {
 	case "server", "scheduler", "start-all":
 		// For long-running process, we setup file cache for better performance
-		hc := fileutil.NewCache[*models.Status](0, time.Hour*12)
+		hc := fileutil.NewCache[*models.DAGRunStatus](0, time.Hour*12)
 		hc.StartEviction(ctx)
 		hrOpts = append(hrOpts, localhistory.WithHistoryFileCache(hc))
 	}
@@ -136,7 +136,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 }
 
 // HistoryManager initializes a HistoryManager using the provided options. If not supplied,
-func (c *Context) HistoryManager(hr models.HistoryStore) history.Manager {
+func (c *Context) HistoryManager(hr models.DAGRunStore) history.DAGRunManager {
 	return history.New(
 		hr,
 		c.Config.Paths.Executable,

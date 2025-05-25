@@ -62,26 +62,26 @@ func enqueueWorkflow(ctx *Context, dag *digraph.DAG, workflowID string) error {
 		return fmt.Errorf("failed to generate log file name: %w", err)
 	}
 
-	workflow := digraph.NewWorkflowRef(dag.Name, workflowID)
+	workflow := digraph.NewDAGRunRef(dag.Name, workflowID)
 
 	// Check if the workflow is already existing in the history store
-	if _, err = ctx.HistoryStore.FindRun(ctx, workflow); err == nil {
+	if _, err = ctx.HistoryStore.FindAttempt(ctx, workflow); err == nil {
 		return fmt.Errorf("workflow %q with ID %q already exists", dag.Name, workflowID)
 	}
 
-	run, err := ctx.HistoryStore.CreateRun(ctx.Context, dag, time.Now(), workflowID, models.NewRunOptions{})
+	run, err := ctx.HistoryStore.CreateAttempt(ctx.Context, dag, time.Now(), workflowID, models.NewDAGRunAttemptOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create run: %w", err)
 	}
 
 	opts := []models.StatusOption{
 		models.WithLogFilePath(logFile),
-		models.WithRunID(run.ID()),
+		models.WithAttemptID(run.ID()),
 		models.WithPreconditions(dag.Preconditions),
 		models.WithQueuedAt(stringutil.FormatTime(time.Now())),
 		models.WithHierarchyRefs(
-			digraph.NewWorkflowRef(dag.Name, workflowID),
-			digraph.WorkflowRef{},
+			digraph.NewDAGRunRef(dag.Name, workflowID),
+			digraph.DAGRunRef{},
 		),
 	}
 
@@ -106,7 +106,7 @@ func enqueueWorkflow(ctx *Context, dag *digraph.DAG, workflowID string) error {
 
 	logger.Info(ctx.Context, "Enqueued workflow",
 		"workflowName", dag.Name,
-		"workflowId", workflowID,
+		"dagRunId", workflowID,
 		"params", dag.Params,
 	)
 

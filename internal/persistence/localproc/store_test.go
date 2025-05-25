@@ -18,9 +18,9 @@ func TestStore(t *testing.T) {
 	store := New(baseDir)
 
 	// Create a workflow reference
-	workflow := digraph.WorkflowRef{
-		Name:       "test_workflow",
-		WorkflowID: "test_id",
+	workflow := digraph.DAGRunRef{
+		Name: "test_workflow",
+		ID:   "test_id",
 	}
 
 	// Get the process for the workflow

@@ -65,7 +65,7 @@ func TestAgent_Run(t *testing.T) {
 
 		// Try to run the DAG again while it is running
 		dagAgent2 := dag.Agent()
-		dagAgent2.RunCheckErr(t, "is already running")
+		dagAgent2.RunCheckErr(t, "already running")
 
 		// Wait for the DAG to finish
 		<-done

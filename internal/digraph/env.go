@@ -12,9 +12,9 @@ import (
 // Env contains the execution metadata for a workflow.
 type Env struct {
 	ExecID string
-	Root   WorkflowRef
+	Root   DAGRunRef
 	DAG    *DAG
-	DB     DB
+	DB     Database
 	Envs   map[string]string
 }
 
@@ -42,7 +42,7 @@ func (e Env) ApplyEnvs(ctx context.Context) {
 
 // SetupEnv sets up the execution context for a workflow.
 // It initializes the environment variables and the DAG metadata.
-func SetupEnv(ctx context.Context, d *DAG, c DB, root WorkflowRef, workflowID, logFile string, params []string) context.Context {
+func SetupEnv(ctx context.Context, d *DAG, c Database, root DAGRunRef, workflowID, logFile string, params []string) context.Context {
 	var envs = map[string]string{
 		EnvKeyWorkflowLogFile: logFile,
 		EnvKeyWorkflowID:      workflowID,

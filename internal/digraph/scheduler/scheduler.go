@@ -94,7 +94,7 @@ func New(cfg *Config) *Scheduler {
 		onSuccess:     cfg.OnSuccess,
 		onFailure:     cfg.OnFailure,
 		onCancel:      cfg.OnCancel,
-		workflowID:    cfg.WorkflowID,
+		workflowID:    cfg.DAGRunID,
 		pause:         time.Millisecond * 100,
 	}
 }
@@ -109,7 +109,7 @@ type Config struct {
 	OnSuccess      *digraph.Step
 	OnFailure      *digraph.Step
 	OnCancel       *digraph.Step
-	WorkflowID     string
+	DAGRunID       string
 }
 
 // Schedule runs the graph of steps.
@@ -181,7 +181,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 							"error", err,
 							"step", node.Name(),
 							"stack", stack,
-							"workflowId", sc.workflowID)
+							"dagRunId", sc.workflowID)
 						node.MarkError(err)
 						sc.setLastError(err)
 
@@ -382,7 +382,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 		// These states should not occur at this point
 		logger.Warn(ctx, "Unexpected final status",
 			"status", sc.Status(graph).String(),
-			"workflowId", sc.workflowID)
+			"dagRunId", sc.workflowID)
 	}
 
 	eventHandlers = append(eventHandlers, digraph.HandlerOnExit)
@@ -650,7 +650,7 @@ func (sc *Scheduler) setup(ctx context.Context) (err error) {
 
 	// Log scheduler setup
 	logger.Debug(ctx, "Scheduler setup complete",
-		"workflowId", sc.workflowID,
+		"dagRunId", sc.workflowID,
 		"maxActiveRuns", sc.maxActiveRuns,
 		"timeout", sc.timeout,
 		"dry", sc.dry)

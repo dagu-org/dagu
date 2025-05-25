@@ -1110,8 +1110,8 @@ func setup(t *testing.T, opts ...schedulerOption) testHelper {
 	th := test.Setup(t)
 
 	cfg := &scheduler.Config{
-		LogDir:     th.Config.Paths.LogDir,
-		WorkflowID: uuid.Must(uuid.NewV7()).String(),
+		LogDir:   th.Config.Paths.LogDir,
+		DAGRunID: uuid.Must(uuid.NewV7()).String(),
 	}
 	for _, opt := range opts {
 		opt(cfg)
@@ -1146,10 +1146,10 @@ func (gh graphHelper) Schedule(t *testing.T, expectedStatus scheduler.Status) sc
 	t.Helper()
 
 	dag := &digraph.DAG{Name: "test_dag"}
-	logFilename := fmt.Sprintf("%s_%s.log", dag.Name, gh.Config.WorkflowID)
+	logFilename := fmt.Sprintf("%s_%s.log", dag.Name, gh.Config.DAGRunID)
 	logFilePath := path.Join(gh.Config.LogDir, logFilename)
 
-	ctx := digraph.SetupEnv(gh.Context, dag, nil, digraph.WorkflowRef{}, gh.Config.WorkflowID, logFilePath, nil)
+	ctx := digraph.SetupEnv(gh.Context, dag, nil, digraph.DAGRunRef{}, gh.Config.DAGRunID, logFilePath, nil)
 
 	var doneNodes []*scheduler.Node
 	progressCh := make(chan *scheduler.Node)

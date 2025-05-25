@@ -54,8 +54,8 @@ func NewEnv(ctx context.Context, step digraph.Step) Env {
 }
 
 // ExecRef returns the execution reference of the current execution context.
-func (e Env) ExecRef() digraph.WorkflowRef {
-	return digraph.NewWorkflowRef(e.DAG.Name, e.ExecID)
+func (e Env) ExecRef() digraph.DAGRunRef {
+	return digraph.NewDAGRunRef(e.DAG.Name, e.ExecID)
 }
 
 // AllEnvs returns all environment variables that needs to be passed to the command.

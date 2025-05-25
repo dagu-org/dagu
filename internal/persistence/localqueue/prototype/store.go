@@ -144,7 +144,7 @@ func (s *Store) DequeueByWorkflowID(ctx context.Context, name, workflowID string
 }
 
 // Enqueue implements models.QueueStore.
-func (s *Store) Enqueue(ctx context.Context, name string, p models.QueuePriority, workflow digraph.WorkflowRef) error {
+func (s *Store) Enqueue(ctx context.Context, name string, p models.QueuePriority, workflow digraph.DAGRunRef) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

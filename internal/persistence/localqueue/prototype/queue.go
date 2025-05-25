@@ -120,7 +120,7 @@ func (q *DualQueue) Len(ctx context.Context) (int, error) {
 }
 
 // Enqueue adds a workflow to the queue with the specified priority
-func (q *DualQueue) Enqueue(ctx context.Context, priority models.QueuePriority, workflow digraph.WorkflowRef) error {
+func (q *DualQueue) Enqueue(ctx context.Context, priority models.QueuePriority, workflow digraph.DAGRunRef) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -131,7 +131,7 @@ func (q *DualQueue) Enqueue(ctx context.Context, priority models.QueuePriority, 
 	if err := qf.Push(ctx, workflow); err != nil {
 		return err
 	}
-	logger.Debug(ctx, "Enqueue", "workflow", workflow.WorkflowID, "priority", priority)
+	logger.Debug(ctx, "Enqueue", "workflow", workflow.ID, "priority", priority)
 	return nil
 }
 

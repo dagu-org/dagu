@@ -31,7 +31,7 @@ type DAG struct {
 	WorkDir    string
 	Next       time.Time
 	Schedule   cron.Schedule
-	Client     history.Manager
+	Client     history.DAGRunManager
 }
 
 // GetDAG returns the DAG associated with this job.
@@ -57,11 +57,11 @@ func (job *DAG) Start(ctx context.Context) error {
 	}
 
 	// Job is ready; proceed to start.
-	return job.Client.StartDAG(ctx, job.DAG, history.StartOptions{Quiet: true})
+	return job.Client.StartDAGRun(ctx, job.DAG, history.StartOptions{Quiet: true})
 }
 
 // Ready checks whether the job can be safely started based on the latest status.
-func (job *DAG) Ready(ctx context.Context, latestStatus models.Status) error {
+func (job *DAG) Ready(ctx context.Context, latestStatus models.DAGRunStatus) error {
 	// Prevent starting if it's already running.
 	if latestStatus.Status == scheduler.StatusRunning {
 		return ErrJobRunning
@@ -86,7 +86,7 @@ func (job *DAG) Ready(ctx context.Context, latestStatus models.Status) error {
 
 // skipIfSuccessful checks if the DAG has already run successfully in the window since the last scheduled time.
 // If so, the current run is skipped.
-func (job *DAG) skipIfSuccessful(ctx context.Context, latestStatus models.Status, latestStartedAt time.Time) error {
+func (job *DAG) skipIfSuccessful(ctx context.Context, latestStatus models.DAGRunStatus, latestStartedAt time.Time) error {
 	// If skip is not configured, or the DAG is not currently successful, do nothing.
 	if !job.DAG.SkipIfSuccessful || latestStatus.Status != scheduler.StatusSuccess {
 		return nil

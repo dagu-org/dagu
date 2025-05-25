@@ -135,7 +135,7 @@ func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject)
 	}
 
 	// Rename the history as well
-	if err := a.historyStore.RenameWorkflows(ctx, old.Name, renamed.Name); err != nil {
+	if err := a.historyStore.RenameDAGRuns(ctx, old.Name, renamed.Name); err != nil {
 		return nil, fmt.Errorf("error renaming history: %w", err)
 	}
 
@@ -198,7 +198,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 
 func (a *API) readHistoryData(
 	_ context.Context,
-	statusList []models.Status,
+	statusList []models.DAGRunStatus,
 ) []api.DAGGridItem {
 	data := map[string][]scheduler.NodeStatus{}
 
@@ -291,7 +291,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	}
 
 	// Get status for each DAG
-	dagStatuses := make([]models.Status, len(result.Items))
+	dagStatuses := make([]models.DAGRunStatus, len(result.Items))
 	for i, item := range result.Items {
 		status, err := a.historyManager.GetLatestStatus(ctx, item)
 		if err != nil {
@@ -350,7 +350,7 @@ func (a *API) GetDAGWorkflowDetails(ctx context.Context, request api.GetDAGWorkf
 		}, nil
 	}
 
-	status, err := a.historyManager.GetDAGRealtimeStatus(ctx, dag, workflowId)
+	status, err := a.historyManager.GetCurrentStatus(ctx, dag, workflowId)
 	if err != nil {
 		return nil, fmt.Errorf("error getting status by workflow ID: %w", err)
 	}
@@ -390,18 +390,18 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 	workflowId := valueOf(request.Body.WorkflowId)
 	if workflowId == "" {
 		var err error
-		workflowId, err = a.historyManager.GenWorkflowID(ctx)
+		workflowId, err = a.historyManager.GenDAGRunID(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("error generating workflow ID: %w", err)
 		}
 	}
 
 	// Check the workflow ID is not already in use
-	_, err = a.historyStore.FindRun(ctx, digraph.WorkflowRef{
-		Name:       dag.Name,
-		WorkflowID: workflowId,
+	_, err = a.historyStore.FindAttempt(ctx, digraph.DAGRunRef{
+		Name: dag.Name,
+		ID:   workflowId,
 	})
-	if !errors.Is(err, models.ErrWorkflowIDNotFound) {
+	if !errors.Is(err, models.ErrDAGRunIDNotFound) {
 		return nil, &Error{
 			HTTPStatus: http.StatusConflict,
 			Code:       api.ErrorCodeAlreadyExists,
@@ -419,10 +419,10 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 }
 
 func (a *API) startWorkflow(ctx context.Context, dag *digraph.DAG, params, workflowID string) error {
-	if err := a.historyManager.StartDAG(ctx, dag, history.StartOptions{
-		Params:     params,
-		WorkflowID: workflowID,
-		Quiet:      true,
+	if err := a.historyManager.StartDAGRun(ctx, dag, history.StartOptions{
+		Params:   params,
+		DAGRunID: workflowID,
+		Quiet:    true,
 	}); err != nil {
 		return fmt.Errorf("error starting DAG: %w", err)
 	}
@@ -440,7 +440,7 @@ waitLoop:
 		case <-ctx.Done():
 			break waitLoop
 		default:
-			status, _ := a.historyManager.GetDAGRealtimeStatus(ctx, dag, workflowID)
+			status, _ := a.historyManager.GetCurrentStatus(ctx, dag, workflowID)
 			if status == nil {
 				continue
 			}
@@ -478,7 +478,7 @@ func (a *API) EnqueueDAGWorkflow(ctx context.Context, request api.EnqueueDAGWork
 	workflowId := valueOf(request.Body.WorkflowId)
 	if workflowId == "" {
 		var err error
-		workflowId, err = a.historyManager.GenWorkflowID(ctx)
+		workflowId, err = a.historyManager.GenDAGRunID(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("error generating workflow ID: %w", err)
 		}
@@ -494,9 +494,9 @@ func (a *API) EnqueueDAGWorkflow(ctx context.Context, request api.EnqueueDAGWork
 }
 
 func (a *API) enqueueWorkflow(ctx context.Context, dag *digraph.DAG, params, workflowID string) error {
-	if err := a.historyManager.EnqueueWorkflow(ctx, dag, history.EnqueueOptions{
-		Params:     params,
-		WorkflowID: workflowID,
+	if err := a.historyManager.EnqueueDAGRun(ctx, dag, history.EnqueueOptions{
+		Params:   params,
+		DAGRunID: workflowID,
 	}); err != nil {
 		return fmt.Errorf("error enqueuing DAG: %w", err)
 	}
@@ -514,7 +514,7 @@ waitLoop:
 		case <-ctx.Done():
 			break waitLoop
 		default:
-			status, _ := a.historyManager.GetDAGRealtimeStatus(ctx, dag, workflowID)
+			status, _ := a.historyManager.GetCurrentStatus(ctx, dag, workflowID)
 			if status == nil {
 				continue
 			}
@@ -564,7 +564,7 @@ func (a *API) TerminateDAGWorkflow(ctx context.Context, request api.TerminateDAG
 			Message:    "DAG is not running",
 		}
 	}
-	if err := a.historyManager.Stop(ctx, dag, status.WorkflowID); err != nil {
+	if err := a.historyManager.Stop(ctx, dag, status.RunID); err != nil {
 		return nil, fmt.Errorf("error stopping DAG: %w", err)
 	}
 	return api.TerminateDAGWorkflow200Response{}, nil
@@ -597,7 +597,7 @@ func (a *API) RetryDAGWorkflow(ctx context.Context, request api.RetryDAGWorkflow
 		}
 	}
 
-	if err := a.historyManager.RetryDAG(ctx, dag, request.Body.WorkflowId); err != nil {
+	if err := a.historyManager.RetryDAGRun(ctx, dag, request.Body.WorkflowId); err != nil {
 		return nil, fmt.Errorf("error retrying DAG: %w", err)
 	}
 

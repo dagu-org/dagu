@@ -30,25 +30,25 @@ func TestJSONDB(t *testing.T) {
 		th.CreateRun(t, ts3, "workflow-id-3", scheduler.StatusSuccess)
 
 		// Request 2 most recent runs
-		runs := th.HistoryStore.RecentRuns(th.Context, "test_DAG", 2)
+		runs := th.HistoryStore.RecentAttempts(th.Context, "test_DAG", 2)
 		require.Len(t, runs, 2)
 
 		// Verify the first record is the most recent
 		status0, err := runs[0].ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "workflow-id-3", status0.WorkflowID)
+		assert.Equal(t, "workflow-id-3", status0.RunID)
 
 		// Verify the second record is the second most recent
 		status1, err := runs[1].ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "workflow-id-2", status1.WorkflowID)
+		assert.Equal(t, "workflow-id-2", status1.RunID)
 
 		// Verify all records are returned if the number requested is equal to the number of records
-		runs = th.HistoryStore.RecentRuns(th.Context, "test_DAG", 3)
+		runs = th.HistoryStore.RecentAttempts(th.Context, "test_DAG", 3)
 		require.Len(t, runs, 3)
 
 		// Verify all records are returned if the number requested is greater than the number of records
-		runs = th.HistoryStore.RecentRuns(th.Context, "test_DAG", 4)
+		runs = th.HistoryStore.RecentAttempts(th.Context, "test_DAG", 4)
 		require.Len(t, runs, 3)
 	})
 	t.Run("LatestRecord", func(t *testing.T) {
@@ -68,14 +68,14 @@ func TestJSONDB(t *testing.T) {
 		// Verify that record created before today is returned
 		obj := th.HistoryStore.(*Store)
 		obj.latestStatusToday = false
-		run, err := th.HistoryStore.LatestRun(th.Context, "test_DAG")
+		run, err := th.HistoryStore.LatestAttempt(th.Context, "test_DAG")
 		require.NoError(t, err)
 
 		// Verify the record is the most recent
 		status, err := run.ReadStatus(th.Context)
 		require.NoError(t, err)
 
-		assert.Equal(t, "workflow-id-3", status.WorkflowID)
+		assert.Equal(t, "workflow-id-3", status.RunID)
 	})
 	t.Run("FindByWorkflowID", func(t *testing.T) {
 		th := setupTestLocalStore(t)
@@ -91,19 +91,19 @@ func TestJSONDB(t *testing.T) {
 		th.CreateRun(t, ts3, "workflow-id-3", scheduler.StatusSuccess)
 
 		// Find the record with workflow ID "workflow-id-2"
-		ref := digraph.NewWorkflowRef("test_DAG", "workflow-id-2")
-		run, err := th.HistoryStore.FindRun(th.Context, ref)
+		ref := digraph.NewDAGRunRef("test_DAG", "workflow-id-2")
+		run, err := th.HistoryStore.FindAttempt(th.Context, ref)
 		require.NoError(t, err)
 
 		// Verify the record is the correct one
 		status, err := run.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "workflow-id-2", status.WorkflowID)
+		assert.Equal(t, "workflow-id-2", status.RunID)
 
 		// Verify an error is returned if the workflow ID does not exist
-		refNonExist := digraph.NewWorkflowRef("test_DAG", "nonexistent-id")
-		_, err = th.HistoryStore.FindRun(th.Context, refNonExist)
-		assert.ErrorIs(t, err, models.ErrWorkflowIDNotFound)
+		refNonExist := digraph.NewDAGRunRef("test_DAG", "nonexistent-id")
+		_, err = th.HistoryStore.FindAttempt(th.Context, refNonExist)
+		assert.ErrorIs(t, err, models.ErrDAGRunIDNotFound)
 	})
 	t.Run("RemoveOld", func(t *testing.T) {
 		th := setupTestLocalStore(t)
@@ -119,16 +119,16 @@ func TestJSONDB(t *testing.T) {
 		th.CreateRun(t, ts3, "workflow-id-3", scheduler.StatusSuccess)
 
 		// Verify runs are present
-		runs := th.HistoryStore.RecentRuns(th.Context, "test_DAG", 3)
+		runs := th.HistoryStore.RecentAttempts(th.Context, "test_DAG", 3)
 		require.Len(t, runs, 3)
 
 		// Remove records older than 0 days
 		// It should remove all records
-		err := th.HistoryStore.RemoveOldWorkflows(th.Context, "test_DAG", 0)
+		err := th.HistoryStore.RemoveOldDAGRuns(th.Context, "test_DAG", 0)
 		require.NoError(t, err)
 
 		// Verify records are removed
-		runs = th.HistoryStore.RecentRuns(th.Context, "test_DAG", 3)
+		runs = th.HistoryStore.RecentAttempts(th.Context, "test_DAG", 3)
 		require.Len(t, runs, 0)
 	})
 	t.Run("ChildWorkflow", func(t *testing.T) {
@@ -141,9 +141,9 @@ func TestJSONDB(t *testing.T) {
 		_ = th.CreateRun(t, ts, "parent-id", scheduler.StatusRunning)
 
 		// Create a child run
-		root := digraph.NewWorkflowRef("test_DAG", "parent-id")
+		root := digraph.NewDAGRunRef("test_DAG", "parent-id")
 		childWorkflowDAG := th.DAG("child")
-		childRun, err := th.HistoryStore.CreateRun(th.Context, childWorkflowDAG.DAG, ts, "sub-id", models.NewRunOptions{
+		childRun, err := th.HistoryStore.CreateAttempt(th.Context, childWorkflowDAG.DAG, ts, "sub-id", models.NewDAGRunAttemptOptions{
 			Root: &root,
 		})
 		require.NoError(t, err)
@@ -156,18 +156,18 @@ func TestJSONDB(t *testing.T) {
 		}()
 
 		statusToWrite := models.InitialStatus(childWorkflowDAG.DAG)
-		statusToWrite.WorkflowID = "sub-id"
+		statusToWrite.RunID = "sub-id"
 		err = childRun.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
 
 		// Verify record is created
-		workflowRef := digraph.NewWorkflowRef("test_DAG", "parent-id")
-		existingRun, err := th.HistoryStore.FindChildWorkflowRun(th.Context, workflowRef, "sub-id")
+		workflowRef := digraph.NewDAGRunRef("test_DAG", "parent-id")
+		existingRun, err := th.HistoryStore.FindChildAttempt(th.Context, workflowRef, "sub-id")
 		require.NoError(t, err)
 
 		status, err := existingRun.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, "sub-id", status.WorkflowID)
+		assert.Equal(t, "sub-id", status.RunID)
 	})
 	t.Run("ChildWorkflow_Retry", func(t *testing.T) {
 		th := setupTestLocalStore(t)
@@ -182,9 +182,9 @@ func TestJSONDB(t *testing.T) {
 		const childWorkflowID = "child-workflow-id"
 		const parentExecID = "parent-id"
 
-		root := digraph.NewWorkflowRef("test_DAG", parentExecID)
+		root := digraph.NewDAGRunRef("test_DAG", parentExecID)
 		childWorkflowDAG := th.DAG("child")
-		run, err := th.HistoryStore.CreateRun(th.Context, childWorkflowDAG.DAG, ts, childWorkflowID, models.NewRunOptions{
+		run, err := th.HistoryStore.CreateAttempt(th.Context, childWorkflowDAG.DAG, ts, childWorkflowID, models.NewDAGRunAttemptOptions{
 			Root: &root,
 		})
 		require.NoError(t, err)
@@ -197,23 +197,23 @@ func TestJSONDB(t *testing.T) {
 		}()
 
 		statusToWrite := models.InitialStatus(childWorkflowDAG.DAG)
-		statusToWrite.WorkflowID = childWorkflowID
+		statusToWrite.RunID = childWorkflowID
 		statusToWrite.Status = scheduler.StatusRunning
 		err = run.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
 
 		// Find the child workflow record
 		ts = time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
-		workflowRef := digraph.NewWorkflowRef("test_DAG", parentExecID)
-		existingRun, err := th.HistoryStore.FindChildWorkflowRun(th.Context, workflowRef, childWorkflowID)
+		workflowRef := digraph.NewDAGRunRef("test_DAG", parentExecID)
+		existingRun, err := th.HistoryStore.FindChildAttempt(th.Context, workflowRef, childWorkflowID)
 		require.NoError(t, err)
 		existingRunStatus, err := existingRun.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, childWorkflowID, existingRunStatus.WorkflowID)
+		assert.Equal(t, childWorkflowID, existingRunStatus.RunID)
 		assert.Equal(t, scheduler.StatusRunning.String(), existingRunStatus.Status.String())
 
 		// Create a retry record and write different status
-		retryRun, err := th.HistoryStore.CreateRun(th.Context, childWorkflowDAG.DAG, ts, childWorkflowID, models.NewRunOptions{
+		retryRun, err := th.HistoryStore.CreateAttempt(th.Context, childWorkflowDAG.DAG, ts, childWorkflowID, models.NewDAGRunAttemptOptions{
 			Root:  &root,
 			Retry: true,
 		})
@@ -224,11 +224,11 @@ func TestJSONDB(t *testing.T) {
 		_ = retryRun.Close(th.Context)
 
 		// Verify the retry record is created
-		existingRun, err = th.HistoryStore.FindChildWorkflowRun(th.Context, workflowRef, childWorkflowID)
+		existingRun, err = th.HistoryStore.FindChildAttempt(th.Context, workflowRef, childWorkflowID)
 		require.NoError(t, err)
 		existingRunStatus, err = existingRun.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, childWorkflowID, existingRunStatus.WorkflowID)
+		assert.Equal(t, childWorkflowID, existingRunStatus.RunID)
 		assert.Equal(t, scheduler.StatusSuccess.String(), existingRunStatus.Status.String())
 	})
 	t.Run("ReadDAG", func(t *testing.T) {
@@ -248,7 +248,7 @@ func TestJSONDB(t *testing.T) {
 		}()
 
 		statusToWrite := models.InitialStatus(rec.dag)
-		statusToWrite.WorkflowID = "parent-id"
+		statusToWrite.RunID = "parent-id"
 
 		err = rec.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
@@ -390,7 +390,7 @@ func TestListStatuses(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, statuses, 1)
-		assert.Equal(t, "workflow-id-2", statuses[0].WorkflowID)
+		assert.Equal(t, "workflow-id-2", statuses[0].RunID)
 	})
 
 	t.Run("FilterByStatus", func(t *testing.T) {
@@ -410,7 +410,7 @@ func TestListStatuses(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, statuses, 1)
-		assert.Equal(t, "workflow-id-2", statuses[0].WorkflowID)
+		assert.Equal(t, "workflow-id-2", statuses[0].RunID)
 		assert.Equal(t, scheduler.StatusError, statuses[0].Status)
 	})
 
@@ -453,8 +453,8 @@ func TestListStatuses(t *testing.T) {
 		require.Len(t, statuses, 3)
 
 		// Verify they are sorted by StartedAt in descending order
-		assert.Equal(t, "workflow-id-3", statuses[0].WorkflowID)
-		assert.Equal(t, "workflow-id-2", statuses[1].WorkflowID)
-		assert.Equal(t, "workflow-id-1", statuses[2].WorkflowID)
+		assert.Equal(t, "workflow-id-3", statuses[0].RunID)
+		assert.Equal(t, "workflow-id-2", statuses[1].RunID)
+		assert.Equal(t, "workflow-id-1", statuses[2].RunID)
 	})
 }

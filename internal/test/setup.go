@@ -140,8 +140,8 @@ type Helper struct {
 	Config        *config.Config
 	LoggingOutput *SyncBuffer
 	DAGStore      models.DAGStore
-	HistoryStore  models.HistoryStore
-	HistoryMgr    history.Manager
+	HistoryStore  models.DAGRunStore
+	HistoryMgr    history.DAGRunManager
 	ProcStore     models.ProcStore
 
 	tmpDir string
@@ -209,7 +209,7 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
 	assert.Eventually(t, func() bool {
-		curr, _ := d.HistoryMgr.GetDAGRealtimeStatus(d.Context, d.DAG, "")
+		curr, _ := d.HistoryMgr.GetCurrentStatus(d.Context, d.DAG, "")
 		if curr == nil {
 			return false
 		}
@@ -296,14 +296,14 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 
 	var workflowID string
 	if helper.opts.RetryTarget != nil {
-		workflowID = helper.opts.RetryTarget.WorkflowID
+		workflowID = helper.opts.RetryTarget.RunID
 	} else {
 		workflowID = generateWorkflowID()
 	}
 
 	logDir := d.Config.Paths.LogDir
 	logFile := filepath.Join(d.Config.Paths.LogDir, workflowID+".log")
-	root := digraph.NewWorkflowRef(d.Name, workflowID)
+	root := digraph.NewDAGRunRef(d.Name, workflowID)
 
 	helper.Agent = agent.New(
 		workflowID,

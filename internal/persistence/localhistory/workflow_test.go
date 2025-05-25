@@ -61,12 +61,12 @@ type ExecutionTest struct {
 	TB testing.TB
 }
 
-func (et ExecutionTest) WriteStatus(t *testing.T, ts models.TimeInUTC, s scheduler.Status) *Run {
+func (et ExecutionTest) WriteStatus(t *testing.T, ts models.TimeInUTC, s scheduler.Status) *Attempt {
 	t.Helper()
 
 	dag := &digraph.DAG{Name: "test-dag"}
 	status := models.InitialStatus(dag)
-	status.WorkflowID = "test-id-1"
+	status.RunID = "test-id-1"
 	status.Status = s
 
 	run, err := et.CreateRun(et.Context, ts, nil)
@@ -169,17 +169,17 @@ func TestWorkflowListLogFiles(t *testing.T) {
 		// Create a run with log files
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
-		status.WorkflowID = "test-workflow"
+		status.RunID = "test-workflow"
 		status.Status = scheduler.StatusSuccess
 		status.Log = "/tmp/test.log"
 		status.Nodes = []*models.Node{
 			{
-				Step: digraph.Step{Name: "step1"},
+				Step:   digraph.Step{Name: "step1"},
 				Stdout: "/tmp/step1.out",
 				Stderr: "/tmp/step1.err",
 			},
 			{
-				Step: digraph.Step{Name: "step2"}, 
+				Step:   digraph.Step{Name: "step2"},
 				Stdout: "/tmp/step2.out",
 				Stderr: "/tmp/step2.err",
 			},
@@ -229,12 +229,12 @@ func TestWorkflowRemoveLogFiles(t *testing.T) {
 		// Create a run with log files pointing to our test files
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
-		status.WorkflowID = "test-workflow"
+		status.RunID = "test-workflow"
 		status.Status = scheduler.StatusSuccess
 		status.Log = logFiles[0]
 		status.Nodes = []*models.Node{
 			{
-				Step: digraph.Step{Name: "step1"},
+				Step:   digraph.Step{Name: "step1"},
 				Stdout: logFiles[1],
 				Stderr: logFiles[2],
 			},
@@ -288,10 +288,10 @@ func TestWorkflowRemoveLogFiles(t *testing.T) {
 		// Create parent workflow with log files
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
-		status.WorkflowID = "parent-workflow"
+		status.RunID = "parent-workflow"
 		status.Log = parentLogFiles[0]
 		status.Nodes = []*models.Node{{
-			Step: digraph.Step{Name: "parent-step"},
+			Step:   digraph.Step{Name: "parent-step"},
 			Stdout: parentLogFiles[1],
 		}}
 
@@ -305,7 +305,7 @@ func TestWorkflowRemoveLogFiles(t *testing.T) {
 		// Create child workflow
 		childDir := filepath.Join(exec.baseDir, ChildWorkflowsDir)
 		require.NoError(t, os.MkdirAll(childDir, 0755))
-		
+
 		childWorkflowDir := filepath.Join(childDir, ChildWorkflowDirPrefix+"child1")
 		require.NoError(t, os.MkdirAll(childWorkflowDir, 0755))
 
@@ -314,10 +314,10 @@ func TestWorkflowRemoveLogFiles(t *testing.T) {
 
 		// Create child run with log files
 		childStatus := models.InitialStatus(dag)
-		childStatus.WorkflowID = "child1"
+		childStatus.RunID = "child1"
 		childStatus.Log = childLogFiles[0]
 		childStatus.Nodes = []*models.Node{{
-			Step: digraph.Step{Name: "child-step"},
+			Step:   digraph.Step{Name: "child-step"},
 			Stdout: childLogFiles[1],
 		}}
 
@@ -366,12 +366,12 @@ func TestWorkflowRemove(t *testing.T) {
 		// Create a run with log files
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
-		status.WorkflowID = "test-workflow"
+		status.RunID = "test-workflow"
 		status.Status = scheduler.StatusSuccess
 		status.Log = logFiles[0]
 		status.Nodes = []*models.Node{
 			{
-				Step: digraph.Step{Name: "step1"},
+				Step:   digraph.Step{Name: "step1"},
 				Stdout: logFiles[1],
 				Stderr: logFiles[2],
 			},
@@ -436,10 +436,10 @@ func TestWorkflowRemove(t *testing.T) {
 		// Create parent workflow with log files
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
-		status.WorkflowID = "parent-workflow"
+		status.RunID = "parent-workflow"
 		status.Log = parentLogFiles[0]
 		status.Nodes = []*models.Node{{
-			Step: digraph.Step{Name: "parent-step"},
+			Step:   digraph.Step{Name: "parent-step"},
 			Stdout: parentLogFiles[1],
 		}}
 
@@ -471,10 +471,10 @@ func TestWorkflowRemove(t *testing.T) {
 			require.NoError(t, err)
 
 			childStatus := models.InitialStatus(dag)
-			childStatus.WorkflowID = child.workflowID
+			childStatus.RunID = child.workflowID
 			childStatus.Log = child.logFiles[0]
 			childStatus.Nodes = []*models.Node{{
-				Step: digraph.Step{Name: fmt.Sprintf("%s-step", child.workflowID)},
+				Step:   digraph.Step{Name: fmt.Sprintf("%s-step", child.workflowID)},
 				Stdout: child.logFiles[1],
 			}}
 
@@ -513,11 +513,11 @@ func TestWorkflowRemove(t *testing.T) {
 		// Create a run with log files that don't exist
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
-		status.WorkflowID = "test-workflow"
+		status.RunID = "test-workflow"
 		status.Log = "/non/existent/path/workflow.log"
 		status.Nodes = []*models.Node{
 			{
-				Step: digraph.Step{Name: "step1"},
+				Step:   digraph.Step{Name: "step1"},
 				Stdout: "/non/existent/path/step1.out",
 				Stderr: "/non/existent/path/step1.err",
 			},

@@ -77,7 +77,7 @@ func runStart(ctx *Context, args []string) error {
 	// Handle child workflow if applicable
 	if isChildWorkflow {
 		// Parse parent execution reference
-		parent, err := digraph.ParseWorkflowRef(parentRef)
+		parent, err := digraph.ParseDAGRunRef(parentRef)
 		if err != nil {
 			return fmt.Errorf("failed to parse parent exec ref: %w", err)
 		}
@@ -88,11 +88,11 @@ func runStart(ctx *Context, args []string) error {
 	logger.Info(ctx, "Executing root workflow",
 		"name", dag.Name,
 		"params", params,
-		"workflowId", workflowID,
+		"dagRunId", workflowID,
 	)
 
 	// Execute the DAG
-	return executeWorkflow(ctx, dag, digraph.WorkflowRef{}, workflowID, root)
+	return executeWorkflow(ctx, dag, digraph.DAGRunRef{}, workflowID, root)
 }
 
 // getExecutionInfo extracts and validates workflow ID and references from command flags
@@ -169,27 +169,27 @@ func loadDAGWithParams(ctx *Context, args []string) (*digraph.DAG, string, error
 }
 
 // determineRootWorkflow creates or parses the root execution reference
-func determineRootWorkflow(isChildWorkflow bool, rootRef string, dag *digraph.DAG, workflowID string) (digraph.WorkflowRef, error) {
+func determineRootWorkflow(isChildWorkflow bool, rootRef string, dag *digraph.DAG, workflowID string) (digraph.DAGRunRef, error) {
 	if isChildWorkflow {
 		// Parse the root execution reference for child workflow
-		root, err := digraph.ParseWorkflowRef(rootRef)
+		root, err := digraph.ParseDAGRunRef(rootRef)
 		if err != nil {
-			return digraph.WorkflowRef{}, fmt.Errorf("failed to parse root exec ref: %w", err)
+			return digraph.DAGRunRef{}, fmt.Errorf("failed to parse root exec ref: %w", err)
 		}
 		return root, nil
 	}
 
 	// Create a new root execution reference for root execution
-	return digraph.NewWorkflowRef(dag.Name, workflowID), nil
+	return digraph.NewDAGRunRef(dag.Name, workflowID), nil
 }
 
 // handleChildWorkflow processes a child workflow, checking for previous runs
-func handleChildWorkflow(ctx *Context, dag *digraph.DAG, workflowID string, params string, root digraph.WorkflowRef, parent digraph.WorkflowRef) error {
+func handleChildWorkflow(ctx *Context, dag *digraph.DAG, workflowID string, params string, root digraph.DAGRunRef, parent digraph.DAGRunRef) error {
 	// Log child workflow
 	logger.Info(ctx, "Executing child workflow",
 		"name", dag.Name,
 		"params", params,
-		"workflowId", workflowID,
+		"dagRunId", workflowID,
 		"root", root,
 		"parent", parent,
 	)
@@ -200,11 +200,11 @@ func handleChildWorkflow(ctx *Context, dag *digraph.DAG, workflowID string, para
 	}
 
 	// Check for previous child workflow with this ID
-	logger.Debug(ctx, "Checking for previous child workflow with the workflow ID", "workflowId", workflowID)
+	logger.Debug(ctx, "Checking for previous child workflow with the workflow ID", "dagRunId", workflowID)
 
 	// Look for existing execution run
-	run, err := ctx.HistoryStore.FindChildWorkflowRun(ctx, root, workflowID)
-	if errors.Is(err, models.ErrWorkflowIDNotFound) {
+	run, err := ctx.HistoryStore.FindChildAttempt(ctx, root, workflowID)
+	if errors.Is(err, models.ErrDAGRunIDNotFound) {
 		// If the workflow ID is not found, proceed with new execution
 		return executeWorkflow(ctx, dag, parent, workflowID, root)
 	}
@@ -223,7 +223,7 @@ func handleChildWorkflow(ctx *Context, dag *digraph.DAG, workflowID string, para
 }
 
 // executeWorkflow handles the actual execution of a DAG
-func executeWorkflow(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, workflowID string, root digraph.WorkflowRef) error {
+func executeWorkflow(ctx *Context, d *digraph.DAG, parent digraph.DAGRunRef, workflowID string, root digraph.DAGRunRef) error {
 	// Open the log file for the scheduler. The log file will be used for future
 	// execution for the same DAG/workflow ID between attempts.
 	logFile, err := ctx.OpenLogFile(d, workflowID)
@@ -237,7 +237,7 @@ func executeWorkflow(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, w
 	// Configure logging to the file
 	ctx.LogToFile(logFile)
 
-	logger.Debug(ctx, "Workflow initiated", "DAG", d.Name, "workflowId", workflowID, "logFile", logFile.Name())
+	logger.Debug(ctx, "Workflow initiated", "DAG", d.Name, "dagRunId", workflowID, "logFile", logFile.Name())
 
 	// Initialize DAG repository with the DAG's directory in the search path
 	dr, err := ctx.dagStore(nil, []string{filepath.Dir(d.Location)})
@@ -256,7 +256,7 @@ func executeWorkflow(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, w
 		ctx.HistoryStore,
 		ctx.ProcStore,
 		root,
-		agent.Options{Parent: parent},
+		agent.Options{ParentDAGRun: parent},
 	)
 
 	// Set up signal handling for the agent
@@ -264,7 +264,7 @@ func executeWorkflow(ctx *Context, d *digraph.DAG, parent digraph.WorkflowRef, w
 
 	// Run the DAG
 	if err := agentInstance.Run(ctx); err != nil {
-		logger.Error(ctx, "Failed to execute workflow", "name", d.Name, "workflowId", workflowID, "err", err)
+		logger.Error(ctx, "Failed to execute workflow", "name", d.Name, "dagRunId", workflowID, "err", err)
 
 		if ctx.Quiet {
 			os.Exit(1)

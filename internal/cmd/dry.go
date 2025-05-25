@@ -79,7 +79,7 @@ func runDry(ctx *Context, args []string) error {
 		return err
 	}
 
-	root := digraph.NewWorkflowRef(dag.Name, workflowID)
+	root := digraph.NewDAGRunRef(dag.Name, workflowID)
 
 	agentInstance := agent.New(
 		workflowID,

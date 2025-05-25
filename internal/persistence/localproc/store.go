@@ -38,7 +38,7 @@ func (s *Store) CountAlive(ctx context.Context, name string) (int, error) {
 }
 
 // Acquire implements models.ProcStore.
-func (s *Store) Acquire(ctx context.Context, workflow digraph.WorkflowRef) (models.ProcHandle, error) {
+func (s *Store) Acquire(ctx context.Context, workflow digraph.DAGRunRef) (models.ProcHandle, error) {
 	if _, ok := s.procGroups.Load(workflow.Name); !ok {
 		pgBaseDir := filepath.Join(s.baseDir, workflow.Name)
 		s.procGroups.Store(workflow.Name, NewProcGroup(pgBaseDir, workflow.Name, s.staleTime))

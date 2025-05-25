@@ -269,7 +269,7 @@ func (q *queueReaderImpl) processItems(ctx context.Context, ch chan<- models.Que
 	return items
 }
 
-func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.QueuedItem, item *queuedItem, data digraph.WorkflowRef, _ map[string]bool) {
+func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.QueuedItem, item *queuedItem, data digraph.DAGRunRef, _ map[string]bool) {
 	item.status = statusProcessing
 
 	select {
@@ -277,7 +277,7 @@ func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.Q
 		select {
 		case res := <-item.Result:
 			if res {
-				logger.Info(ctx, "Item processed successfully", "name", data.Name, "workflowID", data.WorkflowID)
+				logger.Info(ctx, "Item processed successfully", "name", data.Name, "dagRunId", data.ID)
 				item.status = statusDone
 				q.removeProcessedItem(ctx, data)
 				return
@@ -287,7 +287,7 @@ func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.Q
 
 		case <-time.After(processingTimeout):
 			// Timeout waiting for result
-			logger.Warn(ctx, "Timeout waiting for item processing result", "name", data.Name, "workflowID", data.WorkflowID)
+			logger.Warn(ctx, "Timeout waiting for item processing result", "name", data.Name, "dagRunId", data.ID)
 			item.status = statusNone
 
 		case <-ctx.Done():
@@ -300,10 +300,10 @@ func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.Q
 	}
 }
 
-func (q *queueReaderImpl) removeProcessedItem(ctx context.Context, data digraph.WorkflowRef) {
-	if _, err := q.store.DequeueByWorkflowID(ctx, data.Name, data.WorkflowID); err != nil {
+func (q *queueReaderImpl) removeProcessedItem(ctx context.Context, data digraph.DAGRunRef) {
+	if _, err := q.store.DequeueByWorkflowID(ctx, data.Name, data.ID); err != nil {
 		if !errors.Is(err, models.ErrQueueItemNotFound) {
-			logger.Error(ctx, "Failed to dequeue item", "err", err, "name", data.Name, "workflowID", data.WorkflowID)
+			logger.Error(ctx, "Failed to dequeue item", "err", err, "name", data.Name, "dagRunId", data.ID)
 		}
 	}
 }

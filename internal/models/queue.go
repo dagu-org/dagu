@@ -17,7 +17,7 @@ var (
 // for storing and retrieving queued workflows.
 type QueueStore interface {
 	// Enqueue adds an item to the queue
-	Enqueue(ctx context.Context, name string, priority QueuePriority, workflow digraph.WorkflowRef) error
+	Enqueue(ctx context.Context, name string, priority QueuePriority, workflow digraph.DAGRunRef) error
 	// DequeueByName retrieves an item from the queue and removes it
 	DequeueByName(ctx context.Context, name string) (QueuedItemData, error)
 	// Len returns the number of items in the queue
@@ -69,5 +69,5 @@ type QueuedItemData interface {
 	// ID returns the ID of the queued item
 	ID() string
 	// Data returns the data of the queued item
-	Data() digraph.WorkflowRef
+	Data() digraph.DAGRunRef
 }

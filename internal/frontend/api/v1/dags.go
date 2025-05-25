@@ -343,7 +343,7 @@ func (a *API) readStepLog(
 	stepName string,
 	statusFile string,
 ) (*api.StepLog, error) {
-	var status *models.Status
+	var status *models.DAGRunStatus
 
 	if statusFile != "" {
 		parsedStatus, err := localhistory.ParseStatusFile(statusFile)
@@ -440,7 +440,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	}
 
 	// Get status for each DAG
-	dagStatuses := make([]models.Status, len(result.Items))
+	dagStatuses := make([]models.DAGRunStatus, len(result.Items))
 	for _, item := range result.Items {
 		status, err := a.historyManager.GetLatestStatus(ctx, item)
 		if err != nil {
@@ -456,7 +456,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 			Name:       dagStatuses[i].Name,
 			Params:     ptrOf(dagStatuses[i].Params),
 			Pid:        ptrOf(int(dagStatuses[i].PID)),
-			RequestId:  dagStatuses[i].WorkflowID,
+			RequestId:  dagStatuses[i].RunID,
 			StartedAt:  dagStatuses[i].StartedAt,
 			FinishedAt: dagStatuses[i].FinishedAt,
 			Status:     api.RunStatus(dagStatuses[i].Status),
@@ -498,7 +498,7 @@ func (a *API) ListTags(ctx context.Context, _ api.ListTagsRequestObject) (api.Li
 func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionRequestObject) (api.PostDAGActionResponseObject, error) {
 	action := request.Body.Action
 
-	var status models.Status
+	var status models.DAGRunStatus
 	var dag *digraph.DAG
 
 	if action != api.DAGActionSave {
@@ -528,7 +528,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "DAG is already running",
 			}
 		}
-		if err := a.historyManager.StartDAG(ctx, dag, history.StartOptions{
+		if err := a.historyManager.StartDAGRun(ctx, dag, history.StartOptions{
 			Params: valueOf(request.Body.Params),
 		}); err != nil {
 			return nil, fmt.Errorf("error starting DAG: %w", err)
@@ -570,7 +570,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "requestId is required for retry action",
 			}
 		}
-		if err := a.historyManager.RetryDAG(ctx, dag, *request.Body.RequestId); err != nil {
+		if err := a.historyManager.RetryDAGRun(ctx, dag, *request.Body.RequestId); err != nil {
 			return nil, fmt.Errorf("error retrying DAG: %w", err)
 		}
 		return api.PostDAGAction200JSONResponse{}, nil
@@ -651,7 +651,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 		}
 
 		// Rename the history as well
-		if err := a.historyStore.RenameWorkflows(ctx, old.Name, renamed.Name); err != nil {
+		if err := a.historyStore.RenameDAGRuns(ctx, old.Name, renamed.Name); err != nil {
 			return nil, fmt.Errorf("error renaming history: %w", err)
 		}
 
@@ -672,7 +672,7 @@ func (a *API) updateStatus(
 	dag *digraph.DAG,
 	to scheduler.NodeStatus,
 ) error {
-	status, err := a.historyManager.GetDAGRealtimeStatus(ctx, dag, workflowID)
+	status, err := a.historyManager.GetCurrentStatus(ctx, dag, workflowID)
 	if err != nil {
 		return fmt.Errorf("error getting status: %w", err)
 	}
@@ -702,7 +702,7 @@ func (a *API) updateStatus(
 
 	status.Nodes[idxToUpdate].Status = to
 
-	root := digraph.NewWorkflowRef(dag.Name, workflowID)
+	root := digraph.NewDAGRunRef(dag.Name, workflowID)
 	if err := a.historyManager.UpdateStatus(ctx, root, *status); err != nil {
 		return fmt.Errorf("error updating status: %w", err)
 	}
@@ -807,13 +807,13 @@ func toPrecondition(obj *digraph.Condition) api.Precondition {
 	}
 }
 
-func toStatus(s models.Status) api.DAGStatusDetails {
+func toStatus(s models.DAGRunStatus) api.DAGStatusDetails {
 	status := api.DAGStatusDetails{
 		Log:        s.Log,
 		Name:       s.Name,
 		Params:     ptrOf(s.Params),
 		Pid:        int(s.PID),
-		RequestId:  s.WorkflowID,
+		RequestId:  s.RunID,
 		StartedAt:  s.StartedAt,
 		FinishedAt: s.FinishedAt,
 		Status:     api.RunStatus(s.Status),

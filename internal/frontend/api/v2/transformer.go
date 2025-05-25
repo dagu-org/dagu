@@ -64,17 +64,17 @@ func toPrecondition(obj *digraph.Condition) api.Condition {
 	}
 }
 
-func toWorkflowSummary(s models.Status) api.WorkflowSummary {
+func toWorkflowSummary(s models.DAGRunStatus) api.WorkflowSummary {
 	return api.WorkflowSummary{
 		RootWorkflowName:   s.Root.Name,
-		RootWorkflowId:     s.Root.WorkflowID,
+		RootWorkflowId:     s.Root.ID,
 		ParentWorkflowName: ptrOf(s.Parent.Name),
-		ParentWorkflowId:   ptrOf(s.Parent.WorkflowID),
+		ParentWorkflowId:   ptrOf(s.Parent.ID),
 		Log:                s.Log,
 		Name:               s.Name,
 		Params:             ptrOf(s.Params),
 		Pid:                ptrOf(int(s.PID)),
-		WorkflowId:         s.WorkflowID,
+		WorkflowId:         s.RunID,
 		QueuedAt:           ptrOf(s.QueuedAt),
 		StartedAt:          s.StartedAt,
 		FinishedAt:         s.FinishedAt,
@@ -83,7 +83,7 @@ func toWorkflowSummary(s models.Status) api.WorkflowSummary {
 	}
 }
 
-func toWorkflowDetails(s models.Status) api.WorkflowDetails {
+func toWorkflowDetails(s models.DAGRunStatus) api.WorkflowDetails {
 	preconditions := make([]api.Condition, len(s.Preconditions))
 	for i, p := range s.Preconditions {
 		preconditions[i] = toPrecondition(p)
@@ -94,14 +94,14 @@ func toWorkflowDetails(s models.Status) api.WorkflowDetails {
 	}
 	return api.WorkflowDetails{
 		RootWorkflowName:   s.Root.Name,
-		RootWorkflowId:     s.Root.WorkflowID,
+		RootWorkflowId:     s.Root.ID,
 		ParentWorkflowName: ptrOf(s.Parent.Name),
-		ParentWorkflowId:   ptrOf(s.Parent.WorkflowID),
+		ParentWorkflowId:   ptrOf(s.Parent.ID),
 		Log:                s.Log,
 		Name:               s.Name,
 		Params:             ptrOf(s.Params),
 		Pid:                ptrOf(int(s.PID)),
-		WorkflowId:         s.WorkflowID,
+		WorkflowId:         s.RunID,
 		StartedAt:          s.StartedAt,
 		FinishedAt:         s.FinishedAt,
 		Status:             api.Status(s.Status),

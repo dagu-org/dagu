@@ -161,7 +161,7 @@ func TestJobReady(t *testing.T) {
 				Next:     tt.now,
 			}
 
-			lastRunStatus := models.Status{
+			lastRunStatus := models.DAGRunStatus{
 				Status:    tt.lastStatus,
 				StartedAt: stringutil.FormatTime(tt.lastRunTime),
 			}

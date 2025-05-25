@@ -39,8 +39,8 @@ func TestMain(m *testing.M) {
 
 type testHelper struct {
 	manager        scheduler.EntryReader
-	historyManager history.Manager
-	historyStore   models.HistoryStore
+	historyManager history.DAGRunManager
+	historyStore   models.DAGRunStore
 	dagStore       models.DAGStore
 	procStore      models.ProcStore
 	queueStore     models.QueueStore

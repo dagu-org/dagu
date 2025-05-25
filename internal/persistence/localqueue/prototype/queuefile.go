@@ -52,21 +52,21 @@ func NewQueueFile(baseDir, priority string) *QueueFile {
 }
 
 type ItemData struct {
-	FileName string              `json:"file_name"`
-	Workflow digraph.WorkflowRef `json:"workflow"`
-	QueuedAt time.Time           `json:"queued_at"`
+	FileName string            `json:"file_name"`
+	Workflow digraph.DAGRunRef `json:"workflow"`
+	QueuedAt time.Time         `json:"queued_at"`
 }
 
 // Push adds a job to the queue
 // Since it's a prototype, it just create a json file with the job ID and workflow reference
-func (q *QueueFile) Push(ctx context.Context, workflow digraph.WorkflowRef) error {
+func (q *QueueFile) Push(ctx context.Context, workflow digraph.DAGRunRef) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
 	timestamp := models.NewUTC(time.Now())
 
 	// Create the queue file name
-	fileName := queueFileName(q.priority, workflow.WorkflowID, timestamp)
+	fileName := queueFileName(q.priority, workflow.ID, timestamp)
 
 	// Create the full path for the queue file
 	fullPath := filepath.Join(q.baseDir, fileName)
@@ -132,7 +132,7 @@ func (q *QueueFile) PopByWorkflowID(ctx context.Context, workflowID string) ([]*
 
 	var removedJobs []*Job
 	for _, item := range items {
-		if item.Workflow.WorkflowID == workflowID {
+		if item.Workflow.ID == workflowID {
 			if err := os.Remove(filepath.Join(q.baseDir, item.FileName)); err != nil {
 				// Log the error but continue processing other items
 				logger.Warn(ctx, "failed to remove queue file %s: %w", item.FileName, err)
@@ -219,7 +219,7 @@ func (q *QueueFile) FindByWorkflowID(ctx context.Context, workflowID string) (*J
 	}
 
 	for _, item := range items {
-		if item.Workflow.WorkflowID == workflowID {
+		if item.Workflow.ID == workflowID {
 			return NewJob(item), nil
 		}
 	}
@@ -303,9 +303,9 @@ func parseQueueFileName(path, fileName string) (ItemData, error) {
 	// Create the ItemData struct
 	item := ItemData{
 		FileName: fileName,
-		Workflow: digraph.WorkflowRef{
-			Name:       filepath.Base(filepath.Dir(path)),
-			WorkflowID: matches[4],
+		Workflow: digraph.DAGRunRef{
+			Name: filepath.Base(filepath.Dir(path)),
+			ID:   matches[4],
 		},
 		QueuedAt: timestamp,
 	}

@@ -39,19 +39,19 @@ type Agent struct {
 
 	// retryTarget is the target status to retry the DAG.
 	// It is nil if it's not a retry execution.
-	retryTarget *models.Status
+	retryTarget *models.DAGRunStatus
 
 	// dagStore is the database to store the DAG definitions.
 	dagStore models.DAGStore
 
-	// historyStore is the database to store the run history.
-	historyStore models.HistoryStore
+	// dagRunStore is the database to store the run history.
+	dagRunStore models.DAGRunStore
 
 	// procStore is the database to store the process information.
 	procStore models.ProcStore
 
-	// client is the runstore client to communicate with the history.
-	client history.Manager
+	// dagRunManager is the runstore dagRunManager to communicate with the history.
+	dagRunManager history.DAGRunManager
 
 	// scheduler is the scheduler instance to run the DAG.
 	scheduler *scheduler.Scheduler
@@ -75,27 +75,29 @@ type Agent struct {
 	// dag is the DAG to run.
 	dag *digraph.DAG
 
-	// root indicates the DAG name and execution reference of the root execution history.
-	// It is same as the current execution reference if it's not a child workflow.
-	root digraph.WorkflowRef
+	// rootDAGRun indicates the root DAG-run of the current DAG-run.
+	// If the current DAG-run is the root DAG-run, it is the same as the current
+	// DAG name and DAG-run ID.
+	rootDAGRun digraph.DAGRunRef
 
-	// parent is the execution reference of the parent workflow.
-	parent digraph.WorkflowRef
+	// parentDAGRun is the execution reference of the parent DAG-run.
+	parentDAGRun digraph.DAGRunRef
 
-	// workflowID is the workflow ID of the current workflow.
-	workflowID string
+	// dagRunID is the ID for the current DAG-run.
+	dagRunID string
 
-	// runID is the ID for the current run of the workflow.
-	runID string
+	// dagRunAttemptID is the ID for the current DAG-run attempt.
+	dagRunAttemptID string
 
-	// finished is true if the workflow is finished.
+	// finished is true if the DAG-run is finished.
 	finished atomic.Bool
 
-	// lastErr is the last error occurred during the workflow.
+	// lastErr is the last error occurred during the DAG run.
 	lastErr error
 
-	// childWorkflow is true if the agent is running as a child workflow.
-	childWorkflow atomic.Bool
+	// isChildDAGRun is true if the current DAG-run is not the root DAG-run,
+	// meaning that it is a child DAG-run of another DAG-run.
+	isChildDAGRun atomic.Bool
 }
 
 // Options is the configuration for the Agent.
@@ -106,10 +108,10 @@ type Options struct {
 	// RetryTarget is the target status (runstore of execution) to retry.
 	// If it's specified the agent will execute the DAG with the same
 	// configuration as the specified history.
-	RetryTarget *models.Status
-	// Parent is the workflow ID of the parent workflow.
-	// It is required for child workflows to identify the parent DAG.
-	Parent digraph.WorkflowRef
+	RetryTarget *models.DAGRunStatus
+	// ParentDAGRun is the DAG-run reference of the parent DAG-run.
+	// It is required for child DAG-runs to identify the parent DAG-run.
+	ParentDAGRun digraph.DAGRunRef
 }
 
 // New creates a new Agent.
@@ -118,26 +120,26 @@ func New(
 	dag *digraph.DAG,
 	logDir string,
 	logFile string,
-	cli history.Manager,
+	cli history.DAGRunManager,
 	ds models.DAGStore,
-	hs models.HistoryStore,
+	hs models.DAGRunStore,
 	ps models.ProcStore,
-	root digraph.WorkflowRef,
+	root digraph.DAGRunRef,
 	opts Options,
 ) *Agent {
 	return &Agent{
-		root:         root,
-		parent:       opts.Parent,
-		workflowID:   workflowID,
-		dag:          dag,
-		dry:          opts.Dry,
-		retryTarget:  opts.RetryTarget,
-		logDir:       logDir,
-		logFile:      logFile,
-		client:       cli,
-		dagStore:     ds,
-		historyStore: hs,
-		procStore:    ps,
+		rootDAGRun:    root,
+		parentDAGRun:  opts.ParentDAGRun,
+		dagRunID:      workflowID,
+		dag:           dag,
+		dry:           opts.Dry,
+		retryTarget:   opts.RetryTarget,
+		logDir:        logDir,
+		logFile:       logFile,
+		dagRunManager: cli,
+		dagStore:      ds,
+		dagRunStore:   hs,
+		procStore:     ps,
 	}
 }
 
@@ -146,26 +148,25 @@ func (a *Agent) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if a.root.WorkflowID != a.workflowID {
-		logger.Debug(ctx, "Initiating child workflow", "rootRef", a.root.String())
-		a.childWorkflow.Store(true)
-		if a.parent.Zero() {
-			logger.Error(ctx, "Parent workflow ID is required for child workflow")
-			return fmt.Errorf("parent workflow ID is required for child workflow")
+	if a.rootDAGRun.ID != a.dagRunID {
+		logger.Debug(ctx, "Initiating child DAG run", "root-DAG-run", a.rootDAGRun.String(), "parent-DAG-run", a.parentDAGRun.String())
+		a.isChildDAGRun.Store(true)
+		if a.parentDAGRun.Zero() {
+			return fmt.Errorf("parent DAG-run is not specified for child DAG-run %s", a.dagRunID)
 		}
 	}
 
-	var run models.Run
+	var attempt models.DAGRunAttempt
 
 	if !a.dry {
-		// Setup the run record for the workflow.
-		// It's not required for dry-run because it does not create data.
-		r, err := a.setupRun(ctx)
+		// Setup the attempt for the DAG-run.
+		// It's not required for dry-run mode.
+		at, err := a.setupDAGRunAttempt(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to setup execution history: %w", err)
 		}
-		run = r
-		a.runID = run.ID()
+		attempt = at
+		a.dagRunAttemptID = attempt.ID()
 	}
 
 	// Initialize the scheduler
@@ -174,19 +175,19 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Setup the reporter to send the report to the user.
 	a.setupReporter(ctx)
 
-	// Setup the graph for the workflow.
+	// Setup the execution graph for the DAG.
 	if err := a.setupGraph(ctx); err != nil {
 		return fmt.Errorf("failed to setup execution graph: %w", err)
 	}
 
-	// Create a new environment for the workflow execution.
-	dbClient := newDBClient(a.historyStore, a.dagStore)
-	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.root, a.workflowID, a.logFile, a.dag.Params)
+	// Create a new environment for the DAG run.
+	dbClient := newDBClient(a.dagRunStore, a.dagStore)
+	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params)
 
 	// Add structured logging context
-	logFields := []any{"dag", a.dag.Name, "workflowId", a.workflowID}
-	if a.childWorkflow.Load() {
-		logFields = append(logFields, "root", a.root.String(), "parent", a.parent.String())
+	logFields := []any{"dag", a.dag.Name, "dagRunId", a.dagRunID}
+	if a.isChildDAGRun.Load() {
+		logFields = append(logFields, "root", a.rootDAGRun.String(), "parent", a.parentDAGRun.String())
 	}
 	ctx = logger.WithValues(ctx, logFields...)
 
@@ -202,7 +203,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Create a process for heartbeat.
-	proc, err := a.procStore.Acquire(ctx, digraph.NewWorkflowRef(a.dag.Name, a.workflowID))
+	proc, err := a.procStore.Acquire(ctx, digraph.NewDAGRunRef(a.dag.Name, a.dagRunID))
 	if err != nil {
 		return fmt.Errorf("failed to get process: %w", err)
 	}
@@ -214,16 +215,16 @@ func (a *Agent) Run(ctx context.Context) error {
 	}()
 
 	// Open the run file to write the status.
-	if err := run.Open(ctx); err != nil {
+	if err := attempt.Open(ctx); err != nil {
 		return fmt.Errorf("failed to open execution history: %w", err)
 	}
 	defer func() {
-		if err := run.Close(ctx); err != nil {
+		if err := attempt.Close(ctx); err != nil {
 			logger.Error(ctx, "Failed to close runstore store", "err", err)
 		}
 	}()
 
-	if err := run.Write(ctx, a.Status()); err != nil {
+	if err := attempt.Write(ctx, a.Status()); err != nil {
 		logger.Error(ctx, "Failed to write status", "err", err)
 	}
 
@@ -241,7 +242,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 	})
 
-	// Stop the socket server when finishing the workflow.
+	// Stop the socket server when the DAG run is finished.
 	defer func() {
 		if err := a.socketServer.Shutdown(ctx); err != nil {
 			logger.Error(ctx, "Failed to shutdown socket frontend", "err", err)
@@ -261,7 +262,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	go execWithRecovery(ctx, func() {
 		for node := range progressCh {
 			status := a.Status()
-			if err := run.Write(ctx, status); err != nil {
+			if err := attempt.Write(ctx, status); err != nil {
 				logger.Error(ctx, "Failed to write status", "err", err)
 			}
 			if err := a.reporter.reportStep(ctx, a.dag, status, node); err != nil {
@@ -277,29 +278,29 @@ func (a *Agent) Run(ctx context.Context) error {
 		if a.finished.Load() {
 			return
 		}
-		if err := run.Write(ctx, a.Status()); err != nil {
+		if err := attempt.Write(ctx, a.Status()); err != nil {
 			logger.Error(ctx, "Status write failed", "err", err)
 		}
 	})
 
-	// Start the workflow.
-	logger.Debug(ctx, "Workflow started", "workflowId", a.workflowID, "name", a.dag.Name, "params", a.dag.Params)
+	// Start the DAG run.
+	logger.Debug(ctx, "DAG-run started", "dagRunId", a.dagRunID, "name", a.dag.Name, "params", a.dag.Params)
 	lastErr := a.scheduler.Schedule(ctx, a.graph, progressCh)
 
 	// Update the finished status to the runstore database.
 	finishedStatus := a.Status()
 
 	// Log execution summary
-	logger.Info(ctx, "Workflow finished",
+	logger.Info(ctx, "DAG-run finished",
 		"name", a.dag.Name,
-		"workflowId", a.workflowID,
-		"runID", a.runID,
+		"dagRunId", a.dagRunID,
+		"attemptID", a.dagRunAttemptID,
 		"status", finishedStatus.Status.String(),
 		"startedAt", finishedStatus.StartedAt,
 		"finishedAt", finishedStatus.FinishedAt,
 	)
 
-	if err := run.Write(ctx, a.Status()); err != nil {
+	if err := attempt.Write(ctx, a.Status()); err != nil {
 		logger.Error(ctx, "Status write failed", "err", err)
 	}
 
@@ -312,7 +313,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Mark the agent finished.
 	a.finished.Store(true)
 
-	// Return the last error on the workflow.
+	// Return the last error on the DAG run.
 	return lastErr
 }
 
@@ -323,7 +324,7 @@ func (a *Agent) PrintSummary(ctx context.Context) {
 }
 
 // Status collects the current running status of the DAG and returns it.
-func (a *Agent) Status() models.Status {
+func (a *Agent) Status() models.DAGRunStatus {
 	// Lock to avoid race condition.
 	a.lock.RLock()
 	defer a.lock.RUnlock()
@@ -342,15 +343,14 @@ func (a *Agent) Status() models.Status {
 		models.WithOnSuccessNode(a.scheduler.HandlerNode(digraph.HandlerOnSuccess)),
 		models.WithOnFailureNode(a.scheduler.HandlerNode(digraph.HandlerOnFailure)),
 		models.WithOnCancelNode(a.scheduler.HandlerNode(digraph.HandlerOnCancel)),
-		models.WithRunID(a.runID),
-		models.WithHierarchyRefs(a.root, a.parent),
+		models.WithAttemptID(a.dagRunAttemptID),
+		models.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
 		models.WithPreconditions(a.dag.Preconditions),
 	}
 
-	// If the current execution is a retry execution, we need to copy some data
+	// If the current execution is a retry, we need to copy some data
 	// from the retry target to the current status.
 	if a.retryTarget != nil {
-		// QueuedAt is the time when the workflow was queued.
 		opts = append(opts, models.WithQueuedAt(a.retryTarget.QueuedAt))
 		opts = append(opts, models.WithCreatedAt(a.retryTarget.CreatedAt))
 	}
@@ -358,7 +358,7 @@ func (a *Agent) Status() models.Status {
 	// Create the status object to record the current status.
 	return models.NewStatusBuilder(a.dag).
 		Create(
-			a.workflowID,
+			a.dagRunID,
 			schedulerStatus,
 			os.Getpid(),
 			a.graph.StartAt(),
@@ -386,7 +386,7 @@ func (a *Agent) HandleHTTP(ctx context.Context) sock.HTTPHandlerFunc {
 		w.Header().Set("content-type", "application/json")
 		switch {
 		case r.Method == http.MethodGet && statusRe.MatchString(r.URL.Path):
-			// Return the current status of the execution.
+			// Return the current status of the DAG run.
 			status := a.Status()
 			status.Status = scheduler.StatusRunning
 			statusJSON, err := json.Marshal(status)
@@ -397,7 +397,7 @@ func (a *Agent) HandleHTTP(ctx context.Context) sock.HTTPHandlerFunc {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write(statusJSON)
 		case r.Method == http.MethodPost && stopRe.MatchString(r.URL.Path):
-			// Handle Stop request for the workflow.
+			// Handle Stop request for the DAG run.
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("OK"))
 			go func() {
@@ -437,12 +437,12 @@ func (a *Agent) setupReporter(ctx context.Context) {
 	a.reporter = newReporter(senderFn)
 }
 
-// newScheduler creates a scheduler instance for the workflow.
+// newScheduler creates a scheduler instance for the DAG run.
 func (a *Agent) newScheduler() *scheduler.Scheduler {
-	// schedulerLogDir is the directory to store the log files for each node in the workflow.
+	// schedulerLogDir is the directory to store the log files for each node in the DAG run.
 	const dateTimeFormatUTC = "20060102_150405Z"
 	ts := time.Now().UTC().Format(dateTimeFormatUTC)
-	schedulerLogDir := filepath.Join(a.logDir, "run_"+ts+"_"+a.runID)
+	schedulerLogDir := filepath.Join(a.logDir, "run_"+ts+"_"+a.dagRunAttemptID)
 
 	cfg := &scheduler.Config{
 		LogDir:         schedulerLogDir,
@@ -450,7 +450,7 @@ func (a *Agent) newScheduler() *scheduler.Scheduler {
 		Timeout:        a.dag.Timeout,
 		Delay:          a.dag.Delay,
 		Dry:            a.dry,
-		WorkflowID:     a.workflowID,
+		DAGRunID:       a.dagRunID,
 	}
 
 	if a.dag.HandlerOn.Exit != nil {
@@ -489,8 +489,8 @@ func (a *Agent) dryRun(ctx context.Context) error {
 		}
 	}()
 
-	db := newDBClient(a.historyStore, a.dagStore)
-	dagCtx := digraph.SetupEnv(ctx, a.dag, db, a.root, a.workflowID, a.logFile, a.dag.Params)
+	db := newDBClient(a.dagRunStore, a.dagStore)
+	dagCtx := digraph.SetupEnv(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, progressCh)
 	a.lastErr = lastErr
 
@@ -578,28 +578,28 @@ func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 	return nil
 }
 
-func (a *Agent) setupRun(ctx context.Context) (models.Run, error) {
+func (a *Agent) setupDAGRunAttempt(ctx context.Context) (models.DAGRunAttempt, error) {
 	retentionDays := a.dag.HistRetentionDays
-	if err := a.historyStore.RemoveOldWorkflows(ctx, a.dag.Name, retentionDays); err != nil {
+	if err := a.dagRunStore.RemoveOldDAGRuns(ctx, a.dag.Name, retentionDays); err != nil {
 		logger.Error(ctx, "History data cleanup failed", "err", err)
 	}
 
-	opts := models.NewRunOptions{Retry: a.retryTarget != nil}
-	if a.childWorkflow.Load() {
-		opts.Root = &a.root
+	opts := models.NewDAGRunAttemptOptions{Retry: a.retryTarget != nil}
+	if a.isChildDAGRun.Load() {
+		opts.Root = &a.rootDAGRun
 	}
 
-	return a.historyStore.CreateRun(ctx, a.dag, time.Now(), a.workflowID, opts)
+	return a.dagRunStore.CreateAttempt(ctx, a.dag, time.Now(), a.dagRunID, opts)
 }
 
 // setupSocketServer create socket server instance.
 func (a *Agent) setupSocketServer(ctx context.Context) error {
 	var socketAddr string
-	if a.childWorkflow.Load() {
-		// Use separate socket address for child workflows to allow them run concurrently.
-		socketAddr = a.dag.SockAddrSub(a.workflowID)
+	if a.isChildDAGRun.Load() {
+		// Use separate socket address for child
+		socketAddr = a.dag.SockAddrSub(a.dagRunID)
 	} else {
-		socketAddr = a.dag.SockAddr(a.workflowID)
+		socketAddr = a.dag.SockAddr(a.dagRunID)
 	}
 	socketServer, err := sock.NewServer(socketAddr, a.HandleHTTP(ctx))
 	if err != nil {
@@ -611,11 +611,11 @@ func (a *Agent) setupSocketServer(ctx context.Context) error {
 
 // checkIsAlreadyRunning returns error if the DAG is already running.
 func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
-	if a.childWorkflow.Load() {
-		return nil // Skip the check for child workflows
+	if a.isChildDAGRun.Load() {
+		return nil // Skip the check for child DAG-runs
 	}
-	if a.client.IsDAGRunning(ctx, a.dag, a.workflowID) {
-		return fmt.Errorf("the DAG is already running. workflowID=%s, socket=%s", a.workflowID, a.dag.SockAddr(a.workflowID))
+	if a.dagRunManager.IsRunning(ctx, a.dag, a.dagRunID) {
+		return fmt.Errorf("already running. DAG-run ID=%s, socket=%s", a.dagRunID, a.dag.SockAddr(a.dagRunID))
 	}
 	return nil
 }
@@ -669,18 +669,15 @@ func encodeError(w http.ResponseWriter, err error) {
 	}
 }
 
-var _ digraph.DB = &dbClient{}
+var _ digraph.Database = &dbClient{}
 
 type dbClient struct {
-	ds models.DAGStore
-	hs models.HistoryStore
+	ds  models.DAGStore
+	drs models.DAGRunStore
 }
 
-func newDBClient(hs models.HistoryStore, ds models.DAGStore) *dbClient {
-	return &dbClient{
-		hs: hs,
-		ds: ds,
-	}
+func newDBClient(drs models.DAGRunStore, ds models.DAGStore) *dbClient {
+	return &dbClient{drs: drs, ds: ds}
 }
 
 // GetDAG implements digraph.DBClient.
@@ -688,10 +685,10 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error
 	return o.ds.GetDetails(ctx, name)
 }
 
-func (o *dbClient) GetChildWorkflowStatus(ctx context.Context, workflowID string, root digraph.WorkflowRef) (*digraph.Status, error) {
-	run, err := o.hs.FindChildWorkflowRun(ctx, root, workflowID)
+func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) (*digraph.Status, error) {
+	run, err := o.drs.FindChildAttempt(ctx, rootDAGRun, dagRunID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find run for workflow ID %s: %w", workflowID, err)
+		return nil, fmt.Errorf("failed to find run for DAG-run ID %s: %w", dagRunID, err)
 	}
 	status, err := run.ReadStatus(ctx)
 	if err != nil {
@@ -713,9 +710,9 @@ func (o *dbClient) GetChildWorkflowStatus(ctx context.Context, workflowID string
 	}
 
 	return &digraph.Status{
-		Outputs:    outputVariables,
-		Name:       status.Name,
-		WorkflowID: status.WorkflowID,
-		Params:     status.Params,
+		Outputs:  outputVariables,
+		Name:     status.Name,
+		DAGRunID: status.RunID,
+		Params:   status.Params,
 	}, nil
 }

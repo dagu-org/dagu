@@ -17,11 +17,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRun_Open(t *testing.T) {
+func TestAttempt_Open(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "status.dat")
 
-	hr, err := NewRun(file, nil)
+	hr, err := NewAttempt(file, nil)
 	require.NoError(t, err)
 
 	// Test successful open
@@ -37,11 +37,11 @@ func TestRun_Open(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestRun_Write(t *testing.T) {
+func TestAttempt_Write(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "status.dat")
 
-	hr, err := NewRun(file, nil)
+	hr, err := NewAttempt(file, nil)
 	require.NoError(t, err)
 
 	// Test write without open
@@ -60,7 +60,7 @@ func TestRun_Write(t *testing.T) {
 	// Verify file content
 	actual, err := hr.ReadStatus(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, "test", actual.WorkflowID)
+	assert.Equal(t, "test", actual.RunID)
 	assert.Equal(t, scheduler.StatusRunning, actual.Status)
 
 	// Close
@@ -68,7 +68,7 @@ func TestRun_Write(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestRun_Read(t *testing.T) {
+func TestAttempt_Read(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "status.dat")
 
@@ -97,8 +97,8 @@ func TestRun_Read(t *testing.T) {
 	err = f.Close()
 	require.NoError(t, err)
 
-	// Initialize Run and test reading
-	hr, err := NewRun(file, nil)
+	// Initialize attempt
+	hr, err := NewAttempt(file, nil)
 	require.NoError(t, err)
 
 	// Read status - should get the last entry (test2)
@@ -112,7 +112,7 @@ func TestRun_Read(t *testing.T) {
 	assert.Equal(t, scheduler.StatusSuccess.String(), latestStatus.Status.String())
 }
 
-func TestRun_Compact(t *testing.T) {
+func TestAttempt_Compact(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "status.dat")
 
@@ -121,7 +121,7 @@ func TestRun_Compact(t *testing.T) {
 		status := createTestStatus(scheduler.StatusRunning)
 
 		if i == 9 {
-			// Make some status changes to create different runs
+			// Make some status changes to create different attempts
 			status.Status = scheduler.StatusSuccess
 		}
 
@@ -147,8 +147,8 @@ func TestRun_Compact(t *testing.T) {
 	require.NoError(t, err)
 	beforeSize := fileInfo.Size()
 
-	// Initialize Run
-	hr, err := NewRun(file, nil)
+	// Initialize Attempt
+	hr, err := NewAttempt(file, nil)
 	require.NoError(t, err)
 
 	// Compact the file
@@ -169,12 +169,12 @@ func TestRun_Compact(t *testing.T) {
 	assert.Equal(t, scheduler.StatusSuccess, status.Status)
 }
 
-func TestRun_Close(t *testing.T) {
+func TestAttempt_Close(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "status.dat")
 
-	// Initialize and open Run
-	hr, err := NewRun(file, nil)
+	// Initialize and open Attempt
+	hr, err := NewAttempt(file, nil)
 	require.NoError(t, err)
 
 	err = hr.Open(context.Background())
@@ -197,11 +197,11 @@ func TestRun_Close(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestRun_HandleNonExistentFile(t *testing.T) {
+func TestAttempt_HandleNonExistentFile(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "invalid.dat")
 
-	hr, err := NewRun(file, nil)
+	hr, err := NewAttempt(file, nil)
 	require.NoError(t, err)
 
 	// Should be able to open a non-existent file
@@ -215,14 +215,14 @@ func TestRun_HandleNonExistentFile(t *testing.T) {
 	// Verify the file was created with correct data
 	status, err := hr.ReadStatus(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, "test", status.WorkflowID)
+	assert.Equal(t, "test", status.RunID)
 
 	// Cleanup
 	err = hr.Close(context.Background())
 	assert.NoError(t, err)
 }
 
-func TestRun_EmptyFile(t *testing.T) {
+func TestAttempt_EmptyFile(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "empty.dat")
 
@@ -231,7 +231,7 @@ func TestRun_EmptyFile(t *testing.T) {
 	require.NoError(t, err)
 	_ = f.Close()
 
-	hr, err := NewRun(file, nil)
+	hr, err := NewAttempt(file, nil)
 	require.NoError(t, err)
 
 	// Reading an empty file should return EOF
@@ -243,7 +243,7 @@ func TestRun_EmptyFile(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestRun_InvalidJSON(t *testing.T) {
+func TestAttempt_InvalidJSON(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "invalid.dat")
 
@@ -257,7 +257,7 @@ func TestRun_InvalidJSON(t *testing.T) {
 	_, err = f.Write([]byte("invalid json\n"))
 	require.NoError(t, err)
 
-	hr, err := NewRun(file, nil)
+	hr, err := NewAttempt(file, nil)
 	require.NoError(t, err)
 
 	// Should be able to read and get the valid entry
@@ -339,10 +339,10 @@ func TestSafeRename(t *testing.T) {
 func createTempDir(t *testing.T) string {
 	t.Helper()
 
-	runID, err := genRunID()
+	attemptID, err := genAttemptID()
 	require.NoError(t, err)
 
-	dir, err := os.MkdirTemp("", "run_"+formatRunTimestamp(models.NewUTC(time.Now()))+"_"+runID)
+	dir, err := os.MkdirTemp("", "run_"+formatRunTimestamp(models.NewUTC(time.Now()))+"_"+attemptID)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = os.RemoveAll(dir)
@@ -383,16 +383,16 @@ func createTestDAG() *digraph.DAG {
 }
 
 // createTestStatus creates a sample status for testing using StatusFactory
-func createTestStatus(status scheduler.Status) models.Status {
+func createTestStatus(status scheduler.Status) models.DAGRunStatus {
 	dag := createTestDAG()
 
-	return models.Status{
-		Name:       dag.Name,
-		WorkflowID: "test",
-		Status:     status,
-		PID:        models.PID(12345),
-		StartedAt:  stringutil.FormatTime(time.Now()),
-		Nodes:      models.FromSteps(dag.Steps),
+	return models.DAGRunStatus{
+		Name:      dag.Name,
+		RunID:     "test",
+		Status:    status,
+		PID:       models.PID(12345),
+		StartedAt: stringutil.FormatTime(time.Now()),
+		Nodes:     models.FromSteps(dag.Steps),
 	}
 }
 

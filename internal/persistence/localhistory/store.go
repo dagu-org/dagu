@@ -25,14 +25,14 @@ var (
 	ErrTooManyResults  = errors.New("too many results found")
 )
 
-var _ models.HistoryStore = (*Store)(nil)
+var _ models.DAGRunStore = (*Store)(nil)
 
 // Store manages DAGs status files in local Store with high performance and reliability.
 type Store struct {
-	baseDir           string                          // Base directory for all status files
-	latestStatusToday bool                            // Whether to only return today's status
-	cache             *fileutil.Cache[*models.Status] // Optional cache for read operations
-	maxWorkers        int                             // Maximum number of parallel workers
+	baseDir           string                                // Base directory for all status files
+	latestStatusToday bool                                  // Whether to only return today's status
+	cache             *fileutil.Cache[*models.DAGRunStatus] // Optional cache for read operations
+	maxWorkers        int                                   // Maximum number of parallel workers
 }
 
 // HistoryStoreOption defines functional options for configuring local.
@@ -40,14 +40,14 @@ type HistoryStoreOption func(*HistoryStoreOptions)
 
 // HistoryStoreOptions holds configuration options for local.
 type HistoryStoreOptions struct {
-	FileCache         *fileutil.Cache[*models.Status] // Optional cache for status files
-	LatestStatusToday bool                            // Whether to only return today's status
-	MaxWorkers        int                             // Maximum number of parallel workers
-	OperationTimeout  time.Duration                   // Timeout for operations
+	FileCache         *fileutil.Cache[*models.DAGRunStatus] // Optional cache for status files
+	LatestStatusToday bool                                  // Whether to only return today's status
+	MaxWorkers        int                                   // Maximum number of parallel workers
+	OperationTimeout  time.Duration                         // Timeout for operations
 }
 
 // WithHistoryFileCache sets the file cache for local.
-func WithHistoryFileCache(cache *fileutil.Cache[*models.Status]) HistoryStoreOption {
+func WithHistoryFileCache(cache *fileutil.Cache[*models.DAGRunStatus]) HistoryStoreOption {
 	return func(o *HistoryStoreOptions) {
 		o.FileCache = cache
 	}
@@ -61,7 +61,7 @@ func WithLatestStatusToday(latestStatusToday bool) HistoryStoreOption {
 }
 
 // New creates a new JSONDB instance with the specified options.
-func New(baseDir string, opts ...HistoryStoreOption) models.HistoryStore {
+func New(baseDir string, opts ...HistoryStoreOption) models.DAGRunStore {
 	options := &HistoryStoreOptions{
 		LatestStatusToday: true,
 		MaxWorkers:        runtime.NumCPU(),
@@ -81,7 +81,7 @@ func New(baseDir string, opts ...HistoryStoreOption) models.HistoryStore {
 
 // ListStatuses retrieves status records based on the provided options.
 // It supports filtering by time range, status, and limiting the number of results.
-func (store *Store) ListStatuses(ctx context.Context, opts ...models.ListStatusesOption) ([]*models.Status, error) {
+func (store *Store) ListStatuses(ctx context.Context, opts ...models.ListDAGRunStatusesOption) ([]*models.DAGRunStatus, error) {
 	// Apply options and set defaults
 	options, err := prepareListOptions(opts)
 	if err != nil {
@@ -105,7 +105,7 @@ func (store *Store) ListStatuses(ctx context.Context, opts ...models.ListStatuse
 }
 
 // prepareListOptions processes the provided options and sets default values.
-func prepareListOptions(opts []models.ListStatusesOption) (models.ListStatusesOptions, error) {
+func prepareListOptions(opts []models.ListDAGRunStatusesOption) (models.ListStatusesOptions, error) {
 	var options models.ListStatusesOptions
 
 	// Apply all options
@@ -132,7 +132,7 @@ func (store *Store) collectStatusesFromRoots(
 	parentCtx context.Context,
 	roots []DataRoot,
 	opts models.ListStatusesOptions,
-) ([]*models.Status, error) {
+) ([]*models.DAGRunStatus, error) {
 
 	if len(roots) == 0 {
 		return nil, nil
@@ -144,7 +144,7 @@ func (store *Store) collectStatusesFromRoots(
 
 	var (
 		resultsMu      sync.Mutex
-		results        = make([]*models.Status, 0, opts.Limit)
+		results        = make([]*models.DAGRunStatus, 0, opts.Limit)
 		remaining      atomic.Int64
 		statusesFilter = make(map[scheduler.Status]struct{})
 	)
@@ -170,9 +170,9 @@ func (store *Store) collectStatusesFromRoots(
 				limit: int(remaining.Load()),
 			})
 
-			statuses := make([]*models.Status, 0, len(workflows))
+			statuses := make([]*models.DAGRunStatus, 0, len(workflows))
 			for _, workflow := range workflows {
-				if opts.WorkflowID != "" && !strings.Contains(workflow.workflowID, opts.WorkflowID) {
+				if opts.DAGRunID != "" && !strings.Contains(workflow.workflowID, opts.DAGRunID) {
 					continue
 				}
 
@@ -234,10 +234,10 @@ func (store *Store) collectStatusesFromRoots(
 	return results, nil
 }
 
-// CreateRun creates a new history record for the specified workflow ID.
+// CreateAttempt creates a new history record for the specified workflow ID.
 // If opts.Root is not nil, it creates a new history record for a child workflow.
 // If opts.Retry is true, it creates a retry record for the specified workflow ID.
-func (store *Store) CreateRun(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewRunOptions) (models.Run, error) {
+func (store *Store) CreateAttempt(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewDAGRunAttemptOptions) (models.DAGRunAttempt, error) {
 	if workflowID == "" {
 		return nil, ErrWorkflowIDEmpty
 	}
@@ -273,9 +273,9 @@ func (store *Store) CreateRun(ctx context.Context, dag *digraph.DAG, timestamp t
 }
 
 // newChildRecord creates a new history record for a child workflow.
-func (b *Store) newChildRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewRunOptions) (models.Run, error) {
+func (b *Store) newChildRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewDAGRunAttemptOptions) (models.DAGRunAttempt, error) {
 	dataRoot := NewDataRoot(b.baseDir, opts.Root.Name)
-	root, err := dataRoot.FindByWorkflowID(ctx, opts.Root.WorkflowID)
+	root, err := dataRoot.FindByWorkflowID(ctx, opts.Root.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find root execution: %w", err)
 	}
@@ -306,8 +306,8 @@ func (b *Store) newChildRecord(ctx context.Context, dag *digraph.DAG, timestamp 
 	return record, nil
 }
 
-// RecentRuns returns the most recent history records for the specified workflow name.
-func (store *Store) RecentRuns(ctx context.Context, dagName string, itemLimit int) []models.Run {
+// RecentAttempts returns the most recent history records for the specified workflow name.
+func (store *Store) RecentAttempts(ctx context.Context, dagName string, itemLimit int) []models.DAGRunAttempt {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -327,7 +327,7 @@ func (store *Store) RecentRuns(ctx context.Context, dagName string, itemLimit in
 	items := root.Latest(ctx, itemLimit)
 
 	// Get the latest record for each item
-	records := make([]models.Run, 0, len(items))
+	records := make([]models.DAGRunAttempt, 0, len(items))
 	for _, item := range items {
 		record, err := item.LatestRun(ctx, store.cache)
 		if err != nil {
@@ -340,9 +340,9 @@ func (store *Store) RecentRuns(ctx context.Context, dagName string, itemLimit in
 	return records
 }
 
-// LatestRun returns the most recent history record for the specified workflow name.
+// LatestAttempt returns the most recent history record for the specified workflow name.
 // If latestStatusToday is true, it only returns today's status.
-func (store *Store) LatestRun(ctx context.Context, dagName string) (models.Run, error) {
+func (store *Store) LatestAttempt(ctx context.Context, dagName string) (models.DAGRunAttempt, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -374,8 +374,8 @@ func (store *Store) LatestRun(ctx context.Context, dagName string) (models.Run, 
 	return latest[0].LatestRun(ctx, store.cache)
 }
 
-// FindRun finds a history record by workflow ID.
-func (store *Store) FindRun(ctx context.Context, ref digraph.WorkflowRef) (models.Run, error) {
+// FindAttempt finds a history record by workflow ID.
+func (store *Store) FindAttempt(ctx context.Context, ref digraph.DAGRunRef) (models.DAGRunAttempt, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -384,12 +384,12 @@ func (store *Store) FindRun(ctx context.Context, ref digraph.WorkflowRef) (model
 		// Continue with operation
 	}
 
-	if ref.WorkflowID == "" {
+	if ref.ID == "" {
 		return nil, ErrWorkflowIDEmpty
 	}
 
 	root := NewDataRoot(store.baseDir, ref.Name)
-	run, err := root.FindByWorkflowID(ctx, ref.WorkflowID)
+	run, err := root.FindByWorkflowID(ctx, ref.ID)
 
 	if err != nil {
 		return nil, err
@@ -398,9 +398,9 @@ func (store *Store) FindRun(ctx context.Context, ref digraph.WorkflowRef) (model
 	return run.LatestRun(ctx, store.cache)
 }
 
-// FindChildWorkflowRun finds a child workflow by its ID.
+// FindChildAttempt finds a child workflow by its ID.
 // It returns the latest record for the specified child workflow ID.
-func (store *Store) FindChildWorkflowRun(ctx context.Context, ref digraph.WorkflowRef, childWorkflowID string) (models.Run, error) {
+func (store *Store) FindChildAttempt(ctx context.Context, ref digraph.DAGRunRef, childWorkflowID string) (models.DAGRunAttempt, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -409,12 +409,12 @@ func (store *Store) FindChildWorkflowRun(ctx context.Context, ref digraph.Workfl
 		// Continue with operation
 	}
 
-	if ref.WorkflowID == "" {
+	if ref.ID == "" {
 		return nil, ErrWorkflowIDEmpty
 	}
 
 	root := NewDataRoot(store.baseDir, ref.Name)
-	run, err := root.FindByWorkflowID(ctx, ref.WorkflowID)
+	run, err := root.FindByWorkflowID(ctx, ref.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find execution: %w", err)
 	}
@@ -426,12 +426,12 @@ func (store *Store) FindChildWorkflowRun(ctx context.Context, ref digraph.Workfl
 	return childWorkflow.LatestRun(ctx, store.cache)
 }
 
-// RemoveOldWorkflows removes old history records older than the specified retention days.
+// RemoveOldDAGRuns removes old history records older than the specified retention days.
 // It only removes records older than the specified retention days.
 // If retentionDays is negative, no files will be removed.
 // If retentionDays is zero, all files will be removed.
 // If retentionDays is positive, only files older than the specified number of days will be removed.
-func (store *Store) RemoveOldWorkflows(ctx context.Context, dagName string, retentionDays int) error {
+func (store *Store) RemoveOldDAGRuns(ctx context.Context, dagName string, retentionDays int) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -449,8 +449,8 @@ func (store *Store) RemoveOldWorkflows(ctx context.Context, dagName string, rete
 	return root.RemoveOld(ctx, retentionDays)
 }
 
-// RenameWorkflows renames all history records for the specified workflow name.
-func (store *Store) RenameWorkflows(ctx context.Context, oldNameOrPath, newNameOrPath string) error {
+// RenameDAGRuns renames all history records for the specified workflow name.
+func (store *Store) RenameDAGRuns(ctx context.Context, oldNameOrPath, newNameOrPath string) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
