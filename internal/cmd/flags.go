@@ -91,18 +91,10 @@ var (
 	}
 
 	// Workflow name to dequeue a workflow.
-	workflowNameFlagDequeue = commandLineFlag{
-		name:      "workflow-name",
-		shorthand: "n",
+	workflowFlagDequeue = commandLineFlag{
+		name:      "workflow",
+		shorthand: "w",
 		usage:     "workflow name to dequeue a workflow",
-		required:  true,
-	}
-
-	// Unique workflow ID to dequeue a workflow.
-	workflowIDFlagDequeue = commandLineFlag{
-		name:      "workflow-id",
-		shorthand: "e",
-		usage:     "workflow ID to dequeue a workflow",
 		required:  true,
 	}
 

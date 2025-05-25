@@ -62,6 +62,13 @@ func enqueueWorkflow(ctx *Context, dag *digraph.DAG, workflowID string) error {
 		return fmt.Errorf("failed to generate log file name: %w", err)
 	}
 
+	workflow := digraph.NewWorkflowRef(dag.Name, workflowID)
+
+	// Check if the workflow is already existing in the history store
+	if _, err = ctx.HistoryStore.FindRun(ctx, workflow); err == nil {
+		return fmt.Errorf("workflow %q with ID %q already exists", dag.Name, workflowID)
+	}
+
 	run, err := ctx.HistoryStore.CreateRun(ctx.Context, dag, time.Now(), workflowID, models.NewRunOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create run: %w", err)
@@ -72,6 +79,10 @@ func enqueueWorkflow(ctx *Context, dag *digraph.DAG, workflowID string) error {
 		models.WithRunID(run.ID()),
 		models.WithPreconditions(dag.Preconditions),
 		models.WithQueuedAt(stringutil.FormatTime(time.Now())),
+		models.WithHierarchyRefs(
+			digraph.NewWorkflowRef(dag.Name, workflowID),
+			digraph.WorkflowRef{},
+		),
 	}
 
 	// As a prototype, we save the status to the database to enqueue the workflow
@@ -89,7 +100,7 @@ func enqueueWorkflow(ctx *Context, dag *digraph.DAG, workflowID string) error {
 	}
 
 	// Enqueue the workflow
-	if err := ctx.QueueStore.Enqueue(ctx.Context, dag.Name, models.QueuePriorityLow, digraph.NewWorkflowRef(dag.Name, workflowID)); err != nil {
+	if err := ctx.QueueStore.Enqueue(ctx.Context, dag.Name, models.QueuePriorityLow, workflow); err != nil {
 		return fmt.Errorf("failed to enqueue workflow: %w", err)
 	}
 

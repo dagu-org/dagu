@@ -89,6 +89,15 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 		if err := os.Remove(p.fileName); err != nil {
 			logger.Error(ctx, "Failed to remove heartbeat file", "err", err)
 		}
+
+		// If the directory is empty after removing the file, remove the directory as well
+		entries, err := os.ReadDir(dir)
+		if err == nil && len(entries) == 0 {
+			if err := os.Remove(dir); err != nil {
+				logger.Info(ctx, "Failed to remove empty heartbeat directory", "err", err)
+			}
+		}
+
 		p.started.Store(false)
 		return err
 	}
@@ -130,7 +139,7 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 		for {
 			select {
 			case <-ticker.C:
-				binary.BigEndian.PutUint64(buf, uint64(time.Now().UnixNano()))
+				binary.BigEndian.PutUint64(buf, uint64(time.Now().Unix()))
 				if _, err := fd.WriteAt(buf, 0); err != nil {
 					logger.Error(ctx, "Failed to write heartbeat", "err", err)
 				}

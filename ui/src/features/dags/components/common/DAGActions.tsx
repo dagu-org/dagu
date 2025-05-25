@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/tooltip'; // Import Shadcn Tooltip
 import dayjs from '@/lib/dayjs';
 import StatusChip from '@/ui/StatusChip';
-import { Play, RefreshCw, Square } from 'lucide-react'; // Import lucide icons
+import { Play, RefreshCw, Square, Clock } from 'lucide-react'; // Import lucide icons
 import React from 'react';
 import { components } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
@@ -56,6 +56,7 @@ function DAGActions({
 }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const [isStartModal, setIsStartModal] = React.useState(false);
+  const [isEnqueueModal, setIsEnqueueModal] = React.useState(false);
   const [isStopModal, setIsStopModal] = React.useState(false);
   const [isRetryModal, setIsRetryModal] = React.useState(false);
   const [retryWorkflowId, setRetryWorkflowId] = React.useState<string>('');
@@ -73,9 +74,10 @@ function DAGActions({
 
   // Determine which buttons should be enabled based on current status
   const buttonState = {
-    start: status?.status != 1,
+    start: status?.status != 1, // Disable only when running (1)
+    enqueue: true, // Always allow enqueuing
     stop: status?.status == 1,
-    retry: status?.status != 1 && status?.workflowId != '',
+    retry: status?.status != 1 && status?.status != 5 && status?.workflowId != '', // Disable when running (1) or queued (5)
   };
 
   if (!dag) {
@@ -116,6 +118,38 @@ function DAGActions({
           </TooltipTrigger>
           <TooltipContent>
             <p>Start DAG execution</p>
+          </TooltipContent>
+        </Tooltip>
+
+        {/* Enqueue Button */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            {displayMode === 'compact' ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={!buttonState['enqueue']}
+                onClick={() => setIsEnqueueModal(true)}
+                className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+              >
+                <Clock className="h-4 w-4" />
+                <span className="sr-only">Enqueue</span>
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!buttonState['enqueue']}
+                onClick={() => setIsEnqueueModal(true)}
+                className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+              >
+                <Clock className="mr-2 h-4 w-4" />
+                Enqueue
+              </Button>
+            )}
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Enqueue DAG execution</p>
           </TooltipContent>
         </Tooltip>
 
@@ -309,25 +343,77 @@ function DAGActions({
           dismissModal={() => setIsStopModal(false)}
           onSubmit={async () => {
             setIsStopModal(false);
-            const { error } = await client.POST('/dags/{fileName}/stop', {
-              params: {
-                query: {
-                  remoteNode: appBarContext.selectedRemoteNode || 'local',
+            
+            // Use workflow API if we have workflow name and ID, otherwise use DAG API
+            if (status?.name && status?.workflowId) {
+              const { error } = await client.POST('/workflows/{name}/{workflowId}/stop', {
+                params: {
+                  query: {
+                    remoteNode: appBarContext.selectedRemoteNode || 'local',
+                  },
+                  path: {
+                    name: status.name,
+                    workflowId: status.workflowId,
+                  },
                 },
-                path: {
-                  fileName: fileName,
+              });
+              if (error) {
+                console.error('Stop workflow API error:', error);
+                alert(error.message || 'An error occurred');
+                return;
+              }
+            } else {
+              const { error } = await client.POST('/dags/{fileName}/stop', {
+                params: {
+                  query: {
+                    remoteNode: appBarContext.selectedRemoteNode || 'local',
+                  },
+                  path: {
+                    fileName: fileName,
+                  },
                 },
-              },
-            });
-            if (error) {
-              console.error('Retry API error:', error);
-              alert(error.message || 'An error occurred');
-              return;
+              });
+              if (error) {
+                console.error('Stop DAG API error:', error);
+                alert(error.message || 'An error occurred');
+                return;
+              }
             }
             reloadData();
           }}
         >
-          <div>Do you really want to cancel the DAG?</div>
+          <div>
+            <p className="mb-2">
+              {status?.name && status?.workflowId 
+                ? `Do you really want to stop the workflow "${status.name}"?`
+                : 'Do you really want to cancel the DAG?'
+              }
+            </p>
+            {status?.name && (
+              <LabeledItem label="Workflow-Name">
+                <span className="font-mono text-sm">{status.name}</span>
+              </LabeledItem>
+            )}
+            {status?.workflowId && (
+              <LabeledItem label="Workflow-ID">
+                <span className="font-mono text-sm">{status.workflowId}</span>
+              </LabeledItem>
+            )}
+            {status?.startedAt && (
+              <LabeledItem label="Started At">
+                <span className="text-sm">
+                  {dayjs(status.startedAt).format('YYYY-MM-DD HH:mm:ss Z')}
+                </span>
+              </LabeledItem>
+            )}
+            {status?.status !== undefined && (
+              <LabeledItem label="Status">
+                <StatusChip status={status.status} size="sm">
+                  {status.statusLabel || ''}
+                </StatusChip>
+              </LabeledItem>
+            )}
+          </div>
         </ConfirmModal>
         <ConfirmModal
           title="Confirmation"
@@ -337,22 +423,44 @@ function DAGActions({
           onSubmit={async () => {
             setIsRetryModal(false);
 
-            const { error } = await client.POST('/dags/{fileName}/retry', {
-              params: {
-                path: {
-                  fileName: fileName,
+            // Use workflow API if we have workflow name and ID, otherwise use DAG API
+            if (status?.name && retryWorkflowId) {
+              const { error } = await client.POST('/workflows/{name}/{workflowId}/retry', {
+                params: {
+                  path: {
+                    name: status.name,
+                    workflowId: retryWorkflowId,
+                  },
+                  query: {
+                    remoteNode: appBarContext.selectedRemoteNode || 'local',
+                  },
                 },
-                query: {
-                  remoteNode: appBarContext.selectedRemoteNode || 'local',
+                body: {
+                  workflowId: retryWorkflowId,
                 },
-              },
-              body: {
-                workflowId: retryWorkflowId,
-              },
-            });
-            if (error) {
-              alert(error.message || 'An error occurred');
-              return;
+              });
+              if (error) {
+                alert(error.message || 'An error occurred');
+                return;
+              }
+            } else {
+              const { error } = await client.POST('/dags/{fileName}/retry', {
+                params: {
+                  path: {
+                    fileName: fileName,
+                  },
+                  query: {
+                    remoteNode: appBarContext.selectedRemoteNode || 'local',
+                  },
+                },
+                body: {
+                  workflowId: retryWorkflowId,
+                },
+              });
+              if (error) {
+                alert(error.message || 'An error occurred');
+                return;
+              }
             }
             reloadData();
           }}
@@ -360,7 +468,10 @@ function DAGActions({
           {/* Keep modal content structure */}
           <div>
             <p className="mb-2">
-              Do you really want to rerun the following execution?
+              {status?.name && retryWorkflowId
+                ? `Do you really want to retry the workflow "${status.name}"?`
+                : 'Do you really want to rerun the following execution?'
+              }
             </p>
             <LabeledItem label="Workflow-Name">
               <span className="font-mono text-sm">{status?.name || 'N/A'}</span>
@@ -389,8 +500,13 @@ function DAGActions({
         <StartDAGModal
           dag={dag}
           visible={isStartModal}
-          onSubmit={async (params) => {
+          action="start"
+          onSubmit={async (params, workflowId) => {
             setIsStartModal(false);
+            const body: { params: string; workflowId?: string } = { params };
+            if (workflowId) {
+              body.workflowId = workflowId;
+            }
             const { error } = await client.POST('/dags/{fileName}/start', {
               params: {
                 path: {
@@ -400,9 +516,7 @@ function DAGActions({
                   remoteNode: appBarContext.selectedRemoteNode || 'local',
                 },
               },
-              body: {
-                params: params,
-              },
+              body,
             });
             if (error) {
               alert(error.message || 'An error occurred');
@@ -416,6 +530,41 @@ function DAGActions({
           }}
           dismissModal={() => {
             setIsStartModal(false);
+          }}
+        />
+        <StartDAGModal
+          dag={dag}
+          visible={isEnqueueModal}
+          action="enqueue"
+          onSubmit={async (params, workflowId) => {
+            setIsEnqueueModal(false);
+            const body: { params: string; workflowId?: string } = { params };
+            if (workflowId) {
+              body.workflowId = workflowId;
+            }
+            const { error } = await client.POST('/dags/{fileName}/enqueue', {
+              params: {
+                path: {
+                  fileName: fileName,
+                },
+                query: {
+                  remoteNode: appBarContext.selectedRemoteNode || 'local',
+                },
+              },
+              body,
+            });
+            if (error) {
+              alert(error.message || 'An error occurred');
+              return;
+            }
+            reloadData();
+            // Navigate to status tab after execution
+            if (navigateToStatusTab) {
+              navigateToStatusTab();
+            }
+          }}
+          dismissModal={() => {
+            setIsEnqueueModal(false);
           }}
         />
       </div>

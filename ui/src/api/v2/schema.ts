@@ -4,2225 +4,2358 @@
  */
 
 export interface paths {
-  '/health': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check server health status
+         * @description Returns health information about the Dagu server
+         */
+        get: operations["getHealthStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Check server health status
-     * @description Returns health information about the Dagu server
-     */
-    get: operations['getHealthStatus'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all available DAGs
+         * @description Retrieves DAG definitions with optional filtering by name and tags
+         */
+        get: operations["listDAGs"];
+        put?: never;
+        /**
+         * Create a new DAG definition
+         * @description Creates a new empty DAG file with the specified name
+         */
+        post: operations["createNewDAG"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * List all available DAGs
-     * @description Retrieves DAG definitions with optional filtering by name and tags
-     */
-    get: operations['listDAGs'];
-    put?: never;
-    /**
-     * Create a new DAG definition
-     * @description Creates a new empty DAG file with the specified name
-     */
-    post: operations['createNewDAG'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/{fileName}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/{fileName}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve comprehensive DAG information
+         * @description Fetches detailed information about a specific DAG definition
+         */
+        get: operations["getDAGDetails"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete an existing DAG
+         * @description Permanently removes a DAG definition from the system
+         */
+        delete: operations["deleteDAG"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Retrieve comprehensive DAG information
-     * @description Fetches detailed information about a specific DAG definition
-     */
-    get: operations['getDAGDetails'];
-    put?: never;
-    post?: never;
-    /**
-     * Delete an existing DAG
-     * @description Permanently removes a DAG definition from the system
-     */
-    delete: operations['deleteDAG'];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/{fileName}/start': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/{fileName}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create and execute a workflow from DAG
+         * @description Creates a workflow from the DAG definition and starts its execution with optional parameters
+         */
+        post: operations["executeDAG"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /**
-     * Create and execute a workflow from DAG
-     * @description Creates a workflow from the DAG definition and starts its execution with optional parameters
-     */
-    post: operations['executeDAG'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/{fileName}/stop': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/{fileName}/enqueue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enqueue a workflow from DAG
+         * @description Creates a workflow from the DAG definition and adds it to the queue for execution
+         */
+        post: operations["enqueueDAGWorkflow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /**
-     * Terminate a running workflow
-     * @description Forcefully stops a running workflow created from this DAG
-     */
-    post: operations['terminateDAGWorkflow'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/{fileName}/retry': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/{fileName}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Terminate a running workflow
+         * @description Forcefully stops a running workflow created from this DAG
+         */
+        post: operations["terminateDAGWorkflow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /**
-     * Retry workflow execution
-     * @description Creates a new workflow based on a previous execution
-     */
-    post: operations['retryDAGWorkflow'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/{fileName}/workflows': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/{fileName}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry workflow execution
+         * @description Creates a new workflow based on a previous execution
+         */
+        post: operations["retryDAGWorkflow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Retrieve execution history of a DAG
-     * @description Fetches history of workflows created from this DAG definition
-     */
-    get: operations['getDAGWorkflowHistory'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/{fileName}/workflows/{workflowId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/{fileName}/workflows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve execution history of a DAG
+         * @description Fetches history of workflows created from this DAG definition
+         */
+        get: operations["getDAGWorkflowHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Get detailed status of a specific workflow
-     * @description Retrieves status information about a particular workflow created from this DAG
-     */
-    get: operations['getDAGWorkflowDetails'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/{fileName}/spec': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/{fileName}/workflows/{workflowId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get detailed status of a specific workflow
+         * @description Retrieves status information about a particular workflow created from this DAG
+         */
+        get: operations["getDAGWorkflowDetails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Retrieve DAG specification
-     * @description Fetches the YAML specification of a DAG definition
-     */
-    get: operations['getDAGSpec'];
-    /**
-     * Update DAG spec
-     * @description Modifies the YAML specification of a DAG definition
-     */
-    put: operations['updateDAGSpec'];
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/{fileName}/suspend': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/{fileName}/spec": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve DAG specification
+         * @description Fetches the YAML specification of a DAG definition
+         */
+        get: operations["getDAGSpec"];
+        /**
+         * Update DAG spec
+         * @description Modifies the YAML specification of a DAG definition
+         */
+        put: operations["updateDAGSpec"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /**
-     * Toggle DAG suspension state
-     * @description Controls whether the scheduler should create workflows from this DAG according to its defined cron schedule
-     */
-    post: operations['updateDAGSuspensionState'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/{fileName}/rename': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/{fileName}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Toggle DAG suspension state
+         * @description Controls whether the scheduler should create workflows from this DAG according to its defined cron schedule
+         */
+        post: operations["updateDAGSuspensionState"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /**
-     * Change DAG file ID
-     * @description Changes the file ID of the DAG definition
-     */
-    post: operations['renameDAG'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/search': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/{fileName}/rename": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change DAG file ID
+         * @description Changes the file ID of the DAG definition
+         */
+        post: operations["renameDAG"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Search DAGs
-     * @description Performs a full-text search across all DAG definitions
-     */
-    get: operations['searchDAGs'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/dags/tags': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search DAGs
+         * @description Performs a full-text search across all DAG definitions
+         */
+        get: operations["searchDAGs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * List all available DAG tags
-     * @description Retrieves all unique tags used across DAG definitions
-     */
-    get: operations['getAllDAGTags'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/workflows': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/dags/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all available DAG tags
+         * @description Retrieves all unique tags used across DAG definitions
+         */
+        get: operations["getAllDAGTags"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * List all workflows
-     * @description Retrieves a list of all workflows with optional filtering by name and status
-     */
-    get: operations['listWorkflows'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/workflows/{name}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/workflows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all workflows
+         * @description Retrieves a list of all workflows with optional filtering by name and status
+         */
+        get: operations["listWorkflows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * List all workflows with a specific name
-     * @description Retrieves a list of all workflows with optional filtering by name and status
-     */
-    get: operations['listWorkflowsByName'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/workflows/{name}/{workflowId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/workflows/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all workflows with a specific name
+         * @description Retrieves a list of all workflows with optional filtering by name and status
+         */
+        get: operations["listWorkflowsByName"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Retrieve detailed status of a workflow
-     * @description Fetches detailed status information about a specific workflow
-     */
-    get: operations['getWorkflowDetails'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/workflows/{name}/{workflowId}/log': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/workflows/{name}/{workflowId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve detailed status of a workflow
+         * @description Fetches detailed status information about a specific workflow
+         */
+        get: operations["getWorkflowDetails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Retrieve full execution log of a workflow
-     * @description Fetches the execution log for a workflow
-     */
-    get: operations['getWorkflowLog'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/workflows/{name}/{workflowId}/retry': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/workflows/{name}/{workflowId}/dequeue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Dequeue a queued workflow
+         * @description Dequeue a workflow execution that is currently queued
+         */
+        get: operations["dequeueWorkflow"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /**
-     * Retry workflow execution
-     * @description Creates a new workflow based on a previous execution
-     */
-    post: operations['retryWorkflow'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/workflows/{name}/{workflowId}/stop': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/workflows/{name}/{workflowId}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve full execution log of a workflow
+         * @description Fetches the execution log for a workflow
+         */
+        get: operations["getWorkflowLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /**
-     * Terminate a running workflow
-     * @description Forcefully stops a running workflow created from this DAG
-     */
-    post: operations['terminateWorkflow'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/workflows/{name}/{workflowId}/steps/{stepName}/log': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/workflows/{name}/{workflowId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry workflow execution
+         * @description Creates a new workflow based on a previous execution
+         */
+        post: operations["retryWorkflow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Retrieve log for a specific step in a workflow
-     * @description Fetches the log for an individual step in a workflow
-     */
-    get: operations['getWorkflowStepLog'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/workflows/{name}/{workflowId}/steps/{stepName}/status': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/workflows/{name}/{workflowId}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Terminate a running workflow
+         * @description Forcefully stops a running workflow created from this DAG
+         */
+        post: operations["terminateWorkflow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /**
-     * Manually update a step's execution status
-     * @description Changes the status of a specific step within a workflow
-     */
-    patch: operations['updateWorkflowStepStatus'];
-    trace?: never;
-  };
-  '/workflows/{name}/{workflowId}/children/{childWorkflowId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/workflows/{name}/{workflowId}/steps/{stepName}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve log for a specific step in a workflow
+         * @description Fetches the log for an individual step in a workflow
+         */
+        get: operations["getWorkflowStepLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Retrieve detailed status of a child workflow
-     * @description Fetches detailed status information about a specific child workflow
-     */
-    get: operations['getChildWorkflowDetails'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/workflows/{name}/{workflowId}/children/{childWorkflowId}/log': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/workflows/{name}/{workflowId}/steps/{stepName}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Manually update a step's execution status
+         * @description Changes the status of a specific step within a workflow
+         */
+        patch: operations["updateWorkflowStepStatus"];
+        trace?: never;
     };
-    /**
-     * Retrieve log for a specific child workflow
-     * @description Fetches the log for an individual child workflow
-     */
-    get: operations['getChildWorkflowLog'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/workflows/{name}/{workflowId}/children/{childWorkflowId}/steps/{stepName}/log': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/workflows/{name}/{workflowId}/children/{childWorkflowId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve detailed status of a child workflow
+         * @description Fetches detailed status information about a specific child workflow
+         */
+        get: operations["getChildWorkflowDetails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Retrieve log for a specific step in a child workflow
-     * @description Fetches the log for an individual step in a child workflow
-     */
-    get: operations['getChildWorkflowStepLog'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/workflows/{name}/{workflowId}/children/{childWorkflowId}/steps/{stepName}/status': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/workflows/{name}/{workflowId}/children/{childWorkflowId}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve log for a specific child workflow
+         * @description Fetches the log for an individual child workflow
+         */
+        get: operations["getChildWorkflowLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /**
-     * Manually update a step's execution status in a child workflow
-     * @description Changes the status of a specific step within a child workflow
-     */
-    patch: operations['updateChildWorkflowStepStatus'];
-    trace?: never;
-  };
+    "/workflows/{name}/{workflowId}/children/{childWorkflowId}/steps/{stepName}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve log for a specific step in a child workflow
+         * @description Fetches the log for an individual step in a child workflow
+         */
+        get: operations["getChildWorkflowStepLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflows/{name}/{workflowId}/children/{childWorkflowId}/steps/{stepName}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Manually update a step's execution status in a child workflow
+         * @description Changes the status of a specific step within a child workflow
+         */
+        patch: operations["updateChildWorkflowStepStatus"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-  schemas: {
-    /** @description Generic error response object */
-    Error: {
-      code: components['schemas']['ErrorCode'];
-      /** @description Short error message */
-      message: string;
-      /** @description Additional error details */
-      details?: Record<string, never>;
-    };
-    /**
-     * @description Error code indicating the type of error
-     * @enum {string}
-     */
-    ErrorCode: ErrorCode;
-    /**
-     * Format: string
-     * @enum {string}
-     */
-    StdoutOrStderr: StdoutOrStderr;
-    /**
-     * Format: int64
-     * @description Unix timestamp in seconds
-     * @example 1672531199
-     */
-    UnixTimestamp: number;
-    /**
-     * Format: regex
-     * @description Name of the DAG file
-     */
-    DAGFileName: string;
-    /**
-     * Format: regex
-     * @description Name of the DAG
-     */
-    DAGName: string;
-    Pagination: {
-      /** @description total number of records */
-      totalRecords: number;
-      /** @description current page number */
-      currentPage: number;
-      /** @description total number of pages */
-      totalPages: number;
-      /** @description next page number */
-      nextPage: number;
-      /** @description previous page number */
-      prevPage: number;
-    };
-    /**
-     * @description Unique identifier for the workflow
-     * @example latest
-     */
-    WorkflowId: string;
-    /** @description Response object for the health check endpoint */
-    HealthResponse: {
-      /**
-       * @description Overall health status of the server
-       * @enum {string}
-       */
-      status: HealthResponseStatus;
-      /** @description Current version of the server */
-      version: string;
-      /** @description Server uptime in seconds */
-      uptime: number;
-      /** @description Current server time */
-      timestamp: string;
-    };
-    /** @description DAG file with its status information */
-    DAGFile: {
-      /** @description File ID of the DAG file */
-      fileName: string;
-      dag: components['schemas']['DAG'];
-      latestWorkflow: components['schemas']['WorkflowSummary'];
-      /** @description Whether the DAG is suspended */
-      suspended: boolean;
-      /** @description List of errors encountered during the request */
-      errors: string[];
-    };
-    /** @description Core DAG configuration containing definition and metadata */
-    DAG: {
-      /** @description Logical grouping of related DAGs for organizational purposes */
-      group?: string;
-      /** @description Logical name of the DAG */
-      name: string;
-      /** @description List of scheduling expressions defining when workflows should be created from this DAG */
-      schedule?: components['schemas']['Schedule'][];
-      /** @description Human-readable description of the DAG's purpose and behavior */
-      description?: string;
-      /** @description List of parameter names that can be passed to workflows created from this DAG */
-      params?: string[];
-      /** @description Default parameter values in JSON format if not specified at workflow creation */
-      defaultParams?: string;
-      /** @description List of tags for categorizing and filtering DAGs */
-      tags?: string[];
-    };
-    /** @description Schedule configuration for workflow creation */
-    Schedule: {
-      /** @description Cron expression or schedule pattern */
-      expression: string;
-    };
-    /**
-     * @description Numeric status code indicating current workflow state:
-     *     0: "Not started"
-     *     1: "Running"
-     *     2: "Failed"
-     *     3: "Cancelled"
-     *     4: "Success"
-     *     5: "Queued"
-     *
-     * @enum {integer}
-     */
-    Status: Status;
-    /**
-     * @description Human-readable status description for the workflow
-     * @enum {string}
-     */
-    StatusLabel: StatusLabel;
-    /**
-     * @description Numeric status code indicating current node state:
-     *     0: "Not started"
-     *     1: "Running"
-     *     2: "Failed"
-     *     3: "Cancelled"
-     *     4: "Success"
-     *     5: "Skipped"
-     *
-     * @enum {integer}
-     */
-    NodeStatus: NodeStatus;
-    /**
-     * @description Human-readable status description for the node
-     * @enum {string}
-     */
-    NodeStatusLabel: NodeStatusLabel;
-    /** @description Detailed DAG configuration information */
-    DAGDetails: {
-      /** @description Logical grouping of related DAGs for organizational purposes */
-      group?: string;
-      /** @description Unique identifier for the DAG within its group */
-      name: string;
-      /** @description List of scheduling expressions defining when workflows should be created from this DAG */
-      schedule?: components['schemas']['Schedule'][];
-      /** @description Human-readable description of the DAG's purpose and behavior */
-      description?: string;
-      /** @description List of environment variables to set before executing a workflow */
-      env?: string[];
-      /** @description Directory path for storing log files */
-      logDir?: string;
-      handlerOn?: components['schemas']['HandlerOn'];
-      /** @description List of steps to execute in workflows created from this DAG */
-      steps?: components['schemas']['Step'][];
-      /** @description Time in seconds to wait before starting a workflow */
-      delay?: number;
-      /** @description Number of days to retain historical logs */
-      histRetentionDays?: number;
-      /** @description Conditions that must be met before a workflow can start */
-      preconditions?: components['schemas']['Condition'][];
-      /** @description Maximum number of concurrent workflows allowed from this DAG */
-      maxActiveWorkflows?: number;
-      /** @description Maximum number of active steps allowed in workflows created from this DAG */
-      maxActiveSteps?: number;
-      /** @description List of parameter names that can be passed to workflows created from this DAG */
-      params?: string[];
-      /** @description Default parameter values in JSON format if not specified at workflow creation */
-      defaultParams?: string;
-      /** @description List of tags for categorizing and filtering DAGs */
-      tags?: string[];
-    };
-    /** @description Configuration for event handlers in a workflow */
-    HandlerOn: {
-      failure?: components['schemas']['Step'];
-      success?: components['schemas']['Step'];
-      cancel?: components['schemas']['Step'];
-      exit?: components['schemas']['Step'];
-    };
-    /** @description Current status of a workflow */
-    WorkflowSummary: {
-      /** @description Name of the root workflow */
-      rootWorkflowName: string;
-      /** @description ID of the root workflow */
-      rootWorkflowId: string;
-      /** @description Name of the parent workflow */
-      parentWorkflowName?: string;
-      /** @description ID of the parent workflow */
-      parentWorkflowId?: string;
-      workflowId: components['schemas']['WorkflowId'];
-      name: components['schemas']['DAGName'];
-      status: components['schemas']['Status'];
-      statusLabel: components['schemas']['StatusLabel'];
-      /** @description Process ID of the workflow */
-      pid?: number;
-      /** @description RFC 3339 timestamp when the workflow was queued */
-      queuedAt?: string;
-      /** @description RFC 3339 timestamp when the workflow started */
-      startedAt: string;
-      /** @description RFC 3339 timestamp when the workflow finished */
-      finishedAt: string;
-      /** @description Path to the log file */
-      log: string;
-      /** @description Runtime parameters passed to the workflow in JSON format */
-      params?: string;
-    };
-    /** @description Detailed status of a workflow including child workflow nodes */
-    WorkflowDetails: components['schemas']['WorkflowSummary'] & {
-      /** @description Status of individual steps within the workflow */
-      nodes: components['schemas']['Node'][];
-      onExit?: components['schemas']['Node'];
-      onSuccess?: components['schemas']['Node'];
-      onFailure?: components['schemas']['Node'];
-      onCancel?: components['schemas']['Node'];
-      /** @description List of preconditions that must be met before the workflow can start */
-      preconditions?: components['schemas']['Condition'][];
-    };
-    /** @description Status of an individual step within a workflow */
-    Node: {
-      step: components['schemas']['Step'];
-      /** @description Path to the standard output log file for this step */
-      stdout: string;
-      /** @description Path to the standard error log file for this step */
-      stderr: string;
-      /** @description RFC3339 timestamp when the step started */
-      startedAt: string;
-      /** @description RFC3339 timestamp when the step finished */
-      finishedAt: string;
-      status: components['schemas']['NodeStatus'];
-      statusLabel: components['schemas']['NodeStatusLabel'];
-      /** @description Number of retry attempts made for this step */
-      retryCount: number;
-      /** @description Number of successful completions for repeating steps */
-      doneCount: number;
-      /** @description List of child workflows associated with this step */
-      children?: components['schemas']['ChildWorkflow'][];
-      /** @description Error message if the step failed */
-      error?: string;
-    };
-    /** @description Metadata for a child workflow */
-    ChildWorkflow: {
-      workflowId: components['schemas']['WorkflowId'];
-    };
-    /** @description Individual task definition that performs a specific operation in a workflow */
-    Step: {
-      /** @description Unique identifier for the step within the workflow */
-      name: string;
-      /** @description Human-readable description of what the step does */
-      description?: string;
-      /** @description Working directory for executing the step's command */
-      dir?: string;
-      /** @description Complete command string including arguments to execute */
-      cmdWithArgs?: string;
-      /** @description Base command to execute without arguments */
-      command?: string;
-      /** @description Script content if the step executes a script file */
-      script?: string;
-      /** @description File path for capturing standard output */
-      stdout?: string;
-      /** @description File path for capturing standard error */
-      stderr?: string;
-      /** @description Variable name to store the step's output */
-      output?: string;
-      /** @description List of arguments to pass to the command */
-      args?: string[];
-      /** @description The name of the DAG to run as a child workflow */
-      run?: string;
-      /** @description Parameters to pass to the child workflow in JSON format */
-      params?: string;
-      /** @description List of step names that must complete before this step can start */
-      depends?: string[];
-      repeatPolicy?: components['schemas']['RepeatPolicy'];
-      /** @description Whether to send email notifications on step failure */
-      mailOnError?: boolean;
-      /** @description Conditions that must be met before the step can start */
-      preconditions?: components['schemas']['Condition'][];
-    };
-    /** @description Individual search result item for a DAG */
-    SearchResultItem: {
-      /** @description Name of the matching DAG */
-      name: string;
-      dag: components['schemas']['DAG'];
-      /** @description Details of where matches were found */
-      matches: components['schemas']['SearchDAGsMatchItem'][];
-    };
-    /** @description Details of a search match within a DAG definition */
-    SearchDAGsMatchItem: {
-      /** @description Matching line content */
-      line: string;
-      /** @description Line number where match was found */
-      lineNumber: number;
-      /** @description Start line for context */
-      startLine: number;
-    };
-    /** @description Log information for the execution */
-    Log: {
-      /** @description Log content */
-      content: string;
-      /** @description Number of lines returned */
-      lineCount?: number;
-      /** @description Total number of lines in the log file */
-      totalLines?: number;
-      /** @description Whether there are more lines available */
-      hasMore?: boolean;
-      /** @description Whether the line count is an estimate */
-      isEstimate?: boolean;
-    };
-    /** @description Grid item for visualizing workflow execution history */
-    DAGGridItem: {
-      /** @description Name of the step */
-      name: string;
-      /** @description Status of the step ordered by time */
-      history: components['schemas']['NodeStatus'][];
-    };
-    /** @description Precondition that must be satisfied before running a step or workflow */
-    Condition: {
-      /** @description Expression or check to evaluate */
-      condition: string;
-      /** @description Expected result of the condition evaluation */
-      expected?: string;
-      /** @description Error message if the condition is not met */
-      error?: string;
-      /** @description Whether the condition was met */
-      matched?: boolean;
-    };
-    /** @description Configuration for step retry behavior */
-    RepeatPolicy: {
-      /** @description Whether the step should be retried on failure */
-      repeat?: boolean;
-      /** @description Time in seconds to wait between retry attempts */
-      interval?: number;
-    };
-    /** @description Response object for listing all tags */
-    ListTagResponse: {
-      /** @description List of unique tags */
-      tags: string[];
-      /** @description List of errors encountered during the request */
-      errors: string[];
-    };
-  };
-  responses: never;
-  parameters: {
-    /** @description page number of items to fetch (default is 1) */
-    Page: number;
-    /** @description number of items per page (default is 30, max is 100) */
-    PerPage: number;
-    /** @description the name of the DAG file */
-    DAGFileName: components['schemas']['DAGFileName'];
-    /** @description name of the DAG */
-    DAGName: components['schemas']['DAGName'];
-    /** @description name of the step */
-    StepName: string;
-    /** @description name of the remote node */
-    RemoteNode: string;
-    /** @description ID of the workflow or 'latest' to get the most recent workflow */
-    WorkflowId: components['schemas']['WorkflowId'];
-    /** @description ID of the workflow or 'latest' to get the most recent workflow */
-    WorkflowIdSearch: components['schemas']['WorkflowId'];
-    /** @description name of the workflow */
-    WorkflowName: string;
-    /** @description status of the workflow */
-    Status: components['schemas']['Status'];
-    /** @description start datetime for filtering workflows in ISO 8601 format with timezone */
-    DateTimeFrom: components['schemas']['UnixTimestamp'];
-    /** @description end datetime for filtering workflows in ISO 8601 format with timezone */
-    DateTimeTo: components['schemas']['UnixTimestamp'];
-    /** @description Number of lines to return from the end of the file */
-    Tail: number;
-    /** @description Number of lines to return from the beginning of the file */
-    Head: number;
-    /** @description Line number to start reading from (1-based) */
-    Offset: number;
-    /** @description Maximum number of lines to return */
-    Limit: number;
-    /** @description Whether to return stdout or stderr logs */
-    StdoutOrStderr: components['schemas']['StdoutOrStderr'];
-  };
-  requestBodies: never;
-  headers: never;
-  pathItems: never;
-}
-export type $defs = Record<string, never>;
-export interface operations {
-  getHealthStatus: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
+    schemas: {
+        /** @description Generic error response object */
+        Error: {
+            code: components["schemas"]["ErrorCode"];
+            /** @description Short error message */
+            message: string;
+            /** @description Additional error details */
+            details?: Record<string, never>;
         };
-        content: {
-          'application/json': components['schemas']['HealthResponse'];
+        /**
+         * @description Error code indicating the type of error
+         * @enum {string}
+         */
+        ErrorCode: ErrorCode;
+        /**
+         * Format: string
+         * @enum {string}
+         */
+        Stream: Stream;
+        /**
+         * Format: int64
+         * @description Unix timestamp in seconds
+         * @example 1672531199
+         */
+        UnixTimestamp: number;
+        /**
+         * Format: regex
+         * @description Name of the DAG file
+         */
+        DAGFileName: string;
+        /**
+         * Format: regex
+         * @description Name of the DAG
+         */
+        DAGName: string;
+        Pagination: {
+            /** @description total number of records */
+            totalRecords: number;
+            /** @description current page number */
+            currentPage: number;
+            /** @description total number of pages */
+            totalPages: number;
+            /** @description next page number */
+            nextPage: number;
+            /** @description previous page number */
+            prevPage: number;
         };
-      };
-      /** @description Unexpected error */
-      default: {
-        headers: {
-          [name: string]: unknown;
+        /**
+         * @description Unique identifier for the workflow
+         * @example latest
+         */
+        WorkflowId: string;
+        /** @description Response object for the health check endpoint */
+        HealthResponse: {
+            /**
+             * @description Overall health status of the server
+             * @enum {string}
+             */
+            status: HealthResponseStatus;
+            /** @description Current version of the server */
+            version: string;
+            /** @description Server uptime in seconds */
+            uptime: number;
+            /** @description Current server time */
+            timestamp: string;
         };
-        content?: never;
-      };
-    };
-  };
-  listDAGs: {
-    parameters: {
-      query?: {
-        /** @description page number of items to fetch (default is 1) */
-        page?: components['parameters']['Page'];
-        /** @description number of items per page (default is 30, max is 100) */
-        perPage?: components['parameters']['PerPage'];
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-        /** @description Filter DAGs by name */
-        name?: string;
-        /** @description Filter DAGs by tag */
-        tag?: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': {
-            /** @description List of DAG definitions with their status and metadata */
-            dags: components['schemas']['DAGFile'][];
-            /** @description List of errors encountered during the request */
-            errors: string[];
-            pagination: components['schemas']['Pagination'];
-          };
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  createNewDAG: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': {
-          name: components['schemas']['DAGName'];
-        };
-      };
-    };
-    responses: {
-      /** @description A successful response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': {
-            /** @description Name of the newly created DAG */
-            name: string;
-          };
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  getDAGDetails: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description the name of the DAG file */
-        fileName: components['parameters']['DAGFileName'];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': {
-            dag?: components['schemas']['DAGDetails'];
-            latestWorkflow: components['schemas']['WorkflowDetails'];
+        /** @description DAG file with its status information */
+        DAGFile: {
+            /** @description File ID of the DAG file */
+            fileName: string;
+            dag: components["schemas"]["DAG"];
+            latestWorkflow: components["schemas"]["WorkflowSummary"];
             /** @description Whether the DAG is suspended */
             suspended: boolean;
             /** @description List of errors encountered during the request */
             errors: string[];
-          };
         };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
+        /** @description Core DAG configuration containing definition and metadata */
+        DAG: {
+            /** @description Logical grouping of related DAGs for organizational purposes */
+            group?: string;
+            /** @description Logical name of the DAG */
+            name: string;
+            /** @description List of scheduling expressions defining when workflows should be created from this DAG */
+            schedule?: components["schemas"]["Schedule"][];
+            /** @description Human-readable description of the DAG's purpose and behavior */
+            description?: string;
+            /** @description List of parameter names that can be passed to workflows created from this DAG */
+            params?: string[];
+            /** @description Default parameter values in JSON format if not specified at workflow creation */
+            defaultParams?: string;
+            /** @description List of tags for categorizing and filtering DAGs */
+            tags?: string[];
         };
-        content: {
-          'application/json': components['schemas']['Error'];
+        /** @description Schedule configuration for workflow creation */
+        Schedule: {
+            /** @description Cron expression or schedule pattern */
+            expression: string;
         };
-      };
-    };
-  };
-  deleteDAG: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description the name of the DAG file */
-        fileName: components['parameters']['DAGFileName'];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description DAG successfully deleted */
-      204: {
-        headers: {
-          [name: string]: unknown;
+        /**
+         * @description Numeric status code indicating current workflow state:
+         *     0: "Not started"
+         *     1: "Running"
+         *     2: "Failed"
+         *     3: "Cancelled"
+         *     4: "Success"
+         *     5: "Queued"
+         *
+         * @enum {integer}
+         */
+        Status: Status;
+        /**
+         * @description Human-readable status description for the workflow
+         * @enum {string}
+         */
+        StatusLabel: StatusLabel;
+        /**
+         * @description Numeric status code indicating current node state:
+         *     0: "Not started"
+         *     1: "Running"
+         *     2: "Failed"
+         *     3: "Cancelled"
+         *     4: "Success"
+         *     5: "Skipped"
+         *
+         * @enum {integer}
+         */
+        NodeStatus: NodeStatus;
+        /**
+         * @description Human-readable status description for the node
+         * @enum {string}
+         */
+        NodeStatusLabel: NodeStatusLabel;
+        /** @description Detailed DAG configuration information */
+        DAGDetails: {
+            /** @description Logical grouping of related DAGs for organizational purposes */
+            group?: string;
+            /** @description Unique identifier for the DAG within its group */
+            name: string;
+            /** @description List of scheduling expressions defining when workflows should be created from this DAG */
+            schedule?: components["schemas"]["Schedule"][];
+            /** @description Human-readable description of the DAG's purpose and behavior */
+            description?: string;
+            /** @description List of environment variables to set before executing a workflow */
+            env?: string[];
+            /** @description Directory path for storing log files */
+            logDir?: string;
+            handlerOn?: components["schemas"]["HandlerOn"];
+            /** @description List of steps to execute in workflows created from this DAG */
+            steps?: components["schemas"]["Step"][];
+            /** @description Time in seconds to wait before starting a workflow */
+            delay?: number;
+            /** @description Number of days to retain historical logs */
+            histRetentionDays?: number;
+            /** @description Conditions that must be met before a workflow can start */
+            preconditions?: components["schemas"]["Condition"][];
+            /** @description Maximum number of concurrent workflows allowed from this DAG */
+            maxActiveWorkflows?: number;
+            /** @description Maximum number of concurrent workflows allowed from this DAG */
+            maxActiveSteps?: number;
+            /** @description List of parameter names that can be passed to workflows created from this DAG */
+            params?: string[];
+            /** @description Default parameter values in JSON format if not specified at workflow creation */
+            defaultParams?: string;
+            /** @description List of tags for categorizing and filtering DAGs */
+            tags?: string[];
         };
-        content?: never;
-      };
-      /** @description DAG not found */
-      404: {
-        headers: {
-          [name: string]: unknown;
+        /** @description Configuration for event handlers in a workflow */
+        HandlerOn: {
+            failure?: components["schemas"]["Step"];
+            success?: components["schemas"]["Step"];
+            cancel?: components["schemas"]["Step"];
+            exit?: components["schemas"]["Step"];
         };
-        content: {
-          'application/json': components['schemas']['Error'];
+        /** @description Current status of a workflow */
+        WorkflowSummary: {
+            /** @description Name of the root workflow */
+            rootWorkflowName: string;
+            /** @description ID of the root workflow */
+            rootWorkflowId: string;
+            /** @description Name of the parent workflow */
+            parentWorkflowName?: string;
+            /** @description ID of the parent workflow */
+            parentWorkflowId?: string;
+            workflowId: components["schemas"]["WorkflowId"];
+            name: components["schemas"]["DAGName"];
+            status: components["schemas"]["Status"];
+            statusLabel: components["schemas"]["StatusLabel"];
+            /** @description Process ID of the workflow */
+            pid?: number;
+            /** @description RFC 3339 timestamp when the workflow was queued */
+            queuedAt?: string;
+            /** @description RFC 3339 timestamp when the workflow started */
+            startedAt: string;
+            /** @description RFC 3339 timestamp when the workflow finished */
+            finishedAt: string;
+            /** @description Path to the log file */
+            log: string;
+            /** @description Runtime parameters passed to the workflow in JSON format */
+            params?: string;
         };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
+        /** @description Detailed status of a workflow including child workflow nodes */
+        WorkflowDetails: components["schemas"]["WorkflowSummary"] & {
+            /** @description Status of individual steps within the workflow */
+            nodes: components["schemas"]["Node"][];
+            onExit?: components["schemas"]["Node"];
+            onSuccess?: components["schemas"]["Node"];
+            onFailure?: components["schemas"]["Node"];
+            onCancel?: components["schemas"]["Node"];
+            /** @description List of preconditions that must be met before the workflow can start */
+            preconditions?: components["schemas"]["Condition"][];
         };
-        content: {
-          'application/json': components['schemas']['Error'];
+        /** @description Status of an individual step within a workflow */
+        Node: {
+            step: components["schemas"]["Step"];
+            /** @description Path to the standard output log file for this step */
+            stdout: string;
+            /** @description Path to the standard error log file for this step */
+            stderr: string;
+            /** @description RFC3339 timestamp when the step started */
+            startedAt: string;
+            /** @description RFC3339 timestamp when the step finished */
+            finishedAt: string;
+            status: components["schemas"]["NodeStatus"];
+            statusLabel: components["schemas"]["NodeStatusLabel"];
+            /** @description Number of retry attempts made for this step */
+            retryCount: number;
+            /** @description Number of successful completions for repeating steps */
+            doneCount: number;
+            /** @description List of child workflows associated with this step */
+            children?: components["schemas"]["ChildWorkflow"][];
+            /** @description Error message if the step failed */
+            error?: string;
         };
-      };
-    };
-  };
-  executeDAG: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description the name of the DAG file */
-        fileName: components['parameters']['DAGFileName'];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': {
-          /** @description Parameters to pass to the workflow in JSON format */
-          params?: string;
+        /** @description Metadata for a child workflow */
+        ChildWorkflow: {
+            workflowId: components["schemas"]["WorkflowId"];
         };
-      };
-    };
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
+        /** @description Individual task definition that performs a specific operation in a workflow */
+        Step: {
+            /** @description Unique identifier for the step within the workflow */
+            name: string;
+            /** @description Human-readable description of what the step does */
+            description?: string;
+            /** @description Working directory for executing the step's command */
+            dir?: string;
+            /** @description Complete command string including arguments to execute */
+            cmdWithArgs?: string;
+            /** @description Base command to execute without arguments */
+            command?: string;
+            /** @description Script content if the step executes a script file */
+            script?: string;
+            /** @description File path for capturing standard output */
+            stdout?: string;
+            /** @description File path for capturing standard error */
+            stderr?: string;
+            /** @description Variable name to store the step's output */
+            output?: string;
+            /** @description List of arguments to pass to the command */
+            args?: string[];
+            /** @description The name of the DAG to run as a child workflow */
+            run?: string;
+            /** @description Parameters to pass to the child workflow in JSON format */
+            params?: string;
+            /** @description List of step names that must complete before this step can start */
+            depends?: string[];
+            repeatPolicy?: components["schemas"]["RepeatPolicy"];
+            /** @description Whether to send email notifications on step failure */
+            mailOnError?: boolean;
+            /** @description Conditions that must be met before the step can start */
+            preconditions?: components["schemas"]["Condition"][];
         };
-        content: {
-          'application/json': {
-            /** @description ID of the created workflow */
-            workflowId: string;
-          };
+        /** @description Individual search result item for a DAG */
+        SearchResultItem: {
+            /** @description Name of the matching DAG */
+            name: string;
+            dag: components["schemas"]["DAG"];
+            /** @description Details of where matches were found */
+            matches: components["schemas"]["SearchDAGsMatchItem"][];
         };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
+        /** @description Details of a search match within a DAG definition */
+        SearchDAGsMatchItem: {
+            /** @description Matching line content */
+            line: string;
+            /** @description Line number where match was found */
+            lineNumber: number;
+            /** @description Start line for context */
+            startLine: number;
         };
-        content: {
-          'application/json': components['schemas']['Error'];
+        /** @description Log information for the execution */
+        Log: {
+            /** @description Log content */
+            content: string;
+            /** @description Number of lines returned */
+            lineCount?: number;
+            /** @description Total number of lines in the log file */
+            totalLines?: number;
+            /** @description Whether there are more lines available */
+            hasMore?: boolean;
+            /** @description Whether the line count is an estimate */
+            isEstimate?: boolean;
         };
-      };
-    };
-  };
-  terminateDAGWorkflow: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description the name of the DAG file */
-        fileName: components['parameters']['DAGFileName'];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
+        /** @description Grid item for visualizing workflow execution history */
+        DAGGridItem: {
+            /** @description Name of the step */
+            name: string;
+            /** @description Status of the step ordered by time */
+            history: components["schemas"]["NodeStatus"][];
         };
-        content?: never;
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
+        /** @description Precondition that must be satisfied before running a step or workflow */
+        Condition: {
+            /** @description Expression or check to evaluate */
+            condition: string;
+            /** @description Expected result of the condition evaluation */
+            expected?: string;
+            /** @description Error message if the condition is not met */
+            error?: string;
+            /** @description Whether the condition was met */
+            matched?: boolean;
         };
-        content: {
-          'application/json': components['schemas']['Error'];
+        /** @description Configuration for step retry behavior */
+        RepeatPolicy: {
+            /** @description Whether the step should be retried on failure */
+            repeat?: boolean;
+            /** @description Time in seconds to wait between retry attempts */
+            interval?: number;
         };
-      };
-    };
-  };
-  retryDAGWorkflow: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description the name of the DAG file */
-        fileName: components['parameters']['DAGFileName'];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': {
-          /** @description ID of the workflow to retry */
-          workflowId: string;
-        };
-      };
-    };
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  getDAGWorkflowHistory: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description the name of the DAG file */
-        fileName: components['parameters']['DAGFileName'];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': {
-            /** @description List of historical workflows created from this DAG */
-            workflows: components['schemas']['WorkflowDetails'][];
-            /** @description Grid data for visualization */
-            gridData: components['schemas']['DAGGridItem'][];
-          };
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  getDAGWorkflowDetails: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description the name of the DAG file */
-        fileName: components['parameters']['DAGFileName'];
-        /** @description ID of the workflow or 'latest' to get the most recent workflow */
-        workflowId: components['parameters']['WorkflowId'];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': {
-            workflow: components['schemas']['WorkflowDetails'];
-          };
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  getDAGSpec: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description the name of the DAG file */
-        fileName: components['parameters']['DAGFileName'];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': {
-            dag?: components['schemas']['DAGDetails'];
-            /** @description The DAG spec in YAML format */
-            spec: string;
-            /** @description List of errors in the spec */
+        /** @description Response object for listing all tags */
+        ListTagResponse: {
+            /** @description List of unique tags */
+            tags: string[];
+            /** @description List of errors encountered during the request */
             errors: string[];
-          };
         };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
     };
-  };
-  updateDAGSpec: {
+    responses: never;
     parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
+        /** @description page number of items to fetch (default is 1) */
+        Page: number;
+        /** @description number of items per page (default is 30, max is 100) */
+        PerPage: number;
         /** @description the name of the DAG file */
-        fileName: components['parameters']['DAGFileName'];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': {
-          /** @description The new DAG spec in YAML format */
-          spec: string;
-        };
-      };
-    };
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': {
-            /** @description List of errors in the spec */
-            errors: string[];
-          };
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  updateDAGSuspensionState: {
-    parameters: {
-      query?: {
+        DAGFileName: components["schemas"]["DAGFileName"];
+        /** @description name of the DAG */
+        DAGName: components["schemas"]["DAGName"];
+        /** @description name of the step */
+        StepName: string;
         /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description the name of the DAG file */
-        fileName: components['parameters']['DAGFileName'];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': {
-          /** @description Suspend status to set for the DAG */
-          suspend: boolean;
-        };
-      };
-    };
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description DAG not found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  renameDAG: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description the name of the DAG file */
-        fileName: components['parameters']['DAGFileName'];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': {
-          /** @description New file name for the DAG */
-          newFileName: string;
-        };
-      };
-    };
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description Invalid request */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-      /** @description DAG not found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  searchDAGs: {
-    parameters: {
-      query: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-        /** @description A search query string */
-        q: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': {
-            /** @description Search results matching the query */
-            results: components['schemas']['SearchResultItem'][];
-            /** @description Errors encountered during the search */
-            errors: string[];
-          };
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  getAllDAGTags: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ListTagResponse'];
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  listWorkflows: {
-    parameters: {
-      query?: {
-        /** @description status of the workflow */
-        status?: components['parameters']['Status'];
-        /** @description start datetime for filtering workflows in ISO 8601 format with timezone */
-        fromDate?: components['parameters']['DateTimeFrom'];
-        /** @description end datetime for filtering workflows in ISO 8601 format with timezone */
-        toDate?: components['parameters']['DateTimeTo'];
+        RemoteNode: string;
         /** @description ID of the workflow or 'latest' to get the most recent workflow */
-        workflowId?: components['parameters']['WorkflowIdSearch'];
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-        /** @description Filter workflows by name */
-        name?: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': {
-            /** @description List of workflows with their status and metadata */
-            workflows: components['schemas']['WorkflowSummary'][];
-          };
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  listWorkflowsByName: {
-    parameters: {
-      query?: {
-        /** @description status of the workflow */
-        status?: components['parameters']['Status'];
-        /** @description start datetime for filtering workflows in ISO 8601 format with timezone */
-        fromDate?: components['parameters']['DateTimeFrom'];
-        /** @description end datetime for filtering workflows in ISO 8601 format with timezone */
-        toDate?: components['parameters']['DateTimeTo'];
+        WorkflowId: components["schemas"]["WorkflowId"];
         /** @description ID of the workflow or 'latest' to get the most recent workflow */
-        workflowId?: components['parameters']['WorkflowIdSearch'];
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
+        WorkflowIdSearch: components["schemas"]["WorkflowId"];
         /** @description name of the workflow */
-        name: components['parameters']['WorkflowName'];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': {
-            /** @description List of workflows with their status and metadata */
-            workflows: components['schemas']['WorkflowSummary'][];
-          };
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  getWorkflowDetails: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description name of the DAG */
-        name: components['parameters']['DAGName'];
-        /** @description ID of the workflow or 'latest' to get the most recent workflow */
-        workflowId: components['parameters']['WorkflowId'];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': {
-            workflowDetails: components['schemas']['WorkflowDetails'];
-          };
-        };
-      };
-      /** @description Workflow not found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  getWorkflowLog: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
+        WorkflowName: string;
+        /** @description status of the workflow */
+        Status: components["schemas"]["Status"];
+        /** @description start datetime for filtering workflows in ISO 8601 format with timezone */
+        DateTimeFrom: components["schemas"]["UnixTimestamp"];
+        /** @description end datetime for filtering workflows in ISO 8601 format with timezone */
+        DateTimeTo: components["schemas"]["UnixTimestamp"];
         /** @description Number of lines to return from the end of the file */
-        tail?: components['parameters']['Tail'];
+        Tail: number;
         /** @description Number of lines to return from the beginning of the file */
-        head?: components['parameters']['Head'];
+        Head: number;
         /** @description Line number to start reading from (1-based) */
-        offset?: components['parameters']['Offset'];
+        Offset: number;
         /** @description Maximum number of lines to return */
-        limit?: components['parameters']['Limit'];
-      };
-      header?: never;
-      path: {
-        /** @description name of the DAG */
-        name: components['parameters']['DAGName'];
-        /** @description ID of the workflow or 'latest' to get the most recent workflow */
-        workflowId: components['parameters']['WorkflowId'];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Log'];
-        };
-      };
-      /** @description Log file not found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  retryWorkflow: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description name of the DAG */
-        name: components['parameters']['DAGName'];
-        /** @description ID of the workflow or 'latest' to get the most recent workflow */
-        workflowId: components['parameters']['WorkflowId'];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': {
-          /** @description ID of the workflow to retry */
-          workflowId: string;
-        };
-      };
-    };
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  terminateWorkflow: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description name of the DAG */
-        name: components['parameters']['DAGName'];
-        /** @description ID of the workflow or 'latest' to get the most recent workflow */
-        workflowId: components['parameters']['WorkflowId'];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-    };
-  };
-  getWorkflowStepLog: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-        /** @description Number of lines to return from the end of the file */
-        tail?: components['parameters']['Tail'];
-        /** @description Number of lines to return from the beginning of the file */
-        head?: components['parameters']['Head'];
-        /** @description Line number to start reading from (1-based) */
-        offset?: components['parameters']['Offset'];
-        /** @description Maximum number of lines to return */
-        limit?: components['parameters']['Limit'];
+        Limit: number;
         /** @description Whether to return stdout or stderr logs */
-        stdoutOrStderr?: components['parameters']['StdoutOrStderr'];
-      };
-      header?: never;
-      path: {
-        /** @description name of the DAG */
-        name: components['parameters']['DAGName'];
-        /** @description ID of the workflow or 'latest' to get the most recent workflow */
-        workflowId: components['parameters']['WorkflowId'];
-        /** @description name of the step */
-        stepName: components['parameters']['StepName'];
-      };
-      cookie?: never;
+        Stream: components["schemas"]["Stream"];
     };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
+    requestBodies: never;
+    headers: never;
+    pathItems: never;
+}
+export type $defs = Record<string, never>;
+export interface operations {
+    getHealthStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        content: {
-          'application/json': components['schemas']['Log'];
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
-      };
-      /** @description Log file not found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
     };
-  };
-  updateWorkflowStepStatus: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description name of the DAG */
-        name: components['parameters']['DAGName'];
-        /** @description ID of the workflow or 'latest' to get the most recent workflow */
-        workflowId: components['parameters']['WorkflowId'];
-        /** @description name of the step */
-        stepName: components['parameters']['StepName'];
-      };
-      cookie?: never;
+    listDAGs: {
+        parameters: {
+            query?: {
+                /** @description page number of items to fetch (default is 1) */
+                page?: components["parameters"]["Page"];
+                /** @description number of items per page (default is 30, max is 100) */
+                perPage?: components["parameters"]["PerPage"];
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Filter DAGs by name */
+                name?: string;
+                /** @description Filter DAGs by tag */
+                tag?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description List of DAG definitions with their status and metadata */
+                        dags: components["schemas"]["DAGFile"][];
+                        /** @description List of errors encountered during the request */
+                        errors: string[];
+                        pagination: components["schemas"]["Pagination"];
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
     };
-    requestBody: {
-      content: {
-        'application/json': {
-          status: components['schemas']['NodeStatus'];
+    createNewDAG: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: components["schemas"]["DAGName"];
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Name of the newly created DAG */
+                        name: string;
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
     };
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
+    getDAGDetails: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
         };
-        content?: never;
-      };
-      /** @description Invalid request */
-      400: {
-        headers: {
-          [name: string]: unknown;
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        dag?: components["schemas"]["DAGDetails"];
+                        latestWorkflow: components["schemas"]["WorkflowDetails"];
+                        /** @description Whether the DAG is suspended */
+                        suspended: boolean;
+                        /** @description List of errors encountered during the request */
+                        errors: string[];
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-      /** @description Workflow or step not found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
     };
-  };
-  getChildWorkflowDetails: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description name of the DAG */
-        name: components['parameters']['DAGName'];
-        /** @description ID of the workflow or 'latest' to get the most recent workflow */
-        workflowId: components['parameters']['WorkflowId'];
-        /** @description ID of the child workflow to retrieve details for */
-        childWorkflowId: string;
-      };
-      cookie?: never;
+    deleteDAG: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description DAG successfully deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description DAG not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
     };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
+    executeDAG: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
         };
-        content: {
-          'application/json': {
-            workflowDetails: components['schemas']['WorkflowDetails'];
-          };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Parameters to pass to the workflow in JSON format */
+                    params?: string;
+                    /** @description Optional ID for the workflow, if not provided a new one will be generated */
+                    workflowId?: string;
+                };
+            };
         };
-      };
-      /** @description Child workflow not found */
-      404: {
-        headers: {
-          [name: string]: unknown;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description ID of the created workflow */
+                        workflowId: string;
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
     };
-  };
-  getChildWorkflowLog: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-        /** @description Number of lines to return from the end of the file */
-        tail?: components['parameters']['Tail'];
-        /** @description Number of lines to return from the beginning of the file */
-        head?: components['parameters']['Head'];
-        /** @description Line number to start reading from (1-based) */
-        offset?: components['parameters']['Offset'];
-        /** @description Maximum number of lines to return */
-        limit?: components['parameters']['Limit'];
-      };
-      header?: never;
-      path: {
-        /** @description name of the DAG */
-        name: components['parameters']['DAGName'];
-        /** @description ID of the workflow or 'latest' to get the most recent workflow */
-        workflowId: components['parameters']['WorkflowId'];
-        /** @description ID of the child workflow to retrieve the log for */
-        childWorkflowId: string;
-      };
-      cookie?: never;
+    enqueueDAGWorkflow: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Parameters to pass to the workflow in JSON format */
+                    params?: string;
+                    /** @description Optional ID for the workflow, if not provided a new one will be generated */
+                    workflowId?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description ID of the created workflow */
+                        workflowId: string;
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
     };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
+    terminateDAGWorkflow: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
         };
-        content: {
-          'application/json': components['schemas']['Log'];
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
-      };
-      /** @description Log file not found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
     };
-  };
-  getChildWorkflowStepLog: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-        /** @description Number of lines to return from the end of the file */
-        tail?: components['parameters']['Tail'];
-        /** @description Number of lines to return from the beginning of the file */
-        head?: components['parameters']['Head'];
-        /** @description Line number to start reading from (1-based) */
-        offset?: components['parameters']['Offset'];
-        /** @description Maximum number of lines to return */
-        limit?: components['parameters']['Limit'];
-        /** @description Whether to return stdout or stderr logs */
-        stdoutOrStderr?: components['parameters']['StdoutOrStderr'];
-      };
-      header?: never;
-      path: {
-        /** @description name of the DAG */
-        name: components['parameters']['DAGName'];
-        /** @description ID of the workflow or 'latest' to get the most recent workflow */
-        workflowId: components['parameters']['WorkflowId'];
-        /** @description ID of the child workflow to retrieve the log for */
-        childWorkflowId: string;
-        /** @description name of the step */
-        stepName: components['parameters']['StepName'];
-      };
-      cookie?: never;
+    retryDAGWorkflow: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description ID of the workflow to retry */
+                    workflowId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
     };
-    requestBody?: never;
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
+    getDAGWorkflowHistory: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
         };
-        content: {
-          'application/json': components['schemas']['Log'];
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description List of historical workflows created from this DAG */
+                        workflows: components["schemas"]["WorkflowDetails"][];
+                        /** @description Grid data for visualization */
+                        gridData: components["schemas"]["DAGGridItem"][];
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
-      };
-      /** @description Log file not found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
     };
-  };
-  updateChildWorkflowStepStatus: {
-    parameters: {
-      query?: {
-        /** @description name of the remote node */
-        remoteNode?: components['parameters']['RemoteNode'];
-      };
-      header?: never;
-      path: {
-        /** @description name of the DAG */
-        name: components['parameters']['DAGName'];
-        /** @description ID of the workflow or 'latest' to get the most recent workflow */
-        workflowId: components['parameters']['WorkflowId'];
-        /** @description ID of the child workflow to update the step status for */
-        childWorkflowId: string;
-        /** @description name of the step */
-        stepName: components['parameters']['StepName'];
-      };
-      cookie?: never;
+    getDAGWorkflowDetails: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId: components["parameters"]["WorkflowId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        workflow: components["schemas"]["WorkflowDetails"];
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
     };
-    requestBody: {
-      content: {
-        'application/json': {
-          status: components['schemas']['NodeStatus'];
+    getDAGSpec: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
         };
-      };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        dag?: components["schemas"]["DAGDetails"];
+                        /** @description The DAG spec in YAML format */
+                        spec: string;
+                        /** @description List of errors in the spec */
+                        errors: string[];
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
     };
-    responses: {
-      /** @description A successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
+    updateDAGSpec: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
         };
-        content?: never;
-      };
-      /** @description Invalid request */
-      400: {
-        headers: {
-          [name: string]: unknown;
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The new DAG spec in YAML format */
+                    spec: string;
+                };
+            };
         };
-        content: {
-          'application/json': components['schemas']['Error'];
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description List of errors in the spec */
+                        errors: string[];
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
-      };
-      /** @description Workflow or step not found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
-      /** @description Generic error response */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Error'];
-        };
-      };
     };
-  };
+    updateDAGSuspensionState: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Suspend status to set for the DAG */
+                    suspend: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description DAG not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    renameDAG: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description New file name for the DAG */
+                    newFileName: string;
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description DAG not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    searchDAGs: {
+        parameters: {
+            query: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description A search query string */
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Search results matching the query */
+                        results: components["schemas"]["SearchResultItem"][];
+                        /** @description Errors encountered during the search */
+                        errors: string[];
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getAllDAGTags: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListTagResponse"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listWorkflows: {
+        parameters: {
+            query?: {
+                /** @description status of the workflow */
+                status?: components["parameters"]["Status"];
+                /** @description start datetime for filtering workflows in ISO 8601 format with timezone */
+                fromDate?: components["parameters"]["DateTimeFrom"];
+                /** @description end datetime for filtering workflows in ISO 8601 format with timezone */
+                toDate?: components["parameters"]["DateTimeTo"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId?: components["parameters"]["WorkflowIdSearch"];
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Filter workflows by name */
+                name?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description List of workflows with their status and metadata */
+                        workflows: components["schemas"]["WorkflowSummary"][];
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listWorkflowsByName: {
+        parameters: {
+            query?: {
+                /** @description status of the workflow */
+                status?: components["parameters"]["Status"];
+                /** @description start datetime for filtering workflows in ISO 8601 format with timezone */
+                fromDate?: components["parameters"]["DateTimeFrom"];
+                /** @description end datetime for filtering workflows in ISO 8601 format with timezone */
+                toDate?: components["parameters"]["DateTimeTo"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId?: components["parameters"]["WorkflowIdSearch"];
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the workflow */
+                name: components["parameters"]["WorkflowName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description List of workflows with their status and metadata */
+                        workflows: components["schemas"]["WorkflowSummary"][];
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getWorkflowDetails: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId: components["parameters"]["WorkflowId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        workflowDetails: components["schemas"]["WorkflowDetails"];
+                    };
+                };
+            };
+            /** @description Workflow not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    dequeueWorkflow: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId: components["parameters"]["WorkflowId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Workflow not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getWorkflowLog: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Number of lines to return from the end of the file */
+                tail?: components["parameters"]["Tail"];
+                /** @description Number of lines to return from the beginning of the file */
+                head?: components["parameters"]["Head"];
+                /** @description Line number to start reading from (1-based) */
+                offset?: components["parameters"]["Offset"];
+                /** @description Maximum number of lines to return */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId: components["parameters"]["WorkflowId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Log"];
+                };
+            };
+            /** @description Log file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    retryWorkflow: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId: components["parameters"]["WorkflowId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description ID of the workflow to retry */
+                    workflowId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    terminateWorkflow: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId: components["parameters"]["WorkflowId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getWorkflowStepLog: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Number of lines to return from the end of the file */
+                tail?: components["parameters"]["Tail"];
+                /** @description Number of lines to return from the beginning of the file */
+                head?: components["parameters"]["Head"];
+                /** @description Line number to start reading from (1-based) */
+                offset?: components["parameters"]["Offset"];
+                /** @description Maximum number of lines to return */
+                limit?: components["parameters"]["Limit"];
+                /** @description Whether to return stdout or stderr logs */
+                stream?: components["parameters"]["Stream"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId: components["parameters"]["WorkflowId"];
+                /** @description name of the step */
+                stepName: components["parameters"]["StepName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Log"];
+                };
+            };
+            /** @description Log file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateWorkflowStepStatus: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId: components["parameters"]["WorkflowId"];
+                /** @description name of the step */
+                stepName: components["parameters"]["StepName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    status: components["schemas"]["NodeStatus"];
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Workflow or step not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getChildWorkflowDetails: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId: components["parameters"]["WorkflowId"];
+                /** @description ID of the child workflow to retrieve details for */
+                childWorkflowId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        workflowDetails: components["schemas"]["WorkflowDetails"];
+                    };
+                };
+            };
+            /** @description Child workflow not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getChildWorkflowLog: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Number of lines to return from the end of the file */
+                tail?: components["parameters"]["Tail"];
+                /** @description Number of lines to return from the beginning of the file */
+                head?: components["parameters"]["Head"];
+                /** @description Line number to start reading from (1-based) */
+                offset?: components["parameters"]["Offset"];
+                /** @description Maximum number of lines to return */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId: components["parameters"]["WorkflowId"];
+                /** @description ID of the child workflow to retrieve the log for */
+                childWorkflowId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Log"];
+                };
+            };
+            /** @description Log file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getChildWorkflowStepLog: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Number of lines to return from the end of the file */
+                tail?: components["parameters"]["Tail"];
+                /** @description Number of lines to return from the beginning of the file */
+                head?: components["parameters"]["Head"];
+                /** @description Line number to start reading from (1-based) */
+                offset?: components["parameters"]["Offset"];
+                /** @description Maximum number of lines to return */
+                limit?: components["parameters"]["Limit"];
+                /** @description Whether to return stdout or stderr logs */
+                stream?: components["parameters"]["Stream"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId: components["parameters"]["WorkflowId"];
+                /** @description ID of the child workflow to retrieve the log for */
+                childWorkflowId: string;
+                /** @description name of the step */
+                stepName: components["parameters"]["StepName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Log"];
+                };
+            };
+            /** @description Log file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateChildWorkflowStepStatus: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the workflow or 'latest' to get the most recent workflow */
+                workflowId: components["parameters"]["WorkflowId"];
+                /** @description ID of the child workflow to update the step status for */
+                childWorkflowId: string;
+                /** @description name of the step */
+                stepName: components["parameters"]["StepName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    status: components["schemas"]["NodeStatus"];
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Workflow or step not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
 }
 export enum ErrorCode {
-  bad_request = 'bad_request',
-  not_found = 'not_found',
-  internal_error = 'internal_error',
-  unauthorized = 'unauthorized',
-  bad_gateway = 'bad_gateway',
-  remote_node_error = 'remote_node_error',
-  already_running = 'already_running',
-  not_running = 'not_running',
-  already_exists = 'already_exists',
+    bad_request = "bad_request",
+    not_found = "not_found",
+    internal_error = "internal_error",
+    unauthorized = "unauthorized",
+    bad_gateway = "bad_gateway",
+    remote_node_error = "remote_node_error",
+    already_running = "already_running",
+    not_running = "not_running",
+    already_exists = "already_exists"
 }
-export enum StdoutOrStderr {
-  stdout = 'stdout',
-  stderr = 'stderr',
+export enum Stream {
+    stdout = "stdout",
+    stderr = "stderr"
 }
 export enum HealthResponseStatus {
-  healthy = 'healthy',
-  unhealthy = 'unhealthy',
+    healthy = "healthy",
+    unhealthy = "unhealthy"
 }
 export enum Status {
-  NotStarted = 0,
-  Running = 1,
-  Failed = 2,
-  Cancelled = 3,
-  Success = 4,
-  Queued = 5,
+    NotStarted = 0,
+    Running = 1,
+    Failed = 2,
+    Cancelled = 3,
+    Success = 4,
+    Queued = 5
 }
 export enum StatusLabel {
-  not_started = 'not started',
-  running = 'running',
-  failed = 'failed',
-  cancelled = 'cancelled',
-  finished = 'finished',
-  queued = 'queued',
+    not_started = "not started",
+    running = "running",
+    failed = "failed",
+    cancelled = "cancelled",
+    finished = "finished",
+    queued = "queued"
 }
 export enum NodeStatus {
-  NotStarted = 0,
-  Running = 1,
-  Failed = 2,
-  Cancelled = 3,
-  Success = 4,
-  Skipped = 5,
+    NotStarted = 0,
+    Running = 1,
+    Failed = 2,
+    Cancelled = 3,
+    Success = 4,
+    Skipped = 5
 }
 export enum NodeStatusLabel {
-  not_started = 'not started',
-  running = 'running',
-  failed = 'failed',
-  canceled = 'canceled',
-  finished = 'finished',
-  skipped = 'skipped',
+    not_started = "not started",
+    running = "running",
+    failed = "failed",
+    canceled = "canceled",
+    finished = "finished",
+    skipped = "skipped"
 }

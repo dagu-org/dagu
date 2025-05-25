@@ -17,21 +17,21 @@ func CmdDequeue() *cobra.Command {
 			Long: `Dequeue a workflow to the queue.
 
 Example:
-	dagu dequeue --workflow-name=my_workflow_name --workflow-id=my_workflow_id
+	dagu dequeue --workflow=my_workflow_name:my_workflow_id
 `,
 		}, dequeueFlags, runDequeue,
 	)
 }
 
-var dequeueFlags = []commandLineFlag{paramsFlag, workflowNameFlagDequeue, workflowIDFlagDequeue}
+var dequeueFlags = []commandLineFlag{paramsFlag, workflowFlagDequeue}
 
 func runDequeue(ctx *Context, _ []string) error {
 	// Get workflow ID from flags
-	workflowName, _ := ctx.StringParam("workflow-name")
-	workflowID, _ := ctx.StringParam("workflow-id")
-
-	workflow := digraph.NewWorkflowRef(workflowName, workflowID)
-
+	workflowRef, _ := ctx.StringParam("workflow")
+	workflow, err := digraph.ParseWorkflowRef(workflowRef)
+	if err != nil {
+		return fmt.Errorf("failed to parse workflow reference %s: %w", workflowRef, err)
+	}
 	return dequeueWorkflow(ctx, workflow)
 }
 
@@ -58,7 +58,7 @@ func dequeueWorkflow(ctx *Context, workflow digraph.WorkflowRef) error {
 	}
 
 	// Make sure the workflow is not running at least locally
-	latestStatus, err := ctx.HistoryMgr.GetLatestStatus(ctx, dag)
+	latestStatus, err := ctx.HistoryMgr.GetDAGRealtimeStatus(ctx, dag, workflow.WorkflowID)
 	if err != nil {
 		return fmt.Errorf("failed to get latest status: %w", err)
 	}

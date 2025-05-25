@@ -11,9 +11,9 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import dayjs from '@/lib/dayjs';
-import { RefreshCw, Square } from 'lucide-react';
+import { RefreshCw, Square, X } from 'lucide-react';
 import React from 'react';
-import { components } from '../../../../api/v2/schema';
+import { components, Status } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useClient } from '../../../../hooks/api';
 import ConfirmModal from '../../../../ui/ConfirmModal';
@@ -53,6 +53,7 @@ function WorkflowActions({
   const appBarContext = React.useContext(AppBarContext);
   const [isStopModal, setIsStopModal] = React.useState(false);
   const [isRetryModal, setIsRetryModal] = React.useState(false);
+  const [isDequeueModal, setIsDequeueModal] = React.useState(false);
 
   const client = useClient();
 
@@ -67,8 +68,9 @@ function WorkflowActions({
 
   // Determine which buttons should be enabled based on current status and root level
   const buttonState = {
-    stop: isRootLevel && workflow?.status === 1, // Running and at root level
-    retry: isRootLevel && workflow?.status !== 1 && workflow?.workflowId !== '', // Not running, has workflowId, and at root level
+    stop: isRootLevel && workflow?.status === Status.Running, // Running and at root level
+    retry: isRootLevel && workflow?.status !== Status.Running && workflow?.status !== Status.Queued && workflow?.workflowId !== '', // Not running, not queued, has workflowId, and at root level
+    dequeue: isRootLevel && workflow?.status === Status.Queued, // Queued and at root level
   };
 
   if (!workflow) {
@@ -145,6 +147,40 @@ function WorkflowActions({
           </TooltipTrigger>
           <TooltipContent>
             <p>{isRootLevel ? 'Retry Workflow execution' : 'Retry action only available at root workflow level'}</p>
+          </TooltipContent>
+        </Tooltip>
+
+        {/* Dequeue Button */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              {displayMode === 'compact' ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled={!buttonState['dequeue']}
+                  onClick={() => setIsDequeueModal(true)}
+                  className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">Dequeue</span>
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!buttonState['dequeue']}
+                  onClick={() => setIsDequeueModal(true)}
+                  className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Dequeue
+                </Button>
+              )}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{isRootLevel ? 'Remove Workflow from queue' : 'Dequeue action only available at root workflow level'}</p>
           </TooltipContent>
         </Tooltip>
 
@@ -230,6 +266,57 @@ function WorkflowActions({
                 </span>
               </LabeledItem>
             )}
+            {workflow?.status !== undefined && (
+              <LabeledItem label="Status">
+                <StatusChip status={workflow.status} size="sm">
+                  {workflow.statusLabel || ''}
+                </StatusChip>
+              </LabeledItem>
+            )}
+          </div>
+        </ConfirmModal>
+
+        {/* Dequeue Confirmation Modal */}
+        <ConfirmModal
+          title="Confirmation"
+          buttonText="Dequeue"
+          visible={isDequeueModal}
+          dismissModal={() => setIsDequeueModal(false)}
+          onSubmit={async () => {
+            setIsDequeueModal(false);
+
+            const { error } = await client.GET('/workflows/{name}/{workflowId}/dequeue', {
+              params: {
+                path: {
+                  name: name,
+                  workflowId: workflow.workflowId,
+                },
+                query: {
+                  remoteNode: appBarContext.selectedRemoteNode || 'local',
+                },
+              },
+            });
+            if (error) {
+              alert(error.message || 'An error occurred');
+              return;
+            }
+            reloadData();
+          }}
+        >
+          <div>
+            <p className="mb-2">
+              Do you really want to dequeue the following workflow?
+            </p>
+            <LabeledItem label="Workflow-Name">
+              <span className="font-mono text-sm">
+                {workflow?.name || 'N/A'}
+              </span>
+            </LabeledItem>
+            <LabeledItem label="Workflow-ID">
+              <span className="font-mono text-sm">
+                {workflow?.workflowId || 'N/A'}
+              </span>
+            </LabeledItem>
             {workflow?.status !== undefined && (
               <LabeledItem label="Status">
                 <StatusChip status={workflow.status} size="sm">

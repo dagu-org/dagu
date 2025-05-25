@@ -1,5 +1,5 @@
 /**
- * StartDAGModal component provides a modal dialog for starting a DAG with parameters.
+ * StartDAGModal component provides a modal dialog for starting or enqueuing a DAG with parameters.
  *
  * @module features/dags/components/dag-execution
  */
@@ -32,13 +32,21 @@ type Props = {
   /** Function to close the modal */
   dismissModal: () => void;
   /** Function called when the user submits the form */
-  onSubmit: (params: string) => void;
+  onSubmit: (params: string, workflowId?: string) => void;
+  /** Action type: 'start' or 'enqueue' */
+  action?: 'start' | 'enqueue';
 };
 
 /**
- * Modal dialog for starting a DAG with parameters
+ * Modal dialog for starting or enqueuing a DAG with parameters
  */
-function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
+function StartDAGModal({
+  visible,
+  dag,
+  dismissModal,
+  onSubmit,
+  action = 'start',
+}: Props) {
   const ref = React.useRef<HTMLInputElement>(null);
 
   // Parse default parameters from the DAG definition
@@ -50,6 +58,7 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
   }, [dag.defaultParams]);
 
   const [params, setParams] = React.useState<Parameter[]>([]);
+  const [workflowId, setWorkflowId] = React.useState<string>('');
 
   // Update params when default params change
   React.useEffect(() => {
@@ -95,7 +104,7 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
 
         // If no specific element is focused, trigger the primary action
         e.preventDefault();
-        onSubmit(stringifyParams(params));
+        onSubmit(stringifyParams(params), workflowId || undefined);
       }
     };
 
@@ -103,16 +112,28 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [visible, params, onSubmit, dismissModal]);
+  }, [visible, params, workflowId, onSubmit, dismissModal]);
 
   return (
     <Dialog open={visible} onOpenChange={(open) => !open && dismissModal()}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Start the DAG</DialogTitle>
+          <DialogTitle>
+            {action === 'enqueue' ? 'Enqueue the DAG' : 'Start the DAG'}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="py-4 space-y-4">
+          {/* Optional Workflow ID field */}
+          <div className="space-y-2">
+            <Label htmlFor="workflow-id">Workflow ID (optional)</Label>
+            <Input
+              id="workflow-id"
+              placeholder="Enter custom workflow ID"
+              value={workflowId}
+              onChange={(e) => setWorkflowId(e.target.value)}
+            />
+          </div>
           {parsedParams.map((p, i) => {
             if (p.Name != undefined) {
               return (
@@ -183,10 +204,10 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
           <Button
             ref={submitButtonRef}
             onClick={() => {
-              onSubmit(stringifyParams(params));
+              onSubmit(stringifyParams(params), workflowId || undefined);
             }}
           >
-            Start
+            {action === 'enqueue' ? 'Enqueue' : 'Start'}
           </Button>
         </DialogFooter>
       </DialogContent>

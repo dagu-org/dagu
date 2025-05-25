@@ -227,6 +227,52 @@ paths:
                 params:
                   type: string
                   description: "Parameters to pass to the workflow in JSON format"
+                workflowId:
+                  type: string
+                  description: "Optional ID for the workflow, if not provided a new one will be generated"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workflowId:
+                    type: string
+                    description: "ID of the created workflow"
+                required:
+                  - workflowId
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/enqueue:
+    post:
+      summary: "Enqueue a workflow from DAG"
+      description: "Creates a workflow from the DAG definition and adds it to the queue for execution"
+      operationId: "enqueueDAGWorkflow"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                params:
+                  type: string
+                  description: "Parameters to pass to the workflow in JSON format"
+                workflowId:
+                  type: string
+                  description: "Optional ID for the workflow, if not provided a new one will be generated"
       responses:
         "200":
           description: "A successful response"
@@ -697,6 +743,33 @@ paths:
                     $ref: "#/components/schemas/WorkflowDetails"
                 required:
                   - workflowDetails
+        "404":
+          description: "Workflow not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /workflows/{name}/{workflowId}/dequeue:
+    get:
+      summary: "Dequeue a queued workflow"
+      description: "Dequeue a workflow execution that is currently queued"
+      operationId: "dequeueWorkflow"
+      tags:
+        - "workflows"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/WorkflowId"
+      responses:
+        "200":
+          description: "A successful response"
         "404":
           description: "Workflow not found"
           content:

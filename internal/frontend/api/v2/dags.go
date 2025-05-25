@@ -387,17 +387,44 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		}
 	}
 
-	workflowId, err := a.historyManager.GenWorkflowID(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error generating workflow ID: %w", err)
+	workflowId := valueOf(request.Body.WorkflowId)
+	if workflowId == "" {
+		var err error
+		workflowId, err = a.historyManager.GenWorkflowID(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("error generating workflow ID: %w", err)
+		}
 	}
 
-	if err := a.historyManager.StartDAG(ctx, dag, history.StartOptions{
-		Params:     valueOf(request.Body.Params),
+	// Check the workflow ID is not already in use
+	_, err = a.historyStore.FindRun(ctx, digraph.WorkflowRef{
+		Name:       dag.Name,
 		WorkflowID: workflowId,
+	})
+	if !errors.Is(err, models.ErrWorkflowIDNotFound) {
+		return nil, &Error{
+			HTTPStatus: http.StatusConflict,
+			Code:       api.ErrorCodeAlreadyExists,
+			Message:    fmt.Sprintf("Workflow ID %s already exists for DAG %s", workflowId, dag.Name),
+		}
+	}
+
+	if err := a.startWorkflow(ctx, dag, valueOf(request.Body.Params), workflowId); err != nil {
+		return nil, fmt.Errorf("error starting workflow: %w", err)
+	}
+
+	return api.ExecuteDAG200JSONResponse{
+		WorkflowId: workflowId,
+	}, nil
+}
+
+func (a *API) startWorkflow(ctx context.Context, dag *digraph.DAG, params, workflowID string) error {
+	if err := a.historyManager.StartDAG(ctx, dag, history.StartOptions{
+		Params:     params,
+		WorkflowID: workflowID,
 		Quiet:      true,
 	}); err != nil {
-		return nil, fmt.Errorf("error starting DAG: %w", err)
+		return fmt.Errorf("error starting DAG: %w", err)
 	}
 
 	// Wait for the DAG to start
@@ -413,7 +440,7 @@ waitLoop:
 		case <-ctx.Done():
 			break waitLoop
 		default:
-			status, _ := a.historyManager.GetDAGRealtimeStatus(ctx, dag, workflowId)
+			status, _ := a.historyManager.GetDAGRealtimeStatus(ctx, dag, workflowID)
 			if status == nil {
 				continue
 			}
@@ -428,16 +455,88 @@ waitLoop:
 	}
 
 	if !running {
-		return nil, &Error{
+		return &Error{
 			HTTPStatus: http.StatusInternalServerError,
 			Code:       api.ErrorCodeInternalError,
 			Message:    "DAG did not start",
 		}
 	}
 
-	return api.ExecuteDAG200JSONResponse{
+	return nil
+}
+
+func (a *API) EnqueueDAGWorkflow(ctx context.Context, request api.EnqueueDAGWorkflowRequestObject) (api.EnqueueDAGWorkflowResponseObject, error) {
+	dag, err := a.dagStore.GetMetadata(ctx, request.FileName)
+	if err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
+		}
+	}
+
+	workflowId := valueOf(request.Body.WorkflowId)
+	if workflowId == "" {
+		var err error
+		workflowId, err = a.historyManager.GenWorkflowID(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("error generating workflow ID: %w", err)
+		}
+	}
+
+	if err := a.enqueueWorkflow(ctx, dag, valueOf(request.Body.Params), workflowId); err != nil {
+		return nil, fmt.Errorf("error enqueuing workflow: %w", err)
+	}
+
+	return api.EnqueueDAGWorkflow200JSONResponse{
 		WorkflowId: workflowId,
 	}, nil
+}
+
+func (a *API) enqueueWorkflow(ctx context.Context, dag *digraph.DAG, params, workflowID string) error {
+	if err := a.historyManager.EnqueueWorkflow(ctx, dag, history.EnqueueOptions{
+		Params:     params,
+		WorkflowID: workflowID,
+	}); err != nil {
+		return fmt.Errorf("error enqueuing DAG: %w", err)
+	}
+
+	// Wait for the DAG to be enqueued
+	timer := time.NewTimer(3 * time.Second)
+	var ok bool
+	defer timer.Stop()
+
+waitLoop:
+	for {
+		select {
+		case <-timer.C:
+			break waitLoop
+		case <-ctx.Done():
+			break waitLoop
+		default:
+			status, _ := a.historyManager.GetDAGRealtimeStatus(ctx, dag, workflowID)
+			if status == nil {
+				continue
+			}
+			if status.Status != scheduler.StatusNone {
+				// If status is not None, it means the DAG has started or even finished
+				ok = true
+				timer.Stop()
+				break waitLoop
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+
+	if !ok {
+		return &Error{
+			HTTPStatus: http.StatusInternalServerError,
+			Code:       api.ErrorCodeInternalError,
+			Message:    "Failed to enqueue workflow execution",
+		}
+	}
+
+	return nil
 }
 
 func (a *API) TerminateDAGWorkflow(ctx context.Context, request api.TerminateDAGWorkflowRequestObject) (api.TerminateDAGWorkflowResponseObject, error) {

@@ -7,7 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"slices"
-	"strings"
+	"strconv"
 	"syscall"
 
 	"github.com/dagu-org/dagu/internal/config"
@@ -80,7 +80,7 @@ func (m *Manager) StartDAG(_ context.Context, dag *digraph.DAG, opts StartOption
 	args := []string{"start"}
 	if opts.Params != "" {
 		args = append(args, "-p")
-		args = append(args, fmt.Sprintf(`"%s"`, escapeArg(opts.Params)))
+		args = append(args, strconv.Quote(opts.Params))
 	}
 	if opts.Quiet {
 		args = append(args, "-q")
@@ -104,6 +104,68 @@ func (m *Manager) StartDAG(_ context.Context, dag *digraph.DAG, opts StartOption
 	cmd.Stderr = os.Stderr
 
 	return cmd.Start()
+}
+
+// EnqueueWorkflow enqueues a workflow for execution by executing the configured executable.
+func (m *Manager) EnqueueWorkflow(_ context.Context, dag *digraph.DAG, opts EnqueueOptions) error {
+	args := []string{"enqueue"}
+	if opts.Params != "" {
+		args = append(args, "-p")
+		args = append(args, strconv.Quote(opts.Params))
+	}
+	if opts.Quiet {
+		args = append(args, "-q")
+	}
+	if opts.WorkflowID != "" {
+		args = append(args, fmt.Sprintf("--workflow-id=%s", opts.WorkflowID))
+	}
+	if configFile := config.UsedConfigFile.Load(); configFile != nil {
+		if configFile, ok := configFile.(string); ok {
+			args = append(args, "--config")
+			args = append(args, configFile)
+		}
+	}
+	args = append(args, dag.Location)
+	// nolint:gosec
+	cmd := exec.Command(m.executable, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
+	cmd.Dir = m.workDir
+	cmd.Env = os.Environ()
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start enqueue command: %w", err)
+	}
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("failed to enqueue workflow: %w", err)
+	}
+	return nil
+}
+
+func (m *Manager) DequeueWorkflow(_ context.Context, workflow digraph.WorkflowRef) error {
+	args := []string{"dequeue", fmt.Sprintf("--workflow=%s", workflow.String())}
+	if configFile := config.UsedConfigFile.Load(); configFile != nil {
+		if configFile, ok := configFile.(string); ok {
+			args = append(args, "--config")
+			args = append(args, configFile)
+		}
+	}
+	// nolint:gosec
+	cmd := exec.Command(m.executable, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
+	cmd.Dir = m.workDir
+	cmd.Env = os.Environ()
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start dequeue command: %w", err)
+	}
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("failed to dequeue workflow: %w", err)
+	}
+	return nil
 }
 
 // RestartDAG restarts a DAG by executing the configured executable with the restart command.
@@ -276,13 +338,23 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 		currentStatus, err := m.currentStatus(ctx, dag, latestStatus.WorkflowID)
 		if err == nil {
 			return *currentStatus, nil
+		} else {
+			logger.Debug(ctx, "Failed to get current status from socket", "error", err)
 		}
 	}
 
-	// If querying the current status fails, even if the status is running,
-	// set the status to error
+	// If querying the current status fails, ensure if the status is running,
 	if latestStatus.Status == scheduler.StatusRunning {
-		latestStatus.Status = scheduler.StatusError
+		// Check the PID is still alive
+		pid := int(latestStatus.PID)
+		if pid > 0 {
+			_, err := os.FindProcess(pid)
+			if err != nil {
+				// If we cannot find the process, mark the status as error
+				latestStatus.Status = scheduler.StatusError
+				logger.Warn(ctx, "No PID set for running status, marking status as error")
+			}
+		}
 	}
 
 	return *latestStatus, nil
@@ -364,27 +436,15 @@ func (e *Manager) UpdateStatus(ctx context.Context, root digraph.WorkflowRef, st
 	return nil
 }
 
-// escapeArg escapes special characters in command arguments.
-// Currently handles carriage returns and newlines by adding backslashes.
-func escapeArg(input string) string {
-	escaped := strings.Builder{}
-
-	for _, char := range input {
-		switch char {
-		case '\r':
-			_, _ = escaped.WriteString("\\r")
-		case '\n':
-			_, _ = escaped.WriteString("\\n")
-		default:
-			_, _ = escaped.WriteRune(char)
-		}
-	}
-
-	return escaped.String()
-}
-
 // StartOptions contains options for starting a DAG.
 type StartOptions struct {
+	Params     string // Parameters to pass to the DAG
+	Quiet      bool   // Whether to run in quiet mode
+	WorkflowID string // Workflow ID for the workflow
+}
+
+// EnqueueOptions contains options for enqueuing a DAG.
+type EnqueueOptions struct {
 	Params     string // Parameters to pass to the DAG
 	Quiet      bool   // Whether to run in quiet mode
 	WorkflowID string // Workflow ID for the workflow

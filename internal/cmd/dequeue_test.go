@@ -21,7 +21,7 @@ func TestDequeueCommand(t *testing.T) {
 	// Now test the dequeue command
 	th.RunCommand(t, cmd.CmdDequeue(), test.CmdTest{
 		Name:        "Dequeue",
-		Args:        []string{"dequeue", "--workflow-name", "dequeue", "--workflow-id=test-workflow"},
+		Args:        []string{"dequeue", "--workflow", "dequeue:test-workflow"},
 		ExpectedOut: []string{"Dequeued workflow"},
 	})
 }
