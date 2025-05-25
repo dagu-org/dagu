@@ -87,7 +87,7 @@ func (dr DAGRunTest) WriteStatus(t *testing.T, ts models.TimeInUTC, s scheduler.
 func TestListChildDAGRuns(t *testing.T) {
 	t.Run("NoChildDAGRuns", func(t *testing.T) {
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestDAGRun(t, "test-workflow", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "test-dag-run", models.NewUTC(time.Now()))
 
 		children, err := exec.ListChildDAGRuns(exec.Context)
 		require.NoError(t, err)
@@ -96,7 +96,7 @@ func TestListChildDAGRuns(t *testing.T) {
 
 	t.Run("WithChildDAGRuns", func(t *testing.T) {
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestDAGRun(t, "parent-workflow", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "parent-dag-run", models.NewUTC(time.Now()))
 
 		// Create child DAG-run directory and some child DAG-run directories
 		childDir := filepath.Join(exec.baseDir, ChildDAGRunsDir)
@@ -126,12 +126,12 @@ func TestListChildDAGRuns(t *testing.T) {
 	})
 }
 
-func TestWorkflowListRuns(t *testing.T) {
+func TestDAGRunListRuns(t *testing.T) {
 	t.Run("NoRuns", func(t *testing.T) {
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestDAGRun(t, "test-workflow", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "test-dag-run", models.NewUTC(time.Now()))
 
-		// Remove the run that was created by CreateTestExecution
+		// Remove the run that was created by CreateTestDAGRun
 		require.NoError(t, os.RemoveAll(exec.baseDir))
 		require.NoError(t, os.MkdirAll(exec.baseDir, 0755))
 
@@ -142,7 +142,7 @@ func TestWorkflowListRuns(t *testing.T) {
 
 	t.Run("WithMultipleRuns", func(t *testing.T) {
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestDAGRun(t, "test-workflow", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "test-dag-run", models.NewUTC(time.Now()))
 
 		// Create additional runs
 		ts1 := models.NewUTC(time.Date(2021, 1, 1, 12, 0, 0, 0, time.UTC))
@@ -164,12 +164,12 @@ func TestWorkflowListRuns(t *testing.T) {
 func TestListLogFiles(t *testing.T) {
 	t.Run("WithLogFiles", func(t *testing.T) {
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestDAGRun(t, "test-workflow", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "test-dag-run", models.NewUTC(time.Now()))
 
 		// Create a run with log files
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
-		status.RunID = "test-workflow"
+		status.RunID = "test-dag-run"
 		status.Status = scheduler.StatusSuccess
 		status.Log = "/tmp/test.log"
 		status.Nodes = []*models.Node{
@@ -224,12 +224,12 @@ func TestRemoveLogFiles(t *testing.T) {
 		}
 
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestDAGRun(t, "test-workflow", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "test-dag-run", models.NewUTC(time.Now()))
 
 		// Create a run with log files pointing to our test files
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
-		status.RunID = "test-workflow"
+		status.RunID = "test-dag-run"
 		status.Status = scheduler.StatusSuccess
 		status.Log = logFiles[0]
 		status.Nodes = []*models.Node{
@@ -283,12 +283,12 @@ func TestRemoveLogFiles(t *testing.T) {
 		}
 
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestDAGRun(t, "parent-workflow", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "parent-dag-run", models.NewUTC(time.Now()))
 
 		// Create parent DAG-run with log files
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
-		status.RunID = "parent-workflow"
+		status.RunID = "parent-dag-run"
 		status.Log = parentLogFiles[0]
 		status.Nodes = []*models.Node{{
 			Step:   digraph.Step{Name: "parent-step"},
@@ -351,7 +351,7 @@ func TestDAGRunRemove(t *testing.T) {
 
 		// Create test log files
 		logFiles := []string{
-			filepath.Join(tmpDir, "workflow.log"),
+			filepath.Join(tmpDir, "dag-run.log"),
 			filepath.Join(tmpDir, "step1.out"),
 			filepath.Join(tmpDir, "step1.err"),
 		}
@@ -361,12 +361,12 @@ func TestDAGRunRemove(t *testing.T) {
 		}
 
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestDAGRun(t, "test-workflow", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "test-dag-run", models.NewUTC(time.Now()))
 
 		// Create a run with log files
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
-		status.RunID = "test-workflow"
+		status.RunID = "test-dag-run"
 		status.Status = scheduler.StatusSuccess
 		status.Log = logFiles[0]
 		status.Nodes = []*models.Node{
@@ -386,7 +386,7 @@ func TestDAGRunRemove(t *testing.T) {
 
 		// Verify DAG-run directory and log files exist
 		_, err = os.Stat(exec.baseDir)
-		require.NoError(t, err, "workflow directory should exist")
+		require.NoError(t, err, "DAG-run directory should exist")
 
 		for _, logFile := range logFiles {
 			_, err := os.Stat(logFile)
@@ -431,12 +431,12 @@ func TestDAGRunRemove(t *testing.T) {
 		}
 
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestDAGRun(t, "parent-workflow", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "parent-dag-run", models.NewUTC(time.Now()))
 
 		// Create parent DAG-run with log files
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
-		status.RunID = "parent-workflow"
+		status.RunID = "parent-dag-run"
 		status.Log = parentLogFiles[0]
 		status.Nodes = []*models.Node{{
 			Step:   digraph.Step{Name: "parent-step"},
@@ -508,13 +508,13 @@ func TestDAGRunRemove(t *testing.T) {
 
 	t.Run("RemoveHandlesNonExistentLogFiles", func(t *testing.T) {
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestDAGRun(t, "test-workflow", models.NewUTC(time.Now()))
+		exec := root.CreateTestDAGRun(t, "test-dag-run", models.NewUTC(time.Now()))
 
 		// Create a run with log files that don't exist
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
-		status.RunID = "test-workflow"
-		status.Log = "/non/existent/path/workflow.log"
+		status.RunID = "test-dag-run"
+		status.Log = "/non/existent/path/dag-run.log"
 		status.Nodes = []*models.Node{
 			{
 				Step:   digraph.Step{Name: "step1"},
