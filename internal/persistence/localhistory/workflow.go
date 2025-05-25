@@ -234,11 +234,19 @@ func (e Workflow) removeLogFiles(ctx context.Context) error {
 		deleteFiles = append(deleteFiles, childLogFiles...)
 	}
 
-	// Remove all log files
+	parentDirs := make(map[string]struct{})
+
+	// Remove all log files.
 	for _, file := range deleteFiles {
 		if err := os.Remove(file); err != nil {
 			logger.Error(ctx, "failed to remove log file", "err", err, "workflow", e.workflowID, "file", file)
 		}
+		parentDirs[filepath.Dir(file)] = struct{}{}
+	}
+
+	// Remove parent dirs if they are empty.
+	for p := range parentDirs {
+		_ = os.Remove(p)
 	}
 
 	return nil
@@ -260,6 +268,14 @@ func (e Workflow) listLogFiles(ctx context.Context) ([]string, error) {
 		}
 		logFiles = append(logFiles, status.Log)
 		for _, n := range status.Nodes {
+			logFiles = append(logFiles, n.Stdout, n.Stderr)
+		}
+		for _, n := range []*models.Node{
+			status.OnSuccess, status.OnExit, status.OnFailure, status.OnCancel,
+		} {
+			if n == nil {
+				continue
+			}
 			logFiles = append(logFiles, n.Stdout, n.Stderr)
 		}
 	}
