@@ -24,8 +24,8 @@ func TestDataRoot(t *testing.T) {
 			dr := NewDataRoot(baseDir, dagName)
 
 			assert.Equal(t, "test-dag", dr.prefix, "prefix should be set correctly")
-			assert.Equal(t, filepath.Join(baseDir, "test-dag", "executions"), dr.executionsDir, "path should be set correctly")
-			assert.Equal(t, filepath.Join(baseDir, "test-dag", "executions", "*", "*", "*", DAGRunDirPrefix+"*"), dr.globPattern, "globPattern should be set correctly")
+			assert.Equal(t, filepath.Join(baseDir, "test-dag", "dag-runs"), dr.dagRunsDir, "path should be set correctly")
+			assert.Equal(t, filepath.Join(baseDir, "test-dag", "dag-runs", "*", "*", "*", DAGRunDirPrefix+"*"), dr.globPattern, "globPattern should be set correctly")
 		})
 
 		t.Run("WithYAMLExtension", func(t *testing.T) {
@@ -66,13 +66,13 @@ func TestDataRootRuns(t *testing.T) {
 		ctx := context.Background()
 
 		root := setupTestDataRoot(t)
-		exec := root.CreateTestDAGRun(t, "test-id1", ts)
+		dagRun := root.CreateTestDAGRun(t, "test-id1", ts)
 		_ = root.CreateTestDAGRun(t, "test-id2", ts)
 
-		actual, err := root.FindByWorkflowID(ctx, "test-id1")
+		actual, err := root.FindByDAGRunID(ctx, "test-id1")
 		require.NoError(t, err)
 
-		assert.Equal(t, exec.DAGRun, actual, "FindByWorkflowID should return the correct run")
+		assert.Equal(t, dagRun.DAGRun, actual, "FindByWorkflowID should return the correct run")
 	})
 
 	t.Run("Latest", func(t *testing.T) {
@@ -221,7 +221,7 @@ func (drt *DataRootTest) CreateTestDAGRun(t *testing.T, workflowID string, ts mo
 	err := drt.Create()
 	require.NoError(t, err)
 
-	run, err := drt.CreateWorkflow(ts, workflowID)
+	run, err := drt.CreateDAGRun(ts, workflowID)
 	require.NoError(t, err)
 
 	return DAGRunTest{

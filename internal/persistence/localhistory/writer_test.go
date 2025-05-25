@@ -46,7 +46,7 @@ func TestWriter(t *testing.T) {
 
 		// Append to existing file
 		dataRoot := NewDataRoot(th.TmpDir, dag.Name)
-		run, err := dataRoot.FindByWorkflowID(th.Context, workflowID)
+		run, err := dataRoot.FindByDAGRunID(th.Context, workflowID)
 		require.NoError(t, err)
 
 		latestRun, err := run.LatestAttempt(th.Context, nil)

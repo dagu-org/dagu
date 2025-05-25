@@ -251,13 +251,13 @@ func (store *Store) CreateAttempt(ctx context.Context, dag *digraph.DAG, timesta
 
 	var run *DAGRun
 	if opts.Retry {
-		r, err := dataRoot.FindByWorkflowID(ctx, workflowID)
+		r, err := dataRoot.FindByDAGRunID(ctx, workflowID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find execution: %w", err)
 		}
 		run = r
 	} else {
-		r, err := dataRoot.CreateWorkflow(ts, workflowID)
+		r, err := dataRoot.CreateDAGRun(ts, workflowID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create run: %w", err)
 		}
@@ -275,7 +275,7 @@ func (store *Store) CreateAttempt(ctx context.Context, dag *digraph.DAG, timesta
 // newChildRecord creates a new history record for a child workflow.
 func (b *Store) newChildRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, workflowID string, opts models.NewDAGRunAttemptOptions) (models.DAGRunAttempt, error) {
 	dataRoot := NewDataRoot(b.baseDir, opts.Root.Name)
-	root, err := dataRoot.FindByWorkflowID(ctx, opts.Root.ID)
+	root, err := dataRoot.FindByDAGRunID(ctx, opts.Root.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find root execution: %w", err)
 	}
@@ -389,7 +389,7 @@ func (store *Store) FindAttempt(ctx context.Context, ref digraph.DAGRunRef) (mod
 	}
 
 	root := NewDataRoot(store.baseDir, ref.Name)
-	run, err := root.FindByWorkflowID(ctx, ref.ID)
+	run, err := root.FindByDAGRunID(ctx, ref.ID)
 
 	if err != nil {
 		return nil, err
@@ -414,7 +414,7 @@ func (store *Store) FindChildAttempt(ctx context.Context, ref digraph.DAGRunRef,
 	}
 
 	root := NewDataRoot(store.baseDir, ref.Name)
-	run, err := root.FindByWorkflowID(ctx, ref.ID)
+	run, err := root.FindByDAGRunID(ctx, ref.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find execution: %w", err)
 	}

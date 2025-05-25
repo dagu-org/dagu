@@ -28,11 +28,11 @@ import (
 // It handles the organization of run data in a hierarchical structure
 // based on year, month, and day.
 type DataRoot struct {
-	baseDir       string             // Base directory for all DAGs
-	prefix        string             // Sanitized prefix for directory names
-	executionsDir string             // Path to the executions directory
-	globPattern   string             // Pattern for finding run directories
-	root          *digraph.DAGRunRef // Optional reference to the root DAG
+	baseDir     string             // Base directory for all DAGs
+	prefix      string             // Sanitized prefix for directory names
+	dagRunsDir  string             // Path to the executions directory
+	globPattern string             // Pattern for finding run directories
+	root        *digraph.DAGRunRef // Optional reference to the root DAG
 }
 
 // NewDataRoot creates a new DataRoot instance for managing a DAG's run history.
@@ -65,8 +65,8 @@ func NewDataRoot(baseDir, dagName string) DataRoot {
 	}
 
 	root.prefix = prefix
-	root.executionsDir = filepath.Join(baseDir, root.prefix, "executions")
-	root.globPattern = filepath.Join(root.executionsDir, "*", "*", "*", DAGRunDirPrefix+"*")
+	root.dagRunsDir = filepath.Join(baseDir, root.prefix, "dag-runs")
+	root.globPattern = filepath.Join(root.dagRunsDir, "*", "*", "*", DAGRunDirPrefix+"*")
 
 	return root
 }
@@ -74,16 +74,16 @@ func NewDataRoot(baseDir, dagName string) DataRoot {
 // NewDataRootWithPrefix creates a new DataRoot instance with a specified prefix.
 // This is useful for creating a DataRoot with a specific directory structure
 func NewDataRootWithPrefix(baseDir, prefix string) DataRoot {
-	executionsDir := filepath.Join(baseDir, prefix, "executions")
+	executionsDir := filepath.Join(baseDir, prefix, "dagu-runs")
 	return DataRoot{
-		baseDir:       baseDir,
-		prefix:        prefix,
-		executionsDir: executionsDir,
-		globPattern:   filepath.Join(executionsDir, "*", "*", "*", DAGRunDirPrefix+"*"),
+		baseDir:     baseDir,
+		prefix:      prefix,
+		dagRunsDir:  executionsDir,
+		globPattern: filepath.Join(executionsDir, "*", "*", "*", DAGRunDirPrefix+"*"),
 	}
 }
 
-// FindByWorkflowID locates an runs by its workflow ID.
+// FindByDAGRunID locates an runs by its workflow ID.
 // It searches through all runs directories to find a match,
 // and returns the most recent one if multiple matches are found.
 //
@@ -93,15 +93,15 @@ func NewDataRootWithPrefix(baseDir, prefix string) DataRoot {
 //
 // Returns:
 //   - The matching Execution instance, or an error if not found
-func (dr *DataRoot) FindByWorkflowID(_ context.Context, workflowID string) (*DAGRun, error) {
+func (dr *DataRoot) FindByDAGRunID(_ context.Context, dagRunID string) (*DAGRun, error) {
 	// Find matching files
-	matches, err := filepath.Glob(dr.GlobPatternWithWorkflowID(workflowID))
+	matches, err := filepath.Glob(dr.GlobPatternWithDAGRunID(dagRunID))
 	if err != nil {
 		return nil, fmt.Errorf("failed to make glob pattern: %w", err)
 	}
 
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("%w: %s", models.ErrDAGRunIDNotFound, workflowID)
+		return nil, fmt.Errorf("%w: %s", models.ErrDAGRunIDNotFound, dagRunID)
 	}
 
 	// Sort matches by timestamp (most recent first)
@@ -133,9 +133,9 @@ func (dr *DataRoot) LatestAfter(ctx context.Context, cutoff models.TimeInUTC) (*
 	return runs[0], nil
 }
 
-func (dr *DataRoot) CreateWorkflow(ts models.TimeInUTC, workflowID string) (*DAGRun, error) {
-	dirName := DAGRunDirPrefix + formatDAGRunTimestamp(ts) + "_" + workflowID
-	dir := filepath.Join(dr.executionsDir, ts.Format("2006"), ts.Format("01"), ts.Format("02"), dirName)
+func (dr *DataRoot) CreateDAGRun(ts models.TimeInUTC, dagRunID string) (*DAGRun, error) {
+	dirName := DAGRunDirPrefix + formatDAGRunTimestamp(ts) + "_" + dagRunID
+	dir := filepath.Join(dr.dagRunsDir, ts.Format("2006"), ts.Format("01"), ts.Format("02"), dirName)
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create directory %s: %w", dir, err)
@@ -144,12 +144,12 @@ func (dr *DataRoot) CreateWorkflow(ts models.TimeInUTC, workflowID string) (*DAG
 	return NewDAGRun(dir)
 }
 
-func (dr DataRoot) GlobPatternWithWorkflowID(workflowID string) string {
-	return filepath.Join(dr.executionsDir, "2*", "*", "*", DAGRunDirPrefix+"*"+workflowID+"*")
+func (dr DataRoot) GlobPatternWithDAGRunID(dagRunID string) string {
+	return filepath.Join(dr.dagRunsDir, "2*", "*", "*", DAGRunDirPrefix+"*"+dagRunID+"*")
 }
 
 func (dr DataRoot) Exists() bool {
-	_, err := os.Stat(dr.executionsDir)
+	_, err := os.Stat(dr.dagRunsDir)
 	return !os.IsNotExist(err)
 }
 
@@ -157,14 +157,14 @@ func (dr DataRoot) Create() error {
 	if dr.Exists() {
 		return nil
 	}
-	if err := os.MkdirAll(dr.executionsDir, 0750); err != nil {
-		return fmt.Errorf("failed to create directory %s: %w", dr.executionsDir, err)
+	if err := os.MkdirAll(dr.dagRunsDir, 0750); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dr.dagRunsDir, err)
 	}
 	return nil
 }
 
 func (dr DataRoot) IsEmpty() bool {
-	_, err := os.Stat(dr.executionsDir)
+	_, err := os.Stat(dr.dagRunsDir)
 	if err != nil && os.IsNotExist(err) {
 		return true
 	}
@@ -179,8 +179,8 @@ func (dr DataRoot) IsEmpty() bool {
 }
 
 func (dr DataRoot) Remove() error {
-	if err := os.RemoveAll(dr.executionsDir); err != nil {
-		return fmt.Errorf("failed to remove directory %s: %w", dr.executionsDir, err)
+	if err := os.RemoveAll(dr.dagRunsDir); err != nil {
+		return fmt.Errorf("failed to remove directory %s: %w", dr.dagRunsDir, err)
 	}
 	return nil
 }
@@ -209,7 +209,7 @@ func (dr DataRoot) Rename(ctx context.Context, newRoot DataRoot) error {
 		day := filepath.Base(filepath.Dir(targetDir))
 		month := filepath.Base(filepath.Dir(filepath.Dir(targetDir)))
 		year := filepath.Base(filepath.Dir(filepath.Dir(filepath.Dir(targetDir))))
-		newDir := filepath.Join(newRoot.executionsDir, year, month, day, filepath.Base(targetDir))
+		newDir := filepath.Join(newRoot.dagRunsDir, year, month, day, filepath.Base(targetDir))
 
 		// Make sure the new directory exists
 		if err := os.MkdirAll(filepath.Dir(newDir), 0750); err != nil {
@@ -319,14 +319,14 @@ func (dr DataRoot) listInRange(ctx context.Context, start, end models.TimeInUTC,
 		endDate = end.Time
 	}
 
-	years, err := listDirsSorted(dr.executionsDir, false, reYear)
+	years, err := listDirsSorted(dr.dagRunsDir, false, reYear)
 	if err != nil {
 		return nil
 	}
 
 	for _, year := range years {
 		yearInt, _ := strconv.Atoi(year)
-		yearPath := filepath.Join(dr.executionsDir, year)
+		yearPath := filepath.Join(dr.dagRunsDir, year)
 
 		// Skip years outside the range
 		if yearInt < startDate.Year() || yearInt > endDate.Year() {
@@ -407,14 +407,14 @@ BREAK:
 func (dr DataRoot) listRecentRuns(_ context.Context, itemLimit int) ([]*DAGRun, error) {
 	var founds []string
 
-	years, err := listDirsSorted(dr.executionsDir, true, reYear)
+	years, err := listDirsSorted(dr.dagRunsDir, true, reYear)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list years: %w", err)
 	}
 
 YEAR_LOOP:
 	for _, year := range years {
-		yearPath := filepath.Join(dr.executionsDir, year)
+		yearPath := filepath.Join(dr.dagRunsDir, year)
 		months, err := listDirsSorted(yearPath, true, reMonth)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list months: %w", err)

@@ -117,7 +117,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		hrOpts = append(hrOpts, localhistory.WithHistoryFileCache(hc))
 	}
 
-	hs := localhistory.New(cfg.Paths.HistoryDir, hrOpts...)
+	hs := localhistory.New(cfg.Paths.DAGRunsDir, hrOpts...)
 	hm := history.New(hs, cfg.Paths.Executable, cfg.Global.WorkDir)
 	ps := localproc.New(cfg.Paths.ProcDir)
 	qs := prototype.New(cfg.Paths.QueueDir)

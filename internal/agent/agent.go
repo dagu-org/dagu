@@ -581,7 +581,7 @@ func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 func (a *Agent) setupDAGRunAttempt(ctx context.Context) (models.DAGRunAttempt, error) {
 	retentionDays := a.dag.HistRetentionDays
 	if err := a.dagRunStore.RemoveOldDAGRuns(ctx, a.dag.Name, retentionDays); err != nil {
-		logger.Error(ctx, "History data cleanup failed", "err", err)
+		logger.Error(ctx, "DAG-runs data cleanup failed", "err", err)
 	}
 
 	opts := models.NewDAGRunAttemptOptions{Retry: a.retryTarget != nil}

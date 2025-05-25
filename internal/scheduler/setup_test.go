@@ -65,13 +65,13 @@ func setupTest(t *testing.T) testHelper {
 			DataDir:         filepath.Join(tempDir, "."+build.Slug, "data"),
 			DAGsDir:         testdataDir,
 			SuspendFlagsDir: tempDir,
-			HistoryDir:      filepath.Join(tempDir, "."+build.Slug, "data", "history"),
+			DAGRunsDir:      filepath.Join(tempDir, "."+build.Slug, "data", "dag-runs"),
 		},
 		Global: config.Global{WorkDir: tempDir},
 	}
 
 	ds := localdag.New(cfg.Paths.DAGsDir, localdag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
-	hs := localhistory.New(cfg.Paths.HistoryDir)
+	hs := localhistory.New(cfg.Paths.DAGRunsDir)
 	ps := localproc.New(cfg.Paths.ProcDir)
 	qs := prototype.New(cfg.Paths.QueueDir)
 
