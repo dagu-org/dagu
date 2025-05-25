@@ -789,7 +789,7 @@ func TestScheduler(t *testing.T) {
 		require.Equal(t, "RESULT=step_test", output, "unexpected output %q", output)
 	})
 
-	t.Run("RepeatPolicy_ConditionShellCommand", func(t *testing.T) {
+	t.Run("RepeatPolicy_RepeatsUntilCommandConditionMatchesExpected", func(t *testing.T) {
 		sc := setup(t)
 
 		// This step will repeat until the file contains 'ready'
@@ -822,7 +822,7 @@ func TestScheduler(t *testing.T) {
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 
-	t.Run("RepeatPolicy_ConditionExit0", func(t *testing.T) {
+	t.Run("RepeatPolicy_RepeatWhileConditionExits0", func(t *testing.T) {
 		sc := setup(t)
 		// This step will repeat until the file exists
 		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_exit0_%s", uuid.Must(uuid.NewV7()).String()))
@@ -851,7 +851,7 @@ func TestScheduler(t *testing.T) {
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 
-	t.Run("RepeatPolicy_ExitCode", func(t *testing.T) {
+	t.Run("RepeatPolicy_RepeatsWhileCommandExitCodeMatches", func(t *testing.T) {
 		sc := setup(t)
 		// This step will repeat until exit code is not 42.
 		countFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_exitcode_%s", uuid.Must(uuid.NewV7()).String()))
@@ -884,7 +884,7 @@ func TestScheduler(t *testing.T) {
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 
-	t.Run("RepeatPolicy_ConditionStringMatch_Expression", func(t *testing.T) {
+	t.Run("RepeatPolicy_RepeatsUntilEnvVarConditionMatchesExpected", func(t *testing.T) {
 		sc := setup(t)
 		// This step will repeat until the environment variable TEST_REPEAT_MATCH_EXPR equals 'done'
 		os.Setenv("TEST_REPEAT_MATCH_EXPR", "notyet")
@@ -911,7 +911,7 @@ func TestScheduler(t *testing.T) {
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 
-	t.Run("RepeatPolicy_ConditionStringMatchWithOutputVar", func(t *testing.T) {
+	t.Run("RepeatPolicy_RepeatsUntilOutputVarConditionMatchesExpected", func(t *testing.T) {
 		sc := setup(t)
 		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_outputvar_%s", uuid.Must(uuid.NewV7()).String()))
 		_ = os.Remove(file)

@@ -305,7 +305,7 @@ Dagu supports advanced repeat-until logic for steps using the ``repeatPolicy`` f
 - ``condition``: Command or expression to evaluate after each run.
 - ``expected``: Value or regex to match the output of ``condition``.
 - ``exitCode``: Integer or list of integers; repeat if the last command exits with one of these codes.
-- ``repeat``: Boolean; if true, repeat the step unconditionally.
+- ``repeat``: Boolean; if true, repeat the step unconditionally. This is equivalent to setting ``condition: "true"``.
 - ``intervalSec``: Time in seconds to wait before repeating the step.
 
 .. note::

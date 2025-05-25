@@ -775,25 +775,3 @@ func (sc *Scheduler) handleNodeRetry(ctx context.Context, node *Node, execErr er
 	node.SetStatus(NodeStatusNone)
 	return true
 }
-
-// Helper for repeatPolicy: run a shell command and get output and exit code
-func runShellCommandWithExitCode(ctx context.Context, cmdStr string, shell string) (string, int, error) {
-	sh := shell
-	if sh == "" {
-		sh = "/bin/sh"
-	}
-	cmd := exec.CommandContext(ctx, sh, "-c", cmdStr)
-	var outBuf strings.Builder
-	cmd.Stdout = &outBuf
-	cmd.Stderr = &outBuf
-	err := cmd.Run()
-	exitCode := 0
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			exitCode = exitErr.ExitCode()
-		} else {
-			exitCode = 1
-		}
-	}
-	return outBuf.String(), exitCode, err
-}
