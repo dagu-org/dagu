@@ -370,8 +370,9 @@ func TestBuildStep(t *testing.T) {
 		th := testLoad(t, "repeat_policy_condition.yaml")
 		assert.Len(t, th.Steps, 1)
 		repeatPolicy := th.Steps[0].RepeatPolicy
-		assert.Equal(t, "echo hello", repeatPolicy.Condition)
-		assert.Equal(t, "hello", repeatPolicy.Expected)
+		require.NotNil(t, repeatPolicy.Condition)
+		assert.Equal(t, "echo hello", repeatPolicy.Condition.Condition)
+		assert.Equal(t, "hello", repeatPolicy.Condition.Expected)
 		assert.Equal(t, 1*time.Second, repeatPolicy.Interval)
 	})
 	t.Run("SignalOnStop", func(t *testing.T) {
