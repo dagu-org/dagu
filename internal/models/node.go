@@ -9,50 +9,6 @@ import (
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
-// FromSteps converts a list of DAG steps to persistence Node objects
-func FromSteps(steps []digraph.Step) []*Node {
-	var ret []*Node
-	for _, s := range steps {
-		ret = append(ret, NewNode(s))
-	}
-	return ret
-}
-
-// FromNodes converts scheduler NodeData objects to persistence Node objects
-func FromNodes(nodes []scheduler.NodeData) []*Node {
-	var ret []*Node
-	for _, node := range nodes {
-		ret = append(ret, FromNode(node))
-	}
-	return ret
-}
-
-// FromNode converts a single scheduler NodeData to a persistence Node
-func FromNode(node scheduler.NodeData) *Node {
-	children := make([]ChildDAGRun, len(node.State.Children))
-	for i, child := range node.State.Children {
-		children[i] = ChildDAGRun(child)
-	}
-	var errText string
-	if node.State.Error != nil {
-		errText = node.State.Error.Error()
-	}
-	return &Node{
-		Step:            node.Step,
-		Stdout:          node.State.Stdout,
-		Stderr:          node.State.Stderr,
-		StartedAt:       stringutil.FormatTime(node.State.StartedAt),
-		FinishedAt:      stringutil.FormatTime(node.State.FinishedAt),
-		Status:          node.State.Status,
-		RetriedAt:       stringutil.FormatTime(node.State.RetriedAt),
-		RetryCount:      node.State.RetryCount,
-		DoneCount:       node.State.DoneCount,
-		Error:           errText,
-		Children:        children,
-		OutputVariables: node.State.OutputVariables,
-	}
-}
-
 // Node represents a DAG step with its execution state for persistence
 type Node struct {
 	Step            digraph.Step         `json:"step"`
@@ -104,5 +60,49 @@ func NewNode(step digraph.Step) *Node {
 		StartedAt:  "-",
 		FinishedAt: "-",
 		Status:     scheduler.NodeStatusNone,
+	}
+}
+
+// FromSteps converts a list of DAG steps to persistence Node objects
+func FromSteps(steps []digraph.Step) []*Node {
+	var ret []*Node
+	for _, s := range steps {
+		ret = append(ret, NewNode(s))
+	}
+	return ret
+}
+
+// FromNodes converts scheduler NodeData objects to persistence Node objects
+func FromNodes(nodes []scheduler.NodeData) []*Node {
+	var ret []*Node
+	for _, node := range nodes {
+		ret = append(ret, FromNode(node))
+	}
+	return ret
+}
+
+// FromNode converts a single scheduler NodeData to a persistence Node
+func FromNode(node scheduler.NodeData) *Node {
+	children := make([]ChildDAGRun, len(node.State.Children))
+	for i, child := range node.State.Children {
+		children[i] = ChildDAGRun(child)
+	}
+	var errText string
+	if node.State.Error != nil {
+		errText = node.State.Error.Error()
+	}
+	return &Node{
+		Step:            node.Step,
+		Stdout:          node.State.Stdout,
+		Stderr:          node.State.Stderr,
+		StartedAt:       stringutil.FormatTime(node.State.StartedAt),
+		FinishedAt:      stringutil.FormatTime(node.State.FinishedAt),
+		Status:          node.State.Status,
+		RetriedAt:       stringutil.FormatTime(node.State.RetriedAt),
+		RetryCount:      node.State.RetryCount,
+		DoneCount:       node.State.DoneCount,
+		Error:           errText,
+		Children:        children,
+		OutputVariables: node.State.OutputVariables,
 	}
 }

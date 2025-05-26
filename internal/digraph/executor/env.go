@@ -53,9 +53,9 @@ func NewEnv(ctx context.Context, step digraph.Step) Env {
 	}
 }
 
-// ExecRef returns the execution reference of the current execution context.
-func (e Env) ExecRef() digraph.DAGRunRef {
-	return digraph.NewDAGRunRef(e.DAG.Name, e.ExecID)
+// DAGRunRef returns the DAGRunRef for the current execution context.
+func (e Env) DAGRunRef() digraph.DAGRunRef {
+	return digraph.NewDAGRunRef(e.DAG.Name, e.DAGRunID)
 }
 
 // AllEnvs returns all environment variables that needs to be passed to the command.

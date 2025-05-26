@@ -328,12 +328,12 @@ func TestBuildStep(t *testing.T) {
 			},
 		}, th.Steps[0].ExecutorConfig.Config)
 	})
-	t.Run("CallingSub", func(t *testing.T) {
+	t.Run("DAGExecutor", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "calling_sub.yaml")
+		th := testLoad(t, "sub_dag.yaml")
 		assert.Len(t, th.Steps, 1)
-		assert.Equal(t, "sub", th.Steps[0].ExecutorConfig.Type)
+		assert.Equal(t, "dag", th.Steps[0].ExecutorConfig.Type)
 		assert.Equal(t, "run", th.Steps[0].Command)
 		assert.Equal(t, []string{
 			"sub_dag",

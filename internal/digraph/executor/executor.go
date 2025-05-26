@@ -21,9 +21,9 @@ type ExitCoder interface {
 	ExitCode() int
 }
 
-// ChildWorkflow is an interface for child workflows.
-type ChildWorkflow interface {
-	SetWorkflowID(string)
+// ChildDAG is an interface for child workflows.
+type ChildDAG interface {
+	SetDAGRunID(string)
 }
 
 type Creator func(ctx context.Context, step digraph.Step) (Executor, error)

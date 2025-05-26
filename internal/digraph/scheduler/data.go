@@ -109,11 +109,11 @@ func (s *Data) SetExecutorConfig(cfg digraph.ExecutorConfig) {
 	s.inner.Step.ExecutorConfig = cfg
 }
 
-func (s *Data) SetChildWorkflow(childWorkflow digraph.ChildWorkflow) {
+func (s *Data) SetChildWorkflow(childWorkflow digraph.ChildDAG) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.inner.Step.ChildWorkflow = &childWorkflow
+	s.inner.Step.ChildDAG = &childWorkflow
 }
 
 func (s *Data) Args() []string {

@@ -1,4 +1,4 @@
 steps:
-  - name: calling_sub
+  - name: execute a sub-dag
     run: sub_dag
     params: "param1=value1 param2=value2"

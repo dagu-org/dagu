@@ -88,7 +88,7 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "executor", fn: buildExecutor},
 	{name: "command", fn: buildCommand},
 	{name: "depends", fn: buildDepends},
-	{name: "childWorkflow", fn: buildChildWorkflow},
+	{name: "childDAG", fn: buildChildDAG},
 	{name: "continueOn", fn: buildContinueOn},
 	{name: "retryPolicy", fn: buildRetryPolicy},
 	{name: "repeatPolicy", fn: buildRepeatPolicy},
@@ -755,7 +755,7 @@ func validateStep(_ BuildContext, def stepDef, step *Step) error {
 	// TODO: Validate executor config for each executor type.
 
 	if step.Command == "" {
-		if step.ExecutorConfig.Type == "" && step.Script == "" && step.ChildWorkflow == nil {
+		if step.ExecutorConfig.Type == "" && step.Script == "" && step.ChildDAG == nil {
 			return ErrStepCommandIsRequired
 		}
 	}
@@ -797,8 +797,8 @@ func buildSignalOnStop(_ BuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
-// buildChildWorkflow parses the child workflow definition and sets the step fields.
-func buildChildWorkflow(_ BuildContext, def stepDef, step *Step) error {
+// buildChildDAG parses the child workflow definition and sets the step fields.
+func buildChildDAG(_ BuildContext, def stepDef, step *Step) error {
 	name, params := def.Run, def.Params
 
 	// if the run field is not set, return nil.
@@ -807,8 +807,8 @@ func buildChildWorkflow(_ BuildContext, def stepDef, step *Step) error {
 	}
 
 	// Set the step fields for the child workflow.
-	step.ChildWorkflow = &ChildWorkflow{Name: name, Params: params}
-	step.ExecutorConfig.Type = ExecutorTypeSub
+	step.ChildDAG = &ChildDAG{Name: name, Params: params}
+	step.ExecutorConfig.Type = ExecutorTypeDAG
 	step.Command = "run"
 	step.Args = []string{name, params}
 	step.CmdWithArgs = fmt.Sprintf("%s %s", name, params)

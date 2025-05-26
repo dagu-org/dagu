@@ -199,7 +199,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	n.SetExecutorConfig(execConfig)
 
 	// Evaluate the child workflow if set
-	if w := n.Step().ChildWorkflow; w != nil {
+	if w := n.Step().ChildDAG; w != nil {
 		w, err := EvalObject(ctx, *w)
 		if err != nil {
 			return nil, fmt.Errorf("failed to eval child workflow: %w", err)
@@ -232,7 +232,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	}
 
 	// If the command is a child workflow, we need to set the workflow ID.
-	if childWorkflow, ok := cmd.(executor.ChildWorkflow); ok {
+	if childWorkflow, ok := cmd.(executor.ChildDAG); ok {
 		workflowID, err := n.ChildWorkflowID()
 		if err != nil {
 			return nil, fmt.Errorf("failed to determine workflow ID for child workflow: %w", err)
@@ -240,7 +240,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 		if workflowID == "" {
 			return nil, fmt.Errorf("workflow ID is empty for child workflow")
 		}
-		childWorkflow.SetWorkflowID(workflowID)
+		childWorkflow.SetDAGRunID(workflowID)
 	}
 
 	return cmd, nil

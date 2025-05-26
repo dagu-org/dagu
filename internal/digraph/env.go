@@ -11,11 +11,11 @@ import (
 
 // Env contains the execution metadata for a workflow.
 type Env struct {
-	ExecID string
-	Root   DAGRunRef
-	DAG    *DAG
-	DB     Database
-	Envs   map[string]string
+	DAGRunID   string
+	RootDAGRun DAGRunRef
+	DAG        *DAG
+	DB         Database
+	Envs       map[string]string
 }
 
 func (e Env) AllEnvs() []string {
@@ -58,11 +58,11 @@ func SetupEnv(ctx context.Context, d *DAG, c Database, root DAGRunRef, workflowI
 	}
 
 	return context.WithValue(ctx, envCtxKey{}, Env{
-		Root:   root,
-		DAG:    d,
-		DB:     c,
-		Envs:   envs,
-		ExecID: workflowID,
+		RootDAGRun: root,
+		DAG:        d,
+		DB:         c,
+		Envs:       envs,
+		DAGRunID:   workflowID,
 	})
 }
 
