@@ -601,7 +601,7 @@ Complete list of DAG-level configuration options:
 - ``timeoutSec``: DAG timeout in seconds
 - ``delaySec``: Delay between steps
 - ``maxActiveSteps``: Maximum parallel steps (default: no limit)
-- ``maxActiveWorkflows``: Maximum parallel workflows (default: 1)
+- ``maxActiveRuns``: Maximum parallel workflows (default: 1)
 - ``params``: Default parameters
 - ``precondition``: DAG-level conditions
 - ``mailOn``: Email notification settings

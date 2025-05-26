@@ -134,7 +134,7 @@ These fields apply to the entire DAG. They appear at the root of the YAML file.
 ~~~~~~~~~~~~~~~
   Limit on how many steps can run concurrently in this DAG.
 
-``maxActiveWorkflows``
+``maxActiveRuns``
 ~~~~~~~~~~~~~~~~~~
   Limit on how many active workflows (DAG runs) can exist at the same time. If this limit is reached, new runs will be queued until existing ones finish.
 

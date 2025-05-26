@@ -201,7 +201,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 
 			// Update the queue configuration with the latest execution
 			s.queueConfigs.Store(data.Name, queueConfig{
-				MaxConcurrency: max(dag.MaxActiveWorkflows, 1),
+				MaxConcurrency: max(dag.MaxActiveRuns, 1),
 			})
 
 			startedAt = time.Now()
