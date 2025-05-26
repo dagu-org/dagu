@@ -116,7 +116,7 @@ type Options struct {
 
 // New creates a new Agent.
 func New(
-	workflowID string,
+	dagRunID string,
 	dag *digraph.DAG,
 	logDir string,
 	logFile string,
@@ -130,7 +130,7 @@ func New(
 	return &Agent{
 		rootDAGRun:    root,
 		parentDAGRun:  opts.ParentDAGRun,
-		dagRunID:      workflowID,
+		dagRunID:      dagRunID,
 		dag:           dag,
 		dry:           opts.Dry,
 		retryTarget:   opts.RetryTarget,
@@ -149,10 +149,10 @@ func (a *Agent) Run(ctx context.Context) error {
 	defer cancel()
 
 	if a.rootDAGRun.ID != a.dagRunID {
-		logger.Debug(ctx, "Initiating child DAG run", "root-DAG-run", a.rootDAGRun.String(), "parent-DAG-run", a.parentDAGRun.String())
+		logger.Debug(ctx, "Initiating a child DAG-run", "root-run", a.rootDAGRun.String(), "parent-run", a.parentDAGRun.String())
 		a.isChildDAGRun.Store(true)
 		if a.parentDAGRun.Zero() {
-			return fmt.Errorf("parent DAG-run is not specified for child DAG-run %s", a.dagRunID)
+			return fmt.Errorf("parent DAG-run is not specified for the child DAG-run %s", a.dagRunID)
 		}
 	}
 

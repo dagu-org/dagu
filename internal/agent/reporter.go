@@ -85,7 +85,7 @@ func (r *reporter) send(ctx context.Context, dag *digraph.DAG, status models.DAG
 }
 
 var dagHeader = table.Row{
-	"dagRunId",
+	"Run ID",
 	"Name",
 	"Started At",
 	"Finished At",

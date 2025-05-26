@@ -20,19 +20,22 @@ var (
 // It abstracts the details of the storage mechanism, allowing for different
 // implementations (e.g., file-based, in-memory, etc.) to be used interchangeably.
 type DAGRunStore interface {
-	// CreateAttempt creates a new execution record for a workflow
-	CreateAttempt(ctx context.Context, dag *digraph.DAG, ts time.Time, workflowID string, opts NewDAGRunAttemptOptions) (DAGRunAttempt, error)
-	// RecentAttempts returns the most recent workflows for the given name, limited by itemLimit
+	// CreateAttempt creates a new execution record for a DAG-run.
+	CreateAttempt(ctx context.Context, dag *digraph.DAG, ts time.Time, dagRunID string, opts NewDAGRunAttemptOptions) (DAGRunAttempt, error)
+	// RecentAttempts returns the most recent DAG-run's attempt for the DAG name, limited by itemLimit
 	RecentAttempts(ctx context.Context, name string, itemLimit int) []DAGRunAttempt
-	// LatestAttempt returns the most recent workflows for the given name
+	// LatestAttempt returns the most recent DAG-run's attempt for the DAG name.
 	LatestAttempt(ctx context.Context, name string) (DAGRunAttempt, error)
-	// ListStatuses returns a list of statuses for the given workflow ID
+	// ListStatuses returns a list of statuses.
 	ListStatuses(ctx context.Context, opts ...ListDAGRunStatusesOption) ([]*DAGRunStatus, error)
-	// FindAttempt finds a run by it's workflow ID
-	FindAttempt(ctx context.Context, workflow digraph.DAGRunRef) (DAGRunAttempt, error)
-	// FindChildAttempt finds a child workflow record by its workflow ID
+	// FindAttempt finds the latest attempt for the DAG-run.
+	FindAttempt(ctx context.Context, dagRun digraph.DAGRunRef) (DAGRunAttempt, error)
+	// FindChildAttempt finds a child DAG-run record by DAG-run ID.
 	FindChildAttempt(ctx context.Context, dagRun digraph.DAGRunRef, childDAGRunID string) (DAGRunAttempt, error)
-	// RemoveOldDAGRuns delete run data older than retentionDays
+	// RemoveOldDAGRuns delete DAG-run records older than retentionDays
+	// If retentionDays is negative, it won't delete any records.
+	// If retentionDays is zero, it will delete all records for the DAG name.
+	// But it will not delete the records with non-final statuses (e.g., running, queued).
 	RemoveOldDAGRuns(ctx context.Context, name string, retentionDays int) error
 	// RenameDAGRuns renames all run data from oldName to newName
 	// The name means the DAG name, renaming it will allow user to manage those runs
@@ -89,7 +92,7 @@ func WithName(name string) ListDAGRunStatusesOption {
 	}
 }
 
-// WithDAGRunID sets the workflow ID for listing DAG runs
+// WithDAGRunID sets the DAG run ID for listing DAG runs
 func WithDAGRunID(dagRunID string) ListDAGRunStatusesOption {
 	return func(o *ListDAGRunStatusesOptions) {
 		o.DAGRunID = dagRunID
@@ -98,13 +101,15 @@ func WithDAGRunID(dagRunID string) ListDAGRunStatusesOption {
 
 // NewDAGRunAttemptOptions contains options for creating a new run record
 type NewDAGRunAttemptOptions struct {
+	// RootDAGRun is the root DAG-run reference for this attempt.
 	RootDAGRun *digraph.DAGRunRef
-	Retry      bool
+	// Retry indicates whether this is a retry of a previous run.
+	Retry bool
 }
 
-// DAGRunAttempt represents a single execution of a workflow that can be read and written
+// DAGRunAttempt represents a single execution of a DAG-run to record the status and execution details.
 type DAGRunAttempt interface {
-	// ID returns the ID of the attempt, which is a unique identifier for the run
+	// ID returns the identifier for the attempt that is unique within the DAG-run.
 	ID() string
 	// Open prepares the attempt for writing status updates
 	Open(ctx context.Context) error

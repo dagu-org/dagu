@@ -34,8 +34,10 @@ type DAG struct {
 	// Description is the description of the DAG. This is optional.
 	Description string `json:"description,omitempty"`
 	// Schedule configuration for starting, stopping, and restarting the DAG.
-	Schedule        []Schedule `json:"schedule,omitempty"`
-	StopSchedule    []Schedule `json:"stopSchedule,omitempty"`
+	Schedule []Schedule `json:"schedule,omitempty"`
+	// StopSchedule contains the cron expressions for stopping the DAG.
+	StopSchedule []Schedule `json:"stopSchedule,omitempty"`
+	// RestartSchedule contains the cron expressions for restarting the DAG.
 	RestartSchedule []Schedule `json:"restartSchedule,omitempty"`
 	// SkipIfSuccessful indicates whether to skip the DAG if it was successful previously.
 	// E.g., when the DAG has already been executed manually before the scheduled time.

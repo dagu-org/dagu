@@ -4,7 +4,9 @@ import "context"
 
 // Database is the interface for accessing the database to retrieve DAGs and DAG-run statuses.
 type Database interface {
+	// GetDAG retrieves a DAG by its name.
 	GetDAG(ctx context.Context, name string) (*DAG, error)
+	// GetChildDAGRunStatus retrieves the status of a child DAG-run by its ID and the root DAG-run reference.
 	GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun DAGRunRef) (*Status, error)
 }
 
