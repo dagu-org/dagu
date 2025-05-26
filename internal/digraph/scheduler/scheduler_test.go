@@ -704,11 +704,11 @@ func TestScheduler(t *testing.T) {
 		output, _ := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.Equal(t, "RESULT=value", output, "expected output %q, got %q", "value", output)
 	})
-	t.Run("SpecialVars_WORKFLOW_LOG_FILE", func(t *testing.T) {
+	t.Run("SpecialVars_DAG_RUN_LOG_FILE", func(t *testing.T) {
 		sc := setup(t)
 
 		graph := sc.newGraph(t,
-			newStep("1", withCommand("echo $WORKFLOW_LOG_FILE"), withOutput("RESULT")),
+			newStep("1", withCommand("echo $DAG_RUN_LOG_FILE"), withOutput("RESULT")),
 		)
 
 		result := graph.Schedule(t, scheduler.StatusSuccess)
@@ -718,11 +718,11 @@ func TestScheduler(t *testing.T) {
 		require.True(t, ok, "output variable not found")
 		require.Regexp(t, `^RESULT=/.*/.*\.log$`, output, "unexpected output %q", output)
 	})
-	t.Run("SpecialVars_WORKFLOW_STEP_STDOUT_FILE", func(t *testing.T) {
+	t.Run("SpecialVars_DAG_RUN_STEP_STDOUT_FILE", func(t *testing.T) {
 		sc := setup(t)
 
 		graph := sc.newGraph(t,
-			newStep("1", withCommand("echo $WORKFLOW_STEP_STDOUT_FILE"), withOutput("RESULT")),
+			newStep("1", withCommand("echo $DAG_RUN_STEP_STDOUT_FILE"), withOutput("RESULT")),
 		)
 
 		result := graph.Schedule(t, scheduler.StatusSuccess)
@@ -732,11 +732,11 @@ func TestScheduler(t *testing.T) {
 		require.True(t, ok, "output variable not found")
 		require.Regexp(t, `^RESULT=/.*/.*\.out$`, output, "unexpected output %q", output)
 	})
-	t.Run("SpecialVars_WORKFLOW_STEP_STDERR_FILE", func(t *testing.T) {
+	t.Run("SpecialVars_DAG_RUN_STEP_STDERR_FILE", func(t *testing.T) {
 		sc := setup(t)
 
 		graph := sc.newGraph(t,
-			newStep("1", withCommand("echo $WORKFLOW_STEP_STDERR_FILE"), withOutput("RESULT")),
+			newStep("1", withCommand("echo $DAG_RUN_STEP_STDERR_FILE"), withOutput("RESULT")),
 		)
 
 		result := graph.Schedule(t, scheduler.StatusSuccess)
@@ -746,11 +746,11 @@ func TestScheduler(t *testing.T) {
 		require.True(t, ok, "output variable not found")
 		require.Regexp(t, `^RESULT=/.*/.*\.err$`, output, "unexpected output %q", output)
 	})
-	t.Run("SpecialVars_WORKFLOW_ID", func(t *testing.T) {
+	t.Run("SpecialVars_DAG_RUN_ID", func(t *testing.T) {
 		sc := setup(t)
 
 		graph := sc.newGraph(t,
-			newStep("1", withCommand("echo $WORKFLOW_ID"), withOutput("RESULT")),
+			newStep("1", withCommand("echo $DAG_RUN_ID"), withOutput("RESULT")),
 		)
 
 		result := graph.Schedule(t, scheduler.StatusSuccess)
@@ -760,11 +760,11 @@ func TestScheduler(t *testing.T) {
 		require.True(t, ok, "output variable not found")
 		require.Regexp(t, `RESULT=[a-f0-9-]+`, output, "unexpected output %q", output)
 	})
-	t.Run("SpecialVars_WORKFLOW_NAME", func(t *testing.T) {
+	t.Run("SpecialVars_DAG_NAME", func(t *testing.T) {
 		sc := setup(t)
 
 		graph := sc.newGraph(t,
-			newStep("1", withCommand("echo $WORKFLOW_NAME"), withOutput("RESULT")),
+			newStep("1", withCommand("echo $DAG_NAME"), withOutput("RESULT")),
 		)
 
 		result := graph.Schedule(t, scheduler.StatusSuccess)
@@ -774,11 +774,11 @@ func TestScheduler(t *testing.T) {
 		require.True(t, ok, "output variable not found")
 		require.Equal(t, "RESULT=test_dag", output, "unexpected output %q", output)
 	})
-	t.Run("SpecialVars_WORKFLOW_STEP_NAME", func(t *testing.T) {
+	t.Run("SpecialVars_DAG_RUN_STEP_NAME", func(t *testing.T) {
 		sc := setup(t)
 
 		graph := sc.newGraph(t,
-			newStep("step_test", withCommand("echo $WORKFLOW_STEP_NAME"), withOutput("RESULT")),
+			newStep("step_test", withCommand("echo $DAG_RUN_STEP_NAME"), withOutput("RESULT")),
 		)
 
 		result := graph.Schedule(t, scheduler.StatusSuccess)

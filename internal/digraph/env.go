@@ -44,9 +44,9 @@ func (e Env) ApplyEnvs(ctx context.Context) {
 // It initializes the environment variables and the DAG metadata.
 func SetupEnv(ctx context.Context, d *DAG, c Database, root DAGRunRef, workflowID, logFile string, params []string) context.Context {
 	var envs = map[string]string{
-		EnvKeyWorkflowLogFile: logFile,
-		EnvKeyWorkflowID:      workflowID,
-		EnvKeyWorkflowName:    d.Name,
+		EnvKeyDAGRunLogFile: logFile,
+		EnvKeyDAGRunID:      workflowID,
+		EnvKeyDAGName:       d.Name,
 	}
 	for _, param := range params {
 		parts := strings.SplitN(param, "=", 2)

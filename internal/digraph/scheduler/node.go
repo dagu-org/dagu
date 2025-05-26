@@ -387,8 +387,8 @@ func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
 	defer n.mu.RUnlock()
 	env := executor.GetEnv(ctx)
 	env = env.WithEnv(
-		digraph.EnvKeyWorkflowStepStdoutFile, n.GetStdout(),
-		digraph.EnvKeyWorkflowStepStderrFile, n.GetStderr(),
+		digraph.EnvKeyDAGRunStepStdoutFile, n.GetStdout(),
+		digraph.EnvKeyDAGRunStepStderrFile, n.GetStderr(),
 	)
 	return executor.WithEnv(ctx, env)
 }
