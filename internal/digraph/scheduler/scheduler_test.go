@@ -794,8 +794,16 @@ func TestScheduler(t *testing.T) {
 
 		// This step will repeat until the file contains 'ready'
 		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_test_%s.txt", uuid.Must(uuid.NewV7()).String()))
-		_ = os.Remove(file)
-		defer os.Remove(file)
+		err := os.Remove(file)
+		if err != nil && !os.IsNotExist(err) {
+			require.NoError(t, err)
+		}
+		defer func() {
+			err := os.Remove(file)
+			if err != nil && !os.IsNotExist(err) {
+				require.NoError(t, err)
+			}
+		}()
 		graph := sc.newGraph(t,
 			newStep("1",
 				withCommand(fmt.Sprintf("cat %s || true", file)),
@@ -826,8 +834,16 @@ func TestScheduler(t *testing.T) {
 		sc := setup(t)
 		// This step will repeat until the file exists
 		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_exit0_%s", uuid.Must(uuid.NewV7()).String()))
-		_ = os.Remove(file)
-		defer os.Remove(file)
+		err := os.Remove(file)
+		if err != nil && !os.IsNotExist(err) {
+			require.NoError(t, err)
+		}
+		defer func() {
+			err := os.Remove(file)
+			if err != nil && !os.IsNotExist(err) {
+				require.NoError(t, err)
+			}
+		}()
 		graph := sc.newGraph(t,
 			newStep("1",
 				withCommand("echo hello"),
@@ -843,7 +859,8 @@ func TestScheduler(t *testing.T) {
 		go func() {
 			time.Sleep(200 * time.Millisecond)
 			f, _ := os.Create(file)
-			f.Close()
+			err := f.Close()
+			require.NoError(t, err)
 		}()
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
@@ -855,8 +872,16 @@ func TestScheduler(t *testing.T) {
 		sc := setup(t)
 		// This step will repeat until exit code is not 42.
 		countFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_exitcode_%s", uuid.Must(uuid.NewV7()).String()))
-		_ = os.Remove(countFile)
-		defer os.Remove(countFile)
+		err := os.Remove(countFile)
+		if err != nil && !os.IsNotExist(err) {
+			require.NoError(t, err)
+		}
+		defer func() {
+			err := os.Remove(countFile)
+			if err != nil && !os.IsNotExist(err) {
+				require.NoError(t, err)
+			}
+		}()
 		// Script: fail with exit 42 until file exists, then exit 0
 		script := fmt.Sprintf(`if [ ! -f %[1]s ]; then exit 42; else exit 0; fi`, countFile)
 		graph := sc.newGraph(t,
@@ -876,7 +901,8 @@ func TestScheduler(t *testing.T) {
 		go func() {
 			time.Sleep(350 * time.Millisecond)
 			f, _ := os.Create(countFile)
-			f.Close()
+			err := f.Close()
+			require.NoError(t, err)
 		}()
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
@@ -887,8 +913,12 @@ func TestScheduler(t *testing.T) {
 	t.Run("RepeatPolicy_RepeatsUntilEnvVarConditionMatchesExpected", func(t *testing.T) {
 		sc := setup(t)
 		// This step will repeat until the environment variable TEST_REPEAT_MATCH_EXPR equals 'done'
-		os.Setenv("TEST_REPEAT_MATCH_EXPR", "notyet")
-		t.Cleanup(func() { os.Unsetenv("TEST_REPEAT_MATCH_EXPR") })
+		err := os.Setenv("TEST_REPEAT_MATCH_EXPR", "notyet")
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			err := os.Unsetenv("TEST_REPEAT_MATCH_EXPR")
+			require.NoError(t, err)
+		})
 		graph := sc.newGraph(t,
 			newStep("1",
 				withCommand("echo $TEST_REPEAT_MATCH_EXPR"),
@@ -903,7 +933,8 @@ func TestScheduler(t *testing.T) {
 		)
 		go func() {
 			time.Sleep(300 * time.Millisecond)
-			os.Setenv("TEST_REPEAT_MATCH_EXPR", "done")
+			err := os.Setenv("TEST_REPEAT_MATCH_EXPR", "done")
+			require.NoError(t, err)
 		}()
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
@@ -914,10 +945,14 @@ func TestScheduler(t *testing.T) {
 	t.Run("RepeatPolicy_RepeatsUntilOutputVarConditionMatchesExpected", func(t *testing.T) {
 		sc := setup(t)
 		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_outputvar_%s", uuid.Must(uuid.NewV7()).String()))
-		_ = os.Remove(file)
-		t.Cleanup(func() { os.Remove(file) })
+		err := os.Remove(file)
+		if err != nil && !os.IsNotExist(err) {
+			require.NoError(t, err)
+		}
+		t.Cleanup(func() { err := os.Remove(file); require.NoError(t, err) })
 		// Write initial value
-		os.WriteFile(file, []byte("notyet"), 0644)
+		err = os.WriteFile(file, []byte("notyet"), 0644)
+		require.NoError(t, err)
 		graph := sc.newGraph(t,
 			newStep("1",
 				withCommand(fmt.Sprintf("cat %s", file)),
@@ -933,7 +968,8 @@ func TestScheduler(t *testing.T) {
 		)
 		go func() {
 			time.Sleep(300 * time.Millisecond)
-			os.WriteFile(file, []byte("done"), 0644)
+			err := os.WriteFile(file, []byte("done"), 0644)
+			require.NoError(t, err)
 		}()
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
