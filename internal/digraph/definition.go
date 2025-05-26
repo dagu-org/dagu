@@ -45,10 +45,7 @@ type definition struct {
 	Precondition any
 	// Preconditions is the condition to run the DAG.
 	Preconditions any
-	// maxActiveRuns is the maximum number of concurrent workflows.
-	maxActiveRuns int
-	// MaxActiveRuns is the maximum number of concurrent steps.
-	// deprecated: use MaxActiveSteps instead.
+	// maxActiveRuns is the maximum number of concurrent DAG-runs.
 	MaxActiveRuns int
 	// MaxActiveSteps is the maximum number of concurrent steps.
 	MaxActiveSteps int

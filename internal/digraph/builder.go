@@ -117,7 +117,7 @@ func build(ctx BuildContext, spec *definition) (*DAG, error) {
 		Delay:          time.Second * time.Duration(spec.DelaySec),
 		RestartWait:    time.Second * time.Duration(spec.RestartWaitSec),
 		Tags:           parseTags(spec.Tags),
-		MaxActiveRuns:  spec.maxActiveRuns,
+		MaxActiveRuns:  spec.MaxActiveRuns,
 		MaxActiveSteps: spec.MaxActiveSteps,
 	}
 

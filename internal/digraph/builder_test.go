@@ -107,7 +107,7 @@ func TestBuild(t *testing.T) {
 		assert.Equal(t, &digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Preconditions[0])
 	})
 	t.Run("maxActiveRuns", func(t *testing.T) {
-		th := testLoad(t, "max_active_workflows.yaml")
+		th := testLoad(t, "max_active_runs.yaml")
 		assert.Equal(t, 5, th.MaxActiveRuns)
 	})
 	t.Run("MaxActiveSteps", func(t *testing.T) {
