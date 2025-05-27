@@ -279,15 +279,6 @@ func (s *Scheduler) start(ctx context.Context) {
 				<-timer.C
 			}
 			return
-
-		default:
-			if !s.running.Load() {
-				// If the scheduler is not running, stop the timer
-				if !timer.Stop() {
-					<-timer.C
-				}
-				return
-			}
 		}
 	}
 }
