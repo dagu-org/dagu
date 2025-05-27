@@ -64,26 +64,26 @@ func toPrecondition(obj *digraph.Condition) api.Condition {
 	}
 }
 
-func toWorkflowSummary(s models.DAGRunStatus) api.WorkflowSummary {
-	return api.WorkflowSummary{
-		RootWorkflowName:   s.Root.Name,
-		RootWorkflowId:     s.Root.ID,
-		ParentWorkflowName: ptrOf(s.Parent.Name),
-		ParentWorkflowId:   ptrOf(s.Parent.ID),
-		Log:                s.Log,
-		Name:               s.Name,
-		Params:             ptrOf(s.Params),
-		Pid:                ptrOf(int(s.PID)),
-		WorkflowId:         s.DAGRunID,
-		QueuedAt:           ptrOf(s.QueuedAt),
-		StartedAt:          s.StartedAt,
-		FinishedAt:         s.FinishedAt,
-		Status:             api.Status(s.Status),
-		StatusLabel:        api.StatusLabel(s.Status.String()),
+func toDAGRunSummary(s models.DAGRunStatus) api.DAGRunSummary {
+	return api.DAGRunSummary{
+		RootDAGRunName:   s.Root.Name,
+		RootDAGRunId:     s.Root.ID,
+		ParentDAGRunName: ptrOf(s.Parent.Name),
+		ParentDAGRunId:   ptrOf(s.Parent.ID),
+		Log:              s.Log,
+		Name:             s.Name,
+		Params:           ptrOf(s.Params),
+		Pid:              ptrOf(int(s.PID)),
+		DagRunId:         s.DAGRunID,
+		QueuedAt:         ptrOf(s.QueuedAt),
+		StartedAt:        s.StartedAt,
+		FinishedAt:       s.FinishedAt,
+		Status:           api.Status(s.Status),
+		StatusLabel:      api.StatusLabel(s.Status.String()),
 	}
 }
 
-func toWorkflowDetails(s models.DAGRunStatus) api.WorkflowDetails {
+func toDAGRunDetails(s models.DAGRunStatus) api.DAGRunDetails {
 	preconditions := make([]api.Condition, len(s.Preconditions))
 	for i, p := range s.Preconditions {
 		preconditions[i] = toPrecondition(p)
@@ -92,26 +92,26 @@ func toWorkflowDetails(s models.DAGRunStatus) api.WorkflowDetails {
 	for i, n := range s.Nodes {
 		nodes[i] = toNode(n)
 	}
-	return api.WorkflowDetails{
-		RootWorkflowName:   s.Root.Name,
-		RootWorkflowId:     s.Root.ID,
-		ParentWorkflowName: ptrOf(s.Parent.Name),
-		ParentWorkflowId:   ptrOf(s.Parent.ID),
-		Log:                s.Log,
-		Name:               s.Name,
-		Params:             ptrOf(s.Params),
-		Pid:                ptrOf(int(s.PID)),
-		WorkflowId:         s.DAGRunID,
-		StartedAt:          s.StartedAt,
-		FinishedAt:         s.FinishedAt,
-		Status:             api.Status(s.Status),
-		StatusLabel:        api.StatusLabel(s.Status.String()),
-		Preconditions:      ptrOf(preconditions),
-		Nodes:              nodes,
-		OnSuccess:          ptrOf(toNode(s.OnSuccess)),
-		OnFailure:          ptrOf(toNode(s.OnFailure)),
-		OnCancel:           ptrOf(toNode(s.OnCancel)),
-		OnExit:             ptrOf(toNode(s.OnExit)),
+	return api.DAGRunDetails{
+		RootDAGRunName:   s.Root.Name,
+		RootDAGRunId:     s.Root.ID,
+		ParentDAGRunName: ptrOf(s.Parent.Name),
+		ParentDAGRunId:   ptrOf(s.Parent.ID),
+		Log:              s.Log,
+		Name:             s.Name,
+		Params:           ptrOf(s.Params),
+		Pid:              ptrOf(int(s.PID)),
+		DagRunId:         s.DAGRunID,
+		StartedAt:        s.StartedAt,
+		FinishedAt:       s.FinishedAt,
+		Status:           api.Status(s.Status),
+		StatusLabel:      api.StatusLabel(s.Status.String()),
+		Preconditions:    ptrOf(preconditions),
+		Nodes:            nodes,
+		OnSuccess:        ptrOf(toNode(s.OnSuccess)),
+		OnFailure:        ptrOf(toNode(s.OnFailure)),
+		OnCancel:         ptrOf(toNode(s.OnCancel)),
+		OnExit:           ptrOf(toNode(s.OnExit)),
 	}
 }
 
@@ -130,15 +130,15 @@ func toNode(node *models.Node) api.Node {
 		StatusLabel: api.NodeStatusLabel(node.Status.String()),
 		Step:        toStep(node.Step),
 		Error:       ptrOf(node.Error),
-		Children:    ptrOf(toChildWorkflows(node.Children)),
+		Children:    ptrOf(toChildDAGRuns(node.Children)),
 	}
 }
 
-func toChildWorkflows(childWorkflows []models.ChildDAGRun) []api.ChildWorkflow {
-	var result []api.ChildWorkflow
-	for _, w := range childWorkflows {
-		result = append(result, api.ChildWorkflow{
-			WorkflowId: w.DAGRunID,
+func toChildDAGRuns(childDAGRuns []models.ChildDAGRun) []api.ChildDAGRun {
+	var result []api.ChildDAGRun
+	for _, w := range childDAGRuns {
+		result = append(result, api.ChildDAGRun{
+			DagRunId: w.DAGRunID,
 		})
 	}
 	return result
@@ -184,21 +184,21 @@ func toDAGDetails(dag *digraph.DAG) *api.DAGDetails {
 	}
 
 	return &api.DAGDetails{
-		Name:               dag.Name,
-		Description:        ptrOf(dag.Description),
-		DefaultParams:      ptrOf(dag.DefaultParams),
-		Delay:              ptrOf(int(dag.Delay.Seconds())),
-		Env:                ptrOf(dag.Env),
-		Group:              ptrOf(dag.Group),
-		HandlerOn:          ptrOf(handlerOn),
-		HistRetentionDays:  ptrOf(dag.HistRetentionDays),
-		LogDir:             ptrOf(dag.LogDir),
-		MaxActiveWorkflows: ptrOf(dag.MaxActiveRuns),
-		MaxActiveSteps:     ptrOf(dag.MaxActiveSteps),
-		Params:             ptrOf(dag.Params),
-		Preconditions:      ptrOf(preconditions),
-		Schedule:           ptrOf(schedules),
-		Steps:              ptrOf(steps),
-		Tags:               ptrOf(dag.Tags),
+		Name:              dag.Name,
+		Description:       ptrOf(dag.Description),
+		DefaultParams:     ptrOf(dag.DefaultParams),
+		Delay:             ptrOf(int(dag.Delay.Seconds())),
+		Env:               ptrOf(dag.Env),
+		Group:             ptrOf(dag.Group),
+		HandlerOn:         ptrOf(handlerOn),
+		HistRetentionDays: ptrOf(dag.HistRetentionDays),
+		LogDir:            ptrOf(dag.LogDir),
+		MaxActiveDAGRuns:  ptrOf(dag.MaxActiveRuns),
+		MaxActiveSteps:    ptrOf(dag.MaxActiveSteps),
+		Params:            ptrOf(dag.Params),
+		Preconditions:     ptrOf(preconditions),
+		Schedule:          ptrOf(schedules),
+		Steps:             ptrOf(steps),
+		Tags:              ptrOf(dag.Tags),
 	}
 }

@@ -530,7 +530,7 @@ components:
 
     DAG:
       type: object
-      description: "Core DAG configuration containing workflow definition and metadata"
+      description: "Core DAG configuration containing dag-run definition and metadata"
       properties:
         Group:
           type: string
