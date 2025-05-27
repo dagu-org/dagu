@@ -265,7 +265,7 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *C
 				fmt.Printf("Failed to create CPU profile file: %v\n", err)
 				os.Exit(1)
 			}
-			pprof.StartCPUProfile(f)
+			_ = pprof.StartCPUProfile(f)
 			defer func() {
 				pprof.StopCPUProfile()
 				if err := f.Close(); err != nil {
