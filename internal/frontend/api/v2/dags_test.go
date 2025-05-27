@@ -35,9 +35,9 @@ func TestDAG(t *testing.T) {
 		var execResp api.ExecuteDAG200JSONResponse
 		resp.Unmarshal(t, &execResp)
 
-		require.NotEmpty(t, execResp.DagRunId, "expected a non-empty DAG-run ID")
+		require.NotEmpty(t, execResp.DagRunId, "expected a non-empty dag-run ID")
 
-		// Check the status of the DAG-run
+		// Check the status of the dag-run
 		require.Eventually(t, func() bool {
 			url := fmt.Sprintf("/api/v2/dags/test_dag/dag-runs/%s", execResp.DagRunId)
 			statusResp := server.Client().Get(url).ExpectStatus(http.StatusOK).Send(t)

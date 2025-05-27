@@ -53,7 +53,7 @@ These fields apply to the entire DAG. They appear at the root of the YAML file.
 
 ``schedule``
 ~~~~~~~~~~~
-  A cron expression (``* * * * *``) that determines how often the DAG runs.  
+  A cron expression (``* * * * *``) that determines how often the dag-runs.  
   If omitted, the DAG will only run manually (unless triggered via CLI or another mechanism).
 
   **Example**:
@@ -128,7 +128,7 @@ These fields apply to the entire DAG. They appear at the root of the YAML file.
 
 ``delaySec``
 ~~~~~~~~~~~
-  Delay (in seconds) before starting each step in a DAG run. This can be useful to stagger workloads.
+  Delay (in seconds) before starting each step in a dag-run. This can be useful to stagger workloads.
 
 ``maxActiveSteps``
 ~~~~~~~~~~~~~~~
@@ -136,7 +136,7 @@ These fields apply to the entire DAG. They appear at the root of the YAML file.
 
 ``maxActiveRuns``
 ~~~~~~~~~~~~~~~~~~
-  Limit on how many active workflows (DAG runs) can exist at the same time. If this limit is reached, new runs will be queued until existing ones finish.
+  Limit on how many active dag-runs can exist at the same time. If this limit is reached, new runs will be queued until existing ones finish.
 
 ``params``
 ~~~~~~~~~

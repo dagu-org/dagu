@@ -36,7 +36,7 @@ const (
 	AttemptDirPrefix = "attempt_"
 )
 
-// JSONLStatusFile is the name of the status file for each DAG run.
+// JSONLStatusFile is the name of the status file for each dag-run.
 // It contains the status of the DAG-run in JSON Lines format.
 // While running the DAG-run, new lines are appended to this file on each status update.
 // After finishing the run, this file will be compacted into a single JSON line file.
@@ -46,7 +46,7 @@ const JSONLStatusFile = "status.jsonl"
 type DAGRun struct {
 	baseDir   string    // Base directory path for this run
 	timestamp time.Time // Timestamp when the run was created
-	dagRunID  string    // Unique identifier for the DAG run
+	dagRunID  string    // Unique identifier for the dag-run
 }
 
 // NewDAGRun creates a new Run instance from a directory path.

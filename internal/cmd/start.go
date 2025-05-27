@@ -17,10 +17,10 @@ import (
 
 // Errors for start command
 var (
-	// ErrDAGRunIDRequired is returned when a child DAG-run is attempted without providing a DAG run ID
+	// ErrDAGRunIDRequired is returned when a child DAG-run is attempted without providing a dag-run ID
 	ErrDAGRunIDRequired = errors.New("DAG-run ID must be provided for child DAG-runs")
 
-	// ErrDAGRunIDFormat is returned when the provided DAG run ID is not valid
+	// ErrDAGRunIDFormat is returned when the provided dag-run ID is not valid
 	ErrDAGRunIDFormat = errors.New("DAG-run ID must only contain alphanumeric characters, dashes, and underscores")
 
 	// ErrDAGRunIDTooLong is returned when the provided DAG-run ID is too long
@@ -100,7 +100,7 @@ func runStart(ctx *Context, args []string) error {
 func getDAGRunInfo(ctx *Context) (dagRunID, rootDAGRun, parentDAGRun string, isChildDAGRun bool, err error) {
 	dagRunID, err = ctx.StringParam("run-id")
 	if err != nil {
-		return "", "", "", false, fmt.Errorf("failed to get DAG run ID: %w", err)
+		return "", "", "", false, fmt.Errorf("failed to get dag-run ID: %w", err)
 	}
 
 	// Get root and parent execution references
@@ -108,7 +108,7 @@ func getDAGRunInfo(ctx *Context) (dagRunID, rootDAGRun, parentDAGRun string, isC
 	parentDAGRun, _ = ctx.Command.Flags().GetString("parent")
 	isChildDAGRun = parentDAGRun != "" || rootDAGRun != ""
 
-	// Validate DAG run ID for child DAG runs
+	// Validate dag-run ID for child dag-runs
 	if isChildDAGRun && dagRunID == "" {
 		return "", "", "", false, ErrDAGRunIDRequired
 	}

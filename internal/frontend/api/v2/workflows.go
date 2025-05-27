@@ -98,7 +98,7 @@ func (a *API) GetDAGRunLog(ctx context.Context, request api.GetDAGRunLogRequestO
 	if err != nil {
 		return api.GetDAGRunLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("DAG-run ID %s not found for DAG %s", dagRunId, dagName),
+			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
 		}, nil
 	}
 
@@ -134,7 +134,7 @@ func (a *API) GetDAGRunStepLog(ctx context.Context, request api.GetDAGRunStepLog
 	if err != nil {
 		return api.GetDAGRunStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("DAG-run ID %s not found for DAG %s", dagRunId, dagName),
+			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
 		}, nil
 	}
 
@@ -180,13 +180,13 @@ func (a *API) UpdateDAGRunStepStatus(ctx context.Context, request api.UpdateDAGR
 	if err != nil {
 		return &api.UpdateDAGRunStepStatus404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("DAG-run ID %s not found for DAG %s", request.DagRunId, request.Name),
+			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
 		}, nil
 	}
 	if status.Status == scheduler.StatusRunning {
 		return &api.UpdateDAGRunStepStatus400JSONResponse{
 			Code:    api.ErrorCodeBadRequest,
-			Message: fmt.Sprintf("DAG-run ID %s for DAG %s is still running", request.DagRunId, request.Name),
+			Message: fmt.Sprintf("dag-run ID %s for DAG %s is still running", request.DagRunId, request.Name),
 		}, nil
 	}
 
@@ -221,7 +221,7 @@ func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetails
 	if err != nil {
 		return &api.GetDAGRunDetails404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("DAG-run ID %s not found for DAG %s", request.DagRunId, request.Name),
+			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
 		}, nil
 	}
 	return &api.GetDAGRunDetails200JSONResponse{
@@ -236,7 +236,7 @@ func (a *API) GetChildDAGRunDetails(ctx context.Context, request api.GetChildDAG
 	if err != nil {
 		return &api.GetChildDAGRunDetails404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("child DAG-run ID %s not found for DAG %s", request.ChildDAGRunId, request.Name),
+			Message: fmt.Sprintf("child dag-run ID %s not found for DAG %s", request.ChildDAGRunId, request.Name),
 		}, nil
 	}
 	return &api.GetChildDAGRunDetails200JSONResponse{
@@ -251,7 +251,7 @@ func (a *API) GetChildDAGRunLog(ctx context.Context, request api.GetChildDAGRunL
 	if err != nil {
 		return &api.GetChildDAGRunLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("child DAG-run ID %s not found for DAG %s", request.ChildDAGRunId, request.Name),
+			Message: fmt.Sprintf("child dag-run ID %s not found for DAG %s", request.ChildDAGRunId, request.Name),
 		}, nil
 	}
 
@@ -285,7 +285,7 @@ func (a *API) GetChildDAGRunStepLog(ctx context.Context, request api.GetChildDAG
 	if err != nil {
 		return &api.GetChildDAGRunStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("child DAG-run ID %s not found for DAG %s", request.ChildDAGRunId, request.Name),
+			Message: fmt.Sprintf("child dag-run ID %s not found for DAG %s", request.ChildDAGRunId, request.Name),
 		}, nil
 	}
 
@@ -332,13 +332,13 @@ func (a *API) UpdateChildDAGRunStepStatus(ctx context.Context, request api.Updat
 	if err != nil {
 		return &api.UpdateChildDAGRunStepStatus404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("child DAG-run ID %s not found for DAG %s", request.ChildDAGRunId, request.Name),
+			Message: fmt.Sprintf("child dag-run ID %s not found for DAG %s", request.ChildDAGRunId, request.Name),
 		}, nil
 	}
 	if status.Status == scheduler.StatusRunning {
 		return &api.UpdateChildDAGRunStepStatus400JSONResponse{
 			Code:    api.ErrorCodeBadRequest,
-			Message: fmt.Sprintf("DAG-run ID %s for DAG %s is still running", request.DagRunId, request.Name),
+			Message: fmt.Sprintf("dag-run ID %s for DAG %s is still running", request.DagRunId, request.Name),
 		}, nil
 	}
 
@@ -380,7 +380,7 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
 			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("DAG-run ID %s not found for DAG %s", request.DagRunId, request.Name),
+			Message:    fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
 		}
 	}
 
@@ -402,7 +402,7 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
 			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("DAG-run ID %s not found for DAG %s", request.DagRunId, request.Name),
+			Message:    fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
 		}
 	}
 
@@ -442,7 +442,7 @@ func (a *API) DequeueDAGRun(ctx context.Context, request api.DequeueDAGRunReques
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
 			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("DAG-run ID %s not found for DAG %s", request.DagRunId, request.Name),
+			Message:    fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
 		}
 	}
 

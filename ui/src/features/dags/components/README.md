@@ -39,7 +39,7 @@ Components for DAG execution management:
 
 Components for visualizing DAG workflows:
 
-- `DAGGraph`: Tabbed interface for visualizing DAG runs as either a graph or timeline
+- `DAGGraph`: Tabbed interface for visualizing dag-runs as either a graph or timeline
 - `Graph`: Renders a Mermaid.js flowchart of DAG steps with dependencies
 - `TimelineChart`: Renders a Gantt chart showing the execution timeline of DAG steps
 - `FlowchartSwitch`: Toggle for switching between horizontal and vertical flowchart layouts

@@ -305,7 +305,7 @@ dagu start <file or DAG name> [-- value1 value2 ...]
 # Displays the current status of the DAG
 dagu status <file or DAG name>
 
-# Re-runs the specified DAG run
+# Re-runs the specified dag-run
 dagu retry --run-id=<run-id> <file or DAG name>
 
 # Stops the current running DAG

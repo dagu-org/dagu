@@ -234,7 +234,7 @@ Examples:
 .. code-block:: yaml
 
   steps:
-    - name: sub workflow
+    - name: child DAG
       run: sub_workflow
       output: SUB_RESULT
     - name: use output

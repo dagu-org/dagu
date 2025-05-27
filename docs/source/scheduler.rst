@@ -126,7 +126,7 @@ To prevent redundant executions of scheduled DAGs, you can set ``skipIfSuccessfu
 This is particularly useful for resource-intensive tasks where unnecessary re-runs should be avoided. Note that this only affects scheduled runs - manual triggers will always execute regardless of this setting.
 
 For example, with the above configuration:
-- If the DAG runs successfully at 04:00
+- If the dag-runs successfully at 04:00
 - And someone triggers it at 05:00
 - The run will be skipped because there's already a successful run since the last schedule
 - The next run will occur at the next scheduled time (08:00)

@@ -49,7 +49,7 @@ func NewDualQueue(baseDir, name string) *DualQueue {
 	}
 }
 
-// FindByDAGRunID retrieves a DAG-run from the queue by its DAG run ID
+// FindByDAGRunID retrieves a DAG-run from the queue by its dag-run ID
 // without removing it. It returns the first found item in the queue files.
 // If the item is not found in any of the queue files, it returns ErrQueueItemNotFound.
 func (q *DualQueue) FindByDAGRunID(ctx context.Context, dagRunID string) (models.QueuedItemData, error) {
@@ -67,7 +67,7 @@ func (q *DualQueue) FindByDAGRunID(ctx context.Context, dagRunID string) (models
 	return nil, ErrQueueItemNotFound
 }
 
-// DequeueByDAGRunID retrieves a DAG-run from the queue by its DAG run ID
+// DequeueByDAGRunID retrieves a DAG-run from the queue by its dag-run ID
 func (q *DualQueue) DequeueByDAGRunID(ctx context.Context, dagRunID string) ([]models.QueuedItemData, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()

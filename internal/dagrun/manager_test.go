@@ -130,7 +130,7 @@ func TestManager(t *testing.T) {
 		ctx := th.Context
 		cli := th.DAGRunMgr
 
-		// update with invalid DAG run ID.
+		// update with invalid dag-run ID.
 		status := testNewStatus(dag.DAG, "unknown-req-id", scheduler.StatusError, scheduler.NodeStatusError)
 
 		// Check if the update fails.

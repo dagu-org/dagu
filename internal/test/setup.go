@@ -417,7 +417,7 @@ func setShell(t *testing.T, shell string) {
 	_ = os.Setenv("SHELL", shPath)
 }
 
-// genDAGRunID generates a new unique DAG run ID using UUID v7.
+// genDAGRunID generates a new unique dag-run ID using UUID v7.
 func genDAGRunID() string {
 	id, err := uuid.NewV7()
 	if err != nil {

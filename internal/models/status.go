@@ -139,7 +139,7 @@ func WithPreconditions(conditions []*digraph.Condition) StatusOption {
 	}
 }
 
-// Create builds a Status object for a DAG run with the specified parameters
+// Create builds a Status object for a dag-run with the specified parameters
 func (f *StatusBuilder) Create(
 	dagRunID string,
 	status scheduler.Status,
@@ -171,7 +171,7 @@ func StatusFromJSON(s string) (*DAGRunStatus, error) {
 	return status, err
 }
 
-// DAGRunStatus represents the complete execution state of a DAG run.
+// DAGRunStatus represents the complete execution state of a dag-run.
 type DAGRunStatus struct {
 	Root          digraph.DAGRunRef    `json:"root,omitempty"`
 	Parent        digraph.DAGRunRef    `json:"parent,omitempty"`
@@ -195,7 +195,7 @@ type DAGRunStatus struct {
 	Preconditions []*digraph.Condition `json:"preconditions,omitempty"`
 }
 
-// DAGRun returns a reference to the DAG run associated with this status
+// DAGRun returns a reference to the dag-run associated with this status
 func (st *DAGRunStatus) DAGRun() digraph.DAGRunRef {
 	return digraph.NewDAGRunRef(st.Name, st.DAGRunID)
 }

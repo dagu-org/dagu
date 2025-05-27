@@ -65,16 +65,16 @@ func (m *Manager) Stop(ctx context.Context, dag *digraph.DAG, dagRunID string) e
 	return err
 }
 
-// GenDAGRunID generates a unique ID for a DAG run using UUID version 7.
+// GenDAGRunID generates a unique ID for a dag-run using UUID version 7.
 func (m *Manager) GenDAGRunID(_ context.Context) (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
-		return "", fmt.Errorf("failed to generate DAG run ID: %w", err)
+		return "", fmt.Errorf("failed to generate dag-run ID: %w", err)
 	}
 	return id.String(), nil
 }
 
-// StartDAGRun starts a DAG run by executing the configured executable with the start command.
+// StartDAGRun starts a dag-run by executing the configured executable with the start command.
 // It sets up the command to run in its own process group and configures standard output/error.
 func (m *Manager) StartDAGRun(_ context.Context, dag *digraph.DAG, opts StartOptions) error {
 	args := []string{"start"}
@@ -106,7 +106,7 @@ func (m *Manager) StartDAGRun(_ context.Context, dag *digraph.DAG, opts StartOpt
 	return cmd.Start()
 }
 
-// EnqueueDAGRun enqueues a DAG run by executing the configured executable with the enqueue command.
+// EnqueueDAGRun enqueues a dag-run by executing the configured executable with the enqueue command.
 func (m *Manager) EnqueueDAGRun(_ context.Context, dag *digraph.DAG, opts EnqueueOptions) error {
 	args := []string{"enqueue"}
 	if opts.Params != "" {
@@ -138,7 +138,7 @@ func (m *Manager) EnqueueDAGRun(_ context.Context, dag *digraph.DAG, opts Enqueu
 		return fmt.Errorf("failed to start enqueue command: %w", err)
 	}
 	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("failed to enqueue DAG run: %w", err)
+		return fmt.Errorf("failed to enqueue dag-run: %w", err)
 	}
 	return nil
 }
@@ -163,7 +163,7 @@ func (m *Manager) DequeueDAGRun(_ context.Context, dagRun digraph.DAGRunRef) err
 		return fmt.Errorf("failed to start dequeue command: %w", err)
 	}
 	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("failed to dequeue DAG run: %w", err)
+		return fmt.Errorf("failed to dequeue dag-run: %w", err)
 	}
 	return nil
 }
@@ -190,7 +190,7 @@ func (m *Manager) RestartDAG(_ context.Context, dag *digraph.DAG, opts RestartOp
 	return cmd.Start()
 }
 
-// RetryDAGRun retries a DAG run by executing the configured executable with the retry command.
+// RetryDAGRun retries a dag-run by executing the configured executable with the retry command.
 func (m *Manager) RetryDAGRun(_ context.Context, dag *digraph.DAG, dagRunID string) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--run-id=%s", dagRunID))
@@ -209,15 +209,15 @@ func (m *Manager) RetryDAGRun(_ context.Context, dag *digraph.DAG, dagRunID stri
 	return cmd.Start()
 }
 
-// IsRunning checks if a DAG run is currently running by querying its status.
+// IsRunning checks if a dag-run is currently running by querying its status.
 // Returns true if the status can be retrieved without error, indicating the DAG is running.
 func (m *Manager) IsRunning(ctx context.Context, dag *digraph.DAG, dagRunID string) bool {
 	_, err := m.currentStatus(ctx, dag, dagRunID)
 	return err == nil
 }
 
-// GetCurrentStatus retrieves the current status of a DAG run by its run ID.
-// If the DAG run is running, it queries the socket for the current status.
+// GetCurrentStatus retrieves the current status of a dag-run by its run ID.
+// If the dag-run is running, it queries the socket for the current status.
 // If the socket doesn't exist or times out, it falls back to stored status or creates an initial status.
 func (m *Manager) GetCurrentStatus(ctx context.Context, dag *digraph.DAG, dagRunID string) (*models.DAGRunStatus, error) {
 	status, err := m.currentStatus(ctx, dag, dagRunID)
@@ -242,7 +242,7 @@ FALLBACK:
 	return m.getPersistedOrCurrentStatus(ctx, dag, dagRunID)
 }
 
-// GetSavedStatus retrieves the saved status of a DAG run by its digraph.DAGRun reference.
+// GetSavedStatus retrieves the saved status of a dag-run by its digraph.DAGRun reference.
 func (m *Manager) GetSavedStatus(ctx context.Context, dagRun digraph.DAGRunRef) (*models.DAGRunStatus, error) {
 	attempt, err := m.dagRunStore.FindAttempt(ctx, dagRun)
 	if err != nil {
@@ -255,7 +255,7 @@ func (m *Manager) GetSavedStatus(ctx context.Context, dagRun digraph.DAGRunRef) 
 	return status, nil
 }
 
-// getPersistedOrCurrentStatus retrieves the persisted status of a DAG run by its ID.
+// getPersistedOrCurrentStatus retrieves the persisted status of a dag-run by its ID.
 // If the stored status indicates the DAG is running, it attempts to get the current status.
 // If status is running and current status retrieval fails, it marks the status as error.
 func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *digraph.DAG, dagRunID string) (
@@ -264,7 +264,7 @@ func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *digraph.
 	dagRunRef := digraph.NewDAGRunRef(dag.Name, dagRunID)
 	attempt, err := m.dagRunStore.FindAttempt(ctx, dagRunRef)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find status by DAG run ID: %w", err)
+		return nil, fmt.Errorf("failed to find status by dag-run ID: %w", err)
 	}
 	status, err := attempt.ReadStatus(ctx)
 	if err != nil {
@@ -288,12 +288,12 @@ func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *digraph.
 	return status, nil
 }
 
-// FindChildDAGRunStatus retrieves the status of a child DAG run by its ID.
+// FindChildDAGRunStatus retrieves the status of a child dag-run by its ID.
 // It looks up the child attempt in the DAG-run store and reads its status.
 func (m *Manager) FindChildDAGRunStatus(ctx context.Context, rootDAGRun digraph.DAGRunRef, childRunID string) (*models.DAGRunStatus, error) {
 	attempt, err := m.dagRunStore.FindChildAttempt(ctx, rootDAGRun, childRunID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find child DAG run attempt: %w", err)
+		return nil, fmt.Errorf("failed to find child dag-run attempt: %w", err)
 	}
 	status, err := attempt.ReadStatus(ctx)
 	if err != nil {
@@ -386,7 +386,7 @@ func (m *Manager) ListRecentStatus(ctx context.Context, name string, n int) []mo
 	return statuses
 }
 
-// UpdateStatus updates the status of a DAG run.
+// UpdateStatus updates the status of a dag-run.
 func (m *Manager) UpdateStatus(ctx context.Context, rootDAGRun digraph.DAGRunRef, newStatus models.DAGRunStatus) error {
 	// Check for context cancellation
 	select {
@@ -435,21 +435,21 @@ func (m *Manager) UpdateStatus(ctx context.Context, rootDAGRun digraph.DAGRunRef
 	return nil
 }
 
-// StartOptions contains options for initiating a DAG run.
+// StartOptions contains options for initiating a dag-run.
 type StartOptions struct {
 	Params   string // Parameters to pass to the DAG
 	Quiet    bool   // Whether to run in quiet mode
-	DAGRunID string // ID for the DAG run
+	DAGRunID string // ID for the dag-run
 }
 
-// EnqueueOptions contains options for enqueuing a DAG run.
+// EnqueueOptions contains options for enqueuing a dag-run.
 type EnqueueOptions struct {
 	Params   string // Parameters to pass to the DAG
 	Quiet    bool   // Whether to run in quiet mode
-	DAGRunID string // ID for the DAG run
+	DAGRunID string // ID for the dag-run
 }
 
-// RestartOptions contains options for restarting a DAG run.
+// RestartOptions contains options for restarting a dag-run.
 type RestartOptions struct {
 	Quiet bool // Whether to run in quiet mode
 }

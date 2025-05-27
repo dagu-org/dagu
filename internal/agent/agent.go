@@ -92,7 +92,7 @@ type Agent struct {
 	// finished is true if the DAG-run is finished.
 	finished atomic.Bool
 
-	// lastErr is the last error occurred during the DAG run.
+	// lastErr is the last error occurred during the dag-run.
 	lastErr error
 
 	// isChildDAGRun is true if the current DAG-run is not the root DAG-run,
@@ -180,7 +180,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to setup execution graph: %w", err)
 	}
 
-	// Create a new environment for the DAG run.
+	// Create a new environment for the dag-run.
 	dbClient := newDBClient(a.dagRunStore, a.dagStore)
 	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params)
 
@@ -242,7 +242,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 	})
 
-	// Stop the socket server when the DAG run is finished.
+	// Stop the socket server when the dag-run is finished.
 	defer func() {
 		if err := a.socketServer.Shutdown(ctx); err != nil {
 			logger.Error(ctx, "Failed to shutdown socket frontend", "err", err)
@@ -283,7 +283,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 	})
 
-	// Start the DAG run.
+	// Start the dag-run.
 	logger.Debug(ctx, "DAG-run started", "dagRunId", a.dagRunID, "name", a.dag.Name, "params", a.dag.Params)
 	lastErr := a.scheduler.Schedule(ctx, a.graph, progressCh)
 
@@ -313,7 +313,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Mark the agent finished.
 	a.finished.Store(true)
 
-	// Return the last error on the DAG run.
+	// Return the last error on the dag-run.
 	return lastErr
 }
 
@@ -386,7 +386,7 @@ func (a *Agent) HandleHTTP(ctx context.Context) sock.HTTPHandlerFunc {
 		w.Header().Set("content-type", "application/json")
 		switch {
 		case r.Method == http.MethodGet && statusRe.MatchString(r.URL.Path):
-			// Return the current status of the DAG run.
+			// Return the current status of the dag-run.
 			status := a.Status()
 			status.Status = scheduler.StatusRunning
 			statusJSON, err := json.Marshal(status)
@@ -397,7 +397,7 @@ func (a *Agent) HandleHTTP(ctx context.Context) sock.HTTPHandlerFunc {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write(statusJSON)
 		case r.Method == http.MethodPost && stopRe.MatchString(r.URL.Path):
-			// Handle Stop request for the DAG run.
+			// Handle Stop request for the dag-run.
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("OK"))
 			go func() {
@@ -437,9 +437,9 @@ func (a *Agent) setupReporter(ctx context.Context) {
 	a.reporter = newReporter(senderFn)
 }
 
-// newScheduler creates a scheduler instance for the DAG run.
+// newScheduler creates a scheduler instance for the dag-run.
 func (a *Agent) newScheduler() *scheduler.Scheduler {
-	// schedulerLogDir is the directory to store the log files for each node in the DAG run.
+	// schedulerLogDir is the directory to store the log files for each node in the dag-run.
 	const dateTimeFormatUTC = "20060102_150405Z"
 	ts := time.Now().UTC().Format(dateTimeFormatUTC)
 	schedulerLogDir := filepath.Join(a.logDir, "run_"+ts+"_"+a.dagRunAttemptID)

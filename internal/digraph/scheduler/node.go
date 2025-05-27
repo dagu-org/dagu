@@ -235,7 +235,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	if childDAG, ok := cmd.(executor.ChildDAG); ok {
 		dagRunID, err := n.GenChildDAGRunID()
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate child DAG run ID: %w", err)
+			return nil, fmt.Errorf("failed to generate child dag-run ID: %w", err)
 		}
 		childDAG.SetDAGRunID(dagRunID)
 	}

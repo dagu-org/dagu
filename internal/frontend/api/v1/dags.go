@@ -650,9 +650,9 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 			return nil, fmt.Errorf("error getting new DAG metadata: %w", err)
 		}
 
-		// Rename the DAG runs associated with the old name
+		// Rename the dag-runs associated with the old name
 		if err := a.dagRunStore.RenameDAGRuns(ctx, old.Name, renamed.Name); err != nil {
-			return nil, fmt.Errorf("error renaming DAG runs: %w", err)
+			return nil, fmt.Errorf("error renaming dag-runs: %w", err)
 		}
 
 		return api.PostDAGAction200JSONResponse{

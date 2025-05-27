@@ -9,7 +9,7 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
-// Env contains the execution metadata for a DAG run.
+// Env contains the execution metadata for a dag-run.
 type Env struct {
 	DAGRunID   string
 	RootDAGRun DAGRunRef
@@ -40,7 +40,7 @@ func (e Env) ApplyEnvs(ctx context.Context) {
 	}
 }
 
-// SetupEnv sets up the execution context for a DAG run.
+// SetupEnv sets up the execution context for a dag-run.
 // It initializes the environment variables and the DAG metadata.
 func SetupEnv(ctx context.Context, dag *DAG, db Database, rootDAGRun DAGRunRef, dagRunID, logFile string, params []string) context.Context {
 	var envs = map[string]string{

@@ -204,7 +204,7 @@ func (q *QueueFile) Pop(ctx context.Context) (*Job, error) {
 	return NewJob(item), nil
 }
 
-// FindByDAGRunID finds a job by its DAG run ID without removing it from the queue.
+// FindByDAGRunID finds a job by its dag-run ID without removing it from the queue.
 func (q *QueueFile) FindByDAGRunID(ctx context.Context, dagRunID string) (*Job, error) {
 	q.mu.RLock()
 	defer q.mu.RUnlock()

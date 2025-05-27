@@ -9,9 +9,9 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 )
 
-// Errors related to DAG run management
+// Errors related to dag-run management
 var (
-	ErrDAGRunIDNotFound = errors.New("DAG run ID not found")
+	ErrDAGRunIDNotFound = errors.New("dag-run ID not found")
 	ErrNoStatusData     = errors.New("no status data")
 )
 
@@ -57,42 +57,42 @@ type ListDAGRunStatusesOptions struct {
 // ListRunsOption is a functional option for configuring ListRunsOptions
 type ListDAGRunStatusesOption func(*ListDAGRunStatusesOptions)
 
-// WithFrom sets the start time for listing DAG runs
+// WithFrom sets the start time for listing dag-runs
 func WithFrom(from TimeInUTC) ListDAGRunStatusesOption {
 	return func(o *ListDAGRunStatusesOptions) {
 		o.From = from
 	}
 }
 
-// WithTo sets the end time for listing DAG runs
+// WithTo sets the end time for listing dag-runs
 func WithTo(to TimeInUTC) ListDAGRunStatusesOption {
 	return func(o *ListDAGRunStatusesOptions) {
 		o.To = to
 	}
 }
 
-// WithStatuses sets the statuses for listing DAG runs
+// WithStatuses sets the statuses for listing dag-runs
 func WithStatuses(statuses []scheduler.Status) ListDAGRunStatusesOption {
 	return func(o *ListDAGRunStatusesOptions) {
 		o.Statuses = statuses
 	}
 }
 
-// WithExactName sets the name for listing DAG runs
+// WithExactName sets the name for listing dag-runs
 func WithExactName(name string) ListDAGRunStatusesOption {
 	return func(o *ListDAGRunStatusesOptions) {
 		o.ExactName = name
 	}
 }
 
-// WithName sets the name for listing DAG runs
+// WithName sets the name for listing dag-runs
 func WithName(name string) ListDAGRunStatusesOption {
 	return func(o *ListDAGRunStatusesOptions) {
 		o.Name = name
 	}
 }
 
-// WithDAGRunID sets the DAG run ID for listing DAG runs
+// WithDAGRunID sets the dag-run ID for listing dag-runs
 func WithDAGRunID(dagRunID string) ListDAGRunStatusesOption {
 	return func(o *ListDAGRunStatusesOptions) {
 		o.DAGRunID = dagRunID

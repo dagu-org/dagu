@@ -48,7 +48,7 @@ type NodeState struct {
 	// ExitCode is the exit code that the command exited with.
 	// It only makes sense when the node is a command executor.
 	ExitCode int
-	// Children stores the child DAG runs.
+	// Children stores the child dag-runs.
 	Children []ChildDAGRun
 	// OutputVariables stores the output variables for the following steps.
 	// It only contains the local output variables.
@@ -56,7 +56,7 @@ type NodeState struct {
 }
 
 type ChildDAGRun struct {
-	// DAGRunID is the run ID of the child DAG run.
+	// DAGRunID is the run ID of the child dag-run.
 	DAGRunID string
 }
 
@@ -162,8 +162,8 @@ func (s *Data) Data() NodeData {
 }
 
 // GenChildDAGRunID returns the DAG-run ID for the child DAG-run.
-// Currently, it only supports a single child DAG run.
-// In the future, it may support multiple child DAG runs (e.g., for-each).
+// Currently, it only supports a single child dag-run.
+// In the future, it may support multiple child dag-runs (e.g., for-each).
 func (s *Data) GenChildDAGRunID() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -171,10 +171,10 @@ func (s *Data) GenChildDAGRunID() (string, error) {
 	if len(s.inner.State.Children) > 0 {
 		return s.inner.State.Children[0].DAGRunID, nil
 	}
-	// Generate a new DAGRunID for the child DAG run.
+	// Generate a new DAGRunID for the child dag-run.
 	r, err := generateDAGRunID()
 	if err != nil {
-		return "", fmt.Errorf("failed to generate child DAG run ID: %w", err)
+		return "", fmt.Errorf("failed to generate child dag-run ID: %w", err)
 	}
 	s.inner.State.Children = append(s.inner.State.Children, ChildDAGRun{DAGRunID: r})
 	return r, nil

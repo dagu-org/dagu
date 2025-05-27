@@ -72,11 +72,11 @@ type DAG struct {
 	RestartWait time.Duration `json:"restartWait,omitempty"`
 	// MaxActiveSteps specifies the maximum concurrent steps to run in an execution.
 	MaxActiveSteps int `json:"maxActiveSteps,omitempty"`
-	// MaxActiveRuns specifies the maximum number of concurrent DAG runs.
+	// MaxActiveRuns specifies the maximum number of concurrent dag-runs.
 	MaxActiveRuns int `json:"maxActiveRuns,omitempty"`
 	// MaxCleanUpTime is the maximum time to wait for cleanup when the DAG is stopped.
 	MaxCleanUpTime time.Duration `json:"maxCleanUpTime,omitempty"`
-	// HistRetentionDays is the number of days to keep the history of DAG runs.
+	// HistRetentionDays is the number of days to keep the history of dag-runs.
 	HistRetentionDays int `json:"histRetentionDays,omitempty"`
 	// BuildErrors contains any errors encountered while building the DAG.
 	BuildErrors []error

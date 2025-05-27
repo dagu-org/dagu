@@ -126,7 +126,7 @@ func (a *API) handleError(w http.ResponseWriter, _ *http.Request, err error) {
 	switch {
 	case errors.Is(err, models.ErrDAGRunIDNotFound):
 		code = api.ErrorCodeNotFound
-		message = "DAG-run not found"
+		message = "dag-run not found"
 	}
 
 	w.Header().Set("Content-Type", "application/json")

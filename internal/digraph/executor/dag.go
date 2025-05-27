@@ -70,7 +70,7 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 	}
 
 	if e.dagRunID == "" {
-		return fmt.Errorf("dag run ID is not set")
+		return fmt.Errorf("dag-run ID is not set")
 	}
 
 	e.lock.Lock()
@@ -78,7 +78,7 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 	env := GetEnv(ctx)
 
 	if env.RootDAGRun.Zero() {
-		return fmt.Errorf("root DAG run ID is not set")
+		return fmt.Errorf("root dag-run ID is not set")
 	}
 
 	args := []string{
@@ -136,10 +136,10 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 		return fmt.Errorf("child DAG-run failed: %w", err)
 	}
 
-	// get results from the child DAG run
+	// get results from the child dag-run
 	result, err := env.DB.GetChildDAGRunStatus(ctx, e.dagRunID, env.RootDAGRun)
 	if err != nil {
-		return fmt.Errorf("failed to find result for the child DAG run %q: %w", e.dagRunID, err)
+		return fmt.Errorf("failed to find result for the child dag-run %q: %w", e.dagRunID, err)
 	}
 
 	jsonData, err := json.MarshalIndent(result, "", "  ")
