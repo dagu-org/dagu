@@ -693,10 +693,34 @@ func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
+// buildRepeatPolicy sets up the repeat policy for a step.
+//
+// Semantics:
+//  1. If both "condition" and "expected" are set:
+//     - After the step runs, evaluate "condition" (may be a shell command, env var, or expression).
+//     - Compare its output to "expected". Repeat as long as the comparison does NOT match.
+//  2. If only "condition" is set (and "expected" is empty):
+//     - Repeat as long as "condition" (may be a shell command, env var, or expression) evaluates to exit code 0.
+//  3. If "exitCode" is specified (and "condition" is not set):
+//     - Repeat as long as the last step’s exit code matches any value in the list.
+//  4. If only "repeat: true", repeat unconditionally at the given interval.
+//
+// Precedence: Condition > ExitCode > Repeat.
+//
+// This mirrors the Precondition logic for consistency.
 func buildRepeatPolicy(_ BuildContext, def stepDef, step *Step) error {
 	if def.RepeatPolicy != nil {
+		if def.RepeatPolicy.Condition != "" {
+			step.RepeatPolicy.Condition = &Condition{
+				Condition: def.RepeatPolicy.Condition,
+				Expected:  def.RepeatPolicy.Expected,
+			}
+		} else {
+			step.RepeatPolicy.Condition = nil
+		}
 		step.RepeatPolicy.Repeat = def.RepeatPolicy.Repeat
 		step.RepeatPolicy.Interval = time.Second * time.Duration(def.RepeatPolicy.IntervalSec)
+		step.RepeatPolicy.ExitCode = def.RepeatPolicy.ExitCode
 	}
 	return nil
 }

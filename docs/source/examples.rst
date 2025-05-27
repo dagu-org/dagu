@@ -267,3 +267,58 @@ Customizing Signal Handling on Stop
         for s in {1..64}; do trap "echo trap $s" $s; done
         sleep 60
       signalOnStop: "SIGINT"
+
+Advanced Step Repetition (repeatPolicy)
+---------------------------------------
+
+Dagu supports advanced repeat-until logic for steps using the ``repeatPolicy`` field. You can repeat a step until a command output matches a string or regex, or until a specific exit code is returned.
+
+.. code-block:: yaml
+
+  steps:
+    - name: repeat-until-string-match
+      command: echo foo
+      output: RESULT
+      repeatPolicy:
+        condition: "$RESULT"
+        expected: "foo"
+        intervalSec: 30
+
+    - name: repeat-until-condition-exits-non-zero
+      command: echo "checking"
+      repeatPolicy:
+        condition: "test -f /tmp/flag"
+        intervalSec: 1
+
+    - name: repeat-while-exitcode-matches
+      command: test -f /tmp/flag
+      repeatPolicy:
+        exitCode: [0]
+        intervalSec: 5
+
+    - name: repeat-forever
+      command: echo 'hello'
+      repeatPolicy:
+        repeat: true
+        intervalSec: 60
+
+- ``condition``: Command or expression to evaluate after each run.
+- ``expected``: Value or regex to match the output of ``condition``.
+- ``exitCode``: Integer or list of integers; repeat if the last command exits with one of these codes.
+- ``repeat``: Boolean; if true, repeat the step unconditionally. This is equivalent to setting ``condition: "true"``.
+- ``intervalSec``: Time in seconds to wait before repeating the step.
+
+.. note::
+
+   **repeatPolicy precedence and semantics (Dagu 2025.05):**
+
+   1. If both ``condition`` and ``expected`` are set:
+      - After the step runs, evaluate ``condition`` (may be a shell command, env var, or expression).
+      - Compare its output to ``expected``. Repeat as long as the comparison does not match.
+   2. If only ``condition`` is set (and ``expected`` is empty):
+      - Repeat as long as ``condition`` (may be a shell command, env var, or expression) evaluates to exit code 0.
+   3. If ``exitCode`` is specified (and ``condition`` is not set):
+      - Repeat as long as the last step’s exit code matches any value in the list.
+   4. If only ``repeat: true``, repeat unconditionally at the given interval.
+
+   The evaluation order is: ``condition`` > ``exitCode`` > ``repeat``. This mirrors the ``precondition`` logic for consistency.

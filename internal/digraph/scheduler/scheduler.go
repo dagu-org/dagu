@@ -288,16 +288,49 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 						node.IncDoneCount()
 					}
 
-					if node.Step().RepeatPolicy.Repeat {
-						if execErr == nil || node.Step().ContinueOn.Failure {
-							if !sc.isCanceled() {
-								time.Sleep(node.Step().RepeatPolicy.Interval)
-								if progressCh != nil {
-									progressCh <- node
-								}
-								continue ExecRepeat
+					shouldRepeat := false
+					step := node.Step()
+					if step.RepeatPolicy.Condition != nil {
+						// Ensure node's own output variables are reloaded
+						// before evaluating the condition.
+						if node.inner.State.OutputVariables != nil {
+							env := executor.GetEnv(ctx)
+							env.ForceLoadOutputVariables(node.inner.State.OutputVariables)
+							ctx = executor.WithEnv(ctx, env)
+						}
+						shell := cmdutil.GetShellCommand(step.Shell)
+						err := EvalCondition(ctx, shell, step.RepeatPolicy.Condition)
+						if step.RepeatPolicy.Condition.Expected != "" {
+							// Repeat as long as condition does NOT match expected (err != nil)
+							if err != nil {
+								shouldRepeat = true
+							}
+						} else {
+							// Repeat as long as it returns exit code 0 (err == nil)
+							if err == nil {
+								shouldRepeat = true
 							}
 						}
+					} else if len(step.RepeatPolicy.ExitCode) > 0 {
+						// Repeat if last exit code matches any in ExitCode
+						lastExit := node.State().ExitCode
+						for _, code := range step.RepeatPolicy.ExitCode {
+							if lastExit == code {
+								shouldRepeat = true
+								break
+							}
+						}
+					} else if step.RepeatPolicy.Repeat {
+						// Unconditional repeat
+						shouldRepeat = (execErr == nil || step.ContinueOn.Failure)
+					}
+
+					if shouldRepeat && !sc.isCanceled() {
+						time.Sleep(step.RepeatPolicy.Interval)
+						if progressCh != nil {
+							progressCh <- node
+						}
+						continue
 					}
 
 					if execErr != nil && progressCh != nil {
