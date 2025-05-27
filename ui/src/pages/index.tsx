@@ -209,7 +209,7 @@ function Dashboard(): React.ReactElement | null {
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
               <span className="text-xs font-medium text-muted-foreground">
-                DAG Run:
+                DAG Name:
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -225,7 +225,7 @@ function Dashboard(): React.ReactElement | null {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all" className="text-xs">
-                    All DAG runs
+                    All
                   </SelectItem>
                   {uniqueDAGRunNames.map((name) => (
                     <SelectItem key={name} value={name} className="text-xs">
