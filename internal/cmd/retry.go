@@ -46,7 +46,7 @@ func runRetry(ctx *Context, args []string) error {
 
 	// Retrieve the previous run data for specified workflow ID.
 	ref := digraph.NewDAGRunRef(name, workflowID)
-	attempt, err := ctx.HistoryStore.FindAttempt(ctx, ref)
+	attempt, err := ctx.dagRunStore.FindAttempt(ctx, ref)
 	if err != nil {
 		return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflowID, err)
 	}
@@ -98,9 +98,9 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.DAGRunStatus, r
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
-		ctx.HistoryMgr,
+		ctx.dagRunMgr,
 		dr,
-		ctx.HistoryStore,
+		ctx.dagRunStore,
 		ctx.ProcStore,
 		rootRun,
 		agent.Options{

@@ -35,11 +35,11 @@ type Store struct {
 	maxWorkers        int                                   // Maximum number of parallel workers
 }
 
-// HistoryStoreOption defines functional options for configuring local.
-type HistoryStoreOption func(*HistoryStoreOptions)
+// DAGRunStoreOption defines functional options for configuring local.
+type DAGRunStoreOption func(*DAGRunStoreOptions)
 
-// HistoryStoreOptions holds configuration options for local.
-type HistoryStoreOptions struct {
+// DAGRunStoreOptions holds configuration options for local.
+type DAGRunStoreOptions struct {
 	FileCache         *fileutil.Cache[*models.DAGRunStatus] // Optional cache for status files
 	LatestStatusToday bool                                  // Whether to only return today's status
 	MaxWorkers        int                                   // Maximum number of parallel workers
@@ -47,22 +47,22 @@ type HistoryStoreOptions struct {
 }
 
 // WithHistoryFileCache sets the file cache for local.
-func WithHistoryFileCache(cache *fileutil.Cache[*models.DAGRunStatus]) HistoryStoreOption {
-	return func(o *HistoryStoreOptions) {
+func WithHistoryFileCache(cache *fileutil.Cache[*models.DAGRunStatus]) DAGRunStoreOption {
+	return func(o *DAGRunStoreOptions) {
 		o.FileCache = cache
 	}
 }
 
 // WithLatestStatusToday sets whether to only return today's status.
-func WithLatestStatusToday(latestStatusToday bool) HistoryStoreOption {
-	return func(o *HistoryStoreOptions) {
+func WithLatestStatusToday(latestStatusToday bool) DAGRunStoreOption {
+	return func(o *DAGRunStoreOptions) {
 		o.LatestStatusToday = latestStatusToday
 	}
 }
 
 // New creates a new JSONDB instance with the specified options.
-func New(baseDir string, opts ...HistoryStoreOption) models.DAGRunStore {
-	options := &HistoryStoreOptions{
+func New(baseDir string, opts ...DAGRunStoreOption) models.DAGRunStore {
+	options := &DAGRunStoreOptions{
 		LatestStatusToday: true,
 		MaxWorkers:        runtime.NumCPU(),
 	}

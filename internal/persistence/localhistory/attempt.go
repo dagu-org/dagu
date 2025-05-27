@@ -52,14 +52,14 @@ type AttemptOption func(*Attempt)
 // WithDAG sets the DAG associated with the Attempt.
 // This allows the Attempt to store DAG metadata alongside the status data.
 func WithDAG(dag *digraph.DAG) AttemptOption {
-	return func(r *Attempt) {
-		r.dag = dag
+	return func(att *Attempt) {
+		att.dag = dag
 	}
 }
 
 // ID implements models.DAGRunAttempt.
-func (r *Attempt) ID() string {
-	return r.id
+func (att *Attempt) ID() string {
+	return att.id
 }
 
 // NewAttempt creates a new Run for the specified file.
@@ -68,23 +68,23 @@ func NewAttempt(file string, cache *fileutil.Cache[*models.DAGRunStatus], opts .
 	if len(matches) != 3 {
 		return nil, fmt.Errorf("invalid file path for run data: %s", file)
 	}
-	r := &Attempt{id: matches[2], file: file, cache: cache}
+	att := &Attempt{id: matches[2], file: file, cache: cache}
 	for _, opt := range opts {
-		opt(r)
+		opt(att)
 	}
-	return r, nil
+	return att, nil
 }
 
 // Exists returns true if the status file exists.
-func (r *Attempt) Exists() bool {
-	_, err := os.Stat(r.file)
+func (att *Attempt) Exists() bool {
+	_, err := os.Stat(att.file)
 	return err == nil
 }
 
 // ModTime returns the last modification time of the status file.
 // This is used to determine when the file was last updated.
-func (r *Attempt) ModTime() (time.Time, error) {
-	info, err := os.Stat(r.file)
+func (att *Attempt) ModTime() (time.Time, error) {
+	info, err := os.Stat(att.file)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -92,7 +92,7 @@ func (r *Attempt) ModTime() (time.Time, error) {
 }
 
 // ReadDAG implements models.DAGRunAttempt.
-func (r *Attempt) ReadDAG(ctx context.Context) (*digraph.DAG, error) {
+func (att *Attempt) ReadDAG(ctx context.Context) (*digraph.DAG, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -102,7 +102,7 @@ func (r *Attempt) ReadDAG(ctx context.Context) (*digraph.DAG, error) {
 	}
 
 	// Determine the path to the DAG definition file
-	dir := filepath.Dir(r.file)
+	dir := filepath.Dir(att.file)
 	dagFile := filepath.Join(dir, DAGDefinition)
 
 	// Check if the file exists
@@ -130,7 +130,7 @@ func (r *Attempt) ReadDAG(ctx context.Context) (*digraph.DAG, error) {
 
 // Open initializes the status file for writing. It returns an error if the file is already open.
 // The context can be used to cancel the operation.
-func (r *Attempt) Open(ctx context.Context) error {
+func (att *Attempt) Open(ctx context.Context) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -139,22 +139,22 @@ func (r *Attempt) Open(ctx context.Context) error {
 		// Continue with operation
 	}
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	att.mu.Lock()
+	defer att.mu.Unlock()
 
-	if r.writer != nil {
+	if att.writer != nil {
 		return fmt.Errorf("status file already open: %w", ErrStatusFileOpen)
 	}
 
 	// Ensure the directory exists
-	dir := filepath.Dir(r.file)
+	dir := filepath.Dir(att.file)
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
 	// If it's a new file, create it
-	if r.dag != nil {
-		dagJSON, err := json.Marshal(r.dag)
+	if att.dag != nil {
+		dagJSON, err := json.Marshal(att.dag)
 		if err != nil {
 			return fmt.Errorf("failed to marshal DAG definition: %w", err)
 		}
@@ -163,40 +163,40 @@ func (r *Attempt) Open(ctx context.Context) error {
 		}
 	}
 
-	logger.Debugf(ctx, "Initializing status file: %s", r.file)
+	logger.Debugf(ctx, "Initializing status file: %s", att.file)
 
-	writer := NewWriter(r.file)
+	writer := NewWriter(att.file)
 
 	if err := writer.Open(); err != nil {
 		return fmt.Errorf("failed to open writer: %w", err)
 	}
 
-	r.writer = writer
+	att.writer = writer
 	return nil
 }
 
 // Write adds a new status to the file. It returns an error if the file is not open
 // or is currently being closed. The context can be used to cancel the operation.
-func (r *Attempt) Write(ctx context.Context, status models.DAGRunStatus) error {
+func (att *Attempt) Write(ctx context.Context, status models.DAGRunStatus) error {
 	// Check if we're closing before acquiring the mutex to reduce contention
-	if r.isClosing.Load() {
+	if att.isClosing.Load() {
 		return fmt.Errorf("cannot write while file is closing: %w", ErrStatusFileNotOpen)
 	}
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	att.mu.Lock()
+	defer att.mu.Unlock()
 
-	if r.writer == nil {
+	if att.writer == nil {
 		return fmt.Errorf("status file not open: %w", ErrStatusFileNotOpen)
 	}
 
-	if writeErr := r.writer.Write(ctx, status); writeErr != nil {
+	if writeErr := att.writer.Write(ctx, status); writeErr != nil {
 		return fmt.Errorf("failed to write status: %w", ErrWriteFailed)
 	}
 
 	// Invalidate cache after successful write
-	if r.cache != nil {
-		r.cache.Invalidate(r.file)
+	if att.cache != nil {
+		att.cache.Invalidate(att.file)
 	}
 
 	return nil
@@ -204,31 +204,31 @@ func (r *Attempt) Write(ctx context.Context, status models.DAGRunStatus) error {
 
 // Close properly closes the status file, performs compaction, and invalidates the cache.
 // It's safe to call Close multiple times. The context can be used to cancel the operation.
-func (r *Attempt) Close(ctx context.Context) error {
+func (att *Attempt) Close(ctx context.Context) error {
 	// Set the closing flag to prevent new writes
-	r.isClosing.Store(true)
-	defer r.isClosing.Store(false)
+	att.isClosing.Store(true)
+	defer att.isClosing.Store(false)
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	att.mu.Lock()
+	defer att.mu.Unlock()
 
-	if r.writer == nil {
+	if att.writer == nil {
 		return nil
 	}
 
 	// Create a copy to avoid nil dereference in deferred function
-	w := r.writer
-	r.writer = nil
+	w := att.writer
+	att.writer = nil
 
 	// Attempt to compact the file
-	if compactErr := r.compactLocked(ctx); compactErr != nil {
+	if compactErr := att.compactLocked(ctx); compactErr != nil {
 		logger.Warnf(ctx, "Failed to compact file during close: %v", compactErr)
 		// Continue with close even if compaction fails
 	}
 
 	// Invalidate the cache
-	if r.cache != nil {
-		r.cache.Invalidate(r.file)
+	if att.cache != nil {
+		att.cache.Invalidate(att.file)
 	}
 
 	// Close the writer
@@ -241,7 +241,7 @@ func (r *Attempt) Close(ctx context.Context) error {
 
 // Compact performs file compaction to optimize storage and read performance.
 // It's safe to call while the file is open or closed. The context can be used to cancel the operation.
-func (r *Attempt) Compact(ctx context.Context) error {
+func (att *Attempt) Compact(ctx context.Context) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -251,17 +251,17 @@ func (r *Attempt) Compact(ctx context.Context) error {
 	}
 
 	// Set the closing flag to prevent new writes during compaction
-	r.isClosing.Store(true)
-	defer r.isClosing.Store(false)
+	att.isClosing.Store(true)
+	defer att.isClosing.Store(false)
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	att.mu.Lock()
+	defer att.mu.Unlock()
 
-	return r.compactLocked(ctx)
+	return att.compactLocked(ctx)
 }
 
 // compactLocked performs actual compaction with the lock already held
-func (r *Attempt) compactLocked(ctx context.Context) error {
+func (att *Attempt) compactLocked(ctx context.Context) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -270,16 +270,16 @@ func (r *Attempt) compactLocked(ctx context.Context) error {
 		// Continue with operation
 	}
 
-	status, err := r.parseLocked()
+	status, err := att.parseLocked()
 	if err == io.EOF {
 		return nil // Empty file, nothing to compact
 	}
 	if err != nil {
-		return fmt.Errorf("%w: %s: %v", ErrCompactFailed, r.file, err)
+		return fmt.Errorf("%w: %s: %v", ErrCompactFailed, att.file, err)
 	}
 
 	// Create a temporary file in the same directory
-	dir := filepath.Dir(r.file)
+	dir := filepath.Dir(att.file)
 	tempFile, err := os.CreateTemp(dir, "compact_*.tmp")
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
@@ -318,13 +318,13 @@ func (r *Attempt) compactLocked(ctx context.Context) error {
 	}
 
 	// Use atomic rename for safer file replacement
-	if err := safeRename(tempFilePath, r.file); err != nil {
+	if err := safeRename(tempFilePath, att.file); err != nil {
 		return fmt.Errorf("failed to replace original file: %w", err)
 	}
 
 	// Invalidate the cache after successful compaction
-	if r.cache != nil {
-		r.cache.Invalidate(r.file)
+	if att.cache != nil {
+		att.cache.Invalidate(att.file)
 	}
 
 	success = true
@@ -346,7 +346,7 @@ func safeRename(source, target string) error {
 
 // ReadStatus reads the latest status from the file, using cache if available.
 // The context can be used to cancel the operation.
-func (r *Attempt) ReadStatus(ctx context.Context) (*models.DAGRunStatus, error) {
+func (att *Attempt) ReadStatus(ctx context.Context) (*models.DAGRunStatus, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -356,11 +356,11 @@ func (r *Attempt) ReadStatus(ctx context.Context) (*models.DAGRunStatus, error) 
 	}
 
 	// Try to use cache first if available
-	if r.cache != nil {
-		status, cacheErr := r.cache.LoadLatest(r.file, func() (*models.DAGRunStatus, error) {
-			r.mu.RLock()
-			defer r.mu.RUnlock()
-			return r.parseLocked()
+	if att.cache != nil {
+		status, cacheErr := att.cache.LoadLatest(att.file, func() (*models.DAGRunStatus, error) {
+			att.mu.RLock()
+			defer att.mu.RUnlock()
+			return att.parseLocked()
 		})
 
 		if cacheErr == nil {
@@ -369,9 +369,9 @@ func (r *Attempt) ReadStatus(ctx context.Context) (*models.DAGRunStatus, error) 
 	}
 
 	// Cache miss or disabled, perform a direct read
-	r.mu.RLock()
-	parsed, parseErr := r.parseLocked()
-	r.mu.RUnlock()
+	att.mu.RLock()
+	parsed, parseErr := att.parseLocked()
+	att.mu.RUnlock()
 
 	if parseErr != nil {
 		return nil, fmt.Errorf("failed to parse status file: %w", parseErr)
@@ -383,8 +383,8 @@ func (r *Attempt) ReadStatus(ctx context.Context) (*models.DAGRunStatus, error) 
 
 // parseLocked reads the status file and returns the last valid status.
 // Must be called with a lock (read or write) already held.
-func (r *Attempt) parseLocked() (*models.DAGRunStatus, error) {
-	return ParseStatusFile(r.file)
+func (att *Attempt) parseLocked() (*models.DAGRunStatus, error) {
+	return ParseStatusFile(att.file)
 }
 
 // ParseStatusFile reads the status file and returns the last valid status.

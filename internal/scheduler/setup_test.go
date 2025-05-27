@@ -38,13 +38,13 @@ func TestMain(m *testing.M) {
 }
 
 type testHelper struct {
-	manager        scheduler.EntryReader
-	historyManager history.DAGRunManager
-	historyStore   models.DAGRunStore
-	dagStore       models.DAGStore
-	procStore      models.ProcStore
-	queueStore     models.QueueStore
-	config         *config.Config
+	EntryReader scheduler.EntryReader
+	DAGRunMgr   history.DAGRunManager
+	DAGRunStore models.DAGRunStore
+	DAGStore    models.DAGStore
+	ProcStore   models.ProcStore
+	QueueStore  models.QueueStore
+	Config      *config.Config
 }
 
 func setupTest(t *testing.T) testHelper {
@@ -71,20 +71,20 @@ func setupTest(t *testing.T) testHelper {
 	}
 
 	ds := localdag.New(cfg.Paths.DAGsDir, localdag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
-	hs := localhistory.New(cfg.Paths.DAGRunsDir)
+	drs := localhistory.New(cfg.Paths.DAGRunsDir)
 	ps := localproc.New(cfg.Paths.ProcDir)
 	qs := prototype.New(cfg.Paths.QueueDir)
 
-	hm := history.New(hs, cfg.Paths.Executable, cfg.Global.WorkDir)
-	jm := scheduler.NewEntryReader(testdataDir, ds, hm, "", "")
+	drm := history.New(drs, cfg.Paths.Executable, cfg.Global.WorkDir)
+	em := scheduler.NewEntryReader(testdataDir, ds, drm, "", "")
 
 	return testHelper{
-		manager:        jm,
-		dagStore:       ds,
-		historyStore:   hs,
-		historyManager: hm,
-		config:         cfg,
-		procStore:      ps,
-		queueStore:     qs,
+		EntryReader: em,
+		DAGStore:    ds,
+		DAGRunStore: drs,
+		DAGRunMgr:   drm,
+		Config:      cfg,
+		ProcStore:   ps,
+		QueueStore:  qs,
 	}
 }

@@ -52,8 +52,8 @@ type queueConfig struct {
 func New(
 	cfg *config.Config,
 	er EntryReader,
-	hm history.DAGRunManager,
-	hs models.DAGRunStore,
+	drm history.DAGRunManager,
+	drs models.DAGRunStore,
 	qs models.QueueStore,
 	ps models.ProcStore,
 ) *Scheduler {
@@ -67,8 +67,8 @@ func New(
 		stopChan:    make(chan struct{}),
 		location:    timeLoc,
 		er:          er,
-		hm:          hm,
-		dagRunStore: hs,
+		hm:          drm,
+		dagRunStore: drs,
 		queueStore:  qs,
 		procStore:   ps,
 	}

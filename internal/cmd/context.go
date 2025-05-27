@@ -34,14 +34,14 @@ import (
 type Context struct {
 	context.Context
 
-	Command      *cobra.Command
-	Flags        []commandLineFlag
-	Config       *config.Config
-	Quiet        bool
-	HistoryStore models.DAGRunStore
-	HistoryMgr   history.DAGRunManager
-	ProcStore    models.ProcStore
-	QueueStore   models.QueueStore
+	Command     *cobra.Command
+	Flags       []commandLineFlag
+	Config      *config.Config
+	Quiet       bool
+	dagRunStore models.DAGRunStore
+	dagRunMgr   history.DAGRunManager
+	ProcStore   models.ProcStore
+	QueueStore  models.QueueStore
 }
 
 // LogToFile creates a new logger context with a file writer.
@@ -105,7 +105,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	}
 
 	// Initialize history repository and history manager
-	hrOpts := []localhistory.HistoryStoreOption{
+	hrOpts := []localhistory.DAGRunStoreOption{
 		localhistory.WithLatestStatusToday(cfg.Server.LatestStatusToday),
 	}
 
@@ -117,28 +117,28 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		hrOpts = append(hrOpts, localhistory.WithHistoryFileCache(hc))
 	}
 
-	hs := localhistory.New(cfg.Paths.DAGRunsDir, hrOpts...)
-	hm := history.New(hs, cfg.Paths.Executable, cfg.Global.WorkDir)
+	drs := localhistory.New(cfg.Paths.DAGRunsDir, hrOpts...)
+	drm := history.New(drs, cfg.Paths.Executable, cfg.Global.WorkDir)
 	ps := localproc.New(cfg.Paths.ProcDir)
 	qs := prototype.New(cfg.Paths.QueueDir)
 
 	return &Context{
-		Context:      ctx,
-		Command:      cmd,
-		Config:       cfg,
-		Quiet:        quiet,
-		HistoryStore: hs,
-		HistoryMgr:   hm,
-		Flags:        flags,
-		ProcStore:    ps,
-		QueueStore:   qs,
+		Context:     ctx,
+		Command:     cmd,
+		Config:      cfg,
+		Quiet:       quiet,
+		dagRunStore: drs,
+		dagRunMgr:   drm,
+		Flags:       flags,
+		ProcStore:   ps,
+		QueueStore:  qs,
 	}, nil
 }
 
 // HistoryManager initializes a HistoryManager using the provided options. If not supplied,
-func (c *Context) HistoryManager(hr models.DAGRunStore) history.DAGRunManager {
+func (c *Context) HistoryManager(drs models.DAGRunStore) history.DAGRunManager {
 	return history.New(
-		hr,
+		drs,
 		c.Config.Paths.Executable,
 		c.Config.Global.WorkDir,
 	)
@@ -155,7 +155,7 @@ func (c *Context) NewServer() (*frontend.Server, error) {
 		return nil, err
 	}
 
-	return frontend.NewServer(c.Config, dr, c.HistoryStore, c.HistoryMgr), nil
+	return frontend.NewServer(c.Config, dr, c.dagRunStore, c.dagRunMgr), nil
 }
 
 // NewScheduler creates a new NewScheduler instance using the default client.
@@ -169,8 +169,8 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 		return nil, fmt.Errorf("failed to initialize DAG client: %w", err)
 	}
 
-	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.HistoryMgr, c.Config.Paths.Executable, c.Config.Global.WorkDir)
-	return scheduler.New(c.Config, m, c.HistoryMgr, c.HistoryStore, c.QueueStore, c.ProcStore), nil
+	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.dagRunMgr, c.Config.Paths.Executable, c.Config.Global.WorkDir)
+	return scheduler.New(c.Config, m, c.dagRunMgr, c.dagRunStore, c.QueueStore, c.ProcStore), nil
 }
 
 // StringParam retrieves a string parameter from the command line flags.

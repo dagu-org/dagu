@@ -120,9 +120,9 @@ func New(
 	dag *digraph.DAG,
 	logDir string,
 	logFile string,
-	cli history.DAGRunManager,
+	drm history.DAGRunManager,
 	ds models.DAGStore,
-	hs models.DAGRunStore,
+	drs models.DAGRunStore,
 	ps models.ProcStore,
 	root digraph.DAGRunRef,
 	opts Options,
@@ -136,9 +136,9 @@ func New(
 		retryTarget:   opts.RetryTarget,
 		logDir:        logDir,
 		logFile:       logFile,
-		dagRunManager: cli,
+		dagRunManager: drm,
 		dagStore:      ds,
-		dagRunStore:   hs,
+		dagRunStore:   drs,
 		procStore:     ps,
 	}
 }

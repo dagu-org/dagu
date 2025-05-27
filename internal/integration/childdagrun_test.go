@@ -63,7 +63,7 @@ steps:
 	// First, find the child_2 DAG-run ID to update its status
 	ctx := context.Background()
 	ref := digraph.NewDAGRunRef("parent", dagRunID)
-	parentAttempt, err := th.HistoryStore.FindAttempt(ctx, ref)
+	parentAttempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
 
 	updateStatus := func(rec models.DAGRunAttempt, status *models.DAGRunStatus) {
@@ -84,7 +84,7 @@ steps:
 	updateStatus(parentAttempt, parentStatus)
 
 	// (2) Find the child_1 DAG-run ID to update its status
-	child1Attempt, err := th.HistoryStore.FindChildAttempt(ctx, ref, child1Node.Children[0].DAGRunID)
+	child1Attempt, err := th.DAGRunStore.FindChildAttempt(ctx, ref, child1Node.Children[0].DAGRunID)
 	require.NoError(t, err)
 
 	child1Status, err := child1Attempt.ReadStatus(ctx)
@@ -96,7 +96,7 @@ steps:
 	updateStatus(child1Attempt, child1Status)
 
 	// (4) Find the child_2 DAG-run ID to update its status
-	child2Attempt, err := th.HistoryStore.FindChildAttempt(ctx, ref, child2Node.Children[0].DAGRunID)
+	child2Attempt, err := th.DAGRunStore.FindChildAttempt(ctx, ref, child2Node.Children[0].DAGRunID)
 	require.NoError(t, err)
 
 	child2Status, err := child2Attempt.ReadStatus(ctx)
@@ -122,7 +122,7 @@ steps:
 	})
 
 	// Check if the child_2 status is now "success"
-	child2Attempt, err = th.HistoryStore.FindChildAttempt(ctx, ref, child2Node.Children[0].DAGRunID)
+	child2Attempt, err = th.DAGRunStore.FindChildAttempt(ctx, ref, child2Node.Children[0].DAGRunID)
 	require.NoError(t, err)
 	child2Status, err = child2Attempt.ReadStatus(ctx)
 	require.NoError(t, err)

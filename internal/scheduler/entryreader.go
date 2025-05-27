@@ -66,25 +66,25 @@ func NewEntryReader(dir string, dagCli models.DAGStore, hm history.DAGRunManager
 	}
 }
 
-func (m *entryReaderImpl) Start(ctx context.Context, done chan any) error {
-	if err := m.initialize(ctx); err != nil {
+func (er *entryReaderImpl) Start(ctx context.Context, done chan any) error {
+	if err := er.initialize(ctx); err != nil {
 		return fmt.Errorf("failed to initialize DAGs: %w", err)
 	}
 
-	go m.watchDags(ctx, done)
+	go er.watchDags(ctx, done)
 
 	return nil
 }
 
-func (m *entryReaderImpl) Next(ctx context.Context, now time.Time) ([]*ScheduledJob, error) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+func (er *entryReaderImpl) Next(ctx context.Context, now time.Time) ([]*ScheduledJob, error) {
+	er.lock.Lock()
+	defer er.lock.Unlock()
 
 	var jobs []*ScheduledJob
 
-	for _, dag := range m.registry {
+	for _, dag := range er.registry {
 		dagName := strings.TrimSuffix(filepath.Base(dag.Location), filepath.Ext(dag.Location))
-		if m.dagClient.IsSuspended(ctx, dagName) {
+		if er.dagClient.IsSuspended(ctx, dagName) {
 			continue
 		}
 
@@ -100,7 +100,7 @@ func (m *entryReaderImpl) Next(ctx context.Context, now time.Time) ([]*Scheduled
 		for _, s := range schedules {
 			for _, schedule := range s.items {
 				next := schedule.Parsed.Next(now)
-				job := NewScheduledJob(next, m.createJob(dag, next, schedule.Parsed), s.typ)
+				job := NewScheduledJob(next, er.createJob(dag, next, schedule.Parsed), s.typ)
 				jobs = append(jobs, job)
 			}
 		}
@@ -109,23 +109,23 @@ func (m *entryReaderImpl) Next(ctx context.Context, now time.Time) ([]*Scheduled
 	return jobs, nil
 }
 
-func (m *entryReaderImpl) createJob(dag *digraph.DAG, next time.Time, schedule cron.Schedule) Job {
+func (er *entryReaderImpl) createJob(dag *digraph.DAG, next time.Time, schedule cron.Schedule) Job {
 	return &DAGRunJob{
 		DAG:        dag,
-		Executable: m.executable,
-		WorkDir:    m.workDir,
+		Executable: er.executable,
+		WorkDir:    er.workDir,
 		Next:       next,
 		Schedule:   schedule,
-		Client:     m.historyManager,
+		Client:     er.historyManager,
 	}
 }
 
-func (m *entryReaderImpl) initialize(ctx context.Context) error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+func (er *entryReaderImpl) initialize(ctx context.Context) error {
+	er.lock.Lock()
+	defer er.lock.Unlock()
 
-	logger.Info(ctx, "Loading DAGs", "dir", m.targetDir)
-	fis, err := os.ReadDir(m.targetDir)
+	logger.Info(ctx, "Loading DAGs", "dir", er.targetDir)
+	fis, err := os.ReadDir(er.targetDir)
 	if err != nil {
 		return err
 	}
@@ -133,12 +133,12 @@ func (m *entryReaderImpl) initialize(ctx context.Context) error {
 	var dags []string
 	for _, fi := range fis {
 		if fileutil.IsYAMLFile(fi.Name()) {
-			dag, err := digraph.Load(ctx, filepath.Join(m.targetDir, fi.Name()), digraph.OnlyMetadata(), digraph.WithoutEval())
+			dag, err := digraph.Load(ctx, filepath.Join(er.targetDir, fi.Name()), digraph.OnlyMetadata(), digraph.WithoutEval())
 			if err != nil {
 				logger.Error(ctx, "DAG load failed", "err", err, "name", fi.Name())
 				continue
 			}
-			m.registry[fi.Name()] = dag
+			er.registry[fi.Name()] = dag
 			dags = append(dags, fi.Name())
 		}
 	}
@@ -147,7 +147,7 @@ func (m *entryReaderImpl) initialize(ctx context.Context) error {
 	return nil
 }
 
-func (m *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
+func (er *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
 	watcher, err := filenotify.New(time.Minute)
 	if err != nil {
 		logger.Error(ctx, "Watcher creation failed", "err", err)
@@ -158,7 +158,7 @@ func (m *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
 		_ = watcher.Close()
 	}()
 
-	_ = watcher.Add(m.targetDir)
+	_ = watcher.Add(er.targetDir)
 
 	for {
 		select {
@@ -174,22 +174,22 @@ func (m *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
 				continue
 			}
 
-			m.lock.Lock()
+			er.lock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				filePath := filepath.Join(m.targetDir, filepath.Base(event.Name))
+				filePath := filepath.Join(er.targetDir, filepath.Base(event.Name))
 				dag, err := digraph.Load(ctx, filePath, digraph.OnlyMetadata(), digraph.WithoutEval())
 				if err != nil {
 					logger.Error(ctx, "DAG load failed", "err", err, "file", event.Name)
 				} else {
-					m.registry[filepath.Base(event.Name)] = dag
+					er.registry[filepath.Base(event.Name)] = dag
 					logger.Info(ctx, "DAG added/updated", "name", filepath.Base(event.Name))
 				}
 			}
 			if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
-				delete(m.registry, filepath.Base(event.Name))
+				delete(er.registry, filepath.Base(event.Name))
 				logger.Info(ctx, "DAG removed", "name", filepath.Base(event.Name))
 			}
-			m.lock.Unlock()
+			er.lock.Unlock()
 
 		case err, ok := <-watcher.Errors():
 			if !ok {

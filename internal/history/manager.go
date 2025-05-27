@@ -23,12 +23,12 @@ import (
 // New creates a new Manager instance.
 // The Manager is used to interact with the DAG.
 func New(
-	hs models.DAGRunStore,
+	drs models.DAGRunStore,
 	executable string,
 	workDir string,
 ) DAGRunManager {
 	return DAGRunManager{
-		dagRunStore: hs,
+		dagRunStore: drs,
 		executable:  executable,
 		workDir:     workDir,
 	}
@@ -46,14 +46,14 @@ type DAGRunManager struct {
 
 // LoadYAML loads a DAG from YAML specification bytes without evaluating it.
 // It appends the WithoutEval option to any provided options.
-func (m *DAGRunManager) LoadYAML(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error) {
+func (drm *DAGRunManager) LoadYAML(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error) {
 	opts = append(slices.Clone(opts), digraph.WithoutEval())
 	return digraph.LoadYAML(ctx, spec, opts...)
 }
 
 // Stop stops a running DAG by sending a stop request to its socket.
 // If the DAG is not running, it logs a message and returns nil.
-func (m *DAGRunManager) Stop(ctx context.Context, dag *digraph.DAG, dagRunID string) error {
+func (drm *DAGRunManager) Stop(ctx context.Context, dag *digraph.DAG, dagRunID string) error {
 	logger.Info(ctx, "Stopping", "name", dag.Name)
 	addr := dag.SockAddr(dagRunID)
 	if !fileutil.FileExists(addr) {
@@ -66,7 +66,7 @@ func (m *DAGRunManager) Stop(ctx context.Context, dag *digraph.DAG, dagRunID str
 }
 
 // GenDAGRunID generates a unique ID for a DAG run using UUID version 7.
-func (m *DAGRunManager) GenDAGRunID(_ context.Context) (string, error) {
+func (drm *DAGRunManager) GenDAGRunID(_ context.Context) (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return "", fmt.Errorf("failed to generate DAG run ID: %w", err)
@@ -76,7 +76,7 @@ func (m *DAGRunManager) GenDAGRunID(_ context.Context) (string, error) {
 
 // StartDAGRun starts a DAG run by executing the configured executable with the start command.
 // It sets up the command to run in its own process group and configures standard output/error.
-func (m *DAGRunManager) StartDAGRun(_ context.Context, dag *digraph.DAG, opts StartOptions) error {
+func (drm *DAGRunManager) StartDAGRun(_ context.Context, dag *digraph.DAG, opts StartOptions) error {
 	args := []string{"start"}
 	if opts.Params != "" {
 		args = append(args, "-p")
@@ -96,9 +96,9 @@ func (m *DAGRunManager) StartDAGRun(_ context.Context, dag *digraph.DAG, opts St
 	}
 	args = append(args, dag.Location)
 	// nolint:gosec
-	cmd := exec.Command(m.executable, args...)
+	cmd := exec.Command(drm.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
-	cmd.Dir = m.workDir
+	cmd.Dir = drm.workDir
 	cmd.Env = os.Environ()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -107,7 +107,7 @@ func (m *DAGRunManager) StartDAGRun(_ context.Context, dag *digraph.DAG, opts St
 }
 
 // EnqueueDAGRun enqueues a DAG run by executing the configured executable with the enqueue command.
-func (m *DAGRunManager) EnqueueDAGRun(_ context.Context, dag *digraph.DAG, opts EnqueueOptions) error {
+func (drm *DAGRunManager) EnqueueDAGRun(_ context.Context, dag *digraph.DAG, opts EnqueueOptions) error {
 	args := []string{"enqueue"}
 	if opts.Params != "" {
 		args = append(args, "-p")
@@ -127,9 +127,9 @@ func (m *DAGRunManager) EnqueueDAGRun(_ context.Context, dag *digraph.DAG, opts 
 	}
 	args = append(args, dag.Location)
 	// nolint:gosec
-	cmd := exec.Command(m.executable, args...)
+	cmd := exec.Command(drm.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
-	cmd.Dir = m.workDir
+	cmd.Dir = drm.workDir
 	cmd.Env = os.Environ()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -143,7 +143,7 @@ func (m *DAGRunManager) EnqueueDAGRun(_ context.Context, dag *digraph.DAG, opts 
 	return nil
 }
 
-func (m *DAGRunManager) DequeueDAGRun(_ context.Context, dagRun digraph.DAGRunRef) error {
+func (drm *DAGRunManager) DequeueDAGRun(_ context.Context, dagRun digraph.DAGRunRef) error {
 	args := []string{"dequeue", fmt.Sprintf("--workflow=%s", dagRun.String())}
 	if configFile := config.UsedConfigFile.Load(); configFile != nil {
 		if configFile, ok := configFile.(string); ok {
@@ -152,9 +152,9 @@ func (m *DAGRunManager) DequeueDAGRun(_ context.Context, dagRun digraph.DAGRunRe
 		}
 	}
 	// nolint:gosec
-	cmd := exec.Command(m.executable, args...)
+	cmd := exec.Command(drm.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
-	cmd.Dir = m.workDir
+	cmd.Dir = drm.workDir
 	cmd.Env = os.Environ()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -170,7 +170,7 @@ func (m *DAGRunManager) DequeueDAGRun(_ context.Context, dagRun digraph.DAGRunRe
 
 // RestartDAG restarts a DAG by executing the configured executable with the restart command.
 // It sets up the command to run in its own process group.
-func (m *DAGRunManager) RestartDAG(_ context.Context, dag *digraph.DAG, opts RestartOptions) error {
+func (drm *DAGRunManager) RestartDAG(_ context.Context, dag *digraph.DAG, opts RestartOptions) error {
 	args := []string{"restart"}
 	if opts.Quiet {
 		args = append(args, "-q")
@@ -183,15 +183,15 @@ func (m *DAGRunManager) RestartDAG(_ context.Context, dag *digraph.DAG, opts Res
 	}
 	args = append(args, dag.Location)
 	// nolint:gosec
-	cmd := exec.Command(m.executable, args...)
+	cmd := exec.Command(drm.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
-	cmd.Dir = m.workDir
+	cmd.Dir = drm.workDir
 	cmd.Env = os.Environ()
 	return cmd.Start()
 }
 
 // RetryDAGRun retries a DAG run by executing the configured executable with the retry command.
-func (m *DAGRunManager) RetryDAGRun(_ context.Context, dag *digraph.DAG, dagRunID string) error {
+func (drm *DAGRunManager) RetryDAGRun(_ context.Context, dag *digraph.DAG, dagRunID string) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--workflow-id=%s", dagRunID))
 	if configFile := config.UsedConfigFile.Load(); configFile != nil {
@@ -202,25 +202,25 @@ func (m *DAGRunManager) RetryDAGRun(_ context.Context, dag *digraph.DAG, dagRunI
 	}
 	args = append(args, dag.Name)
 	// nolint:gosec
-	cmd := exec.Command(m.executable, args...)
+	cmd := exec.Command(drm.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
-	cmd.Dir = m.workDir
+	cmd.Dir = drm.workDir
 	cmd.Env = os.Environ()
 	return cmd.Start()
 }
 
 // IsRunning checks if a DAG run is currently running by querying its status.
 // Returns true if the status can be retrieved without error, indicating the DAG is running.
-func (m *DAGRunManager) IsRunning(ctx context.Context, dag *digraph.DAG, dagRunID string) bool {
-	_, err := m.currentStatus(ctx, dag, dagRunID)
+func (drm *DAGRunManager) IsRunning(ctx context.Context, dag *digraph.DAG, dagRunID string) bool {
+	_, err := drm.currentStatus(ctx, dag, dagRunID)
 	return err == nil
 }
 
 // GetCurrentStatus retrieves the current status of a DAG run by its run ID.
 // If the DAG run is running, it queries the socket for the current status.
 // If the socket doesn't exist or times out, it falls back to stored status or creates an initial status.
-func (m *DAGRunManager) GetCurrentStatus(ctx context.Context, dag *digraph.DAG, dagRunID string) (*models.DAGRunStatus, error) {
-	status, err := m.currentStatus(ctx, dag, dagRunID)
+func (drm *DAGRunManager) GetCurrentStatus(ctx context.Context, dag *digraph.DAG, dagRunID string) (*models.DAGRunStatus, error) {
+	status, err := drm.currentStatus(ctx, dag, dagRunID)
 	if err != nil {
 		// No such file or directory
 		if errors.Is(err, os.ErrNotExist) {
@@ -239,12 +239,12 @@ FALLBACK:
 		status := models.InitialStatus(dag)
 		return &status, nil
 	}
-	return m.getPersistedOrCurrentStatus(ctx, dag, dagRunID)
+	return drm.getPersistedOrCurrentStatus(ctx, dag, dagRunID)
 }
 
 // GetSavedStatus retrieves the saved status of a DAG run by its digraph.DAGRun reference.
-func (e *DAGRunManager) GetSavedStatus(ctx context.Context, dagRun digraph.DAGRunRef) (*models.DAGRunStatus, error) {
-	attempt, err := e.dagRunStore.FindAttempt(ctx, dagRun)
+func (drm *DAGRunManager) GetSavedStatus(ctx context.Context, dagRun digraph.DAGRunRef) (*models.DAGRunStatus, error) {
+	attempt, err := drm.dagRunStore.FindAttempt(ctx, dagRun)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by run reference: %w", err)
 	}
@@ -258,11 +258,11 @@ func (e *DAGRunManager) GetSavedStatus(ctx context.Context, dagRun digraph.DAGRu
 // getPersistedOrCurrentStatus retrieves the persisted status of a DAG run by its ID.
 // If the stored status indicates the DAG is running, it attempts to get the current status.
 // If status is running and current status retrieval fails, it marks the status as error.
-func (m *DAGRunManager) getPersistedOrCurrentStatus(ctx context.Context, dag *digraph.DAG, dagRunID string) (
+func (drm *DAGRunManager) getPersistedOrCurrentStatus(ctx context.Context, dag *digraph.DAG, dagRunID string) (
 	*models.DAGRunStatus, error,
 ) {
 	dagRunRef := digraph.NewDAGRunRef(dag.Name, dagRunID)
-	attempt, err := m.dagRunStore.FindAttempt(ctx, dagRunRef)
+	attempt, err := drm.dagRunStore.FindAttempt(ctx, dagRunRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by DAG run ID: %w", err)
 	}
@@ -273,7 +273,7 @@ func (m *DAGRunManager) getPersistedOrCurrentStatus(ctx context.Context, dag *di
 
 	// If the DAG is running, query the current status
 	if status.Status == scheduler.StatusRunning {
-		currentStatus, err := m.currentStatus(ctx, dag, status.DAGRunID)
+		currentStatus, err := drm.currentStatus(ctx, dag, status.DAGRunID)
 		if err == nil {
 			return currentStatus, nil
 		}
@@ -290,8 +290,8 @@ func (m *DAGRunManager) getPersistedOrCurrentStatus(ctx context.Context, dag *di
 
 // FindChildDAGRunStatus retrieves the status of a child DAG run by its ID.
 // It looks up the child attempt in the history store and reads its status.
-func (m *DAGRunManager) FindChildDAGRunStatus(ctx context.Context, rootDAGRun digraph.DAGRunRef, childRunID string) (*models.DAGRunStatus, error) {
-	attempt, err := m.dagRunStore.FindChildAttempt(ctx, rootDAGRun, childRunID)
+func (drm *DAGRunManager) FindChildDAGRunStatus(ctx context.Context, rootDAGRun digraph.DAGRunRef, childRunID string) (*models.DAGRunStatus, error) {
+	attempt, err := drm.dagRunStore.FindChildAttempt(ctx, rootDAGRun, childRunID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find child DAG run attempt: %w", err)
 	}
@@ -318,11 +318,11 @@ func (*DAGRunManager) currentStatus(_ context.Context, dag *digraph.DAG, dagRunI
 // GetLatestStatus retrieves the latest status of a DAG.
 // If the DAG is running, it attempts to get the current status from the socket.
 // If that fails or no status exists, it returns an initial status or an error.
-func (m *DAGRunManager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models.DAGRunStatus, error) {
+func (drm *DAGRunManager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models.DAGRunStatus, error) {
 	var latestStatus *models.DAGRunStatus
 
 	// Find the latest status by name
-	attempt, err := m.dagRunStore.LatestAttempt(ctx, dag.Name)
+	attempt, err := drm.dagRunStore.LatestAttempt(ctx, dag.Name)
 	if err != nil {
 		goto handleError
 	}
@@ -335,7 +335,7 @@ func (m *DAGRunManager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (
 
 	// If the DAG is running, query the current status
 	if latestStatus.Status == scheduler.StatusRunning {
-		currentStatus, err := m.currentStatus(ctx, dag, latestStatus.DAGRunID)
+		currentStatus, err := drm.currentStatus(ctx, dag, latestStatus.DAGRunID)
 		if err == nil {
 			return *currentStatus, nil
 		} else {
@@ -373,8 +373,8 @@ handleError:
 
 // ListRecentStatus retrieves the n most recent statuses for a DAG by name.
 // It returns a slice of Status objects, filtering out any that cannot be read.
-func (m *DAGRunManager) ListRecentStatus(ctx context.Context, name string, n int) []models.DAGRunStatus {
-	attempts := m.dagRunStore.RecentAttempts(ctx, name, n)
+func (drm *DAGRunManager) ListRecentStatus(ctx context.Context, name string, n int) []models.DAGRunStatus {
+	attempts := drm.dagRunStore.RecentAttempts(ctx, name, n)
 
 	var statuses []models.DAGRunStatus
 	for _, att := range attempts {
@@ -387,7 +387,7 @@ func (m *DAGRunManager) ListRecentStatus(ctx context.Context, name string, n int
 }
 
 // UpdateStatus updates the status of a DAG run.
-func (e *DAGRunManager) UpdateStatus(ctx context.Context, rootDAGRun digraph.DAGRunRef, newStatus models.DAGRunStatus) error {
+func (drm *DAGRunManager) UpdateStatus(ctx context.Context, rootDAGRun digraph.DAGRunRef, newStatus models.DAGRunStatus) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -401,7 +401,7 @@ func (e *DAGRunManager) UpdateStatus(ctx context.Context, rootDAGRun digraph.DAG
 
 	if rootDAGRun.ID == newStatus.DAGRunID {
 		// If the DAG-run ID matches the root DAG-run ID, find the attempt by the root DAG-run ID
-		att, err := e.dagRunStore.FindAttempt(ctx, rootDAGRun)
+		att, err := drm.dagRunStore.FindAttempt(ctx, rootDAGRun)
 		if err != nil {
 			return fmt.Errorf("failed to find the DAG-run: %w", err)
 		}
@@ -409,7 +409,7 @@ func (e *DAGRunManager) UpdateStatus(ctx context.Context, rootDAGRun digraph.DAG
 	} else {
 		// If the DAG-run ID does not match the root DAG-run ID,
 		// find the attempt by the child DAG-run ID
-		att, err := e.dagRunStore.FindChildAttempt(ctx, rootDAGRun, newStatus.DAGRunID)
+		att, err := drm.dagRunStore.FindChildAttempt(ctx, rootDAGRun, newStatus.DAGRunID)
 		if err != nil {
 			return fmt.Errorf("failed to find child DAG-run: %w", err)
 		}

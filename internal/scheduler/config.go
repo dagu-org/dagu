@@ -21,17 +21,17 @@ func NewConfigSet() *ConfigSet {
 }
 
 // Get retrieves the configuration for a given DAG name.
-func (w *ConfigSet) Get(name string) Config {
-	w.mu.RLock()
-	defer w.mu.RUnlock()
-	return w.configs[name]
+func (cs *ConfigSet) Get(name string) Config {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	return cs.configs[name]
 }
 
 // Set sets the configuration for a given DAG name.
-func (w *ConfigSet) Set(name string, config Config) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	w.configs[name] = config
+func (cs *ConfigSet) Set(name string, config Config) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	cs.configs[name] = config
 }
 
 // DefaultConfig is the default configuration used when no specific configuration is set.

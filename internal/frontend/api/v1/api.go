@@ -33,8 +33,8 @@ type API struct {
 
 func New(
 	dr models.DAGStore,
-	hr models.DAGRunStore,
-	hm history.DAGRunManager,
+	drs models.DAGRunStore,
+	drm history.DAGRunManager,
 	cfg *config.Config,
 ) *API {
 	remoteNodes := make(map[string]config.RemoteNode)
@@ -44,8 +44,8 @@ func New(
 
 	return &API{
 		dagStore:           dr,
-		dagRunStore:        hr,
-		dagRunManager:      hm,
+		dagRunStore:        drs,
+		dagRunManager:      drm,
 		logEncodingCharset: cfg.UI.LogEncodingCharset,
 		remoteNodes:        remoteNodes,
 		apiBasePath:        cfg.Server.APIBasePath,

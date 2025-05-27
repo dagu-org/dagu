@@ -102,12 +102,12 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	historyManager := history.New(runStore, cfg.Paths.Executable, cfg.Global.WorkDir)
 
 	helper := Helper{
-		Context:      createDefaultContext(),
-		Config:       cfg,
-		HistoryMgr:   historyManager,
-		DAGStore:     dagStore,
-		HistoryStore: runStore,
-		ProcStore:    procStore,
+		Context:     createDefaultContext(),
+		Config:      cfg,
+		DAGRunMgr:   historyManager,
+		DAGStore:    dagStore,
+		DAGRunStore: runStore,
+		ProcStore:   procStore,
 
 		tmpDir: tmpDir,
 	}
@@ -140,8 +140,8 @@ type Helper struct {
 	Config        *config.Config
 	LoggingOutput *SyncBuffer
 	DAGStore      models.DAGStore
-	HistoryStore  models.DAGRunStore
-	HistoryMgr    history.DAGRunManager
+	DAGRunStore   models.DAGRunStore
+	DAGRunMgr     history.DAGRunManager
 	ProcStore     models.ProcStore
 
 	tmpDir string
@@ -187,7 +187,7 @@ func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
 	require.Eventually(t, func() bool {
-		latest, err := d.HistoryMgr.GetLatestStatus(d.Context, d.DAG)
+		latest, err := d.DAGRunMgr.GetLatestStatus(d.Context, d.DAG)
 		if err != nil {
 			return false
 		}
@@ -201,7 +201,7 @@ func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
 
 	// the +1 to the limit is needed to ensure that the number of therunstore
 	// entries is exactly the expected number
-	runstore := d.HistoryMgr.ListRecentStatus(d.Context, d.Name, expected+1)
+	runstore := d.DAGRunMgr.ListRecentStatus(d.Context, d.Name, expected+1)
 	require.Len(t, runstore, expected)
 }
 
@@ -209,7 +209,7 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
 	assert.Eventually(t, func() bool {
-		curr, _ := d.HistoryMgr.GetCurrentStatus(d.Context, d.DAG, "")
+		curr, _ := d.DAGRunMgr.GetCurrentStatus(d.Context, d.DAG, "")
 		if curr == nil {
 			return false
 		}
@@ -224,7 +224,7 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]any) {
 	t.Helper()
 
-	status, err := d.HistoryMgr.GetLatestStatus(d.Context, d.DAG)
+	status, err := d.DAGRunMgr.GetLatestStatus(d.Context, d.DAG)
 	require.NoError(t, err)
 
 	// collect the actual outputs from the status
@@ -310,9 +310,9 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		d.DAG,
 		logDir,
 		logFile,
-		d.HistoryMgr,
+		d.DAGRunMgr,
 		d.DAGStore,
-		d.HistoryStore,
+		d.DAGRunStore,
 		d.ProcStore,
 		root,
 		helper.opts,

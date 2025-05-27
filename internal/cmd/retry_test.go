@@ -28,7 +28,7 @@ func TestRetryCommand(t *testing.T) {
 		dag, err := cli.GetMetadata(ctx, dagFile.Location)
 		require.NoError(t, err)
 
-		status, err := th.HistoryMgr.GetLatestStatus(ctx, dag)
+		status, err := th.DAGRunMgr.GetLatestStatus(ctx, dag)
 		require.NoError(t, err)
 		require.Equal(t, status.Status, scheduler.StatusSuccess)
 		require.NotNil(t, status.Status)

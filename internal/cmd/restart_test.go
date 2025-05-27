@@ -53,7 +53,7 @@ func TestRestartCommand(t *testing.T) {
 		time.Sleep(time.Millisecond * 300) // Wait for the history to be updated.
 
 		// Check parameter was the same as the first execution
-		recentHistory := th.HistoryMgr.ListRecentStatus(th.Context, loaded.Name, 2)
+		recentHistory := th.DAGRunMgr.ListRecentStatus(th.Context, loaded.Name, 2)
 
 		require.Len(t, recentHistory, 2)
 		require.Equal(t, recentHistory[0].Params, recentHistory[1].Params)

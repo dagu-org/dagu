@@ -55,13 +55,13 @@ func runRestart(ctx *Context, args []string) error {
 	if dagRunID != "" {
 		// Retrieve the previous run for the specified workflow ID.
 		dagRunRef := digraph.NewDAGRunRef(name, dagRunID)
-		att, err := ctx.HistoryStore.FindAttempt(ctx, dagRunRef)
+		att, err := ctx.dagRunStore.FindAttempt(ctx, dagRunRef)
 		if err != nil {
 			return fmt.Errorf("failed to find the run for workflow ID %s: %w", dagRunID, err)
 		}
 		attempt = att
 	} else {
-		att, err := ctx.HistoryStore.LatestAttempt(ctx, name)
+		att, err := ctx.dagRunStore.LatestAttempt(ctx, name)
 		if err != nil {
 			return fmt.Errorf("failed to find the latest execution history for DAG %s: %w", name, err)
 		}
@@ -90,7 +90,7 @@ func runRestart(ctx *Context, args []string) error {
 
 func handleRestartProcess(ctx *Context, d *digraph.DAG, workflowID string) error {
 	// Stop if running
-	if err := stopDAGIfRunning(ctx, ctx.HistoryMgr, d, workflowID); err != nil {
+	if err := stopDAGIfRunning(ctx, ctx.dagRunMgr, d, workflowID); err != nil {
 		return fmt.Errorf("failed to stop DAG: %w", err)
 	}
 
@@ -101,7 +101,7 @@ func handleRestartProcess(ctx *Context, d *digraph.DAG, workflowID string) error
 	}
 
 	// Execute the exact same DAG with the same parameters but a new workflow ID
-	return executeDAG(ctx, ctx.HistoryMgr, d)
+	return executeDAG(ctx, ctx.dagRunMgr, d)
 }
 
 func executeDAG(ctx *Context, cli history.DAGRunManager, dag *digraph.DAG) error {
@@ -134,7 +134,7 @@ func executeDAG(ctx *Context, cli history.DAGRunManager, dag *digraph.DAG) error
 		logFile.Name(),
 		cli,
 		dr,
-		ctx.HistoryStore,
+		ctx.dagRunStore,
 		ctx.ProcStore,
 		digraph.NewDAGRunRef(dag.Name, workflowID),
 		agent.Options{Dry: false})
