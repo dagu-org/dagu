@@ -38,34 +38,190 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
 
   // Helper function to ensure we have a valid IANA timezone
   const getValidTimezone = React.useCallback((tz: string): string => {
-    // If it's already a valid timezone, return it
     try {
-      // Test if the timezone is valid
       dayjs().tz(tz);
       return tz;
     } catch {
-      // If it's an offset format like UTC+9, convert to a valid IANA timezone
       if (tz.startsWith('UTC+') || tz.startsWith('UTC-')) {
-        // Default to a common timezone in that offset
         return (
           'Etc/GMT' + (tz.startsWith('UTC+') ? '-' : '+') + tz.substring(4)
         );
       }
-      // Fall back to the browser's timezone
       return dayjs.tz.guess();
+    }
+  }, []);
+
+  // Function to determine appropriate time scale based on visible range
+  const updateTimeAxisBasedOnZoom = React.useCallback((timeline: Timeline) => {
+    try {
+      const range = timeline.getWindow();
+      const rangeInMs = range.end.getTime() - range.start.getTime();
+      const rangeInMinutes = rangeInMs / (1000 * 60);
+      const rangeInHours = rangeInMinutes / 60;
+      const rangeInDays = rangeInHours / 24;
+
+      let options = {};
+
+      if (rangeInMinutes < 30) {
+        // Less than 30 minutes - show 1-minute intervals
+        options = {
+          timeAxis: { scale: 'minute', step: 1 },
+          format: {
+            minorLabels: {
+              second: 's',
+              minute: 'HH:mm:ss',
+            },
+            majorLabels: {
+              minute: 'HH:mm',
+              hour: 'ddd D MMM HH:mm',
+            },
+          },
+        };
+      } else if (rangeInMinutes < 120) {
+        // 30 minutes to 2 hours - show 5-minute intervals
+        options = {
+          timeAxis: { scale: 'minute', step: 5 },
+          format: {
+            minorLabels: {
+              minute: 'HH:mm',
+              hour: 'HH:mm',
+            },
+            majorLabels: {
+              hour: 'ddd D MMM',
+              day: 'ddd D MMM',
+            },
+          },
+        };
+      } else if (rangeInHours < 6) {
+        // 2-6 hours - show 15-minute intervals
+        options = {
+          timeAxis: { scale: 'minute', step: 15 },
+          format: {
+            minorLabels: {
+              minute: 'HH:mm',
+              hour: 'HH:mm',
+            },
+            majorLabels: {
+              hour: 'ddd D MMM',
+              day: 'ddd D MMM',
+            },
+          },
+        };
+      } else if (rangeInHours < 24) {
+        // 6-24 hours - show hourly
+        options = {
+          timeAxis: { scale: 'hour', step: 1 },
+          format: {
+            minorLabels: {
+              hour: 'HH:mm',
+            },
+            majorLabels: {
+              day: 'ddd D MMM',
+            },
+          },
+        };
+      } else if (rangeInDays < 3) {
+        // 1-3 days - show 2-hour intervals
+        options = {
+          timeAxis: { scale: 'hour', step: 2 },
+          format: {
+            minorLabels: {
+              hour: 'HH:mm',
+              day: 'D',
+            },
+            majorLabels: {
+              day: 'ddd D MMM',
+              week: 'MMM YYYY',
+            },
+          },
+        };
+      } else if (rangeInDays < 7) {
+        // 3-7 days - show 4-hour intervals
+        options = {
+          timeAxis: { scale: 'hour', step: 4 },
+          format: {
+            minorLabels: {
+              hour: 'HH:mm',
+              day: 'D',
+            },
+            majorLabels: {
+              day: 'ddd D MMM',
+              week: 'MMM YYYY',
+            },
+          },
+        };
+      } else if (rangeInDays < 30) {
+        // 7-30 days - show daily
+        options = {
+          timeAxis: { scale: 'day', step: 1 },
+          format: {
+            minorLabels: {
+              day: 'D',
+              weekday: 'ddd',
+            },
+            majorLabels: {
+              week: 'W',
+              month: 'MMM YYYY',
+            },
+          },
+        };
+      } else if (rangeInDays < 90) {
+        // 30-90 days - show 2-day intervals
+        options = {
+          timeAxis: { scale: 'day', step: 2 },
+          format: {
+            minorLabels: {
+              day: 'D',
+              week: 'W',
+            },
+            majorLabels: {
+              month: 'MMM YYYY',
+            },
+          },
+        };
+      } else if (rangeInDays < 365) {
+        // 90-365 days - show weekly
+        options = {
+          timeAxis: { scale: 'week', step: 1 },
+          format: {
+            minorLabels: {
+              week: 'W',
+              month: 'MMM',
+            },
+            majorLabels: {
+              month: 'MMM YYYY',
+              year: 'YYYY',
+            },
+          },
+        };
+      } else {
+        // More than 365 days - show monthly
+        options = {
+          timeAxis: { scale: 'month', step: 1 },
+          format: {
+            minorLabels: {
+              month: 'MMM',
+            },
+            majorLabels: {
+              year: 'YYYY',
+            },
+          },
+        };
+      }
+
+      timeline.setOptions(options);
+    } catch (error) {
+      console.warn('Error updating time axis:', error);
     }
   }, []);
 
   useEffect(() => {
     if (!timelineRef.current) return;
 
-    // Get a valid timezone
     const validTimezone = getValidTimezone(config.tz);
-
     const items: TimelineItem[] = [];
     const now = dayjs();
 
-    // Use selected date for timeline view range if provided, otherwise use today
     const viewStartDate = selectedDate
       ? dayjs.unix(selectedDate.startTimestamp)
       : dayjs().startOf('day');
@@ -74,9 +230,7 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
       ? dayjs.unix(selectedDate.endTimestamp)
       : now.endOf('day');
 
-    // Store the initial view range for reset functionality
     if (!timelineInstance.current) {
-      // Store initial view range in a ref with validated dates
       initialViewRef.current = {
         start: !isNaN(viewStartDate.toDate().getTime())
           ? viewStartDate.toDate()
@@ -94,7 +248,6 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
         const startMoment = dayjs(start);
         const end = dagRun.finishedAt !== '-' ? dayjs(dagRun.finishedAt) : now;
 
-        // Validate that we have valid dates before adding to timeline
         const startDate = startMoment.tz(validTimezone).toDate();
         const endDate = end.tz(validTimezone).toDate();
 
@@ -117,7 +270,6 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
 
     const dataset = new DataSet(items);
 
-    // Validate view dates before using them
     const validViewStartDate = !isNaN(viewStartDate.toDate().getTime())
       ? viewStartDate.toDate()
       : dayjs().startOf('day').toDate();
@@ -126,7 +278,6 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
       : dayjs().endOf('day').toDate();
 
     if (!timelineInstance.current) {
-      // For vis-timeline, we need to use the Timeline constructor with options
       timelineInstance.current = new Timeline(timelineRef.current, dataset, {
         start: validViewStartDate,
         end: validViewEndDate,
@@ -156,33 +307,45 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
           axis: 2,
         },
       });
+
+      // Add range change listener for dynamic time axis
+      timelineInstance.current.on('rangechanged', () => {
+        if (timelineInstance.current) {
+          updateTimeAxisBasedOnZoom(timelineInstance.current);
+        }
+      });
+
+      // Initial update based on current view
+      updateTimeAxisBasedOnZoom(timelineInstance.current);
     } else {
       timelineInstance.current.setItems(dataset);
-      // Update the timeline window when selectedDate changes
       timelineInstance.current.setWindow(validViewStartDate, validViewEndDate);
     }
 
     return () => {
       if (timelineInstance.current) {
+        timelineInstance.current.off('rangechanged');
         timelineInstance.current.destroy();
         timelineInstance.current = null;
       }
     };
-  }, [input, config.tz, getValidTimezone, selectedDate]);
+  }, [
+    input,
+    config.tz,
+    getValidTimezone,
+    selectedDate,
+    updateTimeAxisBasedOnZoom,
+  ]);
 
-  // Add click event handler whenever the timeline instance is created or updated
   useEffect(() => {
     const timeline = timelineInstance.current;
     if (timeline) {
-      // Remove any existing click handlers to avoid duplicates
       timeline.off('click');
 
-      // Add the click handler
       timeline.on('click', (properties) => {
         if (properties.item) {
           const itemId = properties.item.toString();
 
-          // Find the original dagRun item that matches this ID
           const matchingDAGRun = input.find(
             (dagRun) => itemId === dagRun.name + `_${dagRun.dagRunId}`
           );
@@ -199,22 +362,18 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
     }
 
     return () => {
-      // Clean up the event handler when the component unmounts or timeline changes
       if (timeline) {
         timeline.off('click');
       }
     };
-  }, [input]); // Re-run when input data changes, as that's when timeline might be recreated
+  }, [input]);
 
-  // Handle modal close
   const handleCloseModal = () => {
     setIsModalOpen(false);
   };
 
-  // Reference to store initial view range for reset functionality
   const initialViewRef = useRef<{ start: Date; end: Date } | null>(null);
 
-  // Timeline navigation handlers
   const handleZoomIn = () => {
     if (timelineInstance.current) {
       timelineInstance.current.zoomIn(0.5);
@@ -229,11 +388,14 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
 
   const handleFit = () => {
     if (timelineInstance.current) {
-      // Simply call fit without checking items - vis-timeline handles empty datasets
       try {
         timelineInstance.current.fit();
-      } catch (fitError) {
-        console.warn('Timeline fit failed:', fitError);
+      } catch {
+        try {
+          timelineInstance.current.fit();
+        } catch (fitError) {
+          console.warn('Timeline fit failed:', fitError);
+        }
       }
     }
   };
@@ -241,7 +403,6 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
   const handleCurrent = () => {
     if (timelineInstance.current) {
       const now = dayjs();
-      // Move to current time with a 2-hour window
       timelineInstance.current.setWindow(
         now.subtract(1, 'hour').toDate(),
         now.add(1, 'hour').toDate()
@@ -251,7 +412,6 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
 
   const handleReset = () => {
     if (timelineInstance.current && initialViewRef.current) {
-      // Reset to the initial view range
       timelineInstance.current.setWindow(
         initialViewRef.current.start,
         initialViewRef.current.end
