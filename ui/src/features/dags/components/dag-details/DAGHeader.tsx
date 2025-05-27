@@ -51,8 +51,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
         <div className="flex-1 min-w-0">
           {/* Breadcrumb navigation */}
           <nav className="flex flex-wrap items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400 mb-2">
-            {dagRunToDisplay.rootDAGRunId !==
-              dagRunToDisplay.dagRunId && (
+            {dagRunToDisplay.rootDAGRunId !== dagRunToDisplay.dagRunId && (
               <>
                 <a
                   href={`/dags/${fileName}?dagRunId=${dagRunToDisplay.rootDAGRunId}&dagRunName=${encodeURIComponent(dagRunToDisplay.rootDAGRunName)}`}
@@ -71,8 +70,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
               dagRunToDisplay.parentDAGRunId &&
               dagRunToDisplay.parentDAGRunName !==
                 dagRunToDisplay.rootDAGRunName &&
-              dagRunToDisplay.parentDAGRunName !==
-                dagRunToDisplay.name && (
+              dagRunToDisplay.parentDAGRunName !== dagRunToDisplay.name && (
                 <>
                   <a
                     href={`/dags/${fileName}?dagRunId=${dagRunToDisplay.rootDAGRunId}&childDAGRunId=${dagRunToDisplay.parentDAGRunId}&dagRunName=${encodeURIComponent(dagRunToDisplay.rootDAGRunName)}`}
@@ -160,7 +158,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
 
               <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 ml-auto">
                 <span className="font-medium text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                  DAG-run ID
+                  Run ID
                 </span>
                 <code className="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-3 py-1.5 rounded-md text-xs font-mono border">
                   {dagRunToDisplay.rootDAGRunId}

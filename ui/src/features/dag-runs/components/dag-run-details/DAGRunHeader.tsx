@@ -11,10 +11,7 @@ interface DAGRunHeaderProps {
   refreshFn: () => void;
 }
 
-const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({
-  dagRun,
-  refreshFn,
-}) => {
+const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
   const navigate = useNavigate();
 
   // Format duration utility function
@@ -33,9 +30,7 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({
 
   const handleRootDAGRunClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    navigate(
-      `/dag-runs/${dagRun.rootDAGRunName}/${dagRun.rootDAGRunId}`
-    );
+    navigate(`/dag-runs/${dagRun.rootDAGRunName}/${dagRun.rootDAGRunId}`);
   };
 
   const handleParentDAGRunClick = (e: React.MouseEvent) => {
@@ -148,7 +143,7 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({
 
             <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 ml-auto">
               <span className="font-medium text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                DAG-run ID
+                Run ID
               </span>
               <code className="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-3 py-1.5 rounded-md text-xs font-mono border">
                 {dagRun.dagRunId}
