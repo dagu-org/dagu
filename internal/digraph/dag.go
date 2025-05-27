@@ -19,7 +19,7 @@ const (
 	defaultMaxCleanUpTime       = 60 * time.Second
 )
 
-// DAG contains all information about a workflow.
+// DAG contains all information about a DAG.
 type DAG struct {
 	// Location is the absolute path to the DAG file.
 	Location string `json:"location,omitempty"`
@@ -205,17 +205,17 @@ func (d *DAG) HasTag(tag string) bool {
 
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
-func (d *DAG) SockAddr(workflowID string) string {
+func (d *DAG) SockAddr(dagRunID string) string {
 	if d.Location != "" {
 		return SockAddr(d.Location, "")
 	}
-	return SockAddr(d.Name, workflowID)
+	return SockAddr(d.Name, dagRunID)
 }
 
-// SockAddrSub returns the unix socket address for a specific workflow ID.
-// This is used to control child workflows.
-func (d *DAG) SockAddrSub(workflowID string) string {
-	return SockAddr(d.GetName(), workflowID)
+// SockAddrForChildDAGRun returns the unix socket address for a specific DAG-run ID.
+// This is used to control child DAG-runs.
+func (d *DAG) SockAddrForChildDAGRun(dagRunID string) string {
+	return SockAddr(d.GetName(), dagRunID)
 }
 
 // GetName returns the name of the DAG.

@@ -22,13 +22,13 @@ func TestQueueReader(t *testing.T) {
 	// Add some items to the queue
 	err := store.Enqueue(ctx, "test-name", models.QueuePriorityLow, digraph.DAGRunRef{
 		Name: "test-name",
-		ID:   "test-workflow-1",
+		ID:   "test-dag-1",
 	})
 	require.NoError(t, err, "expected no error when adding job to store")
 
 	err = store.Enqueue(ctx, "test-name", models.QueuePriorityHigh, digraph.DAGRunRef{
 		Name: "test-name",
-		ID:   "test-workflow-2",
+		ID:   "test-dag-2",
 	})
 	require.NoError(t, err, "expected no error when adding job to store")
 
@@ -61,10 +61,10 @@ func TestQueueReader(t *testing.T) {
 
 	// Verify that the high priority item was received first
 	data1 := receivedItems[0].Data()
-	require.Equal(t, "test-workflow-2", data1.ID, "expected high priority item first")
+	require.Equal(t, "test-dag-2", data1.ID, "expected high priority item first")
 
 	data2 := receivedItems[1].Data()
-	require.Equal(t, "test-workflow-1", data2.ID, "expected low priority item second")
+	require.Equal(t, "test-dag-1", data2.ID, "expected low priority item second")
 
 	// Stop the reader
 	reader.Stop(ctx)
@@ -82,7 +82,7 @@ func TestQueueReaderChannelFull(t *testing.T) {
 	// Add an item to the queue
 	err := store.Enqueue(ctx, "test-name", models.QueuePriorityLow, digraph.DAGRunRef{
 		Name: "test-name",
-		ID:   "test-workflow-1",
+		ID:   "test-dag-1",
 	})
 	require.NoError(t, err, "expected no error when adding job to store")
 
@@ -149,7 +149,7 @@ func TestQueueReaderContextCancellation(t *testing.T) {
 	// Add an item to the queue
 	err := store.Enqueue(ctx, "test-name", models.QueuePriorityLow, digraph.DAGRunRef{
 		Name: "test-name",
-		ID:   "test-workflow-1",
+		ID:   "test-dag-1",
 	})
 	require.NoError(t, err, "expected no error when adding job to store")
 

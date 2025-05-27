@@ -37,7 +37,7 @@ type Scheduler struct {
 	stopChan     chan struct{}
 	running      atomic.Bool
 	location     *time.Location
-	historyStore models.DAGRunStore
+	dagRunStore  models.DAGRunStore
 	queueStore   models.QueueStore
 	procStore    models.ProcStore
 	cancel       context.CancelFunc
@@ -63,14 +63,14 @@ func New(
 	}
 
 	return &Scheduler{
-		logDir:       cfg.Paths.LogDir,
-		stopChan:     make(chan struct{}),
-		location:     timeLoc,
-		er:           er,
-		hm:           hm,
-		historyStore: hs,
-		queueStore:   qs,
-		procStore:    ps,
+		logDir:      cfg.Paths.LogDir,
+		stopChan:    make(chan struct{}),
+		location:    timeLoc,
+		er:          er,
+		hm:          hm,
+		dagRunStore: hs,
+		queueStore:  qs,
+		procStore:   ps,
 	}
 }
 
@@ -173,8 +173,8 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				goto SEND_RESULT
 			}
 
-			// Fetch the dag of the workflow
-			attempt, err = s.historyStore.FindAttempt(ctx, data)
+			// Fetch the DAG of the DAG-run attempt
+			attempt, err = s.dagRunStore.FindAttempt(ctx, data)
 			if err != nil {
 				logger.Error(ctx, "Failed to find run", "err", err, "data", data)
 				goto SEND_RESULT
@@ -214,7 +214,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 		WAIT_FOR_RUN:
 			for {
 				// Check if the dag is running
-				attempt, err = s.historyStore.FindAttempt(ctx, data)
+				attempt, err = s.dagRunStore.FindAttempt(ctx, data)
 				if err != nil {
 					logger.Error(ctx, "Failed to find run", "err", err, "data", data)
 				}

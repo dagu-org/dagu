@@ -109,7 +109,6 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 		cmd.Stdout = e.stdout
 	}
 	if e.stderr != nil {
-		// TODO: Separate stderr and stdout for child workflow to avoid mixing logger output
 		cmd.Stderr = e.stderr
 	}
 

@@ -294,19 +294,19 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		opt(helper)
 	}
 
-	var workflowID string
+	var dagRunID string
 	if helper.opts.RetryTarget != nil {
-		workflowID = helper.opts.RetryTarget.DAGRunID
+		dagRunID = helper.opts.RetryTarget.DAGRunID
 	} else {
-		workflowID = generateWorkflowID()
+		dagRunID = genDAGRunID()
 	}
 
 	logDir := d.Config.Paths.LogDir
-	logFile := filepath.Join(d.Config.Paths.LogDir, workflowID+".log")
-	root := digraph.NewDAGRunRef(d.Name, workflowID)
+	logFile := filepath.Join(d.Config.Paths.LogDir, dagRunID+".log")
+	root := digraph.NewDAGRunRef(d.Name, dagRunID)
 
 	helper.Agent = agent.New(
-		workflowID,
+		dagRunID,
 		d.DAG,
 		logDir,
 		logFile,
@@ -408,6 +408,7 @@ func createDefaultContext() context.Context {
 	))
 }
 
+// getShell returns the path to the default shell.
 func setShell(t *testing.T, shell string) {
 	t.Helper()
 
@@ -416,7 +417,8 @@ func setShell(t *testing.T, shell string) {
 	_ = os.Setenv("SHELL", shPath)
 }
 
-func generateWorkflowID() string {
+// genDAGRunID generates a new unique DAG run ID using UUID v7.
+func genDAGRunID() string {
 	id, err := uuid.NewV7()
 	if err != nil {
 		panic(err)

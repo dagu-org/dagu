@@ -23,8 +23,8 @@ var _ api.StrictServerInterface = (*API)(nil)
 
 type API struct {
 	dagStore           models.DAGStore
-	historyStore       models.DAGRunStore
-	historyManager     history.DAGRunManager
+	dagRunStore        models.DAGRunStore
+	dagRunManager      history.DAGRunManager
 	remoteNodes        map[string]config.RemoteNode
 	apiBasePath        string
 	logEncodingCharset string
@@ -44,8 +44,8 @@ func New(
 
 	return &API{
 		dagStore:           dr,
-		historyStore:       hr,
-		historyManager:     hm,
+		dagRunStore:        hr,
+		dagRunManager:      hm,
 		logEncodingCharset: cfg.UI.LogEncodingCharset,
 		remoteNodes:        remoteNodes,
 		apiBasePath:        cfg.Server.APIBasePath,
@@ -126,7 +126,7 @@ func (a *API) handleError(w http.ResponseWriter, _ *http.Request, err error) {
 	switch {
 	case errors.Is(err, models.ErrDAGRunIDNotFound):
 		code = api.ErrorCodeNotFound
-		message = "workflow ID not found"
+		message = "DAG-run not found"
 	}
 
 	w.Header().Set("Content-Type", "application/json")

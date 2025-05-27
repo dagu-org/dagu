@@ -52,17 +52,17 @@ steps:
     command: echo "Hello, $PARAM"
 `)
 
-	workflowID := uuid.Must(uuid.NewV7()).String()
-	args := []string{"start", "--workflow-id", workflowID, "parent"}
+	dagRunID := uuid.Must(uuid.NewV7()).String()
+	args := []string{"start", "--workflow-id", dagRunID, "parent"}
 	th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"DAG-run finished"},
 	})
 
 	// Update the child_2 status to "failed" to simulate a retry
-	// First, find the child_2 workflow ID to update its status
+	// First, find the child_2 DAG-run ID to update its status
 	ctx := context.Background()
-	ref := digraph.NewDAGRunRef("parent", workflowID)
+	ref := digraph.NewDAGRunRef("parent", dagRunID)
 	parentAttempt, err := th.HistoryStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
 
@@ -83,7 +83,7 @@ steps:
 	child1Node.Status = scheduler.NodeStatusError
 	updateStatus(parentAttempt, parentStatus)
 
-	// (2) Find the child_1 workflow ID to update its status
+	// (2) Find the child_1 DAG-run ID to update its status
 	child1Attempt, err := th.HistoryStore.FindChildAttempt(ctx, ref, child1Node.Children[0].DAGRunID)
 	require.NoError(t, err)
 
@@ -95,7 +95,7 @@ steps:
 	child2Node.Status = scheduler.NodeStatusError
 	updateStatus(child1Attempt, child1Status)
 
-	// (4) Find the child_2 workflow ID to update its status
+	// (4) Find the child_2 DAG-run ID to update its status
 	child2Attempt, err := th.HistoryStore.FindChildAttempt(ctx, ref, child2Node.Children[0].DAGRunID)
 	require.NoError(t, err)
 
@@ -115,7 +115,7 @@ steps:
 
 	// Retry the DAG
 
-	args = []string{"retry", "--workflow-id", workflowID, "parent"}
+	args = []string{"retry", "--workflow-id", dagRunID, "parent"}
 	th.RunCommand(t, cmd.CmdRetry(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"DAG-run finished"},
@@ -129,5 +129,5 @@ steps:
 	require.Equal(t, child2Status.Nodes[0].Status.String(), scheduler.NodeStatusSuccess.String())
 
 	require.Equal(t, "parent", child2Status.Root.Name, "parent")
-	require.Equal(t, workflowID, child2Status.Root.ID)
+	require.Equal(t, dagRunID, child2Status.Root.ID)
 }

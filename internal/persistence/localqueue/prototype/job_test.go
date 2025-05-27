@@ -13,9 +13,9 @@ func TestJob(t *testing.T) {
 	// Create a new job
 	job := NewJob(ItemData{
 		FileName: "/tmp/test-file.json",
-		Workflow: digraph.DAGRunRef{
+		DAGRun: digraph.DAGRunRef{
 			Name: "test-name",
-			ID:   "test-workflow",
+			ID:   "test-dag",
 		},
 	})
 
@@ -25,5 +25,5 @@ func TestJob(t *testing.T) {
 	// Check if the job data is correct
 	jobData := job.Data()
 	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
-	require.Equal(t, "test-workflow", jobData.ID, "expected job ID to be 'test-workflow'")
+	require.Equal(t, "test-dag", jobData.ID, "expected job ID to be 'test-dag'")
 }

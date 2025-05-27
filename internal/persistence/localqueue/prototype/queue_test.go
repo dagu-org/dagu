@@ -26,13 +26,13 @@ func TestQueue(t *testing.T) {
 	// Add a low priority job to the queue
 	err = queue.Enqueue(th.Context, models.QueuePriorityLow, digraph.DAGRunRef{
 		Name: "test-name",
-		ID:   "low-priority-workflow",
+		ID:   "low-priority-dag-run",
 	})
 
 	// Add a high priority job to the queue
 	err = queue.Enqueue(th.Context, models.QueuePriorityHigh, digraph.DAGRunRef{
 		Name: "test-name",
-		ID:   "high-priority-workflow",
+		ID:   "high-priority-dag-run",
 	})
 
 	// Check if the queue length is 2
@@ -47,7 +47,7 @@ func TestQueue(t *testing.T) {
 
 	jobData := job.Data()
 	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
-	require.Equal(t, "high-priority-workflow", jobData.ID, "expected job ID to be 'high-priority-workflow'")
+	require.Equal(t, "high-priority-dag-run", jobData.ID, "expected job ID to be 'high-priority-dag-run'")
 
 	// Now the queue should have only one item left
 	queueLen, err = queue.Len(th.Context)
@@ -60,10 +60,10 @@ func TestQueue(t *testing.T) {
 	require.NotNil(t, job, "expected job to be not nil")
 	jobData = job.Data()
 	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
-	require.Equal(t, "low-priority-workflow", jobData.ID, "expected job ID to be 'low-priority-workflow'")
+	require.Equal(t, "low-priority-dag-run", jobData.ID, "expected job ID to be 'low-priority-dag-run'")
 }
 
-func TestQueue_FindByWorkflowID(t *testing.T) {
+func TestQueue_FindByDAGRunID(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
@@ -74,30 +74,30 @@ func TestQueue_FindByWorkflowID(t *testing.T) {
 	// Add a low priority job to the queue
 	err := queue.Enqueue(th.Context, models.QueuePriorityLow, digraph.DAGRunRef{
 		Name: "test-name",
-		ID:   "low-priority-workflow",
+		ID:   "low-priority-dag-run",
 	})
 	require.NoError(t, err, "expected no error when adding job to queue")
 
 	// Add a high priority job to the queue
 	err = queue.Enqueue(th.Context, models.QueuePriorityHigh, digraph.DAGRunRef{
 		Name: "test-name",
-		ID:   "high-priority-workflow",
+		ID:   "high-priority-dag-run",
 	})
 	require.NoError(t, err, "expected no error when adding job to queue")
 
-	// Check if FindByWorkflowID returns the high priority job
-	job, err := queue.FindByWorkflowID(th.Context, "high-priority-workflow")
-	require.NoError(t, err, "expected no error when finding job by workflow ID")
+	// Check if FindByDAGRunID returns the high priority job
+	job, err := queue.FindByDAGRunID(th.Context, "high-priority-dag-run")
+	require.NoError(t, err, "expected no error when finding job by DAG-run ID")
 	require.NotNil(t, job, "expected job to be not nil")
 	jobData := job.Data()
 	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
-	require.Equal(t, "high-priority-workflow", jobData.ID, "expected job ID to be 'high-priority-workflow'")
+	require.Equal(t, "high-priority-dag-run", jobData.ID, "expected job ID to be 'high-priority-dag-run'")
 
-	// Check if FindByWorkflowID returns the low priority job
-	job, err = queue.FindByWorkflowID(th.Context, "low-priority-workflow")
-	require.NoError(t, err, "expected no error when finding job by workflow ID")
+	// Check if FindByDAGRunID returns the low priority job
+	job, err = queue.FindByDAGRunID(th.Context, "low-priority-dag-run")
+	require.NoError(t, err, "expected no error when finding job by DAG-run ID")
 	require.NotNil(t, job, "expected job to be not nil")
 	jobData = job.Data()
 	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
-	require.Equal(t, "low-priority-workflow", jobData.ID, "expected job ID to be 'low-priority-workflow'")
+	require.Equal(t, "low-priority-dag-run", jobData.ID, "expected job ID to be 'low-priority-dag-run'")
 }

@@ -21,19 +21,19 @@ func TestAttempt_Open(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "status.dat")
 
-	hr, err := NewAttempt(file, nil)
+	att, err := NewAttempt(file, nil)
 	require.NoError(t, err)
 
 	// Test successful open
-	err = hr.Open(context.Background())
+	err = att.Open(context.Background())
 	assert.NoError(t, err)
 
 	// Test open when already open
-	err = hr.Open(context.Background())
+	err = att.Open(context.Background())
 	assert.ErrorIs(t, err, ErrStatusFileOpen)
 
 	// Cleanup
-	err = hr.Close(context.Background())
+	err = att.Close(context.Background())
 	assert.NoError(t, err)
 }
 
@@ -41,30 +41,30 @@ func TestAttempt_Write(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "status.dat")
 
-	hr, err := NewAttempt(file, nil)
+	att, err := NewAttempt(file, nil)
 	require.NoError(t, err)
 
 	// Test write without open
 	status := createTestStatus(scheduler.StatusRunning)
-	err = hr.Write(context.Background(), status)
+	err = att.Write(context.Background(), status)
 	assert.ErrorIs(t, err, ErrStatusFileNotOpen)
 
 	// Open and write
-	err = hr.Open(context.Background())
+	err = att.Open(context.Background())
 	require.NoError(t, err)
 
 	// Write test status
-	err = hr.Write(context.Background(), status)
+	err = att.Write(context.Background(), status)
 	assert.NoError(t, err)
 
 	// Verify file content
-	actual, err := hr.ReadStatus(context.Background())
+	actual, err := att.ReadStatus(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, "test", actual.DAGRunID)
 	assert.Equal(t, scheduler.StatusRunning, actual.Status)
 
 	// Close
-	err = hr.Close(context.Background())
+	err = att.Close(context.Background())
 	assert.NoError(t, err)
 }
 
@@ -98,16 +98,16 @@ func TestAttempt_Read(t *testing.T) {
 	require.NoError(t, err)
 
 	// Initialize attempt
-	hr, err := NewAttempt(file, nil)
+	att, err := NewAttempt(file, nil)
 	require.NoError(t, err)
 
 	// Read status - should get the last entry (test2)
-	status, err := hr.ReadStatus(context.Background())
+	status, err := att.ReadStatus(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, scheduler.StatusSuccess.String(), status.Status.String())
 
 	// Read using ReadStatus
-	latestStatus, err := hr.ReadStatus(context.Background())
+	latestStatus, err := att.ReadStatus(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, scheduler.StatusSuccess.String(), latestStatus.Status.String())
 }
@@ -148,11 +148,11 @@ func TestAttempt_Compact(t *testing.T) {
 	beforeSize := fileInfo.Size()
 
 	// Initialize Attempt
-	hr, err := NewAttempt(file, nil)
+	att, err := NewAttempt(file, nil)
 	require.NoError(t, err)
 
 	// Compact the file
-	err = hr.Compact(context.Background())
+	err = att.Compact(context.Background())
 	assert.NoError(t, err)
 
 	// Get file size after compaction
@@ -164,7 +164,7 @@ func TestAttempt_Compact(t *testing.T) {
 	assert.Less(t, afterSize, beforeSize)
 
 	// Verify content is still correct
-	status, err := hr.ReadStatus(context.Background())
+	status, err := att.ReadStatus(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, scheduler.StatusSuccess, status.Status)
 }
@@ -174,26 +174,26 @@ func TestAttempt_Close(t *testing.T) {
 	file := filepath.Join(dir, "status.dat")
 
 	// Initialize and open Attempt
-	hr, err := NewAttempt(file, nil)
+	att, err := NewAttempt(file, nil)
 	require.NoError(t, err)
 
-	err = hr.Open(context.Background())
+	err = att.Open(context.Background())
 	require.NoError(t, err)
 
 	// Write some data
-	err = hr.Write(context.Background(), createTestStatus(scheduler.StatusRunning))
+	err = att.Write(context.Background(), createTestStatus(scheduler.StatusRunning))
 	require.NoError(t, err)
 
 	// Close
-	err = hr.Close(context.Background())
+	err = att.Close(context.Background())
 	assert.NoError(t, err)
 
 	// Verify we can't write after close
-	err = hr.Write(context.Background(), createTestStatus(scheduler.StatusSuccess))
+	err = att.Write(context.Background(), createTestStatus(scheduler.StatusSuccess))
 	assert.ErrorIs(t, err, ErrStatusFileNotOpen)
 
 	// Test double close is safe
-	err = hr.Close(context.Background())
+	err = att.Close(context.Background())
 	assert.NoError(t, err)
 }
 
@@ -201,24 +201,24 @@ func TestAttempt_HandleNonExistentFile(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "invalid.dat")
 
-	hr, err := NewAttempt(file, nil)
+	att, err := NewAttempt(file, nil)
 	require.NoError(t, err)
 
 	// Should be able to open a non-existent file
-	err = hr.Open(context.Background())
+	err = att.Open(context.Background())
 	assert.NoError(t, err)
 
 	// Write to create the file
-	err = hr.Write(context.Background(), createTestStatus(scheduler.StatusSuccess))
+	err = att.Write(context.Background(), createTestStatus(scheduler.StatusSuccess))
 	assert.NoError(t, err)
 
 	// Verify the file was created with correct data
-	status, err := hr.ReadStatus(context.Background())
+	status, err := att.ReadStatus(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, "test", status.DAGRunID)
 
 	// Cleanup
-	err = hr.Close(context.Background())
+	err = att.Close(context.Background())
 	assert.NoError(t, err)
 }
 
@@ -231,15 +231,15 @@ func TestAttempt_EmptyFile(t *testing.T) {
 	require.NoError(t, err)
 	_ = f.Close()
 
-	hr, err := NewAttempt(file, nil)
+	att, err := NewAttempt(file, nil)
 	require.NoError(t, err)
 
 	// Reading an empty file should return EOF
-	_, err = hr.ReadStatus(context.Background())
+	_, err = att.ReadStatus(context.Background())
 	assert.ErrorIs(t, err, io.EOF)
 
 	// Compacting an empty file should be safe
-	err = hr.Compact(context.Background())
+	err = att.Compact(context.Background())
 	assert.NoError(t, err)
 }
 
@@ -257,11 +257,11 @@ func TestAttempt_InvalidJSON(t *testing.T) {
 	_, err = f.Write([]byte("invalid json\n"))
 	require.NoError(t, err)
 
-	hr, err := NewAttempt(file, nil)
+	att, err := NewAttempt(file, nil)
 	require.NoError(t, err)
 
 	// Should be able to read and get the valid entry
-	status, err := hr.ReadStatus(context.Background())
+	status, err := att.ReadStatus(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, scheduler.StatusRunning.String(), status.Status.String())
 }

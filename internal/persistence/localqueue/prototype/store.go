@@ -22,7 +22,7 @@ var _ models.QueueStore = (*Store)(nil)
 // as a prototype for a more complex queue implementation.
 type Store struct {
 	baseDir string
-	// queues is a map of queues, where the key is the queue name (workflow name)
+	// queues is a map of queues, where the key is the queue name (DAG name)
 	queues map[string]*DualQueue
 	mu     sync.Mutex
 
@@ -47,7 +47,7 @@ func (s *Store) All(ctx context.Context) ([]models.QueuedItemData, error) {
 		// Grep high priority items in the directory
 		files, err := filepath.Glob(pattern)
 		if err != nil {
-			return nil, fmt.Errorf("failed to list high priority workflows: %w", err)
+			return nil, fmt.Errorf("failed to list high priority DAG-runs: %w", err)
 		}
 
 		// Sort the files by name which reflects the order of the items
@@ -82,7 +82,7 @@ func (s *Store) DequeueByName(ctx context.Context, name string) (models.QueuedIt
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to dequeue workflow %s: %w", name, err)
+		return nil, fmt.Errorf("failed to dequeue DAG-run %s: %w", name, err)
 	}
 
 	return item, nil
@@ -113,14 +113,14 @@ func (s *Store) List(ctx context.Context, name string) ([]models.QueuedItemData,
 	q := s.queues[name]
 	items, err := q.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list workflows %s: %w", name, err)
+		return nil, fmt.Errorf("failed to list DAG-runs %s: %w", name, err)
 	}
 
 	return items, nil
 }
 
 // DequeueByDAGRunID implements models.QueueStore.
-func (s *Store) DequeueByDAGRunID(ctx context.Context, name, workflowID string) ([]models.QueuedItemData, error) {
+func (s *Store) DequeueByDAGRunID(ctx context.Context, name, dagRunID string) ([]models.QueuedItemData, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -130,9 +130,9 @@ func (s *Store) DequeueByDAGRunID(ctx context.Context, name, workflowID string) 
 	}
 
 	q := s.queues[name]
-	item, err := q.DequeueByWorkflowID(ctx, workflowID)
+	item, err := q.DequeueByDAGRunID(ctx, dagRunID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to dequeue workflow %s: %w", workflowID, err)
+		return nil, fmt.Errorf("failed to dequeue DAG-run %s: %w", dagRunID, err)
 	}
 	items = append(items, item...)
 
@@ -144,7 +144,7 @@ func (s *Store) DequeueByDAGRunID(ctx context.Context, name, workflowID string) 
 }
 
 // Enqueue implements models.QueueStore.
-func (s *Store) Enqueue(ctx context.Context, name string, p models.QueuePriority, workflow digraph.DAGRunRef) error {
+func (s *Store) Enqueue(ctx context.Context, name string, p models.QueuePriority, dagRun digraph.DAGRunRef) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -153,8 +153,8 @@ func (s *Store) Enqueue(ctx context.Context, name string, p models.QueuePriority
 	}
 
 	q := s.queues[name]
-	if err := q.Enqueue(ctx, p, workflow); err != nil {
-		return fmt.Errorf("failed to enqueue workflow %s: %w", name, err)
+	if err := q.Enqueue(ctx, p, dagRun); err != nil {
+		return fmt.Errorf("failed to enqueue DAG-run %s: %w", name, err)
 	}
 
 	return nil
@@ -165,6 +165,7 @@ func (s *Store) Reader(ctx context.Context) models.QueueReader {
 	return newQueueReader(s)
 }
 
+// createDualQueue creates a new DualQueue for the given name.
 func (s *Store) createDualQueue(name string) *DualQueue {
 	queueBaseDir := filepath.Join(s.baseDir, name)
 	return NewDualQueue(queueBaseDir, name)

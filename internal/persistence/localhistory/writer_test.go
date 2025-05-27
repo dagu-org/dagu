@@ -14,39 +14,35 @@ import (
 )
 
 func TestWriter(t *testing.T) {
-	th := setupTestLocalStore(t)
+	th := setupTestStore(t)
 
 	t.Run("WriteStatusToNewFile", func(t *testing.T) {
 		dag := th.DAG("test_write_status")
-		workflowID := uuid.Must(uuid.NewV7()).String()
-		status := models.NewStatusBuilder(dag.DAG).Create(
-			workflowID, scheduler.StatusRunning, 1, time.Now(),
-		)
-		writer := dag.Writer(t, workflowID, time.Now())
+		dagRunID := uuid.Must(uuid.NewV7()).String()
+		status := models.NewStatusBuilder(dag.DAG).Create(dagRunID, scheduler.StatusRunning, 1, time.Now())
+		writer := dag.Writer(t, dagRunID, time.Now())
 		writer.Write(t, status)
 
-		writer.AssertContent(t, "test_write_status", workflowID, scheduler.StatusRunning)
+		writer.AssertContent(t, "test_write_status", dagRunID, scheduler.StatusRunning)
 	})
 
 	t.Run("WriteStatusToExistingFile", func(t *testing.T) {
 		dag := th.DAG("test_append_to_existing")
-		workflowID := uuid.Must(uuid.NewV7()).String()
+		dagRunID := uuid.Must(uuid.NewV7()).String()
 		startedAt := time.Now()
 
-		writer := dag.Writer(t, workflowID, startedAt)
+		writer := dag.Writer(t, dagRunID, startedAt)
 
-		status := models.NewStatusBuilder(dag.DAG).Create(
-			workflowID, scheduler.StatusCancel, 1, time.Now(),
-		)
+		status := models.NewStatusBuilder(dag.DAG).Create(dagRunID, scheduler.StatusCancel, 1, time.Now())
 
 		// Write initial status
 		writer.Write(t, status)
 		writer.Close(t)
-		writer.AssertContent(t, "test_append_to_existing", workflowID, scheduler.StatusCancel)
+		writer.AssertContent(t, "test_append_to_existing", dagRunID, scheduler.StatusCancel)
 
 		// Append to existing file
 		dataRoot := NewDataRoot(th.TmpDir, dag.Name)
-		run, err := dataRoot.FindByDAGRunID(th.Context, workflowID)
+		run, err := dataRoot.FindByDAGRunID(th.Context, dagRunID)
 		require.NoError(t, err)
 
 		latestRun, err := run.LatestAttempt(th.Context, nil)
@@ -64,12 +60,12 @@ func TestWriter(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify appended data
-		writer.AssertContent(t, "test_append_to_existing", workflowID, scheduler.StatusSuccess)
+		writer.AssertContent(t, "test_append_to_existing", dagRunID, scheduler.StatusSuccess)
 	})
 }
 
 func TestWriterErrorHandling(t *testing.T) {
-	th := setupTestLocalStore(t)
+	th := setupTestStore(t)
 
 	t.Run("OpenNonExistentDirectory", func(t *testing.T) {
 		writer := NewWriter("/nonexistent/dir/file.dat")
@@ -83,8 +79,8 @@ func TestWriterErrorHandling(t *testing.T) {
 		require.NoError(t, writer.close())
 
 		dag := th.DAG("test_write_to_closed_writer")
-		workflowID := uuid.Must(uuid.NewV7()).String()
-		status := models.NewStatusBuilder(dag.DAG).Create(workflowID, scheduler.StatusRunning, 1, time.Now())
+		dagRunID := uuid.Must(uuid.NewV7()).String()
+		status := models.NewStatusBuilder(dag.DAG).Create(dagRunID, scheduler.StatusRunning, 1, time.Now())
 		assert.Error(t, writer.write(status))
 	})
 
@@ -97,22 +93,22 @@ func TestWriterErrorHandling(t *testing.T) {
 }
 
 func TestWriterRename(t *testing.T) {
-	th := setupTestLocalStore(t)
+	th := setupTestStore(t)
 
 	// Create a status file with old path
 	dag := th.DAG("test_rename_old")
-	writer := dag.Writer(t, "workflow-id-1", time.Now())
-	workflowID := uuid.Must(uuid.NewV7()).String()
-	status := models.NewStatusBuilder(dag.DAG).Create(workflowID, scheduler.StatusRunning, 1, time.Now())
+	writer := dag.Writer(t, "dag-run-id-1", time.Now())
+	dagRunID := uuid.Must(uuid.NewV7()).String()
+	status := models.NewStatusBuilder(dag.DAG).Create(dagRunID, scheduler.StatusRunning, 1, time.Now())
 	writer.Write(t, status)
 	writer.Close(t)
 	require.FileExists(t, writer.FilePath)
 
 	// Rename and verify the file
 	newDAG := th.DAG("test_rename_new")
-	err := th.DAGRunStore.RenameDAGRuns(context.Background(), dag.Location, newDAG.Location)
+	err := th.Store.RenameDAGRuns(context.Background(), dag.Location, newDAG.Location)
 	require.NoError(t, err)
-	newWriter := newDAG.Writer(t, "workflow-id-2", time.Now())
+	newWriter := newDAG.Writer(t, "dag-run-id-2", time.Now())
 
 	require.NoFileExists(t, writer.FilePath)
 	require.FileExists(t, newWriter.FilePath)

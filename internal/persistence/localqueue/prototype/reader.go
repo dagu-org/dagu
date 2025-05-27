@@ -346,7 +346,7 @@ func (q *queueReaderImpl) IsRunning() bool {
 
 // setupWatcher sets up the file watcher for the base directory and existing subdirectories
 func (q *queueReaderImpl) setupWatcher(ctx context.Context, watcher filenotify.FileWatcher, baseDir string) error {
-	// Watch the base directory for new workflow directories
+	// Watch the base directory for new queue files and subdirectories
 	if err := watcher.Add(baseDir); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to watch base directory %s: %w", baseDir, err)
 	}
@@ -356,7 +356,7 @@ func (q *queueReaderImpl) setupWatcher(ctx context.Context, watcher filenotify.F
 		return fmt.Errorf("failed to create base directory %s: %w", baseDir, err)
 	}
 
-	// Watch existing workflow subdirectories
+	// Watch existing
 	entries, err := os.ReadDir(baseDir)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to read base directory %s: %w", baseDir, err)
@@ -366,9 +366,9 @@ func (q *queueReaderImpl) setupWatcher(ctx context.Context, watcher filenotify.F
 		if entry.IsDir() {
 			subDir := filepath.Join(baseDir, entry.Name())
 			if err := watcher.Add(subDir); err != nil {
-				logger.Warn(ctx, "Failed to watch workflow directory", "dir", subDir, "err", err)
+				logger.Warn(ctx, "Failed to watch queue directory", "dir", subDir, "err", err)
 			} else {
-				logger.Debug(ctx, "Watching workflow directory", "dir", subDir)
+				logger.Debug(ctx, "Watching queue directory", "dir", subDir)
 			}
 		}
 	}
@@ -400,9 +400,9 @@ func (q *queueReaderImpl) handleFileEvent(ctx context.Context, event fsnotify.Ev
 
 				if watcher != nil {
 					if err := watcher.Add(event.Name); err != nil {
-						logger.Warn(ctx, "Failed to watch new workflow directory", "dir", event.Name, "err", err)
+						logger.Warn(ctx, "Failed to watch new queue directory", "dir", event.Name, "err", err)
 					} else {
-						logger.Debug(ctx, "Started watching new workflow directory", "dir", event.Name)
+						logger.Debug(ctx, "Started watching new queue directory", "dir", event.Name)
 					}
 				}
 				return true

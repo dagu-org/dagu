@@ -23,12 +23,12 @@ var priorities = []models.QueuePriority{
 	models.QueuePriorityHigh, models.QueuePriorityLow,
 }
 
-// DualQueue represents a queue for storing workflows with two priorities:
-// high and low. It uses two queue files to store the workflows.
+// DualQueue represents a queue for storing DAG-runs with two priorities:
+// high and low. It uses two queue files to store the items.
 type DualQueue struct {
 	// baseDir is the base directory for the queue files
 	baseDir string
-	// name is the name of the workflow
+	// name is the name of the DAGs that this queue is for
 	name string
 	// queueFiles is a map of queue files, where the key is the priority
 	files map[models.QueuePriority]*QueueFile
@@ -49,38 +49,38 @@ func NewDualQueue(baseDir, name string) *DualQueue {
 	}
 }
 
-// FindByWorkflowID retrieves a workflow from the queue by its ID
+// FindByDAGRunID retrieves a DAG-run from the queue by its DAG run ID
 // without removing it. It returns the first found item in the queue files.
-// If the workflow is not found, it returns ErrQueueItemNotFound.
-func (q *DualQueue) FindByWorkflowID(ctx context.Context, workflowID string) (models.QueuedItemData, error) {
+// If the item is not found in any of the queue files, it returns ErrQueueItemNotFound.
+func (q *DualQueue) FindByDAGRunID(ctx context.Context, dagRunID string) (models.QueuedItemData, error) {
 	for _, priority := range priorities {
 		qf := q.files[priority]
-		item, err := qf.FindByWorkflowID(ctx, workflowID)
+		item, err := qf.FindByDAGRunID(ctx, dagRunID)
 		if errors.Is(err, ErrQueueFileItemNotFound) {
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("failed to find workflow %s: %w", workflowID, err)
+			return nil, fmt.Errorf("failed to find DAG-run %s: %w", dagRunID, err)
 		}
 		return item, nil
 	}
 	return nil, ErrQueueItemNotFound
 }
 
-// DequeueByWorkflowID retrieves a workflow from the queue by its ID and removes it
-func (q *DualQueue) DequeueByWorkflowID(ctx context.Context, workflowID string) ([]models.QueuedItemData, error) {
+// DequeueByDAGRunID retrieves a DAG-run from the queue by its DAG run ID
+func (q *DualQueue) DequeueByDAGRunID(ctx context.Context, dagRunID string) ([]models.QueuedItemData, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
 	var items []models.QueuedItemData
 	for _, priority := range priorities {
 		qf := q.files[priority]
-		popped, err := qf.PopByWorkflowID(ctx, workflowID)
+		popped, err := qf.PopByDAGRunID(ctx, dagRunID)
 		if errors.Is(err, ErrQueueFileEmpty) {
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("failed to pop workflow %s: %w", workflowID, err)
+			return nil, fmt.Errorf("failed to pop DAG-run %s: %w", dagRunID, err)
 		}
 		for _, item := range popped {
 			items = append(items, item)
@@ -96,7 +96,7 @@ func (q *DualQueue) List(ctx context.Context) ([]models.QueuedItemData, error) {
 		qf := q.files[priority]
 		qItems, err := qf.List(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to list workflows: %w", err)
+			return nil, fmt.Errorf("failed to list items in queue with priority %d: %w", priority, err)
 		}
 		for _, item := range qItems {
 			items = append(items, item)
@@ -119,8 +119,8 @@ func (q *DualQueue) Len(ctx context.Context) (int, error) {
 	return total, nil
 }
 
-// Enqueue adds a workflow to the queue with the specified priority
-func (q *DualQueue) Enqueue(ctx context.Context, priority models.QueuePriority, workflow digraph.DAGRunRef) error {
+// Enqueue adds a DAG-run to the queue with the specified priority
+func (q *DualQueue) Enqueue(ctx context.Context, priority models.QueuePriority, dagRun digraph.DAGRunRef) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -128,14 +128,14 @@ func (q *DualQueue) Enqueue(ctx context.Context, priority models.QueuePriority, 
 		return fmt.Errorf("invalid queue priority: %d", priority)
 	}
 	qf := q.files[priority]
-	if err := qf.Push(ctx, workflow); err != nil {
+	if err := qf.Push(ctx, dagRun); err != nil {
 		return err
 	}
-	logger.Debug(ctx, "Enqueue", "dagRunId", workflow.ID, "priority", priority)
+	logger.Debug(ctx, "Enqueue", "dagRunId", dagRun.ID, "priority", priority)
 	return nil
 }
 
-// Dequeue retrieves a workflow from the queue and removes it
+// Dequeue retrieves a DAG-run from the queue and removes it.
 // It checks the high-priority queue first, then the low-priority queue
 func (q *DualQueue) Dequeue(ctx context.Context) (models.QueuedItemData, error) {
 	q.mu.Lock()

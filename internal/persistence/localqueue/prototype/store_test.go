@@ -25,7 +25,7 @@ func TestStore(t *testing.T) {
 	// Add a job to thestore
 	err = store.Enqueue(th.Context, "test-name", models.QueuePriorityLow, digraph.DAGRunRef{
 		Name: "test-name",
-		ID:   "test-workflow",
+		ID:   "test-dag",
 	})
 	require.NoError(t, err, "expected no error when adding job to store")
 
@@ -43,7 +43,7 @@ func TestStore(t *testing.T) {
 	job, err := store.DequeueByName(th.Context, "test-name")
 	require.NoError(t, err, "expected no error when dequeueing job from store")
 	require.NotNil(t, job, "expected job to be not nil")
-	require.Contains(t, job.ID(), "test-workflow", "expected job ID to contain 'test-workflow'")
+	require.Contains(t, job.ID(), "test-dag", "expected job ID to contain 'test-dag'")
 	jobData := job.Data()
 	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
 
@@ -53,7 +53,7 @@ func TestStore(t *testing.T) {
 	require.Equal(t, 0, length, "expected store length to be 0")
 }
 
-func TestStore_DequeueByWorkflowID(t *testing.T) {
+func TestStore_DequeueByDAGRunID(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
@@ -64,24 +64,24 @@ func TestStore_DequeueByWorkflowID(t *testing.T) {
 	// Add a job to thestore
 	err := store.Enqueue(th.Context, "test-name", models.QueuePriorityLow, digraph.DAGRunRef{
 		Name: "test-name",
-		ID:   "test-workflow",
+		ID:   "test-dag",
 	})
 	require.NoError(t, err, "expected no error when adding job to store")
 
 	// Add another job to thestore
 	err = store.Enqueue(th.Context, "test-name", models.QueuePriorityLow, digraph.DAGRunRef{
 		Name: "test-name",
-		ID:   "test-workflow-2",
+		ID:   "test-dag-2",
 	})
 
-	// Check if dequeue by workflow ID returns the job
-	jobs, err := store.DequeueByDAGRunID(th.Context, "test-name", "test-workflow-2")
-	require.NoError(t, err, "expected no error when dequeueing job by workflow ID from store")
+	// Check if dequeue by DAG-run ID returns the job
+	jobs, err := store.DequeueByDAGRunID(th.Context, "test-name", "test-dag-2")
+	require.NoError(t, err, "expected no error when dequeueing job by DAG-run ID from store")
 	require.Len(t, jobs, 1, "expected to dequeue one job")
-	require.Contains(t, jobs[0].ID(), "test-workflow-2", "expected job ID to contain 'test-workflow-2'")
+	require.Contains(t, jobs[0].ID(), "test-dag-2", "expected job ID to contain 'test-dag-2'")
 	jobData := jobs[0].Data()
 	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
-	require.Equal(t, "test-workflow-2", jobData.ID, "expected job ID to be 'test-workflow-2'")
+	require.Equal(t, "test-dag-2", jobData.ID, "expected job ID to be 'test-dag-2'")
 }
 
 func TestStore_List(t *testing.T) {
@@ -95,14 +95,14 @@ func TestStore_List(t *testing.T) {
 	// Add a job to thestore
 	err := store.Enqueue(th.Context, "test-name", models.QueuePriorityLow, digraph.DAGRunRef{
 		Name: "test-name",
-		ID:   "test-workflow",
+		ID:   "test-dag",
 	})
 	require.NoError(t, err, "expected no error when adding job to store")
 
 	// Add another job to thestore
 	err = store.Enqueue(th.Context, "test-name", models.QueuePriorityLow, digraph.DAGRunRef{
 		Name: "test-name",
-		ID:   "test-workflow-2",
+		ID:   "test-dag-2",
 	})
 	require.NoError(t, err, "expected no error when adding job to store")
 
@@ -123,14 +123,14 @@ func TestStore_All(t *testing.T) {
 	// Add a job to thestore
 	err := store.Enqueue(th.Context, "test-name", models.QueuePriorityLow, digraph.DAGRunRef{
 		Name: "test-name",
-		ID:   "test-workflow",
+		ID:   "test-dag",
 	})
 	require.NoError(t, err, "expected no error when adding job to store")
 
 	// Add another job to thestore
 	err = store.Enqueue(th.Context, "test-name2", models.QueuePriorityHigh, digraph.DAGRunRef{
 		Name: "test-name2",
-		ID:   "test-workflow-2",
+		ID:   "test-dag-2",
 	})
 	require.NoError(t, err, "expected no error when adding job to store")
 
@@ -145,7 +145,7 @@ func TestStore_All(t *testing.T) {
 
 	// Check if the jobs are sorted by priority
 	require.Equal(t, "test-name2", data1.Name, "expected job name to be 'test-name'")
-	require.Equal(t, "test-workflow-2", data1.ID, "expected job ID to be 'test-workflow-2'")
+	require.Equal(t, "test-dag-2", data1.ID, "expected job ID to be 'test-dag-2'")
 	require.Equal(t, "test-name", data2.Name, "expected job name to be 'test-name'")
-	require.Equal(t, "test-workflow", data2.ID, "expected job ID to be 'test-workflow'")
+	require.Equal(t, "test-dag", data2.ID, "expected job ID to be 'test-dag'")
 }

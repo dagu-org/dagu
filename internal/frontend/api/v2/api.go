@@ -131,7 +131,7 @@ func (a *API) handleError(w http.ResponseWriter, r *http.Request, err error) {
 
 	case errors.Is(err, models.ErrDAGRunIDNotFound):
 		code = api.ErrorCodeNotFound
-		message = "workflow ID not found"
+		message = "DAG-run ID not found"
 
 	case errors.Is(err, models.ErrDAGAlreadyExists):
 		code = api.ErrorCodeAlreadyExists

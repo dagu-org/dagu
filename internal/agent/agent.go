@@ -597,7 +597,7 @@ func (a *Agent) setupSocketServer(ctx context.Context) error {
 	var socketAddr string
 	if a.isChildDAGRun.Load() {
 		// Use separate socket address for child
-		socketAddr = a.dag.SockAddrSub(a.dagRunID)
+		socketAddr = a.dag.SockAddrForChildDAGRun(a.dagRunID)
 	} else {
 		socketAddr = a.dag.SockAddr(a.dagRunID)
 	}

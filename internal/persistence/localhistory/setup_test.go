@@ -14,20 +14,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type LocalStoreTest struct {
-	Context     context.Context
-	DAGRunStore models.DAGRunStore
-	TmpDir      string
+type StoreTest struct {
+	Context context.Context
+	Store   models.DAGRunStore
+	TmpDir  string
 }
 
-func setupTestLocalStore(t *testing.T) LocalStoreTest {
+func setupTestStore(t *testing.T) StoreTest {
 	tmpDir, err := os.MkdirTemp("", "test")
 	require.NoError(t, err)
 
-	th := LocalStoreTest{
-		Context:     context.Background(),
-		DAGRunStore: New(tmpDir),
-		TmpDir:      tmpDir,
+	th := StoreTest{
+		Context: context.Background(),
+		Store:   New(tmpDir),
+		TmpDir:  tmpDir,
 	}
 
 	t.Cleanup(func() {
@@ -36,11 +36,11 @@ func setupTestLocalStore(t *testing.T) LocalStoreTest {
 	return th
 }
 
-func (th LocalStoreTest) CreateAttempt(t *testing.T, ts time.Time, dagRunID string, s scheduler.Status) *Attempt {
+func (th StoreTest) CreateAttempt(t *testing.T, ts time.Time, dagRunID string, s scheduler.Status) *Attempt {
 	t.Helper()
 
 	dag := th.DAG("test_DAG")
-	attempt, err := th.DAGRunStore.CreateAttempt(th.Context, dag.DAG, ts, dagRunID, models.NewDAGRunAttemptOptions{})
+	attempt, err := th.Store.CreateAttempt(th.Context, dag.DAG, ts, dagRunID, models.NewDAGRunAttemptOptions{})
 	require.NoError(t, err)
 
 	err = attempt.Open(th.Context)
@@ -60,7 +60,7 @@ func (th LocalStoreTest) CreateAttempt(t *testing.T, ts time.Time, dagRunID stri
 	return attempt.(*Attempt)
 }
 
-func (th LocalStoreTest) DAG(name string) DAGTest {
+func (th StoreTest) DAG(name string) DAGTest {
 	return DAGTest{
 		th: th,
 		DAG: &digraph.DAG{
@@ -71,7 +71,7 @@ func (th LocalStoreTest) DAG(name string) DAGTest {
 }
 
 type DAGTest struct {
-	th LocalStoreTest
+	th StoreTest
 	*digraph.DAG
 }
 
@@ -82,8 +82,8 @@ func (d DAGTest) Writer(t *testing.T, dagRunID string, startedAt time.Time) Writ
 	dagRun, err := root.CreateDAGRun(models.NewUTC(startedAt), dagRunID)
 	require.NoError(t, err)
 
-	obj := d.th.DAGRunStore.(*Store)
-	attempt, err := dagRun.CreateAttempt(d.th.Context, models.NewUTC(startedAt), obj.cache, WithDAG(d.DAG))
+	store := d.th.Store.(*Store)
+	attempt, err := dagRun.CreateAttempt(d.th.Context, models.NewUTC(startedAt), store.cache, WithDAG(d.DAG))
 	require.NoError(t, err)
 
 	writer := NewWriter(attempt.file)
@@ -127,7 +127,7 @@ func (w WriterTest) Close(t *testing.T) {
 }
 
 type WriterTest struct {
-	th LocalStoreTest
+	th StoreTest
 
 	DAGRunID string
 	FilePath string

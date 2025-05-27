@@ -119,7 +119,7 @@ func (pg *ProcGroup) isStale(ctx context.Context, file string) bool {
 func (pg *ProcGroup) Acquire(ctx context.Context, dagRun digraph.DAGRunRef) (*ProcHandle, error) {
 	// Sanity check the DAG-run reference
 	if pg.name != dagRun.Name {
-		return nil, fmt.Errorf("workflow name %s does not match proc file name %s", dagRun.Name, pg.name)
+		return nil, fmt.Errorf("DAG name %s does not match proc file name %s", dagRun.Name, pg.name)
 	}
 	// Generate the proc file name
 	fileName := pg.getFileName(models.NewUTC(time.Now()), dagRun)
@@ -128,10 +128,10 @@ func (pg *ProcGroup) Acquire(ctx context.Context, dagRun digraph.DAGRunRef) (*Pr
 	}), nil
 }
 
-// getFileName generates a proc file name based on the workflow reference.
-func (pg *ProcGroup) getFileName(t models.TimeInUTC, workflow digraph.DAGRunRef) string {
+// getFileName generates a proc file name based on the DAG-run reference and the current time.
+func (pg *ProcGroup) getFileName(t models.TimeInUTC, dagRun digraph.DAGRunRef) string {
 	timestamp := t.Format(dateTimeFormatUTC)
-	fileName := procFilePrefix + timestamp + "Z_" + workflow.ID + ".proc"
+	fileName := procFilePrefix + timestamp + "Z_" + dagRun.ID + ".proc"
 	return filepath.Join(pg.baseDir, fileName)
 }
 

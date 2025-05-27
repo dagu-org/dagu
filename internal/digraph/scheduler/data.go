@@ -109,11 +109,11 @@ func (s *Data) SetExecutorConfig(cfg digraph.ExecutorConfig) {
 	s.inner.Step.ExecutorConfig = cfg
 }
 
-func (s *Data) SetChildDAG(childWorkflow digraph.ChildDAG) {
+func (s *Data) SetChildDAG(childDAG digraph.ChildDAG) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.inner.Step.ChildDAG = &childWorkflow
+	s.inner.Step.ChildDAG = &childDAG
 }
 
 func (s *Data) Args() []string {
@@ -167,14 +167,14 @@ func (s *Data) Data() NodeData {
 func (s *Data) GenChildDAGRunID() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// If children is not empty, return the first child's workflow ID.
+	// If children is not empty, return the first child's DAGRunID.
 	if len(s.inner.State.Children) > 0 {
 		return s.inner.State.Children[0].DAGRunID, nil
 	}
-	// Generate a new workflow ID for the current node.
-	r, err := generateWorkflowID()
+	// Generate a new DAGRunID for the child DAG run.
+	r, err := generateDAGRunID()
 	if err != nil {
-		return "", fmt.Errorf("failed to generate workflow ID: %w", err)
+		return "", fmt.Errorf("failed to generate child DAG run ID: %w", err)
 	}
 	s.inner.State.Children = append(s.inner.State.Children, ChildDAGRun{DAGRunID: r})
 	return r, nil
@@ -418,7 +418,7 @@ func (n *Data) ClearState(s digraph.Step) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	// The data of child workflows need to be preserved to retain their workflow IDs
+	// The data of child DAG-run need to be preserved to retain their DAG-run IDs
 	children := n.inner.State.Children
 	n.inner.State = NodeState{}
 	n.inner.State.Children = children
@@ -435,9 +435,9 @@ func (n *Data) MarkError(err error) {
 	n.inner.State.Status = NodeStatusError
 }
 
-// generateWorkflowID generates a new workflow ID.
-// For simplicity, we use UUIDs as workflow IDs.
-func generateWorkflowID() (string, error) {
+// generateDAGRunID generates a new DAG-run ID.
+// For simplicity, we use UUIDs as DAG-run IDs.
+func generateDAGRunID() (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return "", err

@@ -30,7 +30,7 @@ import (
 type DataRoot struct {
 	baseDir     string             // Base directory for all DAGs
 	prefix      string             // Sanitized prefix for directory names
-	dagRunsDir  string             // Path to the executions directory
+	dagRunsDir  string             // Path to the DAG-runs directory
 	globPattern string             // Pattern for finding run directories
 	root        *digraph.DAGRunRef // Optional reference to the root DAG
 }

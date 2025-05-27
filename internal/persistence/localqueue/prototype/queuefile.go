@@ -28,45 +28,47 @@ const itemPrefix = "item_"
 
 // QueueFile is a simple queue implementation using files
 // It stores the queued items in JSON files in a specified directory
-// File name format: prefix_YYYYMMDD_HHMMSS_millisZ_workflowID.json
 // The timestamp is in UTC and the milliseconds are added to the filename
 // Since this relies on the file system, it is not thread-safe and should be
 // accessed by a single process at a time.
 type QueueFile struct {
 	// baseDir is the base directory for the queue files
 	baseDir string
-	// priority is the priority for the queue files
-	priority string
+	// prefix is the prefix for the queue files
+	// It is used for differentiating between different priorities
+	prefix string
 	// match is the match for matching the queue file name
 	match *regexp.Regexp
 	// mu is the mutex for synchronizing access to the queue
 	mu sync.RWMutex
 }
 
-func NewQueueFile(baseDir, priority string) *QueueFile {
+// NewQueueFile creates a new queue file with the specified base directory and priority
+func NewQueueFile(baseDir, prefix string) *QueueFile {
 	return &QueueFile{
-		baseDir:  baseDir,
-		priority: priority,
-		match:    regexp.MustCompile(fmt.Sprintf(`^%s%s(\d{8}_\d{6})_(\d{3})Z_(.*)\.json$`, itemPrefix, priority)),
+		baseDir: baseDir,
+		prefix:  prefix,
+		match:   regexp.MustCompile(fmt.Sprintf(`^%s%s(\d{8}_\d{6})_(\d{3})Z_(.*)\.json$`, itemPrefix, prefix)),
 	}
 }
 
+// ItemData represents the data stored in the queue file
 type ItemData struct {
-	FileName string            `json:"file_name"`
-	Workflow digraph.DAGRunRef `json:"workflow"`
-	QueuedAt time.Time         `json:"queued_at"`
+	FileName string            `json:"fileName"`
+	DAGRun   digraph.DAGRunRef `json:"dagRun"`
+	QueuedAt time.Time         `json:"queuedAt"`
 }
 
 // Push adds a job to the queue
-// Since it's a prototype, it just create a json file with the job ID and workflow reference
-func (q *QueueFile) Push(ctx context.Context, workflow digraph.DAGRunRef) error {
+// Since it's a prototype, it just create a json file with the job ID and DAG-run reference
+func (q *QueueFile) Push(ctx context.Context, dagRun digraph.DAGRunRef) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
 	timestamp := models.NewUTC(time.Now())
 
 	// Create the queue file name
-	fileName := queueFileName(q.priority, workflow.ID, timestamp)
+	fileName := queueFileName(q.prefix, dagRun.ID, timestamp)
 
 	// Create the full path for the queue file
 	fullPath := filepath.Join(q.baseDir, fileName)
@@ -88,7 +90,7 @@ func (q *QueueFile) Push(ctx context.Context, workflow digraph.DAGRunRef) error 
 
 	data, err := json.Marshal(ItemData{
 		FileName: fileName,
-		Workflow: workflow,
+		DAGRun:   dagRun,
 		QueuedAt: timestamp.Time,
 	})
 
@@ -114,8 +116,8 @@ func (q *QueueFile) Push(ctx context.Context, workflow digraph.DAGRunRef) error 
 	return nil
 }
 
-// PopByWorkflowID removes jobs from the queue by workflow ID
-func (q *QueueFile) PopByWorkflowID(ctx context.Context, workflowID string) ([]*Job, error) {
+// PopByDAGRunID removes jobs from the queue by DAG-run ID
+func (q *QueueFile) PopByDAGRunID(ctx context.Context, dagRunID string) ([]*Job, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -132,7 +134,7 @@ func (q *QueueFile) PopByWorkflowID(ctx context.Context, workflowID string) ([]*
 
 	var removedJobs []*Job
 	for _, item := range items {
-		if item.Workflow.ID == workflowID {
+		if item.DAGRun.ID == dagRunID {
 			if err := os.Remove(filepath.Join(q.baseDir, item.FileName)); err != nil {
 				// Log the error but continue processing other items
 				logger.Warn(ctx, "failed to remove queue file %s: %w", item.FileName, err)
@@ -202,8 +204,8 @@ func (q *QueueFile) Pop(ctx context.Context) (*Job, error) {
 	return NewJob(item), nil
 }
 
-// FindByWorkflowID finds a job by its workflow ID
-func (q *QueueFile) FindByWorkflowID(ctx context.Context, workflowID string) (*Job, error) {
+// FindByDAGRunID finds a job by its DAG run ID without removing it from the queue.
+func (q *QueueFile) FindByDAGRunID(ctx context.Context, dagRunID string) (*Job, error) {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 
@@ -219,7 +221,7 @@ func (q *QueueFile) FindByWorkflowID(ctx context.Context, workflowID string) (*J
 	}
 
 	for _, item := range items {
-		if item.Workflow.ID == workflowID {
+		if item.DAGRun.ID == dagRunID {
 			return NewJob(item), nil
 		}
 	}
@@ -250,7 +252,7 @@ func (q *QueueFile) Len(ctx context.Context) (int, error) {
 // It is not thread-safe and should be called with the mutex locked
 // to ensure that no other operations are modifying the queue at the same time.
 func (q *QueueFile) listItems(ctx context.Context) ([]ItemData, error) {
-	pattern := filepath.Join(q.baseDir, itemPrefix+q.priority+"*")
+	pattern := filepath.Join(q.baseDir, itemPrefix+q.prefix+"*")
 	files, err := filepath.Glob(pattern)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list files in %s: %w", q.baseDir, err)
@@ -263,7 +265,7 @@ func (q *QueueFile) listItems(ctx context.Context) ([]ItemData, error) {
 		if !q.match.MatchString(fileName) {
 			continue
 		}
-		// Parse the file name to get the workflow ID and timestamp
+		// Parse the file name to get the DAG-run ID and timestamp
 		item, err := parseQueueFileName(file, fileName)
 		if err != nil {
 			logger.Error(ctx, "failed to parse queue file name %s: %w", fileName, err)
@@ -281,7 +283,7 @@ func (q *QueueFile) listItems(ctx context.Context) ([]ItemData, error) {
 }
 
 func parseQueueFileName(path, fileName string) (ItemData, error) {
-	// Extract the workflow ID and timestamp from the file name
+	// Extract the DAG-run ID and timestamp from the file name
 	matches := parseRegex.FindStringSubmatch(fileName)
 	if len(matches) != 5 {
 		return ItemData{}, fmt.Errorf("invalid queue file name format: %s", fileName)
@@ -303,7 +305,7 @@ func parseQueueFileName(path, fileName string) (ItemData, error) {
 	// Create the ItemData struct
 	item := ItemData{
 		FileName: fileName,
-		Workflow: digraph.DAGRunRef{
+		DAGRun: digraph.DAGRunRef{
 			Name: filepath.Base(filepath.Dir(path)),
 			ID:   matches[4],
 		},
@@ -316,10 +318,10 @@ func parseQueueFileName(path, fileName string) (ItemData, error) {
 // parseRegex is the regex used to parse the queue file name
 var parseRegex = regexp.MustCompile(`^item_(high|low)_(\d{8}_\d{6})_(\d{3})Z_(.*)\.json$`)
 
-func queueFileName(priority, workflowID string, t models.TimeInUTC) string {
+func queueFileName(priority, dagRunID string, t models.TimeInUTC) string {
 	mill := t.UnixMilli()
 	timestamp := t.Format(dateTimeFormatUTC) + "_" + fmt.Sprintf("%03d", mill%1000) + "Z"
-	return itemPrefix + priority + timestamp + "_" + workflowID + ".json"
+	return itemPrefix + priority + timestamp + "_" + dagRunID + ".json"
 }
 
 // dateTimeFormat is the format used for the timestamp in the queue file name

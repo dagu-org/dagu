@@ -29,10 +29,10 @@ const (
 	// ChildDAGRunDirPrefix is the prefix for child DAG-run directories.
 	ChildDAGRunDirPrefix = "child_"
 
-	// DAGRunDirPrefix is the prefix for workflow directories.
+	// DAGRunDirPrefix is the prefix for DAG-run directories.
 	DAGRunDirPrefix = "dag-run_"
 
-	// AttemptDirPrefix is the prefix for run directories.
+	// AttemptDirPrefix is the prefix for attempt directories.
 	AttemptDirPrefix = "attempt_"
 )
 
@@ -50,9 +50,9 @@ type DAGRun struct {
 }
 
 // NewDAGRun creates a new Run instance from a directory path.
-// It parses the directory name to extract the timestamp and workflow ID.
+// It parses the directory name to extract the timestamp and DAG-run ID.
 func NewDAGRun(dir string) (*DAGRun, error) {
-	// Determine if the run is a child workflow
+	// Determine if the run is a child DAG-run or a regular DAG-run.
 	parentDir := filepath.Dir(dir)
 	if filepath.Base(parentDir) == ChildDAGRunsDir {
 		matches := reChildDAGRunDir.FindStringSubmatch(filepath.Base(dir))
@@ -108,7 +108,7 @@ func (e DAGRun) CreateChildDAGRun(_ context.Context, dagRunID string) (*DAGRun, 
 	return NewDAGRun(dir)
 }
 
-// FindChildDAGRun searches for a child DAG-run by its DAG-run ID.
+// FindChildDAGRun searches for a child DAG-run by its run ID.
 func (e DAGRun) FindChildDAGRun(_ context.Context, dagRunID string) (*DAGRun, error) {
 	globPattern := filepath.Join(e.baseDir, ChildDAGRunsDir, "child_"+dagRunID)
 	matches, err := filepath.Glob(globPattern)
@@ -214,7 +214,7 @@ func (e DAGRun) removeLogFiles(ctx context.Context) error {
 
 	children, err := e.ListChildDAGRuns(ctx)
 	if err != nil {
-		logger.Error(ctx, "failed to list child workflows to remove", "err", err, "dagRunId", e.dagRunID)
+		logger.Error(ctx, "failed to list child DAG-runs", "err", err, "dagRunId", e.dagRunID)
 	}
 	for _, child := range children {
 		childLogFiles, err := child.listLogFiles(ctx)
@@ -242,8 +242,9 @@ func (e DAGRun) removeLogFiles(ctx context.Context) error {
 	return nil
 }
 
+// listLogFiles lists all log files associated with the DAG-run.
 func (e DAGRun) listLogFiles(ctx context.Context) ([]string, error) {
-	// List all log files in the workflow directory
+	// List all log files in the DAG-run directory and its attempts.
 	runs, err := e.ListAttempts(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list runs: %w", err)
@@ -274,9 +275,9 @@ func (e DAGRun) listLogFiles(ctx context.Context) ([]string, error) {
 }
 
 // Regular expressions for parsing directory names
-var reDAGRunDir = regexp.MustCompile(`^` + DAGRunDirPrefix + `(\d{8}_\d{6}Z)_(.*)$`)         // Matches workflow directory names
-var reAttemptDir = regexp.MustCompile(`^` + AttemptDirPrefix + `(\d{8}_\d{6}_\d{3}Z)_(.*)$`) // Matches run directory names
-var reChildDAGRunDir = regexp.MustCompile(`^` + ChildDAGRunDirPrefix + `(.*)$`)              // Matches child workflow directory names
+var reDAGRunDir = regexp.MustCompile(`^` + DAGRunDirPrefix + `(\d{8}_\d{6}Z)_(.*)$`)         // Matches DAG-run directory names
+var reAttemptDir = regexp.MustCompile(`^` + AttemptDirPrefix + `(\d{8}_\d{6}_\d{3}Z)_(.*)$`) // Matches attempt directory names
+var reChildDAGRunDir = regexp.MustCompile(`^` + ChildDAGRunDirPrefix + `(.*)$`)              // Matches child DAG-run directory names
 
 // formatDAGRunTimestamp formats a models.TimeInUTC instance into a string representation (without milliseconds).
 // The format is "YYYYMMDD_HHMMSSZ".

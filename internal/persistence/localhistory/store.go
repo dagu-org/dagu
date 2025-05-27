@@ -390,7 +390,6 @@ func (store *Store) FindAttempt(ctx context.Context, ref digraph.DAGRunRef) (mod
 
 	root := NewDataRoot(store.baseDir, ref.Name)
 	run, err := root.FindByDAGRunID(ctx, ref.ID)
-
 	if err != nil {
 		return nil, err
 	}
