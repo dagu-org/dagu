@@ -110,9 +110,9 @@ type stepDef struct {
 	// When it is empty, the same signal as the parent process is sent.
 	// It can be KILL when the process does not stop over the timeout.
 	SignalOnStop *string `yaml:"signalOnStop,omitempty"`
-	// Run is the name of a DAG to run as a child workflow
+	// Run is the name of a DAG to run as a child DAG-run.
 	Run string `yaml:"run,omitempty"`
-	// Params specifies the parameters for the child workflow.
+	// Params specifies the parameters for the child DAG-run.
 	Params string `yaml:"params,omitempty"`
 }
 

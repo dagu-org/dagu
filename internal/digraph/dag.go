@@ -323,13 +323,13 @@ func (d *DAG) setupHandlers(workDir string) {
 
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
-func SockAddr(name, workflowID string) string {
+func SockAddr(name, dagRunID string) string {
 	maxSocketNameLength := 50 // Maximum length for socket name
 	name = fileutil.SafeName(name)
-	workflowID = fileutil.SafeName(workflowID)
+	dagRunID = fileutil.SafeName(dagRunID)
 
 	// Create MD5 hash of the combined name and DAG-run ID and take first 8 chars
-	combined := name + workflowID
+	combined := name + dagRunID
 	hashLength := 6
 	hash := fmt.Sprintf("%x", md5.Sum([]byte(combined)))[:hashLength] // nolint:gosec
 

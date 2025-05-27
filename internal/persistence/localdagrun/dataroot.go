@@ -41,7 +41,6 @@ type DataRoot struct {
 // Parameters:
 //   - baseDir: The base directory where all DAG data is stored
 //   - dagName: The name of the DAG (can be a path to a YAML file)
-//   - opts: Optional functional options for configuring the DataRoot
 //
 // Returns:
 //   - A configured DataRoot instance

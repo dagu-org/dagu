@@ -144,7 +144,7 @@ func (m *Manager) EnqueueDAGRun(_ context.Context, dag *digraph.DAG, opts Enqueu
 }
 
 func (m *Manager) DequeueDAGRun(_ context.Context, dagRun digraph.DAGRunRef) error {
-	args := []string{"dequeue", fmt.Sprintf("--workflow=%s", dagRun.String())}
+	args := []string{"dequeue", fmt.Sprintf("--dag-run=%s", dagRun.String())}
 	if configFile := config.UsedConfigFile.Load(); configFile != nil {
 		if configFile, ok := configFile.(string); ok {
 			args = append(args, "--config")

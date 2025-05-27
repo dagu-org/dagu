@@ -10,7 +10,7 @@ type Database interface {
 	GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun DAGRunRef) (*Status, error)
 }
 
-// Status is the result of a workflow.
+// Status is the result of a DAG-run.
 type Status struct {
 	// Name represents the name of the executed DAG.
 	Name string `json:"name,omitempty"`
