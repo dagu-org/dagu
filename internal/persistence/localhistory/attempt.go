@@ -37,7 +37,7 @@ var _ models.DAGRunAttempt = (*Attempt)(nil)
 // Attempt manages an append-only status file with read, write, and compaction capabilities.
 // It provides thread-safe operations and supports metrics collection.
 type Attempt struct {
-	id        string                                // Run ID
+	id        string                                // Attempt ID, extracted from the file path
 	file      string                                // Path to the status file
 	writer    *Writer                               // Writer for appending status updates
 	mu        sync.RWMutex                          // Mutex for thread safety

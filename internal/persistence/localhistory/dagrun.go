@@ -30,10 +30,10 @@ const (
 	ChildDAGRunDirPrefix = "child_"
 
 	// DAGRunDirPrefix is the prefix for workflow directories.
-	DAGRunDirPrefix = "workflow_"
+	DAGRunDirPrefix = "dag-run_"
 
 	// AttemptDirPrefix is the prefix for run directories.
-	AttemptDirPrefix = "run_"
+	AttemptDirPrefix = "attempt_"
 )
 
 // JSONLStatusFile is the name of the status file for each DAG run.

@@ -342,7 +342,7 @@ func createTempDir(t *testing.T) string {
 	attemptID, err := genAttemptID()
 	require.NoError(t, err)
 
-	dir, err := os.MkdirTemp("", "run_"+formatAttemptTimestamp(models.NewUTC(time.Now()))+"_"+attemptID)
+	dir, err := os.MkdirTemp("", "attempt_"+formatAttemptTimestamp(models.NewUTC(time.Now()))+"_"+attemptID)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = os.RemoveAll(dir)
