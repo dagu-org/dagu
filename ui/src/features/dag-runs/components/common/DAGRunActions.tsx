@@ -1,7 +1,7 @@
 /**
- * WorkflowActions component provides action buttons for Workflow operations (stop, retry).
+ * DAGRunActions component provides action buttons for DAGRun operations (stop, retry).
  *
- * @module features/workflows/components/common
+ * @module features/dagRuns/components/common
  */
 import { Button } from '@/components/ui/button';
 import {
@@ -21,14 +21,14 @@ import LabeledItem from '../../../../ui/LabeledItem';
 import StatusChip from '../../../../ui/StatusChip';
 
 /**
- * Props for the WorkflowActions component
+ * Props for the DAGRunActions component
  */
 type Props = {
-  /** Current status of the Workflow */
-  workflow?:
-    | components['schemas']['WorkflowSummary']
-    | components['schemas']['WorkflowDetails'];
-  /** Name of the Workflow */
+  /** Current status of the DAGRun */
+  dagRun?:
+    | components['schemas']['DAGRunSummary']
+    | components['schemas']['DAGRunDetails'];
+  /** Name of the DAGRun */
   name: string;
   /** Whether to show text labels on buttons */
   label?: boolean;
@@ -36,15 +36,15 @@ type Props = {
   refresh?: () => void;
   /** Display mode: 'compact' for icon-only, 'full' for text+icon buttons */
   displayMode?: 'compact' | 'full';
-  /** Whether this is a root level workflow (controls availability of retry/stop actions) */
+  /** Whether this is a root level dagRun (controls availability of retry/stop actions) */
   isRootLevel?: boolean;
 };
 
 /**
- * WorkflowActions component provides buttons to stop and retry Workflow executions
+ * DAGRunActions component provides buttons to stop and retry DAGRun executions
  */
-function WorkflowActions({
-  workflow,
+function DAGRunActions({
+  dagRun,
   name,
   refresh,
   displayMode = 'compact',
@@ -58,7 +58,7 @@ function WorkflowActions({
   const client = useClient();
 
   /**
-   * Reload Workflow data after an action is performed
+   * Reload DAGRun data after an action is performed
    */
   const reloadData = () => {
     if (refresh) {
@@ -68,12 +68,12 @@ function WorkflowActions({
 
   // Determine which buttons should be enabled based on current status and root level
   const buttonState = {
-    stop: isRootLevel && workflow?.status === Status.Running, // Running and at root level
-    retry: isRootLevel && workflow?.status !== Status.Running && workflow?.status !== Status.Queued && workflow?.workflowId !== '', // Not running, not queued, has workflowId, and at root level
-    dequeue: isRootLevel && workflow?.status === Status.Queued, // Queued and at root level
+    stop: isRootLevel && dagRun?.status === Status.Running, // Running and at root level
+    retry: isRootLevel && dagRun?.status !== Status.Running && dagRun?.status !== Status.Queued && dagRun?.dagRunId !== '', // Not running, not queued, has dagRunId, and at root level
+    dequeue: isRootLevel && dagRun?.status === Status.Queued, // Queued and at root level
   };
 
-  if (!workflow) {
+  if (!dagRun) {
     return <></>;
   }
 
@@ -112,7 +112,7 @@ function WorkflowActions({
             </span>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{isRootLevel ? 'Stop Workflow execution' : 'Stop action only available at root workflow level'}</p>
+            <p>{isRootLevel ? 'Stop DAGRun execution' : 'Stop action only available at root dagRun level'}</p>
           </TooltipContent>
         </Tooltip>
 
@@ -146,7 +146,7 @@ function WorkflowActions({
             </span>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{isRootLevel ? 'Retry Workflow execution' : 'Retry action only available at root workflow level'}</p>
+            <p>{isRootLevel ? 'Retry DAGRun execution' : 'Retry action only available at root dagRun level'}</p>
           </TooltipContent>
         </Tooltip>
 
@@ -180,7 +180,7 @@ function WorkflowActions({
             </span>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{isRootLevel ? 'Remove Workflow from queue' : 'Dequeue action only available at root workflow level'}</p>
+            <p>{isRootLevel ? 'Remove DAGRun from queue' : 'Dequeue action only available at root dagRun level'}</p>
           </TooltipContent>
         </Tooltip>
 
@@ -192,14 +192,14 @@ function WorkflowActions({
           dismissModal={() => setIsStopModal(false)}
           onSubmit={async () => {
             setIsStopModal(false);
-            const { error } = await client.POST('/workflows/{name}/{workflowId}/stop', {
+            const { error } = await client.POST('/dag-runs/{name}/{dagRunId}/stop', {
               params: {
                 query: {
                   remoteNode: appBarContext.selectedRemoteNode || 'local',
                 },
                 path: {
                   name: name,
-                  workflowId: workflow.workflowId,
+                  dagRunId: dagRun.dagRunId,
                 },
               },
             });
@@ -211,7 +211,7 @@ function WorkflowActions({
             reloadData();
           }}
         >
-          <div>Do you really want to stop this workflow?</div>
+          <div>Do you really want to stop this dagRun?</div>
         </ConfirmModal>
 
         {/* Retry Confirmation Modal */}
@@ -223,18 +223,18 @@ function WorkflowActions({
           onSubmit={async () => {
             setIsRetryModal(false);
 
-            const { error } = await client.POST('/workflows/{name}/{workflowId}/retry', {
+            const { error } = await client.POST('/dag-runs/{name}/{dagRunId}/retry', {
               params: {
                 path: {
                   name: name,
-                  workflowId: workflow.workflowId,
+                  dagRunId: dagRun.dagRunId,
                 },
                 query: {
                   remoteNode: appBarContext.selectedRemoteNode || 'local',
                 },
               },
               body: {
-                workflowId: workflow.workflowId,
+                dagRunId: dagRun.dagRunId,
               },
             });
             if (error) {
@@ -249,27 +249,27 @@ function WorkflowActions({
             <p className="mb-2">
               Do you really want to retry the following execution?
             </p>
-            <LabeledItem label="Workflow-Name">
+            <LabeledItem label="DAGRun-Name">
               <span className="font-mono text-sm">
-                {workflow?.name || 'N/A'}
+                {dagRun?.name || 'N/A'}
               </span>
             </LabeledItem>
-            <LabeledItem label="Workflow-ID">
+            <LabeledItem label="DAGRun-ID">
               <span className="font-mono text-sm">
-                {workflow?.workflowId || 'N/A'}
+                {dagRun?.dagRunId || 'N/A'}
               </span>
             </LabeledItem>
-            {workflow?.startedAt && (
+            {dagRun?.startedAt && (
               <LabeledItem label="Started At">
                 <span className="text-sm">
-                  {dayjs(workflow.startedAt).format('YYYY-MM-DD HH:mm:ss Z')}
+                  {dayjs(dagRun.startedAt).format('YYYY-MM-DD HH:mm:ss Z')}
                 </span>
               </LabeledItem>
             )}
-            {workflow?.status !== undefined && (
+            {dagRun?.status !== undefined && (
               <LabeledItem label="Status">
-                <StatusChip status={workflow.status} size="sm">
-                  {workflow.statusLabel || ''}
+                <StatusChip status={dagRun.status} size="sm">
+                  {dagRun.statusLabel || ''}
                 </StatusChip>
               </LabeledItem>
             )}
@@ -285,11 +285,11 @@ function WorkflowActions({
           onSubmit={async () => {
             setIsDequeueModal(false);
 
-            const { error } = await client.GET('/workflows/{name}/{workflowId}/dequeue', {
+            const { error } = await client.GET('/dag-runs/{name}/{dagRunId}/dequeue', {
               params: {
                 path: {
                   name: name,
-                  workflowId: workflow.workflowId,
+                  dagRunId: dagRun.dagRunId,
                 },
                 query: {
                   remoteNode: appBarContext.selectedRemoteNode || 'local',
@@ -305,22 +305,22 @@ function WorkflowActions({
         >
           <div>
             <p className="mb-2">
-              Do you really want to dequeue the following workflow?
+              Do you really want to dequeue the following dagRun?
             </p>
-            <LabeledItem label="Workflow-Name">
+            <LabeledItem label="DAGRun-Name">
               <span className="font-mono text-sm">
-                {workflow?.name || 'N/A'}
+                {dagRun?.name || 'N/A'}
               </span>
             </LabeledItem>
-            <LabeledItem label="Workflow-ID">
+            <LabeledItem label="DAGRun-ID">
               <span className="font-mono text-sm">
-                {workflow?.workflowId || 'N/A'}
+                {dagRun?.dagRunId || 'N/A'}
               </span>
             </LabeledItem>
-            {workflow?.status !== undefined && (
+            {dagRun?.status !== undefined && (
               <LabeledItem label="Status">
-                <StatusChip status={workflow.status} size="sm">
-                  {workflow.statusLabel || ''}
+                <StatusChip status={dagRun.status} size="sm">
+                  {dagRun.statusLabel || ''}
                 </StatusChip>
               </LabeledItem>
             )}
@@ -331,4 +331,4 @@ function WorkflowActions({
   );
 }
 
-export default WorkflowActions;
+export default DAGRunActions;

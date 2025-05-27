@@ -16,7 +16,7 @@ export * from './dag-list';
 // Components for DAG execution management
 export * from './dag-execution';
 
-// Components for visualizing DAG workflows
+// Components for visualizing DAG dagRuns
 export * from './visualization';
 
 // Components for displaying DAG details

@@ -4,15 +4,15 @@ import { useNavigate } from 'react-router-dom';
 import { components, Status } from '../../../../api/v2/schema';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
-import { WorkflowActions } from '../common';
+import { DAGRunActions } from '../common';
 
-interface WorkflowHeaderProps {
-  workflow: components['schemas']['WorkflowDetails'];
+interface DAGRunHeaderProps {
+  dagRun: components['schemas']['DAGRunDetails'];
   refreshFn: () => void;
 }
 
-const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
-  workflow,
+const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({
+  dagRun,
   refreshFn,
 }) => {
   const navigate = useNavigate();
@@ -31,22 +31,22 @@ const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
     return `${seconds}s`;
   };
 
-  const handleRootWorkflowClick = (e: React.MouseEvent) => {
+  const handleRootDAGRunClick = (e: React.MouseEvent) => {
     e.preventDefault();
     navigate(
-      `/workflows/${workflow.rootWorkflowName}/${workflow.rootWorkflowId}`
+      `/dag-runs/${dagRun.rootDAGRunName}/${dagRun.rootDAGRunId}`
     );
   };
 
-  const handleParentWorkflowClick = (e: React.MouseEvent) => {
+  const handleParentDAGRunClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    if (workflow.parentWorkflowId) {
+    if (dagRun.parentDAGRunId) {
       const searchParams = new URLSearchParams();
-      searchParams.set('childWorkflowId', workflow.workflowId);
-      searchParams.set('workflowId', workflow.rootWorkflowId);
-      searchParams.set('workflowName', workflow.rootWorkflowName);
+      searchParams.set('childDAGRunId', dagRun.dagRunId);
+      searchParams.set('dagRunId', dagRun.rootDAGRunId);
+      searchParams.set('dagRunName', dagRun.rootDAGRunName);
       navigate(
-        `/workflows/${workflow.parentWorkflowName}?${searchParams.toString()}`
+        `/dag-runs/${dagRun.parentDAGRunName}?${searchParams.toString()}`
       );
     }
   };
@@ -58,14 +58,14 @@ const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
         <div className="flex-1 min-w-0">
           {/* Breadcrumb navigation */}
           <nav className="flex flex-wrap items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400 mb-2">
-            {workflow.rootWorkflowId !== workflow.workflowId && (
+            {dagRun.rootDAGRunId !== dagRun.dagRunId && (
               <>
                 <a
-                  href={`/workflows/${workflow.rootWorkflowName}/${workflow.rootWorkflowId}`}
-                  onClick={handleRootWorkflowClick}
+                  href={`/dag-runs/${dagRun.rootDAGRunName}/${dagRun.rootDAGRunId}`}
+                  onClick={handleRootDAGRunClick}
                   className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline transition-colors font-medium"
                 >
-                  {workflow.rootWorkflowName}
+                  {dagRun.rootDAGRunName}
                 </a>
                 <span className="text-slate-400 dark:text-slate-500 mx-1">
                   /
@@ -73,17 +73,17 @@ const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
               </>
             )}
 
-            {workflow.parentWorkflowName &&
-              workflow.parentWorkflowId &&
-              workflow.parentWorkflowName !== workflow.rootWorkflowName &&
-              workflow.parentWorkflowName !== workflow.name && (
+            {dagRun.parentDAGRunName &&
+              dagRun.parentDAGRunId &&
+              dagRun.parentDAGRunName !== dagRun.rootDAGRunName &&
+              dagRun.parentDAGRunName !== dagRun.name && (
                 <>
                   <a
                     href="#"
-                    onClick={handleParentWorkflowClick}
+                    onClick={handleParentDAGRunClick}
                     className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline transition-colors font-medium"
                   >
-                    {workflow.parentWorkflowName}
+                    {dagRun.parentDAGRunName}
                   </a>
                   <span className="text-slate-400 dark:text-slate-500 mx-1">
                     /
@@ -93,27 +93,27 @@ const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
           </nav>
 
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 truncate">
-            {workflow.name}
+            {dagRun.name}
           </h1>
         </div>
       </div>
 
       {/* Status and metadata row */}
-      {workflow.status != Status.NotStarted && (
+      {dagRun.status != Status.NotStarted && (
         <div className="flex flex-wrap items-center gap-2 lg:gap-6">
           {/* Status and actions */}
           <div className="flex items-center gap-3">
-            {workflow.status && (
-              <StatusChip status={workflow.status} size="md">
-                {workflow.statusLabel || ''}
+            {dagRun.status && (
+              <StatusChip status={dagRun.status} size="md">
+                {dagRun.statusLabel || ''}
               </StatusChip>
             )}
-            <WorkflowActions
-              workflow={workflow}
-              name={workflow.name}
+            <DAGRunActions
+              dagRun={dagRun}
+              name={dagRun.name}
               refresh={refreshFn}
               displayMode="compact"
-              isRootLevel={workflow.rootWorkflowId === workflow.workflowId}
+              isRootLevel={dagRun.rootDAGRunId === dagRun.dagRunId}
             />
           </div>
 
@@ -123,13 +123,13 @@ const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
               <Calendar className="h-4 w-4 text-slate-500" />
               <div className="flex flex-col">
                 <span className="font-medium">
-                  {workflow?.startedAt
-                    ? dayjs(workflow.startedAt).format('MMM D, HH:mm:ss')
+                  {dagRun?.startedAt
+                    ? dayjs(dagRun.startedAt).format('MMM D, HH:mm:ss')
                     : '--'}
                 </span>
-                {workflow?.startedAt && (
+                {dagRun?.startedAt && (
                   <span className="text-xs text-slate-500 dark:text-slate-400">
-                    {dayjs(workflow.startedAt).format('z')}
+                    {dayjs(dagRun.startedAt).format('z')}
                   </span>
                 )}
               </div>
@@ -138,20 +138,20 @@ const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
             <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-2">
               <Timer className="h-4 w-4 text-slate-500" />
               <span className="font-medium">
-                {workflow.finishedAt
-                  ? formatDuration(workflow.startedAt, workflow.finishedAt)
-                  : workflow.startedAt
-                    ? formatDuration(workflow.startedAt, dayjs().toISOString())
+                {dagRun.finishedAt
+                  ? formatDuration(dagRun.startedAt, dagRun.finishedAt)
+                  : dagRun.startedAt
+                    ? formatDuration(dagRun.startedAt, dayjs().toISOString())
                     : '--'}
               </span>
             </div>
 
             <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 ml-auto">
               <span className="font-medium text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                Workflow ID
+                DAG-run ID
               </span>
               <code className="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-3 py-1.5 rounded-md text-xs font-mono border">
-                {workflow.workflowId}
+                {dagRun.dagRunId}
               </code>
             </div>
           </div>
@@ -161,4 +161,4 @@ const WorkflowHeader: React.FC<WorkflowHeaderProps> = ({
   );
 };
 
-export default WorkflowHeader;
+export default DAGRunHeader;

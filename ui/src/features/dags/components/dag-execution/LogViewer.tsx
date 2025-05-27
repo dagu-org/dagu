@@ -9,10 +9,10 @@ type LogViewerProps = {
   onClose: () => void;
   logType: 'execution' | 'step';
   dagName: string;
-  workflowId: string;
+  dagRunId: string;
   stepName?: string;
   isInModal?: boolean;
-  workflow?: components['schemas']['WorkflowDetails'];
+  dagRun?: components['schemas']['DAGRunDetails'];
   stream?: 'stdout' | 'stderr';
 };
 
@@ -25,10 +25,10 @@ const LogViewer: React.FC<LogViewerProps> = ({
   onClose,
   logType,
   dagName,
-  workflowId,
+  dagRunId,
   stepName,
   isInModal = true,
-  workflow,
+  dagRun,
   stream = 'stdout',
 }) => {
   // Determine the title based on the log type
@@ -44,7 +44,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
       title={title}
       isInModal={isInModal}
       dagName={dagName}
-      workflowId={workflowId}
+      dagRunId={dagRunId}
       stepName={stepName}
       logType={logType}
     >
@@ -52,17 +52,17 @@ const LogViewer: React.FC<LogViewerProps> = ({
         {logType === 'execution' ? (
           <ExecutionLog
             name={dagName}
-            workflowId={workflowId}
-            workflow={workflow}
+            dagRunId={dagRunId}
+            dagRun={dagRun}
             stream={stream}
           />
         ) : (
           stepName && (
             <StepLog
               dagName={dagName}
-              workflowId={workflowId}
+              dagRunId={dagRunId}
               stepName={stepName}
-              workflow={workflow}
+              dagRun={dagRun}
               stream={stream}
             />
           )

@@ -1,5 +1,5 @@
 /**
- * Visualization components for DAG workflows
+ * Visualization components for DAG dagRuns
  *
  * @module features/dags/components/visualization
  */

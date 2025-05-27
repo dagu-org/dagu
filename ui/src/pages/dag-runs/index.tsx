@@ -15,13 +15,13 @@ import {
 } from '../../components/ui/select';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useConfig } from '../../contexts/ConfigContext';
-import WorkflowTable from '../../features/workflows/components/workflow-list/WorkflowTable';
+import DAGRunTable from '../../features/dag-runs/components/dag-run-list/DAGRunTable';
 import { useQuery } from '../../hooks/api';
 import LoadingIndicator from '../../ui/LoadingIndicator';
 import StatusChip from '../../ui/StatusChip';
 import Title from '../../ui/Title';
 
-function Workflows() {
+function DAGRuns() {
   const query = new URLSearchParams(useLocation().search);
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
@@ -54,11 +54,9 @@ function Workflows() {
     }
   };
 
-  // State for search input, workflow ID, status, and date ranges
+  // State for search input, dagRun ID, status, and date ranges
   const [searchText, setSearchText] = React.useState(query.get('name') || '');
-  const [workflowId, setWorkflowId] = React.useState(
-    query.get('workflowId') || ''
-  );
+  const [dagRunId, setDagRunId] = React.useState(query.get('dagRunId') || '');
   const [status, setStatus] = React.useState<string>(
     query.get('status') || 'all'
   );
@@ -86,8 +84,8 @@ function Workflows() {
   const [apiSearchText, setAPISearchText] = React.useState(
     query.get('name') || ''
   );
-  const [apiWorkflowId, setApiWorkflowId] = React.useState(
-    query.get('workflowId') || ''
+  const [apiDagRunId, setApiDagRunId] = React.useState(
+    query.get('dagRunId') || ''
   );
   const [apiStatus, setApiStatus] = React.useState(
     query.get('status') || 'all'
@@ -100,17 +98,17 @@ function Workflows() {
   );
 
   React.useEffect(() => {
-    appBarContext.setTitle('Workflows');
+    appBarContext.setTitle('DAG Runs');
   }, [appBarContext]);
 
   const { data, isLoading, mutate } = useQuery(
-    '/workflows',
+    '/dag-runs',
     {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
           name: apiSearchText ? apiSearchText : undefined,
-          workflowId: apiWorkflowId ? apiWorkflowId : undefined,
+          dagRunId: apiDagRunId ? apiDagRunId : undefined,
           status:
             apiStatus && apiStatus !== 'all' ? parseInt(apiStatus) : undefined,
           fromDate: formatDateForApi(apiFromDate),
@@ -152,7 +150,7 @@ function Workflows() {
     // Console log for debugging
     console.log('Search with parameters:', {
       name: searchText,
-      workflowId: workflowId,
+      dagRunId: dagRunId,
       status: statusToUse,
       from: fromDate,
       to: toDate,
@@ -163,14 +161,14 @@ function Workflows() {
 
     // Update API state with values
     setAPISearchText(searchText);
-    setApiWorkflowId(workflowId);
+    setApiDagRunId(dagRunId);
     setApiStatus(statusToUse);
     setApiFromDate(fromDate);
     setApiToDate(toDate);
 
     // Update URL parameters
     addSearchParam('name', searchText);
-    addSearchParam('workflowId', workflowId);
+    addSearchParam('dagRunId', dagRunId);
     addSearchParam('status', statusToUse);
     addSearchParam(
       'fromDate',
@@ -186,10 +184,10 @@ function Workflows() {
     setSearchText(e.target.value);
   };
 
-  const handleWorkflowIdInputChange = (
+  const handleDagRunIdInputChange = (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
-    setWorkflowId(e.target.value);
+    setDagRunId(e.target.value);
   };
 
   const handleStatusChange = (value: string) => {
@@ -225,20 +223,20 @@ function Workflows() {
 
   return (
     <div className="flex flex-col">
-      <Title>Workflows</Title>
+      <Title>DAG Runs</Title>
       <div className="bg-gray-50 rounded-lg p-3 mb-4 space-y-3">
         <div className="flex flex-wrap gap-2">
           <Input
-            placeholder="Filter by workflow name..."
+            placeholder="Filter by DAG name..."
             value={searchText}
             onChange={handleNameInputChange}
             onKeyDown={handleInputKeyPress}
             className="flex-1 min-w-[200px] bg-background"
           />
           <Input
-            placeholder="Filter by workflow ID..."
-            value={workflowId}
-            onChange={handleWorkflowIdInputChange}
+            placeholder="Filter by Run ID..."
+            value={dagRunId}
+            onChange={handleDagRunIdInputChange}
             onKeyDown={handleInputKeyPress}
             className="flex-1 min-w-[180px] bg-background"
           />
@@ -332,10 +330,10 @@ function Workflows() {
       {isLoading ? (
         <LoadingIndicator />
       ) : (
-        <WorkflowTable workflows={data?.workflows || []} />
+        <DAGRunTable dagRuns={data?.dagRuns || []} />
       )}
     </div>
   );
 }
 
-export default Workflows;
+export default DAGRuns;

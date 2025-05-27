@@ -12,20 +12,20 @@ import {
 import { useConfig } from '../../../../contexts/ConfigContext';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
-import { WorkflowDetailsModal } from '../../components/workflow-details';
+import { DAGRunDetailsModal } from '../dag-run-details';
 
-interface WorkflowTableProps {
-  workflows: components['schemas']['WorkflowSummary'][];
+interface DAGRunTableProps {
+  dagRuns: components['schemas']['DAGRunSummary'][];
 }
 
-function WorkflowTable({ workflows }: WorkflowTableProps) {
+function DAGRunTable({ dagRuns }: DAGRunTableProps) {
   const config = useConfig();
   const navigate = useNavigate();
   const [isSmallScreen, setIsSmallScreen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
-  const [selectedWorkflow, setSelectedWorkflow] = useState<{
+  const [selectedDAGRun, setSelectedDAGRun] = useState<{
     name: string;
-    workflowId: string;
+    dagRunId: string;
   } | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
 
@@ -45,39 +45,39 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
-  // Enhanced keyboard navigation for workflows
+  // Enhanced keyboard navigation for dagRuns
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // If modal is open, use the existing navigation logic
-      if (selectedWorkflow) {
-        const currentIndex = workflows.findIndex(
-          (item) => item.workflowId === selectedWorkflow.workflowId
+      if (selectedDAGRun) {
+        const currentIndex = dagRuns.findIndex(
+          (item) => item.dagRunId === selectedDAGRun.dagRunId
         );
         if (currentIndex === -1) return;
 
         // Navigate with arrow keys
-        if (event.key === 'ArrowDown' && currentIndex < workflows.length - 1) {
-          // Move to next workflow
+        if (event.key === 'ArrowDown' && currentIndex < dagRuns.length - 1) {
+          // Move to next DAG-run
           const nextIndex = currentIndex + 1;
-          const nextWorkflow = workflows[nextIndex];
-          if (nextWorkflow) {
-            // Update both selectedWorkflow and selectedIndex
-            setSelectedWorkflow({
-              name: nextWorkflow.name,
-              workflowId: nextWorkflow.workflowId,
+          const nextDAGRun = dagRuns[nextIndex];
+          if (nextDAGRun) {
+            // Update both selectedDAGRun and selectedIndex
+            setSelectedDAGRun({
+              name: nextDAGRun.name,
+              dagRunId: nextDAGRun.dagRunId,
             });
             setSelectedIndex(nextIndex);
             scrollToSelectedRow(nextIndex);
           }
         } else if (event.key === 'ArrowUp' && currentIndex > 0) {
-          // Move to previous workflow
+          // Move to previous DAG-run
           const prevIndex = currentIndex - 1;
-          const prevWorkflow = workflows[prevIndex];
-          if (prevWorkflow) {
-            // Update both selectedWorkflow and selectedIndex
-            setSelectedWorkflow({
-              name: prevWorkflow.name,
-              workflowId: prevWorkflow.workflowId,
+          const prevDAGRun = dagRuns[prevIndex];
+          if (prevDAGRun) {
+            // Update both selectedDAGRun and selectedIndex
+            setSelectedDAGRun({
+              name: prevDAGRun.name,
+              dagRunId: prevDAGRun.dagRunId,
             });
             setSelectedIndex(prevIndex);
             scrollToSelectedRow(prevIndex);
@@ -90,7 +90,7 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
       if (event.key === 'ArrowDown') {
         event.preventDefault();
         setSelectedIndex((prev) => {
-          const newIndex = prev < workflows.length - 1 ? prev + 1 : prev;
+          const newIndex = prev < dagRuns.length - 1 ? prev + 1 : prev;
           scrollToSelectedRow(newIndex);
           return newIndex;
         });
@@ -103,11 +103,11 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
         });
       } else if (event.key === 'Enter' && selectedIndex >= 0) {
         // Open modal when Enter is pressed on selected row
-        const selectedItem = workflows[selectedIndex];
+        const selectedItem = dagRuns[selectedIndex];
         if (selectedItem) {
-          setSelectedWorkflow({
+          setSelectedDAGRun({
             name: selectedItem.name,
-            workflowId: selectedItem.workflowId,
+            dagRunId: selectedItem.dagRunId,
           });
         }
       }
@@ -130,16 +130,16 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedWorkflow, workflows, selectedIndex]);
+  }, [selectedDAGRun, dagRuns, selectedIndex]);
 
-  // Initialize selection when workflows change
+  // Initialize selection when dagRuns change
   useEffect(() => {
-    if (workflows.length > 0 && selectedIndex === -1) {
+    if (dagRuns.length > 0 && selectedIndex === -1) {
       setSelectedIndex(0);
-    } else if (selectedIndex >= workflows.length) {
-      setSelectedIndex(workflows.length - 1);
+    } else if (selectedIndex >= dagRuns.length) {
+      setSelectedIndex(dagRuns.length - 1);
     }
-  }, [workflows, selectedIndex]);
+  }, [dagRuns, selectedIndex]);
 
   // Format timezone information for display
   const getTimezoneInfo = (): string => {
@@ -163,13 +163,13 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
     startedAt: string,
     finishedAt: string | null
   ): string => {
-    // If workflow hasn't started yet, return dash
+    // If DAG-run hasn't started yet, return dash
     if (!startedAt) {
       return '-';
     }
 
     if (!finishedAt) {
-      // If workflow is still running, calculate duration from start until now
+      // If DAG-run is still running, calculate duration from start until now
       const start = dayjs(startedAt);
       const now = dayjs();
       const durationMs = now.diff(start);
@@ -210,17 +210,17 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
     <div className="flex flex-col items-center justify-center py-12 px-4 border rounded-md bg-white">
       <div className="text-6xl mb-4">🔍</div>
       <h3 className="text-lg font-normal text-gray-900 mb-2">
-        No workflows found
+        No DAG runs found
       </h3>
       <p className="text-sm text-gray-500 text-center max-w-md mb-4">
-        There are no workflows matching your current filters. Try adjusting your
+        There are no DAG runs matching your current filters. Try adjusting your
         search criteria or date range.
       </p>
     </div>
   );
 
-  // If there are no workflows, show empty state
-  if (workflows.length === 0) {
+  // If there are no DAG runs, show empty state
+  if (dagRuns.length === 0) {
     return <EmptyState />;
   }
 
@@ -228,39 +228,39 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
   if (isSmallScreen) {
     return (
       <div className="space-y-2">
-        {workflows.map((workflow, index) => (
+        {dagRuns.map((dagRun, index) => (
           <div
-            key={workflow.workflowId}
+            key={dagRun.dagRunId}
             className={`p-3 rounded-lg border min-h-[80px] flex flex-col ${
               selectedIndex === index
                 ? 'bg-primary/10 border-primary'
                 : 'bg-card border-border'
             } cursor-pointer shadow-sm`}
             onClick={(e) => {
-              // Navigate directly to workflow page with correct URL pattern
+              // Navigate directly to DAG-run page with correct URL pattern
               if (e.metaKey || e.ctrlKey) {
                 // Open in new tab if Cmd/Ctrl is pressed
                 window.open(
-                  `/workflows/${workflow.name}/${workflow.workflowId}`,
+                  `/dag-runs/${dagRun.name}/${dagRun.dagRunId}`,
                   '_blank'
                 );
               } else {
                 // Use React Router for SPA navigation
-                navigate(`/workflows/${workflow.name}/${workflow.workflowId}`);
+                navigate(`/dag-runs/${dagRun.name}/${dagRun.dagRunId}`);
               }
             }}
           >
             {/* Header with name and status */}
             <div className="flex justify-between items-start mb-2">
-              <div className="font-normal text-sm">{workflow.name}</div>
-              <StatusChip status={workflow.status} size="xs">
-                {workflow.statusLabel}
+              <div className="font-normal text-sm">{dagRun.name}</div>
+              <StatusChip status={dagRun.status} size="xs">
+                {dagRun.statusLabel}
               </StatusChip>
             </div>
 
-            {/* Workflow ID */}
+            {/* DAG-run ID */}
             <div className="text-xs font-mono text-muted-foreground mb-2">
-              {workflow.workflowId}
+              {dagRun.dagRunId}
             </div>
 
             {/* Timestamps */}
@@ -268,18 +268,18 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
               <div className="flex justify-between items-center">
                 <div>
                   <span className="text-muted-foreground">Queued: </span>
-                  {workflow.queuedAt || '-'}
+                  {dagRun.queuedAt || '-'}
                 </div>
                 <div>
                   <span className="text-muted-foreground">Started: </span>
-                  {workflow.startedAt || '-'}
+                  {dagRun.startedAt || '-'}
                 </div>
               </div>
               <div className="text-left flex items-center gap-1.5">
                 <span className="text-muted-foreground">Duration: </span>
                 <span className="flex items-center gap-1">
-                  {calculateDuration(workflow.startedAt, workflow.finishedAt)}
-                  {workflow.status === 1 && workflow.startedAt && (
+                  {calculateDuration(dagRun.startedAt, dagRun.finishedAt)}
+                  {dagRun.status === 1 && dagRun.startedAt && (
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-lime-500 animate-pulse" />
                   )}
                 </span>
@@ -303,10 +303,10 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
         <TableHeader>
           <TableRow>
             <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
-              Workflow Name
+              DAG Name
             </TableHead>
             <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
-              Workflow ID
+              Run ID
             </TableHead>
             <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
               Status
@@ -329,9 +329,9 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {workflows.map((workflow, index) => (
+          {dagRuns.map((dagRun, index) => (
             <TableRow
-              key={workflow.workflowId}
+              key={dagRun.dagRunId}
               className={`cursor-pointer ${
                 selectedIndex === index
                   ? 'bg-primary/10 hover:bg-primary/15 border-l-4 border-primary border-b-0 border-t-0'
@@ -340,35 +340,35 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
               style={{ fontSize: '0.8125rem' }}
               onClick={() => {
                 setSelectedIndex(index);
-                setSelectedWorkflow({
-                  name: workflow.name,
-                  workflowId: workflow.workflowId,
+                setSelectedDAGRun({
+                  name: dagRun.name,
+                  dagRunId: dagRun.dagRunId,
                 });
               }}
             >
               <TableCell className="py-1 px-2 font-normal">
-                {workflow.name}
+                {dagRun.name}
               </TableCell>
               <TableCell className="py-1 px-2 font-mono text-muted-foreground">
-                {workflow.workflowId}
+                {dagRun.dagRunId}
               </TableCell>
               <TableCell className="py-1 px-2">
                 <div className="flex items-center">
-                  <StatusChip status={workflow.status} size="xs">
-                    {workflow.statusLabel}
+                  <StatusChip status={dagRun.status} size="xs">
+                    {dagRun.statusLabel}
                   </StatusChip>
                 </div>
               </TableCell>
               <TableCell className="py-1 px-2 text-left">
-                {workflow.queuedAt || '-'}
+                {dagRun.queuedAt || '-'}
               </TableCell>
               <TableCell className="py-1 px-2 text-left">
-                {workflow.startedAt || '-'}
+                {dagRun.startedAt || '-'}
               </TableCell>
               <TableCell className="py-1 px-2 text-left">
                 <div className="flex items-center gap-1">
-                  {calculateDuration(workflow.startedAt, workflow.finishedAt)}
-                  {workflow.status === 1 && workflow.startedAt && (
+                  {calculateDuration(dagRun.startedAt, dagRun.finishedAt)}
+                  {dagRun.status === 1 && dagRun.startedAt && (
                     <span className="inline-block w-2 h-2 rounded-full bg-lime-500 animate-pulse" />
                   )}
                 </div>
@@ -378,14 +378,14 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
         </TableBody>
       </Table>
 
-      {/* Workflow Details Modal */}
-      {selectedWorkflow && (
-        <WorkflowDetailsModal
-          name={selectedWorkflow.name}
-          workflowId={selectedWorkflow.workflowId}
-          isOpen={!!selectedWorkflow}
+      {/* DAG-run Details Modal */}
+      {selectedDAGRun && (
+        <DAGRunDetailsModal
+          name={selectedDAGRun.name}
+          dagRunId={selectedDAGRun.dagRunId}
+          isOpen={!!selectedDAGRun}
           onClose={() => {
-            setSelectedWorkflow(null);
+            setSelectedDAGRun(null);
             // Don't reset selectedIndex when closing modal
             // This keeps the row highlighted after closing
           }}
@@ -395,4 +395,4 @@ function WorkflowTable({ workflows }: WorkflowTableProps) {
   );
 }
 
-export default WorkflowTable;
+export default DAGRunTable;

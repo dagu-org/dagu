@@ -18,12 +18,12 @@ import { DAGHeader } from './';
 type DAGDetailsContentProps = {
   fileName: string;
   dag: components['schemas']['DAG'];
-  currentWorkflow: components['schemas']['WorkflowDetails'];
+  currentDAGRun: components['schemas']['DAGRunDetails'];
   refreshFn: () => void;
   formatDuration: (startDate: string, endDate: string) => string;
   activeTab: string;
   onTabChange?: (tab: string) => void;
-  workflowId?: string;
+  dagRunId?: string;
   stepName?: string | null;
   isModal?: boolean;
   navigateToStatusTab?: () => void;
@@ -39,12 +39,12 @@ type LogViewerState = {
 const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   fileName,
   dag,
-  currentWorkflow,
+  currentDAGRun,
   refreshFn,
   formatDuration,
   activeTab,
   onTabChange,
-  workflowId = 'latest',
+  dagRunId = 'latest',
   stepName = null,
   isModal = false,
   navigateToStatusTab,
@@ -63,7 +63,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
     }
 
     // Open log viewer when clicking on log tabs
-    if (tab === 'workflow-log') {
+    if (tab === 'dagRun-log') {
       setLogViewer({
         isOpen: true,
         logType: 'execution',
@@ -94,7 +94,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
         {!skipHeader && (
           <DAGHeader
             dag={dag}
-            currentWorkflow={currentWorkflow}
+            currentDAGRun={currentDAGRun}
             fileName={fileName || ''}
             refreshFn={refreshFn}
             formatDuration={formatDuration}
@@ -156,7 +156,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                 />
               )}
 
-              {(activeTab === 'log' || activeTab === 'workflow-log') &&
+              {(activeTab === 'log' || activeTab === 'dagRun-log') &&
                 (isModal ? (
                   <ModalLinkTab
                     label="Log"
@@ -236,7 +236,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                 />
               )}
 
-              {(activeTab === 'log' || activeTab === 'workflow-log') &&
+              {(activeTab === 'log' || activeTab === 'dagRun-log') &&
                 (isModal ? (
                   <ModalLinkTab
                     label=""
@@ -264,7 +264,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
         </div>
         <div className="flex-1">
           {activeTab === 'status' ? (
-            <DAGStatus workflow={currentWorkflow} fileName={fileName || ''} />
+            <DAGStatus dagRun={currentDAGRun} fileName={fileName || ''} />
           ) : null}
           {activeTab === 'spec' ? <DAGSpec fileName={fileName} /> : null}
           {activeTab === 'history' ? (
@@ -272,19 +272,19 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
               <DAGExecutionHistory fileName={fileName || ''} />
             </div>
           ) : null}
-          {activeTab === 'workflow-log' ? (
+          {activeTab === 'dagRun-log' ? (
             <ExecutionLog
               name={dag?.name || ''}
-              workflowId={workflowId}
-              workflow={currentWorkflow}
+              dagRunId={dagRunId}
+              dagRun={currentDAGRun}
             />
           ) : null}
           {activeTab === 'log' && stepName ? (
             <StepLog
               dagName={dag?.name || ''}
-              workflowId={workflowId}
+              dagRunId={dagRunId}
               stepName={stepName}
-              workflow={currentWorkflow}
+              dagRun={currentDAGRun}
             />
           ) : null}
 
@@ -294,10 +294,10 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             onClose={closeLogViewer}
             logType={logViewer.logType}
             dagName={dag?.name || ''}
-            workflowId={workflowId}
+            dagRunId={dagRunId}
             stepName={logViewer.stepName}
             isInModal={isModal}
-            workflow={currentWorkflow}
+            dagRun={currentDAGRun}
           />
         </div>
       </div>

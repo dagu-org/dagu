@@ -8,14 +8,14 @@ import {
   CardTitle,
 } from '../../../../components/ui/card';
 import StatusChip from '../../../../ui/StatusChip';
-import { WorkflowDetailsModal } from '../../components/workflow-details';
+import { DAGRunDetailsModal } from '../../components/dagRun-details';
 
-interface WorkflowCardProps {
-  workflow: components['schemas']['WorkflowSummary'];
+interface DAGRunCardProps {
+  dagRun: components['schemas']['DAGRunSummary'];
   timezoneInfo: string;
 }
 
-function WorkflowCard({ workflow, timezoneInfo }: WorkflowCardProps) {
+function DAGRunCard({ dagRun, timezoneInfo }: DAGRunCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Add keyboard navigation for the modal
@@ -41,30 +41,30 @@ function WorkflowCard({ workflow, timezoneInfo }: WorkflowCardProps) {
         onClick={() => setIsModalOpen(true)}
       >
         <CardHeader className="pb-2 px-4 py-3">
-          <CardTitle className="text-sm truncate" title={workflow.name}>
-            {workflow.name}
+          <CardTitle className="text-sm truncate" title={dagRun.name}>
+            {dagRun.name}
           </CardTitle>
           <CardDescription
             className="text-xs truncate"
-            title={workflow.workflowId}
+            title={dagRun.dagRunId}
           >
-            ID: {workflow.workflowId}
+            ID: {dagRun.dagRunId}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-1.5 pt-0 px-4 pb-3">
           <div className="flex justify-between items-center text-xs">
             <span className="text-muted-foreground text-xs">Status:</span>
-            <StatusChip status={workflow.status} size="xs">
-              {workflow.statusLabel}
+            <StatusChip status={dagRun.status} size="xs">
+              {dagRun.statusLabel}
             </StatusChip>
           </div>
           <div className="flex justify-between items-center text-xs">
             <span className="text-muted-foreground text-xs">Started:</span>
-            <span className="truncate ml-2">{workflow.startedAt}</span>
+            <span className="truncate ml-2">{dagRun.startedAt}</span>
           </div>
           <div className="flex justify-between items-center text-xs">
             <span className="text-muted-foreground text-xs">Finished:</span>
-            <span className="truncate ml-2">{workflow.finishedAt || '-'}</span>
+            <span className="truncate ml-2">{dagRun.finishedAt || '-'}</span>
           </div>
           <div className="text-[10px] text-muted-foreground text-right pt-1">
             {timezoneInfo}
@@ -72,11 +72,11 @@ function WorkflowCard({ workflow, timezoneInfo }: WorkflowCardProps) {
         </CardContent>
       </div>
 
-      {/* Workflow Details Modal */}
+      {/* DAGRun Details Modal */}
       {isModalOpen && (
-        <WorkflowDetailsModal
-          name={workflow.name}
-          workflowId={workflow.workflowId}
+        <DAGRunDetailsModal
+          name={dagRun.name}
+          dagRunId={dagRun.dagRunId}
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
         />
@@ -85,4 +85,4 @@ function WorkflowCard({ workflow, timezoneInfo }: WorkflowCardProps) {
   );
 }
 
-export default WorkflowCard;
+export default DAGRunCard;

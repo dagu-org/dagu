@@ -1,6 +1,6 @@
 import { components } from '../../../api/v2/schema';
 
-export function getEventHandlers(s: components['schemas']['WorkflowDetails']) {
+export function getEventHandlers(s: components['schemas']['DAGRunDetails']) {
   const ret: components['schemas']['Node'][] = [];
   if (s.onSuccess) {
     ret.push(s.onSuccess);

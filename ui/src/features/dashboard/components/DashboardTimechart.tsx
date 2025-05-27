@@ -5,12 +5,12 @@ import { components } from '../../../api/v2/schema';
 import { statusColorMapping } from '../../../consts';
 import { useConfig } from '../../../contexts/ConfigContext';
 import dayjs from '../../../lib/dayjs';
-import WorkflowDetailsModal from '../../workflows/components/workflow-details/WorkflowDetailsModal';
+import DAGRunDetailsModal from '../../dag-runs/components/dag-run-details/DAGRunDetailsModal';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, Maximize, Clock, RotateCcw } from 'lucide-react';
 
 type Props = {
-  data: components['schemas']['WorkflowSummary'][];
+  data: components['schemas']['DAGRunSummary'][];
   selectedDate?: {
     startTimestamp: number;
     endTimestamp?: number;
@@ -30,9 +30,9 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
   const timelineRef = useRef<HTMLDivElement>(null);
   const timelineInstance = useRef<Timeline | null>(null);
   const config = useConfig();
-  const [selectedWorkflow, setSelectedWorkflow] = useState<{
+  const [selectedDAGRun, setSelectedDAGRun] = useState<{
     name: string;
-    workflowId: string;
+    dagRunId: string;
   } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -83,17 +83,17 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
       };
     }
 
-    input.forEach((workflow) => {
-      const status = workflow.status;
-      const start = workflow.startedAt;
+    input.forEach((dagRun) => {
+      const status = dagRun.status;
+      const start = dagRun.startedAt;
       if (start && start !== '-') {
         const startMoment = dayjs(start);
         const end =
-          workflow.finishedAt !== '-' ? dayjs(workflow.finishedAt) : now;
+          dagRun.finishedAt !== '-' ? dayjs(dagRun.finishedAt) : now;
 
         items.push({
-          id: workflow.name + `_${workflow.workflowId}`,
-          content: workflow.name,
+          id: dagRun.name + `_${dagRun.dagRunId}`,
+          content: dagRun.name,
           start: startMoment.tz(validTimezone).toDate(),
           end: end.tz(validTimezone).toDate(),
           group: 'main',
@@ -164,15 +164,15 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
         if (properties.item) {
           const itemId = properties.item.toString();
 
-          // Find the original workflow item that matches this ID
-          const matchingWorkflow = input.find(
-            (workflow) => itemId === workflow.name + `_${workflow.workflowId}`
+          // Find the original dagRun item that matches this ID
+          const matchingDAGRun = input.find(
+            (dagRun) => itemId === dagRun.name + `_${dagRun.dagRunId}`
           );
 
-          if (matchingWorkflow) {
-            setSelectedWorkflow({
-              name: matchingWorkflow.name,
-              workflowId: matchingWorkflow.workflowId,
+          if (matchingDAGRun) {
+            setSelectedDAGRun({
+              name: matchingDAGRun.name,
+              dagRunId: matchingDAGRun.dagRunId,
             });
             setIsModalOpen(true);
           }
@@ -286,10 +286,10 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
         </Button>
       </div>
       <div ref={timelineRef} style={{ width: '100%', height: '100%' }} />
-      {selectedWorkflow && (
-        <WorkflowDetailsModal
-          name={selectedWorkflow.name}
-          workflowId={selectedWorkflow.workflowId}
+      {selectedDAGRun && (
+        <DAGRunDetailsModal
+          name={selectedDAGRun.name}
+          dagRunId={selectedDAGRun.dagRunId}
           isOpen={isModalOpen}
           onClose={handleCloseModal}
         />

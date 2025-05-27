@@ -32,7 +32,7 @@ type Props = {
   /** Function to close the modal */
   dismissModal: () => void;
   /** Function called when the user submits the form */
-  onSubmit: (params: string, workflowId?: string) => void;
+  onSubmit: (params: string, dagRunId?: string) => void;
   /** Action type: 'start' or 'enqueue' */
   action?: 'start' | 'enqueue';
 };
@@ -58,7 +58,7 @@ function StartDAGModal({
   }, [dag.defaultParams]);
 
   const [params, setParams] = React.useState<Parameter[]>([]);
-  const [workflowId, setWorkflowId] = React.useState<string>('');
+  const [dagRunId, setDAGRunId] = React.useState<string>('');
 
   // Update params when default params change
   React.useEffect(() => {
@@ -104,7 +104,7 @@ function StartDAGModal({
 
         // If no specific element is focused, trigger the primary action
         e.preventDefault();
-        onSubmit(stringifyParams(params), workflowId || undefined);
+        onSubmit(stringifyParams(params), dagRunId || undefined);
       }
     };
 
@@ -112,7 +112,7 @@ function StartDAGModal({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [visible, params, workflowId, onSubmit, dismissModal]);
+  }, [visible, params, dagRunId, onSubmit, dismissModal]);
 
   return (
     <Dialog open={visible} onOpenChange={(open) => !open && dismissModal()}>
@@ -124,14 +124,14 @@ function StartDAGModal({
         </DialogHeader>
 
         <div className="py-4 space-y-4">
-          {/* Optional Workflow ID field */}
+          {/* Optional DAGRun ID field */}
           <div className="space-y-2">
-            <Label htmlFor="workflow-id">Workflow ID (optional)</Label>
+            <Label htmlFor="dagRun-id">DAGRun ID (optional)</Label>
             <Input
-              id="workflow-id"
-              placeholder="Enter custom workflow ID"
-              value={workflowId}
-              onChange={(e) => setWorkflowId(e.target.value)}
+              id="dagRun-id"
+              placeholder="Enter custom dagRun ID"
+              value={dagRunId}
+              onChange={(e) => setDAGRunId(e.target.value)}
             />
           </div>
           {parsedParams.map((p, i) => {
@@ -204,7 +204,7 @@ function StartDAGModal({
           <Button
             ref={submitButtonRef}
             onClick={() => {
-              onSubmit(stringifyParams(params), workflowId || undefined);
+              onSubmit(stringifyParams(params), dagRunId || undefined);
             }}
           >
             {action === 'enqueue' ? 'Enqueue' : 'Start'}

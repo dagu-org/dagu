@@ -1,5 +1,13 @@
 import React from 'react';
-import { CheckCircle, Filter, ListChecks, Play, XCircle, StopCircle, Clock } from 'lucide-react';
+import {
+  CheckCircle,
+  Filter,
+  ListChecks,
+  Play,
+  XCircle,
+  StopCircle,
+  Clock,
+} from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -19,7 +27,7 @@ import { Status } from '../api/v2/schema'; // Import the Status enum
 import dayjs from '../lib/dayjs';
 
 // Define types using the imported components structure
-type WorkflowSummary = components['schemas']['WorkflowSummary'];
+type DAGRunSummary = components['schemas']['DAGRunSummary'];
 
 type Metrics = Record<Status, number>;
 
@@ -47,7 +55,7 @@ function Dashboard(): React.ReactElement | null {
   // All hooks must be called unconditionally at the top level.
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
-  const [selectedWorkflow, setSelectedWorkflow] = React.useState<string>('all');
+  const [selectedDAGRun, setSelectedDAGRun] = React.useState<string>('all');
   const [dateRange, setDateRange] = React.useState<{
     startDate: number;
     endDate: number | undefined;
@@ -61,7 +69,7 @@ function Dashboard(): React.ReactElement | null {
 
     return {
       startDate: startOfDay.unix(),
-      endDate: undefined, // No end date by default to get all workflows until now
+      endDate: undefined, // No end date by default to get all dagRuns until now
     };
   });
 
@@ -73,38 +81,38 @@ function Dashboard(): React.ReactElement | null {
     });
   };
 
-  const { data, error, isLoading } = useQuery('/workflows', {
+  const { data, error, isLoading } = useQuery('/dag-runs', {
     params: {
       query: {
         remoteNode: appBarContext.selectedRemoteNode || 'local',
         fromDate: dateRange.startDate,
         toDate: dateRange.endDate,
-        name: selectedWorkflow !== 'all' ? selectedWorkflow : undefined,
+        name: selectedDAGRun !== 'all' ? selectedDAGRun : undefined,
       },
     },
     // Refresh every 5 seconds to keep the dashboard up-to-date
     refreshInterval: 5000,
   });
 
-  // Extract unique workflow names for the select dropdown - must be before conditional returns
-  const workflowsList: WorkflowSummary[] = data?.workflows || [];
+  // Extract unique dagRun names for the select dropdown - must be before conditional returns
+  const dagRunsList: DAGRunSummary[] = data?.dagRuns || [];
 
   // This useMemo hook must be called unconditionally
-  const uniqueWorkflowNames = React.useMemo(() => {
+  const uniqueDAGRunNames = React.useMemo(() => {
     const names = new Set<string>();
-    if (data && data.workflows) {
-      data.workflows.forEach((workflow) => {
-        if (workflow.name) {
-          names.add(workflow.name);
+    if (data && data.dagRuns) {
+      data.dagRuns.forEach((dagRun) => {
+        if (dagRun.name) {
+          names.add(dagRun.name);
         }
       });
     }
     return Array.from(names).sort();
   }, [data]);
 
-  // Handle workflow selection change
-  const handleWorkflowChange = (value: string) => {
-    setSelectedWorkflow(value);
+  // Handle dagRun selection change
+  const handleDAGRunChange = (value: string) => {
+    setSelectedDAGRun(value);
   };
 
   // Effect for setting AppBar title - MUST be called before conditional returns
@@ -138,15 +146,15 @@ function Dashboard(): React.ReactElement | null {
   // --- Calculate metrics ---
   // Initialize metrics
   const metrics = initializeMetrics();
-  const totalWorkflows = workflowsList.length;
+  const totalDAGRuns = dagRunsList.length;
 
-  // Calculate metrics from workflow data
-  workflowsList.forEach((workflow) => {
+  // Calculate metrics from dagRun data
+  dagRunsList.forEach((dagRun) => {
     if (
-      workflow &&
-      Object.prototype.hasOwnProperty.call(metrics, workflow.status)
+      dagRun &&
+      Object.prototype.hasOwnProperty.call(metrics, dagRun.status)
     ) {
-      const statusKey = workflow.status as Status;
+      const statusKey = dagRun.status as Status;
       metrics[statusKey]! += 1;
     }
   });
@@ -155,7 +163,7 @@ function Dashboard(): React.ReactElement | null {
   const metricCards = [
     {
       title: 'Total',
-      value: totalWorkflows,
+      value: totalDAGRuns,
       icon: <ListChecks className="h-5 w-5 text-gray-600" />,
     },
     {
@@ -200,43 +208,45 @@ function Dashboard(): React.ReactElement | null {
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">Workflow:</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                DAG Run:
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <Select
-                value={selectedWorkflow}
-                onValueChange={handleWorkflowChange}
+                value={selectedDAGRun}
+                onValueChange={handleDAGRunChange}
                 disabled={isLoading}
               >
                 <SelectTrigger className="h-7 w-full sm:w-[180px] text-xs">
                   <SelectValue
-                    placeholder={
-                      isLoading ? 'Loading...' : 'All workflows'
-                    }
+                    placeholder={isLoading ? 'Loading...' : 'All dagRuns'}
                   />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all" className="text-xs">
-                    All Workflows
+                    All DAG runs
                   </SelectItem>
-                  {uniqueWorkflowNames.map((name) => (
+                  {uniqueDAGRunNames.map((name) => (
                     <SelectItem key={name} value={name} className="text-xs">
                       {name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {selectedWorkflow !== 'all' && (
+              {selectedDAGRun !== 'all' && (
                 <span className="text-xs text-muted-foreground px-2 py-1 bg-muted rounded whitespace-nowrap">
-                  {selectedWorkflow}
+                  {selectedDAGRun}
                 </span>
               )}
             </div>
           </div>
-          
+
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground">Date:</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                Date:
+              </span>
               <Input
                 type="date"
                 value={dayjs.unix(dateRange.startDate).format('YYYY-MM-DD')}
@@ -277,14 +287,24 @@ function Dashboard(): React.ReactElement | null {
             </div>
           </div>
         </div>
-        
+
         {/* Bottom row: Dense metrics */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-x divide-y lg:divide-y-0">
           {metricCards.map((card) => (
-            <div key={card.title} className="p-2 sm:p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
+            <div
+              key={card.title}
+              className="p-2 sm:p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2"
+            >
               <div className="flex items-center gap-1 sm:gap-2">
-                {React.cloneElement(card.icon, { className: card.icon.props.className.replace('h-5 w-5', 'h-3 w-3') })}
-                <span className="text-xs font-medium text-muted-foreground">{card.title}</span>
+                {React.cloneElement(card.icon, {
+                  className: card.icon.props.className.replace(
+                    'h-5 w-5',
+                    'h-3 w-3'
+                  ),
+                })}
+                <span className="text-xs font-medium text-muted-foreground">
+                  {card.title}
+                </span>
               </div>
               <span className="text-lg font-bold">{card.value}</span>
             </div>
@@ -301,7 +321,7 @@ function Dashboard(): React.ReactElement | null {
         </div>
         <div className="p-0">
           <DashboardTimeChart
-            data={workflowsList}
+            data={dagRunsList}
             selectedDate={{
               startTimestamp: dateRange.startDate,
               endTimestamp: dateRange.endDate,

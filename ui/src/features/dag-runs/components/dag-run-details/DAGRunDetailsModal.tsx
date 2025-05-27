@@ -5,37 +5,37 @@ import { useNavigate } from 'react-router-dom';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
-import { WorkflowContext } from '../../contexts/WorkflowContext';
-import WorkflowDetailsContent from './WorkflowDetailsContent';
+import { DAGRunContext } from '../../contexts/DAGRunContext';
+import DAGRunDetailsContent from './DAGRunDetailsContent';
 
-type WorkflowDetailsModalProps = {
+type DAGRunDetailsModalProps = {
   name: string;
-  workflowId: string;
+  dagRunId: string;
   isOpen: boolean;
   onClose: () => void;
 };
 
-const WorkflowDetailsModal: React.FC<WorkflowDetailsModalProps> = ({
+const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
   name,
-  workflowId,
+  dagRunId,
   isOpen,
   onClose,
 }) => {
   const navigate = useNavigate();
   const appBarContext = React.useContext(AppBarContext);
 
-  // Check for child workflow ID in URL search params
+  // Check for child DAG-run ID in URL search params
   const searchParams = new URLSearchParams(window.location.search);
-  const childWorkflowId = searchParams.get('childWorkflowId');
-  const parentWorkflowId = searchParams.get('workflowId');
-  const parentName = searchParams.get('workflowName') || name;
+  const childDAGRunId = searchParams.get('childDAGRunId');
+  const parentDAGRunId = searchParams.get('dagRunId');
+  const parentName = searchParams.get('dagRunName') || name;
 
-  // Determine the API endpoint based on whether this is a child workflow
-  const endpoint = childWorkflowId
-    ? '/workflows/{name}/{workflowId}/children/{childWorkflowId}'
-    : '/workflows/{name}/{workflowId}';
+  // Determine the API endpoint based on whether this is a child DAG-run
+  const endpoint = childDAGRunId
+    ? '/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}'
+    : '/dag-runs/{name}/{dagRunId}';
 
-  // Fetch workflow details
+  // Fetch DAG-run details
   const { data, isLoading, mutate } = useQuery(
     endpoint,
     {
@@ -43,15 +43,15 @@ const WorkflowDetailsModal: React.FC<WorkflowDetailsModalProps> = ({
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
-        path: childWorkflowId
+        path: childDAGRunId
           ? {
               name: parentName || '',
-              workflowId: parentWorkflowId || '',
-              childWorkflowId: childWorkflowId,
+              dagRunId: parentDAGRunId || '',
+              childDAGRunId: childDAGRunId,
             }
           : {
               name: name || '',
-              workflowId: workflowId || 'latest',
+              dagRunId: dagRunId || 'latest',
             },
       },
     },
@@ -63,7 +63,7 @@ const WorkflowDetailsModal: React.FC<WorkflowDetailsModalProps> = ({
   }, [mutate]);
 
   const handleFullscreenClick = (e?: React.MouseEvent) => {
-    const url = `/workflows/${name}/${workflowId}`;
+    const url = `/dag-runs/${name}/${dagRunId}`;
 
     // If Cmd (Mac) or Ctrl (Windows/Linux) key is pressed, open in new tab
     if (e && (e.metaKey || e.ctrlKey)) {
@@ -116,14 +116,14 @@ const WorkflowDetailsModal: React.FC<WorkflowDetailsModalProps> = ({
 
       {/* Side Modal */}
       <div className="fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-gray-100 border-l border-border shadow-xl z-50 overflow-y-auto">
-        <WorkflowContext.Provider
+        <DAGRunContext.Provider
           value={{
             refresh: refreshFn,
             name: name || '',
-            workflowId: workflowId || '',
+            dagRunId: dagRunId || '',
           }}
         >
-          <div className="p-6 w-full flex flex-col h-full workflow-modal-content">
+          <div className="p-6 w-full flex flex-col h-full dagRun-modal-content">
             <div className="flex justify-between items-center mb-4">
               <p className="text-xs text-muted-foreground">
                 Use{' '}
@@ -164,18 +164,18 @@ const WorkflowDetailsModal: React.FC<WorkflowDetailsModalProps> = ({
             </div>
 
             <div className="flex-1 overflow-y-auto">
-              <WorkflowDetailsContent
+              <DAGRunDetailsContent
                 name={name}
-                workflow={data.workflowDetails}
+                dagRun={data.dagRunDetails}
                 refreshFn={refreshFn}
-                workflowId={workflowId}
+                dagRunId={dagRunId}
               />
             </div>
           </div>
-        </WorkflowContext.Provider>
+        </DAGRunContext.Provider>
       </div>
     </>
   );
 };
 
-export default WorkflowDetailsModal;
+export default DAGRunDetailsModal;

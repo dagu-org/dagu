@@ -1,5 +1,5 @@
 /**
- * DAGGraph component provides a tabbed interface for visualizing DAG workflows as either a graph or timeline.
+ * DAGGraph component provides a tabbed interface for visualizing DAG dagRuns as either a graph or timeline.
  *
  * @module features/dags/components/visualization
  */
@@ -21,8 +21,8 @@ import { FlowchartSwitch, FlowchartType, Graph, TimelineChart } from './';
  * Props for the DAGGraph component
  */
 type Props = {
-  /** DAG workflow details containing execution information */
-  workflow: components['schemas']['WorkflowDetails'];
+  /** DAG dagRun details containing execution information */
+  dagRun: components['schemas']['DAGRunDetails'];
   /** Callback for when a step is selected in the graph (double-click) */
   onSelectStep?: (id: string) => void;
   /** Callback for when a step is right-clicked in the graph */
@@ -30,10 +30,10 @@ type Props = {
 };
 
 /**
- * DAGGraph component provides a tabbed interface for visualizing DAG workflows
+ * DAGGraph component provides a tabbed interface for visualizing DAG dagRuns
  * with options to switch between graph and timeline views
  */
-function DAGGraph({ workflow, onSelectStep, onRightClickStep }: Props) {
+function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
   // Active tab state (0 = Graph, 1 = Timeline)
   const [sub, setSub] = React.useState('0');
 
@@ -97,7 +97,7 @@ function DAGGraph({ workflow, onSelectStep, onRightClickStep }: Props) {
               </TooltipTrigger>
               <TooltipContent>
                 <div className="space-y-1">
-                  <p>Double-click: Navigate to child workflow</p>
+                  <p>Double-click: Navigate to child dagRun</p>
                   <p>Right-click: Update node status</p>
                 </div>
               </TooltipContent>
@@ -107,16 +107,16 @@ function DAGGraph({ workflow, onSelectStep, onRightClickStep }: Props) {
         <div className="overflow-x-auto">
           {sub === '0' ? (
             <Graph
-              steps={workflow.nodes}
+              steps={dagRun.nodes}
               type="status"
               flowchart={flowchart}
               onClickNode={onSelectStep}
               onRightClickNode={onRightClickStep}
-              showIcons={workflow.status > Status.NotStarted}
-              animate={workflow.status == Status.Running}
+              showIcons={dagRun.status > Status.NotStarted}
+              animate={dagRun.status == Status.Running}
             />
           ) : (
-            <TimelineChart status={workflow} />
+            <TimelineChart status={dagRun} />
           )}
         </div>
       </BorderedBox>

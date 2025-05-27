@@ -30,12 +30,12 @@ const calculateTotalPages = (totalLines: number, pageSize: number): number => {
 type Props = {
   /** DAG name or fileName */
   dagName: string;
-  /** Workflow ID of the execution */
-  workflowId: string;
+  /** DAG-run ID of the execution */
+  dagRunId: string;
   /** Name of the step to display logs for */
   stepName: string;
-  /** Full workflow details (optional) - used to determine if this is a child workflow */
-  workflow?: components['schemas']['WorkflowDetails'];
+  /** Full DAG-run details (optional) - used to determine if this is a child DAG-run */
+  dagRun?: components['schemas']['DAGRunDetails'];
   /** Whether to show stdout or stderr logs */
   stream?: 'stdout' | 'stderr';
 };
@@ -55,9 +55,9 @@ const ANSI_CODES_REGEX = [
  */
 function StepLog({
   dagName,
-  workflowId,
+  dagRunId,
   stepName,
-  workflow,
+  dagRun,
   stream = 'stdout',
 }: Props) {
   const appBarContext = React.useContext(AppBarContext);
@@ -75,11 +75,11 @@ function StepLog({
   const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
-  // Determine if this is a child workflow
-  const isChildWorkflow =
-    workflow &&
-    workflow.rootWorkflowId &&
-    workflow.rootWorkflowId !== workflow.workflowId;
+  // Determine if this is a child DAG-run
+  const isChildDAGRun =
+    dagRun &&
+    dagRun.rootDAGRunId &&
+    dagRun.rootDAGRunId !== dagRun.dagRunId;
 
   // Determine query parameters based on view mode
   const queryParams: Record<string, number | string> = {
@@ -97,22 +97,22 @@ function StepLog({
     queryParams.limit = pageSize;
   }
 
-  // Determine the API endpoint based on whether this is a child workflow
-  const apiEndpoint = isChildWorkflow
-    ? '/workflows/{name}/{workflowId}/children/{childWorkflowId}/steps/{stepName}/log'
-    : '/workflows/{name}/{workflowId}/steps/{stepName}/log';
+  // Determine the API endpoint based on whether this is a child DAG-run
+  const apiEndpoint = isChildDAGRun
+    ? '/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/log'
+    : '/dag-runs/{name}/{dagRunId}/steps/{stepName}/log';
 
-  // Prepare path parameters based on whether this is a child workflow
-  const pathParams = isChildWorkflow
+  // Prepare path parameters based on whether this is a child DAG-run
+  const pathParams = isChildDAGRun
     ? {
-        name: workflow.rootWorkflowName,
-        workflowId: workflow.rootWorkflowId,
-        childWorkflowId: workflow.workflowId,
+        name: dagRun.rootDAGRunName,
+        dagRunId: dagRun.rootDAGRunId,
+        childDAGRunId: dagRun.dagRunId,
         stepName,
       }
     : {
         name: dagName,
-        workflowId,
+        dagRunId,
         stepName,
       };
 

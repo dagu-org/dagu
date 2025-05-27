@@ -71,22 +71,22 @@ export const mainListItems = React.forwardRef<
           onClick={onNavItemClick}
         />
         <NavItem
-          to="/workflows"
-          text="Workflows"
+          to="/dag-runs"
+          text="DAG Runs"
           icon={<List size={18} />}
           isOpen={isOpen}
           onClick={onNavItemClick}
         />
         <NavItem
           to="/dags"
-          text="DAGs"
+          text="DAG Definitions"
           icon={<GitBranch size={18} />}
           isOpen={isOpen}
           onClick={onNavItemClick}
         />
         <NavItem
           to="/search"
-          text="Search"
+          text="Search DAG Definitions"
           icon={<Search size={18} />}
           isOpen={isOpen}
           onClick={onNavItemClick}

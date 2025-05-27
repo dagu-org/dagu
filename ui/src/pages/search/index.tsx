@@ -52,10 +52,10 @@ function Search() {
   return (
     <div className="w-full">
       <div className="w-full">
-        <Title>Search</Title>
+        <Title>Search DAG Definitions</Title>
         <div className="flex space-x-4 items-center">
           <Input
-            placeholder="Search Text"
+            placeholder="Search text..."
             className="flex-1"
             ref={ref}
             value={searchVal}
