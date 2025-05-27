@@ -114,9 +114,9 @@ type docker struct {
 	// networkConfig is configuration for the container network
 	// See https://pkg.go.dev/github.com/docker/docker@v27.5.1+incompatible/api/types/network#NetworkingConfig
 	networkConfig *network.NetworkingConfig
-	// execConfig is configuration for exec in existing container
+	// execOptions is configuration for exec in existing container
 	// See https://pkg.go.dev/github.com/docker/docker/api/types/container#ExecOptions
-	execConfig *container.ExecOptions
+	execOptions *container.ExecOptions
 }
 
 func (e *docker) SetStdout(out io.Writer) {
@@ -277,20 +277,20 @@ func (e *docker) execInContainer(ctx context.Context, cli *client.Client, args [
 	}
 
 	// Create exec configuration
-	execConfig := container.ExecOptions{
-		User:         e.execConfig.User,
-		Privileged:   e.execConfig.Privileged,
-		Tty:          e.execConfig.Tty,
+	execOpts := container.ExecOptions{
+		User:         e.execOptions.User,
+		Privileged:   e.execOptions.Privileged,
+		Tty:          e.execOptions.Tty,
 		AttachStdin:  false,
 		AttachStdout: true,
 		AttachStderr: true,
 		Cmd:          append([]string{e.step.Command}, args...),
-		Env:          e.execConfig.Env,
-		WorkingDir:   e.execConfig.WorkingDir,
+		Env:          e.execOptions.Env,
+		WorkingDir:   e.execOptions.WorkingDir,
 	}
 
 	// Create exec instance
-	containerID, err := cli.ContainerExecCreate(ctx, e.containerName, execConfig)
+	containerID, err := cli.ContainerExecCreate(ctx, e.containerName, execOpts)
 	if err != nil {
 		return fmt.Errorf("failed to create exec: %w", err)
 	}
@@ -374,7 +374,7 @@ func newDocker(
 ) (Executor, error) {
 	containerConfig := &container.Config{}
 	hostConfig := &container.HostConfig{}
-	execConfig := &container.ExecOptions{}
+	execOpts := &container.ExecOptions{}
 	networkConfig := &network.NetworkingConfig{}
 
 	execCfg := step.ExecutorConfig
@@ -418,7 +418,7 @@ func newDocker(
 
 	if cfg, ok := execCfg.Config["exec"]; ok {
 		md, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-			Result: &execConfig,
+			Result: &execOpts,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create decoder: %w", err)
@@ -470,7 +470,7 @@ func newDocker(
 		containerConfig: containerConfig,
 		hostConfig:      hostConfig,
 		networkConfig:   networkConfig,
-		execConfig:      execConfig,
+		execOptions:     execOpts,
 		autoRemove:      autoRemove,
 	}
 

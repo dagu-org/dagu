@@ -11,7 +11,7 @@ func CmdScheduler() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "scheduler [flags]",
-			Short: "Start the scheduler for automated DAG execution",
+			Short: "Start the scheduler for automated DAG-run execution",
 			Long: `Launch the scheduler process that monitors DAG definitions and automatically triggers DAG based on their defined schedules.
 
 The scheduler continuously monitors the specified directory for DAG definitions,

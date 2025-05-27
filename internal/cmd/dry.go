@@ -17,7 +17,7 @@ func CmdDry() *cobra.Command {
 			Short: "Simulate a DAG-run without executing actual commands",
 			Long: `Perform a dry-run simulation of a DAG-run without executing any real actions.
 
-This command processes a DAG definition and simulates the entire DAG execution
+This command simulates the DAG-run based on the provided DAG definition,
 without producing any side effects or running actual commands.
 
 Parameters after the "--" separator are passed as execution parameters (either positional or key=value pairs),
