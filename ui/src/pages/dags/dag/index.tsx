@@ -7,7 +7,7 @@ import {
   DAGHeader,
 } from '../../../features/dags/components/dag-details';
 import { DAGContext } from '../../../features/dags/contexts/DAGContext';
-import { RootWorkflowContext } from '../../../features/dags/contexts/RootWorkflowContext';
+import { RootDAGRunContext } from '../../../features/dags/contexts/RootDAGRunContext';
 import { useQuery } from '../../../hooks/api';
 import dayjs from '../../../lib/dayjs';
 import LoadingIndicator from '../../../ui/LoadingIndicator';
@@ -18,7 +18,7 @@ type Params = {
   tab?: string;
 };
 
-type WorkflowDetails = components['schemas']['WorkflowDetails'];
+type DAGRunDetails = components['schemas']['DAGRunDetails'];
 
 function DAGDetails() {
   const params = useParams<Params>();
@@ -27,10 +27,10 @@ function DAGDetails() {
   const [searchParams] = useSearchParams();
 
   // Extract query parameters
-  const workflowId = searchParams.get('workflowId');
+  const dagRunId = searchParams.get('dagRunId');
   const stepName = searchParams.get('step');
-  const childWorkflowId = searchParams.get('childWorkflowId');
-  const queriedWorkflowName = searchParams.get('workflowName');
+  const childDAGRunId = searchParams.get('childDAGRunId');
+  const queriedDAGRunName = searchParams.get('dagRunName');
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const fileName = params.fileName || '';
 
@@ -87,117 +87,117 @@ function DAGDetails() {
     }
   );
 
-  // Use workflowName from URL if available, otherwise use the name from dagData
-  const workflowName = queriedWorkflowName || dagData?.dag?.name || '';
+  // Use dagRunName from URL if available, otherwise use the name from dagData
+  const dagRunName = queriedDAGRunName || dagData?.dag?.name || '';
 
-  // Fetch specific workflow data if workflowId is provided
-  const { data: workflowResponse, isLoading: isLoadingWorkflow } = useQuery(
-    '/workflows/{name}/{workflowId}',
+  // Fetch specific DAG-run data if dagRunId is provided
+  const { data: dagRunResponse, isLoading: isLoadingDAGRun } = useQuery(
+    '/dag-runs/{name}/{dagRunId}',
     {
       params: {
         path: {
-          name: workflowName,
-          workflowId: workflowId || '',
+          name: dagRunName,
+          dagRunId: dagRunId || '',
         },
         query: { remoteNode },
       },
     },
     {
       isPaused: () =>
-        (!workflowName && !queriedWorkflowName) ||
-        !workflowId ||
-        !!childWorkflowId,
+        (!dagRunName && !queriedDAGRunName) ||
+        !dagRunId ||
+        !!childDAGRunId,
       refreshInterval: 2000,
     }
   );
 
-  // Fetch child workflow data if needed
-  const { data: childWorkflowResponse, isLoading: isLoadingChildWorkflow } =
+  // Fetch child DAG-run data if needed
+  const { data: childDAGRunResponse, isLoading: isLoadingChildDAGRun } =
     useQuery(
-      '/workflows/{name}/{workflowId}/children/{childWorkflowId}',
+      '/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}',
       {
         params: {
           path: {
-            name: workflowName,
-            workflowId: workflowId || '',
-            childWorkflowId: childWorkflowId || '',
+            name: dagRunName,
+            dagRunId: dagRunId || '',
+            childDAGRunId: childDAGRunId || '',
           },
           query: { remoteNode },
         },
       },
       {
         refreshInterval: 2000,
-        isPaused: () => !childWorkflowId || !workflowId || !workflowName,
+        isPaused: () => !childDAGRunId || !dagRunId || !dagRunName,
       }
     );
 
-  // Determine the current workflow to display
-  let currentWorkflow: WorkflowDetails | undefined;
-  if (childWorkflowId && childWorkflowResponse?.workflowDetails) {
-    currentWorkflow = childWorkflowResponse.workflowDetails;
+  // Determine the current DAG-run to display
+  let currentDAGRun: DAGRunDetails | undefined;
+  if (childDAGRunId && childDAGRunResponse?.dagRunDetails) {
+    currentDAGRun = childDAGRunResponse.dagRunDetails;
   } else if (
-    workflowId &&
-    !childWorkflowId &&
-    workflowResponse?.workflowDetails
+    dagRunId &&
+    !childDAGRunId &&
+    dagRunResponse?.dagRunDetails
   ) {
-    currentWorkflow = workflowResponse.workflowDetails;
-  } else if (!childWorkflowId) {
-    currentWorkflow = dagData?.latestWorkflow;
+    currentDAGRun = dagRunResponse.dagRunDetails;
+  } else if (!childDAGRunId) {
+    currentDAGRun = dagData?.latestDAGRun;
   }
 
-  // Root workflow context state
-  const [rootWorkflowData, setRootWorkflowData] = useState<
-    WorkflowDetails | undefined
+  // Root DAG-run context state
+  const [rootDAGRunData, setRootDAGRunData] = useState<
+    DAGRunDetails | undefined
   >(undefined);
 
-  // Update root workflow data when current workflow changes
-  // This is now the only place that updates the rootWorkflowContext
+  // Update root DAG-run data when current DAG-run changes
+  // This is now the only place that updates the rootDAGRunContext
   // The history page only changes the URL parameters
   useEffect(() => {
-    // Set the initial value if rootWorkflowData is undefined
-    if (!rootWorkflowData) {
-      if (currentWorkflow) {
-        setRootWorkflowData(currentWorkflow);
-      } else if (dagData?.latestWorkflow) {
-        setRootWorkflowData(dagData.latestWorkflow);
+    // Set the initial value if rootDAGRunData is undefined
+    if (!rootDAGRunData) {
+      if (currentDAGRun) {
+        setRootDAGRunData(currentDAGRun);
+      } else if (dagData?.latestDAGRun) {
+        setRootDAGRunData(dagData.latestDAGRun);
       }
     }
-    // Always update when currentWorkflow changes, regardless of the tab
+    // Always update when currentDAGRun changes, regardless of the tab
     // This ensures the header is updated when navigating through history
-    else if (currentWorkflow) {
-      setRootWorkflowData(currentWorkflow);
-    } else if (dagData?.latestWorkflow) {
-      setRootWorkflowData(dagData.latestWorkflow);
+    else if (currentDAGRun) {
+      setRootDAGRunData(currentDAGRun);
+    } else if (dagData?.latestDAGRun) {
+      setRootDAGRunData(dagData.latestDAGRun);
     }
-  }, [currentWorkflow, dagData?.latestWorkflow, rootWorkflowData]);
+  }, [currentDAGRun, dagData?.latestDAGRun, rootDAGRunData]);
 
   // Determine if basic data is loading (no DAG data available at all)
   const isBasicLoading = !fileName || isLoadingDag || !dagData || !dagData.dag;
 
-  // Determine if content is loading (DAG data is available but workflow details are loading)
+  // Determine if content is loading (DAG data is available but DAG-run details are loading)
   let isContentLoading = false;
 
-  // For non-status tabs, we don't need to wait for workflow data
+  // For non-status tabs, we don't need to wait for DAG-run data
   if (tab === 'status') {
-    // Child workflow loading state
+    // Child DAG-run loading state
     if (
-      childWorkflowId &&
-      (isLoadingChildWorkflow || !childWorkflowResponse?.workflowDetails)
+      childDAGRunId &&
+      (isLoadingChildDAGRun || !childDAGRunResponse?.dagRunDetails)
     ) {
       isContentLoading = true;
     }
 
-    // Specific workflow loading state (only for status tab)
+    // Specific DAG-run loading state (only for status tab)
     else if (
-      workflowId &&
-      !childWorkflowId &&
-      (isLoadingWorkflow || !workflowResponse?.workflowDetails)
+      dagRunId &&
+      !childDAGRunId &&
+      (isLoadingDAGRun || !dagRunResponse?.dagRunDetails)
     ) {
       isContentLoading = true;
     }
 
-    // No workflow data available
-    else if (!currentWorkflow && !dagData?.latestWorkflow) {
+    // No DAG-run data available
+    else if (!currentDAGRun && !dagData?.latestDAGRun) {
       isContentLoading = true;
     }
   }
@@ -213,30 +213,30 @@ function DAGDetails() {
     return <LoadingIndicator />;
   }
 
-  // Determine which workflow to display in the header
+  // Determine which DAG-run to display in the header
   // We want to show the header even when content is loading
-  const headerWorkflow = currentWorkflow || dagData?.latestWorkflow;
+  const headerDAGRun = currentDAGRun || dagData?.latestDAGRun;
 
   return (
     <DAGContext.Provider
       value={{
         refresh: refreshData,
         fileName,
-        name: workflowName,
+        name: dagRunName,
       }}
     >
-      <RootWorkflowContext.Provider
+      <RootDAGRunContext.Provider
         value={{
-          data: rootWorkflowData,
-          setData: setRootWorkflowData,
+          data: rootDAGRunData,
+          setData: setRootDAGRunData,
         }}
       >
         <div className="w-full flex flex-col">
           {/* Always render the DAG Header when basic data is available */}
-          {dagData?.dag && headerWorkflow && (
+          {dagData?.dag && headerDAGRun && (
             <DAGHeader
               dag={dagData.dag}
-              currentWorkflow={headerWorkflow}
+              currentDAGRun={headerDAGRun}
               fileName={fileName}
               refreshFn={refreshData}
               formatDuration={formatDuration}
@@ -251,16 +251,16 @@ function DAGDetails() {
             </div>
           ) : (
             dagData?.dag &&
-            headerWorkflow && (
+            headerDAGRun && (
               <DAGDetailsContent
                 fileName={fileName}
                 dag={dagData.dag}
-                currentWorkflow={headerWorkflow}
+                currentDAGRun={headerDAGRun}
                 refreshFn={refreshData}
                 formatDuration={formatDuration}
                 activeTab={tab}
                 onTabChange={handleTabChange}
-                workflowId={currentWorkflow?.workflowId}
+                dagRunId={currentDAGRun?.dagRunId}
                 stepName={stepName}
                 isModal={false}
                 navigateToStatusTab={navigateToStatusTab}
@@ -269,7 +269,7 @@ function DAGDetails() {
             )
           )}
         </div>
-      </RootWorkflowContext.Provider>
+      </RootDAGRunContext.Provider>
     </DAGContext.Provider>
   );
 }

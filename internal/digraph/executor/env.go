@@ -48,14 +48,14 @@ func NewEnv(ctx context.Context, step digraph.Step) Env {
 		Variables: &SyncMap{},
 		Step:      step,
 		Envs: map[string]string{
-			digraph.EnvKeyWorkflowStepName: step.Name,
+			digraph.EnvKeyDAGRunStepName: step.Name,
 		},
 	}
 }
 
-// ExecRef returns the execution reference of the current execution context.
-func (e Env) ExecRef() digraph.WorkflowRef {
-	return digraph.NewWorkflowRef(e.DAG.Name, e.ExecID)
+// DAGRunRef returns the DAGRunRef for the current execution context.
+func (e Env) DAGRunRef() digraph.DAGRunRef {
+	return digraph.NewDAGRunRef(e.DAG.Name, e.DAGRunID)
 }
 
 // AllEnvs returns all environment variables that needs to be passed to the command.

@@ -17,14 +17,14 @@ func TestStore(t *testing.T) {
 	baseDir := t.TempDir()
 	store := New(baseDir)
 
-	// Create a workflow reference
-	workflow := digraph.WorkflowRef{
-		Name:       "test_workflow",
-		WorkflowID: "test_id",
+	// Create a dagRun reference
+	dagRun := digraph.DAGRunRef{
+		Name: "test_dag",
+		ID:   "test_id",
 	}
 
-	// Get the process for the workflow
-	proc, err := store.Acquire(ctx, workflow)
+	// Get the process for the dag-run
+	proc, err := store.Acquire(ctx, dagRun)
 	require.NoError(t, err, "failed to get proc")
 
 	// Stop the process after a short delay
@@ -37,7 +37,7 @@ func TestStore(t *testing.T) {
 	}()
 
 	// Check if the count is 1
-	count, err := store.CountAlive(ctx, workflow.Name)
+	count, err := store.CountAlive(ctx, dagRun.Name)
 	require.NoError(t, err, "failed to count proc files")
 	require.Equal(t, 1, count, "expected 1 proc file")
 
@@ -45,7 +45,7 @@ func TestStore(t *testing.T) {
 	<-done
 
 	// Check if the count is 0
-	count, err = store.CountAlive(ctx, workflow.Name)
+	count, err = store.CountAlive(ctx, dagRun.Name)
 	require.NoError(t, err, "failed to count proc files")
 	require.Equal(t, 0, count, "expected 0 proc files")
 }

@@ -21,20 +21,20 @@ func TestRetryCommand(t *testing.T) {
 		args := []string{"start", `--params="foo"`, dagFile.Location}
 		th.RunCommand(t, cmd.CmdStart(), test.CmdTest{Args: args})
 
-		// Find the workflow ID.
+		// Find the dag-run ID.
 		cli := th.DAGStore
 		ctx := context.Background()
 
 		dag, err := cli.GetMetadata(ctx, dagFile.Location)
 		require.NoError(t, err)
 
-		status, err := th.HistoryMgr.GetLatestStatus(ctx, dag)
+		status, err := th.DAGRunMgr.GetLatestStatus(ctx, dag)
 		require.NoError(t, err)
 		require.Equal(t, status.Status, scheduler.StatusSuccess)
 		require.NotNil(t, status.Status)
 
-		// Retry with the workflow ID.
-		args = []string{"retry", fmt.Sprintf("--workflow-id=%s", status.WorkflowID), dagFile.Location}
+		// Retry with the dag-run ID.
+		args = []string{"retry", fmt.Sprintf("--run-id=%s", status.DAGRunID), dagFile.Location}
 		th.RunCommand(t, cmd.CmdRetry(), test.CmdTest{
 			Args:        args,
 			ExpectedOut: []string{`[1=foo]`},

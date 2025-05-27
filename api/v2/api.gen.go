@@ -91,13 +91,13 @@ const (
 	StreamStdout Stream = "stdout"
 )
 
-// ChildWorkflow Metadata for a child workflow
-type ChildWorkflow struct {
-	// WorkflowId Unique identifier for the workflow
-	WorkflowId WorkflowId `json:"workflowId"`
+// ChildDAGRun Metadata for a child DAG-run
+type ChildDAGRun struct {
+	// DagRunId Unique identifier for the DAG-run
+	DagRunId DAGRunId `json:"dagRunId"`
 }
 
-// Condition Precondition that must be satisfied before running a step or workflow
+// Condition Precondition that must be satisfied before running a step or DAG-run
 type Condition struct {
 	// Condition Expression or check to evaluate
 	Condition string `json:"condition"`
@@ -114,7 +114,7 @@ type Condition struct {
 
 // DAG Core DAG configuration containing definition and metadata
 type DAG struct {
-	// DefaultParams Default parameter values in JSON format if not specified at workflow creation
+	// DefaultParams Default parameter values in JSON format if not specified at DAG-run creation
 	DefaultParams *string `json:"defaultParams,omitempty"`
 
 	// Description Human-readable description of the DAG's purpose and behavior
@@ -126,10 +126,10 @@ type DAG struct {
 	// Name Logical name of the DAG
 	Name string `json:"name"`
 
-	// Params List of parameter names that can be passed to workflows created from this DAG
+	// Params List of parameter names that can be passed to DAG-runs created from this DAG
 	Params *[]string `json:"params,omitempty"`
 
-	// Schedule List of scheduling expressions defining when workflows should be created from this DAG
+	// Schedule List of scheduling expressions defining when DAG-runs should be created from this DAG
 	Schedule *[]Schedule `json:"schedule,omitempty"`
 
 	// Tags List of tags for categorizing and filtering DAGs
@@ -138,22 +138,22 @@ type DAG struct {
 
 // DAGDetails Detailed DAG configuration information
 type DAGDetails struct {
-	// DefaultParams Default parameter values in JSON format if not specified at workflow creation
+	// DefaultParams Default parameter values in JSON format if not specified at DAG-run creation
 	DefaultParams *string `json:"defaultParams,omitempty"`
 
-	// Delay Time in seconds to wait before starting a workflow
+	// Delay Time in seconds to wait before starting a DAG-run
 	Delay *int `json:"delay,omitempty"`
 
 	// Description Human-readable description of the DAG's purpose and behavior
 	Description *string `json:"description,omitempty"`
 
-	// Env List of environment variables to set before executing a workflow
+	// Env List of environment variables to set before executing a DAG-run
 	Env *[]string `json:"env,omitempty"`
 
 	// Group Logical grouping of related DAGs for organizational purposes
 	Group *string `json:"group,omitempty"`
 
-	// HandlerOn Configuration for event handlers in a workflow
+	// HandlerOn Configuration for event handlers in a DAG-run
 	HandlerOn *HandlerOn `json:"handlerOn,omitempty"`
 
 	// HistRetentionDays Number of days to retain historical logs
@@ -162,25 +162,25 @@ type DAGDetails struct {
 	// LogDir Directory path for storing log files
 	LogDir *string `json:"logDir,omitempty"`
 
-	// MaxActiveSteps Maximum number of concurrent workflows allowed from this DAG
-	MaxActiveSteps *int `json:"maxActiveSteps,omitempty"`
+	// MaxActiveDAGRuns Maximum number of concurrent DAG-runs allowed from this DAG
+	MaxActiveDAGRuns *int `json:"maxActiveDAGRuns,omitempty"`
 
-	// MaxActiveWorkflows Maximum number of concurrent workflows allowed from this DAG
-	MaxActiveWorkflows *int `json:"maxActiveWorkflows,omitempty"`
+	// MaxActiveSteps Maximum number of concurrent DAG-runs allowed from this DAG
+	MaxActiveSteps *int `json:"maxActiveSteps,omitempty"`
 
 	// Name Unique identifier for the DAG within its group
 	Name string `json:"name"`
 
-	// Params List of parameter names that can be passed to workflows created from this DAG
+	// Params List of parameter names that can be passed to DAG-runs created from this DAG
 	Params *[]string `json:"params,omitempty"`
 
-	// Preconditions Conditions that must be met before a workflow can start
+	// Preconditions Conditions that must be met before a DAG-run can start
 	Preconditions *[]Condition `json:"preconditions,omitempty"`
 
-	// Schedule List of scheduling expressions defining when workflows should be created from this DAG
+	// Schedule List of scheduling expressions defining when DAG-runs should be created from this DAG
 	Schedule *[]Schedule `json:"schedule,omitempty"`
 
-	// Steps List of steps to execute in workflows created from this DAG
+	// Steps List of steps to execute in DAG-runs created from this DAG
 	Steps *[]Step `json:"steps,omitempty"`
 
 	// Tags List of tags for categorizing and filtering DAGs
@@ -198,8 +198,8 @@ type DAGFile struct {
 	// FileName File ID of the DAG file
 	FileName string `json:"fileName"`
 
-	// LatestWorkflow Current status of a workflow
-	LatestWorkflow WorkflowSummary `json:"latestWorkflow"`
+	// LatestDAGRun Current status of a DAG-run
+	LatestDAGRun DAGRunSummary `json:"latestDAGRun"`
 
 	// Suspended Whether the DAG is suspended
 	Suspended bool `json:"suspended"`
@@ -208,7 +208,7 @@ type DAGFile struct {
 // DAGFileName Name of the DAG file
 type DAGFileName = string
 
-// DAGGridItem Grid item for visualizing workflow execution history
+// DAGGridItem Grid item for visualizing DAG-run execution history
 type DAGGridItem struct {
 	// History Status of the step ordered by time
 	History []NodeStatus `json:"history"`
@@ -219,6 +219,129 @@ type DAGGridItem struct {
 
 // DAGName Name of the DAG
 type DAGName = string
+
+// DAGRunDetails defines model for DAGRunDetails.
+type DAGRunDetails struct {
+	// DagRunId Unique identifier for the DAG-run
+	DagRunId DAGRunId `json:"dagRunId"`
+
+	// FinishedAt RFC 3339 timestamp when the DAG-run finished
+	FinishedAt string `json:"finishedAt"`
+
+	// Log Path to the log file
+	Log string `json:"log"`
+
+	// Name Name of the DAG
+	Name DAGName `json:"name"`
+
+	// Nodes Status of individual steps within the DAG-run
+	Nodes []Node `json:"nodes"`
+
+	// OnCancel Status of an individual step within a DAG-run
+	OnCancel *Node `json:"onCancel,omitempty"`
+
+	// OnExit Status of an individual step within a DAG-run
+	OnExit *Node `json:"onExit,omitempty"`
+
+	// OnFailure Status of an individual step within a DAG-run
+	OnFailure *Node `json:"onFailure,omitempty"`
+
+	// OnSuccess Status of an individual step within a DAG-run
+	OnSuccess *Node `json:"onSuccess,omitempty"`
+
+	// Params Runtime parameters passed to the DAG-run in JSON format
+	Params *string `json:"params,omitempty"`
+
+	// ParentDAGRunId ID of the parent DAG-run
+	ParentDAGRunId *string `json:"parentDAGRunId,omitempty"`
+
+	// ParentDAGRunName Name of the parent DAG-run
+	ParentDAGRunName *string `json:"parentDAGRunName,omitempty"`
+
+	// Pid Process ID of the DAG-run
+	Pid *int `json:"pid,omitempty"`
+
+	// Preconditions List of preconditions that must be met before the DAG-run can start
+	Preconditions *[]Condition `json:"preconditions,omitempty"`
+
+	// QueuedAt RFC 3339 timestamp when the DAG-run was queued
+	QueuedAt *string `json:"queuedAt,omitempty"`
+
+	// RootDAGRunId ID of the root DAG-run
+	RootDAGRunId string `json:"rootDAGRunId"`
+
+	// RootDAGRunName Name of the root DAG-run
+	RootDAGRunName string `json:"rootDAGRunName"`
+
+	// StartedAt RFC 3339 timestamp when the DAG-run started
+	StartedAt string `json:"startedAt"`
+
+	// Status Numeric status code indicating current DAG-run state:
+	// 0: "Not started"
+	// 1: "Running"
+	// 2: "Failed"
+	// 3: "Cancelled"
+	// 4: "Success"
+	// 5: "Queued"
+	Status Status `json:"status"`
+
+	// StatusLabel Human-readable status description for the DAG-run
+	StatusLabel StatusLabel `json:"statusLabel"`
+}
+
+// DAGRunId Unique identifier for the DAG-run
+type DAGRunId = string
+
+// DAGRunSummary Current status of a DAG-run
+type DAGRunSummary struct {
+	// DagRunId Unique identifier for the DAG-run
+	DagRunId DAGRunId `json:"dagRunId"`
+
+	// FinishedAt RFC 3339 timestamp when the DAG-run finished
+	FinishedAt string `json:"finishedAt"`
+
+	// Log Path to the log file
+	Log string `json:"log"`
+
+	// Name Name of the DAG
+	Name DAGName `json:"name"`
+
+	// Params Runtime parameters passed to the DAG-run in JSON format
+	Params *string `json:"params,omitempty"`
+
+	// ParentDAGRunId ID of the parent DAG-run
+	ParentDAGRunId *string `json:"parentDAGRunId,omitempty"`
+
+	// ParentDAGRunName Name of the parent DAG-run
+	ParentDAGRunName *string `json:"parentDAGRunName,omitempty"`
+
+	// Pid Process ID of the DAG-run
+	Pid *int `json:"pid,omitempty"`
+
+	// QueuedAt RFC 3339 timestamp when the DAG-run was queued
+	QueuedAt *string `json:"queuedAt,omitempty"`
+
+	// RootDAGRunId ID of the root DAG-run
+	RootDAGRunId string `json:"rootDAGRunId"`
+
+	// RootDAGRunName Name of the root DAG-run
+	RootDAGRunName string `json:"rootDAGRunName"`
+
+	// StartedAt RFC 3339 timestamp when the DAG-run started
+	StartedAt string `json:"startedAt"`
+
+	// Status Numeric status code indicating current DAG-run state:
+	// 0: "Not started"
+	// 1: "Running"
+	// 2: "Failed"
+	// 3: "Cancelled"
+	// 4: "Success"
+	// 5: "Queued"
+	Status Status `json:"status"`
+
+	// StatusLabel Human-readable status description for the DAG-run
+	StatusLabel StatusLabel `json:"statusLabel"`
+}
 
 // Error Generic error response object
 type Error struct {
@@ -235,18 +358,18 @@ type Error struct {
 // ErrorCode Error code indicating the type of error
 type ErrorCode string
 
-// HandlerOn Configuration for event handlers in a workflow
+// HandlerOn Configuration for event handlers in a DAG-run
 type HandlerOn struct {
-	// Cancel Individual task definition that performs a specific operation in a workflow
+	// Cancel Individual task definition that performs a specific operation in a DAG-run
 	Cancel *Step `json:"cancel,omitempty"`
 
-	// Exit Individual task definition that performs a specific operation in a workflow
+	// Exit Individual task definition that performs a specific operation in a DAG-run
 	Exit *Step `json:"exit,omitempty"`
 
-	// Failure Individual task definition that performs a specific operation in a workflow
+	// Failure Individual task definition that performs a specific operation in a DAG-run
 	Failure *Step `json:"failure,omitempty"`
 
-	// Success Individual task definition that performs a specific operation in a workflow
+	// Success Individual task definition that performs a specific operation in a DAG-run
 	Success *Step `json:"success,omitempty"`
 }
 
@@ -295,10 +418,10 @@ type Log struct {
 	TotalLines *int `json:"totalLines,omitempty"`
 }
 
-// Node Status of an individual step within a workflow
+// Node Status of an individual step within a DAG-run
 type Node struct {
-	// Children List of child workflows associated with this step
-	Children *[]ChildWorkflow `json:"children,omitempty"`
+	// Children List of child DAG-runs associated with this step
+	Children *[]ChildDAGRun `json:"children,omitempty"`
 
 	// DoneCount Number of successful completions for repeating steps
 	DoneCount int `json:"doneCount"`
@@ -333,7 +456,7 @@ type Node struct {
 	// Stdout Path to the standard output log file for this step
 	Stdout string `json:"stdout"`
 
-	// Step Individual task definition that performs a specific operation in a workflow
+	// Step Individual task definition that performs a specific operation in a DAG-run
 	Step Step `json:"step"`
 }
 
@@ -376,7 +499,7 @@ type RepeatPolicy struct {
 	Repeat *bool `json:"repeat,omitempty"`
 }
 
-// Schedule Schedule configuration for workflow creation
+// Schedule Schedule configuration for DAG-run creation
 type Schedule struct {
 	// Expression Cron expression or schedule pattern
 	Expression string `json:"expression"`
@@ -406,7 +529,7 @@ type SearchResultItem struct {
 	Name string `json:"name"`
 }
 
-// Status Numeric status code indicating current workflow state:
+// Status Numeric status code indicating current DAG-run state:
 // 0: "Not started"
 // 1: "Running"
 // 2: "Failed"
@@ -415,10 +538,10 @@ type SearchResultItem struct {
 // 5: "Queued"
 type Status int
 
-// StatusLabel Human-readable status description for the workflow
+// StatusLabel Human-readable status description for the DAG-run
 type StatusLabel string
 
-// Step Individual task definition that performs a specific operation in a workflow
+// Step Individual task definition that performs a specific operation in a DAG-run
 type Step struct {
 	// Args List of arguments to pass to the command
 	Args *[]string `json:"args,omitempty"`
@@ -441,13 +564,13 @@ type Step struct {
 	// MailOnError Whether to send email notifications on step failure
 	MailOnError *bool `json:"mailOnError,omitempty"`
 
-	// Name Unique identifier for the step within the workflow
+	// Name Unique identifier for the step within the DAG-run
 	Name string `json:"name"`
 
 	// Output Variable name to store the step's output
 	Output *string `json:"output,omitempty"`
 
-	// Params Parameters to pass to the child workflow in JSON format
+	// Params Parameters to pass to the child DAG-run in JSON format
 	Params *string `json:"params,omitempty"`
 
 	// Preconditions Conditions that must be met before the step can start
@@ -456,7 +579,7 @@ type Step struct {
 	// RepeatPolicy Configuration for step retry behavior
 	RepeatPolicy *RepeatPolicy `json:"repeatPolicy,omitempty"`
 
-	// Run The name of the DAG to run as a child workflow
+	// Run The name of the DAG to run as a child DAG-run
 	Run *string `json:"run,omitempty"`
 
 	// Script Script content if the step executes a script file
@@ -475,128 +598,11 @@ type Stream string
 // UnixTimestamp Unix timestamp in seconds
 type UnixTimestamp = int64
 
-// WorkflowDetails defines model for WorkflowDetails.
-type WorkflowDetails struct {
-	// FinishedAt RFC 3339 timestamp when the workflow finished
-	FinishedAt string `json:"finishedAt"`
+// DAGRunIdSearch Unique identifier for the DAG-run
+type DAGRunIdSearch = DAGRunId
 
-	// Log Path to the log file
-	Log string `json:"log"`
-
-	// Name Name of the DAG
-	Name DAGName `json:"name"`
-
-	// Nodes Status of individual steps within the workflow
-	Nodes []Node `json:"nodes"`
-
-	// OnCancel Status of an individual step within a workflow
-	OnCancel *Node `json:"onCancel,omitempty"`
-
-	// OnExit Status of an individual step within a workflow
-	OnExit *Node `json:"onExit,omitempty"`
-
-	// OnFailure Status of an individual step within a workflow
-	OnFailure *Node `json:"onFailure,omitempty"`
-
-	// OnSuccess Status of an individual step within a workflow
-	OnSuccess *Node `json:"onSuccess,omitempty"`
-
-	// Params Runtime parameters passed to the workflow in JSON format
-	Params *string `json:"params,omitempty"`
-
-	// ParentWorkflowId ID of the parent workflow
-	ParentWorkflowId *string `json:"parentWorkflowId,omitempty"`
-
-	// ParentWorkflowName Name of the parent workflow
-	ParentWorkflowName *string `json:"parentWorkflowName,omitempty"`
-
-	// Pid Process ID of the workflow
-	Pid *int `json:"pid,omitempty"`
-
-	// Preconditions List of preconditions that must be met before the workflow can start
-	Preconditions *[]Condition `json:"preconditions,omitempty"`
-
-	// QueuedAt RFC 3339 timestamp when the workflow was queued
-	QueuedAt *string `json:"queuedAt,omitempty"`
-
-	// RootWorkflowId ID of the root workflow
-	RootWorkflowId string `json:"rootWorkflowId"`
-
-	// RootWorkflowName Name of the root workflow
-	RootWorkflowName string `json:"rootWorkflowName"`
-
-	// StartedAt RFC 3339 timestamp when the workflow started
-	StartedAt string `json:"startedAt"`
-
-	// Status Numeric status code indicating current workflow state:
-	// 0: "Not started"
-	// 1: "Running"
-	// 2: "Failed"
-	// 3: "Cancelled"
-	// 4: "Success"
-	// 5: "Queued"
-	Status Status `json:"status"`
-
-	// StatusLabel Human-readable status description for the workflow
-	StatusLabel StatusLabel `json:"statusLabel"`
-
-	// WorkflowId Unique identifier for the workflow
-	WorkflowId WorkflowId `json:"workflowId"`
-}
-
-// WorkflowId Unique identifier for the workflow
-type WorkflowId = string
-
-// WorkflowSummary Current status of a workflow
-type WorkflowSummary struct {
-	// FinishedAt RFC 3339 timestamp when the workflow finished
-	FinishedAt string `json:"finishedAt"`
-
-	// Log Path to the log file
-	Log string `json:"log"`
-
-	// Name Name of the DAG
-	Name DAGName `json:"name"`
-
-	// Params Runtime parameters passed to the workflow in JSON format
-	Params *string `json:"params,omitempty"`
-
-	// ParentWorkflowId ID of the parent workflow
-	ParentWorkflowId *string `json:"parentWorkflowId,omitempty"`
-
-	// ParentWorkflowName Name of the parent workflow
-	ParentWorkflowName *string `json:"parentWorkflowName,omitempty"`
-
-	// Pid Process ID of the workflow
-	Pid *int `json:"pid,omitempty"`
-
-	// QueuedAt RFC 3339 timestamp when the workflow was queued
-	QueuedAt *string `json:"queuedAt,omitempty"`
-
-	// RootWorkflowId ID of the root workflow
-	RootWorkflowId string `json:"rootWorkflowId"`
-
-	// RootWorkflowName Name of the root workflow
-	RootWorkflowName string `json:"rootWorkflowName"`
-
-	// StartedAt RFC 3339 timestamp when the workflow started
-	StartedAt string `json:"startedAt"`
-
-	// Status Numeric status code indicating current workflow state:
-	// 0: "Not started"
-	// 1: "Running"
-	// 2: "Failed"
-	// 3: "Cancelled"
-	// 4: "Success"
-	// 5: "Queued"
-	Status Status `json:"status"`
-
-	// StatusLabel Human-readable status description for the workflow
-	StatusLabel StatusLabel `json:"statusLabel"`
-
-	// WorkflowId Unique identifier for the workflow
-	WorkflowId WorkflowId `json:"workflowId"`
-}
+// DAGRunName defines model for DAGRunName.
+type DAGRunName = string
 
 // DateTimeFrom Unix timestamp in seconds
 type DateTimeFrom = UnixTimestamp
@@ -628,11 +634,194 @@ type StepName = string
 // Tail defines model for Tail.
 type Tail = int
 
-// WorkflowIdSearch Unique identifier for the workflow
-type WorkflowIdSearch = WorkflowId
+// ListDAGRunsParams defines parameters for ListDAGRuns.
+type ListDAGRunsParams struct {
+	// Status status of the DAG-run
+	Status *Status `form:"status,omitempty" json:"status,omitempty"`
 
-// WorkflowName defines model for WorkflowName.
-type WorkflowName = string
+	// FromDate start datetime for filtering DAG-runs in ISO 8601 format with timezone
+	FromDate *DateTimeFrom `form:"fromDate,omitempty" json:"fromDate,omitempty"`
+
+	// ToDate end datetime for filtering DAG-runs in ISO 8601 format with timezone
+	ToDate *DateTimeTo `form:"toDate,omitempty" json:"toDate,omitempty"`
+
+	// DagRunId ID of the DAG-run or 'latest' to get the most recent DAG-run
+	DagRunId *DAGRunIdSearch `form:"dagRunId,omitempty" json:"dagRunId,omitempty"`
+
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+
+	// Name Filter DAG-runs by name
+	Name *string `form:"name,omitempty" json:"name,omitempty"`
+}
+
+// ListDAGRunsByNameParams defines parameters for ListDAGRunsByName.
+type ListDAGRunsByNameParams struct {
+	// Status status of the DAG-run
+	Status *Status `form:"status,omitempty" json:"status,omitempty"`
+
+	// FromDate start datetime for filtering DAG-runs in ISO 8601 format with timezone
+	FromDate *DateTimeFrom `form:"fromDate,omitempty" json:"fromDate,omitempty"`
+
+	// ToDate end datetime for filtering DAG-runs in ISO 8601 format with timezone
+	ToDate *DateTimeTo `form:"toDate,omitempty" json:"toDate,omitempty"`
+
+	// DagRunId ID of the DAG-run or 'latest' to get the most recent DAG-run
+	DagRunId *DAGRunIdSearch `form:"dagRunId,omitempty" json:"dagRunId,omitempty"`
+
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
+// GetDAGRunDetailsParams defines parameters for GetDAGRunDetails.
+type GetDAGRunDetailsParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
+// GetChildDAGRunDetailsParams defines parameters for GetChildDAGRunDetails.
+type GetChildDAGRunDetailsParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
+// GetChildDAGRunLogParams defines parameters for GetChildDAGRunLog.
+type GetChildDAGRunLogParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+
+	// Tail Number of lines to return from the end of the file
+	Tail *Tail `form:"tail,omitempty" json:"tail,omitempty"`
+
+	// Head Number of lines to return from the beginning of the file
+	Head *Head `form:"head,omitempty" json:"head,omitempty"`
+
+	// Offset Line number to start reading from (1-based)
+	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit Maximum number of lines to return
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// GetChildDAGRunStepLogParams defines parameters for GetChildDAGRunStepLog.
+type GetChildDAGRunStepLogParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+
+	// Tail Number of lines to return from the end of the file
+	Tail *Tail `form:"tail,omitempty" json:"tail,omitempty"`
+
+	// Head Number of lines to return from the beginning of the file
+	Head *Head `form:"head,omitempty" json:"head,omitempty"`
+
+	// Offset Line number to start reading from (1-based)
+	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit Maximum number of lines to return
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Stream Whether to return stdout or stderr logs
+	Stream *Stream `form:"stream,omitempty" json:"stream,omitempty"`
+}
+
+// UpdateChildDAGRunStepStatusJSONBody defines parameters for UpdateChildDAGRunStepStatus.
+type UpdateChildDAGRunStepStatusJSONBody struct {
+	// Status Numeric status code indicating current node state:
+	// 0: "Not started"
+	// 1: "Running"
+	// 2: "Failed"
+	// 3: "Cancelled"
+	// 4: "Success"
+	// 5: "Skipped"
+	Status NodeStatus `json:"status"`
+}
+
+// UpdateChildDAGRunStepStatusParams defines parameters for UpdateChildDAGRunStepStatus.
+type UpdateChildDAGRunStepStatusParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
+// DequeueDAGRunParams defines parameters for DequeueDAGRun.
+type DequeueDAGRunParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
+// GetDAGRunLogParams defines parameters for GetDAGRunLog.
+type GetDAGRunLogParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+
+	// Tail Number of lines to return from the end of the file
+	Tail *Tail `form:"tail,omitempty" json:"tail,omitempty"`
+
+	// Head Number of lines to return from the beginning of the file
+	Head *Head `form:"head,omitempty" json:"head,omitempty"`
+
+	// Offset Line number to start reading from (1-based)
+	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit Maximum number of lines to return
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// RetryDAGRunJSONBody defines parameters for RetryDAGRun.
+type RetryDAGRunJSONBody struct {
+	// DagRunId ID of the DAG-run to retry
+	DagRunId string `json:"dagRunId"`
+}
+
+// RetryDAGRunParams defines parameters for RetryDAGRun.
+type RetryDAGRunParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
+// GetDAGRunStepLogParams defines parameters for GetDAGRunStepLog.
+type GetDAGRunStepLogParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+
+	// Tail Number of lines to return from the end of the file
+	Tail *Tail `form:"tail,omitempty" json:"tail,omitempty"`
+
+	// Head Number of lines to return from the beginning of the file
+	Head *Head `form:"head,omitempty" json:"head,omitempty"`
+
+	// Offset Line number to start reading from (1-based)
+	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit Maximum number of lines to return
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Stream Whether to return stdout or stderr logs
+	Stream *Stream `form:"stream,omitempty" json:"stream,omitempty"`
+}
+
+// UpdateDAGRunStepStatusJSONBody defines parameters for UpdateDAGRunStepStatus.
+type UpdateDAGRunStepStatusJSONBody struct {
+	// Status Numeric status code indicating current node state:
+	// 0: "Not started"
+	// 1: "Running"
+	// 2: "Failed"
+	// 3: "Cancelled"
+	// 4: "Success"
+	// 5: "Skipped"
+	Status NodeStatus `json:"status"`
+}
+
+// UpdateDAGRunStepStatusParams defines parameters for UpdateDAGRunStepStatus.
+type UpdateDAGRunStepStatusParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
+// TerminateDAGRunParams defines parameters for TerminateDAGRun.
+type TerminateDAGRunParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
 
 // ListDAGsParams defines parameters for ListDAGs.
 type ListDAGsParams struct {
@@ -691,17 +880,29 @@ type GetDAGDetailsParams struct {
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
-// EnqueueDAGWorkflowJSONBody defines parameters for EnqueueDAGWorkflow.
-type EnqueueDAGWorkflowJSONBody struct {
-	// Params Parameters to pass to the workflow in JSON format
-	Params *string `json:"params,omitempty"`
-
-	// WorkflowId Optional ID for the workflow, if not provided a new one will be generated
-	WorkflowId *string `json:"workflowId,omitempty"`
+// GetDAGDAGRunHistoryParams defines parameters for GetDAGDAGRunHistory.
+type GetDAGDAGRunHistoryParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
-// EnqueueDAGWorkflowParams defines parameters for EnqueueDAGWorkflow.
-type EnqueueDAGWorkflowParams struct {
+// GetDAGDAGRunDetailsParams defines parameters for GetDAGDAGRunDetails.
+type GetDAGDAGRunDetailsParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
+// EnqueueDAGDAGRunJSONBody defines parameters for EnqueueDAGDAGRun.
+type EnqueueDAGDAGRunJSONBody struct {
+	// DagRunId Optional ID for the DAG-run, if not provided a new one will be generated
+	DagRunId *string `json:"dagRunId,omitempty"`
+
+	// Params Parameters to pass to the DAG-run in JSON format
+	Params *string `json:"params,omitempty"`
+}
+
+// EnqueueDAGDAGRunParams defines parameters for EnqueueDAGDAGRun.
+type EnqueueDAGDAGRunParams struct {
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
@@ -718,14 +919,14 @@ type RenameDAGParams struct {
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
-// RetryDAGWorkflowJSONBody defines parameters for RetryDAGWorkflow.
-type RetryDAGWorkflowJSONBody struct {
-	// WorkflowId ID of the workflow to retry
-	WorkflowId string `json:"workflowId"`
+// RetryDAGDAGRunJSONBody defines parameters for RetryDAGDAGRun.
+type RetryDAGDAGRunJSONBody struct {
+	// DagRunId ID of the DAG-run to retry
+	DagRunId string `json:"dagRunId"`
 }
 
-// RetryDAGWorkflowParams defines parameters for RetryDAGWorkflow.
-type RetryDAGWorkflowParams struct {
+// RetryDAGDAGRunParams defines parameters for RetryDAGDAGRun.
+type RetryDAGDAGRunParams struct {
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
@@ -750,11 +951,11 @@ type UpdateDAGSpecParams struct {
 
 // ExecuteDAGJSONBody defines parameters for ExecuteDAG.
 type ExecuteDAGJSONBody struct {
-	// Params Parameters to pass to the workflow in JSON format
-	Params *string `json:"params,omitempty"`
+	// DagRunId Optional ID for the DAG-run, if not provided a new one will be generated
+	DagRunId *string `json:"dagRunId,omitempty"`
 
-	// WorkflowId Optional ID for the workflow, if not provided a new one will be generated
-	WorkflowId *string `json:"workflowId,omitempty"`
+	// Params Parameters to pass to the DAG-run in JSON format
+	Params *string `json:"params,omitempty"`
 }
 
 // ExecuteDAGParams defines parameters for ExecuteDAG.
@@ -763,8 +964,8 @@ type ExecuteDAGParams struct {
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
-// TerminateDAGWorkflowParams defines parameters for TerminateDAGWorkflow.
-type TerminateDAGWorkflowParams struct {
+// TerminateDAGDAGRunParams defines parameters for TerminateDAGDAGRun.
+type TerminateDAGDAGRunParams struct {
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
@@ -781,218 +982,26 @@ type UpdateDAGSuspensionStateParams struct {
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
-// GetDAGWorkflowHistoryParams defines parameters for GetDAGWorkflowHistory.
-type GetDAGWorkflowHistoryParams struct {
-	// RemoteNode name of the remote node
-	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
-}
+// UpdateChildDAGRunStepStatusJSONRequestBody defines body for UpdateChildDAGRunStepStatus for application/json ContentType.
+type UpdateChildDAGRunStepStatusJSONRequestBody UpdateChildDAGRunStepStatusJSONBody
 
-// GetDAGWorkflowDetailsParams defines parameters for GetDAGWorkflowDetails.
-type GetDAGWorkflowDetailsParams struct {
-	// RemoteNode name of the remote node
-	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
-}
+// RetryDAGRunJSONRequestBody defines body for RetryDAGRun for application/json ContentType.
+type RetryDAGRunJSONRequestBody RetryDAGRunJSONBody
 
-// ListWorkflowsParams defines parameters for ListWorkflows.
-type ListWorkflowsParams struct {
-	// Status status of the workflow
-	Status *Status `form:"status,omitempty" json:"status,omitempty"`
-
-	// FromDate start datetime for filtering workflows in ISO 8601 format with timezone
-	FromDate *DateTimeFrom `form:"fromDate,omitempty" json:"fromDate,omitempty"`
-
-	// ToDate end datetime for filtering workflows in ISO 8601 format with timezone
-	ToDate *DateTimeTo `form:"toDate,omitempty" json:"toDate,omitempty"`
-
-	// WorkflowId ID of the workflow or 'latest' to get the most recent workflow
-	WorkflowId *WorkflowIdSearch `form:"workflowId,omitempty" json:"workflowId,omitempty"`
-
-	// RemoteNode name of the remote node
-	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
-
-	// Name Filter workflows by name
-	Name *string `form:"name,omitempty" json:"name,omitempty"`
-}
-
-// ListWorkflowsByNameParams defines parameters for ListWorkflowsByName.
-type ListWorkflowsByNameParams struct {
-	// Status status of the workflow
-	Status *Status `form:"status,omitempty" json:"status,omitempty"`
-
-	// FromDate start datetime for filtering workflows in ISO 8601 format with timezone
-	FromDate *DateTimeFrom `form:"fromDate,omitempty" json:"fromDate,omitempty"`
-
-	// ToDate end datetime for filtering workflows in ISO 8601 format with timezone
-	ToDate *DateTimeTo `form:"toDate,omitempty" json:"toDate,omitempty"`
-
-	// WorkflowId ID of the workflow or 'latest' to get the most recent workflow
-	WorkflowId *WorkflowIdSearch `form:"workflowId,omitempty" json:"workflowId,omitempty"`
-
-	// RemoteNode name of the remote node
-	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
-}
-
-// GetWorkflowDetailsParams defines parameters for GetWorkflowDetails.
-type GetWorkflowDetailsParams struct {
-	// RemoteNode name of the remote node
-	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
-}
-
-// GetChildWorkflowDetailsParams defines parameters for GetChildWorkflowDetails.
-type GetChildWorkflowDetailsParams struct {
-	// RemoteNode name of the remote node
-	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
-}
-
-// GetChildWorkflowLogParams defines parameters for GetChildWorkflowLog.
-type GetChildWorkflowLogParams struct {
-	// RemoteNode name of the remote node
-	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
-
-	// Tail Number of lines to return from the end of the file
-	Tail *Tail `form:"tail,omitempty" json:"tail,omitempty"`
-
-	// Head Number of lines to return from the beginning of the file
-	Head *Head `form:"head,omitempty" json:"head,omitempty"`
-
-	// Offset Line number to start reading from (1-based)
-	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
-
-	// Limit Maximum number of lines to return
-	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
-}
-
-// GetChildWorkflowStepLogParams defines parameters for GetChildWorkflowStepLog.
-type GetChildWorkflowStepLogParams struct {
-	// RemoteNode name of the remote node
-	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
-
-	// Tail Number of lines to return from the end of the file
-	Tail *Tail `form:"tail,omitempty" json:"tail,omitempty"`
-
-	// Head Number of lines to return from the beginning of the file
-	Head *Head `form:"head,omitempty" json:"head,omitempty"`
-
-	// Offset Line number to start reading from (1-based)
-	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
-
-	// Limit Maximum number of lines to return
-	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
-
-	// Stream Whether to return stdout or stderr logs
-	Stream *Stream `form:"stream,omitempty" json:"stream,omitempty"`
-}
-
-// UpdateChildWorkflowStepStatusJSONBody defines parameters for UpdateChildWorkflowStepStatus.
-type UpdateChildWorkflowStepStatusJSONBody struct {
-	// Status Numeric status code indicating current node state:
-	// 0: "Not started"
-	// 1: "Running"
-	// 2: "Failed"
-	// 3: "Cancelled"
-	// 4: "Success"
-	// 5: "Skipped"
-	Status NodeStatus `json:"status"`
-}
-
-// UpdateChildWorkflowStepStatusParams defines parameters for UpdateChildWorkflowStepStatus.
-type UpdateChildWorkflowStepStatusParams struct {
-	// RemoteNode name of the remote node
-	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
-}
-
-// DequeueWorkflowParams defines parameters for DequeueWorkflow.
-type DequeueWorkflowParams struct {
-	// RemoteNode name of the remote node
-	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
-}
-
-// GetWorkflowLogParams defines parameters for GetWorkflowLog.
-type GetWorkflowLogParams struct {
-	// RemoteNode name of the remote node
-	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
-
-	// Tail Number of lines to return from the end of the file
-	Tail *Tail `form:"tail,omitempty" json:"tail,omitempty"`
-
-	// Head Number of lines to return from the beginning of the file
-	Head *Head `form:"head,omitempty" json:"head,omitempty"`
-
-	// Offset Line number to start reading from (1-based)
-	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
-
-	// Limit Maximum number of lines to return
-	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
-}
-
-// RetryWorkflowJSONBody defines parameters for RetryWorkflow.
-type RetryWorkflowJSONBody struct {
-	// WorkflowId ID of the workflow to retry
-	WorkflowId string `json:"workflowId"`
-}
-
-// RetryWorkflowParams defines parameters for RetryWorkflow.
-type RetryWorkflowParams struct {
-	// RemoteNode name of the remote node
-	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
-}
-
-// GetWorkflowStepLogParams defines parameters for GetWorkflowStepLog.
-type GetWorkflowStepLogParams struct {
-	// RemoteNode name of the remote node
-	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
-
-	// Tail Number of lines to return from the end of the file
-	Tail *Tail `form:"tail,omitempty" json:"tail,omitempty"`
-
-	// Head Number of lines to return from the beginning of the file
-	Head *Head `form:"head,omitempty" json:"head,omitempty"`
-
-	// Offset Line number to start reading from (1-based)
-	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
-
-	// Limit Maximum number of lines to return
-	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
-
-	// Stream Whether to return stdout or stderr logs
-	Stream *Stream `form:"stream,omitempty" json:"stream,omitempty"`
-}
-
-// UpdateWorkflowStepStatusJSONBody defines parameters for UpdateWorkflowStepStatus.
-type UpdateWorkflowStepStatusJSONBody struct {
-	// Status Numeric status code indicating current node state:
-	// 0: "Not started"
-	// 1: "Running"
-	// 2: "Failed"
-	// 3: "Cancelled"
-	// 4: "Success"
-	// 5: "Skipped"
-	Status NodeStatus `json:"status"`
-}
-
-// UpdateWorkflowStepStatusParams defines parameters for UpdateWorkflowStepStatus.
-type UpdateWorkflowStepStatusParams struct {
-	// RemoteNode name of the remote node
-	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
-}
-
-// TerminateWorkflowParams defines parameters for TerminateWorkflow.
-type TerminateWorkflowParams struct {
-	// RemoteNode name of the remote node
-	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
-}
+// UpdateDAGRunStepStatusJSONRequestBody defines body for UpdateDAGRunStepStatus for application/json ContentType.
+type UpdateDAGRunStepStatusJSONRequestBody UpdateDAGRunStepStatusJSONBody
 
 // CreateNewDAGJSONRequestBody defines body for CreateNewDAG for application/json ContentType.
 type CreateNewDAGJSONRequestBody CreateNewDAGJSONBody
 
-// EnqueueDAGWorkflowJSONRequestBody defines body for EnqueueDAGWorkflow for application/json ContentType.
-type EnqueueDAGWorkflowJSONRequestBody EnqueueDAGWorkflowJSONBody
+// EnqueueDAGDAGRunJSONRequestBody defines body for EnqueueDAGDAGRun for application/json ContentType.
+type EnqueueDAGDAGRunJSONRequestBody EnqueueDAGDAGRunJSONBody
 
 // RenameDAGJSONRequestBody defines body for RenameDAG for application/json ContentType.
 type RenameDAGJSONRequestBody RenameDAGJSONBody
 
-// RetryDAGWorkflowJSONRequestBody defines body for RetryDAGWorkflow for application/json ContentType.
-type RetryDAGWorkflowJSONRequestBody RetryDAGWorkflowJSONBody
+// RetryDAGDAGRunJSONRequestBody defines body for RetryDAGDAGRun for application/json ContentType.
+type RetryDAGDAGRunJSONRequestBody RetryDAGDAGRunJSONBody
 
 // UpdateDAGSpecJSONRequestBody defines body for UpdateDAGSpec for application/json ContentType.
 type UpdateDAGSpecJSONRequestBody UpdateDAGSpecJSONBody
@@ -1003,17 +1012,47 @@ type ExecuteDAGJSONRequestBody ExecuteDAGJSONBody
 // UpdateDAGSuspensionStateJSONRequestBody defines body for UpdateDAGSuspensionState for application/json ContentType.
 type UpdateDAGSuspensionStateJSONRequestBody UpdateDAGSuspensionStateJSONBody
 
-// UpdateChildWorkflowStepStatusJSONRequestBody defines body for UpdateChildWorkflowStepStatus for application/json ContentType.
-type UpdateChildWorkflowStepStatusJSONRequestBody UpdateChildWorkflowStepStatusJSONBody
-
-// RetryWorkflowJSONRequestBody defines body for RetryWorkflow for application/json ContentType.
-type RetryWorkflowJSONRequestBody RetryWorkflowJSONBody
-
-// UpdateWorkflowStepStatusJSONRequestBody defines body for UpdateWorkflowStepStatus for application/json ContentType.
-type UpdateWorkflowStepStatusJSONRequestBody UpdateWorkflowStepStatusJSONBody
-
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// List all DAG-runs
+	// (GET /dag-runs)
+	ListDAGRuns(w http.ResponseWriter, r *http.Request, params ListDAGRunsParams)
+	// List all DAG-runs with a specific name
+	// (GET /dag-runs/{name})
+	ListDAGRunsByName(w http.ResponseWriter, r *http.Request, name DAGRunName, params ListDAGRunsByNameParams)
+	// Retrieve detailed status of a DAG-run
+	// (GET /dag-runs/{name}/{dagRunId})
+	GetDAGRunDetails(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params GetDAGRunDetailsParams)
+	// Retrieve detailed status of a child DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/children/{childDAGRunId})
+	GetChildDAGRunDetails(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, childDAGRunId string, params GetChildDAGRunDetailsParams)
+	// Retrieve log for a specific child DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/log)
+	GetChildDAGRunLog(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, childDAGRunId string, params GetChildDAGRunLogParams)
+	// Retrieve log for a specific step in a child DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/log)
+	GetChildDAGRunStepLog(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, childDAGRunId string, stepName StepName, params GetChildDAGRunStepLogParams)
+	// Manually update a step's execution status in a child DAG-run
+	// (PATCH /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/status)
+	UpdateChildDAGRunStepStatus(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, childDAGRunId string, stepName StepName, params UpdateChildDAGRunStepStatusParams)
+	// Dequeue a queued DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/dequeue)
+	DequeueDAGRun(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params DequeueDAGRunParams)
+	// Retrieve full execution log of a DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/log)
+	GetDAGRunLog(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params GetDAGRunLogParams)
+	// Retry DAG-run execution
+	// (POST /dag-runs/{name}/{dagRunId}/retry)
+	RetryDAGRun(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params RetryDAGRunParams)
+	// Retrieve log for a specific step in a DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/steps/{stepName}/log)
+	GetDAGRunStepLog(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, stepName StepName, params GetDAGRunStepLogParams)
+	// Manually update a step's execution status
+	// (PATCH /dag-runs/{name}/{dagRunId}/steps/{stepName}/status)
+	UpdateDAGRunStepStatus(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, stepName StepName, params UpdateDAGRunStepStatusParams)
+	// Terminate a running DAG-run
+	// (POST /dag-runs/{name}/{dagRunId}/stop)
+	TerminateDAGRun(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params TerminateDAGRunParams)
 	// List all available DAGs
 	// (GET /dags)
 	ListDAGs(w http.ResponseWriter, r *http.Request, params ListDAGsParams)
@@ -1032,83 +1071,122 @@ type ServerInterface interface {
 	// Retrieve comprehensive DAG information
 	// (GET /dags/{fileName})
 	GetDAGDetails(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGDetailsParams)
-	// Enqueue a workflow from DAG
+	// Retrieve execution history of a DAG
+	// (GET /dags/{fileName}/dag-runs)
+	GetDAGDAGRunHistory(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGDAGRunHistoryParams)
+	// Get detailed status of a specific DAG-run
+	// (GET /dags/{fileName}/dag-runs/{dagRunId})
+	GetDAGDAGRunDetails(w http.ResponseWriter, r *http.Request, fileName DAGFileName, dagRunId DAGRunId, params GetDAGDAGRunDetailsParams)
+	// Enqueue a DAG-run from DAG
 	// (POST /dags/{fileName}/enqueue)
-	EnqueueDAGWorkflow(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params EnqueueDAGWorkflowParams)
+	EnqueueDAGDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params EnqueueDAGDAGRunParams)
 	// Change DAG file ID
 	// (POST /dags/{fileName}/rename)
 	RenameDAG(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RenameDAGParams)
-	// Retry workflow execution
+	// Retry DAG-run execution
 	// (POST /dags/{fileName}/retry)
-	RetryDAGWorkflow(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryDAGWorkflowParams)
+	RetryDAGDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryDAGDAGRunParams)
 	// Retrieve DAG specification
 	// (GET /dags/{fileName}/spec)
 	GetDAGSpec(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGSpecParams)
 	// Update DAG spec
 	// (PUT /dags/{fileName}/spec)
 	UpdateDAGSpec(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params UpdateDAGSpecParams)
-	// Create and execute a workflow from DAG
+	// Create and execute a DAG-run from DAG
 	// (POST /dags/{fileName}/start)
 	ExecuteDAG(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params ExecuteDAGParams)
-	// Terminate a running workflow
+	// Terminate a running DAG-run
 	// (POST /dags/{fileName}/stop)
-	TerminateDAGWorkflow(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateDAGWorkflowParams)
+	TerminateDAGDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateDAGDAGRunParams)
 	// Toggle DAG suspension state
 	// (POST /dags/{fileName}/suspend)
 	UpdateDAGSuspensionState(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params UpdateDAGSuspensionStateParams)
-	// Retrieve execution history of a DAG
-	// (GET /dags/{fileName}/workflows)
-	GetDAGWorkflowHistory(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGWorkflowHistoryParams)
-	// Get detailed status of a specific workflow
-	// (GET /dags/{fileName}/workflows/{workflowId})
-	GetDAGWorkflowDetails(w http.ResponseWriter, r *http.Request, fileName DAGFileName, workflowId WorkflowId, params GetDAGWorkflowDetailsParams)
 	// Check server health status
 	// (GET /health)
 	GetHealthStatus(w http.ResponseWriter, r *http.Request)
-	// List all workflows
-	// (GET /workflows)
-	ListWorkflows(w http.ResponseWriter, r *http.Request, params ListWorkflowsParams)
-	// List all workflows with a specific name
-	// (GET /workflows/{name})
-	ListWorkflowsByName(w http.ResponseWriter, r *http.Request, name WorkflowName, params ListWorkflowsByNameParams)
-	// Retrieve detailed status of a workflow
-	// (GET /workflows/{name}/{workflowId})
-	GetWorkflowDetails(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, params GetWorkflowDetailsParams)
-	// Retrieve detailed status of a child workflow
-	// (GET /workflows/{name}/{workflowId}/children/{childWorkflowId})
-	GetChildWorkflowDetails(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, childWorkflowId string, params GetChildWorkflowDetailsParams)
-	// Retrieve log for a specific child workflow
-	// (GET /workflows/{name}/{workflowId}/children/{childWorkflowId}/log)
-	GetChildWorkflowLog(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, childWorkflowId string, params GetChildWorkflowLogParams)
-	// Retrieve log for a specific step in a child workflow
-	// (GET /workflows/{name}/{workflowId}/children/{childWorkflowId}/steps/{stepName}/log)
-	GetChildWorkflowStepLog(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, childWorkflowId string, stepName StepName, params GetChildWorkflowStepLogParams)
-	// Manually update a step's execution status in a child workflow
-	// (PATCH /workflows/{name}/{workflowId}/children/{childWorkflowId}/steps/{stepName}/status)
-	UpdateChildWorkflowStepStatus(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, childWorkflowId string, stepName StepName, params UpdateChildWorkflowStepStatusParams)
-	// Dequeue a queued workflow
-	// (GET /workflows/{name}/{workflowId}/dequeue)
-	DequeueWorkflow(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, params DequeueWorkflowParams)
-	// Retrieve full execution log of a workflow
-	// (GET /workflows/{name}/{workflowId}/log)
-	GetWorkflowLog(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, params GetWorkflowLogParams)
-	// Retry workflow execution
-	// (POST /workflows/{name}/{workflowId}/retry)
-	RetryWorkflow(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, params RetryWorkflowParams)
-	// Retrieve log for a specific step in a workflow
-	// (GET /workflows/{name}/{workflowId}/steps/{stepName}/log)
-	GetWorkflowStepLog(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, stepName StepName, params GetWorkflowStepLogParams)
-	// Manually update a step's execution status
-	// (PATCH /workflows/{name}/{workflowId}/steps/{stepName}/status)
-	UpdateWorkflowStepStatus(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, stepName StepName, params UpdateWorkflowStepStatusParams)
-	// Terminate a running workflow
-	// (POST /workflows/{name}/{workflowId}/stop)
-	TerminateWorkflow(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, params TerminateWorkflowParams)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// List all DAG-runs
+// (GET /dag-runs)
+func (_ Unimplemented) ListDAGRuns(w http.ResponseWriter, r *http.Request, params ListDAGRunsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List all DAG-runs with a specific name
+// (GET /dag-runs/{name})
+func (_ Unimplemented) ListDAGRunsByName(w http.ResponseWriter, r *http.Request, name DAGRunName, params ListDAGRunsByNameParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Retrieve detailed status of a DAG-run
+// (GET /dag-runs/{name}/{dagRunId})
+func (_ Unimplemented) GetDAGRunDetails(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params GetDAGRunDetailsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Retrieve detailed status of a child DAG-run
+// (GET /dag-runs/{name}/{dagRunId}/children/{childDAGRunId})
+func (_ Unimplemented) GetChildDAGRunDetails(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, childDAGRunId string, params GetChildDAGRunDetailsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Retrieve log for a specific child DAG-run
+// (GET /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/log)
+func (_ Unimplemented) GetChildDAGRunLog(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, childDAGRunId string, params GetChildDAGRunLogParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Retrieve log for a specific step in a child DAG-run
+// (GET /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/log)
+func (_ Unimplemented) GetChildDAGRunStepLog(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, childDAGRunId string, stepName StepName, params GetChildDAGRunStepLogParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Manually update a step's execution status in a child DAG-run
+// (PATCH /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/status)
+func (_ Unimplemented) UpdateChildDAGRunStepStatus(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, childDAGRunId string, stepName StepName, params UpdateChildDAGRunStepStatusParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Dequeue a queued DAG-run
+// (GET /dag-runs/{name}/{dagRunId}/dequeue)
+func (_ Unimplemented) DequeueDAGRun(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params DequeueDAGRunParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Retrieve full execution log of a DAG-run
+// (GET /dag-runs/{name}/{dagRunId}/log)
+func (_ Unimplemented) GetDAGRunLog(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params GetDAGRunLogParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Retry DAG-run execution
+// (POST /dag-runs/{name}/{dagRunId}/retry)
+func (_ Unimplemented) RetryDAGRun(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params RetryDAGRunParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Retrieve log for a specific step in a DAG-run
+// (GET /dag-runs/{name}/{dagRunId}/steps/{stepName}/log)
+func (_ Unimplemented) GetDAGRunStepLog(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, stepName StepName, params GetDAGRunStepLogParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Manually update a step's execution status
+// (PATCH /dag-runs/{name}/{dagRunId}/steps/{stepName}/status)
+func (_ Unimplemented) UpdateDAGRunStepStatus(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, stepName StepName, params UpdateDAGRunStepStatusParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Terminate a running DAG-run
+// (POST /dag-runs/{name}/{dagRunId}/stop)
+func (_ Unimplemented) TerminateDAGRun(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params TerminateDAGRunParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // List all available DAGs
 // (GET /dags)
@@ -1146,9 +1224,21 @@ func (_ Unimplemented) GetDAGDetails(w http.ResponseWriter, r *http.Request, fil
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Enqueue a workflow from DAG
+// Retrieve execution history of a DAG
+// (GET /dags/{fileName}/dag-runs)
+func (_ Unimplemented) GetDAGDAGRunHistory(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGDAGRunHistoryParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get detailed status of a specific DAG-run
+// (GET /dags/{fileName}/dag-runs/{dagRunId})
+func (_ Unimplemented) GetDAGDAGRunDetails(w http.ResponseWriter, r *http.Request, fileName DAGFileName, dagRunId DAGRunId, params GetDAGDAGRunDetailsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Enqueue a DAG-run from DAG
 // (POST /dags/{fileName}/enqueue)
-func (_ Unimplemented) EnqueueDAGWorkflow(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params EnqueueDAGWorkflowParams) {
+func (_ Unimplemented) EnqueueDAGDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params EnqueueDAGDAGRunParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1158,9 +1248,9 @@ func (_ Unimplemented) RenameDAG(w http.ResponseWriter, r *http.Request, fileNam
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Retry workflow execution
+// Retry DAG-run execution
 // (POST /dags/{fileName}/retry)
-func (_ Unimplemented) RetryDAGWorkflow(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryDAGWorkflowParams) {
+func (_ Unimplemented) RetryDAGDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryDAGDAGRunParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1176,15 +1266,15 @@ func (_ Unimplemented) UpdateDAGSpec(w http.ResponseWriter, r *http.Request, fil
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Create and execute a workflow from DAG
+// Create and execute a DAG-run from DAG
 // (POST /dags/{fileName}/start)
 func (_ Unimplemented) ExecuteDAG(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params ExecuteDAGParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Terminate a running workflow
+// Terminate a running DAG-run
 // (POST /dags/{fileName}/stop)
-func (_ Unimplemented) TerminateDAGWorkflow(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateDAGWorkflowParams) {
+func (_ Unimplemented) TerminateDAGDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateDAGDAGRunParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1194,99 +1284,9 @@ func (_ Unimplemented) UpdateDAGSuspensionState(w http.ResponseWriter, r *http.R
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Retrieve execution history of a DAG
-// (GET /dags/{fileName}/workflows)
-func (_ Unimplemented) GetDAGWorkflowHistory(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGWorkflowHistoryParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Get detailed status of a specific workflow
-// (GET /dags/{fileName}/workflows/{workflowId})
-func (_ Unimplemented) GetDAGWorkflowDetails(w http.ResponseWriter, r *http.Request, fileName DAGFileName, workflowId WorkflowId, params GetDAGWorkflowDetailsParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
 // Check server health status
 // (GET /health)
 func (_ Unimplemented) GetHealthStatus(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// List all workflows
-// (GET /workflows)
-func (_ Unimplemented) ListWorkflows(w http.ResponseWriter, r *http.Request, params ListWorkflowsParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// List all workflows with a specific name
-// (GET /workflows/{name})
-func (_ Unimplemented) ListWorkflowsByName(w http.ResponseWriter, r *http.Request, name WorkflowName, params ListWorkflowsByNameParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Retrieve detailed status of a workflow
-// (GET /workflows/{name}/{workflowId})
-func (_ Unimplemented) GetWorkflowDetails(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, params GetWorkflowDetailsParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Retrieve detailed status of a child workflow
-// (GET /workflows/{name}/{workflowId}/children/{childWorkflowId})
-func (_ Unimplemented) GetChildWorkflowDetails(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, childWorkflowId string, params GetChildWorkflowDetailsParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Retrieve log for a specific child workflow
-// (GET /workflows/{name}/{workflowId}/children/{childWorkflowId}/log)
-func (_ Unimplemented) GetChildWorkflowLog(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, childWorkflowId string, params GetChildWorkflowLogParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Retrieve log for a specific step in a child workflow
-// (GET /workflows/{name}/{workflowId}/children/{childWorkflowId}/steps/{stepName}/log)
-func (_ Unimplemented) GetChildWorkflowStepLog(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, childWorkflowId string, stepName StepName, params GetChildWorkflowStepLogParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Manually update a step's execution status in a child workflow
-// (PATCH /workflows/{name}/{workflowId}/children/{childWorkflowId}/steps/{stepName}/status)
-func (_ Unimplemented) UpdateChildWorkflowStepStatus(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, childWorkflowId string, stepName StepName, params UpdateChildWorkflowStepStatusParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Dequeue a queued workflow
-// (GET /workflows/{name}/{workflowId}/dequeue)
-func (_ Unimplemented) DequeueWorkflow(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, params DequeueWorkflowParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Retrieve full execution log of a workflow
-// (GET /workflows/{name}/{workflowId}/log)
-func (_ Unimplemented) GetWorkflowLog(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, params GetWorkflowLogParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Retry workflow execution
-// (POST /workflows/{name}/{workflowId}/retry)
-func (_ Unimplemented) RetryWorkflow(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, params RetryWorkflowParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Retrieve log for a specific step in a workflow
-// (GET /workflows/{name}/{workflowId}/steps/{stepName}/log)
-func (_ Unimplemented) GetWorkflowStepLog(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, stepName StepName, params GetWorkflowStepLogParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Manually update a step's execution status
-// (PATCH /workflows/{name}/{workflowId}/steps/{stepName}/status)
-func (_ Unimplemented) UpdateWorkflowStepStatus(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, stepName StepName, params UpdateWorkflowStepStatusParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Terminate a running workflow
-// (POST /workflows/{name}/{workflowId}/stop)
-func (_ Unimplemented) TerminateWorkflow(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, params TerminateWorkflowParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1298,6 +1298,956 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListDAGRuns operation middleware
+func (siw *ServerInterfaceWrapper) ListDAGRuns(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListDAGRunsParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "status", r.URL.Query(), &params.Status)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "fromDate" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "fromDate", r.URL.Query(), &params.FromDate)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fromDate", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "toDate" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "toDate", r.URL.Query(), &params.ToDate)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "toDate", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "dagRunId" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "dagRunId", r.URL.Query(), &params.DagRunId)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "name" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "name", r.URL.Query(), &params.Name)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDAGRuns(w, r, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListDAGRunsByName operation middleware
+func (siw *ServerInterfaceWrapper) ListDAGRunsByName(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name DAGRunName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListDAGRunsByNameParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "status", r.URL.Query(), &params.Status)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "fromDate" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "fromDate", r.URL.Query(), &params.FromDate)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fromDate", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "toDate" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "toDate", r.URL.Query(), &params.ToDate)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "toDate", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "dagRunId" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "dagRunId", r.URL.Query(), &params.DagRunId)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDAGRunsByName(w, r, name, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDAGRunDetails operation middleware
+func (siw *ServerInterfaceWrapper) GetDAGRunDetails(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name DAGName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "dagRunId" -------------
+	var dagRunId DAGRunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetDAGRunDetailsParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDAGRunDetails(w, r, name, dagRunId, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetChildDAGRunDetails operation middleware
+func (siw *ServerInterfaceWrapper) GetChildDAGRunDetails(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name DAGName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "dagRunId" -------------
+	var dagRunId DAGRunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "childDAGRunId" -------------
+	var childDAGRunId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "childDAGRunId", chi.URLParam(r, "childDAGRunId"), &childDAGRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "childDAGRunId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetChildDAGRunDetailsParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetChildDAGRunDetails(w, r, name, dagRunId, childDAGRunId, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetChildDAGRunLog operation middleware
+func (siw *ServerInterfaceWrapper) GetChildDAGRunLog(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name DAGName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "dagRunId" -------------
+	var dagRunId DAGRunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "childDAGRunId" -------------
+	var childDAGRunId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "childDAGRunId", chi.URLParam(r, "childDAGRunId"), &childDAGRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "childDAGRunId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetChildDAGRunLogParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "tail" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "tail", r.URL.Query(), &params.Tail)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tail", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "head" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "head", r.URL.Query(), &params.Head)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "head", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "offset", r.URL.Query(), &params.Offset)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "limit", r.URL.Query(), &params.Limit)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetChildDAGRunLog(w, r, name, dagRunId, childDAGRunId, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetChildDAGRunStepLog operation middleware
+func (siw *ServerInterfaceWrapper) GetChildDAGRunStepLog(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name DAGName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "dagRunId" -------------
+	var dagRunId DAGRunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "childDAGRunId" -------------
+	var childDAGRunId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "childDAGRunId", chi.URLParam(r, "childDAGRunId"), &childDAGRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "childDAGRunId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "stepName" -------------
+	var stepName StepName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "stepName", chi.URLParam(r, "stepName"), &stepName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "stepName", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetChildDAGRunStepLogParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "tail" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "tail", r.URL.Query(), &params.Tail)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tail", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "head" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "head", r.URL.Query(), &params.Head)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "head", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "offset", r.URL.Query(), &params.Offset)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "limit", r.URL.Query(), &params.Limit)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "stream" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "stream", r.URL.Query(), &params.Stream)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "stream", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetChildDAGRunStepLog(w, r, name, dagRunId, childDAGRunId, stepName, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateChildDAGRunStepStatus operation middleware
+func (siw *ServerInterfaceWrapper) UpdateChildDAGRunStepStatus(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name DAGName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "dagRunId" -------------
+	var dagRunId DAGRunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "childDAGRunId" -------------
+	var childDAGRunId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "childDAGRunId", chi.URLParam(r, "childDAGRunId"), &childDAGRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "childDAGRunId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "stepName" -------------
+	var stepName StepName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "stepName", chi.URLParam(r, "stepName"), &stepName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "stepName", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateChildDAGRunStepStatusParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateChildDAGRunStepStatus(w, r, name, dagRunId, childDAGRunId, stepName, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DequeueDAGRun operation middleware
+func (siw *ServerInterfaceWrapper) DequeueDAGRun(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name DAGName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "dagRunId" -------------
+	var dagRunId DAGRunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DequeueDAGRunParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DequeueDAGRun(w, r, name, dagRunId, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDAGRunLog operation middleware
+func (siw *ServerInterfaceWrapper) GetDAGRunLog(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name DAGName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "dagRunId" -------------
+	var dagRunId DAGRunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetDAGRunLogParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "tail" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "tail", r.URL.Query(), &params.Tail)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tail", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "head" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "head", r.URL.Query(), &params.Head)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "head", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "offset", r.URL.Query(), &params.Offset)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "limit", r.URL.Query(), &params.Limit)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDAGRunLog(w, r, name, dagRunId, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RetryDAGRun operation middleware
+func (siw *ServerInterfaceWrapper) RetryDAGRun(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name DAGName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "dagRunId" -------------
+	var dagRunId DAGRunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RetryDAGRunParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RetryDAGRun(w, r, name, dagRunId, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDAGRunStepLog operation middleware
+func (siw *ServerInterfaceWrapper) GetDAGRunStepLog(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name DAGName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "dagRunId" -------------
+	var dagRunId DAGRunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "stepName" -------------
+	var stepName StepName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "stepName", chi.URLParam(r, "stepName"), &stepName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "stepName", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetDAGRunStepLogParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "tail" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "tail", r.URL.Query(), &params.Tail)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tail", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "head" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "head", r.URL.Query(), &params.Head)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "head", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "offset", r.URL.Query(), &params.Offset)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "limit", r.URL.Query(), &params.Limit)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "stream" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "stream", r.URL.Query(), &params.Stream)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "stream", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDAGRunStepLog(w, r, name, dagRunId, stepName, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateDAGRunStepStatus operation middleware
+func (siw *ServerInterfaceWrapper) UpdateDAGRunStepStatus(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name DAGName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "dagRunId" -------------
+	var dagRunId DAGRunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "stepName" -------------
+	var stepName StepName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "stepName", chi.URLParam(r, "stepName"), &stepName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "stepName", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateDAGRunStepStatusParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateDAGRunStepStatus(w, r, name, dagRunId, stepName, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TerminateDAGRun operation middleware
+func (siw *ServerInterfaceWrapper) TerminateDAGRun(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name DAGName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "dagRunId" -------------
+	var dagRunId DAGRunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params TerminateDAGRunParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TerminateDAGRun(w, r, name, dagRunId, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ListDAGs operation middleware
 func (siw *ServerInterfaceWrapper) ListDAGs(w http.ResponseWriter, r *http.Request) {
@@ -1574,8 +2524,8 @@ func (siw *ServerInterfaceWrapper) GetDAGDetails(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
-// EnqueueDAGWorkflow operation middleware
-func (siw *ServerInterfaceWrapper) EnqueueDAGWorkflow(w http.ResponseWriter, r *http.Request) {
+// GetDAGDAGRunHistory operation middleware
+func (siw *ServerInterfaceWrapper) GetDAGDAGRunHistory(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -1597,7 +2547,7 @@ func (siw *ServerInterfaceWrapper) EnqueueDAGWorkflow(w http.ResponseWriter, r *
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params EnqueueDAGWorkflowParams
+	var params GetDAGDAGRunHistoryParams
 
 	// ------------- Optional query parameter "remoteNode" -------------
 
@@ -1608,7 +2558,104 @@ func (siw *ServerInterfaceWrapper) EnqueueDAGWorkflow(w http.ResponseWriter, r *
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.EnqueueDAGWorkflow(w, r, fileName, params)
+		siw.Handler.GetDAGDAGRunHistory(w, r, fileName, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDAGDAGRunDetails operation middleware
+func (siw *ServerInterfaceWrapper) GetDAGDAGRunDetails(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "fileName" -------------
+	var fileName DAGFileName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "fileName", chi.URLParam(r, "fileName"), &fileName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "dagRunId" -------------
+	var dagRunId DAGRunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetDAGDAGRunDetailsParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDAGDAGRunDetails(w, r, fileName, dagRunId, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// EnqueueDAGDAGRun operation middleware
+func (siw *ServerInterfaceWrapper) EnqueueDAGDAGRun(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "fileName" -------------
+	var fileName DAGFileName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "fileName", chi.URLParam(r, "fileName"), &fileName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileName", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params EnqueueDAGDAGRunParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EnqueueDAGDAGRun(w, r, fileName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1662,8 +2709,8 @@ func (siw *ServerInterfaceWrapper) RenameDAG(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
-// RetryDAGWorkflow operation middleware
-func (siw *ServerInterfaceWrapper) RetryDAGWorkflow(w http.ResponseWriter, r *http.Request) {
+// RetryDAGDAGRun operation middleware
+func (siw *ServerInterfaceWrapper) RetryDAGDAGRun(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -1685,7 +2732,7 @@ func (siw *ServerInterfaceWrapper) RetryDAGWorkflow(w http.ResponseWriter, r *ht
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params RetryDAGWorkflowParams
+	var params RetryDAGDAGRunParams
 
 	// ------------- Optional query parameter "remoteNode" -------------
 
@@ -1696,7 +2743,7 @@ func (siw *ServerInterfaceWrapper) RetryDAGWorkflow(w http.ResponseWriter, r *ht
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RetryDAGWorkflow(w, r, fileName, params)
+		siw.Handler.RetryDAGDAGRun(w, r, fileName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1838,8 +2885,8 @@ func (siw *ServerInterfaceWrapper) ExecuteDAG(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
-// TerminateDAGWorkflow operation middleware
-func (siw *ServerInterfaceWrapper) TerminateDAGWorkflow(w http.ResponseWriter, r *http.Request) {
+// TerminateDAGDAGRun operation middleware
+func (siw *ServerInterfaceWrapper) TerminateDAGDAGRun(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -1861,7 +2908,7 @@ func (siw *ServerInterfaceWrapper) TerminateDAGWorkflow(w http.ResponseWriter, r
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params TerminateDAGWorkflowParams
+	var params TerminateDAGDAGRunParams
 
 	// ------------- Optional query parameter "remoteNode" -------------
 
@@ -1872,7 +2919,7 @@ func (siw *ServerInterfaceWrapper) TerminateDAGWorkflow(w http.ResponseWriter, r
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.TerminateDAGWorkflow(w, r, fileName, params)
+		siw.Handler.TerminateDAGDAGRun(w, r, fileName, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -1926,103 +2973,6 @@ func (siw *ServerInterfaceWrapper) UpdateDAGSuspensionState(w http.ResponseWrite
 	handler.ServeHTTP(w, r)
 }
 
-// GetDAGWorkflowHistory operation middleware
-func (siw *ServerInterfaceWrapper) GetDAGWorkflowHistory(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "fileName" -------------
-	var fileName DAGFileName
-
-	err = runtime.BindStyledParameterWithOptions("simple", "fileName", chi.URLParam(r, "fileName"), &fileName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileName", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params GetDAGWorkflowHistoryParams
-
-	// ------------- Optional query parameter "remoteNode" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDAGWorkflowHistory(w, r, fileName, params)
-	}))
-
-	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
-		handler = siw.HandlerMiddlewares[i](handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetDAGWorkflowDetails operation middleware
-func (siw *ServerInterfaceWrapper) GetDAGWorkflowDetails(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "fileName" -------------
-	var fileName DAGFileName
-
-	err = runtime.BindStyledParameterWithOptions("simple", "fileName", chi.URLParam(r, "fileName"), &fileName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileName", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "workflowId" -------------
-	var workflowId WorkflowId
-
-	err = runtime.BindStyledParameterWithOptions("simple", "workflowId", chi.URLParam(r, "workflowId"), &workflowId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workflowId", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params GetDAGWorkflowDetailsParams
-
-	// ------------- Optional query parameter "remoteNode" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDAGWorkflowDetails(w, r, fileName, workflowId, params)
-	}))
-
-	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
-		handler = siw.HandlerMiddlewares[i](handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
 // GetHealthStatus operation middleware
 func (siw *ServerInterfaceWrapper) GetHealthStatus(w http.ResponseWriter, r *http.Request) {
 
@@ -2036,956 +2986,6 @@ func (siw *ServerInterfaceWrapper) GetHealthStatus(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetHealthStatus(w, r)
-	}))
-
-	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
-		handler = siw.HandlerMiddlewares[i](handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ListWorkflows operation middleware
-func (siw *ServerInterfaceWrapper) ListWorkflows(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params ListWorkflowsParams
-
-	// ------------- Optional query parameter "status" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "status", r.URL.Query(), &params.Status)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "fromDate" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "fromDate", r.URL.Query(), &params.FromDate)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fromDate", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "toDate" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "toDate", r.URL.Query(), &params.ToDate)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "toDate", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "workflowId" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "workflowId", r.URL.Query(), &params.WorkflowId)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workflowId", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "remoteNode" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "name" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "name", r.URL.Query(), &params.Name)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListWorkflows(w, r, params)
-	}))
-
-	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
-		handler = siw.HandlerMiddlewares[i](handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ListWorkflowsByName operation middleware
-func (siw *ServerInterfaceWrapper) ListWorkflowsByName(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "name" -------------
-	var name WorkflowName
-
-	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params ListWorkflowsByNameParams
-
-	// ------------- Optional query parameter "status" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "status", r.URL.Query(), &params.Status)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "fromDate" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "fromDate", r.URL.Query(), &params.FromDate)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fromDate", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "toDate" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "toDate", r.URL.Query(), &params.ToDate)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "toDate", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "workflowId" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "workflowId", r.URL.Query(), &params.WorkflowId)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workflowId", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "remoteNode" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListWorkflowsByName(w, r, name, params)
-	}))
-
-	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
-		handler = siw.HandlerMiddlewares[i](handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetWorkflowDetails operation middleware
-func (siw *ServerInterfaceWrapper) GetWorkflowDetails(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "name" -------------
-	var name DAGName
-
-	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "workflowId" -------------
-	var workflowId WorkflowId
-
-	err = runtime.BindStyledParameterWithOptions("simple", "workflowId", chi.URLParam(r, "workflowId"), &workflowId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workflowId", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params GetWorkflowDetailsParams
-
-	// ------------- Optional query parameter "remoteNode" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetWorkflowDetails(w, r, name, workflowId, params)
-	}))
-
-	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
-		handler = siw.HandlerMiddlewares[i](handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetChildWorkflowDetails operation middleware
-func (siw *ServerInterfaceWrapper) GetChildWorkflowDetails(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "name" -------------
-	var name DAGName
-
-	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "workflowId" -------------
-	var workflowId WorkflowId
-
-	err = runtime.BindStyledParameterWithOptions("simple", "workflowId", chi.URLParam(r, "workflowId"), &workflowId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workflowId", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "childWorkflowId" -------------
-	var childWorkflowId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "childWorkflowId", chi.URLParam(r, "childWorkflowId"), &childWorkflowId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "childWorkflowId", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params GetChildWorkflowDetailsParams
-
-	// ------------- Optional query parameter "remoteNode" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetChildWorkflowDetails(w, r, name, workflowId, childWorkflowId, params)
-	}))
-
-	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
-		handler = siw.HandlerMiddlewares[i](handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetChildWorkflowLog operation middleware
-func (siw *ServerInterfaceWrapper) GetChildWorkflowLog(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "name" -------------
-	var name DAGName
-
-	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "workflowId" -------------
-	var workflowId WorkflowId
-
-	err = runtime.BindStyledParameterWithOptions("simple", "workflowId", chi.URLParam(r, "workflowId"), &workflowId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workflowId", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "childWorkflowId" -------------
-	var childWorkflowId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "childWorkflowId", chi.URLParam(r, "childWorkflowId"), &childWorkflowId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "childWorkflowId", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params GetChildWorkflowLogParams
-
-	// ------------- Optional query parameter "remoteNode" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "tail" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "tail", r.URL.Query(), &params.Tail)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tail", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "head" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "head", r.URL.Query(), &params.Head)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "head", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "offset" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "offset", r.URL.Query(), &params.Offset)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "limit" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "limit", r.URL.Query(), &params.Limit)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetChildWorkflowLog(w, r, name, workflowId, childWorkflowId, params)
-	}))
-
-	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
-		handler = siw.HandlerMiddlewares[i](handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetChildWorkflowStepLog operation middleware
-func (siw *ServerInterfaceWrapper) GetChildWorkflowStepLog(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "name" -------------
-	var name DAGName
-
-	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "workflowId" -------------
-	var workflowId WorkflowId
-
-	err = runtime.BindStyledParameterWithOptions("simple", "workflowId", chi.URLParam(r, "workflowId"), &workflowId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workflowId", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "childWorkflowId" -------------
-	var childWorkflowId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "childWorkflowId", chi.URLParam(r, "childWorkflowId"), &childWorkflowId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "childWorkflowId", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "stepName" -------------
-	var stepName StepName
-
-	err = runtime.BindStyledParameterWithOptions("simple", "stepName", chi.URLParam(r, "stepName"), &stepName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "stepName", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params GetChildWorkflowStepLogParams
-
-	// ------------- Optional query parameter "remoteNode" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "tail" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "tail", r.URL.Query(), &params.Tail)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tail", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "head" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "head", r.URL.Query(), &params.Head)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "head", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "offset" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "offset", r.URL.Query(), &params.Offset)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "limit" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "limit", r.URL.Query(), &params.Limit)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "stream" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "stream", r.URL.Query(), &params.Stream)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "stream", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetChildWorkflowStepLog(w, r, name, workflowId, childWorkflowId, stepName, params)
-	}))
-
-	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
-		handler = siw.HandlerMiddlewares[i](handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// UpdateChildWorkflowStepStatus operation middleware
-func (siw *ServerInterfaceWrapper) UpdateChildWorkflowStepStatus(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "name" -------------
-	var name DAGName
-
-	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "workflowId" -------------
-	var workflowId WorkflowId
-
-	err = runtime.BindStyledParameterWithOptions("simple", "workflowId", chi.URLParam(r, "workflowId"), &workflowId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workflowId", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "childWorkflowId" -------------
-	var childWorkflowId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "childWorkflowId", chi.URLParam(r, "childWorkflowId"), &childWorkflowId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "childWorkflowId", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "stepName" -------------
-	var stepName StepName
-
-	err = runtime.BindStyledParameterWithOptions("simple", "stepName", chi.URLParam(r, "stepName"), &stepName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "stepName", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params UpdateChildWorkflowStepStatusParams
-
-	// ------------- Optional query parameter "remoteNode" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateChildWorkflowStepStatus(w, r, name, workflowId, childWorkflowId, stepName, params)
-	}))
-
-	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
-		handler = siw.HandlerMiddlewares[i](handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// DequeueWorkflow operation middleware
-func (siw *ServerInterfaceWrapper) DequeueWorkflow(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "name" -------------
-	var name DAGName
-
-	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "workflowId" -------------
-	var workflowId WorkflowId
-
-	err = runtime.BindStyledParameterWithOptions("simple", "workflowId", chi.URLParam(r, "workflowId"), &workflowId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workflowId", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params DequeueWorkflowParams
-
-	// ------------- Optional query parameter "remoteNode" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DequeueWorkflow(w, r, name, workflowId, params)
-	}))
-
-	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
-		handler = siw.HandlerMiddlewares[i](handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetWorkflowLog operation middleware
-func (siw *ServerInterfaceWrapper) GetWorkflowLog(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "name" -------------
-	var name DAGName
-
-	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "workflowId" -------------
-	var workflowId WorkflowId
-
-	err = runtime.BindStyledParameterWithOptions("simple", "workflowId", chi.URLParam(r, "workflowId"), &workflowId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workflowId", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params GetWorkflowLogParams
-
-	// ------------- Optional query parameter "remoteNode" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "tail" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "tail", r.URL.Query(), &params.Tail)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tail", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "head" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "head", r.URL.Query(), &params.Head)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "head", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "offset" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "offset", r.URL.Query(), &params.Offset)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "limit" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "limit", r.URL.Query(), &params.Limit)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetWorkflowLog(w, r, name, workflowId, params)
-	}))
-
-	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
-		handler = siw.HandlerMiddlewares[i](handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// RetryWorkflow operation middleware
-func (siw *ServerInterfaceWrapper) RetryWorkflow(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "name" -------------
-	var name DAGName
-
-	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "workflowId" -------------
-	var workflowId WorkflowId
-
-	err = runtime.BindStyledParameterWithOptions("simple", "workflowId", chi.URLParam(r, "workflowId"), &workflowId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workflowId", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params RetryWorkflowParams
-
-	// ------------- Optional query parameter "remoteNode" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RetryWorkflow(w, r, name, workflowId, params)
-	}))
-
-	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
-		handler = siw.HandlerMiddlewares[i](handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetWorkflowStepLog operation middleware
-func (siw *ServerInterfaceWrapper) GetWorkflowStepLog(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "name" -------------
-	var name DAGName
-
-	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "workflowId" -------------
-	var workflowId WorkflowId
-
-	err = runtime.BindStyledParameterWithOptions("simple", "workflowId", chi.URLParam(r, "workflowId"), &workflowId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workflowId", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "stepName" -------------
-	var stepName StepName
-
-	err = runtime.BindStyledParameterWithOptions("simple", "stepName", chi.URLParam(r, "stepName"), &stepName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "stepName", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params GetWorkflowStepLogParams
-
-	// ------------- Optional query parameter "remoteNode" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "tail" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "tail", r.URL.Query(), &params.Tail)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tail", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "head" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "head", r.URL.Query(), &params.Head)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "head", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "offset" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "offset", r.URL.Query(), &params.Offset)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "limit" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "limit", r.URL.Query(), &params.Limit)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "stream" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "stream", r.URL.Query(), &params.Stream)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "stream", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetWorkflowStepLog(w, r, name, workflowId, stepName, params)
-	}))
-
-	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
-		handler = siw.HandlerMiddlewares[i](handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// UpdateWorkflowStepStatus operation middleware
-func (siw *ServerInterfaceWrapper) UpdateWorkflowStepStatus(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "name" -------------
-	var name DAGName
-
-	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "workflowId" -------------
-	var workflowId WorkflowId
-
-	err = runtime.BindStyledParameterWithOptions("simple", "workflowId", chi.URLParam(r, "workflowId"), &workflowId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workflowId", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "stepName" -------------
-	var stepName StepName
-
-	err = runtime.BindStyledParameterWithOptions("simple", "stepName", chi.URLParam(r, "stepName"), &stepName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "stepName", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params UpdateWorkflowStepStatusParams
-
-	// ------------- Optional query parameter "remoteNode" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateWorkflowStepStatus(w, r, name, workflowId, stepName, params)
-	}))
-
-	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
-		handler = siw.HandlerMiddlewares[i](handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// TerminateWorkflow operation middleware
-func (siw *ServerInterfaceWrapper) TerminateWorkflow(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "name" -------------
-	var name DAGName
-
-	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "workflowId" -------------
-	var workflowId WorkflowId
-
-	err = runtime.BindStyledParameterWithOptions("simple", "workflowId", chi.URLParam(r, "workflowId"), &workflowId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workflowId", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params TerminateWorkflowParams
-
-	// ------------- Optional query parameter "remoteNode" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.TerminateWorkflow(w, r, name, workflowId, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -3109,6 +3109,45 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/dag-runs", wrapper.ListDAGRuns)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/dag-runs/{name}", wrapper.ListDAGRunsByName)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/dag-runs/{name}/{dagRunId}", wrapper.GetDAGRunDetails)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}", wrapper.GetChildDAGRunDetails)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/log", wrapper.GetChildDAGRunLog)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/log", wrapper.GetChildDAGRunStepLog)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/status", wrapper.UpdateChildDAGRunStepStatus)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/dag-runs/{name}/{dagRunId}/dequeue", wrapper.DequeueDAGRun)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/dag-runs/{name}/{dagRunId}/log", wrapper.GetDAGRunLog)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/dag-runs/{name}/{dagRunId}/retry", wrapper.RetryDAGRun)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/dag-runs/{name}/{dagRunId}/steps/{stepName}/log", wrapper.GetDAGRunStepLog)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/dag-runs/{name}/{dagRunId}/steps/{stepName}/status", wrapper.UpdateDAGRunStepStatus)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/dag-runs/{name}/{dagRunId}/stop", wrapper.TerminateDAGRun)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/dags", wrapper.ListDAGs)
 	})
 	r.Group(func(r chi.Router) {
@@ -3127,13 +3166,19 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/dags/{fileName}", wrapper.GetDAGDetails)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/dags/{fileName}/enqueue", wrapper.EnqueueDAGWorkflow)
+		r.Get(options.BaseURL+"/dags/{fileName}/dag-runs", wrapper.GetDAGDAGRunHistory)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/dags/{fileName}/dag-runs/{dagRunId}", wrapper.GetDAGDAGRunDetails)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/dags/{fileName}/enqueue", wrapper.EnqueueDAGDAGRun)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/dags/{fileName}/rename", wrapper.RenameDAG)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/dags/{fileName}/retry", wrapper.RetryDAGWorkflow)
+		r.Post(options.BaseURL+"/dags/{fileName}/retry", wrapper.RetryDAGDAGRun)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/dags/{fileName}/spec", wrapper.GetDAGSpec)
@@ -3145,61 +3190,533 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/dags/{fileName}/start", wrapper.ExecuteDAG)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/dags/{fileName}/stop", wrapper.TerminateDAGWorkflow)
+		r.Post(options.BaseURL+"/dags/{fileName}/stop", wrapper.TerminateDAGDAGRun)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/dags/{fileName}/suspend", wrapper.UpdateDAGSuspensionState)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dags/{fileName}/workflows", wrapper.GetDAGWorkflowHistory)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dags/{fileName}/workflows/{workflowId}", wrapper.GetDAGWorkflowDetails)
-	})
-	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/health", wrapper.GetHealthStatus)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/workflows", wrapper.ListWorkflows)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/workflows/{name}", wrapper.ListWorkflowsByName)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/workflows/{name}/{workflowId}", wrapper.GetWorkflowDetails)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/workflows/{name}/{workflowId}/children/{childWorkflowId}", wrapper.GetChildWorkflowDetails)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/workflows/{name}/{workflowId}/children/{childWorkflowId}/log", wrapper.GetChildWorkflowLog)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/workflows/{name}/{workflowId}/children/{childWorkflowId}/steps/{stepName}/log", wrapper.GetChildWorkflowStepLog)
-	})
-	r.Group(func(r chi.Router) {
-		r.Patch(options.BaseURL+"/workflows/{name}/{workflowId}/children/{childWorkflowId}/steps/{stepName}/status", wrapper.UpdateChildWorkflowStepStatus)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/workflows/{name}/{workflowId}/dequeue", wrapper.DequeueWorkflow)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/workflows/{name}/{workflowId}/log", wrapper.GetWorkflowLog)
-	})
-	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/workflows/{name}/{workflowId}/retry", wrapper.RetryWorkflow)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/workflows/{name}/{workflowId}/steps/{stepName}/log", wrapper.GetWorkflowStepLog)
-	})
-	r.Group(func(r chi.Router) {
-		r.Patch(options.BaseURL+"/workflows/{name}/{workflowId}/steps/{stepName}/status", wrapper.UpdateWorkflowStepStatus)
-	})
-	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/workflows/{name}/{workflowId}/stop", wrapper.TerminateWorkflow)
 	})
 
 	return r
+}
+
+type ListDAGRunsRequestObject struct {
+	Params ListDAGRunsParams
+}
+
+type ListDAGRunsResponseObject interface {
+	VisitListDAGRunsResponse(w http.ResponseWriter) error
+}
+
+type ListDAGRuns200JSONResponse struct {
+	// DagRuns List of DAG-runs with their status and metadata
+	DagRuns []DAGRunSummary `json:"dagRuns"`
+}
+
+func (response ListDAGRuns200JSONResponse) VisitListDAGRunsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListDAGRunsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListDAGRunsdefaultJSONResponse) VisitListDAGRunsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type ListDAGRunsByNameRequestObject struct {
+	Name   DAGRunName `json:"name"`
+	Params ListDAGRunsByNameParams
+}
+
+type ListDAGRunsByNameResponseObject interface {
+	VisitListDAGRunsByNameResponse(w http.ResponseWriter) error
+}
+
+type ListDAGRunsByName200JSONResponse struct {
+	// DagRuns List of DAG-runs with their status and metadata
+	DagRuns []DAGRunSummary `json:"dagRuns"`
+}
+
+func (response ListDAGRunsByName200JSONResponse) VisitListDAGRunsByNameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListDAGRunsByNamedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListDAGRunsByNamedefaultJSONResponse) VisitListDAGRunsByNameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type GetDAGRunDetailsRequestObject struct {
+	Name     DAGName  `json:"name"`
+	DagRunId DAGRunId `json:"dagRunId"`
+	Params   GetDAGRunDetailsParams
+}
+
+type GetDAGRunDetailsResponseObject interface {
+	VisitGetDAGRunDetailsResponse(w http.ResponseWriter) error
+}
+
+type GetDAGRunDetails200JSONResponse struct {
+	// DagRunDetails Detailed status of a DAG-run including child DAG-run nodes
+	DagRunDetails DAGRunDetails `json:"dagRunDetails"`
+}
+
+func (response GetDAGRunDetails200JSONResponse) VisitGetDAGRunDetailsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetDAGRunDetails404JSONResponse Error
+
+func (response GetDAGRunDetails404JSONResponse) VisitGetDAGRunDetailsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetDAGRunDetailsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetDAGRunDetailsdefaultJSONResponse) VisitGetDAGRunDetailsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type GetChildDAGRunDetailsRequestObject struct {
+	Name          DAGName  `json:"name"`
+	DagRunId      DAGRunId `json:"dagRunId"`
+	ChildDAGRunId string   `json:"childDAGRunId"`
+	Params        GetChildDAGRunDetailsParams
+}
+
+type GetChildDAGRunDetailsResponseObject interface {
+	VisitGetChildDAGRunDetailsResponse(w http.ResponseWriter) error
+}
+
+type GetChildDAGRunDetails200JSONResponse struct {
+	// DagRunDetails Detailed status of a DAG-run including child DAG-run nodes
+	DagRunDetails DAGRunDetails `json:"dagRunDetails"`
+}
+
+func (response GetChildDAGRunDetails200JSONResponse) VisitGetChildDAGRunDetailsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetChildDAGRunDetails404JSONResponse Error
+
+func (response GetChildDAGRunDetails404JSONResponse) VisitGetChildDAGRunDetailsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetChildDAGRunDetailsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetChildDAGRunDetailsdefaultJSONResponse) VisitGetChildDAGRunDetailsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type GetChildDAGRunLogRequestObject struct {
+	Name          DAGName  `json:"name"`
+	DagRunId      DAGRunId `json:"dagRunId"`
+	ChildDAGRunId string   `json:"childDAGRunId"`
+	Params        GetChildDAGRunLogParams
+}
+
+type GetChildDAGRunLogResponseObject interface {
+	VisitGetChildDAGRunLogResponse(w http.ResponseWriter) error
+}
+
+type GetChildDAGRunLog200JSONResponse Log
+
+func (response GetChildDAGRunLog200JSONResponse) VisitGetChildDAGRunLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetChildDAGRunLog404JSONResponse Error
+
+func (response GetChildDAGRunLog404JSONResponse) VisitGetChildDAGRunLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetChildDAGRunLogdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetChildDAGRunLogdefaultJSONResponse) VisitGetChildDAGRunLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type GetChildDAGRunStepLogRequestObject struct {
+	Name          DAGName  `json:"name"`
+	DagRunId      DAGRunId `json:"dagRunId"`
+	ChildDAGRunId string   `json:"childDAGRunId"`
+	StepName      StepName `json:"stepName"`
+	Params        GetChildDAGRunStepLogParams
+}
+
+type GetChildDAGRunStepLogResponseObject interface {
+	VisitGetChildDAGRunStepLogResponse(w http.ResponseWriter) error
+}
+
+type GetChildDAGRunStepLog200JSONResponse Log
+
+func (response GetChildDAGRunStepLog200JSONResponse) VisitGetChildDAGRunStepLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetChildDAGRunStepLog404JSONResponse Error
+
+func (response GetChildDAGRunStepLog404JSONResponse) VisitGetChildDAGRunStepLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetChildDAGRunStepLogdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetChildDAGRunStepLogdefaultJSONResponse) VisitGetChildDAGRunStepLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type UpdateChildDAGRunStepStatusRequestObject struct {
+	Name          DAGName  `json:"name"`
+	DagRunId      DAGRunId `json:"dagRunId"`
+	ChildDAGRunId string   `json:"childDAGRunId"`
+	StepName      StepName `json:"stepName"`
+	Params        UpdateChildDAGRunStepStatusParams
+	Body          *UpdateChildDAGRunStepStatusJSONRequestBody
+}
+
+type UpdateChildDAGRunStepStatusResponseObject interface {
+	VisitUpdateChildDAGRunStepStatusResponse(w http.ResponseWriter) error
+}
+
+type UpdateChildDAGRunStepStatus200Response struct {
+}
+
+func (response UpdateChildDAGRunStepStatus200Response) VisitUpdateChildDAGRunStepStatusResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type UpdateChildDAGRunStepStatus400JSONResponse Error
+
+func (response UpdateChildDAGRunStepStatus400JSONResponse) VisitUpdateChildDAGRunStepStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateChildDAGRunStepStatus404JSONResponse Error
+
+func (response UpdateChildDAGRunStepStatus404JSONResponse) VisitUpdateChildDAGRunStepStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateChildDAGRunStepStatusdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response UpdateChildDAGRunStepStatusdefaultJSONResponse) VisitUpdateChildDAGRunStepStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type DequeueDAGRunRequestObject struct {
+	Name     DAGName  `json:"name"`
+	DagRunId DAGRunId `json:"dagRunId"`
+	Params   DequeueDAGRunParams
+}
+
+type DequeueDAGRunResponseObject interface {
+	VisitDequeueDAGRunResponse(w http.ResponseWriter) error
+}
+
+type DequeueDAGRun200Response struct {
+}
+
+func (response DequeueDAGRun200Response) VisitDequeueDAGRunResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type DequeueDAGRun404JSONResponse Error
+
+func (response DequeueDAGRun404JSONResponse) VisitDequeueDAGRunResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DequeueDAGRundefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response DequeueDAGRundefaultJSONResponse) VisitDequeueDAGRunResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type GetDAGRunLogRequestObject struct {
+	Name     DAGName  `json:"name"`
+	DagRunId DAGRunId `json:"dagRunId"`
+	Params   GetDAGRunLogParams
+}
+
+type GetDAGRunLogResponseObject interface {
+	VisitGetDAGRunLogResponse(w http.ResponseWriter) error
+}
+
+type GetDAGRunLog200JSONResponse Log
+
+func (response GetDAGRunLog200JSONResponse) VisitGetDAGRunLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetDAGRunLog404JSONResponse Error
+
+func (response GetDAGRunLog404JSONResponse) VisitGetDAGRunLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetDAGRunLogdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetDAGRunLogdefaultJSONResponse) VisitGetDAGRunLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type RetryDAGRunRequestObject struct {
+	Name     DAGName  `json:"name"`
+	DagRunId DAGRunId `json:"dagRunId"`
+	Params   RetryDAGRunParams
+	Body     *RetryDAGRunJSONRequestBody
+}
+
+type RetryDAGRunResponseObject interface {
+	VisitRetryDAGRunResponse(w http.ResponseWriter) error
+}
+
+type RetryDAGRun200Response struct {
+}
+
+func (response RetryDAGRun200Response) VisitRetryDAGRunResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type RetryDAGRundefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response RetryDAGRundefaultJSONResponse) VisitRetryDAGRunResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type GetDAGRunStepLogRequestObject struct {
+	Name     DAGName  `json:"name"`
+	DagRunId DAGRunId `json:"dagRunId"`
+	StepName StepName `json:"stepName"`
+	Params   GetDAGRunStepLogParams
+}
+
+type GetDAGRunStepLogResponseObject interface {
+	VisitGetDAGRunStepLogResponse(w http.ResponseWriter) error
+}
+
+type GetDAGRunStepLog200JSONResponse Log
+
+func (response GetDAGRunStepLog200JSONResponse) VisitGetDAGRunStepLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetDAGRunStepLog404JSONResponse Error
+
+func (response GetDAGRunStepLog404JSONResponse) VisitGetDAGRunStepLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetDAGRunStepLogdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetDAGRunStepLogdefaultJSONResponse) VisitGetDAGRunStepLogResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type UpdateDAGRunStepStatusRequestObject struct {
+	Name     DAGName  `json:"name"`
+	DagRunId DAGRunId `json:"dagRunId"`
+	StepName StepName `json:"stepName"`
+	Params   UpdateDAGRunStepStatusParams
+	Body     *UpdateDAGRunStepStatusJSONRequestBody
+}
+
+type UpdateDAGRunStepStatusResponseObject interface {
+	VisitUpdateDAGRunStepStatusResponse(w http.ResponseWriter) error
+}
+
+type UpdateDAGRunStepStatus200Response struct {
+}
+
+func (response UpdateDAGRunStepStatus200Response) VisitUpdateDAGRunStepStatusResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type UpdateDAGRunStepStatus400JSONResponse Error
+
+func (response UpdateDAGRunStepStatus400JSONResponse) VisitUpdateDAGRunStepStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateDAGRunStepStatus404JSONResponse Error
+
+func (response UpdateDAGRunStepStatus404JSONResponse) VisitUpdateDAGRunStepStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateDAGRunStepStatusdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response UpdateDAGRunStepStatusdefaultJSONResponse) VisitUpdateDAGRunStepStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type TerminateDAGRunRequestObject struct {
+	Name     DAGName  `json:"name"`
+	DagRunId DAGRunId `json:"dagRunId"`
+	Params   TerminateDAGRunParams
+}
+
+type TerminateDAGRunResponseObject interface {
+	VisitTerminateDAGRunResponse(w http.ResponseWriter) error
+}
+
+type TerminateDAGRun200Response struct {
+}
+
+func (response TerminateDAGRun200Response) VisitTerminateDAGRunResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type TerminateDAGRundefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response TerminateDAGRundefaultJSONResponse) VisitTerminateDAGRunResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
 }
 
 type ListDAGsRequestObject struct {
@@ -3389,8 +3906,8 @@ type GetDAGDetails200JSONResponse struct {
 	// Errors List of errors encountered during the request
 	Errors []string `json:"errors"`
 
-	// LatestWorkflow Detailed status of a workflow including child workflow nodes
-	LatestWorkflow WorkflowDetails `json:"latestWorkflow"`
+	// LatestDAGRun Detailed status of a DAG-run including child DAG-run nodes
+	LatestDAGRun DAGRunDetails `json:"latestDAGRun"`
 
 	// Suspended Whether the DAG is suspended
 	Suspended bool `json:"suspended"`
@@ -3415,34 +3932,104 @@ func (response GetDAGDetailsdefaultJSONResponse) VisitGetDAGDetailsResponse(w ht
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type EnqueueDAGWorkflowRequestObject struct {
+type GetDAGDAGRunHistoryRequestObject struct {
 	FileName DAGFileName `json:"fileName"`
-	Params   EnqueueDAGWorkflowParams
-	Body     *EnqueueDAGWorkflowJSONRequestBody
+	Params   GetDAGDAGRunHistoryParams
 }
 
-type EnqueueDAGWorkflowResponseObject interface {
-	VisitEnqueueDAGWorkflowResponse(w http.ResponseWriter) error
+type GetDAGDAGRunHistoryResponseObject interface {
+	VisitGetDAGDAGRunHistoryResponse(w http.ResponseWriter) error
 }
 
-type EnqueueDAGWorkflow200JSONResponse struct {
-	// WorkflowId ID of the created workflow
-	WorkflowId string `json:"workflowId"`
+type GetDAGDAGRunHistory200JSONResponse struct {
+	// DagRuns List of historical DAG-runs created from this DAG
+	DagRuns []DAGRunDetails `json:"dagRuns"`
+
+	// GridData Grid data for visualization
+	GridData []DAGGridItem `json:"gridData"`
 }
 
-func (response EnqueueDAGWorkflow200JSONResponse) VisitEnqueueDAGWorkflowResponse(w http.ResponseWriter) error {
+func (response GetDAGDAGRunHistory200JSONResponse) VisitGetDAGDAGRunHistoryResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type EnqueueDAGWorkflowdefaultJSONResponse struct {
+type GetDAGDAGRunHistorydefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response EnqueueDAGWorkflowdefaultJSONResponse) VisitEnqueueDAGWorkflowResponse(w http.ResponseWriter) error {
+func (response GetDAGDAGRunHistorydefaultJSONResponse) VisitGetDAGDAGRunHistoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type GetDAGDAGRunDetailsRequestObject struct {
+	FileName DAGFileName `json:"fileName"`
+	DagRunId DAGRunId    `json:"dagRunId"`
+	Params   GetDAGDAGRunDetailsParams
+}
+
+type GetDAGDAGRunDetailsResponseObject interface {
+	VisitGetDAGDAGRunDetailsResponse(w http.ResponseWriter) error
+}
+
+type GetDAGDAGRunDetails200JSONResponse struct {
+	// DagRun Detailed status of a DAG-run including child DAG-run nodes
+	DagRun DAGRunDetails `json:"dagRun"`
+}
+
+func (response GetDAGDAGRunDetails200JSONResponse) VisitGetDAGDAGRunDetailsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetDAGDAGRunDetailsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetDAGDAGRunDetailsdefaultJSONResponse) VisitGetDAGDAGRunDetailsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type EnqueueDAGDAGRunRequestObject struct {
+	FileName DAGFileName `json:"fileName"`
+	Params   EnqueueDAGDAGRunParams
+	Body     *EnqueueDAGDAGRunJSONRequestBody
+}
+
+type EnqueueDAGDAGRunResponseObject interface {
+	VisitEnqueueDAGDAGRunResponse(w http.ResponseWriter) error
+}
+
+type EnqueueDAGDAGRun200JSONResponse struct {
+	// DagRunId ID of the created DAG-run
+	DagRunId string `json:"dagRunId"`
+}
+
+func (response EnqueueDAGDAGRun200JSONResponse) VisitEnqueueDAGDAGRunResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type EnqueueDAGDAGRundefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response EnqueueDAGDAGRundefaultJSONResponse) VisitEnqueueDAGDAGRunResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
@@ -3497,30 +4084,30 @@ func (response RenameDAGdefaultJSONResponse) VisitRenameDAGResponse(w http.Respo
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type RetryDAGWorkflowRequestObject struct {
+type RetryDAGDAGRunRequestObject struct {
 	FileName DAGFileName `json:"fileName"`
-	Params   RetryDAGWorkflowParams
-	Body     *RetryDAGWorkflowJSONRequestBody
+	Params   RetryDAGDAGRunParams
+	Body     *RetryDAGDAGRunJSONRequestBody
 }
 
-type RetryDAGWorkflowResponseObject interface {
-	VisitRetryDAGWorkflowResponse(w http.ResponseWriter) error
+type RetryDAGDAGRunResponseObject interface {
+	VisitRetryDAGDAGRunResponse(w http.ResponseWriter) error
 }
 
-type RetryDAGWorkflow200Response struct {
+type RetryDAGDAGRun200Response struct {
 }
 
-func (response RetryDAGWorkflow200Response) VisitRetryDAGWorkflowResponse(w http.ResponseWriter) error {
+func (response RetryDAGDAGRun200Response) VisitRetryDAGDAGRunResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type RetryDAGWorkflowdefaultJSONResponse struct {
+type RetryDAGDAGRundefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response RetryDAGWorkflowdefaultJSONResponse) VisitRetryDAGWorkflowResponse(w http.ResponseWriter) error {
+func (response RetryDAGDAGRundefaultJSONResponse) VisitRetryDAGDAGRunResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
@@ -3611,8 +4198,8 @@ type ExecuteDAGResponseObject interface {
 }
 
 type ExecuteDAG200JSONResponse struct {
-	// WorkflowId ID of the created workflow
-	WorkflowId string `json:"workflowId"`
+	// DagRunId ID of the created DAG-run
+	DagRunId string `json:"dagRunId"`
 }
 
 func (response ExecuteDAG200JSONResponse) VisitExecuteDAGResponse(w http.ResponseWriter) error {
@@ -3634,29 +4221,29 @@ func (response ExecuteDAGdefaultJSONResponse) VisitExecuteDAGResponse(w http.Res
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type TerminateDAGWorkflowRequestObject struct {
+type TerminateDAGDAGRunRequestObject struct {
 	FileName DAGFileName `json:"fileName"`
-	Params   TerminateDAGWorkflowParams
+	Params   TerminateDAGDAGRunParams
 }
 
-type TerminateDAGWorkflowResponseObject interface {
-	VisitTerminateDAGWorkflowResponse(w http.ResponseWriter) error
+type TerminateDAGDAGRunResponseObject interface {
+	VisitTerminateDAGDAGRunResponse(w http.ResponseWriter) error
 }
 
-type TerminateDAGWorkflow200Response struct {
+type TerminateDAGDAGRun200Response struct {
 }
 
-func (response TerminateDAGWorkflow200Response) VisitTerminateDAGWorkflowResponse(w http.ResponseWriter) error {
+func (response TerminateDAGDAGRun200Response) VisitTerminateDAGDAGRunResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type TerminateDAGWorkflowdefaultJSONResponse struct {
+type TerminateDAGDAGRundefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response TerminateDAGWorkflowdefaultJSONResponse) VisitTerminateDAGWorkflowResponse(w http.ResponseWriter) error {
+func (response TerminateDAGDAGRundefaultJSONResponse) VisitTerminateDAGDAGRunResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
@@ -3702,76 +4289,6 @@ func (response UpdateDAGSuspensionStatedefaultJSONResponse) VisitUpdateDAGSuspen
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type GetDAGWorkflowHistoryRequestObject struct {
-	FileName DAGFileName `json:"fileName"`
-	Params   GetDAGWorkflowHistoryParams
-}
-
-type GetDAGWorkflowHistoryResponseObject interface {
-	VisitGetDAGWorkflowHistoryResponse(w http.ResponseWriter) error
-}
-
-type GetDAGWorkflowHistory200JSONResponse struct {
-	// GridData Grid data for visualization
-	GridData []DAGGridItem `json:"gridData"`
-
-	// Workflows List of historical workflows created from this DAG
-	Workflows []WorkflowDetails `json:"workflows"`
-}
-
-func (response GetDAGWorkflowHistory200JSONResponse) VisitGetDAGWorkflowHistoryResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetDAGWorkflowHistorydefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response GetDAGWorkflowHistorydefaultJSONResponse) VisitGetDAGWorkflowHistoryResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-
-	return json.NewEncoder(w).Encode(response.Body)
-}
-
-type GetDAGWorkflowDetailsRequestObject struct {
-	FileName   DAGFileName `json:"fileName"`
-	WorkflowId WorkflowId  `json:"workflowId"`
-	Params     GetDAGWorkflowDetailsParams
-}
-
-type GetDAGWorkflowDetailsResponseObject interface {
-	VisitGetDAGWorkflowDetailsResponse(w http.ResponseWriter) error
-}
-
-type GetDAGWorkflowDetails200JSONResponse struct {
-	// Workflow Detailed status of a workflow including child workflow nodes
-	Workflow WorkflowDetails `json:"workflow"`
-}
-
-func (response GetDAGWorkflowDetails200JSONResponse) VisitGetDAGWorkflowDetailsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetDAGWorkflowDetailsdefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response GetDAGWorkflowDetailsdefaultJSONResponse) VisitGetDAGWorkflowDetailsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-
-	return json.NewEncoder(w).Encode(response.Body)
-}
-
 type GetHealthStatusRequestObject struct {
 }
 
@@ -3797,525 +4314,47 @@ func (response GetHealthStatusdefaultResponse) VisitGetHealthStatusResponse(w ht
 	return nil
 }
 
-type ListWorkflowsRequestObject struct {
-	Params ListWorkflowsParams
-}
-
-type ListWorkflowsResponseObject interface {
-	VisitListWorkflowsResponse(w http.ResponseWriter) error
-}
-
-type ListWorkflows200JSONResponse struct {
-	// Workflows List of workflows with their status and metadata
-	Workflows []WorkflowSummary `json:"workflows"`
-}
-
-func (response ListWorkflows200JSONResponse) VisitListWorkflowsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type ListWorkflowsdefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response ListWorkflowsdefaultJSONResponse) VisitListWorkflowsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-
-	return json.NewEncoder(w).Encode(response.Body)
-}
-
-type ListWorkflowsByNameRequestObject struct {
-	Name   WorkflowName `json:"name"`
-	Params ListWorkflowsByNameParams
-}
-
-type ListWorkflowsByNameResponseObject interface {
-	VisitListWorkflowsByNameResponse(w http.ResponseWriter) error
-}
-
-type ListWorkflowsByName200JSONResponse struct {
-	// Workflows List of workflows with their status and metadata
-	Workflows []WorkflowSummary `json:"workflows"`
-}
-
-func (response ListWorkflowsByName200JSONResponse) VisitListWorkflowsByNameResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type ListWorkflowsByNamedefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response ListWorkflowsByNamedefaultJSONResponse) VisitListWorkflowsByNameResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-
-	return json.NewEncoder(w).Encode(response.Body)
-}
-
-type GetWorkflowDetailsRequestObject struct {
-	Name       DAGName    `json:"name"`
-	WorkflowId WorkflowId `json:"workflowId"`
-	Params     GetWorkflowDetailsParams
-}
-
-type GetWorkflowDetailsResponseObject interface {
-	VisitGetWorkflowDetailsResponse(w http.ResponseWriter) error
-}
-
-type GetWorkflowDetails200JSONResponse struct {
-	// WorkflowDetails Detailed status of a workflow including child workflow nodes
-	WorkflowDetails WorkflowDetails `json:"workflowDetails"`
-}
-
-func (response GetWorkflowDetails200JSONResponse) VisitGetWorkflowDetailsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetWorkflowDetails404JSONResponse Error
-
-func (response GetWorkflowDetails404JSONResponse) VisitGetWorkflowDetailsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetWorkflowDetailsdefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response GetWorkflowDetailsdefaultJSONResponse) VisitGetWorkflowDetailsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-
-	return json.NewEncoder(w).Encode(response.Body)
-}
-
-type GetChildWorkflowDetailsRequestObject struct {
-	Name            DAGName    `json:"name"`
-	WorkflowId      WorkflowId `json:"workflowId"`
-	ChildWorkflowId string     `json:"childWorkflowId"`
-	Params          GetChildWorkflowDetailsParams
-}
-
-type GetChildWorkflowDetailsResponseObject interface {
-	VisitGetChildWorkflowDetailsResponse(w http.ResponseWriter) error
-}
-
-type GetChildWorkflowDetails200JSONResponse struct {
-	// WorkflowDetails Detailed status of a workflow including child workflow nodes
-	WorkflowDetails WorkflowDetails `json:"workflowDetails"`
-}
-
-func (response GetChildWorkflowDetails200JSONResponse) VisitGetChildWorkflowDetailsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetChildWorkflowDetails404JSONResponse Error
-
-func (response GetChildWorkflowDetails404JSONResponse) VisitGetChildWorkflowDetailsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetChildWorkflowDetailsdefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response GetChildWorkflowDetailsdefaultJSONResponse) VisitGetChildWorkflowDetailsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-
-	return json.NewEncoder(w).Encode(response.Body)
-}
-
-type GetChildWorkflowLogRequestObject struct {
-	Name            DAGName    `json:"name"`
-	WorkflowId      WorkflowId `json:"workflowId"`
-	ChildWorkflowId string     `json:"childWorkflowId"`
-	Params          GetChildWorkflowLogParams
-}
-
-type GetChildWorkflowLogResponseObject interface {
-	VisitGetChildWorkflowLogResponse(w http.ResponseWriter) error
-}
-
-type GetChildWorkflowLog200JSONResponse Log
-
-func (response GetChildWorkflowLog200JSONResponse) VisitGetChildWorkflowLogResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetChildWorkflowLog404JSONResponse Error
-
-func (response GetChildWorkflowLog404JSONResponse) VisitGetChildWorkflowLogResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetChildWorkflowLogdefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response GetChildWorkflowLogdefaultJSONResponse) VisitGetChildWorkflowLogResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-
-	return json.NewEncoder(w).Encode(response.Body)
-}
-
-type GetChildWorkflowStepLogRequestObject struct {
-	Name            DAGName    `json:"name"`
-	WorkflowId      WorkflowId `json:"workflowId"`
-	ChildWorkflowId string     `json:"childWorkflowId"`
-	StepName        StepName   `json:"stepName"`
-	Params          GetChildWorkflowStepLogParams
-}
-
-type GetChildWorkflowStepLogResponseObject interface {
-	VisitGetChildWorkflowStepLogResponse(w http.ResponseWriter) error
-}
-
-type GetChildWorkflowStepLog200JSONResponse Log
-
-func (response GetChildWorkflowStepLog200JSONResponse) VisitGetChildWorkflowStepLogResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetChildWorkflowStepLog404JSONResponse Error
-
-func (response GetChildWorkflowStepLog404JSONResponse) VisitGetChildWorkflowStepLogResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetChildWorkflowStepLogdefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response GetChildWorkflowStepLogdefaultJSONResponse) VisitGetChildWorkflowStepLogResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-
-	return json.NewEncoder(w).Encode(response.Body)
-}
-
-type UpdateChildWorkflowStepStatusRequestObject struct {
-	Name            DAGName    `json:"name"`
-	WorkflowId      WorkflowId `json:"workflowId"`
-	ChildWorkflowId string     `json:"childWorkflowId"`
-	StepName        StepName   `json:"stepName"`
-	Params          UpdateChildWorkflowStepStatusParams
-	Body            *UpdateChildWorkflowStepStatusJSONRequestBody
-}
-
-type UpdateChildWorkflowStepStatusResponseObject interface {
-	VisitUpdateChildWorkflowStepStatusResponse(w http.ResponseWriter) error
-}
-
-type UpdateChildWorkflowStepStatus200Response struct {
-}
-
-func (response UpdateChildWorkflowStepStatus200Response) VisitUpdateChildWorkflowStepStatusResponse(w http.ResponseWriter) error {
-	w.WriteHeader(200)
-	return nil
-}
-
-type UpdateChildWorkflowStepStatus400JSONResponse Error
-
-func (response UpdateChildWorkflowStepStatus400JSONResponse) VisitUpdateChildWorkflowStepStatusResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(400)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type UpdateChildWorkflowStepStatus404JSONResponse Error
-
-func (response UpdateChildWorkflowStepStatus404JSONResponse) VisitUpdateChildWorkflowStepStatusResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type UpdateChildWorkflowStepStatusdefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response UpdateChildWorkflowStepStatusdefaultJSONResponse) VisitUpdateChildWorkflowStepStatusResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-
-	return json.NewEncoder(w).Encode(response.Body)
-}
-
-type DequeueWorkflowRequestObject struct {
-	Name       DAGName    `json:"name"`
-	WorkflowId WorkflowId `json:"workflowId"`
-	Params     DequeueWorkflowParams
-}
-
-type DequeueWorkflowResponseObject interface {
-	VisitDequeueWorkflowResponse(w http.ResponseWriter) error
-}
-
-type DequeueWorkflow200Response struct {
-}
-
-func (response DequeueWorkflow200Response) VisitDequeueWorkflowResponse(w http.ResponseWriter) error {
-	w.WriteHeader(200)
-	return nil
-}
-
-type DequeueWorkflow404JSONResponse Error
-
-func (response DequeueWorkflow404JSONResponse) VisitDequeueWorkflowResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type DequeueWorkflowdefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response DequeueWorkflowdefaultJSONResponse) VisitDequeueWorkflowResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-
-	return json.NewEncoder(w).Encode(response.Body)
-}
-
-type GetWorkflowLogRequestObject struct {
-	Name       DAGName    `json:"name"`
-	WorkflowId WorkflowId `json:"workflowId"`
-	Params     GetWorkflowLogParams
-}
-
-type GetWorkflowLogResponseObject interface {
-	VisitGetWorkflowLogResponse(w http.ResponseWriter) error
-}
-
-type GetWorkflowLog200JSONResponse Log
-
-func (response GetWorkflowLog200JSONResponse) VisitGetWorkflowLogResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetWorkflowLog404JSONResponse Error
-
-func (response GetWorkflowLog404JSONResponse) VisitGetWorkflowLogResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetWorkflowLogdefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response GetWorkflowLogdefaultJSONResponse) VisitGetWorkflowLogResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-
-	return json.NewEncoder(w).Encode(response.Body)
-}
-
-type RetryWorkflowRequestObject struct {
-	Name       DAGName    `json:"name"`
-	WorkflowId WorkflowId `json:"workflowId"`
-	Params     RetryWorkflowParams
-	Body       *RetryWorkflowJSONRequestBody
-}
-
-type RetryWorkflowResponseObject interface {
-	VisitRetryWorkflowResponse(w http.ResponseWriter) error
-}
-
-type RetryWorkflow200Response struct {
-}
-
-func (response RetryWorkflow200Response) VisitRetryWorkflowResponse(w http.ResponseWriter) error {
-	w.WriteHeader(200)
-	return nil
-}
-
-type RetryWorkflowdefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response RetryWorkflowdefaultJSONResponse) VisitRetryWorkflowResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-
-	return json.NewEncoder(w).Encode(response.Body)
-}
-
-type GetWorkflowStepLogRequestObject struct {
-	Name       DAGName    `json:"name"`
-	WorkflowId WorkflowId `json:"workflowId"`
-	StepName   StepName   `json:"stepName"`
-	Params     GetWorkflowStepLogParams
-}
-
-type GetWorkflowStepLogResponseObject interface {
-	VisitGetWorkflowStepLogResponse(w http.ResponseWriter) error
-}
-
-type GetWorkflowStepLog200JSONResponse Log
-
-func (response GetWorkflowStepLog200JSONResponse) VisitGetWorkflowStepLogResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetWorkflowStepLog404JSONResponse Error
-
-func (response GetWorkflowStepLog404JSONResponse) VisitGetWorkflowStepLogResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetWorkflowStepLogdefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response GetWorkflowStepLogdefaultJSONResponse) VisitGetWorkflowStepLogResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-
-	return json.NewEncoder(w).Encode(response.Body)
-}
-
-type UpdateWorkflowStepStatusRequestObject struct {
-	Name       DAGName    `json:"name"`
-	WorkflowId WorkflowId `json:"workflowId"`
-	StepName   StepName   `json:"stepName"`
-	Params     UpdateWorkflowStepStatusParams
-	Body       *UpdateWorkflowStepStatusJSONRequestBody
-}
-
-type UpdateWorkflowStepStatusResponseObject interface {
-	VisitUpdateWorkflowStepStatusResponse(w http.ResponseWriter) error
-}
-
-type UpdateWorkflowStepStatus200Response struct {
-}
-
-func (response UpdateWorkflowStepStatus200Response) VisitUpdateWorkflowStepStatusResponse(w http.ResponseWriter) error {
-	w.WriteHeader(200)
-	return nil
-}
-
-type UpdateWorkflowStepStatus400JSONResponse Error
-
-func (response UpdateWorkflowStepStatus400JSONResponse) VisitUpdateWorkflowStepStatusResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(400)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type UpdateWorkflowStepStatus404JSONResponse Error
-
-func (response UpdateWorkflowStepStatus404JSONResponse) VisitUpdateWorkflowStepStatusResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type UpdateWorkflowStepStatusdefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response UpdateWorkflowStepStatusdefaultJSONResponse) VisitUpdateWorkflowStepStatusResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-
-	return json.NewEncoder(w).Encode(response.Body)
-}
-
-type TerminateWorkflowRequestObject struct {
-	Name       DAGName    `json:"name"`
-	WorkflowId WorkflowId `json:"workflowId"`
-	Params     TerminateWorkflowParams
-}
-
-type TerminateWorkflowResponseObject interface {
-	VisitTerminateWorkflowResponse(w http.ResponseWriter) error
-}
-
-type TerminateWorkflow200Response struct {
-}
-
-func (response TerminateWorkflow200Response) VisitTerminateWorkflowResponse(w http.ResponseWriter) error {
-	w.WriteHeader(200)
-	return nil
-}
-
-type TerminateWorkflowdefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response TerminateWorkflowdefaultJSONResponse) VisitTerminateWorkflowResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-
-	return json.NewEncoder(w).Encode(response.Body)
-}
-
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// List all DAG-runs
+	// (GET /dag-runs)
+	ListDAGRuns(ctx context.Context, request ListDAGRunsRequestObject) (ListDAGRunsResponseObject, error)
+	// List all DAG-runs with a specific name
+	// (GET /dag-runs/{name})
+	ListDAGRunsByName(ctx context.Context, request ListDAGRunsByNameRequestObject) (ListDAGRunsByNameResponseObject, error)
+	// Retrieve detailed status of a DAG-run
+	// (GET /dag-runs/{name}/{dagRunId})
+	GetDAGRunDetails(ctx context.Context, request GetDAGRunDetailsRequestObject) (GetDAGRunDetailsResponseObject, error)
+	// Retrieve detailed status of a child DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/children/{childDAGRunId})
+	GetChildDAGRunDetails(ctx context.Context, request GetChildDAGRunDetailsRequestObject) (GetChildDAGRunDetailsResponseObject, error)
+	// Retrieve log for a specific child DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/log)
+	GetChildDAGRunLog(ctx context.Context, request GetChildDAGRunLogRequestObject) (GetChildDAGRunLogResponseObject, error)
+	// Retrieve log for a specific step in a child DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/log)
+	GetChildDAGRunStepLog(ctx context.Context, request GetChildDAGRunStepLogRequestObject) (GetChildDAGRunStepLogResponseObject, error)
+	// Manually update a step's execution status in a child DAG-run
+	// (PATCH /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/status)
+	UpdateChildDAGRunStepStatus(ctx context.Context, request UpdateChildDAGRunStepStatusRequestObject) (UpdateChildDAGRunStepStatusResponseObject, error)
+	// Dequeue a queued DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/dequeue)
+	DequeueDAGRun(ctx context.Context, request DequeueDAGRunRequestObject) (DequeueDAGRunResponseObject, error)
+	// Retrieve full execution log of a DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/log)
+	GetDAGRunLog(ctx context.Context, request GetDAGRunLogRequestObject) (GetDAGRunLogResponseObject, error)
+	// Retry DAG-run execution
+	// (POST /dag-runs/{name}/{dagRunId}/retry)
+	RetryDAGRun(ctx context.Context, request RetryDAGRunRequestObject) (RetryDAGRunResponseObject, error)
+	// Retrieve log for a specific step in a DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/steps/{stepName}/log)
+	GetDAGRunStepLog(ctx context.Context, request GetDAGRunStepLogRequestObject) (GetDAGRunStepLogResponseObject, error)
+	// Manually update a step's execution status
+	// (PATCH /dag-runs/{name}/{dagRunId}/steps/{stepName}/status)
+	UpdateDAGRunStepStatus(ctx context.Context, request UpdateDAGRunStepStatusRequestObject) (UpdateDAGRunStepStatusResponseObject, error)
+	// Terminate a running DAG-run
+	// (POST /dag-runs/{name}/{dagRunId}/stop)
+	TerminateDAGRun(ctx context.Context, request TerminateDAGRunRequestObject) (TerminateDAGRunResponseObject, error)
 	// List all available DAGs
 	// (GET /dags)
 	ListDAGs(ctx context.Context, request ListDAGsRequestObject) (ListDAGsResponseObject, error)
@@ -4334,78 +4373,39 @@ type StrictServerInterface interface {
 	// Retrieve comprehensive DAG information
 	// (GET /dags/{fileName})
 	GetDAGDetails(ctx context.Context, request GetDAGDetailsRequestObject) (GetDAGDetailsResponseObject, error)
-	// Enqueue a workflow from DAG
+	// Retrieve execution history of a DAG
+	// (GET /dags/{fileName}/dag-runs)
+	GetDAGDAGRunHistory(ctx context.Context, request GetDAGDAGRunHistoryRequestObject) (GetDAGDAGRunHistoryResponseObject, error)
+	// Get detailed status of a specific DAG-run
+	// (GET /dags/{fileName}/dag-runs/{dagRunId})
+	GetDAGDAGRunDetails(ctx context.Context, request GetDAGDAGRunDetailsRequestObject) (GetDAGDAGRunDetailsResponseObject, error)
+	// Enqueue a DAG-run from DAG
 	// (POST /dags/{fileName}/enqueue)
-	EnqueueDAGWorkflow(ctx context.Context, request EnqueueDAGWorkflowRequestObject) (EnqueueDAGWorkflowResponseObject, error)
+	EnqueueDAGDAGRun(ctx context.Context, request EnqueueDAGDAGRunRequestObject) (EnqueueDAGDAGRunResponseObject, error)
 	// Change DAG file ID
 	// (POST /dags/{fileName}/rename)
 	RenameDAG(ctx context.Context, request RenameDAGRequestObject) (RenameDAGResponseObject, error)
-	// Retry workflow execution
+	// Retry DAG-run execution
 	// (POST /dags/{fileName}/retry)
-	RetryDAGWorkflow(ctx context.Context, request RetryDAGWorkflowRequestObject) (RetryDAGWorkflowResponseObject, error)
+	RetryDAGDAGRun(ctx context.Context, request RetryDAGDAGRunRequestObject) (RetryDAGDAGRunResponseObject, error)
 	// Retrieve DAG specification
 	// (GET /dags/{fileName}/spec)
 	GetDAGSpec(ctx context.Context, request GetDAGSpecRequestObject) (GetDAGSpecResponseObject, error)
 	// Update DAG spec
 	// (PUT /dags/{fileName}/spec)
 	UpdateDAGSpec(ctx context.Context, request UpdateDAGSpecRequestObject) (UpdateDAGSpecResponseObject, error)
-	// Create and execute a workflow from DAG
+	// Create and execute a DAG-run from DAG
 	// (POST /dags/{fileName}/start)
 	ExecuteDAG(ctx context.Context, request ExecuteDAGRequestObject) (ExecuteDAGResponseObject, error)
-	// Terminate a running workflow
+	// Terminate a running DAG-run
 	// (POST /dags/{fileName}/stop)
-	TerminateDAGWorkflow(ctx context.Context, request TerminateDAGWorkflowRequestObject) (TerminateDAGWorkflowResponseObject, error)
+	TerminateDAGDAGRun(ctx context.Context, request TerminateDAGDAGRunRequestObject) (TerminateDAGDAGRunResponseObject, error)
 	// Toggle DAG suspension state
 	// (POST /dags/{fileName}/suspend)
 	UpdateDAGSuspensionState(ctx context.Context, request UpdateDAGSuspensionStateRequestObject) (UpdateDAGSuspensionStateResponseObject, error)
-	// Retrieve execution history of a DAG
-	// (GET /dags/{fileName}/workflows)
-	GetDAGWorkflowHistory(ctx context.Context, request GetDAGWorkflowHistoryRequestObject) (GetDAGWorkflowHistoryResponseObject, error)
-	// Get detailed status of a specific workflow
-	// (GET /dags/{fileName}/workflows/{workflowId})
-	GetDAGWorkflowDetails(ctx context.Context, request GetDAGWorkflowDetailsRequestObject) (GetDAGWorkflowDetailsResponseObject, error)
 	// Check server health status
 	// (GET /health)
 	GetHealthStatus(ctx context.Context, request GetHealthStatusRequestObject) (GetHealthStatusResponseObject, error)
-	// List all workflows
-	// (GET /workflows)
-	ListWorkflows(ctx context.Context, request ListWorkflowsRequestObject) (ListWorkflowsResponseObject, error)
-	// List all workflows with a specific name
-	// (GET /workflows/{name})
-	ListWorkflowsByName(ctx context.Context, request ListWorkflowsByNameRequestObject) (ListWorkflowsByNameResponseObject, error)
-	// Retrieve detailed status of a workflow
-	// (GET /workflows/{name}/{workflowId})
-	GetWorkflowDetails(ctx context.Context, request GetWorkflowDetailsRequestObject) (GetWorkflowDetailsResponseObject, error)
-	// Retrieve detailed status of a child workflow
-	// (GET /workflows/{name}/{workflowId}/children/{childWorkflowId})
-	GetChildWorkflowDetails(ctx context.Context, request GetChildWorkflowDetailsRequestObject) (GetChildWorkflowDetailsResponseObject, error)
-	// Retrieve log for a specific child workflow
-	// (GET /workflows/{name}/{workflowId}/children/{childWorkflowId}/log)
-	GetChildWorkflowLog(ctx context.Context, request GetChildWorkflowLogRequestObject) (GetChildWorkflowLogResponseObject, error)
-	// Retrieve log for a specific step in a child workflow
-	// (GET /workflows/{name}/{workflowId}/children/{childWorkflowId}/steps/{stepName}/log)
-	GetChildWorkflowStepLog(ctx context.Context, request GetChildWorkflowStepLogRequestObject) (GetChildWorkflowStepLogResponseObject, error)
-	// Manually update a step's execution status in a child workflow
-	// (PATCH /workflows/{name}/{workflowId}/children/{childWorkflowId}/steps/{stepName}/status)
-	UpdateChildWorkflowStepStatus(ctx context.Context, request UpdateChildWorkflowStepStatusRequestObject) (UpdateChildWorkflowStepStatusResponseObject, error)
-	// Dequeue a queued workflow
-	// (GET /workflows/{name}/{workflowId}/dequeue)
-	DequeueWorkflow(ctx context.Context, request DequeueWorkflowRequestObject) (DequeueWorkflowResponseObject, error)
-	// Retrieve full execution log of a workflow
-	// (GET /workflows/{name}/{workflowId}/log)
-	GetWorkflowLog(ctx context.Context, request GetWorkflowLogRequestObject) (GetWorkflowLogResponseObject, error)
-	// Retry workflow execution
-	// (POST /workflows/{name}/{workflowId}/retry)
-	RetryWorkflow(ctx context.Context, request RetryWorkflowRequestObject) (RetryWorkflowResponseObject, error)
-	// Retrieve log for a specific step in a workflow
-	// (GET /workflows/{name}/{workflowId}/steps/{stepName}/log)
-	GetWorkflowStepLog(ctx context.Context, request GetWorkflowStepLogRequestObject) (GetWorkflowStepLogResponseObject, error)
-	// Manually update a step's execution status
-	// (PATCH /workflows/{name}/{workflowId}/steps/{stepName}/status)
-	UpdateWorkflowStepStatus(ctx context.Context, request UpdateWorkflowStepStatusRequestObject) (UpdateWorkflowStepStatusResponseObject, error)
-	// Terminate a running workflow
-	// (POST /workflows/{name}/{workflowId}/stop)
-	TerminateWorkflow(ctx context.Context, request TerminateWorkflowRequestObject) (TerminateWorkflowResponseObject, error)
 }
 
 type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
@@ -4435,6 +4435,396 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// ListDAGRuns operation middleware
+func (sh *strictHandler) ListDAGRuns(w http.ResponseWriter, r *http.Request, params ListDAGRunsParams) {
+	var request ListDAGRunsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDAGRuns(ctx, request.(ListDAGRunsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDAGRuns")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDAGRunsResponseObject); ok {
+		if err := validResponse.VisitListDAGRunsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListDAGRunsByName operation middleware
+func (sh *strictHandler) ListDAGRunsByName(w http.ResponseWriter, r *http.Request, name DAGRunName, params ListDAGRunsByNameParams) {
+	var request ListDAGRunsByNameRequestObject
+
+	request.Name = name
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDAGRunsByName(ctx, request.(ListDAGRunsByNameRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDAGRunsByName")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDAGRunsByNameResponseObject); ok {
+		if err := validResponse.VisitListDAGRunsByNameResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDAGRunDetails operation middleware
+func (sh *strictHandler) GetDAGRunDetails(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params GetDAGRunDetailsParams) {
+	var request GetDAGRunDetailsRequestObject
+
+	request.Name = name
+	request.DagRunId = dagRunId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDAGRunDetails(ctx, request.(GetDAGRunDetailsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDAGRunDetails")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDAGRunDetailsResponseObject); ok {
+		if err := validResponse.VisitGetDAGRunDetailsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetChildDAGRunDetails operation middleware
+func (sh *strictHandler) GetChildDAGRunDetails(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, childDAGRunId string, params GetChildDAGRunDetailsParams) {
+	var request GetChildDAGRunDetailsRequestObject
+
+	request.Name = name
+	request.DagRunId = dagRunId
+	request.ChildDAGRunId = childDAGRunId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetChildDAGRunDetails(ctx, request.(GetChildDAGRunDetailsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetChildDAGRunDetails")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetChildDAGRunDetailsResponseObject); ok {
+		if err := validResponse.VisitGetChildDAGRunDetailsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetChildDAGRunLog operation middleware
+func (sh *strictHandler) GetChildDAGRunLog(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, childDAGRunId string, params GetChildDAGRunLogParams) {
+	var request GetChildDAGRunLogRequestObject
+
+	request.Name = name
+	request.DagRunId = dagRunId
+	request.ChildDAGRunId = childDAGRunId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetChildDAGRunLog(ctx, request.(GetChildDAGRunLogRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetChildDAGRunLog")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetChildDAGRunLogResponseObject); ok {
+		if err := validResponse.VisitGetChildDAGRunLogResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetChildDAGRunStepLog operation middleware
+func (sh *strictHandler) GetChildDAGRunStepLog(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, childDAGRunId string, stepName StepName, params GetChildDAGRunStepLogParams) {
+	var request GetChildDAGRunStepLogRequestObject
+
+	request.Name = name
+	request.DagRunId = dagRunId
+	request.ChildDAGRunId = childDAGRunId
+	request.StepName = stepName
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetChildDAGRunStepLog(ctx, request.(GetChildDAGRunStepLogRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetChildDAGRunStepLog")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetChildDAGRunStepLogResponseObject); ok {
+		if err := validResponse.VisitGetChildDAGRunStepLogResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateChildDAGRunStepStatus operation middleware
+func (sh *strictHandler) UpdateChildDAGRunStepStatus(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, childDAGRunId string, stepName StepName, params UpdateChildDAGRunStepStatusParams) {
+	var request UpdateChildDAGRunStepStatusRequestObject
+
+	request.Name = name
+	request.DagRunId = dagRunId
+	request.ChildDAGRunId = childDAGRunId
+	request.StepName = stepName
+	request.Params = params
+
+	var body UpdateChildDAGRunStepStatusJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateChildDAGRunStepStatus(ctx, request.(UpdateChildDAGRunStepStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateChildDAGRunStepStatus")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateChildDAGRunStepStatusResponseObject); ok {
+		if err := validResponse.VisitUpdateChildDAGRunStepStatusResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DequeueDAGRun operation middleware
+func (sh *strictHandler) DequeueDAGRun(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params DequeueDAGRunParams) {
+	var request DequeueDAGRunRequestObject
+
+	request.Name = name
+	request.DagRunId = dagRunId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DequeueDAGRun(ctx, request.(DequeueDAGRunRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DequeueDAGRun")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DequeueDAGRunResponseObject); ok {
+		if err := validResponse.VisitDequeueDAGRunResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDAGRunLog operation middleware
+func (sh *strictHandler) GetDAGRunLog(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params GetDAGRunLogParams) {
+	var request GetDAGRunLogRequestObject
+
+	request.Name = name
+	request.DagRunId = dagRunId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDAGRunLog(ctx, request.(GetDAGRunLogRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDAGRunLog")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDAGRunLogResponseObject); ok {
+		if err := validResponse.VisitGetDAGRunLogResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RetryDAGRun operation middleware
+func (sh *strictHandler) RetryDAGRun(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params RetryDAGRunParams) {
+	var request RetryDAGRunRequestObject
+
+	request.Name = name
+	request.DagRunId = dagRunId
+	request.Params = params
+
+	var body RetryDAGRunJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RetryDAGRun(ctx, request.(RetryDAGRunRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RetryDAGRun")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RetryDAGRunResponseObject); ok {
+		if err := validResponse.VisitRetryDAGRunResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDAGRunStepLog operation middleware
+func (sh *strictHandler) GetDAGRunStepLog(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, stepName StepName, params GetDAGRunStepLogParams) {
+	var request GetDAGRunStepLogRequestObject
+
+	request.Name = name
+	request.DagRunId = dagRunId
+	request.StepName = stepName
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDAGRunStepLog(ctx, request.(GetDAGRunStepLogRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDAGRunStepLog")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDAGRunStepLogResponseObject); ok {
+		if err := validResponse.VisitGetDAGRunStepLogResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateDAGRunStepStatus operation middleware
+func (sh *strictHandler) UpdateDAGRunStepStatus(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, stepName StepName, params UpdateDAGRunStepStatusParams) {
+	var request UpdateDAGRunStepStatusRequestObject
+
+	request.Name = name
+	request.DagRunId = dagRunId
+	request.StepName = stepName
+	request.Params = params
+
+	var body UpdateDAGRunStepStatusJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateDAGRunStepStatus(ctx, request.(UpdateDAGRunStepStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateDAGRunStepStatus")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateDAGRunStepStatusResponseObject); ok {
+		if err := validResponse.VisitUpdateDAGRunStepStatusResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// TerminateDAGRun operation middleware
+func (sh *strictHandler) TerminateDAGRun(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params TerminateDAGRunParams) {
+	var request TerminateDAGRunRequestObject
+
+	request.Name = name
+	request.DagRunId = dagRunId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TerminateDAGRun(ctx, request.(TerminateDAGRunRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TerminateDAGRun")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TerminateDAGRunResponseObject); ok {
+		if err := validResponse.VisitTerminateDAGRunResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // ListDAGs operation middleware
@@ -4602,14 +4992,69 @@ func (sh *strictHandler) GetDAGDetails(w http.ResponseWriter, r *http.Request, f
 	}
 }
 
-// EnqueueDAGWorkflow operation middleware
-func (sh *strictHandler) EnqueueDAGWorkflow(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params EnqueueDAGWorkflowParams) {
-	var request EnqueueDAGWorkflowRequestObject
+// GetDAGDAGRunHistory operation middleware
+func (sh *strictHandler) GetDAGDAGRunHistory(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGDAGRunHistoryParams) {
+	var request GetDAGDAGRunHistoryRequestObject
 
 	request.FileName = fileName
 	request.Params = params
 
-	var body EnqueueDAGWorkflowJSONRequestBody
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDAGDAGRunHistory(ctx, request.(GetDAGDAGRunHistoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDAGDAGRunHistory")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDAGDAGRunHistoryResponseObject); ok {
+		if err := validResponse.VisitGetDAGDAGRunHistoryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDAGDAGRunDetails operation middleware
+func (sh *strictHandler) GetDAGDAGRunDetails(w http.ResponseWriter, r *http.Request, fileName DAGFileName, dagRunId DAGRunId, params GetDAGDAGRunDetailsParams) {
+	var request GetDAGDAGRunDetailsRequestObject
+
+	request.FileName = fileName
+	request.DagRunId = dagRunId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDAGDAGRunDetails(ctx, request.(GetDAGDAGRunDetailsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDAGDAGRunDetails")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDAGDAGRunDetailsResponseObject); ok {
+		if err := validResponse.VisitGetDAGDAGRunDetailsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// EnqueueDAGDAGRun operation middleware
+func (sh *strictHandler) EnqueueDAGDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params EnqueueDAGDAGRunParams) {
+	var request EnqueueDAGDAGRunRequestObject
+
+	request.FileName = fileName
+	request.Params = params
+
+	var body EnqueueDAGDAGRunJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -4617,18 +5062,18 @@ func (sh *strictHandler) EnqueueDAGWorkflow(w http.ResponseWriter, r *http.Reque
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.EnqueueDAGWorkflow(ctx, request.(EnqueueDAGWorkflowRequestObject))
+		return sh.ssi.EnqueueDAGDAGRun(ctx, request.(EnqueueDAGDAGRunRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "EnqueueDAGWorkflow")
+		handler = middleware(handler, "EnqueueDAGDAGRun")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(EnqueueDAGWorkflowResponseObject); ok {
-		if err := validResponse.VisitEnqueueDAGWorkflowResponse(w); err != nil {
+	} else if validResponse, ok := response.(EnqueueDAGDAGRunResponseObject); ok {
+		if err := validResponse.VisitEnqueueDAGDAGRunResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -4670,14 +5115,14 @@ func (sh *strictHandler) RenameDAG(w http.ResponseWriter, r *http.Request, fileN
 	}
 }
 
-// RetryDAGWorkflow operation middleware
-func (sh *strictHandler) RetryDAGWorkflow(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryDAGWorkflowParams) {
-	var request RetryDAGWorkflowRequestObject
+// RetryDAGDAGRun operation middleware
+func (sh *strictHandler) RetryDAGDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryDAGDAGRunParams) {
+	var request RetryDAGDAGRunRequestObject
 
 	request.FileName = fileName
 	request.Params = params
 
-	var body RetryDAGWorkflowJSONRequestBody
+	var body RetryDAGDAGRunJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -4685,18 +5130,18 @@ func (sh *strictHandler) RetryDAGWorkflow(w http.ResponseWriter, r *http.Request
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.RetryDAGWorkflow(ctx, request.(RetryDAGWorkflowRequestObject))
+		return sh.ssi.RetryDAGDAGRun(ctx, request.(RetryDAGDAGRunRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "RetryDAGWorkflow")
+		handler = middleware(handler, "RetryDAGDAGRun")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(RetryDAGWorkflowResponseObject); ok {
-		if err := validResponse.VisitRetryDAGWorkflowResponse(w); err != nil {
+	} else if validResponse, ok := response.(RetryDAGDAGRunResponseObject); ok {
+		if err := validResponse.VisitRetryDAGDAGRunResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -4799,26 +5244,26 @@ func (sh *strictHandler) ExecuteDAG(w http.ResponseWriter, r *http.Request, file
 	}
 }
 
-// TerminateDAGWorkflow operation middleware
-func (sh *strictHandler) TerminateDAGWorkflow(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateDAGWorkflowParams) {
-	var request TerminateDAGWorkflowRequestObject
+// TerminateDAGDAGRun operation middleware
+func (sh *strictHandler) TerminateDAGDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateDAGDAGRunParams) {
+	var request TerminateDAGDAGRunRequestObject
 
 	request.FileName = fileName
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.TerminateDAGWorkflow(ctx, request.(TerminateDAGWorkflowRequestObject))
+		return sh.ssi.TerminateDAGDAGRun(ctx, request.(TerminateDAGDAGRunRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "TerminateDAGWorkflow")
+		handler = middleware(handler, "TerminateDAGDAGRun")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(TerminateDAGWorkflowResponseObject); ok {
-		if err := validResponse.VisitTerminateDAGWorkflowResponse(w); err != nil {
+	} else if validResponse, ok := response.(TerminateDAGDAGRunResponseObject); ok {
+		if err := validResponse.VisitTerminateDAGDAGRunResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -4860,61 +5305,6 @@ func (sh *strictHandler) UpdateDAGSuspensionState(w http.ResponseWriter, r *http
 	}
 }
 
-// GetDAGWorkflowHistory operation middleware
-func (sh *strictHandler) GetDAGWorkflowHistory(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGWorkflowHistoryParams) {
-	var request GetDAGWorkflowHistoryRequestObject
-
-	request.FileName = fileName
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetDAGWorkflowHistory(ctx, request.(GetDAGWorkflowHistoryRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetDAGWorkflowHistory")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetDAGWorkflowHistoryResponseObject); ok {
-		if err := validResponse.VisitGetDAGWorkflowHistoryResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// GetDAGWorkflowDetails operation middleware
-func (sh *strictHandler) GetDAGWorkflowDetails(w http.ResponseWriter, r *http.Request, fileName DAGFileName, workflowId WorkflowId, params GetDAGWorkflowDetailsParams) {
-	var request GetDAGWorkflowDetailsRequestObject
-
-	request.FileName = fileName
-	request.WorkflowId = workflowId
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetDAGWorkflowDetails(ctx, request.(GetDAGWorkflowDetailsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetDAGWorkflowDetails")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetDAGWorkflowDetailsResponseObject); ok {
-		if err := validResponse.VisitGetDAGWorkflowDetailsResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
 // GetHealthStatus operation middleware
 func (sh *strictHandler) GetHealthStatus(w http.ResponseWriter, r *http.Request) {
 	var request GetHealthStatusRequestObject
@@ -4939,501 +5329,110 @@ func (sh *strictHandler) GetHealthStatus(w http.ResponseWriter, r *http.Request)
 	}
 }
 
-// ListWorkflows operation middleware
-func (sh *strictHandler) ListWorkflows(w http.ResponseWriter, r *http.Request, params ListWorkflowsParams) {
-	var request ListWorkflowsRequestObject
-
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ListWorkflows(ctx, request.(ListWorkflowsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListWorkflows")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ListWorkflowsResponseObject); ok {
-		if err := validResponse.VisitListWorkflowsResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// ListWorkflowsByName operation middleware
-func (sh *strictHandler) ListWorkflowsByName(w http.ResponseWriter, r *http.Request, name WorkflowName, params ListWorkflowsByNameParams) {
-	var request ListWorkflowsByNameRequestObject
-
-	request.Name = name
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ListWorkflowsByName(ctx, request.(ListWorkflowsByNameRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListWorkflowsByName")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ListWorkflowsByNameResponseObject); ok {
-		if err := validResponse.VisitListWorkflowsByNameResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// GetWorkflowDetails operation middleware
-func (sh *strictHandler) GetWorkflowDetails(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, params GetWorkflowDetailsParams) {
-	var request GetWorkflowDetailsRequestObject
-
-	request.Name = name
-	request.WorkflowId = workflowId
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetWorkflowDetails(ctx, request.(GetWorkflowDetailsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetWorkflowDetails")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetWorkflowDetailsResponseObject); ok {
-		if err := validResponse.VisitGetWorkflowDetailsResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// GetChildWorkflowDetails operation middleware
-func (sh *strictHandler) GetChildWorkflowDetails(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, childWorkflowId string, params GetChildWorkflowDetailsParams) {
-	var request GetChildWorkflowDetailsRequestObject
-
-	request.Name = name
-	request.WorkflowId = workflowId
-	request.ChildWorkflowId = childWorkflowId
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetChildWorkflowDetails(ctx, request.(GetChildWorkflowDetailsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetChildWorkflowDetails")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetChildWorkflowDetailsResponseObject); ok {
-		if err := validResponse.VisitGetChildWorkflowDetailsResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// GetChildWorkflowLog operation middleware
-func (sh *strictHandler) GetChildWorkflowLog(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, childWorkflowId string, params GetChildWorkflowLogParams) {
-	var request GetChildWorkflowLogRequestObject
-
-	request.Name = name
-	request.WorkflowId = workflowId
-	request.ChildWorkflowId = childWorkflowId
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetChildWorkflowLog(ctx, request.(GetChildWorkflowLogRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetChildWorkflowLog")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetChildWorkflowLogResponseObject); ok {
-		if err := validResponse.VisitGetChildWorkflowLogResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// GetChildWorkflowStepLog operation middleware
-func (sh *strictHandler) GetChildWorkflowStepLog(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, childWorkflowId string, stepName StepName, params GetChildWorkflowStepLogParams) {
-	var request GetChildWorkflowStepLogRequestObject
-
-	request.Name = name
-	request.WorkflowId = workflowId
-	request.ChildWorkflowId = childWorkflowId
-	request.StepName = stepName
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetChildWorkflowStepLog(ctx, request.(GetChildWorkflowStepLogRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetChildWorkflowStepLog")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetChildWorkflowStepLogResponseObject); ok {
-		if err := validResponse.VisitGetChildWorkflowStepLogResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// UpdateChildWorkflowStepStatus operation middleware
-func (sh *strictHandler) UpdateChildWorkflowStepStatus(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, childWorkflowId string, stepName StepName, params UpdateChildWorkflowStepStatusParams) {
-	var request UpdateChildWorkflowStepStatusRequestObject
-
-	request.Name = name
-	request.WorkflowId = workflowId
-	request.ChildWorkflowId = childWorkflowId
-	request.StepName = stepName
-	request.Params = params
-
-	var body UpdateChildWorkflowStepStatusJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
-	}
-	request.Body = &body
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.UpdateChildWorkflowStepStatus(ctx, request.(UpdateChildWorkflowStepStatusRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "UpdateChildWorkflowStepStatus")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(UpdateChildWorkflowStepStatusResponseObject); ok {
-		if err := validResponse.VisitUpdateChildWorkflowStepStatusResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// DequeueWorkflow operation middleware
-func (sh *strictHandler) DequeueWorkflow(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, params DequeueWorkflowParams) {
-	var request DequeueWorkflowRequestObject
-
-	request.Name = name
-	request.WorkflowId = workflowId
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.DequeueWorkflow(ctx, request.(DequeueWorkflowRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "DequeueWorkflow")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(DequeueWorkflowResponseObject); ok {
-		if err := validResponse.VisitDequeueWorkflowResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// GetWorkflowLog operation middleware
-func (sh *strictHandler) GetWorkflowLog(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, params GetWorkflowLogParams) {
-	var request GetWorkflowLogRequestObject
-
-	request.Name = name
-	request.WorkflowId = workflowId
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetWorkflowLog(ctx, request.(GetWorkflowLogRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetWorkflowLog")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetWorkflowLogResponseObject); ok {
-		if err := validResponse.VisitGetWorkflowLogResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// RetryWorkflow operation middleware
-func (sh *strictHandler) RetryWorkflow(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, params RetryWorkflowParams) {
-	var request RetryWorkflowRequestObject
-
-	request.Name = name
-	request.WorkflowId = workflowId
-	request.Params = params
-
-	var body RetryWorkflowJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
-	}
-	request.Body = &body
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.RetryWorkflow(ctx, request.(RetryWorkflowRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "RetryWorkflow")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(RetryWorkflowResponseObject); ok {
-		if err := validResponse.VisitRetryWorkflowResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// GetWorkflowStepLog operation middleware
-func (sh *strictHandler) GetWorkflowStepLog(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, stepName StepName, params GetWorkflowStepLogParams) {
-	var request GetWorkflowStepLogRequestObject
-
-	request.Name = name
-	request.WorkflowId = workflowId
-	request.StepName = stepName
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetWorkflowStepLog(ctx, request.(GetWorkflowStepLogRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetWorkflowStepLog")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetWorkflowStepLogResponseObject); ok {
-		if err := validResponse.VisitGetWorkflowStepLogResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// UpdateWorkflowStepStatus operation middleware
-func (sh *strictHandler) UpdateWorkflowStepStatus(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, stepName StepName, params UpdateWorkflowStepStatusParams) {
-	var request UpdateWorkflowStepStatusRequestObject
-
-	request.Name = name
-	request.WorkflowId = workflowId
-	request.StepName = stepName
-	request.Params = params
-
-	var body UpdateWorkflowStepStatusJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
-	}
-	request.Body = &body
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.UpdateWorkflowStepStatus(ctx, request.(UpdateWorkflowStepStatusRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "UpdateWorkflowStepStatus")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(UpdateWorkflowStepStatusResponseObject); ok {
-		if err := validResponse.VisitUpdateWorkflowStepStatusResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// TerminateWorkflow operation middleware
-func (sh *strictHandler) TerminateWorkflow(w http.ResponseWriter, r *http.Request, name DAGName, workflowId WorkflowId, params TerminateWorkflowParams) {
-	var request TerminateWorkflowRequestObject
-
-	request.Name = name
-	request.WorkflowId = workflowId
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.TerminateWorkflow(ctx, request.(TerminateWorkflowRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "TerminateWorkflow")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(TerminateWorkflowResponseObject); ok {
-		if err := validResponse.VisitTerminateWorkflowResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

@@ -74,7 +74,7 @@ func testErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.DA
 	dag.MailOn.Failure = true
 	dag.MailOn.Success = false
 
-	_ = rp.send(context.Background(), dag, models.Status{
+	_ = rp.send(context.Background(), dag, models.DAGRunStatus{
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}, fmt.Errorf("Error"))
@@ -88,7 +88,7 @@ func testNoErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.
 	dag.MailOn.Failure = false
 	dag.MailOn.Success = true
 
-	err := rp.send(context.Background(), dag, models.Status{
+	err := rp.send(context.Background(), dag, models.DAGRunStatus{
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}, nil)
@@ -100,7 +100,7 @@ func testSuccessMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.
 	dag.MailOn.Failure = true
 	dag.MailOn.Success = true
 
-	err := rp.send(context.Background(), dag, models.Status{
+	err := rp.send(context.Background(), dag, models.DAGRunStatus{
 		Status: scheduler.StatusSuccess,
 		Nodes:  nodes,
 	}, nil)
@@ -112,7 +112,7 @@ func testSuccessMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.
 }
 
 func testRenderSummary(t *testing.T, _ *reporter, _ *mockSender, dag *digraph.DAG, _ []*models.Node) {
-	status := models.NewStatusBuilder(dag).Create("workflow-id", scheduler.StatusError, 0, time.Now())
+	status := models.NewStatusBuilder(dag).Create("run-id", scheduler.StatusError, 0, time.Now())
 	summary := renderDAGSummary(status, errors.New("test error"))
 	require.Contains(t, summary, "test error")
 	require.Contains(t, summary, dag.Name)

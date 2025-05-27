@@ -69,13 +69,13 @@ func TestLogDir(t *testing.T) {
 func TestLogFileName(t *testing.T) {
 	t.Run("filename format", func(t *testing.T) {
 		cfg := cmd.LogConfig{
-			Name:       "test dag",
-			WorkflowID: "12345678901234", // Longer than 8 chars to test truncation
+			Name:     "test dag",
+			DAGRunID: "12345678901234", // Longer than 8 chars to test truncation
 		}
 
 		filename := cfg.LogFile()
 
-		assert.Contains(t, filename, "workflow")
+		assert.Contains(t, filename, "dag-run")
 		assert.Contains(t, filename, time.Now().Format("20060102"))
 		assert.Contains(t, filename, "12345678")  // Should be truncated
 		assert.NotContains(t, filename, "901234") // Shouldn't contain the rest

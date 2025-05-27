@@ -88,7 +88,7 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "executor", fn: buildExecutor},
 	{name: "command", fn: buildCommand},
 	{name: "depends", fn: buildDepends},
-	{name: "childWorkflow", fn: buildChildWorkflow},
+	{name: "childDAG", fn: buildChildDAG},
 	{name: "continueOn", fn: buildContinueOn},
 	{name: "retryPolicy", fn: buildRetryPolicy},
 	{name: "repeatPolicy", fn: buildRepeatPolicy},
@@ -109,16 +109,16 @@ type StepBuilderFn func(ctx BuildContext, def stepDef, step *Step) error
 // build builds a DAG from the specification.
 func build(ctx BuildContext, spec *definition) (*DAG, error) {
 	dag := &DAG{
-		Location:           ctx.file,
-		Name:               spec.Name,
-		Group:              spec.Group,
-		Description:        spec.Description,
-		Timeout:            time.Second * time.Duration(spec.TimeoutSec),
-		Delay:              time.Second * time.Duration(spec.DelaySec),
-		RestartWait:        time.Second * time.Duration(spec.RestartWaitSec),
-		Tags:               parseTags(spec.Tags),
-		MaxActiveWorkflows: spec.MaxActiveWorkflows,
-		MaxActiveSteps:     spec.MaxActiveSteps,
+		Location:       ctx.file,
+		Name:           spec.Name,
+		Group:          spec.Group,
+		Description:    spec.Description,
+		Timeout:        time.Second * time.Duration(spec.TimeoutSec),
+		Delay:          time.Second * time.Duration(spec.DelaySec),
+		RestartWait:    time.Second * time.Duration(spec.RestartWaitSec),
+		Tags:           parseTags(spec.Tags),
+		MaxActiveRuns:  spec.MaxActiveRuns,
+		MaxActiveSteps: spec.MaxActiveSteps,
 	}
 
 	// For backward compatibility, set MaxActiveSteps to MaxActiveRuns
@@ -755,7 +755,7 @@ func validateStep(_ BuildContext, def stepDef, step *Step) error {
 	// TODO: Validate executor config for each executor type.
 
 	if step.Command == "" {
-		if step.ExecutorConfig.Type == "" && step.Script == "" && step.ChildWorkflow == nil {
+		if step.ExecutorConfig.Type == "" && step.Script == "" && step.ChildDAG == nil {
 			return ErrStepCommandIsRequired
 		}
 	}
@@ -797,8 +797,8 @@ func buildSignalOnStop(_ BuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
-// buildChildWorkflow parses the child workflow definition and sets the step fields.
-func buildChildWorkflow(_ BuildContext, def stepDef, step *Step) error {
+// buildChildDAG parses the child DAG definition and sets up the step to run a child DAG.
+func buildChildDAG(_ BuildContext, def stepDef, step *Step) error {
 	name, params := def.Run, def.Params
 
 	// if the run field is not set, return nil.
@@ -806,15 +806,15 @@ func buildChildWorkflow(_ BuildContext, def stepDef, step *Step) error {
 		return nil
 	}
 
-	// Set the step fields for the child workflow.
-	step.ChildWorkflow = &ChildWorkflow{Name: name, Params: params}
-	step.ExecutorConfig.Type = ExecutorTypeSub
+	step.ChildDAG = &ChildDAG{Name: name, Params: params}
+	step.ExecutorConfig.Type = ExecutorTypeDAG
 	step.Command = "run"
 	step.Args = []string{name, params}
 	step.CmdWithArgs = fmt.Sprintf("%s %s", name, params)
 	return nil
 }
 
+// buildDepends parses the depends field in the step definition.
 func buildDepends(_ BuildContext, def stepDef, step *Step) error {
 	deps, err := parseStringOrArray(def.Depends)
 	if err != nil {

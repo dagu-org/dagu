@@ -25,8 +25,8 @@ servers:
 tags:
   - name: "dags"
     description: "Operations for managing and creating DAG definitions"
-  - name: "workflows"
-    description: "Operations for retrieving historical data and logs of workflow executions"
+  - name: "dag-runs"
+    description: "Operations for retrieving historical data and logs of DAG-run executions"
   - name: "system"
     description: "System operations for monitoring and managing the Dagu server"
 
@@ -161,8 +161,8 @@ paths:
                 properties:
                   dag:
                     $ref: "#/components/schemas/DAGDetails"
-                  latestWorkflow:
-                    $ref: "#/components/schemas/WorkflowDetails"
+                  latestDAGRun:
+                    $ref: "#/components/schemas/DAGRunDetails"
                   suspended:
                     type: boolean
                     description: "Whether the DAG is suspended"
@@ -172,7 +172,7 @@ paths:
                     items:
                       type: string
                 required:
-                  - latestWorkflow
+                  - latestDAGRun
                   - suspended
                   - errors
         default:
@@ -209,8 +209,8 @@ paths:
 
   /dags/{fileName}/start:
     post:
-      summary: "Create and execute a workflow from DAG"
-      description: "Creates a workflow from the DAG definition and starts its execution with optional parameters"
+      summary: "Create and execute a DAG-run from DAG"
+      description: "Creates a DAG-run from the DAG definition and starts its execution with optional parameters"
       operationId: "executeDAG"
       tags:
         - "dags"
@@ -226,10 +226,10 @@ paths:
               properties:
                 params:
                   type: string
-                  description: "Parameters to pass to the workflow in JSON format"
-                workflowId:
+                  description: "Parameters to pass to the DAG-run in JSON format"
+                dagRunId:
                   type: string
-                  description: "Optional ID for the workflow, if not provided a new one will be generated"
+                  description: "Optional ID for the DAG-run, if not provided a new one will be generated"
       responses:
         "200":
           description: "A successful response"
@@ -238,11 +238,11 @@ paths:
               schema:
                 type: object
                 properties:
-                  workflowId:
+                  dagRunId:
                     type: string
-                    description: "ID of the created workflow"
+                    description: "ID of the created DAG-run"
                 required:
-                  - workflowId
+                  - dagRunId
         default:
           description: "Generic error response"
           content:
@@ -252,9 +252,9 @@ paths:
 
   /dags/{fileName}/enqueue:
     post:
-      summary: "Enqueue a workflow from DAG"
-      description: "Creates a workflow from the DAG definition and adds it to the queue for execution"
-      operationId: "enqueueDAGWorkflow"
+      summary: "Enqueue a DAG-run from DAG"
+      description: "Creates a DAG-run from the DAG definition and adds it to the queue for execution"
+      operationId: "enqueueDAGDAGRun"
       tags:
         - "dags"
       parameters:
@@ -269,10 +269,10 @@ paths:
               properties:
                 params:
                   type: string
-                  description: "Parameters to pass to the workflow in JSON format"
-                workflowId:
+                  description: "Parameters to pass to the DAG-run in JSON format"
+                dagRunId:
                   type: string
-                  description: "Optional ID for the workflow, if not provided a new one will be generated"
+                  description: "Optional ID for the DAG-run, if not provided a new one will be generated"
       responses:
         "200":
           description: "A successful response"
@@ -281,11 +281,11 @@ paths:
               schema:
                 type: object
                 properties:
-                  workflowId:
+                  dagRunId:
                     type: string
-                    description: "ID of the created workflow"
+                    description: "ID of the created DAG-run"
                 required:
-                  - workflowId
+                  - dagRunId
         default:
           description: "Generic error response"
           content:
@@ -295,9 +295,9 @@ paths:
 
   /dags/{fileName}/stop:
     post:
-      summary: "Terminate a running workflow"
-      description: "Forcefully stops a running workflow created from this DAG"
-      operationId: "terminateDAGWorkflow"
+      summary: "Terminate a running DAG-run"
+      description: "Forcefully stops a running DAG-run created from this DAG"
+      operationId: "terminateDAGDAGRun"
       tags:
         - "dags"
       parameters:
@@ -315,9 +315,9 @@ paths:
 
   /dags/{fileName}/retry:
     post:
-      summary: "Retry workflow execution"
-      description: "Creates a new workflow based on a previous execution"
-      operationId: "retryDAGWorkflow"
+      summary: "Retry DAG-run execution"
+      description: "Creates a new DAG-run based on a previous execution"
+      operationId: "retryDAGDAGRun"
       tags:
         - "dags"
       parameters:
@@ -330,11 +330,11 @@ paths:
             schema:
               type: object
               properties:
-                workflowId:
+                dagRunId:
                   type: string
-                  description: "ID of the workflow to retry"
+                  description: "ID of the DAG-run to retry"
               required:
-                - workflowId
+                - dagRunId
       responses:
         "200":
           description: "A successful response"
@@ -345,11 +345,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{fileName}/workflows:
+  /dags/{fileName}/dag-runs:
     get:
       summary: "Retrieve execution history of a DAG"
-      description: "Fetches history of workflows created from this DAG definition"
-      operationId: "getDAGWorkflowHistory"
+      description: "Fetches history of DAG-runs created from this DAG definition"
+      operationId: "getDAGDAGRunHistory"
       tags:
         - "dags"
       parameters:
@@ -363,18 +363,18 @@ paths:
               schema:
                 type: object
                 properties:
-                  workflows:
+                  dagRuns:
                     type: array
-                    description: "List of historical workflows created from this DAG"
+                    description: "List of historical DAG-runs created from this DAG"
                     items:
-                      $ref: "#/components/schemas/WorkflowDetails"
+                      $ref: "#/components/schemas/DAGRunDetails"
                   gridData:
                     type: array
                     description: "Grid data for visualization"
                     items:
                       $ref: "#/components/schemas/DAGGridItem"
                 required:
-                  - workflows
+                  - dagRuns
                   - gridData
         default:
           description: "Generic error response"
@@ -383,17 +383,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{fileName}/workflows/{workflowId}:
+  /dags/{fileName}/dag-runs/{dagRunId}:
     get:
-      summary: "Get detailed status of a specific workflow"
-      description: "Retrieves status information about a particular workflow created from this DAG"
+      summary: "Get detailed status of a specific DAG-run"
+      description: "Retrieves status information about a particular DAG-run created from this DAG"
       tags:
         - "dags"
-      operationId: "getDAGWorkflowDetails"
+      operationId: "getDAGDAGRunDetails"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGFileName"
-        - $ref: "#/components/parameters/WorkflowId"
+        - $ref: "#/components/parameters/DAGRunId"
       responses:
         "200":
           description: "A successful response"
@@ -402,10 +402,10 @@ paths:
               schema:
                 type: object
                 properties:
-                  workflow:
-                    $ref: "#/components/schemas/WorkflowDetails"
+                  dagRun:
+                    $ref: "#/components/schemas/DAGRunDetails"
                 required:
-                  - workflow
+                  - dagRun
         default:
           description: "Generic error response"
           content:
@@ -497,7 +497,7 @@ paths:
   /dags/{fileName}/suspend:
     post:
       summary: "Toggle DAG suspension state"
-      description: "Controls whether the scheduler should create workflows from this DAG according to its defined cron schedule"
+      description: "Controls whether the scheduler should create DAG-runs from this DAG according to its defined cron schedule"
       operationId: "updateDAGSuspensionState"
       tags:
         - "dags"
@@ -643,25 +643,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /workflows:
+  /dag-runs:
     get:
-      summary: "List all workflows"
-      description: "Retrieves a list of all workflows with optional filtering by name and status"
-      operationId: "listWorkflows"
+      summary: "List all DAG-runs"
+      description: "Retrieves a list of all DAG-runs with optional filtering by name and status"
+      operationId: "listDAGRuns"
       tags:
-        - "workflows"
+        - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/Status"
         - $ref: "#/components/parameters/DateTimeFrom"
         - $ref: "#/components/parameters/DateTimeTo"
-        - $ref: "#/components/parameters/WorkflowIdSearch"
+        - $ref: "#/components/parameters/DAGRunIdSearch"
         - $ref: "#/components/parameters/RemoteNode"
         - name: "name"
           in: "query"
           required: false
           schema:
             type: "string"
-          description: "Filter workflows by name"
+          description: "Filter DAG-runs by name"
       responses:
         "200":
           description: "A successful response"
@@ -670,13 +670,13 @@ paths:
               schema:
                 type: object
                 properties:
-                  workflows:
+                  dagRuns:
                     type: array
-                    description: "List of workflows with their status and metadata"
+                    description: "List of DAG-runs with their status and metadata"
                     items:
-                      $ref: "#/components/schemas/WorkflowSummary"
+                      $ref: "#/components/schemas/DAGRunSummary"
                 required:
-                  - workflows
+                  - dagRuns
         default:
           description: "Generic error response"
           content:
@@ -684,19 +684,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /workflows/{name}:
+  /dag-runs/{name}:
     get:
-      summary: "List all workflows with a specific name"
-      description: "Retrieves a list of all workflows with optional filtering by name and status"
-      operationId: "listWorkflowsByName"
+      summary: "List all DAG-runs with a specific name"
+      description: "Retrieves a list of all DAG-runs with optional filtering by name and status"
+      operationId: "listDAGRunsByName"
       tags:
-        - "workflows"
+        - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/Status"
         - $ref: "#/components/parameters/DateTimeFrom"
         - $ref: "#/components/parameters/DateTimeTo"
-        - $ref: "#/components/parameters/WorkflowName"
-        - $ref: "#/components/parameters/WorkflowIdSearch"
+        - $ref: "#/components/parameters/DAGRunName"
+        - $ref: "#/components/parameters/DAGRunIdSearch"
         - $ref: "#/components/parameters/RemoteNode"
       responses:
         "200":
@@ -706,13 +706,13 @@ paths:
               schema:
                 type: object
                 properties:
-                  workflows:
+                  dagRuns:
                     type: array
-                    description: "List of workflows with their status and metadata"
+                    description: "List of DAG-runs with their status and metadata"
                     items:
-                      $ref: "#/components/schemas/WorkflowSummary"
+                      $ref: "#/components/schemas/DAGRunSummary"
                 required:
-                  - workflows
+                  - dagRuns
         default:
           description: "Generic error response"
           content:
@@ -720,17 +720,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /workflows/{name}/{workflowId}:
+  /dag-runs/{name}/{dagRunId}:
     get:
-      summary: "Retrieve detailed status of a workflow"
-      description: "Fetches detailed status information about a specific workflow"
-      operationId: "getWorkflowDetails"
+      summary: "Retrieve detailed status of a DAG-run"
+      description: "Fetches detailed status information about a specific DAG-run"
+      operationId: "getDAGRunDetails"
       tags:
-        - "workflows"
+        - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
-        - $ref: "#/components/parameters/WorkflowId"
+        - $ref: "#/components/parameters/DAGRunId"
       responses:
         "200":
           description: "A successful response"
@@ -739,12 +739,12 @@ paths:
               schema:
                 type: object
                 properties:
-                  workflowDetails:
-                    $ref: "#/components/schemas/WorkflowDetails"
+                  dagRunDetails:
+                    $ref: "#/components/schemas/DAGRunDetails"
                 required:
-                  - workflowDetails
+                  - dagRunDetails
         "404":
-          description: "Workflow not found"
+          description: "DAGRun not found"
           content:
             application/json:
               schema:
@@ -756,22 +756,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /workflows/{name}/{workflowId}/dequeue:
+  /dag-runs/{name}/{dagRunId}/dequeue:
     get:
-      summary: "Dequeue a queued workflow"
-      description: "Dequeue a workflow execution that is currently queued"
-      operationId: "dequeueWorkflow"
+      summary: "Dequeue a queued DAG-run"
+      description: "Dequeue a DAG-run execution that is currently queued"
+      operationId: "dequeueDAGRun"
       tags:
-        - "workflows"
+        - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
-        - $ref: "#/components/parameters/WorkflowId"
+        - $ref: "#/components/parameters/DAGRunId"
       responses:
         "200":
           description: "A successful response"
         "404":
-          description: "Workflow not found"
+          description: "DAGRun not found"
           content:
             application/json:
               schema:
@@ -783,17 +783,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /workflows/{name}/{workflowId}/log:
+  /dag-runs/{name}/{dagRunId}/log:
     get:
-      summary: "Retrieve full execution log of a workflow"
-      description: "Fetches the execution log for a workflow"
-      operationId: "getWorkflowLog"
+      summary: "Retrieve full execution log of a DAG-run"
+      description: "Fetches the execution log for a DAG-run"
+      operationId: "getDAGRunLog"
       tags:
-        - "workflows"
+        - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
-        - $ref: "#/components/parameters/WorkflowId"
+        - $ref: "#/components/parameters/DAGRunId"
         - $ref: "#/components/parameters/Tail"
         - $ref: "#/components/parameters/Head"
         - $ref: "#/components/parameters/Offset"
@@ -818,17 +818,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /workflows/{name}/{workflowId}/retry:
+  /dag-runs/{name}/{dagRunId}/retry:
     post:
-      summary: "Retry workflow execution"
-      description: "Creates a new workflow based on a previous execution"
-      operationId: "retryWorkflow"
+      summary: "Retry DAG-run execution"
+      description: "Creates a new DAG-run based on a previous execution"
+      operationId: "retryDAGRun"
       tags:
-        - "workflows"
+        - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
-        - $ref: "#/components/parameters/WorkflowId"
+        - $ref: "#/components/parameters/DAGRunId"
       requestBody:
         required: true
         content:
@@ -836,11 +836,11 @@ paths:
             schema:
               type: object
               properties:
-                workflowId:
+                dagRunId:
                   type: string
-                  description: "ID of the workflow to retry"
+                  description: "ID of the DAG-run to retry"
               required:
-                - workflowId
+                - dagRunId
       responses:
         "200":
           description: "A successful response"
@@ -851,17 +851,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /workflows/{name}/{workflowId}/stop:
+  /dag-runs/{name}/{dagRunId}/stop:
     post:
-      summary: "Terminate a running workflow"
-      description: "Forcefully stops a running workflow created from this DAG"
-      operationId: "terminateWorkflow"
+      summary: "Terminate a running DAG-run"
+      description: "Forcefully stops a running DAG-run created from this DAG"
+      operationId: "terminateDAGRun"
       tags:
-        - "workflows"
+        - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
-        - $ref: "#/components/parameters/WorkflowId"
+        - $ref: "#/components/parameters/DAGRunId"
       responses:
         "200":
           description: "A successful response"
@@ -872,17 +872,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /workflows/{name}/{workflowId}/steps/{stepName}/log:
+  /dag-runs/{name}/{dagRunId}/steps/{stepName}/log:
     get:
-      summary: "Retrieve log for a specific step in a workflow"
-      description: "Fetches the log for an individual step in a workflow"
-      operationId: "getWorkflowStepLog"
+      summary: "Retrieve log for a specific step in a DAG-run"
+      description: "Fetches the log for an individual step in a DAG-run"
+      operationId: "getDAGRunStepLog"
       tags:
-        - "workflows"
+        - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
-        - $ref: "#/components/parameters/WorkflowId"
+        - $ref: "#/components/parameters/DAGRunId"
         - $ref: "#/components/parameters/StepName"
         - $ref: "#/components/parameters/Tail"
         - $ref: "#/components/parameters/Head"
@@ -909,17 +909,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /workflows/{name}/{workflowId}/steps/{stepName}/status:
+  /dag-runs/{name}/{dagRunId}/steps/{stepName}/status:
     patch:
       summary: "Manually update a step's execution status"
-      description: "Changes the status of a specific step within a workflow"
-      operationId: "updateWorkflowStepStatus"
+      description: "Changes the status of a specific step within a DAG-run"
+      operationId: "updateDAGRunStepStatus"
       tags:
-        - "workflows"
+        - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
-        - $ref: "#/components/parameters/WorkflowId"
+        - $ref: "#/components/parameters/DAGRunId"
         - $ref: "#/components/parameters/StepName"
       requestBody:
         required: true
@@ -942,7 +942,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Workflow or step not found"
+          description: "DAGRun or step not found"
           content:
             application/json:
               schema:
@@ -954,23 +954,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /workflows/{name}/{workflowId}/children/{childWorkflowId}:
+  /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}:
     get:
-      summary: "Retrieve detailed status of a child workflow"
-      description: "Fetches detailed status information about a specific child workflow"
-      operationId: "getChildWorkflowDetails"
+      summary: "Retrieve detailed status of a child DAG-run"
+      description: "Fetches detailed status information about a specific child DAG-run"
+      operationId: "getChildDAGRunDetails"
       tags:
-        - "workflows"
+        - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
-        - $ref: "#/components/parameters/WorkflowId"
-        - name: "childWorkflowId"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "childDAGRunId"
           in: "path"
           required: true
           schema:
             type: "string"
-          description: "ID of the child workflow to retrieve details for"
+          description: "ID of the child DAG-run to retrieve details for"
       responses:
         "200":
           description: "A successful response"
@@ -979,12 +979,12 @@ paths:
               schema:
                 type: object
                 properties:
-                  workflowDetails:
-                    $ref: "#/components/schemas/WorkflowDetails"
+                  dagRunDetails:
+                    $ref: "#/components/schemas/DAGRunDetails"
                 required:
-                  - workflowDetails
+                  - dagRunDetails
         "404":
-          description: "Child workflow not found"
+          description: "Child DAG-run not found"
           content:
             application/json:
               schema:
@@ -996,27 +996,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /workflows/{name}/{workflowId}/children/{childWorkflowId}/log:
+  /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/log:
     get:
-      summary: "Retrieve log for a specific child workflow"
-      description: "Fetches the log for an individual child workflow"
-      operationId: "getChildWorkflowLog"
+      summary: "Retrieve log for a specific child DAG-run"
+      description: "Fetches the log for an individual child DAG-run"
+      operationId: "getChildDAGRunLog"
       tags:
-        - "workflows"
+        - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
-        - $ref: "#/components/parameters/WorkflowId"
+        - $ref: "#/components/parameters/DAGRunId"
         - $ref: "#/components/parameters/Tail"
         - $ref: "#/components/parameters/Head"
         - $ref: "#/components/parameters/Offset"
         - $ref: "#/components/parameters/Limit"
-        - name: "childWorkflowId"
+        - name: "childDAGRunId"
           in: "path"
           required: true
           schema:
             type: "string"
-          description: "ID of the child workflow to retrieve the log for"
+          description: "ID of the child DAG-run to retrieve the log for"
       responses:
         "200":
           description: "A successful response"
@@ -1037,28 +1037,28 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /workflows/{name}/{workflowId}/children/{childWorkflowId}/steps/{stepName}/log:
+  /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/log:
     get:
-      summary: "Retrieve log for a specific step in a child workflow"
-      description: "Fetches the log for an individual step in a child workflow"
-      operationId: "getChildWorkflowStepLog"
+      summary: "Retrieve log for a specific step in a child DAG-run"
+      description: "Fetches the log for an individual step in a child DAG-run"
+      operationId: "getChildDAGRunStepLog"
       tags:
-        - "workflows"
+        - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
-        - $ref: "#/components/parameters/WorkflowId"
+        - $ref: "#/components/parameters/DAGRunId"
         - $ref: "#/components/parameters/Tail"
         - $ref: "#/components/parameters/Head"
         - $ref: "#/components/parameters/Offset"
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Stream"
-        - name: "childWorkflowId"
+        - name: "childDAGRunId"
           in: "path"
           required: true
           schema:
             type: "string"
-          description: "ID of the child workflow to retrieve the log for"
+          description: "ID of the child DAG-run to retrieve the log for"
         - $ref: "#/components/parameters/StepName"
       responses:
         "200":
@@ -1080,23 +1080,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /workflows/{name}/{workflowId}/children/{childWorkflowId}/steps/{stepName}/status:
+  /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/status:
     patch:
-      summary: "Manually update a step's execution status in a child workflow"
-      description: "Changes the status of a specific step within a child workflow"
-      operationId: "updateChildWorkflowStepStatus"
+      summary: "Manually update a step's execution status in a child DAG-run"
+      description: "Changes the status of a specific step within a child DAG-run"
+      operationId: "updateChildDAGRunStepStatus"
       tags:
-        - "workflows"
+        - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
-        - $ref: "#/components/parameters/WorkflowId"
-        - name: "childWorkflowId"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "childDAGRunId"
           in: "path"
           required: true
           schema:
             type: "string"
-          description: "ID of the child workflow to update the step status for"
+          description: "ID of the child DAG-run to update the step status for"
         - $ref: "#/components/parameters/StepName"
       requestBody:
         required: true
@@ -1119,7 +1119,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Workflow or step not found"
+          description: "DAGRun or step not found"
           content:
             application/json:
               schema:
@@ -1196,26 +1196,26 @@ components:
         type: string
         default: "local"
 
-    WorkflowId:
-      name: workflowId
+    DAGRunId:
+      name: dagRunId
       in: path
-      description: ID of the workflow or 'latest' to get the most recent workflow
+      description: ID of the DAG-run or 'latest' to get the most recent DAG-run
       required: true
       schema:
-        $ref: "#/components/schemas/WorkflowId"
+        $ref: "#/components/schemas/DAGRunId"
 
-    WorkflowIdSearch:
-      name: workflowId
+    DAGRunIdSearch:
+      name: dagRunId
       in: query
-      description: ID of the workflow or 'latest' to get the most recent workflow
+      description: ID of the DAG-run or 'latest' to get the most recent DAG-run
       required: false
       schema:
-        $ref: "#/components/schemas/WorkflowId"
+        $ref: "#/components/schemas/DAGRunId"
 
-    WorkflowName:
+    DAGRunName:
       name: name
       in: path
-      description: name of the workflow
+      description: name of the DAG-run
       required: true
       schema:
         type: string
@@ -1223,7 +1223,7 @@ components:
     Status:
       name: status
       in: query
-      description: status of the workflow
+      description: status of the DAG-run
       required: false
       schema:
         $ref: "#/components/schemas/Status"
@@ -1231,7 +1231,7 @@ components:
     DateTimeFrom:
       name: fromDate
       in: query
-      description: start datetime for filtering workflows in ISO 8601 format with timezone
+      description: start datetime for filtering DAG-runs in ISO 8601 format with timezone
       required: false
       schema:
         $ref: "#/components/schemas/UnixTimestamp"
@@ -1239,7 +1239,7 @@ components:
     DateTimeTo:
       name: toDate
       in: query
-      description: end datetime for filtering workflows in ISO 8601 format with timezone
+      description: end datetime for filtering DAG-runs in ISO 8601 format with timezone
       required: false
       schema:
         $ref: "#/components/schemas/UnixTimestamp"
@@ -1372,9 +1372,9 @@ components:
         - nextPage
         - prevPage
 
-    WorkflowId:
+    DAGRunId:
       type: string
-      description: "Unique identifier for the workflow"
+      description: "Unique identifier for the DAG-run"
       example: "latest"
       pattern: "^[a-zA-Z0-9_-]+$"
 
@@ -1410,8 +1410,8 @@ components:
           description: "File ID of the DAG file"
         dag:
           $ref: "#/components/schemas/DAG"
-        latestWorkflow:
-          $ref: "#/components/schemas/WorkflowSummary"
+        latestDAGRun:
+          $ref: "#/components/schemas/DAGRunSummary"
         suspended:
           type: boolean
           description: "Whether the DAG is suspended"
@@ -1423,7 +1423,7 @@ components:
       required:
         - fileName
         - dag
-        - latestWorkflow
+        - latestDAGRun
         - suspended
         - errors
 
@@ -1439,7 +1439,7 @@ components:
           description: "Logical name of the DAG"
         schedule:
           type: array
-          description: "List of scheduling expressions defining when workflows should be created from this DAG"
+          description: "List of scheduling expressions defining when DAG-runs should be created from this DAG"
           items:
             $ref: "#/components/schemas/Schedule"
         description:
@@ -1447,12 +1447,12 @@ components:
           description: "Human-readable description of the DAG's purpose and behavior"
         params:
           type: array
-          description: "List of parameter names that can be passed to workflows created from this DAG"
+          description: "List of parameter names that can be passed to DAG-runs created from this DAG"
           items:
             type: string
         defaultParams:
           type: string
-          description: "Default parameter values in JSON format if not specified at workflow creation"
+          description: "Default parameter values in JSON format if not specified at DAG-run creation"
         tags:
           type: array
           description: "List of tags for categorizing and filtering DAGs"
@@ -1464,7 +1464,7 @@ components:
 
     Schedule:
       type: object
-      description: "Schedule configuration for workflow creation"
+      description: "Schedule configuration for DAG-run creation"
       properties:
         expression:
           type: string
@@ -1483,7 +1483,7 @@ components:
         - "Success"
         - "Queued"
       description: |
-        Numeric status code indicating current workflow state:
+        Numeric status code indicating current DAG-run state:
         0: "Not started"
         1: "Running"
         2: "Failed"
@@ -1493,7 +1493,7 @@ components:
 
     StatusLabel:
       type: string
-      description: "Human-readable status description for the workflow"
+      description: "Human-readable status description for the DAG-run"
       enum:
         - "not started"
         - "running"
@@ -1544,7 +1544,7 @@ components:
           description: "Unique identifier for the DAG within its group"
         schedule:
           type: array
-          description: "List of scheduling expressions defining when workflows should be created from this DAG"
+          description: "List of scheduling expressions defining when DAG-runs should be created from this DAG"
           items:
             $ref: "#/components/schemas/Schedule"
         description:
@@ -1552,7 +1552,7 @@ components:
           description: "Human-readable description of the DAG's purpose and behavior"
         env:
           type: array
-          description: "List of environment variables to set before executing a workflow"
+          description: "List of environment variables to set before executing a DAG-run"
           items:
             type: string
         logDir:
@@ -1562,34 +1562,34 @@ components:
           $ref: "#/components/schemas/HandlerOn"
         steps:
           type: array
-          description: "List of steps to execute in workflows created from this DAG"
+          description: "List of steps to execute in DAG-runs created from this DAG"
           items:
             $ref: "#/components/schemas/Step"
         delay:
           type: integer
-          description: "Time in seconds to wait before starting a workflow"
+          description: "Time in seconds to wait before starting a DAG-run"
         histRetentionDays:
           type: integer
           description: "Number of days to retain historical logs"
         preconditions:
           type: array
-          description: "Conditions that must be met before a workflow can start"
+          description: "Conditions that must be met before a DAG-run can start"
           items:
             $ref: "#/components/schemas/Condition"
-        maxActiveWorkflows:
+        maxActiveDAGRuns:
           type: integer
-          description: "Maximum number of concurrent workflows allowed from this DAG"
+          description: "Maximum number of concurrent DAG-runs allowed from this DAG"
         maxActiveSteps:
           type: integer
-          description: "Maximum number of concurrent workflows allowed from this DAG"
+          description: "Maximum number of concurrent DAG-runs allowed from this DAG"
         params:
           type: array
-          description: "List of parameter names that can be passed to workflows created from this DAG"
+          description: "List of parameter names that can be passed to DAG-runs created from this DAG"
           items:
             type: string
         defaultParams:
           type: string
-          description: "Default parameter values in JSON format if not specified at workflow creation"
+          description: "Default parameter values in JSON format if not specified at DAG-run creation"
         tags:
           type: array
           description: "List of tags for categorizing and filtering DAGs"
@@ -1601,7 +1601,7 @@ components:
 
     HandlerOn:
       type: object
-      description: "Configuration for event handlers in a workflow"
+      description: "Configuration for event handlers in a DAG-run"
       properties:
         failure:
           $ref: "#/components/schemas/Step"
@@ -1612,24 +1612,24 @@ components:
         exit:
           $ref: "#/components/schemas/Step"
 
-    WorkflowSummary:
+    DAGRunSummary:
       type: object
-      description: "Current status of a workflow"
+      description: "Current status of a DAG-run"
       properties:
-        rootWorkflowName:
+        rootDAGRunName:
           type: string
-          description: "Name of the root workflow"
-        rootWorkflowId:
+          description: "Name of the root DAG-run"
+        rootDAGRunId:
           type: string
-          description: "ID of the root workflow"
-        parentWorkflowName:
+          description: "ID of the root DAG-run"
+        parentDAGRunName:
           type: string
-          description: "Name of the parent workflow"
-        parentWorkflowId:
+          description: "Name of the parent DAG-run"
+        parentDAGRunId:
           type: string
-          description: "ID of the parent workflow"
-        workflowId:
-          $ref: "#/components/schemas/WorkflowId"
+          description: "ID of the parent DAG-run"
+        dagRunId:
+          $ref: "#/components/schemas/DAGRunId"
         name:
           $ref: "#/components/schemas/DAGName"
         status:
@@ -1638,26 +1638,26 @@ components:
           $ref: "#/components/schemas/StatusLabel"
         pid:
           type: integer
-          description: "Process ID of the workflow"
+          description: "Process ID of the DAG-run"
         queuedAt:
           type: string
-          description: "RFC 3339 timestamp when the workflow was queued"
+          description: "RFC 3339 timestamp when the DAG-run was queued"
         startedAt:
           type: string
-          description: "RFC 3339 timestamp when the workflow started"
+          description: "RFC 3339 timestamp when the DAG-run started"
         finishedAt:
           type: string
-          description: "RFC 3339 timestamp when the workflow finished"
+          description: "RFC 3339 timestamp when the DAG-run finished"
         log:
           type: string
           description: "Path to the log file"
         params:
           type: string
-          description: "Runtime parameters passed to the workflow in JSON format"
+          description: "Runtime parameters passed to the DAG-run in JSON format"
       required:
-        - rootWorkflowName
-        - rootWorkflowId
-        - workflowId
+        - rootDAGRunName
+        - rootDAGRunId
+        - dagRunId
         - name
         - status
         - statusLabel
@@ -1665,17 +1665,17 @@ components:
         - finishedAt
         - log
 
-    WorkflowDetails:
+    DAGRunDetails:
       type: object
-      description: "Detailed status of a workflow including child workflow nodes"
+      description: "Detailed status of a DAG-run including child DAG-run nodes"
       allOf:
-        - $ref: "#/components/schemas/WorkflowSummary"
+        - $ref: "#/components/schemas/DAGRunSummary"
         - type: object
-          description: "Detailed status information for the steps within a workflow."
+          description: "Detailed status information for the steps within a DAG-run."
           properties:
             nodes:
               type: array
-              description: "Status of individual steps within the workflow"
+              description: "Status of individual steps within the DAG-run"
               items:
                 $ref: "#/components/schemas/Node"
             onExit:
@@ -1688,7 +1688,7 @@ components:
               $ref: "#/components/schemas/Node"
             preconditions:
               type: array
-              description: "List of preconditions that must be met before the workflow can start"
+              description: "List of preconditions that must be met before the DAG-run can start"
               items:
                 $ref: "#/components/schemas/Condition"
           required:
@@ -1696,7 +1696,7 @@ components:
 
     Node:
       type: object
-      description: "Status of an individual step within a workflow"
+      description: "Status of an individual step within a DAG-run"
       properties:
         step:
           $ref: "#/components/schemas/Step"
@@ -1724,9 +1724,9 @@ components:
           description: "Number of successful completions for repeating steps"
         children:
           type: array
-          description: "List of child workflows associated with this step"
+          description: "List of child DAG-runs associated with this step"
           items:
-            $ref: "#/components/schemas/ChildWorkflow"
+            $ref: "#/components/schemas/ChildDAGRun"
         error:
           type: string
           description: "Error message if the step failed"
@@ -1741,22 +1741,22 @@ components:
         - retryCount
         - doneCount
 
-    ChildWorkflow:
+    ChildDAGRun:
       type: object
-      description: "Metadata for a child workflow"
+      description: "Metadata for a child DAG-run"
       properties:
-        workflowId:
-          $ref: "#/components/schemas/WorkflowId"
+        dagRunId:
+          $ref: "#/components/schemas/DAGRunId"
       required:
-        - workflowId
+        - dagRunId
 
     Step:
       type: object
-      description: "Individual task definition that performs a specific operation in a workflow"
+      description: "Individual task definition that performs a specific operation in a DAG-run"
       properties:
         name:
           type: string
-          description: "Unique identifier for the step within the workflow"
+          description: "Unique identifier for the step within the DAG-run"
         description:
           type: string
           description: "Human-readable description of what the step does"
@@ -1788,10 +1788,10 @@ components:
             type: string
         run:
           type: string
-          description: "The name of the DAG to run as a child workflow"
+          description: "The name of the DAG to run as a child DAG-run"
         params:
           type: string
-          description: "Parameters to pass to the child workflow in JSON format"
+          description: "Parameters to pass to the child DAG-run in JSON format"
         depends:
           type: array
           description: "List of step names that must complete before this step can start"
@@ -1871,7 +1871,7 @@ components:
 
     DAGGridItem:
       type: object
-      description: "Grid item for visualizing workflow execution history"
+      description: "Grid item for visualizing DAG-run execution history"
       properties:
         name:
           type: string
@@ -1887,7 +1887,7 @@ components:
 
     Condition:
       type: object
-      description: "Precondition that must be satisfied before running a step or workflow"
+      description: "Precondition that must be satisfied before running a step or DAG-run"
       properties:
         condition:
           type: string

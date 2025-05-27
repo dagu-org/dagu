@@ -106,9 +106,9 @@ func TestBuild(t *testing.T) {
 		assert.Len(t, th.Preconditions, 1)
 		assert.Equal(t, &digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Preconditions[0])
 	})
-	t.Run("MaxActiveWorkflows", func(t *testing.T) {
-		th := testLoad(t, "max_active_workflows.yaml")
-		assert.Equal(t, 5, th.MaxActiveWorkflows)
+	t.Run("maxActiveRuns", func(t *testing.T) {
+		th := testLoad(t, "max_active_runs.yaml")
+		assert.Equal(t, 5, th.MaxActiveRuns)
 	})
 	t.Run("MaxActiveSteps", func(t *testing.T) {
 		th := testLoad(t, "max_active_steps.yaml")
@@ -328,12 +328,12 @@ func TestBuildStep(t *testing.T) {
 			},
 		}, th.Steps[0].ExecutorConfig.Config)
 	})
-	t.Run("CallingSub", func(t *testing.T) {
+	t.Run("DAGExecutor", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "calling_sub.yaml")
+		th := testLoad(t, "sub_dag.yaml")
 		assert.Len(t, th.Steps, 1)
-		assert.Equal(t, "sub", th.Steps[0].ExecutorConfig.Type)
+		assert.Equal(t, "dag", th.Steps[0].ExecutorConfig.Type)
 		assert.Equal(t, "run", th.Steps[0].Command)
 		assert.Equal(t, []string{
 			"sub_dag",

@@ -11,14 +11,14 @@ func CmdServer() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "server [flags]",
-			Short: "Start the web UI server for workflow management",
-			Long: `Launch the Dagu web server that provides a graphical interface for monitoring and managing workflows.
+			Short: "Start the web UI server for DAG management",
+			Long: `Launch the Dagu web server that provides a graphical interface for monitoring and managing DAGs.
 
 The web UI allows you to:
-- View all available DAG definitions
-- Monitor active and historical workflow executions
-- Inspect workflow details including step status and logs
-- Start, stop, and retry workflows
+- View and manage DAG definitions
+- Monitor active and historical DAG-runs
+- Inspect DAG-run details including step status and logs
+- Start, stop, and retry DAG-runs 
 - View execution history and statistics
 
 Flags:

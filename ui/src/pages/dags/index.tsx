@@ -64,7 +64,7 @@ function DAGs() {
   }, [mutate]);
 
   React.useEffect(() => {
-    appBarContext.setTitle('DAGs');
+    appBarContext.setTitle('DAG Definitions');
   }, [appBarContext]);
 
   const { dagFiles, errorCount } = React.useMemo(() => {

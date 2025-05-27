@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 )
@@ -31,13 +31,13 @@ type Job interface {
 }
 
 type Scheduler struct {
-	hm           history.Manager
+	hm           dagrun.Manager
 	er           EntryReader
 	logDir       string
 	stopChan     chan struct{}
 	running      atomic.Bool
 	location     *time.Location
-	historyStore models.HistoryStore
+	dagRunStore  models.DAGRunStore
 	queueStore   models.QueueStore
 	procStore    models.ProcStore
 	cancel       context.CancelFunc
@@ -52,8 +52,8 @@ type queueConfig struct {
 func New(
 	cfg *config.Config,
 	er EntryReader,
-	hm history.Manager,
-	hs models.HistoryStore,
+	drm dagrun.Manager,
+	drs models.DAGRunStore,
 	qs models.QueueStore,
 	ps models.ProcStore,
 ) *Scheduler {
@@ -63,14 +63,14 @@ func New(
 	}
 
 	return &Scheduler{
-		logDir:       cfg.Paths.LogDir,
-		stopChan:     make(chan struct{}),
-		location:     timeLoc,
-		er:           er,
-		hm:           hm,
-		historyStore: hs,
-		queueStore:   qs,
-		procStore:    ps,
+		logDir:      cfg.Paths.LogDir,
+		stopChan:    make(chan struct{}),
+		location:    timeLoc,
+		er:          er,
+		hm:          drm,
+		dagRunStore: drs,
+		queueStore:  qs,
+		procStore:   ps,
 	}
 }
 
@@ -155,8 +155,8 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			logger.Info(ctx, "Received item from queue", "data", data)
 			var (
 				dag       *digraph.DAG
-				history   models.Run
-				status    *models.Status
+				attempt   models.DAGRunAttempt
+				status    *models.DAGRunStatus
 				err       error
 				done      bool
 				startedAt time.Time
@@ -173,14 +173,14 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				goto SEND_RESULT
 			}
 
-			// Fetch the dag of the workflow
-			history, err = s.historyStore.FindRun(ctx, data)
+			// Fetch the DAG of the dag-run attempt
+			attempt, err = s.dagRunStore.FindAttempt(ctx, data)
 			if err != nil {
 				logger.Error(ctx, "Failed to find run", "err", err, "data", data)
 				goto SEND_RESULT
 			}
 
-			status, err = history.ReadStatus(ctx)
+			status, err = attempt.ReadStatus(ctx)
 			if err != nil {
 				logger.Error(ctx, "Failed to read status", "err", err, "data", data)
 				goto SEND_RESULT
@@ -193,7 +193,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				goto SEND_RESULT
 			}
 
-			dag, err = history.ReadDAG(ctx)
+			dag, err = attempt.ReadDAG(ctx)
 			if err != nil {
 				logger.Error(ctx, "Failed to read dag", "err", err, "data", data)
 				goto SEND_RESULT
@@ -201,11 +201,11 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 
 			// Update the queue configuration with the latest execution
 			s.queueConfigs.Store(data.Name, queueConfig{
-				MaxConcurrency: max(dag.MaxActiveWorkflows, 1),
+				MaxConcurrency: max(dag.MaxActiveRuns, 1),
 			})
 
 			startedAt = time.Now()
-			if err := s.hm.RetryDAG(ctx, dag, data.WorkflowID); err != nil {
+			if err := s.hm.RetryDAGRun(ctx, dag, data.ID); err != nil {
 				logger.Error(ctx, "Failed to retry dag", "err", err, "data", data)
 				goto SEND_RESULT
 			}
@@ -214,11 +214,11 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 		WAIT_FOR_RUN:
 			for {
 				// Check if the dag is running
-				history, err = s.historyStore.FindRun(ctx, data)
+				attempt, err = s.dagRunStore.FindAttempt(ctx, data)
 				if err != nil {
 					logger.Error(ctx, "Failed to find run", "err", err, "data", data)
 				}
-				status, err := history.ReadStatus(ctx)
+				status, err := attempt.ReadStatus(ctx)
 				if err != nil {
 					logger.Error(ctx, "Failed to read status", "err", err, "data", data)
 					goto SEND_RESULT

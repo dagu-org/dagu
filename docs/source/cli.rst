@@ -19,10 +19,10 @@ The following commands are available for interacting with Dagu:
   # Displays the current status of the DAG
   dagu status <file>
   
-  # Re-runs the specified DAG run
+  # Re-runs the specified DAG-run
   dagu retry --request-id=<request-id> <file>
   
-  # Stops the DAG run
+  # Stops the DAG-run
   dagu stop <file>
   
   # Restarts the current running DAG

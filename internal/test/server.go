@@ -47,7 +47,7 @@ func SetupServer(t *testing.T, opts ...HelperOption) Server {
 func (srv *Server) runServer(t *testing.T) {
 	t.Helper()
 
-	server := frontend.NewServer(srv.Config, srv.DAGStore, srv.HistoryStore, srv.HistoryMgr)
+	server := frontend.NewServer(srv.Config, srv.DAGStore, srv.DAGRunStore, srv.DAGRunMgr)
 	err := server.Serve(srv.Context)
 	require.NoError(t, err, "failed to start server")
 }

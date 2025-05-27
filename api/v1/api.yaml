@@ -530,7 +530,7 @@ components:
 
     DAG:
       type: object
-      description: "Core DAG configuration containing workflow definition and metadata"
+      description: "Core DAG configuration containing dag-run definition and metadata"
       properties:
         Group:
           type: string
@@ -564,7 +564,7 @@ components:
 
     Schedule:
       type: object
-      description: "Schedule configuration for DAG run"
+      description: "Schedule configuration for dag-run"
       properties:
         Expression:
           type: string
@@ -574,11 +574,11 @@ components:
 
     DAGStatus:
       type: object
-      description: "Current status of a DAG run"
+      description: "Current status of a dag-run"
       properties:
         RequestId:
           type: string
-          description: "Unique identifier for the DAG run request"
+          description: "Unique identifier for the dag-run request"
         Name:
           type: string
           description: "Name of the DAG being executed"
@@ -588,13 +588,13 @@ components:
           $ref: "#/components/schemas/RunStatusText"
         Pid:
           type: integer
-          description: "Process ID of the DAG run"
+          description: "Process ID of the dag-run"
         StartedAt:
           type: string
-          description: "RFC 3339 timestamp when the DAG run started"
+          description: "RFC 3339 timestamp when the dag-run started"
         FinishedAt:
           type: string
-          description: "RFC 3339 timestamp when the DAG run finished"
+          description: "RFC 3339 timestamp when the dag-run finished"
         Log:
           type: string
           description: "Path to the log file"
@@ -622,7 +622,7 @@ components:
 
     RunStatusText:
       type: string
-      description: "Human-readable status description for the DAG run"
+      description: "Human-readable status description for the dag-run"
       enum:
         - "not started"
         - "running"
@@ -757,7 +757,7 @@ components:
 
     DAGStatusDetails:
       type: object
-      description: "Detailed status of a DAG run including child nodes"
+      description: "Detailed status of a dag-run including child nodes"
       properties:
         RequestId:
           type: string
@@ -771,7 +771,7 @@ components:
           $ref: "#/components/schemas/RunStatusText"
         Pid:
           type: integer
-          description: "Process ID of the DAG run"
+          description: "Process ID of the dag-run"
         Nodes:
           type: array
           description: "Status of individual steps within the DAG"
@@ -787,10 +787,10 @@ components:
           $ref: "#/components/schemas/Node"
         StartedAt:
           type: string
-          description: "RFC3339 timestamp when the DAG run started"
+          description: "RFC3339 timestamp when the dag-run started"
         FinishedAt:
           type: string
-          description: "RFC3339 timestamp when the DAG run finished"
+          description: "RFC3339 timestamp when the dag-run finished"
         Log:
           type: string
           description: "Path to the log file"
@@ -810,7 +810,7 @@ components:
 
     Node:
       type: object
-      description: "Status of an individual step within a DAG run"
+      description: "Status of an individual step within a dag-run"
       properties:
         Step:
           $ref: "#/components/schemas/Step"

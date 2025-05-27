@@ -1,5 +1,5 @@
 /**
- * Graph component for visualizing DAG workflows using Mermaid.js
+ * Graph component for visualizing DAG dagRuns using Mermaid.js
  *
  * @module features/dags/components/visualization
  */
@@ -47,7 +47,7 @@ declare global {
 }
 
 /**
- * Graph component for visualizing DAG workflows
+ * Graph component for visualizing DAG dagRuns
  * Renders a Mermaid.js flowchart with nodes and connections
  */
 const Graph: React.FC<Props> = ({
@@ -137,19 +137,19 @@ const Graph: React.FC<Props> = ({
       const id = step.name.replace(/\s/g, '_');
       const c = graphStatusMap[status] || '';
 
-      // Check if this is a child workflow node (has a 'run' property)
-      const isChildWorkflow = !!step.run;
+      // Check if this is a child dagRun node (has a 'run' property)
+      const isChildDAGRun = !!step.run;
 
-      // Add indicator for child workflow nodes in the label only
+      // Add indicator for child dagRun nodes in the label only
       // Escape any special characters in the label to prevent Mermaid parsing errors
       let label = step.name;
-      if (isChildWorkflow && step.run) {
+      if (isChildDAGRun && step.run) {
         // Use a simpler format to avoid parsing issues
         label = `${step.name} → ${step.run}`;
       }
 
-      // Use different shape for child workflows (hexagon) but keep the same color for status
-      if (isChildWorkflow) {
+      // Use different shape for child dagRuns (hexagon) but keep the same color for status
+      if (isChildDAGRun) {
         dat.push(`${id}{{${label}}}${c};`);
       } else {
         dat.push(`${id}["${label}"]${c};`);

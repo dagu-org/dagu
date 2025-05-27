@@ -1,4 +1,0 @@
-steps:
-  - name: calling_sub
-    run: sub_dag
-    params: "param1=value1 param2=value2"

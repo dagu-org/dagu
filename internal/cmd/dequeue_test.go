@@ -15,13 +15,13 @@ func TestDequeueCommand(t *testing.T) {
 	// Enqueue the DAG first
 	th.RunCommand(t, cmd.CmdEnqueue(), test.CmdTest{
 		Name: "Enqueue",
-		Args: []string{"enqueue", "--workflow-id", "test-workflow", dag.Location},
+		Args: []string{"enqueue", "--run-id", "test-DAG", dag.Location},
 	})
 
 	// Now test the dequeue command
 	th.RunCommand(t, cmd.CmdDequeue(), test.CmdTest{
 		Name:        "Dequeue",
-		Args:        []string{"dequeue", "--workflow", "dequeue:test-workflow"},
-		ExpectedOut: []string{"Dequeued workflow"},
+		Args:        []string{"dequeue", "--dag-run", "dequeue:test-DAG"},
+		ExpectedOut: []string{"Dequeued dag-run"},
 	})
 }

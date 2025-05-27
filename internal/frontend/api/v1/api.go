@@ -10,8 +10,8 @@ import (
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/frontend/auth"
-	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
@@ -23,8 +23,8 @@ var _ api.StrictServerInterface = (*API)(nil)
 
 type API struct {
 	dagStore           models.DAGStore
-	historyStore       models.HistoryStore
-	historyManager     history.Manager
+	dagRunStore        models.DAGRunStore
+	dagRunManager      dagrun.Manager
 	remoteNodes        map[string]config.RemoteNode
 	apiBasePath        string
 	logEncodingCharset string
@@ -33,8 +33,8 @@ type API struct {
 
 func New(
 	dr models.DAGStore,
-	hr models.HistoryStore,
-	hm history.Manager,
+	drs models.DAGRunStore,
+	drm dagrun.Manager,
 	cfg *config.Config,
 ) *API {
 	remoteNodes := make(map[string]config.RemoteNode)
@@ -44,8 +44,8 @@ func New(
 
 	return &API{
 		dagStore:           dr,
-		historyStore:       hr,
-		historyManager:     hm,
+		dagRunStore:        drs,
+		dagRunManager:      drm,
 		logEncodingCharset: cfg.UI.LogEncodingCharset,
 		remoteNodes:        remoteNodes,
 		apiBasePath:        cfg.Server.APIBasePath,
@@ -124,9 +124,9 @@ func (a *API) handleError(w http.ResponseWriter, _ *http.Request, err error) {
 	}
 
 	switch {
-	case errors.Is(err, models.ErrWorkflowIDNotFound):
+	case errors.Is(err, models.ErrDAGRunIDNotFound):
 		code = api.ErrorCodeNotFound
-		message = "workflow ID not found"
+		message = "dag-run not found"
 	}
 
 	w.Header().Set("Content-Type", "application/json")

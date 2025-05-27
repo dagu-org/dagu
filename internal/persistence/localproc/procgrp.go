@@ -16,7 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 )
 
-// ProcGroup is a struct that manages process files for a given workflow name.
+// ProcGroup is a struct that manages process files for a given DAG name.
 type ProcGroup struct {
 	name      string
 	baseDir   string
@@ -30,7 +30,7 @@ const procFilePrefix = "proc_"
 // procFileRegex is a regex pattern to match the proc file name format
 var procFileRegex = regexp.MustCompile(`^proc_\d{8}_\d{6}Z_.*\.proc$`)
 
-// NewProcGroup creates a new instance of a ProcGroup with the specified base directory and workflow name.
+// NewProcGroup creates a new instance of a ProcGroup with the specified base directory and DAG name.
 func NewProcGroup(baseDir, name string, staleTime time.Duration) *ProcGroup {
 	return &ProcGroup{
 		baseDir:   baseDir,
@@ -39,7 +39,7 @@ func NewProcGroup(baseDir, name string, staleTime time.Duration) *ProcGroup {
 	}
 }
 
-// Count retrieves the count of alive proc files for the specified workflow name.
+// Count retrieves the count of alive proc files for the specified DAG name.
 func (pg *ProcGroup) Count(ctx context.Context, name string) (int, error) {
 	pg.mu.Lock()
 	defer pg.mu.Unlock()
@@ -114,24 +114,24 @@ func (pg *ProcGroup) isStale(ctx context.Context, file string) bool {
 	return true
 }
 
-// GetProc retrieves a proc file for the specified workflow reference.
+// GetProc retrieves a proc file for the specified dag-run reference.
 // It returns a new Proc instance with the generated file name.
-func (pg *ProcGroup) Acquire(ctx context.Context, workflow digraph.WorkflowRef) (*ProcHandle, error) {
-	// Sanity check the workflow reference
-	if pg.name != workflow.Name {
-		return nil, fmt.Errorf("workflow name %s does not match proc file name %s", workflow.Name, pg.name)
+func (pg *ProcGroup) Acquire(ctx context.Context, dagRun digraph.DAGRunRef) (*ProcHandle, error) {
+	// Sanity check the dag-run reference
+	if pg.name != dagRun.Name {
+		return nil, fmt.Errorf("DAG name %s does not match proc file name %s", dagRun.Name, pg.name)
 	}
 	// Generate the proc file name
-	fileName := pg.getFileName(models.NewUTC(time.Now()), workflow)
+	fileName := pg.getFileName(models.NewUTC(time.Now()), dagRun)
 	return NewProcHandler(fileName, models.ProcMeta{
 		StartedAt: time.Now().Unix(),
 	}), nil
 }
 
-// getFileName generates a proc file name based on the workflow reference.
-func (pg *ProcGroup) getFileName(t models.TimeInUTC, workflow digraph.WorkflowRef) string {
+// getFileName generates a proc file name based on the dag-run reference and the current time.
+func (pg *ProcGroup) getFileName(t models.TimeInUTC, dagRun digraph.DAGRunRef) string {
 	timestamp := t.Format(dateTimeFormatUTC)
-	fileName := procFilePrefix + timestamp + "Z_" + workflow.WorkflowID + ".proc"
+	fileName := procFilePrefix + timestamp + "Z_" + dagRun.ID + ".proc"
 	return filepath.Join(pg.baseDir, fileName)
 }
 

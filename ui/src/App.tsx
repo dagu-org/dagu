@@ -11,8 +11,8 @@ import Dashboard from './pages';
 import DAGs from './pages/dags';
 import DAGDetails from './pages/dags/dag';
 import Search from './pages/search';
-import Workflows from './pages/workflows';
-import WorkflowDetails from './pages/workflows/workflow';
+import DAGRuns from './pages/dag-runs';
+import DAGRunDetails from './pages/dag-runs/dag-run';
 
 type Props = {
   config: Config;
@@ -99,14 +99,10 @@ function App({ config }: Props) {
                     />
                     <Route path="/dags/:fileName/" element={<DAGDetails />} />
                     <Route path="/search/" element={<Search />} />
-                    <Route path="/workflows" element={<Workflows />} />
+                    <Route path="/dag-runs" element={<DAGRuns />} />
                     <Route
-                      path="/workflows/:name/:workflowId"
-                      element={<WorkflowDetails />}
-                    />
-                    <Route
-                      path="/workflows/:name"
-                      element={<WorkflowDetails />}
+                      path="/dag-runs/:name/:dagRunId"
+                      element={<DAGRunDetails />}
                     />
                   </Routes>
                 </Layout>

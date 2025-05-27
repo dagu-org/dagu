@@ -1,13 +1,15 @@
 package digraph
 
+// SystemVariablePrefix is the prefix for temporary variables used internally by Dagu
+// to avoid conflicts with user-defined variables.
 const SystemVariablePrefix = "DAGU_"
 
 // Special environment variables.
 const (
-	EnvKeyWorkflowID             = "WORKFLOW_ID"
-	EnvKeyWorkflowName           = "WORKFLOW_NAME"
-	EnvKeyWorkflowLogFile        = "WORKFLOW_LOG_FILE"
-	EnvKeyWorkflowStepName       = "WORKFLOW_STEP_NAME"
-	EnvKeyWorkflowStepStdoutFile = "WORKFLOW_STEP_STDOUT_FILE"
-	EnvKeyWorkflowStepStderrFile = "WORKFLOW_STEP_STDERR_FILE"
+	EnvKeyDAGName              = "DAG_NAME"
+	EnvKeyDAGRunID             = "DAG_RUN_ID"
+	EnvKeyDAGRunLogFile        = "DAG_RUN_LOG_FILE"
+	EnvKeyDAGRunStepName       = "DAG_RUN_STEP_NAME"
+	EnvKeyDAGRunStepStdoutFile = "DAG_RUN_STEP_STDOUT_FILE"
+	EnvKeyDAGRunStepStderrFile = "DAG_RUN_STEP_STDERR_FILE"
 )

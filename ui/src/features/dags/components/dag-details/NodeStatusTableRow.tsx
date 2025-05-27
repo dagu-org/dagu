@@ -26,14 +26,14 @@ type Props = {
   rownum: number;
   /** Node data to display */
   node: components['schemas']['Node'];
-  /** Workflow ID for log linking */
-  workflowId?: string;
+  /** DAGRun ID for log linking */
+  dagRunId?: string;
   /** DAG name or file name */
   name: string;
   /** Function to open log viewer */
-  onViewLog?: (stepName: string, workflowId: string) => void;
-  /** Full workflow details (optional) - used to determine if this is a child workflow */
-  workflow?: components['schemas']['WorkflowDetails'];
+  onViewLog?: (stepName: string, dagRunId: string) => void;
+  /** Full dagRun details (optional) - used to determine if this is a child dagRun */
+  dagRun?: components['schemas']['DAGRunDetails'];
   /** View mode: desktop or mobile */
   view?: 'desktop' | 'mobile';
 };
@@ -94,17 +94,17 @@ function NodeStatusTableRow({
   name,
   rownum,
   node,
-  workflowId,
+  dagRunId,
   onViewLog,
-  workflow,
+  dagRun,
   view = 'desktop',
 }: Props) {
   const navigate = useNavigate();
   // State to store the current duration for running tasks
   const [currentDuration, setCurrentDuration] = useState<string>('-');
 
-  // Check if this is a child workflow node
-  const hasChildWorkflow =
+  // Check if this is a child dagRun node
+  const hasChildDAGRun =
     !!node.step.run && node.children && node.children.length > 0;
 
   // Update duration every second for running tasks
@@ -132,8 +132,8 @@ function NodeStatusTableRow({
   if (node.step) {
     searchParams.set('step', node.step.name);
   }
-  if (workflowId) {
-    searchParams.set('workflowId', workflowId);
+  if (dagRunId) {
+    searchParams.set('dagRunId', dagRunId);
   }
 
   const url = `/dags/${name}/log?${searchParams.toString()}`;
@@ -150,57 +150,56 @@ function NodeStatusTableRow({
     }
   };
 
-  // Handle child workflow navigation
-  const handleChildWorkflowNavigation = () => {
-    if (hasChildWorkflow && node.children && node.children[0]) {
-      const childWorkflowId = node.children[0].workflowId;
+  // Handle child dagRun navigation
+  const handleChildDAGRunNavigation = () => {
+    if (hasChildDAGRun && node.children && node.children[0]) {
+      const childDAGRunId = node.children[0].dagRunId;
 
-      // Check if we're in a workflow context or a DAG context
-      // More reliable detection by checking the current URL path or the workflow object
+      // Check if we're in a dagRun context or a DAG context
+      // More reliable detection by checking the current URL path or the dagRun object
       const currentPath = window.location.pathname;
-      const isModal =
-        document.querySelector('.workflow-modal-content') !== null;
-      const isWorkflowContext =
-        workflow && (currentPath.startsWith('/workflows/') || isModal);
+      const isModal = document.querySelector('.dagRun-modal-content') !== null;
+      const isDAGRunContext =
+        dagRun && (currentPath.startsWith('/dag-runs/') || isModal);
 
-      if (isWorkflowContext) {
-        // For workflows, use query parameters to navigate to the workflow details page
+      if (isDAGRunContext) {
+        // For dagRuns, use query parameters to navigate to the dagRun details page
         const searchParams = new URLSearchParams();
-        searchParams.set('childWorkflowId', childWorkflowId);
+        searchParams.set('childDAGRunId', childDAGRunId);
 
-        // Use root workflow information from the workflow prop if available
-        if (workflow && workflow.rootWorkflowId) {
-          // If this is already a child workflow, use its root information
-          searchParams.set('workflowId', workflow.rootWorkflowId);
-          searchParams.set('workflowName', workflow.rootWorkflowName);
+        // Use root dagRun information from the dagRun prop if available
+        if (dagRun && dagRun.rootDAGRunId) {
+          // If this is already a child dagRun, use its root information
+          searchParams.set('dagRunId', dagRun.rootDAGRunId);
+          searchParams.set('dagRunName', dagRun.rootDAGRunName);
         } else {
-          // Otherwise, use the current workflow as the root
-          searchParams.set('workflowId', workflowId || '');
-          searchParams.set('workflowName', workflow?.name || name);
+          // Otherwise, use the current dagRun as the root
+          searchParams.set('dagRunId', dagRunId || '');
+          searchParams.set('dagRunName', dagRun?.name || name);
         }
 
         searchParams.set('step', node.step.name);
         navigate(
-          `/workflows/${workflow?.name || name}?${searchParams.toString()}`
+          `/dag-runs/${dagRun?.name || name}?${searchParams.toString()}`
         );
       } else {
         // For DAGs, use the existing approach with query parameters
         const searchParams = new URLSearchParams();
-        searchParams.set('childWorkflowId', childWorkflowId);
+        searchParams.set('childDAGRunId', childDAGRunId);
 
-        // Use root workflow information from the workflow prop if available
-        if (workflow && workflow.rootWorkflowId) {
-          // If this is already a child workflow, use its root information
-          searchParams.set('workflowId', workflow.rootWorkflowId);
+        // Use root dagRun information from the dagRun prop if available
+        if (dagRun && dagRun.rootDAGRunId) {
+          // If this is already a child dagRun, use its root information
+          searchParams.set('dagRunId', dagRun.rootDAGRunId);
         } else {
-          // Otherwise, use the current workflow as the root
-          searchParams.set('workflowId', workflowId || '');
+          // Otherwise, use the current dagRun as the root
+          searchParams.set('dagRunId', dagRunId || '');
         }
 
-        // Add workflowName parameter to avoid waiting for DAG details
-        // Use the root workflow name or current workflow name
-        if (workflow) {
-          searchParams.set('workflowName', workflow.rootWorkflowName);
+        // Add dagRunName parameter to avoid waiting for DAG details
+        // Use the root dagRun name or current dagRun name
+        if (dagRun) {
+          searchParams.set('dagRunName', dagRun.rootDAGRunName);
         }
 
         searchParams.set('step', node.step.name);
@@ -215,7 +214,7 @@ function NodeStatusTableRow({
     // which will open the link in a new tab
     if (!(e.metaKey || e.ctrlKey) && onViewLog) {
       e.preventDefault();
-      onViewLog(node.step.name, workflowId || '');
+      onViewLog(node.step.name, dagRunId || '');
     }
   };
 
@@ -239,7 +238,7 @@ function NodeStatusTableRow({
           <div className="space-y-0.5">
             <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 text-wrap break-all flex items-center gap-1.5">
               {node.step.name}
-              {hasChildWorkflow && (
+              {hasChildDAGRun && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span className="inline-flex items-center text-blue-500 cursor-pointer">
@@ -248,7 +247,7 @@ function NodeStatusTableRow({
                   </TooltipTrigger>
                   <TooltipContent>
                     <span className="text-xs">
-                      Child Workflow: {node.step.run}
+                      Child DAG Run: {node.step.run}
                     </span>
                   </TooltipContent>
                 </Tooltip>
@@ -259,12 +258,12 @@ function NodeStatusTableRow({
                 {node.step.description}
               </div>
             )}
-            {hasChildWorkflow && (
+            {hasChildDAGRun && (
               <div
                 className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline"
-                onClick={handleChildWorkflowNavigation}
+                onClick={handleChildDAGRunNavigation}
               >
-                View Child Workflow: {node.step.run}
+                View Child DAG Run: {node.step.run}
               </div>
             )}
           </div>
@@ -299,19 +298,23 @@ function NodeStatusTableRow({
                     {node.step.command}
                   </span>
                 </div>
-                
+
                 {node.step.args && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="pl-5 text-xs font-medium text-slate-500 dark:text-slate-400 cursor-pointer leading-tight">
                         <span className="break-all whitespace-pre-wrap">
-                          {Array.isArray(node.step.args) ? node.step.args.join(' ') : node.step.args}
+                          {Array.isArray(node.step.args)
+                            ? node.step.args.join(' ')
+                            : node.step.args}
                         </span>
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
                       <pre className="max-w-[500px] whitespace-pre-wrap break-all text-xs">
-                        {Array.isArray(node.step.args) ? node.step.args.join(' ') : node.step.args}
+                        {Array.isArray(node.step.args)
+                          ? node.step.args.join(' ')
+                          : node.step.args}
                       </pre>
                     </TooltipContent>
                   </Tooltip>
@@ -396,7 +399,7 @@ function NodeStatusTableRow({
                                 e.preventDefault();
                                 onViewLog(
                                   `${node.step.name}_stderr`,
-                                  workflowId || ''
+                                  dagRunId || ''
                                 );
                               }
                             }
@@ -443,7 +446,7 @@ function NodeStatusTableRow({
                             e.preventDefault();
                             onViewLog(
                               `${node.step.name}_stderr`,
-                              workflowId || ''
+                              dagRunId || ''
                             );
                           }
                         }}
@@ -483,7 +486,7 @@ function NodeStatusTableRow({
           </span>
           <h3 className="font-semibold text-slate-800 dark:text-slate-200">
             {node.step.name}
-            {hasChildWorkflow && (
+            {hasChildDAGRun && (
               <span className="inline-flex items-center text-blue-500 ml-1.5">
                 <GitBranch className="h-4 w-4" />
               </span>
@@ -502,13 +505,13 @@ function NodeStatusTableRow({
         </div>
       )}
 
-      {/* Child workflow link */}
-      {hasChildWorkflow && (
+      {/* Child dagRun link */}
+      {hasChildDAGRun && (
         <div
           className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline mb-3"
-          onClick={handleChildWorkflowNavigation}
+          onClick={handleChildDAGRunNavigation}
         >
-          View Child Workflow: {node.step.run}
+          View Child DAG Run: {node.step.run}
         </div>
       )}
 
@@ -535,11 +538,13 @@ function NodeStatusTableRow({
                   {node.step.command}
                 </span>
               </div>
-              
+
               {node.step.args && (
                 <div className="pl-5 text-xs font-medium text-slate-500 dark:text-slate-400 leading-tight">
                   <span className="break-all whitespace-pre-wrap">
-                    {Array.isArray(node.step.args) ? node.step.args.join(' ') : node.step.args}
+                    {Array.isArray(node.step.args)
+                      ? node.step.args.join(' ')
+                      : node.step.args}
                   </span>
                 </div>
               )}
@@ -620,7 +625,7 @@ function NodeStatusTableRow({
                   ? (e) => {
                       if (!(e.metaKey || e.ctrlKey) && onViewLog) {
                         e.preventDefault();
-                        onViewLog(`${node.step.name}_stderr`, workflowId || '');
+                        onViewLog(`${node.step.name}_stderr`, dagRunId || '');
                       }
                     }
                   : handleViewLog
@@ -648,7 +653,7 @@ function NodeStatusTableRow({
                 onClick={(e) => {
                   if (!(e.metaKey || e.ctrlKey) && onViewLog) {
                     e.preventDefault();
-                    onViewLog(`${node.step.name}_stderr`, workflowId || '');
+                    onViewLog(`${node.step.name}_stderr`, dagRunId || '');
                   }
                 }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"

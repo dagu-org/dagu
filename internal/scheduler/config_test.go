@@ -7,41 +7,41 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestWorkflowConfigSet(t *testing.T) {
-	t.Run("NewWorkflowConfigSet", func(t *testing.T) {
-		configSet := NewWorkflowConfigSet()
+func TestConfigSet(t *testing.T) {
+	t.Run("NewConfigSet", func(t *testing.T) {
+		configSet := NewConfigSet()
 		assert.NotNil(t, configSet)
 		assert.NotNil(t, configSet.configs)
 		assert.Empty(t, configSet.configs)
 	})
 
 	t.Run("Get_NonExistentConfig", func(t *testing.T) {
-		configSet := NewWorkflowConfigSet()
+		configSet := NewConfigSet()
 		config := configSet.Get("non-existent")
-		// Should return zero value of WorkflowConfig
+		// Should return zero value of Config
 		assert.Equal(t, 0, config.ConcurrencyLimit)
 	})
 
 	t.Run("Set_And_Get", func(t *testing.T) {
-		configSet := NewWorkflowConfigSet()
-		workflowName := "test-workflow"
-		expectedConfig := WorkflowConfig{
+		configSet := NewConfigSet()
+		dagName := "test-dag"
+		expectedConfig := Config{
 			ConcurrencyLimit: 5,
 		}
 
-		configSet.Set(workflowName, expectedConfig)
-		actualConfig := configSet.Get(workflowName)
+		configSet.Set(dagName, expectedConfig)
+		actualConfig := configSet.Get(dagName)
 
 		assert.Equal(t, expectedConfig, actualConfig)
 	})
 
-	t.Run("DefaultWorkflowConfig", func(t *testing.T) {
-		assert.Equal(t, 1, DefaultWorkflowConfig.ConcurrencyLimit)
+	t.Run("DefaultDAGConfig", func(t *testing.T) {
+		assert.Equal(t, 1, DefaultConfig.ConcurrencyLimit)
 	})
 
 	t.Run("Concurrent_Access", func(t *testing.T) {
-		configSet := NewWorkflowConfigSet()
-		workflowName := "concurrent-workflow"
+		configSet := NewConfigSet()
+		dagName := "concurrent-dag"
 
 		// Test concurrent reads and writes
 		var wg sync.WaitGroup
@@ -51,7 +51,7 @@ func TestWorkflowConfigSet(t *testing.T) {
 		for i := 0; i < 5; i++ {
 			go func(val int) {
 				defer wg.Done()
-				configSet.Set(workflowName, WorkflowConfig{ConcurrencyLimit: val})
+				configSet.Set(dagName, Config{ConcurrencyLimit: val})
 			}(i)
 		}
 
@@ -59,7 +59,7 @@ func TestWorkflowConfigSet(t *testing.T) {
 		for i := 0; i < 5; i++ {
 			go func() {
 				defer wg.Done()
-				_ = configSet.Get(workflowName)
+				_ = configSet.Get(dagName)
 			}()
 		}
 
@@ -67,22 +67,22 @@ func TestWorkflowConfigSet(t *testing.T) {
 
 		// We can't assert on the exact value since the order of execution is non-deterministic,
 		// but we can verify that the operation completed without deadlocks or panics
-		_ = configSet.Get(workflowName)
+		_ = configSet.Get(dagName)
 	})
 
-	t.Run("Multiple_Workflows", func(t *testing.T) {
-		configSet := NewWorkflowConfigSet()
+	t.Run("Multiple_DAGs", func(t *testing.T) {
+		configSet := NewConfigSet()
 
-		workflow1 := "workflow-1"
-		config1 := WorkflowConfig{ConcurrencyLimit: 3}
+		dag1 := "dag-1"
+		config1 := Config{ConcurrencyLimit: 3}
 
-		workflow2 := "workflow-2"
-		config2 := WorkflowConfig{ConcurrencyLimit: 7}
+		dag2 := "dag-2"
+		config2 := Config{ConcurrencyLimit: 7}
 
-		configSet.Set(workflow1, config1)
-		configSet.Set(workflow2, config2)
+		configSet.Set(dag1, config1)
+		configSet.Set(dag2, config2)
 
-		assert.Equal(t, config1, configSet.Get(workflow1))
-		assert.Equal(t, config2, configSet.Get(workflow2))
+		assert.Equal(t, config1, configSet.Get(dag1))
+		assert.Equal(t, config2, configSet.Get(dag2))
 	})
 }

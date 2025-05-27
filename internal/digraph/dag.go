@@ -15,11 +15,11 @@ import (
 
 // Constants for configuration defaults
 const (
-	defaultHistoryRetentionDays = 30
-	defaultMaxCleanUpTime       = 60 * time.Second
+	defaultDAGRunRetentionDays = 30
+	defaultMaxCleanUpTime      = 60 * time.Second
 )
 
-// DAG contains all information about a workflow.
+// DAG contains all information about a DAG.
 type DAG struct {
 	// Location is the absolute path to the DAG file.
 	Location string `json:"location,omitempty"`
@@ -34,8 +34,10 @@ type DAG struct {
 	// Description is the description of the DAG. This is optional.
 	Description string `json:"description,omitempty"`
 	// Schedule configuration for starting, stopping, and restarting the DAG.
-	Schedule        []Schedule `json:"schedule,omitempty"`
-	StopSchedule    []Schedule `json:"stopSchedule,omitempty"`
+	Schedule []Schedule `json:"schedule,omitempty"`
+	// StopSchedule contains the cron expressions for stopping the DAG.
+	StopSchedule []Schedule `json:"stopSchedule,omitempty"`
+	// RestartSchedule contains the cron expressions for restarting the DAG.
 	RestartSchedule []Schedule `json:"restartSchedule,omitempty"`
 	// SkipIfSuccessful indicates whether to skip the DAG if it was successful previously.
 	// E.g., when the DAG has already been executed manually before the scheduled time.
@@ -68,13 +70,13 @@ type DAG struct {
 	Delay time.Duration `json:"delay,omitempty"`
 	// RestartWait is the time to wait before restarting the DAG.
 	RestartWait time.Duration `json:"restartWait,omitempty"`
-	// MaxActiveWorkflows specifies the maximum number of concurrent workflows.
-	MaxActiveWorkflows int `json:"maxActiveWorkflows,omitempty"`
 	// MaxActiveSteps specifies the maximum concurrent steps to run in an execution.
 	MaxActiveSteps int `json:"maxActiveSteps,omitempty"`
+	// MaxActiveRuns specifies the maximum number of concurrent dag-runs.
+	MaxActiveRuns int `json:"maxActiveRuns,omitempty"`
 	// MaxCleanUpTime is the maximum time to wait for cleanup when the DAG is stopped.
 	MaxCleanUpTime time.Duration `json:"maxCleanUpTime,omitempty"`
-	// HistRetentionDays is the number of days to keep the history.
+	// HistRetentionDays is the number of days to keep the history of dag-runs.
 	HistRetentionDays int `json:"histRetentionDays,omitempty"`
 	// BuildErrors contains any errors encountered while building the DAG.
 	BuildErrors []error
@@ -203,17 +205,17 @@ func (d *DAG) HasTag(tag string) bool {
 
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
-func (d *DAG) SockAddr(workflowID string) string {
+func (d *DAG) SockAddr(dagRunID string) string {
 	if d.Location != "" {
 		return SockAddr(d.Location, "")
 	}
-	return SockAddr(d.Name, workflowID)
+	return SockAddr(d.Name, dagRunID)
 }
 
-// SockAddrSub returns the unix socket address for a specific workflow ID.
-// This is used to control child workflows.
-func (d *DAG) SockAddrSub(workflowID string) string {
-	return SockAddr(d.GetName(), workflowID)
+// SockAddrForChildDAGRun returns the unix socket address for a specific dag-run ID.
+// This is used to control child dag-runs.
+func (d *DAG) SockAddrForChildDAGRun(dagRunID string) string {
+	return SockAddr(d.GetName(), dagRunID)
 }
 
 // GetName returns the name of the DAG.
@@ -277,7 +279,7 @@ func (d *DAG) initializeDefaults() {
 
 	// Set default history retention days to 30 if not specified.
 	if d.HistRetentionDays == 0 {
-		d.HistRetentionDays = defaultHistoryRetentionDays
+		d.HistRetentionDays = defaultDAGRunRetentionDays
 	}
 
 	// Set default max cleanup time to 60 seconds if not specified.
@@ -321,13 +323,13 @@ func (d *DAG) setupHandlers(workDir string) {
 
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
-func SockAddr(name, workflowID string) string {
+func SockAddr(name, dagRunID string) string {
 	maxSocketNameLength := 50 // Maximum length for socket name
 	name = fileutil.SafeName(name)
-	workflowID = fileutil.SafeName(workflowID)
+	dagRunID = fileutil.SafeName(dagRunID)
 
-	// Create MD5 hash of the combined name and workflow ID and take first 8 chars
-	combined := name + workflowID
+	// Create MD5 hash of the combined name and dag-run ID and take first 8 chars
+	combined := name + dagRunID
 	hashLength := 6
 	hash := fmt.Sprintf("%x", md5.Sum([]byte(combined)))[:hashLength] // nolint:gosec
 

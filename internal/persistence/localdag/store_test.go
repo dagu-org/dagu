@@ -74,7 +74,7 @@ steps:
 	require.NoError(t, err)
 
 	// List all DAGs
-	opts := models.ListOptions{}
+	opts := models.ListDAGsOptions{}
 	result, errList, err := store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Empty(t, errList)
@@ -484,7 +484,7 @@ steps:
 
 	// Test pagination
 	paginator := models.NewPaginator(2, 2) // limit=2, offset=2
-	opts := models.ListOptions{Paginator: &paginator}
+	opts := models.ListDAGsOptions{Paginator: &paginator}
 	result, errList, err := store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Empty(t, errList)
@@ -522,7 +522,7 @@ steps:
 	require.NoError(t, err)
 
 	// Test name filtering
-	opts := models.ListOptions{Name: "web"}
+	opts := models.ListDAGsOptions{Name: "web"}
 	result, errList, err := store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Empty(t, errList)
@@ -530,7 +530,7 @@ steps:
 	assert.Equal(t, "filter-web-dag", result.Items[0].Name)
 
 	// Test tag filtering
-	opts = models.ListOptions{Tag: "frontend"}
+	opts = models.ListDAGsOptions{Tag: "frontend"}
 	result, errList, err = store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Empty(t, errList)
@@ -538,7 +538,7 @@ steps:
 	assert.Equal(t, "filter-web-dag", result.Items[0].Name)
 
 	// Test case-insensitive tag filtering
-	opts = models.ListOptions{Tag: "FRONTEND"}
+	opts = models.ListDAGsOptions{Tag: "FRONTEND"}
 	result, errList, err = store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Empty(t, errList)

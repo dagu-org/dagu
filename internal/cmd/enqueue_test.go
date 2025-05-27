@@ -14,7 +14,7 @@ func TestEnqueueCommand(t *testing.T) {
 		{
 			Name:        "Enqueue",
 			Args:        []string{"enqueue", th.DAG(t, "cmd/enqueue.yaml").Location},
-			ExpectedOut: []string{"Enqueued workflow"},
+			ExpectedOut: []string{"Enqueued"},
 		},
 		{
 			Name:        "EnqueueWithParams",
@@ -27,9 +27,9 @@ func TestEnqueueCommand(t *testing.T) {
 			ExpectedOut: []string{`params="[1=p5 2=p6]"`},
 		},
 		{
-			Name:        "EnqueueWithWorkflowID",
-			Args:        []string{"enqueue", `--workflow-id="test-workflow"`, th.DAG(t, "cmd/enqueue.yaml").Location},
-			ExpectedOut: []string{"test-workflow"},
+			Name:        "EnqueueWithDAGRunID",
+			Args:        []string{"enqueue", `--run-id="test-dag-run"`, th.DAG(t, "cmd/enqueue.yaml").Location},
+			ExpectedOut: []string{"test-dag-run"},
 		},
 	}
 

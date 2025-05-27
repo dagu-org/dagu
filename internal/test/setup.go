@@ -17,14 +17,14 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/localdag"
-	"github.com/dagu-org/dagu/internal/persistence/localhistory"
+	"github.com/dagu-org/dagu/internal/persistence/localdagrun"
 	"github.com/dagu-org/dagu/internal/persistence/localproc"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -96,18 +96,18 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	}
 
 	dagStore := localdag.New(cfg.Paths.DAGsDir, localdag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
-	runStore := localhistory.New(cfg.Paths.HistoryDir)
+	runStore := localdagrun.New(cfg.Paths.DAGRunsDir)
 	procStore := localproc.New(cfg.Paths.ProcDir)
 
-	historyManager := history.New(runStore, cfg.Paths.Executable, cfg.Global.WorkDir)
+	drm := dagrun.New(runStore, cfg.Paths.Executable, cfg.Global.WorkDir)
 
 	helper := Helper{
-		Context:      createDefaultContext(),
-		Config:       cfg,
-		HistoryMgr:   historyManager,
-		DAGStore:     dagStore,
-		HistoryStore: runStore,
-		ProcStore:    procStore,
+		Context:     createDefaultContext(),
+		Config:      cfg,
+		DAGRunMgr:   drm,
+		DAGStore:    dagStore,
+		DAGRunStore: runStore,
+		ProcStore:   procStore,
 
 		tmpDir: tmpDir,
 	}
@@ -140,8 +140,8 @@ type Helper struct {
 	Config        *config.Config
 	LoggingOutput *SyncBuffer
 	DAGStore      models.DAGStore
-	HistoryStore  models.HistoryStore
-	HistoryMgr    history.Manager
+	DAGRunStore   models.DAGRunStore
+	DAGRunMgr     dagrun.Manager
 	ProcStore     models.ProcStore
 
 	tmpDir string
@@ -187,7 +187,7 @@ func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
 	require.Eventually(t, func() bool {
-		latest, err := d.HistoryMgr.GetLatestStatus(d.Context, d.DAG)
+		latest, err := d.DAGRunMgr.GetLatestStatus(d.Context, d.DAG)
 		if err != nil {
 			return false
 		}
@@ -196,12 +196,12 @@ func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 	}, time.Second*5, time.Second)
 }
 
-func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
+func (d *DAG) AssertDAGRunCount(t *testing.T, expected int) {
 	t.Helper()
 
-	// the +1 to the limit is needed to ensure that the number of therunstore
+	// the +1 to the limit is needed to ensure that the number of dag-run
 	// entries is exactly the expected number
-	runstore := d.HistoryMgr.ListRecentStatus(d.Context, d.Name, expected+1)
+	runstore := d.DAGRunMgr.ListRecentStatus(d.Context, d.Name, expected+1)
 	require.Len(t, runstore, expected)
 }
 
@@ -209,7 +209,7 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
 	assert.Eventually(t, func() bool {
-		curr, _ := d.HistoryMgr.GetDAGRealtimeStatus(d.Context, d.DAG, "")
+		curr, _ := d.DAGRunMgr.GetCurrentStatus(d.Context, d.DAG, "")
 		if curr == nil {
 			return false
 		}
@@ -224,7 +224,7 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]any) {
 	t.Helper()
 
-	status, err := d.HistoryMgr.GetLatestStatus(d.Context, d.DAG)
+	status, err := d.DAGRunMgr.GetLatestStatus(d.Context, d.DAG)
 	require.NoError(t, err)
 
 	// collect the actual outputs from the status
@@ -294,25 +294,25 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		opt(helper)
 	}
 
-	var workflowID string
+	var dagRunID string
 	if helper.opts.RetryTarget != nil {
-		workflowID = helper.opts.RetryTarget.WorkflowID
+		dagRunID = helper.opts.RetryTarget.DAGRunID
 	} else {
-		workflowID = generateWorkflowID()
+		dagRunID = genDAGRunID()
 	}
 
 	logDir := d.Config.Paths.LogDir
-	logFile := filepath.Join(d.Config.Paths.LogDir, workflowID+".log")
-	root := digraph.NewWorkflowRef(d.Name, workflowID)
+	logFile := filepath.Join(d.Config.Paths.LogDir, dagRunID+".log")
+	root := digraph.NewDAGRunRef(d.Name, dagRunID)
 
 	helper.Agent = agent.New(
-		workflowID,
+		dagRunID,
 		d.DAG,
 		logDir,
 		logFile,
-		d.HistoryMgr,
+		d.DAGRunMgr,
 		d.DAGStore,
-		d.HistoryStore,
+		d.DAGRunStore,
 		d.ProcStore,
 		root,
 		helper.opts,
@@ -408,6 +408,7 @@ func createDefaultContext() context.Context {
 	))
 }
 
+// getShell returns the path to the default shell.
 func setShell(t *testing.T, shell string) {
 	t.Helper()
 
@@ -416,7 +417,8 @@ func setShell(t *testing.T, shell string) {
 	_ = os.Setenv("SHELL", shPath)
 }
 
-func generateWorkflowID() string {
+// genDAGRunID generates a new unique dag-run ID using UUID v7.
+func genDAGRunID() string {
 	id, err := uuid.NewV7()
 	if err != nil {
 		panic(err)

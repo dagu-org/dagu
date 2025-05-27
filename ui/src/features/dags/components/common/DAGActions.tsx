@@ -27,8 +27,8 @@ import { StartDAGModal } from '../dag-execution';
 type Props = {
   /** Current status of the DAG */
   status?:
-    | components['schemas']['WorkflowSummary']
-    | components['schemas']['WorkflowDetails'];
+    | components['schemas']['DAGRunSummary']
+    | components['schemas']['DAGRunDetails'];
   /** File ID of the DAG */
   fileName: string;
   /** DAG definition */
@@ -59,7 +59,7 @@ function DAGActions({
   const [isEnqueueModal, setIsEnqueueModal] = React.useState(false);
   const [isStopModal, setIsStopModal] = React.useState(false);
   const [isRetryModal, setIsRetryModal] = React.useState(false);
-  const [retryWorkflowId, setRetryWorkflowId] = React.useState<string>('');
+  const [retryDagRunId, setRetryDagRunId] = React.useState<string>('');
 
   const client = useClient();
 
@@ -77,7 +77,7 @@ function DAGActions({
     start: status?.status != 1, // Disable only when running (1)
     enqueue: true, // Always allow enqueuing
     stop: status?.status == 1,
-    retry: status?.status != 1 && status?.status != 5 && status?.workflowId != '', // Disable when running (1) or queued (5)
+    retry: status?.status != 1 && status?.status != 5 && status?.dagRunId != '', // Disable when running (1) or queued (5)
   };
 
   if (!dag) {
@@ -198,8 +198,8 @@ function DAGActions({
                   const urlParams = new URLSearchParams(window.location.search);
                   const idxParam = urlParams.get('idx');
 
-                  // Default to current status workflowId
-                  let workflowIdToUse = status?.workflowId || '';
+                  // Default to current status dagRunId
+                  let dagRunIdToUse = status?.dagRunId || '';
 
                   // If we're in the history page or modal history tab with a specific run selected
                   const isInHistoryPage =
@@ -214,9 +214,9 @@ function DAGActions({
                     idxParam !== null
                   ) {
                     try {
-                      // Get all workflows for this DAG to find the correct workflowId
+                      // Get all dag-runs for this DAG to find the correct dagRunId
                       const { data } = await client.GET(
-                        '/dags/{fileName}/workflows',
+                        '/dags/{fileName}/dag-runs',
                         {
                           params: {
                             path: {
@@ -230,26 +230,26 @@ function DAGActions({
                         }
                       );
 
-                      if (data?.workflows && data.workflows.length > 0) {
+                      if (data?.dagRuns && data.dagRuns.length > 0) {
                         // Convert idx to integer
                         const selectedIdx = parseInt(idxParam);
 
-                        // Get the workflow at the selected index (reversed order)
-                        const selectedWorkflow = [...data.workflows].reverse()[
+                        // Get the dag-run at the selected index (reversed order)
+                        const selectedDagRun = [...data.dagRuns].reverse()[
                           selectedIdx
                         ];
 
-                        if (selectedWorkflow && selectedWorkflow.workflowId) {
-                          workflowIdToUse = selectedWorkflow.workflowId;
+                        if (selectedDagRun && selectedDagRun.dagRunId) {
+                          dagRunIdToUse = selectedDagRun.dagRunId;
                         }
                       }
                     } catch (err) {
-                      console.error('Error fetching workflows for retry:', err);
+                      console.error('Error fetching dag-runs for retry:', err);
                     }
                   }
 
-                  // Set the workflowId to use for retry
-                  setRetryWorkflowId(workflowIdToUse);
+                  // Set the dagRunId to use for retry
+                  setRetryDagRunId(dagRunIdToUse);
 
                   // Show the modal
                   setIsRetryModal(true);
@@ -269,8 +269,8 @@ function DAGActions({
                   const urlParams = new URLSearchParams(window.location.search);
                   const idxParam = urlParams.get('idx');
 
-                  // Default to current status workflowId
-                  let workflowIdToUse = status?.workflowId || '';
+                  // Default to current status dagRunId
+                  let dagRunIdToUse = status?.dagRunId || '';
 
                   // If we're in the history page or modal history tab with a specific run selected
                   const isInHistoryPage =
@@ -285,9 +285,9 @@ function DAGActions({
                     idxParam !== null
                   ) {
                     try {
-                      // Get all workflows for this DAG to find the correct workflowId
+                      // Get all dag-runs for this DAG to find the correct dagRunId
                       const { data } = await client.GET(
-                        '/dags/{fileName}/workflows',
+                        '/dags/{fileName}/dag-runs',
                         {
                           params: {
                             path: {
@@ -301,26 +301,26 @@ function DAGActions({
                         }
                       );
 
-                      if (data?.workflows && data.workflows.length > 0) {
+                      if (data?.dagRuns && data.dagRuns.length > 0) {
                         // Convert idx to integer
                         const selectedIdx = parseInt(idxParam);
 
-                        // Get the workflow at the selected index (reversed order)
-                        const selectedWorkflow = [...data.workflows].reverse()[
+                        // Get the dag-run at the selected index (reversed order)
+                        const selectedDagRun = [...data.dagRuns].reverse()[
                           selectedIdx
                         ];
 
-                        if (selectedWorkflow && selectedWorkflow.workflowId) {
-                          workflowIdToUse = selectedWorkflow.workflowId;
+                        if (selectedDagRun && selectedDagRun.dagRunId) {
+                          dagRunIdToUse = selectedDagRun.dagRunId;
                         }
                       }
                     } catch (err) {
-                      console.error('Error fetching workflows for retry:', err);
+                      console.error('Error fetching dag-runs for retry:', err);
                     }
                   }
 
-                  // Set the workflowId to use for retry
-                  setRetryWorkflowId(workflowIdToUse);
+                  // Set the dagRunId to use for retry
+                  setRetryDagRunId(dagRunIdToUse);
 
                   // Show the modal
                   setIsRetryModal(true);
@@ -344,21 +344,21 @@ function DAGActions({
           onSubmit={async () => {
             setIsStopModal(false);
             
-            // Use workflow API if we have workflow name and ID, otherwise use DAG API
-            if (status?.name && status?.workflowId) {
-              const { error } = await client.POST('/workflows/{name}/{workflowId}/stop', {
+            // Use dag-run API if we have DAG name and ID, otherwise use DAG API
+            if (status?.name && status?.dagRunId) {
+              const { error } = await client.POST('/dag-runs/{name}/{dagRunId}/stop', {
                 params: {
                   query: {
                     remoteNode: appBarContext.selectedRemoteNode || 'local',
                   },
                   path: {
                     name: status.name,
-                    workflowId: status.workflowId,
+                    dagRunId: status.dagRunId,
                   },
                 },
               });
               if (error) {
-                console.error('Stop workflow API error:', error);
+                console.error('Stop dag-run API error:', error);
                 alert(error.message || 'An error occurred');
                 return;
               }
@@ -384,19 +384,19 @@ function DAGActions({
         >
           <div>
             <p className="mb-2">
-              {status?.name && status?.workflowId 
-                ? `Do you really want to stop the workflow "${status.name}"?`
+              {status?.name && status?.dagRunId 
+                ? `Do you really want to stop the dag-run "${status.name}"?`
                 : 'Do you really want to cancel the DAG?'
               }
             </p>
             {status?.name && (
-              <LabeledItem label="Workflow-Name">
+              <LabeledItem label="DAG-Run-Name">
                 <span className="font-mono text-sm">{status.name}</span>
               </LabeledItem>
             )}
-            {status?.workflowId && (
-              <LabeledItem label="Workflow-ID">
-                <span className="font-mono text-sm">{status.workflowId}</span>
+            {status?.dagRunId && (
+              <LabeledItem label="DAG-Run-ID">
+                <span className="font-mono text-sm">{status.dagRunId}</span>
               </LabeledItem>
             )}
             {status?.startedAt && (
@@ -423,20 +423,20 @@ function DAGActions({
           onSubmit={async () => {
             setIsRetryModal(false);
 
-            // Use workflow API if we have workflow name and ID, otherwise use DAG API
-            if (status?.name && retryWorkflowId) {
-              const { error } = await client.POST('/workflows/{name}/{workflowId}/retry', {
+            // Use dag-run API if we have DAG name and ID, otherwise use DAG API
+            if (status?.name && retryDagRunId) {
+              const { error } = await client.POST('/dag-runs/{name}/{dagRunId}/retry', {
                 params: {
                   path: {
                     name: status.name,
-                    workflowId: retryWorkflowId,
+                    dagRunId: retryDagRunId,
                   },
                   query: {
                     remoteNode: appBarContext.selectedRemoteNode || 'local',
                   },
                 },
                 body: {
-                  workflowId: retryWorkflowId,
+                  dagRunId: retryDagRunId,
                 },
               });
               if (error) {
@@ -454,7 +454,7 @@ function DAGActions({
                   },
                 },
                 body: {
-                  workflowId: retryWorkflowId,
+                  dagRunId: retryDagRunId,
                 },
               });
               if (error) {
@@ -468,17 +468,17 @@ function DAGActions({
           {/* Keep modal content structure */}
           <div>
             <p className="mb-2">
-              {status?.name && retryWorkflowId
-                ? `Do you really want to retry the workflow "${status.name}"?`
+              {status?.name && retryDagRunId
+                ? `Do you really want to retry the dag-run "${status.name}"?`
                 : 'Do you really want to rerun the following execution?'
               }
             </p>
-            <LabeledItem label="Workflow-Name">
+            <LabeledItem label="DAG-Run-Name">
               <span className="font-mono text-sm">{status?.name || 'N/A'}</span>
             </LabeledItem>
-            <LabeledItem label="Workflow-ID">
+            <LabeledItem label="DAG-Run-ID">
               <span className="font-mono text-sm">
-                {retryWorkflowId || status?.workflowId || 'N/A'}
+                {retryDagRunId || status?.dagRunId || 'N/A'}
               </span>
             </LabeledItem>
             {status?.startedAt && (
@@ -501,11 +501,11 @@ function DAGActions({
           dag={dag}
           visible={isStartModal}
           action="start"
-          onSubmit={async (params, workflowId) => {
+          onSubmit={async (params, dagRunId) => {
             setIsStartModal(false);
-            const body: { params: string; workflowId?: string } = { params };
-            if (workflowId) {
-              body.workflowId = workflowId;
+            const body: { params: string; dagRunId?: string } = { params };
+            if (dagRunId) {
+              body.dagRunId = dagRunId;
             }
             const { error } = await client.POST('/dags/{fileName}/start', {
               params: {
@@ -536,11 +536,11 @@ function DAGActions({
           dag={dag}
           visible={isEnqueueModal}
           action="enqueue"
-          onSubmit={async (params, workflowId) => {
+          onSubmit={async (params, dagRunId) => {
             setIsEnqueueModal(false);
-            const body: { params: string; workflowId?: string } = { params };
-            if (workflowId) {
-              body.workflowId = workflowId;
+            const body: { params: string; dagRunId?: string } = { params };
+            if (dagRunId) {
+              body.dagRunId = dagRunId;
             }
             const { error } = await client.POST('/dags/{fileName}/enqueue', {
               params: {

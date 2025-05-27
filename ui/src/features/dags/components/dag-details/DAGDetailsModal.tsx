@@ -8,7 +8,7 @@ import { useQuery } from '../../../../hooks/api';
 import dayjs from '../../../../lib/dayjs';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
-import { RootWorkflowContext } from '../../contexts/RootWorkflowContext';
+import { RootDAGRunContext } from '../../contexts/RootDAGRunContext';
 import DAGDetailsContent from './DAGDetailsContent';
 
 type DAGDetailsModalProps = {
@@ -24,11 +24,11 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
 }) => {
   const navigate = useNavigate();
   const appBarContext = React.useContext(AppBarContext);
-  const [currentWorkflow, setCurrentWorkflow] = React.useState<
-    components['schemas']['WorkflowDetails'] | undefined
+  const [currentDAGRun, setCurrentDAGRun] = React.useState<
+    components['schemas']['DAGRunDetails'] | undefined
   >();
   const [activeTab, setActiveTab] = React.useState('status');
-  const [workflowId] = React.useState<string>('latest');
+  const [dagRunId] = React.useState<string>('latest');
   const [stepName] = React.useState<string | null>(null);
 
   // Function to navigate to status tab
@@ -74,7 +74,7 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
 
   React.useEffect(() => {
     if (data) {
-      setCurrentWorkflow(data.latestWorkflow);
+      setCurrentDAGRun(data.latestDAGRun);
     }
   }, [data]);
 
@@ -118,7 +118,7 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
 
   if (!isOpen) return null;
 
-  if (isLoading || !data || !data.latestWorkflow) {
+  if (isLoading || !data || !data.latestDAGRun) {
     return (
       <div className="fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-gray-100 border-l border-border shadow-xl z-50 flex items-center justify-center">
         <LoadingIndicator />
@@ -143,11 +143,11 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
             name: data.dag?.name || '',
           }}
         >
-          <RootWorkflowContext.Provider
+          <RootDAGRunContext.Provider
             value={{
-              data: currentWorkflow,
-              setData: (status: components['schemas']['WorkflowDetails']) => {
-                setCurrentWorkflow(status);
+              data: currentDAGRun,
+              setData: (status: components['schemas']['DAGRunDetails']) => {
+                setCurrentDAGRun(status);
               },
             }}
           >
@@ -196,12 +196,12 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
                   <DAGDetailsContent
                     fileName={fileName}
                     dag={data.dag}
-                    currentWorkflow={data.latestWorkflow}
+                    currentDAGRun={data.latestDAGRun}
                     refreshFn={refreshFn}
                     formatDuration={formatDuration}
                     activeTab={activeTab}
                     onTabChange={setActiveTab}
-                    workflowId={workflowId}
+                    dagRunId={dagRunId}
                     stepName={stepName}
                     isModal={true}
                     navigateToStatusTab={navigateToStatusTab}
@@ -209,7 +209,7 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
                 )}
               </div>
             </div>
-          </RootWorkflowContext.Provider>
+          </RootDAGRunContext.Provider>
         </DAGContext.Provider>
       </div>
     </>

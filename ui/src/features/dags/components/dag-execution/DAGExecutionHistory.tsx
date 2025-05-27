@@ -38,7 +38,7 @@ function DAGExecutionHistory({
 
   // Fetch execution history data
   const { data } = useQuery(
-    '/dags/{fileName}/workflows',
+    '/dags/{fileName}/dag-runs',
     {
       params: {
         query: {
@@ -58,14 +58,14 @@ function DAGExecutionHistory({
   }
 
   // Show message if no execution history is found
-  if (!data.workflows?.length) {
+  if (!data.dagRuns?.length) {
     return <div>Execution history was not found.</div>;
   }
 
   return (
     <DAGHistoryTable
       fileName={fileName}
-      workflows={data.workflows}
+      dagRuns={data.dagRuns}
       gridData={data.gridData}
     />
   );
@@ -79,14 +79,14 @@ type HistoryTableProps = {
   fileName: string;
   /** Grid data for visualization */
   gridData: components['schemas']['DAGGridItem'][] | null;
-  /** List of DAG workflows */
-  workflows: components['schemas']['WorkflowDetails'][] | null;
+  /** List of DAG dagRuns */
+  dagRuns: components['schemas']['DAGRunDetails'][] | null;
 };
 
 /**
  * DAGHistoryTable displays detailed execution history with interactive elements
  */
-function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
+function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
   const navigate = useNavigate();
@@ -97,29 +97,29 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
     isOpen: false,
     logType: 'step' as 'execution' | 'step',
     stepName: '',
-    workflowId: '',
+    dagRunId: '',
     stream: 'stdout' as 'stdout' | 'stderr',
   });
 
-  // Get the selected workflow index from URL parameters using React Router
+  // Get the selected dagRun index from URL parameters using React Router
   const [searchParams, setSearchParams] = useSearchParams();
   const idxParam = searchParams.get('idx');
   const [idx, setIdx] = React.useState(
     idxParam
       ? parseInt(idxParam)
-      : workflows && workflows.length
-        ? workflows.length - 1
+      : dagRuns && dagRuns.length
+        ? dagRuns.length - 1
         : 0
   );
 
   // Removed unused context since we're no longer directly updating it
 
-  // Ensure index is valid when workflows change (e.g., when switching DAGs)
+  // Ensure index is valid when dagRuns change (e.g., when switching DAGs)
   React.useEffect(() => {
-    if (!workflows || workflows.length === 0) return;
+    if (!dagRuns || dagRuns.length === 0) return;
 
     // Clamp the index to be within valid range
-    const maxIdx = workflows.length - 1;
+    const maxIdx = dagRuns.length - 1;
     const validIdx = Math.max(0, Math.min(idx, maxIdx));
 
     // Only update if the index needs adjustment
@@ -129,31 +129,31 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
       setSearchParams(newParams);
       setIdx(validIdx);
     }
-  }, [workflows, idx]);
+  }, [dagRuns, idx]);
 
   /**
-   * Update the selected workflow index and update URL parameters
+   * Update the selected dagRun index and update URL parameters
    */
   const updateIdx = (newIdx: number) => {
     // Ensure newIdx is within valid range
-    if (newIdx < 0 || !workflows || newIdx >= workflows.length) {
+    if (newIdx < 0 || !dagRuns || newIdx >= dagRuns.length) {
       return;
     }
 
     setIdx(newIdx);
-    const reversedWorkflows = [...(workflows || [])].reverse();
+    const reversedDAGRuns = [...(dagRuns || [])].reverse();
 
-    if (reversedWorkflows && reversedWorkflows[newIdx]) {
-      // Instead of directly updating the context, update the URL with the workflow ID
-      const selectedWorkflow = reversedWorkflows[newIdx];
+    if (reversedDAGRuns && reversedDAGRuns[newIdx]) {
+      // Instead of directly updating the context, update the URL with the dagRun ID
+      const selectedDAGRun = reversedDAGRuns[newIdx];
       const newParams = new URLSearchParams(searchParams);
       newParams.set('idx', newIdx.toString());
 
-      // Add or update the workflowId parameter
-      newParams.set('workflowId', selectedWorkflow.workflowId);
+      // Add or update the dagRunId parameter
+      newParams.set('dagRunId', selectedDAGRun.dagRunId);
 
-      // Add workflowName parameter to avoid waiting for DAG details
-      newParams.set('workflowName', selectedWorkflow.name);
+      // Add dagRunName parameter to avoid waiting for DAG details
+      newParams.set('dagRunName', selectedDAGRun.name);
 
       setSearchParams(newParams);
     }
@@ -166,7 +166,7 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
       if (!isNaN(newIdx) && newIdx !== idx) {
         setIdx(newIdx);
 
-        // No longer updating the RootWorkflowContext here
+        // No longer updating the RootDAGRunContext here
         // The status details page will handle this based on URL parameters
       }
     }
@@ -185,7 +185,7 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
         updateIdx(idx + 1);
       }
     },
-    [idx, workflows, updateIdx]
+    [idx, dagRuns, updateIdx]
   );
 
   // Add and remove keyboard event listener
@@ -196,14 +196,14 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
     };
   }, [handleKeyDown]);
 
-  // Get event handlers for the selected workflow
+  // Get event handlers for the selected dagRun
   let handlers: components['schemas']['Node'][] | null = null;
-  if (workflows && idx < workflows.length && workflows[idx]) {
-    handlers = getEventHandlers(workflows[idx]);
+  if (dagRuns && idx < dagRuns.length && dagRuns[idx]) {
+    handlers = getEventHandlers(dagRuns[idx]);
   }
 
-  // Reverse the workflows array for display (newest first)
-  const reversedWorkflows = [...(workflows || [])].reverse();
+  // Reverse the dagRuns array for display (newest first)
+  const reversedDAGRuns = [...(dagRuns || [])].reverse();
 
   // State for the selected step in the status update modal
   const [selectedStep, setSelectedStep] = React.useState<
@@ -224,21 +224,21 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
   ) => {
     if (
       !selectedStep ||
-      !reversedWorkflows ||
-      idx >= reversedWorkflows.length ||
-      !reversedWorkflows[idx]
+      !reversedDAGRuns ||
+      idx >= reversedDAGRuns.length ||
+      !reversedDAGRuns[idx]
     ) {
       return;
     }
 
     // Call the API to update the step status
     const { error } = await client.PATCH(
-      '/workflows/{name}/{workflowId}/steps/{stepName}/status',
+      '/dag-runs/{name}/{dagRunId}/steps/{stepName}/status',
       {
         params: {
           path: {
-            name: reversedWorkflows[idx].name,
-            workflowId: reversedWorkflows[idx].workflowId,
+            name: reversedDAGRuns[idx].name,
+            dagRunId: reversedDAGRuns[idx].dagRunId,
             stepName: selectedStep.name,
           },
           query: {
@@ -263,34 +263,34 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
   // The status details page will handle this based on URL parameters
 
   /**
-   * Handle double-click on graph node (navigate to child workflow)
+   * Handle double-click on graph node (navigate to child dagRun)
    */
   const onSelectStepOnGraph = React.useCallback(
     async (id: string) => {
-      const workflow = reversedWorkflows[idx];
-      if (!workflow) {
+      const dagRun = reversedDAGRuns[idx];
+      if (!dagRun) {
         return;
       }
 
       // Find the clicked step
-      const n = workflow.nodes?.find(
+      const n = dagRun.nodes?.find(
         (n) => n.step.name.replace(/\s/g, '_') == id
       );
 
       if (!n || !n.step.run) return;
 
-      // If it's a child workflow, navigate to its details
-      const childWorkflow = n.children?.[0];
-      if (childWorkflow && childWorkflow.workflowId) {
-        // Navigate to the child workflow details using React Router with search params
-        // Include workflowName parameter to avoid waiting for DAG details
+      // If it's a child dagRun, navigate to its details
+      const childDAGRun = n.children?.[0];
+      if (childDAGRun && childDAGRun.dagRunId) {
+        // Navigate to the child dagRun details using React Router with search params
+        // Include dagRunName parameter to avoid waiting for DAG details
         navigate({
           pathname: `/dags/${fileName}`,
-          search: `?workflowId=${workflow.rootWorkflowId}&childWorkflowId=${childWorkflow.workflowId}&workflowName=${encodeURIComponent(workflow.rootWorkflowName)}`,
+          search: `?dagRunId=${dagRun.rootDAGRunId}&childDAGRunId=${childDAGRun.dagRunId}&dagRunName=${encodeURIComponent(dagRun.rootDAGRunName)}`,
         });
       }
     },
-    [reversedWorkflows, idx, navigate]
+    [reversedDAGRuns, idx, navigate]
   );
 
   /**
@@ -298,21 +298,21 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
    */
   const onRightClickStepOnGraph = React.useCallback(
     (id: string) => {
-      const workflow = reversedWorkflows[idx];
-      if (!workflow) {
+      const dagRun = reversedDAGRuns[idx];
+      if (!dagRun) {
         return;
       }
 
-      // Only allow status updates for completed workflows
+      // Only allow status updates for completed dagRuns
       if (
-        workflow.status == Status.Running ||
-        workflow.status == Status.NotStarted
+        dagRun.status == Status.Running ||
+        dagRun.status == Status.NotStarted
       ) {
         return;
       }
 
       // Find the right-clicked step
-      const n = workflow.nodes?.find(
+      const n = dagRun.nodes?.find(
         (n) => n.step.name.replace(/\s/g, '_') == id
       );
 
@@ -321,7 +321,7 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
         setModal(true);
       }
     },
-    [reversedWorkflows, idx]
+    [reversedDAGRuns, idx]
   );
 
   return (
@@ -336,7 +336,7 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
             </div>
             <div className="p-6">
               <HistoryTable
-                workflows={reversedWorkflows || []}
+                dagRuns={reversedDAGRuns || []}
                 gridData={gridData || []}
                 onSelect={updateIdx}
                 idx={idx}
@@ -344,17 +344,17 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
             </div>
           </div>
 
-          {reversedWorkflows && reversedWorkflows[idx] ? (
+          {reversedDAGRuns && reversedDAGRuns[idx] ? (
             <React.Fragment>
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
                 <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                    Workflow Visualization
+                    DAGRun Visualization
                   </h2>
                 </div>
                 <div className="p-6">
                   <DAGGraph
-                    workflow={reversedWorkflows[idx]}
+                    dagRun={reversedDAGRuns[idx]}
                     onSelectStep={onSelectStepOnGraph}
                     onRightClickStep={onRightClickStepOnGraph}
                   />
@@ -369,15 +369,15 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
                 </div>
                 <div className="p-6">
                   <DAGStatusOverview
-                    status={reversedWorkflows[idx]}
-                    workflowId={reversedWorkflows[idx].workflowId}
+                    status={reversedDAGRuns[idx]}
+                    dagRunId={reversedDAGRuns[idx].dagRunId}
                     {...props}
-                    onViewLog={(workflowId) => {
+                    onViewLog={(dagRunId) => {
                       setLogViewer({
                         isOpen: true,
                         logType: 'execution',
                         stepName: '',
-                        workflowId,
+                        dagRunId,
                         stream: 'stdout',
                       });
                     }}
@@ -390,19 +390,19 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
                 <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
                     <span>Execution Steps</span>
-                    {reversedWorkflows[idx].nodes && (
+                    {reversedDAGRuns[idx].nodes && (
                       <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
-                        {reversedWorkflows[idx].nodes.length} step{reversedWorkflows[idx].nodes.length !== 1 ? 's' : ''}
+                        {reversedDAGRuns[idx].nodes.length} step{reversedDAGRuns[idx].nodes.length !== 1 ? 's' : ''}
                       </span>
                     )}
                   </h2>
                 </div>
                 <div className="overflow-x-auto">
                   <NodeStatusTable
-                    nodes={reversedWorkflows[idx].nodes}
-                    status={reversedWorkflows[idx]}
+                    nodes={reversedDAGRuns[idx].nodes}
+                    status={reversedDAGRuns[idx]}
                     {...props}
-                    onViewLog={(stepName, workflowId) => {
+                    onViewLog={(stepName, dagRunId) => {
                       // Check if this is a stderr log (indicated by _stderr suffix)
                       const isStderr = stepName.endsWith('_stderr');
                       const actualStepName = isStderr ? stepName.slice(0, -7) : stepName; // Remove '_stderr' suffix
@@ -411,8 +411,8 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
                         isOpen: true,
                         logType: 'step',
                         stepName: actualStepName,
-                        workflowId:
-                          workflowId || reversedWorkflows[idx]?.workflowId || '',
+                        dagRunId:
+                          dagRunId || reversedDAGRuns[idx]?.dagRunId || '',
                         stream: isStderr ? 'stderr' : 'stdout',
                       });
                     }}
@@ -425,18 +425,18 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
                 <div className="mb-4">
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
                     <span>Execution Steps</span>
-                    {reversedWorkflows[idx].nodes && (
+                    {reversedDAGRuns[idx].nodes && (
                       <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
-                        {reversedWorkflows[idx].nodes.length} step{reversedWorkflows[idx].nodes.length !== 1 ? 's' : ''}
+                        {reversedDAGRuns[idx].nodes.length} step{reversedDAGRuns[idx].nodes.length !== 1 ? 's' : ''}
                       </span>
                     )}
                   </h2>
                 </div>
                 <NodeStatusTable
-                  nodes={reversedWorkflows[idx].nodes}
-                  status={reversedWorkflows[idx]}
+                  nodes={reversedDAGRuns[idx].nodes}
+                  status={reversedDAGRuns[idx]}
                   {...props}
-                  onViewLog={(stepName, workflowId) => {
+                  onViewLog={(stepName, dagRunId) => {
                     // Check if this is a stderr log (indicated by _stderr suffix)
                     const isStderr = stepName.endsWith('_stderr');
                     const actualStepName = isStderr ? stepName.slice(0, -7) : stepName; // Remove '_stderr' suffix
@@ -445,8 +445,8 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
                       isOpen: true,
                       logType: 'step',
                       stepName: actualStepName,
-                      workflowId:
-                        workflowId || reversedWorkflows[idx]?.workflowId || '',
+                      dagRunId:
+                        dagRunId || reversedDAGRuns[idx]?.dagRunId || '',
                       stream: isStderr ? 'stderr' : 'stdout',
                     });
                   }}
@@ -467,10 +467,10 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
                     </div>
                     <div className="overflow-x-auto">
                       <NodeStatusTable
-                        nodes={getEventHandlers(reversedWorkflows[idx])}
-                        status={reversedWorkflows[idx]}
+                        nodes={getEventHandlers(reversedDAGRuns[idx])}
+                        status={reversedDAGRuns[idx]}
                         {...props}
-                        onViewLog={(stepName, workflowId) => {
+                        onViewLog={(stepName, dagRunId) => {
                           // Check if this is a stderr log (indicated by _stderr suffix)
                           const isStderr = stepName.endsWith('_stderr');
                           const actualStepName = isStderr ? stepName.slice(0, -7) : stepName; // Remove '_stderr' suffix
@@ -479,9 +479,9 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
                             isOpen: true,
                             logType: 'step',
                             stepName: actualStepName,
-                            workflowId:
-                              workflowId ||
-                              reversedWorkflows[idx]?.workflowId ||
+                            dagRunId:
+                              dagRunId ||
+                              reversedDAGRuns[idx]?.dagRunId ||
                               '',
                             stream: isStderr ? 'stderr' : 'stdout',
                           });
@@ -501,10 +501,10 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
                       </h2>
                     </div>
                     <NodeStatusTable
-                      nodes={getEventHandlers(reversedWorkflows[idx])}
-                      status={reversedWorkflows[idx]}
+                      nodes={getEventHandlers(reversedDAGRuns[idx])}
+                      status={reversedDAGRuns[idx]}
                       {...props}
-                      onViewLog={(stepName, workflowId) => {
+                      onViewLog={(stepName, dagRunId) => {
                         // Check if this is a stderr log (indicated by _stderr suffix)
                         const isStderr = stepName.endsWith('_stderr');
                         const actualStepName = isStderr ? stepName.slice(0, -7) : stepName; // Remove '_stderr' suffix
@@ -513,9 +513,9 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
                           isOpen: true,
                           logType: 'step',
                           stepName: actualStepName,
-                          workflowId:
-                            workflowId ||
-                            reversedWorkflows[idx]?.workflowId ||
+                          dagRunId:
+                            dagRunId ||
+                            reversedDAGRuns[idx]?.dagRunId ||
                             '',
                           stream: isStderr ? 'stderr' : 'stdout',
                         });
@@ -533,13 +533,13 @@ function DAGHistoryTable({ fileName, gridData, workflows }: HistoryTableProps) {
                 }
                 logType={logViewer.logType}
                 dagName={
-                  reversedWorkflows && reversedWorkflows[idx]
-                    ? reversedWorkflows[idx].name
+                  reversedDAGRuns && reversedDAGRuns[idx]
+                    ? reversedDAGRuns[idx].name
                     : ''
                 }
-                workflowId={logViewer.workflowId}
+                dagRunId={logViewer.dagRunId}
                 stepName={logViewer.stepName}
-                workflow={reversedWorkflows[idx]}
+                dagRun={reversedDAGRuns[idx]}
                 stream={logViewer.stream}
               />
             </React.Fragment>

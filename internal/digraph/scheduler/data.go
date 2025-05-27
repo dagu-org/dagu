@@ -48,16 +48,16 @@ type NodeState struct {
 	// ExitCode is the exit code that the command exited with.
 	// It only makes sense when the node is a command executor.
 	ExitCode int
-	// Child executions is the list of child workflows that this node has executed.
-	Children []ChildWorkflow
+	// Children stores the child dag-runs.
+	Children []ChildDAGRun
 	// OutputVariables stores the output variables for the following steps.
 	// It only contains the local output variables.
 	OutputVariables *executor.SyncMap
 }
 
-type ChildWorkflow struct {
-	// WorkflowID is the workflow ID of the child workflow.
-	WorkflowID string
+type ChildDAGRun struct {
+	// DAGRunID is the run ID of the child dag-run.
+	DAGRunID string
 }
 
 type NodeStatus int
@@ -109,11 +109,11 @@ func (s *Data) SetExecutorConfig(cfg digraph.ExecutorConfig) {
 	s.inner.Step.ExecutorConfig = cfg
 }
 
-func (s *Data) SetChildWorkflow(childWorkflow digraph.ChildWorkflow) {
+func (s *Data) SetChildDAG(childDAG digraph.ChildDAG) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.inner.Step.ChildWorkflow = &childWorkflow
+	s.inner.Step.ChildDAG = &childDAG
 }
 
 func (s *Data) Args() []string {
@@ -161,19 +161,22 @@ func (s *Data) Data() NodeData {
 	return s.inner
 }
 
-func (s *Data) ChildWorkflowID() (string, error) {
+// GenChildDAGRunID returns the dag-run ID for the child dag-run.
+// Currently, it only supports a single child dag-run.
+// In the future, it may support multiple child dag-runs (e.g., for-each).
+func (s *Data) GenChildDAGRunID() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// If children is not empty, return the first child's workflow ID.
+	// If children is not empty, return the first child's DAGRunID.
 	if len(s.inner.State.Children) > 0 {
-		return s.inner.State.Children[0].WorkflowID, nil
+		return s.inner.State.Children[0].DAGRunID, nil
 	}
-	// Generate a new workflow ID for the current node.
-	r, err := generateWorkflowID()
+	// Generate a new DAGRunID for the child dag-run.
+	r, err := generateDAGRunID()
 	if err != nil {
-		return "", fmt.Errorf("failed to generate workflow ID: %w", err)
+		return "", fmt.Errorf("failed to generate child dag-run ID: %w", err)
 	}
-	s.inner.State.Children = append(s.inner.State.Children, ChildWorkflow{WorkflowID: r})
+	s.inner.State.Children = append(s.inner.State.Children, ChildDAGRun{DAGRunID: r})
 	return r, nil
 }
 
@@ -415,7 +418,7 @@ func (n *Data) ClearState(s digraph.Step) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	// The data of child workflows need to be preserved to retain their workflow IDs
+	// The data of child dag-run need to be preserved to retain their dag-run IDs
 	children := n.inner.State.Children
 	n.inner.State = NodeState{}
 	n.inner.State.Children = children
@@ -432,9 +435,9 @@ func (n *Data) MarkError(err error) {
 	n.inner.State.Status = NodeStatusError
 }
 
-// generateWorkflowID generates a new workflow ID.
-// For simplicity, we use UUIDs as workflow IDs.
-func generateWorkflowID() (string, error) {
+// generateDAGRunID generates a new dag-run ID.
+// For simplicity, we use UUIDs as dag-run IDs.
+func generateDAGRunID() (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return "", err

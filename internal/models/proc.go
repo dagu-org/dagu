@@ -8,15 +8,15 @@ import (
 
 // ProcStore is an interface for managing process storage.
 type ProcStore interface {
-	// Acquire creates a new process for a given workflow.
+	// Acquire creates a new process for a given dag-run.
 	// It automatically starts the heartbeat for the process.
-	Acquire(ctx context.Context, workflow digraph.WorkflowRef) (ProcHandle, error)
-	// CountAlive retrieves the number of processes associated with a given workflow name.
+	Acquire(ctx context.Context, dagRun digraph.DAGRunRef) (ProcHandle, error)
+	// CountAlive retrieves the number of processes associated with a given DAG name.
 	// It only counts the processes that are alive.
 	CountAlive(ctx context.Context, name string) (int, error)
 }
 
-// ProcHandle represents a process that is associated with a workflow.
+// ProcHandle represents a process that is associated with a dag-run.
 type ProcHandle interface {
 	// Stop stops the heartbeat for the process.
 	Stop(ctx context.Context) error
@@ -26,7 +26,7 @@ type ProcHandle interface {
 
 // ProcMeta is a struct that holds metadata for a process.
 type ProcMeta struct {
-	StartedAt  int64
-	Name       string
-	WorkflowID string
+	StartedAt int64
+	Name      string
+	DAGRunID  string
 }

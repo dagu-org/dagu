@@ -29,7 +29,7 @@ func TestScheduler(t *testing.T) {
 		}
 
 		th := setupTest(t)
-		sc := scheduler.New(th.config, entryReader, th.historyManager, th.historyStore, th.queueStore, th.procStore)
+		sc := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
 
 		ctx := context.Background()
 		go func() {
@@ -53,7 +53,7 @@ func TestScheduler(t *testing.T) {
 		}
 
 		th := setupTest(t)
-		sc := scheduler.New(th.config, entryReader, th.historyManager, th.historyStore, th.queueStore, th.procStore)
+		sc := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
 
 		go func() {
 			_ = sc.Start(context.Background())
@@ -69,7 +69,7 @@ func TestScheduler(t *testing.T) {
 		scheduler.SetFixedTime(now)
 
 		th := setupTest(t)
-		schedulerInstance := scheduler.New(th.config, &mockJobManager{}, th.historyManager, th.historyStore, th.queueStore, th.procStore)
+		schedulerInstance := scheduler.New(th.Config, &mockJobManager{}, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
 
 		next := schedulerInstance.NextTick(now)
 		require.Equal(t, time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC), next)
@@ -153,7 +153,7 @@ func TestJobReady(t *testing.T) {
 
 			scheduler.SetFixedTime(tt.now)
 
-			job := &scheduler.DAG{
+			job := &scheduler.DAGRunJob{
 				DAG: &digraph.DAG{
 					SkipIfSuccessful: tt.skipSuccessful,
 				},
@@ -161,7 +161,7 @@ func TestJobReady(t *testing.T) {
 				Next:     tt.now,
 			}
 
-			lastRunStatus := models.Status{
+			lastRunStatus := models.DAGRunStatus{
 				Status:    tt.lastStatus,
 				StartedAt: stringutil.FormatTime(tt.lastRunTime),
 			}
@@ -205,7 +205,7 @@ func TestPrevExecTime(t *testing.T) {
 			schedule, err := cronParser.Parse(tt.schedule)
 			require.NoError(t, err)
 
-			job := &scheduler.DAG{Schedule: schedule, Next: tt.now}
+			job := &scheduler.DAGRunJob{Schedule: schedule, Next: tt.now}
 			got := job.PrevExecTime(context.Background())
 			require.Equal(t, tt.want, got)
 		})

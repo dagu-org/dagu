@@ -25,11 +25,11 @@ func TestStatusCommand(t *testing.T) {
 		}()
 
 		require.Eventually(t, func() bool {
-			runRecords := th.HistoryStore.RecentRuns(th.Context, dagFile.Location, 1)
-			if len(runRecords) < 1 {
+			attempts := th.DAGRunStore.RecentAttempts(th.Context, dagFile.Location, 1)
+			if len(attempts) < 1 {
 				return false
 			}
-			status, err := runRecords[0].ReadStatus(th.Context)
+			status, err := attempts[0].ReadStatus(th.Context)
 			if err != nil {
 				return false
 			}

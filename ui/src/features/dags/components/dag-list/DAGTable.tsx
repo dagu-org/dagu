@@ -170,7 +170,7 @@ function getNextSchedule(
 // Allow returning number for group sorting placeholder
 function getStatus(data: RowItem): components['schemas']['Status'] | number {
   if (data.kind === ItemKind.DAG) {
-    return data.dag.latestWorkflow.status;
+    return data.dag.latestDAGRun.status;
   }
   // Use a number outside the Status enum range for groups
   return -1;
@@ -345,8 +345,8 @@ const defaultColumns = [
       if (data.kind === ItemKind.DAG) {
         // Use the updated StatusChip component with xs size
         return (
-          <StatusChip status={data.dag.latestWorkflow.status} size="xs">
-            {data.dag.latestWorkflow?.statusLabel}
+          <StatusChip status={data.dag.latestDAGRun.status} size="xs">
+            {data.dag.latestDAGRun?.statusLabel}
           </StatusChip>
         );
       }
@@ -376,7 +376,7 @@ const defaultColumns = [
         return null;
       }
 
-      const { startedAt, finishedAt, status } = data.dag.latestWorkflow;
+      const { startedAt, finishedAt, status } = data.dag.latestDAGRun;
 
       if (!startedAt || startedAt === '-') {
         // If no start time, display nothing or a placeholder
@@ -423,8 +423,8 @@ const defaultColumns = [
         return dataA.kind === ItemKind.Group ? -1 : 1;
       }
       // Prioritize rows with startedAt dates
-      const startedAtA = dataA.dag.latestWorkflow.startedAt;
-      const startedAtB = dataB.dag.latestWorkflow.startedAt;
+      const startedAtA = dataA.dag.latestDAGRun.startedAt;
+      const startedAtB = dataB.dag.latestDAGRun.startedAt;
 
       if (!startedAtA && !startedAtB) return 0; // Both null/undefined
       if (!startedAtA) return 1; // A is null, should come after B
@@ -581,7 +581,7 @@ const defaultColumns = [
         >
           <DAGActions
             dag={data.dag.dag}
-            status={data.dag.latestWorkflow}
+            status={data.dag.latestDAGRun}
             fileName={data.dag.fileName}
             label={false}
             refresh={table.options.meta?.refreshFn}
@@ -857,7 +857,7 @@ function DAGTable({
             </div>
             <Input
               type="search"
-              placeholder="Search DAGs..."
+              placeholder="Search definitions..."
               value={searchText}
               onChange={(e) => handleSearchTextChange(e.target.value)}
               className="pl-10 h-9 bg-background border border-input rounded-md w-full"
@@ -1087,8 +1087,8 @@ function DAGTable({
               const dagRow = row.original as DAGRow;
               const dag = dagRow.dag;
               const fileName = dag.fileName;
-              const status = dag.latestWorkflow.status;
-              const statusLabel = dag.latestWorkflow.statusLabel;
+              const status = dag.latestDAGRun.status;
+              const statusLabel = dag.latestDAGRun.statusLabel;
               const tags = dag.dag.tags || [];
               const description = dag.dag.description;
 
@@ -1149,11 +1149,11 @@ function DAGTable({
                   )}
 
                   {/* Last run info */}
-                  {dag.latestWorkflow.startedAt &&
-                    dag.latestWorkflow.startedAt !== '-' && (
+                  {dag.latestDAGRun.startedAt &&
+                    dag.latestDAGRun.startedAt !== '-' && (
                       <div className="flex items-center text-xs text-muted-foreground mb-2">
                         <Calendar className="h-3 w-3 mr-1" />
-                        <span>{dag.latestWorkflow.startedAt}</span>
+                        <span>{dag.latestDAGRun.startedAt}</span>
                       </div>
                     )}
 

@@ -286,7 +286,7 @@ func TestProgressingNode(t *testing.T) {
 
 	dag.AssertCurrentStatus(t, scheduler.StatusRunning)
 
-	status, err := dag.HistoryMgr.GetLatestStatus(dag.Context, dag.DAG)
+	status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, err, "failed to get latest status")
 
 	// Check the first node is in progress
@@ -300,11 +300,11 @@ func TestProgressingNode(t *testing.T) {
 	dag.AssertCurrentStatus(t, scheduler.StatusRunning)
 
 	// Check the progress of the nodes
-	status, err = dag.HistoryMgr.GetLatestStatus(dag.Context, dag.DAG)
+	status, err = dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, err, "failed to get latest status")
 
-	// Assert that the workflow is still running
-	require.Equal(t, scheduler.StatusRunning.String(), status.Status.String(), "workflow should be running")
+	// Assert that the dag-run is still running
+	require.Equal(t, scheduler.StatusRunning.String(), status.Status.String(), "dag-run should be running")
 
 	// Check the first node is finished
 	require.Equal(t, scheduler.NodeStatusSuccess.String(), status.Nodes[0].Status.String(), "first node should be finished")
@@ -315,7 +315,7 @@ func TestProgressingNode(t *testing.T) {
 	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
 
 	// Check the second node is finished
-	status, err = dag.HistoryMgr.GetLatestStatus(dag.Context, dag.DAG)
+	status, err = dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, err, "failed to get latest status")
 
 	require.Equal(t, scheduler.NodeStatusSuccess.String(), status.Nodes[1].Status.String(), "second node should be finished")

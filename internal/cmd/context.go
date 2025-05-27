@@ -13,16 +13,16 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/frontend"
-	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/localdag"
-	"github.com/dagu-org/dagu/internal/persistence/localhistory"
+	"github.com/dagu-org/dagu/internal/persistence/localdagrun"
 	"github.com/dagu-org/dagu/internal/persistence/localproc"
-	"github.com/dagu-org/dagu/internal/persistence/localqueue/prototype"
+	"github.com/dagu-org/dagu/internal/persistence/localqueue"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
@@ -34,14 +34,15 @@ import (
 type Context struct {
 	context.Context
 
-	Command      *cobra.Command
-	Flags        []commandLineFlag
-	Config       *config.Config
-	Quiet        bool
-	HistoryStore models.HistoryStore
-	HistoryMgr   history.Manager
-	ProcStore    models.ProcStore
-	QueueStore   models.QueueStore
+	Command *cobra.Command
+	Flags   []commandLineFlag
+	Config  *config.Config
+	Quiet   bool
+
+	DAGRunStore models.DAGRunStore
+	DAGRunMgr   dagrun.Manager
+	ProcStore   models.ProcStore
+	QueueStore  models.QueueStore
 }
 
 // LogToFile creates a new logger context with a file writer.
@@ -105,40 +106,40 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	}
 
 	// Initialize history repository and history manager
-	hrOpts := []localhistory.HistoryStoreOption{
-		localhistory.WithLatestStatusToday(cfg.Server.LatestStatusToday),
+	hrOpts := []localdagrun.DAGRunStoreOption{
+		localdagrun.WithLatestStatusToday(cfg.Server.LatestStatusToday),
 	}
 
 	switch cmd.Name() {
 	case "server", "scheduler", "start-all":
 		// For long-running process, we setup file cache for better performance
-		hc := fileutil.NewCache[*models.Status](0, time.Hour*12)
+		hc := fileutil.NewCache[*models.DAGRunStatus](0, time.Hour*12)
 		hc.StartEviction(ctx)
-		hrOpts = append(hrOpts, localhistory.WithHistoryFileCache(hc))
+		hrOpts = append(hrOpts, localdagrun.WithHistoryFileCache(hc))
 	}
 
-	hs := localhistory.New(cfg.Paths.HistoryDir, hrOpts...)
-	hm := history.New(hs, cfg.Paths.Executable, cfg.Global.WorkDir)
+	drs := localdagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
+	drm := dagrun.New(drs, cfg.Paths.Executable, cfg.Global.WorkDir)
 	ps := localproc.New(cfg.Paths.ProcDir)
-	qs := prototype.New(cfg.Paths.QueueDir)
+	qs := localqueue.New(cfg.Paths.QueueDir)
 
 	return &Context{
-		Context:      ctx,
-		Command:      cmd,
-		Config:       cfg,
-		Quiet:        quiet,
-		HistoryStore: hs,
-		HistoryMgr:   hm,
-		Flags:        flags,
-		ProcStore:    ps,
-		QueueStore:   qs,
+		Context:     ctx,
+		Command:     cmd,
+		Config:      cfg,
+		Quiet:       quiet,
+		DAGRunStore: drs,
+		DAGRunMgr:   drm,
+		Flags:       flags,
+		ProcStore:   ps,
+		QueueStore:  qs,
 	}, nil
 }
 
 // HistoryManager initializes a HistoryManager using the provided options. If not supplied,
-func (c *Context) HistoryManager(hr models.HistoryStore) history.Manager {
-	return history.New(
-		hr,
+func (c *Context) HistoryManager(drs models.DAGRunStore) dagrun.Manager {
+	return dagrun.New(
+		drs,
 		c.Config.Paths.Executable,
 		c.Config.Global.WorkDir,
 	)
@@ -155,7 +156,7 @@ func (c *Context) NewServer() (*frontend.Server, error) {
 		return nil, err
 	}
 
-	return frontend.NewServer(c.Config, dr, c.HistoryStore, c.HistoryMgr), nil
+	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.DAGRunMgr), nil
 }
 
 // NewScheduler creates a new NewScheduler instance using the default client.
@@ -169,8 +170,8 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 		return nil, fmt.Errorf("failed to initialize DAG client: %w", err)
 	}
 
-	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.HistoryMgr, c.Config.Paths.Executable, c.Config.Global.WorkDir)
-	return scheduler.New(c.Config, m, c.HistoryMgr, c.HistoryStore, c.QueueStore, c.ProcStore), nil
+	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, c.Config.Paths.Executable, c.Config.Global.WorkDir)
+	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore), nil
 }
 
 // StringParam retrieves a string parameter from the command line flags.
@@ -206,22 +207,22 @@ func (c *Context) dagStore(cache *fileutil.Cache[*digraph.DAG], searchPaths []st
 	), nil
 }
 
-// OpenLogFile creates and opens a log file for a given workflow.
+// OpenLogFile creates and opens a log file for a given dag-run.
 // It evaluates the log directory, validates settings, creates the log directory,
-// builds a filename using the current timestamp and workflow ID, and then opens the file.
+// builds a filename using the current timestamp and dag-run ID, and then opens the file.
 func (c *Context) OpenLogFile(
 	dag *digraph.DAG,
-	workflowID string,
+	dagRunID string,
 ) (*os.File, error) {
-	logPath, err := c.GenLogFileName(dag, workflowID)
+	logPath, err := c.GenLogFileName(dag, dagRunID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate log file name: %w", err)
 	}
 	return fileutil.OpenOrCreateFile(logPath)
 }
 
-// GenLogFileName generates a log file name based on the DAG and workflow ID.
-func (c *Context) GenLogFileName(dag *digraph.DAG, workflowID string) (string, error) {
+// GenLogFileName generates a log file name based on the DAG and dag-run ID.
+func (c *Context) GenLogFileName(dag *digraph.DAG, dagRunID string) (string, error) {
 	// Read the global configuration for log directory.
 	baseLogDir, err := cmdutil.EvalString(c, c.Config.Paths.LogDir)
 	if err != nil {
@@ -235,10 +236,10 @@ func (c *Context) GenLogFileName(dag *digraph.DAG, workflowID string) (string, e
 	}
 
 	cfg := LogConfig{
-		BaseDir:    baseLogDir,
-		DAGLogDir:  dagLogDir,
-		Name:       dag.Name,
-		WorkflowID: workflowID,
+		BaseDir:   baseLogDir,
+		DAGLogDir: dagLogDir,
+		Name:      dag.Name,
+		DAGRunID:  dagRunID,
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -289,8 +290,8 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *C
 	return cmd
 }
 
-// genWorkflowID creates a new UUID string to be used as a workflow IDentifier.
-func genWorkflowID() (string, error) {
+// genRunID creates a new UUID string to be used as a dag-run IDentifier.
+func genRunID() (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return "", err
@@ -298,26 +299,26 @@ func genWorkflowID() (string, error) {
 	return id.String(), nil
 }
 
-// validateWorkflowID checks if the workflow ID is valid and not empty.
-func validateWorkflowID(workflowID string) error {
-	if workflowID == "" {
-		return ErrWorkflowIDRequired
+// validateRunID checks if the dag-run ID is valid and not empty.
+func validateRunID(dagRunID string) error {
+	if dagRunID == "" {
+		return ErrDAGRunIDRequired
 	}
-	if !regexWorkflowID.MatchString(workflowID) {
-		return ErrWorkflowIDFormat
+	if !reDAGRunID.MatchString(dagRunID) {
+		return ErrDAGRunIDFormat
 	}
-	if len(workflowID) > maxWorkflowIDLen {
-		return ErrWorkflowIDTooLong
+	if len(dagRunID) > maxDAGRunIDLen {
+		return ErrDAGRunIDTooLong
 	}
 	return nil
 }
 
-// regexWorkflowID is a regular expression to validate workflow IDs.
+// reDAGRunID is a regular expression to validate dag-run IDs.
 // It allows alphanumeric characters, hyphens, and underscores.
-var regexWorkflowID = regexp.MustCompile(`^[-a-zA-Z0-9_]+$`)
+var reDAGRunID = regexp.MustCompile(`^[-a-zA-Z0-9_]+$`)
 
-// maxWorkflowIDLen is the max length of the workflow ID
-const maxWorkflowIDLen = 60
+// maxDAGRunIDLen is the max length of the dag-run ID
+const maxDAGRunIDLen = 60
 
 // signalListener is an interface for types that can receive OS signals.
 type signalListener interface {
@@ -346,10 +347,10 @@ func listenSignals(ctx context.Context, listener signalListener) {
 
 // LogConfig defines configuration for log file creation.
 type LogConfig struct {
-	BaseDir    string // Base directory for logs.
-	DAGLogDir  string // Optional alternative log directory specified by the DAG definition.
-	Name       string // Name of the workflow; used for generating a safe directory name.
-	WorkflowID string // Unique workflow ID used in the filename.
+	BaseDir   string // Base directory for logs.
+	DAGLogDir string // Optional alternative log directory specified by the DAG definition.
+	Name      string // Name of the DAG; used for generating a safe directory name.
+	DAGRunID  string // Unique dag-run ID used in the filename.
 }
 
 // Validate checks that essential fields are provided.
@@ -379,7 +380,7 @@ func (cfg LogConfig) LogDir() (string, error) {
 	utcTimestamp := time.Now().UTC().Format("20060102_150405Z")
 
 	safeName := fileutil.SafeName(cfg.Name)
-	logDir := filepath.Join(baseDir, safeName, "workflow_"+utcTimestamp+"_"+cfg.WorkflowID)
+	logDir := filepath.Join(baseDir, safeName, "dag-run_"+utcTimestamp+"_"+cfg.DAGRunID)
 	if err := os.MkdirAll(logDir, 0750); err != nil {
 		return "", fmt.Errorf("failed to initialize directory %s: %w", logDir, err)
 	}
@@ -388,13 +389,13 @@ func (cfg LogConfig) LogDir() (string, error) {
 }
 
 // LogFile constructs the log filename using the prefix, safe DAG name, current timestamp,
-// and a truncated version of the workflow ID.
+// and a truncated version of the dag-run ID.
 func (cfg LogConfig) LogFile() string {
 	timestamp := time.Now().Format("20060102.15:04:05.000")
-	truncatedWorkflowID := stringutil.TruncString(cfg.WorkflowID, 8)
+	truncDAGRunID := stringutil.TruncString(cfg.DAGRunID, 8)
 
-	return fmt.Sprintf("workflow_%s.%s.log",
+	return fmt.Sprintf("dag-run_%s.%s.log",
 		timestamp,
-		truncatedWorkflowID,
+		truncDAGRunID,
 	)
 }

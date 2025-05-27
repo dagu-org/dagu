@@ -19,12 +19,12 @@ import NodeStatusTableRow from './NodeStatusTableRow';
 type Props = {
   /** List of nodes to display */
   nodes?: components['schemas']['Node'][];
-  /** DAG workflow details */
-  status: components['schemas']['WorkflowDetails'];
+  /** DAG dagRun details */
+  status: components['schemas']['DAGRunDetails'];
   /** DAG file ID */
   fileName: string;
   /** Function to open log viewer */
-  onViewLog?: (stepName: string, workflowId: string) => void;
+  onViewLog?: (stepName: string, dagRunId: string) => void;
 };
 
 /**
@@ -73,10 +73,10 @@ function NodeStatusTable({ nodes, status, fileName, onViewLog }: Props) {
                   key={n.step.name}
                   rownum={idx + 1}
                   node={n}
-                  workflowId={status.workflowId}
+                  dagRunId={status.dagRunId}
                   name={fileName}
                   onViewLog={onViewLog}
-                  workflow={status}
+                  dagRun={status}
                   view="desktop"
                 />
               ))}
@@ -92,10 +92,10 @@ function NodeStatusTable({ nodes, status, fileName, onViewLog }: Props) {
             key={n.step.name}
             rownum={idx + 1}
             node={n}
-            workflowId={status.workflowId}
+            dagRunId={status.dagRunId}
             name={fileName}
             onViewLog={onViewLog}
-            workflow={status}
+            dagRun={status}
             view="mobile"
           />
         ))}

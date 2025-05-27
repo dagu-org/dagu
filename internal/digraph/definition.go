@@ -39,16 +39,13 @@ type definition struct {
 	DelaySec int
 	// RestartWaitSec is the wait in seconds to when the DAG is restarted.
 	RestartWaitSec int
-	// HistRetentionDays is the retention days of the history.
+	// HistRetentionDays is the retention days of the dag-runs history.
 	HistRetentionDays *int
 	// Precondition is the condition to run the DAG.
 	Precondition any
 	// Preconditions is the condition to run the DAG.
 	Preconditions any
-	// MaxActiveWorkflows is the maximum number of concurrent workflows.
-	MaxActiveWorkflows int
-	// MaxActiveRuns is the maximum number of concurrent steps.
-	// deprecated: use MaxActiveSteps instead.
+	// maxActiveRuns is the maximum number of concurrent dag-runs.
 	MaxActiveRuns int
 	// MaxActiveSteps is the maximum number of concurrent steps.
 	MaxActiveSteps int
@@ -113,9 +110,9 @@ type stepDef struct {
 	// When it is empty, the same signal as the parent process is sent.
 	// It can be KILL when the process does not stop over the timeout.
 	SignalOnStop *string `yaml:"signalOnStop,omitempty"`
-	// Run is the name of a DAG to run as a child workflow
+	// Run is the name of a DAG to run as a child dag-run.
 	Run string `yaml:"run,omitempty"`
-	// Params specifies the parameters for the child workflow.
+	// Params specifies the parameters for the child dag-run.
 	Params string `yaml:"params,omitempty"`
 }
 

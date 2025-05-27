@@ -24,14 +24,14 @@ import StatusChip from '../../../../ui/StatusChip';
  * Props for the DAGStatusOverview component
  */
 type Props = {
-  /** DAG workflow details */
-  status?: components['schemas']['WorkflowDetails'];
+  /** DAG dagRun details */
+  status?: components['schemas']['DAGRunDetails'];
   /** DAG file ID */
   fileName: string;
-  /** Workflow ID of the execution */
-  workflowId?: string;
+  /** DAGRun ID of the execution */
+  dagRunId?: string;
   /** Function to open log viewer */
-  onViewLog?: (workflowId: string) => void;
+  onViewLog?: (dagRunId: string) => void;
 };
 
 /**
@@ -41,15 +41,15 @@ type Props = {
 function DAGStatusOverview({
   status,
   fileName,
-  workflowId = '',
+  dagRunId = '',
   onViewLog,
 }: Props) {
   // Build URL for log viewing
   const searchParams = new URLSearchParams();
-  if (workflowId) {
-    searchParams.set('workflowId', workflowId);
+  if (dagRunId) {
+    searchParams.set('dagRunId', dagRunId);
   }
-  const url = `/dags/${fileName}/workflow-log?${searchParams.toString()}`;
+  const url = `/dags/${fileName}/dagRun-log?${searchParams.toString()}`;
 
   // Don't render if no status is provided
   if (!status) {
@@ -118,12 +118,12 @@ function DAGStatusOverview({
           )}
         </div>
 
-        {status.workflowId && (
+        {status.dagRunId && (
           <div className="flex items-center gap-1.5">
             <div className="flex items-center">
               <Hash className="h-3 w-3 mr-0.5 text-slate-500 dark:text-slate-400" />
               <span className="text-xs font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-300">
-                {status.workflowId}
+                {status.dagRunId}
               </span>
             </div>
 
@@ -132,7 +132,7 @@ function DAGStatusOverview({
               onClick={(e) => {
                 if (!(e.metaKey || e.ctrlKey) && onViewLog) {
                   e.preventDefault();
-                  onViewLog(status.workflowId);
+                  onViewLog(status.dagRunId);
                 }
               }}
               className="inline-flex items-center text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors duration-200 cursor-pointer"
@@ -159,12 +159,12 @@ function DAGStatusOverview({
           </div>
         )}
 
-        {status.workflowId && (
+        {status.dagRunId && (
           <div className="space-y-1">
             <div className="flex items-center">
               <Hash className="h-3 w-3 mr-0.5 text-slate-500 dark:text-slate-400" />
               <span className="text-xs font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-300">
-                {status.workflowId}
+                {status.dagRunId}
               </span>
             </div>
 
@@ -174,7 +174,7 @@ function DAGStatusOverview({
                 onClick={(e) => {
                   if (!(e.metaKey || e.ctrlKey) && onViewLog) {
                     e.preventDefault();
-                    onViewLog(status.workflowId);
+                    onViewLog(status.dagRunId);
                   }
                 }}
                 className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-200 cursor-pointer"
@@ -368,7 +368,7 @@ function DAGStatusOverview({
         {status.status === Status.Queued && (
           <div className="mt-1.5 flex items-center text-xs text-slate-600 dark:text-slate-400">
             <Clock className="h-3 w-3 mr-1 text-purple-500" />
-            <span>Workflow is queued for execution</span>
+            <span>DAGRun is queued for execution</span>
           </div>
         )}
         {status.status === Status.Cancelled && (
@@ -379,7 +379,7 @@ function DAGStatusOverview({
         )}
       </div>
 
-      {/* Workflow-level Precondition Errors */}
+      {/* DAGRun-level Precondition Errors */}
       {status.preconditions?.some(
         (cond: components['schemas']['Condition']) => cond.error
       ) && (
@@ -387,7 +387,7 @@ function DAGStatusOverview({
           <div className="flex items-center mb-1">
             <Info className="h-3.5 w-3.5 mr-1 text-amber-500 dark:text-amber-400" />
             <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
-              Workflow Precondition Unmet
+              DAGRun Precondition Unmet
             </span>
           </div>
           <div className="space-y-2">

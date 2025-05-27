@@ -186,7 +186,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		cfg.Paths.AdminLogsDir = fileutil.ResolvePathOrBlank(def.Paths.AdminLogsDir)
 		cfg.Paths.BaseConfig = fileutil.ResolvePathOrBlank(def.Paths.BaseConfig)
 		cfg.Paths.Executable = fileutil.ResolvePathOrBlank(def.Paths.Executable)
-		cfg.Paths.HistoryDir = fileutil.ResolvePathOrBlank(def.Paths.HistoryDir)
+		cfg.Paths.DAGRunsDir = fileutil.ResolvePathOrBlank(def.Paths.DAGRunsDir)
 		cfg.Paths.QueueDir = fileutil.ResolvePathOrBlank(def.Paths.QueueDir)
 		cfg.Paths.ProcDir = fileutil.ResolvePathOrBlank(def.Paths.ProcDir)
 	}
@@ -205,8 +205,8 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	l.LoadLegacyEnv(&cfg)
 
 	// Setup the directory inside the datadir.
-	if cfg.Paths.HistoryDir == "" {
-		cfg.Paths.HistoryDir = filepath.Join(cfg.Paths.DataDir, "history")
+	if cfg.Paths.DAGRunsDir == "" {
+		cfg.Paths.DAGRunsDir = filepath.Join(cfg.Paths.DataDir, "dag-runs")
 	}
 	if cfg.Paths.ProcDir == "" {
 		cfg.Paths.ProcDir = filepath.Join(cfg.Paths.DataDir, "proc")
@@ -415,7 +415,7 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("paths.suspendFlagsDir", "SUSPEND_FLAGS_DIR")
 	l.bindEnv("paths.adminLogsDir", "ADMIN_LOG_DIR")
 	l.bindEnv("paths.baseConfig", "BASE_CONFIG")
-	l.bindEnv("paths.historyDir", "HISTORY_DIR")
+	l.bindEnv("paths.historyDir", "DAG_RUNS_DIR")
 	l.bindEnv("paths.procDir", "PROC_DIR")
 	l.bindEnv("paths.queueDir", "QUEUE_DIR")
 

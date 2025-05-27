@@ -21,13 +21,13 @@ type DAGStore interface {
 	// Delete removes a DAG definition by name
 	Delete(ctx context.Context, fileName string) error
 	// List returns a paginated list of DAG definitions with filtering options
-	List(ctx context.Context, params ListOptions) (PaginatedResult[*digraph.DAG], []string, error)
+	List(ctx context.Context, params ListDAGsOptions) (PaginatedResult[*digraph.DAG], []string, error)
 	// GetMetadata retrieves only the metadata of a DAG definition (faster than full load)
 	GetMetadata(ctx context.Context, fileName string) (*digraph.DAG, error)
 	// GetDetails retrieves the complete DAG definition including all fields
 	GetDetails(ctx context.Context, fileName string, opts ...digraph.LoadOption) (*digraph.DAG, error)
 	// Grep searches for a pattern in all DAG definitions and returns matching results
-	Grep(ctx context.Context, pattern string) (ret []*GrepResult, errs []string, err error)
+	Grep(ctx context.Context, pattern string) (ret []*GrepDAGsResult, errs []string, err error)
 	// Rename changes a DAG's identifier from oldID to newID
 	Rename(ctx context.Context, oldID, newID string) error
 	// GetSpec retrieves the raw YAML specification of a DAG
@@ -44,22 +44,22 @@ type DAGStore interface {
 	IsSuspended(ctx context.Context, fileName string) bool
 }
 
-// ListOptions contains parameters for paginated DAG listing
-type ListOptions struct {
+// ListDAGsOptions contains parameters for paginated DAG listing
+type ListDAGsOptions struct {
 	Paginator *Paginator
 	Name      string // Optional name filter
 	Tag       string // Optional tag filter
 }
 
-// ListResult contains the result of a paginated DAG listing operation
-type ListResult struct {
+// ListDAGsResult contains the result of a paginated DAG listing operation
+type ListDAGsResult struct {
 	DAGs   []*digraph.DAG // The list of DAGs for the current page
 	Count  int            // Total count of DAGs matching the filter
 	Errors []string       // Any errors encountered during listing
 }
 
-// GrepResult represents the result of a pattern search within a DAG definition
-type GrepResult struct {
+// GrepDAGsResult represents the result of a pattern search within a DAG definition
+type GrepDAGsResult struct {
 	Name    string       // Name of the DAG
 	DAG     *digraph.DAG // The DAG object
 	Matches []*Match     // Matching lines and their context

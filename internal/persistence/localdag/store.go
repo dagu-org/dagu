@@ -209,7 +209,7 @@ func (store *Storage) ensureDirExist() error {
 }
 
 // List lists DAGs with pagination support.
-func (store *Storage) List(ctx context.Context, opts models.ListOptions) (models.PaginatedResult[*digraph.DAG], []string, error) {
+func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (models.PaginatedResult[*digraph.DAG], []string, error) {
 	var dags []*digraph.DAG
 	var errList []string
 	var totalCount int
@@ -271,7 +271,7 @@ func (store *Storage) List(ctx context.Context, opts models.ListOptions) (models
 
 // Grep searches for a pattern in all DAGs.
 func (store *Storage) Grep(ctx context.Context, pattern string) (
-	ret []*models.GrepResult, errs []string, err error,
+	ret []*models.GrepDAGsResult, errs []string, err error,
 ) {
 	if pattern == "" {
 		// return empty result if pattern is empty
@@ -310,7 +310,7 @@ func (store *Storage) Grep(ctx context.Context, pattern string) (
 				errs = append(errs, fmt.Sprintf("check %s failed: %s", entry.Name(), err))
 				continue
 			}
-			ret = append(ret, &models.GrepResult{
+			ret = append(ret, &models.GrepDAGsResult{
 				Name:    strings.TrimSuffix(entry.Name(), path.Ext(entry.Name())),
 				DAG:     dag,
 				Matches: matches,

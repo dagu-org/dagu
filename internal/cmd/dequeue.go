@@ -13,80 +13,80 @@ func CmdDequeue() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "dequeue [flags]",
-			Short: "Dequeue a workflow to the queue.",
-			Long: `Dequeue a workflow to the queue.
+			Short: "Dequeue a DAG-run from the queue",
+			Long: `Dequeue a DAG-run from the queue.
 
 Example:
-	dagu dequeue --workflow=my_workflow_name:my_workflow_id
+	dagu dequeue --dag-run=dag_name:my_dag_run_id
 `,
 		}, dequeueFlags, runDequeue,
 	)
 }
 
-var dequeueFlags = []commandLineFlag{paramsFlag, workflowFlagDequeue}
+var dequeueFlags = []commandLineFlag{paramsFlag, dagRunFlagDequeue}
 
 func runDequeue(ctx *Context, _ []string) error {
-	// Get workflow ID from flags
-	workflowRef, _ := ctx.StringParam("workflow")
-	workflow, err := digraph.ParseWorkflowRef(workflowRef)
+	// Get dag-run reference from the context
+	dagRunRef, _ := ctx.StringParam("dag-run")
+	dagRun, err := digraph.ParseDAGRunRef(dagRunRef)
 	if err != nil {
-		return fmt.Errorf("failed to parse workflow reference %s: %w", workflowRef, err)
+		return fmt.Errorf("failed to parse dag-run reference %s: %w", dagRunRef, err)
 	}
-	return dequeueWorkflow(ctx, workflow)
+	return dequeueDAGRun(ctx, dagRun)
 }
 
-// dequeueWorkflow dequeues a workflow to the queue.
-func dequeueWorkflow(ctx *Context, workflow digraph.WorkflowRef) error {
-	run, err := ctx.HistoryStore.FindRun(ctx, workflow)
+// dequeueDAGRun dequeues a dag-run from the queue.
+func dequeueDAGRun(ctx *Context, dagRun digraph.DAGRunRef) error {
+	attempt, err := ctx.DAGRunStore.FindAttempt(ctx, dagRun)
 	if err != nil {
-		return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflow.WorkflowID, err)
+		return fmt.Errorf("failed to find the record for dag-run ID %s: %w", dagRun.ID, err)
 	}
 
-	status, err := run.ReadStatus(ctx)
+	status, err := attempt.ReadStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 
 	if status.Status != scheduler.StatusQueued {
 		// If the status is not queued, return an error
-		return fmt.Errorf("workflow %s is not in queued status but %s", workflow.WorkflowID, status.Status)
+		return fmt.Errorf("dag-run %s is not in queued status but %s", dagRun.ID, status.Status)
 	}
 
-	dag, err := run.ReadDAG(ctx)
+	dag, err := attempt.ReadDAG(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read dag: %w", err)
 	}
 
-	// Make sure the workflow is not running at least locally
-	latestStatus, err := ctx.HistoryMgr.GetDAGRealtimeStatus(ctx, dag, workflow.WorkflowID)
+	// Make sure the dag-run is not running at least locally
+	latestStatus, err := ctx.DAGRunMgr.GetCurrentStatus(ctx, dag, dagRun.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get latest status: %w", err)
 	}
 	if latestStatus.Status != scheduler.StatusQueued {
-		return fmt.Errorf("workflow %s is not in queued status but %s", workflow.WorkflowID, latestStatus.Status)
+		return fmt.Errorf("dag-run %s is not in queued status but %s", dagRun.ID, latestStatus.Status)
 	}
 
-	// Make the workflow status to cancelled
+	// Make the status as canceled
 	status.Status = scheduler.StatusCancel
 
-	if err := run.Open(ctx.Context); err != nil {
+	if err := attempt.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open run: %w", err)
 	}
 	defer func() {
-		_ = run.Close(ctx.Context)
+		_ = attempt.Close(ctx.Context)
 	}()
-	if err := run.Write(ctx.Context, *status); err != nil {
+	if err := attempt.Write(ctx.Context, *status); err != nil {
 		return fmt.Errorf("failed to save status: %w", err)
 	}
 
-	// Dequeue the workflow
-	if _, err = ctx.QueueStore.DequeueByWorkflowID(ctx.Context, workflow.Name, workflow.WorkflowID); err != nil {
-		return fmt.Errorf("failed to dequeue workflow %s: %w", workflow.WorkflowID, err)
+	// Dequeue the dag-run from the queue
+	if _, err = ctx.QueueStore.DequeueByDAGRunID(ctx.Context, dagRun.Name, dagRun.ID); err != nil {
+		return fmt.Errorf("failed to dequeue dag-run %s: %w", dagRun.ID, err)
 	}
 
-	logger.Info(ctx.Context, "Dequeued workflow",
-		"workflowName", workflow.Name,
-		"workflowId", workflow.WorkflowID,
+	logger.Info(ctx.Context, "Dequeued dag-run",
+		"dag", dagRun.Name,
+		"runId", dagRun.ID,
 	)
 
 	return nil

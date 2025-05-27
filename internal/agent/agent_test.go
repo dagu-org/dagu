@@ -37,7 +37,7 @@ func TestAgent_Run(t *testing.T) {
 
 		// Create a history file by running a DAG
 		dagAgent.RunSuccess(t)
-		dag.AssertHistoryCount(t, 1)
+		dag.AssertDAGRunCount(t, 1)
 
 		// Set the retention days to 0 (delete all history files except the latest one)
 		dag.HistRetentionDays = 0
@@ -47,7 +47,7 @@ func TestAgent_Run(t *testing.T) {
 		dagAgent.RunSuccess(t)
 
 		// Check if only the latest history file exists
-		dag.AssertHistoryCount(t, 1)
+		dag.AssertDAGRunCount(t, 1)
 	})
 	t.Run("AlreadyRunning", func(t *testing.T) {
 		th := test.Setup(t)
@@ -65,7 +65,7 @@ func TestAgent_Run(t *testing.T) {
 
 		// Try to run the DAG again while it is running
 		dagAgent2 := dag.Agent()
-		dagAgent2.RunCheckErr(t, "is already running")
+		dagAgent2.RunCheckErr(t, "already running")
 
 		// Wait for the DAG to finish
 		<-done
@@ -159,7 +159,7 @@ func TestAgent_DryRun(t *testing.T) {
 		require.Equal(t, scheduler.StatusSuccess, curStatus.Status)
 
 		// Check if the status is not saved
-		dag.AssertHistoryCount(t, 0)
+		dag.AssertDAGRunCount(t, 0)
 	})
 }
 

@@ -79,7 +79,7 @@ func (r *PathResolver) resolve(appHomeEnv, legacyPath string) {
 // This approach uses the standard XDG directories (DataHome and ConfigHome)
 // to organize application data, logs, and configuration files.
 func (r *PathResolver) setXDGPaths() {
-	r.DataDir = filepath.Join(r.DataHome, build.Slug, "history")
+	r.DataDir = filepath.Join(r.DataHome, build.Slug, "data")
 	r.LogsDir = filepath.Join(r.DataHome, build.Slug, "logs")
 	r.BaseConfigFile = filepath.Join(r.ConfigHome, build.Slug, "base.yaml")
 	r.AdminLogsDir = filepath.Join(r.DataHome, build.Slug, "logs", "admin")

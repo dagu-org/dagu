@@ -42,79 +42,79 @@ var (
 		bindViper:    true,
 	}
 
-	// Additional parameters to pass to the workflow.
+	// Additional parameters to pass to the dag-run.
 	// These parameters override the default values defined in the DAG.
 	// They can be specified either inline or following a "--" separator to distinguish them from other flags.
 	// Accepted formats include positional parameters and key=value pairs (e.g., "P1=foo P2=bar").
 	paramsFlag = commandLineFlag{
 		name:      "params",
 		shorthand: "p",
-		usage:     "Parameters to pass to the workflow (overrides DAG defaults; supports positional values and key=value pairs, e.g., P1=foo P2=bar)",
+		usage:     "Parameters to pass to the dag-run (overrides DAG defaults; supports positional values and key=value pairs, e.g., P1=foo P2=bar)",
 	}
 
-	// Unique workflow ID required for retrying a workflow.
+	// Unique dag-run ID required for retrying a dag-run.
 	// This flag must be provided when using the retry command.
-	workflowIDFlagRetry = commandLineFlag{
-		name:      "workflow-id",
-		shorthand: "e",
-		usage:     "Unique workflow ID for retrying a workflow (required)",
+	dagRunIDFlagRetry = commandLineFlag{
+		name:      "run-id",
+		shorthand: "r",
+		usage:     "Unique dag-run ID to retry a dag-run",
 		required:  true,
 	}
 
-	// Unique workflow ID used for starting a new workflow.
+	// Unique dag-run ID used for starting a new dag-run.
 	// This is used to track and identify the execution instance and its status.
-	workflowIDFlag = commandLineFlag{
-		name:      "workflow-id",
-		shorthand: "e",
-		usage:     "Unique workflow ID for a workflow",
+	dagRunIDFlag = commandLineFlag{
+		name:      "run-id",
+		shorthand: "r",
+		usage:     "Unique dag-run ID for starting a new dag-run",
 	}
 
-	// Unique workflow ID used for stopping a workflow.
-	workflowIDFlagStop = commandLineFlag{
-		name:      "workflow-id",
-		shorthand: "e",
-		usage:     "workflow ID for stopping a workflow",
+	// Unique dag-run ID used for stopping a dag-run.
+	dagRunIDFlagStop = commandLineFlag{
+		name:      "run-id",
+		shorthand: "r",
+		usage:     "dag-run ID for stopping a dag-run",
 	}
 
-	// Unique workflow ID used for restarting a workflow.
-	workflowIDFlagRestart = commandLineFlag{
-		name:      "workflow-id",
-		shorthand: "e",
-		usage:     "workflow ID for restarting a workflow",
+	// Unique dag-run ID used for restarting a dag-run.
+	dagRunIDFlagRestart = commandLineFlag{
+		name:      "run-id",
+		shorthand: "r",
+		usage:     "dag-run ID for restarting a dag-run",
 	}
 
-	// Unique workflow ID used for checking the status of a workflow.
-	workflowIDFlagStatus = commandLineFlag{
-		name:      "workflow-id",
-		shorthand: "e",
-		usage:     "workflow ID for checking the status of a workflow",
+	// Unique dag-run ID used for checking the status of a dag-run.
+	dagRunIDFlagStatus = commandLineFlag{
+		name:      "run-id",
+		shorthand: "r",
+		usage:     "dag-run ID for checking the status of a dag-run",
 	}
 
-	// Workflow name to dequeue a workflow.
-	workflowFlagDequeue = commandLineFlag{
-		name:      "workflow",
-		shorthand: "w",
-		usage:     "workflow name to dequeue a workflow",
+	// Unique dag-run reference used for dequeueing a dag-run.
+	dagRunFlagDequeue = commandLineFlag{
+		name:      "dag-run",
+		shorthand: "d",
+		usage:     "<DAG-name>:<run-id> to dequeue a dag-run",
 		required:  true,
 	}
 
-	// rootRefNameFlag reads the root DAG name for starting a child workflow.
-	rootWorkflowFlag = commandLineFlag{
+	// rootDAGRunFlag reads the root DAG name for starting a child dag-run.
+	rootDAGRunFlag = commandLineFlag{
 		name:  "root",
-		usage: "[only for child workflows] workflow-reference for the root workflow",
+		usage: "[only for child dag-runs] reference for the root dag-run",
 	}
 
-	// parentWorkflowFlag reads the parent ref for starting a child workflow.
-	parentWorkflowFlag = commandLineFlag{
+	// parentDAGRunFlag reads the parent ref for starting a child dag-run.
+	parentDAGRunFlag = commandLineFlag{
 		name:  "parent",
-		usage: "[only for child workflows] workflow-reference for the parent workflow",
+		usage: "[only for child dag-runs] reference for the parent dag-run",
 	}
 
-	// Suppresses output during workflow (e.g., logs, status updates).
+	// quietFlag is used to suppress output during command execution.
 	quietFlag = commandLineFlag{
 		name:      "quiet",
 		shorthand: "q",
-		usage:     "Suppress output during workflow",
+		usage:     "Suppress output during dag-run",
 		isBool:    true,
 	}
 
