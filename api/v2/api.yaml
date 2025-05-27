@@ -363,7 +363,7 @@ paths:
               schema:
                 type: object
                 properties:
-                  dag-runs:
+                  dagRuns:
                     type: array
                     description: "List of historical DAG-runs created from this DAG"
                     items:
@@ -374,7 +374,7 @@ paths:
                     items:
                       $ref: "#/components/schemas/DAGGridItem"
                 required:
-                  - dag-runs
+                  - dagRuns
                   - gridData
         default:
           description: "Generic error response"
@@ -402,10 +402,10 @@ paths:
               schema:
                 type: object
                 properties:
-                  dag-run:
+                  dagRun:
                     $ref: "#/components/schemas/DAGRunDetails"
                 required:
-                  - dag-run
+                  - dagRun
         default:
           description: "Generic error response"
           content:
@@ -670,13 +670,13 @@ paths:
               schema:
                 type: object
                 properties:
-                  dag-runs:
+                  dagRuns:
                     type: array
                     description: "List of DAG-runs with their status and metadata"
                     items:
                       $ref: "#/components/schemas/DAGRunSummary"
                 required:
-                  - dag-runs
+                  - dagRuns
         default:
           description: "Generic error response"
           content:
@@ -706,13 +706,13 @@ paths:
               schema:
                 type: object
                 properties:
-                  dag-runs:
+                  dagRuns:
                     type: array
                     description: "List of DAG-runs with their status and metadata"
                     items:
                       $ref: "#/components/schemas/DAGRunSummary"
                 required:
-                  - dag-runs
+                  - dagRuns
         default:
           description: "Generic error response"
           content:
