@@ -91,13 +91,13 @@ const (
 	StreamStdout Stream = "stdout"
 )
 
-// ChildDAGRun Metadata for a child dag-run
+// ChildDAGRun Metadata for a child DAG-run
 type ChildDAGRun struct {
-	// DagRunId Unique identifier for the dag-run
-	DagRunId DAGRunId `json:"dag-runId"`
+	// DagRunId Unique identifier for the DAG-run
+	DagRunId DAGRunId `json:"dagRunId"`
 }
 
-// Condition Precondition that must be satisfied before running a step or dag-run
+// Condition Precondition that must be satisfied before running a step or DAG-run
 type Condition struct {
 	// Condition Expression or check to evaluate
 	Condition string `json:"condition"`
@@ -114,7 +114,7 @@ type Condition struct {
 
 // DAG Core DAG configuration containing definition and metadata
 type DAG struct {
-	// DefaultParams Default parameter values in JSON format if not specified at dag-run creation
+	// DefaultParams Default parameter values in JSON format if not specified at DAG-run creation
 	DefaultParams *string `json:"defaultParams,omitempty"`
 
 	// Description Human-readable description of the DAG's purpose and behavior
@@ -126,10 +126,10 @@ type DAG struct {
 	// Name Logical name of the DAG
 	Name string `json:"name"`
 
-	// Params List of parameter names that can be passed to dag-runs created from this DAG
+	// Params List of parameter names that can be passed to DAG-runs created from this DAG
 	Params *[]string `json:"params,omitempty"`
 
-	// Schedule List of scheduling expressions defining when dag-runs should be created from this DAG
+	// Schedule List of scheduling expressions defining when DAG-runs should be created from this DAG
 	Schedule *[]Schedule `json:"schedule,omitempty"`
 
 	// Tags List of tags for categorizing and filtering DAGs
@@ -138,22 +138,22 @@ type DAG struct {
 
 // DAGDetails Detailed DAG configuration information
 type DAGDetails struct {
-	// DefaultParams Default parameter values in JSON format if not specified at dag-run creation
+	// DefaultParams Default parameter values in JSON format if not specified at DAG-run creation
 	DefaultParams *string `json:"defaultParams,omitempty"`
 
-	// Delay Time in seconds to wait before starting a dag-run
+	// Delay Time in seconds to wait before starting a DAG-run
 	Delay *int `json:"delay,omitempty"`
 
 	// Description Human-readable description of the DAG's purpose and behavior
 	Description *string `json:"description,omitempty"`
 
-	// Env List of environment variables to set before executing a dag-run
+	// Env List of environment variables to set before executing a DAG-run
 	Env *[]string `json:"env,omitempty"`
 
 	// Group Logical grouping of related DAGs for organizational purposes
 	Group *string `json:"group,omitempty"`
 
-	// HandlerOn Configuration for event handlers in a dag-run
+	// HandlerOn Configuration for event handlers in a DAG-run
 	HandlerOn *HandlerOn `json:"handlerOn,omitempty"`
 
 	// HistRetentionDays Number of days to retain historical logs
@@ -162,25 +162,25 @@ type DAGDetails struct {
 	// LogDir Directory path for storing log files
 	LogDir *string `json:"logDir,omitempty"`
 
-	// MaxActiveDAGRuns Maximum number of concurrent dag-runs allowed from this DAG
+	// MaxActiveDAGRuns Maximum number of concurrent DAG-runs allowed from this DAG
 	MaxActiveDAGRuns *int `json:"maxActiveDAGRuns,omitempty"`
 
-	// MaxActiveSteps Maximum number of concurrent dag-runs allowed from this DAG
+	// MaxActiveSteps Maximum number of concurrent DAG-runs allowed from this DAG
 	MaxActiveSteps *int `json:"maxActiveSteps,omitempty"`
 
 	// Name Unique identifier for the DAG within its group
 	Name string `json:"name"`
 
-	// Params List of parameter names that can be passed to dag-runs created from this DAG
+	// Params List of parameter names that can be passed to DAG-runs created from this DAG
 	Params *[]string `json:"params,omitempty"`
 
-	// Preconditions Conditions that must be met before a dag-run can start
+	// Preconditions Conditions that must be met before a DAG-run can start
 	Preconditions *[]Condition `json:"preconditions,omitempty"`
 
-	// Schedule List of scheduling expressions defining when dag-runs should be created from this DAG
+	// Schedule List of scheduling expressions defining when DAG-runs should be created from this DAG
 	Schedule *[]Schedule `json:"schedule,omitempty"`
 
-	// Steps List of steps to execute in dag-runs created from this DAG
+	// Steps List of steps to execute in DAG-runs created from this DAG
 	Steps *[]Step `json:"steps,omitempty"`
 
 	// Tags List of tags for categorizing and filtering DAGs
@@ -198,7 +198,7 @@ type DAGFile struct {
 	// FileName File ID of the DAG file
 	FileName string `json:"fileName"`
 
-	// LatestDAGRun Current status of a dag-run
+	// LatestDAGRun Current status of a DAG-run
 	LatestDAGRun DAGRunSummary `json:"latestDAGRun"`
 
 	// Suspended Whether the DAG is suspended
@@ -208,7 +208,7 @@ type DAGFile struct {
 // DAGFileName Name of the DAG file
 type DAGFileName = string
 
-// DAGGridItem Grid item for visualizing dag-run execution history
+// DAGGridItem Grid item for visualizing DAG-run execution history
 type DAGGridItem struct {
 	// History Status of the step ordered by time
 	History []NodeStatus `json:"history"`
@@ -222,10 +222,10 @@ type DAGName = string
 
 // DAGRunDetails defines model for DAGRunDetails.
 type DAGRunDetails struct {
-	// DagRunId Unique identifier for the dag-run
-	DagRunId DAGRunId `json:"dag-runId"`
+	// DagRunId Unique identifier for the DAG-run
+	DagRunId DAGRunId `json:"dagRunId"`
 
-	// FinishedAt RFC 3339 timestamp when the dag-run finished
+	// FinishedAt RFC 3339 timestamp when the DAG-run finished
 	FinishedAt string `json:"finishedAt"`
 
 	// Log Path to the log file
@@ -234,49 +234,49 @@ type DAGRunDetails struct {
 	// Name Name of the DAG
 	Name DAGName `json:"name"`
 
-	// Nodes Status of individual steps within the dag-run
+	// Nodes Status of individual steps within the DAG-run
 	Nodes []Node `json:"nodes"`
 
-	// OnCancel Status of an individual step within a dag-run
+	// OnCancel Status of an individual step within a DAG-run
 	OnCancel *Node `json:"onCancel,omitempty"`
 
-	// OnExit Status of an individual step within a dag-run
+	// OnExit Status of an individual step within a DAG-run
 	OnExit *Node `json:"onExit,omitempty"`
 
-	// OnFailure Status of an individual step within a dag-run
+	// OnFailure Status of an individual step within a DAG-run
 	OnFailure *Node `json:"onFailure,omitempty"`
 
-	// OnSuccess Status of an individual step within a dag-run
+	// OnSuccess Status of an individual step within a DAG-run
 	OnSuccess *Node `json:"onSuccess,omitempty"`
 
-	// Params Runtime parameters passed to the dag-run in JSON format
+	// Params Runtime parameters passed to the DAG-run in JSON format
 	Params *string `json:"params,omitempty"`
 
-	// ParentDAGRunId ID of the parent dag-run
+	// ParentDAGRunId ID of the parent DAG-run
 	ParentDAGRunId *string `json:"parentDAGRunId,omitempty"`
 
-	// ParentDAGRunName Name of the parent dag-run
+	// ParentDAGRunName Name of the parent DAG-run
 	ParentDAGRunName *string `json:"parentDAGRunName,omitempty"`
 
-	// Pid Process ID of the dag-run
+	// Pid Process ID of the DAG-run
 	Pid *int `json:"pid,omitempty"`
 
-	// Preconditions List of preconditions that must be met before the dag-run can start
+	// Preconditions List of preconditions that must be met before the DAG-run can start
 	Preconditions *[]Condition `json:"preconditions,omitempty"`
 
-	// QueuedAt RFC 3339 timestamp when the dag-run was queued
+	// QueuedAt RFC 3339 timestamp when the DAG-run was queued
 	QueuedAt *string `json:"queuedAt,omitempty"`
 
-	// RootDAGRunId ID of the root dag-run
+	// RootDAGRunId ID of the root DAG-run
 	RootDAGRunId string `json:"rootDAGRunId"`
 
-	// RootDAGRunName Name of the root dag-run
+	// RootDAGRunName Name of the root DAG-run
 	RootDAGRunName string `json:"rootDAGRunName"`
 
-	// StartedAt RFC 3339 timestamp when the dag-run started
+	// StartedAt RFC 3339 timestamp when the DAG-run started
 	StartedAt string `json:"startedAt"`
 
-	// Status Numeric status code indicating current dag-run state:
+	// Status Numeric status code indicating current DAG-run state:
 	// 0: "Not started"
 	// 1: "Running"
 	// 2: "Failed"
@@ -285,19 +285,19 @@ type DAGRunDetails struct {
 	// 5: "Queued"
 	Status Status `json:"status"`
 
-	// StatusLabel Human-readable status description for the dag-run
+	// StatusLabel Human-readable status description for the DAG-run
 	StatusLabel StatusLabel `json:"statusLabel"`
 }
 
-// DAGRunId Unique identifier for the dag-run
+// DAGRunId Unique identifier for the DAG-run
 type DAGRunId = string
 
-// DAGRunSummary Current status of a dag-run
+// DAGRunSummary Current status of a DAG-run
 type DAGRunSummary struct {
-	// DagRunId Unique identifier for the dag-run
-	DagRunId DAGRunId `json:"dag-runId"`
+	// DagRunId Unique identifier for the DAG-run
+	DagRunId DAGRunId `json:"dagRunId"`
 
-	// FinishedAt RFC 3339 timestamp when the dag-run finished
+	// FinishedAt RFC 3339 timestamp when the DAG-run finished
 	FinishedAt string `json:"finishedAt"`
 
 	// Log Path to the log file
@@ -306,31 +306,31 @@ type DAGRunSummary struct {
 	// Name Name of the DAG
 	Name DAGName `json:"name"`
 
-	// Params Runtime parameters passed to the dag-run in JSON format
+	// Params Runtime parameters passed to the DAG-run in JSON format
 	Params *string `json:"params,omitempty"`
 
-	// ParentDAGRunId ID of the parent dag-run
+	// ParentDAGRunId ID of the parent DAG-run
 	ParentDAGRunId *string `json:"parentDAGRunId,omitempty"`
 
-	// ParentDAGRunName Name of the parent dag-run
+	// ParentDAGRunName Name of the parent DAG-run
 	ParentDAGRunName *string `json:"parentDAGRunName,omitempty"`
 
-	// Pid Process ID of the dag-run
+	// Pid Process ID of the DAG-run
 	Pid *int `json:"pid,omitempty"`
 
-	// QueuedAt RFC 3339 timestamp when the dag-run was queued
+	// QueuedAt RFC 3339 timestamp when the DAG-run was queued
 	QueuedAt *string `json:"queuedAt,omitempty"`
 
-	// RootDAGRunId ID of the root dag-run
+	// RootDAGRunId ID of the root DAG-run
 	RootDAGRunId string `json:"rootDAGRunId"`
 
-	// RootDAGRunName Name of the root dag-run
+	// RootDAGRunName Name of the root DAG-run
 	RootDAGRunName string `json:"rootDAGRunName"`
 
-	// StartedAt RFC 3339 timestamp when the dag-run started
+	// StartedAt RFC 3339 timestamp when the DAG-run started
 	StartedAt string `json:"startedAt"`
 
-	// Status Numeric status code indicating current dag-run state:
+	// Status Numeric status code indicating current DAG-run state:
 	// 0: "Not started"
 	// 1: "Running"
 	// 2: "Failed"
@@ -339,7 +339,7 @@ type DAGRunSummary struct {
 	// 5: "Queued"
 	Status Status `json:"status"`
 
-	// StatusLabel Human-readable status description for the dag-run
+	// StatusLabel Human-readable status description for the DAG-run
 	StatusLabel StatusLabel `json:"statusLabel"`
 }
 
@@ -358,18 +358,18 @@ type Error struct {
 // ErrorCode Error code indicating the type of error
 type ErrorCode string
 
-// HandlerOn Configuration for event handlers in a dag-run
+// HandlerOn Configuration for event handlers in a DAG-run
 type HandlerOn struct {
-	// Cancel Individual task definition that performs a specific operation in a dag-run
+	// Cancel Individual task definition that performs a specific operation in a DAG-run
 	Cancel *Step `json:"cancel,omitempty"`
 
-	// Exit Individual task definition that performs a specific operation in a dag-run
+	// Exit Individual task definition that performs a specific operation in a DAG-run
 	Exit *Step `json:"exit,omitempty"`
 
-	// Failure Individual task definition that performs a specific operation in a dag-run
+	// Failure Individual task definition that performs a specific operation in a DAG-run
 	Failure *Step `json:"failure,omitempty"`
 
-	// Success Individual task definition that performs a specific operation in a dag-run
+	// Success Individual task definition that performs a specific operation in a DAG-run
 	Success *Step `json:"success,omitempty"`
 }
 
@@ -418,9 +418,9 @@ type Log struct {
 	TotalLines *int `json:"totalLines,omitempty"`
 }
 
-// Node Status of an individual step within a dag-run
+// Node Status of an individual step within a DAG-run
 type Node struct {
-	// Children List of child dag-runs associated with this step
+	// Children List of child DAG-runs associated with this step
 	Children *[]ChildDAGRun `json:"children,omitempty"`
 
 	// DoneCount Number of successful completions for repeating steps
@@ -456,7 +456,7 @@ type Node struct {
 	// Stdout Path to the standard output log file for this step
 	Stdout string `json:"stdout"`
 
-	// Step Individual task definition that performs a specific operation in a dag-run
+	// Step Individual task definition that performs a specific operation in a DAG-run
 	Step Step `json:"step"`
 }
 
@@ -499,7 +499,7 @@ type RepeatPolicy struct {
 	Repeat *bool `json:"repeat,omitempty"`
 }
 
-// Schedule Schedule configuration for dag-run creation
+// Schedule Schedule configuration for DAG-run creation
 type Schedule struct {
 	// Expression Cron expression or schedule pattern
 	Expression string `json:"expression"`
@@ -529,7 +529,7 @@ type SearchResultItem struct {
 	Name string `json:"name"`
 }
 
-// Status Numeric status code indicating current dag-run state:
+// Status Numeric status code indicating current DAG-run state:
 // 0: "Not started"
 // 1: "Running"
 // 2: "Failed"
@@ -538,10 +538,10 @@ type SearchResultItem struct {
 // 5: "Queued"
 type Status int
 
-// StatusLabel Human-readable status description for the dag-run
+// StatusLabel Human-readable status description for the DAG-run
 type StatusLabel string
 
-// Step Individual task definition that performs a specific operation in a dag-run
+// Step Individual task definition that performs a specific operation in a DAG-run
 type Step struct {
 	// Args List of arguments to pass to the command
 	Args *[]string `json:"args,omitempty"`
@@ -564,13 +564,13 @@ type Step struct {
 	// MailOnError Whether to send email notifications on step failure
 	MailOnError *bool `json:"mailOnError,omitempty"`
 
-	// Name Unique identifier for the step within the dag-run
+	// Name Unique identifier for the step within the DAG-run
 	Name string `json:"name"`
 
 	// Output Variable name to store the step's output
 	Output *string `json:"output,omitempty"`
 
-	// Params Parameters to pass to the child dag-run in JSON format
+	// Params Parameters to pass to the child DAG-run in JSON format
 	Params *string `json:"params,omitempty"`
 
 	// Preconditions Conditions that must be met before the step can start
@@ -579,7 +579,7 @@ type Step struct {
 	// RepeatPolicy Configuration for step retry behavior
 	RepeatPolicy *RepeatPolicy `json:"repeatPolicy,omitempty"`
 
-	// Run The name of the DAG to run as a child dag-run
+	// Run The name of the DAG to run as a child DAG-run
 	Run *string `json:"run,omitempty"`
 
 	// Script Script content if the step executes a script file
@@ -598,7 +598,7 @@ type Stream string
 // UnixTimestamp Unix timestamp in seconds
 type UnixTimestamp = int64
 
-// DAGRunIdSearch Unique identifier for the dag-run
+// DAGRunIdSearch Unique identifier for the DAG-run
 type DAGRunIdSearch = DAGRunId
 
 // DAGRunName defines model for DAGRunName.
@@ -636,38 +636,38 @@ type Tail = int
 
 // ListDAGRunsParams defines parameters for ListDAGRuns.
 type ListDAGRunsParams struct {
-	// Status status of the dag-run
+	// Status status of the DAG-run
 	Status *Status `form:"status,omitempty" json:"status,omitempty"`
 
-	// FromDate start datetime for filtering dag-runs in ISO 8601 format with timezone
+	// FromDate start datetime for filtering DAG-runs in ISO 8601 format with timezone
 	FromDate *DateTimeFrom `form:"fromDate,omitempty" json:"fromDate,omitempty"`
 
-	// ToDate end datetime for filtering dag-runs in ISO 8601 format with timezone
+	// ToDate end datetime for filtering DAG-runs in ISO 8601 format with timezone
 	ToDate *DateTimeTo `form:"toDate,omitempty" json:"toDate,omitempty"`
 
-	// DagRunId ID of the dag-run or 'latest' to get the most recent dag-run
-	DagRunId *DAGRunIdSearch `form:"dag-runId,omitempty" json:"dag-runId,omitempty"`
+	// DagRunId ID of the DAG-run or 'latest' to get the most recent DAG-run
+	DagRunId *DAGRunIdSearch `form:"dagRunId,omitempty" json:"dagRunId,omitempty"`
 
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 
-	// Name Filter dag-runs by name
+	// Name Filter DAG-runs by name
 	Name *string `form:"name,omitempty" json:"name,omitempty"`
 }
 
 // ListDAGRunsByNameParams defines parameters for ListDAGRunsByName.
 type ListDAGRunsByNameParams struct {
-	// Status status of the dag-run
+	// Status status of the DAG-run
 	Status *Status `form:"status,omitempty" json:"status,omitempty"`
 
-	// FromDate start datetime for filtering dag-runs in ISO 8601 format with timezone
+	// FromDate start datetime for filtering DAG-runs in ISO 8601 format with timezone
 	FromDate *DateTimeFrom `form:"fromDate,omitempty" json:"fromDate,omitempty"`
 
-	// ToDate end datetime for filtering dag-runs in ISO 8601 format with timezone
+	// ToDate end datetime for filtering DAG-runs in ISO 8601 format with timezone
 	ToDate *DateTimeTo `form:"toDate,omitempty" json:"toDate,omitempty"`
 
-	// DagRunId ID of the dag-run or 'latest' to get the most recent dag-run
-	DagRunId *DAGRunIdSearch `form:"dag-runId,omitempty" json:"dag-runId,omitempty"`
+	// DagRunId ID of the DAG-run or 'latest' to get the most recent DAG-run
+	DagRunId *DAGRunIdSearch `form:"dagRunId,omitempty" json:"dagRunId,omitempty"`
 
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
@@ -768,8 +768,8 @@ type GetDAGRunLogParams struct {
 
 // RetryDAGRunJSONBody defines parameters for RetryDAGRun.
 type RetryDAGRunJSONBody struct {
-	// DagRunId ID of the dag-run to retry
-	DagRunId string `json:"dag-runId"`
+	// DagRunId ID of the DAG-run to retry
+	DagRunId string `json:"dagRunId"`
 }
 
 // RetryDAGRunParams defines parameters for RetryDAGRun.
@@ -894,10 +894,10 @@ type GetDAGDAGRunDetailsParams struct {
 
 // EnqueueDAGDAGRunJSONBody defines parameters for EnqueueDAGDAGRun.
 type EnqueueDAGDAGRunJSONBody struct {
-	// DagRunId Optional ID for the dag-run, if not provided a new one will be generated
-	DagRunId *string `json:"dag-runId,omitempty"`
+	// DagRunId Optional ID for the DAG-run, if not provided a new one will be generated
+	DagRunId *string `json:"dagRunId,omitempty"`
 
-	// Params Parameters to pass to the dag-run in JSON format
+	// Params Parameters to pass to the DAG-run in JSON format
 	Params *string `json:"params,omitempty"`
 }
 
@@ -921,8 +921,8 @@ type RenameDAGParams struct {
 
 // RetryDAGDAGRunJSONBody defines parameters for RetryDAGDAGRun.
 type RetryDAGDAGRunJSONBody struct {
-	// DagRunId ID of the dag-run to retry
-	DagRunId string `json:"dag-runId"`
+	// DagRunId ID of the DAG-run to retry
+	DagRunId string `json:"dagRunId"`
 }
 
 // RetryDAGDAGRunParams defines parameters for RetryDAGDAGRun.
@@ -951,10 +951,10 @@ type UpdateDAGSpecParams struct {
 
 // ExecuteDAGJSONBody defines parameters for ExecuteDAG.
 type ExecuteDAGJSONBody struct {
-	// DagRunId Optional ID for the dag-run, if not provided a new one will be generated
-	DagRunId *string `json:"dag-runId,omitempty"`
+	// DagRunId Optional ID for the DAG-run, if not provided a new one will be generated
+	DagRunId *string `json:"dagRunId,omitempty"`
 
-	// Params Parameters to pass to the dag-run in JSON format
+	// Params Parameters to pass to the DAG-run in JSON format
 	Params *string `json:"params,omitempty"`
 }
 
@@ -1014,44 +1014,44 @@ type UpdateDAGSuspensionStateJSONRequestBody UpdateDAGSuspensionStateJSONBody
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// List all dag-runs
+	// List all DAG-runs
 	// (GET /dag-runs)
 	ListDAGRuns(w http.ResponseWriter, r *http.Request, params ListDAGRunsParams)
-	// List all dag-runs with a specific name
+	// List all DAG-runs with a specific name
 	// (GET /dag-runs/{name})
 	ListDAGRunsByName(w http.ResponseWriter, r *http.Request, name DAGRunName, params ListDAGRunsByNameParams)
-	// Retrieve detailed status of a dag-run
-	// (GET /dag-runs/{name}/{dag-runId})
+	// Retrieve detailed status of a DAG-run
+	// (GET /dag-runs/{name}/{dagRunId})
 	GetDAGRunDetails(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params GetDAGRunDetailsParams)
-	// Retrieve detailed status of a child dag-run
-	// (GET /dag-runs/{name}/{dag-runId}/children/{childDAGRunId})
+	// Retrieve detailed status of a child DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/children/{childDAGRunId})
 	GetChildDAGRunDetails(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, childDAGRunId string, params GetChildDAGRunDetailsParams)
-	// Retrieve log for a specific child dag-run
-	// (GET /dag-runs/{name}/{dag-runId}/children/{childDAGRunId}/log)
+	// Retrieve log for a specific child DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/log)
 	GetChildDAGRunLog(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, childDAGRunId string, params GetChildDAGRunLogParams)
-	// Retrieve log for a specific step in a child dag-run
-	// (GET /dag-runs/{name}/{dag-runId}/children/{childDAGRunId}/steps/{stepName}/log)
+	// Retrieve log for a specific step in a child DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/log)
 	GetChildDAGRunStepLog(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, childDAGRunId string, stepName StepName, params GetChildDAGRunStepLogParams)
-	// Manually update a step's execution status in a child dag-run
-	// (PATCH /dag-runs/{name}/{dag-runId}/children/{childDAGRunId}/steps/{stepName}/status)
+	// Manually update a step's execution status in a child DAG-run
+	// (PATCH /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/status)
 	UpdateChildDAGRunStepStatus(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, childDAGRunId string, stepName StepName, params UpdateChildDAGRunStepStatusParams)
-	// Dequeue a queued dag-run
-	// (GET /dag-runs/{name}/{dag-runId}/dequeue)
+	// Dequeue a queued DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/dequeue)
 	DequeueDAGRun(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params DequeueDAGRunParams)
-	// Retrieve full execution log of a dag-run
-	// (GET /dag-runs/{name}/{dag-runId}/log)
+	// Retrieve full execution log of a DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/log)
 	GetDAGRunLog(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params GetDAGRunLogParams)
-	// Retry dag-run execution
-	// (POST /dag-runs/{name}/{dag-runId}/retry)
+	// Retry DAG-run execution
+	// (POST /dag-runs/{name}/{dagRunId}/retry)
 	RetryDAGRun(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params RetryDAGRunParams)
-	// Retrieve log for a specific step in a dag-run
-	// (GET /dag-runs/{name}/{dag-runId}/steps/{stepName}/log)
+	// Retrieve log for a specific step in a DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/steps/{stepName}/log)
 	GetDAGRunStepLog(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, stepName StepName, params GetDAGRunStepLogParams)
 	// Manually update a step's execution status
-	// (PATCH /dag-runs/{name}/{dag-runId}/steps/{stepName}/status)
+	// (PATCH /dag-runs/{name}/{dagRunId}/steps/{stepName}/status)
 	UpdateDAGRunStepStatus(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, stepName StepName, params UpdateDAGRunStepStatusParams)
-	// Terminate a running dag-run
-	// (POST /dag-runs/{name}/{dag-runId}/stop)
+	// Terminate a running DAG-run
+	// (POST /dag-runs/{name}/{dagRunId}/stop)
 	TerminateDAGRun(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params TerminateDAGRunParams)
 	// List all available DAGs
 	// (GET /dags)
@@ -1074,16 +1074,16 @@ type ServerInterface interface {
 	// Retrieve execution history of a DAG
 	// (GET /dags/{fileName}/dag-runs)
 	GetDAGDAGRunHistory(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params GetDAGDAGRunHistoryParams)
-	// Get detailed status of a specific dag-run
-	// (GET /dags/{fileName}/dag-runs/{dag-runId})
+	// Get detailed status of a specific DAG-run
+	// (GET /dags/{fileName}/dag-runs/{dagRunId})
 	GetDAGDAGRunDetails(w http.ResponseWriter, r *http.Request, fileName DAGFileName, dagRunId DAGRunId, params GetDAGDAGRunDetailsParams)
-	// Enqueue a dag-run from DAG
+	// Enqueue a DAG-run from DAG
 	// (POST /dags/{fileName}/enqueue)
 	EnqueueDAGDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params EnqueueDAGDAGRunParams)
 	// Change DAG file ID
 	// (POST /dags/{fileName}/rename)
 	RenameDAG(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RenameDAGParams)
-	// Retry dag-run execution
+	// Retry DAG-run execution
 	// (POST /dags/{fileName}/retry)
 	RetryDAGDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryDAGDAGRunParams)
 	// Retrieve DAG specification
@@ -1092,10 +1092,10 @@ type ServerInterface interface {
 	// Update DAG spec
 	// (PUT /dags/{fileName}/spec)
 	UpdateDAGSpec(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params UpdateDAGSpecParams)
-	// Create and execute a dag-run from DAG
+	// Create and execute a DAG-run from DAG
 	// (POST /dags/{fileName}/start)
 	ExecuteDAG(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params ExecuteDAGParams)
-	// Terminate a running dag-run
+	// Terminate a running DAG-run
 	// (POST /dags/{fileName}/stop)
 	TerminateDAGDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateDAGDAGRunParams)
 	// Toggle DAG suspension state
@@ -1110,80 +1110,80 @@ type ServerInterface interface {
 
 type Unimplemented struct{}
 
-// List all dag-runs
+// List all DAG-runs
 // (GET /dag-runs)
 func (_ Unimplemented) ListDAGRuns(w http.ResponseWriter, r *http.Request, params ListDAGRunsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// List all dag-runs with a specific name
+// List all DAG-runs with a specific name
 // (GET /dag-runs/{name})
 func (_ Unimplemented) ListDAGRunsByName(w http.ResponseWriter, r *http.Request, name DAGRunName, params ListDAGRunsByNameParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Retrieve detailed status of a dag-run
-// (GET /dag-runs/{name}/{dag-runId})
+// Retrieve detailed status of a DAG-run
+// (GET /dag-runs/{name}/{dagRunId})
 func (_ Unimplemented) GetDAGRunDetails(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params GetDAGRunDetailsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Retrieve detailed status of a child dag-run
-// (GET /dag-runs/{name}/{dag-runId}/children/{childDAGRunId})
+// Retrieve detailed status of a child DAG-run
+// (GET /dag-runs/{name}/{dagRunId}/children/{childDAGRunId})
 func (_ Unimplemented) GetChildDAGRunDetails(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, childDAGRunId string, params GetChildDAGRunDetailsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Retrieve log for a specific child dag-run
-// (GET /dag-runs/{name}/{dag-runId}/children/{childDAGRunId}/log)
+// Retrieve log for a specific child DAG-run
+// (GET /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/log)
 func (_ Unimplemented) GetChildDAGRunLog(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, childDAGRunId string, params GetChildDAGRunLogParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Retrieve log for a specific step in a child dag-run
-// (GET /dag-runs/{name}/{dag-runId}/children/{childDAGRunId}/steps/{stepName}/log)
+// Retrieve log for a specific step in a child DAG-run
+// (GET /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/log)
 func (_ Unimplemented) GetChildDAGRunStepLog(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, childDAGRunId string, stepName StepName, params GetChildDAGRunStepLogParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Manually update a step's execution status in a child dag-run
-// (PATCH /dag-runs/{name}/{dag-runId}/children/{childDAGRunId}/steps/{stepName}/status)
+// Manually update a step's execution status in a child DAG-run
+// (PATCH /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/status)
 func (_ Unimplemented) UpdateChildDAGRunStepStatus(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, childDAGRunId string, stepName StepName, params UpdateChildDAGRunStepStatusParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Dequeue a queued dag-run
-// (GET /dag-runs/{name}/{dag-runId}/dequeue)
+// Dequeue a queued DAG-run
+// (GET /dag-runs/{name}/{dagRunId}/dequeue)
 func (_ Unimplemented) DequeueDAGRun(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params DequeueDAGRunParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Retrieve full execution log of a dag-run
-// (GET /dag-runs/{name}/{dag-runId}/log)
+// Retrieve full execution log of a DAG-run
+// (GET /dag-runs/{name}/{dagRunId}/log)
 func (_ Unimplemented) GetDAGRunLog(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params GetDAGRunLogParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Retry dag-run execution
-// (POST /dag-runs/{name}/{dag-runId}/retry)
+// Retry DAG-run execution
+// (POST /dag-runs/{name}/{dagRunId}/retry)
 func (_ Unimplemented) RetryDAGRun(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params RetryDAGRunParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Retrieve log for a specific step in a dag-run
-// (GET /dag-runs/{name}/{dag-runId}/steps/{stepName}/log)
+// Retrieve log for a specific step in a DAG-run
+// (GET /dag-runs/{name}/{dagRunId}/steps/{stepName}/log)
 func (_ Unimplemented) GetDAGRunStepLog(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, stepName StepName, params GetDAGRunStepLogParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Manually update a step's execution status
-// (PATCH /dag-runs/{name}/{dag-runId}/steps/{stepName}/status)
+// (PATCH /dag-runs/{name}/{dagRunId}/steps/{stepName}/status)
 func (_ Unimplemented) UpdateDAGRunStepStatus(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, stepName StepName, params UpdateDAGRunStepStatusParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Terminate a running dag-run
-// (POST /dag-runs/{name}/{dag-runId}/stop)
+// Terminate a running DAG-run
+// (POST /dag-runs/{name}/{dagRunId}/stop)
 func (_ Unimplemented) TerminateDAGRun(w http.ResponseWriter, r *http.Request, name DAGName, dagRunId DAGRunId, params TerminateDAGRunParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
@@ -1230,13 +1230,13 @@ func (_ Unimplemented) GetDAGDAGRunHistory(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Get detailed status of a specific dag-run
-// (GET /dags/{fileName}/dag-runs/{dag-runId})
+// Get detailed status of a specific DAG-run
+// (GET /dags/{fileName}/dag-runs/{dagRunId})
 func (_ Unimplemented) GetDAGDAGRunDetails(w http.ResponseWriter, r *http.Request, fileName DAGFileName, dagRunId DAGRunId, params GetDAGDAGRunDetailsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Enqueue a dag-run from DAG
+// Enqueue a DAG-run from DAG
 // (POST /dags/{fileName}/enqueue)
 func (_ Unimplemented) EnqueueDAGDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params EnqueueDAGDAGRunParams) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -1248,7 +1248,7 @@ func (_ Unimplemented) RenameDAG(w http.ResponseWriter, r *http.Request, fileNam
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Retry dag-run execution
+// Retry DAG-run execution
 // (POST /dags/{fileName}/retry)
 func (_ Unimplemented) RetryDAGDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params RetryDAGDAGRunParams) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -1266,13 +1266,13 @@ func (_ Unimplemented) UpdateDAGSpec(w http.ResponseWriter, r *http.Request, fil
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Create and execute a dag-run from DAG
+// Create and execute a DAG-run from DAG
 // (POST /dags/{fileName}/start)
 func (_ Unimplemented) ExecuteDAG(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params ExecuteDAGParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Terminate a running dag-run
+// Terminate a running DAG-run
 // (POST /dags/{fileName}/stop)
 func (_ Unimplemented) TerminateDAGDAGRun(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TerminateDAGDAGRunParams) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -1339,11 +1339,11 @@ func (siw *ServerInterfaceWrapper) ListDAGRuns(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// ------------- Optional query parameter "dag-runId" -------------
+	// ------------- Optional query parameter "dagRunId" -------------
 
-	err = runtime.BindQueryParameter("form", true, false, "dag-runId", r.URL.Query(), &params.DagRunId)
+	err = runtime.BindQueryParameter("form", true, false, "dagRunId", r.URL.Query(), &params.DagRunId)
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dag-runId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
 		return
 	}
 
@@ -1423,11 +1423,11 @@ func (siw *ServerInterfaceWrapper) ListDAGRunsByName(w http.ResponseWriter, r *h
 		return
 	}
 
-	// ------------- Optional query parameter "dag-runId" -------------
+	// ------------- Optional query parameter "dagRunId" -------------
 
-	err = runtime.BindQueryParameter("form", true, false, "dag-runId", r.URL.Query(), &params.DagRunId)
+	err = runtime.BindQueryParameter("form", true, false, "dagRunId", r.URL.Query(), &params.DagRunId)
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dag-runId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
 		return
 	}
 
@@ -1464,12 +1464,12 @@ func (siw *ServerInterfaceWrapper) GetDAGRunDetails(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// ------------- Path parameter "dag-runId" -------------
+	// ------------- Path parameter "dagRunId" -------------
 	var dagRunId DAGRunId
 
-	err = runtime.BindStyledParameterWithOptions("simple", "dag-runId", chi.URLParam(r, "dag-runId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dag-runId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
 		return
 	}
 
@@ -1517,12 +1517,12 @@ func (siw *ServerInterfaceWrapper) GetChildDAGRunDetails(w http.ResponseWriter, 
 		return
 	}
 
-	// ------------- Path parameter "dag-runId" -------------
+	// ------------- Path parameter "dagRunId" -------------
 	var dagRunId DAGRunId
 
-	err = runtime.BindStyledParameterWithOptions("simple", "dag-runId", chi.URLParam(r, "dag-runId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dag-runId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
 		return
 	}
 
@@ -1579,12 +1579,12 @@ func (siw *ServerInterfaceWrapper) GetChildDAGRunLog(w http.ResponseWriter, r *h
 		return
 	}
 
-	// ------------- Path parameter "dag-runId" -------------
+	// ------------- Path parameter "dagRunId" -------------
 	var dagRunId DAGRunId
 
-	err = runtime.BindStyledParameterWithOptions("simple", "dag-runId", chi.URLParam(r, "dag-runId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dag-runId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
 		return
 	}
 
@@ -1673,12 +1673,12 @@ func (siw *ServerInterfaceWrapper) GetChildDAGRunStepLog(w http.ResponseWriter, 
 		return
 	}
 
-	// ------------- Path parameter "dag-runId" -------------
+	// ------------- Path parameter "dagRunId" -------------
 	var dagRunId DAGRunId
 
-	err = runtime.BindStyledParameterWithOptions("simple", "dag-runId", chi.URLParam(r, "dag-runId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dag-runId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
 		return
 	}
 
@@ -1784,12 +1784,12 @@ func (siw *ServerInterfaceWrapper) UpdateChildDAGRunStepStatus(w http.ResponseWr
 		return
 	}
 
-	// ------------- Path parameter "dag-runId" -------------
+	// ------------- Path parameter "dagRunId" -------------
 	var dagRunId DAGRunId
 
-	err = runtime.BindStyledParameterWithOptions("simple", "dag-runId", chi.URLParam(r, "dag-runId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dag-runId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
 		return
 	}
 
@@ -1855,12 +1855,12 @@ func (siw *ServerInterfaceWrapper) DequeueDAGRun(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// ------------- Path parameter "dag-runId" -------------
+	// ------------- Path parameter "dagRunId" -------------
 	var dagRunId DAGRunId
 
-	err = runtime.BindStyledParameterWithOptions("simple", "dag-runId", chi.URLParam(r, "dag-runId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dag-runId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
 		return
 	}
 
@@ -1908,12 +1908,12 @@ func (siw *ServerInterfaceWrapper) GetDAGRunLog(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// ------------- Path parameter "dag-runId" -------------
+	// ------------- Path parameter "dagRunId" -------------
 	var dagRunId DAGRunId
 
-	err = runtime.BindStyledParameterWithOptions("simple", "dag-runId", chi.URLParam(r, "dag-runId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dag-runId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
 		return
 	}
 
@@ -1993,12 +1993,12 @@ func (siw *ServerInterfaceWrapper) RetryDAGRun(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// ------------- Path parameter "dag-runId" -------------
+	// ------------- Path parameter "dagRunId" -------------
 	var dagRunId DAGRunId
 
-	err = runtime.BindStyledParameterWithOptions("simple", "dag-runId", chi.URLParam(r, "dag-runId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dag-runId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
 		return
 	}
 
@@ -2046,12 +2046,12 @@ func (siw *ServerInterfaceWrapper) GetDAGRunStepLog(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// ------------- Path parameter "dag-runId" -------------
+	// ------------- Path parameter "dagRunId" -------------
 	var dagRunId DAGRunId
 
-	err = runtime.BindStyledParameterWithOptions("simple", "dag-runId", chi.URLParam(r, "dag-runId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dag-runId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
 		return
 	}
 
@@ -2148,12 +2148,12 @@ func (siw *ServerInterfaceWrapper) UpdateDAGRunStepStatus(w http.ResponseWriter,
 		return
 	}
 
-	// ------------- Path parameter "dag-runId" -------------
+	// ------------- Path parameter "dagRunId" -------------
 	var dagRunId DAGRunId
 
-	err = runtime.BindStyledParameterWithOptions("simple", "dag-runId", chi.URLParam(r, "dag-runId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dag-runId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
 		return
 	}
 
@@ -2210,12 +2210,12 @@ func (siw *ServerInterfaceWrapper) TerminateDAGRun(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// ------------- Path parameter "dag-runId" -------------
+	// ------------- Path parameter "dagRunId" -------------
 	var dagRunId DAGRunId
 
-	err = runtime.BindStyledParameterWithOptions("simple", "dag-runId", chi.URLParam(r, "dag-runId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dag-runId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
 		return
 	}
 
@@ -2582,12 +2582,12 @@ func (siw *ServerInterfaceWrapper) GetDAGDAGRunDetails(w http.ResponseWriter, r 
 		return
 	}
 
-	// ------------- Path parameter "dag-runId" -------------
+	// ------------- Path parameter "dagRunId" -------------
 	var dagRunId DAGRunId
 
-	err = runtime.BindStyledParameterWithOptions("simple", "dag-runId", chi.URLParam(r, "dag-runId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "dagRunId", chi.URLParam(r, "dagRunId"), &dagRunId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dag-runId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagRunId", Err: err})
 		return
 	}
 
@@ -3115,37 +3115,37 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/dag-runs/{name}", wrapper.ListDAGRunsByName)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dag-runs/{name}/{dag-runId}", wrapper.GetDAGRunDetails)
+		r.Get(options.BaseURL+"/dag-runs/{name}/{dagRunId}", wrapper.GetDAGRunDetails)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dag-runs/{name}/{dag-runId}/children/{childDAGRunId}", wrapper.GetChildDAGRunDetails)
+		r.Get(options.BaseURL+"/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}", wrapper.GetChildDAGRunDetails)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dag-runs/{name}/{dag-runId}/children/{childDAGRunId}/log", wrapper.GetChildDAGRunLog)
+		r.Get(options.BaseURL+"/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/log", wrapper.GetChildDAGRunLog)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dag-runs/{name}/{dag-runId}/children/{childDAGRunId}/steps/{stepName}/log", wrapper.GetChildDAGRunStepLog)
+		r.Get(options.BaseURL+"/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/log", wrapper.GetChildDAGRunStepLog)
 	})
 	r.Group(func(r chi.Router) {
-		r.Patch(options.BaseURL+"/dag-runs/{name}/{dag-runId}/children/{childDAGRunId}/steps/{stepName}/status", wrapper.UpdateChildDAGRunStepStatus)
+		r.Patch(options.BaseURL+"/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/status", wrapper.UpdateChildDAGRunStepStatus)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dag-runs/{name}/{dag-runId}/dequeue", wrapper.DequeueDAGRun)
+		r.Get(options.BaseURL+"/dag-runs/{name}/{dagRunId}/dequeue", wrapper.DequeueDAGRun)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dag-runs/{name}/{dag-runId}/log", wrapper.GetDAGRunLog)
+		r.Get(options.BaseURL+"/dag-runs/{name}/{dagRunId}/log", wrapper.GetDAGRunLog)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/dag-runs/{name}/{dag-runId}/retry", wrapper.RetryDAGRun)
+		r.Post(options.BaseURL+"/dag-runs/{name}/{dagRunId}/retry", wrapper.RetryDAGRun)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dag-runs/{name}/{dag-runId}/steps/{stepName}/log", wrapper.GetDAGRunStepLog)
+		r.Get(options.BaseURL+"/dag-runs/{name}/{dagRunId}/steps/{stepName}/log", wrapper.GetDAGRunStepLog)
 	})
 	r.Group(func(r chi.Router) {
-		r.Patch(options.BaseURL+"/dag-runs/{name}/{dag-runId}/steps/{stepName}/status", wrapper.UpdateDAGRunStepStatus)
+		r.Patch(options.BaseURL+"/dag-runs/{name}/{dagRunId}/steps/{stepName}/status", wrapper.UpdateDAGRunStepStatus)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/dag-runs/{name}/{dag-runId}/stop", wrapper.TerminateDAGRun)
+		r.Post(options.BaseURL+"/dag-runs/{name}/{dagRunId}/stop", wrapper.TerminateDAGRun)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/dags", wrapper.ListDAGs)
@@ -3169,7 +3169,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/dags/{fileName}/dag-runs", wrapper.GetDAGDAGRunHistory)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/dags/{fileName}/dag-runs/{dag-runId}", wrapper.GetDAGDAGRunDetails)
+		r.Get(options.BaseURL+"/dags/{fileName}/dag-runs/{dagRunId}", wrapper.GetDAGDAGRunDetails)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/dags/{fileName}/enqueue", wrapper.EnqueueDAGDAGRun)
@@ -3211,7 +3211,7 @@ type ListDAGRunsResponseObject interface {
 }
 
 type ListDAGRuns200JSONResponse struct {
-	// DagRuns List of dag-runs with their status and metadata
+	// DagRuns List of DAG-runs with their status and metadata
 	DagRuns []DAGRunSummary `json:"dag-runs"`
 }
 
@@ -3244,7 +3244,7 @@ type ListDAGRunsByNameResponseObject interface {
 }
 
 type ListDAGRunsByName200JSONResponse struct {
-	// DagRuns List of dag-runs with their status and metadata
+	// DagRuns List of DAG-runs with their status and metadata
 	DagRuns []DAGRunSummary `json:"dag-runs"`
 }
 
@@ -3269,7 +3269,7 @@ func (response ListDAGRunsByNamedefaultJSONResponse) VisitListDAGRunsByNameRespo
 
 type GetDAGRunDetailsRequestObject struct {
 	Name     DAGName  `json:"name"`
-	DagRunId DAGRunId `json:"dag-runId"`
+	DagRunId DAGRunId `json:"dagRunId"`
 	Params   GetDAGRunDetailsParams
 }
 
@@ -3278,8 +3278,8 @@ type GetDAGRunDetailsResponseObject interface {
 }
 
 type GetDAGRunDetails200JSONResponse struct {
-	// DagRunDetails Detailed status of a dag-run including child dag-run nodes
-	DagRunDetails DAGRunDetails `json:"dag-runDetails"`
+	// DagRunDetails Detailed status of a DAG-run including child DAG-run nodes
+	DagRunDetails DAGRunDetails `json:"dagRunDetails"`
 }
 
 func (response GetDAGRunDetails200JSONResponse) VisitGetDAGRunDetailsResponse(w http.ResponseWriter) error {
@@ -3312,7 +3312,7 @@ func (response GetDAGRunDetailsdefaultJSONResponse) VisitGetDAGRunDetailsRespons
 
 type GetChildDAGRunDetailsRequestObject struct {
 	Name          DAGName  `json:"name"`
-	DagRunId      DAGRunId `json:"dag-runId"`
+	DagRunId      DAGRunId `json:"dagRunId"`
 	ChildDAGRunId string   `json:"childDAGRunId"`
 	Params        GetChildDAGRunDetailsParams
 }
@@ -3322,8 +3322,8 @@ type GetChildDAGRunDetailsResponseObject interface {
 }
 
 type GetChildDAGRunDetails200JSONResponse struct {
-	// DagRunDetails Detailed status of a dag-run including child dag-run nodes
-	DagRunDetails DAGRunDetails `json:"dag-runDetails"`
+	// DagRunDetails Detailed status of a DAG-run including child DAG-run nodes
+	DagRunDetails DAGRunDetails `json:"dagRunDetails"`
 }
 
 func (response GetChildDAGRunDetails200JSONResponse) VisitGetChildDAGRunDetailsResponse(w http.ResponseWriter) error {
@@ -3356,7 +3356,7 @@ func (response GetChildDAGRunDetailsdefaultJSONResponse) VisitGetChildDAGRunDeta
 
 type GetChildDAGRunLogRequestObject struct {
 	Name          DAGName  `json:"name"`
-	DagRunId      DAGRunId `json:"dag-runId"`
+	DagRunId      DAGRunId `json:"dagRunId"`
 	ChildDAGRunId string   `json:"childDAGRunId"`
 	Params        GetChildDAGRunLogParams
 }
@@ -3397,7 +3397,7 @@ func (response GetChildDAGRunLogdefaultJSONResponse) VisitGetChildDAGRunLogRespo
 
 type GetChildDAGRunStepLogRequestObject struct {
 	Name          DAGName  `json:"name"`
-	DagRunId      DAGRunId `json:"dag-runId"`
+	DagRunId      DAGRunId `json:"dagRunId"`
 	ChildDAGRunId string   `json:"childDAGRunId"`
 	StepName      StepName `json:"stepName"`
 	Params        GetChildDAGRunStepLogParams
@@ -3439,7 +3439,7 @@ func (response GetChildDAGRunStepLogdefaultJSONResponse) VisitGetChildDAGRunStep
 
 type UpdateChildDAGRunStepStatusRequestObject struct {
 	Name          DAGName  `json:"name"`
-	DagRunId      DAGRunId `json:"dag-runId"`
+	DagRunId      DAGRunId `json:"dagRunId"`
 	ChildDAGRunId string   `json:"childDAGRunId"`
 	StepName      StepName `json:"stepName"`
 	Params        UpdateChildDAGRunStepStatusParams
@@ -3490,7 +3490,7 @@ func (response UpdateChildDAGRunStepStatusdefaultJSONResponse) VisitUpdateChildD
 
 type DequeueDAGRunRequestObject struct {
 	Name     DAGName  `json:"name"`
-	DagRunId DAGRunId `json:"dag-runId"`
+	DagRunId DAGRunId `json:"dagRunId"`
 	Params   DequeueDAGRunParams
 }
 
@@ -3529,7 +3529,7 @@ func (response DequeueDAGRundefaultJSONResponse) VisitDequeueDAGRunResponse(w ht
 
 type GetDAGRunLogRequestObject struct {
 	Name     DAGName  `json:"name"`
-	DagRunId DAGRunId `json:"dag-runId"`
+	DagRunId DAGRunId `json:"dagRunId"`
 	Params   GetDAGRunLogParams
 }
 
@@ -3569,7 +3569,7 @@ func (response GetDAGRunLogdefaultJSONResponse) VisitGetDAGRunLogResponse(w http
 
 type RetryDAGRunRequestObject struct {
 	Name     DAGName  `json:"name"`
-	DagRunId DAGRunId `json:"dag-runId"`
+	DagRunId DAGRunId `json:"dagRunId"`
 	Params   RetryDAGRunParams
 	Body     *RetryDAGRunJSONRequestBody
 }
@@ -3600,7 +3600,7 @@ func (response RetryDAGRundefaultJSONResponse) VisitRetryDAGRunResponse(w http.R
 
 type GetDAGRunStepLogRequestObject struct {
 	Name     DAGName  `json:"name"`
-	DagRunId DAGRunId `json:"dag-runId"`
+	DagRunId DAGRunId `json:"dagRunId"`
 	StepName StepName `json:"stepName"`
 	Params   GetDAGRunStepLogParams
 }
@@ -3641,7 +3641,7 @@ func (response GetDAGRunStepLogdefaultJSONResponse) VisitGetDAGRunStepLogRespons
 
 type UpdateDAGRunStepStatusRequestObject struct {
 	Name     DAGName  `json:"name"`
-	DagRunId DAGRunId `json:"dag-runId"`
+	DagRunId DAGRunId `json:"dagRunId"`
 	StepName StepName `json:"stepName"`
 	Params   UpdateDAGRunStepStatusParams
 	Body     *UpdateDAGRunStepStatusJSONRequestBody
@@ -3691,7 +3691,7 @@ func (response UpdateDAGRunStepStatusdefaultJSONResponse) VisitUpdateDAGRunStepS
 
 type TerminateDAGRunRequestObject struct {
 	Name     DAGName  `json:"name"`
-	DagRunId DAGRunId `json:"dag-runId"`
+	DagRunId DAGRunId `json:"dagRunId"`
 	Params   TerminateDAGRunParams
 }
 
@@ -3906,7 +3906,7 @@ type GetDAGDetails200JSONResponse struct {
 	// Errors List of errors encountered during the request
 	Errors []string `json:"errors"`
 
-	// LatestDAGRun Detailed status of a dag-run including child dag-run nodes
+	// LatestDAGRun Detailed status of a DAG-run including child DAG-run nodes
 	LatestDAGRun DAGRunDetails `json:"latestDAGRun"`
 
 	// Suspended Whether the DAG is suspended
@@ -3942,7 +3942,7 @@ type GetDAGDAGRunHistoryResponseObject interface {
 }
 
 type GetDAGDAGRunHistory200JSONResponse struct {
-	// DagRuns List of historical dag-runs created from this DAG
+	// DagRuns List of historical DAG-runs created from this DAG
 	DagRuns []DAGRunDetails `json:"dag-runs"`
 
 	// GridData Grid data for visualization
@@ -3970,7 +3970,7 @@ func (response GetDAGDAGRunHistorydefaultJSONResponse) VisitGetDAGDAGRunHistoryR
 
 type GetDAGDAGRunDetailsRequestObject struct {
 	FileName DAGFileName `json:"fileName"`
-	DagRunId DAGRunId    `json:"dag-runId"`
+	DagRunId DAGRunId    `json:"dagRunId"`
 	Params   GetDAGDAGRunDetailsParams
 }
 
@@ -3979,7 +3979,7 @@ type GetDAGDAGRunDetailsResponseObject interface {
 }
 
 type GetDAGDAGRunDetails200JSONResponse struct {
-	// DagRun Detailed status of a dag-run including child dag-run nodes
+	// DagRun Detailed status of a DAG-run including child DAG-run nodes
 	DagRun DAGRunDetails `json:"dag-run"`
 }
 
@@ -4013,8 +4013,8 @@ type EnqueueDAGDAGRunResponseObject interface {
 }
 
 type EnqueueDAGDAGRun200JSONResponse struct {
-	// DagRunId ID of the created dag-run
-	DagRunId string `json:"dag-runId"`
+	// DagRunId ID of the created DAG-run
+	DagRunId string `json:"dagRunId"`
 }
 
 func (response EnqueueDAGDAGRun200JSONResponse) VisitEnqueueDAGDAGRunResponse(w http.ResponseWriter) error {
@@ -4198,8 +4198,8 @@ type ExecuteDAGResponseObject interface {
 }
 
 type ExecuteDAG200JSONResponse struct {
-	// DagRunId ID of the created dag-run
-	DagRunId string `json:"dag-runId"`
+	// DagRunId ID of the created DAG-run
+	DagRunId string `json:"dagRunId"`
 }
 
 func (response ExecuteDAG200JSONResponse) VisitExecuteDAGResponse(w http.ResponseWriter) error {
@@ -4316,44 +4316,44 @@ func (response GetHealthStatusdefaultResponse) VisitGetHealthStatusResponse(w ht
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
-	// List all dag-runs
+	// List all DAG-runs
 	// (GET /dag-runs)
 	ListDAGRuns(ctx context.Context, request ListDAGRunsRequestObject) (ListDAGRunsResponseObject, error)
-	// List all dag-runs with a specific name
+	// List all DAG-runs with a specific name
 	// (GET /dag-runs/{name})
 	ListDAGRunsByName(ctx context.Context, request ListDAGRunsByNameRequestObject) (ListDAGRunsByNameResponseObject, error)
-	// Retrieve detailed status of a dag-run
-	// (GET /dag-runs/{name}/{dag-runId})
+	// Retrieve detailed status of a DAG-run
+	// (GET /dag-runs/{name}/{dagRunId})
 	GetDAGRunDetails(ctx context.Context, request GetDAGRunDetailsRequestObject) (GetDAGRunDetailsResponseObject, error)
-	// Retrieve detailed status of a child dag-run
-	// (GET /dag-runs/{name}/{dag-runId}/children/{childDAGRunId})
+	// Retrieve detailed status of a child DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/children/{childDAGRunId})
 	GetChildDAGRunDetails(ctx context.Context, request GetChildDAGRunDetailsRequestObject) (GetChildDAGRunDetailsResponseObject, error)
-	// Retrieve log for a specific child dag-run
-	// (GET /dag-runs/{name}/{dag-runId}/children/{childDAGRunId}/log)
+	// Retrieve log for a specific child DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/log)
 	GetChildDAGRunLog(ctx context.Context, request GetChildDAGRunLogRequestObject) (GetChildDAGRunLogResponseObject, error)
-	// Retrieve log for a specific step in a child dag-run
-	// (GET /dag-runs/{name}/{dag-runId}/children/{childDAGRunId}/steps/{stepName}/log)
+	// Retrieve log for a specific step in a child DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/log)
 	GetChildDAGRunStepLog(ctx context.Context, request GetChildDAGRunStepLogRequestObject) (GetChildDAGRunStepLogResponseObject, error)
-	// Manually update a step's execution status in a child dag-run
-	// (PATCH /dag-runs/{name}/{dag-runId}/children/{childDAGRunId}/steps/{stepName}/status)
+	// Manually update a step's execution status in a child DAG-run
+	// (PATCH /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/status)
 	UpdateChildDAGRunStepStatus(ctx context.Context, request UpdateChildDAGRunStepStatusRequestObject) (UpdateChildDAGRunStepStatusResponseObject, error)
-	// Dequeue a queued dag-run
-	// (GET /dag-runs/{name}/{dag-runId}/dequeue)
+	// Dequeue a queued DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/dequeue)
 	DequeueDAGRun(ctx context.Context, request DequeueDAGRunRequestObject) (DequeueDAGRunResponseObject, error)
-	// Retrieve full execution log of a dag-run
-	// (GET /dag-runs/{name}/{dag-runId}/log)
+	// Retrieve full execution log of a DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/log)
 	GetDAGRunLog(ctx context.Context, request GetDAGRunLogRequestObject) (GetDAGRunLogResponseObject, error)
-	// Retry dag-run execution
-	// (POST /dag-runs/{name}/{dag-runId}/retry)
+	// Retry DAG-run execution
+	// (POST /dag-runs/{name}/{dagRunId}/retry)
 	RetryDAGRun(ctx context.Context, request RetryDAGRunRequestObject) (RetryDAGRunResponseObject, error)
-	// Retrieve log for a specific step in a dag-run
-	// (GET /dag-runs/{name}/{dag-runId}/steps/{stepName}/log)
+	// Retrieve log for a specific step in a DAG-run
+	// (GET /dag-runs/{name}/{dagRunId}/steps/{stepName}/log)
 	GetDAGRunStepLog(ctx context.Context, request GetDAGRunStepLogRequestObject) (GetDAGRunStepLogResponseObject, error)
 	// Manually update a step's execution status
-	// (PATCH /dag-runs/{name}/{dag-runId}/steps/{stepName}/status)
+	// (PATCH /dag-runs/{name}/{dagRunId}/steps/{stepName}/status)
 	UpdateDAGRunStepStatus(ctx context.Context, request UpdateDAGRunStepStatusRequestObject) (UpdateDAGRunStepStatusResponseObject, error)
-	// Terminate a running dag-run
-	// (POST /dag-runs/{name}/{dag-runId}/stop)
+	// Terminate a running DAG-run
+	// (POST /dag-runs/{name}/{dagRunId}/stop)
 	TerminateDAGRun(ctx context.Context, request TerminateDAGRunRequestObject) (TerminateDAGRunResponseObject, error)
 	// List all available DAGs
 	// (GET /dags)
@@ -4376,16 +4376,16 @@ type StrictServerInterface interface {
 	// Retrieve execution history of a DAG
 	// (GET /dags/{fileName}/dag-runs)
 	GetDAGDAGRunHistory(ctx context.Context, request GetDAGDAGRunHistoryRequestObject) (GetDAGDAGRunHistoryResponseObject, error)
-	// Get detailed status of a specific dag-run
-	// (GET /dags/{fileName}/dag-runs/{dag-runId})
+	// Get detailed status of a specific DAG-run
+	// (GET /dags/{fileName}/dag-runs/{dagRunId})
 	GetDAGDAGRunDetails(ctx context.Context, request GetDAGDAGRunDetailsRequestObject) (GetDAGDAGRunDetailsResponseObject, error)
-	// Enqueue a dag-run from DAG
+	// Enqueue a DAG-run from DAG
 	// (POST /dags/{fileName}/enqueue)
 	EnqueueDAGDAGRun(ctx context.Context, request EnqueueDAGDAGRunRequestObject) (EnqueueDAGDAGRunResponseObject, error)
 	// Change DAG file ID
 	// (POST /dags/{fileName}/rename)
 	RenameDAG(ctx context.Context, request RenameDAGRequestObject) (RenameDAGResponseObject, error)
-	// Retry dag-run execution
+	// Retry DAG-run execution
 	// (POST /dags/{fileName}/retry)
 	RetryDAGDAGRun(ctx context.Context, request RetryDAGDAGRunRequestObject) (RetryDAGDAGRunResponseObject, error)
 	// Retrieve DAG specification
@@ -4394,10 +4394,10 @@ type StrictServerInterface interface {
 	// Update DAG spec
 	// (PUT /dags/{fileName}/spec)
 	UpdateDAGSpec(ctx context.Context, request UpdateDAGSpecRequestObject) (UpdateDAGSpecResponseObject, error)
-	// Create and execute a dag-run from DAG
+	// Create and execute a DAG-run from DAG
 	// (POST /dags/{fileName}/start)
 	ExecuteDAG(ctx context.Context, request ExecuteDAGRequestObject) (ExecuteDAGResponseObject, error)
-	// Terminate a running dag-run
+	// Terminate a running DAG-run
 	// (POST /dags/{fileName}/stop)
 	TerminateDAGDAGRun(ctx context.Context, request TerminateDAGDAGRunRequestObject) (TerminateDAGDAGRunResponseObject, error)
 	// Toggle DAG suspension state
@@ -5332,107 +5332,107 @@ func (sh *strictHandler) GetHealthStatus(w http.ResponseWriter, r *http.Request)
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/+w9a1PkOJJ/RVG3EbMXVzT09MzeDd9Y6Ka5YLr7oPc29ma4CWFnVWnHltySDNR08N8v",
-	"lJJs2ZYfxauB4xuF5VQ6le9MSV9nicgLwYFrNdv9OiuopDlokPjrYO/wHcvgA83B/ExBJZIVmgk+253p",
-	"FRBOcyBiQczfB3uHZMEymM1nzDwvqF7N5jOOL88WHs58JuFLySSks10tS5jPVLKCnJoJ/iRhMdud/ct2",
-	"jdS2faq2Q1yur+cGtzheLZzi6PBbohKicVLyo7SLx9GBxyKlyy1ZciIk+S6jGpT+jmhBlqDxcS6UJhIS",
-	"4NoPjSPtHh6lt8HcYhuifgpUJqv7+YAvJch1/AtujPH4sg9ScXTp9bow45SWjC/tvFTDZ5bDOyny7sxK",
-	"U2k+XINmOZCFkEYONJjXPSqKME6OTj+S//jLzmszJKeaXDK9IuadPwSHHootpMjN9JMJ9jfOrgyuStO8",
-	"aGD/WXRxB57eF+Za3BLv90AjYvWhzM9BmpXOGAdl+FCCLiUnhlS4/OewZJybb3D8EKqlFpYrM0mIY844",
-	"y8t8tvt67jmBcQ1LkIjUMcuZ7mL1M70ybxHeh13P9BmCa8xvIc12X+/s7OzMx/D5uFgoiCB0zDh4bLQg",
-	"lkcl0NSQBSn159db51RB+q89qAkLeQPafKLLiGAWdAkBXZiGHOmyAJ2syJ9TWNAy04Qp8roPFQOigYh7",
-	"CREZQwpkHK82SgVIgriGKL3ZmZOcXiF2Ozu9+Lk5oij+aBYxXNRRlE8gFxo+iHREzUkcR7gZGEdM1pCi",
-	"uM0ykdBsNo/ovFNNdami2k6XqkfTtqa3YyerADelnR2KcT2vNBRxJa/8+5sp+lMtgUZU/N9XoFdWkpyy",
-	"UToVpTYWUekUpCSZWKpeMiDU6WTA4Qafz5RlN1KBRq+PKz9twE8W8Gs/Erlif8Wy1BrkiDoETVOqKZoU",
-	"ShIzNuCVQooCpGZg+atyCjbxBepl/SWAcFbhLc7/CYmeXc9n+4KnzCLWxvOThMQ/JXpFNclLpck5EEU1",
-	"UwsGKTmHhZBAZGlNCkWuMwvf9z1J/3xvrwoJSpnZhCTJCpLfzerBBc1KayxbPDmfgZRCRiCZf5MclDIq",
-	"i9mlrr+FKcKFJjkq8C7MqwISDWkUQXxCJCijAkUbsEPVjI4AzqlOVjG4lQA1gF1S1UTxXIgMKO8scE3S",
-	"2AIbL78z475ZNBOTJIIv2LKUiLT5pSnDlUxhwbhFhPLUIII82+VPqy0/mdAoohAPnLWoQidiSAToN/3n",
-	"6ccP3mdiC1wSVUDCkLFo5S2TREIvTRuztSd/X+aUbxm7Ts8zIMHDIAT6TpGilIVQgB96Dit6wYSMTbaU",
-	"oiwi3oRYsoRmBB87x0qCCQVSM4FCORdySTn7Az+EZn5KFZuGR1W7n6UbwXUAFD2LccwUMm29GAaYsrKd",
-	"UG5Eu6BKQWrkrnJxkf6Qev3JlI8cjWcQMRUVRlRKup45zZiWGfSj5EYY6kGlBpTjQr4klyvgNUZqJcrM",
-	"rNU4boO2xKMVQVnT5QAFzVNc1oRqWArJ/kDtx9MgRDBLvwGVWkLtAjHjggyJ9gEYMxUVPPPAcmBLyhm3",
-	"QmdF6pGJc0bX3WlN6GOmUGiQ0KZfUqa99UH/3Zqf2uy0LfQD6wrgF/3sA/yCScFz4JpcUMnMlPhVCqqP",
-	"gitIys5XTZe5B1JWK8rTDORHPiZs76uB5i2m9Alo4GaGA7pWQ35cStfejaOME/OukPgRzq3sLnUmlgcs",
-	"4hgcMAmJFnJNjEeM34rA+NLAQm9QxU331V6i2QVYL0tNiXETwZNSyiDvowjNMnEZUVfdL6hmNM7+A8wX",
-	"Nzp/4+xLCYSlZqUWDCSSzCc0L5leMU6YVpadnoQtKgKvVsU8I/+s6fLmtWTSWpVRbpXPVItTe9vPw0qq",
-	"OHNW+JrH6MOjMkMdPn0ph8NAKJ6w2X7HYsvsiwQ2g2jEyuUTBi02XU4IDatgaYA69jkBnoiSa5CQkrRE",
-	"mth8ypcSlN5I1ha99RFDAFLn0IPySAeozanXwfR4EHxa5jmVlkFLVQBPx6IuMz9TpB49GnQFJRuzAi00",
-	"w4krwg/wQpxIH+IFJMsLmMBawpVhCKo1SPPG//5Ct/7Y2/qfna2ffts6+7c/xeh5sHd4KFl6pCGSyzFP",
-	"MOWHYnLBVEkzKyVe5zm/RHhDvO5wpP9/B/hpIzvmMgUpMtr5GjPmU8X/g0jBJ8S6bMdHqelyY90cV0SW",
-	"/ef0LN+kpbuTVTspeeDu0yz7uJjt/rKZQPSGCV1NU5l6q8Wdsa+M36vOunORghpadcZTdsHSkmZNmK1c",
-	"6VQGiC294PuUJ5BNfV/wt1e2ZDFt9DvKslLC9BdOyyQBNfl7RryTymsKh/U6KmF18i5dlbac4Lp3xeNs",
-	"PsJsYhH4UownWYkFmEZClFjocdnrKS73e601l8EVzYsMq0youG8okF6yun6kc8Ujn3oXOV5jWzlTK0j3",
-	"IvWtk3f75M2bNz+hTsWaoXUNQ4bw70dNrlhG0sEmYtICgfhgaSh9NalJoD9AOCk51l3rposgHgg/pJl6",
-	"6IlBgOspzQh2ZDeLEIc1rvonwGNpLPMujNIgnSaDaOj2pYTy5nxwSRWxEGLoSSEmEc6MG/rMGs440cZg",
-	"oRq7+Qe713sgu7LelEqcH39Mz8cNzmkwtK1AW8RpUX3eaAxxTkldPAzghqRpKAgr0TEH5m28gHIIHCRL",
-	"bEhAJKhCcAXEvdet6aSjEo8T7Tsrl/ZlLfdSa3No5qb2IyOou/JOxOFYCand+37QmK+X2CqwH95Lqv1o",
-	"3dnWmwwM9HFM7OeiJgOliq2M2eFlbuY7p+lvdUTFhf5tIUqeYinSGCGa/eZfKTkt9coEq8i05s0l1XBJ",
-	"11i/zYWG34yRrF6gmQSarn9zRTkHv/7ln8MVUzo03LUgvA+zep0ESZBLNoYVLoyOc4lATAX3m7pkknfm",
-	"o3uY4Jv5sYtpnpkfrqb5ZXb4dYQd3gPN9OrEiUZEFTWFpnJBVvieK28CTwvBeFekVE+DwccLkDTLPJRm",
-	"v4ECeQEhl9lRa2Qi/3dsuSttOeDHIGwfpHUglAU+6cqifc0+DlL4UUN2AVJFk/MeCTeg873Dsl3pSg+/",
-	"Qjf88pjIG3f7M11utsgZUzZtn2WYcOqs7cPnYYazYqV1lx2uN0x8ubcHUh3HMafyWCyjMWeVZYg1EGjg",
-	"Og7KP4wWKtTPQsJgHkgCoRJIboIn2z1CLyjL6Hno6VYZofmMqbdKs5zqYbAIi+BqEqYI5QT8azGoZvS+",
-	"GTze3GI7W0JnJhAnLTTNjs24SEXNPOs05LlYvOvdhw1YrdYDpHdsveMtWnU2gPJ2QqCTY+guvgkNJfB+",
-	"Zm4Ej4pQpUTCMM9s2zJXTFWdUZPC4KCTJyJZqZiwVs7WLMqMmBkysGH7Al2rAqy3YFPpsXXcpMkFybjA",
-	"KDsmBCNBY5/rbKEOBIwStFyP0gFHERNl54VWJKcpOIGvF6X7+cPu/iDKt3b1m3nGDdz9+kXn8pu3U5By",
-	"OK5WmvKUytR5r14Q+6gUfk4qSj0RuCh1UeqNoEMx2VNqml4E6LCraDAQqPQENgGDhULXp3f6+jM/lDnG",
-	"Nc5vanvsvn5q3GkcA7u/8p1d8uvsg9Cem36d/cpfm/+dWI/a/P7e/H6HYmd+vjE/bSLS/ecH8x+XCzS/",
-	"f8Tfv7OisM9rp21n/nr+/fzN/If5j2cdcZjPrrbMuK0LKrFeaoj8QejTitFPKjf/ndcCFSKzuUfB/GUn",
-	"n501SFYx92B3hCNf2CThDbfrt/UeKK/pZlaxQq5SUTYgwD8DBaM8chFm/ESXjFPfxdGyD3YB4z3NfnWD",
-	"nut4KRyueiCYJ6OvFxIuepq9JVwwUapREGi5DYwIC+uW5S5wWC+UE0iETCfAkW7gqM1vgJ03SN7APCBk",
-	"QJSYxJ6gEfwkMpaspwScqNutMQlacJqcgGH0Bc02aSbSlwC8ZaWilLVWe9jnswaoKsEbqAxSYj7BRarR",
-	"GmOHOKe9XQH+Sau9a1F334a9Vq0YpGofiBBcCh70F2Abt5/K58jHYq4AfmzF7a6qg71D9TPVySpei3TF",
-	"Lps7V/gGwR7a2k882DsMOlU7X2m82ljrjE5W2PJj3fLekME8t97L8BaSS4wcHGrUOHY2ldPjyxxHsUIV",
-	"blHCDgWD1pUeF0f8xgau4TT9xD/BHuY45Y8Cv9zS3XU8V5Vh6qqaN+1FsL3QanDRA7KCIpfmR5Ukm9Qj",
-	"EmGyG1WLc88w0X7beNXYNgX4z4wuw+18lCCdfc9uyn9hdeDbeCl2bnRS7shBCUqAm/koHSfFVU1iPsqp",
-	"c5h7xUpT9XvYY48l3ALkQshcGXVnO2cTYsTLt+0OBMZUDmV4qFyWuZENY+wKqpQPCRKR57QpUaPJpCRP",
-	"/870ai86476NbyvIxMIJqrsNXFxfWEz5etQ6U/yVqhp80FtmjIIodT1BvMG4AJ6OtKyFrYhYVk/8V1WF",
-	"dRcsxcvqoyS8RSfypUGq8i9SEe9XTWPNr38X8nfs5KmaYDF7X/UZe6jfqYAvIq2wLPvIe+pGwVYwBTwl",
-	"YEYTLrThZWrTHoLXWYq4G7R5N2qYPYqWS2v8bfDbBf7frg/bbrDAXaG+h8IRxb25QZPrp7p23Ra8Ro/D",
-	"hBL2rbtWKzLdbdOqbPnuQ4Aafv41qtqIex45OUELYshEVWS7XDdZgcBi7rL52/t7jYSZUyGoeO2ovuaG",
-	"viQO9jNWPeUJLbTN2DcTOptkbkYh9rFjzB+J+x9+O6c3hO00zVnQteagRz6guTc9JrRXQYKuUQKqmnBe",
-	"/+Xfv//xzevXP/0UTMm4/ssPcQdYQVJKptcmBMqdBSzYZ/G7TQ2fA5Ug33lAoqBfymqTL6oaHFDDXmmN",
-	"VcFzqliyV2o88KEebf7bHmzQYHwhfE2CJriIbvPoP4Sm5D3NaUpn81kpM/ee2t3eXjK9Ks9fJSLfXgut",
-	"6SpPO0ZhtvfpqIoDpMgy36icC87cjoUDuixdDewVRgAJuCKVQ+Lw0/HWm1c7QwikdFluCbnEP7bPM3G+",
-	"nVPGt4+P9t9+OH37yqKmmcZWKTNjUEfbnX3/aufVDmrVAjgt2Gx39gb/hd1UK1yYbZ+MNz+Wse34Jxgb",
-	"X6D8Zd5lybI6i4+pe1G4zoC6V/t8bVWFdTRc4rDymI5SZ9f9po154wSXns7Jekjd6DE6snEGxgbjP4tJ",
-	"o5tnkUx4I9gk3+35fIf0q6nrqNizDdo3nPRuDD8z+saWQXGJv9/ZadXpaFFkzvxv/1NZn6eGF+2FG/DQ",
-	"mlyhV8Ck9/dbO1UnWbdOy/hgmbNCr6tRr7syHFZ+PI2sqLsjBjYg02hzTQyDeB+PVaG+c9ESNpS3ma8Y",
-	"h99r3qlEefurYYvrby3Rf127hqmnLNeuEfKetcCLlD43KbWUDVIFTlNPE93tr1VXYb8YvwObe0sHdgnQ",
-	"cwy6azRq17wpt4egm5sYNhXbllEbF5dNJeuepCTYtDHO4n5wD0v7x7di7B92frh/prafg9vAbdb20UmU",
-	"N1Id9m41628uUNu+T2X7a1L3j9y5pLVD4Y68Bc0rj1jo5v1t5c00id0DHq4ZNtHEDzlqEH6jk45elMCd",
-	"yeF+ayvPE9UFnZzT3WmEbbfXZlArVE15Qrba5jZRAcdi+UjFf2QsHvQ1YRyeiThhnDsWcMJIe6DhzTRU",
-	"sGiPTUMNyZHhkkenR459q9pTUCGVpPZb6rtUINg4uv3VH+p3W42CCXGsNW6iW041FC/65Rb6ZTRlYY89",
-	"fGyaaArm7rDJF6311LRWvyq4V/1Vt2YXVMfO3t5fUb50Six005qIV01iw3rsb0VKNbRU2alPPT7pYKnE",
-	"T2u0wxtaPQY1gHuY/irS9S0iq81b+OMbw+JhVPPjr+O6a7K22bl/cT/iFzRjabVB7IETPb4v9xHrup8p",
-	"L2mWrb1gUN/ZUZ9pU6Vd7kbppYBNYr3u2IF9HhyDUaOCjRxM+Ya/bF1v029qMAekOnroqWRVX7KVmzBv",
-	"zSqWDW7HmFNjhJoda/9gNMH/EgjcNBB4cZEfs4u8KLOsJRG3LxXgdhN0boTSsc0YQG1nGofLykrg3RRE",
-	"GCtVbSoKt0w3BdN8wPqRm4e7cAgb5yiNXdfjAuT1aAPd0Pn5d+0oPj7GX3c9k5vx+b2lqUbN0ZPOTdVx",
-	"07PKY70YuiebC7qVtbv3ZM9wmueJZHhecikvuZTnkku5qZ4QRb9T/E7IBIw3viZmoPGO/Q1EjZ3PkdPF",
-	"m1rhM8ic8UoxPL/kyeNimorc3QUbZJMpWweaW8GndRi7Q6ui/cWb2wY832DC2vpL9+6ojx9v7bhlD/8Y",
-	"bI27meO3pC0fdnfAQM9xlAXuovUYj+uPbH57+JPcisbhJ0NoB8ekRCLa4Ky2BtDn2DBdneHm73YIFI3C",
-	"reVTUi+QF3pNmlc0oE9a3XHkpKypTSyQD3Dpzku4sXm5M1dvo/OZp20mnOLjvb4DlPuPaOBwma0roz/5",
-	"nIZnxO6W0Ryzds5FabG8t6vbqrreOmpeP9UnEhh3a0vDlfZHgtBECoVXDLUVb0cI6pM4buthdZbG4oJG",
-	"iVR7VGOG6suDdtiNHxNqMQ9unJl2SOjbQZPilnMTi2JPdond2xCe/KLqQ1DMPJ62G5zDEpw3M7Z9x6M0",
-	"cJzokxVTR9W4JarEUk/zeY3sBae3klJB6uVyTCYPQe9l2cHe4Wd3Ru3tLNN95fJaJ/A+N3fEhyB9jPDV",
-	"3zN0bfkgg9hZs59A5pTbJgEJubAbL5scUF9/rNbKSGG3jcAAv62bMim0ra48ivDOD/F7seo1ztbE0iF9",
-	"yLTM424NwMNpKCd4pHtwUlXb0Z2292hw01HHtYhVXR5st9EQJ921xV6C1vZq5OBcupsfg1Zt8vkWceTm",
-	"l6oF6N7bpWo3uUPtyRqEqtpiIEtYAVfswlGtcd/fuG0YP2LDy7i7zKyxQzuaKp0g47hM7+tL4J6KpG+6",
-	"lT24cPZuLq/sCFT37l6WHlBNe+7nS6mmjfv5PKdMnb26/2/yRvoAp+cogp1LDUPlvoH8TdpVX/vvA5t8",
-	"Cyo1S8qMyg1LGqFwfgMz/M1329/JDtvnxOSHoOO7WiMnNkxgdeBVS/NY2rS6as5HHq2IhPKU0DRVhGl/",
-	"Lp7tcQ3OJYyYn7fc9zs/VNWuZXvuuVftoy9aHR20Ty2d+5v1CykuWGqifcz3CQ7kkmUZOQeyNExBe649",
-	"2PykwqlnFF7fvPJ/n+1+Xmn2Hhi4Ybffk1QBTmLaIjnZvEnwGfgekQ96dBbdm50HXMkThPwtkg53UkqB",
-	"y4Hbm+HSdXzRHMJ788dLEwHYl4aa55y5sYJTVxWPDqYK5IM1jT9PG/vSD35f/eB9LGu8zUn93v/Y+/m4",
-	"8k2pP/eaTktKnJpZnnIu4l4Sh+5UbGWJMz1L6Nese0IzpuQLSAxoXLABt7DRJmpReMbZPE+ZinujDSex",
-	"E59/FilbsNtJQdXm/E0E4U46kXt5zjc23Jjvzh48RLlX+WxfufPsZMoyc7XmE+0MHm1/R9kJBKYI02Ff",
-	"c7OzNJCwTqLCHiv/VKOblxTFS4riwdvXeFpd6HLTbMU32DvwjYKk/2/bAnpX3BaKB7S+vUVBkcvwhj53",
-	"qZ301/TZda+LfM2CKE0SIfEKIy3QIqCtAPOa4BWwAY8MkVRM8FNtr35+gs5ZTehWs6B94OsLeP+Pjie9",
-	"+or/HvZDZLxeMk+fxXLpWtBUxZj2Mrm4zK2AZno1VNQsJVfEDouUNJEP6htLYvH7e3y32pl5b02Fdp7b",
-	"9hS2r7mBqwISYzbALUwz0QfJ7+7TPY06++NcY97ZdXjFDaqG+nKbX86M8Af31OA/jIRb4FaVtFjRkH3v",
-	"01FNensfzFdLkOvd7e2vK6H09TYt2PbF97P57MLdhoW0X1U61X38LBMJzfDfbcq9F0o37m9yc17PG71W",
-	"HhDepVNfxed+4kU1SIezijpdF9Rxj71IPaecLv0lOfbaU9sG12qCdd3gyNjdhvIWUHeCooHUaALRFKfJ",
-	"xFIFnTR1iNCcyHZQdCc7xeWub/hzH1Jf8IO7lfx3deXHzeC45vrs+v8CAAD//2F3z0+wrAAA",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

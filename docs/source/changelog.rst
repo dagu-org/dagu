@@ -160,4 +160,4 @@ v1.16.0 (2025-01-09)
 - **Support for environment variables in the most of the fields**: You can now use environment variables in most of the fields in the DAG configuration file.
 - **Bugfix**: Fixed the issue where the DAG can't be edited when the DAG name contains ``.``.
 - **UI**: Updated the visualization of the DAG in the Web UI for better readability.
-- **Optimization**: Optimized the size of the saved state files by removing unnecessary information. This will reduce the disk space required for storing the history of the dag-runs.
+- **Optimization**: Optimized the size of the saved state files by removing unnecessary information. This will reduce the disk space required for storing the history of the DAG-runs.

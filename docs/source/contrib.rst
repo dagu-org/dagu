@@ -38,7 +38,7 @@ Conventional Commit Message Examples
 
 .. code-block:: sh
    
-   feat: add user notifications on dag-runs
+   feat: add user notifications on DAG-runs
 
 .. code-block:: sh
    

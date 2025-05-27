@@ -323,11 +323,11 @@ Executes various actions on a specific DAG.
      - Conditional
    * - params
      - string
-     - JSON string of parameters for dag-run
+     - JSON string of parameters for DAG-run
      - No
 
 Available Actions:
-    - ``start``: Begin dag-run
+    - ``start``: Begin DAG-run
         - Requires: none
         - Optional: params
         - Fails if DAG is already running
@@ -335,7 +335,7 @@ Available Actions:
     - ``suspend``: Toggle DAG suspension state
         - Requires: value ("true" or "false")
     
-    - ``stop``: Stop dag-run
+    - ``stop``: Stop DAG-run
         - Requires: none
         - Fails if DAG is not running
     
