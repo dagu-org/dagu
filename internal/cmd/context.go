@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath" // Uses OS-specific separators (backslash on Windows, slash on Unix)
+	"path/filepath"
 	"regexp"
+	"runtime/pprof"
 	"syscall"
 	"time"
 
@@ -257,6 +258,22 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *C
 	initFlags(cmd, flags...)
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		// Setup cpu profiling if enabled.
+		if cpuProfileEnabled, _ := cmd.Flags().GetBool("cpu-profile"); cpuProfileEnabled {
+			f, err := os.Create("cpu.prof")
+			if err != nil {
+				fmt.Printf("Failed to create CPU profile file: %v\n", err)
+				os.Exit(1)
+			}
+			pprof.StartCPUProfile(f)
+			defer func() {
+				pprof.StopCPUProfile()
+				if err := f.Close(); err != nil {
+					fmt.Printf("Failed to close CPU profile file: %v\n", err)
+				}
+			}()
+		}
+
 		ctx, err := NewContext(cmd, flags)
 		if err != nil {
 			fmt.Printf("Initialization error: %v\n", err)
