@@ -78,8 +78,12 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
     if (!timelineInstance.current) {
       // Store initial view range in a ref with validated dates
       initialViewRef.current = {
-        start: !isNaN(viewStartDate.toDate().getTime()) ? viewStartDate.toDate() : dayjs().startOf('day').toDate(),
-        end: !isNaN(viewEndDate.toDate().getTime()) ? viewEndDate.toDate() : dayjs().endOf('day').toDate(),
+        start: !isNaN(viewStartDate.toDate().getTime())
+          ? viewStartDate.toDate()
+          : dayjs().startOf('day').toDate(),
+        end: !isNaN(viewEndDate.toDate().getTime())
+          ? viewEndDate.toDate()
+          : dayjs().endOf('day').toDate(),
       };
     }
 
@@ -88,14 +92,17 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
       const start = dagRun.startedAt;
       if (start && start !== '-') {
         const startMoment = dayjs(start);
-        const end =
-          dagRun.finishedAt !== '-' ? dayjs(dagRun.finishedAt) : now;
+        const end = dagRun.finishedAt !== '-' ? dayjs(dagRun.finishedAt) : now;
 
         // Validate that we have valid dates before adding to timeline
         const startDate = startMoment.tz(validTimezone).toDate();
         const endDate = end.tz(validTimezone).toDate();
-        
-        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime()) && startDate <= endDate) {
+
+        if (
+          !isNaN(startDate.getTime()) &&
+          !isNaN(endDate.getTime()) &&
+          startDate <= endDate
+        ) {
           items.push({
             id: dagRun.name + `_${dagRun.dagRunId}`,
             content: dagRun.name,
@@ -111,8 +118,12 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
     const dataset = new DataSet(items);
 
     // Validate view dates before using them
-    const validViewStartDate = !isNaN(viewStartDate.toDate().getTime()) ? viewStartDate.toDate() : dayjs().startOf('day').toDate();
-    const validViewEndDate = !isNaN(viewEndDate.toDate().getTime()) ? viewEndDate.toDate() : dayjs().endOf('day').toDate();
+    const validViewStartDate = !isNaN(viewStartDate.toDate().getTime())
+      ? viewStartDate.toDate()
+      : dayjs().startOf('day').toDate();
+    const validViewEndDate = !isNaN(viewEndDate.toDate().getTime())
+      ? viewEndDate.toDate()
+      : dayjs().endOf('day').toDate();
 
     if (!timelineInstance.current) {
       // For vis-timeline, we need to use the Timeline constructor with options
@@ -140,18 +151,15 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
         },
         height: '100%',
         maxHeight: '100%',
-        margin: { 
+        margin: {
           item: { vertical: 4, horizontal: 2 },
-          axis: 2
+          axis: 2,
         },
       });
     } else {
       timelineInstance.current.setItems(dataset);
       // Update the timeline window when selectedDate changes
-      timelineInstance.current.setWindow(
-        validViewStartDate,
-        validViewEndDate
-      );
+      timelineInstance.current.setWindow(validViewStartDate, validViewEndDate);
     }
 
     return () => {
@@ -221,21 +229,11 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
 
   const handleFit = () => {
     if (timelineInstance.current) {
-      // Check if timeline has valid items before calling fit
+      // Simply call fit without checking items - vis-timeline handles empty datasets
       try {
-        // Use the itemsData property instead of getItems() method
-        const dataset = timelineInstance.current.itemsData;
-        if (dataset && dataset.length > 0) {
-          timelineInstance.current.fit();
-        }
-      } catch (error) {
-        // If there's an error accessing items, just try to fit anyway
-        // but wrap in try-catch to prevent crashes
-        try {
-          timelineInstance.current.fit();
-        } catch (fitError) {
-          console.warn('Timeline fit failed:', fitError);
-        }
+        timelineInstance.current.fit();
+      } catch (fitError) {
+        console.warn('Timeline fit failed:', fitError);
       }
     }
   };
