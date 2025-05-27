@@ -14,17 +14,17 @@ var (
 )
 
 // QueueStore provides an interface for interacting with the underlying database
-// for storing and retrieving queued workflows.
+// for storing and retrieving queued DAG-run items.
 type QueueStore interface {
 	// Enqueue adds an item to the queue
-	Enqueue(ctx context.Context, name string, priority QueuePriority, workflow digraph.DAGRunRef) error
+	Enqueue(ctx context.Context, name string, priority QueuePriority, dagRun digraph.DAGRunRef) error
 	// DequeueByName retrieves an item from the queue and removes it
 	DequeueByName(ctx context.Context, name string) (QueuedItemData, error)
+	// DequeueByDAGRunID retrieves items from the queue by DAG run ID and removes them
+	DequeueByDAGRunID(ctx context.Context, name, dagRunID string) ([]QueuedItemData, error)
 	// Len returns the number of items in the queue
-	DequeueByWorkflowID(ctx context.Context, name, workflowID string) ([]QueuedItemData, error)
-	// List returns all items in the queue
 	Len(ctx context.Context, name string) (int, error)
-	// DequeueByWorkflowID retrieves a workflow from the queue by its ID and removes it
+	// List returns all items in the queue with the given name
 	List(ctx context.Context, name string) ([]QueuedItemData, error)
 	// All returns all items in the queue
 	All(ctx context.Context) ([]QueuedItemData, error)
@@ -64,7 +64,7 @@ func NewQueuedItem(data QueuedItemData) *QueuedItem {
 	}
 }
 
-// QueuedItemData represents a workflow that is in the queue for execution
+// QueuedItemData represents a DAG-run reference that is queued for execution.
 type QueuedItemData interface {
 	// ID returns the ID of the queued item
 	ID() string

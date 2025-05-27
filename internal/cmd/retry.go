@@ -64,7 +64,7 @@ func runRetry(ctx *Context, args []string) error {
 	}
 
 	// The retry command is currently only supported for root DAGs.
-	if err := executeRetry(ctx, dag, status, status.Workflow()); err != nil {
+	if err := executeRetry(ctx, dag, status, status.DAGRun()); err != nil {
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
 

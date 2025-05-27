@@ -75,7 +75,7 @@ func TestStore_DequeueByWorkflowID(t *testing.T) {
 	})
 
 	// Check if dequeue by workflow ID returns the job
-	jobs, err := store.DequeueByWorkflowID(th.Context, "test-name", "test-workflow-2")
+	jobs, err := store.DequeueByDAGRunID(th.Context, "test-name", "test-workflow-2")
 	require.NoError(t, err, "expected no error when dequeueing job by workflow ID from store")
 	require.Len(t, jobs, 1, "expected to dequeue one job")
 	require.Contains(t, jobs[0].ID(), "test-workflow-2", "expected job ID to contain 'test-workflow-2'")

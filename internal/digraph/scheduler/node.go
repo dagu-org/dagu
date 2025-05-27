@@ -198,13 +198,13 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	execConfig.Config = cfg
 	n.SetExecutorConfig(execConfig)
 
-	// Evaluate the child workflow if set
-	if w := n.Step().ChildDAG; w != nil {
-		w, err := EvalObject(ctx, *w)
+	// Evaluate the child DAG if set
+	if child := n.Step().ChildDAG; child != nil {
+		childDAG, err := EvalObject(ctx, *child)
 		if err != nil {
-			return nil, fmt.Errorf("failed to eval child workflow: %w", err)
+			return nil, fmt.Errorf("failed to eval child DAG: %w", err)
 		}
-		n.SetChildWorkflow(w)
+		n.SetChildDAG(childDAG)
 	}
 
 	// Evaluate script if set
@@ -231,21 +231,19 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 		return nil, fmt.Errorf("failed to setup executor IO: %w", err)
 	}
 
-	// If the command is a child workflow, we need to set the workflow ID.
-	if childWorkflow, ok := cmd.(executor.ChildDAG); ok {
-		workflowID, err := n.ChildWorkflowID()
+	// If the command is a child DAG, set the DAG-run ID
+	if childDAG, ok := cmd.(executor.ChildDAG); ok {
+		dagRunID, err := n.GenChildDAGRunID()
 		if err != nil {
-			return nil, fmt.Errorf("failed to determine workflow ID for child workflow: %w", err)
+			return nil, fmt.Errorf("failed to generate child DAG run ID: %w", err)
 		}
-		if workflowID == "" {
-			return nil, fmt.Errorf("workflow ID is empty for child workflow")
-		}
-		childWorkflow.SetDAGRunID(workflowID)
+		childDAG.SetDAGRunID(dagRunID)
 	}
 
 	return cmd, nil
 }
 
+// evaluateCommandArgs evaluates the command and arguments of the node.
 func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 	if n.cmdEvaluated.Load() {
 		return nil
@@ -393,7 +391,7 @@ func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
 	return executor.WithEnv(ctx, env)
 }
 
-func (n *Node) Setup(ctx context.Context, logDir string, workflowID string) error {
+func (n *Node) Setup(ctx context.Context, logDir string, dagRunID string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -401,7 +399,7 @@ func (n *Node) Setup(ctx context.Context, logDir string, workflowID string) erro
 	startedAt := time.Now()
 	safeName := fileutil.SafeName(n.Name())
 	timestamp := startedAt.Format("20060102.15:04:05.000")
-	postfix := stringutil.TruncString(workflowID, 8)
+	postfix := stringutil.TruncString(dagRunID, 8)
 	logFilename := fmt.Sprintf("%s.%s.%s", safeName, timestamp, postfix)
 	if !fileutil.FileExists(logDir) {
 		if err := os.MkdirAll(logDir, 0750); err != nil {

@@ -301,7 +301,7 @@ func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.Q
 }
 
 func (q *queueReaderImpl) removeProcessedItem(ctx context.Context, data digraph.DAGRunRef) {
-	if _, err := q.store.DequeueByWorkflowID(ctx, data.Name, data.ID); err != nil {
+	if _, err := q.store.DequeueByDAGRunID(ctx, data.Name, data.ID); err != nil {
 		if !errors.Is(err, models.ErrQueueItemNotFound) {
 			logger.Error(ctx, "Failed to dequeue item", "err", err, "name", data.Name, "dagRunId", data.ID)
 		}

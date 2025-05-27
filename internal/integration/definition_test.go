@@ -303,8 +303,8 @@ func TestProgressingNode(t *testing.T) {
 	status, err = dag.HistoryMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, err, "failed to get latest status")
 
-	// Assert that the workflow is still running
-	require.Equal(t, scheduler.StatusRunning.String(), status.Status.String(), "workflow should be running")
+	// Assert that the DAG-run is still running
+	require.Equal(t, scheduler.StatusRunning.String(), status.Status.String(), "DAG-run should be running")
 
 	// Check the first node is finished
 	require.Equal(t, scheduler.NodeStatusSuccess.String(), status.Nodes[0].Status.String(), "first node should be finished")

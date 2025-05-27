@@ -139,16 +139,16 @@ func WithPreconditions(conditions []*digraph.Condition) StatusOption {
 	}
 }
 
-// Create builds a Status object for a workflow with the specified parameters
+// Create builds a Status object for a DAG run with the specified parameters
 func (f *StatusBuilder) Create(
-	workflowID string,
+	dagRunID string,
 	status scheduler.Status,
 	pid int,
 	startedAt time.Time,
 	opts ...StatusOption,
 ) DAGRunStatus {
 	statusObj := InitialStatus(f.dag)
-	statusObj.DAGRunID = workflowID
+	statusObj.DAGRunID = dagRunID
 	statusObj.Status = status
 	statusObj.PID = PID(pid)
 	statusObj.StartedAt = formatTime(startedAt)
@@ -171,7 +171,7 @@ func StatusFromJSON(s string) (*DAGRunStatus, error) {
 	return status, err
 }
 
-// DAGRunStatus represents the complete execution state of a workflow
+// DAGRunStatus represents the complete execution state of a DAG run.
 type DAGRunStatus struct {
 	Root          digraph.DAGRunRef    `json:"root,omitempty"`
 	Parent        digraph.DAGRunRef    `json:"parent,omitempty"`
@@ -195,8 +195,8 @@ type DAGRunStatus struct {
 	Preconditions []*digraph.Condition `json:"preconditions,omitempty"`
 }
 
-// Workflow returns the execution reference for the current status
-func (st *DAGRunStatus) Workflow() digraph.DAGRunRef {
+// DAGRun returns a reference to the DAG run associated with this status
+func (st *DAGRunStatus) DAGRun() digraph.DAGRunRef {
 	return digraph.NewDAGRunRef(st.Name, st.DAGRunID)
 }
 
@@ -245,7 +245,7 @@ func (st *DAGRunStatus) NodeByName(name string) (*Node, error) {
 	return nil, fmt.Errorf("node %s not found", name)
 }
 
-// PID represents a process ID for a running workflow
+// PID represents a process ID for a running DAG-run
 type PID int
 
 // String returns the string representation of the PID, or an empty string if 0

@@ -119,8 +119,8 @@ func (s *Store) List(ctx context.Context, name string) ([]models.QueuedItemData,
 	return items, nil
 }
 
-// DequeueByWorkflowID implements models.QueueStore.
-func (s *Store) DequeueByWorkflowID(ctx context.Context, name, workflowID string) ([]models.QueuedItemData, error) {
+// DequeueByDAGRunID implements models.QueueStore.
+func (s *Store) DequeueByDAGRunID(ctx context.Context, name, workflowID string) ([]models.QueuedItemData, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

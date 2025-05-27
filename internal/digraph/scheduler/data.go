@@ -48,7 +48,7 @@ type NodeState struct {
 	// ExitCode is the exit code that the command exited with.
 	// It only makes sense when the node is a command executor.
 	ExitCode int
-	// Child executions is the list of child workflows that this node has executed.
+	// Children stores the child DAG runs.
 	Children []ChildDAGRun
 	// OutputVariables stores the output variables for the following steps.
 	// It only contains the local output variables.
@@ -109,7 +109,7 @@ func (s *Data) SetExecutorConfig(cfg digraph.ExecutorConfig) {
 	s.inner.Step.ExecutorConfig = cfg
 }
 
-func (s *Data) SetChildWorkflow(childWorkflow digraph.ChildDAG) {
+func (s *Data) SetChildDAG(childWorkflow digraph.ChildDAG) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -161,7 +161,10 @@ func (s *Data) Data() NodeData {
 	return s.inner
 }
 
-func (s *Data) ChildWorkflowID() (string, error) {
+// GenChildDAGRunID returns the DAG-run ID for the child DAG-run.
+// Currently, it only supports a single child DAG run.
+// In the future, it may support multiple child DAG runs (e.g., for-each).
+func (s *Data) GenChildDAGRunID() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// If children is not empty, return the first child's workflow ID.

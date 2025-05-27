@@ -23,10 +23,10 @@ var (
 )
 
 const (
-	// ChildDAGRunsDir is the name of the directory where status files for child workflow data are stored.
+	// ChildDAGRunsDir is the name of the directory where status files for child DAG-runs are stored.
 	ChildDAGRunsDir = "children"
 
-	// ChildDAGRunDirPrefix is the prefix for child workflow directories.
+	// ChildDAGRunDirPrefix is the prefix for child DAG-run directories.
 	ChildDAGRunDirPrefix = "child_"
 
 	// DAGRunDirPrefix is the prefix for workflow directories.

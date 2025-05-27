@@ -27,12 +27,12 @@ func TestManager(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "valid.yaml"))
 		ctx := th.Context
 
-		workflowID := uuid.Must(uuid.NewV7()).String()
+		dagRunID := uuid.Must(uuid.NewV7()).String()
 		socketServer, _ := sock.NewServer(
-			dag.SockAddr(workflowID),
+			dag.SockAddr(dagRunID),
 			func(w http.ResponseWriter, _ *http.Request) {
 				status := models.NewStatusBuilder(dag.DAG).Create(
-					workflowID, scheduler.StatusRunning, 0, time.Now(),
+					dagRunID, scheduler.StatusRunning, 0, time.Now(),
 				)
 				w.WriteHeader(http.StatusOK)
 				jsonData, err := json.Marshal(status)
@@ -58,26 +58,26 @@ func TestManager(t *testing.T) {
 	t.Run("UpdateStatus", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "update_status.yaml"))
 
-		workflowID := uuid.Must(uuid.NewV7()).String()
+		dagRunID := uuid.Must(uuid.NewV7()).String()
 		now := time.Now()
 		ctx := th.Context
 		cli := th.HistoryMgr
 
 		// Open the Attempt data and write a status before updating it.
-		att, err := th.HistoryStore.CreateAttempt(ctx, dag.DAG, now, workflowID, models.NewDAGRunAttemptOptions{})
+		att, err := th.HistoryStore.CreateAttempt(ctx, dag.DAG, now, dagRunID, models.NewDAGRunAttemptOptions{})
 		require.NoError(t, err)
 
 		err = att.Open(ctx)
 		require.NoError(t, err)
 
-		status := testNewStatus(dag.DAG, workflowID, scheduler.StatusSuccess, scheduler.NodeStatusSuccess)
+		status := testNewStatus(dag.DAG, dagRunID, scheduler.StatusSuccess, scheduler.NodeStatusSuccess)
 
 		err = att.Write(ctx, status)
 		require.NoError(t, err)
 		_ = att.Close(ctx)
 
 		// Get the status and check if it is the same as the one we wrote.
-		ref := digraph.NewDAGRunRef(dag.Name, workflowID)
+		ref := digraph.NewDAGRunRef(dag.Name, dagRunID)
 		statusToCheck, err := cli.GetSavedStatus(ctx, ref)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.NodeStatusSuccess, statusToCheck.Nodes[0].Status)
@@ -86,17 +86,17 @@ func TestManager(t *testing.T) {
 		newStatus := scheduler.NodeStatusError
 		status.Nodes[0].Status = newStatus
 
-		root := digraph.NewDAGRunRef(dag.Name, workflowID)
+		root := digraph.NewDAGRunRef(dag.Name, dagRunID)
 		err = cli.UpdateStatus(ctx, root, status)
 		require.NoError(t, err)
 
-		statusByWorkflowID, err := cli.GetSavedStatus(ctx, ref)
+		statusByDAGRunID, err := cli.GetSavedStatus(ctx, ref)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, len(status.Nodes))
-		require.Equal(t, newStatus, statusByWorkflowID.Nodes[0].Status)
+		require.Equal(t, newStatus, statusByDAGRunID.Nodes[0].Status)
 	})
-	t.Run("UpdateChildWorkflowStatus", func(t *testing.T) {
+	t.Run("UpdateChildDAGRunStatus", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "tree_parent.yaml"))
 
 		err := th.HistoryMgr.StartDAGRun(th.Context, dag.DAG, history.StartOptions{Quiet: true})
@@ -104,33 +104,33 @@ func TestManager(t *testing.T) {
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
 
-		// Get the child workflow ID.
+		// Get the child DAG-run status.
 		status, err := th.HistoryMgr.GetLatestStatus(th.Context, dag.DAG)
 		require.NoError(t, err)
-		workflowID := status.DAGRunID
-		childWorkflow := status.Nodes[0].Children[0]
+		dagRunID := status.DAGRunID
+		childDAGRun := status.Nodes[0].Children[0]
 
-		root := digraph.NewDAGRunRef(dag.Name, workflowID)
-		childWorkflowStatus, err := th.HistoryMgr.FindChildDAGRunStatus(th.Context, root, childWorkflow.DAGRunID)
+		root := digraph.NewDAGRunRef(dag.Name, dagRunID)
+		childDAGRunStatus, err := th.HistoryMgr.FindChildDAGRunStatus(th.Context, root, childDAGRun.DAGRunID)
 		require.NoError(t, err)
-		require.Equal(t, scheduler.StatusSuccess.String(), childWorkflowStatus.Status.String())
+		require.Equal(t, scheduler.StatusSuccess.String(), childDAGRunStatus.Status.String())
 
-		// Update the the child workflow status.
-		childWorkflowStatus.Nodes[0].Status = scheduler.NodeStatusError
-		err = th.HistoryMgr.UpdateStatus(th.Context, root, *childWorkflowStatus)
+		// Update the the child DAG-run status.
+		childDAGRunStatus.Nodes[0].Status = scheduler.NodeStatusError
+		err = th.HistoryMgr.UpdateStatus(th.Context, root, *childDAGRunStatus)
 		require.NoError(t, err)
 
-		// Check if the child workflow status is updated.
-		childWorkflowStatus, err = th.HistoryMgr.FindChildDAGRunStatus(th.Context, root, childWorkflow.DAGRunID)
+		// Check if the child DAG-run status is updated.
+		childDAGRunStatus, err = th.HistoryMgr.FindChildDAGRunStatus(th.Context, root, childDAGRun.DAGRunID)
 		require.NoError(t, err)
-		require.Equal(t, scheduler.NodeStatusError.String(), childWorkflowStatus.Nodes[0].Status.String())
+		require.Equal(t, scheduler.NodeStatusError.String(), childDAGRunStatus.Nodes[0].Status.String())
 	})
-	t.Run("InvalidUpdateStatusWithInvalidWorkflowID", func(t *testing.T) {
-		dag := th.DAG(t, filepath.Join("client", "invalid_workflow_id.yaml"))
+	t.Run("InvalidUpdateStatusWithInvalidDAGRunID", func(t *testing.T) {
+		dag := th.DAG(t, filepath.Join("client", "invalid_run_id.yaml"))
 		ctx := th.Context
 		cli := th.HistoryMgr
 
-		// update with invalid workflow ID
+		// update with invalid DAG run ID.
 		status := testNewStatus(dag.DAG, "unknown-req-id", scheduler.StatusError, scheduler.NodeStatusError)
 
 		// Check if the update fails.
@@ -200,12 +200,12 @@ func TestClient_RunDAG(t *testing.T) {
 		status, err := cli.GetLatestStatus(ctx, dag.DAG)
 		require.NoError(t, err)
 
-		prevWorkflowID := status.DAGRunID
+		prevDAGRunID := status.DAGRunID
 		prevParams := status.Params
 
 		time.Sleep(1 * time.Second)
 
-		err = cli.RetryDAGRun(ctx, dag.DAG, prevWorkflowID)
+		err = cli.RetryDAGRun(ctx, dag.DAG, prevDAGRunID)
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish
@@ -215,16 +215,14 @@ func TestClient_RunDAG(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check if the params are the same as the previous run.
-		require.Equal(t, prevWorkflowID, status.DAGRunID)
+		require.Equal(t, prevDAGRunID, status.DAGRunID)
 		require.Equal(t, prevParams, status.Params)
 	})
 }
 
-func testNewStatus(dag *digraph.DAG, workflowID string, status scheduler.Status, nodeStatus scheduler.NodeStatus) models.DAGRunStatus {
+func testNewStatus(dag *digraph.DAG, dagRunID string, status scheduler.Status, nodeStatus scheduler.NodeStatus) models.DAGRunStatus {
 	nodes := []scheduler.NodeData{{State: scheduler.NodeState{Status: nodeStatus}}}
 	tm := time.Now()
 	startedAt := &tm
-	return models.NewStatusBuilder(dag).Create(
-		workflowID, status, 0, *startedAt, models.WithNodes(nodes),
-	)
+	return models.NewStatusBuilder(dag).Create(dagRunID, status, 0, *startedAt, models.WithNodes(nodes))
 }

@@ -80,7 +80,7 @@ func dequeueWorkflow(ctx *Context, workflow digraph.DAGRunRef) error {
 	}
 
 	// Dequeue the workflow
-	if _, err = ctx.QueueStore.DequeueByWorkflowID(ctx.Context, workflow.Name, workflow.ID); err != nil {
+	if _, err = ctx.QueueStore.DequeueByDAGRunID(ctx.Context, workflow.Name, workflow.ID); err != nil {
 		return fmt.Errorf("failed to dequeue workflow %s: %w", workflow.ID, err)
 	}
 
