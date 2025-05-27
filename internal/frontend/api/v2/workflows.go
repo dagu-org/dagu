@@ -98,7 +98,7 @@ func (a *API) GetWorkflowLog(ctx context.Context, request api.GetWorkflowLogRequ
 	if err != nil {
 		return api.GetWorkflowLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("workflow ID %s not found for DAG %s", workflowId, dagName),
+			Message: fmt.Sprintf("DAG-run ID %s not found for DAG %s", workflowId, dagName),
 		}, nil
 	}
 
@@ -134,7 +134,7 @@ func (a *API) GetWorkflowStepLog(ctx context.Context, request api.GetWorkflowSte
 	if err != nil {
 		return api.GetWorkflowStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("workflow ID %s not found for DAG %s", workflowId, dagName),
+			Message: fmt.Sprintf("DAG-run ID %s not found for DAG %s", workflowId, dagName),
 		}, nil
 	}
 
@@ -180,13 +180,13 @@ func (a *API) UpdateWorkflowStepStatus(ctx context.Context, request api.UpdateWo
 	if err != nil {
 		return &api.UpdateWorkflowStepStatus404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("workflow ID %s not found for DAG %s", request.WorkflowId, request.Name),
+			Message: fmt.Sprintf("DAG-run ID %s not found for DAG %s", request.WorkflowId, request.Name),
 		}, nil
 	}
 	if status.Status == scheduler.StatusRunning {
 		return &api.UpdateWorkflowStepStatus400JSONResponse{
 			Code:    api.ErrorCodeBadRequest,
-			Message: fmt.Sprintf("workflow ID %s for DAG %s is still running", request.WorkflowId, request.Name),
+			Message: fmt.Sprintf("DAG-run ID %s for DAG %s is still running", request.WorkflowId, request.Name),
 		}, nil
 	}
 
@@ -221,7 +221,7 @@ func (a *API) GetWorkflowDetails(ctx context.Context, request api.GetWorkflowDet
 	if err != nil {
 		return &api.GetWorkflowDetails404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("workflow ID %s not found for DAG %s", request.WorkflowId, request.Name),
+			Message: fmt.Sprintf("DAG-run ID %s not found for DAG %s", request.WorkflowId, request.Name),
 		}, nil
 	}
 	return &api.GetWorkflowDetails200JSONResponse{
@@ -236,7 +236,7 @@ func (a *API) GetChildWorkflowDetails(ctx context.Context, request api.GetChildW
 	if err != nil {
 		return &api.GetChildWorkflowDetails404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("child workflow ID %s not found for DAG %s", request.ChildWorkflowId, request.Name),
+			Message: fmt.Sprintf("child DAG-run ID %s not found for DAG %s", request.ChildWorkflowId, request.Name),
 		}, nil
 	}
 	return &api.GetChildWorkflowDetails200JSONResponse{
@@ -251,7 +251,7 @@ func (a *API) GetChildWorkflowLog(ctx context.Context, request api.GetChildWorkf
 	if err != nil {
 		return &api.GetChildWorkflowLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("child workflow ID %s not found for DAG %s", request.ChildWorkflowId, request.Name),
+			Message: fmt.Sprintf("child DAG-run ID %s not found for DAG %s", request.ChildWorkflowId, request.Name),
 		}, nil
 	}
 
@@ -285,7 +285,7 @@ func (a *API) GetChildWorkflowStepLog(ctx context.Context, request api.GetChildW
 	if err != nil {
 		return &api.GetChildWorkflowStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("child workflow ID %s not found for DAG %s", request.ChildWorkflowId, request.Name),
+			Message: fmt.Sprintf("child DAG-run ID %s not found for DAG %s", request.ChildWorkflowId, request.Name),
 		}, nil
 	}
 
@@ -332,13 +332,13 @@ func (a *API) UpdateChildWorkflowStepStatus(ctx context.Context, request api.Upd
 	if err != nil {
 		return &api.UpdateChildWorkflowStepStatus404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("child workflow ID %s not found for DAG %s", request.ChildWorkflowId, request.Name),
+			Message: fmt.Sprintf("child DAG-run ID %s not found for DAG %s", request.ChildWorkflowId, request.Name),
 		}, nil
 	}
 	if status.Status == scheduler.StatusRunning {
 		return &api.UpdateChildWorkflowStepStatus400JSONResponse{
 			Code:    api.ErrorCodeBadRequest,
-			Message: fmt.Sprintf("workflow ID %s for DAG %s is still running", request.WorkflowId, request.Name),
+			Message: fmt.Sprintf("DAG-run ID %s for DAG %s is still running", request.WorkflowId, request.Name),
 		}, nil
 	}
 
@@ -380,7 +380,7 @@ func (a *API) RetryWorkflow(ctx context.Context, request api.RetryWorkflowReques
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
 			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("workflow ID %s not found for DAG %s", request.WorkflowId, request.Name),
+			Message:    fmt.Sprintf("DAG-run ID %s not found for DAG %s", request.WorkflowId, request.Name),
 		}
 	}
 
@@ -402,7 +402,7 @@ func (a *API) TerminateWorkflow(ctx context.Context, request api.TerminateWorkfl
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
 			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("workflow ID %s not found for DAG %s", request.WorkflowId, request.Name),
+			Message:    fmt.Sprintf("DAG-run ID %s not found for DAG %s", request.WorkflowId, request.Name),
 		}
 	}
 
@@ -442,7 +442,7 @@ func (a *API) DequeueWorkflow(ctx context.Context, request api.DequeueWorkflowRe
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
 			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("workflow ID %s not found for DAG %s", request.WorkflowId, request.Name),
+			Message:    fmt.Sprintf("DAG-run ID %s not found for DAG %s", request.WorkflowId, request.Name),
 		}
 	}
 

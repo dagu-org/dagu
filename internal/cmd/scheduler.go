@@ -11,13 +11,12 @@ func CmdScheduler() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "scheduler [flags]",
-			Short: "Start the scheduler for automated workflow execution",
-			Long: `Launch the scheduler process that monitors DAG definitions and automatically triggers workflows based on their defined schedules.
+			Short: "Start the scheduler for automated DAG execution",
+			Long: `Launch the scheduler process that monitors DAG definitions and automatically triggers DAG based on their defined schedules.
 
 The scheduler continuously monitors the specified directory for DAG definitions,
-evaluates their schedule expressions (cron format), and initiates workflow executions
-when their scheduled time arrives. It handles time-based dependencies and ensures
-workflows run at their specified intervals.
+evaluates their schedule expressions (cron format), and initiates DAG-run executions
+when their scheduled time arrives. It also consumes DAG-runs from the queue and executes them.
 
 Flags:
   --dags string   Path to the directory containing DAG definition files

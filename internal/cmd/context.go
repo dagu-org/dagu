@@ -207,22 +207,22 @@ func (c *Context) dagStore(cache *fileutil.Cache[*digraph.DAG], searchPaths []st
 	), nil
 }
 
-// OpenLogFile creates and opens a log file for a given workflow.
+// OpenLogFile creates and opens a log file for a given DAG-run.
 // It evaluates the log directory, validates settings, creates the log directory,
-// builds a filename using the current timestamp and workflow ID, and then opens the file.
+// builds a filename using the current timestamp and DAG-run ID, and then opens the file.
 func (c *Context) OpenLogFile(
 	dag *digraph.DAG,
-	workflowID string,
+	dagRunID string,
 ) (*os.File, error) {
-	logPath, err := c.GenLogFileName(dag, workflowID)
+	logPath, err := c.GenLogFileName(dag, dagRunID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate log file name: %w", err)
 	}
 	return fileutil.OpenOrCreateFile(logPath)
 }
 
-// GenLogFileName generates a log file name based on the DAG and workflow ID.
-func (c *Context) GenLogFileName(dag *digraph.DAG, workflowID string) (string, error) {
+// GenLogFileName generates a log file name based on the DAG and DAG-run ID.
+func (c *Context) GenLogFileName(dag *digraph.DAG, dagRunID string) (string, error) {
 	// Read the global configuration for log directory.
 	baseLogDir, err := cmdutil.EvalString(c, c.Config.Paths.LogDir)
 	if err != nil {
@@ -236,10 +236,10 @@ func (c *Context) GenLogFileName(dag *digraph.DAG, workflowID string) (string, e
 	}
 
 	cfg := LogConfig{
-		BaseDir:    baseLogDir,
-		DAGLogDir:  dagLogDir,
-		Name:       dag.Name,
-		WorkflowID: workflowID,
+		BaseDir:   baseLogDir,
+		DAGLogDir: dagLogDir,
+		Name:      dag.Name,
+		DAGRunID:  dagRunID,
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -290,8 +290,8 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *C
 	return cmd
 }
 
-// genWorkflowID creates a new UUID string to be used as a workflow IDentifier.
-func genWorkflowID() (string, error) {
+// genRunID creates a new UUID string to be used as a DAG-run IDentifier.
+func genRunID() (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return "", err
@@ -299,26 +299,26 @@ func genWorkflowID() (string, error) {
 	return id.String(), nil
 }
 
-// validateWorkflowID checks if the workflow ID is valid and not empty.
-func validateWorkflowID(workflowID string) error {
-	if workflowID == "" {
-		return ErrWorkflowIDRequired
+// validateRunID checks if the DAG-run ID is valid and not empty.
+func validateRunID(dagRunID string) error {
+	if dagRunID == "" {
+		return ErrDAGRunIDRequired
 	}
-	if !regexWorkflowID.MatchString(workflowID) {
-		return ErrWorkflowIDFormat
+	if !reDAGRunID.MatchString(dagRunID) {
+		return ErrDAGRunIDFormat
 	}
-	if len(workflowID) > maxWorkflowIDLen {
-		return ErrWorkflowIDTooLong
+	if len(dagRunID) > maxDAGRunIDLen {
+		return ErrDAGRunIDTooLong
 	}
 	return nil
 }
 
-// regexWorkflowID is a regular expression to validate workflow IDs.
+// reDAGRunID is a regular expression to validate DAG-run IDs.
 // It allows alphanumeric characters, hyphens, and underscores.
-var regexWorkflowID = regexp.MustCompile(`^[-a-zA-Z0-9_]+$`)
+var reDAGRunID = regexp.MustCompile(`^[-a-zA-Z0-9_]+$`)
 
-// maxWorkflowIDLen is the max length of the workflow ID
-const maxWorkflowIDLen = 60
+// maxDAGRunIDLen is the max length of the DAG-run ID
+const maxDAGRunIDLen = 60
 
 // signalListener is an interface for types that can receive OS signals.
 type signalListener interface {
@@ -347,10 +347,10 @@ func listenSignals(ctx context.Context, listener signalListener) {
 
 // LogConfig defines configuration for log file creation.
 type LogConfig struct {
-	BaseDir    string // Base directory for logs.
-	DAGLogDir  string // Optional alternative log directory specified by the DAG definition.
-	Name       string // Name of the workflow; used for generating a safe directory name.
-	WorkflowID string // Unique workflow ID used in the filename.
+	BaseDir   string // Base directory for logs.
+	DAGLogDir string // Optional alternative log directory specified by the DAG definition.
+	Name      string // Name of the DAG; used for generating a safe directory name.
+	DAGRunID  string // Unique DAG-run ID used in the filename.
 }
 
 // Validate checks that essential fields are provided.
@@ -380,7 +380,7 @@ func (cfg LogConfig) LogDir() (string, error) {
 	utcTimestamp := time.Now().UTC().Format("20060102_150405Z")
 
 	safeName := fileutil.SafeName(cfg.Name)
-	logDir := filepath.Join(baseDir, safeName, "workflow_"+utcTimestamp+"_"+cfg.WorkflowID)
+	logDir := filepath.Join(baseDir, safeName, "workflow_"+utcTimestamp+"_"+cfg.DAGRunID)
 	if err := os.MkdirAll(logDir, 0750); err != nil {
 		return "", fmt.Errorf("failed to initialize directory %s: %w", logDir, err)
 	}
@@ -389,13 +389,13 @@ func (cfg LogConfig) LogDir() (string, error) {
 }
 
 // LogFile constructs the log filename using the prefix, safe DAG name, current timestamp,
-// and a truncated version of the workflow ID.
+// and a truncated version of the DAG-run ID.
 func (cfg LogConfig) LogFile() string {
 	timestamp := time.Now().Format("20060102.15:04:05.000")
-	truncatedWorkflowID := stringutil.TruncString(cfg.WorkflowID, 8)
+	truncDAGRunID := stringutil.TruncString(cfg.DAGRunID, 8)
 
 	return fmt.Sprintf("workflow_%s.%s.log",
 		timestamp,
-		truncatedWorkflowID,
+		truncDAGRunID,
 	)
 }

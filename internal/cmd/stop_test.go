@@ -11,59 +11,59 @@ import (
 )
 
 func TestStopCommand(t *testing.T) {
-	t.Run("StopDAG", func(t *testing.T) {
+	t.Run("StopDAGRun", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, "cmd/stop.yaml")
+		dag := th.DAG(t, "cmd/stop.yaml")
 
 		done := make(chan struct{})
 		go func() {
 			// Start the DAG to stop.
-			args := []string{"start", dagFile.Location}
+			args := []string{"start", dag.Location}
 			th.RunCommand(t, cmd.CmdStart(), test.CmdTest{Args: args})
 			close(done)
 		}()
 
 		time.Sleep(time.Millisecond * 100)
 
-		// Wait for the workflow running.
-		dagFile.AssertLatestStatus(t, scheduler.StatusRunning)
+		// Wait for the DAG-run running.
+		dag.AssertLatestStatus(t, scheduler.StatusRunning)
 
-		// Stop the DAG.
+		// Stop the DAG-run.
 		th.RunCommand(t, cmd.CmdStop(), test.CmdTest{
-			Args:        []string{"stop", dagFile.Location},
-			ExpectedOut: []string{"Workflow stopped"}})
+			Args:        []string{"stop", dag.Location},
+			ExpectedOut: []string{"stopped"}})
 
-		// Check the DAG is stopped.
-		dagFile.AssertLatestStatus(t, scheduler.StatusCancel)
+		// Check the DAG-run is stopped.
+		dag.AssertLatestStatus(t, scheduler.StatusCancel)
 		<-done
 	})
-	t.Run("StopDAGWithRequestID", func(t *testing.T) {
+	t.Run("StopDAGRunWithRunID", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, "cmd/stop.yaml")
+		dag := th.DAG(t, "cmd/stop.yaml")
 
 		done := make(chan struct{})
-		workflowID := uuid.Must(uuid.NewV7()).String()
+		dagRunID := uuid.Must(uuid.NewV7()).String()
 		go func() {
-			// Start the DAG to stop.
-			args := []string{"start", "--workflow-id=" + workflowID, dagFile.Location}
+			// Start the DAG-run to stop.
+			args := []string{"start", "--run-id=" + dagRunID, dag.Location}
 			th.RunCommand(t, cmd.CmdStart(), test.CmdTest{Args: args})
 			close(done)
 		}()
 
 		time.Sleep(time.Millisecond * 100)
 
-		// Wait for the workflow running.
-		dagFile.AssertLatestStatus(t, scheduler.StatusRunning)
+		// Wait for the DAG-run running
+		dag.AssertLatestStatus(t, scheduler.StatusRunning)
 
-		// Stop the workflow.
+		// Stop the DAG-run with a specific run ID.
 		th.RunCommand(t, cmd.CmdStop(), test.CmdTest{
-			Args:        []string{"stop", dagFile.Location, "--workflow-id=" + workflowID},
-			ExpectedOut: []string{"Workflow stopped"}})
+			Args:        []string{"stop", dag.Location, "--run-id=" + dagRunID},
+			ExpectedOut: []string{"stopped"}})
 
-		// Check the DAG is stopped.
-		dagFile.AssertLatestStatus(t, scheduler.StatusCancel)
+		// Check the DAG-run is stopped.
+		dag.AssertLatestStatus(t, scheduler.StatusCancel)
 		<-done
 	})
 }

@@ -14,13 +14,11 @@ func CmdDry() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "dry [flags] <DAG definition> [-- param1 param2 ...]",
-			Short: "Simulate a workflow without executing actual commands",
-			Long: `Perform a dry-run simulation of a workflow without executing any real actions.
+			Short: "Simulate a DAG-run without executing actual commands",
+			Long: `Perform a dry-run simulation of a DAG-run without executing any real actions.
 
-This command processes a DAG definition and simulates the entire workflow execution,
-showing the execution plan, step dependencies, and configuration. It validates the
-workflow structure and parameters without producing any side effects or running
-actual commands.
+This command processes a DAG definition and simulates the entire DAG execution
+without producing any side effects or running actual commands.
 
 Parameters after the "--" separator are passed as execution parameters (either positional or key=value pairs),
 allowing you to test different parameter configurations.
@@ -59,14 +57,14 @@ func runDry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 	}
 
-	workflowID, err := genWorkflowID()
+	dagRunID, err := genRunID()
 	if err != nil {
-		return fmt.Errorf("failed to generate workflow ID: %w", err)
+		return fmt.Errorf("failed to generate DAG-run ID: %w", err)
 	}
 
-	logFile, err := ctx.OpenLogFile(dag, workflowID)
+	logFile, err := ctx.OpenLogFile(dag, dagRunID)
 	if err != nil {
-		return fmt.Errorf("failed to initialize log file for workflow %s: %w", dag.Name, err)
+		return fmt.Errorf("failed to initialize log file for DAG-run %s: %w", dag.Name, err)
 	}
 	defer func() {
 		_ = logFile.Close()
@@ -79,10 +77,10 @@ func runDry(ctx *Context, args []string) error {
 		return err
 	}
 
-	root := digraph.NewDAGRunRef(dag.Name, workflowID)
+	root := digraph.NewDAGRunRef(dag.Name, dagRunID)
 
 	agentInstance := agent.New(
-		workflowID,
+		dagRunID,
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
@@ -97,7 +95,7 @@ func runDry(ctx *Context, args []string) error {
 	listenSignals(ctx, agentInstance)
 
 	if err := agentInstance.Run(ctx); err != nil {
-		return fmt.Errorf("failed to execute the workflow %s (workflow ID: %s): %w", dag.Name, workflowID, err)
+		return fmt.Errorf("failed to execute the DAG-run %s (DAG-run ID: %s): %w", dag.Name, dagRunID, err)
 	}
 
 	agentInstance.PrintSummary(ctx)

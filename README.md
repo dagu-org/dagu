@@ -305,10 +305,10 @@ dagu start <file or DAG name> [-- value1 value2 ...]
 # Displays the current status of the DAG
 dagu status <file or DAG name>
 
-# Re-runs the specified workflow
-dagu retry --workflow-id=<workflow-id> <file or DAG name>
+# Re-runs the specified DAG run
+dagu retry --run-id=<run-id> <file or DAG name>
 
-# Stops the workflow
+# Stops the current running DAG
 dagu stop <file or DAG name>
 
 # Restarts the current running DAG

@@ -53,7 +53,7 @@ steps:
 `)
 
 	dagRunID := uuid.Must(uuid.NewV7()).String()
-	args := []string{"start", "--workflow-id", dagRunID, "parent"}
+	args := []string{"start", "--run-id", dagRunID, "parent"}
 	th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"DAG-run finished"},
@@ -115,7 +115,7 @@ steps:
 
 	// Retry the DAG
 
-	args = []string{"retry", "--workflow-id", dagRunID, "parent"}
+	args = []string{"retry", "--run-id", dagRunID, "parent"}
 	th.RunCommand(t, cmd.CmdRetry(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"DAG-run finished"},

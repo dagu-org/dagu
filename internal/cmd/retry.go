@@ -16,39 +16,32 @@ import (
 func CmdRetry() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "retry [flags] <workflow name>",
-			Short: "Retry a previously executed workflow",
-			Long: `Create a new run for a previously executed workflow using the same workflow ID.
-
-Unlike restart, which creates a new workflow with a new ID, retry creates a new run within 
-the same workflow ID. This preserves the workflow history and allows for multiple attempts
-of the same workflow instance.
+			Use:   "retry [flags] <DAG name>",
+			Short: "Retry a previously executed DAG-run with the same DAG-run ID",
+			Long: `Create a new run for a previously executed DAG-run using the same DAG-run ID.
 
 Flags:
-  --workflow-id string (required) Unique identifier of the workflow to retry.
+  --run-id string (required) Unique identifier of the DAG-run to retry.
 
 Example:
-  dagu retry --workflow-id=abc123 my_dag
-
-This command is useful for recovering from errors or transient issues by creating a new run
-of the same workflow without changing its identity.
+  dagu retry --run-id=abc123 my_dag
 `,
 			Args: cobra.ExactArgs(1),
 		}, retryFlags, runRetry,
 	)
 }
 
-var retryFlags = []commandLineFlag{workflowIDFlagRetry}
+var retryFlags = []commandLineFlag{dagRunIDFlagRetry}
 
 func runRetry(ctx *Context, args []string) error {
-	workflowID, _ := ctx.StringParam("workflow-id")
+	dagRunID, _ := ctx.StringParam("run-id")
 	name := args[0]
 
-	// Retrieve the previous run data for specified workflow ID.
-	ref := digraph.NewDAGRunRef(name, workflowID)
+	// Retrieve the previous run data for specified DAG-run ID.
+	ref := digraph.NewDAGRunRef(name, dagRunID)
 	attempt, err := ctx.DAGRunStore.FindAttempt(ctx, ref)
 	if err != nil {
-		return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflowID, err)
+		return fmt.Errorf("failed to find the record for DAG-run ID %s: %w", dagRunID, err)
 	}
 
 	// Read the detailed status of the previous status.
@@ -72,7 +65,7 @@ func runRetry(ctx *Context, args []string) error {
 }
 
 func executeRetry(ctx *Context, dag *digraph.DAG, status *models.DAGRunStatus, rootRun digraph.DAGRunRef) error {
-	logger.Debug(ctx, "Executing workflow retry", "name", dag.Name, "dagRunId", status.DAGRunID)
+	logger.Debug(ctx, "Executing DAG-run retry", "dag", dag.Name, "runId", status.DAGRunID)
 
 	// We use the same log file for the retry as the original run.
 	logFile, err := fileutil.OpenOrCreateFile(status.Log)
@@ -83,7 +76,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.DAGRunStatus, r
 		_ = logFile.Close()
 	}()
 
-	logger.Info(ctx, "Workflow retry initiated", "DAG", dag.Name, "dagRunId", status.DAGRunID, "logFile", logFile.Name())
+	logger.Info(ctx, "DAG-run retry initiated", "DAG", dag.Name, "dagRunId", status.DAGRunID, "logFile", logFile.Name())
 
 	// Update the context with the log file
 	ctx.LogToFile(logFile)
@@ -116,7 +109,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.DAGRunStatus, r
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
-			return fmt.Errorf("failed to execute the workflow %s (workflow ID: %s): %w", dag.Name, status.DAGRunID, err)
+			return fmt.Errorf("failed to execute the DAG %s (DAG-run ID: %s): %w", dag.Name, status.DAGRunID, err)
 		}
 	}
 

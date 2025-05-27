@@ -16,7 +16,7 @@ func CmdStartAll() *cobra.Command {
 
 This convenience command combines the functionality of 'dagu server' and 'dagu scheduler'
 into a single process, making it easier to run a complete Dagu instance. The web UI
-provides the management interface while the scheduler handles automated workflow execution
+provides the management interface while the scheduler handles automated DAG-run execution
 based on defined schedules.
 
 Flags:

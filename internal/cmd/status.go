@@ -12,22 +12,21 @@ import (
 func CmdStatus() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "status [flags] <workflow name>",
-			Short: "Display the current status of a workflow",
-			Long: `Show real-time status information for a specified workflow instance.
+			Use:   "status [flags] <DAG name>",
+			Short: "Display the current status of a DAG-run",
+			Long: `Show real-time status information for a specified DAG-run instance.
 
-This command retrieves and displays the current execution status of a workflow,
+This command retrieves and displays the current execution status of a DAG-run,
 including its state (running, completed, failed), process ID, and other relevant details.
-It connects to the workflow's agent to get the most up-to-date information.
 
 Flags:
-  --workflow-id string (optional) Unique identifier of the workflow to check.
+  --run-id string (optional) Unique identifier of the DAG-run to check.
                                  If not provided, it will show the status of the
-                                 most recent workflow for the given name.
+                                 most recent DAG-run for the given name.
 
 Example:
-  dagu status --workflow-id=abc123 my_dag
-  dagu status my_dag  # Shows status of the most recent workflow
+  dagu status --run-id=abc123 my_dag
+  dagu status my_dag  # Shows status of the most recent DAG-run
 `,
 			Args: cobra.ExactArgs(1),
 		}, statusFlags, runStatus,
@@ -35,24 +34,24 @@ Example:
 }
 
 var statusFlags = []commandLineFlag{
-	workflowIDFlagStatus,
+	dagRunIDFlagStatus,
 }
 
 func runStatus(ctx *Context, args []string) error {
-	workflowID, err := ctx.StringParam("workflow-id")
+	dagRunID, err := ctx.StringParam("run-id")
 	if err != nil {
-		return fmt.Errorf("failed to get workflow ID: %w", err)
+		return fmt.Errorf("failed to get DAG-run ID: %w", err)
 	}
 
 	name := args[0]
 
 	var attempt models.DAGRunAttempt
-	if workflowID != "" {
-		// Retrieve the previous run's record for the specified workflow ID.
-		dagRunRef := digraph.NewDAGRunRef(name, workflowID)
+	if dagRunID != "" {
+		// Retrieve the previous run's record for the specified DAG-run ID.
+		dagRunRef := digraph.NewDAGRunRef(name, dagRunID)
 		att, err := ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
 		if err != nil {
-			return fmt.Errorf("failed to find run data for workflow ID %s: %w", workflowID, err)
+			return fmt.Errorf("failed to find run data for DAG-run ID %s: %w", dagRunID, err)
 		}
 		attempt = att
 	} else {
@@ -68,7 +67,7 @@ func runStatus(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read DAG from run data: %w", err)
 	}
 
-	status, err := ctx.DAGRunMgr.GetCurrentStatus(ctx, dag, workflowID)
+	status, err := ctx.DAGRunMgr.GetCurrentStatus(ctx, dag, dagRunID)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve current status: %w", err)
 	}

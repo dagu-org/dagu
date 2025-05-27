@@ -13,33 +13,33 @@ func CmdDequeue() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "dequeue [flags]",
-			Short: "Dequeue a workflow to the queue.",
-			Long: `Dequeue a workflow to the queue.
+			Short: "Dequeue a DAG-run from the queue",
+			Long: `Dequeue a DAG-run from the queue.
 
 Example:
-	dagu dequeue --workflow=my_workflow_name:my_workflow_id
+	dagu dequeue --dag-run=dag_name:my_dag_run_id
 `,
 		}, dequeueFlags, runDequeue,
 	)
 }
 
-var dequeueFlags = []commandLineFlag{paramsFlag, workflowFlagDequeue}
+var dequeueFlags = []commandLineFlag{paramsFlag, dagRunFlagDequeue}
 
 func runDequeue(ctx *Context, _ []string) error {
-	// Get workflow ID from flags
-	workflowRef, _ := ctx.StringParam("workflow")
-	workflow, err := digraph.ParseDAGRunRef(workflowRef)
+	// Get DAG-run reference from the context
+	dagRunRef, _ := ctx.StringParam("dag-run")
+	dagRun, err := digraph.ParseDAGRunRef(dagRunRef)
 	if err != nil {
-		return fmt.Errorf("failed to parse workflow reference %s: %w", workflowRef, err)
+		return fmt.Errorf("failed to parse DAG-run reference %s: %w", dagRunRef, err)
 	}
-	return dequeueWorkflow(ctx, workflow)
+	return dequeueDAGRun(ctx, dagRun)
 }
 
-// dequeueWorkflow dequeues a workflow to the queue.
-func dequeueWorkflow(ctx *Context, workflow digraph.DAGRunRef) error {
-	attempt, err := ctx.DAGRunStore.FindAttempt(ctx, workflow)
+// dequeueDAGRun dequeues a DAG-run from the queue.
+func dequeueDAGRun(ctx *Context, dagRun digraph.DAGRunRef) error {
+	attempt, err := ctx.DAGRunStore.FindAttempt(ctx, dagRun)
 	if err != nil {
-		return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflow.ID, err)
+		return fmt.Errorf("failed to find the record for DAG-run ID %s: %w", dagRun.ID, err)
 	}
 
 	status, err := attempt.ReadStatus(ctx)
@@ -49,7 +49,7 @@ func dequeueWorkflow(ctx *Context, workflow digraph.DAGRunRef) error {
 
 	if status.Status != scheduler.StatusQueued {
 		// If the status is not queued, return an error
-		return fmt.Errorf("workflow %s is not in queued status but %s", workflow.ID, status.Status)
+		return fmt.Errorf("DAG-run %s is not in queued status but %s", dagRun.ID, status.Status)
 	}
 
 	dag, err := attempt.ReadDAG(ctx)
@@ -57,16 +57,16 @@ func dequeueWorkflow(ctx *Context, workflow digraph.DAGRunRef) error {
 		return fmt.Errorf("failed to read dag: %w", err)
 	}
 
-	// Make sure the workflow is not running at least locally
-	latestStatus, err := ctx.DAGRunMgr.GetCurrentStatus(ctx, dag, workflow.ID)
+	// Make sure the DAG-run is not running at least locally
+	latestStatus, err := ctx.DAGRunMgr.GetCurrentStatus(ctx, dag, dagRun.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get latest status: %w", err)
 	}
 	if latestStatus.Status != scheduler.StatusQueued {
-		return fmt.Errorf("workflow %s is not in queued status but %s", workflow.ID, latestStatus.Status)
+		return fmt.Errorf("DAG-run %s is not in queued status but %s", dagRun.ID, latestStatus.Status)
 	}
 
-	// Make the workflow status to cancelled
+	// Make the status as canceled
 	status.Status = scheduler.StatusCancel
 
 	if err := attempt.Open(ctx.Context); err != nil {
@@ -79,14 +79,14 @@ func dequeueWorkflow(ctx *Context, workflow digraph.DAGRunRef) error {
 		return fmt.Errorf("failed to save status: %w", err)
 	}
 
-	// Dequeue the workflow
-	if _, err = ctx.QueueStore.DequeueByDAGRunID(ctx.Context, workflow.Name, workflow.ID); err != nil {
-		return fmt.Errorf("failed to dequeue workflow %s: %w", workflow.ID, err)
+	// Dequeue the DAG-run from the queue
+	if _, err = ctx.QueueStore.DequeueByDAGRunID(ctx.Context, dagRun.Name, dagRun.ID); err != nil {
+		return fmt.Errorf("failed to dequeue DAG-run %s: %w", dagRun.ID, err)
 	}
 
-	logger.Info(ctx.Context, "Dequeued workflow",
-		"workflowName", workflow.Name,
-		"dagRunId", workflow.ID,
+	logger.Info(ctx.Context, "Dequeued DAG-run",
+		"dag", dagRun.Name,
+		"runId", dagRun.ID,
 	)
 
 	return nil

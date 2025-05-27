@@ -86,7 +86,7 @@ func (m *Manager) StartDAGRun(_ context.Context, dag *digraph.DAG, opts StartOpt
 		args = append(args, "-q")
 	}
 	if opts.DAGRunID != "" {
-		args = append(args, fmt.Sprintf("--workflow-id=%s", opts.DAGRunID))
+		args = append(args, fmt.Sprintf("--run-id=%s", opts.DAGRunID))
 	}
 	if configFile := config.UsedConfigFile.Load(); configFile != nil {
 		if configFile, ok := configFile.(string); ok {
@@ -117,7 +117,7 @@ func (m *Manager) EnqueueDAGRun(_ context.Context, dag *digraph.DAG, opts Enqueu
 		args = append(args, "-q")
 	}
 	if opts.DAGRunID != "" {
-		args = append(args, fmt.Sprintf("--workflow-id=%s", opts.DAGRunID))
+		args = append(args, fmt.Sprintf("--run-id=%s", opts.DAGRunID))
 	}
 	if configFile := config.UsedConfigFile.Load(); configFile != nil {
 		if configFile, ok := configFile.(string); ok {
@@ -193,7 +193,7 @@ func (m *Manager) RestartDAG(_ context.Context, dag *digraph.DAG, opts RestartOp
 // RetryDAGRun retries a DAG run by executing the configured executable with the retry command.
 func (m *Manager) RetryDAGRun(_ context.Context, dag *digraph.DAG, dagRunID string) error {
 	args := []string{"retry"}
-	args = append(args, fmt.Sprintf("--workflow-id=%s", dagRunID))
+	args = append(args, fmt.Sprintf("--run-id=%s", dagRunID))
 	if configFile := config.UsedConfigFile.Load(); configFile != nil {
 		if configFile, ok := configFile.(string); ok {
 			args = append(args, "--config")

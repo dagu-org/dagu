@@ -35,7 +35,7 @@ func TestDAG(t *testing.T) {
 		var execResp api.ExecuteDAG200JSONResponse
 		resp.Unmarshal(t, &execResp)
 
-		require.NotEmpty(t, execResp.WorkflowId, "expected a non-empty workflow ID")
+		require.NotEmpty(t, execResp.WorkflowId, "expected a non-empty DAG-run ID")
 
 		// Check the status of the workflow
 		require.Eventually(t, func() bool {

@@ -352,7 +352,7 @@ func (a *API) GetDAGWorkflowDetails(ctx context.Context, request api.GetDAGWorkf
 
 	status, err := a.dagRunMgr.GetCurrentStatus(ctx, dag, workflowId)
 	if err != nil {
-		return nil, fmt.Errorf("error getting status by workflow ID: %w", err)
+		return nil, fmt.Errorf("error getting status by DAG-run ID: %w", err)
 	}
 
 	return &api.GetDAGWorkflowDetails200JSONResponse{
@@ -392,11 +392,11 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		var err error
 		workflowId, err = a.dagRunMgr.GenDAGRunID(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("error generating workflow ID: %w", err)
+			return nil, fmt.Errorf("error generating DAG-run ID: %w", err)
 		}
 	}
 
-	// Check the workflow ID is not already in use
+	// Check the DAG-run ID is not already in use
 	_, err = a.dagRunStore.FindAttempt(ctx, digraph.DAGRunRef{
 		Name: dag.Name,
 		ID:   workflowId,
@@ -405,7 +405,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		return nil, &Error{
 			HTTPStatus: http.StatusConflict,
 			Code:       api.ErrorCodeAlreadyExists,
-			Message:    fmt.Sprintf("Workflow ID %s already exists for DAG %s", workflowId, dag.Name),
+			Message:    fmt.Sprintf("DAG-run ID %s already exists for DAG %s", workflowId, dag.Name),
 		}
 	}
 
@@ -480,7 +480,7 @@ func (a *API) EnqueueDAGWorkflow(ctx context.Context, request api.EnqueueDAGWork
 		var err error
 		workflowId, err = a.dagRunMgr.GenDAGRunID(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("error generating workflow ID: %w", err)
+			return nil, fmt.Errorf("error generating DAG-run ID: %w", err)
 		}
 	}
 

@@ -16,33 +16,33 @@ func CmdEnqueue() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "enqueue [flags]",
-			Short: "Enqueue a workflow to the queue.",
-			Long: `Enqueue a workflow to the queue.
+			Short: "Enqueue a DAG-run to the queue.",
+			Long: `Enqueue a DAG-run to the queue.
 
 Example:
-	dagu enqueue --workflow-id=my_workflow_id my_dag -- P1=foo P2=bar
+	dagu enqueue --run-id=run_id my_dag -- P1=foo P2=bar
 `,
 		}, enqueueFlags, runEnqueue,
 	)
 }
 
-var enqueueFlags = []commandLineFlag{paramsFlag, workflowIDFlag}
+var enqueueFlags = []commandLineFlag{paramsFlag, dagRunIDFlag}
 
 func runEnqueue(ctx *Context, args []string) error {
-	// Get workflow ID from flags
-	workflowID, err := ctx.StringParam("workflow-id")
+	// Get Run ID from the context or generate a new one
+	runID, err := ctx.StringParam("run-id")
 	if err != nil {
-		return fmt.Errorf("failed to get workflow ID: %w", err)
+		return fmt.Errorf("failed to get Run ID: %w", err)
 	}
 
-	if workflowID == "" {
-		// Generate a new workflow ID
-		workflowID, err = genWorkflowID()
+	if runID == "" {
+		// Generate a new Run ID if not provided
+		runID, err = genRunID()
 		if err != nil {
-			return fmt.Errorf("failed to generate workflow ID: %w", err)
+			return fmt.Errorf("failed to generate Run ID: %w", err)
 		}
-	} else if err := validateWorkflowID(workflowID); err != nil {
-		return fmt.Errorf("invalid workflow ID: %w", err)
+	} else if err := validateRunID(runID); err != nil {
+		return fmt.Errorf("invalid Run ID: %w", err)
 	}
 
 	// Load parameters and DAG
@@ -50,26 +50,26 @@ func runEnqueue(ctx *Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	dag.Location = "" // Queued workflows must not have a location
+	dag.Location = "" // Queued DAG-runs must not have a location
 
-	return enqueueWorkflow(ctx, dag, workflowID)
+	return enqueueDAGRun(ctx, dag, runID)
 }
 
-// enqueueWorkflow enqueues a workflow to the queue.
-func enqueueWorkflow(ctx *Context, dag *digraph.DAG, workflowID string) error {
-	logFile, err := ctx.GenLogFileName(dag, workflowID)
+// enqueueDAGRun enqueues a DAG-run to the queue.
+func enqueueDAGRun(ctx *Context, dag *digraph.DAG, dagRunID string) error {
+	logFile, err := ctx.GenLogFileName(dag, dagRunID)
 	if err != nil {
 		return fmt.Errorf("failed to generate log file name: %w", err)
 	}
 
-	workflow := digraph.NewDAGRunRef(dag.Name, workflowID)
+	dagRun := digraph.NewDAGRunRef(dag.Name, dagRunID)
 
-	// Check if the workflow is already existing in the history store
-	if _, err = ctx.DAGRunStore.FindAttempt(ctx, workflow); err == nil {
-		return fmt.Errorf("workflow %q with ID %q already exists", dag.Name, workflowID)
+	// Check if the DAG-run is already existing in the history store
+	if _, err = ctx.DAGRunStore.FindAttempt(ctx, dagRun); err == nil {
+		return fmt.Errorf("DAG %q with ID %q already exists", dag.Name, dagRunID)
 	}
 
-	att, err := ctx.DAGRunStore.CreateAttempt(ctx.Context, dag, time.Now(), workflowID, models.NewDAGRunAttemptOptions{})
+	att, err := ctx.DAGRunStore.CreateAttempt(ctx.Context, dag, time.Now(), dagRunID, models.NewDAGRunAttemptOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create run: %w", err)
 	}
@@ -80,14 +80,14 @@ func enqueueWorkflow(ctx *Context, dag *digraph.DAG, workflowID string) error {
 		models.WithPreconditions(dag.Preconditions),
 		models.WithQueuedAt(stringutil.FormatTime(time.Now())),
 		models.WithHierarchyRefs(
-			digraph.NewDAGRunRef(dag.Name, workflowID),
+			digraph.NewDAGRunRef(dag.Name, dagRunID),
 			digraph.DAGRunRef{},
 		),
 	}
 
-	// As a prototype, we save the status to the database to enqueue the workflow
+	// As a prototype, we save the status to the database to enqueue the DAG-run.
 	// This could be changed to save to a queue file in the future
-	status := models.NewStatusBuilder(dag).Create(workflowID, scheduler.StatusQueued, 0, time.Time{}, opts...)
+	status := models.NewStatusBuilder(dag).Create(dagRunID, scheduler.StatusQueued, 0, time.Time{}, opts...)
 
 	if err := att.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open run: %w", err)
@@ -99,14 +99,14 @@ func enqueueWorkflow(ctx *Context, dag *digraph.DAG, workflowID string) error {
 		return fmt.Errorf("failed to save status: %w", err)
 	}
 
-	// Enqueue the workflow
-	if err := ctx.QueueStore.Enqueue(ctx.Context, dag.Name, models.QueuePriorityLow, workflow); err != nil {
-		return fmt.Errorf("failed to enqueue workflow: %w", err)
+	// Enqueue the DAG-run to the queue
+	if err := ctx.QueueStore.Enqueue(ctx.Context, dag.Name, models.QueuePriorityLow, dagRun); err != nil {
+		return fmt.Errorf("failed to enqueue DAG-run: %w", err)
 	}
 
-	logger.Info(ctx.Context, "Enqueued workflow",
-		"workflowName", dag.Name,
-		"dagRunId", workflowID,
+	logger.Info(ctx.Context, "Enqueued DAG-run",
+		"dag", dag.Name,
+		"dagRunId", dagRunID,
 		"params", dag.Params,
 	)
 
