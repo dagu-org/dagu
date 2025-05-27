@@ -39,7 +39,7 @@ type definition struct {
 	DelaySec int
 	// RestartWaitSec is the wait in seconds to when the DAG is restarted.
 	RestartWaitSec int
-	// HistRetentionDays is the retention days of the history.
+	// HistRetentionDays is the retention days of the DAG-runs history.
 	HistRetentionDays *int
 	// Precondition is the condition to run the DAG.
 	Precondition any

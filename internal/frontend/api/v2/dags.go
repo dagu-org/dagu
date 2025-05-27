@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/models"
 )
 
@@ -419,7 +419,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 }
 
 func (a *API) startWorkflow(ctx context.Context, dag *digraph.DAG, params, workflowID string) error {
-	if err := a.dagRunMgr.StartDAGRun(ctx, dag, history.StartOptions{
+	if err := a.dagRunMgr.StartDAGRun(ctx, dag, dagrun.StartOptions{
 		Params:   params,
 		DAGRunID: workflowID,
 		Quiet:    true,
@@ -494,7 +494,7 @@ func (a *API) EnqueueDAGWorkflow(ctx context.Context, request api.EnqueueDAGWork
 }
 
 func (a *API) enqueueWorkflow(ctx context.Context, dag *digraph.DAG, params, workflowID string) error {
-	if err := a.dagRunMgr.EnqueueDAGRun(ctx, dag, history.EnqueueOptions{
+	if err := a.dagRunMgr.EnqueueDAGRun(ctx, dag, dagrun.EnqueueOptions{
 		Params:   params,
 		DAGRunID: workflowID,
 	}); err != nil {

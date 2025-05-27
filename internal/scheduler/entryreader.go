@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/scheduler/filenotify"
@@ -44,25 +44,25 @@ var _ EntryReader = (*entryReaderImpl)(nil)
 
 // entryReaderImpl manages DAGs on local filesystem.
 type entryReaderImpl struct {
-	targetDir      string
-	registry       map[string]*digraph.DAG
-	lock           sync.Mutex
-	dagClient      models.DAGStore
-	historyManager history.DAGRunManager
-	executable     string
-	workDir        string
+	targetDir  string
+	registry   map[string]*digraph.DAG
+	lock       sync.Mutex
+	dagStore   models.DAGStore
+	dagRunMgr  dagrun.Manager
+	executable string
+	workDir    string
 }
 
 // NewEntryReader creates a new DAG manager with the given configuration.
-func NewEntryReader(dir string, dagCli models.DAGStore, hm history.DAGRunManager, executable, workDir string) EntryReader {
+func NewEntryReader(dir string, dagCli models.DAGStore, drm dagrun.Manager, executable, workDir string) EntryReader {
 	return &entryReaderImpl{
-		targetDir:      dir,
-		lock:           sync.Mutex{},
-		registry:       map[string]*digraph.DAG{},
-		dagClient:      dagCli,
-		historyManager: hm,
-		executable:     executable,
-		workDir:        workDir,
+		targetDir:  dir,
+		lock:       sync.Mutex{},
+		registry:   map[string]*digraph.DAG{},
+		dagStore:   dagCli,
+		dagRunMgr:  drm,
+		executable: executable,
+		workDir:    workDir,
 	}
 }
 
@@ -84,7 +84,7 @@ func (er *entryReaderImpl) Next(ctx context.Context, now time.Time) ([]*Schedule
 
 	for _, dag := range er.registry {
 		dagName := strings.TrimSuffix(filepath.Base(dag.Location), filepath.Ext(dag.Location))
-		if er.dagClient.IsSuspended(ctx, dagName) {
+		if er.dagStore.IsSuspended(ctx, dagName) {
 			continue
 		}
 
@@ -116,7 +116,7 @@ func (er *entryReaderImpl) createJob(dag *digraph.DAG, next time.Time, schedule 
 		WorkDir:    er.workDir,
 		Next:       next,
 		Schedule:   schedule,
-		Client:     er.historyManager,
+		Client:     er.dagRunMgr,
 	}
 }
 

@@ -1,4 +1,4 @@
-package history_test
+package dagrun_test
 
 import (
 	"encoding/json"
@@ -10,9 +10,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/sock"
 	"github.com/dagu-org/dagu/internal/test"
@@ -99,7 +99,7 @@ func TestManager(t *testing.T) {
 	t.Run("UpdateChildDAGRunStatus", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "tree_parent.yaml"))
 
-		err := th.DAGRunMgr.StartDAGRun(th.Context, dag.DAG, history.StartOptions{Quiet: true})
+		err := th.DAGRunMgr.StartDAGRun(th.Context, dag.DAG, dagrun.StartOptions{Quiet: true})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
@@ -146,7 +146,7 @@ func TestClient_RunDAG(t *testing.T) {
 	t.Run("RunDAG", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "run_dag.yaml"))
 
-		err := th.DAGRunMgr.StartDAGRun(th.Context, dag.DAG, history.StartOptions{
+		err := th.DAGRunMgr.StartDAGRun(th.Context, dag.DAG, dagrun.StartOptions{
 			Quiet: true,
 		})
 		require.NoError(t, err)
@@ -161,7 +161,7 @@ func TestClient_RunDAG(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "stop.yaml"))
 		ctx := th.Context
 
-		err := th.DAGRunMgr.StartDAGRun(ctx, dag.DAG, history.StartOptions{})
+		err := th.DAGRunMgr.StartDAGRun(ctx, dag.DAG, dagrun.StartOptions{})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusRunning)
@@ -175,12 +175,12 @@ func TestClient_RunDAG(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "restart.yaml"))
 		ctx := th.Context
 
-		err := th.DAGRunMgr.StartDAGRun(th.Context, dag.DAG, history.StartOptions{})
+		err := th.DAGRunMgr.StartDAGRun(th.Context, dag.DAG, dagrun.StartOptions{})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusRunning)
 
-		err = th.DAGRunMgr.RestartDAG(ctx, dag.DAG, history.RestartOptions{})
+		err = th.DAGRunMgr.RestartDAG(ctx, dag.DAG, dagrun.RestartOptions{})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
@@ -190,7 +190,7 @@ func TestClient_RunDAG(t *testing.T) {
 		ctx := th.Context
 		cli := th.DAGRunMgr
 
-		err := cli.StartDAGRun(ctx, dag.DAG, history.StartOptions{Params: "x y z"})
+		err := cli.StartDAGRun(ctx, dag.DAG, dagrun.StartOptions{Params: "x y z"})
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish

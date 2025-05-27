@@ -12,11 +12,11 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/api/v1"
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/models"
-	"github.com/dagu-org/dagu/internal/persistence/localhistory"
+	"github.com/dagu-org/dagu/internal/persistence/localdagrun"
 	"github.com/samber/lo"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/japanese"
@@ -311,7 +311,7 @@ func (a *API) readLog(
 	var logFile string
 
 	if statusFile != "" {
-		status, err := localhistory.ParseStatusFile(statusFile)
+		status, err := localdagrun.ParseStatusFile(statusFile)
 		if err != nil {
 			return nil, err
 		}
@@ -346,7 +346,7 @@ func (a *API) readStepLog(
 	var status *models.DAGRunStatus
 
 	if statusFile != "" {
-		parsedStatus, err := localhistory.ParseStatusFile(statusFile)
+		parsedStatus, err := localdagrun.ParseStatusFile(statusFile)
 		if err != nil {
 			return nil, err
 		}
@@ -528,7 +528,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "DAG is already running",
 			}
 		}
-		if err := a.dagRunManager.StartDAGRun(ctx, dag, history.StartOptions{
+		if err := a.dagRunManager.StartDAGRun(ctx, dag, dagrun.StartOptions{
 			Params: valueOf(request.Body.Params),
 		}); err != nil {
 			return nil, fmt.Errorf("error starting DAG: %w", err)
@@ -650,9 +650,9 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 			return nil, fmt.Errorf("error getting new DAG metadata: %w", err)
 		}
 
-		// Rename the history as well
+		// Rename the DAG runs associated with the old name
 		if err := a.dagRunStore.RenameDAGRuns(ctx, old.Name, renamed.Name); err != nil {
-			return nil, fmt.Errorf("error renaming history: %w", err)
+			return nil, fmt.Errorf("error renaming DAG runs: %w", err)
 		}
 
 		return api.PostDAGAction200JSONResponse{

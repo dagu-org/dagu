@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
@@ -55,13 +55,13 @@ func runRestart(ctx *Context, args []string) error {
 	if dagRunID != "" {
 		// Retrieve the previous run for the specified workflow ID.
 		dagRunRef := digraph.NewDAGRunRef(name, dagRunID)
-		att, err := ctx.dagRunStore.FindAttempt(ctx, dagRunRef)
+		att, err := ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
 		if err != nil {
 			return fmt.Errorf("failed to find the run for workflow ID %s: %w", dagRunID, err)
 		}
 		attempt = att
 	} else {
-		att, err := ctx.dagRunStore.LatestAttempt(ctx, name)
+		att, err := ctx.DAGRunStore.LatestAttempt(ctx, name)
 		if err != nil {
 			return fmt.Errorf("failed to find the latest execution history for DAG %s: %w", name, err)
 		}
@@ -90,7 +90,7 @@ func runRestart(ctx *Context, args []string) error {
 
 func handleRestartProcess(ctx *Context, d *digraph.DAG, workflowID string) error {
 	// Stop if running
-	if err := stopDAGIfRunning(ctx, ctx.dagRunMgr, d, workflowID); err != nil {
+	if err := stopDAGIfRunning(ctx, ctx.DAGRunMgr, d, workflowID); err != nil {
 		return fmt.Errorf("failed to stop DAG: %w", err)
 	}
 
@@ -101,10 +101,10 @@ func handleRestartProcess(ctx *Context, d *digraph.DAG, workflowID string) error
 	}
 
 	// Execute the exact same DAG with the same parameters but a new workflow ID
-	return executeDAG(ctx, ctx.dagRunMgr, d)
+	return executeDAG(ctx, ctx.DAGRunMgr, d)
 }
 
-func executeDAG(ctx *Context, cli history.DAGRunManager, dag *digraph.DAG) error {
+func executeDAG(ctx *Context, cli dagrun.Manager, dag *digraph.DAG) error {
 	workflowID, err := genWorkflowID()
 	if err != nil {
 		return fmt.Errorf("failed to generate workflow ID: %w", err)
@@ -134,7 +134,7 @@ func executeDAG(ctx *Context, cli history.DAGRunManager, dag *digraph.DAG) error
 		logFile.Name(),
 		cli,
 		dr,
-		ctx.dagRunStore,
+		ctx.DAGRunStore,
 		ctx.ProcStore,
 		digraph.NewDAGRunRef(dag.Name, workflowID),
 		agent.Options{Dry: false})
@@ -152,7 +152,7 @@ func executeDAG(ctx *Context, cli history.DAGRunManager, dag *digraph.DAG) error
 	return nil
 }
 
-func stopDAGIfRunning(ctx context.Context, cli history.DAGRunManager, dag *digraph.DAG, workflowID string) error {
+func stopDAGIfRunning(ctx context.Context, cli dagrun.Manager, dag *digraph.DAG, workflowID string) error {
 	status, err := cli.GetCurrentStatus(ctx, dag, workflowID)
 	if err != nil {
 		return fmt.Errorf("failed to get current status: %w", err)
@@ -167,7 +167,7 @@ func stopDAGIfRunning(ctx context.Context, cli history.DAGRunManager, dag *digra
 	return nil
 }
 
-func stopRunningDAG(ctx context.Context, cli history.DAGRunManager, dag *digraph.DAG, workflowID string) error {
+func stopRunningDAG(ctx context.Context, cli dagrun.Manager, dag *digraph.DAG, workflowID string) error {
 	const stopPollInterval = 100 * time.Millisecond
 	for {
 		status, err := cli.GetCurrentStatus(ctx, dag, workflowID)

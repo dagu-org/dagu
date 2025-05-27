@@ -203,7 +203,7 @@ func handleChildWorkflow(ctx *Context, dag *digraph.DAG, workflowID string, para
 	logger.Debug(ctx, "Checking for previous child workflow with the workflow ID", "dagRunId", workflowID)
 
 	// Look for existing execution childAttempt
-	childAttempt, err := ctx.dagRunStore.FindChildAttempt(ctx, root, workflowID)
+	childAttempt, err := ctx.DAGRunStore.FindChildAttempt(ctx, root, workflowID)
 	if errors.Is(err, models.ErrDAGRunIDNotFound) {
 		// If the workflow ID is not found, proceed with new execution
 		return executeWorkflow(ctx, dag, parent, workflowID, root)
@@ -251,9 +251,9 @@ func executeWorkflow(ctx *Context, d *digraph.DAG, parent digraph.DAGRunRef, wor
 		d,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
-		ctx.dagRunMgr,
+		ctx.DAGRunMgr,
 		dr,
-		ctx.dagRunStore,
+		ctx.DAGRunStore,
 		ctx.ProcStore,
 		root,
 		agent.Options{ParentDAGRun: parent},

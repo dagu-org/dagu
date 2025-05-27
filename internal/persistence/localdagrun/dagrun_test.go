@@ -1,4 +1,4 @@
-package localhistory
+package localdagrun
 
 import (
 	"fmt"

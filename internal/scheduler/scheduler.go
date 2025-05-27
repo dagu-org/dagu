@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 )
@@ -31,7 +31,7 @@ type Job interface {
 }
 
 type Scheduler struct {
-	hm           history.DAGRunManager
+	hm           dagrun.Manager
 	er           EntryReader
 	logDir       string
 	stopChan     chan struct{}
@@ -52,7 +52,7 @@ type queueConfig struct {
 func New(
 	cfg *config.Config,
 	er EntryReader,
-	drm history.DAGRunManager,
+	drm dagrun.Manager,
 	drs models.DAGRunStore,
 	qs models.QueueStore,
 	ps models.ProcStore,

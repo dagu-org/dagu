@@ -15,8 +15,8 @@ import (
 
 // Constants for configuration defaults
 const (
-	defaultHistoryRetentionDays = 30
-	defaultMaxCleanUpTime       = 60 * time.Second
+	defaultDAGRunRetentionDays = 30
+	defaultMaxCleanUpTime      = 60 * time.Second
 )
 
 // DAG contains all information about a DAG.
@@ -76,7 +76,7 @@ type DAG struct {
 	MaxActiveRuns int `json:"maxActiveRuns,omitempty"`
 	// MaxCleanUpTime is the maximum time to wait for cleanup when the DAG is stopped.
 	MaxCleanUpTime time.Duration `json:"maxCleanUpTime,omitempty"`
-	// HistRetentionDays is the number of days to keep the history.
+	// HistRetentionDays is the number of days to keep the history of DAG runs.
 	HistRetentionDays int `json:"histRetentionDays,omitempty"`
 	// BuildErrors contains any errors encountered while building the DAG.
 	BuildErrors []error
@@ -279,7 +279,7 @@ func (d *DAG) initializeDefaults() {
 
 	// Set default history retention days to 30 if not specified.
 	if d.HistRetentionDays == 0 {
-		d.HistRetentionDays = defaultHistoryRetentionDays
+		d.HistRetentionDays = defaultDAGRunRetentionDays
 	}
 
 	// Set default max cleanup time to 60 seconds if not specified.

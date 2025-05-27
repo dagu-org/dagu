@@ -13,16 +13,16 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/frontend"
-	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/localdag"
-	"github.com/dagu-org/dagu/internal/persistence/localhistory"
+	"github.com/dagu-org/dagu/internal/persistence/localdagrun"
 	"github.com/dagu-org/dagu/internal/persistence/localproc"
-	"github.com/dagu-org/dagu/internal/persistence/localqueue/prototype"
+	"github.com/dagu-org/dagu/internal/persistence/localqueue"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
@@ -34,12 +34,13 @@ import (
 type Context struct {
 	context.Context
 
-	Command     *cobra.Command
-	Flags       []commandLineFlag
-	Config      *config.Config
-	Quiet       bool
-	dagRunStore models.DAGRunStore
-	dagRunMgr   history.DAGRunManager
+	Command *cobra.Command
+	Flags   []commandLineFlag
+	Config  *config.Config
+	Quiet   bool
+
+	DAGRunStore models.DAGRunStore
+	DAGRunMgr   dagrun.Manager
 	ProcStore   models.ProcStore
 	QueueStore  models.QueueStore
 }
@@ -105,8 +106,8 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	}
 
 	// Initialize history repository and history manager
-	hrOpts := []localhistory.DAGRunStoreOption{
-		localhistory.WithLatestStatusToday(cfg.Server.LatestStatusToday),
+	hrOpts := []localdagrun.DAGRunStoreOption{
+		localdagrun.WithLatestStatusToday(cfg.Server.LatestStatusToday),
 	}
 
 	switch cmd.Name() {
@@ -114,21 +115,21 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		// For long-running process, we setup file cache for better performance
 		hc := fileutil.NewCache[*models.DAGRunStatus](0, time.Hour*12)
 		hc.StartEviction(ctx)
-		hrOpts = append(hrOpts, localhistory.WithHistoryFileCache(hc))
+		hrOpts = append(hrOpts, localdagrun.WithHistoryFileCache(hc))
 	}
 
-	drs := localhistory.New(cfg.Paths.DAGRunsDir, hrOpts...)
-	drm := history.New(drs, cfg.Paths.Executable, cfg.Global.WorkDir)
+	drs := localdagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
+	drm := dagrun.New(drs, cfg.Paths.Executable, cfg.Global.WorkDir)
 	ps := localproc.New(cfg.Paths.ProcDir)
-	qs := prototype.New(cfg.Paths.QueueDir)
+	qs := localqueue.New(cfg.Paths.QueueDir)
 
 	return &Context{
 		Context:     ctx,
 		Command:     cmd,
 		Config:      cfg,
 		Quiet:       quiet,
-		dagRunStore: drs,
-		dagRunMgr:   drm,
+		DAGRunStore: drs,
+		DAGRunMgr:   drm,
 		Flags:       flags,
 		ProcStore:   ps,
 		QueueStore:  qs,
@@ -136,8 +137,8 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 }
 
 // HistoryManager initializes a HistoryManager using the provided options. If not supplied,
-func (c *Context) HistoryManager(drs models.DAGRunStore) history.DAGRunManager {
-	return history.New(
+func (c *Context) HistoryManager(drs models.DAGRunStore) dagrun.Manager {
+	return dagrun.New(
 		drs,
 		c.Config.Paths.Executable,
 		c.Config.Global.WorkDir,
@@ -155,7 +156,7 @@ func (c *Context) NewServer() (*frontend.Server, error) {
 		return nil, err
 	}
 
-	return frontend.NewServer(c.Config, dr, c.dagRunStore, c.dagRunMgr), nil
+	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.DAGRunMgr), nil
 }
 
 // NewScheduler creates a new NewScheduler instance using the default client.
@@ -169,8 +170,8 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 		return nil, fmt.Errorf("failed to initialize DAG client: %w", err)
 	}
 
-	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.dagRunMgr, c.Config.Paths.Executable, c.Config.Global.WorkDir)
-	return scheduler.New(c.Config, m, c.dagRunMgr, c.dagRunStore, c.QueueStore, c.ProcStore), nil
+	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, c.Config.Paths.Executable, c.Config.Global.WorkDir)
+	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore), nil
 }
 
 // StringParam retrieves a string parameter from the command line flags.

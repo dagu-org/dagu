@@ -5,9 +5,9 @@ import (
 	"errors"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/stringutil"
@@ -32,7 +32,7 @@ type DAGRunJob struct {
 	WorkDir    string
 	Next       time.Time
 	Schedule   cron.Schedule
-	Client     history.DAGRunManager
+	Client     dagrun.Manager
 }
 
 // GetDAG returns the DAG associated with this job.
@@ -58,7 +58,7 @@ func (j *DAGRunJob) Start(ctx context.Context) error {
 	}
 
 	// Job is ready; proceed to start.
-	return j.Client.StartDAGRun(ctx, j.DAG, history.StartOptions{Quiet: true})
+	return j.Client.StartDAGRun(ctx, j.DAG, dagrun.StartOptions{Quiet: true})
 }
 
 // Ready checks whether the job can be safely started based on the latest status.
@@ -124,7 +124,7 @@ func (j *DAGRunJob) Stop(ctx context.Context) error {
 
 // Restart restarts the job unconditionally (quiet mode).
 func (j *DAGRunJob) Restart(ctx context.Context) error {
-	return j.Client.RestartDAG(ctx, j.DAG, history.RestartOptions{Quiet: true})
+	return j.Client.RestartDAG(ctx, j.DAG, dagrun.RestartOptions{Quiet: true})
 }
 
 // String returns a string representation of the job, which is the DAG's name.

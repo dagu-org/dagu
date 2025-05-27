@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/history"
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/stretchr/testify/require"
 )
@@ -15,7 +15,7 @@ func TestReadEntries(t *testing.T) {
 	now := expectedNext.Add(-time.Second)
 
 	t.Run("InvalidDirectory", func(t *testing.T) {
-		manager := scheduler.NewEntryReader("invalid_directory", nil, history.DAGRunManager{}, "", "")
+		manager := scheduler.NewEntryReader("invalid_directory", nil, dagrun.Manager{}, "", "")
 		jobs, err := manager.Next(context.Background(), expectedNext)
 		require.NoError(t, err)
 		require.Len(t, jobs, 0)

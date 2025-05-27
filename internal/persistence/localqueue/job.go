@@ -1,4 +1,4 @@
-package prototype
+package localqueue
 
 import (
 	"path/filepath"

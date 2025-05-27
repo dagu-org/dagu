@@ -37,7 +37,7 @@ func runDequeue(ctx *Context, _ []string) error {
 
 // dequeueWorkflow dequeues a workflow to the queue.
 func dequeueWorkflow(ctx *Context, workflow digraph.DAGRunRef) error {
-	attempt, err := ctx.dagRunStore.FindAttempt(ctx, workflow)
+	attempt, err := ctx.DAGRunStore.FindAttempt(ctx, workflow)
 	if err != nil {
 		return fmt.Errorf("failed to find the record for workflow ID %s: %w", workflow.ID, err)
 	}
@@ -58,7 +58,7 @@ func dequeueWorkflow(ctx *Context, workflow digraph.DAGRunRef) error {
 	}
 
 	// Make sure the workflow is not running at least locally
-	latestStatus, err := ctx.dagRunMgr.GetCurrentStatus(ctx, dag, workflow.ID)
+	latestStatus, err := ctx.DAGRunMgr.GetCurrentStatus(ctx, dag, workflow.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get latest status: %w", err)
 	}

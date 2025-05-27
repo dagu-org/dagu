@@ -65,11 +65,11 @@ func enqueueWorkflow(ctx *Context, dag *digraph.DAG, workflowID string) error {
 	workflow := digraph.NewDAGRunRef(dag.Name, workflowID)
 
 	// Check if the workflow is already existing in the history store
-	if _, err = ctx.dagRunStore.FindAttempt(ctx, workflow); err == nil {
+	if _, err = ctx.DAGRunStore.FindAttempt(ctx, workflow); err == nil {
 		return fmt.Errorf("workflow %q with ID %q already exists", dag.Name, workflowID)
 	}
 
-	att, err := ctx.dagRunStore.CreateAttempt(ctx.Context, dag, time.Now(), workflowID, models.NewDAGRunAttemptOptions{})
+	att, err := ctx.DAGRunStore.CreateAttempt(ctx.Context, dag, time.Now(), workflowID, models.NewDAGRunAttemptOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create run: %w", err)
 	}

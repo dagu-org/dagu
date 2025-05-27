@@ -17,14 +17,14 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/localdag"
-	"github.com/dagu-org/dagu/internal/persistence/localhistory"
+	"github.com/dagu-org/dagu/internal/persistence/localdagrun"
 	"github.com/dagu-org/dagu/internal/persistence/localproc"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -96,15 +96,15 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	}
 
 	dagStore := localdag.New(cfg.Paths.DAGsDir, localdag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
-	runStore := localhistory.New(cfg.Paths.DAGRunsDir)
+	runStore := localdagrun.New(cfg.Paths.DAGRunsDir)
 	procStore := localproc.New(cfg.Paths.ProcDir)
 
-	historyManager := history.New(runStore, cfg.Paths.Executable, cfg.Global.WorkDir)
+	drm := dagrun.New(runStore, cfg.Paths.Executable, cfg.Global.WorkDir)
 
 	helper := Helper{
 		Context:     createDefaultContext(),
 		Config:      cfg,
-		DAGRunMgr:   historyManager,
+		DAGRunMgr:   drm,
 		DAGStore:    dagStore,
 		DAGRunStore: runStore,
 		ProcStore:   procStore,
@@ -141,7 +141,7 @@ type Helper struct {
 	LoggingOutput *SyncBuffer
 	DAGStore      models.DAGStore
 	DAGRunStore   models.DAGRunStore
-	DAGRunMgr     history.DAGRunManager
+	DAGRunMgr     dagrun.Manager
 	ProcStore     models.ProcStore
 
 	tmpDir string
@@ -196,10 +196,10 @@ func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 	}, time.Second*5, time.Second)
 }
 
-func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
+func (d *DAG) AssertDAGRunCount(t *testing.T, expected int) {
 	t.Helper()
 
-	// the +1 to the limit is needed to ensure that the number of therunstore
+	// the +1 to the limit is needed to ensure that the number of DAG-run
 	// entries is exactly the expected number
 	runstore := d.DAGRunMgr.ListRecentStatus(d.Context, d.Name, expected+1)
 	require.Len(t, runstore, expected)

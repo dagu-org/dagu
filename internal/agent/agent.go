@@ -16,9 +16,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/mailer"
 	"github.com/dagu-org/dagu/internal/models"
@@ -50,8 +50,8 @@ type Agent struct {
 	// procStore is the database to store the process information.
 	procStore models.ProcStore
 
-	// dagRunManager is the runstore dagRunManager to communicate with the history.
-	dagRunManager history.DAGRunManager
+	// dagRunMgr is the runstore dagRunMgr to communicate with the history.
+	dagRunMgr dagrun.Manager
 
 	// scheduler is the scheduler instance to run the DAG.
 	scheduler *scheduler.Scheduler
@@ -120,7 +120,7 @@ func New(
 	dag *digraph.DAG,
 	logDir string,
 	logFile string,
-	drm history.DAGRunManager,
+	drm dagrun.Manager,
 	ds models.DAGStore,
 	drs models.DAGRunStore,
 	ps models.ProcStore,
@@ -128,18 +128,18 @@ func New(
 	opts Options,
 ) *Agent {
 	return &Agent{
-		rootDAGRun:    root,
-		parentDAGRun:  opts.ParentDAGRun,
-		dagRunID:      dagRunID,
-		dag:           dag,
-		dry:           opts.Dry,
-		retryTarget:   opts.RetryTarget,
-		logDir:        logDir,
-		logFile:       logFile,
-		dagRunManager: drm,
-		dagStore:      ds,
-		dagRunStore:   drs,
-		procStore:     ps,
+		rootDAGRun:   root,
+		parentDAGRun: opts.ParentDAGRun,
+		dagRunID:     dagRunID,
+		dag:          dag,
+		dry:          opts.Dry,
+		retryTarget:  opts.RetryTarget,
+		logDir:       logDir,
+		logFile:      logFile,
+		dagRunMgr:    drm,
+		dagStore:     ds,
+		dagRunStore:  drs,
+		procStore:    ps,
 	}
 }
 
@@ -614,7 +614,7 @@ func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
 	if a.isChildDAGRun.Load() {
 		return nil // Skip the check for child DAG-runs
 	}
-	if a.dagRunManager.IsRunning(ctx, a.dag, a.dagRunID) {
+	if a.dagRunMgr.IsRunning(ctx, a.dag, a.dagRunID) {
 		return fmt.Errorf("already running. DAG-run ID=%s, socket=%s", a.dagRunID, a.dag.SockAddr(a.dagRunID))
 	}
 	return nil

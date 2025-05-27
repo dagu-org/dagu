@@ -7,13 +7,13 @@ import (
 
 	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/history"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/localdag"
-	"github.com/dagu-org/dagu/internal/persistence/localhistory"
+	"github.com/dagu-org/dagu/internal/persistence/localdagrun"
 	"github.com/dagu-org/dagu/internal/persistence/localproc"
-	"github.com/dagu-org/dagu/internal/persistence/localqueue/prototype"
+	"github.com/dagu-org/dagu/internal/persistence/localqueue"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -39,7 +39,7 @@ func TestMain(m *testing.M) {
 
 type testHelper struct {
 	EntryReader scheduler.EntryReader
-	DAGRunMgr   history.DAGRunManager
+	DAGRunMgr   dagrun.Manager
 	DAGRunStore models.DAGRunStore
 	DAGStore    models.DAGStore
 	ProcStore   models.ProcStore
@@ -71,11 +71,11 @@ func setupTest(t *testing.T) testHelper {
 	}
 
 	ds := localdag.New(cfg.Paths.DAGsDir, localdag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
-	drs := localhistory.New(cfg.Paths.DAGRunsDir)
+	drs := localdagrun.New(cfg.Paths.DAGRunsDir)
 	ps := localproc.New(cfg.Paths.ProcDir)
-	qs := prototype.New(cfg.Paths.QueueDir)
+	qs := localqueue.New(cfg.Paths.QueueDir)
 
-	drm := history.New(drs, cfg.Paths.Executable, cfg.Global.WorkDir)
+	drm := dagrun.New(drs, cfg.Paths.Executable, cfg.Global.WorkDir)
 	em := scheduler.NewEntryReader(testdataDir, ds, drm, "", "")
 
 	return testHelper{
