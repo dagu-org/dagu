@@ -26,20 +26,20 @@ Example:
 var dequeueFlags = []commandLineFlag{paramsFlag, dagRunFlagDequeue}
 
 func runDequeue(ctx *Context, _ []string) error {
-	// Get DAG-run reference from the context
+	// Get dag-run reference from the context
 	dagRunRef, _ := ctx.StringParam("dag-run")
 	dagRun, err := digraph.ParseDAGRunRef(dagRunRef)
 	if err != nil {
-		return fmt.Errorf("failed to parse DAG-run reference %s: %w", dagRunRef, err)
+		return fmt.Errorf("failed to parse dag-run reference %s: %w", dagRunRef, err)
 	}
 	return dequeueDAGRun(ctx, dagRun)
 }
 
-// dequeueDAGRun dequeues a DAG-run from the queue.
+// dequeueDAGRun dequeues a dag-run from the queue.
 func dequeueDAGRun(ctx *Context, dagRun digraph.DAGRunRef) error {
 	attempt, err := ctx.DAGRunStore.FindAttempt(ctx, dagRun)
 	if err != nil {
-		return fmt.Errorf("failed to find the record for DAG-run ID %s: %w", dagRun.ID, err)
+		return fmt.Errorf("failed to find the record for dag-run ID %s: %w", dagRun.ID, err)
 	}
 
 	status, err := attempt.ReadStatus(ctx)
@@ -49,7 +49,7 @@ func dequeueDAGRun(ctx *Context, dagRun digraph.DAGRunRef) error {
 
 	if status.Status != scheduler.StatusQueued {
 		// If the status is not queued, return an error
-		return fmt.Errorf("DAG-run %s is not in queued status but %s", dagRun.ID, status.Status)
+		return fmt.Errorf("dag-run %s is not in queued status but %s", dagRun.ID, status.Status)
 	}
 
 	dag, err := attempt.ReadDAG(ctx)
@@ -57,13 +57,13 @@ func dequeueDAGRun(ctx *Context, dagRun digraph.DAGRunRef) error {
 		return fmt.Errorf("failed to read dag: %w", err)
 	}
 
-	// Make sure the DAG-run is not running at least locally
+	// Make sure the dag-run is not running at least locally
 	latestStatus, err := ctx.DAGRunMgr.GetCurrentStatus(ctx, dag, dagRun.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get latest status: %w", err)
 	}
 	if latestStatus.Status != scheduler.StatusQueued {
-		return fmt.Errorf("DAG-run %s is not in queued status but %s", dagRun.ID, latestStatus.Status)
+		return fmt.Errorf("dag-run %s is not in queued status but %s", dagRun.ID, latestStatus.Status)
 	}
 
 	// Make the status as canceled
@@ -79,12 +79,12 @@ func dequeueDAGRun(ctx *Context, dagRun digraph.DAGRunRef) error {
 		return fmt.Errorf("failed to save status: %w", err)
 	}
 
-	// Dequeue the DAG-run from the queue
+	// Dequeue the dag-run from the queue
 	if _, err = ctx.QueueStore.DequeueByDAGRunID(ctx.Context, dagRun.Name, dagRun.ID); err != nil {
-		return fmt.Errorf("failed to dequeue DAG-run %s: %w", dagRun.ID, err)
+		return fmt.Errorf("failed to dequeue dag-run %s: %w", dagRun.ID, err)
 	}
 
-	logger.Info(ctx.Context, "Dequeued DAG-run",
+	logger.Info(ctx.Context, "Dequeued dag-run",
 		"dag", dagRun.Name,
 		"runId", dagRun.ID,
 	)

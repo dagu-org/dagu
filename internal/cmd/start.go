@@ -17,17 +17,17 @@ import (
 
 // Errors for start command
 var (
-	// ErrDAGRunIDRequired is returned when a child DAG-run is attempted without providing a dag-run ID
-	ErrDAGRunIDRequired = errors.New("DAG-run ID must be provided for child DAG-runs")
+	// ErrDAGRunIDRequired is returned when a child dag-run is attempted without providing a dag-run ID
+	ErrDAGRunIDRequired = errors.New("dag-run ID must be provided for child dag-runs")
 
 	// ErrDAGRunIDFormat is returned when the provided dag-run ID is not valid
-	ErrDAGRunIDFormat = errors.New("DAG-run ID must only contain alphanumeric characters, dashes, and underscores")
+	ErrDAGRunIDFormat = errors.New("dag-run ID must only contain alphanumeric characters, dashes, and underscores")
 
-	// ErrDAGRunIDTooLong is returned when the provided DAG-run ID is too long
-	ErrDAGRunIDTooLong = errors.New("DAG-run ID length must be less than 60 characters")
+	// ErrDAGRunIDTooLong is returned when the provided dag-run ID is too long
+	ErrDAGRunIDTooLong = errors.New("dag-run ID length must be less than 60 characters")
 )
 
-// CmdStart creates and returns a cobra command for starting a DAG-run
+// CmdStart creates and returns a cobra command for starting a dag-run
 func CmdStart() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
@@ -56,7 +56,7 @@ var startFlags = []commandLineFlag{paramsFlag, dagRunIDFlag, parentDAGRunFlag, r
 
 // runStart handles the execution of the start command
 func runStart(ctx *Context, args []string) error {
-	// Get DAG-run ID and references
+	// Get dag-run ID and references
 	dagRunID, rootRef, parentRef, isChildDAGRun, err := getDAGRunInfo(ctx)
 	if err != nil {
 		return err
@@ -74,28 +74,28 @@ func runStart(ctx *Context, args []string) error {
 		return err
 	}
 
-	// Handle child DAG-run if applicable
+	// Handle child dag-run if applicable
 	if isChildDAGRun {
 		// Parse parent execution reference
 		parent, err := digraph.ParseDAGRunRef(parentRef)
 		if err != nil {
-			return fmt.Errorf("failed to parse parent DAG-run reference: %w", err)
+			return fmt.Errorf("failed to parse parent dag-run reference: %w", err)
 		}
 		return handleChildDAGRun(ctx, dag, dagRunID, params, root, parent)
 	}
 
-	// Log root DAG-run
-	logger.Info(ctx, "Executing root DAG-run",
+	// Log root dag-run
+	logger.Info(ctx, "Executing root dag-run",
 		"dag", dag.Name,
 		"params", params,
 		"dagRunId", dagRunID,
 	)
 
-	// Execute the DAG-run
+	// Execute the dag-run
 	return executeDAGRun(ctx, dag, digraph.DAGRunRef{}, dagRunID, root)
 }
 
-// getDAGRunInfo extracts and validates DAG-run ID and references from command flags
+// getDAGRunInfo extracts and validates dag-run ID and references from command flags
 // nolint:revive
 func getDAGRunInfo(ctx *Context) (dagRunID, rootDAGRun, parentDAGRun string, isChildDAGRun bool, err error) {
 	dagRunID, err = ctx.StringParam("run-id")
@@ -113,16 +113,16 @@ func getDAGRunInfo(ctx *Context) (dagRunID, rootDAGRun, parentDAGRun string, isC
 		return "", "", "", false, ErrDAGRunIDRequired
 	}
 
-	// Validate or generate DAG-run ID
+	// Validate or generate dag-run ID
 	if dagRunID != "" {
 		if err := validateRunID(dagRunID); err != nil {
 			return "", "", "", false, err
 		}
 	} else {
-		// Generate a new DAG-run ID if not provided
+		// Generate a new dag-run ID if not provided
 		dagRunID, err = genRunID()
 		if err != nil {
-			return "", "", "", false, fmt.Errorf("failed to generate DAG-run ID: %w", err)
+			return "", "", "", false, fmt.Errorf("failed to generate dag-run ID: %w", err)
 		}
 	}
 
@@ -170,7 +170,7 @@ func loadDAGWithParams(ctx *Context, args []string) (*digraph.DAG, string, error
 // determineRootDAGRun creates or parses the root execution reference
 func determineRootDAGRun(isChildDAGRun bool, rootDAGRun string, dag *digraph.DAG, dagRunID string) (digraph.DAGRunRef, error) {
 	if isChildDAGRun {
-		// Parse the rootDAGRun execution reference for child DAG-runs
+		// Parse the rootDAGRun execution reference for child dag-runs
 		rootDAGRun, err := digraph.ParseDAGRunRef(rootDAGRun)
 		if err != nil {
 			return digraph.DAGRunRef{}, fmt.Errorf("failed to parse root exec ref: %w", err)
@@ -182,10 +182,10 @@ func determineRootDAGRun(isChildDAGRun bool, rootDAGRun string, dag *digraph.DAG
 	return digraph.NewDAGRunRef(dag.Name, dagRunID), nil
 }
 
-// handleChildDAGRun processes a child DAG-run, checking for previous runs
+// handleChildDAGRun processes a child dag-run, checking for previous runs
 func handleChildDAGRun(ctx *Context, dag *digraph.DAG, dagRunID string, params string, root digraph.DAGRunRef, parent digraph.DAGRunRef) error {
-	// Log child DAG-run execution
-	logger.Info(ctx, "Executing child DAG-run",
+	// Log child dag-run execution
+	logger.Info(ctx, "Executing child dag-run",
 		"dag", dag.Name,
 		"params", params,
 		"dagRunId", dagRunID,
@@ -193,28 +193,28 @@ func handleChildDAGRun(ctx *Context, dag *digraph.DAG, dagRunID string, params s
 		"parent", parent,
 	)
 
-	// Double-check DAG-run ID is provided (should be caught earlier, but being defensive)
+	// Double-check dag-run ID is provided (should be caught earlier, but being defensive)
 	if dagRunID == "" {
-		return fmt.Errorf("DAG-run ID must be provided for child DAGrun")
+		return fmt.Errorf("dag-run ID must be provided for child DAGrun")
 	}
 
-	// Check for previous child DAG-run with this ID
-	logger.Debug(ctx, "Checking for previous child DAG-run with the DAG-run ID", "dagRunId", dagRunID)
+	// Check for previous child dag-run with this ID
+	logger.Debug(ctx, "Checking for previous child dag-run with the dag-run ID", "dagRunId", dagRunID)
 
 	// Look for existing execution childAttempt
 	childAttempt, err := ctx.DAGRunStore.FindChildAttempt(ctx, root, dagRunID)
 	if errors.Is(err, models.ErrDAGRunIDNotFound) {
-		// If the DAG-run ID is not found, proceed with new execution
+		// If the dag-run ID is not found, proceed with new execution
 		return executeDAGRun(ctx, dag, parent, dagRunID, root)
 	}
 	if err != nil {
-		return fmt.Errorf("failed to find the record for DAG-run ID %s: %w", dagRunID, err)
+		return fmt.Errorf("failed to find the record for dag-run ID %s: %w", dagRunID, err)
 	}
 
 	// Read the status of the previous run
 	status, err := childAttempt.ReadStatus(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to read previous run status for DAG-run ID %s: %w", dagRunID, err)
+		return fmt.Errorf("failed to read previous run status for dag-run ID %s: %w", dagRunID, err)
 	}
 
 	// Execute as a retry of the previous run
@@ -224,7 +224,7 @@ func handleChildDAGRun(ctx *Context, dag *digraph.DAG, dagRunID string, params s
 // executeDAGRun handles the actual execution of a DAG
 func executeDAGRun(ctx *Context, d *digraph.DAG, parent digraph.DAGRunRef, dagRunID string, root digraph.DAGRunRef) error {
 	// Open the log file for the scheduler. The log file will be used for future
-	// execution for the same DAG/DAG-run ID between attempts.
+	// execution for the same DAG/dag-run ID between attempts.
 	logFile, err := ctx.OpenLogFile(d, dagRunID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", d.Name, err)
@@ -236,7 +236,7 @@ func executeDAGRun(ctx *Context, d *digraph.DAG, parent digraph.DAGRunRef, dagRu
 	// Configure logging to the file
 	ctx.LogToFile(logFile)
 
-	logger.Debug(ctx, "DAG-run initiated", "DAG", d.Name, "dagRunId", dagRunID, "logFile", logFile.Name())
+	logger.Debug(ctx, "dag-run initiated", "DAG", d.Name, "dagRunId", dagRunID, "logFile", logFile.Name())
 
 	// Initialize DAG repository with the DAG's directory in the search path
 	dr, err := ctx.dagStore(nil, []string{filepath.Dir(d.Location)})
@@ -263,13 +263,13 @@ func executeDAGRun(ctx *Context, d *digraph.DAG, parent digraph.DAGRunRef, dagRu
 
 	// Run the DAG
 	if err := agentInstance.Run(ctx); err != nil {
-		logger.Error(ctx, "Failed to execute DAG-run", "dag", d.Name, "dagRunId", dagRunID, "err", err)
+		logger.Error(ctx, "Failed to execute dag-run", "dag", d.Name, "dagRunId", dagRunID, "err", err)
 
 		if ctx.Quiet {
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
-			return fmt.Errorf("failed to execute the DAG-run %s (DAG-run ID: %s): %w", d.Name, dagRunID, err)
+			return fmt.Errorf("failed to execute the dag-run %s (dag-run ID: %s): %w", d.Name, dagRunID, err)
 		}
 	}
 

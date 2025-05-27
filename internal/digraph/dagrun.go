@@ -7,17 +7,17 @@ import (
 
 // Errors for RunRef parsing
 var (
-	ErrInvalidRunRefFormat = errors.New("invalid DAG-run reference format")
+	ErrInvalidRunRefFormat = errors.New("invalid dag-run reference format")
 )
 
-// DAGRunRef represents a reference to a DAG-run
+// DAGRunRef represents a reference to a dag-run
 type DAGRunRef struct {
 	Name string `json:"name,omitempty"`
 	ID   string `json:"id,omitempty"`
 }
 
-// NewDAGRunRef creates a new reference to DAG-run with the given DAG name and run ID.
-// It is used to identify a specific DAG-run.
+// NewDAGRunRef creates a new reference to dag-run with the given DAG name and run ID.
+// It is used to identify a specific dag-run.
 func NewDAGRunRef(name, runID string) DAGRunRef {
 	return DAGRunRef{
 		Name: name,
@@ -25,7 +25,7 @@ func NewDAGRunRef(name, runID string) DAGRunRef {
 	}
 }
 
-// String returns a string representation of the DAG-run reference.
+// String returns a string representation of the dag-run reference.
 func (e DAGRunRef) String() string {
 	return e.Name + ":" + e.ID
 }

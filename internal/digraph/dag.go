@@ -212,8 +212,8 @@ func (d *DAG) SockAddr(dagRunID string) string {
 	return SockAddr(d.Name, dagRunID)
 }
 
-// SockAddrForChildDAGRun returns the unix socket address for a specific DAG-run ID.
-// This is used to control child DAG-runs.
+// SockAddrForChildDAGRun returns the unix socket address for a specific dag-run ID.
+// This is used to control child dag-runs.
 func (d *DAG) SockAddrForChildDAGRun(dagRunID string) string {
 	return SockAddr(d.GetName(), dagRunID)
 }
@@ -328,7 +328,7 @@ func SockAddr(name, dagRunID string) string {
 	name = fileutil.SafeName(name)
 	dagRunID = fileutil.SafeName(dagRunID)
 
-	// Create MD5 hash of the combined name and DAG-run ID and take first 8 chars
+	// Create MD5 hash of the combined name and dag-run ID and take first 8 chars
 	combined := name + dagRunID
 	hashLength := 6
 	hash := fmt.Sprintf("%x", md5.Sum([]byte(combined)))[:hashLength] // nolint:gosec

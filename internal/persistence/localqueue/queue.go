@@ -23,7 +23,7 @@ var priorities = []models.QueuePriority{
 	models.QueuePriorityHigh, models.QueuePriorityLow,
 }
 
-// DualQueue represents a queue for storing DAG-runs with two priorities:
+// DualQueue represents a queue for storing dag-runs with two priorities:
 // high and low. It uses two queue files to store the items.
 type DualQueue struct {
 	// baseDir is the base directory for the queue files
@@ -49,7 +49,7 @@ func NewDualQueue(baseDir, name string) *DualQueue {
 	}
 }
 
-// FindByDAGRunID retrieves a DAG-run from the queue by its dag-run ID
+// FindByDAGRunID retrieves a dag-run from the queue by its dag-run ID
 // without removing it. It returns the first found item in the queue files.
 // If the item is not found in any of the queue files, it returns ErrQueueItemNotFound.
 func (q *DualQueue) FindByDAGRunID(ctx context.Context, dagRunID string) (models.QueuedItemData, error) {
@@ -60,14 +60,14 @@ func (q *DualQueue) FindByDAGRunID(ctx context.Context, dagRunID string) (models
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("failed to find DAG-run %s: %w", dagRunID, err)
+			return nil, fmt.Errorf("failed to find dag-run %s: %w", dagRunID, err)
 		}
 		return item, nil
 	}
 	return nil, ErrQueueItemNotFound
 }
 
-// DequeueByDAGRunID retrieves a DAG-run from the queue by its dag-run ID
+// DequeueByDAGRunID retrieves a dag-run from the queue by its dag-run ID
 func (q *DualQueue) DequeueByDAGRunID(ctx context.Context, dagRunID string) ([]models.QueuedItemData, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -80,7 +80,7 @@ func (q *DualQueue) DequeueByDAGRunID(ctx context.Context, dagRunID string) ([]m
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("failed to pop DAG-run %s: %w", dagRunID, err)
+			return nil, fmt.Errorf("failed to pop dag-run %s: %w", dagRunID, err)
 		}
 		for _, item := range popped {
 			items = append(items, item)
@@ -119,7 +119,7 @@ func (q *DualQueue) Len(ctx context.Context) (int, error) {
 	return total, nil
 }
 
-// Enqueue adds a DAG-run to the queue with the specified priority
+// Enqueue adds a dag-run to the queue with the specified priority
 func (q *DualQueue) Enqueue(ctx context.Context, priority models.QueuePriority, dagRun digraph.DAGRunRef) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -135,7 +135,7 @@ func (q *DualQueue) Enqueue(ctx context.Context, priority models.QueuePriority, 
 	return nil
 }
 
-// Dequeue retrieves a DAG-run from the queue and removes it.
+// Dequeue retrieves a dag-run from the queue and removes it.
 // It checks the high-priority queue first, then the low-priority queue
 func (q *DualQueue) Dequeue(ctx context.Context) (models.QueuedItemData, error) {
 	q.mu.Lock()

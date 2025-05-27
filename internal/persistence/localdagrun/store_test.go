@@ -90,7 +90,7 @@ func TestJSONDB(t *testing.T) {
 		th.CreateAttempt(t, ts2, "dagrun-id-2", scheduler.StatusError)
 		th.CreateAttempt(t, ts3, "dagrun-id-3", scheduler.StatusSuccess)
 
-		// Find the record with DAG-run ID "dagrun-id-2"
+		// Find the record with dag-run ID "dagrun-id-2"
 		ref := digraph.NewDAGRunRef("test_DAG", "dagrun-id-2")
 		attempt, err := th.Store.FindAttempt(th.Context, ref)
 		require.NoError(t, err)
@@ -100,7 +100,7 @@ func TestJSONDB(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "dagrun-id-2", status.DAGRunID)
 
-		// Verify an error is returned if the DAG-run ID does not exist
+		// Verify an error is returned if the dag-run ID does not exist
 		refNonExist := digraph.NewDAGRunRef("test_DAG", "nonexistent-id")
 		_, err = th.Store.FindAttempt(th.Context, refNonExist)
 		assert.ErrorIs(t, err, models.ErrDAGRunIDNotFound)
@@ -184,7 +184,7 @@ func TestJSONDB(t *testing.T) {
 		// Create a parent record
 		_ = th.CreateAttempt(t, ts, "parent-id", scheduler.StatusRunning)
 
-		// Create a child DAG-run
+		// Create a child dag-run
 		const childDAGRunID = "child-dagrun-id"
 		const parentDAGRunID = "parent-id"
 
@@ -208,7 +208,7 @@ func TestJSONDB(t *testing.T) {
 		err = attempt.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
 
-		// Find the child DAG-run record
+		// Find the child dag-run record
 		ts = time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
 		dagRunRef := digraph.NewDAGRunRef("test_DAG", parentDAGRunID)
 		existingAttempt, err := th.Store.FindChildAttempt(th.Context, dagRunRef, childDAGRunID)

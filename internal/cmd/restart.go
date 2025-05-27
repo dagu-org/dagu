@@ -23,7 +23,6 @@ func CmdRestart() *cobra.Command {
 			Short: "Restart a running DAG-run with a new ID",
 			Long: `Stop a currently running DAG-run and immediately restart it with the same configuration but with a new DAG-run ID.
 
-This command creates a new DAG-run instance based on the same DAG definition as the original DAG-run.
 It first gracefully stops the active DAG-run, ensuring all resources are properly released, then
 initiates a new DAG-run with identical parameters.
 
@@ -46,18 +45,18 @@ var restartFlags = []commandLineFlag{
 func runRestart(ctx *Context, args []string) error {
 	dagRunID, err := ctx.StringParam("run-id")
 	if err != nil {
-		return fmt.Errorf("failed to get DAG-run ID: %w", err)
+		return fmt.Errorf("failed to get dag-run ID: %w", err)
 	}
 
 	name := args[0]
 
 	var attempt models.DAGRunAttempt
 	if dagRunID != "" {
-		// Retrieve the previous run for the specified DAG-run ID.
+		// Retrieve the previous run for the specified dag-run ID.
 		dagRunRef := digraph.NewDAGRunRef(name, dagRunID)
 		att, err := ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
 		if err != nil {
-			return fmt.Errorf("failed to find the run for DAG-run ID %s: %w", dagRunID, err)
+			return fmt.Errorf("failed to find the run for dag-run ID %s: %w", dagRunID, err)
 		}
 		attempt = att
 	} else {
@@ -100,14 +99,14 @@ func handleRestartProcess(ctx *Context, d *digraph.DAG, dagRunID string) error {
 		time.Sleep(d.RestartWait)
 	}
 
-	// Execute the exact same DAG with the same parameters but a new DAG-run ID
+	// Execute the exact same DAG with the same parameters but a new dag-run ID
 	return executeDAG(ctx, ctx.DAGRunMgr, d)
 }
 
 func executeDAG(ctx *Context, cli dagrun.Manager, dag *digraph.DAG) error {
 	dagRunID, err := genRunID()
 	if err != nil {
-		return fmt.Errorf("failed to generate DAG-run ID: %w", err)
+		return fmt.Errorf("failed to generate dag-run ID: %w", err)
 	}
 
 	logFile, err := ctx.OpenLogFile(dag, dagRunID)
@@ -120,7 +119,7 @@ func executeDAG(ctx *Context, cli dagrun.Manager, dag *digraph.DAG) error {
 
 	ctx.LogToFile(logFile)
 
-	logger.Info(ctx, "DAG-run restart initiated", "DAG", dag.Name, "dagRunId", dagRunID, "logFile", logFile.Name())
+	logger.Info(ctx, "dag-run restart initiated", "DAG", dag.Name, "dagRunId", dagRunID, "logFile", logFile.Name())
 
 	dr, err := ctx.dagStore(nil, []string{filepath.Dir(dag.Location)})
 	if err != nil {
@@ -145,7 +144,7 @@ func executeDAG(ctx *Context, cli dagrun.Manager, dag *digraph.DAG) error {
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
-			return fmt.Errorf("DAG-run failed: %w", err)
+			return fmt.Errorf("dag-run failed: %w", err)
 		}
 	}
 

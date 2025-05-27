@@ -87,7 +87,7 @@ func TestQueue_FindByDAGRunID(t *testing.T) {
 
 	// Check if FindByDAGRunID returns the high priority job
 	job, err := queue.FindByDAGRunID(th.Context, "high-priority-dag-run")
-	require.NoError(t, err, "expected no error when finding job by DAG-run ID")
+	require.NoError(t, err, "expected no error when finding job by dag-run ID")
 	require.NotNil(t, job, "expected job to be not nil")
 	jobData := job.Data()
 	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
@@ -95,7 +95,7 @@ func TestQueue_FindByDAGRunID(t *testing.T) {
 
 	// Check if FindByDAGRunID returns the low priority job
 	job, err = queue.FindByDAGRunID(th.Context, "low-priority-dag-run")
-	require.NoError(t, err, "expected no error when finding job by DAG-run ID")
+	require.NoError(t, err, "expected no error when finding job by dag-run ID")
 	require.NotNil(t, job, "expected job to be not nil")
 	jobData = job.Data()
 	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")

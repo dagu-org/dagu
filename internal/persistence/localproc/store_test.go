@@ -23,7 +23,7 @@ func TestStore(t *testing.T) {
 		ID:   "test_id",
 	}
 
-	// Get the process for the DAG-run
+	// Get the process for the dag-run
 	proc, err := store.Acquire(ctx, dagRun)
 	require.NoError(t, err, "failed to get proc")
 

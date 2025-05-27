@@ -14,7 +14,7 @@ var (
 )
 
 // QueueStore provides an interface for interacting with the underlying database
-// for storing and retrieving queued DAG-run items.
+// for storing and retrieving queued dag-run items.
 type QueueStore interface {
 	// Enqueue adds an item to the queue
 	Enqueue(ctx context.Context, name string, priority QueuePriority, dagRun digraph.DAGRunRef) error
@@ -64,7 +64,7 @@ func NewQueuedItem(data QueuedItemData) *QueuedItem {
 	}
 }
 
-// QueuedItemData represents a DAG-run reference that is queued for execution.
+// QueuedItemData represents a dag-run reference that is queued for execution.
 type QueuedItemData interface {
 	// ID returns the ID of the queued item
 	ID() string

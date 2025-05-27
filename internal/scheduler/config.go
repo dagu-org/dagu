@@ -8,7 +8,7 @@ type ConfigSet struct {
 	configs map[string]Config
 }
 
-// Config represents the configuration shared for all DAG-runs with the same DAG name.
+// Config represents the configuration shared for all dag-runs with the same DAG name.
 type Config struct {
 	ConcurrencyLimit int
 }

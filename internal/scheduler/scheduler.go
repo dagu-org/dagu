@@ -173,7 +173,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				goto SEND_RESULT
 			}
 
-			// Fetch the DAG of the DAG-run attempt
+			// Fetch the DAG of the dag-run attempt
 			attempt, err = s.dagRunStore.FindAttempt(ctx, data)
 			if err != nil {
 				logger.Error(ctx, "Failed to find run", "err", err, "data", data)

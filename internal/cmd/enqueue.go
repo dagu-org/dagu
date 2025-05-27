@@ -50,12 +50,12 @@ func runEnqueue(ctx *Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	dag.Location = "" // Queued DAG-runs must not have a location
+	dag.Location = "" // Queued dag-runs must not have a location
 
 	return enqueueDAGRun(ctx, dag, runID)
 }
 
-// enqueueDAGRun enqueues a DAG-run to the queue.
+// enqueueDAGRun enqueues a dag-run to the queue.
 func enqueueDAGRun(ctx *Context, dag *digraph.DAG, dagRunID string) error {
 	logFile, err := ctx.GenLogFileName(dag, dagRunID)
 	if err != nil {
@@ -64,7 +64,7 @@ func enqueueDAGRun(ctx *Context, dag *digraph.DAG, dagRunID string) error {
 
 	dagRun := digraph.NewDAGRunRef(dag.Name, dagRunID)
 
-	// Check if the DAG-run is already existing in the history store
+	// Check if the dag-run is already existing in the history store
 	if _, err = ctx.DAGRunStore.FindAttempt(ctx, dagRun); err == nil {
 		return fmt.Errorf("DAG %q with ID %q already exists", dag.Name, dagRunID)
 	}
@@ -85,7 +85,7 @@ func enqueueDAGRun(ctx *Context, dag *digraph.DAG, dagRunID string) error {
 		),
 	}
 
-	// As a prototype, we save the status to the database to enqueue the DAG-run.
+	// As a prototype, we save the status to the database to enqueue the dag-run.
 	// This could be changed to save to a queue file in the future
 	status := models.NewStatusBuilder(dag).Create(dagRunID, scheduler.StatusQueued, 0, time.Time{}, opts...)
 
@@ -99,12 +99,12 @@ func enqueueDAGRun(ctx *Context, dag *digraph.DAG, dagRunID string) error {
 		return fmt.Errorf("failed to save status: %w", err)
 	}
 
-	// Enqueue the DAG-run to the queue
+	// Enqueue the dag-run to the queue
 	if err := ctx.QueueStore.Enqueue(ctx.Context, dag.Name, models.QueuePriorityLow, dagRun); err != nil {
-		return fmt.Errorf("failed to enqueue DAG-run: %w", err)
+		return fmt.Errorf("failed to enqueue dag-run: %w", err)
 	}
 
-	logger.Info(ctx.Context, "Enqueued DAG-run",
+	logger.Info(ctx.Context, "Enqueued dag-run",
 		"dag", dag.Name,
 		"dagRunId", dagRunID,
 		"params", dag.Params,

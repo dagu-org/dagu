@@ -129,11 +129,11 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 	e.lock.Unlock()
 
 	if err != nil {
-		return fmt.Errorf("failed to start child DAG-run: %w", err)
+		return fmt.Errorf("failed to start child dag-run: %w", err)
 	}
 
 	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("child DAG-run failed: %w", err)
+		return fmt.Errorf("child dag-run failed: %w", err)
 	}
 
 	// get results from the child dag-run

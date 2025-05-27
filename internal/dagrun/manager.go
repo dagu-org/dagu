@@ -36,7 +36,7 @@ func New(
 
 // Manager provides methods to interact with DAGs, including starting, stopping,
 // restarting, and retrieving status information. It communicates with the DAG
-// through a socket interface and manages DAG-run data.
+// through a socket interface and manages dag-run data.
 type Manager struct {
 	dagRunStore models.DAGRunStore // Store interface for persisting run data
 
@@ -289,7 +289,7 @@ func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *digraph.
 }
 
 // FindChildDAGRunStatus retrieves the status of a child dag-run by its ID.
-// It looks up the child attempt in the DAG-run store and reads its status.
+// It looks up the child attempt in the dag-run store and reads its status.
 func (m *Manager) FindChildDAGRunStatus(ctx context.Context, rootDAGRun digraph.DAGRunRef, childRunID string) (*models.DAGRunStatus, error) {
 	attempt, err := m.dagRunStore.FindChildAttempt(ctx, rootDAGRun, childRunID)
 	if err != nil {
@@ -400,31 +400,31 @@ func (m *Manager) UpdateStatus(ctx context.Context, rootDAGRun digraph.DAGRunRef
 	var attempt models.DAGRunAttempt
 
 	if rootDAGRun.ID == newStatus.DAGRunID {
-		// If the DAG-run ID matches the root DAG-run ID, find the attempt by the root DAG-run ID
+		// If the dag-run ID matches the root dag-run ID, find the attempt by the root dag-run ID
 		att, err := m.dagRunStore.FindAttempt(ctx, rootDAGRun)
 		if err != nil {
-			return fmt.Errorf("failed to find the DAG-run: %w", err)
+			return fmt.Errorf("failed to find the dag-run: %w", err)
 		}
 		attempt = att
 	} else {
-		// If the DAG-run ID does not match the root DAG-run ID,
-		// find the attempt by the child DAG-run ID
+		// If the dag-run ID does not match the root dag-run ID,
+		// find the attempt by the child dag-run ID
 		att, err := m.dagRunStore.FindChildAttempt(ctx, rootDAGRun, newStatus.DAGRunID)
 		if err != nil {
-			return fmt.Errorf("failed to find child DAG-run: %w", err)
+			return fmt.Errorf("failed to find child dag-run: %w", err)
 		}
 		attempt = att
 	}
 
 	// Open, write, and close the run
 	if err := attempt.Open(ctx); err != nil {
-		return fmt.Errorf("failed to open DAG-run data: %w", err)
+		return fmt.Errorf("failed to open dag-run data: %w", err)
 	}
 
 	// Ensure the run data is closed even if write fails
 	defer func() {
 		if closeErr := attempt.Close(ctx); closeErr != nil {
-			logger.Errorf(ctx, "Failed to close DAG-run data: %v", closeErr)
+			logger.Errorf(ctx, "Failed to close dag-run data: %v", closeErr)
 		}
 	}()
 

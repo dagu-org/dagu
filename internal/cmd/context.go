@@ -207,9 +207,9 @@ func (c *Context) dagStore(cache *fileutil.Cache[*digraph.DAG], searchPaths []st
 	), nil
 }
 
-// OpenLogFile creates and opens a log file for a given DAG-run.
+// OpenLogFile creates and opens a log file for a given dag-run.
 // It evaluates the log directory, validates settings, creates the log directory,
-// builds a filename using the current timestamp and DAG-run ID, and then opens the file.
+// builds a filename using the current timestamp and dag-run ID, and then opens the file.
 func (c *Context) OpenLogFile(
 	dag *digraph.DAG,
 	dagRunID string,
@@ -221,7 +221,7 @@ func (c *Context) OpenLogFile(
 	return fileutil.OpenOrCreateFile(logPath)
 }
 
-// GenLogFileName generates a log file name based on the DAG and DAG-run ID.
+// GenLogFileName generates a log file name based on the DAG and dag-run ID.
 func (c *Context) GenLogFileName(dag *digraph.DAG, dagRunID string) (string, error) {
 	// Read the global configuration for log directory.
 	baseLogDir, err := cmdutil.EvalString(c, c.Config.Paths.LogDir)
@@ -290,7 +290,7 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *C
 	return cmd
 }
 
-// genRunID creates a new UUID string to be used as a DAG-run IDentifier.
+// genRunID creates a new UUID string to be used as a dag-run IDentifier.
 func genRunID() (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
@@ -299,7 +299,7 @@ func genRunID() (string, error) {
 	return id.String(), nil
 }
 
-// validateRunID checks if the DAG-run ID is valid and not empty.
+// validateRunID checks if the dag-run ID is valid and not empty.
 func validateRunID(dagRunID string) error {
 	if dagRunID == "" {
 		return ErrDAGRunIDRequired
@@ -313,11 +313,11 @@ func validateRunID(dagRunID string) error {
 	return nil
 }
 
-// reDAGRunID is a regular expression to validate DAG-run IDs.
+// reDAGRunID is a regular expression to validate dag-run IDs.
 // It allows alphanumeric characters, hyphens, and underscores.
 var reDAGRunID = regexp.MustCompile(`^[-a-zA-Z0-9_]+$`)
 
-// maxDAGRunIDLen is the max length of the DAG-run ID
+// maxDAGRunIDLen is the max length of the dag-run ID
 const maxDAGRunIDLen = 60
 
 // signalListener is an interface for types that can receive OS signals.
@@ -350,7 +350,7 @@ type LogConfig struct {
 	BaseDir   string // Base directory for logs.
 	DAGLogDir string // Optional alternative log directory specified by the DAG definition.
 	Name      string // Name of the DAG; used for generating a safe directory name.
-	DAGRunID  string // Unique DAG-run ID used in the filename.
+	DAGRunID  string // Unique dag-run ID used in the filename.
 }
 
 // Validate checks that essential fields are provided.
@@ -389,7 +389,7 @@ func (cfg LogConfig) LogDir() (string, error) {
 }
 
 // LogFile constructs the log filename using the prefix, safe DAG name, current timestamp,
-// and a truncated version of the DAG-run ID.
+// and a truncated version of the dag-run ID.
 func (cfg LogConfig) LogFile() string {
 	timestamp := time.Now().Format("20060102.15:04:05.000")
 	truncDAGRunID := stringutil.TruncString(cfg.DAGRunID, 8)

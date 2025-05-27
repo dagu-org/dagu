@@ -30,7 +30,7 @@ import (
 type DataRoot struct {
 	baseDir     string             // Base directory for all DAGs
 	prefix      string             // Sanitized prefix for directory names
-	dagRunsDir  string             // Path to the DAG-runs directory
+	dagRunsDir  string             // Path to the dag-runs directory
 	globPattern string             // Pattern for finding run directories
 	root        *digraph.DAGRunRef // Optional reference to the root DAG
 }
@@ -82,13 +82,13 @@ func NewDataRootWithPrefix(baseDir, prefix string) DataRoot {
 	}
 }
 
-// FindByDAGRunID locates a DAG-run by its ID.
-// It searches through all DAG-run directories to find a match,
+// FindByDAGRunID locates a dag-run by its ID.
+// It searches through all dag-run directories to find a match,
 // and returns the most recent one if multiple matches are found.
 //
 // Parameters:
 //   - ctx: Context for the operation (unused but kept for interface consistency)
-//   - dagRunID: The unique DAG-run ID to search for
+//   - dagRunID: The unique dag-run ID to search for
 //
 // Returns:
 //   - The matching DAGRun instance, or an error if not found
@@ -109,8 +109,8 @@ func (dr *DataRoot) FindByDAGRunID(_ context.Context, dagRunID string) (*DAGRun,
 	return NewDAGRun(matches[0])
 }
 
-// Latest returns the most recent DAG-runs up to the specified limit.
-// It searches through the DAG-run directories and returns them sorted by timestamp (newest first).
+// Latest returns the most recent dag-runs up to the specified limit.
+// It searches through the dag-run directories and returns them sorted by timestamp (newest first).
 func (dr *DataRoot) Latest(ctx context.Context, itemLimit int) []*DAGRun {
 	dagRuns, err := dr.listRecentDAGRuns(ctx, itemLimit)
 	if err != nil {
@@ -120,8 +120,8 @@ func (dr *DataRoot) Latest(ctx context.Context, itemLimit int) []*DAGRun {
 	return dagRuns
 }
 
-// LatestAfter returns the most recent DAG-run that occurred after the specified cutoff time.
-// Returns ErrNoStatusData if no DAG-run is found or if the latest run is before the cutoff.
+// LatestAfter returns the most recent dag-run that occurred after the specified cutoff time.
+// Returns ErrNoStatusData if no dag-run is found or if the latest run is before the cutoff.
 func (dr *DataRoot) LatestAfter(ctx context.Context, cutoff models.TimeInUTC) (*DAGRun, error) {
 	runs, err := dr.listRecentDAGRuns(ctx, 1)
 	if err != nil {
@@ -136,7 +136,7 @@ func (dr *DataRoot) LatestAfter(ctx context.Context, cutoff models.TimeInUTC) (*
 	return runs[0], nil
 }
 
-// CreateDAGRun creates a new DAG-run directory with the specified timestamp and ID.
+// CreateDAGRun creates a new dag-run directory with the specified timestamp and ID.
 // The directory structure follows the pattern: year/month/day/run-YYYYMMDD_HHMMSS_dagRunID
 func (dr *DataRoot) CreateDAGRun(ts models.TimeInUTC, dagRunID string) (*DAGRun, error) {
 	dirName := DAGRunDirPrefix + formatDAGRunTimestamp(ts) + "_" + dagRunID
@@ -149,19 +149,19 @@ func (dr *DataRoot) CreateDAGRun(ts models.TimeInUTC, dagRunID string) (*DAGRun,
 	return NewDAGRun(dir)
 }
 
-// GlobPatternWithDAGRunID returns a glob pattern for finding DAG-run directories
-// that contain the specified DAG-run ID in their name.
+// GlobPatternWithDAGRunID returns a glob pattern for finding dag-run directories
+// that contain the specified dag-run ID in their name.
 func (dr DataRoot) GlobPatternWithDAGRunID(dagRunID string) string {
 	return filepath.Join(dr.dagRunsDir, "2*", "*", "*", DAGRunDirPrefix+"*"+dagRunID+"*")
 }
 
-// Exists checks if the DAG-runs directory exists in the file system.
+// Exists checks if the dag-runs directory exists in the file system.
 func (dr DataRoot) Exists() bool {
 	_, err := os.Stat(dr.dagRunsDir)
 	return !os.IsNotExist(err)
 }
 
-// Create creates the DAG-runs directory if it doesn't already exist.
+// Create creates the dag-runs directory if it doesn't already exist.
 // Returns nil if the directory already exists or is successfully created.
 func (dr DataRoot) Create() error {
 	if dr.Exists() {
@@ -173,8 +173,8 @@ func (dr DataRoot) Create() error {
 	return nil
 }
 
-// IsEmpty checks if the DAG-runs directory exists and contains no DAG-run directories.
-// Returns true if the directory doesn't exist or contains no DAG-runs.
+// IsEmpty checks if the dag-runs directory exists and contains no dag-run directories.
+// Returns true if the directory doesn't exist or contains no dag-runs.
 func (dr DataRoot) IsEmpty() bool {
 	_, err := os.Stat(dr.dagRunsDir)
 	if err != nil && os.IsNotExist(err) {
@@ -190,7 +190,7 @@ func (dr DataRoot) IsEmpty() bool {
 	return false
 }
 
-// Remove completely removes the DAG-runs directory and all its contents.
+// Remove completely removes the dag-runs directory and all its contents.
 // This operation cannot be undone.
 func (dr DataRoot) Remove() error {
 	if err := os.RemoveAll(dr.dagRunsDir); err != nil {
@@ -199,7 +199,7 @@ func (dr DataRoot) Remove() error {
 	return nil
 }
 
-// Rename moves all DAG-run directories from this DataRoot to a new DataRoot location.
+// Rename moves all dag-run directories from this DataRoot to a new DataRoot location.
 // This operation preserves the hierarchical structure and removes empty directories.
 // Both DataRoots must share the same base directory.
 func (dr DataRoot) Rename(ctx context.Context, newRoot DataRoot) error {
@@ -257,7 +257,7 @@ func (dr DataRoot) Rename(ctx context.Context, newRoot DataRoot) error {
 	return nil
 }
 
-// RemoveOld removes old DAG-runs older than the specified retention days.
+// RemoveOld removes old dag-runs older than the specified retention days.
 // It only removes records older than the specified retention days.
 // If retentionDays is negative, no files will be removed.
 // If retentionDays is zero, all files will be removed.
@@ -322,7 +322,7 @@ func (dr DataRoot) removeEmptyDir(ctx context.Context, dayDir string) {
 	}
 }
 
-// listDAGRunsInRangeOpts contains options for listing DAG-runs in a range
+// listDAGRunsInRangeOpts contains options for listing dag-runs in a range
 type listDAGRunsInRangeOpts struct {
 	limit int
 }

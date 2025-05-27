@@ -75,28 +75,28 @@ type Agent struct {
 	// dag is the DAG to run.
 	dag *digraph.DAG
 
-	// rootDAGRun indicates the root DAG-run of the current DAG-run.
-	// If the current DAG-run is the root DAG-run, it is the same as the current
-	// DAG name and DAG-run ID.
+	// rootDAGRun indicates the root dag-run of the current dag-run.
+	// If the current dag-run is the root dag-run, it is the same as the current
+	// DAG name and dag-run ID.
 	rootDAGRun digraph.DAGRunRef
 
-	// parentDAGRun is the execution reference of the parent DAG-run.
+	// parentDAGRun is the execution reference of the parent dag-run.
 	parentDAGRun digraph.DAGRunRef
 
-	// dagRunID is the ID for the current DAG-run.
+	// dagRunID is the ID for the current dag-run.
 	dagRunID string
 
-	// dagRunAttemptID is the ID for the current DAG-run attempt.
+	// dagRunAttemptID is the ID for the current dag-run attempt.
 	dagRunAttemptID string
 
-	// finished is true if the DAG-run is finished.
+	// finished is true if the dag-run is finished.
 	finished atomic.Bool
 
 	// lastErr is the last error occurred during the dag-run.
 	lastErr error
 
-	// isChildDAGRun is true if the current DAG-run is not the root DAG-run,
-	// meaning that it is a child DAG-run of another DAG-run.
+	// isChildDAGRun is true if the current dag-run is not the root dag-run,
+	// meaning that it is a child dag-run of another dag-run.
 	isChildDAGRun atomic.Bool
 }
 
@@ -109,8 +109,8 @@ type Options struct {
 	// If it's specified the agent will execute the DAG with the same
 	// configuration as the specified history.
 	RetryTarget *models.DAGRunStatus
-	// ParentDAGRun is the DAG-run reference of the parent DAG-run.
-	// It is required for child DAG-runs to identify the parent DAG-run.
+	// ParentDAGRun is the dag-run reference of the parent dag-run.
+	// It is required for child dag-runs to identify the parent dag-run.
 	ParentDAGRun digraph.DAGRunRef
 }
 
@@ -149,17 +149,17 @@ func (a *Agent) Run(ctx context.Context) error {
 	defer cancel()
 
 	if a.rootDAGRun.ID != a.dagRunID {
-		logger.Debug(ctx, "Initiating a child DAG-run", "root-run", a.rootDAGRun.String(), "parent-run", a.parentDAGRun.String())
+		logger.Debug(ctx, "Initiating a child dag-run", "root-run", a.rootDAGRun.String(), "parent-run", a.parentDAGRun.String())
 		a.isChildDAGRun.Store(true)
 		if a.parentDAGRun.Zero() {
-			return fmt.Errorf("parent DAG-run is not specified for the child DAG-run %s", a.dagRunID)
+			return fmt.Errorf("parent dag-run is not specified for the child dag-run %s", a.dagRunID)
 		}
 	}
 
 	var attempt models.DAGRunAttempt
 
 	if !a.dry {
-		// Setup the attempt for the DAG-run.
+		// Setup the attempt for the dag-run.
 		// It's not required for dry-run mode.
 		att, err := a.setupDAGRunAttempt(ctx)
 		if err != nil {
@@ -284,14 +284,14 @@ func (a *Agent) Run(ctx context.Context) error {
 	})
 
 	// Start the dag-run.
-	logger.Debug(ctx, "DAG-run started", "dagRunId", a.dagRunID, "name", a.dag.Name, "params", a.dag.Params)
+	logger.Debug(ctx, "dag-run started", "dagRunId", a.dagRunID, "name", a.dag.Name, "params", a.dag.Params)
 	lastErr := a.scheduler.Schedule(ctx, a.graph, progressCh)
 
 	// Update the finished status to the runstore database.
 	finishedStatus := a.Status()
 
 	// Log execution summary
-	logger.Info(ctx, "DAG-run finished",
+	logger.Info(ctx, "dag-run finished",
 		"name", a.dag.Name,
 		"dagRunId", a.dagRunID,
 		"attemptID", a.dagRunAttemptID,
@@ -581,7 +581,7 @@ func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 func (a *Agent) setupDAGRunAttempt(ctx context.Context) (models.DAGRunAttempt, error) {
 	retentionDays := a.dag.HistRetentionDays
 	if err := a.dagRunStore.RemoveOldDAGRuns(ctx, a.dag.Name, retentionDays); err != nil {
-		logger.Error(ctx, "DAG-runs data cleanup failed", "err", err)
+		logger.Error(ctx, "dag-runs data cleanup failed", "err", err)
 	}
 
 	opts := models.NewDAGRunAttemptOptions{Retry: a.retryTarget != nil}
@@ -612,10 +612,10 @@ func (a *Agent) setupSocketServer(ctx context.Context) error {
 // checkIsAlreadyRunning returns error if the DAG is already running.
 func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
 	if a.isChildDAGRun.Load() {
-		return nil // Skip the check for child DAG-runs
+		return nil // Skip the check for child dag-runs
 	}
 	if a.dagRunMgr.IsRunning(ctx, a.dag, a.dagRunID) {
-		return fmt.Errorf("already running. DAG-run ID=%s, socket=%s", a.dagRunID, a.dag.SockAddr(a.dagRunID))
+		return fmt.Errorf("already running. dag-run ID=%s, socket=%s", a.dagRunID, a.dag.SockAddr(a.dagRunID))
 	}
 	return nil
 }
@@ -688,7 +688,7 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error
 func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) (*digraph.Status, error) {
 	childAttempt, err := o.drs.FindChildAttempt(ctx, rootDAGRun, dagRunID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find run for DAG-run ID %s: %w", dagRunID, err)
+		return nil, fmt.Errorf("failed to find run for dag-run ID %s: %w", dagRunID, err)
 	}
 	status, err := childAttempt.ReadStatus(ctx)
 	if err != nil {

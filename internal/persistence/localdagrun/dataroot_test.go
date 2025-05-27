@@ -150,7 +150,7 @@ func TestDataRootRemoveOld(t *testing.T) {
 		ts1 := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 		ts2 := time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
 
-		// Create DAG-runs with old timestamps
+		// Create dag-runs with old timestamps
 		dagRun1 := root.CreateTestDAGRun(t, "dag-run-1", models.NewUTC(ts1))
 		dagRun2 := root.CreateTestDAGRun(t, "dag-run-2", models.NewUTC(ts2))
 
@@ -177,23 +177,23 @@ func TestDataRootRemoveOld(t *testing.T) {
 		createAttemptWithStatus(dagRun1, ts1)
 		createAttemptWithStatus(dagRun2, ts2)
 
-		// Verify DAG-runs exist
-		assert.True(t, fileutil.FileExists(dagRun1.DAGRun.baseDir), "DAG-run 1 should exist before cleanup")
-		assert.True(t, fileutil.FileExists(dagRun2.DAGRun.baseDir), "DAG-run 2 should exist before cleanup")
+		// Verify dag-runs exist
+		assert.True(t, fileutil.FileExists(dagRun1.DAGRun.baseDir), "dag-run 1 should exist before cleanup")
+		assert.True(t, fileutil.FileExists(dagRun2.DAGRun.baseDir), "dag-run 2 should exist before cleanup")
 
-		// Remove all DAG-runs (retention = 0)
+		// Remove all dag-runs (retention = 0)
 		err := root.RemoveOld(root.Context, 0)
 		require.NoError(t, err)
 
-		// Verify all DAG-runs are removed
-		assert.False(t, fileutil.FileExists(dagRun1.DAGRun.baseDir), "DAG-run 1 should be removed")
-		assert.False(t, fileutil.FileExists(dagRun2.DAGRun.baseDir), "DAG-run 2 should be removed")
+		// Verify all dag-runs are removed
+		assert.False(t, fileutil.FileExists(dagRun1.DAGRun.baseDir), "dag-run 1 should be removed")
+		assert.False(t, fileutil.FileExists(dagRun2.DAGRun.baseDir), "dag-run 2 should be removed")
 	})
 
 	t.Run("KeepRecentWhenRetentionIsPositive", func(t *testing.T) {
 		root := setupTestDataRoot(t)
 
-		// Create DAG-runs: one old and one recent
+		// Create dag-runs: one old and one recent
 		oldTime := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 		recentTime := time.Now().AddDate(0, 0, -1) // 1 day ago
 
@@ -223,23 +223,23 @@ func TestDataRootRemoveOld(t *testing.T) {
 		createAttemptWithStatus(dagRun1, oldTime)
 		createAttemptWithStatus(dagRun2, recentTime)
 
-		// Verify DAG-runs exist
-		assert.True(t, fileutil.FileExists(dagRun1.DAGRun.baseDir), "Old DAG-run should exist before cleanup")
-		assert.True(t, fileutil.FileExists(dagRun2.DAGRun.baseDir), "Recent DAG-run should exist before cleanup")
+		// Verify dag-runs exist
+		assert.True(t, fileutil.FileExists(dagRun1.DAGRun.baseDir), "Old dag-run should exist before cleanup")
+		assert.True(t, fileutil.FileExists(dagRun2.DAGRun.baseDir), "Recent dag-run should exist before cleanup")
 
-		// Remove DAG-runs older than 7 days (should remove old but keep recent)
+		// Remove dag-runs older than 7 days (should remove old but keep recent)
 		err := root.RemoveOld(root.Context, 7)
 		require.NoError(t, err)
 
-		// Verify old DAG-run is removed but recent one is kept
-		assert.False(t, fileutil.FileExists(dagRun1.DAGRun.baseDir), "Old DAG-run should be removed")
-		assert.True(t, fileutil.FileExists(dagRun2.DAGRun.baseDir), "Recent DAG-run should be kept")
+		// Verify old dag-run is removed but recent one is kept
+		assert.False(t, fileutil.FileExists(dagRun1.DAGRun.baseDir), "Old dag-run should be removed")
+		assert.True(t, fileutil.FileExists(dagRun2.DAGRun.baseDir), "Recent dag-run should be kept")
 	})
 
 	t.Run("RemoveEmptyDirectories", func(t *testing.T) {
 		root := setupTestDataRoot(t)
 
-		// Create DAG-runs in different date directories
+		// Create dag-runs in different date directories
 		date1 := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 		date2 := time.Date(2020, 1, 2, 0, 0, 0, 0, time.UTC)
 
@@ -270,16 +270,16 @@ func TestDataRootRemoveOld(t *testing.T) {
 		createAttemptWithStatus(dagRun2, date2)
 
 		// Verify directory structure exists
-		assert.True(t, fileutil.FileExists(dagRun1.DAGRun.baseDir), "DAG-run 1 should exist")
-		assert.True(t, fileutil.FileExists(dagRun2.DAGRun.baseDir), "DAG-run 2 should exist")
+		assert.True(t, fileutil.FileExists(dagRun1.DAGRun.baseDir), "dag-run 1 should exist")
+		assert.True(t, fileutil.FileExists(dagRun2.DAGRun.baseDir), "dag-run 2 should exist")
 
-		// Remove all old DAG-runs (retention = 0)
+		// Remove all old dag-runs (retention = 0)
 		err := root.RemoveOld(root.Context, 0)
 		require.NoError(t, err)
 
-		// Verify DAG-runs are removed
-		assert.False(t, fileutil.FileExists(dagRun1.DAGRun.baseDir), "DAG-run 1 should be removed")
-		assert.False(t, fileutil.FileExists(dagRun2.DAGRun.baseDir), "DAG-run 2 should be removed")
+		// Verify dag-runs are removed
+		assert.False(t, fileutil.FileExists(dagRun1.DAGRun.baseDir), "dag-run 1 should be removed")
+		assert.False(t, fileutil.FileExists(dagRun2.DAGRun.baseDir), "dag-run 2 should be removed")
 
 		// Verify that the cleanup also removes empty directories
 		// The method should clean up empty year/month/day directories
@@ -361,8 +361,8 @@ type DataRootTest struct {
 	Context context.Context
 }
 
-// CreateTestDAGRun creates a test DAG-run with the specified ID and timestamp.
-// It ensures the DataRoot directory exists before creating the DAG-run.
+// CreateTestDAGRun creates a test dag-run with the specified ID and timestamp.
+// It ensures the DataRoot directory exists before creating the dag-run.
 func (drt *DataRootTest) CreateTestDAGRun(t *testing.T, dagRunID string, ts models.TimeInUTC) DAGRunTest {
 	t.Helper()
 

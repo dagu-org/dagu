@@ -231,7 +231,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 		return nil, fmt.Errorf("failed to setup executor IO: %w", err)
 	}
 
-	// If the command is a child DAG, set the DAG-run ID
+	// If the command is a child DAG, set the dag-run ID
 	if childDAG, ok := cmd.(executor.ChildDAG); ok {
 		dagRunID, err := n.GenChildDAGRunID()
 		if err != nil {

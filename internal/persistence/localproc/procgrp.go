@@ -114,10 +114,10 @@ func (pg *ProcGroup) isStale(ctx context.Context, file string) bool {
 	return true
 }
 
-// GetProc retrieves a proc file for the specified DAG-run reference.
+// GetProc retrieves a proc file for the specified dag-run reference.
 // It returns a new Proc instance with the generated file name.
 func (pg *ProcGroup) Acquire(ctx context.Context, dagRun digraph.DAGRunRef) (*ProcHandle, error) {
-	// Sanity check the DAG-run reference
+	// Sanity check the dag-run reference
 	if pg.name != dagRun.Name {
 		return nil, fmt.Errorf("DAG name %s does not match proc file name %s", dagRun.Name, pg.name)
 	}
@@ -128,7 +128,7 @@ func (pg *ProcGroup) Acquire(ctx context.Context, dagRun digraph.DAGRunRef) (*Pr
 	}), nil
 }
 
-// getFileName generates a proc file name based on the DAG-run reference and the current time.
+// getFileName generates a proc file name based on the dag-run reference and the current time.
 func (pg *ProcGroup) getFileName(t models.TimeInUTC, dagRun digraph.DAGRunRef) string {
 	timestamp := t.Format(dateTimeFormatUTC)
 	fileName := procFilePrefix + timestamp + "Z_" + dagRun.ID + ".proc"

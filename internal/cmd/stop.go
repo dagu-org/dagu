@@ -39,18 +39,18 @@ var stopFlags = []commandLineFlag{
 func runStop(ctx *Context, args []string) error {
 	dagRunID, err := ctx.StringParam("run-id")
 	if err != nil {
-		return fmt.Errorf("failed to get DAG-run ID: %w", err)
+		return fmt.Errorf("failed to get dag-run ID: %w", err)
 	}
 
 	name := args[0]
 
 	var dag *digraph.DAG
 	if dagRunID != "" {
-		// Retrieve the previous run's history record for the specified DAG-run ID.
+		// Retrieve the previous run's history record for the specified dag-run ID.
 		ref := digraph.NewDAGRunRef(name, dagRunID)
 		rec, err := ctx.DAGRunStore.FindAttempt(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to find the record for DAG-run ID %s: %w", dagRunID, err)
+			return fmt.Errorf("failed to find the record for dag-run ID %s: %w", dagRunID, err)
 		}
 
 		d, err := rec.ReadDAG(ctx)
@@ -66,12 +66,12 @@ func runStop(ctx *Context, args []string) error {
 		dag = d
 	}
 
-	logger.Info(ctx, "DAG-run is stopping", "dag", dag.Name)
+	logger.Info(ctx, "dag-run is stopping", "dag", dag.Name)
 
 	if err := ctx.DAGRunMgr.Stop(ctx, dag, dagRunID); err != nil {
 		return fmt.Errorf("failed to stop DAG: %w", err)
 	}
 
-	logger.Info(ctx, "DAG-run stopped", "dag", dag.Name)
+	logger.Info(ctx, "dag-run stopped", "dag", dag.Name)
 	return nil
 }

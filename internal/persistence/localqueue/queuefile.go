@@ -60,7 +60,7 @@ type ItemData struct {
 }
 
 // Push adds a job to the queue
-// Since it's a prototype, it just create a json file with the job ID and DAG-run reference
+// Since it's a prototype, it just create a json file with the job ID and dag-run reference
 func (q *QueueFile) Push(ctx context.Context, dagRun digraph.DAGRunRef) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -116,7 +116,7 @@ func (q *QueueFile) Push(ctx context.Context, dagRun digraph.DAGRunRef) error {
 	return nil
 }
 
-// PopByDAGRunID removes jobs from the queue by DAG-run ID
+// PopByDAGRunID removes jobs from the queue by dag-run ID
 func (q *QueueFile) PopByDAGRunID(ctx context.Context, dagRunID string) ([]*Job, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -265,7 +265,7 @@ func (q *QueueFile) listItems(ctx context.Context) ([]ItemData, error) {
 		if !q.match.MatchString(fileName) {
 			continue
 		}
-		// Parse the file name to get the DAG-run ID and timestamp
+		// Parse the file name to get the dag-run ID and timestamp
 		item, err := parseQueueFileName(file, fileName)
 		if err != nil {
 			logger.Error(ctx, "failed to parse queue file name %s: %w", fileName, err)
@@ -283,7 +283,7 @@ func (q *QueueFile) listItems(ctx context.Context) ([]ItemData, error) {
 }
 
 func parseQueueFileName(path, fileName string) (ItemData, error) {
-	// Extract the DAG-run ID and timestamp from the file name
+	// Extract the dag-run ID and timestamp from the file name
 	matches := parseRegex.FindStringSubmatch(fileName)
 	if len(matches) != 5 {
 		return ItemData{}, fmt.Errorf("invalid queue file name format: %s", fileName)

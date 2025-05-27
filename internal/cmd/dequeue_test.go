@@ -22,6 +22,6 @@ func TestDequeueCommand(t *testing.T) {
 	th.RunCommand(t, cmd.CmdDequeue(), test.CmdTest{
 		Name:        "Dequeue",
 		Args:        []string{"dequeue", "--dag-run", "dequeue:test-DAG"},
-		ExpectedOut: []string{"Dequeued DAG-run"},
+		ExpectedOut: []string{"Dequeued dag-run"},
 	})
 }

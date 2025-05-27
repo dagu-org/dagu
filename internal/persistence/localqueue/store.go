@@ -47,7 +47,7 @@ func (s *Store) All(ctx context.Context) ([]models.QueuedItemData, error) {
 		// Grep high priority items in the directory
 		files, err := filepath.Glob(pattern)
 		if err != nil {
-			return nil, fmt.Errorf("failed to list high priority DAG-runs: %w", err)
+			return nil, fmt.Errorf("failed to list high priority dag-runs: %w", err)
 		}
 
 		// Sort the files by name which reflects the order of the items
@@ -82,7 +82,7 @@ func (s *Store) DequeueByName(ctx context.Context, name string) (models.QueuedIt
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to dequeue DAG-run %s: %w", name, err)
+		return nil, fmt.Errorf("failed to dequeue dag-run %s: %w", name, err)
 	}
 
 	return item, nil
@@ -113,7 +113,7 @@ func (s *Store) List(ctx context.Context, name string) ([]models.QueuedItemData,
 	q := s.queues[name]
 	items, err := q.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list DAG-runs %s: %w", name, err)
+		return nil, fmt.Errorf("failed to list dag-runs %s: %w", name, err)
 	}
 
 	return items, nil
@@ -132,7 +132,7 @@ func (s *Store) DequeueByDAGRunID(ctx context.Context, name, dagRunID string) ([
 	q := s.queues[name]
 	item, err := q.DequeueByDAGRunID(ctx, dagRunID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to dequeue DAG-run %s: %w", dagRunID, err)
+		return nil, fmt.Errorf("failed to dequeue dag-run %s: %w", dagRunID, err)
 	}
 	items = append(items, item...)
 
@@ -154,7 +154,7 @@ func (s *Store) Enqueue(ctx context.Context, name string, p models.QueuePriority
 
 	q := s.queues[name]
 	if err := q.Enqueue(ctx, p, dagRun); err != nil {
-		return fmt.Errorf("failed to enqueue DAG-run %s: %w", name, err)
+		return fmt.Errorf("failed to enqueue dag-run %s: %w", name, err)
 	}
 
 	return nil

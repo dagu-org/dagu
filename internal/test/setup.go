@@ -199,7 +199,7 @@ func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 func (d *DAG) AssertDAGRunCount(t *testing.T, expected int) {
 	t.Helper()
 
-	// the +1 to the limit is needed to ensure that the number of DAG-run
+	// the +1 to the limit is needed to ensure that the number of dag-run
 	// entries is exactly the expected number
 	runstore := d.DAGRunMgr.ListRecentStatus(d.Context, d.Name, expected+1)
 	require.Len(t, runstore, expected)

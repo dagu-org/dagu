@@ -81,9 +81,9 @@ func TestQueueFile_FindByDAGRunID(t *testing.T) {
 	})
 	require.NoError(t, err, "expected no error when adding job to queue")
 
-	// Find the job by DAG-run ID
+	// Find the job by dag-run ID
 	job, err := qf.FindByDAGRunID(th.Context, "test-dag")
-	require.NoError(t, err, "expected no error when finding job by DAG-run ID")
+	require.NoError(t, err, "expected no error when finding job by dag-run ID")
 	require.NotNil(t, job, "expected job to be not nil")
 	require.Equal(t, "test-name", job.DAGRun.Name, "expected job name to be 'test-name'")
 	require.Equal(t, "test-dag", job.DAGRun.ID, "expected job ID to be 'test'")

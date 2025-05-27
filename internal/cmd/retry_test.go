@@ -21,7 +21,7 @@ func TestRetryCommand(t *testing.T) {
 		args := []string{"start", `--params="foo"`, dagFile.Location}
 		th.RunCommand(t, cmd.CmdStart(), test.CmdTest{Args: args})
 
-		// Find the DAG-run ID.
+		// Find the dag-run ID.
 		cli := th.DAGStore
 		ctx := context.Background()
 
@@ -33,7 +33,7 @@ func TestRetryCommand(t *testing.T) {
 		require.Equal(t, status.Status, scheduler.StatusSuccess)
 		require.NotNil(t, status.Status)
 
-		// Retry with the DAG-run ID.
+		// Retry with the dag-run ID.
 		args = []string{"retry", fmt.Sprintf("--run-id=%s", status.DAGRunID), dagFile.Location}
 		th.RunCommand(t, cmd.CmdRetry(), test.CmdTest{
 			Args:        args,

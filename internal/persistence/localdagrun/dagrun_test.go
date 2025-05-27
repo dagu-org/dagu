@@ -73,18 +73,18 @@ func TestListChildDAGRuns(t *testing.T) {
 
 		children, err := run.ListChildDAGRuns(run.Context)
 		require.NoError(t, err)
-		assert.Empty(t, children, "should return empty list when no child DAG-run exist")
+		assert.Empty(t, children, "should return empty list when no child dag-run exist")
 	})
 
 	t.Run("WithChildDAGRuns", func(t *testing.T) {
 		root := setupTestDataRoot(t)
 		run := root.CreateTestDAGRun(t, "parent-dag-run", models.NewUTC(time.Now()))
 
-		// Create child DAG-run directory and some child DAG-run directories
+		// Create child dag-run directory and some child dag-run directories
 		childDir := filepath.Join(run.baseDir, ChildDAGRunsDir)
 		require.NoError(t, os.MkdirAll(childDir, 0755))
 
-		// Create two child DAG-run directories
+		// Create two child dag-run directories
 		child1Dir := filepath.Join(childDir, ChildDAGRunDirPrefix+"child1")
 		child2Dir := filepath.Join(childDir, ChildDAGRunDirPrefix+"child2")
 		require.NoError(t, os.MkdirAll(child1Dir, 0755))
@@ -96,9 +96,9 @@ func TestListChildDAGRuns(t *testing.T) {
 
 		children, err := run.ListChildDAGRuns(run.Context)
 		require.NoError(t, err)
-		assert.Len(t, children, 2, "should return two child DAG-runs")
+		assert.Len(t, children, 2, "should return two child dag-runs")
 
-		// Verify child DAG-run directories
+		// Verify child dag-run directories
 		childIDs := make([]string, len(children))
 		for i, child := range children {
 			childIDs[i] = child.dagRunID
@@ -267,7 +267,7 @@ func TestRemoveLogFiles(t *testing.T) {
 		root := setupTestDataRoot(t)
 		run := root.CreateTestDAGRun(t, "parent-dag-run", models.NewUTC(time.Now()))
 
-		// Create parent DAG-run with log files
+		// Create parent dag-run with log files
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
 		status.DAGRunID = "parent-dag-run"
@@ -284,7 +284,7 @@ func TestRemoveLogFiles(t *testing.T) {
 		require.NoError(t, att.Write(run.Context, status))
 		require.NoError(t, att.Close(run.Context))
 
-		// Create child DAG-run directory
+		// Create child dag-run directory
 		childDir := filepath.Join(run.baseDir, ChildDAGRunsDir)
 		require.NoError(t, os.MkdirAll(childDir, 0755))
 
@@ -366,22 +366,22 @@ func TestDAGRunRemove(t *testing.T) {
 		require.NoError(t, att.Write(run.Context, status))
 		require.NoError(t, att.Close(run.Context))
 
-		// Verify DAG-run directory and log files exist
+		// Verify dag-run directory and log files exist
 		_, err = os.Stat(run.baseDir)
-		require.NoError(t, err, "DAG-run directory should exist")
+		require.NoError(t, err, "dag-run directory should exist")
 
 		for _, logFile := range logFiles {
 			_, err := os.Stat(logFile)
 			require.NoError(t, err, "log file should exist: %s", logFile)
 		}
 
-		// Remove the DAG-run
+		// Remove the dag-run
 		err = run.Remove(run.Context)
 		require.NoError(t, err)
 
-		// Verify the DAG-run directory is removed
+		// Verify the dag-run directory is removed
 		_, err = os.Stat(run.baseDir)
-		assert.True(t, os.IsNotExist(err), "DAG-run directory should be removed")
+		assert.True(t, os.IsNotExist(err), "dag-run directory should be removed")
 
 		// Verify log files are removed
 		for _, logFile := range logFiles {
@@ -415,7 +415,7 @@ func TestDAGRunRemove(t *testing.T) {
 		root := setupTestDataRoot(t)
 		run := root.CreateTestDAGRun(t, "parent-dag-run", models.NewUTC(time.Now()))
 
-		// Create parent DAG-run with log files
+		// Create parent dag-run with log files
 		dag := &digraph.DAG{Name: "test-dag"}
 		status := models.InitialStatus(dag)
 		status.DAGRunID = "parent-dag-run"
@@ -432,11 +432,11 @@ func TestDAGRunRemove(t *testing.T) {
 		require.NoError(t, att.Write(run.Context, status))
 		require.NoError(t, att.Close(run.Context))
 
-		// Create child DAG-run directory
+		// Create child dag-run directory
 		childDir := filepath.Join(run.baseDir, ChildDAGRunsDir)
 		require.NoError(t, os.MkdirAll(childDir, 0755))
 
-		// Create two child DAG-run with their own log files
+		// Create two child dag-run with their own log files
 		childDAGRuns := []struct {
 			dagRunID string
 			logFiles []string
@@ -473,13 +473,13 @@ func TestDAGRunRemove(t *testing.T) {
 			require.NoError(t, err, "log file should exist before removal: %s", logFile)
 		}
 
-		// Remove the parent DAG-run (should remove all log files including child DAG-runs)
+		// Remove the parent dag-run (should remove all log files including child dag-runs)
 		err = run.Remove(run.Context)
 		require.NoError(t, err)
 
-		// Verify DAG-run directory is removed
+		// Verify dag-run directory is removed
 		_, err = os.Stat(run.baseDir)
-		assert.True(t, os.IsNotExist(err), "DAG-run directory should be removed")
+		assert.True(t, os.IsNotExist(err), "dag-run directory should be removed")
 
 		// Verify all log files are removed (parent and children)
 		for _, logFile := range allLogFiles {
@@ -516,8 +516,8 @@ func TestDAGRunRemove(t *testing.T) {
 		err = run.Remove(run.Context)
 		require.NoError(t, err)
 
-		// Verify DAG-run directory is removed
+		// Verify dag-run directory is removed
 		_, err = os.Stat(run.baseDir)
-		assert.True(t, os.IsNotExist(err), "DAG-run directory should be removed")
+		assert.True(t, os.IsNotExist(err), "dag-run directory should be removed")
 	})
 }

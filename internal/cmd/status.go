@@ -40,18 +40,18 @@ var statusFlags = []commandLineFlag{
 func runStatus(ctx *Context, args []string) error {
 	dagRunID, err := ctx.StringParam("run-id")
 	if err != nil {
-		return fmt.Errorf("failed to get DAG-run ID: %w", err)
+		return fmt.Errorf("failed to get dag-run ID: %w", err)
 	}
 
 	name := args[0]
 
 	var attempt models.DAGRunAttempt
 	if dagRunID != "" {
-		// Retrieve the previous run's record for the specified DAG-run ID.
+		// Retrieve the previous run's record for the specified dag-run ID.
 		dagRunRef := digraph.NewDAGRunRef(name, dagRunID)
 		att, err := ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
 		if err != nil {
-			return fmt.Errorf("failed to find run data for DAG-run ID %s: %w", dagRunID, err)
+			return fmt.Errorf("failed to find run data for dag-run ID %s: %w", dagRunID, err)
 		}
 		attempt = att
 	} else {

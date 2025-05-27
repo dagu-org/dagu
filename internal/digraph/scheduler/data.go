@@ -161,7 +161,7 @@ func (s *Data) Data() NodeData {
 	return s.inner
 }
 
-// GenChildDAGRunID returns the DAG-run ID for the child DAG-run.
+// GenChildDAGRunID returns the dag-run ID for the child dag-run.
 // Currently, it only supports a single child dag-run.
 // In the future, it may support multiple child dag-runs (e.g., for-each).
 func (s *Data) GenChildDAGRunID() (string, error) {
@@ -418,7 +418,7 @@ func (n *Data) ClearState(s digraph.Step) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	// The data of child DAG-run need to be preserved to retain their DAG-run IDs
+	// The data of child dag-run need to be preserved to retain their dag-run IDs
 	children := n.inner.State.Children
 	n.inner.State = NodeState{}
 	n.inner.State.Children = children
@@ -435,8 +435,8 @@ func (n *Data) MarkError(err error) {
 	n.inner.State.Status = NodeStatusError
 }
 
-// generateDAGRunID generates a new DAG-run ID.
-// For simplicity, we use UUIDs as DAG-run IDs.
+// generateDAGRunID generates a new dag-run ID.
+// For simplicity, we use UUIDs as dag-run IDs.
 func generateDAGRunID() (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {

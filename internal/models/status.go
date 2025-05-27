@@ -245,7 +245,7 @@ func (st *DAGRunStatus) NodeByName(name string) (*Node, error) {
 	return nil, fmt.Errorf("node %s not found", name)
 }
 
-// PID represents a process ID for a running DAG-run
+// PID represents a process ID for a running dag-run
 type PID int
 
 // String returns the string representation of the PID, or an empty string if 0

@@ -56,11 +56,11 @@ steps:
 	args := []string{"start", "--run-id", dagRunID, "parent"}
 	th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
 		Args:        args,
-		ExpectedOut: []string{"DAG-run finished"},
+		ExpectedOut: []string{"dag-run finished"},
 	})
 
 	// Update the child_2 status to "failed" to simulate a retry
-	// First, find the child_2 DAG-run ID to update its status
+	// First, find the child_2 dag-run ID to update its status
 	ctx := context.Background()
 	ref := digraph.NewDAGRunRef("parent", dagRunID)
 	parentAttempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
@@ -83,7 +83,7 @@ steps:
 	child1Node.Status = scheduler.NodeStatusError
 	updateStatus(parentAttempt, parentStatus)
 
-	// (2) Find the child_1 DAG-run ID to update its status
+	// (2) Find the child_1 dag-run ID to update its status
 	child1Attempt, err := th.DAGRunStore.FindChildAttempt(ctx, ref, child1Node.Children[0].DAGRunID)
 	require.NoError(t, err)
 
@@ -95,7 +95,7 @@ steps:
 	child2Node.Status = scheduler.NodeStatusError
 	updateStatus(child1Attempt, child1Status)
 
-	// (4) Find the child_2 DAG-run ID to update its status
+	// (4) Find the child_2 dag-run ID to update its status
 	child2Attempt, err := th.DAGRunStore.FindChildAttempt(ctx, ref, child2Node.Children[0].DAGRunID)
 	require.NoError(t, err)
 
@@ -118,7 +118,7 @@ steps:
 	args = []string{"retry", "--run-id", dagRunID, "parent"}
 	th.RunCommand(t, cmd.CmdRetry(), test.CmdTest{
 		Args:        args,
-		ExpectedOut: []string{"DAG-run finished"},
+		ExpectedOut: []string{"dag-run finished"},
 	})
 
 	// Check if the child_2 status is now "success"

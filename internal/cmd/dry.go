@@ -59,12 +59,12 @@ func runDry(ctx *Context, args []string) error {
 
 	dagRunID, err := genRunID()
 	if err != nil {
-		return fmt.Errorf("failed to generate DAG-run ID: %w", err)
+		return fmt.Errorf("failed to generate dag-run ID: %w", err)
 	}
 
 	logFile, err := ctx.OpenLogFile(dag, dagRunID)
 	if err != nil {
-		return fmt.Errorf("failed to initialize log file for DAG-run %s: %w", dag.Name, err)
+		return fmt.Errorf("failed to initialize log file for dag-run %s: %w", dag.Name, err)
 	}
 	defer func() {
 		_ = logFile.Close()
@@ -95,7 +95,7 @@ func runDry(ctx *Context, args []string) error {
 	listenSignals(ctx, agentInstance)
 
 	if err := agentInstance.Run(ctx); err != nil {
-		return fmt.Errorf("failed to execute the DAG-run %s (DAG-run ID: %s): %w", dag.Name, dagRunID, err)
+		return fmt.Errorf("failed to execute the dag-run %s (dag-run ID: %s): %w", dag.Name, dagRunID, err)
 	}
 
 	agentInstance.PrintSummary(ctx)

@@ -104,7 +104,7 @@ func TestManager(t *testing.T) {
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
 
-		// Get the child DAG-run status.
+		// Get the child dag-run status.
 		status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 		require.NoError(t, err)
 		dagRunID := status.DAGRunID
@@ -115,12 +115,12 @@ func TestManager(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusSuccess.String(), childDAGRunStatus.Status.String())
 
-		// Update the the child DAG-run status.
+		// Update the the child dag-run status.
 		childDAGRunStatus.Nodes[0].Status = scheduler.NodeStatusError
 		err = th.DAGRunMgr.UpdateStatus(th.Context, root, *childDAGRunStatus)
 		require.NoError(t, err)
 
-		// Check if the child DAG-run status is updated.
+		// Check if the child dag-run status is updated.
 		childDAGRunStatus, err = th.DAGRunMgr.FindChildDAGRunStatus(th.Context, root, childDAGRun.DAGRunID)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.NodeStatusError.String(), childDAGRunStatus.Nodes[0].Status.String())
