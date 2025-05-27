@@ -241,6 +241,10 @@ addlicense:
 		-f scripts/header.txt \
 		.
 
+# cpuprof opens the CPU profile in the browser.
+cpuprof:
+	@go tool pprof -http=:9999 cpu.prof
+
 ##############################################################################
 # Internal targets
 ##############################################################################

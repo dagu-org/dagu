@@ -30,3 +30,6 @@ __debug_bin*
 # Local configuration files
 *.local.md
 *.local.json
+
+# Profile files
+*.prof

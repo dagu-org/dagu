@@ -117,6 +117,13 @@ var (
 		usage:     "Suppress output during workflow",
 		isBool:    true,
 	}
+
+	// cpuProfileFlag is used to enable CPU profiling.
+	cpuProfileFlag = commandLineFlag{
+		name:   "cpu-profile",
+		usage:  "Enable CPU profiling (saves to cpu.pprof)",
+		isBool: true,
+	}
 )
 
 type commandLineFlag struct {
@@ -127,7 +134,7 @@ type commandLineFlag struct {
 }
 
 func initFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
-	flags := append([]commandLineFlag{configFlag, quietFlag}, additionalFlags...)
+	flags := append([]commandLineFlag{configFlag, quietFlag, cpuProfileFlag}, additionalFlags...)
 
 	for _, flag := range flags {
 		if flag.isBool {
