@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from '../../../../components/ui/card';
 import StatusChip from '../../../../ui/StatusChip';
-import { DAGRunDetailsModal } from '../../components/dagRun-details';
+import { DAGRunDetailsModal } from '../../components/dag-run-details';
 
 interface DAGRunCardProps {
   dagRun: components['schemas']['DAGRunSummary'];
@@ -44,10 +44,7 @@ function DAGRunCard({ dagRun, timezoneInfo }: DAGRunCardProps) {
           <CardTitle className="text-sm truncate" title={dagRun.name}>
             {dagRun.name}
           </CardTitle>
-          <CardDescription
-            className="text-xs truncate"
-            title={dagRun.dagRunId}
-          >
+          <CardDescription className="text-xs truncate" title={dagRun.dagRunId}>
             ID: {dagRun.dagRunId}
           </CardDescription>
         </CardHeader>
