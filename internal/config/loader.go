@@ -197,6 +197,14 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		cfg.UI.NavbarTitle = def.UI.NavbarTitle
 		cfg.UI.MaxDashboardPageLimit = def.UI.MaxDashboardPageLimit
 		cfg.UI.LogEncodingCharset = def.UI.LogEncodingCharset
+		cfg.UI.Permissions = UIPermissions{
+			WriteDAGs: true,
+		}
+
+		// Permissions can be nil, so we check before dereferencing.
+		if def.UI.Permissions.WriteDAGs != nil {
+			cfg.UI.Permissions.WriteDAGs = *def.UI.Permissions.WriteDAGs
+		}
 	}
 
 	// Incorporate legacy field values, which may override existing settings.

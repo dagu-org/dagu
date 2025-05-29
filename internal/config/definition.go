@@ -173,10 +173,17 @@ type pathsConfigDef struct {
 
 // uiDef holds the user interface configuration settings.
 type uiDef struct {
-	LogEncodingCharset    string `mapstructure:"logEncodingCharset"`
-	NavbarColor           string `mapstructure:"navbarColor"`
-	NavbarTitle           string `mapstructure:"navbarTitle"`
-	MaxDashboardPageLimit int    `mapstructure:"maxDashboardPageLimit"`
+	LogEncodingCharset    string         `mapstructure:"logEncodingCharset"`
+	NavbarColor           string         `mapstructure:"navbarColor"`
+	NavbarTitle           string         `mapstructure:"navbarTitle"`
+	MaxDashboardPageLimit int            `mapstructure:"maxDashboardPageLimit"`
+	Permissions           permissionsDef `mapstructure:"permissions"`
+}
+
+// permissionsDef holds the permissions configuration for the application.
+// It defines what actions are allowed in the UI, such as writing DAGs.
+type permissionsDef struct {
+	WriteDAGs *bool `mapstructure:"writeDAGs"`
 }
 
 // remoteNodeDef represents a configuration for connecting to a remote node.

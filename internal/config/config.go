@@ -178,6 +178,11 @@ type UI struct {
 	NavbarColor           string
 	NavbarTitle           string
 	MaxDashboardPageLimit int
+	Permissions           UIPermissions
+}
+
+type UIPermissions struct {
+	WriteDAGs bool
 }
 
 // RemoteNode represents a remote node configuration
