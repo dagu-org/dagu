@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { components, NodeStatus, Status } from '../../../api/v2/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
+import { useConfig } from '../../../contexts/ConfigContext';
 import { useClient } from '../../../hooks/api';
 import { DAGContext } from '../contexts/DAGContext';
 import { getEventHandlers } from '../lib/getEventHandlers';
@@ -16,6 +17,7 @@ type Props = {
 
 function DAGStatus({ dagRun, fileName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
+  const config = useConfig();
   const navigate = useNavigate();
   const [modal, setModal] = useState(false);
   const [selectedStep, setSelectedStep] = useState<
@@ -110,7 +112,9 @@ function DAGStatus({ dagRun, fileName }: Props) {
             }
 
             searchParams.set('step', n.step.name);
-            navigate(`/dag-runs/${dagRun.name}?${searchParams.toString()}`);
+            navigate(
+              `/dag-runs/${dagRun.name}/${dagRunId}?${searchParams.toString()}`
+            );
           } else {
             // For DAGs, use the existing approach with query parameters
             navigate({
@@ -127,13 +131,18 @@ function DAGStatus({ dagRun, fileName }: Props) {
   // Handle right-click on graph node (show status update modal)
   const onRightClickStepOnGraph = React.useCallback(
     (id: string) => {
+      // Check if user has permission to run DAGs
+      if (!config.permissions.runDags) {
+        return;
+      }
+
       const status = dagRun.status;
 
       // Only allow status updates for completed DAG runs
       if (status !== Status.Running && status !== Status.NotStarted) {
         // find the right-clicked step
         const n = dagRun.nodes?.find(
-          (n) => n.step.name.replace(/\s/g, '_') == id
+          (n) => n.step.name.replace(/[-\s]/g, 'dagutmp') == id
         );
 
         if (n) {
@@ -143,7 +152,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
         }
       }
     },
-    [dagRun]
+    [dagRun, config.permissions.runDags]
   );
 
   const handlers = getEventHandlers(dagRun);

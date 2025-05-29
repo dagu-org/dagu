@@ -15,6 +15,7 @@ import { RefreshCw, Square, X } from 'lucide-react';
 import React from 'react';
 import { components, Status } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
+import { useConfig } from '../../../../contexts/ConfigContext';
 import { useClient } from '../../../../hooks/api';
 import ConfirmModal from '../../../../ui/ConfirmModal';
 import LabeledItem from '../../../../ui/LabeledItem';
@@ -51,6 +52,7 @@ function DAGRunActions({
   isRootLevel = true,
 }: Props) {
   const appBarContext = React.useContext(AppBarContext);
+  const config = useConfig();
   const [isStopModal, setIsStopModal] = React.useState(false);
   const [isRetryModal, setIsRetryModal] = React.useState(false);
   const [isDequeueModal, setIsDequeueModal] = React.useState(false);
@@ -73,7 +75,7 @@ function DAGRunActions({
     dequeue: isRootLevel && dagRun?.status === Status.Queued, // Queued and at root level
   };
 
-  if (!dagRun) {
+  if (!dagRun || !config.permissions.runDags) {
     return <></>;
   }
 

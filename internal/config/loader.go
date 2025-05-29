@@ -140,6 +140,18 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		Port:        def.Port,
 		BasePath:    def.BasePath,
 		APIBasePath: def.APIBasePath,
+		Permissions: map[Permission]bool{
+			PermissionWriteDAGs: true,
+			PermissionRunDAGs:   true,
+		},
+	}
+
+	// Permissions can be nil, so we check before dereferencing.
+	if def.Permissions.WriteDAGs != nil {
+		cfg.Server.Permissions[PermissionWriteDAGs] = *def.Permissions.WriteDAGs
+	}
+	if def.Permissions.RunDAGs != nil {
+		cfg.Server.Permissions[PermissionRunDAGs] = *def.Permissions.RunDAGs
 	}
 
 	// Process remote node definitions.

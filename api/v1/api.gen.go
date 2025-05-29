@@ -53,6 +53,7 @@ const (
 	ErrorCodeAlreadyRunning  ErrorCode = "already_running"
 	ErrorCodeBadGateway      ErrorCode = "bad_gateway"
 	ErrorCodeBadRequest      ErrorCode = "bad_request"
+	ErrorCodeForbidden       ErrorCode = "forbidden"
 	ErrorCodeInternalError   ErrorCode = "internal_error"
 	ErrorCodeNotFound        ErrorCode = "not_found"
 	ErrorCodeNotRunning      ErrorCode = "not_running"
@@ -104,7 +105,7 @@ const (
 	RunStatusTextRunning    RunStatusText = "running"
 )
 
-// DAG Core DAG configuration containing workflow definition and metadata
+// DAG Core DAG configuration containing dag-run definition and metadata
 type DAG struct {
 	// DefaultParams Default parameter values in JSON format if not specified at runtime
 	DefaultParams *string `json:"DefaultParams,omitempty"`
@@ -171,8 +172,8 @@ type DAGDetails struct {
 	// LogDir Directory path for storing log files
 	LogDir *string `json:"LogDir,omitempty"`
 
-	// MaxActiveSteps Maximum number of concurrent steps to run
-	MaxActiveSteps *int `json:"MaxActiveSteps,omitempty"`
+	// MaxActiveRuns Maximum number of concurrent steps to run
+	MaxActiveRuns *int `json:"MaxActiveRuns,omitempty"`
 
 	// Name Unique identifier for the DAG within its group
 	Name string `json:"Name"`
@@ -216,13 +217,13 @@ type DAGLogStatusFile struct {
 	// File Path to the log file
 	File string `json:"File"`
 
-	// Status Detailed status of a DAG run including child nodes
+	// Status Detailed status of a dag-run including child nodes
 	Status DAGStatusDetails `json:"Status"`
 }
 
-// DAGStatus Current status of a DAG run
+// DAGStatus Current status of a dag-run
 type DAGStatus struct {
-	// FinishedAt RFC 3339 timestamp when the DAG run finished
+	// FinishedAt RFC 3339 timestamp when the dag-run finished
 	FinishedAt string `json:"FinishedAt"`
 
 	// Log Path to the log file
@@ -234,13 +235,13 @@ type DAGStatus struct {
 	// Params Runtime parameters passed to the DAG in JSON format
 	Params *string `json:"Params,omitempty"`
 
-	// Pid Process ID of the DAG run
+	// Pid Process ID of the dag-run
 	Pid *int `json:"Pid,omitempty"`
 
-	// RequestId Unique identifier for the DAG run request
+	// RequestId Unique identifier for the dag-run request
 	RequestId string `json:"RequestId"`
 
-	// StartedAt RFC 3339 timestamp when the DAG run started
+	// StartedAt RFC 3339 timestamp when the dag-run started
 	StartedAt string `json:"StartedAt"`
 
 	// Status Numeric status code indicating current run state:
@@ -251,13 +252,13 @@ type DAGStatus struct {
 	// 4: "Success"
 	Status RunStatus `json:"Status"`
 
-	// StatusText Human-readable status description for the DAG run
+	// StatusText Human-readable status description for the dag-run
 	StatusText RunStatusText `json:"StatusText"`
 }
 
-// DAGStatusDetails Detailed status of a DAG run including child nodes
+// DAGStatusDetails Detailed status of a dag-run including child nodes
 type DAGStatusDetails struct {
-	// FinishedAt RFC3339 timestamp when the DAG run finished
+	// FinishedAt RFC3339 timestamp when the dag-run finished
 	FinishedAt string `json:"FinishedAt"`
 
 	// Log Path to the log file
@@ -269,28 +270,28 @@ type DAGStatusDetails struct {
 	// Nodes Status of individual steps within the DAG
 	Nodes []Node `json:"Nodes"`
 
-	// OnCancel Status of an individual step within a DAG run
+	// OnCancel Status of an individual step within a dag-run
 	OnCancel *Node `json:"OnCancel,omitempty"`
 
-	// OnExit Status of an individual step within a DAG run
+	// OnExit Status of an individual step within a dag-run
 	OnExit *Node `json:"OnExit,omitempty"`
 
-	// OnFailure Status of an individual step within a DAG run
+	// OnFailure Status of an individual step within a dag-run
 	OnFailure *Node `json:"OnFailure,omitempty"`
 
-	// OnSuccess Status of an individual step within a DAG run
+	// OnSuccess Status of an individual step within a dag-run
 	OnSuccess *Node `json:"OnSuccess,omitempty"`
 
 	// Params Parameters in JSON format
 	Params *string `json:"Params,omitempty"`
 
-	// Pid Process ID of the DAG run
+	// Pid Process ID of the dag-run
 	Pid int `json:"Pid"`
 
 	// RequestId Unique identifier for the run request
 	RequestId string `json:"RequestId"`
 
-	// StartedAt RFC3339 timestamp when the DAG run started
+	// StartedAt RFC3339 timestamp when the dag-run started
 	StartedAt string `json:"StartedAt"`
 
 	// Status Numeric status code indicating current run state:
@@ -301,13 +302,13 @@ type DAGStatusDetails struct {
 	// 4: "Success"
 	Status RunStatus `json:"Status"`
 
-	// StatusText Human-readable status description for the DAG run
+	// StatusText Human-readable status description for the dag-run
 	StatusText RunStatusText `json:"StatusText"`
 }
 
 // DAGStatusFile DAG file with its status information
 type DAGStatusFile struct {
-	// DAG Core DAG configuration containing workflow definition and metadata
+	// DAG Core DAG configuration containing dag-run definition and metadata
 	DAG DAG `json:"DAG"`
 
 	// Error Error message if any
@@ -316,7 +317,7 @@ type DAGStatusFile struct {
 	// File Path to the DAG file
 	File string `json:"File"`
 
-	// Status Current status of a DAG run
+	// Status Current status of a dag-run
 	Status DAGStatus `json:"Status"`
 
 	// Suspended Whether the DAG is suspended
@@ -334,7 +335,7 @@ type DAGStatusFileDetails struct {
 	// File Path to the DAG file
 	File string `json:"File"`
 
-	// Status Detailed status of a DAG run including child nodes
+	// Status Detailed status of a dag-run including child nodes
 	Status DAGStatusDetails `json:"Status"`
 
 	// Suspended Whether the DAG is suspended
@@ -398,7 +399,7 @@ type ListTagResponse struct {
 	Tags []string `json:"Tags"`
 }
 
-// Node Status of an individual step within a DAG run
+// Node Status of an individual step within a dag-run
 type Node struct {
 	// DoneCount Number of successful completions for repeating steps
 	DoneCount int `json:"DoneCount"`
@@ -478,10 +479,10 @@ type RepeatPolicy struct {
 // 4: "Success"
 type RunStatus int
 
-// RunStatusText Human-readable status description for the DAG run
+// RunStatusText Human-readable status description for the dag-run
 type RunStatusText string
 
-// Schedule Schedule configuration for DAG run
+// Schedule Schedule configuration for dag-run
 type Schedule struct {
 	// Expression Cron expression or schedule pattern
 	Expression string `json:"Expression"`
@@ -510,7 +511,7 @@ type SearchDAGsMatchItem struct {
 
 // SearchDAGsResultItem Individual search result item for a DAG
 type SearchDAGsResultItem struct {
-	// DAG Core DAG configuration containing workflow definition and metadata
+	// DAG Core DAG configuration containing dag-run definition and metadata
 	DAG DAG `json:"DAG"`
 
 	// Matches Details of where matches were found
@@ -579,7 +580,7 @@ type StepLog struct {
 	// LogFile Path to the log file
 	LogFile string `json:"LogFile"`
 
-	// Step Status of an individual step within a DAG run
+	// Step Status of an individual step within a dag-run
 	Step Node `json:"Step"`
 }
 
@@ -1776,82 +1777,82 @@ func (sh *strictHandler) ListTags(w http.ResponseWriter, r *http.Request) {
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"ylkAAA==",
+	"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",
+	"AP//+YNrk9VZAAA=",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

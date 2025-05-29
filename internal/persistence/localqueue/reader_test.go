@@ -49,7 +49,7 @@ func TestQueueReader(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		select {
 		case item := <-ch:
-			item.Result <- true // Simulate processing the item
+			item.Result <- models.QueuedItemProcessingResultSuccess // Simulate processing the item
 			receivedItems = append(receivedItems, item)
 		case <-timeout:
 			t.Fatal("timeout waiting for items")

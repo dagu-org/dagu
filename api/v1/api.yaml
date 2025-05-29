@@ -432,6 +432,7 @@ components:
       type: string
       description: "Error code indicating the type of error"
       enum:
+        - "forbidden"
         - "bad_request"
         - "not_found"
         - "internal_error"

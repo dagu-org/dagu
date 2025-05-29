@@ -59,11 +59,14 @@ Create ``config.yaml`` in ``~/.config/dagu/`` to override default settings. Belo
 .. code-block:: yaml
 
     # Server Configuration
-    host: "127.0.0.1" # Web UI hostname
-    port: 8080        # Web UI port
-    basePath: ""      # Base path to serve the application
-    tz: "Asia/Tokyo"  # Timezone (e.g., "America/New_York")
-    headless: true    # Run in headless mode
+    host: "127.0.0.1"  # Web UI hostname
+    port: 8080         # Web UI port
+    basePath: ""       # Base path to serve the application
+    tz: "Asia/Tokyo"   # Timezone (e.g., "America/New_York")
+    headless: true     # Run in headless mode
+    permissions:       # Permissions for Web UI and API on the server
+      writeDAGs: true  # Allow creating / editing / deleting DAGs
+      runDAGs: true    # Allow running / stopping / retrying DAGs
     
     # Directory Configuration
     dagsDir: "~/.config/dagu/dags"            # DAG definitions location

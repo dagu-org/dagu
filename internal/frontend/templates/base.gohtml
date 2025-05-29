@@ -19,6 +19,10 @@
           tzOffsetInSec: +"{{ tzOffsetInSec }}",
           maxDashboardPageLimit: "{{ maxDashboardPageLimit }}",
           remoteNodes: "{{ remoteNodes }}",
+          permissions: {
+            writeDags: "{{ permissionsWriteDags }}" === "true",
+            runDags: "{{ permissionsRunDags }}" === "true",
+          },
         };
       }
     </script>

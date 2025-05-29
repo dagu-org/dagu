@@ -12,6 +12,7 @@ import (
 	"text/template"
 
 	"github.com/dagu-org/dagu/internal/build"
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
@@ -58,6 +59,7 @@ type funcsConfig struct {
 	TzOffsetInSec         int
 	MaxDashboardPageLimit int
 	RemoteNodes           []string
+	Permissions           map[config.Permission]bool
 }
 
 func defaultFunctions(cfg funcsConfig) template.FuncMap {
@@ -87,6 +89,12 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 		"tz": func() string {
 			return cfg.TZ
 		},
+		"permissionsWriteDags": func() string {
+			return convertBooleanToString(cfg.Permissions[config.PermissionWriteDAGs])
+		},
+		"permissionsRunDags": func() string {
+			return convertBooleanToString(cfg.Permissions[config.PermissionRunDAGs])
+		},
 		"tzOffsetInSec": func() int {
 			return cfg.TzOffsetInSec
 		},
@@ -97,6 +105,13 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 			return strings.Join(cfg.RemoteNodes, ",")
 		},
 	}
+}
+
+func convertBooleanToString(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
 }
 
 func baseTemplates() []string {

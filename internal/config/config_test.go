@@ -23,6 +23,9 @@ func TestLoadConfig_WithValidFile(t *testing.T) {
 	configContent := `
 host: "0.0.0.0"
 port: 9090
+permissions:
+  writeDAGs: false
+  runDAGs: false
 debug: true
 basePath: "/dagu"
 apiBasePath: "/api/v1"
@@ -77,10 +80,13 @@ tls:
 	// Verify server settings.
 	assert.Equal(t, "0.0.0.0", cfg.Server.Host)
 	assert.Equal(t, 9090, cfg.Server.Port)
+
 	// cleanBasePath should clean the basePath as provided.
 	assert.Equal(t, "/dagu", cfg.Server.BasePath)
 	assert.Equal(t, "/api/v1", cfg.Server.APIBasePath)
 	assert.Equal(t, true, cfg.Server.Headless)
+	assert.False(t, cfg.Server.Permissions[config.PermissionWriteDAGs])
+	assert.False(t, cfg.Server.Permissions[config.PermissionRunDAGs])
 
 	// Verify authentication.
 	assert.True(t, cfg.Server.Auth.Basic.Enabled())
@@ -132,6 +138,10 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	// For UI defaults, maxDashboardPageLimit should be 100 and logEncodingCharset "utf-8".
 	assert.Equal(t, 100, cfg.UI.MaxDashboardPageLimit)
 	assert.Equal(t, "utf-8", cfg.UI.LogEncodingCharset)
+
+	// Permissions should be set to true
+	assert.True(t, cfg.Server.Permissions[config.PermissionWriteDAGs])
+	assert.True(t, cfg.Server.Permissions[config.PermissionRunDAGs])
 }
 
 func TestValidateConfig_BasicAuthError(t *testing.T) {

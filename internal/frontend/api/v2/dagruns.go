@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
@@ -175,6 +176,10 @@ func (a *API) GetDAGRunStepLog(ctx context.Context, request api.GetDAGRunStepLog
 }
 
 func (a *API) UpdateDAGRunStepStatus(ctx context.Context, request api.UpdateDAGRunStepStatusRequestObject) (api.UpdateDAGRunStepStatusResponseObject, error) {
+	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+
 	ref := digraph.NewDAGRunRef(request.Name, request.DagRunId)
 	status, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
@@ -327,6 +332,10 @@ func (a *API) GetChildDAGRunStepLog(ctx context.Context, request api.GetChildDAG
 
 // UpdateChildDAGRunStepStatus implements api.StrictServerInterface.
 func (a *API) UpdateChildDAGRunStepStatus(ctx context.Context, request api.UpdateChildDAGRunStepStatusRequestObject) (api.UpdateChildDAGRunStepStatusResponseObject, error) {
+	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+
 	root := digraph.NewDAGRunRef(request.Name, request.DagRunId)
 	status, err := a.dagRunMgr.FindChildDAGRunStatus(ctx, root, request.ChildDAGRunId)
 	if err != nil {
@@ -375,6 +384,10 @@ var nodeStatusMapping = map[api.NodeStatus]scheduler.NodeStatus{
 }
 
 func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObject) (api.RetryDAGRunResponseObject, error) {
+	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+
 	attempt, err := a.dagRunStore.FindAttempt(ctx, digraph.NewDAGRunRef(request.Name, request.DagRunId))
 	if err != nil {
 		return nil, &Error{
@@ -397,6 +410,10 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 }
 
 func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRequestObject) (api.TerminateDAGRunResponseObject, error) {
+	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+
 	attempt, err := a.dagRunStore.FindAttempt(ctx, digraph.NewDAGRunRef(request.Name, request.DagRunId))
 	if err != nil {
 		return nil, &Error{
@@ -436,6 +453,10 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 }
 
 func (a *API) DequeueDAGRun(ctx context.Context, request api.DequeueDAGRunRequestObject) (api.DequeueDAGRunResponseObject, error) {
+	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+
 	dagRun := digraph.NewDAGRunRef(request.Name, request.DagRunId)
 	attempt, err := a.dagRunStore.FindAttempt(ctx, dagRun)
 	if err != nil {

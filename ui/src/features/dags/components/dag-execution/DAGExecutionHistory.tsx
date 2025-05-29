@@ -392,7 +392,8 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
                     <span>Execution Steps</span>
                     {reversedDAGRuns[idx].nodes && (
                       <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
-                        {reversedDAGRuns[idx].nodes.length} step{reversedDAGRuns[idx].nodes.length !== 1 ? 's' : ''}
+                        {reversedDAGRuns[idx].nodes.length} step
+                        {reversedDAGRuns[idx].nodes.length !== 1 ? 's' : ''}
                       </span>
                     )}
                   </h2>
@@ -405,8 +406,10 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
                     onViewLog={(stepName, dagRunId) => {
                       // Check if this is a stderr log (indicated by _stderr suffix)
                       const isStderr = stepName.endsWith('_stderr');
-                      const actualStepName = isStderr ? stepName.slice(0, -7) : stepName; // Remove '_stderr' suffix
-                      
+                      const actualStepName = isStderr
+                        ? stepName.slice(0, -7)
+                        : stepName; // Remove '_stderr' suffix
+
                       setLogViewer({
                         isOpen: true,
                         logType: 'step',
@@ -427,7 +430,8 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
                     <span>Execution Steps</span>
                     {reversedDAGRuns[idx].nodes && (
                       <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
-                        {reversedDAGRuns[idx].nodes.length} step{reversedDAGRuns[idx].nodes.length !== 1 ? 's' : ''}
+                        {reversedDAGRuns[idx].nodes.length} step
+                        {reversedDAGRuns[idx].nodes.length !== 1 ? 's' : ''}
                       </span>
                     )}
                   </h2>
@@ -439,8 +443,10 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
                   onViewLog={(stepName, dagRunId) => {
                     // Check if this is a stderr log (indicated by _stderr suffix)
                     const isStderr = stepName.endsWith('_stderr');
-                    const actualStepName = isStderr ? stepName.slice(0, -7) : stepName; // Remove '_stderr' suffix
-                    
+                    const actualStepName = isStderr
+                      ? stepName.slice(0, -7)
+                      : stepName; // Remove '_stderr' suffix
+
                     setLogViewer({
                       isOpen: true,
                       logType: 'step',
@@ -461,7 +467,8 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
                       <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
                         <span>Lifecycle Hooks</span>
                         <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
-                          {handlers.length} hook{handlers.length !== 1 ? 's' : ''}
+                          {handlers.length} hook
+                          {handlers.length !== 1 ? 's' : ''}
                         </span>
                       </h2>
                     </div>
@@ -473,16 +480,16 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
                         onViewLog={(stepName, dagRunId) => {
                           // Check if this is a stderr log (indicated by _stderr suffix)
                           const isStderr = stepName.endsWith('_stderr');
-                          const actualStepName = isStderr ? stepName.slice(0, -7) : stepName; // Remove '_stderr' suffix
-                          
+                          const actualStepName = isStderr
+                            ? stepName.slice(0, -7)
+                            : stepName; // Remove '_stderr' suffix
+
                           setLogViewer({
                             isOpen: true,
                             logType: 'step',
                             stepName: actualStepName,
                             dagRunId:
-                              dagRunId ||
-                              reversedDAGRuns[idx]?.dagRunId ||
-                              '',
+                              dagRunId || reversedDAGRuns[idx]?.dagRunId || '',
                             stream: isStderr ? 'stderr' : 'stdout',
                           });
                         }}
@@ -496,7 +503,8 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
                       <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
                         <span>Lifecycle Hooks</span>
                         <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
-                          {handlers.length} hook{handlers.length !== 1 ? 's' : ''}
+                          {handlers.length} hook
+                          {handlers.length !== 1 ? 's' : ''}
                         </span>
                       </h2>
                     </div>
@@ -507,16 +515,16 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
                       onViewLog={(stepName, dagRunId) => {
                         // Check if this is a stderr log (indicated by _stderr suffix)
                         const isStderr = stepName.endsWith('_stderr');
-                        const actualStepName = isStderr ? stepName.slice(0, -7) : stepName; // Remove '_stderr' suffix
-                        
+                        const actualStepName = isStderr
+                          ? stepName.slice(0, -7)
+                          : stepName; // Remove '_stderr' suffix
+
                         setLogViewer({
                           isOpen: true,
                           logType: 'step',
                           stepName: actualStepName,
                           dagRunId:
-                            dagRunId ||
-                            reversedDAGRuns[idx]?.dagRunId ||
-                            '',
+                            dagRunId || reversedDAGRuns[idx]?.dagRunId || '',
                           stream: isStderr ? 'stderr' : 'stdout',
                         });
                       }}

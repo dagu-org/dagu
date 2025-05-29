@@ -38,7 +38,15 @@ function DAGRunCard({ dagRun, timezoneInfo }: DAGRunCardProps) {
     <Card className="h-full hover:shadow-md transition-shadow">
       <div
         className="block h-full no-underline text-inherit cursor-pointer"
-        onClick={() => setIsModalOpen(true)}
+        onClick={(e) => {
+          if (e.ctrlKey || e.metaKey) {
+            // Open in new tab
+            window.open(`/dag-runs/${dagRun.name}/${dagRun.dagRunId}`, '_blank');
+          } else {
+            // Open modal
+            setIsModalOpen(true);
+          }
+        }}
       >
         <CardHeader className="pb-2 px-4 py-3">
           <CardTitle className="text-sm truncate" title={dagRun.name}>

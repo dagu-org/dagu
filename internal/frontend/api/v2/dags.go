@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
@@ -17,6 +18,10 @@ import (
 )
 
 func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestObject) (api.CreateNewDAGResponseObject, error) {
+	if err := a.isAllowed(ctx, config.PermissionWriteDAGs); err != nil {
+		return nil, err
+	}
+
 	spec := []byte(`steps:
   - name: step1
     command: echo hello
@@ -38,6 +43,10 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 }
 
 func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject) (api.DeleteDAGResponseObject, error) {
+	if err := a.isAllowed(ctx, config.PermissionWriteDAGs); err != nil {
+		return nil, err
+	}
+
 	_, err := a.dagStore.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
@@ -77,6 +86,10 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 }
 
 func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecRequestObject) (api.UpdateDAGSpecResponseObject, error) {
+	if err := a.isAllowed(ctx, config.PermissionWriteDAGs); err != nil {
+		return nil, err
+	}
+
 	err := a.dagStore.UpdateSpec(ctx, request.FileName, []byte(request.Body.Spec))
 
 	var loadErrs digraph.ErrorList
@@ -94,6 +107,10 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 }
 
 func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject) (api.RenameDAGResponseObject, error) {
+	if err := a.isAllowed(ctx, config.PermissionWriteDAGs); err != nil {
+		return nil, err
+	}
+
 	dag, err := a.dagStore.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
@@ -361,6 +378,10 @@ func (a *API) GetDAGDAGRunDetails(ctx context.Context, request api.GetDAGDAGRunD
 }
 
 func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObject) (api.ExecuteDAGResponseObject, error) {
+	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+
 	dag, err := a.dagStore.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
@@ -466,6 +487,10 @@ waitLoop:
 }
 
 func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRunRequestObject) (api.EnqueueDAGDAGRunResponseObject, error) {
+	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+
 	dag, err := a.dagStore.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
@@ -540,6 +565,10 @@ waitLoop:
 }
 
 func (a *API) TerminateDAGDAGRun(ctx context.Context, request api.TerminateDAGDAGRunRequestObject) (api.TerminateDAGDAGRunResponseObject, error) {
+	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+
 	dag, err := a.dagStore.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
@@ -571,6 +600,10 @@ func (a *API) TerminateDAGDAGRun(ctx context.Context, request api.TerminateDAGDA
 }
 
 func (a *API) RetryDAGDAGRun(ctx context.Context, request api.RetryDAGDAGRunRequestObject) (api.RetryDAGDAGRunResponseObject, error) {
+	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+
 	dag, err := a.dagStore.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
@@ -605,6 +638,10 @@ func (a *API) RetryDAGDAGRun(ctx context.Context, request api.RetryDAGDAGRunRequ
 }
 
 func (a *API) UpdateDAGSuspensionState(ctx context.Context, request api.UpdateDAGSuspensionStateRequestObject) (api.UpdateDAGSuspensionStateResponseObject, error) {
+	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+
 	_, err := a.dagStore.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { PencilLine, Trash2 } from 'lucide-react';
 import React from 'react';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
+import { useConfig } from '../../../../contexts/ConfigContext';
 import { useClient } from '../../../../hooks/api';
 
 /**
@@ -23,6 +24,11 @@ type Props = {
 function DAGEditButtons({ fileName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
+  const config = useConfig();
+
+  if (!config.permissions.writeDags) {
+    return null;
+  }
 
   return (
     <div className="flex items-center gap-2">

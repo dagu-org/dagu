@@ -137,6 +137,17 @@ func (a *API) handleError(w http.ResponseWriter, _ *http.Request, err error) {
 	})
 }
 
+func (a *API) isAllowed(_ context.Context, perm config.Permission) error {
+	if !a.config.Server.Permissions[perm] {
+		return &Error{
+			HTTPStatus: http.StatusForbidden,
+			Code:       api.ErrorCodeForbidden,
+			Message:    "Permission denied",
+		}
+	}
+	return nil
+}
+
 func ptrOf[T any](v T) *T {
 	if reflect.ValueOf(v).IsZero() {
 		return nil

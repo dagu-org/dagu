@@ -338,12 +338,18 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
                   : 'hover:bg-muted/50 border-0'
               }`}
               style={{ fontSize: '0.8125rem' }}
-              onClick={() => {
-                setSelectedIndex(index);
-                setSelectedDAGRun({
-                  name: dagRun.name,
-                  dagRunId: dagRun.dagRunId,
-                });
+              onClick={(e) => {
+                if (e.ctrlKey || e.metaKey) {
+                  // Open in new tab
+                  window.open(`/dag-runs/${dagRun.name}/${dagRun.dagRunId}`, '_blank');
+                } else {
+                  // Open modal
+                  setSelectedIndex(index);
+                  setSelectedDAGRun({
+                    name: dagRun.name,
+                    dagRunId: dagRun.dagRunId,
+                  });
+                }
               }}
             >
               <TableCell className="py-1 px-2 font-normal">

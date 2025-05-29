@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import React from 'react';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
+import { useConfig } from '../../../../contexts/ConfigContext';
 import { useClient } from '../../../../hooks/api';
 
 /**
@@ -16,6 +17,11 @@ import { useClient } from '../../../../hooks/api';
 function CreateDAGButton() {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
+  const config = useConfig();
+
+  if (!config.permissions.writeDags) {
+    return null;
+  }
 
   return (
     <Button

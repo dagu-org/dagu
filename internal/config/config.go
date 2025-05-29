@@ -109,7 +109,18 @@ type Server struct {
 	// RemoteNodes holds a list of configurations for connecting to remote nodes.
 	// This enables the management of DAGs on external servers.
 	RemoteNodes []RemoteNode
+
+	// Permissions defines the permissions allowed in the UI and API.
+	Permissions map[Permission]bool
 }
+
+// Permission represents a permission string used in the application.
+type Permission string
+
+const (
+	PermissionWriteDAGs Permission = "write_dags"
+	PermissionRunDAGs   Permission = "run_dags"
+)
 
 func (cfg *Server) cleanBasePath() {
 	if cfg.BasePath == "" {

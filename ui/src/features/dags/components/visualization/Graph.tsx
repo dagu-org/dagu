@@ -134,7 +134,7 @@ const Graph: React.FC<Props> = ({
       step: components['schemas']['Step'],
       status: NodeStatus
     ) => {
-      const id = step.name.replace(/\s/g, '_');
+      const id = step.name.replace(/[\s-]/g, 'dagutmp'); // Replace spaces and dashes with 'x'
       const c = graphStatusMap[status] || '';
 
       // Check if this is a child dagRun node (has a 'run' property)
@@ -158,7 +158,7 @@ const Graph: React.FC<Props> = ({
       // Process dependencies and add connections
       if (step.depends) {
         step.depends.forEach((dep) => {
-          const depId = dep.replace(/\s/g, '_');
+          const depId = dep.replace(/[-\s]/g, 'dagutmp');
           if (status === NodeStatus.Failed) {
             // Dashed line for error state
             dat.push(`${depId} -.- ${id};`);

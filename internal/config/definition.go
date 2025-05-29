@@ -10,6 +10,9 @@ type Definition struct {
 	// Port specifies the network port for incoming connections.
 	Port int `mapstructure:"port"`
 
+	// Permissions defines the permissions allowed in the UI and API.
+	Permissions permissionsDef `mapstructure:"permissions"`
+
 	// Debug toggles debug mode; when true, the application may output extra logs and error details.
 	Debug bool `mapstructure:"debug"`
 
@@ -177,6 +180,13 @@ type uiDef struct {
 	NavbarColor           string `mapstructure:"navbarColor"`
 	NavbarTitle           string `mapstructure:"navbarTitle"`
 	MaxDashboardPageLimit int    `mapstructure:"maxDashboardPageLimit"`
+}
+
+// permissionsDef holds the permissions configuration for the application.
+// It defines what actions are allowed in the UI, such as writing DAGs.
+type permissionsDef struct {
+	WriteDAGs *bool `mapstructure:"writeDAGs"`
+	RunDAGs   *bool `mapstructure:"runDAGs"`
 }
 
 // remoteNodeDef represents a configuration for connecting to a remote node.

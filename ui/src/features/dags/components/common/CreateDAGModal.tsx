@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Plus } from 'lucide-react';
 import { useContext, useState } from 'react';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
+import { useConfig } from '../../../../contexts/ConfigContext';
 import { useClient } from '../../../../hooks/api';
 
 /**
@@ -22,10 +23,15 @@ import { useClient } from '../../../../hooks/api';
 function CreateDAGModal() {
   const appBarContext = useContext(AppBarContext);
   const client = useClient();
+  const config = useConfig();
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  if (!config.permissions.writeDags) {
+    return null;
+  }
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setName(e.target.value);

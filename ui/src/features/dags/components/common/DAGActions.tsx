@@ -16,6 +16,7 @@ import { Play, RefreshCw, Square, Clock } from 'lucide-react'; // Import lucide 
 import React from 'react';
 import { components } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
+import { useConfig } from '../../../../contexts/ConfigContext';
 import { useClient } from '../../../../hooks/api';
 import ConfirmModal from '../../../../ui/ConfirmModal';
 import LabeledItem from '../../../../ui/LabeledItem';
@@ -55,6 +56,7 @@ function DAGActions({
   navigateToStatusTab,
 }: Props) {
   const appBarContext = React.useContext(AppBarContext);
+  const config = useConfig();
   const [isStartModal, setIsStartModal] = React.useState(false);
   const [isEnqueueModal, setIsEnqueueModal] = React.useState(false);
   const [isStopModal, setIsStopModal] = React.useState(false);
@@ -80,7 +82,7 @@ function DAGActions({
     retry: status?.status != 1 && status?.status != 5 && status?.dagRunId != '', // Disable when running (1) or queued (5)
   };
 
-  if (!dag) {
+  if (!dag || !config.permissions.runDags) {
     return <></>;
   }
 
