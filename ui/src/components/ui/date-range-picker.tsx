@@ -10,6 +10,7 @@ interface DateRangePickerProps extends React.HTMLAttributes<HTMLDivElement> {
   onToDateChange: (date: string) => void;
   fromLabel?: string;
   toLabel?: string;
+  onEnterPress?: () => void;
 }
 
 // Custom date-time input component
@@ -18,6 +19,7 @@ interface CustomDateTimeInputProps {
   onChange: (value: string) => void;
   id?: string;
   className?: string;
+  onEnterPress?: () => void;
 }
 
 function CustomDateTimeInput({
@@ -25,6 +27,7 @@ function CustomDateTimeInput({
   onChange,
   id,
   className,
+  onEnterPress,
 }: CustomDateTimeInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const hiddenDateInputRef = useRef<HTMLInputElement>(null);
@@ -125,7 +128,10 @@ function CustomDateTimeInput({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'ArrowUp') {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      onEnterPress?.();
+    } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       e.stopPropagation();
       adjustValue(1);
@@ -196,6 +202,7 @@ export function DateRangePicker({
   onToDateChange,
   fromLabel = 'From',
   toLabel = 'To',
+  onEnterPress,
   className,
   ...props
 }: DateRangePickerProps) {
@@ -221,6 +228,7 @@ export function DateRangePicker({
             id="fromDate"
             value={fromDate}
             onChange={onFromDateChange}
+            onEnterPress={onEnterPress}
             className="border-0 shadow-none focus-visible:ring-0 text-sm py-0.5 h-9 bg-transparent"
           />
         </div>
@@ -241,6 +249,7 @@ export function DateRangePicker({
             id="toDate"
             value={toDate}
             onChange={onToDateChange}
+            onEnterPress={onEnterPress}
             className="border-0 shadow-none focus-visible:ring-0 text-sm py-0.5 h-9 bg-transparent"
           />
         </div>

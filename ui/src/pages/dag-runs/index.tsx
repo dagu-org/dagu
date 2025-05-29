@@ -310,6 +310,7 @@ function DAGRuns() {
           toDate={toDate}
           onFromDateChange={setFromDate}
           onToDateChange={setToDate}
+          onEnterPress={() => handleSearch()}
           fromLabel={`From ${tzLabel}`}
           toLabel={`To ${tzLabel}`}
           className="w-full md:w-auto"
