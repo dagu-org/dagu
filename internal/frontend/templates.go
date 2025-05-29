@@ -59,7 +59,7 @@ type funcsConfig struct {
 	TzOffsetInSec         int
 	MaxDashboardPageLimit int
 	RemoteNodes           []string
-	Permissions           config.UIPermissions
+	Permissions           map[config.Permission]bool
 }
 
 func defaultFunctions(cfg funcsConfig) template.FuncMap {
@@ -90,7 +90,7 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 			return cfg.TZ
 		},
 		"permissionsWriteDags": func() string {
-			return convertBooleanToString(cfg.Permissions.WriteDAGs)
+			return convertBooleanToString(cfg.Permissions[config.PermissionWriteDAGs])
 		},
 		"tzOffsetInSec": func() int {
 			return cfg.TzOffsetInSec

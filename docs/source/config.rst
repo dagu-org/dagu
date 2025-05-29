@@ -64,6 +64,8 @@ Create ``config.yaml`` in ``~/.config/dagu/`` to override default settings. Belo
     basePath: ""      # Base path to serve the application
     tz: "Asia/Tokyo"  # Timezone (e.g., "America/New_York")
     headless: true    # Run in headless mode
+    permissions:
+      writeDAGs: true  # Allow editing DAGs
     
     # Directory Configuration
     dagsDir: "~/.config/dagu/dags"            # DAG definitions location

@@ -140,6 +140,14 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		Port:        def.Port,
 		BasePath:    def.BasePath,
 		APIBasePath: def.APIBasePath,
+		Permissions: map[Permission]bool{
+			PermissionWriteDAGs: true, // Default to true for backward compatibility.
+		},
+	}
+
+	// Permissions can be nil, so we check before dereferencing.
+	if def.Permissions.WriteDAGs != nil {
+		cfg.Server.Permissions[PermissionWriteDAGs] = *def.Permissions.WriteDAGs
 	}
 
 	// Process remote node definitions.
@@ -197,14 +205,6 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		cfg.UI.NavbarTitle = def.UI.NavbarTitle
 		cfg.UI.MaxDashboardPageLimit = def.UI.MaxDashboardPageLimit
 		cfg.UI.LogEncodingCharset = def.UI.LogEncodingCharset
-		cfg.UI.Permissions = UIPermissions{
-			WriteDAGs: true,
-		}
-
-		// Permissions can be nil, so we check before dereferencing.
-		if def.UI.Permissions.WriteDAGs != nil {
-			cfg.UI.Permissions.WriteDAGs = *def.UI.Permissions.WriteDAGs
-		}
 	}
 
 	// Incorporate legacy field values, which may override existing settings.

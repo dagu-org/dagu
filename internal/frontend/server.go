@@ -56,7 +56,7 @@ func NewServer(cfg *config.Config, dr models.DAGStore, drs models.DAGRunStore, d
 			TzOffsetInSec:         cfg.Global.TzOffsetInSec,
 			MaxDashboardPageLimit: cfg.UI.MaxDashboardPageLimit,
 			RemoteNodes:           remoteNodes,
-			Permissions:           cfg.UI.Permissions,
+			Permissions:           cfg.Server.Permissions,
 		},
 	}
 }

@@ -23,6 +23,8 @@ func TestLoadConfig_WithValidFile(t *testing.T) {
 	configContent := `
 host: "0.0.0.0"
 port: 9090
+permissions:
+  writeDAGs: false
 debug: true
 basePath: "/dagu"
 apiBasePath: "/api/v1"
@@ -44,8 +46,6 @@ ui:
   navbarTitle: "Test Dagu"
   maxDashboardPageLimit: 50
   logEncodingCharset: "utf-8"
-  permissions:
-    writeDAGs: false
 auth:
   basic:
     enabled: true
@@ -115,7 +115,7 @@ tls:
 	assert.Equal(t, "Test Dagu", cfg.UI.NavbarTitle)
 	assert.Equal(t, 50, cfg.UI.MaxDashboardPageLimit)
 	assert.Equal(t, "utf-8", cfg.UI.LogEncodingCharset)
-	assert.False(t, cfg.UI.Permissions.WriteDAGs)
+	assert.False(t, cfg.Server.Permissions[config.PermissionWriteDAGs])
 }
 
 func TestLoadConfig_Defaults(t *testing.T) {
