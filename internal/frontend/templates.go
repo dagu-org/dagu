@@ -92,6 +92,9 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 		"permissionsWriteDags": func() string {
 			return convertBooleanToString(cfg.Permissions[config.PermissionWriteDAGs])
 		},
+		"permissionsRunDags": func() string {
+			return convertBooleanToString(cfg.Permissions[config.PermissionRunDAGs])
+		},
 		"tzOffsetInSec": func() int {
 			return cfg.TzOffsetInSec
 		},

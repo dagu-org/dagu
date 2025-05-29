@@ -530,6 +530,10 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 
 	switch request.Body.Action {
 	case api.DAGActionStart:
+		if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+			return nil, err
+		}
+
 		if status.Status == scheduler.StatusRunning {
 			return nil, &Error{
 				HTTPStatus: http.StatusBadRequest,
@@ -545,6 +549,10 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 		return api.PostDAGAction200JSONResponse{}, nil
 
 	case api.DAGActionSuspend:
+		if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+			return nil, err
+		}
+
 		b, err := strconv.ParseBool(valueOf(request.Body.Value))
 		if err != nil {
 			return nil, &Error{
@@ -559,6 +567,10 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 		return api.PostDAGAction200JSONResponse{}, nil
 
 	case api.DAGActionStop:
+		if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+			return nil, err
+		}
+
 		if status.Status != scheduler.StatusRunning {
 			return nil, &Error{
 				HTTPStatus: http.StatusBadRequest,
@@ -572,6 +584,10 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 		return api.PostDAGAction200JSONResponse{}, nil
 
 	case api.DAGActionRetry:
+		if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+			return nil, err
+		}
+
 		if request.Body.RequestId == nil {
 			return nil, &Error{
 				HTTPStatus: http.StatusBadRequest,
@@ -588,6 +604,10 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 		fallthrough
 
 	case api.DAGActionMarkFailed:
+		if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+			return nil, err
+		}
+
 		if status.Status == scheduler.StatusRunning {
 			return nil, &Error{
 				HTTPStatus: http.StatusBadRequest,
@@ -640,6 +660,10 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 		return api.PostDAGAction200JSONResponse{}, nil
 
 	case api.DAGActionRename:
+		if err := a.isAllowed(ctx, config.PermissionWriteDAGs); err != nil {
+			return nil, err
+		}
+
 		if request.Body.Value == nil {
 			return nil, &Error{
 				HTTPStatus: http.StatusBadRequest,

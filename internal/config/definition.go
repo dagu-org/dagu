@@ -186,6 +186,7 @@ type uiDef struct {
 // It defines what actions are allowed in the UI, such as writing DAGs.
 type permissionsDef struct {
 	WriteDAGs *bool `mapstructure:"writeDAGs"`
+	RunDAGs   *bool `mapstructure:"runDAGs"`
 }
 
 // remoteNodeDef represents a configuration for connecting to a remote node.

@@ -119,6 +119,7 @@ type Permission string
 
 const (
 	PermissionWriteDAGs Permission = "write_dags"
+	PermissionRunDAGs   Permission = "run_dags"
 )
 
 func (cfg *Server) cleanBasePath() {
