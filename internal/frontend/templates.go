@@ -89,7 +89,7 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 		"tz": func() string {
 			return cfg.TZ
 		},
-		"permissions.writeDags": func() string {
+		"permissionsWriteDags": func() string {
 			return convertBooleanToString(cfg.Permissions.WriteDAGs)
 		},
 		"tzOffsetInSec": func() int {

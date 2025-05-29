@@ -12,6 +12,7 @@ import { components } from '../../../../api/v2/schema';
 import { Button } from '../../../../components/ui/button';
 import { useSimpleToast } from '../../../../components/ui/simple-toast';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
+import { useConfig } from '../../../../contexts/ConfigContext';
 import { useClient, useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
@@ -35,6 +36,7 @@ type Props = {
 function DAGSpec({ fileName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
+  const config = useConfig();
   const { showToast } = useSimpleToast();
 
   // State for editing mode and current YAML value
@@ -247,7 +249,7 @@ function DAGSpec({ fileName }: Props) {
                     </div>
                   </div>
 
-                  {editing ? (
+                  {editing && config.permissions.writeDags ? (
                     <div className="flex gap-2">
                       <Button
                         id="save-config"
@@ -309,7 +311,7 @@ function DAGSpec({ fileName }: Props) {
                         Cancel
                       </Button>
                     </div>
-                  ) : (
+                  ) : config.permissions.writeDags ? (
                     <Button
                       id="edit-config"
                       variant="outline"
@@ -323,16 +325,16 @@ function DAGSpec({ fileName }: Props) {
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
                     </Button>
-                  )}
+                  ) : null}
                 </div>
 
                 <div className="p-6">
                   <DAGEditor
                     value={data.spec}
-                    readOnly={!editing}
+                    readOnly={!editing || !config.permissions.writeDags}
                     lineNumbers={true}
                     onChange={
-                      editing
+                      editing && config.permissions.writeDags
                         ? (newValue) => {
                             setCurrentValue(newValue || '');
                           }

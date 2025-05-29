@@ -10,6 +10,9 @@ export type Config = {
   version: string;
   maxDashboardPageLimit: number;
   remoteNodes: string;
+  permissions: {
+    writeDags: boolean;
+  };
 };
 
 export const ConfigContext = createContext<Config>(null!);
