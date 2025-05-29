@@ -14,6 +14,7 @@ import { GanttChart, GitGraph, MousePointerClick } from 'lucide-react';
 import React from 'react';
 import { useCookies } from 'react-cookie';
 import { components, Status } from '../../../../api/v2/schema';
+import { useConfig } from '../../../../contexts/ConfigContext';
 import BorderedBox from '../../../../ui/BorderedBox';
 import { FlowchartSwitch, FlowchartType, Graph, TimelineChart } from './';
 
@@ -36,6 +37,7 @@ type Props = {
 function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
   // Active tab state (0 = Graph, 1 = Timeline)
   const [sub, setSub] = React.useState('0');
+  const config = useConfig();
 
   // Flowchart direction preference stored in cookies
   const [cookie, setCookie] = useCookies(['flowchart']);
@@ -92,13 +94,17 @@ function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
               <TooltipTrigger asChild>
                 <div className="flex items-center text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded cursor-help">
                   <MousePointerClick className="h-3 w-3 mr-1" />
-                  Double-click to navigate / Right-click to change status
+                  {config.permissions.runDags
+                    ? 'Double-click to navigate / Right-click to change status'
+                    : 'Double-click to navigate'}
                 </div>
               </TooltipTrigger>
               <TooltipContent>
                 <div className="space-y-1">
                   <p>Double-click: Navigate to child dagRun</p>
-                  <p>Right-click: Update node status</p>
+                  {config.permissions.runDags && (
+                    <p>Right-click: Update node status</p>
+                  )}
                 </div>
               </TooltipContent>
             </Tooltip>
@@ -111,7 +117,9 @@ function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
               type="status"
               flowchart={flowchart}
               onClickNode={onSelectStep}
-              onRightClickNode={onRightClickStep}
+              onRightClickNode={
+                config.permissions.runDags ? onRightClickStep : undefined
+              }
               showIcons={dagRun.status > Status.NotStarted}
               animate={dagRun.status == Status.Running}
             />

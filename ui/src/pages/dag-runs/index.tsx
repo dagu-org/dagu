@@ -147,18 +147,6 @@ function DAGRuns() {
     // Use override status if provided, otherwise use current status
     const statusToUse = overrideStatus !== undefined ? overrideStatus : status;
 
-    // Console log for debugging
-    console.log('Search with parameters:', {
-      name: searchText,
-      dagRunId: dagRunId,
-      status: statusToUse,
-      from: fromDate,
-      to: toDate,
-      timestampFrom: timestampFromDate,
-      timestampTo: timestampToDate,
-      tzOffset: config.tzOffsetInSec,
-    });
-
     // Update API state with values
     setAPISearchText(searchText);
     setApiDagRunId(dagRunId);

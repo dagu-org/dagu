@@ -6,6 +6,7 @@
 import { Switch } from '@/components/ui/switch'; // Import Shadcn Switch
 import React from 'react';
 import { components } from '../../../../api/v2/schema';
+import { useConfig } from '../../../../contexts/ConfigContext';
 import { useClient } from '../../../../hooks/api';
 
 /**
@@ -27,6 +28,7 @@ type Props = {
  */
 function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
   const client = useClient();
+  const config = useConfig();
 
   // Initialize state based on DAG suspension state
   const [checked, setChecked] = React.useState(!dag.suspended);
@@ -74,7 +76,8 @@ function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
   return (
     <Switch
       checked={checked}
-      onCheckedChange={handleCheckedChange}
+      onCheckedChange={config.permissions.runDags ? handleCheckedChange : undefined}
+      disabled={!config.permissions.runDags}
       aria-label={ariaLabel} // Pass aria-label directly
       // Add custom styling for unchecked state visibility
       className="data-[state=unchecked]:bg-gray-300 dark:data-[state=unchecked]:bg-gray-700 cursor-pointer"

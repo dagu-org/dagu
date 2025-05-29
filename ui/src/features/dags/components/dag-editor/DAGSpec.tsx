@@ -4,7 +4,6 @@
  * @module features/dags/components/dag-editor
  */
 import BorderedBox from '@/ui/BorderedBox';
-import SubTitle from '@/ui/SubTitle';
 import { AlertTriangle, Code, Edit, Eye, Save, X } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useCookies } from 'react-cookie';
@@ -186,7 +185,8 @@ function DAGSpec({ fileName }: Props) {
                     <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
                       <span>Steps</span>
                       <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
-                        {data.dag.steps.length} step{data.dag.steps.length !== 1 ? 's' : ''}
+                        {data.dag.steps.length} step
+                        {data.dag.steps.length !== 1 ? 's' : ''}
                       </span>
                     </h2>
                   </div>
@@ -219,11 +219,13 @@ function DAGSpec({ fileName }: Props) {
                     : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
                 }`}
               >
-                <div className={`border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex justify-between items-center ${
-                  editing
-                    ? 'bg-blue-50 dark:bg-blue-900/10'
-                    : 'bg-slate-50 dark:bg-slate-800/50'
-                }`}>
+                <div
+                  className={`border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex justify-between items-center ${
+                    editing
+                      ? 'bg-blue-50 dark:bg-blue-900/10'
+                      : 'bg-slate-50 dark:bg-slate-800/50'
+                  }`}
+                >
                   <div className="flex items-center">
                     <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mr-3">
                       Definition

@@ -12,6 +12,7 @@ export type Config = {
   remoteNodes: string;
   permissions: {
     writeDags: boolean;
+    runDags: boolean;
   };
 };
 
