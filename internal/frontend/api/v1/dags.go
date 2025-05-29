@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/api/v1"
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
@@ -25,6 +26,10 @@ import (
 
 // CreateDAG implements api.StrictServerInterface.
 func (a *API) CreateDAG(ctx context.Context, request api.CreateDAGRequestObject) (api.CreateDAGResponseObject, error) {
+	if err := a.isAllowed(ctx, config.PermissionWriteDAGs); err != nil {
+		return nil, err
+	}
+
 	_, err := a.dagStore.GetMetadata(ctx, request.Body.Value)
 	if err == nil {
 		return nil, &Error{
@@ -50,6 +55,10 @@ func (a *API) CreateDAG(ctx context.Context, request api.CreateDAGRequestObject)
 
 // DeleteDAG implements api.StrictServerInterface.
 func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject) (api.DeleteDAGResponseObject, error) {
+	if err := a.isAllowed(ctx, config.PermissionWriteDAGs); err != nil {
+		return nil, err
+	}
+
 	_, err := a.dagStore.GetMetadata(ctx, request.Name)
 	if err != nil {
 		if errors.Is(err, models.ErrDAGNotFound) {
@@ -143,7 +152,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 		HistRetentionDays: ptrOf(dag.HistRetentionDays),
 		Location:          ptrOf(dag.Location),
 		LogDir:            ptrOf(dag.LogDir),
-		MaxActiveSteps:    ptrOf(dag.MaxActiveSteps),
+		MaxActiveRuns:     ptrOf(dag.MaxActiveSteps),
 		Params:            ptrOf(dag.Params),
 		Preconditions:     ptrOf(preconditions),
 		Schedule:          ptrOf(schedules),
@@ -612,6 +621,10 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 		return api.PostDAGAction200JSONResponse{}, nil
 
 	case api.DAGActionSave:
+		if err := a.isAllowed(ctx, config.PermissionWriteDAGs); err != nil {
+			return nil, err
+		}
+
 		if request.Body.Value == nil {
 			return nil, &Error{
 				HTTPStatus: http.StatusBadRequest,
