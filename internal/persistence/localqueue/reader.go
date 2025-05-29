@@ -276,14 +276,19 @@ func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.Q
 	case ch <- *item.QueuedItem:
 		select {
 		case res := <-item.Result:
-			if res {
+			switch res {
+			case models.QueuedItemProcessingResultRetry:
+				// Item was not processed successfully
+				item.status = statusNone
+			case models.QueuedItemProcessingResultSuccess:
 				logger.Info(ctx, "Item processed successfully", "name", data.Name, "dagRunId", data.ID)
 				item.status = statusDone
 				q.removeProcessedItem(ctx, data)
-				return
+			case models.QueuedItemProcessingResultInvalid:
+				logger.Info(ctx, "Item is invalid, removing", "name", data.Name, "dagRunId", data.ID)
+				item.status = statusDone
+				q.removeProcessedItem(ctx, data)
 			}
-			// Item was not processed successfully
-			item.status = statusNone
 
 		case <-time.After(processingTimeout):
 			// Timeout waiting for result

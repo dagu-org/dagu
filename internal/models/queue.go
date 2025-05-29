@@ -53,14 +53,25 @@ const (
 // QueuedItem is a wrapper for QueuedItem with additional fields
 type QueuedItem struct {
 	QueuedItemData
-	Result chan bool
+	Result chan QueuedItemProcessingResult
 }
+
+type QueuedItemProcessingResult int
+
+const (
+	// QueuedItemProcessingResultRetry indicates that the queued item needs to be retried
+	QueuedItemProcessingResultRetry QueuedItemProcessingResult = 0
+	// QueuedItemProcessingResultSuccess indicates that the queued item was processed successfully
+	QueuedItemProcessingResultSuccess QueuedItemProcessingResult = 1
+	// QueuedItemProcessingResultInvalid indicates that the queued item was invalid so it needs to be removed
+	QueuedItemProcessingResultInvalid QueuedItemProcessingResult = 2
+)
 
 // NewQueuedItem creates a new QueuedItem
 func NewQueuedItem(data QueuedItemData) *QueuedItem {
 	return &QueuedItem{
 		QueuedItemData: data,
-		Result:         make(chan bool, 1),
+		Result:         make(chan QueuedItemProcessingResult, 1),
 	}
 }
 

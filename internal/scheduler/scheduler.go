@@ -158,7 +158,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				attempt   models.DAGRunAttempt
 				status    *models.DAGRunStatus
 				err       error
-				done      bool
+				result    = models.QueuedItemProcessingResultRetry
 				startedAt time.Time
 			)
 
@@ -176,6 +176,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			// Fetch the DAG of the dag-run attempt
 			attempt, err = s.dagRunStore.FindAttempt(ctx, data)
 			if err != nil {
+				result = models.QueuedItemProcessingResultInvalid
 				logger.Error(ctx, "Failed to find run", "err", err, "data", data)
 				goto SEND_RESULT
 			}
@@ -189,7 +190,6 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			if status.Status != scheduler.StatusQueued {
 				// If the status is not queued, skip this item
 				logger.Info(ctx, "Skipping item from queue", "data", data, "status", status.Status)
-				done = true
 				goto SEND_RESULT
 			}
 
@@ -224,7 +224,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 					goto SEND_RESULT
 				}
 				if status.Status != scheduler.StatusQueued {
-					done = true
+					result = models.QueuedItemProcessingResultInvalid
 					break WAIT_FOR_RUN
 				}
 				if time.Since(startedAt) > 5*time.Second {
@@ -233,12 +233,12 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				}
 			}
 
-			if done {
+			if result == models.QueuedItemProcessingResultSuccess {
 				logger.Info(ctx, "Successfully processed item from queue", "data", data)
 			}
 
 		SEND_RESULT:
-			item.Result <- done
+			item.Result <- result
 		}
 	}
 }
