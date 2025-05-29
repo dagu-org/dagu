@@ -130,6 +130,7 @@ function CustomDateTimeInput({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
+      e.stopPropagation();
       onEnterPress?.();
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
@@ -171,13 +172,13 @@ function CustomDateTimeInput({
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
         onClick={() => setCursorPosition(inputRef.current?.selectionStart || 0)}
-        placeholder="Date and time"
-        className={cn(className, 'w-44')}
+        placeholder="YYYY-MM-DD HH:mm:ss"
+        className={cn(className, 'w-44 font-mono text-gray-600 pt-1')}
       />
       <button
         type="button"
         onClick={openDatePicker}
-        className="hover:bg-accent rounded-sm transition-colors"
+        className="px-1 hover:bg-accent rounded-sm transition-colors"
         aria-label="Open date picker"
       >
         <Calendar className="h-4 w-4 text-muted-foreground" />
