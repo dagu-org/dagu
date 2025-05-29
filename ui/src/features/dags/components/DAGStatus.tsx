@@ -112,7 +112,9 @@ function DAGStatus({ dagRun, fileName }: Props) {
             }
 
             searchParams.set('step', n.step.name);
-            navigate(`/dag-runs/${dagRun.name}?${searchParams.toString()}`);
+            navigate(
+              `/dag-runs/${dagRun.name}/${dagRunId}?${searchParams.toString()}`
+            );
           } else {
             // For DAGs, use the existing approach with query parameters
             navigate({
