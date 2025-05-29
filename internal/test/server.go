@@ -29,6 +29,10 @@ func SetupServer(t *testing.T, opts ...HelperOption) Server {
 		&config.Server{
 			Host: "localhost",
 			Port: port,
+			Permissions: map[config.Permission]bool{
+				config.PermissionWriteDAGs: true,
+				config.PermissionRunDAGs:   true,
+			},
 		},
 	))
 
