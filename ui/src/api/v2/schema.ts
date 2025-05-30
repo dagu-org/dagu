@@ -112,46 +112,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/dags/{fileName}/stop": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Terminate a running DAG-run
-         * @description Forcefully stops a running DAG-run created from this DAG
-         */
-        post: operations["terminateDAGDAGRun"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/dags/{fileName}/retry": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Retry DAG-run execution
-         * @description Creates a new DAG-run based on a previous execution
-         */
-        post: operations["retryDAGDAGRun"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/dags/{fileName}/dag-runs": {
         parameters: {
             query?: never;
@@ -1217,79 +1177,6 @@ export interface operations {
                         dagRunId: string;
                     };
                 };
-            };
-            /** @description Generic error response */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    terminateDAGDAGRun: {
-        parameters: {
-            query?: {
-                /** @description name of the remote node */
-                remoteNode?: components["parameters"]["RemoteNode"];
-            };
-            header?: never;
-            path: {
-                /** @description the name of the DAG file */
-                fileName: components["parameters"]["DAGFileName"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description A successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Generic error response */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    retryDAGDAGRun: {
-        parameters: {
-            query?: {
-                /** @description name of the remote node */
-                remoteNode?: components["parameters"]["RemoteNode"];
-            };
-            header?: never;
-            path: {
-                /** @description the name of the DAG file */
-                fileName: components["parameters"]["DAGFileName"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** @description ID of the DAG-run to retry */
-                    dagRunId: string;
-                };
-            };
-        };
-        responses: {
-            /** @description A successful response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Generic error response */
             default: {
