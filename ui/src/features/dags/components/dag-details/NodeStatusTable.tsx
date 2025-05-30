@@ -21,7 +21,7 @@ type Props = {
   nodes?: components['schemas']['Node'][];
   /** DAG dagRun details */
   status: components['schemas']['DAGRunDetails'];
-  /** DAG file ID */
+  /** DAG file name */
   fileName: string;
   /** Function to open log viewer */
   onViewLog?: (stepName: string, dagRunId: string) => void;
