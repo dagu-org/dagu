@@ -164,7 +164,7 @@ func TestSplitCommandWithSub(t *testing.T) {
 		require.Equal(t, "hello world", args[0])
 	})
 	t.Run("EnvVar", func(t *testing.T) {
-		os.Setenv("TEST_ARG", "hello")
+		_ = os.Setenv("TEST_ARG", "hello")
 		cmd, args, err := SplitCommandWithSub("echo $TEST_ARG")
 		require.NoError(t, err)
 		require.Equal(t, "echo", cmd)

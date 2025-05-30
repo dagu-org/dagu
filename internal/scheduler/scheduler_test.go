@@ -1,4 +1,4 @@
-package scheduler
+package scheduler_test
 
 import (
 	"context"
@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	pkgsc "github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/robfig/cron/v3"
 	"github.com/stretchr/testify/require"
@@ -15,59 +16,62 @@ import (
 
 func TestScheduler(t *testing.T) {
 	t.Parallel()
+
 	t.Run("Start", func(t *testing.T) {
 		now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-		setFixedTime(now)
+		scheduler.SetFixedTime(now)
 
 		entryReader := &mockJobManager{
-			Entries: []*ScheduledJob{
+			Entries: []*scheduler.ScheduledJob{
 				{Job: &mockJob{}, Next: now},
 				{Job: &mockJob{}, Next: now.Add(time.Minute)},
 			},
 		}
 
 		th := setupTest(t)
-		scheduler := New(th.config, entryReader)
+		sc := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
 
+		ctx := context.Background()
 		go func() {
-			_ = scheduler.Start(context.Background())
+			_ = sc.Start(ctx)
 		}()
 
 		time.Sleep(time.Second + time.Millisecond*100)
-		scheduler.Stop(context.Background())
+		sc.Stop(ctx)
 
 		require.Equal(t, int32(1), entryReader.Entries[0].Job.(*mockJob).RunCount.Load())
 		require.Equal(t, int32(0), entryReader.Entries[1].Job.(*mockJob).RunCount.Load())
 	})
 	t.Run("Restart", func(t *testing.T) {
 		now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-		setFixedTime(now)
+		scheduler.SetFixedTime(now)
 
 		entryReader := &mockJobManager{
-			Entries: []*ScheduledJob{
-				{Type: ScheduleTypeRestart, Job: &mockJob{}, Next: now},
+			Entries: []*scheduler.ScheduledJob{
+				{Type: scheduler.ScheduleTypeRestart, Job: &mockJob{}, Next: now},
 			},
 		}
 
 		th := setupTest(t)
-		scheduler := New(th.config, entryReader)
+		sc := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
 
 		go func() {
-			_ = scheduler.Start(context.Background())
+			_ = sc.Start(context.Background())
 		}()
-		defer scheduler.Stop(context.Background())
+		defer sc.Stop(context.Background())
 
 		time.Sleep(time.Second + time.Millisecond*100)
 		require.Equal(t, int32(1), entryReader.Entries[0].Job.(*mockJob).RestartCount.Load())
+
 	})
 	t.Run("NextTick", func(t *testing.T) {
 		now := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
-		setFixedTime(now)
+		scheduler.SetFixedTime(now)
 
 		th := setupTest(t)
-		schedulerInstance := New(th.config, &mockJobManager{})
+		schedulerInstance := scheduler.New(th.Config, &mockJobManager{}, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
 
-		next := schedulerInstance.nextTick(now)
+		next := schedulerInstance.NextTick(now)
 		require.Equal(t, time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC), next)
 	})
 }
@@ -75,12 +79,12 @@ func TestScheduler(t *testing.T) {
 func TestFixedTime(t *testing.T) {
 	fixedTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 
-	setFixedTime(fixedTime)
-	require.Equal(t, fixedTime, now())
+	scheduler.SetFixedTime(fixedTime)
+	require.Equal(t, fixedTime, scheduler.Now())
 
 	// Reset
-	setFixedTime(time.Time{})
-	require.NotEqual(t, fixedTime, now())
+	scheduler.SetFixedTime(time.Time{})
+	require.NotEqual(t, fixedTime, scheduler.Now())
 }
 
 func TestJobReady(t *testing.T) {
@@ -91,7 +95,7 @@ func TestJobReady(t *testing.T) {
 		schedule       string
 		now            time.Time
 		lastRunTime    time.Time
-		lastStatus     scheduler.Status
+		lastStatus     pkgsc.Status
 		skipSuccessful bool
 		wantErr        error
 	}{
@@ -100,16 +104,16 @@ func TestJobReady(t *testing.T) {
 			schedule:       "0 * * * *", // Every hour
 			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 			lastRunTime:    time.Date(2020, 1, 1, 0, 1, 0, 0, time.UTC), // 1 min after prev schedule
-			lastStatus:     scheduler.StatusSuccess,
+			lastStatus:     pkgsc.StatusSuccess,
 			skipSuccessful: true,
-			wantErr:        ErrJobSuccess,
+			wantErr:        scheduler.ErrJobSuccess,
 		},
 		{
 			name:           "skip_if_successful_false_with_recent_success",
 			schedule:       "0 * * * *",
 			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 			lastRunTime:    time.Date(2020, 1, 1, 0, 1, 0, 0, time.UTC),
-			lastStatus:     scheduler.StatusSuccess,
+			lastStatus:     pkgsc.StatusSuccess,
 			skipSuccessful: false,
 			wantErr:        nil,
 		},
@@ -118,25 +122,25 @@ func TestJobReady(t *testing.T) {
 			schedule:       "0 * * * *",
 			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 			lastRunTime:    time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
-			lastStatus:     scheduler.StatusRunning,
+			lastStatus:     pkgsc.StatusRunning,
 			skipSuccessful: true,
-			wantErr:        ErrJobRunning,
+			wantErr:        scheduler.ErrJobRunning,
 		},
 		{
-			name:           "last_run_after_next_schedule",
+			name:           "last_execution_after_next_schedule",
 			schedule:       "0 * * * *",
 			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 			lastRunTime:    time.Date(2020, 1, 1, 2, 0, 0, 0, time.UTC),
-			lastStatus:     scheduler.StatusSuccess,
+			lastStatus:     pkgsc.StatusSuccess,
 			skipSuccessful: true,
-			wantErr:        ErrJobFinished,
+			wantErr:        scheduler.ErrJobFinished,
 		},
 		{
 			name:           "failed_previous_run",
 			schedule:       "0 * * * *",
 			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 			lastRunTime:    time.Date(2020, 1, 1, 0, 1, 0, 0, time.UTC),
-			lastStatus:     scheduler.StatusError,
+			lastStatus:     pkgsc.StatusError,
 			skipSuccessful: true,
 			wantErr:        nil,
 		},
@@ -147,9 +151,9 @@ func TestJobReady(t *testing.T) {
 			schedule, err := cronParser.Parse(tt.schedule)
 			require.NoError(t, err)
 
-			setFixedTime(tt.now)
+			scheduler.SetFixedTime(tt.now)
 
-			job := &dagJob{
+			job := &scheduler.DAGRunJob{
 				DAG: &digraph.DAG{
 					SkipIfSuccessful: tt.skipSuccessful,
 				},
@@ -157,12 +161,12 @@ func TestJobReady(t *testing.T) {
 				Next:     tt.now,
 			}
 
-			lastRunStatus := model.Status{
+			lastRunStatus := models.DAGRunStatus{
 				Status:    tt.lastStatus,
 				StartedAt: stringutil.FormatTime(tt.lastRunTime),
 			}
 
-			err = job.ready(context.Background(), lastRunStatus)
+			err = job.Ready(context.Background(), lastRunStatus)
 			require.Equal(t, tt.wantErr, err)
 		})
 	}
@@ -201,8 +205,8 @@ func TestPrevExecTime(t *testing.T) {
 			schedule, err := cronParser.Parse(tt.schedule)
 			require.NoError(t, err)
 
-			job := &dagJob{Schedule: schedule, Next: tt.now}
-			got := job.prevExecTime(context.Background())
+			job := &scheduler.DAGRunJob{Schedule: schedule, Next: tt.now}
+			got := job.PrevExecTime(context.Background())
 			require.Equal(t, tt.want, got)
 		})
 	}

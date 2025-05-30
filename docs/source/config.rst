@@ -43,9 +43,9 @@ Directory Paths
 
 Authentication
 ~~~~~~~~~~~~
-- ``AUTH_BASIC_ENABLED`` (``0``): Enable basic authentication (1=enabled)
-- ``AUTH_BASIC_USERNAME`` (``""``): Basic auth username
-- ``AUTH_BASIC_PASSWORD`` (``""``): Basic auth password
+- ``DAGU_AUTH_BASIC_USERNAME`` (``""``): Basic auth username
+- ``DAGU_AUTH_BASIC_PASSWORD`` (``""``): Basic auth password
+- ``DAGU_AUTH_TOKEN`` (``""``): API token value
 
 UI Customization
 ~~~~~~~~~~~~~~
@@ -59,11 +59,14 @@ Create ``config.yaml`` in ``~/.config/dagu/`` to override default settings. Belo
 .. code-block:: yaml
 
     # Server Configuration
-    host: "127.0.0.1" # Web UI hostname
-    port: 8080        # Web UI port
-    basePath: ""      # Base path to serve the application
-    tz: "Asia/Tokyo"  # Timezone (e.g., "America/New_York")
-    headless: true    # Run in headless mode
+    host: "127.0.0.1"  # Web UI hostname
+    port: 8080         # Web UI port
+    basePath: ""       # Base path to serve the application
+    tz: "Asia/Tokyo"   # Timezone (e.g., "America/New_York")
+    headless: true     # Run in headless mode
+    permissions:       # Permissions for Web UI and API on the server
+      writeDAGs: true  # Allow creating / editing / deleting DAGs
+      runDAGs: true    # Allow running / stopping / retrying DAGs
     
     # Directory Configuration
     dagsDir: "~/.config/dagu/dags"            # DAG definitions location
@@ -88,11 +91,9 @@ Create ``config.yaml`` in ``~/.config/dagu/`` to override default settings. Belo
     # Authentication
     auth:
       basic:
-        enabled: true              # Enable basic auth
         username: "admin"          # Basic auth username
         password: "secret"         # Basic auth password
       token:
-        enabled: true              # Enable API token
         value: "your-secret-token" # API token value
     
     # SSL Configuration

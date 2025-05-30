@@ -5,16 +5,21 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"sync"
 
+	"github.com/containerd/platforms"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/go-viper/mapstructure/v2"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
 
@@ -45,12 +50,56 @@ steps:
 ```
 */
 
+type PullPolicy int
+
+const (
+	PullPolicyAlways PullPolicy = iota
+	PullPolicyNever
+	PullPolicyMissing
+)
+
+var pullPolicyMap = map[string]PullPolicy{
+	"always":  PullPolicyAlways,
+	"missing": PullPolicyMissing,
+	"never":   PullPolicyNever,
+}
+
+func boolToPullPolicy(b bool) PullPolicy {
+	if b {
+		return PullPolicyAlways
+	}
+	return PullPolicyNever
+}
+
+func parsePullPolicy(_ context.Context, raw any) (PullPolicy, error) {
+	switch value := raw.(type) {
+	case string:
+		// Try to parse the string as a pull policy
+		pull, ok := pullPolicyMap[value]
+		if ok {
+			return pull, nil
+		}
+
+		// If the string is not a valid pull policy, try to parse it as a boolean
+		b, err := strconv.ParseBool(value)
+		if err != nil {
+			return PullPolicyMissing, fmt.Errorf("failed to parse pull policy as boolean: %w", err)
+		}
+		return boolToPullPolicy(b), nil
+	case bool:
+		return boolToPullPolicy(value), nil
+	default:
+		return PullPolicyMissing, fmt.Errorf("invalid pull policy type: %T", raw)
+	}
+}
+
 var _ Executor = (*docker)(nil)
 
 type docker struct {
 	image         string
+	platform      string
 	containerName string
-	pull          bool
+	pull          PullPolicy
 	autoRemove    bool
 	step          digraph.Step
 	stdout        io.Writer
@@ -65,9 +114,9 @@ type docker struct {
 	// networkConfig is configuration for the container network
 	// See https://pkg.go.dev/github.com/docker/docker@v27.5.1+incompatible/api/types/network#NetworkingConfig
 	networkConfig *network.NetworkingConfig
-	// execConfig is configuration for exec in existing container
+	// execOptions is configuration for exec in existing container
 	// See https://pkg.go.dev/github.com/docker/docker/api/types/container#ExecOptions
-	execConfig *container.ExecOptions
+	execOptions *container.ExecOptions
 }
 
 func (e *docker) SetStdout(out io.Writer) {
@@ -85,6 +134,60 @@ func (e *docker) Kill(_ os.Signal) error {
 	return nil
 }
 
+func (e *docker) getPlatform(ctx context.Context, cli *client.Client) (specs.Platform, error) {
+	// Extract platform from the current input and fallback to the current docker host platform.
+	var platform specs.Platform
+	if e.platform != "" {
+		var err error
+		platform, err = platforms.Parse(e.platform)
+		if err != nil {
+			return platform, fmt.Errorf("failed to parse platform %s: %w", e.platform, err)
+		}
+	} else {
+		info, err := cli.Info(ctx)
+		if err != nil {
+			return platform, fmt.Errorf("failed to get current docker host info: %w", err)
+		}
+		platform.Architecture = info.Architecture
+		platform.OS = info.OSType
+		platform = platforms.Normalize(platform)
+	}
+	return platform, nil
+}
+
+func (e *docker) shouldPullImage(ctx context.Context, cli *client.Client, platform *specs.Platform) (bool, error) {
+	if e.pull == PullPolicyAlways {
+		return true, nil
+	}
+	if e.pull == PullPolicyNever {
+		return false, nil
+	}
+
+	// Loop through all locally available images that have the same reference with
+	// the input image to check if we have the correct platform.
+	filters := filters.NewArgs()
+	filters.Add("reference", e.image)
+
+	images, err := cli.ImageList(ctx, image.ListOptions{Filters: filters})
+	if err != nil {
+		return false, fmt.Errorf("failed to list local images %s: %w", e.image, err)
+	}
+
+	for _, summary := range images {
+		inspect, err := cli.ImageInspect(ctx, summary.ID)
+		if err != nil {
+			return false, fmt.Errorf("failed to inspect image %s: %w", summary.ID, err)
+		}
+		if (platform.OS == inspect.Os) && (platform.Architecture == inspect.Architecture) && (platform.Variant == inspect.Variant) {
+			// We have the correct image locally, no need to pull
+			return false, nil
+		}
+	}
+
+	// We don't have the correct image
+	return true, nil
+}
+
 func (e *docker) Run(ctx context.Context) error {
 	ctx, cancelFunc := context.WithCancel(ctx)
 	e.context = ctx
@@ -96,27 +199,25 @@ func (e *docker) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer cli.Close()
+	defer func() {
+		_ = cli.Close()
+	}()
 
-	// Evaluate args
-	stepContext := digraph.GetStepContext(ctx)
-	var args []string
-	for _, arg := range e.step.Args {
-		val, err := stepContext.EvalString(ctx, arg)
-		if err != nil {
-			return fmt.Errorf("failed to evaluate arg %s: %w", arg, err)
-		}
-		args = append(args, val)
+	if e.image == "" {
+		return e.execInContainer(ctx, cli, e.step.Args)
 	}
 
-	// If containerName is set, use exec instead of creating a new container
-	if e.containerName != "" {
-		return e.execInContainer(ctx, cli, args)
+	platform, err := e.getPlatform(ctx, cli)
+	if err != nil {
+		return err
 	}
 
-	// New container creation logic
-	if e.pull {
-		reader, err := cli.ImagePull(ctx, e.image, image.PullOptions{})
+	pull, err := e.shouldPullImage(ctx, cli, &platform)
+	if err != nil {
+		return err
+	}
+	if pull {
+		reader, err := cli.ImagePull(ctx, e.image, image.PullOptions{Platform: platforms.Format(platform)})
 		if err != nil {
 			return err
 		}
@@ -127,22 +228,11 @@ func (e *docker) Run(ctx context.Context) error {
 	}
 
 	containerConfig := *e.containerConfig
-	containerConfig.Cmd = append([]string{e.step.Command}, args...)
-	if e.image != "" {
-		containerConfig.Image = e.image
-	}
-
-	env := make([]string, len(containerConfig.Env))
-	for i, e := range containerConfig.Env {
-		env[i], err = stepContext.EvalString(ctx, e)
-		if err != nil {
-			return fmt.Errorf("failed to evaluate env %s: %w", e, err)
-		}
-	}
-	containerConfig.Env = env
+	containerConfig.Cmd = append([]string{e.step.Command}, e.step.Args...)
+	containerConfig.Image = e.image
 
 	resp, err := cli.ContainerCreate(
-		ctx, &containerConfig, e.hostConfig, e.networkConfig, nil, "",
+		ctx, &containerConfig, e.hostConfig, e.networkConfig, &platform, e.containerName,
 	)
 	if err != nil {
 		return err
@@ -187,26 +277,26 @@ func (e *docker) execInContainer(ctx context.Context, cli *client.Client, args [
 	}
 
 	// Create exec configuration
-	execConfig := container.ExecOptions{
-		User:         e.execConfig.User,
-		Privileged:   e.execConfig.Privileged,
-		Tty:          e.execConfig.Tty,
+	execOpts := container.ExecOptions{
+		User:         e.execOptions.User,
+		Privileged:   e.execOptions.Privileged,
+		Tty:          e.execOptions.Tty,
 		AttachStdin:  false,
 		AttachStdout: true,
 		AttachStderr: true,
 		Cmd:          append([]string{e.step.Command}, args...),
-		Env:          e.execConfig.Env,
-		WorkingDir:   e.execConfig.WorkingDir,
+		Env:          e.execOptions.Env,
+		WorkingDir:   e.execOptions.WorkingDir,
 	}
 
 	// Create exec instance
-	execID, err := cli.ContainerExecCreate(ctx, e.containerName, execConfig)
+	containerID, err := cli.ContainerExecCreate(ctx, e.containerName, execOpts)
 	if err != nil {
 		return fmt.Errorf("failed to create exec: %w", err)
 	}
 
 	// Start exec instance
-	resp, err := cli.ContainerExecAttach(ctx, execID.ID, container.ExecAttachOptions{})
+	resp, err := cli.ContainerExecAttach(ctx, containerID.ID, container.ExecAttachOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to start exec: %w", err)
 	}
@@ -221,7 +311,7 @@ func (e *docker) execInContainer(ctx context.Context, cli *client.Client, args [
 
 	// Wait for exec to complete
 	for {
-		inspectResp, err := cli.ContainerExecInspect(ctx, execID.ID)
+		inspectResp, err := cli.ContainerExecInspect(ctx, containerID.ID)
 		if err != nil {
 			return fmt.Errorf("failed to inspect exec: %w", err)
 		}
@@ -284,11 +374,10 @@ func newDocker(
 ) (Executor, error) {
 	containerConfig := &container.Config{}
 	hostConfig := &container.HostConfig{}
-	execConfig := &container.ExecOptions{}
+	execOpts := &container.ExecOptions{}
 	networkConfig := &network.NetworkingConfig{}
 
 	execCfg := step.ExecutorConfig
-	stepContext := digraph.GetStepContext(ctx)
 
 	if cfg, ok := execCfg.Config["container"]; ok {
 		md, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
@@ -301,11 +390,6 @@ func newDocker(
 		if err := md.Decode(cfg); err != nil {
 			return nil, fmt.Errorf("failed to decode config: %w", err)
 		}
-		replaced, err := digraph.EvalStringFields(stepContext, *containerConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate string fields: %w", err)
-		}
-		containerConfig = &replaced
 	}
 
 	if cfg, ok := execCfg.Config["host"]; ok {
@@ -318,11 +402,6 @@ func newDocker(
 		if err := md.Decode(cfg); err != nil {
 			return nil, fmt.Errorf("failed to decode config: %w", err)
 		}
-		replaced, err := digraph.EvalStringFields(stepContext, *hostConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate string fields: %w", err)
-		}
-		hostConfig = &replaced
 	}
 
 	if cfg, ok := execCfg.Config["network"]; ok {
@@ -335,16 +414,11 @@ func newDocker(
 		if err := md.Decode(cfg); err != nil {
 			return nil, fmt.Errorf("failed to decode config: %w", err)
 		}
-		replaced, err := digraph.EvalStringFields(stepContext, *networkConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate string fields: %w", err)
-		}
-		networkConfig = &replaced
 	}
 
 	if cfg, ok := execCfg.Config["exec"]; ok {
 		md, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-			Result: &execConfig,
+			Result: &execOpts,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create decoder: %w", err)
@@ -352,11 +426,6 @@ func newDocker(
 		if err := md.Decode(cfg); err != nil {
 			return nil, fmt.Errorf("failed to decode config: %w", err)
 		}
-		replaced, err := digraph.EvalStringFields(stepContext, *execConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate string fields: %w", err)
-		}
-		execConfig = &replaced
 	}
 
 	autoRemove := false
@@ -367,53 +436,56 @@ func newDocker(
 
 	if a, ok := execCfg.Config["autoRemove"]; ok {
 		var err error
-		autoRemove, err = stepContext.EvalBool(ctx, a)
+		autoRemove, err = stringutil.ParseBool(ctx, a)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate autoRemove value: %w", err)
 		}
 	}
 
-	pull := true
-	if p, ok := execCfg.Config["pull"]; ok {
+	pull := PullPolicyMissing
+	if raw, ok := execCfg.Config["pull"]; ok {
 		var err error
-		pull, err = stepContext.EvalBool(ctx, p)
+		pull, err = parsePullPolicy(ctx, raw)
 		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate pull value: %w", err)
+			return nil, err
 		}
 	}
 
+	platform := ""
+	if value, ok := execCfg.Config["platform"].(string); ok {
+		platform = value
+	}
+
+	containerName := ""
+	if value, ok := execCfg.Config["containerName"].(string); ok {
+		containerName = value
+	}
+
 	exec := &docker{
+		platform:        platform,
+		containerName:   containerName,
 		pull:            pull,
 		step:            step,
 		stdout:          os.Stdout,
 		containerConfig: containerConfig,
 		hostConfig:      hostConfig,
 		networkConfig:   networkConfig,
-		execConfig:      execConfig,
+		execOptions:     execOpts,
 		autoRemove:      autoRemove,
 	}
 
-	// Check for existing container name first
-	if containerName, ok := execCfg.Config["containerName"].(string); ok {
-		value, err := stepContext.EvalString(ctx, containerName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate containerName: %w", err)
-		}
-		exec.containerName = value
-		return exec, nil
-	}
-
-	// Fall back to image if no container name is provided
+	// If image is provided, we don't care about containerName and will create a new container
 	if img, ok := execCfg.Config["image"].(string); ok {
-		value, err := stepContext.EvalString(ctx, img)
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate image: %w", err)
-		}
-		exec.image = value
+		exec.image = img
 		return exec, nil
 	}
 
-	return nil, errors.New("either containerName or image must be specified")
+	// If image is not provided, containerName must be provided so we can use it in exec mode
+	if exec.containerName == "" {
+		return nil, errors.New("at least containerName or image must be specified")
+	} else {
+		return exec, nil
+	}
 }
 
 func init() {

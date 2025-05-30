@@ -1,91 +1,79 @@
 package integration_test
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
-	"net"
-	"net/http"
 	"os"
+	"path"
 	"path/filepath"
-	"strconv"
 	"testing"
-	"time"
 
 	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
 
-// TestServer_BasePath verifies that when BasePath is set in the configuration,
-// the API endpoints are served under that base path and not on the root.
-func TestServer_BasePath(t *testing.T) {
-	// find an available port
-	port := findPort(t)
-
-	// Create a temporary config file with BasePath set to "/dagu"
-	tempDir := t.TempDir()
-	configFile := filepath.Join(tempDir, "config.yaml")
-	// The YAML configuration sets host, port, and basePath.
-	// (Other config fields use default values.)
-	configContent := fmt.Sprintf(`host: "127.0.0.1"
-port: %s
-basePath: "/dagu"
-`, port)
-	require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0644))
-
-	// Use the provided test helper to set up context and cancellation.
-	th := test.SetupCommand(t)
-
-	// Cancel the test context after a delay so the server doesn’t run forever.
-	go func() {
-		time.Sleep(1500 * time.Millisecond)
-		th.Cancel()
-	}()
-
-	// Start the server in a goroutine using the temporary config.
-	// The command-line arguments override the port and point to our config file.
-	go func() {
-		th.RunCommand(t, cmd.CmdServer(), test.CmdTest{
-			Args:        []string{"server", "--config", configFile, "--port=" + port},
-			ExpectedOut: []string{"Serving"},
-		})
-	}()
-
-	// Wait a moment for the server to start.
-	time.Sleep(500 * time.Millisecond)
-
-	// When the config's BasePath is "/dagu", the health endpoint (normally at "/api/v1/health")
-	// should be available at "/dagu/api/v1/health" and NOT at "/api/v1/health".
-
-	// 1. Request without the base path should return 404.
-	resp, err := http.Get("http://127.0.0.1:" + port + "/api/v1/health")
-	require.NoError(t, err)
-	defer resp.Body.Close()
-	require.Equal(t, http.StatusNotFound, resp.StatusCode)
-
-	// 2. Request with the base path should return 200.
-	resp, err = http.Get("http://127.0.0.1:" + port + "/dagu/api/v1/health")
-	require.NoError(t, err)
-	defer resp.Body.Close()
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-
-	// Optionally, decode the JSON response to check for expected health status.
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	var healthResp struct {
-		Status string `json:"status"`
+func TestServer_StartWithConfig(t *testing.T) {
+	testCases := []struct {
+		name       string
+		setupFunc  func(t *testing.T) (string, string) // returns configFile and tempDir
+		dagPath    func(t *testing.T, tempDir string) string
+		envVarName string
+	}{
+		{
+			name: "GlobalLogDir",
+			setupFunc: func(t *testing.T) (string, string) {
+				tempDir := t.TempDir()
+				configFile := filepath.Join(tempDir, "config.yaml")
+				configContent := `logDir: ${TMP_LOGS_DIR}/logs`
+				require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0600))
+				return configFile, tempDir
+			},
+			dagPath: func(t *testing.T, _ string) string {
+				return test.TestdataPath(t, path.Join("integration", "basic.yaml"))
+			},
+			envVarName: "TMP_LOGS_DIR",
+		},
+		{
+			name: "DAGLocalLogDir",
+			setupFunc: func(t *testing.T) (string, string) {
+				tempDir := t.TempDir()
+				dagFile := filepath.Join(tempDir, "basic.yaml")
+				dagContent := `
+logDir: ${DAG_TMP_LOGS_DIR}/logs
+steps:
+  - name: step1
+    command: echo "Hello, world!"
+`
+				require.NoError(t, os.WriteFile(dagFile, []byte(dagContent), 0600))
+				return dagFile, tempDir
+			},
+			dagPath: func(_ *testing.T, tempDir string) string {
+				return filepath.Join(tempDir, "basic.yaml")
+			},
+			envVarName: "DAG_TMP_LOGS_DIR",
+		},
 	}
-	require.NoError(t, json.Unmarshal(body, &healthResp))
-	require.Equal(t, "healthy", healthResp.Status)
-}
 
-// findPort finds an available port.
-func findPort(t *testing.T) string {
-	t.Helper()
-	tcpListener, err := net.Listen("tcp", ":0")
-	require.NoError(t, err)
-	port := tcpListener.Addr().(*net.TCPAddr).Port
-	_ = tcpListener.Close()
-	return strconv.Itoa(port)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Setup test case
+			configFile, tempDir := tc.setupFunc(t)
+			_ = os.Setenv(tc.envVarName, tempDir)
+
+			// Get DAG path
+			dagPath := tc.dagPath(t, tempDir)
+
+			// Run command
+			th := test.SetupCommand(t)
+			args := []string{"start"}
+			if tc.name == "GlobalLogDir" {
+				args = append(args, "--config", configFile)
+			}
+			args = append(args, dagPath)
+
+			th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
+				Args:        args,
+				ExpectedOut: []string{"dag-run finished"},
+			})
+		})
+	}
 }

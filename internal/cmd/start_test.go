@@ -8,15 +8,13 @@ import (
 )
 
 func TestStartCommand(t *testing.T) {
-	t.Parallel()
-
 	th := test.SetupCommand(t)
 
 	tests := []test.CmdTest{
 		{
 			Name:        "StartDAG",
 			Args:        []string{"start", th.DAG(t, "cmd/start.yaml").Location},
-			ExpectedOut: []string{"Step execution started"},
+			ExpectedOut: []string{"Step started"},
 		},
 		{
 			Name:        "StartDAGWithDefaultParams",
@@ -35,8 +33,8 @@ func TestStartCommand(t *testing.T) {
 		},
 		{
 			Name:        "StartDAGWithRequestID",
-			Args:        []string{"start", th.DAG(t, "cmd/start_with_reqid.yaml").Location, "--request-id", "abcdefg"},
-			ExpectedOut: []string{"abcdefg"},
+			Args:        []string{"start", th.DAG(t, "cmd/start_with_dagrun_id.yaml").Location, "--run-id", "01967be2-3bb9-78ef-a54f-5e258df2d020"},
+			ExpectedOut: []string{"01967be2-3bb9-78ef-a54f-5e258df2d020"},
 		},
 	}
 

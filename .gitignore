@@ -23,3 +23,13 @@ coverage.*
 
 # Debug files
 __debug_bin*
+
+# Misc files
+.aider*
+
+# Local configuration files
+*.local.md
+*.local.json
+
+# Profile files
+*.prof

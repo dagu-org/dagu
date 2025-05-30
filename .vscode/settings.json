@@ -1,5 +1,6 @@
 {
     "editor.formatOnSave": true,
+    "editor.insertSpaces": true,
     "[go]": {
         "editor.insertSpaces": true,
         "editor.formatOnSave": true,

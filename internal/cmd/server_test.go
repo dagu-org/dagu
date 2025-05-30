@@ -21,7 +21,7 @@ func TestServerCommand(t *testing.T) {
 		port := findPort(t)
 		th.RunCommand(t, cmd.CmdServer(), test.CmdTest{
 			Args:        []string{"server", fmt.Sprintf("--port=%s", port)},
-			ExpectedOut: []string{"Serving", port},
+			ExpectedOut: []string{"Server is starting", port},
 		})
 
 	})

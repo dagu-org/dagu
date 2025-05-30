@@ -6,7 +6,7 @@ import (
 
 // WithLogger returns a new context with the given logger.
 func WithLogger(ctx context.Context, logger Logger) context.Context {
-	return context.WithValue(ctx, contextKey{}, logger)
+	return context.WithValue(ctx, loggerKey{}, logger)
 }
 
 // WithFixedLogger returns a new context with the given fixed logger.
@@ -20,7 +20,7 @@ func FromContext(ctx context.Context) Logger {
 	if value := ctx.Value(fixedKey{}); value != nil {
 		return value.(Logger)
 	}
-	value := ctx.Value(contextKey{})
+	value := ctx.Value(loggerKey{})
 	if value == nil {
 		return defaultLogger
 	}
@@ -82,5 +82,5 @@ func Write(ctx context.Context, msg string) {
 	FromContext(ctx).Write(msg)
 }
 
-type contextKey struct{}
+type loggerKey struct{}
 type fixedKey struct{}

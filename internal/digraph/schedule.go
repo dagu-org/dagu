@@ -45,14 +45,9 @@ func buildScheduler(values []string) ([]Schedule, error) {
 //
 // ```
 func parseScheduleMap(
-	scheduleMap map[any]any, starts, stops, restarts *[]string,
+	scheduleMap map[string]any, starts, stops, restarts *[]string,
 ) error {
-	for k, v := range scheduleMap {
-		// Key must be a string.
-		key, ok := k.(string)
-		if !ok {
-			return wrapError("schedule", k, ErrScheduleKeyMustBeString)
-		}
+	for key, v := range scheduleMap {
 		var values []string
 
 		switch v := v.(type) {

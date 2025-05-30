@@ -13,7 +13,11 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dagrun"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/models"
 )
 
 // Job is the interface for the actual DAG.
@@ -27,51 +31,333 @@ type Job interface {
 }
 
 type Scheduler struct {
-	manager  JobManager
-	logDir   string
-	stopChan chan struct{}
-	running  atomic.Bool
-	location *time.Location
+	hm           dagrun.Manager
+	er           EntryReader
+	logDir       string
+	stopChan     chan struct{}
+	running      atomic.Bool
+	location     *time.Location
+	dagRunStore  models.DAGRunStore
+	queueStore   models.QueueStore
+	procStore    models.ProcStore
+	cancel       context.CancelFunc
+	lock         sync.Mutex
+	queueConfigs sync.Map
 }
 
-func New(cfg *config.Config, manager JobManager) *Scheduler {
+type queueConfig struct {
+	MaxConcurrency int
+}
+
+func New(
+	cfg *config.Config,
+	er EntryReader,
+	drm dagrun.Manager,
+	drs models.DAGRunStore,
+	qs models.QueueStore,
+	ps models.ProcStore,
+) *Scheduler {
 	timeLoc := cfg.Global.Location
 	if timeLoc == nil {
 		timeLoc = time.Local
 	}
 
 	return &Scheduler{
-		logDir:   cfg.Paths.LogDir,
-		stopChan: make(chan struct{}),
-		location: timeLoc,
-		manager:  manager,
+		logDir:      cfg.Paths.LogDir,
+		stopChan:    make(chan struct{}),
+		location:    timeLoc,
+		er:          er,
+		hm:          drm,
+		dagRunStore: drs,
+		queueStore:  qs,
+		procStore:   ps,
 	}
 }
 
-// ScheduleType is the type of schedule (start, stop, restart).
-type ScheduleType int
+func (s *Scheduler) Start(ctx context.Context) error {
+	sig := make(chan os.Signal, 1)
 
-const (
-	ScheduleTypeStart ScheduleType = iota
-	ScheduleTypeStop
-	ScheduleTypeRestart
-)
+	ctx, cancel := context.WithCancel(ctx)
+	s.cancel = cancel
+	defer cancel()
 
-func (s ScheduleType) String() string {
-	switch s {
-	case ScheduleTypeStart:
-		return "Start"
+	done := make(chan any)
+	defer close(done)
 
-	case ScheduleTypeStop:
-		return "Stop"
+	// Start the DAG file watcher
+	if err := s.er.Start(ctx, done); err != nil {
+		return fmt.Errorf("failed to start manager: %w", err)
+	}
 
-	case ScheduleTypeRestart:
-		return "Restart"
+	// Start queue reader
+	queueCh := make(chan models.QueuedItem, 1)
+	var wg sync.WaitGroup
+	wg.Add(1)
 
-	default:
-		// Should never happen.
-		return "Unknown"
+	go func() {
+		defer wg.Done()
+		go s.handleQueue(ctx, queueCh, done)
+	}()
 
+	qr := s.queueStore.Reader(ctx)
+	if err := qr.Start(ctx, queueCh); err != nil {
+		return fmt.Errorf("failed to start queue reader: %w", err)
+	}
+
+	// Handle OS signals for graceful shutdown
+	signal.Notify(
+		sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT,
+	)
+
+	// Go routine to handle OS signals and context cancellation
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		select {
+		case <-done:
+			qr.Stop(ctx)
+			s.Stop(ctx)
+			return
+
+		case <-sig:
+			qr.Stop(ctx)
+			s.Stop(ctx)
+
+		case <-ctx.Done():
+			qr.Stop(ctx)
+			s.Stop(ctx)
+
+		}
+	}()
+
+	logger.Info(ctx, "Scheduler started")
+
+	// Start the scheduler loop (it blocks)
+	s.start(ctx)
+
+	wg.Wait()
+	return nil
+}
+
+func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, done chan any) {
+	for {
+		select {
+		case <-done:
+			logger.Info(ctx, "Stopping queue handler due to manager shutdown")
+			return
+
+		case <-ctx.Done():
+			logger.Info(ctx, "Stopping queue handler due to context cancellation")
+			return
+
+		case item := <-ch:
+			data := item.Data()
+			logger.Info(ctx, "Received item from queue", "data", data)
+			var (
+				dag       *digraph.DAG
+				attempt   models.DAGRunAttempt
+				status    *models.DAGRunStatus
+				err       error
+				result    = models.QueuedItemProcessingResultRetry
+				startedAt time.Time
+			)
+
+			alive, err := s.procStore.CountAlive(ctx, data.Name)
+			if err != nil {
+				logger.Error(ctx, "Failed to count alive processes", "err", err, "data", data)
+				goto SEND_RESULT
+			}
+
+			if alive >= s.getQueueConfig(data.Name).MaxConcurrency {
+				// If there are alive processes, skip this item
+				goto SEND_RESULT
+			}
+
+			// Fetch the DAG of the dag-run attempt
+			attempt, err = s.dagRunStore.FindAttempt(ctx, data)
+			if err != nil {
+				result = models.QueuedItemProcessingResultInvalid
+				logger.Error(ctx, "Failed to find run", "err", err, "data", data)
+				goto SEND_RESULT
+			}
+
+			status, err = attempt.ReadStatus(ctx)
+			if err != nil {
+				logger.Error(ctx, "Failed to read status", "err", err, "data", data)
+				goto SEND_RESULT
+			}
+
+			if status.Status != scheduler.StatusQueued {
+				logger.Info(ctx, "Skipping item from queue", "data", data, "status", status.Status)
+				result = models.QueuedItemProcessingResultInvalid
+				goto SEND_RESULT
+			}
+
+			dag, err = attempt.ReadDAG(ctx)
+			if err != nil {
+				logger.Error(ctx, "Failed to read dag", "err", err, "data", data)
+				goto SEND_RESULT
+			}
+
+			// Update the queue configuration with the latest execution
+			s.queueConfigs.Store(data.Name, queueConfig{
+				MaxConcurrency: max(dag.MaxActiveRuns, 1),
+			})
+
+			startedAt = time.Now()
+			if err := s.hm.RetryDAGRun(ctx, dag, data.ID); err != nil {
+				logger.Error(ctx, "Failed to retry dag", "err", err, "data", data)
+				goto SEND_RESULT
+			}
+
+			// For now we need to wait for the DAG started
+		WAIT_FOR_RUN:
+			for {
+				// Check if the dag is running
+				attempt, err = s.dagRunStore.FindAttempt(ctx, data)
+				if err != nil {
+					logger.Error(ctx, "Failed to find run", "err", err, "data", data)
+					continue
+				}
+				status, err := attempt.ReadStatus(ctx)
+				if err != nil {
+					logger.Error(ctx, "Failed to read status", "err", err, "data", data)
+					goto SEND_RESULT
+				}
+				if status.Status != scheduler.StatusQueued {
+					result = models.QueuedItemProcessingResultInvalid
+					break WAIT_FOR_RUN
+				}
+				if time.Since(startedAt) > 10*time.Second {
+					logger.Error(ctx, "Timeout waiting for run to start", "data", data)
+					break WAIT_FOR_RUN
+				}
+				select {
+				case <-time.After(500 * time.Millisecond):
+				case <-ctx.Done():
+					logger.Info(ctx, "Context cancelled while waiting for run to start", "data", data)
+					return
+				}
+			}
+
+			if result == models.QueuedItemProcessingResultSuccess {
+				logger.Info(ctx, "Successfully processed item from queue", "data", data)
+			}
+
+		SEND_RESULT:
+			item.Result <- result
+		}
+	}
+}
+
+// SetQueueConfig sets the queue configuration for a specific queue.
+func (s *Scheduler) getQueueConfig(name string) queueConfig {
+	cfg, ok := s.queueConfigs.Load(name)
+	if !ok {
+		return queueConfig{MaxConcurrency: 1}
+	}
+
+	queueCfg, ok := cfg.(queueConfig)
+	if !ok {
+		return queueConfig{MaxConcurrency: 1}
+	}
+
+	return queueCfg
+}
+
+// start starts the scheduler.
+// It runs in a loop, checking for jobs to run every minute.
+func (s *Scheduler) start(ctx context.Context) {
+	t := Now().Truncate(time.Minute)
+	timer := time.NewTimer(0)
+
+	s.running.Store(true)
+
+	for {
+		select {
+		case <-timer.C:
+			s.run(ctx, t)
+			t = s.NextTick(t)
+			_ = timer.Stop()
+			timer.Reset(t.Sub(Now()))
+
+		case <-s.stopChan:
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return
+		}
+	}
+}
+
+// NextTick returns the next tick time for the scheduler.
+func (*Scheduler) NextTick(now time.Time) time.Time {
+	return now.Add(time.Minute).Truncate(time.Second * 60)
+}
+
+// Stop stops the scheduler.
+func (s *Scheduler) Stop(ctx context.Context) {
+	if !s.running.CompareAndSwap(true, false) {
+		return
+	}
+
+	close(s.stopChan)
+
+	s.lock.Lock()
+	if s.cancel != nil {
+		s.cancel()
+		s.cancel = nil
+	}
+	s.lock.Unlock()
+
+	logger.Info(ctx, "Scheduler stopped")
+}
+
+// run executes the scheduled jobs at the current time.
+func (s *Scheduler) run(ctx context.Context, now time.Time) {
+	// Get jobs scheduled to run at or before the current time
+	// Subtract a small buffer to avoid edge cases with exact timing
+	jobs, err := s.er.Next(ctx, now.Add(-time.Second).In(s.location))
+	if err != nil {
+		logger.Error(ctx, "Failed to get next jobs", "err", err)
+		return
+	}
+
+	// Sort the jobs by the next scheduled time for predictable execution order
+	sort.SliceStable(jobs, func(i, j int) bool {
+		return jobs[i].Next.Before(jobs[j].Next)
+	})
+
+	for _, job := range jobs {
+		if job.Next.After(now) {
+			break
+		}
+
+		// Create a child context for this specific job execution
+		jobCtx := logger.WithValues(ctx,
+			"jobType", job.Type.String(),
+			"scheduledTime", job.Next.Format(time.RFC3339))
+
+		// Launch job with bounded concurrency
+		go func(ctx context.Context, job *ScheduledJob) {
+			if err := job.invoke(ctx); err != nil {
+				switch {
+				case errors.Is(err, ErrJobFinished):
+					logger.Info(ctx, "Job already completed", "job", job.Job)
+				case errors.Is(err, ErrJobRunning):
+					logger.Info(ctx, "Job already in progress", "job", job.Job)
+				case errors.Is(err, ErrJobSkipped):
+					logger.Info(ctx, "Job execution skipped", "job", job.Job, "reason", err.Error())
+				default:
+					logger.Error(ctx, "Job execution failed",
+						"job", job.Job,
+						"err", err,
+						"errorType", fmt.Sprintf("%T", err))
+				}
+			} else {
+				logger.Info(ctx, "Job completed successfully", "job", job.Job)
+			}
+		}(jobCtx, job)
 	}
 }
 
@@ -100,130 +386,22 @@ func (s *ScheduledJob) invoke(ctx context.Context) error {
 	}
 }
 
-func (s *Scheduler) Start(ctx context.Context) error {
-	sig := make(chan os.Signal, 1)
-
-	done := make(chan any)
-	defer close(done)
-
-	if err := s.manager.Start(ctx, done); err != nil {
-		return fmt.Errorf("failed to start manager: %w", err)
-	}
-
-	signal.Notify(
-		sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT,
-	)
-
-	go func() {
-		select {
-		case <-done:
-			return
-
-		case <-sig:
-			s.Stop(ctx)
-
-		case <-ctx.Done():
-			s.Stop(ctx)
-
-		}
-	}()
-
-	logger.Info(ctx, "Scheduler started")
-	s.start(ctx)
-
-	return nil
-}
-
-func (s *Scheduler) start(ctx context.Context) {
-	t := now().Truncate(time.Minute)
-	timer := time.NewTimer(0)
-
-	s.running.Store(true)
-
-	for {
-		select {
-		case <-timer.C:
-			s.run(ctx, t)
-			t = s.nextTick(t)
-			_ = timer.Stop()
-			timer.Reset(t.Sub(now()))
-
-		case <-s.stopChan:
-			if !timer.Stop() {
-				<-timer.C
-			}
-			return
-
-		}
-	}
-}
-
-func (s *Scheduler) run(ctx context.Context, now time.Time) {
-	jobs, err := s.manager.Next(ctx, now.Add(-time.Second).In(s.location))
-	if err != nil {
-		logger.Error(ctx, "failed to get next jobs", "err", err)
-		return
-	}
-
-	// Sort the jobs by the next scheduled time.
-	sort.SliceStable(jobs, func(i, j int) bool {
-		return jobs[i].Next.Before(jobs[j].Next)
-	})
-
-	for _, job := range jobs {
-		if job.Next.After(now) {
-			break
-		}
-
-		go func(job *ScheduledJob) {
-			if err := job.invoke(ctx); err != nil {
-				if errors.Is(err, ErrJobFinished) {
-					logger.Info(ctx, "job is already finished", "job", job.Job, "err", err)
-				} else if errors.Is(err, ErrJobRunning) {
-					logger.Info(ctx, "job is already running", "job", job.Job, "err", err)
-				} else if errors.Is(err, ErrJobSkipped) {
-					logger.Info(ctx, "job is skipped", "job", job.Job, "err", err)
-				} else {
-					logger.Error(ctx, "job failed", "job", job.Job, "err", err)
-				}
-			}
-		}(job)
-	}
-}
-
-func (*Scheduler) nextTick(now time.Time) time.Time {
-	return now.Add(time.Minute).Truncate(time.Second * 60)
-}
-
-func (s *Scheduler) Stop(ctx context.Context) {
-	if !s.running.Load() {
-		return
-	}
-
-	if s.stopChan != nil {
-		close(s.stopChan)
-	}
-
-	s.running.Store(false)
-	logger.Info(ctx, "Scheduler stopped")
-}
-
 var (
 	// fixedTime is the fixed time used for testing.
 	fixedTime     time.Time
 	fixedTimeLock sync.RWMutex
 )
 
-// setFixedTime sets the fixed time for testing.
-func setFixedTime(t time.Time) {
+// SetFixedTime sets the fixed time for testing.
+func SetFixedTime(t time.Time) {
 	fixedTimeLock.Lock()
 	defer fixedTimeLock.Unlock()
 
 	fixedTime = t
 }
 
-// now returns the current time.
-func now() time.Time {
+// Now returns the current time.
+func Now() time.Time {
 	fixedTimeLock.RLock()
 	defer fixedTimeLock.RUnlock()
 

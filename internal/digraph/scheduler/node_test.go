@@ -69,21 +69,25 @@ func TestNode(t *testing.T) {
 	t.Run("Stdout", func(t *testing.T) {
 		t.Parallel()
 
-		random := path.Join(os.TempDir(), uuid.Must(uuid.NewRandom()).String())
-		defer os.Remove(random)
+		random := path.Join(os.TempDir(), uuid.Must(uuid.NewV7()).String())
+		defer func() {
+			_ = os.Remove(random)
+		}()
 
 		node := setupNode(t, withNodeCommand("echo hello"), withNodeStdout(random))
 		node.Execute(t)
 
-		file := node.Data().Step.Stdout
+		file := node.NodeData().Step.Stdout
 		dat, _ := os.ReadFile(file)
 		require.Equalf(t, "hello\n", string(dat), "unexpected stdout content: %s", string(dat))
 	})
 	t.Run("Stderr", func(t *testing.T) {
 		t.Parallel()
 
-		random := path.Join(os.TempDir(), uuid.Must(uuid.NewRandom()).String())
-		defer os.Remove(random)
+		random := path.Join(os.TempDir(), uuid.Must(uuid.NewV7()).String())
+		defer func() {
+			_ = os.Remove(random)
+		}()
 
 		node := setupNode(t,
 			withNodeCommand("sh"),
@@ -92,7 +96,7 @@ func TestNode(t *testing.T) {
 		)
 		node.Execute(t)
 
-		file := node.Data().Step.Stderr
+		file := node.NodeData().Step.Stderr
 		dat, _ := os.ReadFile(file)
 		require.Equalf(t, "hello\n", string(dat), "unexpected stderr content: %s", string(dat))
 	})
@@ -250,11 +254,11 @@ func setupNode(t *testing.T, opts ...nodeOption) nodeHelper {
 func (n nodeHelper) Execute(t *testing.T) {
 	t.Helper()
 
-	reqID := reqID()
-	err := n.Node.Setup(n.Context, n.Config.Paths.LogDir, reqID)
+	dagRunID := uuid.Must(uuid.NewV7()).String()
+	err := n.Setup(n.Context, n.Config.Paths.LogDir, dagRunID)
 	require.NoError(t, err, "failed to setup node")
 
-	err = n.Node.Execute(n.execContext(reqID))
+	err = n.Node.Execute(n.execContext(dagRunID))
 	require.NoError(t, err, "failed to execute node")
 
 	err = n.Teardown(n.Context)
@@ -264,7 +268,8 @@ func (n nodeHelper) Execute(t *testing.T) {
 func (n nodeHelper) ExecuteFail(t *testing.T, expectedErr string) {
 	t.Helper()
 
-	err := n.Node.Execute(n.execContext(reqID()))
+	dagRunID := uuid.Must(uuid.NewV7()).String()
+	err := n.Node.Execute(n.execContext(dagRunID))
 	require.Error(t, err, "expected error")
 	require.Contains(t, err.Error(), expectedErr, "unexpected error")
 }
@@ -272,24 +277,20 @@ func (n nodeHelper) ExecuteFail(t *testing.T, expectedErr string) {
 func (n nodeHelper) AssertLogContains(t *testing.T, expected string) {
 	t.Helper()
 
-	dat, err := os.ReadFile(n.Node.LogFile())
-	require.NoErrorf(t, err, "failed to read log file %q", n.Node.LogFile())
+	dat, err := os.ReadFile(n.StdoutFile())
+	require.NoErrorf(t, err, "failed to read log file %q", n.StdoutFile())
 	require.Contains(t, string(dat), expected, "log file does not contain expected string")
 }
 
 func (n nodeHelper) AssertOutput(t *testing.T, key, value string) {
 	t.Helper()
 
-	require.NotNil(t, n.Node.Data().Step.OutputVariables, "output variables not set")
-	data, ok := n.Node.Data().Step.OutputVariables.Load(key)
+	require.NotNil(t, n.NodeData().State.OutputVariables, "output variables not set")
+	data, ok := n.NodeData().State.OutputVariables.Load(key)
 	require.True(t, ok, "output variable not found")
 	require.Equal(t, fmt.Sprintf(`%s=%s`, key, value), data, "output variable value mismatch")
 }
 
-func (n nodeHelper) execContext(reqID string) context.Context {
-	return digraph.NewContext(n.Context, &digraph.DAG{}, nil, reqID, "logFile", nil)
-}
-
-func reqID() string {
-	return uuid.Must(uuid.NewRandom()).String()
+func (n nodeHelper) execContext(dagRunID string) context.Context {
+	return digraph.SetupEnv(n.Context, &digraph.DAG{}, nil, digraph.DAGRunRef{}, dagRunID, "logFile", nil)
 }

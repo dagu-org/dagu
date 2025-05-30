@@ -42,39 +42,87 @@ var (
 		bindViper:    true,
 	}
 
-	// Additional parameters to pass to the DAG execution.
+	// Additional parameters to pass to the dag-run.
 	// These parameters override the default values defined in the DAG.
 	// They can be specified either inline or following a "--" separator to distinguish them from other flags.
 	// Accepted formats include positional parameters and key=value pairs (e.g., "P1=foo P2=bar").
 	paramsFlag = commandLineFlag{
 		name:      "params",
 		shorthand: "p",
-		usage:     "Parameters to pass to the DAG execution (overrides DAG defaults; supports positional values and key=value pairs, e.g., P1=foo P2=bar)",
+		usage:     "Parameters to pass to the dag-run (overrides DAG defaults; supports positional values and key=value pairs, e.g., P1=foo P2=bar)",
 	}
 
-	// Unique request ID required for retrying a DAG execution.
+	// Unique dag-run ID required for retrying a dag-run.
 	// This flag must be provided when using the retry command.
-	requestIDFlagRetry = commandLineFlag{
-		name:      "request-id",
+	dagRunIDFlagRetry = commandLineFlag{
+		name:      "run-id",
 		shorthand: "r",
-		usage:     "Unique request ID for retrying a DAG execution (required)",
+		usage:     "Unique dag-run ID to retry a dag-run",
 		required:  true,
 	}
 
-	// Unique request ID used for starting a new DAG execution.
+	// Unique dag-run ID used for starting a new dag-run.
 	// This is used to track and identify the execution instance and its status.
-	requestIDFlagStart = commandLineFlag{
-		name:      "request-id",
+	dagRunIDFlag = commandLineFlag{
+		name:      "run-id",
 		shorthand: "r",
-		usage:     "Unique request ID for a DAG execution",
+		usage:     "Unique dag-run ID for starting a new dag-run",
 	}
 
-	// Suppresses output during DAG execution (e.g., logs, status updates).
+	// Unique dag-run ID used for stopping a dag-run.
+	dagRunIDFlagStop = commandLineFlag{
+		name:      "run-id",
+		shorthand: "r",
+		usage:     "dag-run ID for stopping a dag-run",
+	}
+
+	// Unique dag-run ID used for restarting a dag-run.
+	dagRunIDFlagRestart = commandLineFlag{
+		name:      "run-id",
+		shorthand: "r",
+		usage:     "dag-run ID for restarting a dag-run",
+	}
+
+	// Unique dag-run ID used for checking the status of a dag-run.
+	dagRunIDFlagStatus = commandLineFlag{
+		name:      "run-id",
+		shorthand: "r",
+		usage:     "dag-run ID for checking the status of a dag-run",
+	}
+
+	// Unique dag-run reference used for dequeueing a dag-run.
+	dagRunFlagDequeue = commandLineFlag{
+		name:      "dag-run",
+		shorthand: "d",
+		usage:     "<DAG-name>:<run-id> to dequeue a dag-run",
+		required:  true,
+	}
+
+	// rootDAGRunFlag reads the root DAG name for starting a child dag-run.
+	rootDAGRunFlag = commandLineFlag{
+		name:  "root",
+		usage: "[only for child dag-runs] reference for the root dag-run",
+	}
+
+	// parentDAGRunFlag reads the parent ref for starting a child dag-run.
+	parentDAGRunFlag = commandLineFlag{
+		name:  "parent",
+		usage: "[only for child dag-runs] reference for the parent dag-run",
+	}
+
+	// quietFlag is used to suppress output during command execution.
 	quietFlag = commandLineFlag{
 		name:      "quiet",
 		shorthand: "q",
-		usage:     "Suppress output during DAG execution",
+		usage:     "Suppress output during dag-run",
 		isBool:    true,
+	}
+
+	// cpuProfileFlag is used to enable CPU profiling.
+	cpuProfileFlag = commandLineFlag{
+		name:   "cpu-profile",
+		usage:  "Enable CPU profiling (saves to cpu.pprof)",
+		isBool: true,
 	}
 )
 
@@ -86,7 +134,7 @@ type commandLineFlag struct {
 }
 
 func initFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
-	flags := append([]commandLineFlag{configFlag, quietFlag}, additionalFlags...)
+	flags := append([]commandLineFlag{configFlag, quietFlag, cpuProfileFlag}, additionalFlags...)
 
 	for _, flag := range flags {
 		if flag.isBool {

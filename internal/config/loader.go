@@ -19,9 +19,15 @@ import (
 // UsedConfigFile is a global variable that stores the path to the configuration file
 var UsedConfigFile = atomic.Value{}
 
+// loadLock synchronizes access to the Load function to ensure that only one configuration load occurs at a time.
+var loadLock sync.Mutex
+
 // Load creates a new configuration by instantiating a ConfigLoader with the provided options
 // and then invoking its Load method.
 func Load(opts ...ConfigLoaderOption) (*Config, error) {
+	loadLock.Lock()
+	defer loadLock.Unlock()
+
 	loader := NewConfigLoader(opts...)
 	cfg, err := loader.Load()
 	if err != nil {
@@ -68,13 +74,13 @@ func (l *ConfigLoader) Load() (*Config, error) {
 		return nil, fmt.Errorf("viper setup failed: %w", err)
 	}
 
-	var def Definition
 	// Attempt to read the main config file. If not found, we proceed without error.
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return nil, fmt.Errorf("failed to read config: %w", err)
 		}
 	}
+	configPath := viper.ConfigFileUsed()
 
 	// Store the path of the used configuration file for later reference.
 	if configFile := viper.ConfigFileUsed(); configFile != "" {
@@ -90,6 +96,7 @@ func (l *ConfigLoader) Load() (*Config, error) {
 	}
 
 	// Unmarshal the merged configuration into our Definition structure.
+	var def Definition
 	if err := viper.Unmarshal(&def); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
@@ -102,6 +109,9 @@ func (l *ConfigLoader) Load() (*Config, error) {
 
 	// Attach any warnings collected during the resolution process.
 	cfg.Warnings = l.warnings
+
+	// Set the config path in the global configuration for reference.
+	cfg.Global.ConfigPath = configPath
 
 	return cfg, nil
 }
@@ -130,6 +140,18 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		Port:        def.Port,
 		BasePath:    def.BasePath,
 		APIBasePath: def.APIBasePath,
+		Permissions: map[Permission]bool{
+			PermissionWriteDAGs: true,
+			PermissionRunDAGs:   true,
+		},
+	}
+
+	// Permissions can be nil, so we check before dereferencing.
+	if def.Permissions.WriteDAGs != nil {
+		cfg.Server.Permissions[PermissionWriteDAGs] = *def.Permissions.WriteDAGs
+	}
+	if def.Permissions.RunDAGs != nil {
+		cfg.Server.Permissions[PermissionRunDAGs] = *def.Permissions.RunDAGs
 	}
 
 	// Process remote node definitions.
@@ -156,19 +178,11 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	// Process authentication settings.
 	if def.Auth != nil {
 		if def.Auth.Basic != nil {
-			cfg.Server.Auth.Basic.Enabled = def.Auth.Basic.Enabled
 			cfg.Server.Auth.Basic.Username = def.Auth.Basic.Username
 			cfg.Server.Auth.Basic.Password = def.Auth.Basic.Password
-			if def.Auth.Basic.Username != "" || def.Auth.Basic.Password != "" {
-				cfg.Server.Auth.Basic.Enabled = true
-			}
 		}
 		if def.Auth.Token != nil {
-			cfg.Server.Auth.Token.Enabled = def.Auth.Token.Enabled
 			cfg.Server.Auth.Token.Value = def.Auth.Token.Value
-			if def.Auth.Token.Value != "" {
-				cfg.Server.Auth.Token.Enabled = true
-			}
 		}
 	}
 
@@ -177,13 +191,16 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 
 	// Set file system paths from the definition.
 	if def.Paths != nil {
-		cfg.Paths.DAGsDir = fileutil.MustResolvePath(def.Paths.DAGsDir)
-		cfg.Paths.SuspendFlagsDir = fileutil.MustResolvePath(def.Paths.SuspendFlagsDir)
-		cfg.Paths.DataDir = fileutil.MustResolvePath(def.Paths.DataDir)
-		cfg.Paths.LogDir = fileutil.MustResolvePath(def.Paths.LogDir)
-		cfg.Paths.AdminLogsDir = fileutil.MustResolvePath(def.Paths.AdminLogsDir)
-		cfg.Paths.BaseConfig = fileutil.MustResolvePath(def.Paths.BaseConfig)
-		cfg.Paths.Executable = fileutil.MustResolvePath(def.Paths.Executable)
+		cfg.Paths.DAGsDir = fileutil.ResolvePathOrBlank(def.Paths.DAGsDir)
+		cfg.Paths.SuspendFlagsDir = fileutil.ResolvePathOrBlank(def.Paths.SuspendFlagsDir)
+		cfg.Paths.DataDir = fileutil.ResolvePathOrBlank(def.Paths.DataDir)
+		cfg.Paths.LogDir = fileutil.ResolvePathOrBlank(def.Paths.LogDir)
+		cfg.Paths.AdminLogsDir = fileutil.ResolvePathOrBlank(def.Paths.AdminLogsDir)
+		cfg.Paths.BaseConfig = fileutil.ResolvePathOrBlank(def.Paths.BaseConfig)
+		cfg.Paths.Executable = fileutil.ResolvePathOrBlank(def.Paths.Executable)
+		cfg.Paths.DAGRunsDir = fileutil.ResolvePathOrBlank(def.Paths.DAGRunsDir)
+		cfg.Paths.QueueDir = fileutil.ResolvePathOrBlank(def.Paths.QueueDir)
+		cfg.Paths.ProcDir = fileutil.ResolvePathOrBlank(def.Paths.ProcDir)
 	}
 
 	// Set UI configuration if provided.
@@ -199,10 +216,22 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	// Load legacy environment variable overrides.
 	l.LoadLegacyEnv(&cfg)
 
+	// Setup the directory inside the datadir.
+	if cfg.Paths.DAGRunsDir == "" {
+		cfg.Paths.DAGRunsDir = filepath.Join(cfg.Paths.DataDir, "dag-runs")
+	}
+	if cfg.Paths.ProcDir == "" {
+		cfg.Paths.ProcDir = filepath.Join(cfg.Paths.DataDir, "proc")
+	}
+	if cfg.Paths.QueueDir == "" {
+		cfg.Paths.QueueDir = filepath.Join(cfg.Paths.DataDir, "queue")
+	}
+
 	// Ensure the executable path is set.
 	if err := l.setExecutable(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to set executable: %w", err)
 	}
+
 	// Validate the final configuration.
 	if err := l.validateConfig(&cfg); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
@@ -220,40 +249,36 @@ func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) {
 	if def.BasicAuthPassword != "" {
 		cfg.Server.Auth.Basic.Password = def.BasicAuthPassword
 	}
-	if def.BasicAuthUsername != "" || def.BasicAuthPassword != "" {
-		cfg.Server.Auth.Basic.Enabled = true
-	}
 	if def.APIBaseURL != "" {
 		cfg.Server.APIBasePath = def.APIBaseURL
 	}
 	if def.IsAuthToken {
-		cfg.Server.Auth.Token.Enabled = true
 		cfg.Server.Auth.Token.Value = def.AuthToken
 	}
 	// For DAGs directory, if both legacy fields are present, def.DAGsDir takes precedence.
 	if def.DAGs != "" {
-		cfg.Paths.DAGsDir = fileutil.MustResolvePath(def.DAGs)
+		cfg.Paths.DAGsDir = fileutil.ResolvePathOrBlank(def.DAGs)
 	}
 	if def.DAGsDir != "" {
-		cfg.Paths.DAGsDir = fileutil.MustResolvePath(def.DAGsDir)
+		cfg.Paths.DAGsDir = fileutil.ResolvePathOrBlank(def.DAGsDir)
 	}
 	if def.Executable != "" {
-		cfg.Paths.Executable = fileutil.MustResolvePath(def.Executable)
+		cfg.Paths.Executable = fileutil.ResolvePathOrBlank(def.Executable)
 	}
 	if def.LogDir != "" {
-		cfg.Paths.LogDir = fileutil.MustResolvePath(def.LogDir)
+		cfg.Paths.LogDir = fileutil.ResolvePathOrBlank(def.LogDir)
 	}
 	if def.DataDir != "" {
-		cfg.Paths.DataDir = fileutil.MustResolvePath(def.DataDir)
+		cfg.Paths.DataDir = fileutil.ResolvePathOrBlank(def.DataDir)
 	}
 	if def.SuspendFlagsDir != "" {
-		cfg.Paths.SuspendFlagsDir = fileutil.MustResolvePath(def.SuspendFlagsDir)
+		cfg.Paths.SuspendFlagsDir = fileutil.ResolvePathOrBlank(def.SuspendFlagsDir)
 	}
 	if def.AdminLogsDir != "" {
-		cfg.Paths.AdminLogsDir = fileutil.MustResolvePath(def.AdminLogsDir)
+		cfg.Paths.AdminLogsDir = fileutil.ResolvePathOrBlank(def.AdminLogsDir)
 	}
 	if def.BaseConfig != "" {
-		cfg.Paths.BaseConfig = fileutil.MustResolvePath(def.BaseConfig)
+		cfg.Paths.BaseConfig = fileutil.ResolvePathOrBlank(def.BaseConfig)
 	}
 	if def.LogEncodingCharset != "" {
 		cfg.UI.LogEncodingCharset = def.LogEncodingCharset
@@ -308,17 +333,20 @@ func (l *ConfigLoader) getXDGConfig(homeDir string) XDGConfig {
 
 // configureViper sets up viper's configuration file location, type, and environment variable handling.
 func (l *ConfigLoader) configureViper(resolver PathResolver) {
+	l.setupViperConfigPath(resolver.ConfigDir)
+	viper.SetEnvPrefix(strings.ToUpper(build.Slug))
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	viper.AutomaticEnv()
+}
+
+func (l *ConfigLoader) setupViperConfigPath(configDir string) {
 	if l.configFile == "" {
-		viper.AddConfigPath(resolver.ConfigDir)
+		viper.AddConfigPath(configDir)
 		viper.SetConfigName("config")
 	} else {
 		viper.SetConfigFile(l.configFile)
 	}
 	viper.SetConfigType("yaml")
-	// Use the application slug as prefix and replace hyphens with underscores.
-	viper.SetEnvPrefix(strings.ToUpper(build.Slug))
-	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
-	viper.AutomaticEnv()
 }
 
 // setDefaultValues establishes the default configuration values for various keys.
@@ -337,7 +365,7 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	viper.SetDefault("port", 8080)
 	viper.SetDefault("debug", false)
 	viper.SetDefault("basePath", "")
-	viper.SetDefault("apiBasePath", "/api/v1")
+	viper.SetDefault("apiBasePath", "/api/v2")
 	viper.SetDefault("latestStatusToday", false)
 
 	// UI settings
@@ -361,6 +389,9 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("debug", "DEBUG")
 	l.bindEnv("headless", "HEADLESS")
 
+	// Global configurations
+	l.bindEnv("workDir", "WORK_DIR")
+
 	// UI configurations
 	l.bindEnv("ui.maxDashboardPageLimit", "UI_MAX_DASHBOARD_PAGE_LIMIT")
 	l.bindEnv("ui.logEncodingCharset", "UI_LOG_ENCODING_CHARSET")
@@ -374,17 +405,13 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("ui.navbarTitle", "NAVBAR_TITLE")
 
 	// Authentication configurations
-	l.bindEnv("auth.basic.enabled", "AUTH_BASIC_ENABLED")
 	l.bindEnv("auth.basic.username", "AUTH_BASIC_USERNAME")
 	l.bindEnv("auth.basic.password", "AUTH_BASIC_PASSWORD")
-	l.bindEnv("auth.token.enabled", "AUTH_TOKEN_ENABLED")
 	l.bindEnv("auth.token.value", "AUTH_TOKEN")
 
 	// Authentication configurations (legacy keys)
-	l.bindEnv("auth.basic.enabled", "IS_BASICAUTH")
 	l.bindEnv("auth.basic.username", "BASICAUTH_USERNAME")
 	l.bindEnv("auth.basic.password", "BASICAUTH_PASSWORD")
-	l.bindEnv("auth.token.enabled", "IS_AUTHTOKEN")
 	l.bindEnv("auth.token.value", "AUTHTOKEN")
 
 	// TLS configurations
@@ -392,15 +419,17 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("tls.keyFile", "KEY_FILE")
 
 	// File paths
-	l.bindEnv("dags", "DAGS")
-	l.bindEnv("dags", "DAGS_DIR")
-	l.bindEnv("workDir", "WORK_DIR")
-	l.bindEnv("baseConfig", "BASE_CONFIG")
-	l.bindEnv("logDir", "LOG_DIR")
-	l.bindEnv("dataDir", "DATA_DIR")
-	l.bindEnv("suspendFlagsDir", "SUSPEND_FLAGS_DIR")
-	l.bindEnv("adminLogsDir", "ADMIN_LOG_DIR")
-	l.bindEnv("executable", "EXECUTABLE")
+	l.bindEnv("paths.dags", "DAGS")
+	l.bindEnv("paths.dags", "DAGS_DIR")
+	l.bindEnv("paths.executable", "EXECUTABLE")
+	l.bindEnv("paths.logDir", "LOG_DIR")
+	l.bindEnv("paths.dataDir", "DATA_DIR")
+	l.bindEnv("paths.suspendFlagsDir", "SUSPEND_FLAGS_DIR")
+	l.bindEnv("paths.adminLogsDir", "ADMIN_LOG_DIR")
+	l.bindEnv("paths.baseConfig", "BASE_CONFIG")
+	l.bindEnv("paths.historyDir", "DAG_RUNS_DIR")
+	l.bindEnv("paths.procDir", "PROC_DIR")
+	l.bindEnv("paths.queueDir", "QUEUE_DIR")
 
 	// UI customization
 	l.bindEnv("latestStatusToday", "LATEST_STATUS_TODAY")
@@ -478,14 +507,6 @@ func (l *ConfigLoader) setExecutable(cfg *Config) error {
 // validateConfig performs basic validation on the configuration to ensure required fields are set
 // and that numerical values fall within acceptable ranges.
 func (l *ConfigLoader) validateConfig(cfg *Config) error {
-	if cfg.Server.Auth.Basic.Enabled && (cfg.Server.Auth.Basic.Username == "" || cfg.Server.Auth.Basic.Password == "") {
-		return fmt.Errorf("basic auth enabled but username or password is not set")
-	}
-
-	if cfg.Server.Auth.Token.Enabled && cfg.Server.Auth.Token.Value == "" {
-		return fmt.Errorf("auth token enabled but token is not set")
-	}
-
 	if cfg.Server.Port < 0 || cfg.Server.Port > 65535 {
 		return fmt.Errorf("invalid port number: %d", cfg.Server.Port)
 	}

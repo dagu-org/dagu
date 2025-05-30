@@ -1,0 +1,6 @@
+steps:
+  - name: "repeat-exitcode"
+    command: "exit 42"
+    repeatPolicy:
+      exitCode: [42]
+      intervalSec: 2

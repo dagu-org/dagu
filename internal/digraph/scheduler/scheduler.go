@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,7 +12,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
@@ -23,6 +26,7 @@ const (
 	StatusError
 	StatusCancel
 	StatusSuccess
+	StatusQueued
 )
 
 func (s Status) String() string {
@@ -35,11 +39,18 @@ func (s Status) String() string {
 		return "canceled"
 	case StatusSuccess:
 		return "finished"
+	case StatusQueued:
+		return "queued"
 	case StatusNone:
 		fallthrough
 	default:
 		return "not started"
 	}
+}
+
+// IsActive checks if the status is active.
+func (s Status) IsActive() bool {
+	return s == StatusRunning || s == StatusQueued
 }
 
 var (
@@ -58,19 +69,29 @@ type Scheduler struct {
 	onSuccess     *digraph.Step
 	onFailure     *digraph.Step
 	onCancel      *digraph.Step
-	requestID     string
+	dagRunID      string
 
 	canceled  int32
 	mu        sync.RWMutex
 	pause     time.Duration
 	lastError error
 	handlers  map[digraph.HandlerType]*Node
+
+	metrics struct {
+		startTime          time.Time
+		totalNodes         int
+		completedNodes     int
+		failedNodes        int
+		skippedNodes       int
+		canceledNodes      int
+		totalExecutionTime time.Duration
+	}
 }
 
 func New(cfg *Config) *Scheduler {
 	return &Scheduler{
 		logDir:        cfg.LogDir,
-		maxActiveRuns: cfg.MaxActiveRuns,
+		maxActiveRuns: cfg.MaxActiveSteps,
 		timeout:       cfg.Timeout,
 		delay:         cfg.Delay,
 		dry:           cfg.Dry,
@@ -78,39 +99,54 @@ func New(cfg *Config) *Scheduler {
 		onSuccess:     cfg.OnSuccess,
 		onFailure:     cfg.OnFailure,
 		onCancel:      cfg.OnCancel,
-		requestID:     cfg.ReqID,
+		dagRunID:      cfg.DAGRunID,
 		pause:         time.Millisecond * 100,
 	}
 }
 
 type Config struct {
-	LogDir        string
-	MaxActiveRuns int
-	Timeout       time.Duration
-	Delay         time.Duration
-	Dry           bool
-	OnExit        *digraph.Step
-	OnSuccess     *digraph.Step
-	OnFailure     *digraph.Step
-	OnCancel      *digraph.Step
-	ReqID         string
+	LogDir         string
+	MaxActiveSteps int
+	Timeout        time.Duration
+	Delay          time.Duration
+	Dry            bool
+	OnExit         *digraph.Step
+	OnSuccess      *digraph.Step
+	OnFailure      *digraph.Step
+	OnCancel       *digraph.Step
+	DAGRunID       string
 }
 
 // Schedule runs the graph of steps.
-func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done chan *Node) error {
+func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progressCh chan *Node) error {
 	if err := sc.setup(ctx); err != nil {
 		return err
 	}
-	graph.Start()
-	defer graph.Finish()
 
-	var wg = sync.WaitGroup{}
-
+	// Create a cancellable context for the entire execution
 	var cancel context.CancelFunc
 	if sc.timeout > 0 {
 		ctx, cancel = context.WithTimeout(ctx, sc.timeout)
-		defer cancel()
+	} else {
+		ctx, cancel = context.WithCancel(ctx)
 	}
+	defer cancel()
+
+	// Start execution and ensure cleanup
+	graph.Start()
+	defer graph.Finish()
+
+	// Initialize node count metrics
+	sc.metrics.totalNodes = len(graph.nodes)
+
+	// If one of the conditions does not met, cancel the execution.
+	env := digraph.GetEnv(ctx)
+	if err := EvalConditions(ctx, cmdutil.GetShellCommand(""), env.DAG.Preconditions); err != nil {
+		logger.Info(ctx, "Preconditions are not met", "err", err)
+		sc.Cancel(ctx, graph)
+	}
+
+	var wg = sync.WaitGroup{}
 
 	for !sc.isFinished(graph) {
 		if sc.isCanceled() {
@@ -118,7 +154,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 		}
 
 	NodesIteration:
-		for _, node := range graph.Nodes() {
+		for _, node := range graph.nodes {
 			if node.State().Status != NodeStatusNone || !isReady(ctx, graph, node) {
 				continue NodesIteration
 			}
@@ -131,35 +167,74 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 
 			wg.Add(1)
 
-			logger.Info(ctx, "Step execution started", "step", node.data.Name())
-			node.data.SetStatus(NodeStatusRunning)
+			logger.Info(ctx, "Step started", "step", node.Name())
+			node.SetStatus(NodeStatusRunning)
+			if progressCh != nil {
+				progressCh <- node
+			}
+
 			go func(ctx context.Context, node *Node) {
+				nodeCtx, nodeCancel := context.WithCancel(ctx)
+				defer nodeCancel()
+
+				// Recover from panics
 				defer func() {
 					if panicObj := recover(); panicObj != nil {
 						stack := string(debug.Stack())
-						err := fmt.Errorf("panic recovered: %v\n%s", panicObj, stack)
-						logger.Error(ctx, "Panic occurred", "error", err, "step", node.data.Name(), "stack", stack)
-						node.data.MarkError(err)
+						err := fmt.Errorf("panic recovered in node %s: %v\n%s", node.Name(), panicObj, stack)
+						logger.Error(ctx, "Panic occurred",
+							"error", err,
+							"step", node.Name(),
+							"stack", stack,
+							"dagRunId", sc.dagRunID)
+						node.MarkError(err)
 						sc.setLastError(err)
+
+						// Update metrics for failed node
+						sc.mu.Lock()
+						sc.metrics.failedNodes++
+						sc.mu.Unlock()
 					}
 				}()
 
+				// Ensure node is finished and wg is decremented
 				defer func() {
-					node.data.Finish()
+					// Update metrics based on node status
+					sc.mu.Lock()
+
+					// Update node status counts
+					switch node.State().Status {
+					case NodeStatusSuccess:
+						sc.metrics.completedNodes++
+					case NodeStatusError:
+						sc.metrics.failedNodes++
+					case NodeStatusSkipped:
+						sc.metrics.skippedNodes++
+					case NodeStatusCancel:
+						sc.metrics.canceledNodes++
+					case NodeStatusNone, NodeStatusRunning:
+						// Should not happen at this point
+					}
+					sc.mu.Unlock()
+
+					node.Finish()
 					wg.Done()
 				}()
 
-				ctx = sc.setupContext(ctx, graph, node)
+				ctx = sc.setupEnviron(nodeCtx, graph, node)
 
 				// Check preconditions
-				if len(node.data.Step().Preconditions) > 0 {
-					logger.Infof(ctx, "Checking pre conditions for \"%s\"", node.data.Name())
-					if err := digraph.EvalConditions(ctx, node.data.Step().Preconditions); err != nil {
-						logger.Infof(ctx, "Pre conditions failed for \"%s\"", node.data.Name())
-						node.data.SetStatus(NodeStatusSkipped)
-						node.data.SetError(err)
-						if done != nil {
-							done <- node
+				if len(node.Step().Preconditions) > 0 {
+					logger.Infof(ctx, "Checking preconditions for \"%s\"", node.Name())
+					shell := cmdutil.GetShellCommand(node.Step().Shell)
+					if err := EvalConditions(ctx, shell, node.Step().Preconditions); err != nil {
+						logger.Infof(ctx, "Preconditions failed for \"%s\"", node.Name())
+						node.SetStatus(NodeStatusSkipped)
+						if !errors.Is(err, ErrConditionNotMet) {
+							node.SetError(err)
+						}
+						if progressCh != nil {
+							progressCh <- node
 						}
 						return
 					}
@@ -169,7 +244,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 				if err := sc.setupNode(ctx, node); err != nil {
 					setupSucceed = false
 					sc.setLastError(err)
-					node.data.MarkError(err)
+					node.MarkError(err)
 				}
 
 				ctx = node.SetupContextBeforeExec(ctx)
@@ -188,50 +263,83 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 							// do nothing
 
 						case sc.isTimeout(graph.startedAt):
-							logger.Info(ctx, "Step execution deadline exceeded", "step", node.data.Name(), "error", execErr)
-							node.data.SetStatus(NodeStatusCancel)
+							logger.Info(ctx, "Step deadline exceeded", "step", node.Name(), "error", execErr)
+							node.SetStatus(NodeStatusCancel)
 							sc.setLastError(execErr)
 
 						case sc.isCanceled():
 							sc.setLastError(execErr)
 
-						case node.retryPolicy.Limit > node.data.GetRetryCount():
+						case node.retryPolicy.Limit > node.GetRetryCount():
 							if sc.handleNodeRetry(ctx, node, execErr) {
 								continue ExecRepeat
 							}
 
 						default:
 							// finish the node
-							node.data.SetStatus(NodeStatusError)
+							node.SetStatus(NodeStatusError)
 							if node.shouldMarkSuccess(ctx) {
 								// mark as success if the node should be marked as success
 								// i.e. continueOn.markSuccess is set to true
-								node.data.SetStatus(NodeStatusSuccess)
+								node.SetStatus(NodeStatusSuccess)
 							} else {
-								node.data.MarkError(execErr)
+								node.MarkError(execErr)
 								sc.setLastError(execErr)
 							}
 						}
 					}
 
 					if node.State().Status != NodeStatusCancel {
-						node.data.IncDoneCount()
+						node.IncDoneCount()
 					}
 
-					if node.data.Step().RepeatPolicy.Repeat {
-						if execErr == nil || node.data.Step().ContinueOn.Failure {
-							if !sc.isCanceled() {
-								time.Sleep(node.data.Step().RepeatPolicy.Interval)
-								if done != nil {
-									done <- node
-								}
-								continue ExecRepeat
+					shouldRepeat := false
+					step := node.Step()
+					if step.RepeatPolicy.Condition != nil {
+						// Ensure node's own output variables are reloaded
+						// before evaluating the condition.
+						if node.inner.State.OutputVariables != nil {
+							env := executor.GetEnv(ctx)
+							env.ForceLoadOutputVariables(node.inner.State.OutputVariables)
+							ctx = executor.WithEnv(ctx, env)
+						}
+						shell := cmdutil.GetShellCommand(step.Shell)
+						err := EvalCondition(ctx, shell, step.RepeatPolicy.Condition)
+						if step.RepeatPolicy.Condition.Expected != "" {
+							// Repeat as long as condition does NOT match expected (err != nil)
+							if err != nil {
+								shouldRepeat = true
+							}
+						} else {
+							// Repeat as long as it returns exit code 0 (err == nil)
+							if err == nil {
+								shouldRepeat = true
 							}
 						}
+					} else if len(step.RepeatPolicy.ExitCode) > 0 {
+						// Repeat if last exit code matches any in ExitCode
+						lastExit := node.State().ExitCode
+						for _, code := range step.RepeatPolicy.ExitCode {
+							if lastExit == code {
+								shouldRepeat = true
+								break
+							}
+						}
+					} else if step.RepeatPolicy.Repeat {
+						// Unconditional repeat
+						shouldRepeat = (execErr == nil || step.ContinueOn.Failure)
 					}
 
-					if execErr != nil && done != nil {
-						done <- node
+					if shouldRepeat && !sc.isCanceled() {
+						time.Sleep(step.RepeatPolicy.Interval)
+						if progressCh != nil {
+							progressCh <- node
+						}
+						continue
+					}
+
+					if execErr != nil && progressCh != nil {
+						progressCh <- node
 						return
 					}
 
@@ -240,16 +348,16 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 
 				// finish the node
 				if node.State().Status == NodeStatusRunning {
-					node.data.SetStatus(NodeStatusSuccess)
+					node.SetStatus(NodeStatusSuccess)
 				}
 
 				if err := sc.teardownNode(ctx, node); err != nil {
 					sc.setLastError(err)
-					node.data.SetStatus(NodeStatusError)
+					node.SetStatus(NodeStatusError)
 				}
 
-				if done != nil {
-					done <- node
+				if progressCh != nil {
+					progressCh <- node
 				}
 			}(ctx, node)
 
@@ -261,35 +369,37 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 
 	wg.Wait()
 
-	var handlers []digraph.HandlerType
+	// Collect final metrics
+	sc.metrics.totalExecutionTime = time.Since(sc.metrics.startTime)
+
+	var eventHandlers []digraph.HandlerType
 	switch sc.Status(graph) {
 	case StatusSuccess:
-		handlers = append(handlers, digraph.HandlerOnSuccess)
+		eventHandlers = append(eventHandlers, digraph.HandlerOnSuccess)
 
 	case StatusError:
-		handlers = append(handlers, digraph.HandlerOnFailure)
+		eventHandlers = append(eventHandlers, digraph.HandlerOnFailure)
 
 	case StatusCancel:
-		handlers = append(handlers, digraph.HandlerOnCancel)
+		eventHandlers = append(eventHandlers, digraph.HandlerOnCancel)
 
-	case StatusNone:
-		// do nothing (should not happen)
-
-	case StatusRunning:
-		// do nothing (should not happen)
-
+	case StatusNone, StatusRunning, StatusQueued:
+		// These states should not occur at this point
+		logger.Warn(ctx, "Unexpected final status",
+			"status", sc.Status(graph).String(),
+			"dagRunId", sc.dagRunID)
 	}
 
-	handlers = append(handlers, digraph.HandlerOnExit)
-	for _, handler := range handlers {
+	eventHandlers = append(eventHandlers, digraph.HandlerOnExit)
+	for _, handler := range eventHandlers {
 		if handlerNode := sc.handlers[handler]; handlerNode != nil {
-			logger.Info(ctx, "Handler execution started", "handler", handlerNode.data.Name())
-			if err := sc.runHandlerNode(ctx, graph, handlerNode); err != nil {
+			logger.Info(ctx, "Handler execution started", "handler", handlerNode.Name())
+			if err := sc.runEventHandler(ctx, graph, handlerNode); err != nil {
 				sc.setLastError(err)
 			}
 
-			if done != nil {
-				done <- handlerNode
+			if progressCh != nil {
+				progressCh <- handlerNode
 			}
 		}
 	}
@@ -306,7 +416,7 @@ func (sc *Scheduler) setLastError(err error) {
 
 func (sc *Scheduler) setupNode(ctx context.Context, node *Node) error {
 	if !sc.dry {
-		return node.Setup(ctx, sc.logDir, sc.requestID)
+		return node.Setup(ctx, sc.logDir, sc.dagRunID)
 	}
 	return nil
 }
@@ -318,11 +428,9 @@ func (sc *Scheduler) teardownNode(ctx context.Context, node *Node) error {
 	return nil
 }
 
-// setupContext builds the context for a step.
-func (sc *Scheduler) setupContext(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
-	stepCtx := digraph.NewStepContext(ctx, node.data.Step())
+func (sc *Scheduler) setupEnviron(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
+	env := executor.NewEnv(ctx, node.Step())
 
-	// get output variables that are available to the next steps
 	curr := node.id
 	visited := make(map[int]struct{})
 	queue := []int{curr}
@@ -332,41 +440,38 @@ func (sc *Scheduler) setupContext(ctx context.Context, graph *ExecutionGraph, no
 			continue
 		}
 		visited[curr] = struct{}{}
-		queue = append(queue, graph.to[curr]...)
+		queue = append(queue, graph.To[curr]...)
 
-		node := graph.node(curr)
-		if node.data.Step().OutputVariables == nil {
+		node := graph.nodeByID[curr]
+		if node.inner.State.OutputVariables == nil {
 			continue
 		}
 
-		stepCtx.LoadOutputVariables(node.data.Step().OutputVariables)
+		env.LoadOutputVariables(node.inner.State.OutputVariables)
 	}
 
-	return digraph.WithStepContext(ctx, stepCtx)
+	return executor.WithEnv(ctx, env)
 }
 
-// buildStepContextForHandler builds the context for a handler.
-func (sc *Scheduler) buildStepContextForHandler(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
-	step := node.data.Step()
-	stepCtx := digraph.NewStepContext(ctx, step)
+func (sc *Scheduler) setupEnvironEventHandler(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
+	env := executor.NewEnv(ctx, node.Step())
 
 	// get all output variables
-	for _, node := range graph.Nodes() {
-		nodeStep := node.data.Step()
-		if nodeStep.OutputVariables == nil {
+	for _, node := range graph.nodes {
+		if node.inner.State.OutputVariables == nil {
 			continue
 		}
 
-		stepCtx.LoadOutputVariables(nodeStep.OutputVariables)
+		env.LoadOutputVariables(node.inner.State.OutputVariables)
 	}
 
-	return digraph.WithStepContext(ctx, stepCtx)
+	return executor.WithEnv(ctx, env)
 }
 
 func (sc *Scheduler) execNode(ctx context.Context, node *Node) error {
 	if !sc.dry {
 		if err := node.Execute(ctx); err != nil {
-			return fmt.Errorf("failed to execute step %q: %w", node.data.Name(), err)
+			return fmt.Errorf("failed to execute step %q: %w", node.Name(), err)
 		}
 	}
 
@@ -383,10 +488,10 @@ func (sc *Scheduler) Signal(
 		sc.setCanceled()
 	}
 
-	for _, node := range graph.Nodes() {
+	for _, node := range graph.nodes {
 		// for a repetitive task, we'll wait for the job to finish
 		// until time reaches max wait time
-		if !node.data.Step().RepeatPolicy.Repeat {
+		if !node.Step().RepeatPolicy.Repeat {
 			node.Signal(ctx, sig, allowOverride)
 		}
 	}
@@ -405,7 +510,7 @@ func (sc *Scheduler) Signal(
 // Cancel sends -1 signal to all nodes.
 func (sc *Scheduler) Cancel(ctx context.Context, g *ExecutionGraph) {
 	sc.setCanceled()
-	for _, node := range g.Nodes() {
+	for _, node := range g.nodes {
 		node.Cancel(ctx)
 	}
 }
@@ -451,8 +556,8 @@ func (sc *Scheduler) isCanceled() bool {
 
 func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 	ready := true
-	for _, dep := range g.to[node.id] {
-		dep := g.node(dep)
+	for _, dep := range g.To[node.id] {
+		dep := g.nodeByID[dep]
 
 		switch dep.State().Status {
 		case NodeStatusSuccess:
@@ -463,20 +568,20 @@ func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 				continue
 			}
 			ready = false
-			node.data.SetStatus(NodeStatusCancel)
-			node.data.SetError(ErrUpstreamFailed)
+			node.SetStatus(NodeStatusCancel)
+			node.SetError(ErrUpstreamFailed)
 
 		case NodeStatusSkipped:
 			if dep.shouldContinue(ctx) {
 				continue
 			}
 			ready = false
-			node.data.SetStatus(NodeStatusSkipped)
-			node.data.SetError(ErrUpstreamSkipped)
+			node.SetStatus(NodeStatusSkipped)
+			node.SetError(ErrUpstreamSkipped)
 
 		case NodeStatusCancel:
 			ready = false
-			node.data.SetStatus(NodeStatusCancel)
+			node.SetStatus(NodeStatusCancel)
 
 		case NodeStatusNone, NodeStatusRunning:
 			ready = false
@@ -489,14 +594,14 @@ func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 	return ready
 }
 
-func (sc *Scheduler) runHandlerNode(ctx context.Context, graph *ExecutionGraph, node *Node) error {
-	defer node.data.Finish()
+func (sc *Scheduler) runEventHandler(ctx context.Context, graph *ExecutionGraph, node *Node) error {
+	defer node.Finish()
 
-	node.data.SetStatus(NodeStatusRunning)
+	node.SetStatus(NodeStatusRunning)
 
 	if !sc.dry {
-		if err := node.Setup(ctx, sc.logDir, sc.requestID); err != nil {
-			node.data.SetStatus(NodeStatusError)
+		if err := node.Setup(ctx, sc.logDir, sc.dagRunID); err != nil {
+			node.SetStatus(NodeStatusError)
 			return nil
 		}
 
@@ -504,43 +609,56 @@ func (sc *Scheduler) runHandlerNode(ctx context.Context, graph *ExecutionGraph, 
 			_ = node.Teardown(ctx)
 		}()
 
-		ctx = sc.buildStepContextForHandler(ctx, graph, node)
+		ctx = sc.setupEnvironEventHandler(ctx, graph, node)
 		if err := node.Execute(ctx); err != nil {
-			node.data.SetStatus(NodeStatusError)
+			node.SetStatus(NodeStatusError)
 			return err
 		}
 
-		node.data.SetStatus(NodeStatusSuccess)
+		node.SetStatus(NodeStatusSuccess)
 	} else {
-		node.data.SetStatus(NodeStatusSuccess)
+		node.SetStatus(NodeStatusSuccess)
 	}
 
 	return nil
 }
 
 func (sc *Scheduler) setup(ctx context.Context) (err error) {
-	digraph.GetContext(ctx).ApplyEnvs()
+	// Apply environment variables specified for the DAG.
+	env := digraph.GetEnv(ctx)
+	env.ApplyEnvs(ctx)
 
 	if !sc.dry {
-		if err = os.MkdirAll(sc.logDir, 0755); err != nil {
+		if err = os.MkdirAll(sc.logDir, 0750); err != nil {
 			err = fmt.Errorf("failed to create log directory: %w", err)
 			return err
 		}
 	}
 
+	// Initialize handlers
 	sc.handlers = map[digraph.HandlerType]*Node{}
 	if sc.onExit != nil {
-		sc.handlers[digraph.HandlerOnExit] = &Node{data: newSafeData(NodeData{Step: *sc.onExit})}
+		sc.handlers[digraph.HandlerOnExit] = &Node{Data: newSafeData(NodeData{Step: *sc.onExit})}
 	}
 	if sc.onSuccess != nil {
-		sc.handlers[digraph.HandlerOnSuccess] = &Node{data: newSafeData(NodeData{Step: *sc.onSuccess})}
+		sc.handlers[digraph.HandlerOnSuccess] = &Node{Data: newSafeData(NodeData{Step: *sc.onSuccess})}
 	}
 	if sc.onFailure != nil {
-		sc.handlers[digraph.HandlerOnFailure] = &Node{data: newSafeData(NodeData{Step: *sc.onFailure})}
+		sc.handlers[digraph.HandlerOnFailure] = &Node{Data: newSafeData(NodeData{Step: *sc.onFailure})}
 	}
 	if sc.onCancel != nil {
-		sc.handlers[digraph.HandlerOnCancel] = &Node{data: newSafeData(NodeData{Step: *sc.onCancel})}
+		sc.handlers[digraph.HandlerOnCancel] = &Node{Data: newSafeData(NodeData{Step: *sc.onCancel})}
 	}
+
+	// Initialize metrics
+	sc.metrics.startTime = time.Now()
+
+	// Log scheduler setup
+	logger.Debug(ctx, "Scheduler setup complete",
+		"dagRunId", sc.dagRunID,
+		"maxActiveRuns", sc.maxActiveRuns,
+		"timeout", sc.timeout,
+		"dry", sc.dry)
 
 	return err
 }
@@ -553,7 +671,7 @@ func (sc *Scheduler) setCanceled() {
 
 func (*Scheduler) runningCount(g *ExecutionGraph) int {
 	count := 0
-	for _, node := range g.Nodes() {
+	for _, node := range g.nodes {
 		if node.State().Status == NodeStatusRunning {
 			count++
 		}
@@ -562,7 +680,7 @@ func (*Scheduler) runningCount(g *ExecutionGraph) int {
 }
 
 func (*Scheduler) isFinished(g *ExecutionGraph) bool {
-	for _, node := range g.Nodes() {
+	for _, node := range g.nodes {
 		if node.State().Status == NodeStatusRunning ||
 			node.State().Status == NodeStatusNone {
 			return false
@@ -574,7 +692,7 @@ func (*Scheduler) isFinished(g *ExecutionGraph) bool {
 func (sc *Scheduler) isSucceed(g *ExecutionGraph) bool {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
-	for _, node := range g.Nodes() {
+	for _, node := range g.nodes {
 		nodeStatus := node.State().Status
 		if nodeStatus == NodeStatusSuccess || nodeStatus == NodeStatusSkipped {
 			continue
@@ -588,6 +706,23 @@ func (sc *Scheduler) isTimeout(startedAt time.Time) bool {
 	return sc.timeout > 0 && time.Since(startedAt) > sc.timeout
 }
 
+// GetMetrics returns the current metrics for the scheduler
+func (sc *Scheduler) GetMetrics() map[string]any {
+	sc.mu.RLock()
+	defer sc.mu.RUnlock()
+
+	metrics := map[string]any{
+		"totalNodes":         sc.metrics.totalNodes,
+		"completedNodes":     sc.metrics.completedNodes,
+		"failedNodes":        sc.metrics.failedNodes,
+		"skippedNodes":       sc.metrics.skippedNodes,
+		"canceledNodes":      sc.metrics.canceledNodes,
+		"totalExecutionTime": sc.metrics.totalExecutionTime.String(),
+	}
+
+	return metrics
+}
+
 // handleNodeRetry handles the retry logic for a node based on exit codes and retry policy
 func (sc *Scheduler) handleNodeRetry(ctx context.Context, node *Node, execErr error) (shouldRetry bool) {
 	var exitCode int
@@ -597,7 +732,7 @@ func (sc *Scheduler) handleNodeRetry(ctx context.Context, node *Node, execErr er
 	if exitErr, ok := execErr.(*exec.ExitError); ok {
 		exitCode = exitErr.ExitCode()
 		exitCodeFound = true
-		logger.Debug(ctx, "Found ExitError", "error", execErr, "exitCode", exitCode)
+		logger.Debug(ctx, "Found exit error", "error", execErr, "exitCode", exitCode)
 	} else {
 		// Try to parse exit code from error string
 		errStr := execErr.Error()
@@ -630,17 +765,18 @@ func (sc *Scheduler) handleNodeRetry(ctx context.Context, node *Node, execErr er
 
 	if !shouldRetry {
 		// finish the node with error
-		node.data.SetStatus(NodeStatusError)
-		node.data.MarkError(execErr)
+		node.SetStatus(NodeStatusError)
+		node.MarkError(execErr)
 		sc.setLastError(execErr)
 		return false
 	}
 
-	// retry
-	node.data.IncRetryCount()
-	logger.Info(ctx, "Step execution failed. Retrying...", "step", node.data.Name(), "error", execErr, "retry", node.data.GetRetryCount(), "exitCode", exitCode)
+	logger.Info(ctx, "Step execution failed. Retrying...", "step", node.Name(), "error", execErr, "retry", node.GetRetryCount(), "exitCode", exitCode)
+
+	// Set the node status to none so that it can be retried
+	node.IncRetryCount()
 	time.Sleep(node.retryPolicy.Interval)
-	node.data.SetRetriedAt(time.Now())
-	node.data.SetStatus(NodeStatusNone)
+	node.SetRetriedAt(time.Now())
+	node.SetStatus(NodeStatusNone)
 	return true
 }

@@ -21,6 +21,12 @@ type ExitCoder interface {
 	ExitCode() int
 }
 
+// ChildDAG is an interface for child DAG executors.
+type ChildDAG interface {
+	SetDAGRunID(string)
+}
+
+// Creator is a function type that creates an Executor based on the step configuration.
 type Creator func(ctx context.Context, step digraph.Step) (Executor, error)
 
 var (

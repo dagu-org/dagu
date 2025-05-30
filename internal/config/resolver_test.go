@@ -19,7 +19,7 @@ func TestResolver(t *testing.T) {
 		tmpDir := fileutil.MustTempDir("test")
 		defer os.RemoveAll(tmpDir)
 
-		os.Setenv("TEST_APP_HOME", filepath.Join(tmpDir, build.Slug))
+		_ = os.Setenv("TEST_APP_HOME", filepath.Join(tmpDir, build.Slug))
 		r := config.NewResolver("TEST_APP_HOME", filepath.Join(tmpDir, ".dagu"), config.XDGConfig{})
 
 		assert.Equal(t, r, config.PathResolver{
@@ -68,7 +68,7 @@ func TestResolver(t *testing.T) {
 				ConfigDir:       path.Join("/home/user/.config", build.Slug),
 				DAGsDir:         path.Join("/home/user/.config", build.Slug, "dags"),
 				SuspendFlagsDir: path.Join("/home/user/.local/share", build.Slug, "suspend"),
-				DataDir:         path.Join("/home/user/.local/share", build.Slug, "history"),
+				DataDir:         path.Join("/home/user/.local/share", build.Slug, "data"),
 				LogsDir:         path.Join("/home/user/.local/share", build.Slug, "logs"),
 				AdminLogsDir:    path.Join("/home/user/.local/share", build.Slug, "logs", "admin"),
 				BaseConfigFile:  path.Join("/home/user/.config", build.Slug, "base.yaml"),

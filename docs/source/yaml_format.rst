@@ -234,7 +234,7 @@ Examples:
 .. code-block:: yaml
 
   steps:
-    - name: sub workflow
+    - name: child DAG
       run: sub_workflow
       output: SUB_RESULT
     - name: use output
@@ -600,7 +600,8 @@ Complete list of DAG-level configuration options:
 - ``histRetentionDays``: Days to keep execution history
 - ``timeoutSec``: DAG timeout in seconds
 - ``delaySec``: Delay between steps
-- ``maxActiveRuns``: Maximum parallel steps
+- ``maxActiveSteps``: Maximum parallel steps (default: no limit)
+- ``maxActiveRuns``: Maximum parallel workflows (default: 1)
 - ``params``: Default parameters
 - ``precondition``: DAG-level conditions
 - ``mailOn``: Email notification settings
@@ -626,7 +627,7 @@ Example DAG configuration:
     histRetentionDays: 3
     timeoutSec: 3600
     delaySec: 1                          
-    maxActiveRuns: 1                     
+    maxActiveSteps: 1                     
     params: param1 param2                
     precondition:                       
       - condition: "`echo $2`"           

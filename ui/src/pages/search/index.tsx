@@ -1,23 +1,38 @@
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import React, { useEffect, useRef } from 'react';
-import { Box, Button, Grid, Stack, TextField, Typography } from '@mui/material';
-import useSWR from 'swr';
 import { useSearchParams } from 'react-router-dom';
-import Title from '../../components/atoms/Title';
-import { GetSearchResponse } from '../../models/api';
-import SearchResult from '../../components/molecules/SearchResult';
-import LoadingIndicator from '../../components/atoms/LoadingIndicator';
 import { AppBarContext } from '../../contexts/AppBarContext';
+import SearchResult from '../../features/search/components/SearchResult';
+import { useQuery } from '../../hooks/api';
+import LoadingIndicator from '../../ui/LoadingIndicator';
+import Title from '../../ui/Title';
 
 function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchVal, setSearchVal] = React.useState(searchParams.get('q') || '');
   const appBarContext = React.useContext(AppBarContext);
 
-  const { data, error } = useSWR<GetSearchResponse>(
-    `/search?q=${searchParams.get('q') || ''}&remoteNode=${
-      appBarContext.selectedRemoteNode || 'local'
-    }`
+  const q = searchParams.get('q') || '';
+  // Use a conditional key pattern - this is a standard SWR pattern for conditional fetching
+  // When q is empty, we pass undefined for the first parameter, which tells SWR not to fetch
+  const { data, isLoading } = useQuery(
+    q ? '/dags/search' : (undefined as any), // eslint-disable-line @typescript-eslint/no-explicit-any
+    q
+      ? {
+          params: {
+            query: {
+              remoteNode: appBarContext.selectedRemoteNode || 'local',
+              q,
+            },
+          },
+        }
+      : {},
+    {
+      refreshInterval: q ? 2000 : 0,
+    }
   );
+
   const ref = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -30,25 +45,24 @@ function Search() {
     });
   }, []);
 
+  if (q && isLoading) {
+    return <LoadingIndicator />;
+  }
+
   return (
-    <Grid container sx={{ mx: 4, width: '100%' }}>
-      <Grid item xs={12}>
-        <Title>Search</Title>
-        <Stack spacing={2} direction="row">
-          <TextField
-            label="Search Text"
-            variant="outlined"
-            style={{
-              flex: 0.5,
+    <div className="w-full">
+      <div className="w-full">
+        <Title>Search DAG Definitions</Title>
+        <div className="flex space-x-4 items-center">
+          <Input
+            placeholder="Search text..."
+            className="flex-1"
+            ref={ref}
+            value={searchVal}
+            onChange={(e) => {
+              setSearchVal(e.target.value);
             }}
-            inputRef={ref}
-            InputProps={{
-              value: searchVal,
-              onChange: (e) => {
-                setSearchVal(e.target.value);
-              },
-              type: 'search',
-            }}
+            type="search"
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 if (searchVal) {
@@ -59,48 +73,53 @@ function Search() {
           />
           <Button
             disabled={!searchVal}
-            variant="outlined"
-            sx={{
-              width: '100px',
-              border: 0,
-            }}
+            variant="outline"
+            className="w-24 cursor-pointer"
             onClick={async () => {
               onSubmit(searchVal);
             }}
           >
             Search
           </Button>
-        </Stack>
+        </div>
 
-        <Box mt={2}>
+        <div className="mt-4">
           {(() => {
-            if (!data && !error) {
-              return <LoadingIndicator />;
+            if (!q) {
+              return (
+                <div className="text-sm text-gray-500 italic">
+                  Enter a search term and press Enter or click Search
+                </div>
+              );
             }
 
-            if (data && data.Results && data.Results.length > 0) {
+            if (data && data.results && data.results.length > 0) {
               return (
-                <Box>
-                  <Typography variant="h6" style={{ fontStyle: 'bolder' }}>
-                    {data.Results.length} results found
-                  </Typography>
-                  <SearchResult results={data?.Results} />
-                </Box>
+                <div>
+                  <h2 className="text-lg font-semibold mb-2">
+                    {data.results.length} results found
+                  </h2>
+                  <SearchResult results={data.results} />
+                </div>
               );
             }
 
             if (
-              (data && !data.Results) ||
-              (data && data.Results && data.Results.length === 0)
+              (data && !data.results) ||
+              (data && data.results && data.results.length === 0)
             ) {
-              return <Box>No results found</Box>;
+              return (
+                <div className="text-sm text-gray-500 italic">
+                  No results found
+                </div>
+              );
             }
 
             return null;
           })()}
-        </Box>
-      </Grid>
-    </Grid>
+        </div>
+      </div>
+    </div>
   );
 }
 export default Search;

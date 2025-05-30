@@ -1,10 +1,12 @@
-package scheduler
+package scheduler_test
 
 import (
 	"context"
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/dagrun"
+	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/stretchr/testify/require"
 )
 
@@ -13,7 +15,7 @@ func TestReadEntries(t *testing.T) {
 	now := expectedNext.Add(-time.Second)
 
 	t.Run("InvalidDirectory", func(t *testing.T) {
-		manager := NewDAGJobManager("invalid_directory", nil, "", "")
+		manager := scheduler.NewEntryReader("invalid_directory", nil, dagrun.Manager{}, "", "")
 		jobs, err := manager.Next(context.Background(), expectedNext)
 		require.NoError(t, err)
 		require.Len(t, jobs, 0)
@@ -25,10 +27,10 @@ func TestReadEntries(t *testing.T) {
 		done := make(chan any)
 		defer close(done)
 
-		err := th.manager.Start(ctx, done)
+		err := th.EntryReader.Start(ctx, done)
 		require.NoError(t, err)
 
-		jobs, err := th.manager.Next(ctx, now)
+		jobs, err := th.EntryReader.Next(ctx, now)
 		require.NoError(t, err)
 		require.NotEmpty(t, jobs, "jobs should not be empty")
 
@@ -43,32 +45,32 @@ func TestReadEntries(t *testing.T) {
 		done := make(chan any)
 		defer close(done)
 
-		err := th.manager.Start(ctx, done)
+		err := th.EntryReader.Start(ctx, done)
 		require.NoError(t, err)
 
-		beforeSuspend, err := th.manager.Next(ctx, now)
+		beforeSuspend, err := th.EntryReader.Next(ctx, now)
 		require.NoError(t, err)
 
 		// find the job and suspend it
 		job := findJobByName(t, beforeSuspend, "scheduled_job").Job
-		dagJob, ok := job.(*dagJob)
+		dagJob, ok := job.(*scheduler.DAGRunJob)
 		require.True(t, ok)
-		dag := dagJob.DAG
-		err = th.client.ToggleSuspend(ctx, dag.Name, true)
+
+		err = th.DAGStore.ToggleSuspend(ctx, dagJob.DAG.Name, true)
 		require.NoError(t, err)
 
 		// check if the job is suspended and not returned
-		afterSuspend, err := th.manager.Next(ctx, now)
+		afterSuspend, err := th.EntryReader.Next(ctx, now)
 		require.NoError(t, err)
 		require.Equal(t, len(afterSuspend), len(beforeSuspend)-1, "suspended job should not be returned")
 	})
 }
 
-func findJobByName(t *testing.T, jobs []*ScheduledJob, name string) *ScheduledJob {
+func findJobByName(t *testing.T, jobs []*scheduler.ScheduledJob, name string) *scheduler.ScheduledJob {
 	t.Helper()
 
 	for _, job := range jobs {
-		dagJob, ok := job.Job.(*dagJob)
+		dagJob, ok := job.Job.(*scheduler.DAGRunJob)
 		if ok && dagJob.DAG.Name == name {
 			return job
 		}

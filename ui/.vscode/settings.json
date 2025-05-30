@@ -1,4 +1,9 @@
 {
+  "editor.renderWhitespace": "all",
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "prettier.tabWidth": 2,
+  "editor.tabSize": 2,
+  "editor.formatOnSave": true,
   "[typescript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true
@@ -10,5 +15,14 @@
   "[javascript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true
-  }
+  },
+  "json.schemas": [
+    {
+      "fileMatch": [
+        "tsconfig.json",
+        "tsconfig.*.json"
+      ],
+      "url": "https://json.schemastore.org/tsconfig"
+    }
+  ]
 }

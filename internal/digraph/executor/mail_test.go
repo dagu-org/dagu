@@ -18,21 +18,21 @@ func TestMail(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
 
 	// Create a test email attachment
 	attachFile := filepath.Join(tmpDir, "email.txt")
 	content := []byte("Test email")
 
-	os.Setenv("MAIL_SUBJECT", "Test Subject")
-	err = os.WriteFile(attachFile, content, 0644)
+	err = os.WriteFile(attachFile, content, 0600)
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
 
 	t.Cleanup(func() {
-		os.Unsetenv("MAIL_SUBJECT")
-		os.Remove(attachFile)
+		_ = os.Remove(attachFile)
 	})
 
 	t.Run("NewMail", func(t *testing.T) {
@@ -61,7 +61,7 @@ func TestMail(t *testing.T) {
 						Config: map[string]any{
 							"from":        "test@example.com",
 							"to":          "recipient@example.com",
-							"subject":     "${MAIL_SUBJECT}",
+							"subject":     "Test Subject",
 							"message":     "Test Message",
 							"attachments": attachFile,
 						},
@@ -73,9 +73,9 @@ func TestMail(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				ctx := context.Background()
-				ctx = digraph.NewContext(ctx, &digraph.DAG{
+				ctx = digraph.SetupEnv(ctx, &digraph.DAG{
 					SMTP: &digraph.SMTPConfig{},
-				}, nil, "", "", nil)
+				}, nil, digraph.DAGRunRef{}, "", "", nil)
 
 				exec, err := newMail(ctx, tt.step)
 

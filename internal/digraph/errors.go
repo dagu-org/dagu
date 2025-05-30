@@ -35,6 +35,8 @@ func wrapError(field string, value any, err error) error {
 
 // errors on building a DAG.
 var (
+	ErrNameTooLong                         = errors.New("name must be less than 40 characters")
+	ErrNameInvalidChars                    = errors.New("name must only contain alphanumeric characters, dashes, dots, and underscores")
 	ErrInvalidSchedule                     = errors.New("invalid schedule")
 	ErrScheduleMustBeStringOrArray         = errors.New("schedule must be a string or an array of strings")
 	ErrInvalidScheduleType                 = errors.New("invalid schedule type")
@@ -43,6 +45,9 @@ var (
 	ErrDuplicateFunction                   = errors.New("duplicate function")
 	ErrFuncParamsMismatch                  = errors.New("func params and args given to func command do not match")
 	ErrStepNameRequired                    = errors.New("step name must be specified")
+	ErrStepNameDuplicate                   = errors.New("step name must be unique")
+	ErrStepNameTooLong                     = errors.New("step name must be less than 40 characters")
+	ErrStepNameInvalidChars                = errors.New("step name must only contain alphanumeric characters, dashes, dots, underscores, and spaces")
 	ErrStepCommandIsRequired               = errors.New("step command is required")
 	ErrStepCommandIsEmpty                  = errors.New("step command is empty")
 	ErrStepCommandMustBeArrayOrString      = errors.New("step command must be an array of strings or a string")
@@ -58,9 +63,8 @@ var (
 	ErrExecutorConfigValueMustBeMap        = errors.New("executor.config value must be a map")
 	ErrExecutorHasInvalidKey               = errors.New("executor has invalid key")
 	ErrExecutorConfigMustBeStringOrMap     = errors.New("executor config must be string or map")
-	ErrDotenvMustBeStringOrArray           = errors.New("dotenv must be a string or an array of strings")
+	ErrDotEnvMustBeStringOrArray           = errors.New("dotenv must be a string or an array of strings")
 	ErrPreconditionMustBeArrayOrString     = errors.New("precondition must be a string or an array of strings")
-	ErrPreconditionKeyMustBeString         = errors.New("precondition key must be a string")
 	ErrPreconditionValueMustBeString       = errors.New("precondition value must be a string")
 	ErrPreconditionHasInvalidKey           = errors.New("precondition has invalid key")
 	ErrContinueOnOutputMustBeStringOrArray = errors.New("continueOn.Output must be a string or an array of strings")
@@ -80,12 +84,33 @@ func (e *ErrorList) Add(err error) {
 	}
 }
 
-// Error implements the error interface.
-// It returns a string with all the errors separated by a semicolon.
-func (e *ErrorList) Error() string {
+// ToStringList returns the list of errors as a slice of strings.
+func (e *ErrorList) ToStringList() []string {
 	errStrings := make([]string, len(*e))
 	for i, err := range *e {
 		errStrings[i] = err.Error()
 	}
+	return errStrings
+}
+
+// Error implements the error interface.
+// It returns a string with all the errors separated by a semicolon.
+func (e ErrorList) Error() string {
+	errStrings := make([]string, len(e))
+	for i, err := range e {
+		errStrings[i] = err.Error()
+	}
 	return strings.Join(errStrings, "; ")
+}
+
+// Unwrap implements the errors.Unwrap interface.
+func (e ErrorList) Unwrap() []error {
+	// If the list is empty, return nil
+	if len(e) == 0 {
+		return nil
+	}
+
+	// Return a copy of the underlying error slice
+	// This allows errors.Is to check against each error in the list
+	return e
 }

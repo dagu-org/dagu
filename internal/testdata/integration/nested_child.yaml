@@ -1,0 +1,12 @@
+params:
+  PARAM: VALUE
+steps:
+  - name: child
+    run: nested_grand_child
+    params: "PARAM=${PARAM}"
+    output: GRAND_CHILD_OUTPUT
+  - name: output
+    command: "echo ${GRAND_CHILD_OUTPUT.outputs.OUTPUT}"
+    depends:
+      - child
+    output: OUTPUT

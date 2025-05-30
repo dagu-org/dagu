@@ -6,15 +6,15 @@
   "properties": {
     "name": {
       "type": "string",
-      "description": "Name of the DAG. If omitted, defaults to the YAML filename without extension. This serves as a unique identifier for the workflow."
+      "description": "Name of the DAG. If omitted, defaults to the YAML filename without extension."
     },
     "description": {
       "type": "string",
-      "description": "A brief description explaining what this DAG does. This helps document the workflow's purpose."
+      "description": "A brief description explaining what this DAG does. This helps document the DAG's purpose."
     },
     "group": {
       "type": "string",
-      "description": "An organizational label used to group related DAGs together. Useful for categorizing workflows in the UI, e.g., 'DailyJobs', 'Analytics'."
+      "description": "An organizational label used to group related DAGs together. Useful for categorizing DAGs in the UI, e.g., 'DailyJobs', 'Analytics'."
     },
     "dotenv": {
       "oneOf": [
@@ -34,7 +34,7 @@
     },
     "schedule": {
       "type": "string",
-      "description": "Cron expression that determines how often the DAG runs (e.g., '5 4 * * *' runs daily at 04:05). If omitted, the DAG will only run manually."
+      "description": "Cron expression that determines how often the DAG triggers (e.g., '5 4 * * *' runs daily at 04:05). If omitted, the DAG will only run manually."
     },
     "skipIfSuccessful": {
       "type": "boolean",
@@ -54,7 +54,7 @@
           "description": "List of tags for categorization"
         }
       ],
-      "description": "Tags for categorizing and searching DAGs. Useful for filtering and organizing workflows."
+      "description": "Tags for categorizing and searching DAGs. Useful for filtering and organizing DAGs."
     },
     "env": {
       "oneOf": [
@@ -92,7 +92,7 @@
           "$ref": "#/definitions/step"
         }
       },
-      "description": "Lifecycle event hooks that define commands to execute when the DAG succeeds, fails, is cancelled, or exits. Useful for cleanup, notifications, or triggering dependent workflows."
+      "description": "Lifecycle event hooks that define commands to execute when the DAG succeeds, fails, is cancelled, or exits. Useful for cleanup, notifications, or triggering dependent DAGs."
     },
     "smtp": {
       "type": "object",
@@ -214,7 +214,7 @@
           "items": {
             "$ref": "#/definitions/step"
           },
-          "description": "List of steps that define the workflow. Steps can depend on each other, forming a directed acyclic graph."
+          "description": "List of steps that define the DAG. Steps can depend on each other, forming a directed acyclic graph."
         },
         {
           "type": "object",
@@ -286,6 +286,13 @@
           "type": "string",
           "description": "Specific shell to use for executing the command. Defaults to $SHELL or sh if not specified."
         },
+        "packages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of packages to install before executing the step. Useful for ensuring dependencies are available. It's only available when the shell is nix-shell."
+        },
         "script": {
           "type": "string",
           "description": "Multi-line script content that will be executed. Gets piped into the command if specified, otherwise uses default shell."
@@ -322,11 +329,11 @@
           "properties": {
             "failure": {
               "type": "boolean",
-              "description": "Continue DAG execution even if this step fails"
+              "description": "Continue dag-run even if this step fails"
             },
             "skipped": {
               "type": "boolean",
-              "description": "Continue DAG execution even if this step is skipped due to preconditions"
+              "description": "Continue dag-run even if this step is skipped due to preconditions"
             },
             "exitCode": {
               "oneOf": [
@@ -410,9 +417,24 @@
             "intervalSec": {
               "type": "integer",
               "description": "Interval in seconds between repetitions"
+            },
+            "condition": {
+              "type": "string",
+              "description": "Command or expression to evaluate for repeat-until. Can include shell commands, environment variables, or command substitutions."
+            },
+            "expected": {
+              "type": "string",
+              "description": "Expected value or pattern to match against the condition result. Supports regex patterns with 're:' prefix."
+            },
+            "exitCode": {
+              "oneOf": [
+                { "type": "integer" },
+                { "type": "array", "items": { "type": "integer" } }
+              ],
+              "description": "Exit code or list of exit codes that will stop repetition. If not specified, all non-zero exit codes will trigger repetition."
             }
           },
-          "description": "Configuration for repeatedly executing this step at fixed intervals."
+          "description": "Configuration for repeatedly executing this step at fixed intervals or until a condition is met. Supports string matching, command substitution, and exit code checks."
         },
         "mailOnError": {
           "type": "boolean",
@@ -452,11 +474,11 @@
         },
         "run": {
           "type": "string",
-          "description": "Name of a sub-workflow (another DAG) to run as this step."
+          "description": "Name of a DAG to run."
         },
         "params": {
           "type": "string",
-          "description": "Parameters to pass to the sub-workflow when using 'run'."
+          "description": "Parameters to pass to the DAG."
         }
       }
     },

@@ -5,46 +5,74 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
 )
 
 func CmdStatus() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "status [flags] /path/to/spec.yaml",
-			Short: "Display the current status of a DAG",
-			Long: `Show real-time status information for a specified DAG execution.
+			Use:   "status [flags] <DAG name>",
+			Short: "Display the current status of a DAG-run",
+			Long: `Show real-time status information for a specified DAG-run instance.
+
+This command retrieves and displays the current execution status of a DAG-run,
+including its state (running, completed, failed), process ID, and other relevant details.
+
+Flags:
+  --run-id string (optional) Unique identifier of the DAG-run to check.
+                                 If not provided, it will show the status of the
+                                 most recent DAG-run for the given name.
 
 Example:
-  dagu status my_dag.yaml
+  dagu status --run-id=abc123 my_dag
+  dagu status my_dag  # Shows status of the most recent DAG-run
 `,
 			Args: cobra.ExactArgs(1),
 		}, statusFlags, runStatus,
 	)
 }
 
-var statusFlags = []commandLineFlag{}
+var statusFlags = []commandLineFlag{
+	dagRunIDFlagStatus,
+}
 
 func runStatus(ctx *Context, args []string) error {
-	dag, err := digraph.Load(ctx, args[0], digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig))
+	dagRunID, err := ctx.StringParam("run-id")
 	if err != nil {
-		logger.Error(ctx, "Failed to load DAG", "path", args[0], "err", err)
-		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
+		return fmt.Errorf("failed to get dag-run ID: %w", err)
 	}
 
-	cli, err := ctx.Client()
-	if err != nil {
-		logger.Error(ctx, "failed to initialize client", "err", err)
-		return fmt.Errorf("failed to initialize client: %w", err)
+	name := args[0]
+
+	var attempt models.DAGRunAttempt
+	if dagRunID != "" {
+		// Retrieve the previous run's record for the specified dag-run ID.
+		dagRunRef := digraph.NewDAGRunRef(name, dagRunID)
+		att, err := ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
+		if err != nil {
+			return fmt.Errorf("failed to find run data for dag-run ID %s: %w", dagRunID, err)
+		}
+		attempt = att
+	} else {
+		r, err := ctx.DAGRunStore.LatestAttempt(ctx, name)
+		if err != nil {
+			return fmt.Errorf("failed to find the latest run data for DAG %s: %w", name, err)
+		}
+		attempt = r
 	}
 
-	status, err := cli.GetCurrentStatus(ctx, dag)
+	dag, err := attempt.ReadDAG(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to retrieve current status", "dag", dag.Name, "err", err)
+		return fmt.Errorf("failed to read DAG from run data: %w", err)
+	}
+
+	status, err := ctx.DAGRunMgr.GetCurrentStatus(ctx, dag, dagRunID)
+	if err != nil {
 		return fmt.Errorf("failed to retrieve current status: %w", err)
 	}
 
-	logger.Info(ctx, "Current status", "pid", status.PID, "status", status.Status)
+	logger.Info(ctx, "Current status", "pid", status.PID, "status", status.Status.String())
 
 	return nil
 }

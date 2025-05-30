@@ -3,6 +3,7 @@ package digraph
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -49,6 +50,12 @@ type BuildOpts struct {
 	ParametersList []string
 	// NoEval specifies whether to evaluate dynamic fields.
 	NoEval bool
+	// Name of the DAG if it's not defined in the spec
+	Name string
+	// DAGsDir is the directory containing the DAG files.
+	DAGsDir string
+	// AllowBuildErrors specifies whether to allow build errors.
+	AllowBuildErrors bool
 }
 
 var builderRegistry = []builderEntry{
@@ -56,9 +63,11 @@ var builderRegistry = []builderEntry{
 	{metadata: true, name: "schedule", fn: buildSchedule},
 	{metadata: true, name: "skipIfSuccessful", fn: skipIfSuccessful},
 	{metadata: true, name: "params", fn: buildParams},
+	{metadata: true, name: "name", fn: buildName},
 	{name: "dotenv", fn: buildDotenv},
 	{name: "mailOn", fn: buildMailOn},
 	{name: "steps", fn: buildSteps},
+	{name: "validateSteps", fn: validateSteps},
 	{name: "logDir", fn: buildLogDir},
 	{name: "handlers", fn: buildHandlers},
 	{name: "smtpConfig", fn: buildSMTPConfig},
@@ -79,13 +88,14 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "executor", fn: buildExecutor},
 	{name: "command", fn: buildCommand},
 	{name: "depends", fn: buildDepends},
-	{name: "subworkflow", fn: buildSubWorkflow},
+	{name: "childDAG", fn: buildChildDAG},
 	{name: "continueOn", fn: buildContinueOn},
 	{name: "retryPolicy", fn: buildRetryPolicy},
 	{name: "repeatPolicy", fn: buildRepeatPolicy},
 	{name: "signalOnStop", fn: buildSignalOnStop},
 	{name: "precondition", fn: buildStepPrecondition},
 	{name: "output", fn: buildOutput},
+	{name: "validate", fn: validateStep},
 }
 
 type stepBuilderEntry struct {
@@ -99,15 +109,21 @@ type StepBuilderFn func(ctx BuildContext, def stepDef, step *Step) error
 // build builds a DAG from the specification.
 func build(ctx BuildContext, spec *definition) (*DAG, error) {
 	dag := &DAG{
-		Location:      ctx.file,
-		Name:          spec.Name,
-		Group:         spec.Group,
-		Description:   spec.Description,
-		Timeout:       time.Second * time.Duration(spec.TimeoutSec),
-		Delay:         time.Second * time.Duration(spec.DelaySec),
-		RestartWait:   time.Second * time.Duration(spec.RestartWaitSec),
-		Tags:          parseTags(spec.Tags),
-		MaxActiveRuns: spec.MaxActiveRuns,
+		Location:       ctx.file,
+		Name:           spec.Name,
+		Group:          spec.Group,
+		Description:    spec.Description,
+		Timeout:        time.Second * time.Duration(spec.TimeoutSec),
+		Delay:          time.Second * time.Duration(spec.DelaySec),
+		RestartWait:    time.Second * time.Duration(spec.RestartWaitSec),
+		Tags:           parseTags(spec.Tags),
+		MaxActiveRuns:  spec.MaxActiveRuns,
+		MaxActiveSteps: spec.MaxActiveSteps,
+	}
+
+	// For backward compatibility, set MaxActiveSteps to MaxActiveRuns
+	if spec.MaxActiveRuns > 0 {
+		dag.MaxActiveSteps = spec.MaxActiveRuns
 	}
 
 	var errs ErrorList
@@ -120,15 +136,15 @@ func build(ctx BuildContext, spec *definition) (*DAG, error) {
 		}
 	}
 
-	if !ctx.opts.OnlyMetadata {
-		// TODO: Remove functions feature.
-		if err := assertFunctions(spec.Functions); err != nil {
-			errs.Add(err)
-		}
-	}
-
 	if len(errs) > 0 {
-		return nil, &errs
+		if ctx.opts.AllowBuildErrors {
+			// If we are allowing build errors, return the DAG with the errors.
+			dag.BuildErrors = errs
+			dag.Steps = nil // Clear steps if there are build errors
+		} else {
+			// If we are not allowing build errors, return an error.
+			return nil, fmt.Errorf("failed to build DAG: %w", errs)
+		}
 	}
 
 	return dag, nil
@@ -205,7 +221,7 @@ func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
 			starts = append(starts, s)
 		}
 
-	case map[any]any:
+	case map[string]any:
 		// Case 3. schedule is a map.
 		if err := parseScheduleMap(
 			schedule, &starts, &stops, &restarts,
@@ -250,11 +266,11 @@ func buildDotenv(ctx BuildContext, spec *definition, dag *DAG) error {
 			case string:
 				dag.Dotenv = append(dag.Dotenv, e)
 			default:
-				return wrapError("dotenv", e, ErrDotenvMustBeStringOrArray)
+				return wrapError("dotenv", e, ErrDotEnvMustBeStringOrArray)
 			}
 		}
 	default:
-		return wrapError("dotenv", v, ErrDotenvMustBeStringOrArray)
+		return wrapError("dotenv", v, ErrDotEnvMustBeStringOrArray)
 	}
 
 	if !ctx.opts.NoEval {
@@ -293,6 +309,37 @@ func buildMailOn(_ BuildContext, spec *definition, dag *DAG) error {
 	return nil
 }
 
+// buildName set the name if name is specified by the option but if Name is defined
+// it does not override
+func buildName(ctx BuildContext, spec *definition, dag *DAG) error {
+	if spec.Name != "" {
+		return nil
+	}
+
+	dag.Name = ctx.opts.Name
+
+	// Validate the name
+	if dag.Name == "" {
+		return nil
+	}
+
+	if len(dag.Name) > maxNameLen {
+		return wrapError("name", dag.Name, ErrNameTooLong)
+	}
+	if !regexName.MatchString(dag.Name) {
+		return wrapError("name", dag.Name, ErrNameInvalidChars)
+	}
+
+	return nil
+}
+
+// regexName is a regular expression that matches valid names.
+// It allows alphanumeric characters, underscores, hyphens, and dots.
+var regexName = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
+
+// maxNameLen is the maximum length of a name.
+var maxNameLen = 40
+
 // buildEnvs builds the environment variables for the DAG.
 // Case 1: env is an array of maps with string keys and string values.
 // Case 2: env is a map with string keys and string values.
@@ -321,28 +368,28 @@ func buildLogDir(_ BuildContext, spec *definition, dag *DAG) (err error) {
 func buildHandlers(ctx BuildContext, spec *definition, dag *DAG) (err error) {
 	if spec.HandlerOn.Exit != nil {
 		spec.HandlerOn.Exit.Name = HandlerOnExit.String()
-		if dag.HandlerOn.Exit, err = buildStep(ctx, *spec.HandlerOn.Exit, spec.Functions); err != nil {
+		if dag.HandlerOn.Exit, err = buildStep(ctx, *spec.HandlerOn.Exit); err != nil {
 			return err
 		}
 	}
 
 	if spec.HandlerOn.Success != nil {
 		spec.HandlerOn.Success.Name = HandlerOnSuccess.String()
-		if dag.HandlerOn.Success, err = buildStep(ctx, *spec.HandlerOn.Success, spec.Functions); err != nil {
+		if dag.HandlerOn.Success, err = buildStep(ctx, *spec.HandlerOn.Success); err != nil {
 			return
 		}
 	}
 
 	if spec.HandlerOn.Failure != nil {
 		spec.HandlerOn.Failure.Name = HandlerOnFailure.String()
-		if dag.HandlerOn.Failure, err = buildStep(ctx, *spec.HandlerOn.Failure, spec.Functions); err != nil {
+		if dag.HandlerOn.Failure, err = buildStep(ctx, *spec.HandlerOn.Failure); err != nil {
 			return
 		}
 	}
 
 	if spec.HandlerOn.Cancel != nil {
 		spec.HandlerOn.Cancel.Name = HandlerOnCancel.String()
-		if dag.HandlerOn.Cancel, err = buildStep(ctx, *spec.HandlerOn.Cancel, spec.Functions); err != nil {
+		if dag.HandlerOn.Cancel, err = buildStep(ctx, *spec.HandlerOn.Cancel); err != nil {
 			return
 		}
 	}
@@ -367,43 +414,41 @@ func buildPrecondition(ctx BuildContext, spec *definition, dag *DAG) error {
 	return nil
 }
 
-func parsePrecondition(ctx BuildContext, precondition any) ([]Condition, error) {
+func parsePrecondition(ctx BuildContext, precondition any) ([]*Condition, error) {
 	switch v := precondition.(type) {
 	case nil:
 		return nil, nil
 
 	case string:
-		return []Condition{{Command: v}}, nil
+		return []*Condition{{Condition: v}}, nil
 
-	case map[any]any:
+	case map[string]any:
 		var ret Condition
-		for k, vv := range v {
-			key, ok := k.(string)
-			if !ok {
-				return nil, wrapError("preconditions", k, ErrPreconditionKeyMustBeString)
-			}
-
+		for key, vv := range v {
 			switch strings.ToLower(key) {
 			case "condition":
-				ret.Condition, ok = vv.(string)
+				val, ok := vv.(string)
 				if !ok {
 					return nil, wrapError("preconditions", vv, ErrPreconditionValueMustBeString)
 				}
+				ret.Condition = val
 
 			case "expected":
-				ret.Expected, ok = vv.(string)
+				val, ok := vv.(string)
 				if !ok {
 					return nil, wrapError("preconditions", vv, ErrPreconditionValueMustBeString)
 				}
+				ret.Expected = val
 
 			case "command":
-				ret.Command, ok = vv.(string)
+				val, ok := vv.(string)
 				if !ok {
 					return nil, wrapError("preconditions", vv, ErrPreconditionValueMustBeString)
 				}
+				ret.Condition = val
 
 			default:
-				return nil, wrapError("preconditions", k, fmt.Errorf("%w: %s", ErrPreconditionHasInvalidKey, key))
+				return nil, wrapError("preconditions", key, fmt.Errorf("%w: %s", ErrPreconditionHasInvalidKey, key))
 
 			}
 		}
@@ -412,10 +457,10 @@ func parsePrecondition(ctx BuildContext, precondition any) ([]Condition, error) 
 			return nil, wrapError("preconditions", v, err)
 		}
 
-		return []Condition{ret}, nil
+		return []*Condition{&ret}, nil
 
 	case []any:
-		var ret []Condition
+		var ret []*Condition
 		for _, vv := range v {
 			parsed, err := parsePrecondition(ctx, vv)
 			if err != nil {
@@ -467,7 +512,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 			return wrapError("steps", v, err)
 		}
 		for _, stepDef := range stepDefs {
-			step, err := buildStep(ctx, stepDef, spec.Functions)
+			step, err := buildStep(ctx, stepDef)
 			if err != nil {
 				return err
 			}
@@ -476,7 +521,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 
 		return nil
 
-	case map[any]any:
+	case map[string]any:
 		stepDefs := make(map[string]stepDef)
 		md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 			ErrorUnused: true,
@@ -487,7 +532,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 		}
 		for name, stepDef := range stepDefs {
 			stepDef.Name = name
-			step, err := buildStep(ctx, stepDef, spec.Functions)
+			step, err := buildStep(ctx, stepDef)
 			if err != nil {
 				return err
 			}
@@ -502,8 +547,30 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 	}
 }
 
+// validateSteps validates the steps in the DAG.
+func validateSteps(ctx BuildContext, spec *definition, dag *DAG) error {
+	// No duplicate step names are allowed.
+	stepNames := make(map[string]struct{})
+	for _, step := range dag.Steps {
+		if step.Name == "" {
+			return wrapError("steps", step, ErrStepNameRequired)
+		}
+
+		if _, exists := stepNames[step.Name]; exists {
+			return wrapError("steps", step.Name, ErrStepNameDuplicate)
+		}
+		stepNames[step.Name] = struct{}{}
+	}
+
+	return nil
+}
+
 // buildSMTPConfig builds the SMTP configuration for the DAG.
 func buildSMTPConfig(_ BuildContext, spec *definition, dag *DAG) (err error) {
+	if spec.SMTP.Host == "" && spec.SMTP.Port == "" {
+		return nil
+	}
+
 	dag.SMTP = &SMTPConfig{
 		Host:     spec.SMTP.Host,
 		Port:     spec.SMTP.Port,
@@ -530,6 +597,10 @@ func buildInfoMailConfig(_ BuildContext, spec *definition, dag *DAG) (err error)
 
 // buildMailConfig builds a MailConfig from the definition.
 func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
+	if def.From == "" && def.To == "" {
+		return nil, nil
+	}
+
 	return &MailConfig{
 		From:       def.From,
 		To:         def.To,
@@ -539,26 +610,18 @@ func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
 }
 
 // buildStep builds a step from the step definition.
-func buildStep(ctx BuildContext, def stepDef, fns []*funcDef) (*Step, error) {
-	if err := assertStepDef(def, fns); err != nil {
-		return nil, err
-	}
-
+func buildStep(ctx BuildContext, def stepDef) (*Step, error) {
 	step := &Step{
 		Name:           def.Name,
 		Description:    def.Description,
 		Shell:          def.Shell,
+		ShellPackages:  def.Packages,
 		Script:         def.Script,
 		Stdout:         def.Stdout,
 		Stderr:         def.Stderr,
 		Dir:            def.Dir,
 		MailOnError:    def.MailOnError,
 		ExecutorConfig: ExecutorConfig{Config: make(map[string]any)},
-	}
-
-	// TODO: remove the deprecated call field.
-	if err := parseFuncCall(step, def.Call, fns); err != nil {
-		return nil, err
 	}
 
 	for _, entry := range stepBuilderRegistry {
@@ -599,6 +662,11 @@ func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
 		switch v := def.RetryPolicy.Limit.(type) {
 		case int:
 			step.RetryPolicy.Limit = v
+			step.RetryPolicy.Limit = int(v)
+		case int64:
+			step.RetryPolicy.Limit = int(v)
+		case uint64:
+			step.RetryPolicy.Limit = int(v)
 		case string:
 			step.RetryPolicy.LimitStr = v
 		default:
@@ -607,6 +675,10 @@ func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
 
 		switch v := def.RetryPolicy.IntervalSec.(type) {
 		case int:
+			step.RetryPolicy.Interval = time.Second * time.Duration(v)
+		case int64:
+			step.RetryPolicy.Interval = time.Second * time.Duration(v)
+		case uint64:
 			step.RetryPolicy.Interval = time.Second * time.Duration(v)
 		case string:
 			step.RetryPolicy.IntervalSecStr = v
@@ -621,10 +693,34 @@ func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
+// buildRepeatPolicy sets up the repeat policy for a step.
+//
+// Semantics:
+//  1. If both "condition" and "expected" are set:
+//     - After the step runs, evaluate "condition" (may be a shell command, env var, or expression).
+//     - Compare its output to "expected". Repeat as long as the comparison does NOT match.
+//  2. If only "condition" is set (and "expected" is empty):
+//     - Repeat as long as "condition" (may be a shell command, env var, or expression) evaluates to exit code 0.
+//  3. If "exitCode" is specified (and "condition" is not set):
+//     - Repeat as long as the last step’s exit code matches any value in the list.
+//  4. If only "repeat: true", repeat unconditionally at the given interval.
+//
+// Precedence: Condition > ExitCode > Repeat.
+//
+// This mirrors the Precondition logic for consistency.
 func buildRepeatPolicy(_ BuildContext, def stepDef, step *Step) error {
 	if def.RepeatPolicy != nil {
+		if def.RepeatPolicy.Condition != "" {
+			step.RepeatPolicy.Condition = &Condition{
+				Condition: def.RepeatPolicy.Condition,
+				Expected:  def.RepeatPolicy.Expected,
+			}
+		} else {
+			step.RepeatPolicy.Condition = nil
+		}
 		step.RepeatPolicy.Repeat = def.RepeatPolicy.Repeat
 		step.RepeatPolicy.Interval = time.Second * time.Duration(def.RepeatPolicy.IntervalSec)
+		step.RepeatPolicy.ExitCode = def.RepeatPolicy.ExitCode
 	}
 	return nil
 }
@@ -642,6 +738,37 @@ func buildOutput(_ BuildContext, def stepDef, step *Step) error {
 	step.Output = def.Output
 	return nil
 }
+
+func validateStep(_ BuildContext, def stepDef, step *Step) error {
+	if step.Name == "" {
+		return wrapError("name", step.Name, ErrStepNameRequired)
+	}
+
+	if len(step.Name) > maxStepNameLen {
+		return wrapError("name", step.Name, ErrStepNameTooLong)
+	}
+
+	if !regexStepName.MatchString(step.Name) {
+		return wrapError("name", step.Name, ErrStepNameInvalidChars)
+	}
+
+	// TODO: Validate executor config for each executor type.
+
+	if step.Command == "" {
+		if step.ExecutorConfig.Type == "" && step.Script == "" && step.ChildDAG == nil {
+			return ErrStepCommandIsRequired
+		}
+	}
+
+	return nil
+}
+
+// regexStepName is a regular expression that matches valid step names.
+// It allows alphanumeric characters, underscores, hyphens, dots, and spaces.
+var regexStepName = regexp.MustCompile(`^[a-zA-Z0-9_][a-zA-Z0-9 _.-]*$`)
+
+// maxStepNameLen is the maximum length of a step name.
+const maxStepNameLen = 40
 
 func buildStepPrecondition(ctx BuildContext, def stepDef, step *Step) error {
 	// Parse both `preconditions` and `precondition` fields.
@@ -670,13 +797,8 @@ func buildSignalOnStop(_ BuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
-// commandRun is not a actual command.
-// subworkflow does not use this command field so it is used
-// just for display purposes.
-const commandRun = "run"
-
-// buildSubWorkflow parses the subworkflow definition and sets the step fields.
-func buildSubWorkflow(_ BuildContext, def stepDef, step *Step) error {
+// buildChildDAG parses the child DAG definition and sets up the step to run a child DAG.
+func buildChildDAG(_ BuildContext, def stepDef, step *Step) error {
 	name, params := def.Run, def.Params
 
 	// if the run field is not set, return nil.
@@ -684,20 +806,15 @@ func buildSubWorkflow(_ BuildContext, def stepDef, step *Step) error {
 		return nil
 	}
 
-	// Set the step fields for the subworkflow.
-	step.SubWorkflow = &SubWorkflow{Name: name, Params: params}
-	step.ExecutorConfig.Type = ExecutorTypeSubWorkflow
-	step.Command = commandRun
+	step.ChildDAG = &ChildDAG{Name: name, Params: params}
+	step.ExecutorConfig.Type = ExecutorTypeDAG
+	step.Command = "run"
 	step.Args = []string{name, params}
 	step.CmdWithArgs = fmt.Sprintf("%s %s", name, params)
 	return nil
 }
 
-const (
-	executorKeyType   = "type"
-	executorKeyConfig = "config"
-)
-
+// buildDepends parses the depends field in the step definition.
 func buildDepends(_ BuildContext, def stepDef, step *Step) error {
 	deps, err := parseStringOrArray(def.Depends)
 	if err != nil {
@@ -713,6 +830,11 @@ func buildDepends(_ BuildContext, def stepDef, step *Step) error {
 // Case 2: executor is a string
 // Case 3: executor is a struct
 func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
+	const (
+		executorKeyType   = "type"
+		executorKeyConfig = "config"
+	)
+
 	executor := def.Executor
 
 	// Case 1: executor is nil
@@ -726,16 +848,11 @@ func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 		// This can be an executor with default configuration.
 		step.ExecutorConfig.Type = val
 
-	case map[any]any:
+	case map[string]any:
 		// Case 3: executor is a struct
 		// In this case, the executor is a struct with type and config fields.
 		// Config is a map of string keys and values.
-		for k, v := range val {
-			key, ok := k.(string)
-			if !ok {
-				return wrapError("executor.config", k, ErrExecutorConfigMustBeString)
-			}
-
+		for key, v := range val {
 			switch key {
 			case executorKeyType:
 				// Executor type is a string.
@@ -749,15 +866,11 @@ func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 				// Executor config is a map of string keys and values.
 				// The values can be of any type.
 				// It is up to the executor to parse the values.
-				executorConfig, ok := v.(map[any]any)
+				executorConfig, ok := v.(map[string]any)
 				if !ok {
 					return wrapError("executor.config", v, ErrExecutorConfigValueMustBeMap)
 				}
-				for k, v := range executorConfig {
-					configKey, ok := k.(string)
-					if !ok {
-						return wrapError("executor.config", k, ErrExecutorConfigMustBeString)
-					}
+				for configKey, v := range executorConfig {
 					step.ExecutorConfig.Config[configKey] = v
 				}
 
@@ -774,104 +887,33 @@ func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 
 	}
 
-	// Convert map[any]any to map[string]any for executor config.
-	// It is up to the executor to parse the values.
-	return convertMap(step.ExecutorConfig.Config)
-}
-
-// assignValues Assign values to command parameters
-func assignValues(command string, params map[string]string) string {
-	updatedCommand := command
-
-	for k, v := range params {
-		updatedCommand = strings.ReplaceAll(
-			updatedCommand, fmt.Sprintf("$%v", k), v,
-		)
-	}
-
-	return updatedCommand
-}
-
-// convertMap converts a map[any]any to a map[string]any.
-func convertMap(m map[string]any) error {
-	if m == nil {
-		return nil
-	}
-
-	queue := []map[string]any{m}
-
-	for len(queue) > 0 {
-		curr := queue[0]
-
-		for k, v := range curr {
-			mm, ok := v.(map[any]any)
-			if !ok {
-				// TODO: do we need to return an error here?
-				continue
-			}
-
-			ret := make(map[string]any)
-			for kk, vv := range mm {
-				key, err := parseKey(kk)
-				if err != nil {
-					return fmt.Errorf(
-						"%w: %s", ErrExecutorConfigMustBeString, err,
-					)
-				}
-				ret[key] = vv
-			}
-
-			delete(curr, k)
-			curr[k] = ret
-			queue = append(queue, ret)
-		}
-		queue = queue[1:]
-	}
-
 	return nil
-}
-
-func parseKey(value any) (string, error) {
-	val, ok := value.(string)
-	if !ok {
-		return "", fmt.Errorf("%w: %T", ErrInvalidKeyType, value)
-	}
-
-	return val, nil
-}
-
-// extractParamNames extracts a slice of parameter names by removing the '$'
-// from the command string.
-func extractParamNames(command string) []string {
-	words := strings.Fields(command)
-
-	var params []string
-	for _, word := range words {
-		if strings.HasPrefix(word, "$") {
-			paramName := strings.TrimPrefix(word, "$")
-			params = append(params, paramName)
-		}
-	}
-
-	return params
 }
 
 func parseIntOrArray(v any) ([]int, error) {
 	switch v := v.(type) {
 	case nil:
 		return nil, nil
-
+	case int64:
+		return []int{int(v)}, nil
+	case uint64:
+		return []int{int(v)}, nil
 	case int:
 		return []int{v}, nil
 
 	case []any:
 		var ret []int
 		for _, vv := range v {
-			i, ok := vv.(int)
-			if !ok {
+			switch vv := vv.(type) {
+			case int:
+				ret = append(ret, vv)
+			case int64:
+				ret = append(ret, int(vv))
+			case uint64:
+				ret = append(ret, int(vv))
+			default:
 				return nil, fmt.Errorf("int or array expected, got %T", vv)
 			}
-			ret = append(ret, i)
 		}
 		return ret, nil
 

@@ -37,6 +37,15 @@ DOCKER_CMD := docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v
 GOTESTSUM_ARGS=--format=standard-quiet
 GO_TEST_FLAGS=-v --race
 
+# OpenAPI configuration
+OAPI_SPEC_DIR_V2=./api/v2
+OAPI_SPEC_FILE_V2=${OAPI_SPEC_DIR_V2}/api.yaml
+OAPI_CONFIG_FILE_V2=${OAPI_SPEC_DIR_V2}/config.yaml
+
+OAPI_SPEC_DIR_V1=./api/v1
+OAPI_SPEC_FILE_V1=${OAPI_SPEC_DIR_V1}/api.yaml
+OAPI_CONFIG_FILE_V1=${OAPI_SPEC_DIR_V1}/config.yaml
+
 # Frontend directories
 
 FE_DIR=./internal/frontend
@@ -53,11 +62,12 @@ COLOR_RED=\033[0;31m
 
 # Go packages for the tools
 
-PKG_swagger=github.com/go-swagger/go-swagger/cmd/swagger
-PKG_golangci_lint=github.com/golangci/golangci-lint/cmd/golangci-lint
+PKG_golangci_lint=github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 PKG_gotestsum=gotest.tools/gotestsum
 PKG_addlicense=github.com/google/addlicense
 PKG_changelog-from-release=github.com/rhysd/changelog-from-release/v3@latest
+PKG_oapi_codegen=github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
+PKG_kin_openapi_validate=github.com/getkin/kin-openapi/cmd/validate
 
 # Certificates for the development environment
 
@@ -90,20 +100,20 @@ run: ${FE_BUNDLE_JS}
 
 # server build the binary and start the server.
 .PHONY: run-server
-run-server: golangci-lint build-bin
+run-server: golangci-lint bin
 	@echo "${COLOR_GREEN}Starting the server...${COLOR_RESET}"
 	${LOCAL_BIN_DIR}/${APP_NAME} server
 
 # scheduler build the binary and start the scheduler.
 .PHONY: run-scheduler
-run-scheduler: golangci-lint build-bin
+run-scheduler: golangci-lint bin
 	@echo "${COLOR_GREEN}Starting the scheduler...${COLOR_RESET}"
 	${LOCAL_BIN_DIR}/${APP_NAME} scheduler
 
 # check if the frontend assets are built.
 ${FE_BUNDLE_JS}:
 	@echo "${COLOR_RED}Error: frontend assets are not built.${COLOR_RESET}"
-	@echo "${COLOR_RED}Please run 'make build-ui' before starting the server.${COLOR_RESET}"
+	@echo "${COLOR_RED}Please run 'make ui' before starting the server.${COLOR_RESET}"
 
 # https starts the server with the HTTPS protocol.
 .PHONY: run-server-https
@@ -115,7 +125,7 @@ run-server-https: ${SERVER_CERT_FILE} ${SERVER_KEY_FILE}
 
 # test runs all tests.
 .PHONY: test
-test: build-bin
+test: bin
 	@echo "${COLOR_GREEN}Running tests...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
 	@go clean -testcache
@@ -137,9 +147,37 @@ open-coverage:
 .PHONY: lint
 lint: golangci-lint
 
+# api generates the server code from the OpenAPI specification.
+.PHONY: api
+api: api-validate
+	@echo "${COLOR_GREEN}Generating API...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_oapi_codegen}
+	@${LOCAL_BIN_DIR}/oapi-codegen --config=${OAPI_CONFIG_FILE_V2} ${OAPI_SPEC_FILE_V2}
+
+# api-validate validates the OpenAPI specification.
+.PHONY: api-validate
+api-validate:
+	@echo "${COLOR_GREEN}Validating API...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_kin_openapi_validate}
+	@${LOCAL_BIN_DIR}/validate ${OAPI_SPEC_FILE_V2}
+
+# api-v1 generates the server code from the OpenAPI specification.
+.PHONY: apiv1
+apiv1: apiv1-validate
+	@echo "${COLOR_GREEN}Generating API...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_oapi_codegen}
+	@${LOCAL_BIN_DIR}/oapi-codegen --config=${OAPI_CONFIG_FILE_V1} ${OAPI_SPEC_FILE_V1}
+
+# api-validate-v1 validates the OpenAPI specification.
+.PHONY: apiv1-validate
+apiv1-validate:
+	@echo "${COLOR_GREEN}Validating API...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_kin_openapi_validate}
+	@${LOCAL_BIN_DIR}/validate ${OAPI_SPEC_FILE_V1}
+
 # api generates the swagger server code.
 .PHONY: swagger
-api: clean-swagger gen-swagger
+swagger: clean-swagger gen-swagger
 
 # certs generates the certificates to use in the development environment.
 .PHONY: certs
@@ -147,7 +185,7 @@ certs: ${CERTS_DIR} ${SERVER_CERT_FILE} ${CLIENT_CERT_FILE} certs-check
 
 # build build the binary.
 .PHONY: build
-build: build-ui build-bin
+build: ui bin
 
 # build-image build the docker image and push to the registry.
 # VERSION should be set via the argument as follows:
@@ -203,54 +241,57 @@ addlicense:
 		-f scripts/header.txt \
 		.
 
+# cpuprof opens the CPU profile in the browser.
+cpuprof:
+	@go tool pprof -http=:9999 cpu.prof
+
 ##############################################################################
 # Internal targets
 ##############################################################################
 
-# build-bin builds the go application.
-.PHONY: build-bin
-build-bin:
+# bin builds the go application.
+.PHONY: bin
+bin:
 	@echo "${COLOR_GREEN}Building the binary...${COLOR_RESET}"
 	@mkdir -p ${BIN_DIR}
 	@go build -ldflags="$(LDFLAGS)" -o ${BIN_DIR}/${APP_NAME} ./cmd
+
+.PHONY: ui
+# ui builds the frontend codes.
+ui: clean-ui build-ui cp-assets
 
 # build-ui builds the frontend codes.
 .PHONY: build-ui
 build-ui:
 	@echo "${COLOR_GREEN}Building UI...${COLOR_RESET}"
 	@cd ui; \
-		rm -rf node_modules; \
-		rm -rf .cache; \
-		yarn cache clean; \
-		NODE_OPTIONS="--max-old-space-size=8192" yarn webpack --config webpack.dev.js; \
-		yarn install; \
-		yarn webpack --config webpack.dev.js
+		pnpm install; \
+		NODE_OPTIONS="--max-old-space-size=8192" pnpm webpack --config webpack.dev.js --progress --color; \
+		pnpm webpack --config webpack.prod.js --progress --color
+	@echo "${COLOR_GREEN}Waiting for the build to finish...${COLOR_RESET}"
+	@sleep 3 # wait for the build to finish
+
+# build-ui-prod builds the frontend codes for production.
+.PHONY: cp-assets
+cp-assets:
 	@echo "${COLOR_GREEN}Copying UI assets...${COLOR_RESET}"
 	@rm -f ${FE_ASSETS_DIR}/*
 	@cp ${FE_BUILD_DIR}/* ${FE_ASSETS_DIR}
+
+# clean-ui removes the UI build cache.
+.PHONY: clean-ui
+clean-ui:
+	@echo "${COLOR_GREEN}Cleaning UI build cache...${COLOR_RESET}"
+	@cd ui; \
+		rm -rf node_modules; \
+		rm -rf .cache;
 
 # golangci-lint run linting tool.
 .PHONY: golangci-lint
 golangci-lint:
 	@echo "${COLOR_GREEN}Running linter...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_golangci_lint)
-	@${LOCAL_BIN_DIR}/golangci-lint run ./...
-
-# clean-swagger removes generated go files for swagger.
-.PHONY: clean-swagger
-clean-swagger:
-	@echo "${COLOR_GREEN}Cleaning the swagger files...${COLOR_RESET}"
-	@rm -rf ${FE_GEN_DIR}/models
-	@rm -rf ${FE_GEN_DIR}/restapi/operations
-
-# gen-swagger generates go files for the API schema.
-.PHONY: gen-swagger
-gen-swagger:
-	@echo "${COLOR_GREEN}Generating the swagger server code...${COLOR_RESET}"
-	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_swagger)
-	@${LOCAL_BIN_DIR}/swagger validate ./api.v1.yaml
-	@${LOCAL_BIN_DIR}/swagger generate server -t ${FE_GEN_DIR} --server-package=restapi --exclude-main -f ./api.v1.yaml
-	@go mod tidy
+	@${LOCAL_BIN_DIR}/golangci-lint run --fix ./...
 
 # changelog generates a changelog from the releases.
 .PHONY: changelog

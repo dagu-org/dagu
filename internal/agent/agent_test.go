@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/test"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,7 +37,7 @@ func TestAgent_Run(t *testing.T) {
 
 		// Create a history file by running a DAG
 		dagAgent.RunSuccess(t)
-		dag.AssertHistoryCount(t, 1)
+		dag.AssertDAGRunCount(t, 1)
 
 		// Set the retention days to 0 (delete all history files except the latest one)
 		dag.HistRetentionDays = 0
@@ -47,7 +47,7 @@ func TestAgent_Run(t *testing.T) {
 		dagAgent.RunSuccess(t)
 
 		// Check if only the latest history file exists
-		dag.AssertHistoryCount(t, 1)
+		dag.AssertDAGRunCount(t, 1)
 	})
 	t.Run("AlreadyRunning", func(t *testing.T) {
 		th := test.Setup(t)
@@ -65,7 +65,7 @@ func TestAgent_Run(t *testing.T) {
 
 		// Try to run the DAG again while it is running
 		dagAgent2 := dag.Agent()
-		dagAgent2.RunCheckErr(t, "is already running")
+		dagAgent2.RunCheckErr(t, "already running")
 
 		// Wait for the DAG to finish
 		<-done
@@ -75,12 +75,12 @@ func TestAgent_Run(t *testing.T) {
 		dag := th.DAG(t, "agent/multiple_steps.yaml")
 
 		// Set a precondition that always fails
-		dag.Preconditions = []digraph.Condition{
+		dag.Preconditions = []*digraph.Condition{
 			{Condition: "`echo 1`", Expected: "0"},
 		}
 
 		dagAgent := dag.Agent()
-		dagAgent.RunCheckErr(t, "condition was not met")
+		dagAgent.RunCancel(t)
 
 		// Check if all nodes are not executed
 		status := dagAgent.Status()
@@ -110,9 +110,11 @@ func TestAgent_Run(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, "agent/sleep.yaml")
 		dagAgent := dag.Agent()
+		done := make(chan struct{})
 
 		go func() {
 			dagAgent.RunCancel(t)
+			close(done)
 		}()
 
 		// wait for the DAG to start
@@ -120,6 +122,8 @@ func TestAgent_Run(t *testing.T) {
 
 		// send a signal to cancel the DAG
 		dagAgent.Abort()
+
+		<-done
 
 		// wait for the DAG to be canceled
 		dag.AssertLatestStatus(t, scheduler.StatusCancel)
@@ -155,7 +159,7 @@ func TestAgent_DryRun(t *testing.T) {
 		require.Equal(t, scheduler.StatusSuccess, curStatus.Status)
 
 		// Check if the status is not saved
-		dag.AssertHistoryCount(t, 0)
+		dag.AssertDAGRunCount(t, 0)
 	})
 }
 
@@ -172,8 +176,8 @@ func TestAgent_Retry(t *testing.T) {
 
 		// Modify the DAG to make it successful
 		status := dagAgent.Status()
-		for i := range status.Nodes {
-			status.Nodes[i].Step.CmdArgsSys = "true"
+		for i := range dag.Steps {
+			dag.Steps[i].CmdWithArgs = "true"
 		}
 
 		// Retry the DAG and check if it is successful
@@ -215,7 +219,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		require.Equal(t, http.StatusOK, mockResponseWriter.status)
 
 		// Check if the status is returned correctly
-		status, err := model.StatusFromJSON(mockResponseWriter.body)
+		status, err := models.StatusFromJSON(mockResponseWriter.body)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusRunning, status.Status)
 

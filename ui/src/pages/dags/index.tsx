@@ -1,22 +1,17 @@
-import React from 'react';
-import DAGErrors from '../../components/molecules/DAGErrors';
-import Box from '@mui/material/Box';
-import CreateDAGButton from '../../components/molecules/CreateDAGButton';
-import WithLoading from '../../components/atoms/WithLoading';
-import DAGTable from '../../components/molecules/DAGTable';
-import Title from '../../components/atoms/Title';
-import { DAGItem, DAGDataType } from '../../models';
-import { useLocation } from 'react-router-dom';
-import { ListWorkflowsResponse } from '../../models/api';
-import { AppBarContext } from '../../contexts/AppBarContext';
-import useSWR, { useSWRConfig } from 'swr';
-import DAGPagination from '../../components/molecules/DAGPagination';
 import { debounce } from 'lodash';
+import React from 'react';
+import { useLocation } from 'react-router-dom';
+import { components } from '../../api/v2/schema';
+import { AppBarContext } from '../../contexts/AppBarContext';
 import { useUserPreferences } from '../../contexts/UserPreference';
+import { DAGErrors } from '../../features/dags/components/dag-editor';
+import { DAGTable } from '../../features/dags/components/dag-list';
+import DAGListHeader from '../../features/dags/components/dag-list/DAGListHeader';
+import { useQuery } from '../../hooks/api';
+import LoadingIndicator from '../../ui/LoadingIndicator';
 
 function DAGs() {
-  const useQuery = () => new URLSearchParams(useLocation().search);
-  const query = useQuery();
+  const query = new URLSearchParams(useLocation().search);
   const group = query.get('group') || '';
   const appBarContext = React.useContext(AppBarContext);
   const [searchText, setSearchText] = React.useState(query.get('search') || '');
@@ -28,25 +23,31 @@ function DAGs() {
   const [apiSearchTag, setAPISearchTag] = React.useState(
     query.get('tag') || ''
   );
-
   const { preferences, updatePreference } = useUserPreferences();
-  // Use preferences.pageLimit instead of local state
+
   const handlePageLimitChange = (newLimit: number) => {
     updatePreference('pageLimit', newLimit);
   };
 
-  const { cache, mutate } = useSWRConfig();
-  const endPoint = `/dags?${new URLSearchParams({
-    page: page.toString(),
-    limit: preferences.pageLimit.toString(),
-    searchName: apiSearchText,
-    searchTag: apiSearchTag,
-    remoteNode: appBarContext.selectedRemoteNode || 'local',
-  }).toString()}`;
-  const { data } = useSWR<ListWorkflowsResponse>(endPoint, null, {
-    refreshInterval: 10000,
-    revalidateIfStale: false,
-  });
+  const { data, mutate, isLoading } = useQuery(
+    '/dags',
+    {
+      params: {
+        query: {
+          page,
+          perPage: preferences.pageLimit || 200,
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+          name: apiSearchText ? apiSearchText : undefined,
+          tag: apiSearchTag ? apiSearchTag : undefined,
+        },
+      },
+    },
+    {
+      refreshInterval: 1000,
+      revalidateIfStale: false,
+      keepPreviousData: true, // Keep previous data while loading new data
+    }
+  );
 
   const addSearchParam = (key: string, value: string) => {
     const locationQuery = new URLSearchParams(window.location.search);
@@ -59,27 +60,29 @@ function DAGs() {
   };
 
   const refreshFn = React.useCallback(() => {
-    setTimeout(() => mutate(endPoint), 500);
-  }, [mutate, cache]);
+    setTimeout(() => mutate(), 500);
+  }, [mutate]);
 
   React.useEffect(() => {
-    appBarContext.setTitle('DAGs');
+    appBarContext.setTitle('DAG Definitions');
   }, [appBarContext]);
 
-  const merged = React.useMemo(() => {
-    const ret: DAGItem[] = [];
-    if (data && data.DAGs) {
-      for (const val of data.DAGs) {
-        if (!val.Error) {
-          ret.push({
-            Type: DAGDataType.DAG,
-            Name: val.DAG.Name,
-            DAGStatus: val,
-          });
+  const { dagFiles, errorCount } = React.useMemo(() => {
+    const dagFiles: components['schemas']['DAGFile'][] = [];
+    let errorCount = 0;
+    if (data && data.dags) {
+      for (const val of data.dags) {
+        if (!val.errors?.length) {
+          dagFiles.push(val);
+        } else {
+          errorCount += 1;
         }
       }
     }
-    return ret;
+    return {
+      dagFiles,
+      errorCount,
+    };
   }, [data]);
 
   const pageChange = (page: number) => {
@@ -117,57 +120,70 @@ function DAGs() {
     debouncedAPISearchTag(searchTag);
   };
 
+  // Store the last valid data to prevent blank screens during loading
+  const [lastValidData, setLastValidData] = React.useState<typeof data | null>(
+    null
+  );
+
+  // Update lastValidData whenever we get new data
+  React.useEffect(() => {
+    if (data) {
+      setLastValidData(data);
+    }
+  }, [data]);
+
+  // Use the current data if available, otherwise use the last valid data
+  const displayData = data || lastValidData;
+
   return (
-    <Box
-      sx={{
-        px: 2,
-        mx: 4,
-        display: 'flex',
-        flexDirection: 'column',
-        width: '100%',
-      }}
-    >
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <Title>DAGs</Title>
-        <CreateDAGButton />
-      </Box>
-      <Box>
-        <WithLoading loaded={!!data && !!merged}>
-          {data && (
-            <React.Fragment>
-              <DAGErrors
-                DAGs={data.DAGs || []}
-                errors={data.Errors || []}
-                hasError={data.HasError}
-              ></DAGErrors>
-              <DAGTable
-                DAGs={merged}
-                group={group}
-                refreshFn={refreshFn}
-                searchText={searchText}
-                handleSearchTextChange={searchTextChange}
-                searchTag={searchTag}
-                handleSearchTagChange={searchTagChange}
-              ></DAGTable>
-              <DAGPagination
-                totalPages={data.PageCount}
-                page={page}
-                pageChange={pageChange}
-                onPageLimitChange={handlePageLimitChange}
-                pageLimit={preferences.pageLimit}
-              />
-            </React.Fragment>
-          )}
-        </WithLoading>
-      </Box>
-    </Box>
+    <div className="flex flex-col">
+      <DAGListHeader />
+
+      {/* Loading indicator - fixed position in center of screen */}
+      {isLoading && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center">
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-lg">
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+          </div>
+        </div>
+      )}
+
+      {/* Content - always visible */}
+      <div className="w-full">
+        {displayData ? (
+          <>
+            <DAGErrors
+              dags={displayData.dags || []}
+              errors={displayData.errors || []}
+              hasError={
+                (errorCount > 0 || displayData.errors?.length > 0) && !isLoading
+              }
+            />
+            <DAGTable
+              dags={isLoading ? (lastValidData ? dagFiles : []) : dagFiles}
+              group={group}
+              refreshFn={refreshFn}
+              searchText={searchText}
+              handleSearchTextChange={searchTextChange}
+              searchTag={searchTag}
+              handleSearchTagChange={searchTagChange}
+              pagination={{
+                totalPages: displayData.pagination.totalPages,
+                page: page,
+                pageChange: pageChange,
+                onPageLimitChange: handlePageLimitChange,
+                pageLimit: preferences.pageLimit,
+              }}
+              isLoading={isLoading}
+            />
+          </>
+        ) : (
+          /* Show initial loading state if no data yet */
+          <LoadingIndicator />
+        )}
+      </div>
+    </div>
   );
 }
+
 export default DAGs;

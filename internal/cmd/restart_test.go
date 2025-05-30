@@ -35,7 +35,7 @@ func TestRestartCommand(t *testing.T) {
 			th.RunCommand(t, cmd.CmdRestart(), test.CmdTest{Args: args})
 		}()
 
-		// Wait for the DAG running again.
+		// Wait for the dag-run running again.
 		dag.AssertCurrentStatus(t, scheduler.StatusRunning)
 
 		time.Sleep(time.Millisecond * 300) // Wait a bit (need to investigate why this is needed).
@@ -50,17 +50,13 @@ func TestRestartCommand(t *testing.T) {
 		loaded, err := digraph.Load(th.Context, dag.Location, digraph.WithBaseConfig(th.Config.Paths.BaseConfig))
 		require.NoError(t, err)
 
-		// Check parameter was the same as the first execution
-		setup := cmd.NewContext(th.Context, th.Config)
-		client, err := setup.Client()
-		require.NoError(t, err)
-
 		time.Sleep(time.Millisecond * 300) // Wait for the history to be updated.
 
-		recentHistory := client.GetRecentHistory(th.Context, loaded, 2)
+		// Check parameter was the same as the first execution
+		recentHistory := th.DAGRunMgr.ListRecentStatus(th.Context, loaded.Name, 2)
 
 		require.Len(t, recentHistory, 2)
-		require.Equal(t, recentHistory[0].Status.Params, recentHistory[1].Status.Params)
+		require.Equal(t, recentHistory[0].Params, recentHistory[1].Params)
 
 		<-done
 	})

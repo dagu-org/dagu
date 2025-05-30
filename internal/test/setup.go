@@ -16,16 +16,16 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/dagu-org/dagu/internal/persistence/jsondb"
-	"github.com/dagu-org/dagu/internal/persistence/local"
-	"github.com/dagu-org/dagu/internal/persistence/local/storage"
+	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/persistence/localdag"
+	"github.com/dagu-org/dagu/internal/persistence/localdagrun"
+	"github.com/dagu-org/dagu/internal/persistence/localproc"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,36 +33,49 @@ import (
 
 var setupLock sync.Mutex
 
-// TestHelperOption defines functional options for Helper
-type TestHelperOption func(*TestOptions)
+// HelperOption defines functional options for Helper
+type HelperOption func(*Options)
 
-type TestOptions struct {
+type Options struct {
 	CaptureLoggingOutput bool // CaptureLoggingOutput enables capturing of logging output
 	DAGsDir              string
+	ServerConfig         *config.Server
 }
 
 // WithCaptureLoggingOutput creates a logging capture option
-func WithCaptureLoggingOutput() TestHelperOption {
-	return func(opts *TestOptions) {
+func WithCaptureLoggingOutput() HelperOption {
+	return func(opts *Options) {
 		opts.CaptureLoggingOutput = true
 	}
 }
 
-func WithDAGsDir(dir string) TestHelperOption {
-	return func(opts *TestOptions) {
+func WithDAGsDir(dir string) HelperOption {
+	return func(opts *Options) {
 		opts.DAGsDir = dir
 	}
 }
 
+func WithServerConfig(cfg *config.Server) HelperOption {
+	return func(opts *Options) {
+		opts.ServerConfig = cfg
+	}
+}
+
 // Setup creates a new Helper instance for testing
-func Setup(t *testing.T, opts ...TestHelperOption) Helper {
+func Setup(t *testing.T, opts ...HelperOption) Helper {
 	setupLock.Lock()
 	defer setupLock.Unlock()
 
-	var options TestOptions
+	var options Options
 	for _, opt := range opts {
 		opt(&options)
 	}
+
+	// Set the log level to debug
+	_ = os.Setenv("DEBUG", "true")
+
+	// Disable the DAG run queue for tests
+	_ = os.Setenv("DISABLE_DAG_RUN_QUEUE", "true")
 
 	random := uuid.New().String()
 	tmpDir := fileutil.MustTempDir(fmt.Sprintf("dagu-test-%s", random))
@@ -70,7 +83,7 @@ func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 
 	root := getProjectRoot(t)
 	executablePath := path.Join(root, ".local", "bin", "dagu")
-	os.Setenv("DAGU_EXECUTABLE", executablePath)
+	_ = os.Setenv("DAGU_EXECUTABLE", executablePath)
 
 	cfg, err := config.Load()
 	require.NoError(t, err)
@@ -81,20 +94,23 @@ func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 		cfg.Paths.DAGsDir = options.DAGsDir
 	}
 
-	dagStore := local.NewDAGStore(cfg.Paths.DAGsDir)
-	historyStore := jsondb.New(cfg.Paths.DataDir)
-	flagStore := local.NewFlagStore(
-		storage.NewStorage(cfg.Paths.SuspendFlagsDir),
-	)
+	if options.ServerConfig != nil {
+		cfg.Server = *options.ServerConfig
+	}
 
-	client := client.New(dagStore, historyStore, flagStore, cfg.Paths.Executable, cfg.Global.WorkDir)
+	dagStore := localdag.New(cfg.Paths.DAGsDir, localdag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
+	runStore := localdagrun.New(cfg.Paths.DAGRunsDir)
+	procStore := localproc.New(cfg.Paths.ProcDir)
+
+	drm := dagrun.New(runStore, procStore, cfg.Paths.Executable, cfg.Global.WorkDir)
 
 	helper := Helper{
-		Context:      createDefaultContext(),
-		Config:       cfg,
-		Client:       client,
-		DAGStore:     dagStore,
-		HistoryStore: historyStore,
+		Context:     createDefaultContext(),
+		Config:      cfg,
+		DAGRunMgr:   drm,
+		DAGStore:    dagStore,
+		DAGRunStore: runStore,
+		ProcStore:   procStore,
 
 		tmpDir: tmpDir,
 	}
@@ -126,9 +142,10 @@ type Helper struct {
 	Cancel        context.CancelFunc
 	Config        *config.Config
 	LoggingOutput *SyncBuffer
-	Client        client.Client
-	HistoryStore  persistence.HistoryStore
-	DAGStore      persistence.DAGStore
+	DAGStore      models.DAGStore
+	DAGRunStore   models.DAGRunStore
+	DAGRunMgr     dagrun.Manager
+	ProcStore     models.ProcStore
 
 	tmpDir string
 }
@@ -172,44 +189,36 @@ type DAG struct {
 func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
-	var status scheduler.Status
-	var lock sync.Mutex
-
 	require.Eventually(t, func() bool {
-		lock.Lock()
-		defer lock.Unlock()
-
-		latest, err := d.Client.GetLatestStatus(d.Context, d.DAG)
-		require.NoError(t, err)
-		status = latest.Status
+		latest, err := d.DAGRunMgr.GetLatestStatus(d.Context, d.DAG)
+		if err != nil {
+			return false
+		}
+		t.Logf("latest status=%s errors=%v", latest.Status.String(), latest.Errors())
 		return latest.Status == expected
-	}, time.Second*3, time.Millisecond*50, "expected latest status to be %q, got %q", expected, status)
+	}, time.Second*5, time.Second)
 }
 
-func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
+func (d *DAG) AssertDAGRunCount(t *testing.T, expected int) {
 	t.Helper()
 
-	// the +1 to the limit is needed to ensure that the number of the history
+	// the +1 to the limit is needed to ensure that the number of dag-run
 	// entries is exactly the expected number
-	history := d.Client.GetRecentHistory(d.Context, d.DAG, expected+1)
-	require.Len(t, history, expected)
+	runstore := d.DAGRunMgr.ListRecentStatus(d.Context, d.Name, expected+1)
+	require.Len(t, runstore, expected)
 }
 
 func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
-	var status scheduler.Status
-	var lock sync.Mutex
-
 	assert.Eventually(t, func() bool {
-		lock.Lock()
-		defer lock.Unlock()
-
-		curr, err := d.Client.GetCurrentStatus(d.Context, d.DAG)
-		require.NoError(t, err)
-		status = curr.Status
+		curr, _ := d.DAGRunMgr.GetCurrentStatus(d.Context, d.DAG, "")
+		if curr == nil {
+			return false
+		}
+		t.Logf("current status=%s errors=%v", curr.Status.String(), curr.Errors())
 		return curr.Status == expected
-	}, time.Second*3, time.Millisecond*50, "expected current status to be %q, got %q", expected, status)
+	}, time.Second*5, time.Second)
 }
 
 // AssertOutputs checks the given outputs against the actual outputs of the DAG
@@ -218,16 +227,16 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]any) {
 	t.Helper()
 
-	status, err := d.Client.GetLatestStatus(d.Context, d.DAG)
+	status, err := d.DAGRunMgr.GetLatestStatus(d.Context, d.DAG)
 	require.NoError(t, err)
 
 	// collect the actual outputs from the status
 	var actualOutputs = make(map[string]string)
 	for _, node := range status.Nodes {
-		if node.Step.OutputVariables == nil {
+		if node.OutputVariables == nil {
 			continue
 		}
-		value, ok := node.Step.OutputVariables.Load(node.Step.Output)
+		value, ok := node.OutputVariables.Load(node.Step.Output)
 		if ok {
 			actualOutputs[node.Step.Output] = value.(string)
 		}
@@ -282,27 +291,33 @@ func WithAgentOptions(options agent.Options) AgentOption {
 }
 
 func (d *DAG) Agent(opts ...AgentOption) *Agent {
-	requestID := genRequestID()
-	logDir := d.Config.Paths.LogDir
-	logFile := filepath.Join(d.Config.Paths.LogDir, requestID+".log")
-
-	helper := &Agent{
-		Helper: d.Helper,
-		DAG:    d.DAG,
-	}
+	helper := &Agent{Helper: d.Helper, DAG: d.DAG}
 
 	for _, opt := range opts {
 		opt(helper)
 	}
 
+	var dagRunID string
+	if helper.opts.RetryTarget != nil {
+		dagRunID = helper.opts.RetryTarget.DAGRunID
+	} else {
+		dagRunID = genDAGRunID()
+	}
+
+	logDir := d.Config.Paths.LogDir
+	logFile := filepath.Join(d.Config.Paths.LogDir, dagRunID+".log")
+	root := digraph.NewDAGRunRef(d.Name, dagRunID)
+
 	helper.Agent = agent.New(
-		requestID,
+		dagRunID,
 		d.DAG,
 		logDir,
 		logFile,
-		d.Client,
+		d.DAGRunMgr,
 		d.DAGStore,
-		d.HistoryStore,
+		d.DAGRunStore,
+		d.ProcStore,
+		root,
 		helper.opts,
 	)
 
@@ -319,41 +334,50 @@ type Agent struct {
 func (a *Agent) RunError(t *testing.T) {
 	t.Helper()
 
-	err := a.Agent.Run(a.Context)
+	err := a.Run(a.Context)
 	assert.Error(t, err)
 
-	status := a.Agent.Status().Status
+	status := a.Status().Status
 	require.Equal(t, scheduler.StatusError.String(), status.String())
 }
 
 func (a *Agent) RunCancel(t *testing.T) {
 	t.Helper()
 
-	err := a.Agent.Run(a.Context)
+	err := a.Run(a.Context)
 	assert.NoError(t, err)
 
-	status := a.Agent.Status().Status
+	status := a.Status().Status
 	require.Equal(t, scheduler.StatusCancel.String(), status.String())
 }
 
 func (a *Agent) RunCheckErr(t *testing.T, expectedErr string) {
 	t.Helper()
 
-	err := a.Agent.Run(a.Context)
+	err := a.Run(a.Context)
 	require.Error(t, err, "expected error %q, got nil", expectedErr)
 	require.Contains(t, err.Error(), expectedErr)
-	status := a.Agent.Status()
+	status := a.Status()
 	require.Equal(t, scheduler.StatusCancel.String(), status.Status.String())
 }
 
 func (a *Agent) RunSuccess(t *testing.T) {
 	t.Helper()
 
-	err := a.Agent.Run(a.Context)
+	err := a.Run(a.Context)
 	assert.NoError(t, err, "failed to run agent")
 
-	status := a.Agent.Status().Status
+	status := a.Status().Status
 	require.Equal(t, scheduler.StatusSuccess.String(), status.String(), "expected status %q, got %q", scheduler.StatusSuccess, status)
+
+	// check all nodes are in success or skipped state
+	for _, node := range a.Status().Nodes {
+		status := node.Status
+		if status == scheduler.NodeStatusSkipped || status == scheduler.NodeStatusSuccess {
+			continue
+		}
+		t.Errorf("expected node %q to be in success state, got %q", node.Step.Name, status.String())
+	}
 }
 
 func (a *Agent) Abort() {
@@ -387,16 +411,18 @@ func createDefaultContext() context.Context {
 	))
 }
 
+// getShell returns the path to the default shell.
 func setShell(t *testing.T, shell string) {
 	t.Helper()
 
 	shPath, err := exec.LookPath(shell)
 	require.NoError(t, err, "failed to find shell")
-	os.Setenv("SHELL", shPath)
+	_ = os.Setenv("SHELL", shPath)
 }
 
-func genRequestID() string {
-	id, err := uuid.NewRandom()
+// genDAGRunID generates a new unique dag-run ID using UUID v7.
+func genDAGRunID() string {
+	id, err := uuid.NewV7()
 	if err != nil {
 		panic(err)
 	}
@@ -416,7 +442,7 @@ func ReadTestdata(t *testing.T, filename string) []byte {
 	t.Helper()
 
 	path := TestdataPath(t, filename)
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec
 	require.NoError(t, err, "failed to read testdata file %q", filename)
 
 	return data

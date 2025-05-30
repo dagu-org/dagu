@@ -15,29 +15,19 @@ import (
 )
 
 func TestBuild(t *testing.T) {
-	t.Parallel()
-
 	t.Run("SkipIfSuccessful", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "skip_if_successful.yaml")
 		assert.True(t, th.SkipIfSuccessful)
 	})
 	t.Run("ParamsWithSubstitution", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "params_with_substitution.yaml")
-		th.AssertParam(t, "1=x", "2=x")
+		th.AssertParam(t, "1=TEST_PARAM", "2=TEST_PARAM")
 	})
 	t.Run("ParamsWithQuotedValues", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "params_with_quoted_values.yaml")
 		th.AssertParam(t, "x=a b c", "y=d e f")
 	})
 	t.Run("ParamsAsMap", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "params_as_map.yaml")
 		th.AssertParam(t,
 			"FOO=foo",
@@ -46,8 +36,6 @@ func TestBuild(t *testing.T) {
 		)
 	})
 	t.Run("ParamsAsMapOverride", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "params_as_map.yaml", withBuildOpts(
 			digraph.BuildOpts{Parameters: "FOO=X BAZ=Y"},
 		))
@@ -58,8 +46,6 @@ func TestBuild(t *testing.T) {
 		)
 	})
 	t.Run("ParamsWithComplexValues", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "params_with_complex_values.yaml")
 		th.AssertParam(t,
 			"1=first",
@@ -72,35 +58,25 @@ func TestBuild(t *testing.T) {
 		)
 	})
 	t.Run("mailOn", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "valid_mail_on.yaml")
 		assert.True(t, th.MailOn.Failure)
 		assert.True(t, th.MailOn.Success)
 	})
 	t.Run("ValidTags", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "valid_tags.yaml")
 		assert.True(t, th.HasTag("daily"))
 		assert.True(t, th.HasTag("monthly"))
 	})
 	t.Run("ValidTagsList", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "valid_tags_list.yaml")
 		assert.True(t, th.HasTag("daily"))
 		assert.True(t, th.HasTag("monthly"))
 	})
 	t.Run("LogDir", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "valid_log_dir.yaml")
 		assert.Equal(t, "/tmp/logs", th.LogDir)
 	})
 	t.Run("MailConfig", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "valid_mail_config.yaml")
 		assert.Equal(t, "smtp.example.com", th.SMTP.Host)
 		assert.Equal(t, "587", th.SMTP.Port)
@@ -118,34 +94,27 @@ func TestBuild(t *testing.T) {
 		assert.True(t, th.InfoMail.AttachLogs)
 	})
 	t.Run("MaxHistRetentionDays", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "hist_retention_days.yaml")
 		assert.Equal(t, 365, th.HistRetentionDays)
 	})
 	t.Run("CleanUpTime", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "max_cleanup_time.yaml")
 		assert.Equal(t, time.Duration(10*time.Second), th.MaxCleanUpTime)
 	})
 	t.Run("Preconditions", func(t *testing.T) {
-		t.Parallel()
-
 		th := testLoad(t, "preconditions.yaml")
 		assert.Len(t, th.Preconditions, 1)
-		assert.Equal(t, digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Preconditions[0])
+		assert.Equal(t, &digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Preconditions[0])
 	})
-	t.Run("MaxActiveRuns", func(t *testing.T) {
-		t.Parallel()
-
+	t.Run("maxActiveRuns", func(t *testing.T) {
 		th := testLoad(t, "max_active_runs.yaml")
-		assert.Equal(t, 3, th.MaxActiveRuns)
+		assert.Equal(t, 5, th.MaxActiveRuns)
 	})
-
+	t.Run("MaxActiveSteps", func(t *testing.T) {
+		th := testLoad(t, "max_active_steps.yaml")
+		assert.Equal(t, 3, th.MaxActiveSteps)
+	})
 	t.Run("ValidationError", func(t *testing.T) {
-		t.Parallel()
-
 		type testCase struct {
 			name        string
 			dag         string
@@ -313,7 +282,7 @@ func TestBuildStep(t *testing.T) {
 		assert.Equal(t, "echo 1", th.Steps[0].CmdWithArgs)
 		assert.Equal(t, "echo", th.Steps[0].Command)
 		assert.Equal(t, []string{"1"}, th.Steps[0].Args)
-		assert.Equal(t, "step 1", th.Steps[0].Name)
+		assert.Equal(t, "step1", th.Steps[0].Name)
 	})
 	t.Run("ValidCommandInArray", func(t *testing.T) {
 		t.Parallel()
@@ -325,7 +294,7 @@ func TestBuildStep(t *testing.T) {
 			th.Steps[0].CmdArgsSys)
 		assert.Equal(t, "echo", th.Steps[0].Command)
 		assert.Equal(t, []string{"1"}, th.Steps[0].Args)
-		assert.Equal(t, "step 1", th.Steps[0].Name)
+		assert.Equal(t, "step1", th.Steps[0].Name)
 	})
 	t.Run("ValidCommandInList", func(t *testing.T) {
 		t.Parallel()
@@ -337,7 +306,7 @@ func TestBuildStep(t *testing.T) {
 			th.Steps[0].CmdArgsSys)
 		assert.Equal(t, "echo", th.Steps[0].Command)
 		assert.Equal(t, []string{"1"}, th.Steps[0].Args)
-		assert.Equal(t, "step 1", th.Steps[0].Name)
+		assert.Equal(t, "step1", th.Steps[0].Name)
 	})
 	t.Run("HTTPExecutor", func(t *testing.T) {
 		t.Parallel()
@@ -359,12 +328,12 @@ func TestBuildStep(t *testing.T) {
 			},
 		}, th.Steps[0].ExecutorConfig.Config)
 	})
-	t.Run("SubWorkflow", func(t *testing.T) {
+	t.Run("DAGExecutor", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "subworkflow.yaml")
+		th := testLoad(t, "sub_dag.yaml")
 		assert.Len(t, th.Steps, 1)
-		assert.Equal(t, "subworkflow", th.Steps[0].ExecutorConfig.Type)
+		assert.Equal(t, "dag", th.Steps[0].ExecutorConfig.Type)
 		assert.Equal(t, "run", th.Steps[0].Command)
 		assert.Equal(t, []string{
 			"sub_dag",
@@ -397,6 +366,15 @@ func TestBuildStep(t *testing.T) {
 		assert.True(t, th.Steps[0].RepeatPolicy.Repeat)
 		assert.Equal(t, 60*time.Second, th.Steps[0].RepeatPolicy.Interval)
 	})
+	t.Run("RepeatPolicyCondition", func(t *testing.T) {
+		th := testLoad(t, "repeat_policy_condition.yaml")
+		assert.Len(t, th.Steps, 1)
+		repeatPolicy := th.Steps[0].RepeatPolicy
+		require.NotNil(t, repeatPolicy.Condition)
+		assert.Equal(t, "echo hello", repeatPolicy.Condition.Condition)
+		assert.Equal(t, "hello", repeatPolicy.Condition.Expected)
+		assert.Equal(t, 1*time.Second, repeatPolicy.Interval)
+	})
 	t.Run("SignalOnStop", func(t *testing.T) {
 		t.Parallel()
 
@@ -410,7 +388,14 @@ func TestBuildStep(t *testing.T) {
 		th := testLoad(t, "step_preconditions.yaml")
 		assert.Len(t, th.Steps, 1)
 		assert.Len(t, th.Steps[0].Preconditions, 1)
-		assert.Equal(t, digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Steps[0].Preconditions[0])
+		assert.Equal(t, &digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Steps[0].Preconditions[0])
+	})
+	t.Run("RepeatPolicyExitCode", func(t *testing.T) {
+		th := testLoad(t, "repeat_policy_exitcode.yaml")
+		assert.Len(t, th.Steps, 1)
+		repeatPolicy := th.Steps[0].RepeatPolicy
+		assert.Equal(t, []int{42}, repeatPolicy.ExitCode)
+		assert.Equal(t, 2*time.Second, repeatPolicy.Interval)
 	})
 }
 

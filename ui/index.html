@@ -1,20 +1,27 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/assets/favicon.ico" />
     <title>Dagu</title>
     <script>
       function getConfig() {
         return {
-          apiURL: 'http://localhost:8080/api/v1',
+          apiURL: 'http://localhost:8080/api/v2',
+          basePath: '',
           title: '',
           navbarColor: '',
-          version: '',
+          version: 'dev',
           tz: '',
+          tzOffsetInSec: undefined,
           maxDashboardPageLimit: '',
-          remoteNodes: '',
+          remoteNodes: 'local,dev1',
+          permissions: {
+            writeDags: true,
+            runDags: true,
+          },
         };
       }
     </script>

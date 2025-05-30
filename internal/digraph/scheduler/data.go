@@ -8,11 +8,14 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/executor"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/stringutil"
+	"github.com/google/uuid"
 )
 
-// SafeData is a thread-safe wrapper around NodeData.
-type SafeData struct {
+// Data is a thread-safe wrapper around NodeData.
+type Data struct {
 	mu    sync.RWMutex
 	inner NodeData
 }
@@ -24,15 +27,37 @@ type NodeData struct {
 }
 
 type NodeState struct {
-	Status     NodeStatus
-	Log        string
-	StartedAt  time.Time
+	// Status represents the state of the node.
+	Status NodeStatus
+	// Stdout is the log file path from the node.
+	Stdout string
+	// Stderr is the log file path for the error log (stderr).
+	Stderr string
+	// StartedAt is the time when the node started.
+	StartedAt time.Time
+	// FinishedAt is the time when the node finished.
 	FinishedAt time.Time
+	// RetryCount is the number of retries happened based on the retry policy.
 	RetryCount int
-	RetriedAt  time.Time
-	DoneCount  int
-	Error      error
-	ExitCode   int
+	// RetriedAt is the time when the node was retried last time.
+	RetriedAt time.Time
+	// DoneCount is the number of times the node was executed.
+	DoneCount int
+	// Error is the error that the executor encountered.
+	Error error
+	// ExitCode is the exit code that the command exited with.
+	// It only makes sense when the node is a command executor.
+	ExitCode int
+	// Children stores the child dag-runs.
+	Children []ChildDAGRun
+	// OutputVariables stores the output variables for the following steps.
+	// It only contains the local output variables.
+	OutputVariables *executor.SyncMap
+}
+
+type ChildDAGRun struct {
+	// DAGRunID is the run ID of the child dag-run.
+	DAGRunID string
 }
 
 type NodeStatus int
@@ -65,11 +90,11 @@ func (s NodeStatus) String() string {
 	}
 }
 
-func newSafeData(data NodeData) SafeData {
-	return SafeData{inner: data}
+func newSafeData(data NodeData) Data {
+	return Data{inner: data}
 }
 
-func (s *SafeData) ResetError() {
+func (s *Data) ResetError() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -77,7 +102,21 @@ func (s *SafeData) ResetError() {
 	s.inner.State.ExitCode = 0
 }
 
-func (s *SafeData) Args() []string {
+func (s *Data) SetExecutorConfig(cfg digraph.ExecutorConfig) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.inner.Step.ExecutorConfig = cfg
+}
+
+func (s *Data) SetChildDAG(childDAG digraph.ChildDAG) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.inner.Step.ChildDAG = &childDAG
+}
+
+func (s *Data) Args() []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -86,21 +125,28 @@ func (s *SafeData) Args() []string {
 	return args
 }
 
-func (s *SafeData) SetArgs(args []string) {
+func (s *Data) SetArgs(args []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.inner.Step.Args = args
 }
 
-func (s *SafeData) Step() digraph.Step {
+func (s *Data) Step() digraph.Step {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.inner.Step
 }
 
-func (s *SafeData) SetStep(step digraph.Step) {
+func (s *Data) SetScript(script string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.inner.Step.Script = script
+}
+
+func (s *Data) SetStep(step digraph.Step) {
 	// TODO: refactor to avoid modifying the step
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -108,120 +154,155 @@ func (s *SafeData) SetStep(step digraph.Step) {
 	s.inner.Step = step
 }
 
-func (s *SafeData) Data() NodeData {
+func (s *Data) Data() NodeData {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.inner
 }
 
-func (s *SafeData) Setup(ctx context.Context, logFile string, startedAt time.Time) error {
+// GenChildDAGRunID returns the dag-run ID for the child dag-run.
+// Currently, it only supports a single child dag-run.
+// In the future, it may support multiple child dag-runs (e.g., for-each).
+func (s *Data) GenChildDAGRunID() (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// If children is not empty, return the first child's DAGRunID.
+	if len(s.inner.State.Children) > 0 {
+		return s.inner.State.Children[0].DAGRunID, nil
+	}
+	// Generate a new DAGRunID for the child dag-run.
+	r, err := generateDAGRunID()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate child dag-run ID: %w", err)
+	}
+	s.inner.State.Children = append(s.inner.State.Children, ChildDAGRun{DAGRunID: r})
+	return r, nil
+}
+
+func (s *Data) Setup(ctx context.Context, logFile string, startedAt time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.inner.State.Log = logFile
+	s.inner.State.Stdout = logFile + ".out"
+	s.inner.State.Stderr = logFile + ".err"
 	s.inner.State.StartedAt = startedAt
 
-	stepContext := digraph.GetStepContext(ctx)
+	env := executor.GetEnv(ctx)
 
-	// Evaluate the stdout and stderr fields
-	stdout, err := stepContext.EvalString(ctx, s.inner.Step.Stdout)
+	// Evaluate the stdout field
+	stdout, err := env.EvalString(ctx, s.inner.Step.Stdout)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate stdout field: %w", err)
 	}
 	s.inner.Step.Stdout = stdout
 
-	stderr, err := stepContext.EvalString(ctx, s.inner.Step.Stderr)
+	// Evaluate the stderr field
+	stderr, err := env.EvalString(ctx, s.inner.Step.Stderr)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate stderr field: %w", err)
 	}
 	s.inner.Step.Stderr = stderr
 
 	// Evaluate the dir field
-	dir, err := stepContext.EvalString(ctx, s.inner.Step.Dir)
+	dir, err := env.EvalString(ctx, s.inner.Step.Dir)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate dir field: %w", err)
 	}
+
+	// Resolve the path to the directory
+	dir, err = fileutil.ResolvePath(dir)
+	if err != nil {
+		return fmt.Errorf("failed to evaluate dir field: %w", err)
+	}
+
 	s.inner.Step.Dir = dir
 
 	return nil
 }
 
-func (s *SafeData) State() NodeState {
+func (s *Data) State() NodeState {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.inner.State
 }
 
-func (s *SafeData) Status() NodeStatus {
+func (s *Data) Status() NodeStatus {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.inner.State.Status
 }
 
-func (s *SafeData) SetStatus(status NodeStatus) {
+func (s *Data) SetStatus(status NodeStatus) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.inner.State.Status = status
 }
 
-func (s *SafeData) ContinueOn() digraph.ContinueOn {
+func (s *Data) ContinueOn() digraph.ContinueOn {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.inner.Step.ContinueOn
 }
 
-func (s *SafeData) Log() string {
+func (s *Data) GetStdout() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return s.inner.State.Log
+	return s.inner.State.Stdout
 }
 
-func (s *SafeData) SignalOnStop() string {
+func (s *Data) GetStderr() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.inner.State.Stderr
+}
+
+func (s *Data) SignalOnStop() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.inner.Step.SignalOnStop
 }
 
-func (s *SafeData) Name() string {
+func (s *Data) Name() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.inner.Step.Name
 }
 
-func (s *SafeData) Error() error {
+func (s *Data) Error() error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.inner.State.Error
 }
 
-func (s *SafeData) SetError(err error) {
+func (s *Data) SetError(err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.inner.State.Error = err
 }
 
-func (s *SafeData) ClearVariable(key string) {
+func (s *Data) ClearVariable(key string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.inner.Step.OutputVariables == nil {
+	if s.inner.State.OutputVariables == nil {
 		return
 	}
 
-	s.inner.Step.OutputVariables.Delete(key)
+	s.inner.State.OutputVariables.Delete(key)
 }
 
-func (s *SafeData) MatchExitCode(exitCodes []int) bool {
+func (s *Data) MatchExitCode(exitCodes []int) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -233,15 +314,15 @@ func (s *SafeData) MatchExitCode(exitCodes []int) bool {
 	return false
 }
 
-func (n *SafeData) getVariable(key string) (stringutil.KeyValue, bool) {
+func (n *Data) getVariable(key string) (stringutil.KeyValue, bool) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
-	if n.inner.Step.OutputVariables == nil {
+	if n.inner.State.OutputVariables == nil {
 		return "", false
 	}
 
-	v, ok := n.inner.Step.OutputVariables.Load(key)
+	v, ok := n.inner.State.OutputVariables.Load(key)
 	if !ok {
 		return "", false
 	}
@@ -249,7 +330,7 @@ func (n *SafeData) getVariable(key string) (stringutil.KeyValue, bool) {
 	return stringutil.KeyValue(v.(string)), true
 }
 
-func (n *SafeData) getBoolVariable(key string) (bool, bool) {
+func (n *Data) getBoolVariable(key string) (bool, bool) {
 	v, ok := n.getVariable(key)
 	if !ok {
 		return false, false
@@ -258,87 +339,108 @@ func (n *SafeData) getBoolVariable(key string) (bool, bool) {
 	return v.Bool(), true
 }
 
-func (n *SafeData) setBoolVariable(key string, value bool) {
-	if n.inner.Step.OutputVariables == nil {
-		n.inner.Step.OutputVariables = &digraph.SyncMap{}
+func (n *Data) setBoolVariable(key string, value bool) {
+
+	if n.inner.State.OutputVariables == nil {
+		n.mu.Lock()
+		n.inner.State.OutputVariables = &executor.SyncMap{}
+		n.mu.Unlock()
 	}
-	n.inner.Step.OutputVariables.Store(key, stringutil.NewKeyValue(key, strconv.FormatBool(value)).String())
+	n.inner.State.OutputVariables.Store(key, stringutil.NewKeyValue(key, strconv.FormatBool(value)).String())
 }
 
-func (n *SafeData) setVariable(key, value string) {
-	if n.inner.Step.OutputVariables == nil {
-		n.inner.Step.OutputVariables = &digraph.SyncMap{}
+func (n *Data) setVariable(key, value string) {
+	if n.inner.State.OutputVariables == nil {
+		n.mu.Lock()
+		n.inner.State.OutputVariables = &executor.SyncMap{}
+		n.mu.Unlock()
 	}
-	n.inner.Step.OutputVariables.Store(key, stringutil.NewKeyValue(key, value).String())
+	n.inner.State.OutputVariables.Store(key, stringutil.NewKeyValue(key, value).String())
 }
 
-func (n *SafeData) Finish() {
+func (n *Data) Finish() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
 	n.inner.State.FinishedAt = time.Now()
 }
 
-func (n *SafeData) IncRetryCount() {
+func (n *Data) IncRetryCount() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
 	n.inner.State.RetryCount++
 }
 
-func (n *SafeData) GetRetryCount() int {
+func (n *Data) GetRetryCount() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
 	return n.inner.State.RetryCount
 }
 
-func (n *SafeData) SetRetriedAt(retriedAt time.Time) {
+func (n *Data) SetRetriedAt(retriedAt time.Time) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
 	n.inner.State.RetriedAt = retriedAt
 }
 
-func (n *SafeData) IncDoneCount() {
+func (n *Data) IncDoneCount() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
 	n.inner.State.DoneCount++
 }
 
-func (n *SafeData) GetDoneCount() int {
+func (n *Data) GetDoneCount() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
 	return n.inner.State.DoneCount
 }
 
-func (n *SafeData) GetExitCode() int {
+func (n *Data) GetExitCode() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
 	return n.inner.State.ExitCode
 }
 
-func (n *SafeData) SetExitCode(exitCode int) {
+func (n *Data) SetExitCode(exitCode int) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
 	n.inner.State.ExitCode = exitCode
 }
 
-func (n *SafeData) ClearState() {
+func (n *Data) ClearState(s digraph.Step) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
+	// The data of child dag-run need to be preserved to retain their dag-run IDs
+	children := n.inner.State.Children
 	n.inner.State = NodeState{}
+	n.inner.State.Children = children
+
+	// Reset the state of the step
+	n.inner.Step = s
 }
 
-func (n *SafeData) MarkError(err error) {
+func (n *Data) MarkError(err error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
 	n.inner.State.Error = err
 	n.inner.State.Status = NodeStatusError
+}
+
+// generateDAGRunID generates a new dag-run ID.
+// For simplicity, we use UUIDs as dag-run IDs.
+func generateDAGRunID() (string, error) {
+	id, err := uuid.NewV7()
+	if err != nil {
+		return "", err
+	}
+	return id.String(), nil
 }

@@ -19,12 +19,10 @@ import (
 )
 
 func TestScheduler(t *testing.T) {
-	t.Parallel()
-
 	testScript := test.TestdataPath(t, filepath.Join("digraph", "scheduler", "testfile.sh"))
 
 	t.Run("SequentialStepsSuccess", func(t *testing.T) {
-		sc := setup(t, withMaxActiveRuns(1))
+		sc := setupScheduler(t, withMaxActiveRuns(1))
 
 		// 1 -> 2 -> 3
 		graph := sc.newGraph(t,
@@ -40,7 +38,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "3", scheduler.NodeStatusSuccess)
 	})
 	t.Run("SequentialStepsWithFailure", func(t *testing.T) {
-		sc := setup(t, withMaxActiveRuns(1))
+		sc := setupScheduler(t, withMaxActiveRuns(1))
 
 		// 1 -> 2 -> 3 -> 4
 		graph := sc.newGraph(t,
@@ -59,7 +57,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "4", scheduler.NodeStatusCancel)
 	})
 	t.Run("ParallelSteps", func(t *testing.T) {
-		sc := setup(t, withMaxActiveRuns(3))
+		sc := setupScheduler(t, withMaxActiveRuns(3))
 
 		// 1,2,3
 		graph := sc.newGraph(t,
@@ -75,7 +73,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "3", scheduler.NodeStatusSuccess)
 	})
 	t.Run("ParallelStepsWithFailure", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		// 1 -> 3 -> 4, 2 (fail)
 		graph := sc.newGraph(t,
@@ -93,7 +91,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "4", scheduler.NodeStatusSuccess)
 	})
 	t.Run("ComplexCommand", func(t *testing.T) {
-		sc := setup(t, withMaxActiveRuns(1))
+		sc := setupScheduler(t, withMaxActiveRuns(1))
 
 		graph := sc.newGraph(t,
 			newStep("1",
@@ -104,7 +102,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
 	})
 	t.Run("ContinueOnFailure", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		// 1 -> 2 (fail) -> 3
 		graph := sc.newGraph(t,
@@ -127,7 +125,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "3", scheduler.NodeStatusSuccess)
 	})
 	t.Run("ContinueOnSkip", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		// 1 -> 2 (skip) -> 3
 		graph := sc.newGraph(t,
@@ -135,7 +133,7 @@ func TestScheduler(t *testing.T) {
 			newStep("2",
 				withDepends("1"),
 				withCommand("false"),
-				withPrecondition(digraph.Condition{
+				withPrecondition(&digraph.Condition{
 					Condition: "`echo 1`",
 					Expected:  "0",
 				}),
@@ -153,7 +151,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "3", scheduler.NodeStatusSuccess)
 	})
 	t.Run("ContinueOnExitCode", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		// 1 (exit code 1) -> 2
 		graph := sc.newGraph(t,
@@ -173,7 +171,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "2", scheduler.NodeStatusSuccess)
 	})
 	t.Run("ContinueOnOutputStdout", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		// 1 (exit code 1) -> 2
 		graph := sc.newGraph(t,
@@ -195,7 +193,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "2", scheduler.NodeStatusSuccess)
 	})
 	t.Run("ContinueOnOutputStderr", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		// 1 (exit code 1) -> 2
 		graph := sc.newGraph(t,
@@ -217,7 +215,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "2", scheduler.NodeStatusSuccess)
 	})
 	t.Run("ContinueOnOutputRegexp", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		// 1 (exit code 1) -> 2
 		graph := sc.newGraph(t,
@@ -239,7 +237,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "2", scheduler.NodeStatusSuccess)
 	})
 	t.Run("ContinueOnMarkSuccess", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		// 1 (exit code 1) -> 2
 		graph := sc.newGraph(t,
@@ -260,7 +258,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "2", scheduler.NodeStatusSuccess)
 	})
 	t.Run("CancelSchedule", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		// 1 -> 2 (cancel when running) -> 3 (should not be executed)
 		graph := sc.newGraph(t,
@@ -270,7 +268,7 @@ func TestScheduler(t *testing.T) {
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 300) // wait for step 2 to start
+			time.Sleep(time.Millisecond * 500) // wait for step 2 to start
 			graph.Cancel(t)
 		}()
 
@@ -281,7 +279,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "3", scheduler.NodeStatusNone)
 	})
 	t.Run("Timeout", func(t *testing.T) {
-		sc := setup(t, withTimeout(time.Second*2))
+		sc := setupScheduler(t, withTimeout(time.Second*2))
 
 		// 1 -> 2 (timeout) -> 3 (should not be executed)
 		graph := sc.newGraph(t,
@@ -301,7 +299,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("RetryPolicyFail", func(t *testing.T) {
 		const file = "flag_test_retry_fail"
 
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
 			newStep("1",
@@ -318,7 +316,7 @@ func TestScheduler(t *testing.T) {
 		require.Equal(t, 2, node.State().RetryCount) // 2 retry
 	})
 	t.Run("RetryWithScript", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		const testEnv = "TEST_RETRY_WITH_SCRIPT"
 		graph := sc.newGraph(t,
@@ -352,10 +350,10 @@ func TestScheduler(t *testing.T) {
 	})
 	t.Run("RetryPolicySuccess", func(t *testing.T) {
 		file := filepath.Join(
-			os.TempDir(), fmt.Sprintf("flag_test_retry_success_%s", uuid.Must(uuid.NewRandom()).String()),
+			os.TempDir(), fmt.Sprintf("flag_test_retry_success_%s", uuid.Must(uuid.NewV7()).String()),
 		)
 
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
 			newStep("1",
@@ -371,7 +369,9 @@ func TestScheduler(t *testing.T) {
 			// Create file during the retry interval
 			f, err := os.Create(file)
 			require.NoError(t, err)
-			defer f.Close()
+			defer func() {
+				_ = f.Close()
+			}()
 
 			t.Cleanup(func() {
 				_ = os.Remove(file)
@@ -389,13 +389,13 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
 	})
 	t.Run("PreconditionMatch", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		// 1 -> 2 (precondition match) -> 3
 		graph := sc.newGraph(t,
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
-				withPrecondition(digraph.Condition{
+				withPrecondition(&digraph.Condition{
 					Condition: "`echo 1`",
 					Expected:  "1",
 				}),
@@ -410,13 +410,13 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "3", scheduler.NodeStatusSuccess)
 	})
 	t.Run("PreconditionNotMatch", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		// 1 -> 2 (precondition not match) -> 3
 		graph := sc.newGraph(t,
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
-				withPrecondition(digraph.Condition{
+				withPrecondition(&digraph.Condition{
 					Condition: "`echo 1`",
 					Expected:  "0",
 				})),
@@ -431,14 +431,14 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "3", scheduler.NodeStatusSkipped)
 	})
 	t.Run("PreconditionWithCommandMet", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		// 1 -> 2 (precondition not match) -> 3
 		graph := sc.newGraph(t,
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
-				withPrecondition(digraph.Condition{
-					Command: "true",
+				withPrecondition(&digraph.Condition{
+					Condition: "true",
 				})),
 			successStep("3", "2"),
 		)
@@ -450,14 +450,14 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "3", scheduler.NodeStatusSuccess)
 	})
 	t.Run("PreconditionWithCommandNotMet", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		// 1 -> 2 (precondition not match) -> 3
 		graph := sc.newGraph(t,
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
-				withPrecondition(digraph.Condition{
-					Command: "false",
+				withPrecondition(&digraph.Condition{
+					Condition: "false",
 				})),
 			successStep("3", "2"),
 		)
@@ -470,7 +470,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "3", scheduler.NodeStatusSkipped)
 	})
 	t.Run("OnExitHandler", func(t *testing.T) {
-		sc := setup(t, withOnExit(successStep("onExit")))
+		sc := setupScheduler(t, withOnExit(successStep("onExit")))
 
 		graph := sc.newGraph(t, successStep("1"))
 
@@ -480,7 +480,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "onExit", scheduler.NodeStatusSuccess)
 	})
 	t.Run("OnExitHandlerFail", func(t *testing.T) {
-		sc := setup(t, withOnExit(failStep("onExit")))
+		sc := setupScheduler(t, withOnExit(failStep("onExit")))
 
 		graph := sc.newGraph(t, successStep("1"))
 
@@ -491,7 +491,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "onExit", scheduler.NodeStatusError)
 	})
 	t.Run("OnCancelHandler", func(t *testing.T) {
-		sc := setup(t, withOnCancel(successStep("onCancel")))
+		sc := setupScheduler(t, withOnCancel(successStep("onCancel")))
 
 		graph := sc.newGraph(t,
 			newStep("1", withCommand("sleep 10")),
@@ -508,7 +508,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "onCancel", scheduler.NodeStatusSuccess)
 	})
 	t.Run("OnSuccessHandler", func(t *testing.T) {
-		sc := setup(t, withOnSuccess(successStep("onSuccess")))
+		sc := setupScheduler(t, withOnSuccess(successStep("onSuccess")))
 
 		graph := sc.newGraph(t, successStep("1"))
 
@@ -518,7 +518,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "onSuccess", scheduler.NodeStatusSuccess)
 	})
 	t.Run("OnFailureHandler", func(t *testing.T) {
-		sc := setup(t, withOnFailure(successStep("onFailure")))
+		sc := setupScheduler(t, withOnFailure(successStep("onFailure")))
 
 		graph := sc.newGraph(t, failStep("1"))
 
@@ -528,7 +528,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "onFailure", scheduler.NodeStatusSuccess)
 	})
 	t.Run("CancelOnSignal", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
 			newStep("1", withCommand("sleep 10")),
@@ -544,7 +544,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusCancel)
 	})
 	t.Run("Repeat", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
 			newStep("1",
@@ -568,7 +568,7 @@ func TestScheduler(t *testing.T) {
 		require.Equal(t, 1, node.State().DoneCount)
 	})
 	t.Run("RepeatFail", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
 			newStep("1",
@@ -586,7 +586,7 @@ func TestScheduler(t *testing.T) {
 		require.Equal(t, 1, node.State().DoneCount)
 	})
 	t.Run("StopRepetitiveTaskGracefully", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
 			newStep("1",
@@ -608,7 +608,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
 	})
 	t.Run("NodeSetupFailure", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
 			newStep("1", withWorkingDir("/nonexistent"),
@@ -623,7 +623,7 @@ func TestScheduler(t *testing.T) {
 		require.Contains(t, result.Error.Error(), "directory does not exist")
 	})
 	t.Run("OutputVariables", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		// 1: echo hello > OUT
 		// 2: echo $OUT > RESULT
@@ -640,12 +640,12 @@ func TestScheduler(t *testing.T) {
 		node := result.Node(t, "2")
 
 		// check if RESULT variable is set to "hello"
-		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
 		require.Equal(t, "RESULT=hello", output, "expected output %q, got %q", "hello", output)
 	})
 	t.Run("OutputInheritance", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		// 1: echo hello > OUT
 		// 2: echo world > OUT2 (depends on 1)
@@ -663,15 +663,15 @@ func TestScheduler(t *testing.T) {
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 
 		node := result.Node(t, "3")
-		output, _ := node.Data().Step.OutputVariables.Load("RESULT")
+		output, _ := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.Equal(t, "RESULT=hello world", output, "expected output %q, got %q", "hello world", output)
 
 		node2 := result.Node(t, "5")
-		output2, _ := node2.Data().Step.OutputVariables.Load("RESULT2")
+		output2, _ := node2.NodeData().State.OutputVariables.Load("RESULT2")
 		require.Equal(t, "RESULT2=", output2, "expected output %q, got %q", "", output)
 	})
 	t.Run("OutputJSONReference", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		jsonData := `{"key": "value"}`
 		graph := sc.newGraph(t,
@@ -684,11 +684,11 @@ func TestScheduler(t *testing.T) {
 		// check if RESULT variable is set to "value"
 		node := result.Node(t, "2")
 
-		output, _ := node.Data().Step.OutputVariables.Load("RESULT")
+		output, _ := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.Equal(t, "RESULT=value", output, "expected output %q, got %q", "value", output)
 	})
 	t.Run("HandlingJSONWithSpecialChars", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		jsonData := `{\n\t"key": "value"\n}`
 		graph := sc.newGraph(t,
@@ -701,67 +701,67 @@ func TestScheduler(t *testing.T) {
 		// check if RESULT variable is set to "value"
 		node := result.Node(t, "2")
 
-		output, _ := node.Data().Step.OutputVariables.Load("RESULT")
+		output, _ := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.Equal(t, "RESULT=value", output, "expected output %q, got %q", "value", output)
 	})
-	t.Run("SpecialVars_DAG_EXECUTION_LOG_PATH", func(t *testing.T) {
-		sc := setup(t)
+	t.Run("SpecialVars_DAG_RUN_LOG_FILE", func(t *testing.T) {
+		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
-			newStep("1", withCommand("echo $DAG_EXECUTION_LOG_PATH"), withOutput("RESULT")),
+			newStep("1", withCommand("echo $DAG_RUN_LOG_FILE"), withOutput("RESULT")),
 		)
 
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		node := result.Node(t, "1")
 
-		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
 		require.Regexp(t, `^RESULT=/.*/.*\.log$`, output, "unexpected output %q", output)
 	})
-	t.Run("SpecialVars_DAG_SCHEDULER_LOG_PATH", func(t *testing.T) {
-		sc := setup(t)
+	t.Run("SpecialVars_DAG_RUN_STEP_STDOUT_FILE", func(t *testing.T) {
+		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
-			newStep("1", withCommand("echo $DAG_SCHEDULER_LOG_PATH"), withOutput("RESULT")),
+			newStep("1", withCommand("echo $DAG_RUN_STEP_STDOUT_FILE"), withOutput("RESULT")),
 		)
 
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		node := result.Node(t, "1")
 
-		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
-		require.Regexp(t, `^RESULT=/.*/.*\.log$`, output, "unexpected output %q", output)
+		require.Regexp(t, `^RESULT=/.*/.*\.out$`, output, "unexpected output %q", output)
 	})
-	t.Run("SpecialVars_DAG_STEP_LOG_PATH", func(t *testing.T) {
-		sc := setup(t)
+	t.Run("SpecialVars_DAG_RUN_STEP_STDERR_FILE", func(t *testing.T) {
+		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
-			newStep("1", withCommand("echo $DAG_STEP_LOG_PATH"), withOutput("RESULT")),
+			newStep("1", withCommand("echo $DAG_RUN_STEP_STDERR_FILE"), withOutput("RESULT")),
 		)
 
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		node := result.Node(t, "1")
 
-		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
-		require.Regexp(t, `^RESULT=/.*/.*\.log$`, output, "unexpected output %q", output)
+		require.Regexp(t, `^RESULT=/.*/.*\.err$`, output, "unexpected output %q", output)
 	})
-	t.Run("SpecialVars_DAG_REQUEST_ID", func(t *testing.T) {
-		sc := setup(t)
+	t.Run("SpecialVars_DAG_RUN_ID", func(t *testing.T) {
+		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
-			newStep("1", withCommand("echo $DAG_REQUEST_ID"), withOutput("RESULT")),
+			newStep("1", withCommand("echo $DAG_RUN_ID"), withOutput("RESULT")),
 		)
 
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		node := result.Node(t, "1")
 
-		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
 		require.Regexp(t, `RESULT=[a-f0-9-]+`, output, "unexpected output %q", output)
 	})
 	t.Run("SpecialVars_DAG_NAME", func(t *testing.T) {
-		sc := setup(t)
+		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
 			newStep("1", withCommand("echo $DAG_NAME"), withOutput("RESULT")),
@@ -770,23 +770,211 @@ func TestScheduler(t *testing.T) {
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		node := result.Node(t, "1")
 
-		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
 		require.Equal(t, "RESULT=test_dag", output, "unexpected output %q", output)
 	})
-	t.Run("SpecialVars_DAG_STEP_NAME", func(t *testing.T) {
-		sc := setup(t)
+	t.Run("SpecialVars_DAG_RUN_STEP_NAME", func(t *testing.T) {
+		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
-			newStep("step_test", withCommand("echo $DAG_STEP_NAME"), withOutput("RESULT")),
+			newStep("step_test", withCommand("echo $DAG_RUN_STEP_NAME"), withOutput("RESULT")),
 		)
 
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		node := result.Node(t, "step_test")
 
-		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
 		require.Equal(t, "RESULT=step_test", output, "unexpected output %q", output)
+	})
+
+	t.Run("RepeatPolicy_RepeatsUntilCommandConditionMatchesExpected", func(t *testing.T) {
+		sc := setupScheduler(t)
+
+		// This step will repeat until the file contains 'ready'
+		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_test_%s.txt", uuid.Must(uuid.NewV7()).String()))
+		err := os.Remove(file)
+		if err != nil && !os.IsNotExist(err) {
+			require.NoError(t, err)
+		}
+		defer func() {
+			err := os.Remove(file)
+			if err != nil && !os.IsNotExist(err) {
+				require.NoError(t, err)
+			}
+		}()
+		graph := sc.newGraph(t,
+			newStep("1",
+				withCommand(fmt.Sprintf("cat %s || true", file)),
+				func(step *digraph.Step) {
+					step.RepeatPolicy.Condition = &digraph.Condition{
+						Condition: fmt.Sprintf("`cat %s || true`", file),
+						Expected:  "ready",
+					}
+					step.RepeatPolicy.Interval = 100 * time.Millisecond
+				},
+			),
+		)
+
+		go func() {
+			time.Sleep(400 * time.Millisecond)
+			err := os.WriteFile(file, []byte("ready"), 0644)
+			require.NoError(t, err, "failed to write to file")
+		}()
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
+		// Should have run at least twice (first: not ready, second: ready)
+		node := result.Node(t, "1")
+		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+	})
+
+	t.Run("RepeatPolicy_RepeatWhileConditionExits0", func(t *testing.T) {
+		sc := setupScheduler(t)
+		// This step will repeat until the file exists
+		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_exit0_%s", uuid.Must(uuid.NewV7()).String()))
+		err := os.Remove(file)
+		if err != nil && !os.IsNotExist(err) {
+			require.NoError(t, err)
+		}
+		defer func() {
+			err := os.Remove(file)
+			if err != nil && !os.IsNotExist(err) {
+				require.NoError(t, err)
+			}
+		}()
+		graph := sc.newGraph(t,
+			newStep("1",
+				withCommand("echo hello"),
+				func(step *digraph.Step) {
+					step.RepeatPolicy.Condition = &digraph.Condition{
+						Condition: "test ! -f " + file,
+					}
+					step.RepeatPolicy.Interval = 100 * time.Millisecond
+				},
+			),
+		)
+		// Create file 100 ms after step runs
+		go func() {
+			time.Sleep(200 * time.Millisecond)
+			f, _ := os.Create(file)
+			err := f.Close()
+			require.NoError(t, err)
+		}()
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
+		node := result.Node(t, "1")
+		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+	})
+
+	t.Run("RepeatPolicy_RepeatsWhileCommandExitCodeMatches", func(t *testing.T) {
+		sc := setupScheduler(t)
+		// This step will repeat until exit code is not 42.
+		countFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_exitcode_%s", uuid.Must(uuid.NewV7()).String()))
+		err := os.Remove(countFile)
+		if err != nil && !os.IsNotExist(err) {
+			require.NoError(t, err)
+		}
+		defer func() {
+			err := os.Remove(countFile)
+			if err != nil && !os.IsNotExist(err) {
+				require.NoError(t, err)
+			}
+		}()
+		// Script: fail with exit 42 until file exists, then exit 0
+		script := fmt.Sprintf(`if [ ! -f %[1]s ]; then exit 42; else exit 0; fi`, countFile)
+		graph := sc.newGraph(t,
+			newStep("1",
+				withScript(script),
+				withContinueOn(digraph.ContinueOn{
+					ExitCode:    []int{42},
+					Failure:     true,
+					MarkSuccess: true,
+				}),
+				func(step *digraph.Step) {
+					step.RepeatPolicy.ExitCode = []int{42}
+					step.RepeatPolicy.Interval = 200 * time.Millisecond
+				},
+			),
+		)
+		go func() {
+			time.Sleep(350 * time.Millisecond)
+			f, _ := os.Create(countFile)
+			err := f.Close()
+			require.NoError(t, err)
+		}()
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
+		node := result.Node(t, "1")
+		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+	})
+
+	t.Run("RepeatPolicy_RepeatsUntilEnvVarConditionMatchesExpected", func(t *testing.T) {
+		sc := setupScheduler(t)
+		// This step will repeat until the environment variable TEST_REPEAT_MATCH_EXPR equals 'done'
+		err := os.Setenv("TEST_REPEAT_MATCH_EXPR", "notyet")
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			err := os.Unsetenv("TEST_REPEAT_MATCH_EXPR")
+			require.NoError(t, err)
+		})
+		graph := sc.newGraph(t,
+			newStep("1",
+				withCommand("echo $TEST_REPEAT_MATCH_EXPR"),
+				func(step *digraph.Step) {
+					step.RepeatPolicy.Condition = &digraph.Condition{
+						Condition: "$TEST_REPEAT_MATCH_EXPR",
+						Expected:  "done",
+					}
+					step.RepeatPolicy.Interval = 100 * time.Millisecond
+				},
+			),
+		)
+		go func() {
+			time.Sleep(300 * time.Millisecond)
+			err := os.Setenv("TEST_REPEAT_MATCH_EXPR", "done")
+			require.NoError(t, err)
+		}()
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
+		node := result.Node(t, "1")
+		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+	})
+
+	t.Run("RepeatPolicy_RepeatsUntilOutputVarConditionMatchesExpected", func(t *testing.T) {
+		sc := setupScheduler(t)
+		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_outputvar_%s", uuid.Must(uuid.NewV7()).String()))
+		err := os.Remove(file)
+		if err != nil && !os.IsNotExist(err) {
+			require.NoError(t, err)
+		}
+		t.Cleanup(func() { err := os.Remove(file); require.NoError(t, err) })
+		// Write initial value
+		err = os.WriteFile(file, []byte("notyet"), 0644)
+		require.NoError(t, err)
+		graph := sc.newGraph(t,
+			newStep("1",
+				withCommand(fmt.Sprintf("cat %s", file)),
+				withOutput("OUT"),
+				func(step *digraph.Step) {
+					step.RepeatPolicy.Condition = &digraph.Condition{
+						Condition: "$OUT",
+						Expected:  "done",
+					}
+					step.RepeatPolicy.Interval = 100 * time.Millisecond
+				},
+			),
+		)
+		go func() {
+			time.Sleep(300 * time.Millisecond)
+			err := os.WriteFile(file, []byte("done"), 0644)
+			require.NoError(t, err)
+		}()
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
+		node := result.Node(t, "1")
+		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 }
 
@@ -826,9 +1014,9 @@ func withRepeatPolicy(repeat bool, interval time.Duration) stepOption {
 	}
 }
 
-func withPrecondition(condition digraph.Condition) stepOption {
+func withPrecondition(condition *digraph.Condition) stepOption {
 	return func(step *digraph.Step) {
-		step.Preconditions = []digraph.Condition{condition}
+		step.Preconditions = []*digraph.Condition{condition}
 	}
 }
 
@@ -888,7 +1076,7 @@ func withTimeout(d time.Duration) schedulerOption {
 
 func withMaxActiveRuns(n int) schedulerOption {
 	return func(cfg *scheduler.Config) {
-		cfg.MaxActiveRuns = n
+		cfg.MaxActiveSteps = n
 	}
 }
 
@@ -916,14 +1104,14 @@ func withOnFailure(step digraph.Step) schedulerOption {
 	}
 }
 
-func setup(t *testing.T, opts ...schedulerOption) testHelper {
+func setupScheduler(t *testing.T, opts ...schedulerOption) testHelper {
 	t.Helper()
 
 	th := test.Setup(t)
 
 	cfg := &scheduler.Config{
-		LogDir: th.Config.Paths.LogDir,
-		ReqID:  uuid.Must(uuid.NewRandom()).String(),
+		LogDir:   th.Config.Paths.LogDir,
+		DAGRunID: uuid.Must(uuid.NewV7()).String(),
 	}
 	for _, opt := range opts {
 		opt(cfg)
@@ -958,25 +1146,25 @@ func (gh graphHelper) Schedule(t *testing.T, expectedStatus scheduler.Status) sc
 	t.Helper()
 
 	dag := &digraph.DAG{Name: "test_dag"}
-	logFilename := fmt.Sprintf("%s_%s.log", dag.Name, gh.Config.ReqID)
+	logFilename := fmt.Sprintf("%s_%s.log", dag.Name, gh.Config.DAGRunID)
 	logFilePath := path.Join(gh.Config.LogDir, logFilename)
 
-	ctx := digraph.NewContext(gh.Context, dag, nil, gh.Config.ReqID, logFilePath, nil)
+	ctx := digraph.SetupEnv(gh.Context, dag, nil, digraph.DAGRunRef{}, gh.Config.DAGRunID, logFilePath, nil)
 
 	var doneNodes []*scheduler.Node
-	nodeCompletedChan := make(chan *scheduler.Node)
+	progressCh := make(chan *scheduler.Node)
 
 	done := make(chan struct{})
 	go func() {
-		for node := range nodeCompletedChan {
+		for node := range progressCh {
 			doneNodes = append(doneNodes, node)
 		}
 		done <- struct{}{}
 	}()
 
-	err := gh.Scheduler.Schedule(ctx, gh.ExecutionGraph, nodeCompletedChan)
+	err := gh.Scheduler.Schedule(ctx, gh.ExecutionGraph, progressCh)
 
-	close(nodeCompletedChan)
+	close(progressCh)
 
 	switch expectedStatus {
 	case scheduler.StatusSuccess, scheduler.StatusCancel:
@@ -985,7 +1173,7 @@ func (gh graphHelper) Schedule(t *testing.T, expectedStatus scheduler.Status) sc
 	case scheduler.StatusError:
 		require.Error(t, err)
 
-	case scheduler.StatusRunning, scheduler.StatusNone:
+	case scheduler.StatusRunning, scheduler.StatusNone, scheduler.StatusQueued:
 		t.Errorf("unexpected status %s", expectedStatus)
 
 	}
@@ -1029,26 +1217,20 @@ func (sr scheduleResult) AssertDoneCount(t *testing.T, expected int) {
 func (sr scheduleResult) AssertNodeStatus(t *testing.T, stepName string, expected scheduler.NodeStatus) {
 	t.Helper()
 
-	var target *scheduler.Node
-
-	nodes := sr.ExecutionGraph.Nodes()
-	for _, node := range nodes {
-		if node.Data().Step.Name == stepName {
-			target = node
+	target := sr.NodeByName(stepName)
+	if target == nil {
+		if sr.Config.OnExit != nil && sr.Config.OnExit.Name == stepName {
+			target = sr.Scheduler.HandlerNode(digraph.HandlerOnExit)
 		}
-	}
-
-	if sr.Config.OnExit != nil && sr.Config.OnExit.Name == stepName {
-		target = sr.Scheduler.HandlerNode(digraph.HandlerOnExit)
-	}
-	if sr.Config.OnSuccess != nil && sr.Config.OnSuccess.Name == stepName {
-		target = sr.Scheduler.HandlerNode(digraph.HandlerOnSuccess)
-	}
-	if sr.Config.OnFailure != nil && sr.Config.OnFailure.Name == stepName {
-		target = sr.Scheduler.HandlerNode(digraph.HandlerOnFailure)
-	}
-	if sr.Config.OnCancel != nil && sr.Config.OnCancel.Name == stepName {
-		target = sr.Scheduler.HandlerNode(digraph.HandlerOnCancel)
+		if sr.Config.OnSuccess != nil && sr.Config.OnSuccess.Name == stepName {
+			target = sr.Scheduler.HandlerNode(digraph.HandlerOnSuccess)
+		}
+		if sr.Config.OnFailure != nil && sr.Config.OnFailure.Name == stepName {
+			target = sr.Scheduler.HandlerNode(digraph.HandlerOnFailure)
+		}
+		if sr.Config.OnCancel != nil && sr.Config.OnCancel.Name == stepName {
+			target = sr.Scheduler.HandlerNode(digraph.HandlerOnCancel)
+		}
 	}
 
 	if target == nil {
@@ -1061,11 +1243,8 @@ func (sr scheduleResult) AssertNodeStatus(t *testing.T, stepName string, expecte
 func (sr scheduleResult) Node(t *testing.T, stepName string) *scheduler.Node {
 	t.Helper()
 
-	nodes := sr.ExecutionGraph.Nodes()
-	for _, node := range nodes {
-		if node.Data().Step.Name == stepName {
-			return node
-		}
+	if node := sr.NodeByName(stepName); node != nil {
+		return node
 	}
 
 	if sr.Config.OnExit != nil && sr.Config.OnExit.Name == stepName {

@@ -5,24 +5,24 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath" // Uses OS-specific separators (backslash on Windows, slash on Unix)
+	"path/filepath"
+	"regexp"
+	"runtime/pprof"
 	"syscall"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/frontend"
-	"github.com/dagu-org/dagu/internal/frontend/server"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/dagu-org/dagu/internal/persistence/filecache"
-	"github.com/dagu-org/dagu/internal/persistence/jsondb"
-	"github.com/dagu-org/dagu/internal/persistence/local"
-	"github.com/dagu-org/dagu/internal/persistence/local/storage"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/persistence/localdag"
+	"github.com/dagu-org/dagu/internal/persistence/localdagrun"
+	"github.com/dagu-org/dagu/internal/persistence/localproc"
+	"github.com/dagu-org/dagu/internal/persistence/localqueue"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
@@ -30,61 +30,49 @@ import (
 	"github.com/spf13/viper"
 )
 
-var _ context.Context = (*Context)(nil)
-
 // Context holds the configuration for a command.
 type Context struct {
-	*cobra.Command
+	context.Context
 
-	run   func(cmd *Context, args []string) error
-	flags []commandLineFlag
-	cfg   *config.Config
-	ctx   context.Context
-	quiet bool
-}
+	Command *cobra.Command
+	Flags   []commandLineFlag
+	Config  *config.Config
+	Quiet   bool
 
-// Deadline implements context.Context.
-func (c *Context) Deadline() (deadline time.Time, ok bool) {
-	return c.ctx.Deadline()
-}
-
-// Done implements context.Context.
-func (c *Context) Done() <-chan struct{} {
-	return c.ctx.Done()
-}
-
-// Err implements context.Context.
-func (c *Context) Err() error {
-	return c.ctx.Err()
-}
-
-// Value implements context.Context.
-func (c *Context) Value(key any) any {
-	return c.ctx.Value(key)
+	DAGRunStore models.DAGRunStore
+	DAGRunMgr   dagrun.Manager
+	ProcStore   models.ProcStore
+	QueueStore  models.QueueStore
 }
 
 // LogToFile creates a new logger context with a file writer.
 func (c *Context) LogToFile(f *os.File) {
 	var opts []logger.Option
-	if c.quiet {
+	if c.Config.Global.Debug {
+		opts = append(opts, logger.WithDebug())
+	}
+	if c.Quiet {
 		opts = append(opts, logger.WithQuiet())
+	}
+	if c.Config.Global.LogFormat != "" {
+		opts = append(opts, logger.WithFormat(c.Config.Global.LogFormat))
 	}
 	if f != nil {
 		opts = append(opts, logger.WithWriter(f))
 	}
-	c.ctx = logger.WithLogger(c.ctx, logger.NewLogger(opts...))
+	c.Context = logger.WithLogger(c.Context, logger.NewLogger(opts...))
 }
 
-// init initializes the application setup by loading configuration,
+// NewContext initializes the application setup by loading configuration,
 // setting up logger context, and logging any warnings.
-func (c *Context) init(cmd *cobra.Command) error {
+func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	ctx := cmd.Context()
 
-	bindFlags(cmd, c.flags...)
+	bindFlags(cmd, flags...)
 
 	quiet, err := cmd.Flags().GetBool("quiet")
 	if err != nil {
-		return fmt.Errorf("failed to get quiet flag: %w", err)
+		return nil, fmt.Errorf("failed to get quiet flag: %w", err)
 	}
 
 	var configLoaderOpts []config.ConfigLoaderOption
@@ -96,187 +84,12 @@ func (c *Context) init(cmd *cobra.Command) error {
 
 	cfg, err := config.Load(configLoaderOpts...)
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
 	// Create a logger context based on config and quiet mode
-	ctx = setupLoggerContext(cfg, ctx, quiet)
-
-	// Log any warnings collected during configuration loading
-	for _, w := range cfg.Warnings {
-		logger.Warn(ctx, w)
-	}
-
-	c.Command = cmd
-	c.cfg = cfg
-	c.ctx = ctx
-	c.quiet = quiet
-
-	return nil
-}
-
-// Client initializes a Client using the provided options. If not supplied,
-// it creates default DAGStore and HistoryStore instances.
-func (s *Context) Client(opts ...clientOption) (client.Client, error) {
-	options := &clientOptions{}
-	for _, opt := range opts {
-		opt(options)
-	}
-	dagStore := options.dagStore
-	if dagStore == nil {
-		var err error
-		dagStore, err = s.dagStore()
-		if err != nil {
-			return nil, fmt.Errorf("failed to initialize DAG store: %w", err)
-		}
-	}
-	historyStore := options.historyStore
-	if historyStore == nil {
-		historyStore = s.historyStore()
-	}
-	// Create a flag store based on the suspend flags directory.
-	flagStore := local.NewFlagStore(storage.NewStorage(
-		s.cfg.Paths.SuspendFlagsDir,
-	))
-
-	return client.New(
-		dagStore,
-		historyStore,
-		flagStore,
-		s.cfg.Paths.Executable,
-		s.cfg.Global.WorkDir,
-	), nil
-}
-
-// server creates and returns a new web UI server.
-// It initializes in-memory caches for DAGs and history, and uses them in the client.
-func (ctx *Context) server() (*server.Server, error) {
-	dagCache := filecache.New[*digraph.DAG](0, time.Hour*12)
-	dagCache.StartEviction(ctx)
-	dagStore := ctx.dagStoreWithCache(dagCache)
-
-	historyCache := filecache.New[*model.Status](0, time.Hour*12)
-	historyCache.StartEviction(ctx)
-	historyStore := ctx.historyStoreWithCache(historyCache)
-
-	cli, err := ctx.Client(withDAGStore(dagStore), withHistoryStore(historyStore))
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize client: %w", err)
-	}
-	return frontend.New(ctx.cfg, cli), nil
-}
-
-// scheduler creates a new scheduler instance using the default client.
-// It builds a DAG job manager to handle scheduled executions.
-func (s *Context) scheduler() (*scheduler.Scheduler, error) {
-	cli, err := s.Client()
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize client: %w", err)
-	}
-
-	manager := scheduler.NewDAGJobManager(s.cfg.Paths.DAGsDir, cli, s.cfg.Paths.Executable, s.cfg.Global.WorkDir)
-	return scheduler.New(s.cfg, manager), nil
-}
-
-// dagStore returns a new DAGStore instance. It ensures that the directory exists
-// (creating it if necessary) before returning the store.
-func (s *Context) dagStore() (persistence.DAGStore, error) {
-	baseDir := s.cfg.Paths.DAGsDir
-	_, err := os.Stat(baseDir)
-	if os.IsNotExist(err) {
-		if err := os.MkdirAll(baseDir, 0755); err != nil {
-			return nil, fmt.Errorf("failed to initialize directory %s: %w", baseDir, err)
-		}
-	}
-
-	return local.NewDAGStore(s.cfg.Paths.DAGsDir), nil
-}
-
-// dagStoreWithCache returns a DAGStore instance that uses an in-memory file cache.
-func (s *Context) dagStoreWithCache(cache *filecache.Cache[*digraph.DAG]) persistence.DAGStore {
-	return local.NewDAGStore(s.cfg.Paths.DAGsDir, local.WithFileCache(cache))
-}
-
-// historyStore returns a new HistoryStore instance using JSON database storage.
-// It applies the "latestStatusToday" setting from the server configuration.
-func (s *Context) historyStore() persistence.HistoryStore {
-	return jsondb.New(s.cfg.Paths.DataDir, jsondb.WithLatestStatusToday(
-		s.cfg.Server.LatestStatusToday,
-	))
-}
-
-// historyStoreWithCache returns a HistoryStore that uses an in-memory cache.
-func (s *Context) historyStoreWithCache(cache *filecache.Cache[*model.Status]) persistence.HistoryStore {
-	return jsondb.New(s.cfg.Paths.DataDir,
-		jsondb.WithLatestStatusToday(s.cfg.Server.LatestStatusToday),
-		jsondb.WithFileCache(cache),
-	)
-}
-
-// OpenLogFile creates and opens a log file for a given DAG execution.
-// It evaluates the log directory, validates settings, creates the log directory,
-// builds a filename using the current timestamp and request ID, and then opens the file.
-func (ctx *Context) OpenLogFile(
-	prefix string,
-	dag *digraph.DAG,
-	requestID string,
-) (*os.File, error) {
-	logDir, err := cmdutil.EvalString(ctx, ctx.cfg.Paths.LogDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to expand log directory: %w", err)
-	}
-	dagLogDir, err := cmdutil.EvalString(ctx, dag.LogDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to expand DAG log directory: %w", err)
-	}
-
-	config := LogFileSettings{
-		Prefix:    prefix,
-		LogDir:    logDir,
-		DAGLogDir: dagLogDir,
-		DAGName:   dag.Name,
-		RequestID: requestID,
-	}
-
-	if err := ValidateSettings(config); err != nil {
-		return nil, fmt.Errorf("invalid log settings: %w", err)
-	}
-
-	outputDir, err := SetupLogDirectory(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to setup log directory: %w", err)
-	}
-
-	filename := BuildLogFilename(config)
-	return CreateLogFile(filepath.Join(outputDir, filename))
-}
-
-// NewCommand creates a new command instance with the given cobra command and run function.
-func NewCommand(cmd *cobra.Command, flags []commandLineFlag, run func(cmd *Context, args []string) error) *cobra.Command {
-	initFlags(cmd, flags...)
-
-	ctx := &Context{flags: flags, run: run}
-
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		if err := ctx.init(cmd); err != nil {
-			fmt.Printf("Initialization error: %v\n", err)
-			os.Exit(1)
-		}
-		if err := ctx.run(ctx, args); err != nil {
-			logger.Error(ctx.ctx, "Command failed", "err", err)
-			os.Exit(1)
-		}
-		return nil
-	}
-
-	return cmd
-}
-
-// setupLoggerContext builds a logger context using options derived from configuration.
-// It checks debug mode, quiet mode, and log format.
-func setupLoggerContext(cfg *config.Config, ctx context.Context, quiet bool) context.Context {
 	var opts []logger.Option
-	if cfg.Global.Debug {
+	if cfg.Global.Debug || os.Getenv("DEBUG") != "" {
 		opts = append(opts, logger.WithDebug())
 	}
 	if quiet {
@@ -285,45 +98,228 @@ func setupLoggerContext(cfg *config.Config, ctx context.Context, quiet bool) con
 	if cfg.Global.LogFormat != "" {
 		opts = append(opts, logger.WithFormat(cfg.Global.LogFormat))
 	}
-	return logger.WithLogger(ctx, logger.NewLogger(opts...))
-}
+	ctx = logger.WithLogger(ctx, logger.NewLogger(opts...))
 
-// NewContext creates a setup instance from an existing configuration.
-func NewContext(ctx context.Context, cfg *config.Config) *Context {
-	return &Context{cfg: cfg, ctx: setupLoggerContext(cfg, ctx, false)}
-}
-
-// clientOption defines functional options for configuring the client.
-type clientOption func(*clientOptions)
-
-// clientOptions holds optional dependencies for constructing a client.
-type clientOptions struct {
-	dagStore     persistence.DAGStore
-	historyStore persistence.HistoryStore
-}
-
-// withDAGStore returns a clientOption that sets a custom DAGStore.
-func withDAGStore(dagStore persistence.DAGStore) clientOption {
-	return func(o *clientOptions) {
-		o.dagStore = dagStore
+	// Log any warnings collected during configuration loading
+	for _, w := range cfg.Warnings {
+		logger.Warn(ctx, w)
 	}
-}
 
-// withHistoryStore returns a clientOption that sets a custom HistoryStore.
-func withHistoryStore(historyStore persistence.HistoryStore) clientOption {
-	return func(o *clientOptions) {
-		o.historyStore = historyStore
+	// Initialize history repository and history manager
+	hrOpts := []localdagrun.DAGRunStoreOption{
+		localdagrun.WithLatestStatusToday(cfg.Server.LatestStatusToday),
 	}
+
+	switch cmd.Name() {
+	case "server", "scheduler", "start-all":
+		// For long-running process, we setup file cache for better performance
+		hc := fileutil.NewCache[*models.DAGRunStatus](0, time.Hour*12)
+		hc.StartEviction(ctx)
+		hrOpts = append(hrOpts, localdagrun.WithHistoryFileCache(hc))
+	}
+
+	ps := localproc.New(cfg.Paths.ProcDir)
+	drs := localdagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
+	drm := dagrun.New(drs, ps, cfg.Paths.Executable, cfg.Global.WorkDir)
+	qs := localqueue.New(cfg.Paths.QueueDir)
+
+	return &Context{
+		Context:     ctx,
+		Command:     cmd,
+		Config:      cfg,
+		Quiet:       quiet,
+		DAGRunStore: drs,
+		DAGRunMgr:   drm,
+		Flags:       flags,
+		ProcStore:   ps,
+		QueueStore:  qs,
+	}, nil
 }
 
-// generateRequestID creates a new UUID string to be used as a request identifier.
-func generateRequestID() (string, error) {
-	id, err := uuid.NewRandom()
+// HistoryManager initializes a HistoryManager using the provided options. If not supplied,
+func (c *Context) HistoryManager(drs models.DAGRunStore) dagrun.Manager {
+	return dagrun.New(
+		drs,
+		c.ProcStore,
+		c.Config.Paths.Executable,
+		c.Config.Global.WorkDir,
+	)
+}
+
+// NewServer creates and returns a new web UI NewServer.
+// It initializes in-memory caches for DAGs and runstore, and uses them in the client.
+func (c *Context) NewServer() (*frontend.Server, error) {
+	dc := fileutil.NewCache[*digraph.DAG](0, time.Hour*12)
+	dc.StartEviction(c)
+
+	dr, err := c.dagStore(dc, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.DAGRunMgr), nil
+}
+
+// NewScheduler creates a new NewScheduler instance using the default client.
+// It builds a DAG job manager to handle scheduled executions.
+func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
+	cache := fileutil.NewCache[*digraph.DAG](0, time.Hour*12)
+	cache.StartEviction(c)
+
+	dr, err := c.dagStore(cache, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize DAG client: %w", err)
+	}
+
+	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, c.Config.Paths.Executable, c.Config.Global.WorkDir)
+	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore), nil
+}
+
+// StringParam retrieves a string parameter from the command line flags.
+// It checks if the parameter is wrapped in quotes and removes them if necessary.
+func (c *Context) StringParam(name string) (string, error) {
+	val, err := c.Command.Flags().GetString(name)
+	if err != nil {
+		return "", fmt.Errorf("failed to get flag %s: %w", name, err)
+	}
+
+	// If it's wrapped in quotes, remove them
+	val = stringutil.RemoveQuotes(val)
+	return val, nil
+}
+
+// dagStore returns a new DAGRepository instance. It ensures that the directory exists
+// (creating it if necessary) before returning the store.
+func (c *Context) dagStore(cache *fileutil.Cache[*digraph.DAG], searchPaths []string) (models.DAGStore, error) {
+	dir := c.Config.Paths.DAGsDir
+	_, err := os.Stat(dir)
+	if os.IsNotExist(err) {
+		if err := os.MkdirAll(dir, 0750); err != nil {
+			return nil, fmt.Errorf("failed to create DAGs directory %s: %w", dir, err)
+		}
+	}
+
+	// Create a flag store based on the suspend flags directory.
+	return localdag.New(
+		c.Config.Paths.DAGsDir,
+		localdag.WithFlagsBaseDir(c.Config.Paths.SuspendFlagsDir),
+		localdag.WithSearchPaths(searchPaths),
+		localdag.WithFileCache(cache),
+	), nil
+}
+
+// OpenLogFile creates and opens a log file for a given dag-run.
+// It evaluates the log directory, validates settings, creates the log directory,
+// builds a filename using the current timestamp and dag-run ID, and then opens the file.
+func (c *Context) OpenLogFile(
+	dag *digraph.DAG,
+	dagRunID string,
+) (*os.File, error) {
+	logPath, err := c.GenLogFileName(dag, dagRunID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate log file name: %w", err)
+	}
+	return fileutil.OpenOrCreateFile(logPath)
+}
+
+// GenLogFileName generates a log file name based on the DAG and dag-run ID.
+func (c *Context) GenLogFileName(dag *digraph.DAG, dagRunID string) (string, error) {
+	// Read the global configuration for log directory.
+	baseLogDir, err := cmdutil.EvalString(c, c.Config.Paths.LogDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to expand log directory: %w", err)
+	}
+
+	// Read the log directory configuration from the DAG.
+	dagLogDir, err := cmdutil.EvalString(c, dag.LogDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to expand DAG log directory: %w", err)
+	}
+
+	cfg := LogConfig{
+		BaseDir:   baseLogDir,
+		DAGLogDir: dagLogDir,
+		Name:      dag.Name,
+		DAGRunID:  dagRunID,
+	}
+
+	if err := cfg.Validate(); err != nil {
+		return "", fmt.Errorf("invalid log settings: %w", err)
+	}
+
+	d, err := cfg.LogDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to setup log directory: %w", err)
+	}
+
+	return filepath.Join(d, cfg.LogFile()), nil
+}
+
+// NewCommand creates a new command instance with the given cobra command and run function.
+func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *Context, args []string) error) *cobra.Command {
+	initFlags(cmd, flags...)
+
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		// Setup cpu profiling if enabled.
+		if cpuProfileEnabled, _ := cmd.Flags().GetBool("cpu-profile"); cpuProfileEnabled {
+			f, err := os.Create("cpu.prof")
+			if err != nil {
+				fmt.Printf("Failed to create CPU profile file: %v\n", err)
+				os.Exit(1)
+			}
+			_ = pprof.StartCPUProfile(f)
+			defer func() {
+				pprof.StopCPUProfile()
+				if err := f.Close(); err != nil {
+					fmt.Printf("Failed to close CPU profile file: %v\n", err)
+				}
+			}()
+		}
+
+		ctx, err := NewContext(cmd, flags)
+		if err != nil {
+			fmt.Printf("Initialization error: %v\n", err)
+			os.Exit(1)
+		}
+		if err := runFunc(ctx, args); err != nil {
+			logger.Error(ctx.Context, "Command failed", "err", err)
+			os.Exit(1)
+		}
+		return nil
+	}
+
+	return cmd
+}
+
+// genRunID creates a new UUID string to be used as a dag-run IDentifier.
+func genRunID() (string, error) {
+	id, err := uuid.NewV7()
 	if err != nil {
 		return "", err
 	}
 	return id.String(), nil
 }
+
+// validateRunID checks if the dag-run ID is valid and not empty.
+func validateRunID(dagRunID string) error {
+	if dagRunID == "" {
+		return ErrDAGRunIDRequired
+	}
+	if !reDAGRunID.MatchString(dagRunID) {
+		return ErrDAGRunIDFormat
+	}
+	if len(dagRunID) > maxDAGRunIDLen {
+		return ErrDAGRunIDTooLong
+	}
+	return nil
+}
+
+// reDAGRunID is a regular expression to validate dag-run IDs.
+// It allows alphanumeric characters, hyphens, and underscores.
+var reDAGRunID = regexp.MustCompile(`^[-a-zA-Z0-9_]+$`)
+
+// maxDAGRunIDLen is the max length of the dag-run ID
+const maxDAGRunIDLen = 60
 
 // signalListener is an interface for types that can receive OS signals.
 type signalListener interface {
@@ -350,71 +346,57 @@ func listenSignals(ctx context.Context, listener signalListener) {
 	}()
 }
 
-// LogFileSettings defines configuration for log file creation.
-type LogFileSettings struct {
-	Prefix    string // Prefix for the log filename (e.g. "start_", "retry_").
-	LogDir    string // Base directory for logs.
-	DAGLogDir string // Optional alternative log directory specified by the DAG.
-	DAGName   string // Name of the DAG; used for generating a safe directory name.
-	RequestID string // Unique request ID used in the filename.
+// LogConfig defines configuration for log file creation.
+type LogConfig struct {
+	BaseDir   string // Base directory for logs.
+	DAGLogDir string // Optional alternative log directory specified by the DAG definition.
+	Name      string // Name of the DAG; used for generating a safe directory name.
+	DAGRunID  string // Unique dag-run ID used in the filename.
 }
 
-// ValidateSettings checks that essential fields are provided.
+// Validate checks that essential fields are provided.
 // It requires that DAGName is not empty and that at least one log directory is specified.
-func ValidateSettings(config LogFileSettings) error {
-	if config.DAGName == "" {
+func (cfg LogConfig) Validate() error {
+	if cfg.Name == "" {
 		return fmt.Errorf("DAGName cannot be empty")
 	}
-	if config.LogDir == "" && config.DAGLogDir == "" {
+	if cfg.BaseDir == "" && cfg.DAGLogDir == "" {
 		return fmt.Errorf("either LogDir or DAGLogDir must be specified")
 	}
 	return nil
 }
 
-// SetupLogDirectory creates (if necessary) and returns the log directory based on the log file settings.
+// LogDir creates (if necessary) and returns the log directory based on the log file settings.
 // It uses a safe version of the DAG name to avoid issues with invalid filesystem characters.
-func SetupLogDirectory(config LogFileSettings) (string, error) {
-	safeName := fileutil.SafeName(config.DAGName)
-
+func (cfg LogConfig) LogDir() (string, error) {
 	// Choose the base directory: if DAGLogDir is provided, use it; otherwise use LogDir.
-	baseDir := config.LogDir
-	if config.DAGLogDir != "" {
-		baseDir = config.DAGLogDir
+	baseDir := cfg.BaseDir
+	if cfg.DAGLogDir != "" {
+		baseDir = cfg.DAGLogDir
+	}
+	if baseDir == "" {
+		return "", fmt.Errorf("base log directory is not set")
 	}
 
-	logDir := filepath.Join(baseDir, safeName)
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	utcTimestamp := time.Now().UTC().Format("20060102_150405Z")
+
+	safeName := fileutil.SafeName(cfg.Name)
+	logDir := filepath.Join(baseDir, safeName, "dag-run_"+utcTimestamp+"_"+cfg.DAGRunID)
+	if err := os.MkdirAll(logDir, 0750); err != nil {
 		return "", fmt.Errorf("failed to initialize directory %s: %w", logDir, err)
 	}
 
 	return logDir, nil
 }
 
-// BuildLogFilename constructs the log filename using the prefix, safe DAG name, current timestamp,
-// and a truncated version of the request ID.
-func BuildLogFilename(config LogFileSettings) string {
+// LogFile constructs the log filename using the prefix, safe DAG name, current timestamp,
+// and a truncated version of the dag-run ID.
+func (cfg LogConfig) LogFile() string {
 	timestamp := time.Now().Format("20060102.15:04:05.000")
-	truncatedRequestID := stringutil.TruncString(config.RequestID, 8)
-	safeDagName := fileutil.SafeName(config.DAGName)
+	truncDAGRunID := stringutil.TruncString(cfg.DAGRunID, 8)
 
-	return fmt.Sprintf("%s%s.%s.%s.log",
-		config.Prefix,
-		safeDagName,
+	return fmt.Sprintf("dag-run_%s.%s.log",
 		timestamp,
-		truncatedRequestID,
+		truncDAGRunID,
 	)
-}
-
-// CreateLogFile opens (or creates) the log file with flags for creation, write-only access,
-// appending, and synchronous I/O. It sets file permissions to 0644.
-func CreateLogFile(filepath string) (*os.File, error) {
-	flags := os.O_CREATE | os.O_WRONLY | os.O_APPEND | os.O_SYNC
-	permissions := os.FileMode(0644)
-
-	file, err := os.OpenFile(filepath, flags, permissions)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create/open log file %s: %w", filepath, err)
-	}
-
-	return file, nil
 }

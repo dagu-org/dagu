@@ -10,6 +10,7 @@ import (
 	"strings"
 )
 
+// Common errors for file operations
 var (
 	ErrUnexpectedEOF         = errors.New("unexpected end of input after escape character")
 	ErrUnknownEscapeSequence = errors.New("unknown escape sequence")
@@ -44,30 +45,16 @@ func FileExists(file string) bool {
 	return !os.IsNotExist(err)
 }
 
-// OpenOrCreateFile opens file or creates it if it doesn't exist.
-func OpenOrCreateFile(file string) (*os.File, error) {
-	if FileExists(file) {
-		return openFile(file)
-	}
-	return createFile(file)
-}
-
-// openFile opens file.
-func openFile(file string) (*os.File, error) {
-	outfile, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0755)
+// OpenOrCreateFile opens (or creates) the log file with flags for creation, write-only access,
+// appending, and synchronous I/O. It sets file permissions to 0600.
+func OpenOrCreateFile(filepath string) (*os.File, error) {
+	flags := os.O_CREATE | os.O_WRONLY | os.O_APPEND | os.O_SYNC
+	file, err := os.OpenFile(filepath, flags, 0600) // nolint:gosec
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create/open log file %s: %w", filepath, err)
 	}
-	return outfile, nil
-}
 
-// createFile creates file.
-func createFile(file string) (*os.File, error) {
-	outfile, err := os.Create(file)
-	if err != nil {
-		return nil, err
-	}
-	return outfile, nil
+	return file, nil
 }
 
 // MustTempDir returns temporary directory.
@@ -103,6 +90,23 @@ func IsYAMLFile(filename string) bool {
 		return false
 	}
 	return slices.Contains(ValidYAMLExtensions, filepath.Ext(filename))
+}
+
+// TrimYAMLFileExtension trims the .yml or .yaml extension from a filename.
+func TrimYAMLFileExtension(filename string) string {
+	if filename == "" {
+		return ""
+	}
+
+	ext := filepath.Ext(filename)
+	switch ext {
+	case ymlExtension:
+		return strings.TrimSuffix(filename, ymlExtension) + yamlExtension
+	case yamlExtension:
+		return strings.TrimSuffix(filename, yamlExtension)
+	default:
+		return filename
+	}
 }
 
 // IsFileWithExtension is a more generic function that checks if a file
@@ -164,9 +168,9 @@ func ResolvePath(path string) (string, error) {
 	return cleanPath, nil
 }
 
-// MustResolvePath works like ResolvePath but panics on error.
+// ResolvePathOrBlank works like ResolvePath but panics on error.
 // Useful when you're confident the path resolution will succeed.
-func MustResolvePath(path string) string {
+func ResolvePathOrBlank(path string) string {
 	resolvedPath, err := ResolvePath(path)
 	if err != nil {
 		log.Println("Failed to resolve path:", err)
