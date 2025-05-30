@@ -25,6 +25,36 @@
 </div>
 
 <h1><b>Dagu</b></h1>
+
+**IMPORTANT**
+
+**🚀 Version 1.17.0-beta.1 Available - Significant Improvements & New Features**
+
+We're excited to announce the beta release of Dagu 1.17.0! This release brings many improvements and new features while maintaining the core stability you rely on.
+
+**Key Features in 1.17.0:**
+- 🎯 **Improved Performance**: Refactored execution history data for more performant history lookup
+- 🔄 **Hierarchical Execution**: Added capability for nested DAG execution
+- 🎨 **Enhanced Web UI**: Overall UI improvements with better user experience
+- 📊 **Advanced History Search**: New execution history page with date-range and status filters (#933)
+- 🐛 **Better Debugging**: 
+  - Display actual results of precondition evaluations (#918)
+  - Show output variable values in the UI (#916)
+  - Separate logs for stdout and stderr by default (#687)
+- 📋 **Queue Management**: Added enqueue functionality for API and UI (#938)
+- 🏗️ **API v2**: New `/api/v2` endpoints with refactored schema and better abstractions ([OpenAPI spec](./api/v2/api.yaml))
+- 🔧 **Various Enhancements**: Including #925, #898, #895, #868, #903, #911, #913, #921, #923, #887, #922, #932, #962
+
+**⚠️ Note on History Data**: Due to internal improvements, history data from 1.16.x requires migration to work with 1.17.0. Most of other functionality remains stable and compatible except for a few changes. We're committed to maintaining full backward compatibility as much as possible in future releases.
+
+**Your feedback is valuable!** Please test the beta and share your experience:
+- 💬 [Join our Discord](https://discord.gg/gpahPUjGRk) for discussions
+- 🐛 [Report issues on GitHub](https://github.com/dagu-org/dagu/issues)
+
+To try the beta: `docker run ghcr.io/dagu-org/dagu:1.17.0-beta.1 dagu start-all`
+
+## Overview
+
 Dagu is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.
 
 Dagu’s design emphasizes minimal external dependencies: it operates solely as a single binary without requiring an external database. A browser-based graphical interface (UI) is provided for real-time monitoring, rendering the status and logs of workflows. This zero-dependency structure makes the system easy to install and well-suited to various infrastructures, including local or air-gapped systems. This local-first architecture also ensures that sensitive data or proprietary workflows remain secure.
