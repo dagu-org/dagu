@@ -84,6 +84,11 @@ func runStart(ctx *Context, args []string) error {
 		return handleChildDAGRun(ctx, dag, dagRunID, params, root, parent)
 	}
 
+	var disabledQueue bool
+	if os.Getenv("DISABLE_DAG_RUN_QUEUE") != "" {
+		disabledQueue = true
+	}
+
 	// Log root dag-run
 	logger.Info(ctx, "Executing root dag-run",
 		"dag", dag.Name,
@@ -91,8 +96,17 @@ func runStart(ctx *Context, args []string) error {
 		"dagRunId", dagRunID,
 	)
 
-	// Execute the dag-run
-	return executeDAGRun(ctx, dag, digraph.DAGRunRef{}, dagRunID, root)
+	// Check if the DAG needs to be enqueued or executed directly
+	// We need to enqueue it unless if the queue is disabled
+	if dag.MaxActiveRuns < 0 || disabledQueue {
+		// MaxActiveRuns < 0 means queueing is disabled for this DAG
+		return executeDAGRun(ctx, dag, digraph.DAGRunRef{}, dagRunID, root)
+	}
+
+	dag.Location = "" // Queued dag-runs must not have a location
+
+	// Enqueue the DAG-run for execution
+	return enqueueDAGRun(ctx, dag, dagRunID)
 }
 
 // getDAGRunInfo extracts and validates dag-run ID and references from command flags

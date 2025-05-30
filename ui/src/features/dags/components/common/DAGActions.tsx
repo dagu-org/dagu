@@ -346,7 +346,7 @@ function DAGActions({
           onSubmit={async () => {
             setIsStopModal(false);
             
-            // Use dag-run API if we have DAG name and ID, otherwise use DAG API
+            // Use dag-run API - requires DAG name and ID
             if (status?.name && status?.dagRunId) {
               const { error } = await client.POST('/dag-runs/{name}/{dagRunId}/stop', {
                 params: {
@@ -364,24 +364,11 @@ function DAGActions({
                 alert(error.message || 'An error occurred');
                 return;
               }
+              reloadData();
             } else {
-              const { error } = await client.POST('/dags/{fileName}/stop', {
-                params: {
-                  query: {
-                    remoteNode: appBarContext.selectedRemoteNode || 'local',
-                  },
-                  path: {
-                    fileName: fileName,
-                  },
-                },
-              });
-              if (error) {
-                console.error('Stop DAG API error:', error);
-                alert(error.message || 'An error occurred');
-                return;
-              }
+              console.error('Cannot stop DAG: missing DAG name or run ID');
+              alert('Cannot stop DAG: missing DAG name or run ID');
             }
-            reloadData();
           }}
         >
           <div>
@@ -425,7 +412,7 @@ function DAGActions({
           onSubmit={async () => {
             setIsRetryModal(false);
 
-            // Use dag-run API if we have DAG name and ID, otherwise use DAG API
+            // Use dag-run API - requires DAG name and ID
             if (status?.name && retryDagRunId) {
               const { error } = await client.POST('/dag-runs/{name}/{dagRunId}/retry', {
                 params: {
@@ -445,26 +432,11 @@ function DAGActions({
                 alert(error.message || 'An error occurred');
                 return;
               }
+              reloadData();
             } else {
-              const { error } = await client.POST('/dags/{fileName}/retry', {
-                params: {
-                  path: {
-                    fileName: fileName,
-                  },
-                  query: {
-                    remoteNode: appBarContext.selectedRemoteNode || 'local',
-                  },
-                },
-                body: {
-                  dagRunId: retryDagRunId,
-                },
-              });
-              if (error) {
-                alert(error.message || 'An error occurred');
-                return;
-              }
+              console.error('Cannot retry DAG: missing DAG name or run ID');
+              alert('Cannot retry DAG: missing DAG name or run ID');
             }
-            reloadData();
           }}
         >
           {/* Keep modal content structure */}

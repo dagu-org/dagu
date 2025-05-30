@@ -43,7 +43,7 @@ function DAGs() {
       },
     },
     {
-      refreshInterval: 10000,
+      refreshInterval: 1000,
       revalidateIfStale: false,
       keepPreviousData: true, // Keep previous data while loading new data
     }

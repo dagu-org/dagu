@@ -121,7 +121,7 @@ function DAGRuns() {
       revalidateIfStale: true,
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
-      refreshInterval: 2000,
+      refreshInterval: 1000,
     }
   );
 

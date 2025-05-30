@@ -391,23 +391,6 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		}
 	}
 
-	status, err := a.dagRunMgr.GetLatestStatus(ctx, dag)
-	if err != nil {
-		return nil, &Error{
-			HTTPStatus: http.StatusNotFound,
-			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
-		}
-	}
-
-	if status.Status == scheduler.StatusRunning {
-		return nil, &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeAlreadyRunning,
-			Message:    "DAG is already running",
-		}
-	}
-
 	dagRunId := valueOf(request.Body.DagRunId)
 	if dagRunId == "" {
 		var err error
@@ -562,79 +545,6 @@ waitLoop:
 	}
 
 	return nil
-}
-
-func (a *API) TerminateDAGDAGRun(ctx context.Context, request api.TerminateDAGDAGRunRequestObject) (api.TerminateDAGDAGRunResponseObject, error) {
-	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
-		return nil, err
-	}
-
-	dag, err := a.dagStore.GetMetadata(ctx, request.FileName)
-	if err != nil {
-		return nil, &Error{
-			HTTPStatus: http.StatusNotFound,
-			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
-		}
-	}
-
-	status, err := a.dagRunMgr.GetLatestStatus(ctx, dag)
-	if err != nil {
-		return nil, &Error{
-			HTTPStatus: http.StatusNotFound,
-			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
-		}
-	}
-	if status.Status != scheduler.StatusRunning {
-		return nil, &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeNotRunning,
-			Message:    "DAG is not running",
-		}
-	}
-	if err := a.dagRunMgr.Stop(ctx, dag, status.DAGRunID); err != nil {
-		return nil, fmt.Errorf("error stopping DAG: %w", err)
-	}
-	return api.TerminateDAGDAGRun200Response{}, nil
-}
-
-func (a *API) RetryDAGDAGRun(ctx context.Context, request api.RetryDAGDAGRunRequestObject) (api.RetryDAGDAGRunResponseObject, error) {
-	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
-		return nil, err
-	}
-
-	dag, err := a.dagStore.GetMetadata(ctx, request.FileName)
-	if err != nil {
-		return nil, &Error{
-			HTTPStatus: http.StatusNotFound,
-			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
-		}
-	}
-
-	status, err := a.dagRunMgr.GetLatestStatus(ctx, dag)
-	if err != nil {
-		return nil, &Error{
-			HTTPStatus: http.StatusNotFound,
-			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
-		}
-	}
-
-	if status.Status == scheduler.StatusRunning {
-		return nil, &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeAlreadyRunning,
-			Message:    "DAG is already running",
-		}
-	}
-
-	if err := a.dagRunMgr.RetryDAGRun(ctx, dag, request.Body.DagRunId); err != nil {
-		return nil, fmt.Errorf("error retrying DAG: %w", err)
-	}
-
-	return api.RetryDAGDAGRun200Response{}, nil
 }
 
 func (a *API) UpdateDAGSuspensionState(ctx context.Context, request api.UpdateDAGSuspensionStateRequestObject) (api.UpdateDAGSuspensionStateResponseObject, error) {

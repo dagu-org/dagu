@@ -74,6 +74,9 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	// Set the log level to debug
 	_ = os.Setenv("DEBUG", "true")
 
+	// Disable the DAG run queue for tests
+	_ = os.Setenv("DISABLE_DAG_RUN_QUEUE", "true")
+
 	random := uuid.New().String()
 	tmpDir := fileutil.MustTempDir(fmt.Sprintf("dagu-test-%s", random))
 	require.NoError(t, os.Setenv("DAGU_HOME", tmpDir))
@@ -99,7 +102,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	runStore := localdagrun.New(cfg.Paths.DAGRunsDir)
 	procStore := localproc.New(cfg.Paths.ProcDir)
 
-	drm := dagrun.New(runStore, cfg.Paths.Executable, cfg.Global.WorkDir)
+	drm := dagrun.New(runStore, procStore, cfg.Paths.Executable, cfg.Global.WorkDir)
 
 	helper := Helper{
 		Context:     createDefaultContext(),

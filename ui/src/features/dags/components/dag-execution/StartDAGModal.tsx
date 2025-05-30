@@ -80,16 +80,6 @@ function StartDAGModal({
         // Get the active element
         const activeElement = document.activeElement;
 
-        // Don't do anything if focus is on an input element
-        const isInputFocused =
-          activeElement instanceof HTMLInputElement ||
-          activeElement instanceof HTMLTextAreaElement ||
-          activeElement instanceof HTMLSelectElement;
-
-        if (isInputFocused) {
-          return;
-        }
-
         // If Cancel button is focused, trigger cancel
         if (activeElement === cancelButtonRef.current) {
           e.preventDefault();
@@ -102,9 +92,16 @@ function StartDAGModal({
           return;
         }
 
-        // If no specific element is focused, trigger the primary action
-        e.preventDefault();
-        onSubmit(stringifyParams(params), dagRunId || undefined);
+        // If an input field is focused, submit the form
+        const isInputFocused =
+          activeElement instanceof HTMLInputElement ||
+          activeElement instanceof HTMLTextAreaElement ||
+          activeElement instanceof HTMLSelectElement;
+
+        if (isInputFocused || !activeElement) {
+          e.preventDefault();
+          onSubmit(stringifyParams(params), dagRunId || undefined);
+        }
       }
     };
 
@@ -126,10 +123,10 @@ function StartDAGModal({
         <div className="py-4 space-y-4">
           {/* Optional DAGRun ID field */}
           <div className="space-y-2">
-            <Label htmlFor="dagRun-id">DAGRun ID (optional)</Label>
+            <Label htmlFor="dagRun-id">DAG-Run ID (optional)</Label>
             <Input
               id="dagRun-id"
-              placeholder="Enter custom dagRun ID"
+              placeholder="Enter custom DAG-Run ID"
               value={dagRunId}
               onChange={(e) => setDAGRunId(e.target.value)}
             />

@@ -293,58 +293,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{fileName}/stop:
-    post:
-      summary: "Terminate a running DAG-run"
-      description: "Forcefully stops a running DAG-run created from this DAG"
-      operationId: "terminateDAGDAGRun"
-      tags:
-        - "dags"
-      parameters:
-        - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileName"
-      responses:
-        "200":
-          description: "A successful response"
-        default:
-          description: "Generic error response"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /dags/{fileName}/retry:
-    post:
-      summary: "Retry DAG-run execution"
-      description: "Creates a new DAG-run based on a previous execution"
-      operationId: "retryDAGDAGRun"
-      tags:
-        - "dags"
-      parameters:
-        - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/DAGFileName"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                dagRunId:
-                  type: string
-                  description: "ID of the DAG-run to retry"
-              required:
-                - dagRunId
-      responses:
-        "200":
-          description: "A successful response"
-        default:
-          description: "Generic error response"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
   /dags/{fileName}/dag-runs:
     get:
       summary: "Retrieve execution history of a DAG"

@@ -75,7 +75,7 @@ func setupTest(t *testing.T) testHelper {
 	ps := localproc.New(cfg.Paths.ProcDir)
 	qs := localqueue.New(cfg.Paths.QueueDir)
 
-	drm := dagrun.New(drs, cfg.Paths.Executable, cfg.Global.WorkDir)
+	drm := dagrun.New(drs, ps, cfg.Paths.Executable, cfg.Global.WorkDir)
 	em := scheduler.NewEntryReader(testdataDir, ds, drm, "", "")
 
 	return testHelper{

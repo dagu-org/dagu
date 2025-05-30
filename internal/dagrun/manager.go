@@ -24,11 +24,13 @@ import (
 // The Manager is used to interact with the DAG.
 func New(
 	drs models.DAGRunStore,
+	ps models.ProcStore,
 	executable string,
 	workDir string,
 ) Manager {
 	return Manager{
 		dagRunStore: drs,
+		procStore:   ps,
 		executable:  executable,
 		workDir:     workDir,
 	}
@@ -39,6 +41,7 @@ func New(
 // through a socket interface and manages dag-run data.
 type Manager struct {
 	dagRunStore models.DAGRunStore // Store interface for persisting run data
+	procStore   models.ProcStore   // Store interface for process management
 
 	executable string // Path to the executable used to run DAGs
 	workDir    string // Working directory for executing commands
@@ -305,7 +308,6 @@ func (m *Manager) FindChildDAGRunStatus(ctx context.Context, rootDAGRun digraph.
 // currentStatus retrieves the current status of a running DAG by querying its socket.
 // This is a private method used internally by other status-related methods.
 func (*Manager) currentStatus(_ context.Context, dag *digraph.DAG, dagRunID string) (*models.DAGRunStatus, error) {
-	// FIXME: Should handle the case of dynamic DAG
 	client := sock.NewClient(dag.SockAddr(dagRunID))
 	statusJSON, err := client.Request("GET", "/status")
 	if err != nil {
@@ -319,7 +321,18 @@ func (*Manager) currentStatus(_ context.Context, dag *digraph.DAG, dagRunID stri
 // If the DAG is running, it attempts to get the current status from the socket.
 // If that fails or no status exists, it returns an initial status or an error.
 func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models.DAGRunStatus, error) {
-	var latestStatus *models.DAGRunStatus
+	var status *models.DAGRunStatus
+
+	// Find the proc store to check if the DAG is running
+	alive, _ := m.procStore.CountAlive(ctx, dag.Name)
+	if alive > 0 {
+		items, _ := m.dagRunStore.ListStatuses(
+			ctx, models.WithName(dag.Name), models.WithStatuses([]scheduler.Status{scheduler.StatusRunning}),
+		)
+		if len(items) > 0 {
+			return *items[0], nil
+		}
+	}
 
 	// Find the latest status by name
 	attempt, err := m.dagRunStore.LatestAttempt(ctx, dag.Name)
@@ -328,47 +341,46 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 	}
 
 	// Read the latest status
-	latestStatus, err = attempt.ReadStatus(ctx)
+	status, err = attempt.ReadStatus(ctx)
 	if err != nil {
 		goto handleError
 	}
 
 	// If the DAG is running, query the current status
-	if latestStatus.Status == scheduler.StatusRunning {
-		currentStatus, err := m.currentStatus(ctx, dag, latestStatus.DAGRunID)
-		if err == nil {
-			return *currentStatus, nil
-		} else {
-			logger.Debug(ctx, "Failed to get current status from socket", "error", err)
+	if status.Status == scheduler.StatusRunning {
+		dag, err = attempt.ReadDAG(ctx)
+		if err != nil {
+			currentStatus, err := m.currentStatus(ctx, dag, status.DAGRunID)
+			if err == nil {
+				status = currentStatus
+			} else {
+				logger.Debug(ctx, "Failed to get current status from socket", "error", err)
+			}
 		}
 	}
 
 	// If querying the current status fails, ensure if the status is running,
-	if latestStatus.Status == scheduler.StatusRunning {
+	if status.Status == scheduler.StatusRunning {
 		// Check the PID is still alive
-		pid := int(latestStatus.PID)
+		pid := int(status.PID)
 		if pid > 0 {
 			_, err := os.FindProcess(pid)
 			if err != nil {
 				// If we cannot find the process, mark the status as error
-				latestStatus.Status = scheduler.StatusError
+				status.Status = scheduler.StatusError
 				logger.Warn(ctx, "No PID set for running status, marking status as error")
 			}
 		}
 	}
 
-	return *latestStatus, nil
+	return *status, nil
 
 handleError:
 
 	// If the latest status is not found, return the default status
 	ret := models.InitialStatus(dag)
-	if errors.Is(err, models.ErrNoStatusData) {
-		// No status for today
-		return ret, nil
-	}
 
-	return ret, err
+	return ret, nil
 }
 
 // ListRecentStatus retrieves the n most recent statuses for a DAG by name.
