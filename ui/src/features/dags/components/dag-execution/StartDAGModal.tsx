@@ -126,10 +126,10 @@ function StartDAGModal({
         <div className="py-4 space-y-4">
           {/* Optional DAGRun ID field */}
           <div className="space-y-2">
-            <Label htmlFor="dagRun-id">DAGRun ID (optional)</Label>
+            <Label htmlFor="dagRun-id">DAG-Run ID (optional)</Label>
             <Input
               id="dagRun-id"
-              placeholder="Enter custom dagRun ID"
+              placeholder="Enter custom DAG-Run ID"
               value={dagRunId}
               onChange={(e) => setDAGRunId(e.target.value)}
             />
