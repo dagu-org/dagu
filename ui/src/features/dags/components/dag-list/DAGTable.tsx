@@ -14,11 +14,11 @@ import {
 } from '@tanstack/react-table';
 import cronParser, { CronDate } from 'cron-parser';
 import {
-  ArrowDown, // Use lucide-react icons
+  ArrowDown,
   ArrowUp,
   Calendar,
   ChevronDown,
-  ChevronUp, // Icon for search input
+  ChevronUp,
   Filter,
   Search,
 } from 'lucide-react';
@@ -26,7 +26,7 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { components } from '../../../../api/v2/schema';
 import dayjs from '../../../../lib/dayjs';
-import StatusChip from '../../../../ui/StatusChip'; // Re-add StatusChip import
+import StatusChip from '../../../../ui/StatusChip';
 import Ticker from '../../../../ui/Ticker';
 import VisuallyHidden from '../../../../ui/VisuallyHidden';
 import { DAGDetailsModal } from '../../components/dag-details';
@@ -220,7 +220,7 @@ const defaultColumns = [
       return null; // Return null instead of empty string for clarity
     },
     enableSorting: false,
-    size: 40, // Example size adjustment
+    size: 40,
   }),
   columnHelper.accessor('name', {
     id: 'Name',
@@ -324,7 +324,7 @@ const defaultColumns = [
         return nameA.localeCompare(nameB);
       }
       // Keep groups potentially sorted differently if needed, or simply by name
-      return ta === ItemKind.Group ? -1 : 1; // Example: Groups first
+      return ta === ItemKind.Group ? -1 : 1;
     },
   }),
   // Tags column removed as tags are now displayed under the name
@@ -335,7 +335,7 @@ const defaultColumns = [
       <div className="flex flex-col py-1">
         <span className="text-xs">Status</span>
         <span className="text-[10px] font-normal text-muted-foreground">
-          Current state
+          Latest status
         </span>
       </div>
     ),
@@ -522,6 +522,7 @@ const defaultColumns = [
       }
       return nextA.getTime() - nextB.getTime();
     },
+    size: 120,
   }),
   // Description column removed as description is now displayed under the name
   columnHelper.accessor('kind', {
@@ -554,7 +555,7 @@ const defaultColumns = [
         </div>
       );
     },
-    size: 60, // Example size
+    size: 60,
   }),
   columnHelper.display({
     id: 'Actions',
@@ -589,7 +590,7 @@ const defaultColumns = [
         </div>
       );
     },
-    size: 100, // Example size
+    size: 100,
   }),
 ];
 
