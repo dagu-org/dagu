@@ -274,7 +274,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
 
       // Find the clicked step
       const n = dagRun.nodes?.find(
-        (n) => n.step.name.replace(/\s/g, '_') == id
+        (n) => n.step.name.replace(/[-\s]/g, 'dagutmp') == id
       );
 
       if (!n || !n.step.run) return;
@@ -313,7 +313,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
 
       // Find the right-clicked step
       const n = dagRun.nodes?.find(
-        (n) => n.step.name.replace(/\s/g, '_') == id
+        (n) => n.step.name.replace(/[-\s]/g, 'dagutmp') == id
       );
 
       if (n) {

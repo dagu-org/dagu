@@ -83,7 +83,7 @@ function DAGDetails() {
       },
     },
     {
-      refreshInterval: 2000,
+      refreshInterval: 1000,
     }
   );
 
@@ -104,10 +104,8 @@ function DAGDetails() {
     },
     {
       isPaused: () =>
-        (!dagRunName && !queriedDAGRunName) ||
-        !dagRunId ||
-        !!childDAGRunId,
-      refreshInterval: 2000,
+        (!dagRunName && !queriedDAGRunName) || !dagRunId || !!childDAGRunId,
+      refreshInterval: 1000,
     }
   );
 
@@ -126,7 +124,7 @@ function DAGDetails() {
         },
       },
       {
-        refreshInterval: 2000,
+        refreshInterval: 1000,
         isPaused: () => !childDAGRunId || !dagRunId || !dagRunName,
       }
     );
@@ -135,11 +133,7 @@ function DAGDetails() {
   let currentDAGRun: DAGRunDetails | undefined;
   if (childDAGRunId && childDAGRunResponse?.dagRunDetails) {
     currentDAGRun = childDAGRunResponse.dagRunDetails;
-  } else if (
-    dagRunId &&
-    !childDAGRunId &&
-    dagRunResponse?.dagRunDetails
-  ) {
+  } else if (dagRunId && !childDAGRunId && dagRunResponse?.dagRunDetails) {
     currentDAGRun = dagRunResponse.dagRunDetails;
   } else if (!childDAGRunId) {
     currentDAGRun = dagData?.latestDAGRun;
