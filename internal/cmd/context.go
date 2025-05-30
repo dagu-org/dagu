@@ -118,9 +118,9 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		hrOpts = append(hrOpts, localdagrun.WithHistoryFileCache(hc))
 	}
 
-	drs := localdagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
-	drm := dagrun.New(drs, cfg.Paths.Executable, cfg.Global.WorkDir)
 	ps := localproc.New(cfg.Paths.ProcDir)
+	drs := localdagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
+	drm := dagrun.New(drs, ps, cfg.Paths.Executable, cfg.Global.WorkDir)
 	qs := localqueue.New(cfg.Paths.QueueDir)
 
 	return &Context{
@@ -140,6 +140,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 func (c *Context) HistoryManager(drs models.DAGRunStore) dagrun.Manager {
 	return dagrun.New(
 		drs,
+		c.ProcStore,
 		c.Config.Paths.Executable,
 		c.Config.Global.WorkDir,
 	)

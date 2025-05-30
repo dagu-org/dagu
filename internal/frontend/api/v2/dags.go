@@ -391,23 +391,6 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		}
 	}
 
-	status, err := a.dagRunMgr.GetLatestStatus(ctx, dag)
-	if err != nil {
-		return nil, &Error{
-			HTTPStatus: http.StatusNotFound,
-			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
-		}
-	}
-
-	if status.Status == scheduler.StatusRunning {
-		return nil, &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeAlreadyRunning,
-			Message:    "DAG is already running",
-		}
-	}
-
 	dagRunId := valueOf(request.Body.DagRunId)
 	if dagRunId == "" {
 		var err error

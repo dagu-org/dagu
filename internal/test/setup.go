@@ -99,7 +99,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	runStore := localdagrun.New(cfg.Paths.DAGRunsDir)
 	procStore := localproc.New(cfg.Paths.ProcDir)
 
-	drm := dagrun.New(runStore, cfg.Paths.Executable, cfg.Global.WorkDir)
+	drm := dagrun.New(runStore, procStore, cfg.Paths.Executable, cfg.Global.WorkDir)
 
 	helper := Helper{
 		Context:     createDefaultContext(),
