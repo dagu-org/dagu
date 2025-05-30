@@ -188,8 +188,8 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			}
 
 			if status.Status != scheduler.StatusQueued {
-				// If the status is not queued, skip this item
 				logger.Info(ctx, "Skipping item from queue", "data", data, "status", status.Status)
+				result = models.QueuedItemProcessingResultInvalid
 				goto SEND_RESULT
 			}
 
@@ -217,6 +217,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				attempt, err = s.dagRunStore.FindAttempt(ctx, data)
 				if err != nil {
 					logger.Error(ctx, "Failed to find run", "err", err, "data", data)
+					continue
 				}
 				status, err := attempt.ReadStatus(ctx)
 				if err != nil {
@@ -227,9 +228,15 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 					result = models.QueuedItemProcessingResultInvalid
 					break WAIT_FOR_RUN
 				}
-				if time.Since(startedAt) > 5*time.Second {
+				if time.Since(startedAt) > 10*time.Second {
 					logger.Error(ctx, "Timeout waiting for run to start", "data", data)
 					break WAIT_FOR_RUN
+				}
+				select {
+				case <-time.After(500 * time.Millisecond):
+				case <-ctx.Done():
+					logger.Info(ctx, "Context cancelled while waiting for run to start", "data", data)
+					return
 				}
 			}
 
