@@ -2309,6 +2309,7 @@ export interface operations {
     };
 }
 export enum ErrorCode {
+    forbidden = "forbidden",
     bad_request = "bad_request",
     not_found = "not_found",
     internal_error = "internal_error",

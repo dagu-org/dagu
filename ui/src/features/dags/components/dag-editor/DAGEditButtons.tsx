@@ -14,7 +14,7 @@ import { useClient } from '../../../../hooks/api';
  * Props for the DAGEditButtons component
  */
 type Props = {
-  /** DAG file ID */
+  /** DAG file name */
   fileName: string;
 };
 
@@ -38,14 +38,14 @@ function DAGEditButtons({ fileName }: Props) {
         className="cursor-pointer"
         onClick={async () => {
           const newFileName = window.prompt(
-            'Please input the new DAG file ID',
+            'Please input the new DAG file name',
             ''
           );
           if (!newFileName) {
             return;
           }
           if (newFileName.indexOf(' ') != -1) {
-            alert('DAG file ID cannot contain space');
+            alert('DAG file name cannot contain space');
             return;
           }
           const { error } = await client.POST('/dags/{fileName}/rename', {

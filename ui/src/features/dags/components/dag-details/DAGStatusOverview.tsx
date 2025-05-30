@@ -26,7 +26,7 @@ import StatusChip from '../../../../ui/StatusChip';
 type Props = {
   /** DAG dagRun details */
   status?: components['schemas']['DAGRunDetails'];
-  /** DAG file ID */
+  /** DAG file name */
   fileName: string;
   /** DAGRun ID of the execution */
   dagRunId?: string;

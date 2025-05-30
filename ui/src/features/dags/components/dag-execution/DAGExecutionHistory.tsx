@@ -19,7 +19,7 @@ import { HistoryTable, LogViewer, StatusUpdateModal } from './';
  * Props for the DAGExecutionHistory component
  */
 type Props = {
-  /** DAG file ID */
+  /** DAG file name */
   fileName: string;
   /** Whether the component is rendered in a modal */
   isInModal?: boolean;
@@ -75,7 +75,7 @@ function DAGExecutionHistory({
  * Props for the DAGHistoryTable component
  */
 type HistoryTableProps = {
-  /** DAG file ID */
+  /** DAG file name */
   fileName: string;
   /** Grid data for visualization */
   gridData: components['schemas']['DAGGridItem'][] | null;

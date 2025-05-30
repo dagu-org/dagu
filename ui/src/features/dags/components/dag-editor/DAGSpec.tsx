@@ -24,7 +24,7 @@ import DAGEditor from './DAGEditor';
  * Props for the DAGSpec component
  */
 type Props = {
-  /** DAG file ID */
+  /** DAG file name */
   fileName: string;
 };
 
