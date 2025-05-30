@@ -36,14 +36,14 @@ We're excited to announce the beta release of Dagu 1.17.0! This release brings m
 - 🎯 **Improved Performance**: Refactored execution history data for more performant history lookup
 - 🔄 **Hierarchical Execution**: Added capability for nested DAG execution
 - 🎨 **Enhanced Web UI**: Overall UI improvements with better user experience
-- 📊 **Advanced History Search**: New execution history page with date-range and status filters (#933)
+- 📊 **Advanced History Search**: New execution history page with date-range and status filters ([#933](https://github.com/dagu-org/dagu/issues/933))
 - 🐛 **Better Debugging**: 
-  - Display actual results of precondition evaluations (#918)
-  - Show output variable values in the UI (#916)
-  - Separate logs for stdout and stderr by default (#687)
-- 📋 **Queue Management**: Added enqueue functionality for API and UI (#938)
+  - Display actual results of precondition evaluations ([#918](https://github.com/dagu-org/dagu/issues/918))
+  - Show output variable values in the UI ([#916](https://github.com/dagu-org/dagu/issues/916))
+  - Separate logs for stdout and stderr by default ([#687](https://github.com/dagu-org/dagu/issues/687))
+- 📋 **Queue Management**: Added enqueue functionality for API and UI ([#938](https://github.com/dagu-org/dagu/issues/938))
 - 🏗️ **API v2**: New `/api/v2` endpoints with refactored schema and better abstractions ([OpenAPI spec](./api/v2/api.yaml))
-- 🔧 **Various Enhancements**: Including #925, #898, #895, #868, #903, #911, #913, #921, #923, #887, #922, #932, #962
+- 🔧 **Various Enhancements**: Including [#925](https://github.com/dagu-org/dagu/issues/925), [#898](https://github.com/dagu-org/dagu/issues/898), [#895](https://github.com/dagu-org/dagu/issues/895), [#868](https://github.com/dagu-org/dagu/issues/868), [#903](https://github.com/dagu-org/dagu/issues/903), [#911](https://github.com/dagu-org/dagu/issues/911), [#913](https://github.com/dagu-org/dagu/issues/913), [#921](https://github.com/dagu-org/dagu/issues/921), [#923](https://github.com/dagu-org/dagu/issues/923), [#887](https://github.com/dagu-org/dagu/issues/887), [#922](https://github.com/dagu-org/dagu/issues/922), [#932](https://github.com/dagu-org/dagu/issues/932), [#962](https://github.com/dagu-org/dagu/issues/962)
 
 **⚠️ Note on History Data**: Due to internal improvements, history data from 1.16.x requires migration to work with 1.17.0. Most of other functionality remains stable and compatible except for a few changes. We're committed to maintaining full backward compatibility as much as possible in future releases.
 
