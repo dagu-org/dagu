@@ -325,7 +325,6 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 
 	// Find the proc store to check if the DAG is running
 	alive, _ := m.procStore.CountAlive(ctx, dag.Name)
-	var latestStatus *models.DAGRunStatus
 	if alive > 0 {
 		items, _ := m.dagRunStore.ListStatuses(
 			ctx, models.WithName(dag.Name), models.WithStatuses([]scheduler.Status{scheduler.StatusRunning}),
@@ -335,24 +334,25 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 		}
 	}
 
-	if latestStatus == nil {
-		// Find the latest status by name
-		attempt, err := m.dagRunStore.LatestAttempt(ctx, dag.Name)
-		if err != nil {
-			goto handleError
-		}
+	// Find the latest status by name
+	attempt, err := m.dagRunStore.LatestAttempt(ctx, dag.Name)
+	if err != nil {
+		goto handleError
+	}
 
-		// Read the latest status
-		status, err = attempt.ReadStatus(ctx)
-		if err != nil {
-			goto handleError
-		}
+	// Read the latest status
+	status, err = attempt.ReadStatus(ctx)
+	if err != nil {
+		goto handleError
+	}
 
-		// If the DAG is running, query the current status
-		if status.Status == scheduler.StatusRunning {
+	// If the DAG is running, query the current status
+	if status.Status == scheduler.StatusRunning {
+		dag, err = attempt.ReadDAG(ctx)
+		if err != nil {
 			currentStatus, err := m.currentStatus(ctx, dag, status.DAGRunID)
 			if err == nil {
-				latestStatus = currentStatus
+				status = currentStatus
 			} else {
 				logger.Debug(ctx, "Failed to get current status from socket", "error", err)
 			}
