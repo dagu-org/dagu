@@ -47,11 +47,26 @@ We're excited to announce the beta release of Dagu 1.17.0! This release brings m
 
 **⚠️ Note on History Data**: Due to internal improvements, history data from 1.16.x requires migration to work with 1.17.0. Most of other functionality remains stable and compatible except for a few changes. We're committed to maintaining full backward compatibility as much as possible in future releases.
 
+### ❤️ Huge Thanks to Our Contributors
+
+This release wouldn’t exist without the community’s time, sweat, and ideas. In particular:
+
+| Contribution | Author |
+|--------------|--------|
+| Optimized Docker image size **and** split into three baseline images | @jerry-yuan |
+| Allow specifying container name & image platform ([#898]) | @vnghia |
+| Enhanced repeat-policy – conditions, expected output, and exit codes | @thefishhat |
+| Implemented queue functionality | @kriyanshii |
+| Countless insightful reviews & feedback | @ghansham |
+
+*Thank you all for pushing Dagu forward! 💙*
+
 **Your feedback is valuable!** Please test the beta and share your experience:
 - 💬 [Join our Discord](https://discord.gg/gpahPUjGRk) for discussions
 - 🐛 [Report issues on GitHub](https://github.com/dagu-org/dagu/issues)
 
-To try the beta: `docker run ghcr.io/dagu-org/dagu:1.17.0-beta.1 dagu start-all`
+
+To try the beta: `docker run --rm -p 8080:8080 ghcr.io/dagu-org/dagu:1.17.0-beta.1 dagu start-all`
 
 ## Overview
 
