@@ -84,7 +84,7 @@ func TestMigrateHistoryCommand(t *testing.T) {
 	}
 
 	t.Run("successful migration", func(t *testing.T) {
-		err := runMigration(ctx, false)
+		err := runMigration(ctx)
 		require.NoError(t, err)
 
 		// Verify migration
@@ -149,7 +149,7 @@ func TestMigrateCommand_NoLegacyData(t *testing.T) {
 	}
 
 	// Run migration with no legacy data
-	err := runMigration(ctx, false)
+	err := runMigration(ctx)
 	require.NoError(t, err)
 
 	// Should complete without errors
@@ -164,9 +164,4 @@ func TestCmdMigrate(t *testing.T) {
 	// Check for history subcommand
 	historyCmd := cmd.Commands()[0]
 	assert.Equal(t, "history", historyCmd.Use)
-
-	// Check for skip-backup flag
-	flag := historyCmd.Flag("skip-backup")
-	assert.NotNil(t, flag)
-	assert.Equal(t, "false", flag.DefValue)
 }

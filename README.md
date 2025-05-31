@@ -49,11 +49,10 @@ We're excited to announce the beta release of Dagu 1.17.0! This release brings m
 
 ```bash
 # Migrate history data
-dagu migrate history                    # Migrates and archives old data
-dagu migrate history --skip-backup      # Migrates without creating backup
+dagu migrate history
 ```
 
-After successful migration, legacy history directories are moved to `~/.config/dagu/history_migrated_<timestamp>` for safekeeping. Most other functionality remains stable and compatible except for a few changes. We're committed to maintaining full backward compatibility as much as possible in future releases.
+After successful migration, legacy history directories are moved to `~/.config/dagu/history_migrated_<timestamp>` for safekeeping. Most other functionality remains stable and compatible except for a few changes. We're committed to maintaining backward compatibility as much as possible in future releases.
 
 ### ❤️ Huge Thanks to Our Contributors
 

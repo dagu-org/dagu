@@ -33,24 +33,20 @@ func MigrateHistoryCommand() *cobra.Command {
 
 This command will:
 - Detect if legacy history data exists
-- Create a backup of the legacy data (unless --skip-backup is used)
 - Convert and migrate all historical DAG runs to the new format
+- Archive the old data to history_migrated_<timestamp> directory
 - Report migration progress and any errors
 
 Example:
-  dagu migrate history
-  dagu migrate history --skip-backup`,
+  dagu migrate history`,
 	}
 
-	var skipBackup bool
-	cmd.Flags().BoolVar(&skipBackup, "skip-backup", false, "Skip creating backup of legacy data")
-
 	return NewCommand(cmd, nil, func(ctx *Context, _ []string) error {
-		return runMigration(ctx, skipBackup)
+		return runMigration(ctx)
 	})
 }
 
-func runMigration(ctx *Context, skipBackup bool) error {
+func runMigration(ctx *Context) error {
 	logger.Info(ctx.Context, "Starting history migration")
 
 	// Create DAG store for loading DAG definitions
@@ -106,7 +102,7 @@ func runMigration(ctx *Context, skipBackup bool) error {
 	}
 
 	// Move legacy data to archive if migration was successful
-	if result.FailedRuns == 0 || skipBackup {
+	if result.FailedRuns == 0 {
 		if err := migrator.MoveLegacyData(ctx.Context); err != nil {
 			logger.Error(ctx.Context, "Failed to move legacy data to archive", "error", err)
 			logger.Info(ctx.Context, "Legacy data remains in original location", "path", filepath.Join(ctx.Config.Paths.DataDir, "history"))
