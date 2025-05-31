@@ -21,7 +21,6 @@ import (
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence/legacy"
-	"github.com/dagu-org/dagu/internal/persistence/legacy/filecache"
 	"github.com/dagu-org/dagu/internal/persistence/legacy/model"
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
@@ -38,7 +37,6 @@ var (
 type Config struct {
 	Location          string
 	LatestStatusToday bool
-	FileCache         *filecache.Cache[*model.Status]
 }
 
 const (
@@ -55,21 +53,13 @@ var _ legacy.HistoryStore = (*JSONDB)(nil)
 type JSONDB struct {
 	baseDir           string
 	latestStatusToday bool
-	fileCache         *filecache.Cache[*model.Status]
 	writer            *writer
 }
 
 type Option func(*Options)
 
 type Options struct {
-	FileCache         *filecache.Cache[*model.Status]
 	LatestStatusToday bool
-}
-
-func WithFileCache(cache *filecache.Cache[*model.Status]) Option {
-	return func(o *Options) {
-		o.FileCache = cache
-	}
 }
 
 func WithLatestStatusToday(latestStatusToday bool) Option {
@@ -89,7 +79,6 @@ func New(baseDir string, opts ...Option) *JSONDB {
 	return &JSONDB{
 		baseDir:           baseDir,
 		latestStatusToday: options.LatestStatusToday,
-		fileCache:         options.FileCache,
 	}
 }
 
@@ -106,12 +95,6 @@ func (db *JSONDB) Update(ctx context.Context, key, requestID string, status mode
 	defer func() {
 		_ = writer.close()
 	}()
-
-	if db.fileCache != nil {
-		defer func() {
-			db.fileCache.Invalidate(statusFile.File)
-		}()
-	}
 
 	return writer.write(status)
 }
@@ -149,10 +132,6 @@ func (db *JSONDB) Close(ctx context.Context) error {
 
 	if err := db.Compact(ctx, db.writer.target); err != nil {
 		return err
-	}
-
-	if db.fileCache != nil {
-		db.fileCache.Invalidate(db.writer.target)
 	}
 	return db.writer.close()
 }
@@ -317,11 +296,6 @@ func (db *JSONDB) Rename(_ context.Context, oldKey, newKey string) error {
 }
 
 func (db *JSONDB) parseStatusFile(file string) (*model.Status, error) {
-	if db.fileCache != nil {
-		return db.fileCache.LoadLatest(file, func() (*model.Status, error) {
-			return ParseStatusFile(file)
-		})
-	}
 	return ParseStatusFile(file)
 }
 
