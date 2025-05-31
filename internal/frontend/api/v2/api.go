@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"path"
 	"reflect"
 
 	"github.com/dagu-org/dagu/api/v2"
@@ -68,18 +69,28 @@ func (a *API) ConfigureRoutes(r chi.Router, baseURL string) error {
 		swagger.Servers = append(swagger.Servers, &openapi3.Server{URL: url})
 	}
 
+	// Setup the API base path
+	if a.config.Server.BasePath != "" {
+		swagger.Servers = append(swagger.Servers, &openapi3.Server{
+			URL: path.Join(baseURL, a.config.Server.BasePath),
+		})
+	}
+
 	// Create the oapi-codegen validator middleware
-	validator := oapimiddleware.OapiRequestValidatorWithOptions(
-		swagger, &oapimiddleware.Options{
-			SilenceServersWarning: true,
-			Options: openapi3filter.Options{
-				AuthenticationFunc: func(_ context.Context, _ *openapi3filter.AuthenticationInput) error {
-					return nil
+	if a.config.Server.StrictValidation {
+		// It is problematic to use the validator behind a reverse proxy
+		validator := oapimiddleware.OapiRequestValidatorWithOptions(
+			swagger, &oapimiddleware.Options{
+				SilenceServersWarning: true,
+				Options: openapi3filter.Options{
+					AuthenticationFunc: func(_ context.Context, _ *openapi3filter.AuthenticationInput) error {
+						return nil
+					},
 				},
 			},
-		},
-	)
-	r.Use(validator)
+		)
+		r.Use(validator)
+	}
 
 	options := api.StrictHTTPServerOptions{
 		ResponseErrorHandlerFunc: a.handleError,
