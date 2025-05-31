@@ -379,7 +379,7 @@ func (store *Store) FindAttempt(ctx context.Context, ref digraph.DAGRunRef) (mod
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
-		return nil, fmt.Errorf("Find canceled: %w", ctx.Err())
+		return nil, fmt.Errorf("find canceled: %w", ctx.Err())
 	default:
 		// Continue with operation
 	}

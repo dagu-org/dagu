@@ -43,7 +43,7 @@ func TestProcGroup(t *testing.T) {
 	}()
 
 	// Check if the count is 1
-	count, err := procFiles.Count(ctx, name)
+	count, err := procFiles.Count(ctx)
 	require.NoError(t, err, "failed to count proc files")
 	require.Equal(t, 1, count, "expected 1 proc file")
 
@@ -51,7 +51,7 @@ func TestProcGroup(t *testing.T) {
 	<-done
 
 	// Check if the count is 0
-	count, err = procFiles.Count(ctx, name)
+	count, err = procFiles.Count(ctx)
 	require.NoError(t, err, "failed to count proc files")
 	require.Equal(t, 0, count, "expected 0 proc files")
 }
@@ -66,7 +66,7 @@ func TestProcGroup_Empty(t *testing.T) {
 	procFiles := NewProcGroup(baseDir, name, time.Hour)
 
 	// Check if the count is 0
-	count, err := procFiles.Count(ctx, name)
+	count, err := procFiles.Count(ctx)
 	require.NoError(t, err, "failed to count proc files")
 	require.Equal(t, 0, count, "expected 0 proc files")
 }
@@ -88,7 +88,7 @@ func TestProcGroup_IsStale(t *testing.T) {
 	require.NoError(t, err, "failed to get proc")
 
 	// Make sure the directory exists
-	err = os.MkdirAll(filepath.Dir(proc.fileName), 0755)
+	err = os.MkdirAll(filepath.Dir(proc.fileName), 0750)
 	require.NoError(t, err, "failed to create proc directory")
 
 	// Create the proc file
@@ -99,6 +99,7 @@ func TestProcGroup_IsStale(t *testing.T) {
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint64(buf, uint64(time.Now().Add(-pg.staleTime).Unix()))
 	_, err = fd.WriteAt(buf, 0)
+	require.NoError(t, err, "failed to write timestamp to proc file")
 
 	// Close the file
 	_ = fd.Sync()
@@ -106,7 +107,7 @@ func TestProcGroup_IsStale(t *testing.T) {
 
 	// Check the count of alive proc files is still 1 because the file is not stale yet
 	// due to the modification time
-	count, err := pg.Count(ctx, name)
+	count, err := pg.Count(ctx)
 	require.NoError(t, err, "failed to count proc files")
 	require.Equal(t, 1, count, "expected 1 proc file")
 
@@ -115,7 +116,7 @@ func TestProcGroup_IsStale(t *testing.T) {
 	require.NoError(t, err, "failed to update file times")
 
 	// Check the count of alive proc files is 0 because the file is stale
-	count, err = pg.Count(ctx, name)
+	count, err = pg.Count(ctx)
 	require.NoError(t, err, "failed to count proc files")
 	require.Equal(t, 0, count, "expected 0 proc files")
 }

@@ -82,17 +82,17 @@ func TestListChildDAGRuns(t *testing.T) {
 
 		// Create child dag-run directory and some child dag-run directories
 		childDir := filepath.Join(run.baseDir, ChildDAGRunsDir)
-		require.NoError(t, os.MkdirAll(childDir, 0755))
+		require.NoError(t, os.MkdirAll(childDir, 0750))
 
 		// Create two child dag-run directories
 		child1Dir := filepath.Join(childDir, ChildDAGRunDirPrefix+"child1")
 		child2Dir := filepath.Join(childDir, ChildDAGRunDirPrefix+"child2")
-		require.NoError(t, os.MkdirAll(child1Dir, 0755))
-		require.NoError(t, os.MkdirAll(child2Dir, 0755))
+		require.NoError(t, os.MkdirAll(child1Dir, 0750))
+		require.NoError(t, os.MkdirAll(child2Dir, 0750))
 
 		// Create a non-directory file (should be ignored)
 		nonDirFile := filepath.Join(childDir, "not-a-directory.txt")
-		require.NoError(t, os.WriteFile(nonDirFile, []byte("test"), 0644))
+		require.NoError(t, os.WriteFile(nonDirFile, []byte("test"), 0600))
 
 		children, err := run.ListChildDAGRuns(run.Context)
 		require.NoError(t, err)
@@ -115,7 +115,7 @@ func TestDAGRunListRuns(t *testing.T) {
 
 		// Remove the run that was created by CreateTestDAGRun
 		require.NoError(t, os.RemoveAll(run.baseDir))
-		require.NoError(t, os.MkdirAll(run.baseDir, 0755))
+		require.NoError(t, os.MkdirAll(run.baseDir, 0750))
 
 		runs, err := run.ListAttempts(run.Context)
 		require.NoError(t, err)
@@ -202,7 +202,7 @@ func TestRemoveLogFiles(t *testing.T) {
 		}
 
 		for _, logFile := range logFiles {
-			require.NoError(t, os.WriteFile(logFile, []byte("test log content"), 0644))
+			require.NoError(t, os.WriteFile(logFile, []byte("test log content"), 0600))
 		}
 
 		root := setupTestDataRoot(t)
@@ -261,7 +261,7 @@ func TestRemoveLogFiles(t *testing.T) {
 
 		allLogFiles := append(parentLogFiles, childLogFiles...)
 		for _, logFile := range allLogFiles {
-			require.NoError(t, os.WriteFile(logFile, []byte("test log content"), 0644))
+			require.NoError(t, os.WriteFile(logFile, []byte("test log content"), 0600))
 		}
 
 		root := setupTestDataRoot(t)
@@ -286,10 +286,10 @@ func TestRemoveLogFiles(t *testing.T) {
 
 		// Create child dag-run directory
 		childDir := filepath.Join(run.baseDir, ChildDAGRunsDir)
-		require.NoError(t, os.MkdirAll(childDir, 0755))
+		require.NoError(t, os.MkdirAll(childDir, 0750))
 
 		childDAGRunDir := filepath.Join(childDir, ChildDAGRunDirPrefix+"child1")
-		require.NoError(t, os.MkdirAll(childDAGRunDir, 0755))
+		require.NoError(t, os.MkdirAll(childDAGRunDir, 0750))
 
 		childDAGRun, err := NewDAGRun(childDAGRunDir)
 		require.NoError(t, err)
@@ -339,7 +339,7 @@ func TestDAGRunRemove(t *testing.T) {
 		}
 
 		for _, logFile := range logFiles {
-			require.NoError(t, os.WriteFile(logFile, []byte("test log content"), 0644))
+			require.NoError(t, os.WriteFile(logFile, []byte("test log content"), 0600))
 		}
 
 		root := setupTestDataRoot(t)
@@ -409,7 +409,7 @@ func TestDAGRunRemove(t *testing.T) {
 
 		allLogFiles := append(append(parentLogFiles, child1LogFiles...), child2LogFiles...)
 		for _, logFile := range allLogFiles {
-			require.NoError(t, os.WriteFile(logFile, []byte("test log content"), 0644))
+			require.NoError(t, os.WriteFile(logFile, []byte("test log content"), 0600))
 		}
 
 		root := setupTestDataRoot(t)
@@ -434,7 +434,7 @@ func TestDAGRunRemove(t *testing.T) {
 
 		// Create child dag-run directory
 		childDir := filepath.Join(run.baseDir, ChildDAGRunsDir)
-		require.NoError(t, os.MkdirAll(childDir, 0755))
+		require.NoError(t, os.MkdirAll(childDir, 0750))
 
 		// Create two child dag-run with their own log files
 		childDAGRuns := []struct {
@@ -447,7 +447,7 @@ func TestDAGRunRemove(t *testing.T) {
 
 		for _, child := range childDAGRuns {
 			childDAGRunDir := filepath.Join(childDir, ChildDAGRunDirPrefix+child.dagRunID)
-			require.NoError(t, os.MkdirAll(childDAGRunDir, 0755))
+			require.NoError(t, os.MkdirAll(childDAGRunDir, 0750))
 
 			childDAGRun, err := NewDAGRun(childDAGRunDir)
 			require.NoError(t, err)

@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"sync"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
@@ -86,7 +85,6 @@ type Storage struct {
 	flagsBaseDir string                        // Base directory for flag store
 	fileCache    *fileutil.Cache[*digraph.DAG] // Optional cache for DAG objects
 	searchPaths  []string                      // Additional search paths for DAG files
-	lock         sync.Mutex
 }
 
 // GetMetadata retrieves the metadata of a DAG by its name.

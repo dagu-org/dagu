@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
-	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -25,10 +24,6 @@ type Store struct {
 	// queues is a map of queues, where the key is the queue name (DAG name)
 	queues map[string]*DualQueue
 	mu     sync.Mutex
-
-	// cache for the last fetched items
-	lastFetched time.Time
-	cache       []models.QueuedItemData
 }
 
 // All implements models.QueueStore.
@@ -161,7 +156,7 @@ func (s *Store) Enqueue(ctx context.Context, name string, p models.QueuePriority
 }
 
 // Reader implements models.QueueStore.
-func (s *Store) Reader(ctx context.Context) models.QueueReader {
+func (s *Store) Reader(_ context.Context) models.QueueReader {
 	return newQueueReader(s)
 }
 

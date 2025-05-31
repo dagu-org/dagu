@@ -12,7 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
-	legacyModel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
+	legacymodel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
 )
 
 // HistoryMigrator handles migration from legacy history format to new format
@@ -49,7 +49,7 @@ type MigrationResult struct {
 }
 
 // NeedsMigration checks if legacy data exists that needs migration
-func (m *HistoryMigrator) NeedsMigration(ctx context.Context) (bool, error) {
+func (m *HistoryMigrator) NeedsMigration(_ context.Context) (bool, error) {
 	dataDir := m.dataDir
 
 	// Check if history directory exists
@@ -179,7 +179,7 @@ func (m *HistoryMigrator) migrateDAGHistory(ctx context.Context, dirName, dagNam
 }
 
 // migrateRun converts and saves a single run
-func (m *HistoryMigrator) migrateRun(ctx context.Context, legacyStatusFile *legacyModel.StatusFile, dirBasedDagName string) error {
+func (m *HistoryMigrator) migrateRun(ctx context.Context, legacyStatusFile *legacymodel.StatusFile, dirBasedDagName string) error {
 	legacyStatus := &legacyStatusFile.Status
 
 	// Load the DAG definition - try both the status name and directory-based name
@@ -227,7 +227,7 @@ func (m *HistoryMigrator) migrateRun(ctx context.Context, legacyStatusFile *lega
 }
 
 // convertStatus converts legacy status to new DAGRunStatus format
-func (m *HistoryMigrator) convertStatus(legacy *legacyModel.Status, dag *digraph.DAG) *models.DAGRunStatus {
+func (m *HistoryMigrator) convertStatus(legacy *legacymodel.Status, dag *digraph.DAG) *models.DAGRunStatus {
 	// Convert timestamps
 	startedAt, _ := m.parseTime(legacy.StartedAt)
 	finishedAt, _ := m.parseTime(legacy.FinishedAt)
@@ -281,7 +281,7 @@ func (m *HistoryMigrator) convertStatus(legacy *legacyModel.Status, dag *digraph
 }
 
 // convertNode converts legacy node to new Node format
-func (m *HistoryMigrator) convertNode(legacy *legacyModel.Node) *models.Node {
+func (m *HistoryMigrator) convertNode(legacy *legacymodel.Node) *models.Node {
 	node := &models.Node{
 		Step:       legacy.Step,
 		Status:     legacy.Status,
@@ -345,7 +345,7 @@ func (m *HistoryMigrator) extractDAGName(dirName string) string {
 	// Check if the part after hyphen is all hex chars
 	suffix := dirName[lastHyphen+1:]
 	for _, ch := range suffix {
-		if !((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f')) {
+		if !((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f')) { //nolint:staticcheck
 			return dirName // Not a hash, return full name
 		}
 	}
@@ -354,8 +354,8 @@ func (m *HistoryMigrator) extractDAGName(dirName string) string {
 }
 
 // readLegacyStatusFile reads a legacy status file directly
-func (m *HistoryMigrator) readLegacyStatusFile(filePath string) (*legacyModel.StatusFile, error) {
-	data, err := os.ReadFile(filePath)
+func (m *HistoryMigrator) readLegacyStatusFile(filePath string) (*legacymodel.StatusFile, error) {
+	data, err := os.ReadFile(filePath) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
@@ -375,7 +375,7 @@ func (m *HistoryMigrator) readLegacyStatusFile(filePath string) (*legacyModel.St
 		return nil, fmt.Errorf("no valid status data found in file")
 	}
 
-	var statusFile legacyModel.StatusFile
+	var statusFile legacymodel.StatusFile
 	if err := json.Unmarshal([]byte(lastValidLine), &statusFile.Status); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal status: %w", err)
 	}
@@ -428,7 +428,7 @@ func (m *HistoryMigrator) MoveLegacyData(ctx context.Context) error {
 	archiveDir := filepath.Join(m.dataDir, fmt.Sprintf("history_migrated_%s", time.Now().Format("20060102_150405")))
 
 	// Create archive directory
-	if err := os.MkdirAll(archiveDir, 0755); err != nil {
+	if err := os.MkdirAll(archiveDir, 0750); err != nil {
 		return fmt.Errorf("failed to create archive directory: %w", err)
 	}
 

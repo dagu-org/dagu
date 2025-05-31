@@ -46,31 +46,31 @@ func TestListDAGsInSubdirectories(t *testing.T) {
 steps:
   - name: step1
     command: echo "root"`
-	err := os.WriteFile(filepath.Join(tmpDir, "root-dag.yaml"), []byte(rootDAG), 0644)
+	err := os.WriteFile(filepath.Join(tmpDir, "root-dag.yaml"), []byte(rootDAG), 0600)
 	require.NoError(t, err)
 
 	// Create subdirectory and DAG
 	subDir := filepath.Join(tmpDir, "subdir")
-	err = os.MkdirAll(subDir, 0755)
+	err = os.MkdirAll(subDir, 0750)
 	require.NoError(t, err)
 
 	subDAG := `name: sub-dag
 steps:
   - name: step1
     command: echo "sub"`
-	err = os.WriteFile(filepath.Join(subDir, "sub-dag.yaml"), []byte(subDAG), 0644)
+	err = os.WriteFile(filepath.Join(subDir, "sub-dag.yaml"), []byte(subDAG), 0600)
 	require.NoError(t, err)
 
 	// Create nested subdirectory and DAG
 	nestedDir := filepath.Join(tmpDir, "subdir", "nested")
-	err = os.MkdirAll(nestedDir, 0755)
+	err = os.MkdirAll(nestedDir, 0750)
 	require.NoError(t, err)
 
 	nestedDAG := `name: nested-dag
 steps:
   - name: step1
     command: echo "nested"`
-	err = os.WriteFile(filepath.Join(nestedDir, "nested-dag.yaml"), []byte(nestedDAG), 0644)
+	err = os.WriteFile(filepath.Join(nestedDir, "nested-dag.yaml"), []byte(nestedDAG), 0600)
 	require.NoError(t, err)
 
 	// List all DAGs
@@ -101,7 +101,7 @@ tags: ["tag1", "tag2"]
 steps:
   - name: step1
     command: echo "hello"`
-	err := os.WriteFile(filepath.Join(tmpDir, "test-dag.yaml"), []byte(dagContent), 0644)
+	err := os.WriteFile(filepath.Join(tmpDir, "test-dag.yaml"), []byte(dagContent), 0600)
 	require.NoError(t, err)
 
 	dag, err := store.GetMetadata(ctx, "test-dag")
@@ -131,7 +131,7 @@ schedule: "0 1 * * *"
 steps:
   - name: step1
     command: echo "detailed"`
-	err := os.WriteFile(filepath.Join(tmpDir, "detailed-dag.yaml"), []byte(dagContent), 0644)
+	err := os.WriteFile(filepath.Join(tmpDir, "detailed-dag.yaml"), []byte(dagContent), 0600)
 	require.NoError(t, err)
 
 	dag, err := store.GetDetails(ctx, "detailed-dag")
@@ -161,7 +161,7 @@ func TestGetSpec(t *testing.T) {
 steps:
   - name: step1
     command: echo "spec"`
-	err := os.WriteFile(filepath.Join(tmpDir, "spec-dag.yaml"), []byte(dagContent), 0644)
+	err := os.WriteFile(filepath.Join(tmpDir, "spec-dag.yaml"), []byte(dagContent), 0600)
 	require.NoError(t, err)
 
 	spec, err := store.GetSpec(ctx, "spec-dag")

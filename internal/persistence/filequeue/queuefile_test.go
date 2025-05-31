@@ -53,7 +53,7 @@ func TestQueueFile(t *testing.T) {
 	require.Regexp(t, "^item_high_", job.FileName, "expected job file name to start with 'item_priority_'")
 
 	// Check if the queue is empty again
-	queueLen, err = qf.Len(th.Context)
+	_, err = qf.Len(th.Context)
 	require.NoError(t, err, "expected no error when getting queue length")
 
 	// Check if pop returns an error when the queue is empty

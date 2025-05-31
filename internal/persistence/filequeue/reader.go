@@ -75,7 +75,7 @@ func (q *queueReaderImpl) Start(ctx context.Context, ch chan<- models.QueuedItem
 		baseDir := q.store.BaseDir()
 		if err := q.setupWatcher(ctx, watcher, baseDir); err != nil {
 			logger.Warn(ctx, "Failed to setup file watcher, falling back to polling only", "err", err)
-			watcher.Close()
+			_ = watcher.Close()
 			watcher = nil
 		}
 	}
@@ -89,7 +89,7 @@ func (q *queueReaderImpl) Start(ctx context.Context, ch chan<- models.QueuedItem
 	if err != nil {
 		q.running.Store(false)
 		if watcher != nil {
-			watcher.Close()
+			_ = watcher.Close()
 		}
 		return fmt.Errorf("failed to read initial items: %w", err)
 	}
@@ -357,7 +357,7 @@ func (q *queueReaderImpl) setupWatcher(ctx context.Context, watcher filenotify.F
 	}
 
 	// Create base directory if it doesn't exist
-	if err := os.MkdirAll(baseDir, 0755); err != nil {
+	if err := os.MkdirAll(baseDir, 0750); err != nil {
 		return fmt.Errorf("failed to create base directory %s: %w", baseDir, err)
 	}
 

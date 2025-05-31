@@ -47,7 +47,7 @@ func NewProcHandler(file string, meta models.ProcMeta) *ProcHandle {
 }
 
 // Stop implements models.Proc.
-func (p *ProcHandle) Stop(ctx context.Context) error {
+func (p *ProcHandle) Stop(_ context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if !p.started.Load() {
@@ -69,11 +69,11 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 
 	// Ensure the directory exists
 	dir := filepath.Dir(p.fileName)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	fd, err := os.OpenFile(p.fileName, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0644)
+	fd, err := os.OpenFile(p.fileName, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0600)
 	if err != nil {
 		p.started.Store(false)
 		return err
@@ -139,7 +139,7 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 		for {
 			select {
 			case <-ticker.C:
-				binary.BigEndian.PutUint64(buf, uint64(time.Now().Unix()))
+				binary.BigEndian.PutUint64(buf, uint64(time.Now().Unix())) // nolint:gosec
 				if _, err := fd.WriteAt(buf, 0); err != nil {
 					logger.Error(ctx, "Failed to write heartbeat", "err", err)
 				}

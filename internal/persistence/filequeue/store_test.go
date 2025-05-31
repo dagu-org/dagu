@@ -73,6 +73,7 @@ func TestStore_DequeueByDAGRunID(t *testing.T) {
 		Name: "test-name",
 		ID:   "test-dag-2",
 	})
+	require.NoError(t, err, "expected no error when adding job to store")
 
 	// Check if dequeue by dag-run ID returns the job
 	jobs, err := store.DequeueByDAGRunID(th.Context, "test-name", "test-dag-2")

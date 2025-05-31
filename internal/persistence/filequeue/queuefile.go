@@ -61,7 +61,7 @@ type ItemData struct {
 
 // Push adds a job to the queue
 // Since it's a prototype, it just create a json file with the job ID and dag-run reference
-func (q *QueueFile) Push(ctx context.Context, dagRun digraph.DAGRunRef) error {
+func (q *QueueFile) Push(_ context.Context, dagRun digraph.DAGRunRef) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -74,7 +74,7 @@ func (q *QueueFile) Push(ctx context.Context, dagRun digraph.DAGRunRef) error {
 	fullPath := filepath.Join(q.baseDir, fileName)
 
 	// Create the directory if it doesn't exist
-	if err := os.MkdirAll(q.baseDir, os.ModePerm); err != nil {
+	if err := os.MkdirAll(q.baseDir, 0750); err != nil { // nolint: gosec
 		return fmt.Errorf("failed to create directory %s: %w", q.baseDir, err)
 	}
 

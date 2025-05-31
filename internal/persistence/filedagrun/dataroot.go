@@ -18,7 +18,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
@@ -28,11 +27,10 @@ import (
 // It handles the organization of run data in a hierarchical structure
 // based on year, month, and day.
 type DataRoot struct {
-	baseDir     string             // Base directory for all DAGs
-	prefix      string             // Sanitized prefix for directory names
-	dagRunsDir  string             // Path to the dag-runs directory
-	globPattern string             // Pattern for finding run directories
-	root        *digraph.DAGRunRef // Optional reference to the root DAG
+	baseDir     string // Base directory for all DAGs
+	prefix      string // Sanitized prefix for directory names
+	dagRunsDir  string // Path to the dag-runs directory
+	globPattern string // Pattern for finding run directories
 }
 
 // NewDataRoot creates a new DataRoot instance for managing a DAG's run history.

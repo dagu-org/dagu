@@ -28,12 +28,14 @@ func TestQueue(t *testing.T) {
 		Name: "test-name",
 		ID:   "low-priority-dag-run",
 	})
+	require.NoError(t, err, "expected no error when adding job to queue")
 
 	// Add a high priority job to the queue
 	err = queue.Enqueue(th.Context, models.QueuePriorityHigh, digraph.DAGRunRef{
 		Name: "test-name",
 		ID:   "high-priority-dag-run",
 	})
+	require.NoError(t, err, "expected no error when adding job to queue")
 
 	// Check if the queue length is 2
 	queueLen, err = queue.Len(th.Context)

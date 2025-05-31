@@ -34,7 +34,7 @@ func (s *Store) CountAlive(ctx context.Context, name string) (int, error) {
 		s.procGroups.Store(name, NewProcGroup(pgBaseDir, name, s.staleTime))
 	}
 	pg, _ := s.procGroups.Load(name)
-	return pg.(*ProcGroup).Count(ctx, name)
+	return pg.(*ProcGroup).Count(ctx)
 }
 
 // Acquire implements models.ProcStore.

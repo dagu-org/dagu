@@ -40,7 +40,7 @@ func NewProcGroup(baseDir, name string, staleTime time.Duration) *ProcGroup {
 }
 
 // Count retrieves the count of alive proc files for the specified DAG name.
-func (pg *ProcGroup) Count(ctx context.Context, name string) (int, error) {
+func (pg *ProcGroup) Count(ctx context.Context) (int, error) {
 	pg.mu.Lock()
 	defer pg.mu.Unlock()
 
@@ -88,7 +88,7 @@ func (pg *ProcGroup) isStale(ctx context.Context, file string) bool {
 	}
 
 	// Check if the file is stale by checking its content (timestamp).
-	data, err := os.ReadFile(file)
+	data, err := os.ReadFile(file) // nolint:gosec
 	if err != nil {
 		logger.Warn(ctx, "failed to read file %s: %v", file, err)
 		return false
@@ -103,7 +103,7 @@ func (pg *ProcGroup) isStale(ctx context.Context, file string) bool {
 	}
 
 	// Parse the timestamp from the file
-	unixTime = int64(binary.BigEndian.Uint64(data[:8]))
+	unixTime = int64(binary.BigEndian.Uint64(data[:8])) // nolint:gosec
 	parsedTime := time.Unix
 	duration := time.Since(time.Unix(unixTime, 0))
 	if duration < pg.staleTime {
@@ -116,7 +116,7 @@ func (pg *ProcGroup) isStale(ctx context.Context, file string) bool {
 
 // GetProc retrieves a proc file for the specified dag-run reference.
 // It returns a new Proc instance with the generated file name.
-func (pg *ProcGroup) Acquire(ctx context.Context, dagRun digraph.DAGRunRef) (*ProcHandle, error) {
+func (pg *ProcGroup) Acquire(_ context.Context, dagRun digraph.DAGRunRef) (*ProcHandle, error) {
 	// Sanity check the dag-run reference
 	if pg.name != dagRun.Name {
 		return nil, fmt.Errorf("DAG name %s does not match proc file name %s", dagRun.Name, pg.name)

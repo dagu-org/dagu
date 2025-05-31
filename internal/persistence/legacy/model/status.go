@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
@@ -77,11 +76,4 @@ func (p PID) String() string {
 
 func (p PID) IsRunning() bool {
 	return p != pidNotRunning
-}
-
-func nodeOrNil(s *digraph.Step) *Node {
-	if s == nil {
-		return nil
-	}
-	return NewNode(*s)
 }

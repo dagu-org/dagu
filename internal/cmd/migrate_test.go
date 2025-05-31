@@ -10,9 +10,9 @@ import (
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
-	legacyModel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
+	legacymodel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,26 +25,26 @@ func TestMigrateHistoryCommand(t *testing.T) {
 	dagRunsDir := filepath.Join(tempDir, "dag-runs")
 	dagsDir := filepath.Join(tempDir, "dags")
 
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
-	require.NoError(t, os.MkdirAll(dagRunsDir, 0755))
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
+	require.NoError(t, os.MkdirAll(dataDir, 0750))
+	require.NoError(t, os.MkdirAll(dagRunsDir, 0750))
+	require.NoError(t, os.MkdirAll(dagsDir, 0750))
 
 	// Create legacy data
 	legacyDagDir := filepath.Join(dataDir, "test-dag-abc123")
-	require.NoError(t, os.MkdirAll(legacyDagDir, 0755))
+	require.NoError(t, os.MkdirAll(legacyDagDir, 0750))
 
 	// Create legacy status
-	legacyStatus := legacyModel.Status{
+	legacyStatus := legacymodel.Status{
 		RequestID:  "req123",
 		Name:       "test-dag",
 		Status:     scheduler.StatusSuccess,
 		StartedAt:  time.Now().Add(-1 * time.Hour).Format(time.RFC3339),
 		FinishedAt: time.Now().Add(-30 * time.Minute).Format(time.RFC3339),
-		Nodes: []*legacyModel.Node{
+		Nodes: []*legacymodel.Node{
 			{
-				Step: digraph.Step{Name: "step1"},
-				Status: scheduler.NodeStatusSuccess,
-				StartedAt: time.Now().Add(-50 * time.Minute).Format(time.RFC3339),
+				Step:       digraph.Step{Name: "step1"},
+				Status:     scheduler.NodeStatusSuccess,
+				StartedAt:  time.Now().Add(-50 * time.Minute).Format(time.RFC3339),
 				FinishedAt: time.Now().Add(-40 * time.Minute).Format(time.RFC3339),
 			},
 		},
@@ -53,11 +53,11 @@ func TestMigrateHistoryCommand(t *testing.T) {
 	// Write legacy data file
 	statusData, _ := json.Marshal(legacyStatus)
 	datFile := filepath.Join(legacyDagDir, "test-dag.20240101.100000.req123.dat")
-	require.NoError(t, os.WriteFile(datFile, statusData, 0644))
+	require.NoError(t, os.WriteFile(datFile, statusData, 0600))
 
 	// Create DAG file
 	dagPath := filepath.Join(dagsDir, "test-dag.yaml")
-	require.NoError(t, os.WriteFile(dagPath, []byte("name: test-dag\nsteps:\n  - name: step1\n    command: echo test"), 0644))
+	require.NoError(t, os.WriteFile(dagPath, []byte("name: test-dag\nsteps:\n  - name: step1\n    command: echo test"), 0600))
 
 	// Create a test context
 	cfg := &config.Config{
@@ -105,7 +105,7 @@ func TestMigrateHistoryCommand(t *testing.T) {
 		// Verify archive exists
 		entries, err := os.ReadDir(dataDir)
 		require.NoError(t, err)
-		
+
 		archiveFound := false
 		for _, entry := range entries {
 			if entry.IsDir() && len(entry.Name()) > 17 && entry.Name()[:17] == "history_migrated_" {
@@ -123,9 +123,9 @@ func TestMigrateCommand_NoLegacyData(t *testing.T) {
 	dagRunsDir := filepath.Join(tempDir, "dag-runs")
 	dagsDir := filepath.Join(tempDir, "dags")
 
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
-	require.NoError(t, os.MkdirAll(dagRunsDir, 0755))
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
+	require.NoError(t, os.MkdirAll(dataDir, 0750))
+	require.NoError(t, os.MkdirAll(dagRunsDir, 0750))
+	require.NoError(t, os.MkdirAll(dagsDir, 0750))
 
 	// Create a test context
 	cfg := &config.Config{
@@ -160,11 +160,11 @@ func TestCmdMigrate(t *testing.T) {
 	assert.NotNil(t, cmd)
 	assert.Equal(t, "migrate", cmd.Use)
 	assert.True(t, cmd.HasSubCommands())
-	
+
 	// Check for history subcommand
 	historyCmd := cmd.Commands()[0]
 	assert.Equal(t, "history", historyCmd.Use)
-	
+
 	// Check for skip-backup flag
 	flag := historyCmd.Flag("skip-backup")
 	assert.NotNil(t, flag)

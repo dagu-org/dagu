@@ -25,14 +25,14 @@ func TestReadLogLines(t *testing.T) {
 		"Line 9",
 		"Line 10",
 	}
-	err := os.WriteFile(testLogPath, []byte(strings.Join(testContent, "\n")), 0644)
+	err := os.WriteFile(testLogPath, []byte(strings.Join(testContent, "\n")), 0600)
 	if err != nil {
 		t.Fatalf("Failed to create test log file: %v", err)
 	}
 
 	// Create an empty log file for testing
 	emptyLogPath := filepath.Join(tempDir, "empty.log")
-	err = os.WriteFile(emptyLogPath, []byte(""), 0644)
+	err = os.WriteFile(emptyLogPath, []byte(""), 0600)
 	if err != nil {
 		t.Fatalf("Failed to create empty log file: %v", err)
 	}
@@ -193,7 +193,7 @@ func TestReadLogContent(t *testing.T) {
 		"Line 4",
 		"Line 5",
 	}
-	err := os.WriteFile(testLogPath, []byte(strings.Join(testContent, "\n")), 0644)
+	err := os.WriteFile(testLogPath, []byte(strings.Join(testContent, "\n")), 0600)
 	if err != nil {
 		t.Fatalf("Failed to create test log file: %v", err)
 	}
@@ -329,7 +329,7 @@ func TestCountLinesExact(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create test file
 			testFilePath := filepath.Join(tempDir, tc.name+".log")
-			err := os.WriteFile(testFilePath, []byte(tc.content), 0644)
+			err := os.WriteFile(testFilePath, []byte(tc.content), 0600)
 			if err != nil {
 				t.Fatalf("Failed to create test file: %v", err)
 			}
@@ -369,7 +369,7 @@ func TestReadFirstLines(t *testing.T) {
 		"Line 4",
 		"Line 5",
 	}
-	err := os.WriteFile(testLogPath, []byte(strings.Join(testContent, "\n")), 0644)
+	err := os.WriteFile(testLogPath, []byte(strings.Join(testContent, "\n")), 0600)
 	if err != nil {
 		t.Fatalf("Failed to create test log file: %v", err)
 	}
@@ -480,7 +480,7 @@ func TestReadLastLines(t *testing.T) {
 		"Line 4",
 		"Line 5",
 	}
-	err := os.WriteFile(testLogPath, []byte(strings.Join(testContent, "\n")), 0644)
+	err := os.WriteFile(testLogPath, []byte(strings.Join(testContent, "\n")), 0600)
 	if err != nil {
 		t.Fatalf("Failed to create test log file: %v", err)
 	}
@@ -591,7 +591,7 @@ func TestReadLinesRange(t *testing.T) {
 		"Line 4",
 		"Line 5",
 	}
-	err := os.WriteFile(testLogPath, []byte(strings.Join(testContent, "\n")), 0644)
+	err := os.WriteFile(testLogPath, []byte(strings.Join(testContent, "\n")), 0600)
 	if err != nil {
 		t.Fatalf("Failed to create test log file: %v", err)
 	}
@@ -758,7 +758,7 @@ func TestEstimateLineCount(t *testing.T) {
 
 			// For small files, write the exact content
 			if tt.fileSize <= 10 {
-				err := os.WriteFile(testFilePath, []byte(tt.content), 0644)
+				err := os.WriteFile(testFilePath, []byte(tt.content), 0600)
 				if err != nil {
 					t.Fatalf("Failed to create test file: %v", err)
 				}

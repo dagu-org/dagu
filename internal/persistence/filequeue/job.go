@@ -31,5 +31,5 @@ func (j *Job) ID() string {
 
 // Data implements models.QueuedItem.
 func (j *Job) Data() digraph.DAGRunRef {
-	return j.ItemData.DAGRun
+	return j.DAGRun
 }

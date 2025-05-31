@@ -236,7 +236,9 @@ func (db *JSONDB) Compact(_ context.Context, targetFilePath string) error {
 	if err := writer.open(); err != nil {
 		return err
 	}
-	defer writer.close()
+	defer func() {
+		_ = writer.close()
+	}()
 
 	if err := writer.write(*status); err != nil {
 		if removeErr := os.Remove(tempFilePath); removeErr != nil {
@@ -270,7 +272,7 @@ func (db *JSONDB) Rename(_ context.Context, oldKey, newKey string) error {
 
 	newDir := db.getDirectory(newKey, getPrefix(newKey))
 	if !db.exists(newDir) {
-		if err := os.MkdirAll(newDir, 0755); err != nil {
+		if err := os.MkdirAll(newDir, 0750); err != nil {
 			return fmt.Errorf("%w: %s : %s", errCreateNewDirectory, newDir, err)
 		}
 	}
@@ -375,12 +377,14 @@ func (s *JSONDB) exists(filePath string) bool {
 }
 
 func ParseStatusFile(filePath string) (*model.Status, error) {
-	f, err := os.Open(filePath)
+	f, err := os.Open(filePath) // nolint:gosec
 	if err != nil {
 		log.Printf("failed to open file. err: %v", err)
 		return nil, err
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 
 	var (
 		offset int64

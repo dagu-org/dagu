@@ -45,7 +45,7 @@ Example:
 	var skipBackup bool
 	cmd.Flags().BoolVar(&skipBackup, "skip-backup", false, "Skip creating backup of legacy data")
 
-	return NewCommand(cmd, nil, func(ctx *Context, args []string) error {
+	return NewCommand(cmd, nil, func(ctx *Context, _ []string) error {
 		return runMigration(ctx, skipBackup)
 	})
 }

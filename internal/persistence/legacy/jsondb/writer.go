@@ -39,7 +39,7 @@ func (w *writer) open() error {
 		return ErrWriterClosed
 	}
 
-	if err := os.MkdirAll(filepath.Dir(w.target), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(w.target), 0750); err != nil {
 		return err
 	}
 
