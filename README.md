@@ -52,7 +52,7 @@ We're excited to announce the beta release of Dagu 1.17.0! This release brings m
 dagu migrate history
 ```
 
-After successful migration, legacy history directories are moved to `~/.config/dagu/history_migrated_<timestamp>` for safekeeping. Most other functionality remains stable and compatible except for a few changes. We're committed to maintaining backward compatibility as much as possible in future releases.
+After successful migration, legacy history directories are moved to `<DAGU_DATA_DIR>/history_migrated_<timestamp>` for safekeeping. Most other functionality remains stable and compatible except for a few changes. We're committed to maintaining backward compatibility as much as possible in future releases.
 
 ### ❤️ Huge Thanks to Our Contributors
 
