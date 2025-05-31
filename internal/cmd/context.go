@@ -23,8 +23,6 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
 	"github.com/dagu-org/dagu/internal/persistence/filequeue"
-	"github.com/dagu-org/dagu/internal/persistence/legacy"
-	"github.com/dagu-org/dagu/internal/persistence/legacy/jsondb"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
@@ -45,9 +43,6 @@ type Context struct {
 	DAGRunMgr   dagrun.Manager
 	ProcStore   models.ProcStore
 	QueueStore  models.QueueStore
-
-	// LegacyStore is used for migration purposes.
-	LegacyStore legacy.HistoryStore
 }
 
 // LogToFile creates a new logger context with a file writer.
@@ -138,7 +133,6 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		Flags:       flags,
 		ProcStore:   ps,
 		QueueStore:  qs,
-		LegacyStore: jsondb.New(cfg.Paths.DataDir),
 	}, nil
 }
 
