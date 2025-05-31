@@ -20,9 +20,9 @@ import (
 
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/dagu-org/dagu/internal/persistence/filecache"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence/legacy"
+	"github.com/dagu-org/dagu/internal/persistence/legacy/filecache"
+	"github.com/dagu-org/dagu/internal/persistence/legacy/model"
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
@@ -49,7 +49,7 @@ const (
 	dateFormat        = "20060102"
 )
 
-var _ persistence.HistoryStore = (*JSONDB)(nil)
+var _ legacy.HistoryStore = (*JSONDB)(nil)
 
 // JSONDB manages DAGs status files in local storage.
 type JSONDB struct {
@@ -208,7 +208,7 @@ func (db *JSONDB) FindByRequestID(_ context.Context, key string, requestID strin
 		}
 	}
 
-	return nil, fmt.Errorf("%w : %s", persistence.ErrRequestIDNotFound, requestID)
+	return nil, fmt.Errorf("%w : %s", legacy.ErrRequestIDNotFound, requestID)
 }
 
 func (db *JSONDB) RemoveAll(ctx context.Context, key string) error {
@@ -354,12 +354,12 @@ func (db *JSONDB) latestToday(key string, day time.Time, latestStatusToday bool)
 
 	matches, err := filepath.Glob(pattern)
 	if err != nil || len(matches) == 0 {
-		return "", persistence.ErrNoStatusDataToday
+		return "", legacy.ErrNoStatusDataToday
 	}
 
 	ret := filterLatest(matches, 1)
 	if len(ret) == 0 {
-		return "", persistence.ErrNoStatusData
+		return "", legacy.ErrNoStatusData
 	}
 
 	startOfDay := day.Truncate(24 * time.Hour)
@@ -370,7 +370,7 @@ func (db *JSONDB) latestToday(key string, day time.Time, latestStatusToday bool)
 			return "", err
 		}
 		if timestamp.Before(startOfDayInUTC.Time) {
-			return "", persistence.ErrNoStatusDataToday
+			return "", legacy.ErrNoStatusDataToday
 		}
 	}
 

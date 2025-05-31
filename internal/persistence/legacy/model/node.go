@@ -28,7 +28,7 @@ func FromNodes(nodes []scheduler.NodeData) []*Node {
 func FromNode(node scheduler.NodeData) *Node {
 	return &Node{
 		Step:       node.Step,
-		Log:        node.State.Log,
+		Log:        node.State.Stdout,
 		StartedAt:  stringutil.FormatTime(node.State.StartedAt),
 		FinishedAt: stringutil.FormatTime(node.State.FinishedAt),
 		Status:     node.State.Status,
@@ -59,7 +59,7 @@ func (n *Node) ToNode() *scheduler.Node {
 	retriedAt, _ := stringutil.ParseTime(n.RetriedAt)
 	return scheduler.NewNode(n.Step, scheduler.NodeState{
 		Status:     n.Status,
-		Log:        n.Log,
+		Stdout:     n.Log,
 		StartedAt:  startedAt,
 		FinishedAt: finishedAt,
 		RetriedAt:  retriedAt,
