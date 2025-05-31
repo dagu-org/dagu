@@ -10,10 +10,10 @@ import (
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/models"
-	"github.com/dagu-org/dagu/internal/persistence/localdag"
-	"github.com/dagu-org/dagu/internal/persistence/localdagrun"
-	"github.com/dagu-org/dagu/internal/persistence/localproc"
-	"github.com/dagu-org/dagu/internal/persistence/localqueue"
+	"github.com/dagu-org/dagu/internal/persistence/filedag"
+	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
+	"github.com/dagu-org/dagu/internal/persistence/fileproc"
+	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -70,10 +70,10 @@ func setupTest(t *testing.T) testHelper {
 		Global: config.Global{WorkDir: tempDir},
 	}
 
-	ds := localdag.New(cfg.Paths.DAGsDir, localdag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
-	drs := localdagrun.New(cfg.Paths.DAGRunsDir)
-	ps := localproc.New(cfg.Paths.ProcDir)
-	qs := localqueue.New(cfg.Paths.QueueDir)
+	ds := filedag.New(cfg.Paths.DAGsDir, filedag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
+	drs := filedagrun.New(cfg.Paths.DAGRunsDir)
+	ps := fileproc.New(cfg.Paths.ProcDir)
+	qs := filequeue.New(cfg.Paths.QueueDir)
 
 	drm := dagrun.New(drs, ps, cfg.Paths.Executable, cfg.Global.WorkDir)
 	em := scheduler.NewEntryReader(testdataDir, ds, drm, "", "")

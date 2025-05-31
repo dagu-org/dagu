@@ -19,10 +19,10 @@ import (
 	"github.com/dagu-org/dagu/internal/frontend"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
-	"github.com/dagu-org/dagu/internal/persistence/localdag"
-	"github.com/dagu-org/dagu/internal/persistence/localdagrun"
-	"github.com/dagu-org/dagu/internal/persistence/localproc"
-	"github.com/dagu-org/dagu/internal/persistence/localqueue"
+	"github.com/dagu-org/dagu/internal/persistence/filedag"
+	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
+	"github.com/dagu-org/dagu/internal/persistence/fileproc"
+	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
@@ -106,8 +106,8 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	}
 
 	// Initialize history repository and history manager
-	hrOpts := []localdagrun.DAGRunStoreOption{
-		localdagrun.WithLatestStatusToday(cfg.Server.LatestStatusToday),
+	hrOpts := []filedagrun.DAGRunStoreOption{
+		filedagrun.WithLatestStatusToday(cfg.Server.LatestStatusToday),
 	}
 
 	switch cmd.Name() {
@@ -115,13 +115,13 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		// For long-running process, we setup file cache for better performance
 		hc := fileutil.NewCache[*models.DAGRunStatus](0, time.Hour*12)
 		hc.StartEviction(ctx)
-		hrOpts = append(hrOpts, localdagrun.WithHistoryFileCache(hc))
+		hrOpts = append(hrOpts, filedagrun.WithHistoryFileCache(hc))
 	}
 
-	ps := localproc.New(cfg.Paths.ProcDir)
-	drs := localdagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
+	ps := fileproc.New(cfg.Paths.ProcDir)
+	drs := filedagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
 	drm := dagrun.New(drs, ps, cfg.Paths.Executable, cfg.Global.WorkDir)
-	qs := localqueue.New(cfg.Paths.QueueDir)
+	qs := filequeue.New(cfg.Paths.QueueDir)
 
 	return &Context{
 		Context:     ctx,
@@ -200,11 +200,11 @@ func (c *Context) dagStore(cache *fileutil.Cache[*digraph.DAG], searchPaths []st
 	}
 
 	// Create a flag store based on the suspend flags directory.
-	return localdag.New(
+	return filedag.New(
 		c.Config.Paths.DAGsDir,
-		localdag.WithFlagsBaseDir(c.Config.Paths.SuspendFlagsDir),
-		localdag.WithSearchPaths(searchPaths),
-		localdag.WithFileCache(cache),
+		filedag.WithFlagsBaseDir(c.Config.Paths.SuspendFlagsDir),
+		filedag.WithSearchPaths(searchPaths),
+		filedag.WithFileCache(cache),
 	), nil
 }
 

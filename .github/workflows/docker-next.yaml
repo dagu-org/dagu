@@ -55,6 +55,8 @@ jobs:
           file: Dockerfile
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
+          build-args: |
+            LDFLAGS=-X 'main.version=next-${{ env.SHORT_SHA }}'
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:next
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:next-${{ env.SHORT_SHA }}

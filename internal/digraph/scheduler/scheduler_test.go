@@ -819,7 +819,7 @@ func TestScheduler(t *testing.T) {
 
 		go func() {
 			time.Sleep(400 * time.Millisecond)
-			err := os.WriteFile(file, []byte("ready"), 0644)
+			err := os.WriteFile(file, []byte("ready"), 0600)
 			require.NoError(t, err, "failed to write to file")
 		}()
 
@@ -951,7 +951,7 @@ func TestScheduler(t *testing.T) {
 		}
 		t.Cleanup(func() { err := os.Remove(file); require.NoError(t, err) })
 		// Write initial value
-		err = os.WriteFile(file, []byte("notyet"), 0644)
+		err = os.WriteFile(file, []byte("notyet"), 0600)
 		require.NoError(t, err)
 		graph := sc.newGraph(t,
 			newStep("1",
@@ -968,7 +968,7 @@ func TestScheduler(t *testing.T) {
 		)
 		go func() {
 			time.Sleep(300 * time.Millisecond)
-			err := os.WriteFile(file, []byte("done"), 0644)
+			err := os.WriteFile(file, []byte("done"), 0600)
 			require.NoError(t, err)
 		}()
 		result := graph.Schedule(t, scheduler.StatusSuccess)

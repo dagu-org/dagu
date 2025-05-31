@@ -250,7 +250,7 @@ func setupScript(_ context.Context, step digraph.Step) (string, error) {
 	}
 
 	// Add execute permissions to the script file
-	if err = os.Chmod(file.Name(), 0755); err != nil { // nolint: gosec
+	if err = os.Chmod(file.Name(), 0750); err != nil { // nolint: gosec
 		return "", fmt.Errorf("failed to set execute permissions on script file: %w", err)
 	}
 

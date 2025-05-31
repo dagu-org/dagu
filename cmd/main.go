@@ -38,6 +38,7 @@ func init() {
 	rootCmd.AddCommand(cmd.CmdScheduler())
 	rootCmd.AddCommand(cmd.CmdRetry())
 	rootCmd.AddCommand(cmd.CmdStartAll())
+	rootCmd.AddCommand(cmd.CmdMigrate())
 
 	build.Version = version
 }

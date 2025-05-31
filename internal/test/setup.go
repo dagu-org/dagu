@@ -23,9 +23,9 @@ import (
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
-	"github.com/dagu-org/dagu/internal/persistence/localdag"
-	"github.com/dagu-org/dagu/internal/persistence/localdagrun"
-	"github.com/dagu-org/dagu/internal/persistence/localproc"
+	"github.com/dagu-org/dagu/internal/persistence/filedag"
+	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
+	"github.com/dagu-org/dagu/internal/persistence/fileproc"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -98,9 +98,9 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		cfg.Server = *options.ServerConfig
 	}
 
-	dagStore := localdag.New(cfg.Paths.DAGsDir, localdag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
-	runStore := localdagrun.New(cfg.Paths.DAGRunsDir)
-	procStore := localproc.New(cfg.Paths.ProcDir)
+	dagStore := filedag.New(cfg.Paths.DAGsDir, filedag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
+	runStore := filedagrun.New(cfg.Paths.DAGRunsDir)
+	procStore := fileproc.New(cfg.Paths.ProcDir)
 
 	drm := dagrun.New(runStore, procStore, cfg.Paths.Executable, cfg.Global.WorkDir)
 
