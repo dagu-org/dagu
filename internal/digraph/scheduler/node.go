@@ -400,7 +400,14 @@ func (n *Node) Setup(ctx context.Context, logDir string, dagRunID string) error 
 	safeName := fileutil.SafeName(n.Name())
 	timestamp := startedAt.Format("20060102.15:04:05.000")
 	postfix := stringutil.TruncString(dagRunID, 8)
-	logFilename := fmt.Sprintf("%s.%s.%s", safeName, timestamp, postfix)
+
+	// Add retry count to filename if this is a retry
+	retrySuffix := ""
+	if n.GetRetryCount() > 0 {
+		retrySuffix = fmt.Sprintf(".retry%d", n.GetRetryCount())
+	}
+
+	logFilename := fmt.Sprintf("%s.%s.%s%s", safeName, timestamp, postfix, retrySuffix)
 	if !fileutil.FileExists(logDir) {
 		if err := os.MkdirAll(logDir, 0750); err != nil {
 			return fmt.Errorf("failed to create log directory %q: %w", logDir, err)
@@ -411,6 +418,10 @@ func (n *Node) Setup(ctx context.Context, logDir string, dagRunID string) error 
 	if err := n.Data.Setup(ctx, logFile, startedAt); err != nil {
 		return fmt.Errorf("failed to setup node data: %w", err)
 	}
+
+	// Reset the output coordinator before setting up new files
+	n.outputs = OutputCoordinator{}
+
 	if err := n.outputs.setup(ctx, n.NodeData()); err != nil {
 		return fmt.Errorf("failed to setup outputs: %w", err)
 	}
@@ -674,8 +685,11 @@ func (oc *OutputCoordinator) closeResources(_ context.Context) error {
 	}
 	for _, f := range []*os.File{oc.stdoutFile, oc.stdoutRedirectFile, oc.StderrRedirectFile} {
 		if f != nil {
-			if err := f.Sync(); err != nil {
-				lastErr = err
+			// Only try to sync if the file is still open
+			if _, err := f.Stat(); err == nil {
+				if err := f.Sync(); err != nil {
+					lastErr = err
+				}
 			}
 			_ = f.Close()
 		}
