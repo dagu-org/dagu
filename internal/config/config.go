@@ -112,6 +112,9 @@ type Server struct {
 
 	// Permissions defines the permissions allowed in the UI and API.
 	Permissions map[Permission]bool
+
+	// StrictValidation enables strict validation of API requests.
+	StrictValidation bool
 }
 
 // Permission represents a permission string used in the application.

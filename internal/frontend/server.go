@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/signal"
 	"path"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"syscall"
@@ -78,7 +77,7 @@ func (srv *Server) Serve(ctx context.Context) error {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Compress(5))
 	r.Use(httplog.RequestLogger(requestLogger))
-	r.Use(middleware.Recoverer) // Use built-in Chi recoverer instead of custom one
+	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"}, // TODO: Update to specific origins for better security
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
@@ -244,34 +243,4 @@ func (srv *Server) setupGracefulShutdown(ctx context.Context) {
 	if err := srv.httpServer.Shutdown(shutdownCtx); err != nil {
 		logger.Error(ctx, "Failed to shutdown server gracefully", "err", err)
 	}
-}
-
-// CustomRecoverer provides a middleware that recovers from panics
-// Note: Can be used instead of Chi's built-in Recoverer if custom handling is needed
-func CustomRecoverer(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			if rvr := recover(); rvr != nil {
-				if rvr == http.ErrAbortHandler {
-					// We don't recover http.ErrAbortHandler so the response
-					// to the client is aborted, this should not be logged
-					panic(rvr)
-				}
-
-				st := string(debug.Stack())
-				logger.Error(r.Context(), "Panic recovered in HTTP handler",
-					"error", rvr,
-					"stacktrace", st,
-					"url", r.URL.String(),
-					"method", r.Method,
-				)
-
-				if r.Header.Get("Connection") != "Upgrade" {
-					w.WriteHeader(http.StatusInternalServerError)
-				}
-			}
-		}()
-
-		next.ServeHTTP(w, r)
-	})
 }
