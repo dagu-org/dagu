@@ -28,7 +28,7 @@
 
 **IMPORTANT**
 
-**🚀 Version 1.17.0-beta.1 Available - Significant Improvements & New Features**
+**🚀 Version 1.17.0-beta Available - Significant Improvements & New Features**
 
 We're excited to announce the beta release of Dagu 1.17.0! This release brings many improvements and new features while maintaining the core stability you rely on.
 
@@ -73,7 +73,7 @@ This release wouldn’t exist without the community’s time, sweat, and ideas. 
 - 🐛 [Report issues on GitHub](https://github.com/dagu-org/dagu/issues)
 
 
-To try the beta: `docker run --rm -p 8080:8080 ghcr.io/dagu-org/dagu:1.17.0-beta.1 dagu start-all`
+To try the beta: `docker run --rm -p 8080:8080 ghcr.io/dagu-org/dagu:latest dagu start-all`
 
 ## Overview
 
