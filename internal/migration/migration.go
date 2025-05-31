@@ -12,13 +12,11 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
-	"github.com/dagu-org/dagu/internal/persistence/legacy"
 	legacyModel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
 )
 
 // HistoryMigrator handles migration from legacy history format to new format
 type HistoryMigrator struct {
-	legacyStore legacy.HistoryStore
 	dagRunStore models.DAGRunStore
 	dagStore    models.DAGStore
 	dataDir     string
@@ -27,14 +25,12 @@ type HistoryMigrator struct {
 
 // NewHistoryMigrator creates a new history migrator
 func NewHistoryMigrator(
-	legacyStore legacy.HistoryStore,
 	dagRunStore models.DAGRunStore,
 	dagStore models.DAGStore,
 	dataDir string,
 	dagsDir string,
 ) *HistoryMigrator {
 	return &HistoryMigrator{
-		legacyStore: legacyStore,
 		dagRunStore: dagRunStore,
 		dagStore:    dagStore,
 		dataDir:     dataDir,
@@ -451,7 +447,7 @@ func (m *HistoryMigrator) MoveLegacyData(ctx context.Context) error {
 		}
 
 		dirPath := filepath.Join(m.dataDir, entry.Name())
-		
+
 		// Check if this directory contains .dat files (legacy history)
 		files, err := os.ReadDir(dirPath)
 		if err != nil {

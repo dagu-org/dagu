@@ -6,7 +6,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/migration"
-	"github.com/dagu-org/dagu/internal/persistence/filedag"
 	"github.com/spf13/cobra"
 )
 
@@ -20,7 +19,7 @@ func CmdMigrate() *cobra.Command {
 Available subcommands:
   history - Migrate DAG run history from v1.16 format to v1.17+ format`,
 	}
-	
+
 	cmd.AddCommand(MigrateHistoryCommand())
 	return cmd
 }
@@ -42,10 +41,10 @@ Example:
   dagu migrate history
   dagu migrate history --skip-backup`,
 	}
-	
+
 	var skipBackup bool
 	cmd.Flags().BoolVar(&skipBackup, "skip-backup", false, "Skip creating backup of legacy data")
-	
+
 	return NewCommand(cmd, nil, func(ctx *Context, args []string) error {
 		return runMigration(ctx, skipBackup)
 	})
@@ -53,39 +52,38 @@ Example:
 
 func runMigration(ctx *Context, skipBackup bool) error {
 	logger.Info(ctx.Context, "Starting history migration")
-	
+
 	// Create DAG store for loading DAG definitions
 	dagStore, err := ctx.dagStore(nil, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create DAG store: %w", err)
 	}
-	
+
 	// Create migrator
 	migrator := migration.NewHistoryMigrator(
-		ctx.LegacyStore,
 		ctx.DAGRunStore,
 		dagStore,
 		ctx.Config.Paths.DataDir,
 		ctx.Config.Paths.DAGsDir,
 	)
-	
+
 	// Check if migration is needed
 	needsMigration, err := migrator.NeedsMigration(ctx.Context)
 	if err != nil {
 		return fmt.Errorf("failed to check migration status: %w", err)
 	}
-	
+
 	if !needsMigration {
 		logger.Info(ctx.Context, "No legacy history data found, migration not needed")
 		return nil
 	}
-	
+
 	// Run migration
 	result, err := migrator.Migrate(ctx.Context)
 	if err != nil {
 		return fmt.Errorf("migration failed: %w", err)
 	}
-	
+
 	// Report results
 	logger.Info(ctx.Context, "Migration completed",
 		"total_dags", result.TotalDAGs,
@@ -94,7 +92,7 @@ func runMigration(ctx *Context, skipBackup bool) error {
 		"skipped", result.SkippedRuns,
 		"failed", result.FailedRuns,
 	)
-	
+
 	if len(result.Errors) > 0 {
 		logger.Warn(ctx.Context, "Migration completed with errors", "error_count", len(result.Errors))
 		for i, err := range result.Errors {
@@ -106,7 +104,7 @@ func runMigration(ctx *Context, skipBackup bool) error {
 			logger.Warn(ctx.Context, "Additional errors omitted", "count", len(result.Errors)-10)
 		}
 	}
-	
+
 	// Move legacy data to archive if migration was successful
 	if result.FailedRuns == 0 || skipBackup {
 		if err := migrator.MoveLegacyData(ctx.Context); err != nil {
@@ -117,7 +115,6 @@ func runMigration(ctx *Context, skipBackup bool) error {
 		logger.Info(ctx.Context, "Legacy data not moved due to migration errors", "failed_runs", result.FailedRuns)
 		logger.Info(ctx.Context, "Fix errors and run migration again to complete the process")
 	}
-	
+
 	return nil
 }
-
