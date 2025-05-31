@@ -44,6 +44,8 @@ jobs:
           file: Dockerfile
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
+          build-args: |
+            LDFLAGS=-X 'main.version=${{ env.VERSION }}-${{ github.sha }}'
           tags: |
             ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}
@@ -83,6 +85,8 @@ jobs:
           file: Dockerfile.dev
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
+          build-args: |
+            LDFLAGS=-X 'main.version=${{ env.VERSION }}-${{ github.sha }}'
           tags: |
             ghcr.io/${{ github.repository }}:dev
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}-dev
@@ -122,6 +126,8 @@ jobs:
           file: Dockerfile.alpine
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
+          build-args: |
+            LDFLAGS=-X 'main.version=${{ env.VERSION }}-${{ github.sha }}'
           tags: |
             ghcr.io/${{ github.repository }}:alpine
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}-alpine
