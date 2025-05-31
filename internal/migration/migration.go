@@ -427,28 +427,59 @@ func (m *HistoryMigrator) loadDAGForMigration(ctx context.Context, statusDagName
 	}, nil
 }
 
-// MoveLegacyData moves the legacy history directory to an archive location after successful migration
+// MoveLegacyData moves individual legacy DAG directories to an archive location after successful migration
 func (m *HistoryMigrator) MoveLegacyData(ctx context.Context) error {
-	historyDir := filepath.Join(m.dataDir, "history")
 	archiveDir := filepath.Join(m.dataDir, fmt.Sprintf("history_migrated_%s", time.Now().Format("20060102_150405")))
 
-	// Check if history directory exists
-	if _, err := os.Stat(historyDir); os.IsNotExist(err) {
-		return nil // Nothing to move
+	// Create archive directory
+	if err := os.MkdirAll(archiveDir, 0755); err != nil {
+		return fmt.Errorf("failed to create archive directory: %w", err)
 	}
 
-	logger.Info(ctx, "Moving legacy history to archive", "from", historyDir, "to", archiveDir)
+	logger.Info(ctx, "Moving legacy history directories to archive", "archive_dir", archiveDir)
 
-	// Ensure parent directory exists
-	if err := os.MkdirAll(filepath.Dir(archiveDir), 0755); err != nil {
-		return fmt.Errorf("failed to create archive parent directory: %w", err)
+	// Read data directory entries
+	entries, err := os.ReadDir(m.dataDir)
+	if err != nil {
+		return fmt.Errorf("failed to read data directory: %w", err)
 	}
 
-	// Rename the directory to archive it
-	if err := os.Rename(historyDir, archiveDir); err != nil {
-		return fmt.Errorf("failed to move legacy history directory: %w", err)
+	movedCount := 0
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		dirPath := filepath.Join(m.dataDir, entry.Name())
+		
+		// Check if this directory contains .dat files (legacy history)
+		files, err := os.ReadDir(dirPath)
+		if err != nil {
+			continue
+		}
+
+		hasDataFiles := false
+		for _, file := range files {
+			if strings.HasSuffix(file.Name(), ".dat") {
+				hasDataFiles = true
+				break
+			}
+		}
+
+		if !hasDataFiles {
+			continue
+		}
+
+		// Move this legacy directory to archive
+		archivePath := filepath.Join(archiveDir, entry.Name())
+		if err := os.Rename(dirPath, archivePath); err != nil {
+			logger.Warn(ctx, "Failed to move legacy directory", "dir", entry.Name(), "error", err)
+		} else {
+			movedCount++
+			logger.Debug(ctx, "Moved legacy directory", "dir", entry.Name())
+		}
 	}
 
-	logger.Info(ctx, "Legacy history data archived successfully", "location", archiveDir)
+	logger.Info(ctx, "Legacy history data archived successfully", "location", archiveDir, "directories_moved", movedCount)
 	return nil
 }
