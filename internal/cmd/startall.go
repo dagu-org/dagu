@@ -40,6 +40,12 @@ func runStartAll(ctx *Context, _ []string) error {
 		ctx.Config.Paths.DAGsDir = dagsDir
 	}
 
+	// Run auto-migration if needed
+	if err := AutoMigrate(ctx); err != nil {
+		logger.Error(ctx, "Failed to run auto-migration", "error", err)
+		// Continue with startup even if migration fails
+	}
+
 	scheduler, err := ctx.NewScheduler()
 	if err != nil {
 		return fmt.Errorf("failed to initialize scheduler: %w", err)

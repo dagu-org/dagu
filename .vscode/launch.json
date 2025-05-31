@@ -43,6 +43,14 @@
       "mode": "auto",
       "program": "${workspaceFolder}/cmd/",
       "args": ["enqueue", "${input:pathToSpec}"]
+    },
+    {
+      "name": "Migrate",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/cmd/",
+      "args": ["migrate", "history"]
     }
   ],
   "inputs": [

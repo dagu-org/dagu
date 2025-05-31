@@ -38,6 +38,12 @@ var serverFlags = []commandLineFlag{dagsFlag, hostFlag, portFlag}
 func runServer(ctx *Context, _ []string) error {
 	logger.Info(ctx, "Server initialization", "host", ctx.Config.Server.Host, "port", ctx.Config.Server.Port)
 
+	// Run auto-migration if needed
+	if err := AutoMigrate(ctx); err != nil {
+		logger.Error(ctx, "Failed to run auto-migration", "error", err)
+		// Continue with server startup even if migration fails
+	}
+
 	server, err := ctx.NewServer()
 	if err != nil {
 		return fmt.Errorf("failed to initialize server: %w", err)
