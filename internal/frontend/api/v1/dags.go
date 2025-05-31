@@ -17,7 +17,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/models"
-	"github.com/dagu-org/dagu/internal/persistence/localdagrun"
+	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/samber/lo"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/japanese"
@@ -320,7 +320,7 @@ func (a *API) readLog(
 	var logFile string
 
 	if statusFile != "" {
-		status, err := localdagrun.ParseStatusFile(statusFile)
+		status, err := filedagrun.ParseStatusFile(statusFile)
 		if err != nil {
 			return nil, err
 		}
@@ -355,7 +355,7 @@ func (a *API) readStepLog(
 	var status *models.DAGRunStatus
 
 	if statusFile != "" {
-		parsedStatus, err := localdagrun.ParseStatusFile(statusFile)
+		parsedStatus, err := filedagrun.ParseStatusFile(statusFile)
 		if err != nil {
 			return nil, err
 		}
