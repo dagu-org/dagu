@@ -164,6 +164,15 @@ func TestDAGExecution(t *testing.T) {
 				"OUT4": "baz",
 			},
 		},
+		{
+			name: "Shell options",
+			dag:  "shellopts.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": []test.Contains{
+					"hello world",
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {

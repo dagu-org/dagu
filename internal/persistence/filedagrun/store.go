@@ -226,7 +226,10 @@ func (store *Store) collectStatusesFromRoots(
 	wg.Wait()
 
 	sort.Slice(results, func(i, j int) bool {
-		return results[i].CreatedAt > results[j].CreatedAt
+		if results[i].CreatedAt != results[j].CreatedAt {
+			return results[i].CreatedAt > results[j].CreatedAt
+		}
+		return results[i].DAGRunID < results[j].DAGRunID
 	})
 	if len(results) > opts.Limit {
 		results = results[:opts.Limit]
