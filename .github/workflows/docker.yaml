@@ -24,6 +24,8 @@ jobs:
           # Remove 'v' prefix from tag
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+          # Get short SHA (first 7 characters)
+          echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -45,7 +47,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           build-args: |
-            LDFLAGS=-X 'main.version=${{ env.VERSION }}-${{ github.sha }}'
+            LDFLAGS=-X 'main.version=${{ env.VERSION }}-${{ env.SHORT_SHA }}'
           tags: |
             ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}
@@ -65,6 +67,8 @@ jobs:
           # Remove 'v' prefix from tag
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+          # Get short SHA (first 7 characters)
+          echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -86,7 +90,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           build-args: |
-            LDFLAGS=-X 'main.version=${{ env.VERSION }}-${{ github.sha }}'
+            LDFLAGS=-X 'main.version=${{ env.VERSION }}-${{ env.SHORT_SHA }}'
           tags: |
             ghcr.io/${{ github.repository }}:dev
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}-dev
@@ -106,6 +110,8 @@ jobs:
           # Remove 'v' prefix from tag
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+          # Get short SHA (first 7 characters)
+          echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -127,7 +133,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           build-args: |
-            LDFLAGS=-X 'main.version=${{ env.VERSION }}-${{ github.sha }}'
+            LDFLAGS=-X 'main.version=${{ env.VERSION }}-${{ env.SHORT_SHA }}'
           tags: |
             ghcr.io/${{ github.repository }}:alpine
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}-alpine
