@@ -1,0 +1,7 @@
+steps:
+  - name: step1
+    description: test step
+    command: |
+      echo 'hello world' && ls -al /
+    shell: /bin/zsh -o errexit -o xtrace -o pipefail -c
+    output: OUT1
