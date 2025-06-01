@@ -82,9 +82,10 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 	hbCtx, cancel := context.WithCancel(ctx)
 	p.cancel = cancel
 
-	// Write the initial heartbeat timestamp
-	body := fmt.Sprintf("%d", time.Now().Unix())
-	if _, err := fd.WriteAt([]byte(body), 0); err != nil {
+	// Write the initial heartbeat timestamp in binary format
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, uint64(time.Now().Unix()))
+	if _, err := fd.WriteAt(buf, 0); err != nil {
 		_ = fd.Close()
 		if err := os.Remove(p.fileName); err != nil {
 			logger.Error(ctx, "Failed to remove heartbeat file", "err", err)
