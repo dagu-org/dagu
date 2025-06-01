@@ -91,26 +91,34 @@ func (pg *ProcGroup) isStale(ctx context.Context, file string) bool {
 	data, err := os.ReadFile(file) // nolint:gosec
 	if err != nil {
 		logger.Warn(ctx, "failed to read file %s: %v", file, err)
-		return false
+		// If we can't read the file, consider it stale
+		return true
 	}
 
-	var unixTime int64
-
-	// It is assumed that the first 8 bytes of the file contain a timestamp in nanoseconds (unix time).
+	// It is assumed that the first 8 bytes of the file contain a timestamp in seconds (unix time).
 	if len(data) < 8 {
-		logger.Warn(ctx, "file %s is too short, expected at least 8 bytes", file)
-		return false
+		logger.Warn(ctx, "file %s is too short (got %d bytes, expected at least 8), considering it stale", file, len(data))
+		return true
 	}
 
 	// Parse the timestamp from the file
-	unixTime = int64(binary.BigEndian.Uint64(data[:8])) // nolint:gosec
-	parsedTime := time.Unix
-	duration := time.Since(time.Unix(unixTime, 0))
+	unixTime := int64(binary.BigEndian.Uint64(data[:8])) // nolint:gosec
+	
+	// Validate the timestamp is reasonable (not in the future, not too old)
+	now := time.Now()
+	parsedTime := time.Unix(unixTime, 0)
+	
+	if parsedTime.After(now.Add(5 * time.Minute)) {
+		logger.Warn(ctx, "proc file %s has timestamp in the future (%s), considering it stale", file, parsedTime)
+		return true
+	}
+	
+	duration := now.Sub(parsedTime)
 	if duration < pg.staleTime {
-		logger.Debug(ctx, "proc file %s is not stale, last modified at %s", file, parsedTime)
+		logger.Debug(ctx, "proc file %s is not stale, last heartbeat at %s (%v ago)", file, parsedTime, duration)
 		return false
 	}
-	logger.Debug(ctx, "proc file %s is stale, last modified at %s", file, parsedTime)
+	logger.Debug(ctx, "proc file %s is stale, last heartbeat at %s (%v ago, threshold: %v)", file, parsedTime, duration, pg.staleTime)
 	return true
 }
 

@@ -30,15 +30,18 @@ ARG USER_GID=$USER_UID
 
 # Install common tools
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && \
-    apt-get install -y \
+# Add retry logic and use specific mirror if needed
+RUN --mount=type=cache,target=/var/cache/apt \
+    --mount=type=cache,target=/var/lib/apt \
+    set -ex && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
     sudo \
     git \
     curl \
     wget \
     zip \
     unzip \
-    sudo \
     tzdata \
     build-essential \
     jq \
@@ -47,6 +50,7 @@ RUN apt-get update && \
     openjdk-11-jdk \
     nodejs \
     npm \
+    ca-certificates \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

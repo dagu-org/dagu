@@ -2,7 +2,6 @@ package dagrun
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -225,14 +224,7 @@ func (m *Manager) IsRunning(ctx context.Context, dag *digraph.DAG, dagRunID stri
 func (m *Manager) GetCurrentStatus(ctx context.Context, dag *digraph.DAG, dagRunID string) (*models.DAGRunStatus, error) {
 	status, err := m.currentStatus(ctx, dag, dagRunID)
 	if err != nil {
-		// No such file or directory
-		if errors.Is(err, os.ErrNotExist) {
-			goto FALLBACK
-		}
-		if errors.Is(err, sock.ErrTimeout) {
-			goto FALLBACK
-		}
-		return nil, fmt.Errorf("failed to get current status: %w", err)
+		goto FALLBACK
 	}
 	return status, nil
 
