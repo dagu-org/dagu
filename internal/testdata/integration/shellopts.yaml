@@ -3,5 +3,5 @@ steps:
     description: test step
     command: |
       echo 'hello world' && ls -al /
-    shell: /bin/zsh -o errexit -o xtrace -o pipefail -c
+    shell: bash -o errexit -o xtrace -o pipefail -c
     output: OUT1
