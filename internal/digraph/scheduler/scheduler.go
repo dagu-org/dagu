@@ -249,10 +249,6 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 
 				ctx = node.SetupContextBeforeExec(ctx)
 
-				defer func() {
-					_ = sc.teardownNode(ctx, node)
-				}()
-
 			ExecRepeat: // repeat execution
 				for setupSucceed && !sc.isCanceled() {
 					execErr := sc.execNode(ctx, node)
