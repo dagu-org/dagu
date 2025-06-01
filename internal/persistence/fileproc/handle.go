@@ -84,7 +84,7 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 
 	// Write the initial heartbeat timestamp in binary format
 	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, uint64(time.Now().Unix()))
+	binary.BigEndian.PutUint64(buf, uint64(time.Now().Unix())) // nolint:gosec
 	if _, err := fd.WriteAt(buf, 0); err != nil {
 		_ = fd.Close()
 		if err := os.Remove(p.fileName); err != nil {
