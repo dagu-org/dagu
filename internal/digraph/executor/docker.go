@@ -103,6 +103,7 @@ type docker struct {
 	autoRemove    bool
 	step          digraph.Step
 	stdout        io.Writer
+	stderr        io.Writer
 	context       context.Context
 	cancel        func()
 	// containerConfig is the configuration for new container creation
@@ -124,7 +125,7 @@ func (e *docker) SetStdout(out io.Writer) {
 }
 
 func (e *docker) SetStderr(out io.Writer) {
-	e.stdout = out
+	e.stderr = out
 }
 
 func (e *docker) Kill(_ os.Signal) error {
@@ -304,7 +305,7 @@ func (e *docker) execInContainer(ctx context.Context, cli *client.Client, args [
 
 	// Copy output
 	go func() {
-		if _, err := stdcopy.StdCopy(e.stdout, e.stdout, resp.Reader); err != nil {
+		if _, err := stdcopy.StdCopy(e.stdout, e.stderr, resp.Reader); err != nil {
 			logger.Error(ctx, "docker executor: stdcopy", "err", err)
 		}
 	}()
@@ -347,7 +348,7 @@ func (e *docker) attachAndWait(ctx context.Context, cli *client.Client, containe
 	}
 
 	go func() {
-		if _, err := stdcopy.StdCopy(e.stdout, e.stdout, out); err != nil {
+		if _, err := stdcopy.StdCopy(e.stdout, e.stderr, out); err != nil {
 			logger.Error(ctx, "docker executor: stdcopy", "err", err)
 		}
 	}()
@@ -467,6 +468,7 @@ func newDocker(
 		pull:            pull,
 		step:            step,
 		stdout:          os.Stdout,
+		stderr:          os.Stderr,
 		containerConfig: containerConfig,
 		hostConfig:      hostConfig,
 		networkConfig:   networkConfig,
