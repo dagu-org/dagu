@@ -99,6 +99,7 @@ var (
 	)
 )
 
+// SplitCommand splits a command string into a command and its arguments.
 func SplitCommand(cmd string) (string, []string, error) {
 	pipeline, err := ParsePipedCommand(cmd)
 	if err != nil {
