@@ -1409,7 +1409,6 @@ components:
             type: string
       required:
         - name
-        - location
 
     Schedule:
       type: object
@@ -1546,7 +1545,6 @@ components:
             type: string
       required:
         - name
-        - location
 
     HandlerOn:
       type: object
@@ -1585,9 +1583,6 @@ components:
           $ref: "#/components/schemas/Status"
         statusLabel:
           $ref: "#/components/schemas/StatusLabel"
-        pid:
-          type: integer
-          description: "Process ID of the DAG-run"
         queuedAt:
           type: string
           description: "RFC 3339 timestamp when the DAG-run was queued"

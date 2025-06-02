@@ -110,12 +110,6 @@ function DAGStatusOverview({
             {status.statusLabel}
           </StatusChip>
 
-          {status.pid && (
-            <div className="flex items-center text-xs text-slate-500 dark:text-slate-400">
-              <Terminal className="h-3 w-3 mr-0.5" />
-              <span>PID: {status.pid}</span>
-            </div>
-          )}
         </div>
 
         {status.dagRunId && (
@@ -152,12 +146,6 @@ function DAGStatusOverview({
           </StatusChip>
         </div>
 
-        {status.pid && (
-          <div className="flex items-center text-xs text-slate-500 dark:text-slate-400">
-            <Terminal className="h-3 w-3 mr-0.5" />
-            <span>PID: {status.pid}</span>
-          </div>
-        )}
 
         {status.dagRunId && (
           <div className="space-y-1">
