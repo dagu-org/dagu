@@ -47,7 +47,6 @@ var (
 	ErrStepNameRequired                    = errors.New("step name must be specified")
 	ErrStepNameDuplicate                   = errors.New("step name must be unique")
 	ErrStepNameTooLong                     = errors.New("step name must be less than 40 characters")
-	ErrStepNameInvalidChars                = errors.New("step name must only contain alphanumeric characters, dashes, dots, underscores, and spaces")
 	ErrStepCommandIsRequired               = errors.New("step command is required")
 	ErrStepCommandIsEmpty                  = errors.New("step command is empty")
 	ErrStepCommandMustBeArrayOrString      = errors.New("step command must be an array of strings or a string")

@@ -748,10 +748,6 @@ func validateStep(_ BuildContext, def stepDef, step *Step) error {
 		return wrapError("name", step.Name, ErrStepNameTooLong)
 	}
 
-	if !regexStepName.MatchString(step.Name) {
-		return wrapError("name", step.Name, ErrStepNameInvalidChars)
-	}
-
 	// TODO: Validate executor config for each executor type.
 
 	if step.Command == "" {
@@ -762,10 +758,6 @@ func validateStep(_ BuildContext, def stepDef, step *Step) error {
 
 	return nil
 }
-
-// regexStepName is a regular expression that matches valid step names.
-// It allows alphanumeric characters, underscores, hyphens, dots, and spaces.
-var regexStepName = regexp.MustCompile(`^[a-zA-Z0-9_][a-zA-Z0-9 _.-]*$`)
 
 // maxStepNameLen is the maximum length of a step name.
 const maxStepNameLen = 40
