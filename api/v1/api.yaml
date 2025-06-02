@@ -587,9 +587,6 @@ components:
           $ref: "#/components/schemas/RunStatus"
         StatusText:
           $ref: "#/components/schemas/RunStatusText"
-        Pid:
-          type: integer
-          description: "Process ID of the dag-run"
         StartedAt:
           type: string
           description: "RFC 3339 timestamp when the dag-run started"
@@ -681,9 +678,6 @@ components:
       type: object
       description: "Detailed DAG configuration information"
       properties:
-        Location:
-          type: string
-          description: "Path to the DAG file"
         Group:
           type: string
           description: "Logical grouping of related DAGs for organizational purposes"
@@ -770,9 +764,6 @@ components:
           $ref: "#/components/schemas/RunStatus"
         StatusText:
           $ref: "#/components/schemas/RunStatusText"
-        Pid:
-          type: integer
-          description: "Process ID of the dag-run"
         Nodes:
           type: array
           description: "Status of individual steps within the DAG"
