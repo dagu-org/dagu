@@ -346,7 +346,9 @@ func (e *docker) attachAndWait(ctx context.Context, cli *client.Client, containe
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer func() {
+		_ = out.Close()
+	}()
 
 	var wg sync.WaitGroup
 	wg.Add(1)
