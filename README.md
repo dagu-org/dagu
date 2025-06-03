@@ -75,6 +75,12 @@ This release wouldn’t exist without the community’s time, sweat, and ideas. 
 
 To try the beta: `docker run --rm -p 8080:8080 ghcr.io/dagu-org/dagu:latest dagu start-all`
 
+## 📢 Updates
+
+- **2025-05-30**: [v1.17.0-beta](https://github.com/dagu-org/dagu/releases) - Major UI improvements, hierarchical execution, and performance enhancements
+
+For complete history, see [CHANGELOG.md](./CHANGELOG.md) | Join our [Discord](https://discord.gg/gpahPUjGRk) for discussions and support
+
 ## Overview
 
 Dagu is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.
@@ -83,6 +89,8 @@ Dagu’s design emphasizes minimal external dependencies: it operates solely as 
 
 <h2><b>Table of Contents</b></h2>
 
+- [📢 Updates](#-updates)
+- [Overview](#overview)
 - [Key Attributes](#key-attributes)
 - [Use Cases](#use-cases)
 - [Community](#community)

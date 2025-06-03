@@ -1,3 +1,201 @@
+<a id="v1.17.0-beta.7"></a>
+# [v1.17.0-beta.7](https://github.com/dagu-org/dagu/releases/tag/v1.17.0-beta.7) - 2025-06-03
+
+## Changelog
+* [`0dfafd647e`](https://github.com/dagu-org/dagu/commit/0dfafd647e226aa4bf281ae6cd72a70d2adbcf76) [[#965](https://github.com/dagu-org/dagu/issues/965)] Fix: docker executor does not print stderr log ([#981](https://github.com/dagu-org/dagu/issues/981))
+
+
+
+[Changes][v1.17.0-beta.7]
+
+
+<a id="v1.17.0-beta.6"></a>
+# [v1.17.0-beta.6](https://github.com/dagu-org/dagu/releases/tag/v1.17.0-beta.6) - 2025-06-02
+
+## Changelog
+* [`a3d73a41fc`](https://github.com/dagu-org/dagu/commit/a3d73a41fcc23095af47587bf4600d283b18abf0) [[#965](https://github.com/dagu-org/dagu/issues/965)] fix: remove restrictive step name validation ([#980](https://github.com/dagu-org/dagu/issues/980))
+
+
+
+[Changes][v1.17.0-beta.6]
+
+
+<a id="v1.17.0-beta.5"></a>
+# [v1.17.0-beta.5](https://github.com/dagu-org/dagu/releases/tag/v1.17.0-beta.5) - 2025-06-01
+
+## Changelog
+* [`85936abd63`](https://github.com/dagu-org/dagu/commit/85936abd63a34106c2f5b19fb018ed7225536ca7) [[#967](https://github.com/dagu-org/dagu/issues/967)] fix: shell options are not working ([#974](https://github.com/dagu-org/dagu/issues/974))
+
+
+
+[Changes][v1.17.0-beta.5]
+
+
+<a id="v1.17.0-beta.4"></a>
+# [v1.17.0-beta.4](https://github.com/dagu-org/dagu/releases/tag/v1.17.0-beta.4) - 2025-06-01
+
+## Changelog
+* [`c87ad77d13`](https://github.com/dagu-org/dagu/commit/c87ad77d13a66eb9c989f8eb70dc75c7cc7e7854) Fix: version name issue ([#973](https://github.com/dagu-org/dagu/issues/973))
+
+
+
+[Changes][v1.17.0-beta.4]
+
+
+<a id="v1.17.0-beta.3"></a>
+# [v1.17.0-beta.3](https://github.com/dagu-org/dagu/releases/tag/v1.17.0-beta.3) - 2025-05-31
+
+## Changelog
+* [`2967d22849`](https://github.com/dagu-org/dagu/commit/2967d22849e77b7013028b9388a7dc6195dba95d) [fb-next] Command for migrating history data from v1.16.x to v1.17.x ([#969](https://github.com/dagu-org/dagu/issues/969))
+
+
+
+[Changes][v1.17.0-beta.3]
+
+
+<a id="v1.17.0-beta.2"></a>
+# [v1.17.0-beta.2](https://github.com/dagu-org/dagu/releases/tag/v1.17.0-beta.2) - 2025-05-31
+
+## Changelog
+* [`5cb885a718`](https://github.com/dagu-org/dagu/commit/5cb885a718edcf5aca55af0db387b2abd00a571e) [[#965](https://github.com/dagu-org/dagu/issues/965)] fix: 404 error for different host name and port ([#966](https://github.com/dagu-org/dagu/issues/966))
+
+
+
+[Changes][v1.17.0-beta.2]
+
+
+<a id="v1.17.0-beta.1"></a>
+# [v1.17.0-beta.1](https://github.com/dagu-org/dagu/releases/tag/v1.17.0-beta.1) - 2025-05-30
+
+**🚀 Version 1.17.0-beta.1 Available - Significant Improvements & New Features**
+
+We're excited to announce the beta release of Dagu 1.17.0! This release brings many improvements and new features while maintaining the core stability you rely on.
+
+**Key Features in 1.17.0:**
+- 🎯 **Improved Performance**: Refactored execution history data for more performant history lookup
+- 🔄 **Hierarchical Execution**: Added capability for nested DAG execution
+- 🎨 **Enhanced Web UI**: Overall UI improvements with better user experience
+- 📊 **Advanced History Search**: New execution history page with date-range and status filters ([#933](https://github.com/dagu-org/dagu/issues/933))
+- 🐛 **Better Debugging**: 
+  - Display actual results of precondition evaluations ([#918](https://github.com/dagu-org/dagu/issues/918))
+  - Show output variable values in the UI ([#916](https://github.com/dagu-org/dagu/issues/916))
+  - Separate logs for stdout and stderr by default ([#687](https://github.com/dagu-org/dagu/issues/687))
+- 📋 **Queue Management**: Added enqueue functionality for API and UI ([#938](https://github.com/dagu-org/dagu/issues/938))
+- 🏗️ **API v2**: New `/api/v2` endpoints with refactored schema and better abstractions ([OpenAPI spec](./api/v2/api.yaml))
+- 🔧 **Various Enhancements**: Including [#925](https://github.com/dagu-org/dagu/issues/925), [#898](https://github.com/dagu-org/dagu/issues/898), [#895](https://github.com/dagu-org/dagu/issues/895), [#868](https://github.com/dagu-org/dagu/issues/868), [#903](https://github.com/dagu-org/dagu/issues/903), [#911](https://github.com/dagu-org/dagu/issues/911), [#913](https://github.com/dagu-org/dagu/issues/913), [#921](https://github.com/dagu-org/dagu/issues/921), [#923](https://github.com/dagu-org/dagu/issues/923), [#887](https://github.com/dagu-org/dagu/issues/887), [#922](https://github.com/dagu-org/dagu/issues/922), [#932](https://github.com/dagu-org/dagu/issues/932), [#962](https://github.com/dagu-org/dagu/issues/962)
+
+**⚠️ Note on History Data**: Due to internal improvements, history data from 1.16.x requires migration to work with 1.17.0. Most of other functionality remains stable and compatible except for a few changes. We're committed to maintaining full backward compatibility as much as possible in future releases.
+
+### ❤️ Huge Thanks to Our Contributors
+
+This release wouldn’t exist without the community’s time, sweat, and ideas. In particular:
+
+| Contribution | Author |
+|--------------|--------|
+| Implemented queue functionality | [@kriyanshii](https://github.com/kriyanshii) |
+| Optimized Docker image size **and** split into three baseline images | [@jerry-yuan](https://github.com/jerry-yuan) |
+| Allow specifying container name & image platform) | [@vnghia](https://github.com/vnghia) |
+| Enhanced repeat-policy – conditions, expected output, and exit codes | [@thefishhat](https://github.com/thefishhat) |
+| Countless insightful reviews & feedback | [@ghansham](https://github.com/ghansham) |
+
+*Thank you all for pushing Dagu forward! 💙*
+
+**Your feedback is valuable!** Please test the beta and share your experience:
+- 💬 [Join our Discord](https://discord.gg/gpahPUjGRk) for discussions
+- 🐛 [Report issues on GitHub](https://github.com/dagu-org/dagu/issues)
+
+To try the beta: `docker run ghcr.io/dagu-org/dagu:1.17.0-beta.1 dagu start-all`
+
+**Full Changelog**: https://github.com/dagu-org/dagu/compare/v1.16.12...v1.17.0-beta.1
+
+## Contributors
+
+<a href="https://github.com/ghansham"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fghansham.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@ghansham"></a>
+<a href="https://github.com/jerry-yuan"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fjerry-yuan.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@jerry-yuan"></a>
+<a href="https://github.com/kriyanshii"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fkriyanshii.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@kriyanshii"></a>
+<a href="https://github.com/thefishhat"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fthefishhat.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@thefishhat"></a>
+<a href="https://github.com/vnghia"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fvnghia.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@vnghia"></a>
+
+[Changes][v1.17.0-beta.1]
+
+
+<a id="v1.16.12"></a>
+# [v1.16.12](https://github.com/dagu-org/dagu/releases/tag/v1.16.12) - 2025-05-20
+
+This release incledes a small follow-up fix to v1.16.11.
+
+## Changelog
+* [`73386c947f`](https://github.com/dagu-org/dagu/commit/73386c947fb2664bfb4be522963638c99a62bc5a) [[#946](https://github.com/dagu-org/dagu/issues/946)] fix: ensure the same config file is passed down to retry and restart execution as wel ([#948](https://github.com/dagu-org/dagu/issues/948))
+
+
+
+[Changes][v1.16.12]
+
+
+<a id="v1.16.11"></a>
+# [v1.16.11](https://github.com/dagu-org/dagu/releases/tag/v1.16.11) - 2025-05-20
+
+This release includes a minor bug fix addressing [#946](https://github.com/dagu-org/dagu/issues/946), where the scheduler did not pass the custom config file path to DAG executions.
+
+## Changelog
+* [`7a7ddbfcbd`](https://github.com/dagu-org/dagu/commit/7a7ddbfcbd3e41ab4d44e466ae0c28061c55e130) [[#946](https://github.com/dagu-org/dagu/issues/946)] fix: scheduler does not pass config file to DAG executions ([#947](https://github.com/dagu-org/dagu/issues/947))
+
+## What's Changed
+* feat: add `--version` and `--install-dir` options to `installer.sh` by [@yottahmd](https://github.com/yottahmd) in [#944](https://github.com/dagu-org/dagu/pull/944)
+* [[#946](https://github.com/dagu-org/dagu/issues/946)] fix: scheduler does not pass config file to DAG executions by [@yottahmd](https://github.com/yottahmd) in [#947](https://github.com/dagu-org/dagu/pull/947)
+
+
+**Full Changelog**: https://github.com/dagu-org/dagu/compare/v1.16.10...v1.16.11
+
+## Contributors
+
+<a href="https://github.com/yottahmd"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fyottahmd.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@yottahmd"></a>
+
+[Changes][v1.16.11]
+
+
+<a id="v1.16.10"></a>
+# [v1.16.10](https://github.com/dagu-org/dagu/releases/tag/v1.16.10) - 2025-05-16
+
+This release includes a minor fix to the Docker image.
+
+## Changelog
+* [`c4bc4ee075`](https://github.com/dagu-org/dagu/commit/c4bc4ee075c4a0f197387cf6782f426a559f7c83) chore: Fix docker image ([#943](https://github.com/dagu-org/dagu/issues/943))
+
+## What's Changed
+* chore: Fix the `sudoers` issue in the docker image by [@yottahmd](https://github.com/yottahmd) in [#943](https://github.com/dagu-org/dagu/pull/943)
+
+**Full Changelog**: https://github.com/dagu-org/dagu/compare/v1.16.9...v1.16.10
+
+## Contributors
+
+<a href="https://github.com/yottahmd"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fyottahmd.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@yottahmd"></a>
+
+[Changes][v1.16.10]
+
+
+<a id="v1.16.9"></a>
+# [v1.16.9](https://github.com/dagu-org/dagu/releases/tag/v1.16.9) - 2025-05-11
+
+This is a release to fix an issue in loading legacy basic authentication configurations.
+
+## Changelog
+* [`557874ae8f`](https://github.com/dagu-org/dagu/commit/557874ae8f969fe41369587b52ada8e95295f913) [[#926](https://github.com/dagu-org/dagu/issues/926)] fix: set basicauth flag correctly when legacy config key specified ([#929](https://github.com/dagu-org/dagu/issues/929))
+
+## What's Changed
+* ci: add docker-next workflow and docs for next preview image by [@yottahmd](https://github.com/yottahmd) in [#928](https://github.com/dagu-org/dagu/pull/928)
+* [[#926](https://github.com/dagu-org/dagu/issues/926)] fix: set basicauth flag correctly when legacy config key specified by [@yottahmd](https://github.com/yottahmd) in [#929](https://github.com/dagu-org/dagu/pull/929)
+
+
+**Full Changelog**: https://github.com/dagu-org/dagu/compare/v1.16.8...v1.16.9
+
+## Contributors
+
+<a href="https://github.com/yottahmd"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fyottahmd.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@yottahmd"></a>
+
+[Changes][v1.16.9]
+
+
 <a id="v1.16.8"></a>
 # [v1.16.8](https://github.com/dagu-org/dagu/releases/tag/v1.16.8) - 2025-05-01
 
@@ -2265,6 +2463,17 @@ For the internal-use directory path you can set the environment variable `DAGU_H
 [Changes][v1.0.0]
 
 
+[v1.17.0-beta.7]: https://github.com/dagu-org/dagu/compare/v1.17.0-beta.6...v1.17.0-beta.7
+[v1.17.0-beta.6]: https://github.com/dagu-org/dagu/compare/v1.17.0-beta.5...v1.17.0-beta.6
+[v1.17.0-beta.5]: https://github.com/dagu-org/dagu/compare/v1.17.0-beta.4...v1.17.0-beta.5
+[v1.17.0-beta.4]: https://github.com/dagu-org/dagu/compare/v1.17.0-beta.3...v1.17.0-beta.4
+[v1.17.0-beta.3]: https://github.com/dagu-org/dagu/compare/v1.17.0-beta.2...v1.17.0-beta.3
+[v1.17.0-beta.2]: https://github.com/dagu-org/dagu/compare/v1.17.0-beta.1...v1.17.0-beta.2
+[v1.17.0-beta.1]: https://github.com/dagu-org/dagu/compare/v1.16.12...v1.17.0-beta.1
+[v1.16.12]: https://github.com/dagu-org/dagu/compare/v1.16.11...v1.16.12
+[v1.16.11]: https://github.com/dagu-org/dagu/compare/v1.16.10...v1.16.11
+[v1.16.10]: https://github.com/dagu-org/dagu/compare/v1.16.9...v1.16.10
+[v1.16.9]: https://github.com/dagu-org/dagu/compare/v1.16.8...v1.16.9
 [v1.16.8]: https://github.com/dagu-org/dagu/compare/v1.16.7...v1.16.8
 [v1.16.7]: https://github.com/dagu-org/dagu/compare/v1.16.6...v1.16.7
 [v1.16.6]: https://github.com/dagu-org/dagu/compare/v1.16.5...v1.16.6
