@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -131,6 +132,30 @@ func SplitCommand(cmd string) (string, []string, error) {
 
 var ErrCommandIsEmpty = fmt.Errorf("command is empty")
 
+// unquoteToken removes surrounding quotes from a token if present
+func unquoteToken(token string) string {
+	if len(token) < 2 {
+		return token
+	}
+	
+	// Check for matching quotes at start and end
+	if (token[0] == '"' && token[len(token)-1] == '"') ||
+		(token[0] == '\'' && token[len(token)-1] == '\'') {
+		// Try to unquote using strconv.Unquote for double quotes
+		if token[0] == '"' {
+			if unquoted, err := strconv.Unquote(token); err == nil {
+				return unquoted
+			}
+		}
+		// For single quotes, or if strconv.Unquote fails,
+		// just remove the surrounding quotes
+		return token[1 : len(token)-1]
+	}
+	
+	// Don't unquote backticks - they're used for command substitution
+	return token
+}
+
 // ParsePipedCommand splits a shell-style command string into a pipeline ([][]string).
 // Each sub-slice represents a single command. Unquoted "|" tokens define the boundaries.
 //
@@ -146,7 +171,7 @@ var ErrCommandIsEmpty = fmt.Errorf("command is empty")
 //	parsePipedCommand(`echo "hello|world"`) =>
 //	  [][]string{ {"echo", "hello|world"} } // single command
 func ParsePipedCommand(cmdString string) ([][]string, error) {
-	var inQuote, inBacktick, inEscape bool
+	var inQuote, inSingleQuote, inBacktick, inEscape bool
 	var current []rune
 	var tokens []string
 
@@ -158,19 +183,22 @@ func ParsePipedCommand(cmdString string) ([][]string, error) {
 		case r == '\\':
 			current = append(current, r)
 			inEscape = true
-		case r == '"' && !inBacktick:
+		case r == '"' && !inBacktick && !inSingleQuote:
 			current = append(current, r)
 			inQuote = !inQuote
-		case r == '`':
+		case r == '\'' && !inBacktick && !inQuote:
+			current = append(current, r)
+			inSingleQuote = !inSingleQuote
+		case r == '`' && !inSingleQuote:
 			current = append(current, r)
 			inBacktick = !inBacktick
-		case r == '|' && !inQuote && !inBacktick:
+		case r == '|' && !inQuote && !inSingleQuote && !inBacktick:
 			if len(current) > 0 {
 				tokens = append(tokens, string(current))
 				current = nil
 			}
 			tokens = append(tokens, "|")
-		case unicode.IsSpace(r) && !inQuote && !inBacktick:
+		case unicode.IsSpace(r) && !inQuote && !inSingleQuote && !inBacktick:
 			if len(current) > 0 {
 				tokens = append(tokens, string(current))
 				current = nil
@@ -194,7 +222,9 @@ func ParsePipedCommand(cmdString string) ([][]string, error) {
 				currentCmd = nil
 			}
 		} else {
-			currentCmd = append(currentCmd, token)
+			// Unquote the token if it's quoted
+			unquoted := unquoteToken(token)
+			currentCmd = append(currentCmd, unquoted)
 		}
 	}
 

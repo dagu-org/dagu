@@ -665,14 +665,14 @@ func (oc *OutputCoordinator) closeResources(_ context.Context) error {
 	defer oc.mu.Unlock()
 
 	var lastErr error
-	for _, w := range []*bufio.Writer{oc.stdoutWriter, oc.stdoutRedirectWriter, oc.stderrRedirectWriter} {
+	for _, w := range []*bufio.Writer{oc.stdoutWriter, oc.stderrWriter, oc.stdoutRedirectWriter, oc.stderrRedirectWriter} {
 		if w != nil {
 			if err := w.Flush(); err != nil {
 				lastErr = err
 			}
 		}
 	}
-	for _, f := range []*os.File{oc.stdoutFile, oc.stdoutRedirectFile, oc.StderrRedirectFile} {
+	for _, f := range []*os.File{oc.stdoutFile, oc.stderrFile, oc.stdoutRedirectFile, oc.StderrRedirectFile} {
 		if f != nil {
 			if err := f.Sync(); err != nil {
 				lastErr = err

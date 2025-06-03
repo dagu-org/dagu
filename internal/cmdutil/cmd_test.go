@@ -29,7 +29,15 @@ func TestSplitCommandWithQuotes(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "echo", cmd)
 		require.Len(t, args, 1)
-		require.Equal(t, `"{\"key\":\"value\"}"`, args[0])
+		require.Equal(t, `{"key":"value"}`, args[0])
+	})
+	t.Run("ShellWithSingleQuotedCommand", func(t *testing.T) {
+		cmd, args, err := SplitCommand(`sh -c 'echo this is stderr >&2'`)
+		require.NoError(t, err)
+		require.Equal(t, "sh", cmd)
+		require.Len(t, args, 2)
+		require.Equal(t, "-c", args[0])
+		require.Equal(t, "echo this is stderr >&2", args[1])
 	})
 }
 
@@ -70,7 +78,7 @@ func TestSplitCommand(t *testing.T) {
 			name:     "command with quoted args",
 			input:    `echo "hello world"`,
 			wantCmd:  "echo",
-			wantArgs: []string{"\"hello world\""},
+			wantArgs: []string{"hello world"},
 		},
 		{
 			name:     "command with pipe",
@@ -88,7 +96,7 @@ func TestSplitCommand(t *testing.T) {
 			name:     "command with quoted pipe",
 			input:    `echo "hello|world"`,
 			wantCmd:  "echo",
-			wantArgs: []string{"\"hello|world\""},
+			wantArgs: []string{"hello|world"},
 		},
 		{
 			name:      "empty command",
@@ -100,13 +108,13 @@ func TestSplitCommand(t *testing.T) {
 			name:     "command with escaped quotes",
 			input:    `echo "\"hello world\""`,
 			wantCmd:  "echo",
-			wantArgs: []string{`"\"hello world\""`},
+			wantArgs: []string{`"hello world"`},
 		},
 		{
 			name:     "command with JSON",
 			input:    `echo "{\n\t\"key\": \"value\"\n}"`,
 			wantCmd:  "echo",
-			wantArgs: []string{`"{\n\t\"key\": \"value\"\n}"`},
+			wantArgs: []string{"{\n\t\"key\": \"value\"\n}"},
 		},
 	}
 
@@ -252,7 +260,7 @@ func TestParsePipedCommand(t *testing.T) {
 		{
 			name:  "command with quoted args",
 			input: `echo "hello world"`,
-			want:  [][]string{{"echo", `"hello world"`}},
+			want:  [][]string{{"echo", `hello world`}},
 		},
 		{
 			name:  "command with pipe",
@@ -267,7 +275,27 @@ func TestParsePipedCommand(t *testing.T) {
 		{
 			name:  "pipe in quotes",
 			input: `echo "hello|world"`,
-			want:  [][]string{{"echo", `"hello|world"`}},
+			want:  [][]string{{"echo", `hello|world`}},
+		},
+		{
+			name:  "command with single quoted args",
+			input: `sh -c 'echo this is stderr >&2'`,
+			want:  [][]string{{"sh", "-c", `echo this is stderr >&2`}},
+		},
+		{
+			name:  "pipe in single quotes",
+			input: `echo 'hello|world'`,
+			want:  [][]string{{"echo", `hello|world`}},
+		},
+		{
+			name:  "mixed single and double quotes",
+			input: `echo "hello" 'world'`,
+			want:  [][]string{{"echo", `hello`, `world`}},
+		},
+		{
+			name:  "single quotes with spaces",
+			input: `echo 'hello world'`,
+			want:  [][]string{{"echo", `hello world`}},
 		},
 		{
 			name:  "multiple spaces between commands",
@@ -287,7 +315,7 @@ func TestParsePipedCommand(t *testing.T) {
 		{
 			name:  "escaped quotes",
 			input: `echo "Hello \"World\""`,
-			want:  [][]string{{"echo", `"Hello \"World\""`}},
+			want:  [][]string{{"echo", `Hello "World"`}},
 		},
 		{
 			name:  "escaped pipe",
@@ -302,14 +330,14 @@ func TestParsePipedCommand(t *testing.T) {
 		{
 			name:  "mixed quotes and backticks",
 			input: "echo \"hello\" world `date`",
-			want:  [][]string{{"echo", `"hello"`, "world", "`date`"}},
+			want:  [][]string{{"echo", `hello`, "world", "`date`"}},
 		},
 		{
 			name:  "complex pipeline",
 			input: `find . -name "*.go" | xargs grep "fmt" | sort | uniq -c`,
 			want: [][]string{
-				{"find", ".", "-name", `"*.go"`},
-				{"xargs", "grep", `"fmt"`},
+				{"find", ".", "-name", `*.go`},
+				{"xargs", "grep", `fmt`},
 				{"sort"},
 				{"uniq", "-c"},
 			},
@@ -358,7 +386,7 @@ func TestParsePipedCommandErrors(t *testing.T) {
 		{
 			name:     "mixed unterminated quotes",
 			input:    "echo \"hello `date`\"",
-			wantPipe: [][]string{{"echo", "\"hello `date`\""}},
+			wantPipe: [][]string{{"echo", "hello `date`"}},
 		},
 	}
 
