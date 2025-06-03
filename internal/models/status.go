@@ -27,7 +27,7 @@ func InitialStatus(dag *digraph.DAG) DAGRunStatus {
 		Name:          dag.Name,
 		Status:        scheduler.StatusNone,
 		PID:           PID(0),
-		Nodes:         FromSteps(dag.Steps),
+		Nodes:         NodesFromSteps(dag.Steps),
 		OnExit:        nodeOrNil(dag.HandlerOn.Exit),
 		OnSuccess:     nodeOrNil(dag.HandlerOn.Success),
 		OnFailure:     nodeOrNil(dag.HandlerOn.Failure),
@@ -55,7 +55,7 @@ func WithHierarchyRefs(root digraph.DAGRunRef, parent digraph.DAGRunRef) StatusO
 // WithNodes returns a StatusOption that sets the node data for the status
 func WithNodes(nodes []scheduler.NodeData) StatusOption {
 	return func(s *DAGRunStatus) {
-		s.Nodes = FromNodes(nodes)
+		s.Nodes = s.setNodes(nodes)
 	}
 }
 
@@ -93,7 +93,7 @@ func WithFinishedAt(t time.Time) StatusOption {
 func WithOnExitNode(node *scheduler.Node) StatusOption {
 	return func(s *DAGRunStatus) {
 		if node != nil {
-			s.OnExit = FromNode(node.NodeData())
+			s.OnExit = newNode(node.NodeData())
 		}
 	}
 }
@@ -102,7 +102,7 @@ func WithOnExitNode(node *scheduler.Node) StatusOption {
 func WithOnSuccessNode(node *scheduler.Node) StatusOption {
 	return func(s *DAGRunStatus) {
 		if node != nil {
-			s.OnSuccess = FromNode(node.NodeData())
+			s.OnSuccess = newNode(node.NodeData())
 		}
 	}
 }
@@ -111,7 +111,7 @@ func WithOnSuccessNode(node *scheduler.Node) StatusOption {
 func WithOnFailureNode(node *scheduler.Node) StatusOption {
 	return func(s *DAGRunStatus) {
 		if node != nil {
-			s.OnFailure = FromNode(node.NodeData())
+			s.OnFailure = newNode(node.NodeData())
 		}
 	}
 }
@@ -120,7 +120,7 @@ func WithOnFailureNode(node *scheduler.Node) StatusOption {
 func WithOnCancelNode(node *scheduler.Node) StatusOption {
 	return func(s *DAGRunStatus) {
 		if node != nil {
-			s.OnCancel = FromNode(node.NodeData())
+			s.OnCancel = newNode(node.NodeData())
 		}
 	}
 }
@@ -245,6 +245,15 @@ func (st *DAGRunStatus) NodeByName(name string) (*Node, error) {
 	return nil, fmt.Errorf("node %s not found", name)
 }
 
+// setNodes converts scheduler NodeData objects to persistence Node objects
+func (s *DAGRunStatus) setNodes(nodes []scheduler.NodeData) []*Node {
+	var ret []*Node
+	for _, node := range nodes {
+		ret = append(ret, newNode(node))
+	}
+	return ret
+}
+
 // PID represents a process ID for a running dag-run
 type PID int
 
@@ -269,5 +278,5 @@ func nodeOrNil(s *digraph.Step) *Node {
 	if s == nil {
 		return nil
 	}
-	return NewNode(*s)
+	return newNodeFromStep(*s)
 }
