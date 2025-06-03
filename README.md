@@ -16,6 +16,7 @@
     <img src="https://godoc.org/github.com/dagu-org/dagu?status.svg" />
   </a>
   <img src="https://github.com/dagu-org/dagu/actions/workflows/ci.yaml/badge.svg" />
+  <a href="https://deepwiki.com/dagu-org/dagu"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
 </p>
 
 <div align="center">
