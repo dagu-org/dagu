@@ -346,8 +346,12 @@ func (e *docker) attachAndWait(ctx context.Context, cli *client.Client, containe
 	if err != nil {
 		return err
 	}
+	defer out.Close()
 
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		if _, err := stdcopy.StdCopy(e.stdout, e.stderr, out); err != nil {
 			logger.Error(ctx, "docker executor: stdcopy", "err", err)
 		}
@@ -366,6 +370,9 @@ func (e *docker) attachAndWait(ctx context.Context, cli *client.Client, containe
 			return fmt.Errorf("exit status %v", status.StatusCode)
 		}
 	}
+
+	// Wait for log copying to complete
+	wg.Wait()
 
 	return nil
 }
