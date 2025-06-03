@@ -31,8 +31,8 @@ ARG USER_GID=$USER_UID
 # Install common tools
 ENV DEBIAN_FRONTEND=noninteractive
 # Add retry logic and use specific mirror if needed
-RUN --mount=type=cache,target=/var/cache/apt \
-    --mount=type=cache,target=/var/lib/apt \
+RUN --mount=type=cache,target=/var/cache/apt,id=apt-cache-$TARGETPLATFORM \
+    --mount=type=cache,target=/var/lib/apt,id=apt-lib-$TARGETPLATFORM \
     set -ex && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
