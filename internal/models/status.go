@@ -175,7 +175,7 @@ func StatusFromJSON(s string) (*DAGRunStatus, error) {
 	if logDir != "" {
 		status.replaceNodePaths(logDir, false)
 	}
-	
+
 	return status, nil
 }
 
@@ -207,7 +207,7 @@ type DAGRunStatus struct {
 func (st DAGRunStatus) MarshalJSON() ([]byte, error) {
 	// Create a deep copy to avoid modifying the original
 	copy := st
-	
+
 	// Deep copy regular nodes since they are pointers
 	if st.Nodes != nil {
 		copy.Nodes = make([]*Node, len(st.Nodes))
@@ -218,7 +218,7 @@ func (st DAGRunStatus) MarshalJSON() ([]byte, error) {
 			}
 		}
 	}
-	
+
 	// Deep copy handler nodes since they are pointers
 	if st.OnExit != nil {
 		exitCopy := *st.OnExit
@@ -236,13 +236,13 @@ func (st DAGRunStatus) MarshalJSON() ([]byte, error) {
 		cancelCopy := *st.OnCancel
 		copy.OnCancel = &cancelCopy
 	}
-	
+
 	// Replace actual paths with placeholders for portability
 	logDir := extractLogDir(st.Log)
 	if logDir != "" {
 		copy.replaceNodePaths(logDir, true)
 	}
-	
+
 	// Use type alias to avoid infinite recursion
 	type Alias DAGRunStatus
 	return json.Marshal(&struct {
@@ -336,12 +336,12 @@ func (st *DAGRunStatus) replaceNodePaths(logDir string, toPlaceholder bool) {
 			node.Stderr = strings.ReplaceAll(node.Stderr, logDirPlaceholder, logDir)
 		}
 	}
-	
+
 	// Process regular nodes
 	for _, node := range st.Nodes {
 		replacePaths(node)
 	}
-	
+
 	// Process handler nodes
 	replacePaths(st.OnExit)
 	replacePaths(st.OnSuccess)
@@ -350,7 +350,7 @@ func (st *DAGRunStatus) replaceNodePaths(logDir string, toPlaceholder bool) {
 }
 
 // logDirPlaceholder is a placeholder for the log directory in the status JSON.
-const logDirPlaceholder = "__INTERNAL_LOG_DIR__"
+const logDirPlaceholder = "__DAGU_LOG_DIR__"
 
 // PID represents a process ID for a running dag-run
 type PID int

@@ -83,12 +83,12 @@ func TestDAGRunStatus_MarshalJSON(t *testing.T) {
 				require.Len(t, nodes, 2)
 
 				node1 := nodes[0].(map[string]any)
-				require.Equal(t, "__INTERNAL_LOG_DIR__/step1.stdout.log", node1["stdout"])
-				require.Equal(t, "__INTERNAL_LOG_DIR__/step1.stderr.log", node1["stderr"])
+				require.Equal(t, "__DAGU_LOG_DIR__/step1.stdout.log", node1["stdout"])
+				require.Equal(t, "__DAGU_LOG_DIR__/step1.stderr.log", node1["stderr"])
 
 				node2 := nodes[1].(map[string]any)
-				require.Equal(t, "__INTERNAL_LOG_DIR__/step2.stdout.log", node2["stdout"])
-				require.Equal(t, "__INTERNAL_LOG_DIR__/step2.stderr.log", node2["stderr"])
+				require.Equal(t, "__DAGU_LOG_DIR__/step2.stdout.log", node2["stdout"])
+				require.Equal(t, "__DAGU_LOG_DIR__/step2.stderr.log", node2["stderr"])
 			},
 		},
 		{
@@ -151,14 +151,14 @@ func TestDAGRunStatus_MarshalJSON(t *testing.T) {
 
 				// First node
 				node1 := nodes[0].(map[string]any)
-				require.Equal(t, "__INTERNAL_LOG_DIR__/step1.stdout.log", node1["stdout"])
+				require.Equal(t, "__DAGU_LOG_DIR__/step1.stdout.log", node1["stdout"])
 
 				// Second node should be nil
 				require.Nil(t, nodes[1])
 
 				// Third node
 				node3 := nodes[2].(map[string]any)
-				require.Equal(t, "__INTERNAL_LOG_DIR__/step3.stderr.log", node3["stderr"])
+				require.Equal(t, "__DAGU_LOG_DIR__/step3.stderr.log", node3["stderr"])
 			},
 		},
 		{
@@ -186,10 +186,10 @@ func TestDAGRunStatus_MarshalJSON(t *testing.T) {
 
 				// Handler nodes should also have their paths replaced with placeholders
 				onExit := result["onExit"].(map[string]any)
-				require.Equal(t, "__INTERNAL_LOG_DIR__/onExit.stdout.log", onExit["stdout"])
+				require.Equal(t, "__DAGU_LOG_DIR__/onExit.stdout.log", onExit["stdout"])
 
 				onFailure := result["onFailure"].(map[string]any)
-				require.Equal(t, "__INTERNAL_LOG_DIR__/onFailure.stdout.log", onFailure["stdout"])
+				require.Equal(t, "__DAGU_LOG_DIR__/onFailure.stdout.log", onFailure["stdout"])
 			},
 		},
 	}
@@ -222,14 +222,14 @@ func TestStatusFromJSON(t *testing.T) {
 				"nodes": [
 					{
 						"step": {"name": "step1"},
-						"stdout": "__INTERNAL_LOG_DIR__/step1.stdout.log",
-						"stderr": "__INTERNAL_LOG_DIR__/step1.stderr.log",
+						"stdout": "__DAGU_LOG_DIR__/step1.stdout.log",
+						"stderr": "__DAGU_LOG_DIR__/step1.stderr.log",
 						"status": 4
 					},
 					{
 						"step": {"name": "step2"},
-						"stdout": "__INTERNAL_LOG_DIR__/step2.stdout.log",
-						"stderr": "__INTERNAL_LOG_DIR__/step2.stderr.log",
+						"stdout": "__DAGU_LOG_DIR__/step2.stdout.log",
+						"stderr": "__DAGU_LOG_DIR__/step2.stderr.log",
 						"status": 2
 					}
 				]
@@ -259,8 +259,8 @@ func TestStatusFromJSON(t *testing.T) {
 				"nodes": [
 					{
 						"step": {"name": "step1"},
-						"stdout": "__INTERNAL_LOG_DIR__/step1.stdout.log",
-						"stderr": "__INTERNAL_LOG_DIR__/step1.stderr.log",
+						"stdout": "__DAGU_LOG_DIR__/step1.stdout.log",
+						"stderr": "__DAGU_LOG_DIR__/step1.stderr.log",
 						"status": 4
 					}
 				]
@@ -270,8 +270,8 @@ func TestStatusFromJSON(t *testing.T) {
 				require.Equal(t, "", status.Log)
 
 				// Placeholders should remain unchanged when no log path
-				require.Equal(t, "__INTERNAL_LOG_DIR__/step1.stdout.log", status.Nodes[0].Stdout)
-				require.Equal(t, "__INTERNAL_LOG_DIR__/step1.stderr.log", status.Nodes[0].Stderr)
+				require.Equal(t, "__DAGU_LOG_DIR__/step1.stdout.log", status.Nodes[0].Stdout)
+				require.Equal(t, "__DAGU_LOG_DIR__/step1.stderr.log", status.Nodes[0].Stderr)
 			},
 		},
 		{
@@ -284,13 +284,13 @@ func TestStatusFromJSON(t *testing.T) {
 				"nodes": [
 					{
 						"step": {"name": "step1"},
-						"stdout": "__INTERNAL_LOG_DIR__/step1.stdout.log",
+						"stdout": "__DAGU_LOG_DIR__/step1.stdout.log",
 						"status": 4
 					},
 					null,
 					{
 						"step": {"name": "step3"},
-						"stderr": "__INTERNAL_LOG_DIR__/step3.stderr.log",
+						"stderr": "__DAGU_LOG_DIR__/step3.stderr.log",
 						"status": 2
 					}
 				]
@@ -317,8 +317,8 @@ func TestStatusFromJSON(t *testing.T) {
 				"nodes": [
 					{
 						"step": {"name": "step1"},
-						"stdout": "__INTERNAL_LOG_DIR__/step1.stdout.log",
-						"stderr": "__INTERNAL_LOG_DIR__/step1.stderr.log",
+						"stdout": "__DAGU_LOG_DIR__/step1.stdout.log",
+						"stderr": "__DAGU_LOG_DIR__/step1.stderr.log",
 						"status": 4
 					}
 				]
@@ -376,25 +376,25 @@ func TestStatusFromJSON(t *testing.T) {
 				"log": "/var/log/dagu/test-dag/test-run-handlers.log",
 				"onExit": {
 					"step": {"name": "cleanup"},
-					"stdout": "__INTERNAL_LOG_DIR__/cleanup.stdout.log",
-					"stderr": "__INTERNAL_LOG_DIR__/cleanup.stderr.log",
+					"stdout": "__DAGU_LOG_DIR__/cleanup.stdout.log",
+					"stderr": "__DAGU_LOG_DIR__/cleanup.stderr.log",
 					"status": 4
 				},
 				"onFailure": {
 					"step": {"name": "notify"},
-					"stdout": "__INTERNAL_LOG_DIR__/notify.stdout.log",
+					"stdout": "__DAGU_LOG_DIR__/notify.stdout.log",
 					"status": 5
 				}
 			}`,
 			validate: func(t *testing.T, status *models.DAGRunStatus) {
 				require.Equal(t, "test-dag", status.Name)
 				require.Equal(t, "/var/log/dagu/test-dag/test-run-handlers.log", status.Log)
-				
+
 				// Check handler nodes have placeholders replaced
 				require.NotNil(t, status.OnExit)
 				require.Equal(t, "/var/log/dagu/test-dag/cleanup.stdout.log", status.OnExit.Stdout)
 				require.Equal(t, "/var/log/dagu/test-dag/cleanup.stderr.log", status.OnExit.Stderr)
-				
+
 				require.NotNil(t, status.OnFailure)
 				require.Equal(t, "/var/log/dagu/test-dag/notify.stdout.log", status.OnFailure.Stdout)
 			},
@@ -417,7 +417,6 @@ func TestStatusFromJSON(t *testing.T) {
 		})
 	}
 }
-
 
 func TestDAGRunStatus_MarshalJSON_DoesNotModifyOriginal(t *testing.T) {
 	// Test that MarshalJSON does not modify the original data
@@ -465,11 +464,11 @@ func TestDAGRunStatus_MarshalJSON_DoesNotModifyOriginal(t *testing.T) {
 
 	nodes := result["nodes"].([]any)
 	node := nodes[0].(map[string]any)
-	require.Equal(t, "__INTERNAL_LOG_DIR__/step1.stdout.log", node["stdout"])
-	require.Equal(t, "__INTERNAL_LOG_DIR__/step1.stderr.log", node["stderr"])
+	require.Equal(t, "__DAGU_LOG_DIR__/step1.stdout.log", node["stdout"])
+	require.Equal(t, "__DAGU_LOG_DIR__/step1.stderr.log", node["stderr"])
 
 	onExit := result["onExit"].(map[string]any)
-	require.Equal(t, "__INTERNAL_LOG_DIR__/onExit.stdout.log", onExit["stdout"])
+	require.Equal(t, "__DAGU_LOG_DIR__/onExit.stdout.log", onExit["stdout"])
 }
 
 func TestDAGRunStatus_MarshalJSON_RoundTrip(t *testing.T) {
