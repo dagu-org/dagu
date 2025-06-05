@@ -156,7 +156,11 @@
     },
     "maxActiveRuns": {
       "type": "integer",
-      "description": "Maximum number of concurrent steps that can be active at once. Especially relevant for DAGs with frequent schedules."
+      "description": "Maximum number of concurrent DAG runs allowed. Useful for limiting resource usage and preventing overload. If exceeded, new runs will be queued until existing ones complete."
+    },
+    "maxActiveSteps": {
+      "type": "integer",
+      "description": "Maximum number of concurrent steps that can be active at once. Useful for limiting resource usage."
     },
     "maxCleanUpTimeSec": {
       "type": "integer",
