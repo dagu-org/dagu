@@ -284,7 +284,22 @@ func (a *Agent) Run(ctx context.Context) error {
 	})
 
 	// Start the dag-run.
-	logger.Debug(ctx, "dag-run started", "dagRunId", a.dagRunID, "name", a.dag.Name, "params", a.dag.Params)
+	if a.retryTarget != nil {
+		logger.Info(ctx, "dag-run retry started",
+			"name", a.dag.Name,
+			"dagRunId", a.dagRunID,
+			"attemptID", a.dagRunAttemptID,
+			"retryTargetAttemptID", a.retryTarget.AttemptID,
+		)
+	} else {
+		logger.Info(ctx, "dag-run started",
+			"name", a.dag.Name,
+			"dagRunId", a.dagRunID,
+			"attemptID", a.dagRunAttemptID,
+			"params", a.dag.Params,
+		)
+	}
+
 	lastErr := a.scheduler.Schedule(ctx, a.graph, progressCh)
 
 	// Update the finished status to the runstore database.
