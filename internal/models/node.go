@@ -25,6 +25,7 @@ type Node struct {
 	OutputVariables *executor.SyncMap    `json:"outputVariables,omitempty"`
 }
 
+// ChildDAGRun represents a child DAG run associated with a node
 type ChildDAGRun struct {
 	DAGRunID string `json:"dagRunId,omitempty"`
 }
@@ -53,8 +54,17 @@ func (n *Node) ToNode() *scheduler.Node {
 	})
 }
 
-// NewNode creates a new Node with default status values for the given step
-func NewNode(step digraph.Step) *Node {
+// NodesFromSteps converts a list of DAG steps to persistence Node objects
+func NodesFromSteps(steps []digraph.Step) []*Node {
+	var ret []*Node
+	for _, s := range steps {
+		ret = append(ret, newNodeFromStep(s))
+	}
+	return ret
+}
+
+// newNodeFromStep creates a new Node with default status values for the given step
+func newNodeFromStep(step digraph.Step) *Node {
 	return &Node{
 		Step:       step,
 		StartedAt:  "-",
@@ -63,26 +73,8 @@ func NewNode(step digraph.Step) *Node {
 	}
 }
 
-// FromSteps converts a list of DAG steps to persistence Node objects
-func FromSteps(steps []digraph.Step) []*Node {
-	var ret []*Node
-	for _, s := range steps {
-		ret = append(ret, NewNode(s))
-	}
-	return ret
-}
-
-// FromNodes converts scheduler NodeData objects to persistence Node objects
-func FromNodes(nodes []scheduler.NodeData) []*Node {
-	var ret []*Node
-	for _, node := range nodes {
-		ret = append(ret, FromNode(node))
-	}
-	return ret
-}
-
-// FromNode converts a single scheduler NodeData to a persistence Node
-func FromNode(node scheduler.NodeData) *Node {
+// newNode converts a single scheduler NodeData to a persistence Node
+func newNode(node scheduler.NodeData) *Node {
 	children := make([]ChildDAGRun, len(node.State.Children))
 	for i, child := range node.State.Children {
 		children[i] = ChildDAGRun(child)

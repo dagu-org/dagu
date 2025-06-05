@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -27,7 +28,7 @@ func InitialStatus(dag *digraph.DAG) DAGRunStatus {
 		Name:          dag.Name,
 		Status:        scheduler.StatusNone,
 		PID:           PID(0),
-		Nodes:         FromSteps(dag.Steps),
+		Nodes:         NodesFromSteps(dag.Steps),
 		OnExit:        nodeOrNil(dag.HandlerOn.Exit),
 		OnSuccess:     nodeOrNil(dag.HandlerOn.Success),
 		OnFailure:     nodeOrNil(dag.HandlerOn.Failure),
@@ -55,7 +56,7 @@ func WithHierarchyRefs(root digraph.DAGRunRef, parent digraph.DAGRunRef) StatusO
 // WithNodes returns a StatusOption that sets the node data for the status
 func WithNodes(nodes []scheduler.NodeData) StatusOption {
 	return func(s *DAGRunStatus) {
-		s.Nodes = FromNodes(nodes)
+		s.Nodes = s.setNodes(nodes)
 	}
 }
 
@@ -93,7 +94,7 @@ func WithFinishedAt(t time.Time) StatusOption {
 func WithOnExitNode(node *scheduler.Node) StatusOption {
 	return func(s *DAGRunStatus) {
 		if node != nil {
-			s.OnExit = FromNode(node.NodeData())
+			s.OnExit = newNode(node.NodeData())
 		}
 	}
 }
@@ -102,7 +103,7 @@ func WithOnExitNode(node *scheduler.Node) StatusOption {
 func WithOnSuccessNode(node *scheduler.Node) StatusOption {
 	return func(s *DAGRunStatus) {
 		if node != nil {
-			s.OnSuccess = FromNode(node.NodeData())
+			s.OnSuccess = newNode(node.NodeData())
 		}
 	}
 }
@@ -111,7 +112,7 @@ func WithOnSuccessNode(node *scheduler.Node) StatusOption {
 func WithOnFailureNode(node *scheduler.Node) StatusOption {
 	return func(s *DAGRunStatus) {
 		if node != nil {
-			s.OnFailure = FromNode(node.NodeData())
+			s.OnFailure = newNode(node.NodeData())
 		}
 	}
 }
@@ -120,7 +121,7 @@ func WithOnFailureNode(node *scheduler.Node) StatusOption {
 func WithOnCancelNode(node *scheduler.Node) StatusOption {
 	return func(s *DAGRunStatus) {
 		if node != nil {
-			s.OnCancel = FromNode(node.NodeData())
+			s.OnCancel = newNode(node.NodeData())
 		}
 	}
 }
@@ -168,7 +169,14 @@ func StatusFromJSON(s string) (*DAGRunStatus, error) {
 	if err != nil {
 		return nil, err
 	}
-	return status, err
+
+	// Replace placeholders with actual log directory
+	logDir := extractLogDir(status.Log)
+	if logDir != "" {
+		status.replaceNodePaths(logDir, false)
+	}
+	
+	return status, nil
 }
 
 // DAGRunStatus represents the complete execution state of a dag-run.
@@ -193,6 +201,55 @@ type DAGRunStatus struct {
 	Params        string               `json:"params,omitempty"`
 	ParamsList    []string             `json:"paramsList,omitempty"`
 	Preconditions []*digraph.Condition `json:"preconditions,omitempty"`
+}
+
+// MarshalJSON customizes the JSON marshaling to replace log paths with placeholders
+func (st DAGRunStatus) MarshalJSON() ([]byte, error) {
+	// Create a deep copy to avoid modifying the original
+	copy := st
+	
+	// Deep copy regular nodes since they are pointers
+	if st.Nodes != nil {
+		copy.Nodes = make([]*Node, len(st.Nodes))
+		for i, node := range st.Nodes {
+			if node != nil {
+				nodeCopy := *node
+				copy.Nodes[i] = &nodeCopy
+			}
+		}
+	}
+	
+	// Deep copy handler nodes since they are pointers
+	if st.OnExit != nil {
+		exitCopy := *st.OnExit
+		copy.OnExit = &exitCopy
+	}
+	if st.OnSuccess != nil {
+		successCopy := *st.OnSuccess
+		copy.OnSuccess = &successCopy
+	}
+	if st.OnFailure != nil {
+		failureCopy := *st.OnFailure
+		copy.OnFailure = &failureCopy
+	}
+	if st.OnCancel != nil {
+		cancelCopy := *st.OnCancel
+		copy.OnCancel = &cancelCopy
+	}
+	
+	// Replace actual paths with placeholders for portability
+	logDir := extractLogDir(st.Log)
+	if logDir != "" {
+		copy.replaceNodePaths(logDir, true)
+	}
+	
+	// Use type alias to avoid infinite recursion
+	type Alias DAGRunStatus
+	return json.Marshal(&struct {
+		*Alias
+	}{
+		Alias: (*Alias)(&copy),
+	})
 }
 
 // DAGRun returns a reference to the dag-run associated with this status
@@ -245,6 +302,56 @@ func (st *DAGRunStatus) NodeByName(name string) (*Node, error) {
 	return nil, fmt.Errorf("node %s not found", name)
 }
 
+// setNodes converts scheduler NodeData objects to persistence Node objects
+func (s *DAGRunStatus) setNodes(nodes []scheduler.NodeData) []*Node {
+	var ret []*Node
+	for _, node := range nodes {
+		ret = append(ret, newNode(node))
+	}
+	return ret
+}
+
+// extractLogDir extracts the log directory from a log file path
+func extractLogDir(logPath string) string {
+	if logPath == "" {
+		return ""
+	}
+	return strings.TrimSuffix(filepath.Dir(logPath), "/")
+}
+
+// replaceNodePaths replaces paths in all nodes (including handler nodes)
+// If toPlaceholder is true, replaces actual paths with placeholder
+// If toPlaceholder is false, replaces placeholder with actual paths
+func (st *DAGRunStatus) replaceNodePaths(logDir string, toPlaceholder bool) {
+	// Helper function to replace paths in a single node
+	replacePaths := func(node *Node) {
+		if node == nil {
+			return
+		}
+		if toPlaceholder {
+			node.Stdout = strings.ReplaceAll(node.Stdout, logDir, logDirPlaceholder)
+			node.Stderr = strings.ReplaceAll(node.Stderr, logDir, logDirPlaceholder)
+		} else {
+			node.Stdout = strings.ReplaceAll(node.Stdout, logDirPlaceholder, logDir)
+			node.Stderr = strings.ReplaceAll(node.Stderr, logDirPlaceholder, logDir)
+		}
+	}
+	
+	// Process regular nodes
+	for _, node := range st.Nodes {
+		replacePaths(node)
+	}
+	
+	// Process handler nodes
+	replacePaths(st.OnExit)
+	replacePaths(st.OnSuccess)
+	replacePaths(st.OnFailure)
+	replacePaths(st.OnCancel)
+}
+
+// logDirPlaceholder is a placeholder for the log directory in the status JSON.
+const logDirPlaceholder = "__INTERNAL_LOG_DIR__"
+
 // PID represents a process ID for a running dag-run
 type PID int
 
@@ -269,5 +376,5 @@ func nodeOrNil(s *digraph.Step) *Node {
 	if s == nil {
 		return nil
 	}
-	return NewNode(*s)
+	return newNodeFromStep(*s)
 }

@@ -392,7 +392,7 @@ func createTestStatus(status scheduler.Status) models.DAGRunStatus {
 		Status:    status,
 		PID:       models.PID(12345),
 		StartedAt: stringutil.FormatTime(time.Now()),
-		Nodes:     models.FromSteps(dag.Steps),
+		Nodes:     models.NodesFromSteps(dag.Steps),
 	}
 }
 
