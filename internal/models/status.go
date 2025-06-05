@@ -211,8 +211,8 @@ type DAGRunStatus struct {
 	Preconditions []*digraph.Condition `json:"preconditions,omitempty"`
 }
 
-func (st *DAGRunStatus) MarshalJSON() ([]byte, error) {
-	copy := *st
+func (st DAGRunStatus) MarshalJSON() ([]byte, error) {
+	copy := st
 	// Replace the actual log directory with the placeholder
 	var logDir string
 	if st.Log != "" {
