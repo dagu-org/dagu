@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -168,6 +169,21 @@ func StatusFromJSON(s string) (*DAGRunStatus, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Replace the log directory placeholder with the actual log directory
+	var logDir string
+	if status.Log != "" {
+		logDir = strings.TrimSuffix(filepath.Dir(status.Log), "/")
+	}
+	if logDir != "" {
+		for _, node := range status.Nodes {
+			if node == nil {
+				continue
+			}
+			node.Stdout = strings.ReplaceAll(node.Stdout, logDirPlaceholder, logDir)
+			node.Stderr = strings.ReplaceAll(node.Stderr, logDirPlaceholder, logDir)
+		}
+	}
 	return status, err
 }
 
@@ -193,6 +209,29 @@ type DAGRunStatus struct {
 	Params        string               `json:"params,omitempty"`
 	ParamsList    []string             `json:"paramsList,omitempty"`
 	Preconditions []*digraph.Condition `json:"preconditions,omitempty"`
+}
+
+func (st *DAGRunStatus) MarshalJSON() ([]byte, error) {
+	copy := *st
+	// Replace the log directory placeholder with the actual log directory
+	var logDir string
+	if st.Log != "" {
+		logDir = strings.TrimSuffix(filepath.Dir(st.Log), "/")
+	}
+	if logDir != "" {
+		for _, node := range copy.Nodes {
+			if node == nil {
+				continue
+			}
+			node.Stdout = strings.ReplaceAll(node.Stdout, logDirPlaceholder, logDir)
+		}
+	}
+	type Alias DAGRunStatus
+	return json.Marshal(&struct {
+		*Alias
+	}{
+		Alias: (*Alias)(&copy),
+	})
 }
 
 // DAGRun returns a reference to the dag-run associated with this status
@@ -253,6 +292,9 @@ func (s *DAGRunStatus) setNodes(nodes []scheduler.NodeData) []*Node {
 	}
 	return ret
 }
+
+// logDirPlaceholder is a placeholder for the log directory in the status JSON.
+const logDirPlaceholder = "__INTERNAL_LOG_DIR__"
 
 // PID represents a process ID for a running dag-run
 type PID int
