@@ -213,7 +213,7 @@ type DAGRunStatus struct {
 
 func (st *DAGRunStatus) MarshalJSON() ([]byte, error) {
 	copy := *st
-	// Replace the log directory placeholder with the actual log directory
+	// Replace the actual log directory with the placeholder
 	var logDir string
 	if st.Log != "" {
 		logDir = strings.TrimSuffix(filepath.Dir(st.Log), "/")
@@ -223,7 +223,8 @@ func (st *DAGRunStatus) MarshalJSON() ([]byte, error) {
 			if node == nil {
 				continue
 			}
-			node.Stdout = strings.ReplaceAll(node.Stdout, logDirPlaceholder, logDir)
+			node.Stdout = strings.ReplaceAll(node.Stdout, logDir, logDirPlaceholder)
+			node.Stderr = strings.ReplaceAll(node.Stderr, logDir, logDirPlaceholder)
 		}
 	}
 	type Alias DAGRunStatus
