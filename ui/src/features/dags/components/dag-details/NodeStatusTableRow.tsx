@@ -474,7 +474,7 @@ function NodeStatusTableRow({
   return (
     <div
       className={cn(
-        'p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-shadow duration-200',
+        'p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-md transition-shadow duration-200',
         getRowHighlight()
       )}
     >

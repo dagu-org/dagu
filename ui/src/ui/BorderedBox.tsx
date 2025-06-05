@@ -57,7 +57,7 @@ export default function BorderedBox({
   return (
     <Card
       className={cn(
-        'rounded-sm border-[#e0e0e0] bg-white shadow-none py-0',
+        'rounded-sm border-border bg-card shadow-none py-0',
         sxClasses,
         className
       )}

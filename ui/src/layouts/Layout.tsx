@@ -10,6 +10,7 @@ import { Menu, X } from 'lucide-react';
 import * as React from 'react';
 import { AppBarContext } from '../contexts/AppBarContext';
 import { mainListItems as MainListItems } from '../menu';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 // Utility: Get contrast color (black or white) for a given background color (hex, rgb, or named)
 function getContrastColor(input?: string): string {
@@ -93,12 +94,12 @@ function Content({ title, navbarColor, children }: LayoutProps) {
   }, []);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-white">
+    <div className="flex h-screen w-screen overflow-hidden bg-background">
       {/* Desktop Sidebar - Hidden on mobile, visible in collapsed state on desktop */}
       <div
         className={cn(
           // Modern base styles with dark background
-          'h-full overflow-hidden bg-[#222] text-white',
+          'h-full overflow-hidden bg-primary text-primary-foreground',
           // Shadow effect
           'shadow-lg',
           // Hidden on mobile, visible on desktop
@@ -127,13 +128,13 @@ function Content({ title, navbarColor, children }: LayoutProps) {
           onClick={() => setIsMobileSidebarOpen(false)}
         >
           <div
-            className="h-full w-60 bg-[#222] text-white shadow-lg overflow-hidden"
+            className="h-full w-60 bg-primary text-primary-foreground shadow-lg overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-end p-4">
               <button
                 onClick={() => setIsMobileSidebarOpen(false)}
-                className="text-white hover:text-gray-300 transition-colors"
+                className="text-primary-foreground hover:text-primary-foreground/70 transition-colors"
               >
                 <X className="h-6 w-6" />
               </button>
@@ -151,31 +152,32 @@ function Content({ title, navbarColor, children }: LayoutProps) {
       )}
 
       {/* Main Content Area */}
-      <div className="flex flex-col flex-1 h-full overflow-hidden bg-gray-100">
+      <div className="flex flex-col flex-1 h-full overflow-hidden bg-muted/30">
         {/* AppBar */}
         <header
           className={cn(
             'relative w-full px-6 transition-shadow duration-200',
             scrolled
-              ? 'shadow-md border-b border-gray-300'
-              : 'border-b border-transparent'
+              ? 'shadow-md border-b border-border'
+              : 'border-b border-transparent',
+            // Use theme-aware classes when no custom color is set
+            !navbarColor || navbarColor.trim() === '' ? 'bg-primary text-primary-foreground' : ''
           )}
-          style={{
-            backgroundColor:
-              navbarColor && navbarColor.trim() !== ''
-                ? navbarColor
-                : '#222222',
-            color: getContrastColor(
-              navbarColor && navbarColor.trim() !== '' ? navbarColor : '#222222'
-            ),
-          }}
+          style={
+            navbarColor && navbarColor.trim() !== ''
+              ? {
+                  backgroundColor: navbarColor,
+                  color: getContrastColor(navbarColor),
+                }
+              : undefined
+          }
         >
           <div className="flex items-center justify-between w-full h-10">
             {/* Left side content: Hamburger menu for mobile + Title */}
             <div className="flex items-center space-x-2">
               {/* Hamburger menu - only visible on mobile */}
               <button
-                className="md:hidden text-current p-1 -ml-1 rounded-md hover:bg-white/10 transition-colors"
+                className="md:hidden text-current p-1 -ml-1 rounded-md hover:bg-accent/10 transition-colors"
                 onClick={() => setIsMobileSidebarOpen(true)}
                 aria-label="Open menu"
               >
@@ -183,11 +185,11 @@ function Content({ title, navbarColor, children }: LayoutProps) {
               </button>
 
               <NavBarTitleText
-                color={getContrastColor(
+                color={
                   navbarColor && navbarColor.trim() !== ''
-                    ? navbarColor
-                    : '#222222'
-                )}
+                    ? getContrastColor(navbarColor)
+                    : undefined
+                }
               >
                 {title || ''}
               </NavBarTitleText>
@@ -195,11 +197,11 @@ function Content({ title, navbarColor, children }: LayoutProps) {
                 {(context) => (
                   <NavBarTitleText
                     visible={scrolled}
-                    color={getContrastColor(
+                    color={
                       navbarColor && navbarColor.trim() !== ''
-                        ? navbarColor
-                        : '#222222'
-                    )}
+                        ? getContrastColor(navbarColor)
+                        : undefined
+                    }
                   >
                     {context.title}
                   </NavBarTitleText>
@@ -208,7 +210,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
             </div>
 
             {/* Right side content */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
               <AppBarContext.Consumer>
                 {(context) => {
                   if (
@@ -222,15 +224,15 @@ function Content({ title, navbarColor, children }: LayoutProps) {
                       value={context.selectedRemoteNode}
                       onValueChange={context.selectRemoteNode}
                     >
-                      <SelectTrigger className="h-6 text-base bg-transparent text-white border-0 hover:bg-white/10 focus:ring-0 focus:outline-none focus:border-0 focus-visible:ring-0 focus-visible:outline-none focus-visible:border-0 focus-visible:shadow-none active:border-0 px-2 py-0 flex items-center min-h-0 gap-1 rounded-md transition-colors duration-200 [&_svg]:!text-white [&_svg]:!opacity-100 shadow-none cursor-pointer">
+                      <SelectTrigger className="h-6 text-base bg-transparent text-current border-0 hover:bg-accent/10 focus:ring-0 focus:outline-none focus:border-0 focus-visible:ring-0 focus-visible:outline-none focus-visible:border-0 focus-visible:shadow-none active:border-0 px-2 py-0 flex items-center min-h-0 gap-1 rounded-md transition-colors duration-200 [&_svg]:!text-current [&_svg]:!opacity-100 shadow-none cursor-pointer">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="text-base rounded-md overflow-hidden p-1 bg-gray-800 border-0 shadow-lg outline-none ring-0 focus:outline-none focus:ring-0 focus:border-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0 text-white">
+                      <SelectContent className="text-base rounded-md overflow-hidden p-1 bg-popover border-border shadow-lg outline-none ring-0 focus:outline-none focus:ring-0 focus:border-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0 text-popover-foreground">
                         {context.remoteNodes.map((node) => (
                           <SelectItem
                             key={node}
                             value={node}
-                            className="text-base py-1 px-2 min-h-0 h-8 text-white hover:bg-white/10 focus:bg-white/10 focus:outline-none focus:ring-0 focus:border-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0 data-[highlighted]:bg-white/10 data-[highlighted]:text-white data-[selected]:text-white data-[selected]:bg-white/20 cursor-pointer"
+                            className="text-base py-1 px-2 min-h-0 h-8 text-popover-foreground hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none focus:ring-0 focus:border-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0 data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[selected]:bg-accent data-[selected]:text-accent-foreground cursor-pointer"
                           >
                             {node}
                           </SelectItem>
@@ -240,6 +242,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
                   );
                 }}
               </AppBarContext.Consumer>
+              <ThemeToggle />
             </div>
           </div>
         </header>
@@ -267,7 +270,7 @@ type NavBarTitleTextProps = {
 const NavBarTitleText = ({
   children,
   visible = true,
-  color = 'white',
+  color,
   size = 'base',
 }: NavBarTitleTextProps) => {
   return (
@@ -277,7 +280,7 @@ const NavBarTitleText = ({
         size === 'sm' ? 'text-sm' : 'text-base',
         visible ? 'opacity-100' : 'opacity-0'
       )}
-      style={{ color }}
+      style={color ? { color } : undefined}
     >
       {children}
     </h1>

@@ -481,22 +481,70 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
         {`
         .vis-timeline {
           font-size: 12px !important;
+          background-color: var(--background) !important;
+          border-color: var(--border) !important;
         }
         .vis-item .vis-item-overflow {
           overflow: visible;
-          color: black;
+          color: var(--foreground);
         }
         .vis-panel.vis-top {
           position: sticky;
           top: 0;
           z-index: 1;
-          background-color: white;
+          background-color: var(--background) !important;
+          border-color: var(--border) !important;
         }
         .vis-labelset {
           position: sticky;
           left: 0;
           z-index: 2;
-          background-color: white;
+          background-color: var(--background) !important;
+        }
+        .vis-foreground {
+          background-color: transparent !important;
+        }
+        .vis-background {
+          background-color: var(--background) !important;
+        }
+        .vis-center {
+          background-color: var(--background) !important;
+        }
+        .vis-left {
+          background-color: var(--background) !important;
+        }
+        .vis-right {
+          background-color: var(--background) !important;
+        }
+        .vis-top {
+          background-color: var(--background) !important;
+        }
+        .vis-bottom {
+          background-color: var(--background) !important;
+        }
+        .vis-time-axis {
+          background-color: var(--background) !important;
+          color: var(--foreground) !important;
+        }
+        .vis-time-axis .vis-text {
+          font-size: 11px !important;
+          color: var(--foreground) !important;
+        }
+        .vis-time-axis .vis-text.vis-major {
+          font-size: 12px !important;
+          font-weight: 600;
+          color: var(--foreground) !important;
+        }
+        .vis-time-axis .vis-text.vis-minor {
+          font-size: 10px !important;
+          color: var(--muted-foreground) !important;
+        }
+        .vis-time-axis .vis-grid.vis-minor {
+          border-color: var(--border) !important;
+          opacity: 0.5;
+        }
+        .vis-time-axis .vis-grid.vis-major {
+          border-color: var(--border) !important;
         }
         .vis-item .vis-item-content {
           position: absolute;
@@ -507,26 +555,20 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
           white-space: nowrap;
           font-size: 12px !important;
           font-weight: 500;
+          color: var(--foreground) !important;
         }
         .vis-item {
           overflow: visible !important;
           height: 18px !important;
         }
-        .vis-time-axis .vis-text {
-          font-size: 11px !important;
+        .vis-panel {
+          background-color: var(--background) !important;
         }
-        .vis-time-axis .vis-text.vis-major {
-          font-size: 12px !important;
-          font-weight: 600;
+        .vis-item.vis-selected {
+          border-color: var(--ring) !important;
         }
-        .vis-time-axis .vis-text.vis-minor {
-          font-size: 10px !important;
-        }
-        .vis-time-axis .vis-grid.vis-minor {
-          border-color: #f0f0f0;
-        }
-        .vis-time-axis .vis-grid.vis-major {
-          border-color: #ddd;
+        .vis-current-time {
+          background-color: var(--destructive) !important;
         }
         `}
       </style>

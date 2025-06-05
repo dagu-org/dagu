@@ -198,23 +198,28 @@ const Graph: React.FC<Props> = ({
     }
 
     // Define node styles for different states with refined colors
+    // Check if dark mode is active
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    const nodeFill = isDarkMode ? '#18181b' : 'white'; // zinc-900 for dark mode
+    const nodeColor = isDarkMode ? '#e4e4e7' : '#333'; // zinc-200 for dark mode text
+    
     dat.push(
-      'classDef none color:#333,fill:white,stroke:lightblue,stroke-width:1.2px'
+      `classDef none color:${nodeColor},fill:${nodeFill},stroke:lightblue,stroke-width:1.2px`
     );
     dat.push(
-      'classDef running color:#333,fill:white,stroke:lime,stroke-width:1.2px'
+      `classDef running color:${nodeColor},fill:${nodeFill},stroke:lime,stroke-width:1.2px`
     );
     dat.push(
-      'classDef error color:#333,fill:white,stroke:red,stroke-width:1.2px'
+      `classDef error color:${nodeColor},fill:${nodeFill},stroke:red,stroke-width:1.2px`
     );
     dat.push(
-      'classDef cancel color:#333,fill:white,stroke:pink,stroke-width:1.2px'
+      `classDef cancel color:${nodeColor},fill:${nodeFill},stroke:pink,stroke-width:1.2px`
     );
     dat.push(
-      'classDef done color:#333,fill:white,stroke:green,stroke-width:1.2px'
+      `classDef done color:${nodeColor},fill:${nodeFill},stroke:green,stroke-width:1.2px`
     );
     dat.push(
-      'classDef skipped color:#333,fill:white,stroke:gray,stroke-width:1.2px'
+      `classDef skipped color:${nodeColor},fill:${nodeFill},stroke:gray,stroke-width:1.2px`
     );
 
     // Add custom link styles
@@ -225,7 +230,7 @@ const Graph: React.FC<Props> = ({
 
   return (
     <div className="relative" ref={containerRef}>
-      <div className="absolute right-2 top-2 z-10 bg-white">
+      <div className="absolute right-2 top-2 z-10 bg-white dark:bg-zinc-900 rounded-md">
         <ToggleGroup aria-label="Zoom controls">
           <ToggleButton
             value="zoomin"

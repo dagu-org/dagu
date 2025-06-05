@@ -141,8 +141,8 @@ function DAGs() {
 
       {/* Loading indicator - fixed position in center of screen */}
       {isLoading && (
-        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center">
-          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-lg">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-card rounded-lg p-6 shadow-lg border border-border">
             <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
           </div>
         </div>

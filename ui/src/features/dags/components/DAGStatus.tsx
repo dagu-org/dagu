@@ -175,9 +175,9 @@ function DAGStatus({ dagRun, fileName }: Props) {
   return (
     <div className="space-y-6">
       {/* DAG Visualization Card */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-        <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+      <div className="bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+        <div className="border-b border-border bg-muted/30 px-6 py-4">
+          <h2 className="text-lg font-semibold text-foreground">
             Graph
           </h2>
         </div>
@@ -195,9 +195,9 @@ function DAGStatus({ dagRun, fileName }: Props) {
           <>
             <div className="grid grid-cols-1 gap-6">
               {/* Status Overview Card */}
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-                <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              <div className="bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                <div className="border-b border-border bg-muted/30 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-foreground">
                     Run Status
                   </h2>
                 </div>
@@ -219,12 +219,12 @@ function DAGStatus({ dagRun, fileName }: Props) {
               </div>
 
               {/* Desktop Steps Table Card */}
-              <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-                <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+              <div className="hidden md:block bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                <div className="border-b border-border bg-muted/30 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-foreground flex items-center justify-between">
                     <span>Steps</span>
                     {dagRun.nodes && (
-                      <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                      <span className="text-sm font-normal text-muted-foreground">
                         {dagRun.nodes.length} step
                         {dagRun.nodes.length !== 1 ? 's' : ''}
                       </span>
@@ -244,10 +244,10 @@ function DAGStatus({ dagRun, fileName }: Props) {
               {/* Mobile Steps - No Card Container */}
               <div className="md:hidden">
                 <div className="mb-4">
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-foreground flex items-center justify-between">
                     <span>Steps</span>
                     {dagRun.nodes && (
-                      <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                      <span className="text-sm font-normal text-muted-foreground">
                         {dagRun.nodes.length} step
                         {dagRun.nodes.length !== 1 ? 's' : ''}
                       </span>
@@ -267,11 +267,11 @@ function DAGStatus({ dagRun, fileName }: Props) {
             {handlers?.length ? (
               <>
                 {/* Desktop Lifecycle Hooks Card */}
-                <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-                  <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                <div className="hidden md:block bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                  <div className="border-b border-border bg-muted/30 px-6 py-4">
+                    <h2 className="text-lg font-semibold text-foreground flex items-center justify-between">
                       <span>Lifecycle Hooks</span>
-                      <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                      <span className="text-sm font-normal text-muted-foreground">
                         {handlers.length} hook{handlers.length !== 1 ? 's' : ''}
                       </span>
                     </h2>
@@ -289,9 +289,9 @@ function DAGStatus({ dagRun, fileName }: Props) {
                 {/* Mobile Lifecycle Hooks - No Card Container */}
                 <div className="md:hidden">
                   <div className="mb-4">
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-foreground flex items-center justify-between">
                       <span>Lifecycle Hooks</span>
-                      <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                      <span className="text-sm font-normal text-muted-foreground">
                         {handlers.length} hook{handlers.length !== 1 ? 's' : ''}
                       </span>
                     </h2>

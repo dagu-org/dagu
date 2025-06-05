@@ -63,6 +63,35 @@ function DAGEditor({
     };
   }, []);
 
+  // Update editor theme when dark mode changes
+  useEffect(() => {
+    if (editorRef.current) {
+      const newTheme = document.documentElement.classList.contains('dark') ? 'vs-dark' : 'vs';
+      monaco.editor.setTheme(newTheme);
+    }
+  }, []);
+
+  // Listen for theme changes
+  useEffect(() => {
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+          if (editorRef.current) {
+            const newTheme = document.documentElement.classList.contains('dark') ? 'vs-dark' : 'vs';
+            monaco.editor.setTheme(newTheme);
+          }
+        }
+      });
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   /**
    * Initialize editor after mounting
    */
@@ -75,12 +104,16 @@ function DAGEditor({
     }, 100);
   };
 
+  // Detect dark mode
+  const isDarkMode = typeof window !== 'undefined' && 
+    document.documentElement.classList.contains('dark');
+
   return (
     <div
       className={`relative transition-all duration-300 ${
         readOnly
-          ? 'border border-transparent bg-slate-50 dark:bg-slate-800/50 rounded-lg'
-          : 'border-2 border-blue-400 dark:border-blue-600 bg-white dark:bg-slate-800 rounded-lg shadow-lg shadow-blue-100 dark:shadow-blue-900/20'
+          ? 'border border-transparent bg-slate-50 dark:bg-zinc-800/50 rounded-lg'
+          : 'border-2 border-blue-400 dark:border-blue-600 bg-white dark:bg-zinc-900 rounded-lg shadow-lg shadow-blue-100 dark:shadow-blue-900/20'
       } ${className}`}
     >
       {!readOnly && (
@@ -91,6 +124,7 @@ function DAGEditor({
       <MonacoEditor
         height="400px"
         language="yaml"
+        theme={isDarkMode ? 'vs-dark' : 'vs'}
         value={value}
         onChange={readOnly ? undefined : onChange}
         onMount={editorDidMount}

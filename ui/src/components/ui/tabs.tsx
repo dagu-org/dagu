@@ -10,7 +10,7 @@ function Tabs({ className, children, ...props }: Omit<TabsProps, 'value'>) {
   return (
     <div
       className={cn(
-        'inline-flex items-center justify-center gap-1 rounded-lg bg-white p-1 text-muted-foreground',
+        'inline-flex items-center justify-center gap-1 rounded-lg bg-white dark:bg-zinc-900 p-1 text-muted-foreground border border-border',
         className
       )}
       {...props}
@@ -39,7 +39,7 @@ function Tab({
         'disabled:pointer-events-none disabled:opacity-50',
         isActive
           ? 'text-primary font-medium'
-          : 'text-muted-foreground hover:text-primary hover:bg-primary/5',
+          : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
         className
       )}
       {...props}

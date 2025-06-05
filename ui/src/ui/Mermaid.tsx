@@ -9,20 +9,48 @@ type Props = {
   onRightClick?: (id: string) => void;
 };
 
-mermaid.initialize({
-  securityLevel: 'loose',
-  startOnLoad: false,
-  maxTextSize: 99999999,
-  flowchart: {
-    curve: 'basis',
-    useMaxWidth: false,
-    htmlLabels: true,
-    nodeSpacing: 50,
-    rankSpacing: 50,
-  },
-  fontFamily: 'Arial',
-  logLevel: 4, // ERROR
-});
+// Initialize Mermaid with dynamic theme support
+const initializeMermaid = () => {
+  const isDarkMode = document.documentElement.classList.contains('dark');
+  
+  mermaid.initialize({
+    securityLevel: 'loose',
+    startOnLoad: false,
+    maxTextSize: 99999999,
+    theme: isDarkMode ? 'dark' : 'default',
+    themeVariables: isDarkMode ? {
+      background: 'transparent',
+      primaryColor: '#18181b', // zinc-900
+      primaryTextColor: '#e4e4e7', // zinc-200
+      primaryBorderColor: '#3f3f46', // zinc-700
+      lineColor: '#71717a', // zinc-500
+      sectionBkgColor: 'transparent',
+      altSectionBkgColor: 'transparent',
+      gridColor: 'transparent',
+      secondaryColor: 'transparent',
+      tertiaryColor: 'transparent',
+    } : {},
+    flowchart: {
+      curve: 'basis',
+      useMaxWidth: false,
+      htmlLabels: true,
+      nodeSpacing: 50,
+      rankSpacing: 50,
+    },
+    gantt: {
+      leftPadding: 150,
+      gridLineStartPadding: 35,
+      fontSize: 12,
+      sectionFontSize: 14,
+      numberSectionStyles: 2,
+    },
+    fontFamily: 'Arial',
+    logLevel: 4, // ERROR
+  });
+};
+
+// Initialize on load
+initializeMermaid();
 
 function Mermaid({
   def,
@@ -59,6 +87,9 @@ function Mermaid({
     }
 
     try {
+      // Reinitialize Mermaid to pick up current theme
+      initializeMermaid();
+      
       // Clear previous content
       mermaidRef.current.innerHTML = '';
 

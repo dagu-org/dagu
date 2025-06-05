@@ -212,7 +212,7 @@ function DAGRuns() {
   return (
     <div className="flex flex-col">
       <Title>DAG Runs</Title>
-      <div className="bg-gray-50 rounded-lg p-3 mb-4 space-y-3">
+      <div className="bg-muted/50 dark:bg-zinc-900/50 rounded-lg p-3 mb-4 space-y-3">
         <div className="flex flex-wrap gap-2">
           <Input
             placeholder="Filter by DAG name..."

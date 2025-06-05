@@ -16,8 +16,8 @@ function Icon({
   return (
     <span
       className={cn(
-        'flex items-center justify-center w-5 h-5 transform-none text-white',
-        isActive ? 'text-white' : 'text-white'
+        'flex items-center justify-center w-5 h-5 transform-none text-primary-foreground',
+        isActive ? 'text-primary-foreground' : 'text-primary-foreground'
       )}
     >
       {children}
@@ -55,7 +55,7 @@ export const mainListItems = React.forwardRef<
         {/* Text container with instant hide/show */}
         {isOpen && (
           <div className="absolute inset-0 flex items-center pl-12">
-            <span className="font-bold tracking-wide select-none text-xl text-white">
+            <span className="font-bold tracking-wide select-none text-xl text-primary-foreground">
               Dagu
             </span>
           </div>
@@ -94,8 +94,8 @@ export const mainListItems = React.forwardRef<
       </nav>
       {/* Version display - only shown when sidebar is expanded */}
       {isOpen && (
-        <div className="px-3 py-2 text-xs text-[#7EB36A]/80">
-          <div className="border-t border-white/10 pt-2">
+        <div className="px-3 py-2 text-xs text-primary-foreground/60">
+          <div className="border-t border-primary-foreground/10 pt-2">
             Version: {config.version}
           </div>
         </div>
@@ -128,8 +128,8 @@ function NavItem({ to, icon, text, isOpen, onClick }: NavItemProps) {
           className={cn(
             'block h-9 flex items-center text-xs font-medium rounded-lg transition-all duration-50 ease-in-out pl-10 pr-3',
             isActive
-              ? 'text-white bg-white/10' // Active: subtle background
-              : 'text-white hover:text-white hover:bg-white/5' // Inactive: lighter green for better contrast
+              ? 'text-primary-foreground bg-primary-foreground/10' // Active: subtle background
+              : 'text-primary-foreground hover:text-primary-foreground hover:bg-primary-foreground/5' // Inactive: lighter green for better contrast
           )}
           aria-current={isActive ? 'page' : undefined}
           title={text}
@@ -140,7 +140,7 @@ function NavItem({ to, icon, text, isOpen, onClick }: NavItemProps) {
           </div>
 
           {/* Text with fade-in animation */}
-          <span className="font-medium text-white text-xs ml-3">{text}</span>
+          <span className="font-medium text-primary-foreground text-xs ml-3">{text}</span>
         </Link>
       </div>
     );
@@ -153,8 +153,8 @@ function NavItem({ to, icon, text, isOpen, onClick }: NavItemProps) {
           className={cn(
             'flex items-center justify-center w-8 h-8 text-xs font-medium rounded-lg transition-all duration-50 ease-in-out',
             isActive
-              ? 'text-white bg-white/10' // Active: subtle background
-              : 'text-white hover:text-white hover:bg-white/5'
+              ? 'text-primary-foreground bg-primary-foreground/10' // Active: subtle background
+              : 'text-primary-foreground hover:text-primary-foreground hover:bg-primary-foreground/5'
           )}
           aria-current={isActive ? 'page' : undefined}
           title={text}

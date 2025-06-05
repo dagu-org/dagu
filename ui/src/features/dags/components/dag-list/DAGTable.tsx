@@ -271,7 +271,7 @@ const defaultColumns = [
                   <Badge
                     key={tag}
                     variant="outline"
-                    className="text-[10px] px-1 py-0 h-3.5 rounded-sm border-primary/20 bg-primary/5 text-primary/90 hover:bg-primary/10 hover:text-primary transition-colors duration-200 cursor-pointer font-normal"
+                    className="text-[10px] px-1 py-0 h-3.5 rounded-sm border-blue-200 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-800/50 hover:text-blue-800 dark:hover:text-blue-200 transition-colors duration-200 cursor-pointer font-normal"
                     onClick={(e) => {
                       e.stopPropagation(); // Prevent row click
                       e.preventDefault();
@@ -408,7 +408,7 @@ const defaultColumns = [
 
       return (
         <div className="space-y-0.5">
-          <span className="font-normal text-gray-700 dark:text-gray-300 text-xs">
+          <span className="font-normal text-foreground/70 text-xs">
             {formattedStartedAt}
           </span>
           {durationContent}
@@ -846,7 +846,7 @@ function DAGTable({
 
       {/* Search, Filter and Pagination Controls */}
       <div
-        className={`bg-gray-50 rounded-lg p-3 mb-4 space-y-3 ${
+        className={`bg-muted/50 dark:bg-zinc-900/50 rounded-lg p-3 mb-4 space-y-3 ${
           isLoading ? 'opacity-70 pointer-events-none' : ''
         }`}
       >
@@ -861,7 +861,7 @@ function DAGTable({
               placeholder="Search definitions..."
               value={searchText}
               onChange={(e) => handleSearchTextChange(e.target.value)}
-              className="pl-10 h-9 bg-background border border-input rounded-md w-full"
+              className="pl-10 h-9 border border-input rounded-md w-full"
             />
             {searchText && (
               <button
@@ -894,7 +894,7 @@ function DAGTable({
               handleSearchTagChange(value === 'all' ? '' : value)
             }
           >
-            <SelectTrigger className="w-auto min-w-[160px] h-9 bg-background border border-input rounded-md">
+            <SelectTrigger className="w-auto min-w-[160px] h-9 border border-input rounded-md">
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
                 <SelectValue placeholder="Filter by tag" />
@@ -1058,10 +1058,10 @@ function DAGTable({
                 >
                   <div className="flex flex-col items-center justify-center py-8">
                     <div className="text-6xl mb-4">🔍</div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    <h3 className="text-lg font-medium text-foreground mb-2">
                       No DAGs found
                     </h3>
-                    <p className="text-sm text-gray-500 text-center max-w-md mb-4">
+                    <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
                       There are no DAGs matching your current filters. Try
                       adjusting your search criteria or tags.
                     </p>
@@ -1165,7 +1165,7 @@ function DAGTable({
                         <Badge
                           key={tag}
                           variant="outline"
-                          className="text-[10px] px-1 py-0 h-3.5 rounded-sm border-primary/20 bg-primary/5 text-primary/90 hover:bg-primary/10 hover:text-primary transition-colors duration-200 cursor-pointer font-normal"
+                          className="text-[10px] px-1 py-0 h-3.5 rounded-sm border-blue-200 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-800/50 hover:text-blue-800 dark:hover:text-blue-200 transition-colors duration-200 cursor-pointer font-normal"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleSearchTagChange(tag);

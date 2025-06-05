@@ -164,7 +164,7 @@ function Dashboard(): React.ReactElement | null {
     {
       title: 'Total',
       value: totalDAGRuns,
-      icon: <ListChecks className="h-5 w-5 text-gray-600" />,
+      icon: <ListChecks className="h-5 w-5 text-muted-foreground" />,
     },
     {
       title: 'Running',

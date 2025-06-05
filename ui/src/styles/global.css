@@ -4,6 +4,16 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  html {
+    @apply bg-background text-foreground;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  
+}
+
 /* Override focus styles for select components */
 [data-slot='select-trigger'],
 [data-slot='select-content'],
@@ -41,12 +51,13 @@
 
 [data-slot='select-item'][data-highlighted],
 [data-slot='select-item'][data-selected] {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--accent);
+  color: var(--accent-foreground);
 }
 
 /* Make the checkmark icon visible */
 [data-slot='select-item-indicator'] svg {
-  color: white;
+  color: currentColor;
   opacity: 1;
 }
 @import 'tw-animate-css';
@@ -97,7 +108,7 @@
   --popover: oklch(0.145 0 0);
   --popover-foreground: oklch(0.985 0 0);
   --primary: #222222;
-  --primary-foreground: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -215,4 +226,154 @@
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
+}
+
+/* Mermaid dark mode support */
+.dark .mermaid {
+  /* Timeline/Gantt chart tooltip styles */
+  --mermaid-tooltip-background: rgb(39 39 42); /* zinc-800 */
+  --mermaid-tooltip-color: rgb(244 244 245); /* zinc-100 */
+  --mermaid-tooltip-border: rgb(63 63 70); /* zinc-700 */
+}
+
+/* Override Mermaid's default tooltip styles for dark mode */
+.dark .mermaid .tooltip {
+  background: var(--mermaid-tooltip-background) !important;
+  color: var(--mermaid-tooltip-color) !important;
+  border: 1px solid var(--mermaid-tooltip-border) !important;
+}
+
+/* Mermaid gantt chart text elements for dark mode */
+.dark .mermaid .gantt text {
+  fill: rgb(244 244 245) !important; /* zinc-100 */
+}
+
+/* Mermaid gantt chart axis labels for dark mode */
+.dark .mermaid .gantt .axisLabel {
+  fill: rgb(244 244 245) !important; /* zinc-100 */
+}
+
+/* Mermaid gantt chart grid lines for dark mode */
+.dark .mermaid .gantt .grid .tick {
+  stroke: rgb(63 63 70) !important; /* zinc-700 */
+}
+
+/* Mermaid gantt chart section labels for dark mode */
+.dark .mermaid .gantt .sectionTitle {
+  fill: rgb(244 244 245) !important; /* zinc-100 */
+}
+
+/* Native date picker dark mode support */
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+/* Style the date picker popup for Webkit browsers (Chrome, Safari, Edge) */
+.dark input[type="datetime-local"]::-webkit-datetime-edit {
+  color: rgb(244 244 245); /* zinc-100 */
+}
+
+.dark input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
+  background-color: rgb(24 24 27); /* zinc-900 */
+}
+
+.dark input[type="datetime-local"]::-webkit-datetime-edit-text {
+  color: rgb(161 161 170); /* zinc-400 */
+}
+
+.dark input[type="datetime-local"]::-webkit-datetime-edit-month-field,
+.dark input[type="datetime-local"]::-webkit-datetime-edit-day-field,
+.dark input[type="datetime-local"]::-webkit-datetime-edit-year-field,
+.dark input[type="datetime-local"]::-webkit-datetime-edit-hour-field,
+.dark input[type="datetime-local"]::-webkit-datetime-edit-minute-field,
+.dark input[type="datetime-local"]::-webkit-datetime-edit-second-field,
+.dark input[type="datetime-local"]::-webkit-datetime-edit-ampm-field {
+  color: rgb(244 244 245); /* zinc-100 */
+}
+
+.dark input[type="datetime-local"]::-webkit-datetime-edit-month-field:focus,
+.dark input[type="datetime-local"]::-webkit-datetime-edit-day-field:focus,
+.dark input[type="datetime-local"]::-webkit-datetime-edit-year-field:focus,
+.dark input[type="datetime-local"]::-webkit-datetime-edit-hour-field:focus,
+.dark input[type="datetime-local"]::-webkit-datetime-edit-minute-field:focus,
+.dark input[type="datetime-local"]::-webkit-datetime-edit-second-field:focus,
+.dark input[type="datetime-local"]::-webkit-datetime-edit-ampm-field:focus {
+  background-color: rgb(39 39 42); /* zinc-800 */
+  color: rgb(244 244 245); /* zinc-100 */
+  outline: none;
+}
+
+/* Attempt to style the calendar popup (limited browser support) */
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  background-color: rgb(24 24 27); /* zinc-900 */
+  border-radius: 4px;
+}
+
+/* Firefox date picker support */
+.dark input[type="datetime-local"] {
+  color-scheme: dark;
+}
+
+/* General dark mode support for all date/time inputs */
+.dark input[type="date"],
+.dark input[type="time"],
+.dark input[type="datetime-local"] {
+  color-scheme: dark;
+}
+
+/* Ensure the calendar picker indicator is visible in dark mode */
+.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark input[type="time"]::-webkit-calendar-picker-indicator,
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) contrast(0.8);
+  opacity: 0.8;
+}
+
+/* Style for browsers that support ::backdrop */
+.dark input[type="datetime-local"]::backdrop {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Mermaid flowchart background pattern for dark mode */
+.dark .mermaid .flowchart-v2 {
+  background: transparent !important;
+}
+
+/* Remove or darken the grid pattern in dark mode */
+.dark .mermaid svg {
+  background: transparent !important;
+}
+
+/* Style any grid/pattern elements in the graph */
+.dark .mermaid pattern#grid line {
+  stroke: rgb(39 39 42) !important; /* zinc-800 - very subtle grid */
+  stroke-opacity: 0.3 !important;
+}
+
+/* Alternative: completely hide the grid in dark mode */
+.dark .mermaid defs pattern {
+  display: none !important;
+}
+
+/* Ensure graph container has proper background */
+.dark .mermaid {
+  background: transparent !important;
+}
+
+/* Fix any white rectangles used as backgrounds */
+.dark .mermaid rect[fill="white"],
+.dark .mermaid rect[fill="#ffffff"],
+.dark .mermaid rect[fill="#FFFFFF"] {
+  fill: transparent !important;
+}
+
+/* Fix grid lines if they exist as path elements */
+.dark .mermaid path[stroke="white"],
+.dark .mermaid path[stroke="#ffffff"],
+.dark .mermaid path[stroke="#FFFFFF"],
+.dark .mermaid line[stroke="white"],
+.dark .mermaid line[stroke="#ffffff"],
+.dark .mermaid line[stroke="#FFFFFF"] {
+  stroke: rgb(63 63 70) !important; /* zinc-700 */
+  stroke-opacity: 0.2 !important;
 }

@@ -79,8 +79,8 @@ function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
       onCheckedChange={config.permissions.runDags ? handleCheckedChange : undefined}
       disabled={!config.permissions.runDags}
       aria-label={ariaLabel} // Pass aria-label directly
-      // Add custom styling for unchecked state visibility
-      className="data-[state=unchecked]:bg-gray-300 dark:data-[state=unchecked]:bg-gray-700 cursor-pointer"
+      // Add custom styling for better visibility in both states
+      className="data-[state=checked]:bg-emerald-700 dark:data-[state=checked]:bg-emerald-800 data-[state=unchecked]:bg-gray-300 dark:data-[state=unchecked]:bg-gray-600 cursor-pointer"
     />
   );
 }

@@ -1,7 +1,10 @@
-import React, { createContext, useCallback, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+
+export type Theme = 'dark' | 'light';
 
 export type UserPreferences = {
   pageLimit: number;
+  theme: Theme;
 };
 
 const UserPreferencesContext = createContext<{
@@ -10,6 +13,7 @@ const UserPreferencesContext = createContext<{
     key: K,
     value: UserPreferences[K]
   ) => void;
+  toggleTheme: () => void;
 }>(null!);
 
 export function UserPreferencesProvider({
@@ -20,17 +24,41 @@ export function UserPreferencesProvider({
   const [preferences, setPreferences] = useState<UserPreferences>(() => {
     try {
       const saved = localStorage.getItem('user_preferences');
-      const defaultPrefs = {
+      const defaultPrefs: UserPreferences = {
         pageLimit: 50,
+        theme: 'dark', // Default to dark theme
       };
-      return saved ? { ...defaultPrefs, ...JSON.parse(saved) } : defaultPrefs;
+      const prefs = saved ? { ...defaultPrefs, ...JSON.parse(saved) } : defaultPrefs;
+      
+      // Apply theme class immediately during initialization
+      const root = document.documentElement;
+      if (prefs.theme === 'dark') {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+      
+      return prefs;
     } catch {
       // Fallback to defaults if parsing fails
+      // Apply dark theme immediately
+      document.documentElement.classList.add('dark');
       return {
         pageLimit: 50,
+        theme: 'dark' as Theme,
       };
     }
   });
+
+  // Apply theme class to document root
+  useEffect(() => {
+    const root = document.documentElement;
+    if (preferences.theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [preferences.theme]);
 
   const updatePreference = useCallback(
     <K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) => {
@@ -43,8 +71,13 @@ export function UserPreferencesProvider({
     []
   );
 
+  const toggleTheme = useCallback(() => {
+    const newTheme = preferences.theme === 'dark' ? 'light' : 'dark';
+    updatePreference('theme', newTheme);
+  }, [preferences.theme, updatePreference]);
+
   return (
-    <UserPreferencesContext.Provider value={{ preferences, updatePreference }}>
+    <UserPreferencesContext.Provider value={{ preferences, updatePreference, toggleTheme }}>
       {children}
     </UserPreferencesContext.Provider>
   );

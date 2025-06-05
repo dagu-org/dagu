@@ -173,7 +173,7 @@ function CustomDateTimeInput({
         onKeyDown={handleKeyDown}
         onClick={() => setCursorPosition(inputRef.current?.selectionStart || 0)}
         placeholder="YYYY-MM-DD HH:mm:ss"
-        className={cn(className, 'w-44 font-mono text-gray-600 pt-1')}
+        className={cn(className, 'w-44 font-mono text-foreground placeholder:text-muted-foreground/60 pt-1')}
       />
       <button
         type="button"
@@ -188,7 +188,7 @@ function CustomDateTimeInput({
         type="datetime-local"
         value={value || ''}
         onChange={handleDatePickerChange}
-        className="sr-only"
+        className="sr-only dark:color-scheme-dark"
         tabIndex={-1}
         aria-hidden="true"
       />
@@ -218,13 +218,7 @@ export function DateRangePicker({
       <CalendarRange className="h-4 w-4 text-muted-foreground mr-2" />
 
       <div className="flex flex-1 flex-col sm:flex-row">
-        <div className="relative flex-1">
-          <label
-            htmlFor="fromDate"
-            className="absolute -top-2 left-2 px-1 text-xs text-muted-foreground bg-background"
-          >
-            {fromLabel}
-          </label>
+        <div className="flex-1">
           <CustomDateTimeInput
             id="fromDate"
             value={fromDate}
@@ -239,13 +233,7 @@ export function DateRangePicker({
           →
         </div>
 
-        <div className="relative flex-1">
-          <label
-            htmlFor="toDate"
-            className="absolute -top-2 left-2 px-1 text-xs text-muted-foreground bg-background"
-          >
-            {toLabel}
-          </label>
+        <div className="flex-1">
           <CustomDateTimeInput
             id="toDate"
             value={toDate}
