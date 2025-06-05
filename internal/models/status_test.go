@@ -167,6 +167,7 @@ func TestDAGRunStatus_MarshalJSON(t *testing.T) {
 				Name:     "test-dag",
 				DAGRunID: "test-run-handler",
 				Status:   scheduler.StatusSuccess,
+				Log:      "/var/log/dagu/test-dag/test-run-handler.log",
 				OnExit: &models.Node{
 					Step:   digraph.Step{Name: "onExit"},
 					Stdout: "/var/log/dagu/test-dag/onExit.stdout.log",
@@ -183,12 +184,12 @@ func TestDAGRunStatus_MarshalJSON(t *testing.T) {
 				err := json.Unmarshal(data, &result)
 				require.NoError(t, err)
 
-				// Handler nodes should not have their stdout paths replaced in current implementation
+				// Handler nodes should also have their paths replaced with placeholders
 				onExit := result["onExit"].(map[string]any)
-				require.Equal(t, "/var/log/dagu/test-dag/onExit.stdout.log", onExit["stdout"])
+				require.Equal(t, "__INTERNAL_LOG_DIR__/onExit.stdout.log", onExit["stdout"])
 
 				onFailure := result["onFailure"].(map[string]any)
-				require.Equal(t, "/var/log/dagu/test-dag/onFailure.stdout.log", onFailure["stdout"])
+				require.Equal(t, "__INTERNAL_LOG_DIR__/onFailure.stdout.log", onFailure["stdout"])
 			},
 		},
 	}
@@ -366,6 +367,38 @@ func TestStatusFromJSON(t *testing.T) {
 			jsonData: ``,
 			wantErr:  true,
 		},
+		{
+			name: "deserialize with handler nodes",
+			jsonData: `{
+				"name": "test-dag",
+				"dagRunId": "test-run-handlers",
+				"status": 4,
+				"log": "/var/log/dagu/test-dag/test-run-handlers.log",
+				"onExit": {
+					"step": {"name": "cleanup"},
+					"stdout": "__INTERNAL_LOG_DIR__/cleanup.stdout.log",
+					"stderr": "__INTERNAL_LOG_DIR__/cleanup.stderr.log",
+					"status": 4
+				},
+				"onFailure": {
+					"step": {"name": "notify"},
+					"stdout": "__INTERNAL_LOG_DIR__/notify.stdout.log",
+					"status": 5
+				}
+			}`,
+			validate: func(t *testing.T, status *models.DAGRunStatus) {
+				require.Equal(t, "test-dag", status.Name)
+				require.Equal(t, "/var/log/dagu/test-dag/test-run-handlers.log", status.Log)
+				
+				// Check handler nodes have placeholders replaced
+				require.NotNil(t, status.OnExit)
+				require.Equal(t, "/var/log/dagu/test-dag/cleanup.stdout.log", status.OnExit.Stdout)
+				require.Equal(t, "/var/log/dagu/test-dag/cleanup.stderr.log", status.OnExit.Stderr)
+				
+				require.NotNil(t, status.OnFailure)
+				require.Equal(t, "/var/log/dagu/test-dag/notify.stdout.log", status.OnFailure.Stdout)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -383,6 +416,60 @@ func TestStatusFromJSON(t *testing.T) {
 			tt.validate(t, status)
 		})
 	}
+}
+
+
+func TestDAGRunStatus_MarshalJSON_DoesNotModifyOriginal(t *testing.T) {
+	// Test that MarshalJSON does not modify the original data
+	original := models.DAGRunStatus{
+		Name:     "test-dag",
+		DAGRunID: "test-run-immutable",
+		Status:   scheduler.StatusRunning,
+		Log:      "/var/log/dagu/test-dag/test-run-immutable.log",
+		Nodes: []*models.Node{
+			{
+				Step:   digraph.Step{Name: "step1"},
+				Stdout: "/var/log/dagu/test-dag/step1.stdout.log",
+				Stderr: "/var/log/dagu/test-dag/step1.stderr.log",
+				Status: scheduler.NodeStatusRunning,
+			},
+		},
+		OnExit: &models.Node{
+			Step:   digraph.Step{Name: "onExit"},
+			Stdout: "/var/log/dagu/test-dag/onExit.stdout.log",
+			Status: scheduler.NodeStatusNone,
+		},
+	}
+
+	// Store original values
+	originalNodeStdout := original.Nodes[0].Stdout
+	originalNodeStderr := original.Nodes[0].Stderr
+	originalOnExitStdout := original.OnExit.Stdout
+
+	// Marshal (this should not modify the original)
+	data, err := original.MarshalJSON()
+	require.NoError(t, err)
+
+	// Verify original data is unchanged
+	require.Equal(t, "/var/log/dagu/test-dag/step1.stdout.log", original.Nodes[0].Stdout)
+	require.Equal(t, "/var/log/dagu/test-dag/step1.stderr.log", original.Nodes[0].Stderr)
+	require.Equal(t, "/var/log/dagu/test-dag/onExit.stdout.log", original.OnExit.Stdout)
+	require.Equal(t, originalNodeStdout, original.Nodes[0].Stdout)
+	require.Equal(t, originalNodeStderr, original.Nodes[0].Stderr)
+	require.Equal(t, originalOnExitStdout, original.OnExit.Stdout)
+
+	// Verify marshaled data has placeholders
+	var result map[string]any
+	err = json.Unmarshal(data, &result)
+	require.NoError(t, err)
+
+	nodes := result["nodes"].([]any)
+	node := nodes[0].(map[string]any)
+	require.Equal(t, "__INTERNAL_LOG_DIR__/step1.stdout.log", node["stdout"])
+	require.Equal(t, "__INTERNAL_LOG_DIR__/step1.stderr.log", node["stderr"])
+
+	onExit := result["onExit"].(map[string]any)
+	require.Equal(t, "__INTERNAL_LOG_DIR__/onExit.stdout.log", onExit["stdout"])
 }
 
 func TestDAGRunStatus_MarshalJSON_RoundTrip(t *testing.T) {

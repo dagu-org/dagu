@@ -170,21 +170,13 @@ func StatusFromJSON(s string) (*DAGRunStatus, error) {
 		return nil, err
 	}
 
-	// Replace the log directory placeholder with the actual log directory
-	var logDir string
-	if status.Log != "" {
-		logDir = strings.TrimSuffix(filepath.Dir(status.Log), "/")
-	}
+	// Replace placeholders with actual log directory
+	logDir := extractLogDir(status.Log)
 	if logDir != "" {
-		for _, node := range status.Nodes {
-			if node == nil {
-				continue
-			}
-			node.Stdout = strings.ReplaceAll(node.Stdout, logDirPlaceholder, logDir)
-			node.Stderr = strings.ReplaceAll(node.Stderr, logDirPlaceholder, logDir)
-		}
+		status.replaceNodePaths(logDir, false)
 	}
-	return status, err
+	
+	return status, nil
 }
 
 // DAGRunStatus represents the complete execution state of a dag-run.
@@ -211,22 +203,47 @@ type DAGRunStatus struct {
 	Preconditions []*digraph.Condition `json:"preconditions,omitempty"`
 }
 
+// MarshalJSON customizes the JSON marshaling to replace log paths with placeholders
 func (st DAGRunStatus) MarshalJSON() ([]byte, error) {
+	// Create a deep copy to avoid modifying the original
 	copy := st
-	// Replace the actual log directory with the placeholder
-	var logDir string
-	if st.Log != "" {
-		logDir = strings.TrimSuffix(filepath.Dir(st.Log), "/")
-	}
-	if logDir != "" {
-		for _, node := range copy.Nodes {
-			if node == nil {
-				continue
+	
+	// Deep copy regular nodes since they are pointers
+	if st.Nodes != nil {
+		copy.Nodes = make([]*Node, len(st.Nodes))
+		for i, node := range st.Nodes {
+			if node != nil {
+				nodeCopy := *node
+				copy.Nodes[i] = &nodeCopy
 			}
-			node.Stdout = strings.ReplaceAll(node.Stdout, logDir, logDirPlaceholder)
-			node.Stderr = strings.ReplaceAll(node.Stderr, logDir, logDirPlaceholder)
 		}
 	}
+	
+	// Deep copy handler nodes since they are pointers
+	if st.OnExit != nil {
+		exitCopy := *st.OnExit
+		copy.OnExit = &exitCopy
+	}
+	if st.OnSuccess != nil {
+		successCopy := *st.OnSuccess
+		copy.OnSuccess = &successCopy
+	}
+	if st.OnFailure != nil {
+		failureCopy := *st.OnFailure
+		copy.OnFailure = &failureCopy
+	}
+	if st.OnCancel != nil {
+		cancelCopy := *st.OnCancel
+		copy.OnCancel = &cancelCopy
+	}
+	
+	// Replace actual paths with placeholders for portability
+	logDir := extractLogDir(st.Log)
+	if logDir != "" {
+		copy.replaceNodePaths(logDir, true)
+	}
+	
+	// Use type alias to avoid infinite recursion
 	type Alias DAGRunStatus
 	return json.Marshal(&struct {
 		*Alias
@@ -292,6 +309,44 @@ func (s *DAGRunStatus) setNodes(nodes []scheduler.NodeData) []*Node {
 		ret = append(ret, newNode(node))
 	}
 	return ret
+}
+
+// extractLogDir extracts the log directory from a log file path
+func extractLogDir(logPath string) string {
+	if logPath == "" {
+		return ""
+	}
+	return strings.TrimSuffix(filepath.Dir(logPath), "/")
+}
+
+// replaceNodePaths replaces paths in all nodes (including handler nodes)
+// If toPlaceholder is true, replaces actual paths with placeholder
+// If toPlaceholder is false, replaces placeholder with actual paths
+func (st *DAGRunStatus) replaceNodePaths(logDir string, toPlaceholder bool) {
+	// Helper function to replace paths in a single node
+	replacePaths := func(node *Node) {
+		if node == nil {
+			return
+		}
+		if toPlaceholder {
+			node.Stdout = strings.ReplaceAll(node.Stdout, logDir, logDirPlaceholder)
+			node.Stderr = strings.ReplaceAll(node.Stderr, logDir, logDirPlaceholder)
+		} else {
+			node.Stdout = strings.ReplaceAll(node.Stdout, logDirPlaceholder, logDir)
+			node.Stderr = strings.ReplaceAll(node.Stderr, logDirPlaceholder, logDir)
+		}
+	}
+	
+	// Process regular nodes
+	for _, node := range st.Nodes {
+		replacePaths(node)
+	}
+	
+	// Process handler nodes
+	replacePaths(st.OnExit)
+	replacePaths(st.OnSuccess)
+	replacePaths(st.OnFailure)
+	replacePaths(st.OnCancel)
 }
 
 // logDirPlaceholder is a placeholder for the log directory in the status JSON.
