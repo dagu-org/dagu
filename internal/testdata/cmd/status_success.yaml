@@ -1,0 +1,4 @@
+name: status-success
+steps:
+  - name: "success"
+    command: "echo 'Success!'"

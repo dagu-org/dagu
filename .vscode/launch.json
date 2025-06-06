@@ -37,6 +37,14 @@
       "args": ["start", "${input:pathToSpec}"]
     },
     {
+      "name": "Status",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/cmd/",
+      "args": ["status", "${input:pathToSpec}"]
+    },
+    {
       "name": "Enqueue",
       "type": "go",
       "request": "launch",

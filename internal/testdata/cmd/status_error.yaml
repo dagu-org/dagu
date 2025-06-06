@@ -1,0 +1,4 @@
+name: status-error
+steps:
+  - name: "error"
+    command: "exit 1"
