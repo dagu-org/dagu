@@ -454,15 +454,15 @@ Automatically retry failed steps with configurable error codes:
       retryPolicy:
         limit: 3
         intervalSec: 5
-        exitCodes: [1, 2]  # Optional: List of exit codes that should trigger a retry
+        exitCode: [1, 2]  # Optional: List of exit codes that should trigger a retry
 
 The retry policy supports the following parameters:
 
 - ``limit``: Maximum number of retry attempts (required)
 - ``intervalSec``: Time in seconds to wait between retries (required)
-- ``exitCodes``: List of exit codes that should trigger a retry (optional)
+- ``exitCode``: List of exit codes that should trigger a retry (optional)
 
-If ``exitCodes`` is not specified, any non-zero exit code will trigger a retry. When ``exitCodes`` is specified, only the listed exit codes will trigger a retry.
+If ``exitCode`` is not specified, any non-zero exit code will trigger a retry. When ``exitCode`` is specified, only the listed exit codes will trigger a retry.
 
 Example with custom error codes:
 
@@ -474,7 +474,7 @@ Example with custom error codes:
       retryPolicy:
         limit: 3
         intervalSec: 30
-        exitCodes: [429, 503]  # Retry on rate limit and service unavailable errors
+        exitCode: [429, 503]  # Retry on rate limit and service unavailable errors
 
 In this example:
 - The command will be retried up to 3 times
