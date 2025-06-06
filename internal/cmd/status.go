@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -264,6 +265,134 @@ func displayStepSummary(nodes []*models.Node) {
 			fmt.Println()
 		}
 	}
+
+	// Show detailed step information with log preview
+	fmt.Println()
+	headerColor = color.New(color.FgCyan, color.Bold)
+	_, _ = headerColor.Println("Step Logs Preview")
+	fmt.Println(strings.Repeat("-", 80))
+
+	// Create detailed table
+	detailTable := table.NewWriter()
+	detailTable.SetStyle(table.StyleLight)
+	detailTable.SetColumnConfigs([]table.ColumnConfig{
+		{Number: 1, AutoMerge: false, WidthMin: 15, WidthMax: 20},
+		{Number: 2, AutoMerge: false, WidthMin: 30, WidthMax: 40},
+		{Number: 3, AutoMerge: false, WidthMin: 30, WidthMax: 40},
+	})
+	detailTable.AppendHeader(table.Row{"Step", "Stdout (first line)", "Stderr (first line)"})
+
+	// Show all steps with log preview
+	for i, node := range nodes {
+		// Read first line of logs
+		stdoutPreview := readFirstLine(node.Stdout)
+		stderrPreview := readFirstLine(node.Stderr)
+
+		detailTable.AppendRow(table.Row{
+			text.WrapSoft(node.Step.Name, 18),
+			text.WrapSoft(stdoutPreview, 38),
+			text.WrapSoft(stderrPreview, 38),
+		})
+
+		// Limit detailed view to reasonable number
+		if i >= 20 && len(nodes) > 25 {
+			detailTable.AppendRow(table.Row{
+				fmt.Sprintf("... %d more", len(nodes)-21),
+				"...",
+				"...",
+			})
+			break
+		}
+	}
+
+	fmt.Println(detailTable.Render())
+}
+
+// readFirstLine reads the first line of a file and adds ellipsis if there's more content
+func readFirstLine(path string) string {
+	if path == "" {
+		return "-"
+	}
+
+	// #nosec G304 - file path is from trusted DAG execution status data
+	file, err := os.Open(path)
+	if err != nil {
+		return "(unable to read)"
+	}
+	defer func() {
+		_ = file.Close() // ignore close error for status display
+	}()
+
+	// Read up to 2KB to handle very long lines and detect binary content
+	buffer := make([]byte, 2048)
+	n, err := file.Read(buffer)
+	if err != nil && n == 0 {
+		return "(empty)"
+	}
+
+	// Check for binary content (null bytes or high percentage of non-printable chars)
+	content := buffer[:n]
+	if isBinaryContent(content) {
+		return "(binary data)"
+	}
+
+	// Convert to string - Go handles invalid UTF-8 gracefully with replacement chars
+	text := string(content)
+
+	// Find first line or use entire text if no newline
+	lines := strings.SplitN(text, "\n", 2)
+	firstLine := lines[0]
+
+	// Check if there's more content
+	hasMoreLines := len(lines) > 1 && lines[1] != ""
+	hasMoreData := n == len(buffer) // buffer was filled, likely more data
+	
+	// For very long single lines, be more aggressive with truncation
+	maxDisplayLength := 45
+	if hasMoreData && !hasMoreLines {
+		// Long line without breaks - show less to indicate truncation
+		maxDisplayLength = 35
+	}
+
+	// Truncate if too long - simple byte truncation is fine for display
+	if len(firstLine) > maxDisplayLength {
+		return firstLine[:maxDisplayLength-3] + "..."
+	}
+
+	// Add ellipsis if there's more content
+	if hasMoreLines || hasMoreData {
+		if len(firstLine) > 30 {
+			return firstLine[:27] + "..."
+		}
+		return firstLine + "..."
+	}
+
+	return firstLine
+}
+
+// isBinaryContent checks if the content appears to be binary data
+func isBinaryContent(data []byte) bool {
+	if len(data) == 0 {
+		return false
+	}
+
+	// Check for null bytes (strong indicator of binary)
+	for _, b := range data {
+		if b == 0 {
+			return true
+		}
+	}
+
+	// Count non-printable characters (excluding common whitespace)
+	nonPrintable := 0
+	for _, b := range data {
+		if b < 32 && b != '\t' && b != '\n' && b != '\r' {
+			nonPrintable++
+		}
+	}
+
+	// If more than 30% non-printable, consider it binary
+	return float64(nonPrintable)/float64(len(data)) > 0.3
 }
 
 // formatStatus returns a colored status string
