@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
@@ -43,23 +45,13 @@ func runStatus(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to get dag-run ID: %w", err)
 	}
 
-	name := args[0]
-
-	var attempt models.DAGRunAttempt
-	if dagRunID != "" {
-		// Retrieve the previous run's record for the specified dag-run ID.
-		dagRunRef := digraph.NewDAGRunRef(name, dagRunID)
-		att, err := ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
-		if err != nil {
-			return fmt.Errorf("failed to find run data for dag-run ID %s: %w", dagRunID, err)
-		}
-		attempt = att
-	} else {
-		r, err := ctx.DAGRunStore.LatestAttempt(ctx, name)
-		if err != nil {
-			return fmt.Errorf("failed to find the latest run data for DAG %s: %w", name, err)
-		}
-		attempt = r
+	name, err := extractDAGName(ctx, args[0])
+	if err != nil {
+		return fmt.Errorf("failed to extract DAG name: %w", err)
+	}
+	attempt, err := extractAttemptID(ctx, name, dagRunID)
+	if err != nil {
+		return fmt.Errorf("failed to extract attempt ID: %w", err)
 	}
 
 	dag, err := attempt.ReadDAG(ctx)
@@ -67,12 +59,60 @@ func runStatus(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read DAG from run data: %w", err)
 	}
 
-	status, err := ctx.DAGRunMgr.GetCurrentStatus(ctx, dag, dagRunID)
+	status, err := attempt.ReadStatus(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to retrieve current status: %w", err)
+		return fmt.Errorf("failed to read status from attempt: %w", err)
 	}
 
-	logger.Info(ctx, "Current status", "pid", status.PID, "status", status.Status.String())
+	if status.Status == scheduler.StatusRunning {
+		realtimeStatus, err := ctx.DAGRunMgr.GetCurrentStatus(ctx, dag, dagRunID)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve current status: %w", err)
+		}
+		if realtimeStatus.DAGRunID == status.DAGRunID {
+			status = realtimeStatus
+		}
+	}
+
+	logger.Info(ctx, "Latest status", "pid", status.PID, "status", status.Status.String())
 
 	return nil
+}
+
+func extractDAGName(ctx *Context, name string) (string, error) {
+	if strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".yml") {
+		// Read the DAG from the file.
+		dagStore, err := ctx.dagStore(nil, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to initialize DAG store: %w", err)
+		}
+		dag, err := dagStore.GetMetadata(ctx, name)
+		if err != nil {
+			return "", fmt.Errorf("failed to read DAG metadata from file %s: %w", name, err)
+		}
+		// Return the DAG name.
+		return dag.Name, nil
+	}
+
+	// Otherwise, treat it as a DAG name.
+	return name, nil
+}
+
+func extractAttemptID(ctx *Context, name, dagRunID string) (models.DAGRunAttempt, error) {
+	if dagRunID != "" {
+		// Retrieve the previous run's record for the specified dag-run ID.
+		dagRunRef := digraph.NewDAGRunRef(name, dagRunID)
+		att, err := ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find run data for dag-run ID %s: %w", dagRunID, err)
+		}
+		return att, nil
+	}
+
+	// If it's not a file, treat it as a DAG name.
+	att, err := ctx.DAGRunStore.LatestAttempt(ctx, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find the latest run data for DAG %s: %w", name, err)
+	}
+	return att, nil
 }
