@@ -1,10 +1,7 @@
 name: status-with-params
-params: "default1 default2"
+params:
+  - param1
+  - param2
 steps:
-  - name: "step1"
-    command: "echo 'Param 1: $1, Param 2: $2'"
-    output: RESULT
-  - name: "step2"
-    command: "echo 'Got: ${RESULT}'"
-    depends:
-      - "step1"
+  - name: "print-params"
+    command: "echo Param1: ${param1}, Param2: ${param2}"
