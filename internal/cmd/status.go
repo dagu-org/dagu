@@ -166,6 +166,8 @@ func displayDetailedStatus(dag *digraph.DAG, status *models.DAGRunStatus) {
 		fmt.Printf("%s The DAG was cancelled.\n", color.YellowString("⚠"))
 	case scheduler.StatusQueued:
 		fmt.Printf("%s The DAG is queued for execution.\n", color.BlueString("●"))
+	case scheduler.StatusNone:
+		fmt.Printf("%s The DAG has not been started yet.\n", color.New(color.Faint).Sprint("○"))
 	}
 }
 

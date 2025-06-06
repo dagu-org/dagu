@@ -1,0 +1,15 @@
+name: status-skipped
+steps:
+  - name: "check"
+    command: "false"
+    continueOn:
+      failure: true
+  - name: "skipped-step"
+    command: "echo 'This will be skipped'"
+    preconditions:
+      - condition: "`echo 0`"
+        expected: "1"
+  - name: "final"
+    command: "echo 'Final step'"
+    depends:
+      - "check"

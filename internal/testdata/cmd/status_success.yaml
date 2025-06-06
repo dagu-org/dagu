@@ -1,0 +1,8 @@
+name: status-success
+steps:
+  - name: "step1"
+    command: "echo 'Step 1 completed'"
+  - name: "step2"
+    command: "echo 'Step 2 completed'"
+    depends:
+      - "step1"

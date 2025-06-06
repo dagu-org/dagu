@@ -1,0 +1,14 @@
+name: status-multiple
+steps:
+  - name: "parallel-1"
+    command: "sleep 0.1 && echo 'Parallel 1'"
+  - name: "parallel-2"
+    command: "sleep 0.1 && echo 'Parallel 2'"
+  - name: "parallel-3"
+    command: "sleep 0.1 && echo 'Parallel 3'"
+  - name: "final"
+    command: "echo 'All done'"
+    depends:
+      - "parallel-1"
+      - "parallel-2"
+      - "parallel-3"

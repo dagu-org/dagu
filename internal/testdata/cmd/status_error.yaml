@@ -1,0 +1,12 @@
+name: status-error
+steps:
+  - name: "step1"
+    command: "echo 'Starting step 1'"
+  - name: "step2"
+    command: "false"
+    depends:
+      - "step1"
+  - name: "step3"
+    command: "echo 'This should not run'"
+    depends:
+      - "step2"
