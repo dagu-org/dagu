@@ -404,7 +404,7 @@ func (dr DataRoot) listDAGRunsInRange(ctx context.Context, start, end models.Tim
 				_ = processFilesParallel(ctx, files, func(filePath string) error {
 					run, err := NewDAGRun(filePath)
 					if err != nil {
-						logger.Debugf(ctx, "Failed to create run from file %s: %v", filePath)
+						logger.Debug(ctx, "Failed to create run from file %s", filePath, "err", err)
 						return err
 					}
 					// Check if the timestamp is within the range
