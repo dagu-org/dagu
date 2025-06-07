@@ -52,6 +52,14 @@ var (
 		usage:     "Parameters to pass to the dag-run (overrides DAG defaults; supports positional values and key=value pairs, e.g., P1=foo P2=bar)",
 	}
 
+	// noQueueFlag is used to indicate that the dag-run should not be queued and should be executed immediately.
+	noQueueFlag = commandLineFlag{
+		name:      "no-queue",
+		usage:     "Do not queue the dag-run, execute immediately",
+		isBool:    true,
+		shorthand: "n",
+	}
+
 	// Unique dag-run ID required for retrying a dag-run.
 	// This flag must be provided when using the retry command.
 	dagRunIDFlagRetry = commandLineFlag{

@@ -87,6 +87,7 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 		fmt.Sprintf("--parent=%s", env.DAGRunRef().String()),
 		fmt.Sprintf("--run-id=%s", e.dagRunID),
 		"--quiet",
+		"--no-queue",
 		e.dag.Location,
 	}
 
