@@ -95,6 +95,7 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "signalOnStop", fn: buildSignalOnStop},
 	{name: "precondition", fn: buildStepPrecondition},
 	{name: "output", fn: buildOutput},
+	{name: "parallel", fn: buildParallel},
 	{name: "validate", fn: validateStep},
 }
 
@@ -756,6 +757,24 @@ func validateStep(_ BuildContext, def stepDef, step *Step) error {
 		}
 	}
 
+	// Validate parallel configuration
+	if step.Parallel != nil {
+		// Parallel steps must have a run field (child-DAG only for MVP)
+		if step.ChildDAG == nil {
+			return wrapError("parallel", step.Parallel, fmt.Errorf("parallel execution is only supported for child-DAGs (must have 'run' field)"))
+		}
+		
+		// MaxConcurrent must be positive
+		if step.Parallel.MaxConcurrent <= 0 {
+			return wrapError("parallel.maxConcurrent", step.Parallel.MaxConcurrent, fmt.Errorf("maxConcurrent must be greater than 0"))
+		}
+		
+		// Items must not be empty (but can be a variable reference that will be resolved at runtime)
+		if len(step.Parallel.Items) == 0 {
+			return wrapError("parallel.items", step.Parallel.Items, fmt.Errorf("parallel items cannot be empty"))
+		}
+	}
+
 	return nil
 }
 
@@ -946,4 +965,70 @@ func parseStringOrArray(v any) ([]string, error) {
 		return nil, fmt.Errorf("string or array expected, got %T", v)
 
 	}
+}
+
+// buildParallel parses the parallel field in the step definition.
+// MVP supports:
+// - Direct array reference: parallel: ${ITEMS}
+// - Static array: parallel: [item1, item2]
+// - Object configuration: parallel: {items: [...], maxConcurrent: 5}
+func buildParallel(ctx BuildContext, def stepDef, step *Step) error {
+	if def.Parallel == nil {
+		return nil
+	}
+
+	step.Parallel = &ParallelConfig{
+		MaxConcurrent: DefaultMaxConcurrent,
+	}
+
+	switch v := def.Parallel.(type) {
+	case string:
+		// Direct variable reference like: parallel: ${ITEMS}
+		// The actual items will be resolved at runtime
+		step.Parallel.Items = []any{v}
+		
+	case []any:
+		// Static array: parallel: [item1, item2]
+		step.Parallel.Items = v
+		
+	case map[string]any:
+		// Object configuration
+		for key, val := range v {
+			switch key {
+			case "items":
+				switch items := val.(type) {
+				case string:
+					// Variable reference in object form
+					step.Parallel.Items = []any{items}
+				case []any:
+					// Direct array in object form
+					step.Parallel.Items = items
+				default:
+					return wrapError("parallel.items", val, fmt.Errorf("parallel.items must be string or array, got %T", val))
+				}
+				
+			case "maxConcurrent":
+				switch mc := val.(type) {
+				case int:
+					step.Parallel.MaxConcurrent = mc
+				case int64:
+					step.Parallel.MaxConcurrent = int(mc)
+				case uint64:
+					step.Parallel.MaxConcurrent = int(mc)
+				case float64:
+					step.Parallel.MaxConcurrent = int(mc)
+				default:
+					return wrapError("parallel.maxConcurrent", val, fmt.Errorf("parallel.maxConcurrent must be int, got %T", val))
+				}
+				
+			default:
+				// Ignore unknown keys for now (future extensibility)
+			}
+		}
+		
+	default:
+		return wrapError("parallel", v, fmt.Errorf("parallel must be string, array, or object, got %T", v))
+	}
+
+	return nil
 }

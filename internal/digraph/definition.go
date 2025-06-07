@@ -114,6 +114,12 @@ type stepDef struct {
 	Run string `yaml:"run,omitempty"`
 	// Params specifies the parameters for the child dag-run.
 	Params string `yaml:"params,omitempty"`
+	// Parallel specifies parallel execution configuration.
+	// Can be:
+	// - Direct array reference: parallel: ${ITEMS}
+	// - Static array: parallel: [item1, item2]
+	// - Object configuration: parallel: {items: ${ITEMS}, maxConcurrent: 5}
+	Parallel any `yaml:"parallel,omitempty"`
 }
 
 // continueOnDef defines the conditions to continue on failure or skipped.
