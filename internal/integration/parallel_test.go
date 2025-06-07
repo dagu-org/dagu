@@ -134,7 +134,7 @@ steps:
 `
 	err := os.WriteFile(dagFile, []byte(dagContent), 0600)
 	require.NoError(t, err)
-	t.Cleanup(func() { os.Remove(dagFile) })
+	t.Cleanup(func() { _ = os.Remove(dagFile) })
 
 	// Load and run the DAG
 	dag := th.DAG(t, filepath.Join("integration", "test-parallel-output.yaml"))
@@ -268,7 +268,7 @@ steps:
 `
 	err := os.WriteFile(dagFile, []byte(dagContent), 0600)
 	require.NoError(t, err)
-	t.Cleanup(func() { os.Remove(dagFile) })
+	t.Cleanup(func() { _ = os.Remove(dagFile) })
 
 	// Load and run the DAG
 	dag := th.DAG(t, filepath.Join("integration", "test-deterministic-ids.yaml"))
