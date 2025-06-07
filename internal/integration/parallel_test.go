@@ -587,3 +587,64 @@ steps:
 		t.Fatal("ALL_OUTPUTS not found")
 	}
 }
+
+// TestParallelExecution_OutOfBoundsAccess verifies behavior when accessing out-of-bounds indices
+func TestParallelExecution_OutOfBoundsAccess(t *testing.T) {
+	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	
+	// Create a parent DAG that tries to access out-of-bounds indices
+	testDir := test.TestdataPath(t, "integration")
+	dagFile := filepath.Join(testDir, "test-parallel-out-of-bounds.yaml")
+	dagContent := `name: test-parallel-out-of-bounds
+steps:
+  - name: parallel-tasks
+    run: child-with-output
+    parallel:
+      items: ["task1", "task2"]  # Only 2 items
+    output: RESULTS
+  - name: access-out-of-bounds
+    command: |
+      echo "Valid index 0: ${RESULTS.outputs[0].TASK_OUTPUT}"
+      echo "Valid index 1: ${RESULTS.outputs[1].TASK_OUTPUT}"
+      echo "Out of bounds index 2: ${RESULTS.outputs[2].TASK_OUTPUT}"
+      echo "Out of bounds index 10: ${RESULTS.outputs[10].TASK_OUTPUT}"
+    depends: parallel-tasks
+    output: TEST_OUTPUT
+`
+	err := os.WriteFile(dagFile, []byte(dagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(dagFile) })
+
+	// Load and run the DAG
+	dag := th.DAG(t, filepath.Join("integration", "test-parallel-out-of-bounds.yaml"))
+	agent := dag.Agent()
+	
+	// The DAG should complete (variable expansion handles undefined gracefully)
+	err = agent.Run(agent.Context)
+	require.NoError(t, err)
+	
+	// Get the latest status to check outputs
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	require.Len(t, status.Nodes, 2)
+	
+	// Check the output from the access-out-of-bounds step
+	outOfBoundsNode := status.Nodes[1]
+	require.Equal(t, "access-out-of-bounds", outOfBoundsNode.Step.Name)
+	require.Equal(t, scheduler.NodeStatusSuccess, outOfBoundsNode.Status)
+	
+	if value, ok := outOfBoundsNode.OutputVariables.Load("TEST_OUTPUT"); ok {
+		output := value.(string)
+		// Valid indices should have values
+		require.Contains(t, output, "Valid index 0:")
+		require.Contains(t, output, "TASK_RESULT_task1")
+		require.Contains(t, output, "Valid index 1:")
+		require.Contains(t, output, "TASK_RESULT_task2")
+		// Out of bounds indices should return <nil>
+		require.Contains(t, output, "Out of bounds index 2: <nil>")
+		require.Contains(t, output, "Out of bounds index 10: <nil>")
+	} else {
+		t.Fatal("TEST_OUTPUT not found")
+	}
+}
