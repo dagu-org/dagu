@@ -24,7 +24,7 @@ var (
 	ErrDAGRunIDFormat = errors.New("dag-run ID must only contain alphanumeric characters, dashes, and underscores")
 
 	// ErrDAGRunIDTooLong is returned when the provided dag-run ID is too long
-	ErrDAGRunIDTooLong = errors.New("dag-run ID length must be less than 60 characters")
+	ErrDAGRunIDTooLong = errors.New("dag-run ID length must be less than 64 characters")
 )
 
 // CmdStart creates and returns a cobra command for starting a dag-run
