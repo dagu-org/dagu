@@ -196,7 +196,14 @@ steps:
 			assert.Equal(t, tt.wantMaxConc, step.Parallel.MaxConcurrent)
 
 			if tt.wantFirstItem != nil && len(step.Parallel.Items) > 0 {
-				assert.Equal(t, tt.wantFirstItem, step.Parallel.Items[0])
+				// Check the first item's value
+				firstItem := step.Parallel.Items[0]
+				if firstItem.Value != "" {
+					assert.Equal(t, tt.wantFirstItem, firstItem.Value)
+				} else {
+					// For simple strings in tests, we expect Value to be set
+					assert.Equal(t, tt.wantFirstItem, firstItem.Value)
+				}
 			}
 		})
 	}
@@ -237,8 +244,8 @@ steps:
 
 	// Check the items
 	items := step.Parallel.Items
-	assert.IsType(t, map[string]any{}, items[0])
-	assert.Equal(t, "us-east-1", items[0].(map[string]any)["REGION"])
+	assert.NotNil(t, items[0].Params)
+	assert.Equal(t, "us-east-1", items[0].Params["REGION"])
 }
 
 func TestParallelIntegration(t *testing.T) {

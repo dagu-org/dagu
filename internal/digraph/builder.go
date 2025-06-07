@@ -985,23 +985,31 @@ func buildParallel(ctx BuildContext, def stepDef, step *Step) error {
 	case string:
 		// Direct variable reference like: parallel: ${ITEMS}
 		// The actual items will be resolved at runtime
-		step.Parallel.Items = []any{v}
+		step.Parallel.Items = []ParallelItem{{Value: v}}
 		
 	case []any:
-		// Static array: parallel: [item1, item2]
-		step.Parallel.Items = v
+		// Static array: parallel: [item1, item2] or parallel: [{SOURCE: s3://...}, ...]
+		items, err := parseParallelItems(v)
+		if err != nil {
+			return wrapError("parallel", v, err)
+		}
+		step.Parallel.Items = items
 		
 	case map[string]any:
 		// Object configuration
 		for key, val := range v {
 			switch key {
 			case "items":
-				switch items := val.(type) {
+				switch itemsVal := val.(type) {
 				case string:
 					// Variable reference in object form
-					step.Parallel.Items = []any{items}
+					step.Parallel.Items = []ParallelItem{{Value: itemsVal}}
 				case []any:
 					// Direct array in object form
+					items, err := parseParallelItems(itemsVal)
+					if err != nil {
+						return wrapError("parallel.items", itemsVal, err)
+					}
 					step.Parallel.Items = items
 				default:
 					return wrapError("parallel.items", val, fmt.Errorf("parallel.items must be string or array, got %T", val))
@@ -1031,4 +1039,38 @@ func buildParallel(ctx BuildContext, def stepDef, step *Step) error {
 	}
 
 	return nil
+}
+
+// parseParallelItems converts an array of any type to ParallelItem slice
+func parseParallelItems(items []any) ([]ParallelItem, error) {
+	var result []ParallelItem
+	
+	for _, item := range items {
+		switch v := item.(type) {
+		case string:
+			// Simple string item
+			result = append(result, ParallelItem{Value: v})
+			
+		case int, int64, uint64, float64:
+			// Numeric items, convert to string
+			result = append(result, ParallelItem{Value: fmt.Sprintf("%v", v)})
+			
+		case map[string]any:
+			// Object with parameters
+			params := make(map[string]string)
+			for key, val := range v {
+				strVal, ok := val.(string)
+				if !ok {
+					return nil, fmt.Errorf("parameter values must be strings, got %T for key %s", val, key)
+				}
+				params[key] = strVal
+			}
+			result = append(result, ParallelItem{Params: params})
+			
+		default:
+			return nil, fmt.Errorf("parallel items must be strings, numbers, or objects, got %T", v)
+		}
+	}
+	
+	return result, nil
 }
