@@ -27,5 +27,6 @@ type ParallelItem struct {
 
 	// Params is used for key-value pairs that will be passed as parameters
 	// E.g. {"SOURCE": "s3://customers", "TYPE": "csv"}
-	Params map[string]string `json:"params,omitempty"`
+	// Uses DeterministicMap to ensure consistent JSON marshaling for hashing
+	Params DeterministicMap `json:"params,omitempty"`
 }

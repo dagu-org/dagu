@@ -1057,7 +1057,7 @@ func parseParallelItems(items []any) ([]ParallelItem, error) {
 			
 		case map[string]any:
 			// Object with parameters
-			params := make(map[string]string)
+			params := make(DeterministicMap)
 			for key, val := range v {
 				strVal, ok := val.(string)
 				if !ok {
