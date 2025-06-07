@@ -239,16 +239,31 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 				if err != nil {
 					return nil, fmt.Errorf("failed to eval parallel variable %q: %w", parallel.Variable, err)
 				}
+
 				var items []any
-				if err := json.Unmarshal([]byte(value), &items); err != nil {
-					return nil, fmt.Errorf("failed to unmarshal parallel variable %q: %w", parallel.Variable, err)
+
+				// check if the value is json array
+				if stringutil.IsJSONArray(value) {
+					if err := json.Unmarshal([]byte(value), &items); err != nil {
+						return nil, fmt.Errorf("failed to unmarshal parallel variable %q: %w", parallel.Variable, err)
+					}
+				} else {
+					// Split the value by whitespace
+					for _, f := range strings.Fields(value) {
+						// Add each field as a separate item
+						items = append(items, f)
+					}
 				}
+
 				var childRuns []ChildDAGRun
 				for _, item := range items {
 					var param string
 					switch item := item.(type) {
 					case string:
 						param = item
+					case int, int64, float64:
+						// Convert numeric types to string
+						param = fmt.Sprintf("%v", item)
 					default:
 						// Marshal the item to JSON
 						itemData, err := json.Marshal(item)
