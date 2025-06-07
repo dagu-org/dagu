@@ -102,6 +102,9 @@ const ExecutorTypeDAGLegacy = "subworkflow"
 // ExecutorTypeDAG is the executor type for a child DAG.
 const ExecutorTypeDAG = "dag"
 
+// ExecutorTypeParallel is the executor type for parallel execution.
+const ExecutorTypeParallel = "parallel"
+
 // ExecutorConfig contains the configuration for the executor.
 type ExecutorConfig struct {
 	// Type represents one of the registered executors.

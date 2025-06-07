@@ -23,7 +23,14 @@ type ExitCoder interface {
 
 // DAGExecutor is an interface for child DAG executors.
 type DAGExecutor interface {
+	Executor
 	SetParams(RunParams)
+}
+
+// ParallelExecutor is an interface for parallel step executors.
+type ParallelExecutor interface {
+	Executor
+	SetParamsList([]RunParams)
 }
 
 // RunParams holds the parameters for running a child DAG.

@@ -16,7 +16,6 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
-var _ Executor = (*dagExecutor)(nil)
 var _ DAGExecutor = (*dagExecutor)(nil)
 
 type dagExecutor struct {
