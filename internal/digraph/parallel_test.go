@@ -13,13 +13,14 @@ import (
 
 func TestBuildParallel(t *testing.T) {
 	tests := []struct {
-		name          string
-		yaml          string
-		wantItems     int
-		wantMaxConc   int
+		name         string
+		yaml         string
+		wantItems    int
+		wantMaxConc  int
 		wantFirstItem any
-		wantErr       bool
-		wantErrMsg    string
+		wantVariable string
+		wantErr      bool
+		wantErrMsg   string
 	}{
 		{
 			name: "direct variable reference",
@@ -30,9 +31,9 @@ steps:
     run: workflows/processor
     parallel: ${ITEMS}
 `,
-			wantItems:     1,
-			wantMaxConc:   10, // default
-			wantFirstItem: "${ITEMS}",
+			wantItems:    0,
+			wantVariable: "${ITEMS}",
+			wantMaxConc:  10, // default
 		},
 		{
 			name: "static array",
@@ -93,9 +94,9 @@ steps:
       items: ${ITEMS}
       maxConcurrent: 5
 `,
-			wantItems:     1,
-			wantMaxConc:   5,
-			wantFirstItem: "${ITEMS}",
+			wantItems:    0,
+			wantVariable: "${ITEMS}",
+			wantMaxConc:  5,
 		},
 		{
 			name: "object form with static array and maxConcurrent",
@@ -162,7 +163,7 @@ steps:
       maxConcurrent: 5
 `,
 			wantErr:    true,
-			wantErrMsg: "parallel items cannot be empty",
+			wantErrMsg: "parallel must have either items array or variable reference",
 		},
 	}
 
@@ -194,6 +195,10 @@ steps:
 
 			assert.Equal(t, tt.wantItems, len(step.Parallel.Items))
 			assert.Equal(t, tt.wantMaxConc, step.Parallel.MaxConcurrent)
+
+			if tt.wantVariable != "" {
+				assert.Equal(t, tt.wantVariable, step.Parallel.Variable)
+			}
 
 			if tt.wantFirstItem != nil && len(step.Parallel.Items) > 0 {
 				// Check the first item's value

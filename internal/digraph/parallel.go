@@ -3,6 +3,9 @@ package digraph
 // ParallelConfig contains the configuration for parallel execution of a step.
 // MVP version supports basic parallel execution with maxConcurrent control.
 type ParallelConfig struct {
+	// Variable is the name of a variable that contains the json array of items to process in parallel.
+	Variable string `json:"variable,omitempty"`
+
 	// Items is the array of items to process in parallel.
 	// Can be a direct array or a reference to a variable containing an array.
 	Items []ParallelItem `json:"items,omitempty"`

@@ -763,15 +763,20 @@ func validateStep(_ BuildContext, def stepDef, step *Step) error {
 		if step.ChildDAG == nil {
 			return wrapError("parallel", step.Parallel, fmt.Errorf("parallel execution is only supported for child-DAGs (must have 'run' field)"))
 		}
-		
+
 		// MaxConcurrent must be positive
 		if step.Parallel.MaxConcurrent <= 0 {
 			return wrapError("parallel.maxConcurrent", step.Parallel.MaxConcurrent, fmt.Errorf("maxConcurrent must be greater than 0"))
 		}
-		
-		// Items must not be empty (but can be a variable reference that will be resolved at runtime)
-		if len(step.Parallel.Items) == 0 {
-			return wrapError("parallel.items", step.Parallel.Items, fmt.Errorf("parallel items cannot be empty"))
+
+		// Must have either items or variable reference
+		if len(step.Parallel.Items) == 0 && step.Parallel.Variable == "" {
+			return wrapError("parallel", step.Parallel, fmt.Errorf("parallel must have either items array or variable reference"))
+		}
+
+		// Cannot have both items and variable
+		if len(step.Parallel.Items) > 0 && step.Parallel.Variable != "" {
+			return wrapError("parallel", step.Parallel, fmt.Errorf("parallel cannot have both items array and variable reference"))
 		}
 	}
 
@@ -985,8 +990,10 @@ func buildParallel(ctx BuildContext, def stepDef, step *Step) error {
 	case string:
 		// Direct variable reference like: parallel: ${ITEMS}
 		// The actual items will be resolved at runtime
-		step.Parallel.Items = []ParallelItem{{Value: v}}
-		
+		// It should be resolved to a json array of items
+		// e.g. ["item1", "item2"] or [{"SOURCE": "s3://..."}]
+		step.Parallel.Variable = v
+
 	case []any:
 		// Static array: parallel: [item1, item2] or parallel: [{SOURCE: s3://...}, ...]
 		items, err := parseParallelItems(v)
@@ -994,7 +1001,7 @@ func buildParallel(ctx BuildContext, def stepDef, step *Step) error {
 			return wrapError("parallel", v, err)
 		}
 		step.Parallel.Items = items
-		
+
 	case map[string]any:
 		// Object configuration
 		for key, val := range v {
@@ -1003,7 +1010,7 @@ func buildParallel(ctx BuildContext, def stepDef, step *Step) error {
 				switch itemsVal := val.(type) {
 				case string:
 					// Variable reference in object form
-					step.Parallel.Items = []ParallelItem{{Value: itemsVal}}
+					step.Parallel.Variable = itemsVal
 				case []any:
 					// Direct array in object form
 					items, err := parseParallelItems(itemsVal)
@@ -1014,7 +1021,7 @@ func buildParallel(ctx BuildContext, def stepDef, step *Step) error {
 				default:
 					return wrapError("parallel.items", val, fmt.Errorf("parallel.items must be string or array, got %T", val))
 				}
-				
+
 			case "maxConcurrent":
 				switch mc := val.(type) {
 				case int:
@@ -1028,12 +1035,12 @@ func buildParallel(ctx BuildContext, def stepDef, step *Step) error {
 				default:
 					return wrapError("parallel.maxConcurrent", val, fmt.Errorf("parallel.maxConcurrent must be int, got %T", val))
 				}
-				
+
 			default:
 				// Ignore unknown keys for now (future extensibility)
 			}
 		}
-		
+
 	default:
 		return wrapError("parallel", v, fmt.Errorf("parallel must be string, array, or object, got %T", v))
 	}
@@ -1044,17 +1051,17 @@ func buildParallel(ctx BuildContext, def stepDef, step *Step) error {
 // parseParallelItems converts an array of any type to ParallelItem slice
 func parseParallelItems(items []any) ([]ParallelItem, error) {
 	var result []ParallelItem
-	
+
 	for _, item := range items {
 		switch v := item.(type) {
 		case string:
 			// Simple string item
 			result = append(result, ParallelItem{Value: v})
-			
+
 		case int, int64, uint64, float64:
 			// Numeric items, convert to string
 			result = append(result, ParallelItem{Value: fmt.Sprintf("%v", v)})
-			
+
 		case map[string]any:
 			// Object with parameters
 			params := make(DeterministicMap)
@@ -1066,11 +1073,11 @@ func parseParallelItems(items []any) ([]ParallelItem, error) {
 				params[key] = strVal
 			}
 			result = append(result, ParallelItem{Params: params})
-			
+
 		default:
 			return nil, fmt.Errorf("parallel items must be strings, numbers, or objects, got %T", v)
 		}
 	}
-	
+
 	return result, nil
 }
