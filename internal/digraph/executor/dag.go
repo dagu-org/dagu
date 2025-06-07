@@ -109,7 +109,6 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 	if e.stderr != nil {
 		cmd.Stderr = e.stderr
 	}
-	cmd.Env = append(cmd.Env, fmt.Sprintf("DAGU_DEBUG=true"))
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
