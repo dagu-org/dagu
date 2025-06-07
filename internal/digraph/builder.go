@@ -88,6 +88,7 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "executor", fn: buildExecutor},
 	{name: "command", fn: buildCommand},
 	{name: "depends", fn: buildDepends},
+	{name: "parallel", fn: buildParallel}, // Must be before childDAG to set executor type correctly
 	{name: "childDAG", fn: buildChildDAG},
 	{name: "continueOn", fn: buildContinueOn},
 	{name: "retryPolicy", fn: buildRetryPolicy},
@@ -95,7 +96,6 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "signalOnStop", fn: buildSignalOnStop},
 	{name: "precondition", fn: buildStepPrecondition},
 	{name: "output", fn: buildOutput},
-	{name: "parallel", fn: buildParallel},
 	{name: "validate", fn: validateStep},
 }
 
@@ -823,7 +823,14 @@ func buildChildDAG(_ BuildContext, def stepDef, step *Step) error {
 	}
 
 	step.ChildDAG = &ChildDAG{Name: name, Params: params}
-	step.ExecutorConfig.Type = ExecutorTypeDAG
+	
+	// Set executor type based on whether parallel execution is configured
+	if step.Parallel != nil {
+		step.ExecutorConfig.Type = ExecutorTypeParallel
+	} else {
+		step.ExecutorConfig.Type = ExecutorTypeDAG
+	}
+	
 	step.Command = "run"
 	step.Args = []string{name, params}
 	step.CmdWithArgs = fmt.Sprintf("%s %s", name, params)

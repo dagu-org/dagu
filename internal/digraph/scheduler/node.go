@@ -240,8 +240,9 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 		}
 		n.SetChildRuns(childRuns)
 
-		// For single child DAG (non-parallel), setup the executor
+		// Setup the executor with child DAG run information
 		if n.Step().Parallel == nil {
+			// Single child DAG execution
 			exec, ok := cmd.(executor.DAGExecutor)
 			if !ok {
 				return nil, fmt.Errorf("executor %T does not support child DAG execution", cmd)
@@ -250,10 +251,22 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 				RunID:  childRuns[0].DAGRunID,
 				Params: childRuns[0].Params,
 			})
+		} else {
+			// Parallel child DAG execution
+			exec, ok := cmd.(executor.ParallelExecutor)
+			if !ok {
+				return nil, fmt.Errorf("executor %T does not support parallel execution", cmd)
+			}
+			// Convert ChildDAGRun to executor.RunParams
+			var runParamsList []executor.RunParams
+			for _, childRun := range childRuns {
+				runParamsList = append(runParamsList, executor.RunParams{
+					RunID:  childRun.DAGRunID,
+					Params: childRun.Params,
+				})
+			}
+			exec.SetParamsList(runParamsList)
 		}
-		// TODO: For parallel execution, we'll need a different executor type
-		// that can handle multiple child runs. This will be implemented
-		// when the parallel executor is created.
 	}
 
 	return cmd, nil
