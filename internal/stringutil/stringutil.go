@@ -2,8 +2,10 @@ package stringutil
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -63,4 +65,21 @@ func RemoveQuotes(s string) string {
 		// fall back to returning the original string.
 	}
 	return s
+}
+
+// IsJSONArray checks if the given string is a valid JSON array.
+// This is useful for determining if parallel input should be parsed as JSON or space-separated.
+func IsJSONArray(s string) bool {
+	s = strings.TrimSpace(s)
+	if len(s) < 2 {
+		return false
+	}
+	
+	// Quick check for brackets
+	if s[0] != '[' || s[len(s)-1] != ']' {
+		return false
+	}
+	
+	// Use json.Valid for accurate validation
+	return json.Valid([]byte(s))
 }

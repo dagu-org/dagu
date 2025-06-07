@@ -11,7 +11,6 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/stringutil"
-	"github.com/google/uuid"
 )
 
 // Data is a thread-safe wrapper around NodeData.
@@ -466,12 +465,3 @@ func (d *Data) MarkError(err error) {
 	d.inner.State.Status = NodeStatusError
 }
 
-// generateDAGRunID generates a new dag-run ID.
-// For simplicity, we use UUIDs as dag-run IDs.
-func generateDAGRunID() (string, error) {
-	id, err := uuid.NewV7()
-	if err != nil {
-		return "", err
-	}
-	return id.String(), nil
-}
