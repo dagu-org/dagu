@@ -1,0 +1,10 @@
+name: parallel-simple
+steps:
+  - name: process-items
+    run: child-echo
+    parallel:
+      items:
+        - "item1"
+        - "item2"
+        - "item3"
+      maxConcurrent: 2

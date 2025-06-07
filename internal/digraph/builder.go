@@ -773,11 +773,6 @@ func validateStep(_ BuildContext, def stepDef, step *Step) error {
 		if len(step.Parallel.Items) == 0 && step.Parallel.Variable == "" {
 			return wrapError("parallel", step.Parallel, fmt.Errorf("parallel must have either items array or variable reference"))
 		}
-
-		// Cannot have both items and variable
-		if len(step.Parallel.Items) > 0 && step.Parallel.Variable != "" {
-			return wrapError("parallel", step.Parallel, fmt.Errorf("parallel cannot have both items array and variable reference"))
-		}
 	}
 
 	return nil

@@ -1,0 +1,7 @@
+name: parallel-space-separated
+env:
+  - SERVERS: "server1 server2 server3"
+steps:
+  - name: process-servers
+    run: child-echo
+    parallel: ${SERVERS}
