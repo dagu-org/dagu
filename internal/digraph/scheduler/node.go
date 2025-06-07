@@ -232,79 +232,28 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 		return nil, fmt.Errorf("failed to setup executor IO: %w", err)
 	}
 
+	// Handle child DAG execution
 	if childDAG := n.Step().ChildDAG; childDAG != nil {
-		if parallel := n.Step().Parallel; parallel != nil {
-			if parallel.Variable != "" {
-				value, err := EvalString(ctx, parallel.Variable)
-				if err != nil {
-					return nil, fmt.Errorf("failed to eval parallel variable %q: %w", parallel.Variable, err)
-				}
+		childRuns, err := n.buildChildDAGRuns(ctx, childDAG)
+		if err != nil {
+			return nil, err
+		}
+		n.SetChildRuns(childRuns)
 
-				var items []any
-
-				// check if the value is json array
-				if stringutil.IsJSONArray(value) {
-					if err := json.Unmarshal([]byte(value), &items); err != nil {
-						return nil, fmt.Errorf("failed to unmarshal parallel variable %q: %w", parallel.Variable, err)
-					}
-				} else {
-					// Split the value by whitespace
-					for _, f := range strings.Fields(value) {
-						// Add each field as a separate item
-						items = append(items, f)
-					}
-				}
-
-				var childRuns []ChildDAGRun
-				for _, item := range items {
-					var param string
-					switch item := item.(type) {
-					case string:
-						param = item
-					case int, int64, float64:
-						// Convert numeric types to string
-						param = fmt.Sprintf("%v", item)
-					default:
-						// Marshal the item to JSON
-						itemData, err := json.Marshal(item)
-						if err != nil {
-							return nil, fmt.Errorf("failed to marshal item to JSON: %w", err)
-						}
-						param = string(itemData)
-					}
-					dagRunID := GenerateChildDAGRunID(ctx, param)
-					childRuns = append(childRuns, ChildDAGRun{
-						DAGRunID: dagRunID,
-						Params:   param,
-					})
-				}
-				n.SetChildRuns(childRuns)
-			}
-		} else {
-			// If parallel is not set, we assume a single child DAG run
-			params, err := EvalString(ctx, childDAG.Params)
-			if err != nil {
-				return nil, fmt.Errorf("failed to eval child dag params: %w", err)
-			}
-			// Generate a unique DAG run ID for the child DAG
-			// based on the params
-			dagRunID := GenerateChildDAGRunID(ctx, params)
-			n.SetChildRuns([]ChildDAGRun{
-				{
-					DAGRunID: dagRunID,
-					Params:   params,
-				},
-			})
-			// setup executor for child DAG
+		// For single child DAG (non-parallel), setup the executor
+		if len(childRuns) == 1 && n.Step().Parallel == nil {
 			exec, ok := cmd.(executor.DAGExecutor)
 			if !ok {
 				return nil, fmt.Errorf("executor %T does not support child DAG execution", cmd)
 			}
 			exec.SetParams(executor.RunParams{
-				RunID:  dagRunID,
-				Params: params,
+				RunID:  childRuns[0].DAGRunID,
+				Params: childRuns[0].Params,
 			})
 		}
+		// TODO: For parallel execution, we'll need a different executor type
+		// that can handle multiple child runs. This will be implemented
+		// when the parallel executor is created.
 	}
 
 	return cmd, nil
@@ -574,6 +523,119 @@ func (n *Node) Init() {
 		return
 	}
 	n.id = getNextNodeID()
+}
+
+// buildChildDAGRuns constructs the child DAG runs based on parallel configuration
+func (n *Node) buildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG) ([]ChildDAGRun, error) {
+	parallel := n.Step().Parallel
+	
+	// Single child DAG execution (non-parallel)
+	if parallel == nil {
+		params, err := EvalString(ctx, childDAG.Params)
+		if err != nil {
+			return nil, fmt.Errorf("failed to eval child dag params: %w", err)
+		}
+		dagRunID := GenerateChildDAGRunID(ctx, params)
+		return []ChildDAGRun{{
+			DAGRunID: dagRunID,
+			Params:   params,
+		}}, nil
+	}
+
+	// Parallel execution
+	var items []any
+
+	// Handle variable reference
+	if parallel.Variable != "" {
+		value, err := EvalString(ctx, parallel.Variable)
+		if err != nil {
+			return nil, fmt.Errorf("failed to eval parallel variable %q: %w", parallel.Variable, err)
+		}
+
+		// Check if the value is JSON array or space-separated
+		if stringutil.IsJSONArray(value) {
+			if err := json.Unmarshal([]byte(value), &items); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal parallel variable %q: %w", parallel.Variable, err)
+			}
+		} else {
+			// Split by whitespace for space-separated items
+			for _, field := range strings.Fields(value) {
+				items = append(items, field)
+			}
+		}
+	} else if len(parallel.Items) > 0 {
+		// Handle static items
+		for _, item := range parallel.Items {
+			if item.Value != "" {
+				items = append(items, item.Value)
+			} else if len(item.Params) > 0 {
+				// For params, convert to JSON string
+				paramData, err := json.Marshal(item.Params)
+				if err != nil {
+					return nil, fmt.Errorf("failed to marshal params: %w", err)
+				}
+				items = append(items, json.RawMessage(paramData))
+			}
+		}
+	}
+
+	// Validate we have items
+	if len(items) == 0 {
+		return nil, fmt.Errorf("parallel execution requires at least one item")
+	}
+
+	// Build child runs
+	var childRuns []ChildDAGRun
+	for i, item := range items {
+		param, err := n.itemToParam(item)
+		if err != nil {
+			return nil, fmt.Errorf("failed to process item %d: %w", i, err)
+		}
+		
+		dagRunID := GenerateChildDAGRunID(ctx, param)
+		childRuns = append(childRuns, ChildDAGRun{
+			DAGRunID: dagRunID,
+			Params:   param,
+		})
+	}
+
+	// TODO: Store max concurrent for scheduler to use
+	// This will need to be implemented when parallel execution is added
+	// if parallel.MaxConcurrent > 0 {
+	//     n.SetMaxConcurrent(parallel.MaxConcurrent)
+	// } else {
+	//     n.SetMaxConcurrent(digraph.DefaultMaxConcurrent)
+	// }
+
+	return childRuns, nil
+}
+
+// itemToParam converts a parallel item to a parameter string
+func (n *Node) itemToParam(item any) (string, error) {
+	switch v := item.(type) {
+	case string:
+		return v, nil
+	case int, int8, int16, int32, int64:
+		return fmt.Sprintf("%d", v), nil
+	case uint, uint8, uint16, uint32, uint64:
+		return fmt.Sprintf("%d", v), nil
+	case float32, float64:
+		return fmt.Sprintf("%g", v), nil
+	case bool:
+		return fmt.Sprintf("%t", v), nil
+	case nil:
+		return "null", nil
+	case json.RawMessage:
+		// Already JSON, return as string
+		return string(v), nil
+	default:
+		// For complex types, marshal to JSON
+		data, err := json.Marshal(v)
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal item to JSON: %w", err)
+		}
+		return string(data), nil
+	}
 }
 
 type RetryPolicy struct {
