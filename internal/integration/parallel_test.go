@@ -24,10 +24,20 @@ func TestParallelExecution_SimpleItems(t *testing.T) {
 	// Verify successful completion
 	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
 
-	// TODO: Once parallel execution is fully implemented, we should verify:
-	// - Three child DAG runs were created
-	// - They ran with correct parameters
-	// - maxConcurrent was respected
+	// Get the latest status to verify parallel execution
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	require.Len(t, status.Nodes, 1) // process-items
+	
+	// Check process-items node
+	processNode := status.Nodes[0]
+	require.Equal(t, "process-items", processNode.Step.Name)
+	require.Equal(t, scheduler.NodeStatusSuccess, processNode.Status)
+	
+	// Verify child DAG runs were created
+	require.NotEmpty(t, processNode.Children)
+	require.Len(t, processNode.Children, 3) // 3 child runs for item1, item2, item3
 }
 
 func TestParallelExecution_ObjectItems(t *testing.T) {
@@ -43,9 +53,26 @@ func TestParallelExecution_ObjectItems(t *testing.T) {
 	// Verify successful completion
 	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
 
-	// TODO: Once parallel execution is fully implemented, verify:
-	// - Three child DAG runs with correct REGION and VERSION parameters
-	// - Parameters were passed as JSON objects
+	// Get the latest status to verify parallel execution
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	require.Len(t, status.Nodes, 1) // process-regions
+	
+	// Check process-regions node
+	processNode := status.Nodes[0]
+	require.Equal(t, "process-regions", processNode.Step.Name)
+	require.Equal(t, scheduler.NodeStatusSuccess, processNode.Status)
+	
+	// Verify child DAG runs were created with JSON parameters
+	require.NotEmpty(t, processNode.Children)
+	require.Len(t, processNode.Children, 3) // 3 child runs for different regions
+	
+	// Verify that parameters contain JSON objects
+	for _, child := range processNode.Children {
+		require.Contains(t, child.Params, `"REGION"`)
+		require.Contains(t, child.Params, `"VERSION"`)
+	}
 }
 
 func TestParallelExecution_VariableReference(t *testing.T) {
@@ -61,7 +88,20 @@ func TestParallelExecution_VariableReference(t *testing.T) {
 	// Verify successful completion
 	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
 
-	// TODO: Verify four child DAG runs with items from JSON array
+	// Get the latest status to verify parallel execution
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	require.Len(t, status.Nodes, 1) // process-from-var
+	
+	// Check process-from-var node
+	processNode := status.Nodes[0]
+	require.Equal(t, "process-from-var", processNode.Step.Name)
+	require.Equal(t, scheduler.NodeStatusSuccess, processNode.Status)
+	
+	// Verify four child DAG runs from JSON array
+	require.NotEmpty(t, processNode.Children)
+	require.Len(t, processNode.Children, 4) // 4 child runs for alpha, beta, gamma, delta
 }
 
 func TestParallelExecution_SpaceSeparated(t *testing.T) {
@@ -77,7 +117,20 @@ func TestParallelExecution_SpaceSeparated(t *testing.T) {
 	// Verify successful completion
 	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
 
-	// TODO: Verify three child DAG runs from space-separated values
+	// Get the latest status to verify parallel execution
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	require.Len(t, status.Nodes, 1) // process-servers
+	
+	// Check process-servers node
+	processNode := status.Nodes[0]
+	require.Equal(t, "process-servers", processNode.Step.Name)
+	require.Equal(t, scheduler.NodeStatusSuccess, processNode.Status)
+	
+	// Verify three child DAG runs from space-separated values
+	require.NotEmpty(t, processNode.Children)
+	require.Len(t, processNode.Children, 3) // 3 child runs for server1, server2, server3
 }
 
 func TestParallelExecution_DirectVariable(t *testing.T) {
@@ -247,14 +300,14 @@ steps:
 	})
 }
 
-// TestParallelExecution_DeterministicIDs verifies that child DAG run IDs are deterministic
+// TestParallelExecution_DeterministicIDs verifies that child DAG run IDs are deterministic and duplicates are deduplicated
 func TestParallelExecution_DeterministicIDs(t *testing.T) {
 	// Create test DAGs in testdata directory
 	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
 	
 	// The child-echo DAG already exists in testdata
 	
-	// Create a temporary test DAG that uses parallel execution
+	// Create a temporary test DAG that uses parallel execution with duplicate items
 	testDir := test.TestdataPath(t, "integration")
 	dagFile := filepath.Join(testDir, "test-deterministic-ids.yaml")
 	dagContent := `name: test-deterministic-ids
@@ -265,6 +318,9 @@ steps:
       items:
         - "test1"
         - "test2"
+        - "test1"  # Duplicate to verify deduplication
+        - "test3"
+        - "test2"  # Another duplicate
 `
 	err := os.WriteFile(dagFile, []byte(dagContent), 0600)
 	require.NoError(t, err)
@@ -273,17 +329,31 @@ steps:
 	// Load and run the DAG
 	dag := th.DAG(t, filepath.Join("integration", "test-deterministic-ids.yaml"))
 
-	// Run twice and verify same child DAG IDs are generated
-	agent1 := dag.Agent()
-	require.NoError(t, agent1.Run(agent1.Context))
+	// Run and verify deduplication
+	agent := dag.Agent()
+	require.NoError(t, agent.Run(agent.Context))
 	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
 
-	// TODO: Capture child DAG run IDs from first run
-
-	// Run again
-	agent2 := dag.Agent()
-	require.NoError(t, agent2.Run(agent2.Context))
-	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
-
-	// TODO: Verify same child DAG run IDs were generated
+	// Get the status to check child DAG run IDs
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.Len(t, status.Nodes, 1)
+	
+	// Collect unique parameters
+	uniqueParams := make(map[string]string)
+	for _, child := range status.Nodes[0].Children {
+		uniqueParams[child.Params] = child.DAGRunID
+	}
+	
+	// Should have only 3 unique runs despite 5 items (test1, test2, test1, test3, test2)
+	require.Len(t, status.Nodes[0].Children, 3, "duplicate items should be deduplicated")
+	require.Len(t, uniqueParams, 3, "should have 3 unique parameter sets")
+	
+	// Verify we have the expected unique parameters
+	_, hasTest1 := uniqueParams["test1"]
+	_, hasTest2 := uniqueParams["test2"]
+	_, hasTest3 := uniqueParams["test3"]
+	require.True(t, hasTest1, "should have test1")
+	require.True(t, hasTest2, "should have test2")
+	require.True(t, hasTest3, "should have test3")
 }

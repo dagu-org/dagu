@@ -610,8 +610,8 @@ func (n *Node) buildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG
 		return nil, fmt.Errorf("parallel execution requires at least one item")
 	}
 
-	// Build child runs
-	var childRuns []ChildDAGRun
+	// Build child runs with deduplication
+	childRunMap := make(map[string]ChildDAGRun)
 	for i, item := range items {
 		param, err := n.itemToParam(item)
 		if err != nil {
@@ -619,10 +619,17 @@ func (n *Node) buildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG
 		}
 
 		dagRunID := GenerateChildDAGRunID(ctx, param)
-		childRuns = append(childRuns, ChildDAGRun{
+		// Use dagRunID as key to deduplicate - same params will generate same ID
+		childRunMap[dagRunID] = ChildDAGRun{
 			DAGRunID: dagRunID,
 			Params:   param,
-		})
+		}
+	}
+	
+	// Convert map back to slice
+	var childRuns []ChildDAGRun
+	for _, run := range childRunMap {
+		childRuns = append(childRuns, run)
 	}
 
 	// TODO: Store max concurrent for scheduler to use
