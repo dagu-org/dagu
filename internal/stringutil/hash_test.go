@@ -2,12 +2,10 @@ package stringutil
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestBase58EncodeSHA256(t *testing.T) {
@@ -98,90 +96,6 @@ func TestBase58Encode(t *testing.T) {
 	}
 }
 
-func TestBase58Decode(t *testing.T) {
-	tests := []struct {
-		name        string
-		input       string
-		expected    []byte
-		expectError bool
-	}{
-		{
-			name:     "empty string",
-			input:    "",
-			expected: []byte{},
-		},
-		{
-			name:     "single 1",
-			input:    "1",
-			expected: []byte{0},
-		},
-		{
-			name:     "multiple 1s",
-			input:    "111",
-			expected: []byte{0, 0, 0},
-		},
-		{
-			name:     "simple base58",
-			input:    "Ldp",
-			expected: []byte{1, 2, 3},
-		},
-		{
-			name:        "invalid character 0",
-			input:       "1230",
-			expectError: true,
-		},
-		{
-			name:        "invalid character O",
-			input:       "123O",
-			expectError: true,
-		},
-		{
-			name:        "invalid character l",
-			input:       "123l",
-			expectError: true,
-		},
-		{
-			name:        "invalid character I",
-			input:       "123I",
-			expectError: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := Base58Decode(tt.input)
-			
-			if tt.expectError {
-				assert.Error(t, err)
-				return
-			}
-			
-			require.NoError(t, err)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-func TestBase58RoundTrip(t *testing.T) {
-	// Test that encode->decode produces original input
-	testCases := [][]byte{
-		{},
-		{0},
-		{0, 0, 0},
-		{1, 2, 3, 4, 5},
-		{255, 254, 253, 252, 251},
-		func() []byte { h := sha256.Sum256([]byte("test data")); return h[:] }(),
-	}
-
-	for i, original := range testCases {
-		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			encoded := Base58Encode(original)
-			decoded, err := Base58Decode(encoded)
-			require.NoError(t, err)
-			assert.Equal(t, original, decoded, "round trip should preserve original bytes")
-		})
-	}
-}
 
 func TestBase58EncodeSHA256_ChildDAGScenarios(t *testing.T) {
 	// Test specific scenarios for child DAG ID generation
@@ -240,14 +154,6 @@ func TestBase58EncodeSHA256_ChildDAGScenarios(t *testing.T) {
 	}
 }
 
-func TestBase58Error(t *testing.T) {
-	// Test the error type
-	err := &base58Error{char: '0'}
-	assert.Equal(t, "invalid base58 character: 0", err.Error())
-	
-	err = &base58Error{char: 'O'}
-	assert.Equal(t, "invalid base58 character: O", err.Error())
-}
 
 func BenchmarkBase58EncodeSHA256(b *testing.B) {
 	input := "parent-dag-run-12345:step-name:{\"key\":\"value\"}"
@@ -268,81 +174,3 @@ func BenchmarkBase58Encode(b *testing.B) {
 	}
 }
 
-// TestBase58Compatibility validates our implementation against known test vectors
-func TestBase58Compatibility(t *testing.T) {
-	// Test vectors from Bitcoin base58 implementation
-	testVectors := []struct {
-		hex    string
-		base58 string
-	}{
-		{
-			hex:    "",
-			base58: "",
-		},
-		{
-			hex:    "00",
-			base58: "1",
-		},
-		{
-			hex:    "0000",
-			base58: "11",
-		},
-		{
-			hex:    "00000000000000000000",
-			base58: "1111111111",
-		},
-		{
-			hex:    "61",
-			base58: "2g",
-		},
-		{
-			hex:    "626262",
-			base58: "a3gV",
-		},
-		{
-			hex:    "636363",
-			base58: "aPEr",
-		},
-		{
-			hex:    "516b6fcd0f",
-			base58: "ABnLTmg",
-		},
-		{
-			hex:    "bf4f89001e670274dd",
-			base58: "3SEo3LWLoPntC",
-		},
-		{
-			hex:    "572e4794",
-			base58: "3EFU7m",
-		},
-		{
-			hex:    "ecac89cad93923c02321",
-			base58: "EJDM8drfXA6uyA",
-		},
-		{
-			hex:    "10c8511e",
-			base58: "Rt5zm",
-		},
-		{
-			hex:    "00000000000000000000000000000000000000000000000000000000000000",
-			base58: "1111111111111111111111111111111",
-		},
-	}
-
-	for _, tv := range testVectors {
-		t.Run(tv.hex, func(t *testing.T) {
-			// Decode hex to bytes
-			bytes, err := hex.DecodeString(tv.hex)
-			require.NoError(t, err)
-			
-			// Test encoding
-			encoded := Base58Encode(bytes)
-			assert.Equal(t, tv.base58, encoded, "encoding should match test vector")
-			
-			// Test decoding
-			decoded, err := Base58Decode(tv.base58)
-			require.NoError(t, err)
-			assert.Equal(t, bytes, decoded, "decoding should match original bytes")
-		})
-	}
-}

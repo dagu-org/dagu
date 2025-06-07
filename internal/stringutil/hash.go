@@ -8,15 +8,6 @@ import (
 // Base58 alphabet used by Bitcoin (excludes 0, O, l, I to avoid ambiguity)
 const base58Alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
-// Pre-computed character to value map for Base58Decode
-var base58CharMap = func() map[rune]int64 {
-	m := make(map[rune]int64, len(base58Alphabet))
-	for i, c := range base58Alphabet {
-		m[c] = int64(i)
-	}
-	return m
-}()
-
 // Base58EncodeSHA256 generates a SHA-256 hash of the input and encodes it as base58.
 // This is useful for creating deterministic, URL-safe identifiers.
 func Base58EncodeSHA256(input string) string {
@@ -64,48 +55,6 @@ func Base58Encode(input []byte) string {
 	return reverseString(string(result))
 }
 
-// Base58Decode decodes a base58 string to bytes.
-// Returns an error if the string contains invalid characters.
-func Base58Decode(input string) ([]byte, error) {
-	if len(input) == 0 {
-		return []byte{}, nil
-	}
-
-	result := big.NewInt(0)
-	base := big.NewInt(58)
-	
-	// Process each character using pre-computed map
-	for _, c := range input {
-		val, ok := base58CharMap[c]
-		if !ok {
-			return nil, &base58Error{char: c}
-		}
-		
-		result.Mul(result, base)
-		result.Add(result, big.NewInt(val))
-	}
-	
-	// Convert to bytes
-	decoded := result.Bytes()
-	
-	// Handle leading '1's (zeros)
-	var numZeros int
-	for _, c := range input {
-		if c != '1' {
-			break
-		}
-		numZeros++
-	}
-	
-	// Prepend zeros if needed
-	if numZeros > 0 {
-		zeros := make([]byte, numZeros)
-		return append(zeros, decoded...), nil
-	}
-	
-	return decoded, nil
-}
-
 // reverseString reverses a string efficiently
 func reverseString(s string) string {
 	runes := []rune(s)
@@ -113,13 +62,4 @@ func reverseString(s string) string {
 		runes[i], runes[j] = runes[j], runes[i]
 	}
 	return string(runes)
-}
-
-// base58Error represents an invalid base58 character error
-type base58Error struct {
-	char rune
-}
-
-func (e *base58Error) Error() string {
-	return "invalid base58 character: " + string(e.char)
 }
