@@ -448,6 +448,8 @@ func (d *Data) ClearState(s digraph.Step) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	d.inner.State = NodeState{}
+
 	// Reset the state of the step
 	d.inner.Step = s
 }
