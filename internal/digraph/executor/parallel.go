@@ -296,16 +296,26 @@ func (e *parallelExecutor) outputResults(_ context.Context) error {
 			Failed     int `json:"failed"`
 			Errors     int `json:"errors"`
 		} `json:"summary"`
-		Results []ChildResult `json:"results"`
+		Results []ChildResult          `json:"results"`
+		Outputs []map[string]any `json:"outputs"`
 	}{}
 
 	output.Summary.Total = len(e.runParamsList)
 	output.Results = make([]ChildResult, 0, len(e.results))
+	output.Outputs = make([]map[string]any, 0, len(e.results))
 
 	// Collect results in order of runParamsList for consistency
 	for _, params := range e.runParamsList {
 		if result, ok := e.results[params.RunID]; ok {
 			output.Results = append(output.Results, *result)
+			
+			// Add just the output to the outputs array
+			if result.Output != nil {
+				output.Outputs = append(output.Outputs, result.Output)
+			} else {
+				// Add empty map if no output
+				output.Outputs = append(output.Outputs, make(map[string]any))
+			}
 			
 			switch result.Status {
 			case "success":

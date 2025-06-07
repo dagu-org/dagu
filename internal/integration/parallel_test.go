@@ -221,6 +221,13 @@ steps:
 		require.Contains(t, parallelResults, `"total": 3`) // Note: JSON has spaces after colons
 		require.Contains(t, parallelResults, `"succeeded": 3`)
 		require.Contains(t, parallelResults, `"results"`)
+		require.Contains(t, parallelResults, `"outputs"`)
+		
+		// Verify outputs array contains the expected output
+		require.Contains(t, parallelResults, `"TASK_OUTPUT"`)
+		require.Contains(t, parallelResults, `TASK_RESULT_A`)
+		require.Contains(t, parallelResults, `TASK_RESULT_B`)
+		require.Contains(t, parallelResults, `TASK_RESULT_C`)
 	} else {
 		t.Fatal("PARALLEL_RESULTS output not found")
 	}
@@ -503,4 +510,80 @@ steps:
 	
 	// Verify that child DAG runs were created (4 due to deduplication of "fail")
 	require.Len(t, parallelNode.Children, 4, "should have 4 child DAG runs after deduplication")
+}
+
+// TestParallelExecution_OutputsArray verifies the outputs array is easily accessible
+func TestParallelExecution_OutputsArray(t *testing.T) {
+	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	
+	// Create a parent DAG that uses outputs array from parallel execution
+	testDir := test.TestdataPath(t, "integration")
+	dagFile := filepath.Join(testDir, "test-parallel-outputs-array.yaml")
+	dagContent := `name: test-parallel-outputs-array
+steps:
+  - name: parallel-tasks
+    run: child-with-output
+    parallel:
+      items: ["task1", "task2", "task3"]
+    output: RESULTS
+  - name: use-first-output
+    command: |
+      # Access first output directly from outputs array
+      echo "First output: ${RESULTS.outputs[0].TASK_OUTPUT}"
+    depends: parallel-tasks
+    output: FIRST_OUTPUT
+  - name: use-all-outputs
+    command: |
+      # Show we can access any output by index
+      echo "Output 0: ${RESULTS.outputs[0].TASK_OUTPUT}"
+      echo "Output 1: ${RESULTS.outputs[1].TASK_OUTPUT}"
+      echo "Output 2: ${RESULTS.outputs[2].TASK_OUTPUT}"
+    depends: parallel-tasks
+    output: ALL_OUTPUTS
+`
+	err := os.WriteFile(dagFile, []byte(dagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(dagFile) })
+
+	// Load and run the DAG
+	dag := th.DAG(t, filepath.Join("integration", "test-parallel-outputs-array.yaml"))
+	agent := dag.Agent()
+	require.NoError(t, agent.Run(agent.Context))
+	
+	// Verify successful completion
+	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+	
+	// Get the latest status to verify outputs
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	require.Len(t, status.Nodes, 3) // parallel-tasks, use-first-output, use-all-outputs
+	
+	// Check that subsequent steps could access the outputs array
+	firstOutputNode := status.Nodes[1]
+	require.Equal(t, "use-first-output", firstOutputNode.Step.Name)
+	require.Equal(t, scheduler.NodeStatusSuccess, firstOutputNode.Status)
+	
+	// Verify the first output was accessible
+	if value, ok := firstOutputNode.OutputVariables.Load("FIRST_OUTPUT"); ok {
+		firstOutput := value.(string)
+		require.Contains(t, firstOutput, "First output:")
+		require.Contains(t, firstOutput, "TASK_RESULT_task1")
+	} else {
+		t.Fatal("FIRST_OUTPUT not found")
+	}
+	
+	// Check all outputs were accessible
+	allOutputsNode := status.Nodes[2]
+	require.Equal(t, "use-all-outputs", allOutputsNode.Step.Name)
+	require.Equal(t, scheduler.NodeStatusSuccess, allOutputsNode.Status)
+	
+	if value, ok := allOutputsNode.OutputVariables.Load("ALL_OUTPUTS"); ok {
+		allOutputs := value.(string)
+		require.Contains(t, allOutputs, "TASK_RESULT_task1")
+		require.Contains(t, allOutputs, "TASK_RESULT_task2")
+		require.Contains(t, allOutputs, "TASK_RESULT_task3")
+	} else {
+		t.Fatal("ALL_OUTPUTS not found")
+	}
 }
