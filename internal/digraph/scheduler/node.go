@@ -241,7 +241,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 		n.SetChildRuns(childRuns)
 
 		// For single child DAG (non-parallel), setup the executor
-		if len(childRuns) == 1 && n.Step().Parallel == nil {
+		if n.Step().Parallel == nil {
 			exec, ok := cmd.(executor.DAGExecutor)
 			if !ok {
 				return nil, fmt.Errorf("executor %T does not support child DAG execution", cmd)
@@ -528,7 +528,7 @@ func (n *Node) Init() {
 // buildChildDAGRuns constructs the child DAG runs based on parallel configuration
 func (n *Node) buildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG) ([]ChildDAGRun, error) {
 	parallel := n.Step().Parallel
-	
+
 	// Single child DAG execution (non-parallel)
 	if parallel == nil {
 		params, err := EvalString(ctx, childDAG.Params)
@@ -567,10 +567,23 @@ func (n *Node) buildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG
 		// Handle static items
 		for _, item := range parallel.Items {
 			if item.Value != "" {
-				items = append(items, item.Value)
+				value, err := EvalString(ctx, item.Value)
+				if err != nil {
+					return nil, fmt.Errorf("failed to eval parallel item value %q: %w", item.Value, err)
+				}
+				items = append(items, value)
 			} else if len(item.Params) > 0 {
-				// For params, convert to JSON string
-				paramData, err := json.Marshal(item.Params)
+				// evaluate each value in Params
+				m := make(digraph.DeterministicMap)
+				for key, value := range item.Params {
+					evaluatedValue, err := EvalString(ctx, value)
+					if err != nil {
+						return nil, fmt.Errorf("failed to eval parallel item param %q: %w", key, err)
+					}
+					m[key] = evaluatedValue
+				}
+				// Convert to JSON string
+				paramData, err := json.Marshal(m)
 				if err != nil {
 					return nil, fmt.Errorf("failed to marshal params: %w", err)
 				}
@@ -591,7 +604,7 @@ func (n *Node) buildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG
 		if err != nil {
 			return nil, fmt.Errorf("failed to process item %d: %w", i, err)
 		}
-		
+
 		dagRunID := GenerateChildDAGRunID(ctx, param)
 		childRuns = append(childRuns, ChildDAGRun{
 			DAGRunID: dagRunID,

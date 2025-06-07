@@ -448,11 +448,6 @@ func (d *Data) ClearState(s digraph.Step) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	// The data of child dag-run need to be preserved to retain their dag-run IDs
-	children := d.inner.State.Children
-	d.inner.State = NodeState{}
-	d.inner.State.Children = children
-
 	// Reset the state of the step
 	d.inner.Step = s
 }
@@ -464,4 +459,3 @@ func (d *Data) MarkError(err error) {
 	d.inner.State.Error = err
 	d.inner.State.Status = NodeStatusError
 }
-
