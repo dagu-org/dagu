@@ -2,10 +2,12 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
+	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
 // EvalString evaluates the given string with the variables within the execution context.
@@ -44,6 +46,14 @@ func EvalObject[T any](ctx context.Context, obj T) (T, error) {
 		// For other types, we can just return the object as is
 		return obj, nil
 	}
+}
+
+// GenerateChildDAGRunID generates a unique run ID based on the current DAG run ID, step name, and parameters.
+func GenerateChildDAGRunID(ctx context.Context, params string) string {
+	env := executor.GetEnv(ctx)
+	return stringutil.Base58EncodeSHA256(
+		fmt.Sprintf("%s:%s:%s", env.DAGRunID, env.Step.Name, params),
+	)
 }
 
 // processMap recursively processes a map, evaluating string values and recursively processing

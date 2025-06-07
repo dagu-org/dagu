@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -231,13 +232,64 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 		return nil, fmt.Errorf("failed to setup executor IO: %w", err)
 	}
 
-	// If the command is a child DAG, set the dag-run ID
-	if childDAG, ok := cmd.(executor.ChildDAG); ok {
-		dagRunID, err := n.GenChildDAGRunID()
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate child dag-run ID: %w", err)
+	if childDAG := n.Step().ChildDAG; childDAG != nil {
+		if parallel := n.Step().Parallel; parallel != nil {
+			if parallel.Variable != "" {
+				value, err := EvalString(ctx, parallel.Variable)
+				if err != nil {
+					return nil, fmt.Errorf("failed to eval parallel variable %q: %w", parallel.Variable, err)
+				}
+				var items []any
+				if err := json.Unmarshal([]byte(value), &items); err != nil {
+					return nil, fmt.Errorf("failed to unmarshal parallel variable %q: %w", parallel.Variable, err)
+				}
+				var childRuns []ChildDAGRun
+				for _, item := range items {
+					var param string
+					switch item := item.(type) {
+					case string:
+						param = item
+					default:
+						// Marshal the item to JSON
+						itemData, err := json.Marshal(item)
+						if err != nil {
+							return nil, fmt.Errorf("failed to marshal item to JSON: %w", err)
+						}
+						param = string(itemData)
+					}
+					dagRunID := GenerateChildDAGRunID(ctx, param)
+					childRuns = append(childRuns, ChildDAGRun{
+						DAGRunID: dagRunID,
+						Params:   param,
+					})
+				}
+				n.SetChildRuns(childRuns)
+			}
+		} else {
+			// If parallel is not set, we assume a single child DAG run
+			params, err := EvalString(ctx, childDAG.Params)
+			if err != nil {
+				return nil, fmt.Errorf("failed to eval child dag params: %w", err)
+			}
+			// Generate a unique DAG run ID for the child DAG
+			// based on the params
+			dagRunID := GenerateChildDAGRunID(ctx, params)
+			n.SetChildRuns([]ChildDAGRun{
+				{
+					DAGRunID: dagRunID,
+					Params:   params,
+				},
+			})
+			// setup executor for child DAG
+			exec, ok := cmd.(executor.DAGExecutor)
+			if !ok {
+				return nil, fmt.Errorf("executor %T does not support child DAG execution", cmd)
+			}
+			exec.SetParams(executor.RunParams{
+				RunID:  dagRunID,
+				Params: params,
+			})
 		}
-		childDAG.SetDAGRunID(dagRunID)
 	}
 
 	return cmd, nil

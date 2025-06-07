@@ -102,7 +102,7 @@ steps:
 	child2Status, err := child2Attempt.ReadStatus(ctx)
 	require.NoError(t, err)
 
-	require.Equal(t, child2Status.Status.String(), scheduler.NodeStatusSuccess.String())
+	require.Equal(t, scheduler.NodeStatusSuccess.String(), child2Status.Status.String())
 
 	// (5) Update the step in child_2 to "failed" to simulate a retry
 	child2Status.Nodes[0].Status = scheduler.NodeStatusError
@@ -111,7 +111,7 @@ steps:
 	// (6) Check if the child_2 status is now "failed"
 	child2Status, err = child2Attempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, child2Status.Nodes[0].Status.String(), scheduler.NodeStatusError.String())
+	require.Equal(t, scheduler.NodeStatusError.String(), child2Status.Nodes[0].Status.String())
 
 	// Retry the DAG
 
@@ -126,7 +126,7 @@ steps:
 	require.NoError(t, err)
 	child2Status, err = child2Attempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, child2Status.Nodes[0].Status.String(), scheduler.NodeStatusSuccess.String())
+	require.Equal(t, scheduler.NodeStatusSuccess.String(), child2Status.Nodes[0].Status.String())
 
 	require.Equal(t, "parent", child2Status.Root.Name, "parent")
 	require.Equal(t, dagRunID, child2Status.Root.ID)
