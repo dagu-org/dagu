@@ -24,7 +24,7 @@ type ParallelItem struct {
 	// Value is used for simple string items or variable references
 	// E.g. "item1", "item2", "${ITEM_VAR}"
 	Value string `json:"value,omitempty"`
-	
+
 	// Params is used for key-value pairs that will be passed as parameters
 	// E.g. {"SOURCE": "s3://customers", "TYPE": "csv"}
 	Params map[string]string `json:"params,omitempty"`

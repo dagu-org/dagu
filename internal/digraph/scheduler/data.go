@@ -48,6 +48,10 @@ type NodeState struct {
 	// ExitCode is the exit code that the command exited with.
 	// It only makes sense when the node is a command executor.
 	ExitCode int
+	// Parallel contains the evaluated parallel execution state for the node.
+	// This is populated when a step has parallel configuration and tracks
+	// all the items that need to be executed in parallel.
+	*Parallel
 	// Children stores the child dag-runs.
 	Children []ChildDAGRun
 	// OutputVariables stores the output variables for the following steps.
@@ -55,9 +59,45 @@ type NodeState struct {
 	OutputVariables *executor.SyncMap
 }
 
+// Parallel represents the evaluated parallel execution configuration for a node.
+// It contains the expanded list of items to be processed in parallel.
+type Parallel struct {
+	// Items contains all the parallel items to be executed.
+	// Each item will result in a separate child DAG run.
+	Items []ParallelItem
+}
+
+// ParallelItem represents a single item in a parallel execution.
+// It combines the item data with a unique identifier for tracking.
+type ParallelItem struct {
+	// Item contains the actual data for this parallel execution.
+	// It can be either a simple value or a map of parameters from digraph.ParallelItem.
+	Item digraph.ParallelItem
+}
+
+// ChildDAGRun represents a child DAG execution within a parent DAG.
+// Each child DAG run has a deterministic ID based on its parameters to ensure idempotency.
 type ChildDAGRun struct {
-	// DAGRunID is the run ID of the child dag-run.
+	// DAGRunID is the unique identifier for the child dag-run.
+	// It is generated as a base58-encoded SHA-256 hash of the string:
+	// "<parent-dag-run-id>:<step-name>:<deterministic-json-params>"
+	// 
+	// This deterministic ID generation ensures:
+	// - Same parameters always produce the same child DAG run ID
+	// - Retries reuse existing child DAG runs instead of creating duplicates
+	// - Each step's children are namespaced by step name to prevent collisions
+	// 
+	// The params are encoded as deterministic JSON (sorted keys) before hashing.
+	// Example input: "abc123:process-regions:{"REGION":"us-east-1","VERSION":"1.0.0"}"
+	// Example output: "5Kd3NBUAdUnhyzenEwVLy9pBKxSwXvE9FMPyR4UKZvpe"
 	DAGRunID string
+	// Params contains the raw parameters passed to the child DAG run.
+	// This can be:
+	// - A simple string: "param1 param2"
+	// - Key-value pairs: "KEY1=value1 KEY2=value2"
+	// - Raw JSON: '{"region": "us-east-1", "config": {"timeout": 30}}'
+	// The exact format depends on how the DAG expects to receive parameters.
+	Params string
 }
 
 type NodeStatus int

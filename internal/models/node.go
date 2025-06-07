@@ -28,6 +28,7 @@ type Node struct {
 // ChildDAGRun represents a child DAG run associated with a node
 type ChildDAGRun struct {
 	DAGRunID string `json:"dagRunId,omitempty"`
+	Params   string `json:"params,omitempty"`
 }
 
 // ToNode converts a persistence Node back to a scheduler Node
