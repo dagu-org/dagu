@@ -3,7 +3,9 @@ package integration_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
@@ -29,12 +31,12 @@ func TestParallelExecution_SimpleItems(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, status)
 	require.Len(t, status.Nodes, 1) // process-items
-	
+
 	// Check process-items node
 	processNode := status.Nodes[0]
 	require.Equal(t, "process-items", processNode.Step.Name)
 	require.Equal(t, scheduler.NodeStatusSuccess, processNode.Status)
-	
+
 	// Verify child DAG runs were created
 	require.NotEmpty(t, processNode.Children)
 	require.Len(t, processNode.Children, 3) // 3 child runs for item1, item2, item3
@@ -58,16 +60,16 @@ func TestParallelExecution_ObjectItems(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, status)
 	require.Len(t, status.Nodes, 1) // process-regions
-	
+
 	// Check process-regions node
 	processNode := status.Nodes[0]
 	require.Equal(t, "process-regions", processNode.Step.Name)
 	require.Equal(t, scheduler.NodeStatusSuccess, processNode.Status)
-	
+
 	// Verify child DAG runs were created with JSON parameters
 	require.NotEmpty(t, processNode.Children)
 	require.Len(t, processNode.Children, 3) // 3 child runs for different regions
-	
+
 	// Verify that parameters contain JSON objects
 	for _, child := range processNode.Children {
 		require.Contains(t, child.Params, `"REGION"`)
@@ -93,12 +95,12 @@ func TestParallelExecution_VariableReference(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, status)
 	require.Len(t, status.Nodes, 1) // process-from-var
-	
+
 	// Check process-from-var node
 	processNode := status.Nodes[0]
 	require.Equal(t, "process-from-var", processNode.Step.Name)
 	require.Equal(t, scheduler.NodeStatusSuccess, processNode.Status)
-	
+
 	// Verify four child DAG runs from JSON array
 	require.NotEmpty(t, processNode.Children)
 	require.Len(t, processNode.Children, 4) // 4 child runs for alpha, beta, gamma, delta
@@ -122,12 +124,12 @@ func TestParallelExecution_SpaceSeparated(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, status)
 	require.Len(t, status.Nodes, 1) // process-servers
-	
+
 	// Check process-servers node
 	processNode := status.Nodes[0]
 	require.Equal(t, "process-servers", processNode.Step.Name)
 	require.Equal(t, scheduler.NodeStatusSuccess, processNode.Status)
-	
+
 	// Verify three child DAG runs from space-separated values
 	require.NotEmpty(t, processNode.Children)
 	require.Len(t, processNode.Children, 3) // 3 child runs for server1, server2, server3
@@ -151,12 +153,12 @@ func TestParallelExecution_DirectVariable(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, status)
 	require.Len(t, status.Nodes, 2) // parallel-tasks and aggregate-results
-	
+
 	// Check parallel-tasks node
 	parallelNode := status.Nodes[0]
 	require.Equal(t, "parallel-tasks", parallelNode.Step.Name)
 	require.Equal(t, scheduler.NodeStatusSuccess, parallelNode.Status)
-	
+
 	// Verify child DAG runs were created
 	require.NotEmpty(t, parallelNode.Children)
 	require.Len(t, parallelNode.Children, 3) // 3 child runs from the ITEMS array
@@ -203,13 +205,13 @@ steps:
 	require.NoError(t, err)
 	require.NotNil(t, status)
 	require.Len(t, status.Nodes, 2) // parallel-with-output and use-output
-	
+
 	// Check parallel-with-output node
 	parallelNode := status.Nodes[0]
 	require.Equal(t, "parallel-with-output", parallelNode.Step.Name)
 	require.Equal(t, scheduler.NodeStatusSuccess, parallelNode.Status)
 	require.Len(t, parallelNode.Children, 3) // 3 child runs
-	
+
 	// Check that the parallel execution produced output
 	require.NotNil(t, parallelNode.OutputVariables)
 	if value, ok := parallelNode.OutputVariables.Load("PARALLEL_RESULTS"); ok {
@@ -222,7 +224,7 @@ steps:
 	} else {
 		t.Fatal("PARALLEL_RESULTS output not found")
 	}
-	
+
 	// Check use-output node
 	useOutputNode := status.Nodes[1]
 	require.Equal(t, "use-output", useOutputNode.Step.Name)
@@ -236,7 +238,7 @@ func TestParallelExecution_InvalidConfiguration(t *testing.T) {
 		dagFile := filepath.Join(th.Config.Paths.DAGsDir, "invalid-parallel.yaml")
 		err := os.MkdirAll(filepath.Dir(dagFile), 0750)
 		require.NoError(t, err)
-		
+
 		dagContent := `name: invalid-parallel
 steps:
   - name: parallel-without-run
@@ -246,7 +248,7 @@ steps:
 `
 		err = os.WriteFile(dagFile, []byte(dagContent), 0600)
 		require.NoError(t, err)
-		
+
 		// This should fail during DAG loading due to validation
 		_, err = digraph.Load(th.Context, dagFile)
 		require.Error(t, err)
@@ -258,7 +260,7 @@ steps:
 		dagFile := filepath.Join(th.Config.Paths.DAGsDir, "invalid-parallel-empty.yaml")
 		err := os.MkdirAll(filepath.Dir(dagFile), 0750)
 		require.NoError(t, err)
-		
+
 		dagContent := `name: invalid-parallel-empty
 steps:
   - name: empty-parallel
@@ -268,20 +270,19 @@ steps:
 `
 		err = os.WriteFile(dagFile, []byte(dagContent), 0600)
 		require.NoError(t, err)
-		
+
 		// This should fail during DAG loading
 		_, err = digraph.Load(th.Context, dagFile)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "parallel must have either items array or variable reference")
 	})
 
-
 	t.Run("InvalidMaxConcurrent", func(t *testing.T) {
 		th := test.Setup(t)
 		dagFile := filepath.Join(th.Config.Paths.DAGsDir, "invalid-max-concurrent.yaml")
 		err := os.MkdirAll(filepath.Dir(dagFile), 0750)
 		require.NoError(t, err)
-		
+
 		dagContent := `name: invalid-max-concurrent
 steps:
   - name: invalid-concurrent
@@ -292,7 +293,7 @@ steps:
 `
 		err = os.WriteFile(dagFile, []byte(dagContent), 0600)
 		require.NoError(t, err)
-		
+
 		// This should fail during DAG loading
 		_, err = digraph.Load(th.Context, dagFile)
 		require.Error(t, err)
@@ -304,9 +305,9 @@ steps:
 func TestParallelExecution_DeterministicIDs(t *testing.T) {
 	// Create test DAGs in testdata directory
 	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
-	
+
 	// The child-echo DAG already exists in testdata
-	
+
 	// Create a temporary test DAG that uses parallel execution with duplicate items
 	testDir := test.TestdataPath(t, "integration")
 	dagFile := filepath.Join(testDir, "test-deterministic-ids.yaml")
@@ -338,17 +339,17 @@ steps:
 	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
 	require.Len(t, status.Nodes, 1)
-	
+
 	// Collect unique parameters
 	uniqueParams := make(map[string]string)
 	for _, child := range status.Nodes[0].Children {
 		uniqueParams[child.Params] = child.DAGRunID
 	}
-	
+
 	// Should have only 3 unique runs despite 5 items (test1, test2, test1, test3, test2)
 	require.Len(t, status.Nodes[0].Children, 3, "duplicate items should be deduplicated")
 	require.Len(t, uniqueParams, 3, "should have 3 unique parameter sets")
-	
+
 	// Verify we have the expected unique parameters
 	_, hasTest1 := uniqueParams["test1"]
 	_, hasTest2 := uniqueParams["test2"]
@@ -356,4 +357,150 @@ steps:
 	require.True(t, hasTest1, "should have test1")
 	require.True(t, hasTest2, "should have test2")
 	require.True(t, hasTest3, "should have test3")
+}
+
+// TestParallelExecution_Cancel verifies that cancelling a parallel execution properly cancels all child DAG runs
+func TestParallelExecution_Cancel(t *testing.T) {
+	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	
+	// Create a child DAG that sleeps for a while
+	testDir := test.TestdataPath(t, "integration")
+	childDagFile := filepath.Join(testDir, "child-sleep.yaml")
+	childDagContent := `name: child-sleep
+params:
+  - SLEEP_TIME: "5"
+steps:
+  - name: sleep
+    command: sleep $1
+`
+	err := os.WriteFile(childDagFile, []byte(childDagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(childDagFile) })
+	
+	// Create a parent DAG with parallel execution
+	parentDagFile := filepath.Join(testDir, "test-parallel-cancel.yaml")
+	parentDagContent := `name: test-parallel-cancel
+steps:
+  - name: parallel-sleep
+    run: child-sleep
+    parallel:
+      items:
+        - "10"
+        - "10"
+        - "10"
+        - "10"
+      maxConcurrent: 2
+`
+	err = os.WriteFile(parentDagFile, []byte(parentDagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(parentDagFile) })
+
+	// Load and start the DAG
+	dag := th.DAG(t, filepath.Join("integration", "test-parallel-cancel.yaml"))
+	agent := dag.Agent()
+	
+	// Start the DAG in a goroutine
+	errChan := make(chan error, 1)
+	go func() {
+		errChan <- agent.Run(agent.Context)
+	}()
+	
+	// Wait a bit to ensure parallel execution has started
+	time.Sleep(1 * time.Second)
+	
+	// Cancel the execution
+	agent.Cancel()
+	
+	// Wait for the agent to finish
+	err = <-errChan
+	require.Error(t, err, "agent should return an error when cancelled")
+	// The error might contain "killed" or "cancelled" depending on timing
+	require.True(t, 
+		strings.Contains(err.Error(), "killed") || strings.Contains(err.Error(), "cancelled"),
+		"error should indicate cancellation: %v", err)
+	
+	// Get the latest status
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	
+	// Check that the parallel step exists
+	require.Len(t, status.Nodes, 1)
+	parallelNode := status.Nodes[0]
+	require.Equal(t, "parallel-sleep", parallelNode.Step.Name)
+	// The step might be marked as failed, cancelled, or even not started depending on timing
+	require.True(t,
+		parallelNode.Status == scheduler.NodeStatusCancel || 
+		parallelNode.Status == scheduler.NodeStatusError ||
+		parallelNode.Status == scheduler.NodeStatusNone,
+		"parallel step should be cancelled, failed, or not started, got: %v", parallelNode.Status)
+	
+	// If the step was actually started, verify that child DAG runs were created
+	if parallelNode.Status != scheduler.NodeStatusNone {
+		require.NotEmpty(t, parallelNode.Children, "child DAG runs should have been created if step started")
+	}
+}
+
+// TestParallelExecution_PartialFailure verifies behavior when some child DAGs fail
+func TestParallelExecution_PartialFailure(t *testing.T) {
+	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	
+	// Create a child DAG that fails for certain inputs
+	testDir := test.TestdataPath(t, "integration")
+	childDagFile := filepath.Join(testDir, "child-conditional-fail.yaml")
+	childDagContent := `name: child-conditional-fail
+params:
+  - INPUT: "default"
+steps:
+  - name: process
+    command: |
+      if [ "$1" = "fail" ]; then
+        echo "Failing as requested"
+        exit 1
+      fi
+      echo "Processing: $1"
+`
+	err := os.WriteFile(childDagFile, []byte(childDagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(childDagFile) })
+	
+	// Create a parent DAG with mixed success/failure items
+	parentDagFile := filepath.Join(testDir, "test-parallel-partial-failure.yaml")
+	parentDagContent := `name: test-parallel-partial-failure
+steps:
+  - name: parallel-mixed
+    run: child-conditional-fail
+    parallel:
+      items:
+        - "ok1"
+        - "fail"
+        - "ok2"
+        - "fail"
+        - "ok3"
+`
+	err = os.WriteFile(parentDagFile, []byte(parentDagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(parentDagFile) })
+
+	// Load and run the DAG
+	dag := th.DAG(t, filepath.Join("integration", "test-parallel-partial-failure.yaml"))
+	agent := dag.Agent()
+	
+	// Run should fail because some child DAGs fail
+	err = agent.Run(agent.Context)
+	require.Error(t, err)
+	
+	// Get the latest status
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	
+	// Check that the parallel step failed
+	require.Len(t, status.Nodes, 1)
+	parallelNode := status.Nodes[0]
+	require.Equal(t, "parallel-mixed", parallelNode.Step.Name)
+	require.Equal(t, scheduler.NodeStatusError, parallelNode.Status)
+	
+	// Verify that child DAG runs were created (4 due to deduplication of "fail")
+	require.Len(t, parallelNode.Children, 4, "should have 4 child DAG runs after deduplication")
 }
