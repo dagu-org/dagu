@@ -152,15 +152,12 @@ func (n *Node) Execute(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	// Only capture output if the execution was successful
-	if exitCode == 0 && n.Error() == nil {
-		if output := n.Step().Output; output != "" {
-			value, err := n.outputs.capturedOutput(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to capture output: %w", err)
-			}
-			n.setVariable(output, value)
+	if output := n.Step().Output; output != "" {
+		value, err := n.outputs.capturedOutput(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to capture output: %w", err)
 		}
+		n.setVariable(output, value)
 	}
 
 	return n.Error()
@@ -628,7 +625,7 @@ func (n *Node) buildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG
 			Params:   param,
 		}
 	}
-	
+
 	// Convert map back to slice
 	var childRuns []ChildDAGRun
 	for _, run := range childRunMap {
@@ -759,11 +756,11 @@ type OutputCoordinator struct {
 	stderrRedirectWriter *bufio.Writer
 
 	// Output capture with size limits to prevent OOM
-	outputWriter     *os.File
-	outputReader     *os.File
-	outputData       string
-	outputCaptured   bool
-	maxOutputSize    int64 // Max output size in bytes
+	outputWriter   *os.File
+	outputReader   *os.File
+	outputData     string
+	outputCaptured bool
+	maxOutputSize  int64 // Max output size in bytes
 }
 
 func (oc *OutputCoordinator) StdoutFile() string {
@@ -815,8 +812,10 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 		// Reset the captured flag to allow new output capture for retry
 		oc.outputCaptured = false
 		oc.maxOutputSize = 1024 * 1024 // 1MB limit
+		// Reset the output data to empty
+		oc.outputData = ""
 	}
-	
+
 	if oc.outputWriter != nil {
 		stdout = io.MultiWriter(stdout, oc.outputWriter)
 	}
@@ -966,32 +965,32 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 	if _, err := io.Copy(&buf, limitedReader); err != nil {
 		return "", fmt.Errorf("io: failed to read output: %w", err)
 	}
-	
+
 	output := strings.TrimSpace(buf.String())
-	
+
 	// Check if output was truncated
 	if buf.Len() == int(oc.maxOutputSize) {
 		logger.Warn(ctx, "Output truncated due to size limit", "maxSize", oc.maxOutputSize)
 		output += "\n[OUTPUT TRUNCATED]"
 	}
-	
+
 	// Accumulate output with previous attempts (for retries)
 	if oc.outputData != "" && output != "" {
 		oc.outputData += "\n" + output
 	} else if output != "" {
 		oc.outputData = output
 	}
-	
+
 	logger.Debug(ctx, "capturedOutput: captured", "output", oc.outputData, "length", len(oc.outputData))
-	
+
 	// Close the reader after reading
 	if err := oc.outputReader.Close(); err != nil {
 		logger.Error(ctx, "failed to close pipe reader", "err", err)
 	}
 	oc.outputReader = nil // Mark as closed
-	
+
 	// Mark as captured for caching
 	oc.outputCaptured = true
-	
+
 	return oc.outputData, nil
 }

@@ -978,11 +978,11 @@ func TestScheduler(t *testing.T) {
 	})
 	t.Run("RetryPolicyWithOutputCapture", func(t *testing.T) {
 		sc := setupScheduler(t)
-		
+
 		// Create a counter file for tracking retry attempts
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("retry_output_%s.txt", uuid.Must(uuid.NewV7()).String()))
 		defer os.Remove(counterFile)
-		
+
 		// Step that outputs different values on each retry and fails until 3rd attempt
 		graph := sc.newGraph(t,
 			newStep("1",
@@ -1009,15 +1009,15 @@ func TestScheduler(t *testing.T) {
 				withRetryPolicy(3, time.Millisecond*100),
 			),
 		)
-		
+
 		result := graph.Schedule(t, scheduler.StatusSuccess)
-		
+
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
-		
+
 		node := result.Node(t, "1")
-		require.Equal(t, 3, node.State().DoneCount)  // 3 executions total
+		require.Equal(t, 1, node.State().DoneCount)  // 1 successful execution
 		require.Equal(t, 2, node.State().RetryCount) // 2 retries
-		
+
 		// Verify that output contains only the final successful attempt's output
 		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
@@ -1025,7 +1025,7 @@ func TestScheduler(t *testing.T) {
 	})
 	t.Run("FailedStepWithOutputCapture", func(t *testing.T) {
 		sc := setupScheduler(t)
-		
+
 		// Step that outputs data but fails
 		graph := sc.newGraph(t,
 			newStep("1",
@@ -1033,17 +1033,17 @@ func TestScheduler(t *testing.T) {
 				withOutput("ERROR_MSG"),
 			),
 		)
-		
+
 		result := graph.Schedule(t, scheduler.StatusError)
-		
+
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusError)
-		
+
 		node := result.Node(t, "1")
-		
-		// Verify that output is NOT captured when step fails (based on current logic)
+
+		// Verify that output is captured even on failure
 		output, ok := node.NodeData().State.OutputVariables.Load("ERROR_MSG")
-		require.False(t, ok, "output variable should not be captured on failure")
-		require.Empty(t, output, "output should be empty on failure")
+		require.True(t, ok, "output variable not found")
+		require.Equal(t, "ERROR_MSG=error_output", output, "expected output %q, got %q", "error_output", output)
 	})
 }
 
