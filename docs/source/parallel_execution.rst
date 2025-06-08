@@ -106,6 +106,29 @@ Reference output from previous steps:
         parallel: ${SERVER_LIST}
         depends: get-items
 
+Dynamic File Discovery
+~~~~~~~~~~~~~~~~~~~~~~
+
+A common pattern is discovering files dynamically and processing them in parallel:
+
+.. code-block:: yaml
+
+    steps:
+      - name: find-csv-files
+        command: find /data -name "*.csv" -type f
+        output: CSV_FILES
+      
+      - name: process-csv-files
+        run: csv-processor
+        parallel: ${CSV_FILES}
+        params:
+          - INPUT_FILE: ${ITEM}
+          - FORMAT: csv
+        depends: find-csv-files
+
+.. note::
+   When the output is newline-separated (like from ``find``), Dagu automatically splits it into an array for parallel processing.
+
 Parameter Passing
 -----------------
 
@@ -133,6 +156,66 @@ Each item is passed as a positional parameter to the child DAG:
     steps:
       - name: process
         command: python process.py "$1"  # $1 receives the file path
+
+Using the $ITEM Variable
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+When using parallel execution with custom parameters, you can access the current item using the ``$ITEM`` variable in the parent DAG's params field:
+
+.. code-block:: yaml
+
+    # Parent DAG
+    steps:
+      - name: process-files
+        run: file-processor
+        parallel:
+          items:
+            - "/path/to/file1.csv"
+            - "/path/to/file2.csv"
+            - "/path/to/file3.csv"
+        params:
+          - FILE: ${ITEM}
+          - OUTPUT_DIR: /processed
+
+.. code-block:: yaml
+
+    # Child DAG (file-processor.yaml)
+    params:
+      - FILE: ""
+      - OUTPUT_DIR: ""
+    
+    steps:
+      - name: process
+        command: |
+          echo "Processing ${FILE} to ${OUTPUT_DIR}"
+          python process.py --input "${FILE}" --output "${OUTPUT_DIR}"
+
+The ``$ITEM`` variable is automatically available when defining parameters for parallel execution and represents the current item being processed from the parallel items list.
+
+Combining $ITEM with Additional Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can combine the ``$ITEM`` variable with other parameters to create more complex configurations:
+
+.. code-block:: yaml
+
+    # Parent DAG
+    steps:
+      - name: get-databases
+        command: echo "db1 db2 db3"
+        output: DATABASES
+      
+      - name: backup-databases
+        run: backup-processor
+        parallel: ${DATABASES}
+        params:
+          - DATABASE: ${ITEM}
+          - BACKUP_PATH: /backups/${ITEM}/$(date +%Y%m%d)
+          - RETENTION_DAYS: 30
+          - COMPRESSION: gzip
+        depends: get-databases
+
+This pattern is particularly useful when you need to pass both the dynamic item and static configuration values to child DAGs.
 
 Object Parameters
 ~~~~~~~~~~~~~~~~~
@@ -539,6 +622,11 @@ Common Issues
    
    - Cause: Same parameters generating same DAG run ID
    - Solution: This is by design to prevent duplicate work
+
+5. **${ITEM} not being replaced**
+   
+   - Cause: Using ${ITEM} outside of the params field in parallel execution
+   - Solution: The ${ITEM} variable is only available in the params field of the step with parallel execution
 
 Debugging Tips
 ~~~~~~~~~~~~~~
