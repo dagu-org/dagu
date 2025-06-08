@@ -1045,6 +1045,53 @@ func TestScheduler(t *testing.T) {
 		require.True(t, ok, "output variable not found")
 		require.Equal(t, "ERROR_MSG=error_output", output, "expected output %q, got %q", "error_output", output)
 	})
+	t.Run("RetryPolicyChildDAGRunWithOutputCapture", func(t *testing.T) {
+		sc := setupScheduler(t)
+
+		// Create a counter file for tracking retry attempts
+		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("retry_child_output_%s.txt", uuid.Must(uuid.NewV7()).String()))
+		defer os.Remove(counterFile)
+
+		// Step that outputs different values on each retry and always fails
+		graph := sc.newGraph(t,
+			newStep("1",
+				withScript(fmt.Sprintf(`
+					COUNTER_FILE="%s"
+					if [ ! -f "$COUNTER_FILE" ]; then
+						echo "1" > "$COUNTER_FILE"
+						echo "output_attempt_1"
+						exit 1
+					else
+						COUNT=$(cat "$COUNTER_FILE")
+						if [ "$COUNT" -eq "1" ]; then
+							echo "2" > "$COUNTER_FILE"
+							echo "output_attempt_2"
+							exit 1
+						elif [ "$COUNT" -eq "2" ]; then
+							echo "3" > "$COUNTER_FILE"
+							echo "output_attempt_3"
+							exit 1
+						fi
+					fi
+				`, counterFile)),
+				withOutput("RESULT"),
+				withRetryPolicy(2, time.Millisecond*100),
+			),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusError)
+
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusError)
+
+		node := result.Node(t, "1")
+		require.Equal(t, 1, node.State().DoneCount)  // 1 execution (failed)
+		require.Equal(t, 2, node.State().RetryCount) // 2 retries
+
+		// Verify that output contains the final retry attempt's output
+		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
+		require.True(t, ok, "output variable not found")
+		require.Equal(t, "RESULT=output_attempt_3", output, "expected final output, got %q", output)
+	})
 }
 
 func successStep(name string, depends ...string) digraph.Step {

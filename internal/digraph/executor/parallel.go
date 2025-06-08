@@ -132,14 +132,15 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 		e.errors = append(e.errors, err)
 	}
 
+	// Always output aggregated results, even if some executions failed
+	if err := e.outputResults(ctx); err != nil {
+		// Log the output error but don't fail the entire execution because of it
+		logger.Error(ctx, "Failed to output results", "error", err)
+	}
+
 	// Check if any executions failed
 	if len(e.errors) > 0 {
 		return fmt.Errorf("parallel execution failed with %d errors: %v", len(e.errors), e.errors[0])
-	}
-
-	// Output aggregated results
-	if err := e.outputResults(ctx); err != nil {
-		return fmt.Errorf("failed to output results: %w", err)
 	}
 
 	return nil

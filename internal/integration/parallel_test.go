@@ -798,3 +798,163 @@ steps:
 		t.Log("OutputVariables is nil - this might be the bug we're fixing")
 	}
 }
+
+// TestParallelExecution_OutputCaptureWithFailures verifies that output is captured even when some child DAGs fail
+func TestParallelExecution_OutputCaptureWithFailures(t *testing.T) {
+	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+
+	// Create a simple child DAG that outputs data and fails/succeeds based on input
+	testDir := test.TestdataPath(t, "integration")
+	childDagFile := filepath.Join(testDir, "child-output-fail.yaml")
+	childDagContent := `name: child-output-fail
+steps:
+  - name: process
+    command: |
+      INPUT="$1"
+      echo "Output for ${INPUT}"
+      if [ "${INPUT}" = "fail" ]; then
+        exit 1
+      fi
+    output: RESULT
+`
+	err := os.WriteFile(childDagFile, []byte(childDagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(childDagFile) })
+
+	// Parent DAG with mixed success/failure
+	parentDagFile := filepath.Join(testDir, "test-parallel-output-failures.yaml")
+	parentDagContent := `name: test-parallel-output-failures
+steps:
+  - name: parallel-test
+    run: child-output-fail
+    parallel:
+      items:
+        - "success"
+        - "fail"
+    output: RESULTS
+    continueOn:
+      failure: true
+`
+	err = os.WriteFile(parentDagFile, []byte(parentDagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(parentDagFile) })
+
+	// Run the DAG
+	dag := th.DAG(t, filepath.Join("integration", "test-parallel-output-failures.yaml"))
+	agent := dag.Agent()
+	err = agent.Run(agent.Context)
+	// Should fail because one child fails
+	require.Error(t, err)
+
+	// Get the latest status
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	require.Len(t, status.Nodes, 1)
+
+	// Check parallel node
+	parallelNode := status.Nodes[0]
+	require.Equal(t, "parallel-test", parallelNode.Step.Name)
+	require.Equal(t, scheduler.NodeStatusError, parallelNode.Status)
+
+	// Verify output was captured even though some child DAGs failed
+	require.NotNil(t, parallelNode.OutputVariables)
+	if value, ok := parallelNode.OutputVariables.Load("RESULTS"); ok {
+		results := value.(string)
+		t.Logf("Captured results: %s", results)
+		require.Contains(t, results, "RESULTS=")
+		
+		// Verify we got JSON output with both success and failure
+		require.Contains(t, results, `"total": 2`)
+		require.Contains(t, results, `"succeeded": 1`)
+		require.Contains(t, results, `"failed": 1`)
+		
+		// Both outputs should be captured
+		require.Contains(t, results, "Output for success")
+		require.Contains(t, results, "Output for fail")
+	} else {
+		t.Fatal("RESULTS output not found")
+	}
+}
+
+// TestParallelExecution_OutputCaptureWithRetry verifies output capture when child DAGs retry
+func TestParallelExecution_OutputCaptureWithRetry(t *testing.T) {
+	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+
+	// Create a simple child DAG that fails first, succeeds on retry
+	testDir := test.TestdataPath(t, "integration")
+	
+	// Clean up counter file after test
+	counterFile := "/tmp/test_retry_counter.txt"
+	t.Cleanup(func() { _ = os.Remove(counterFile) })
+	
+	childDagFile := filepath.Join(testDir, "child-retry-simple.yaml")
+	childDagContent := `name: child-retry-simple
+steps:
+  - name: retry-step
+    command: |
+      COUNTER_FILE="/tmp/test_retry_counter.txt"
+      if [ ! -f "$COUNTER_FILE" ]; then
+        echo "1" > "$COUNTER_FILE"
+        echo "First attempt"
+        exit 1
+      else
+        echo "Retry success"
+        exit 0
+      fi
+    output: OUTPUT
+    retryPolicy:
+      limit: 1
+      intervalSec: 0
+`
+	err := os.WriteFile(childDagFile, []byte(childDagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(childDagFile) })
+
+	// Parent DAG with parallel execution
+	parentDagFile := filepath.Join(testDir, "test-parallel-retry.yaml")
+	parentDagContent := `name: test-parallel-retry
+steps:
+  - name: parallel-retry
+    run: child-retry-simple
+    parallel:
+      items:
+        - "item1"
+    output: RESULTS
+`
+	err = os.WriteFile(parentDagFile, []byte(parentDagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(parentDagFile) })
+
+	// Run the DAG
+	dag := th.DAG(t, filepath.Join("integration", "test-parallel-retry.yaml"))
+	agent := dag.Agent()
+	err = agent.Run(agent.Context)
+	require.NoError(t, err)
+
+	// Get the latest status
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	require.Len(t, status.Nodes, 1)
+
+	// Check parallel node
+	parallelNode := status.Nodes[0]
+	require.Equal(t, "parallel-retry", parallelNode.Step.Name)
+	require.Equal(t, scheduler.NodeStatusSuccess, parallelNode.Status)
+
+	// Verify output was captured from retry
+	require.NotNil(t, parallelNode.OutputVariables)
+	if value, ok := parallelNode.OutputVariables.Load("RESULTS"); ok {
+		results := value.(string)
+		require.Contains(t, results, "RESULTS=")
+		require.Contains(t, results, `"succeeded": 1`)
+		require.Contains(t, results, `"failed": 0`)
+		
+		// Should contain retry output, not first attempt
+		require.Contains(t, results, "Retry success")
+		require.NotContains(t, results, "First attempt")
+	} else {
+		t.Fatal("RESULTS output not found")
+	}
+}
