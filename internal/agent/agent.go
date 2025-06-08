@@ -23,6 +23,7 @@ import (
 	"github.com/dagu-org/dagu/internal/mailer"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/sock"
+	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
 // Agent is responsible for running the DAG and handling communication
@@ -98,6 +99,9 @@ type Agent struct {
 	// isChildDAGRun is true if the current dag-run is not the root dag-run,
 	// meaning that it is a child dag-run of another dag-run.
 	isChildDAGRun atomic.Bool
+
+	// progressDisplay is the progress display for showing real-time execution progress.
+	progressDisplay *ProgressDisplay
 }
 
 // Options is the configuration for the Agent.
@@ -112,6 +116,9 @@ type Options struct {
 	// ParentDAGRun is the dag-run reference of the parent dag-run.
 	// It is required for child dag-runs to identify the parent dag-run.
 	ParentDAGRun digraph.DAGRunRef
+	// ProgressDisplay indicates if the progress display should be shown.
+	// This is typically enabled for CLI execution in a TTY environment.
+	ProgressDisplay bool
 }
 
 // New creates a new Agent.
@@ -127,7 +134,7 @@ func New(
 	root digraph.DAGRunRef,
 	opts Options,
 ) *Agent {
-	return &Agent{
+	a := &Agent{
 		rootDAGRun:   root,
 		parentDAGRun: opts.ParentDAGRun,
 		dagRunID:     dagRunID,
@@ -141,6 +148,13 @@ func New(
 		dagRunStore:  drs,
 		procStore:    ps,
 	}
+
+	// Initialize progress display if enabled
+	if opts.ProgressDisplay {
+		a.progressDisplay = NewProgressDisplay(os.Stderr, dag)
+	}
+
+	return a
 }
 
 // Run setups the scheduler and runs the DAG.
@@ -254,12 +268,28 @@ func (a *Agent) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to start the unix socket server: %w", err)
 	}
 
+	// Start progress display if enabled
+	if a.progressDisplay != nil {
+		a.progressDisplay.Start()
+		// Don't defer Stop() here - we'll do it after all updates are processed
+	}
+
 	// Setup channels to receive status updates for each node in the DAG.
 	// It should receive node instance when the node status changes, for
 	// example, when started, stopped, or cancelled, etc.
 	progressCh := make(chan *scheduler.Node)
-	defer close(progressCh)
+	progressDone := make(chan struct{})
+	defer func() {
+		close(progressCh)
+		<-progressDone // Wait for progress updates to complete
+		if a.progressDisplay != nil {
+			// Give a small delay to ensure final render
+			time.Sleep(100 * time.Millisecond)
+			a.progressDisplay.Stop()
+		}
+	}()
 	go execWithRecovery(ctx, func() {
+		defer close(progressDone)
 		for node := range progressCh {
 			status := a.Status()
 			if err := attempt.Write(ctx, status); err != nil {
@@ -267,6 +297,14 @@ func (a *Agent) Run(ctx context.Context) error {
 			}
 			if err := a.reporter.reportStep(ctx, a.dag, status, node); err != nil {
 				logger.Error(ctx, "Failed to report step", "err", err)
+			}
+			// Update progress display if enabled
+			if a.progressDisplay != nil {
+				// Convert scheduler node to models node
+				nodeData := node.NodeData()
+				modelNode := a.nodeToModelNode(nodeData)
+				a.progressDisplay.UpdateNode(modelNode)
+				a.progressDisplay.UpdateStatus(&status)
 			}
 		}
 	})
@@ -305,6 +343,15 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Update the finished status to the runstore database.
 	finishedStatus := a.Status()
 
+	// Send final progress update if enabled
+	if a.progressDisplay != nil {
+		// Update all nodes with their final status
+		for _, node := range finishedStatus.Nodes {
+			a.progressDisplay.UpdateNode(node)
+		}
+		a.progressDisplay.UpdateStatus(&finishedStatus)
+	}
+
 	// Log execution summary
 	logger.Info(ctx, "dag-run finished",
 		"name", a.dag.Name,
@@ -332,7 +379,39 @@ func (a *Agent) Run(ctx context.Context) error {
 	return lastErr
 }
 
+// nodeToModelNode converts a scheduler NodeData to a models.Node
+func (a *Agent) nodeToModelNode(nodeData scheduler.NodeData) *models.Node {
+	children := make([]models.ChildDAGRun, len(nodeData.State.Children))
+	for i, child := range nodeData.State.Children {
+		children[i] = models.ChildDAGRun(child)
+	}
+	
+	var errText string
+	if nodeData.State.Error != nil {
+		errText = nodeData.State.Error.Error()
+	}
+	
+	return &models.Node{
+		Step:            nodeData.Step,
+		Stdout:          nodeData.State.Stdout,
+		Stderr:          nodeData.State.Stderr,
+		StartedAt:       stringutil.FormatTime(nodeData.State.StartedAt),
+		FinishedAt:      stringutil.FormatTime(nodeData.State.FinishedAt),
+		Status:          nodeData.State.Status,
+		RetriedAt:       stringutil.FormatTime(nodeData.State.RetriedAt),
+		RetryCount:      nodeData.State.RetryCount,
+		DoneCount:       nodeData.State.DoneCount,
+		Error:           errText,
+		Children:        children,
+		OutputVariables: nodeData.State.OutputVariables,
+	}
+}
+
 func (a *Agent) PrintSummary(ctx context.Context) {
+	// Don't print summary if progress display was shown
+	if a.progressDisplay != nil {
+		return
+	}
 	status := a.Status()
 	summary := a.reporter.getSummary(ctx, status, a.lastErr)
 	println(summary)

@@ -101,7 +101,13 @@ func (g *ExecutionGraph) IsRunning() bool {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 	for _, node := range g.nodes {
-		if node.State().Status == NodeStatusRunning {
+		status := node.State().Status
+		if status == NodeStatusRunning {
+			return true
+		}
+		if status == NodeStatusNone && g.finishedAt.IsZero() {
+			// If the node is not started and the graph is not finished,
+			// it means the node is still pending to be executed.
 			return true
 		}
 	}
