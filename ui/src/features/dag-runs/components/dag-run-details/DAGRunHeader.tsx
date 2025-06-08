@@ -37,11 +37,11 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
     e.preventDefault();
     if (dagRun.parentDAGRunId) {
       const searchParams = new URLSearchParams();
-      searchParams.set('childDAGRunId', dagRun.dagRunId);
+      searchParams.set('childDAGRunId', dagRun.parentDAGRunId);
       searchParams.set('dagRunId', dagRun.rootDAGRunId);
       searchParams.set('dagRunName', dagRun.rootDAGRunName);
       navigate(
-        `/dag-runs/${dagRun.parentDAGRunName}?${searchParams.toString()}`
+        `/dag-runs/${dagRun.rootDAGRunName}/${dagRun.rootDAGRunId}?${searchParams.toString()}`
       );
     }
   };
