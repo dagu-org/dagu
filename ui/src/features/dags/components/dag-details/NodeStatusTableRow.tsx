@@ -153,7 +153,10 @@ function NodeStatusTableRow({
   };
 
   // Handle child dagRun navigation
-  const handleChildDAGRunNavigation = (childIndex: number = 0) => {
+  const handleChildDAGRunNavigation = (
+    childIndex: number = 0,
+    e?: React.MouseEvent
+  ) => {
     if (hasChildDAGRun && node.children && node.children[childIndex]) {
       const childDAGRunId = node.children[childIndex].dagRunId;
 
@@ -165,25 +168,37 @@ function NodeStatusTableRow({
         dagRun && (currentPath.startsWith('/dag-runs/') || isModal);
 
       if (isDAGRunContext) {
-        // For dagRuns, use query parameters to navigate to the dagRun details page
+        // For dagRuns, navigate to /dag-runs/{root-dag-name}/{root-dag-run-id}?childDAGRunId=...
         const searchParams = new URLSearchParams();
         searchParams.set('childDAGRunId', childDAGRunId);
 
-        // Use root dagRun information from the dagRun prop if available
+        // Determine root DAG information
+        let rootDAGRunId: string;
+        let rootDAGName: string;
+        
         if (dagRun && dagRun.rootDAGRunId) {
           // If this is already a child dagRun, use its root information
+          rootDAGRunId = dagRun.rootDAGRunId;
+          rootDAGName = dagRun.rootDAGRunName;
           searchParams.set('dagRunId', dagRun.rootDAGRunId);
           searchParams.set('dagRunName', dagRun.rootDAGRunName);
         } else {
           // Otherwise, use the current dagRun as the root
+          rootDAGRunId = dagRunId || '';
+          rootDAGName = dagRun?.name || name;
           searchParams.set('dagRunId', dagRunId || '');
           searchParams.set('dagRunName', dagRun?.name || name);
         }
 
         searchParams.set('step', node.step.name);
-        navigate(
-          `/dag-runs/${dagRun?.name || name}?${searchParams.toString()}`
-        );
+        const url = `/dag-runs/${rootDAGName}/${rootDAGRunId}?${searchParams.toString()}`;
+        
+        // If Cmd/Ctrl key is pressed, open in new tab
+        if (e && (e.metaKey || e.ctrlKey)) {
+          window.open(url, '_blank');
+        } else {
+          navigate(url);
+        }
       } else {
         // For DAGs, use the existing approach with query parameters
         const searchParams = new URLSearchParams();
@@ -205,7 +220,14 @@ function NodeStatusTableRow({
         }
 
         searchParams.set('step', node.step.name);
-        navigate(`/dags/${name}?${searchParams.toString()}`);
+        const url = `/dags/${name}?${searchParams.toString()}`;
+        
+        // If Cmd/Ctrl key is pressed, open in new tab
+        if (e && (e.metaKey || e.ctrlKey)) {
+          window.open(url, '_blank');
+        } else {
+          navigate(url);
+        }
       }
     }
   };
@@ -267,7 +289,8 @@ function NodeStatusTableRow({
                   <>
                     <div
                       className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline"
-                      onClick={() => handleChildDAGRunNavigation(0)}
+                      onClick={(e) => handleChildDAGRunNavigation(0, e)}
+                      title="Click to view child DAG run (Cmd/Ctrl+Click to open in new tab)"
                     >
                       View Child DAG Run: {node.step.run}
                     </div>
@@ -296,7 +319,8 @@ function NodeStatusTableRow({
                             <div key={child.dagRunId} className="py-1">
                               <div
                                 className="text-xs text-blue-500 dark:text-blue-400 cursor-pointer hover:underline"
-                                onClick={() => handleChildDAGRunNavigation(index)}
+                                onClick={(e) => handleChildDAGRunNavigation(index, e)}
+                                title="Click to view child DAG run (Cmd/Ctrl+Click to open in new tab)"
                               >
                                 #{index + 1}: {node.step.run}
                               </div>
@@ -561,7 +585,7 @@ function NodeStatusTableRow({
             <>
               <div
                 className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline mb-1"
-                onClick={() => handleChildDAGRunNavigation(0)}
+                onClick={(e) => handleChildDAGRunNavigation(0, e)}
               >
                 View Child DAG Run: {node.step.run}
               </div>
@@ -587,7 +611,7 @@ function NodeStatusTableRow({
                     <div key={child.dagRunId} className="py-1">
                       <div
                         className="text-xs text-blue-500 dark:text-blue-400 cursor-pointer hover:underline"
-                        onClick={() => handleChildDAGRunNavigation(index)}
+                        onClick={(e) => handleChildDAGRunNavigation(index, e)}
                       >
                         #{index + 1}: {node.step.run}
                       </div>
