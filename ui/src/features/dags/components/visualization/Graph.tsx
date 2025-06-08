@@ -119,6 +119,9 @@ const Graph: React.FC<Props> = ({
 
     const dat: string[] = [];
     dat.push(`flowchart ${flowchart};`);
+    
+    // Add legend comment
+    dat.push(`%% Shapes: Rectangle=Normal Step, Hexagon=Child DAG, Stadium=Parallel Execution`);
 
     // Store the click handler in window for backward compatibility
     // but we'll use double-click for navigation
@@ -132,25 +135,38 @@ const Graph: React.FC<Props> = ({
 
     const addNodeFn = (
       step: components['schemas']['Step'],
-      status: NodeStatus
+      status: NodeStatus,
+      node?: components['schemas']['Node']
     ) => {
       const id = step.name.replace(/[\s-]/g, 'dagutmp'); // Replace spaces and dashes with 'x'
       const c = graphStatusMap[status] || '';
 
       // Check if this is a child dagRun node (has a 'run' property)
       const isChildDAGRun = !!step.run;
+      const hasParallelExecutions = node?.children && node.children.length > 1;
 
       // Add indicator for child dagRun nodes in the label only
       // Escape any special characters in the label to prevent Mermaid parsing errors
       let label = step.name;
       if (isChildDAGRun && step.run) {
-        // Use a simpler format to avoid parsing issues
-        label = `${step.name} → ${step.run}`;
+        if (hasParallelExecutions && node?.children) {
+          // Show parallel execution count - use <br/> for newline in Mermaid
+          label = `${step.name} → ${step.run}<br/>(${node.children.length} parallel)`;
+        } else {
+          // Single child DAG run
+          label = `${step.name} → ${step.run}`;
+        }
       }
 
-      // Use different shape for child dagRuns (hexagon) but keep the same color for status
+      // Use different shape for child dagRuns
       if (isChildDAGRun) {
-        dat.push(`${id}{{${label}}}${c};`);
+        if (hasParallelExecutions) {
+          // Use stadium shape (rounded rectangle) for parallel executions
+          dat.push(`${id}([${label}])${c};`);
+        } else {
+          // Single hexagon for single child DAG run
+          dat.push(`${id}{{${label}}}${c};`);
+        }
       } else {
         dat.push(`${id}["${label}"]${c};`);
       }
@@ -188,8 +204,8 @@ const Graph: React.FC<Props> = ({
 
     // Process nodes based on type
     if (type === 'status') {
-      (steps as components['schemas']['Node'][]).forEach((step) =>
-        addNodeFn(step.step, step.status)
+      (steps as components['schemas']['Node'][]).forEach((node) =>
+        addNodeFn(node.step, node.status, node)
       );
     } else {
       (steps as components['schemas']['Step'][]).forEach((step) =>
