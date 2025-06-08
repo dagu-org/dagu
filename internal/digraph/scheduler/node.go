@@ -132,6 +132,7 @@ func (n *Node) shouldContinue(ctx context.Context) bool {
 func (n *Node) Execute(ctx context.Context) error {
 	cmd, err := n.setupExecutor(ctx)
 	if err != nil {
+		n.SetError(fmt.Errorf("failed to setup executor: %w", err))
 		return err
 	}
 
@@ -608,6 +609,12 @@ func (n *Node) buildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG
 	// Validate we have items
 	if len(items) == 0 {
 		return nil, fmt.Errorf("parallel execution requires at least one item")
+	}
+
+	// Validate maximum number of items
+	const maxParallelItems = 1000
+	if len(items) > maxParallelItems {
+		return nil, fmt.Errorf("parallel execution exceeds maximum limit: %d items (max: %d)", len(items), maxParallelItems)
 	}
 
 	// Build child runs with deduplication

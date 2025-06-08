@@ -1,6 +1,8 @@
 package integration_test
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1068,5 +1070,103 @@ steps:
 		require.Equal(t, 3, resultCount, "Outputs array should only contain successful outputs")
 	} else {
 		t.Fatal("RESULTS output not found")
+	}
+}
+
+// TestParallelExecution_ExceedsMaxLimit verifies that parallel execution with too many items fails
+func TestParallelExecution_ExceedsMaxLimit(t *testing.T) {
+	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+
+	// Create a parent DAG with more than 1000 items
+	testDir := test.TestdataPath(t, "integration")
+	dagFile := filepath.Join(testDir, "test-parallel-exceed-limit.yaml")
+	
+	// Generate a large list of items (1001 items)
+	items := make([]string, 1001)
+	for i := 0; i < 1001; i++ {
+		items[i] = fmt.Sprintf(`        - "item%d"`, i)
+	}
+	itemsStr := strings.Join(items, "\n")
+	
+	dagContent := fmt.Sprintf(`name: test-parallel-exceed-limit
+steps:
+  - name: too-many-items
+    run: child-echo
+    parallel:
+      items:
+%s
+`, itemsStr)
+	
+	err := os.WriteFile(dagFile, []byte(dagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(dagFile) })
+
+	// Load and run the DAG
+	dag := th.DAG(t, filepath.Join("integration", "test-parallel-exceed-limit.yaml"))
+	agent := dag.Agent()
+	
+	// This should fail during execution when buildChildDAGRuns is called
+	err = agent.Run(agent.Context)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "parallel execution exceeds maximum limit: 1001 items (max: 1000)")
+}
+
+// TestParallelExecution_ExactlyMaxLimit verifies that exactly 1000 items works
+func TestParallelExecution_ExactlyMaxLimit(t *testing.T) {
+	// Run this test to verify the boundary condition
+	
+	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+
+	// Create a parent DAG with exactly 1000 items
+	testDir := test.TestdataPath(t, "integration")
+	dagFile := filepath.Join(testDir, "test-parallel-max-limit.yaml")
+	
+	// Generate exactly 1000 items
+	items := make([]string, 1000)
+	for i := 0; i < 1000; i++ {
+		items[i] = fmt.Sprintf(`        - "item%d"`, i)
+	}
+	itemsStr := strings.Join(items, "\n")
+	
+	dagContent := fmt.Sprintf(`name: test-parallel-max-limit
+steps:
+  - name: max-items
+    run: child-echo
+    parallel:
+      items:
+%s
+      maxConcurrent: 10
+`, itemsStr)
+	
+	err := os.WriteFile(dagFile, []byte(dagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(dagFile) })
+
+	// Load the DAG - this should succeed
+	dag := th.DAG(t, filepath.Join("integration", "test-parallel-max-limit.yaml"))
+	
+	// Load and start the DAG - this should succeed as we're at the exact limit
+	agent := dag.Agent()
+	
+	// Start the DAG in a goroutine
+	errChan := make(chan error, 1)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	
+	go func() {
+		agent.Context = ctx
+		errChan <- agent.Run(agent.Context)
+	}()
+	
+	// Let it run for a short time to verify it starts without error
+	select {
+	case err := <-errChan:
+		// If it finished quickly, it might be an error
+		require.NoError(t, err, "DAG should not fail with exactly 1000 items")
+	case <-time.After(1 * time.Second):
+		// If it's still running after 1 second, it means it started successfully
+		// Cancel it to clean up
+		cancel()
+		<-errChan // Wait for it to finish
 	}
 }
