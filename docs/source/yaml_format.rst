@@ -525,6 +525,9 @@ You can access the output of the sub workflow using the `output` field:
       depends:
         - sub workflow
 
+.. note::
+   For executing the same child DAG multiple times with different parameters in parallel, see :ref:`Parallel Execution`.
+
 Command Substitution
 ~~~~~~~~~~~~~~~~~
 Use command output in configurations:

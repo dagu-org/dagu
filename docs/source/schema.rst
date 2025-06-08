@@ -378,6 +378,24 @@ Each element in the top-level ``steps`` list has its own fields for customizatio
 ~~~~~~~~
   Parameters to pass into a sub workflow if this step references one (via ``run``). You can also treat these as environment variables in the workflow.
 
+``parallel``
+~~~~~~~~~~
+  Configuration for parallel execution of child DAGs. Only applicable when ``run`` is specified.
+  
+  - **items**: Array of parameters to execute in parallel
+  - **maxConcurrent**: Maximum number of concurrent executions (default: 8, maximum: 1000)
+  
+  .. code-block:: yaml
+  
+    steps:
+      - name: parallel processing
+        run: process-item.yaml
+        parallel:
+          items: ["item1", "item2", "item3"]
+          maxConcurrent: 2
+  
+  See :ref:`Parallel Execution` for detailed documentation.
+
 ``executor``
 ~~~~~~~~~~
   An executor configuration specifying how the command or script is run (e.g., Docker, SSH, HTTP, Mail, JSON).  
