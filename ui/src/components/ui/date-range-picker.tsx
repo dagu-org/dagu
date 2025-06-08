@@ -213,7 +213,7 @@ export function DateRangePicker({
   return (
     <div
       className={cn(
-        'relative items-center flex rounded-md border px-1 shadow-xs bg-white dark:bg-zinc-900',
+        'relative items-center flex rounded-md border shadow-xs bg-white dark:bg-zinc-900',
         className
       )}
       {...props}
