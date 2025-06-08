@@ -112,7 +112,7 @@ function DAGStatusOverview({
               Parameters
             </span>
           </div>
-          <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-md font-medium text-xs text-slate-700 dark:text-slate-300 font-mono max-h-[100px] overflow-y-auto w-full">
+          <div className="p-2 bg-slate-200 dark:bg-slate-700 rounded-md font-medium text-xs text-slate-800 dark:text-slate-200 font-mono max-h-[100px] overflow-y-auto w-full border">
             {status.params}
           </div>
         </div>
