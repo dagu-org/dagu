@@ -421,7 +421,7 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
 
   return (
     <TimelineWrapper>
-      <div className="flex justify-end gap-1 p-2 border-b bg-muted/30">
+      <div className="flex justify-end gap-1 p-2 border-b bg-muted/30 flex-shrink-0">
         <Button
           variant="ghost"
           size="sm"
@@ -468,7 +468,7 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
           <RotateCcw className="h-3 w-3" />
         </Button>
       </div>
-      <div ref={timelineRef} style={{ width: '100%', height: '100%' }} />
+      <div ref={timelineRef} className="flex-1 min-h-0 overflow-auto" />
       {selectedDAGRun && (
         <DAGRunDetailsModal
           name={selectedDAGRun.name}
@@ -591,7 +591,7 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
 
 function TimelineWrapper({ children }: { children: React.ReactNode }) {
   return (
-    <div className="w-full h-[60vh] overflow-auto bg-background border-t">
+    <div className="w-full h-full flex flex-col bg-background">
       {children}
     </div>
   );

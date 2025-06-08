@@ -200,9 +200,9 @@ function Dashboard(): React.ReactElement | null {
 
   // --- Render the dashboard UI ---
   return (
-    <div className="flex flex-col gap-3 w-full p-0">
+    <div className="flex flex-col gap-3 w-full h-full overflow-hidden">
       {/* Dense Header with Filters and Metrics */}
-      <div className="border rounded bg-card">
+      <div className="border rounded bg-card flex-shrink-0">
         {/* Top row: Filters */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 border-b">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -313,13 +313,13 @@ function Dashboard(): React.ReactElement | null {
       </div>
 
       {/* Compact Timeline Chart */}
-      <div className="border rounded bg-card">
-        <div className="flex items-center justify-between p-3 border-b">
+      <div className="border rounded bg-card flex-1 flex flex-col min-h-0">
+        <div className="flex items-center justify-between p-3 border-b flex-shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold">{title}</span>
           </div>
         </div>
-        <div className="p-0">
+        <div className="flex-1 min-h-0">
           <DashboardTimeChart
             data={dagRunsList}
             selectedDate={{
