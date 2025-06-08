@@ -809,26 +809,45 @@ func buildSignalOnStop(_ BuildContext, def stepDef, step *Step) error {
 }
 
 // buildChildDAG parses the child DAG definition and sets up the step to run a child DAG.
-func buildChildDAG(_ BuildContext, def stepDef, step *Step) error {
-	name, params := def.Run, def.Params
+func buildChildDAG(ctx BuildContext, def stepDef, step *Step) error {
+	name := def.Run
 
 	// if the run field is not set, return nil.
 	if name == "" {
 		return nil
 	}
 
-	step.ChildDAG = &ChildDAG{Name: name, Params: params}
-	
+	// Parse params similar to how DAG params are parsed
+	var paramsStr string
+	if def.Params != nil {
+		// Parse the params to convert them to string format
+		ctxCopy := ctx
+		ctxCopy.opts.NoEval = true // Disable evaluation for params parsing
+		paramPairs, err := parseParamValue(ctxCopy, def.Params)
+		if err != nil {
+			return wrapError("params", def.Params, err)
+		}
+
+		// Convert to string format "key=value key=value ..."
+		var paramsToJoin []string
+		for _, paramPair := range paramPairs {
+			paramsToJoin = append(paramsToJoin, paramPair.Escaped())
+		}
+		paramsStr = strings.Join(paramsToJoin, " ")
+	}
+
+	step.ChildDAG = &ChildDAG{Name: name, Params: paramsStr}
+
 	// Set executor type based on whether parallel execution is configured
 	if step.Parallel != nil {
 		step.ExecutorConfig.Type = ExecutorTypeParallel
 	} else {
 		step.ExecutorConfig.Type = ExecutorTypeDAG
 	}
-	
+
 	step.Command = "run"
-	step.Args = []string{name, params}
-	step.CmdWithArgs = fmt.Sprintf("%s %s", name, params)
+	step.Args = []string{name, paramsStr}
+	step.CmdWithArgs = fmt.Sprintf("%s %s", name, paramsStr)
 	return nil
 }
 

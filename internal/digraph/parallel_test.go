@@ -13,14 +13,14 @@ import (
 
 func TestBuildParallel(t *testing.T) {
 	tests := []struct {
-		name         string
-		yaml         string
-		wantItems    int
-		wantMaxConc  int
+		name          string
+		yaml          string
+		wantItems     int
+		wantMaxConc   int
 		wantFirstItem any
-		wantVariable string
-		wantErr      bool
-		wantErrMsg   string
+		wantVariable  string
+		wantErr       bool
+		wantErrMsg    string
 	}{
 		{
 			name: "direct variable reference",
@@ -245,7 +245,7 @@ steps:
 	assert.Equal(t, 3, len(step.Parallel.Items))
 	assert.Equal(t, 10, step.Parallel.MaxConcurrent)
 	assert.Equal(t, "workflows/deploy", step.ChildDAG.Name)
-	assert.Equal(t, "VERSION=1.0.0", step.ChildDAG.Params)
+	assert.Equal(t, "VERSION=\"1.0.0\"", step.ChildDAG.Params)
 
 	// Check the items
 	items := step.Parallel.Items

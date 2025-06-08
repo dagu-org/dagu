@@ -1170,3 +1170,134 @@ steps:
 		<-errChan // Wait for it to finish
 	}
 }
+
+// TestParallelExecution_DynamicFileDiscovery tests the pattern from README where files are discovered dynamically
+func TestParallelExecution_DynamicFileDiscovery(t *testing.T) {
+	th := test.Setup(t)
+
+	// Create a temporary directory with test CSV files
+	testDataDir := filepath.Join(th.Config.Paths.DAGsDir, "test-data")
+	err := os.MkdirAll(testDataDir, 0755)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(testDataDir) })
+
+	// Create test CSV files
+	testFiles := []string{"data1.csv", "data2.csv", "data3.csv"}
+	for _, file := range testFiles {
+		filePath := filepath.Join(testDataDir, file)
+		content := fmt.Sprintf("id,name\n1,%s\n", file)
+		err := os.WriteFile(filePath, []byte(content), 0644)
+		require.NoError(t, err)
+	}
+
+	// Create a child DAG that processes a file
+	childDagFile := filepath.Join(th.Config.Paths.DAGsDir, "process-file.yaml")
+	childDagContent := `name: process-file
+params:
+  - ITEM: ""
+steps:
+  - name: process
+    script: |
+      FILE="$ITEM"
+      echo "Processing file: ${FILE}"
+      # Simulate file processing
+      if [ -f "${FILE}" ]; then
+        LINE_COUNT=$(wc -l < "${FILE}")
+        echo "File has ${LINE_COUNT} lines"
+      else
+        echo "ERROR: File not found"
+        exit 1
+      fi
+    output: PROCESS_RESULT
+`
+	err = os.WriteFile(childDagFile, []byte(childDagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(childDagFile) })
+
+	// Create the parent DAG that discovers and processes files
+	parentDagFile := filepath.Join(th.Config.Paths.DAGsDir, "test-file-discovery.yaml")
+	parentDagContent := fmt.Sprintf(`name: test-file-discovery
+steps:
+  - name: get files
+    command: find %s -name "*.csv" -type f
+    output: FILES
+  
+  - name: process files
+    run: process-file
+    parallel: ${FILES}
+    params:
+      - ITEM: ${ITEM}
+    depends: get files
+    output: RESULTS
+`, testDataDir)
+	err = os.WriteFile(parentDagFile, []byte(parentDagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(parentDagFile) })
+
+	// Load and run the DAG
+	dagStruct, err := digraph.Load(th.Context, parentDagFile)
+	require.NoError(t, err)
+	
+	// Create the DAG wrapper
+	dag := test.DAG{
+		Helper: &th,
+		DAG:    dagStruct,
+	}
+	
+	agent := dag.Agent()
+	require.NoError(t, agent.Run(agent.Context))
+
+	// Verify successful completion
+	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+
+	// Get the latest status to verify parallel execution
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	require.Len(t, status.Nodes, 2) // get files and process files
+
+	// Check get files node
+	getFilesNode := status.Nodes[0]
+	require.Equal(t, "get files", getFilesNode.Step.Name)
+	require.Equal(t, scheduler.NodeStatusSuccess, getFilesNode.Status)
+
+	// Verify FILES output contains the discovered files
+	require.NotNil(t, getFilesNode.OutputVariables)
+	if value, ok := getFilesNode.OutputVariables.Load("FILES"); ok {
+		files := value.(string)
+		// Should contain newline-separated file paths
+		for _, testFile := range testFiles {
+			require.Contains(t, files, testFile)
+		}
+	} else {
+		t.Fatal("FILES output not found")
+	}
+
+	// Check process files node
+	processNode := status.Nodes[1]
+	require.Equal(t, "process files", processNode.Step.Name)
+	require.Equal(t, scheduler.NodeStatusSuccess, processNode.Status)
+
+	// Verify child DAG runs were created for each file
+	require.NotEmpty(t, processNode.Children)
+	require.Len(t, processNode.Children, 3) // 3 child runs for 3 CSV files
+
+	// Verify parallel execution results
+	require.NotNil(t, processNode.OutputVariables)
+	if value, ok := processNode.OutputVariables.Load("RESULTS"); ok {
+		results := value.(string)
+		require.Contains(t, results, "RESULTS=")
+		require.Contains(t, results, `"total": 3`)
+		require.Contains(t, results, `"succeeded": 3`)
+		require.Contains(t, results, `"failed": 0`)
+		
+		// Each file should have been processed
+		require.Contains(t, results, "Processing file:")
+		require.Contains(t, results, "data1.csv")
+		require.Contains(t, results, "data2.csv")
+		require.Contains(t, results, "data3.csv")
+		require.Regexp(t, `File has\s+2 lines`, results) // Each test file has 2 lines
+	} else {
+		t.Fatal("RESULTS output not found")
+	}
+}

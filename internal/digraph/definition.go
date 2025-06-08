@@ -113,7 +113,7 @@ type stepDef struct {
 	// Run is the name of a DAG to run as a child dag-run.
 	Run string `yaml:"run,omitempty"`
 	// Params specifies the parameters for the child dag-run.
-	Params string `yaml:"params,omitempty"`
+	Params any `yaml:"params,omitempty"`
 	// Parallel specifies parallel execution configuration.
 	// Can be:
 	// - Direct array reference: parallel: ${ITEMS}

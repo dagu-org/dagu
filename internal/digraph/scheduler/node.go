@@ -202,11 +202,13 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 
 	// Evaluate the child DAG if set
 	if child := n.Step().ChildDAG; child != nil {
-		childDAG, err := EvalObject(ctx, *child)
+		dagName, err := EvalString(ctx, child.Name)
 		if err != nil {
-			return nil, fmt.Errorf("failed to eval child DAG: %w", err)
+			return nil, fmt.Errorf("failed to eval child DAG name: %w", err)
 		}
-		n.SetChildDAG(childDAG)
+		copy := *child
+		copy.Name = dagName
+		n.SetChildDAG(copy)
 	}
 
 	// Evaluate script if set
@@ -625,11 +627,26 @@ func (n *Node) buildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG
 			return nil, fmt.Errorf("failed to process item %d: %w", i, err)
 		}
 
-		dagRunID := GenerateChildDAGRunID(ctx, param)
+		// Merge the item param with the step's params if they exist
+		finalParams := param
+		if childDAG.Params != "" {
+			// Create variables map with ITEM set to the current item value
+			variables := map[string]string{
+				"ITEM": param,
+			}
+			// Evaluate the step params with ITEM variable available
+			evaluatedStepParams, err := EvalString(ctx, childDAG.Params, cmdutil.WithVariables(variables))
+			if err != nil {
+				return nil, fmt.Errorf("failed to eval step params: %w", err)
+			}
+			finalParams = evaluatedStepParams
+		}
+
+		dagRunID := GenerateChildDAGRunID(ctx, finalParams)
 		// Use dagRunID as key to deduplicate - same params will generate same ID
 		childRunMap[dagRunID] = ChildDAGRun{
 			DAGRunID: dagRunID,
-			Params:   param,
+			Params:   finalParams,
 		}
 	}
 
