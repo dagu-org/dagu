@@ -119,9 +119,11 @@ const Graph: React.FC<Props> = ({
 
     const dat: string[] = [];
     dat.push(`flowchart ${flowchart};`);
-    
+
     // Add legend comment
-    dat.push(`%% Shapes: Rectangle=Normal Step, Hexagon=Child DAG, Stadium=Parallel Execution`);
+    dat.push(
+      `%% Shapes: Rectangle=Normal Step, Hexagon=Child DAG, Stadium=Parallel Execution`
+    );
 
     // Store the click handler in window for backward compatibility
     // but we'll use double-click for navigation
@@ -150,8 +152,8 @@ const Graph: React.FC<Props> = ({
       let label = step.name;
       if (isChildDAGRun && step.run) {
         if (hasParallelExecutions && node?.children) {
-          // Show parallel execution count - use <br/> for newline in Mermaid
-          label = `${step.name} → ${step.run}<br/>(${node.children.length} parallel)`;
+          // Show parallel execution count in the label - avoid brackets in stadium nodes
+          label = `${step.name} → ${step.run} x${node.children.length}`;
         } else {
           // Single child DAG run
           label = `${step.name} → ${step.run}`;
@@ -160,13 +162,7 @@ const Graph: React.FC<Props> = ({
 
       // Use different shape for child dagRuns
       if (isChildDAGRun) {
-        if (hasParallelExecutions) {
-          // Use stadium shape (rounded rectangle) for parallel executions
-          dat.push(`${id}([${label}])${c};`);
-        } else {
-          // Single hexagon for single child DAG run
-          dat.push(`${id}{{${label}}}${c};`);
-        }
+        dat.push(`${id}{{${label}}}${c};`);
       } else {
         dat.push(`${id}["${label}"]${c};`);
       }
@@ -218,7 +214,7 @@ const Graph: React.FC<Props> = ({
     const isDarkMode = document.documentElement.classList.contains('dark');
     const nodeFill = isDarkMode ? '#18181b' : 'white'; // zinc-900 for dark mode
     const nodeColor = isDarkMode ? '#e4e4e7' : '#333'; // zinc-200 for dark mode text
-    
+
     dat.push(
       `classDef none color:${nodeColor},fill:${nodeFill},stroke:lightblue,stroke-width:1.2px`
     );
