@@ -73,7 +73,7 @@ function DAGDetails() {
   );
 
   // Fetch DAG details
-  const { data: dagData, isLoading: isLoadingDag } = useQuery(
+  const { data: dagData } = useQuery(
     '/dags/{fileName}',
     {
       params: {
@@ -90,7 +90,7 @@ function DAGDetails() {
   const dagRunName = queriedDAGRunName || dagData?.dag?.name || '';
 
   // Fetch specific DAG-run data if dagRunId is provided
-  const { data: dagRunResponse, isLoading: isLoadingDAGRun } = useQuery(
+  const { data: dagRunResponse } = useQuery(
     '/dag-runs/{name}/{dagRunId}',
     {
       params: {
@@ -109,24 +109,23 @@ function DAGDetails() {
   );
 
   // Fetch child DAG-run data if needed
-  const { data: childDAGRunResponse, isLoading: isLoadingChildDAGRun } =
-    useQuery(
-      '/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}',
-      {
-        params: {
-          path: {
-            name: dagRunName,
-            dagRunId: dagRunId || '',
-            childDAGRunId: childDAGRunId || '',
-          },
-          query: { remoteNode },
+  const { data: childDAGRunResponse } = useQuery(
+    '/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}',
+    {
+      params: {
+        path: {
+          name: dagRunName,
+          dagRunId: dagRunId || '',
+          childDAGRunId: childDAGRunId || '',
         },
+        query: { remoteNode },
       },
-      {
-        refreshInterval: 1000,
-        isPaused: () => !childDAGRunId || !dagRunId || !dagRunName,
-      }
-    );
+    },
+    {
+      refreshInterval: 1000,
+      isPaused: () => !childDAGRunId || !dagRunId || !dagRunName,
+    }
+  );
 
   // Determine the current DAG-run to display
   let currentDAGRun: DAGRunDetails | undefined;
@@ -164,20 +163,11 @@ function DAGDetails() {
     }
   }, [currentDAGRun, dagData?.latestDAGRun, rootDAGRunData]);
 
-  // Determine if basic data is loading (no DAG data available at all)
-  const isBasicLoading = !fileName || isLoadingDag || !dagData || !dagData.dag;
-
-
   // Refresh function (placeholder for now)
   const refreshData = useCallback(() => {
     // This could be implemented to trigger a refresh of the data
     // For now it's a placeholder
   }, []);
-
-  // If basic data is loading, show full page loading indicator
-  if (isBasicLoading) {
-    return <LoadingIndicator />;
-  }
 
   // Determine which DAG-run to display in the header
   // We want to show the header even when content is loading
