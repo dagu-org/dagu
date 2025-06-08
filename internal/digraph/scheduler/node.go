@@ -152,12 +152,15 @@ func (n *Node) Execute(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	if output := n.Step().Output; output != "" {
-		value, err := n.outputs.capturedOutput(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to capture output: %w", err)
+	// Only capture output if the execution was successful
+	if exitCode == 0 && n.Error() == nil {
+		if output := n.Step().Output; output != "" {
+			value, err := n.outputs.capturedOutput(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to capture output: %w", err)
+			}
+			n.setVariable(output, value)
 		}
-		n.setVariable(output, value)
 	}
 
 	return n.Error()
@@ -755,8 +758,12 @@ type OutputCoordinator struct {
 	StderrRedirectFile   *os.File
 	stderrRedirectWriter *bufio.Writer
 
-	outputWriter *os.File
-	outputReader *os.File
+	// Output capture with size limits to prevent OOM
+	outputWriter     *os.File
+	outputReader     *os.File
+	outputData       string
+	outputCaptured   bool
+	maxOutputSize    int64 // Max output size in bytes
 }
 
 func (oc *OutputCoordinator) StdoutFile() string {
@@ -784,7 +791,7 @@ func (oc *OutputCoordinator) setup(ctx context.Context, data NodeData) error {
 	return oc.setupStderrRedirect(ctx, data)
 }
 
-func (oc *OutputCoordinator) setupExecutorIO(_ context.Context, cmd executor.Executor, data NodeData) error {
+func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.Executor, data NodeData) error {
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
@@ -798,12 +805,19 @@ func (oc *OutputCoordinator) setupExecutorIO(_ context.Context, cmd executor.Exe
 		stdout = io.MultiWriter(oc.stdoutWriter, oc.stdoutRedirectWriter)
 	}
 
-	// Setup output capture
-	if data.Step.Output != "" {
+	// Setup output capture only if not already set up
+	if data.Step.Output != "" && oc.outputReader == nil {
 		var err error
 		if oc.outputReader, oc.outputWriter, err = os.Pipe(); err != nil {
 			return fmt.Errorf("failed to create pipe: %w", err)
 		}
+		logger.Debug(ctx, "Created new output pipes", "step", data.Step.Name, "outputVar", data.Step.Output)
+		// Reset the captured flag to allow new output capture for retry
+		oc.outputCaptured = false
+		oc.maxOutputSize = 1024 * 1024 // 1MB limit
+	}
+	
+	if oc.outputWriter != nil {
 		stdout = io.MultiWriter(stdout, oc.outputWriter)
 	}
 
@@ -834,7 +848,7 @@ func (oc *OutputCoordinator) closeResources(_ context.Context) error {
 			}
 		}
 	}
-	for _, f := range []*os.File{oc.stdoutFile, oc.stderrFile, oc.stdoutRedirectFile, oc.StderrRedirectFile} {
+	for _, f := range []*os.File{oc.stdoutFile, oc.stderrFile, oc.stdoutRedirectFile, oc.StderrRedirectFile, oc.outputReader, oc.outputWriter} {
 		if f != nil {
 			if err := f.Sync(); err != nil {
 				lastErr = err
@@ -926,18 +940,58 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
+	// Return cached result if already captured
+	if oc.outputCaptured {
+		logger.Debug(ctx, "capturedOutput: returning cached", "output", oc.outputData, "length", len(oc.outputData))
+		return oc.outputData, nil
+	}
+
 	if oc.outputReader == nil {
+		logger.Debug(ctx, "capturedOutput: no output reader")
 		return "", nil
 	}
 
-	if err := oc.outputWriter.Close(); err != nil {
-		logger.Error(ctx, "failed to close pipe writer", "err", err)
+	// Close the writer only if it hasn't been closed already
+	if oc.outputWriter != nil {
+		logger.Debug(ctx, "capturedOutput: closing output writer")
+		if err := oc.outputWriter.Close(); err != nil {
+			logger.Error(ctx, "failed to close pipe writer", "err", err)
+		}
+		oc.outputWriter = nil // Mark as closed
 	}
 
+	// Use limited reader to prevent OOM
+	limitedReader := io.LimitReader(oc.outputReader, oc.maxOutputSize)
 	var buf bytes.Buffer
-	// TODO: Handle case where output is too large
-	if _, err := io.Copy(&buf, oc.outputReader); err != nil {
+	if _, err := io.Copy(&buf, limitedReader); err != nil {
 		return "", fmt.Errorf("io: failed to read output: %w", err)
 	}
-	return strings.TrimSpace(buf.String()), nil
+	
+	output := strings.TrimSpace(buf.String())
+	
+	// Check if output was truncated
+	if buf.Len() == int(oc.maxOutputSize) {
+		logger.Warn(ctx, "Output truncated due to size limit", "maxSize", oc.maxOutputSize)
+		output += "\n[OUTPUT TRUNCATED]"
+	}
+	
+	// Accumulate output with previous attempts (for retries)
+	if oc.outputData != "" && output != "" {
+		oc.outputData += "\n" + output
+	} else if output != "" {
+		oc.outputData = output
+	}
+	
+	logger.Debug(ctx, "capturedOutput: captured", "output", oc.outputData, "length", len(oc.outputData))
+	
+	// Close the reader after reading
+	if err := oc.outputReader.Close(); err != nil {
+		logger.Error(ctx, "failed to close pipe reader", "err", err)
+	}
+	oc.outputReader = nil // Mark as closed
+	
+	// Mark as captured for caching
+	oc.outputCaptured = true
+	
+	return oc.outputData, nil
 }
