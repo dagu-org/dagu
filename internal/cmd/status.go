@@ -87,18 +87,29 @@ func runStatus(ctx *Context, args []string) error {
 
 // displayDetailedStatus renders a formatted table with DAG run information
 func displayDetailedStatus(dag *digraph.DAG, status *models.DAGRunStatus) {
-	// Create header
+	// Create header with 80 character width
 	fmt.Println()
 	headerColor := color.New(color.FgCyan, color.Bold)
-	_, _ = headerColor.Printf("DAG Run Status Report\n")
-	fmt.Println(strings.Repeat("=", 60))
+	
+	// Create a boxed header similar to progress display
+	fmt.Println(strings.Repeat("─", 80))
+	title := "DAG Run Status Report"
+	padding := (80 - len(title)) / 2
+	fmt.Printf("%s%s%s\n", 
+		strings.Repeat(" ", padding), 
+		headerColor.Sprint(title),
+		strings.Repeat(" ", 80 - padding - len(title)))
+	fmt.Println(strings.Repeat("─", 80))
 
-	// Create overview table
+	// Create overview table with fixed 80-character width
 	t := table.NewWriter()
 	t.SetStyle(table.StyleLight)
+	// Configure columns to ensure total width is 80 chars
+	// Table borders: │ + space + col1 + space + │ + space + col2 + space + │
+	// That's 7 chars for borders/spacing, leaving 73 for content
 	t.SetColumnConfigs([]table.ColumnConfig{
-		{Number: 1, AutoMerge: false, WidthMin: 20},
-		{Number: 2, AutoMerge: false, WidthMin: 40},
+		{Number: 1, AutoMerge: false, WidthMin: 22, WidthMax: 22},
+		{Number: 2, AutoMerge: false, WidthMin: 51, WidthMax: 51},
 	})
 
 	// Basic Information
@@ -140,7 +151,7 @@ func displayDetailedStatus(dag *digraph.DAG, status *models.DAGRunStatus) {
 			}
 			errorText += err.Error()
 		}
-		t.AppendRow(table.Row{"Errors", text.WrapSoft(errorText, 40)})
+		t.AppendRow(table.Row{"Errors", text.WrapSoft(errorText, 50)})
 	}
 
 	// Render the overview table
@@ -175,8 +186,16 @@ func displayDetailedStatus(dag *digraph.DAG, status *models.DAGRunStatus) {
 // displayStepSummary shows a summary of all steps in the DAG run
 func displayStepSummary(nodes []*models.Node) {
 	headerColor := color.New(color.FgCyan, color.Bold)
-	_, _ = headerColor.Println("Step Summary")
-	fmt.Println(strings.Repeat("-", 60))
+	
+	// Create a boxed header with 80 character width
+	fmt.Println(strings.Repeat("─", 80))
+	title := "Step Summary"
+	padding := (80 - len(title)) / 2
+	fmt.Printf("%s%s%s\n", 
+		strings.Repeat(" ", padding), 
+		headerColor.Sprint(title),
+		strings.Repeat(" ", 80 - padding - len(title)))
+	fmt.Println(strings.Repeat("─", 80))
 
 	// Count steps by status
 	statusCounts := make(map[scheduler.NodeStatus]int)
@@ -187,6 +206,20 @@ func displayStepSummary(nodes []*models.Node) {
 	// Create step summary table
 	t := table.NewWriter()
 	t.SetStyle(table.StyleLight)
+	// Configure columns to ensure total width is 80 chars
+	// Table borders: │ + space + col1 + space + │ + space + col2 + space + │ + space + col3 + space + │ + space + col4 + space + │
+	// That's 13 chars for borders/spacing, leaving 67 for content
+	t.SetColumnConfigs([]table.ColumnConfig{
+		{Number: 1, AutoMerge: false, WidthMin: 30, WidthMax: 30, WidthMaxEnforcer: func(s string, n int) string {
+			if len(s) <= n {
+				return s
+			}
+			return s[:n]
+		}},
+		{Number: 2, AutoMerge: false, WidthMin: 13, WidthMax: 13},
+		{Number: 3, AutoMerge: false, WidthMin: 12, WidthMax: 12},
+		{Number: 4, AutoMerge: false, WidthMin: 12, WidthMax: 12},
+	})
 	t.AppendHeader(table.Row{"Step Name", "Status", "Started", "Duration"})
 
 	// Show first few steps and any failed steps
@@ -217,9 +250,8 @@ func displayStepSummary(nodes []*models.Node) {
 			}
 		}
 
-		name := truncateText(node.Step.Name, 20)
 		t.AppendRow(table.Row{
-			text.WrapSoft(name, 25),
+			node.Step.Name,
 			formatNodeStatus(node.Status),
 			startTime,
 			duration,
@@ -257,17 +289,33 @@ func displayStepSummary(nodes []*models.Node) {
 
 	// Show detailed step information with log preview
 	fmt.Println()
-	headerColor = color.New(color.FgCyan, color.Bold)
-	_, _ = headerColor.Println("Step Logs Preview")
-	fmt.Println(strings.Repeat("-", 80))
+	
+	// Create a boxed header with 80 character width
+	fmt.Println(strings.Repeat("─", 80))
+	logTitle := "Step Logs Preview"
+	logPadding := (80 - len(logTitle)) / 2
+	fmt.Printf("%s%s%s\n", 
+		strings.Repeat(" ", logPadding), 
+		headerColor.Sprint(logTitle),
+		strings.Repeat(" ", 80 - logPadding - len(logTitle)))
+	fmt.Println(strings.Repeat("─", 80))
 
 	// Create detailed table
 	detailTable := table.NewWriter()
 	detailTable.SetStyle(table.StyleLight)
+	// Configure columns to ensure total width is 80 chars
+	// Table borders: │ + space + col1 + space + │ + space + col2 + space + │ + space + col3 + space + │
+	// That's 10 chars for borders/spacing, leaving 70 for content
+	// Need to add 1 more char, so we'll make it 71 total
 	detailTable.SetColumnConfigs([]table.ColumnConfig{
-		{Number: 1, AutoMerge: false, WidthMin: 15, WidthMax: 20},
-		{Number: 2, AutoMerge: false, WidthMin: 30, WidthMax: 40},
-		{Number: 3, AutoMerge: false, WidthMin: 30, WidthMax: 40},
+		{Number: 1, AutoMerge: false, WidthMin: 17, WidthMax: 17, WidthMaxEnforcer: func(s string, n int) string {
+			if len(s) <= n {
+				return s
+			}
+			return s[:n]
+		}},
+		{Number: 2, AutoMerge: false, WidthMin: 27, WidthMax: 27},
+		{Number: 3, AutoMerge: false, WidthMin: 26, WidthMax: 26},
 	})
 	detailTable.AppendHeader(table.Row{"Step", "Stdout (first line)", "Stderr (first line)"})
 
@@ -277,24 +325,16 @@ func displayStepSummary(nodes []*models.Node) {
 		stdoutPreview := readFirstLine(node.Stdout)
 		stderrPreview := readFirstLine(node.Stderr)
 
-		name := truncateText(node.Step.Name, 12)
 		detailTable.AppendRow(table.Row{
-			text.WrapSoft(name, 18),
-			text.WrapSoft(stdoutPreview, 38),
-			text.WrapSoft(stderrPreview, 38),
+			node.Step.Name,
+			stdoutPreview,
+			stderrPreview,
 		})
 	}
 
 	fmt.Println(detailTable.Render())
 }
 
-// truncateText truncates a string with ellipse
-func truncateText(s string, max int) string {
-	if len(s) <= max {
-		return s
-	}
-	return string([]rune(s)[:max]) + "..."
-}
 
 // readFirstLine reads the first line of a file and adds ellipsis if there's more content
 func readFirstLine(path string) string {
@@ -336,10 +376,10 @@ func readFirstLine(path string) string {
 	hasMoreData := n == len(buffer) // buffer was filled, likely more data
 
 	// For very long single lines, be more aggressive with truncation
-	maxDisplayLength := 45
+	maxDisplayLength := 24
 	if hasMoreData && !hasMoreLines {
 		// Long line without breaks - show less to indicate truncation
-		maxDisplayLength = 35
+		maxDisplayLength = 21
 	}
 
 	// Truncate if too long - simple byte truncation is fine for display
@@ -349,8 +389,8 @@ func readFirstLine(path string) string {
 
 	// Add ellipsis if there's more content
 	if hasMoreLines || hasMoreData {
-		if len(firstLine) > 30 {
-			return firstLine[:27] + "..."
+		if len(firstLine) > 21 {
+			return firstLine[:18] + "..."
 		}
 		return firstLine + "..."
 	}
