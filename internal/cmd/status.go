@@ -106,12 +106,12 @@ func displayDetailedStatus(dag *digraph.DAG, status *models.DAGRunStatus) {
 	t.AppendRow(table.Row{"Run ID", status.DAGRunID})
 	t.AppendRow(table.Row{"Process ID", formatPID(status.PID)})
 	t.AppendRow(table.Row{"Status", formatStatus(status.Status)})
-	
+
 	// Timing Information
 	if status.StartedAt != "" && status.StartedAt != "-" {
 		startedAt, _ := stringutil.ParseTime(status.StartedAt)
 		t.AppendRow(table.Row{"Started At", status.StartedAt})
-		
+
 		if status.FinishedAt != "" && status.FinishedAt != "-" {
 			finishedAt, _ := stringutil.ParseTime(status.FinishedAt)
 			if !startedAt.IsZero() && !finishedAt.IsZero() {
@@ -190,7 +190,6 @@ func displayStepSummary(nodes []*models.Node) {
 	t.AppendHeader(table.Row{"Step Name", "Status", "Started", "Duration"})
 
 	// Show first few steps and any failed steps
-	maxSteps := 10
 	shownSteps := 0
 	failedSteps := []*models.Node{}
 
@@ -199,43 +198,33 @@ func displayStepSummary(nodes []*models.Node) {
 			failedSteps = append(failedSteps, node)
 		}
 
-		if shownSteps < maxSteps {
-			duration := ""
-			startTime := ""
-			
-			if node.StartedAt != "" && node.StartedAt != "-" {
-				startedAt, _ := stringutil.ParseTime(node.StartedAt)
-				if !startedAt.IsZero() {
-					startTime = startedAt.Format("15:04:05")
-				}
-				
-				if node.FinishedAt != "" && node.FinishedAt != "-" {
-					finishedAt, _ := stringutil.ParseTime(node.FinishedAt)
-					if !startedAt.IsZero() && !finishedAt.IsZero() {
-						duration = formatDuration(finishedAt.Sub(startedAt))
-					}
-				} else if node.Status == scheduler.NodeStatusRunning && !startedAt.IsZero() {
-					duration = formatDuration(time.Since(startedAt))
-				}
+		duration := ""
+		startTime := ""
+
+		if node.StartedAt != "" && node.StartedAt != "-" {
+			startedAt, _ := stringutil.ParseTime(node.StartedAt)
+			if !startedAt.IsZero() {
+				startTime = startedAt.Format("15:04:05")
 			}
 
-			t.AppendRow(table.Row{
-				text.WrapSoft(node.Step.Name, 25),
-				formatNodeStatus(node.Status),
-				startTime,
-				duration,
-			})
-			shownSteps++
+			if node.FinishedAt != "" && node.FinishedAt != "-" {
+				finishedAt, _ := stringutil.ParseTime(node.FinishedAt)
+				if !startedAt.IsZero() && !finishedAt.IsZero() {
+					duration = formatDuration(finishedAt.Sub(startedAt))
+				}
+			} else if node.Status == scheduler.NodeStatusRunning && !startedAt.IsZero() {
+				duration = formatDuration(time.Since(startedAt))
+			}
 		}
-	}
 
-	if len(nodes) > maxSteps {
+		name := truncateText(node.Step.Name, 20)
 		t.AppendRow(table.Row{
-			fmt.Sprintf("... and %d more steps", len(nodes)-maxSteps),
-			"",
-			"",
-			"",
+			text.WrapSoft(name, 25),
+			formatNodeStatus(node.Status),
+			startTime,
+			duration,
 		})
+		shownSteps++
 	}
 
 	fmt.Println(t.Render())
@@ -283,29 +272,28 @@ func displayStepSummary(nodes []*models.Node) {
 	detailTable.AppendHeader(table.Row{"Step", "Stdout (first line)", "Stderr (first line)"})
 
 	// Show all steps with log preview
-	for i, node := range nodes {
+	for _, node := range nodes {
 		// Read first line of logs
 		stdoutPreview := readFirstLine(node.Stdout)
 		stderrPreview := readFirstLine(node.Stderr)
 
+		name := truncateText(node.Step.Name, 12)
 		detailTable.AppendRow(table.Row{
-			text.WrapSoft(node.Step.Name, 18),
+			text.WrapSoft(name, 18),
 			text.WrapSoft(stdoutPreview, 38),
 			text.WrapSoft(stderrPreview, 38),
 		})
-
-		// Limit detailed view to reasonable number
-		if i >= 20 && len(nodes) > 25 {
-			detailTable.AppendRow(table.Row{
-				fmt.Sprintf("... %d more", len(nodes)-21),
-				"...",
-				"...",
-			})
-			break
-		}
 	}
 
 	fmt.Println(detailTable.Render())
+}
+
+// truncateText truncates a string with ellipse
+func truncateText(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	return string([]rune(s)[:max]) + "..."
 }
 
 // readFirstLine reads the first line of a file and adds ellipsis if there's more content
@@ -346,7 +334,7 @@ func readFirstLine(path string) string {
 	// Check if there's more content
 	hasMoreLines := len(lines) > 1 && lines[1] != ""
 	hasMoreData := n == len(buffer) // buffer was filled, likely more data
-	
+
 	// For very long single lines, be more aggressive with truncation
 	maxDisplayLength := 45
 	if hasMoreData && !hasMoreLines {
