@@ -308,14 +308,20 @@ func (e *parallelExecutor) outputResults(_ context.Context) error {
 	// Collect results in order of runParamsList for consistency
 	for _, params := range e.runParamsList {
 		if result, ok := e.results[params.RunID]; ok {
-			output.Results = append(output.Results, *result)
+			// Create a copy of the result to potentially modify it
+			resultCopy := *result
 			
-			// Add just the output to the outputs array
-			if result.Output != nil {
+			// Clear output for failed executions
+			if result.Status != "success" {
+				resultCopy.Output = nil
+			}
+			
+			output.Results = append(output.Results, resultCopy)
+			
+			// Add output to the outputs array
+			// Only include outputs from successful executions
+			if result.Status == "success" && result.Output != nil {
 				output.Outputs = append(output.Outputs, result.Output)
-			} else {
-				// Add empty map if no output
-				output.Outputs = append(output.Outputs, make(map[string]any))
 			}
 			
 			switch result.Status {

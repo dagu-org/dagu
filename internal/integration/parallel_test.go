@@ -799,7 +799,7 @@ steps:
 	}
 }
 
-// TestParallelExecution_OutputCaptureWithFailures verifies that output is captured even when some child DAGs fail
+// TestParallelExecution_OutputCaptureWithFailures verifies output behavior when some child DAGs fail
 func TestParallelExecution_OutputCaptureWithFailures(t *testing.T) {
 	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
 
@@ -857,7 +857,7 @@ steps:
 	require.Equal(t, "parallel-test", parallelNode.Step.Name)
 	require.Equal(t, scheduler.NodeStatusError, parallelNode.Status)
 
-	// Verify output was captured even though some child DAGs failed
+	// Verify output was captured for successful executions only
 	require.NotNil(t, parallelNode.OutputVariables)
 	if value, ok := parallelNode.OutputVariables.Load("RESULTS"); ok {
 		results := value.(string)
@@ -869,9 +869,18 @@ steps:
 		require.Contains(t, results, `"succeeded": 1`)
 		require.Contains(t, results, `"failed": 1`)
 		
-		// Both outputs should be captured
+		// Only successful output should be captured
 		require.Contains(t, results, "Output for success")
-		require.Contains(t, results, "Output for fail")
+		require.NotContains(t, results, "Output for fail")
+		
+		// Verify the failed execution has no output in results
+		require.Contains(t, results, `"status": "failed"`)
+		// Outputs array should only contain the successful output
+		outputsSection := results[strings.Index(results, `"outputs": [`):]
+		outputsEndIndex := strings.Index(outputsSection, `]`) + 1
+		outputsContent := outputsSection[:outputsEndIndex]
+		// Should only have 1 output (from the successful execution)
+		require.Equal(t, 1, strings.Count(outputsContent, `"RESULT"`), "Outputs array should only contain successful output")
 	} else {
 		t.Fatal("RESULTS output not found")
 	}
@@ -954,6 +963,109 @@ steps:
 		// Should contain retry output, not first attempt
 		require.Contains(t, results, "Retry success")
 		require.NotContains(t, results, "First attempt")
+	} else {
+		t.Fatal("RESULTS output not found")
+	}
+}
+
+// TestParallelExecution_FailedChildOutputExclusion verifies that outputs from failed child DAGs are excluded
+func TestParallelExecution_FailedChildOutputExclusion(t *testing.T) {
+	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+
+	// Create a child DAG that outputs data based on input
+	testDir := test.TestdataPath(t, "integration")
+	childDagFile := filepath.Join(testDir, "child-conditional-output.yaml")
+	childDagContent := `name: child-conditional-output
+steps:
+  - name: process
+    command: |
+      INPUT="$1"
+      if [ "${INPUT}" = "fail1" ]; then
+        echo "Failed output 1"
+        exit 1
+      elif [ "${INPUT}" = "fail2" ]; then
+        echo "Failed output 2"  
+        exit 2
+      else
+        echo "Success output for ${INPUT}"
+        exit 0
+      fi
+    output: RESULT
+`
+	err := os.WriteFile(childDagFile, []byte(childDagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(childDagFile) })
+
+	// Parent DAG with mixed success/failure items
+	parentDagFile := filepath.Join(testDir, "test-parallel-output-exclusion.yaml")
+	parentDagContent := `name: test-parallel-output-exclusion
+steps:
+  - name: parallel-mixed
+    run: child-conditional-output
+    parallel:
+      items:
+        - "success1"
+        - "fail1"
+        - "success2"
+        - "fail2"
+        - "success3"
+    output: RESULTS
+    continueOn:
+      failure: true
+`
+	err = os.WriteFile(parentDagFile, []byte(parentDagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(parentDagFile) })
+
+	// Run the DAG
+	dag := th.DAG(t, filepath.Join("integration", "test-parallel-output-exclusion.yaml"))
+	agent := dag.Agent()
+	err = agent.Run(agent.Context)
+	// Should fail because some children failed
+	require.Error(t, err)
+
+	// Get the latest status
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	require.Len(t, status.Nodes, 1)
+
+	// Check parallel node
+	parallelNode := status.Nodes[0]
+	require.Equal(t, "parallel-mixed", parallelNode.Step.Name)
+	require.Equal(t, scheduler.NodeStatusError, parallelNode.Status)
+
+	// Verify output was captured
+	require.NotNil(t, parallelNode.OutputVariables)
+	if value, ok := parallelNode.OutputVariables.Load("RESULTS"); ok {
+		results := value.(string)
+		t.Logf("Captured results: %s", results)
+		require.Contains(t, results, "RESULTS=")
+		
+		// Verify summary counts
+		require.Contains(t, results, `"total": 5`)
+		require.Contains(t, results, `"succeeded": 3`)
+		require.Contains(t, results, `"failed": 2`)
+		
+		// Successful outputs should be included
+		require.Contains(t, results, "Success output for success1")
+		require.Contains(t, results, "Success output for success2")
+		require.Contains(t, results, "Success output for success3")
+		
+		// Failed outputs should NOT be included
+		require.NotContains(t, results, "Failed output 1")
+		require.NotContains(t, results, "Failed output 2")
+		
+		// Verify outputs array only contains successful outputs
+		require.Contains(t, results, `"outputs": [`)
+		
+		// The outputs array should only have 3 items (successful ones)
+		// Count occurrences of RESULT in outputs array
+		outputsSection := results[strings.Index(results, `"outputs": [`):]
+		outputsEndIndex := strings.Index(outputsSection, `]`) + 1
+		outputsContent := outputsSection[:outputsEndIndex]
+		resultCount := strings.Count(outputsContent, `"RESULT": "Success output`)
+		require.Equal(t, 3, resultCount, "Outputs array should only contain successful outputs")
 	} else {
 		t.Fatal("RESULTS output not found")
 	}
