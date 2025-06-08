@@ -1691,8 +1691,12 @@ components:
       properties:
         dagRunId:
           $ref: "#/components/schemas/DAGRunId"
+        params:
+          type: string
+          description: "Parameters passed to the child DAG-run in JSON format"
       required:
         - dagRunId
+        - params
 
     Step:
       type: object

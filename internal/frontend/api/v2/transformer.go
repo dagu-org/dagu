@@ -137,6 +137,7 @@ func toChildDAGRuns(childDAGRuns []models.ChildDAGRun) []api.ChildDAGRun {
 	for _, w := range childDAGRuns {
 		result = append(result, api.ChildDAGRun{
 			DagRunId: w.DAGRunID,
+			Params:   w.Params,
 		})
 	}
 	return result
