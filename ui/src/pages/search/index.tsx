@@ -5,7 +5,6 @@ import { useSearchParams } from 'react-router-dom';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import SearchResult from '../../features/search/components/SearchResult';
 import { useQuery } from '../../hooks/api';
-import LoadingIndicator from '../../ui/LoadingIndicator';
 import Title from '../../ui/Title';
 
 function Search() {

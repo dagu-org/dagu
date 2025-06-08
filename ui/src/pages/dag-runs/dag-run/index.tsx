@@ -4,7 +4,6 @@ import { AppBarContext } from '../../../contexts/AppBarContext';
 import { DAGRunDetailsContent } from '../../../features/dag-runs/components/dag-run-details';
 import { DAGRunContext } from '../../../features/dag-runs/contexts/DAGRunContext';
 import { useQuery } from '../../../hooks/api';
-import LoadingIndicator from '../../../ui/LoadingIndicator';
 
 function DAGRunDetailsPage() {
   const { name, dagRunId = 'latest' } = useParams();
@@ -23,7 +22,7 @@ function DAGRunDetailsPage() {
     : '/dag-runs/{name}/{dagRunId}';
 
   // Fetch DAG-run details
-  const { data, isLoading, mutate } = useQuery(
+  const { data, mutate } = useQuery(
     endpoint,
     {
       params: {
@@ -49,12 +48,8 @@ function DAGRunDetailsPage() {
     setTimeout(() => mutate(), 500);
   }, [mutate]);
 
-  if (isLoading || !data) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <LoadingIndicator />
-      </div>
-    );
+  if (!data) {
+    return null;
   }
 
   // Extract DAG-run details from the response
