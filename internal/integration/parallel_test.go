@@ -1417,3 +1417,149 @@ steps:
 		t.Fatal("RESULTS output not found")
 	}
 }
+
+// TestParallelExecution_StaticObjectItems tests parallel execution with static object items containing multiple properties
+func TestParallelExecution_StaticObjectItems(t *testing.T) {
+	th := test.Setup(t)
+
+	// Ensure the DAGs directory exists
+	err := os.MkdirAll(th.Config.Paths.DAGsDir, 0755)
+	require.NoError(t, err)
+
+	// Create a child DAG that deploys a service
+	childDagFile := filepath.Join(th.Config.Paths.DAGsDir, "deploy-service.yaml")
+	childDagContent := `name: deploy-service
+params:
+  - SERVICE_NAME: ""
+  - PORT: ""
+  - REPLICAS: ""
+steps:
+  - name: validate
+    script: |
+      echo "Validating deployment parameters..."
+      if [ -z "$SERVICE_NAME" ] || [ -z "$PORT" ] || [ -z "$REPLICAS" ]; then
+        echo "ERROR: Missing required parameters"
+        exit 1
+      fi
+      echo "Service: $SERVICE_NAME"
+      echo "Port: $PORT"
+      echo "Replicas: $REPLICAS"
+    output: VALIDATE_RESULT
+  - name: deploy
+    script: |
+      echo "Deploying $SERVICE_NAME..."
+      echo "  - Binding to port $PORT"
+      echo "  - Scaling to $REPLICAS replicas"
+      
+      # Simulate deployment
+      sleep 1
+      
+      # Simulate occasional failures for testing continueOnError
+      if [ "$SERVICE_NAME" = "api-service" ]; then
+        echo "ERROR: Failed to deploy $SERVICE_NAME - port $PORT already in use"
+        exit 1
+      fi
+      
+      echo "Successfully deployed $SERVICE_NAME"
+    depends: validate
+    output: DEPLOY_RESULT
+`
+	err = os.WriteFile(childDagFile, []byte(childDagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(childDagFile) })
+
+	// Create the parent DAG with static object items
+	parentDagFile := filepath.Join(th.Config.Paths.DAGsDir, "test-static-objects.yaml")
+	parentDagContent := `name: test-static-objects
+steps:
+  - name: deploy services
+    run: deploy-service
+    parallel:
+      maxConcurrent: 3
+      items:
+        - name: web-service
+          port: 8080
+          replicas: 3
+        - name: api-service
+          port: 8081
+          replicas: 2
+        - name: worker-service
+          port: 8082
+          replicas: 5
+    params:
+      - SERVICE_NAME: ${ITEM.name}
+      - PORT: ${ITEM.port}
+      - REPLICAS: ${ITEM.replicas}
+    continueOn:
+      failure: true  # Continue even if some deployments fail
+    output: DEPLOYMENT_RESULTS
+`
+	err = os.WriteFile(parentDagFile, []byte(parentDagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(parentDagFile) })
+
+	// Load and run the DAG
+	dagStruct, err := digraph.Load(th.Context, parentDagFile)
+	require.NoError(t, err)
+
+	// Create the DAG wrapper
+	dag := test.DAG{
+		Helper: &th,
+		DAG:    dagStruct,
+	}
+
+	agent := dag.Agent()
+	err = agent.Run(agent.Context)
+	// Should fail because api-service deployment fails, but continueOn.failure allows completion
+	require.Error(t, err)
+
+	// Get the latest status to verify parallel execution
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	require.Len(t, status.Nodes, 1) // deploy services
+
+	// Check deploy services node
+	deployNode := status.Nodes[0]
+	require.Equal(t, "deploy services", deployNode.Step.Name)
+	require.Equal(t, scheduler.NodeStatusError, deployNode.Status) // Error because one child failed
+
+	// Verify child DAG runs were created
+	require.NotEmpty(t, deployNode.Children)
+	require.Len(t, deployNode.Children, 3) // 3 child runs for 3 services
+
+	// Verify parallel execution results
+	require.NotNil(t, deployNode.OutputVariables)
+	if value, ok := deployNode.OutputVariables.Load("DEPLOYMENT_RESULTS"); ok {
+		results := value.(string)
+		require.Contains(t, results, "DEPLOYMENT_RESULTS=")
+		require.Contains(t, results, `"total": 3`)
+		require.Contains(t, results, `"succeeded": 2`) // web-service and worker-service succeed
+		require.Contains(t, results, `"failed": 1`)    // api-service fails
+
+		// Verify service parameters were passed correctly for successful services
+		require.Contains(t, results, "Service: web-service")
+		require.Contains(t, results, "Port: 8080")
+		require.Contains(t, results, "Replicas: 3")
+
+		// api-service failed, so its output won't be in the results
+		// Only successful child DAGs have their outputs captured
+
+		require.Contains(t, results, "Service: worker-service")
+		require.Contains(t, results, "Port: 8082")
+		require.Contains(t, results, "Replicas: 5")
+
+		// Verify deployment results
+		require.Contains(t, results, "Successfully deployed web-service")
+		require.Contains(t, results, "Successfully deployed worker-service")
+		// api-service failed, so its output is not captured
+
+		// Verify that successful outputs are captured
+		require.Contains(t, results, "Binding to port 8080")
+		require.Contains(t, results, "Scaling to 3 replicas")
+		require.Contains(t, results, "Binding to port 8082")
+		require.Contains(t, results, "Scaling to 5 replicas")
+	} else {
+		t.Fatal("DEPLOYMENT_RESULTS output not found")
+	}
+}

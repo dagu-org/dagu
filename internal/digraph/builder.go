@@ -1087,9 +1087,22 @@ func parseParallelItems(items []any) ([]ParallelItem, error) {
 			// Object with parameters
 			params := make(DeterministicMap)
 			for key, val := range v {
-				strVal, ok := val.(string)
-				if !ok {
-					return nil, fmt.Errorf("parameter values must be strings, got %T for key %s", val, key)
+				var strVal string
+				switch v := val.(type) {
+				case string:
+					strVal = v
+				case int:
+					strVal = fmt.Sprintf("%d", v)
+				case int64:
+					strVal = fmt.Sprintf("%d", v)
+				case uint64:
+					strVal = fmt.Sprintf("%d", v)
+				case float64:
+					strVal = fmt.Sprintf("%g", v)
+				case bool:
+					strVal = fmt.Sprintf("%t", v)
+				default:
+					return nil, fmt.Errorf("parameter values must be strings, numbers, or booleans, got %T for key %s", val, key)
 				}
 				params[key] = strVal
 			}
