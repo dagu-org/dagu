@@ -36,6 +36,7 @@ We're excited to announce the beta release of Dagu 1.17.0! This release brings m
 **Key Features in 1.17.0:**
 - 🎯 **Improved Performance**: Refactored execution history data for more performant history lookup
 - 🔄 **Hierarchical Execution**: Added capability for nested DAG execution
+- 🚀 **Parallel Execution**: Execute commands or sub-DAGs in parallel with different parameters for batch processing ([#989](https://github.com/dagu-org/dagu/issues/989))
 - 🎨 **Enhanced Web UI**: Overall UI improvements with better user experience
 - 📊 **Advanced History Search**: New execution history page with date-range and status filters ([#933](https://github.com/dagu-org/dagu/issues/933))
 - 🐛 **Better Debugging**: 
@@ -123,6 +124,7 @@ Dagu’s design emphasizes minimal external dependencies: it operates solely as 
   - [Variable Passing](#variable-passing)
   - [Scheduling](#scheduling)
   - [Nested DAGs](#nested-dags)
+  - [Parallel Execution](#parallel-execution)
   - [Running a docker image](#running-a-docker-image)
   - [Environment Variables](#environment-variables)
   - [Notifications on Failure or Success](#notifications-on-failure-or-success)
@@ -603,6 +605,73 @@ steps:
 
 THe parent DAG will call the sub-DAG and write the output to the log (stdout).
 The output will be `Hello from sub-dag`.
+
+### Parallel Execution
+
+You can execute the same child-DAG multiple times in parallel with different parameters.
+
+Basic parallel execution with a simple array:
+
+```yaml
+steps:
+  - name: get files
+    command: find /data -name "*.csv" -printf "%f\n"
+    output: FILES
+  
+  - name: process files
+    run: process-file # child DAG
+    parallel: ${FILES}
+    params:
+      - FILE_NAME: ${ITEM}  # Each item in FILES will be passed as FILE_NAME
+    depends: get files
+```
+
+Parallel execution with object arrays and concurrency control:
+
+```yaml
+steps:
+  - name: get configs
+    command: |
+      echo '[
+        {"region": "us-east-1", "bucket": "data-us"},
+        {"region": "eu-west-1", "bucket": "data-eu"},
+        {"region": "ap-south-1", "bucket": "data-ap"}
+      ]'
+    output: CONFIGS
+  
+  - name: sync data
+    run: sync-data # child DAG for syncing data
+    parallel:
+      items: ${CONFIGS}
+      maxConcurrent: 2  # Process only 2 regions at a time
+    params: REGION=${ITEM.region}, BUCKET=${ITEM.bucket}
+    depends: get configs
+```
+
+Static parallel execution with error handling:
+
+```yaml
+steps:
+  - name: deploy services
+    run: deploy-service
+    parallel:
+      maxConcurrent: 3
+      continueOnError: true  # Continue even if some deployments fail
+      items:
+        - name: web-service
+          port: 8080
+          replicas: 3
+        - name: api-service
+          port: 8081
+          replicas: 2
+        - name: worker-service
+          port: 8082
+          replicas: 5
+    params:
+      - SERVICE_NAME: ${ITEM.name}
+      - PORT: ${ITEM.port}
+      - REPLICAS: ${ITEM.replicas}
+```
 
 ### Running a docker image
 
