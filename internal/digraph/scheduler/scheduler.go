@@ -773,6 +773,6 @@ func (sc *Scheduler) handleNodeRetry(ctx context.Context, node *Node, execErr er
 	node.IncRetryCount()
 	time.Sleep(node.retryPolicy.Interval)
 	node.SetRetriedAt(time.Now())
-	node.SetStatus(NodeStatusNone)
+	node.SetStatus(NodeStatusRunning)
 	return true
 }
