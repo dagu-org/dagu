@@ -17,7 +17,6 @@ import { AppBarContext } from '../../contexts/AppBarContext';
 import { useConfig } from '../../contexts/ConfigContext';
 import DAGRunTable from '../../features/dag-runs/components/dag-run-list/DAGRunTable';
 import { useQuery } from '../../hooks/api';
-import LoadingIndicator from '../../ui/LoadingIndicator';
 import StatusChip from '../../ui/StatusChip';
 import Title from '../../ui/Title';
 
@@ -101,7 +100,7 @@ function DAGRuns() {
     appBarContext.setTitle('DAG Runs');
   }, [appBarContext]);
 
-  const { data, isLoading, mutate } = useQuery(
+  const { data, mutate } = useQuery(
     '/dag-runs',
     {
       params: {
@@ -316,11 +315,7 @@ function DAGRuns() {
           className="w-full md:w-auto"
         />
       </div>
-      {isLoading ? (
-        <LoadingIndicator />
-      ) : (
-        <DAGRunTable dagRuns={data?.dagRuns || []} />
-      )}
+      <DAGRunTable dagRuns={data?.dagRuns || []} />
     </div>
   );
 }

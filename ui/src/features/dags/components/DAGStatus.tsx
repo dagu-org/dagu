@@ -7,7 +7,7 @@ import { useClient } from '../../../hooks/api';
 import { DAGContext } from '../contexts/DAGContext';
 import { getEventHandlers } from '../lib/getEventHandlers';
 import { DAGStatusOverview, NodeStatusTable } from './dag-details';
-import { LogViewer, StatusUpdateModal } from './dag-execution';
+import { LogViewer, ParallelExecutionModal, StatusUpdateModal } from './dag-execution';
 import { DAGGraph } from './visualization';
 
 type Props = {
@@ -30,6 +30,13 @@ function DAGStatus({ dagRun, fileName }: Props) {
     stepName: '',
     dagRunId: '',
     stream: 'stdout' as 'stdout' | 'stderr',
+  });
+  // State for parallel execution modal
+  const [parallelExecutionModal, setParallelExecutionModal] = useState<{
+    isOpen: boolean;
+    node?: components['schemas']['Node'];
+  }>({
+    isOpen: false,
   });
   const client = useClient();
   const dismissModal = () => setModal(false);
@@ -79,49 +86,69 @@ function DAGStatus({ dagRun, fileName }: Props) {
     async (id: string) => {
       // find the clicked step
       const n = dagRun.nodes?.find(
-        (n) => n.step.name.replace(/\s/g, '_') == id
+        (n) => n.step.name.replace(/[-\s]/g, 'dagutmp') == id
       );
 
       if (n && n.step.run) {
-        // Find the child dagRun ID
-        const childDAGRun = n.children?.[0];
+        // Check if there are multiple child runs (parallel execution)
+        if (n.children && n.children.length > 1) {
+          // Show modal to select which parallel execution to view
+          setParallelExecutionModal({
+            isOpen: true,
+            node: n,
+          });
+        } else if (n.children && n.children.length === 1) {
+          // Single child dagRun - navigate directly
+          navigateToChildDagRun(n, 0);
+        }
+      }
+    },
+    [dagRun, navigate, fileName]
+  );
 
-        if (childDAGRun && childDAGRun.dagRunId) {
-          // Navigate to the child DAG-run status page
-          const dagRunId = dagRun.rootDAGRunId;
+  // Helper function to navigate to a specific child DAG run
+  const navigateToChildDagRun = React.useCallback(
+    (node: components['schemas']['Node'], childIndex: number, openInNewTab?: boolean) => {
+      const childDAGRun = node.children?.[childIndex];
+      
+      if (childDAGRun && childDAGRun.dagRunId) {
+        // Navigate to the child DAG-run status page
+        const dagRunId = dagRun.rootDAGRunId || dagRun.dagRunId;
 
-          // Check if we're in a dagRun context or a DAG context
-          // More reliable detection by checking the current URL path or the dagRun object
-          const currentPath = window.location.pathname;
-          const isModal =
-            document.querySelector('.dagRun-modal-content') !== null;
-          const isDAGRunContext =
-            currentPath.startsWith('/dag-runs/') || isModal;
-          if (isDAGRunContext) {
-            // For DAG runs, use query parameters to navigate to the DAG-run details page
-            const searchParams = new URLSearchParams();
-            searchParams.set('childDAGRunId', childDAGRun.dagRunId);
+        // Check if we're in a dagRun context or a DAG context
+        const currentPath = window.location.pathname;
+        const isModal = document.querySelector('.dagRun-modal-content') !== null;
+        const isDAGRunContext = currentPath.startsWith('/dag-runs/') || isModal;
+        
+        let url: string;
+        if (isDAGRunContext) {
+          // For DAG runs, use query parameters to navigate to the DAG-run details page
+          const searchParams = new URLSearchParams();
+          searchParams.set('childDAGRunId', childDAGRun.dagRunId);
 
-            // Use root DAG-run information
-            if (dagRun.rootDAGRunId) {
-              searchParams.set('dagRunId', dagRun.rootDAGRunId);
-              searchParams.set('dagRunName', dagRun.rootDAGRunName);
-            } else {
-              searchParams.set('dagRunId', dagRun.dagRunId);
-              searchParams.set('dagRunName', dagRun.name);
-            }
-
-            searchParams.set('step', n.step.name);
-            navigate(
-              `/dag-runs/${dagRun.name}/${dagRunId}?${searchParams.toString()}`
-            );
+          // Use root DAG-run information
+          if (dagRun.rootDAGRunId) {
+            searchParams.set('dagRunId', dagRun.rootDAGRunId);
+            searchParams.set('dagRunName', dagRun.rootDAGRunName);
           } else {
-            // For DAGs, use the existing approach with query parameters
-            navigate({
-              pathname: `/dags/${fileName}`,
-              search: `?childDAGRunId=${childDAGRun.dagRunId}&dagRunId=${dagRunId}&step=${n.step.name}&dagRunName=${encodeURIComponent(dagRun.rootDAGRunName)}`,
-            });
+            searchParams.set('dagRunId', dagRun.dagRunId);
+            searchParams.set('dagRunName', dagRun.name);
           }
+
+          searchParams.set('step', node.step.name);
+          
+          // Determine root DAG name
+          const rootDAGName = dagRun.rootDAGRunName || dagRun.name;
+          url = `/dag-runs/${rootDAGName}/${dagRunId}?${searchParams.toString()}`;
+        } else {
+          // For DAGs, use the existing approach with query parameters
+          url = `/dags/${fileName}?childDAGRunId=${childDAGRun.dagRunId}&dagRunId=${dagRunId}&step=${node.step.name}&dagRunName=${encodeURIComponent(dagRun.rootDAGRunName || dagRun.name)}`;
+        }
+
+        if (openInNewTab) {
+          window.open(url, '_blank');
+        } else {
+          navigate(url);
         }
       }
     },
@@ -327,6 +354,23 @@ function DAGStatus({ dagRun, fileName }: Props) {
         dagRun={dagRun}
         stream={logViewer.stream}
       />
+
+      {/* Parallel execution selection modal */}
+      {parallelExecutionModal.isOpen && parallelExecutionModal.node && (
+        <ParallelExecutionModal
+          isOpen={parallelExecutionModal.isOpen}
+          onClose={() => setParallelExecutionModal({ isOpen: false })}
+          stepName={parallelExecutionModal.node.step.name}
+          childDAGName={parallelExecutionModal.node.step.run || ''}
+          children={parallelExecutionModal.node.children || []}
+          onSelectChild={(childIndex, openInNewTab) => {
+            navigateToChildDagRun(parallelExecutionModal.node!, childIndex, openInNewTab);
+            if (!openInNewTab) {
+              setParallelExecutionModal({ isOpen: false });
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

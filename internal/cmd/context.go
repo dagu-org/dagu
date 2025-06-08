@@ -319,7 +319,7 @@ func validateRunID(dagRunID string) error {
 var reDAGRunID = regexp.MustCompile(`^[-a-zA-Z0-9_]+$`)
 
 // maxDAGRunIDLen is the max length of the dag-run ID
-const maxDAGRunIDLen = 60
+const maxDAGRunIDLen = 64
 
 // signalListener is an interface for types that can receive OS signals.
 type signalListener interface {

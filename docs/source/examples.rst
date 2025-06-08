@@ -322,3 +322,64 @@ Dagu supports advanced repeat-until logic for steps using the ``repeatPolicy`` f
    4. If only ``repeat: true``, repeat unconditionally at the given interval.
 
    The evaluation order is: ``condition`` > ``exitCode`` > ``repeat``. This mirrors the ``precondition`` logic for consistency.
+
+
+Parallel Execution
+------------------
+
+Execute the same workflow with different parameters in parallel:
+
+.. code-block:: yaml
+
+  name: batch-processing
+  
+  steps:
+    - name: get-files
+      command: ls /data/*.csv | head -10
+      output: FILES
+    
+    - name: process-files-parallel
+      run: process-csv
+      parallel: ${FILES}
+      output: RESULTS
+      depends: get-files
+    
+    - name: summary
+      command: |
+        echo "Processed files:"
+        echo "${RESULTS}" | jq '.summary'
+      depends: process-files-parallel
+
+Process multiple items with object parameters:
+
+.. code-block:: yaml
+
+  name: multi-region-deployment
+  
+  steps:
+    - name: deploy-to-regions
+      run: deploy-stack
+      parallel:
+        items:
+          - REGION: "us-east-1"
+            STACK: "web-app"
+            VERSION: "v1.2.0"
+          - REGION: "eu-west-1"
+            STACK: "web-app"
+            VERSION: "v1.2.0"
+          - REGION: "ap-south-1"
+            STACK: "web-app"
+            VERSION: "v1.1.9"
+        maxConcurrent: 2  # Deploy to 2 regions at a time
+      output: DEPLOY_RESULTS
+    
+    - name: verify-deployments
+      command: |
+        FAILED=$(echo "${DEPLOY_RESULTS}" | jq '.summary.failed')
+        if [ "$FAILED" -gt 0 ]; then
+          echo "Some deployments failed!"
+          exit 1
+        fi
+      depends: deploy-to-regions
+
+For more details on parallel execution, see :ref:`Parallel Execution`.

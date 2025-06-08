@@ -88,6 +88,7 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "executor", fn: buildExecutor},
 	{name: "command", fn: buildCommand},
 	{name: "depends", fn: buildDepends},
+	{name: "parallel", fn: buildParallel}, // Must be before childDAG to set executor type correctly
 	{name: "childDAG", fn: buildChildDAG},
 	{name: "continueOn", fn: buildContinueOn},
 	{name: "retryPolicy", fn: buildRetryPolicy},
@@ -756,6 +757,24 @@ func validateStep(_ BuildContext, def stepDef, step *Step) error {
 		}
 	}
 
+	// Validate parallel configuration
+	if step.Parallel != nil {
+		// Parallel steps must have a run field (child-DAG only for MVP)
+		if step.ChildDAG == nil {
+			return wrapError("parallel", step.Parallel, fmt.Errorf("parallel execution is only supported for child-DAGs (must have 'run' field)"))
+		}
+
+		// MaxConcurrent must be positive
+		if step.Parallel.MaxConcurrent <= 0 {
+			return wrapError("parallel.maxConcurrent", step.Parallel.MaxConcurrent, fmt.Errorf("maxConcurrent must be greater than 0"))
+		}
+
+		// Must have either items or variable reference
+		if len(step.Parallel.Items) == 0 && step.Parallel.Variable == "" {
+			return wrapError("parallel", step.Parallel, fmt.Errorf("parallel must have either items array or variable reference"))
+		}
+	}
+
 	return nil
 }
 
@@ -790,19 +809,45 @@ func buildSignalOnStop(_ BuildContext, def stepDef, step *Step) error {
 }
 
 // buildChildDAG parses the child DAG definition and sets up the step to run a child DAG.
-func buildChildDAG(_ BuildContext, def stepDef, step *Step) error {
-	name, params := def.Run, def.Params
+func buildChildDAG(ctx BuildContext, def stepDef, step *Step) error {
+	name := def.Run
 
 	// if the run field is not set, return nil.
 	if name == "" {
 		return nil
 	}
 
-	step.ChildDAG = &ChildDAG{Name: name, Params: params}
-	step.ExecutorConfig.Type = ExecutorTypeDAG
+	// Parse params similar to how DAG params are parsed
+	var paramsStr string
+	if def.Params != nil {
+		// Parse the params to convert them to string format
+		ctxCopy := ctx
+		ctxCopy.opts.NoEval = true // Disable evaluation for params parsing
+		paramPairs, err := parseParamValue(ctxCopy, def.Params)
+		if err != nil {
+			return wrapError("params", def.Params, err)
+		}
+
+		// Convert to string format "key=value key=value ..."
+		var paramsToJoin []string
+		for _, paramPair := range paramPairs {
+			paramsToJoin = append(paramsToJoin, paramPair.Escaped())
+		}
+		paramsStr = strings.Join(paramsToJoin, " ")
+	}
+
+	step.ChildDAG = &ChildDAG{Name: name, Params: paramsStr}
+
+	// Set executor type based on whether parallel execution is configured
+	if step.Parallel != nil {
+		step.ExecutorConfig.Type = ExecutorTypeParallel
+	} else {
+		step.ExecutorConfig.Type = ExecutorTypeDAG
+	}
+
 	step.Command = "run"
-	step.Args = []string{name, params}
-	step.CmdWithArgs = fmt.Sprintf("%s %s", name, params)
+	step.Args = []string{name, paramsStr}
+	step.CmdWithArgs = fmt.Sprintf("%s %s", name, paramsStr)
 	return nil
 }
 
@@ -946,4 +991,127 @@ func parseStringOrArray(v any) ([]string, error) {
 		return nil, fmt.Errorf("string or array expected, got %T", v)
 
 	}
+}
+
+// buildParallel parses the parallel field in the step definition.
+// MVP supports:
+// - Direct array reference: parallel: ${ITEMS}
+// - Static array: parallel: [item1, item2]
+// - Object configuration: parallel: {items: [...], maxConcurrent: 5}
+func buildParallel(ctx BuildContext, def stepDef, step *Step) error {
+	if def.Parallel == nil {
+		return nil
+	}
+
+	step.Parallel = &ParallelConfig{
+		MaxConcurrent: DefaultMaxConcurrent,
+	}
+
+	switch v := def.Parallel.(type) {
+	case string:
+		// Direct variable reference like: parallel: ${ITEMS}
+		// The actual items will be resolved at runtime
+		// It should be resolved to a json array of items
+		// e.g. ["item1", "item2"] or [{"SOURCE": "s3://..."}]
+		step.Parallel.Variable = v
+
+	case []any:
+		// Static array: parallel: [item1, item2] or parallel: [{SOURCE: s3://...}, ...]
+		items, err := parseParallelItems(v)
+		if err != nil {
+			return wrapError("parallel", v, err)
+		}
+		step.Parallel.Items = items
+
+	case map[string]any:
+		// Object configuration
+		for key, val := range v {
+			switch key {
+			case "items":
+				switch itemsVal := val.(type) {
+				case string:
+					// Variable reference in object form
+					step.Parallel.Variable = itemsVal
+				case []any:
+					// Direct array in object form
+					items, err := parseParallelItems(itemsVal)
+					if err != nil {
+						return wrapError("parallel.items", itemsVal, err)
+					}
+					step.Parallel.Items = items
+				default:
+					return wrapError("parallel.items", val, fmt.Errorf("parallel.items must be string or array, got %T", val))
+				}
+
+			case "maxConcurrent":
+				switch mc := val.(type) {
+				case int:
+					step.Parallel.MaxConcurrent = mc
+				case int64:
+					step.Parallel.MaxConcurrent = int(mc)
+				case uint64:
+					step.Parallel.MaxConcurrent = int(mc)
+				case float64:
+					step.Parallel.MaxConcurrent = int(mc)
+				default:
+					return wrapError("parallel.maxConcurrent", val, fmt.Errorf("parallel.maxConcurrent must be int, got %T", val))
+				}
+
+			default:
+				// Ignore unknown keys for now (future extensibility)
+			}
+		}
+
+	default:
+		return wrapError("parallel", v, fmt.Errorf("parallel must be string, array, or object, got %T", v))
+	}
+
+	return nil
+}
+
+// parseParallelItems converts an array of any type to ParallelItem slice
+func parseParallelItems(items []any) ([]ParallelItem, error) {
+	var result []ParallelItem
+
+	for _, item := range items {
+		switch v := item.(type) {
+		case string:
+			// Simple string item
+			result = append(result, ParallelItem{Value: v})
+
+		case int, int64, uint64, float64:
+			// Numeric items, convert to string
+			result = append(result, ParallelItem{Value: fmt.Sprintf("%v", v)})
+
+		case map[string]any:
+			// Object with parameters
+			params := make(DeterministicMap)
+			for key, val := range v {
+				var strVal string
+				switch v := val.(type) {
+				case string:
+					strVal = v
+				case int:
+					strVal = fmt.Sprintf("%d", v)
+				case int64:
+					strVal = fmt.Sprintf("%d", v)
+				case uint64:
+					strVal = fmt.Sprintf("%d", v)
+				case float64:
+					strVal = fmt.Sprintf("%g", v)
+				case bool:
+					strVal = fmt.Sprintf("%t", v)
+				default:
+					return nil, fmt.Errorf("parameter values must be strings, numbers, or booleans, got %T for key %s", val, key)
+				}
+				params[key] = strVal
+			}
+			result = append(result, ParallelItem{Params: params})
+
+		default:
+			return nil, fmt.Errorf("parallel items must be strings, numbers, or objects, got %T", v)
+		}
+	}
+
+	return result, nil
 }

@@ -1,0 +1,11 @@
+name: child-with-output
+params:
+  - TASK: "default"
+steps:
+  - name: process-task
+    command: |
+      echo "Processing task: $1"
+      echo "TASK_RESULT_$1"
+    output: TASK_OUTPUT
+  - name: finalize
+    command: echo "Task $1 completed with output ${TASK_OUTPUT}"

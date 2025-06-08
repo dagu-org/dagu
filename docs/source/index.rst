@@ -76,6 +76,7 @@ Quick Start
 
    yaml_format
    executors
+   parallel_execution
    base_config
    examples
    special_env

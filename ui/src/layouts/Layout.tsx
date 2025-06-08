@@ -224,15 +224,15 @@ function Content({ title, navbarColor, children }: LayoutProps) {
                       value={context.selectedRemoteNode}
                       onValueChange={context.selectRemoteNode}
                     >
-                      <SelectTrigger className="h-6 text-base bg-transparent text-current border-0 hover:bg-accent/10 focus:ring-0 focus:outline-none focus:border-0 focus-visible:ring-0 focus-visible:outline-none focus-visible:border-0 focus-visible:shadow-none active:border-0 px-2 py-0 flex items-center min-h-0 gap-1 rounded-md transition-colors duration-200 [&_svg]:!text-current [&_svg]:!opacity-100 shadow-none cursor-pointer">
+                      <SelectTrigger className="h-7 text-sm !bg-transparent text-current border-0 hover:!bg-transparent dark:hover:!bg-transparent focus:!bg-transparent dark:focus:!bg-transparent focus:ring-0 focus:outline-none focus:border-0 focus-visible:ring-0 focus-visible:outline-none focus-visible:border-0 focus-visible:shadow-none active:border-0 px-2 py-0 flex items-center min-h-0 gap-1 rounded-md transition-colors duration-200 [&_svg]:!text-current [&_svg]:!opacity-100 shadow-none cursor-pointer">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="text-base rounded-md overflow-hidden p-1 bg-popover border-border shadow-lg outline-none ring-0 focus:outline-none focus:ring-0 focus:border-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0 text-popover-foreground">
+                      <SelectContent className="text-sm rounded-md overflow-hidden p-1 bg-popover border-border shadow-lg outline-none ring-0 focus:outline-none focus:ring-0 focus:border-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0 text-popover-foreground">
                         {context.remoteNodes.map((node) => (
                           <SelectItem
                             key={node}
                             value={node}
-                            className="text-base py-1 px-2 min-h-0 h-8 text-popover-foreground hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none focus:ring-0 focus:border-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0 data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[selected]:bg-accent data-[selected]:text-accent-foreground cursor-pointer"
+                            className="text-sm py-1 px-2 min-h-0 h-7 text-popover-foreground hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none focus:ring-0 focus:border-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0 data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[selected]:bg-accent data-[selected]:text-accent-foreground cursor-pointer"
                           >
                             {node}
                           </SelectItem>

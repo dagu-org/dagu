@@ -483,6 +483,74 @@
         "params": {
           "type": "string",
           "description": "Parameters to pass to the DAG."
+        },
+        "parallel": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Variable containing array of items to process in parallel"
+            },
+            {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                ]
+              },
+              "description": "Array of items to process in parallel"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "description": "Variable containing array of items"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": true
+                          }
+                        ]
+                      },
+                      "description": "Array of items to process in parallel"
+                    }
+                  ]
+                },
+                "maxConcurrent": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000,
+                  "default": 8,
+                  "description": "Maximum number of concurrent executions (default: 8, maximum: 1000)"
+                }
+              },
+              "required": ["items"],
+              "additionalProperties": false,
+              "description": "Parallel execution configuration with concurrency control"
+            }
+          ],
+          "description": "Configuration for parallel execution of child DAGs. Only applicable when 'run' is specified. Allows processing multiple items concurrently using the same workflow definition."
         }
       }
     },

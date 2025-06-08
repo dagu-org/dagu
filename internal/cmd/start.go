@@ -24,7 +24,7 @@ var (
 	ErrDAGRunIDFormat = errors.New("dag-run ID must only contain alphanumeric characters, dashes, and underscores")
 
 	// ErrDAGRunIDTooLong is returned when the provided dag-run ID is too long
-	ErrDAGRunIDTooLong = errors.New("dag-run ID length must be less than 60 characters")
+	ErrDAGRunIDTooLong = errors.New("dag-run ID length must be less than 64 characters")
 )
 
 // CmdStart creates and returns a cobra command for starting a dag-run
@@ -52,7 +52,7 @@ This command parses the DAG definition, resolves parameters, and initiates the D
 }
 
 // Command line flags for the start command
-var startFlags = []commandLineFlag{paramsFlag, dagRunIDFlag, parentDAGRunFlag, rootDAGRunFlag}
+var startFlags = []commandLineFlag{paramsFlag, dagRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, noQueueFlag}
 
 // runStart handles the execution of the start command
 func runStart(ctx *Context, args []string) error {
@@ -86,6 +86,11 @@ func runStart(ctx *Context, args []string) error {
 
 	var disabledQueue bool
 	if os.Getenv("DISABLE_DAG_RUN_QUEUE") != "" {
+		disabledQueue = true
+	}
+
+	// check no-queue flag
+	if ctx.Command.Flags().Changed("no-queue") {
 		disabledQueue = true
 	}
 

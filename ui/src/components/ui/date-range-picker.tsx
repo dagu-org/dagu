@@ -173,7 +173,10 @@ function CustomDateTimeInput({
         onKeyDown={handleKeyDown}
         onClick={() => setCursorPosition(inputRef.current?.selectionStart || 0)}
         placeholder="YYYY-MM-DD HH:mm:ss"
-        className={cn(className, 'w-44 font-mono text-foreground placeholder:text-muted-foreground/60 pt-1')}
+        className={cn(
+          className,
+          'w-44 font-mono text-foreground placeholder:text-muted-foreground/60 pt-1'
+        )}
       />
       <button
         type="button"
@@ -210,15 +213,13 @@ export function DateRangePicker({
   return (
     <div
       className={cn(
-        'relative flex items-center rounded-md border px-1 bg-background shadow-xs',
+        'relative items-center flex rounded-md border shadow-xs bg-white dark:bg-zinc-900',
         className
       )}
       {...props}
     >
-      <CalendarRange className="h-4 w-4 text-muted-foreground mr-2" />
-
-      <div className="flex flex-1 flex-col sm:flex-row">
-        <div className="flex-1">
+      <div className="flex flex-col sm:flex-row">
+        <div>
           <CustomDateTimeInput
             id="fromDate"
             value={fromDate}
@@ -229,11 +230,11 @@ export function DateRangePicker({
         </div>
 
         {/* Arrow only visible on sm screens and above */}
-        <div className="hidden sm:flex items-center px-1 text-muted-foreground bg-background">
+        <div className="hidden sm:flex items-center px-1 text-muted-foreground justify-center flex pl-3">
           →
         </div>
 
-        <div className="flex-1">
+        <div>
           <CustomDateTimeInput
             id="toDate"
             value={toDate}

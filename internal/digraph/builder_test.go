@@ -337,7 +337,7 @@ func TestBuildStep(t *testing.T) {
 		assert.Equal(t, "run", th.Steps[0].Command)
 		assert.Equal(t, []string{
 			"sub_dag",
-			"param1=value1 param2=value2",
+			"param1=\"value1\" param2=\"value2\"",
 		}, th.Steps[0].Args)
 	})
 	t.Run("ContinueOn", func(t *testing.T) {

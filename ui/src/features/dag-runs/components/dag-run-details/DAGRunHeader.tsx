@@ -1,4 +1,4 @@
-import { Calendar, Timer } from 'lucide-react';
+import { Calendar, Terminal, Timer } from 'lucide-react';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { components, Status } from '../../../../api/v2/schema';
@@ -37,11 +37,11 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
     e.preventDefault();
     if (dagRun.parentDAGRunId) {
       const searchParams = new URLSearchParams();
-      searchParams.set('childDAGRunId', dagRun.dagRunId);
+      searchParams.set('childDAGRunId', dagRun.parentDAGRunId);
       searchParams.set('dagRunId', dagRun.rootDAGRunId);
       searchParams.set('dagRunName', dagRun.rootDAGRunName);
       navigate(
-        `/dag-runs/${dagRun.parentDAGRunName}?${searchParams.toString()}`
+        `/dag-runs/${dagRun.rootDAGRunName}/${dagRun.rootDAGRunId}?${searchParams.toString()}`
       );
     }
   };
@@ -114,25 +114,18 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
 
           {/* Metadata items */}
           <div className="flex flex-wrap items-center gap-4 lg:gap-6 text-sm">
-            <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-2">
-              <Calendar className="h-4 w-4 text-slate-500" />
-              <div className="flex flex-col">
-                <span className="font-medium">
-                  {dagRun?.startedAt
-                    ? dayjs(dagRun.startedAt).format('MMM D, HH:mm:ss')
-                    : '--'}
-                </span>
-                {dagRun?.startedAt && (
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
-                    {dayjs(dagRun.startedAt).format('z')}
-                  </span>
-                )}
-              </div>
+            <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 rounded-md px-3 py-1.5 border">
+              <Calendar className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+              <span className="font-medium text-xs">
+                {dagRun?.startedAt
+                  ? `${dayjs(dagRun.startedAt).format('MMM D, HH:mm:ss')} ${dayjs(dagRun.startedAt).format('z')}`
+                  : '--'}
+              </span>
             </div>
 
-            <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-2">
-              <Timer className="h-4 w-4 text-slate-500" />
-              <span className="font-medium">
+            <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 rounded-md px-3 py-1.5 border">
+              <Timer className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+              <span className="font-medium text-xs">
                 {dagRun.finishedAt
                   ? formatDuration(dagRun.startedAt, dagRun.finishedAt)
                   : dagRun.startedAt
@@ -149,6 +142,21 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
                 {dagRun.dagRunId}
               </code>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Parameters - Show if present */}
+      {dagRun.params && (
+        <div className="mt-4 border-t border-slate-200 dark:border-slate-700 pt-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Terminal className="h-4 w-4 text-slate-500" />
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Parameters
+            </span>
+          </div>
+          <div className="bg-slate-200 dark:bg-slate-700 rounded-md px-4 py-3 font-mono text-sm text-slate-800 dark:text-slate-200 max-h-[120px] overflow-y-auto border">
+            {dagRun.params}
           </div>
         </div>
       )}

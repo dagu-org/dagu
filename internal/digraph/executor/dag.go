@@ -16,18 +16,16 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
-var _ Executor = (*dagExecutor)(nil)
-var _ ChildDAG = (*dagExecutor)(nil)
+var _ DAGExecutor = (*dagExecutor)(nil)
 
 type dagExecutor struct {
-	dag      *digraph.DAG
-	lock     sync.Mutex
-	dagRunID string
-	params   string
-	workDir  string
-	stdout   io.Writer
-	stderr   io.Writer
-	cmd      *exec.Cmd
+	dag       *digraph.DAG
+	lock      sync.Mutex
+	workDir   string
+	stdout    io.Writer
+	stderr    io.Writer
+	cmd       *exec.Cmd
+	runParams RunParams
 }
 
 // Errors for DAG executor
@@ -58,7 +56,6 @@ func newDAGExecutor(
 
 	return &dagExecutor{
 		dag:     dag,
-		params:  cfg.Params,
 		workDir: step.Dir,
 	}, nil
 }
@@ -69,7 +66,7 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to find executable path: %w", err)
 	}
 
-	if e.dagRunID == "" {
+	if e.runParams.RunID == "" {
 		return fmt.Errorf("dag-run ID is not set")
 	}
 
@@ -85,8 +82,8 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 		"start",
 		fmt.Sprintf("--root=%s", env.RootDAGRun.String()),
 		fmt.Sprintf("--parent=%s", env.DAGRunRef().String()),
-		fmt.Sprintf("--run-id=%s", e.dagRunID),
-		"--quiet",
+		fmt.Sprintf("--run-id=%s", e.runParams.RunID),
+		"--no-queue",
 		e.dag.Location,
 	}
 
@@ -97,9 +94,9 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 		}
 	}
 
-	if e.params != "" {
+	if e.runParams.Params != "" {
 		args = append(args, "--")
-		args = append(args, e.params)
+		args = append(args, e.runParams.Params)
 	}
 
 	cmd := exec.CommandContext(ctx, executable, args...) // nolint:gosec
@@ -120,7 +117,7 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 	e.cmd = cmd
 
 	logger.Info(ctx, "Executing child DAG",
-		"dagRunId", e.dagRunID,
+		"dagRunId", e.runParams.RunID,
 		"target", e.dag.Name,
 		"args", args,
 	)
@@ -137,9 +134,9 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 	}
 
 	// get results from the child dag-run
-	result, err := env.DB.GetChildDAGRunStatus(ctx, e.dagRunID, env.RootDAGRun)
+	result, err := env.DB.GetChildDAGRunStatus(ctx, e.runParams.RunID, env.RootDAGRun)
 	if err != nil {
-		return fmt.Errorf("failed to find result for the child dag-run %q: %w", e.dagRunID, err)
+		return fmt.Errorf("failed to find result for the child dag-run %q: %w", e.runParams.RunID, err)
 	}
 
 	jsonData, err := json.MarshalIndent(result, "", "  ")
@@ -156,10 +153,10 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 	return nil
 }
 
-func (e *dagExecutor) SetDAGRunID(id string) {
+func (e *dagExecutor) SetParams(params RunParams) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
-	e.dagRunID = id
+	e.runParams = params
 }
 
 func (e *dagExecutor) SetStdout(out io.Writer) {

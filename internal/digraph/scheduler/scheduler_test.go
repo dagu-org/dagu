@@ -345,7 +345,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
 
 		node := result.Node(t, "1")
-		require.Equal(t, 2, node.State().DoneCount)  // 2 executions
+		require.Equal(t, 1, node.State().DoneCount)  // 1 successful execution
 		require.Equal(t, 1, node.State().RetryCount) // 1 retry
 	})
 	t.Run("RetryPolicySuccess", func(t *testing.T) {
@@ -382,7 +382,7 @@ func TestScheduler(t *testing.T) {
 
 		// Check if the retry is successful
 		state := result.Node(t, "1").State()
-		assert.Equal(t, 2, state.DoneCount)
+		assert.Equal(t, 1, state.DoneCount)
 		assert.Equal(t, 1, state.RetryCount)
 		assert.NotEmpty(t, state.RetriedAt)
 
@@ -975,6 +975,126 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
 		node := result.Node(t, "1")
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+	})
+	t.Run("RetryPolicyWithOutputCapture", func(t *testing.T) {
+		sc := setupScheduler(t)
+
+		// Create a counter file for tracking retry attempts
+		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("retry_output_%s.txt", uuid.Must(uuid.NewV7()).String()))
+		defer func() {
+			_ = os.Remove(counterFile)
+		}()
+
+		// Step that outputs different values on each retry and fails until 3rd attempt
+		graph := sc.newGraph(t,
+			newStep("1",
+				withScript(fmt.Sprintf(`
+					COUNTER_FILE="%s"
+					if [ ! -f "$COUNTER_FILE" ]; then
+						echo "1" > "$COUNTER_FILE"
+						echo "output_attempt_1"
+						exit 1
+					else
+						COUNT=$(cat "$COUNTER_FILE")
+						if [ "$COUNT" -eq "1" ]; then
+							echo "2" > "$COUNTER_FILE"
+							echo "output_attempt_2"
+							exit 1
+						elif [ "$COUNT" -eq "2" ]; then
+							echo "3" > "$COUNTER_FILE"
+							echo "output_attempt_3_success"
+							exit 0
+						fi
+					fi
+				`, counterFile)),
+				withOutput("RESULT"),
+				withRetryPolicy(3, time.Millisecond*100),
+			),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
+
+		node := result.Node(t, "1")
+		require.Equal(t, 1, node.State().DoneCount)  // 1 successful execution
+		require.Equal(t, 2, node.State().RetryCount) // 2 retries
+
+		// Verify that output contains only the final successful attempt's output
+		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
+		require.True(t, ok, "output variable not found")
+		require.Equal(t, "RESULT=output_attempt_3_success", output, "expected final output, got %q", output)
+	})
+	t.Run("FailedStepWithOutputCapture", func(t *testing.T) {
+		sc := setupScheduler(t)
+
+		// Step that outputs data but fails
+		graph := sc.newGraph(t,
+			newStep("1",
+				withCommand("echo 'error_output'; exit 1"),
+				withOutput("ERROR_MSG"),
+			),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusError)
+
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusError)
+
+		node := result.Node(t, "1")
+
+		// Verify that output is captured even on failure
+		output, ok := node.NodeData().State.OutputVariables.Load("ERROR_MSG")
+		require.True(t, ok, "output variable not found")
+		require.Equal(t, "ERROR_MSG=error_output", output, "expected output %q, got %q", "error_output", output)
+	})
+	t.Run("RetryPolicyChildDAGRunWithOutputCapture", func(t *testing.T) {
+		sc := setupScheduler(t)
+
+		// Create a counter file for tracking retry attempts
+		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("retry_child_output_%s.txt", uuid.Must(uuid.NewV7()).String()))
+		defer func() {
+			_ = os.Remove(counterFile)
+		}()
+
+		// Step that outputs different values on each retry and always fails
+		graph := sc.newGraph(t,
+			newStep("1",
+				withScript(fmt.Sprintf(`
+					COUNTER_FILE="%s"
+					if [ ! -f "$COUNTER_FILE" ]; then
+						echo "1" > "$COUNTER_FILE"
+						echo "output_attempt_1"
+						exit 1
+					else
+						COUNT=$(cat "$COUNTER_FILE")
+						if [ "$COUNT" -eq "1" ]; then
+							echo "2" > "$COUNTER_FILE"
+							echo "output_attempt_2"
+							exit 1
+						elif [ "$COUNT" -eq "2" ]; then
+							echo "3" > "$COUNTER_FILE"
+							echo "output_attempt_3"
+							exit 1
+						fi
+					fi
+				`, counterFile)),
+				withOutput("RESULT"),
+				withRetryPolicy(2, time.Millisecond*100),
+			),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusError)
+
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusError)
+
+		node := result.Node(t, "1")
+		require.Equal(t, 1, node.State().DoneCount)  // 1 execution (failed)
+		require.Equal(t, 2, node.State().RetryCount) // 2 retries
+
+		// Verify that output contains the final retry attempt's output
+		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
+		require.True(t, ok, "output variable not found")
+		require.Equal(t, "RESULT=output_attempt_3", output, "expected final output, got %q", output)
 	})
 }
 

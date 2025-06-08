@@ -707,8 +707,6 @@ export interface components {
             name: components["schemas"]["DAGName"];
             status: components["schemas"]["Status"];
             statusLabel: components["schemas"]["StatusLabel"];
-            /** @description Process ID of the DAG-run */
-            pid?: number;
             /** @description RFC 3339 timestamp when the DAG-run was queued */
             queuedAt?: string;
             /** @description RFC 3339 timestamp when the DAG-run started */
@@ -756,6 +754,8 @@ export interface components {
         /** @description Metadata for a child DAG-run */
         ChildDAGRun: {
             dagRunId: components["schemas"]["DAGRunId"];
+            /** @description Parameters passed to the child DAG-run in JSON format */
+            params: string;
         };
         /** @description Individual task definition that performs a specific operation in a DAG-run */
         Step: {

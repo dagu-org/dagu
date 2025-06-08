@@ -56,6 +56,8 @@ type Step struct {
 	SignalOnStop string `json:"signalOnStop,omitempty"`
 	// ChildDAG contains the information about a child DAG to be executed.
 	ChildDAG *ChildDAG `json:"childDag,omitempty"`
+	// Parallel contains the configuration for parallel execution.
+	Parallel *ParallelConfig `json:"parallel,omitempty"`
 }
 
 // setup sets the default values for the step.
@@ -99,6 +101,9 @@ const ExecutorTypeDAGLegacy = "subworkflow"
 
 // ExecutorTypeDAG is the executor type for a child DAG.
 const ExecutorTypeDAG = "dag"
+
+// ExecutorTypeParallel is the executor type for parallel execution.
+const ExecutorTypeParallel = "parallel"
 
 // ExecutorConfig contains the configuration for the executor.
 type ExecutorConfig struct {

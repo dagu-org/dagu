@@ -1,0 +1,13 @@
+name: parallel-objects
+steps:
+  - name: process-regions
+    run: child-process
+    parallel:
+      items:
+        - REGION: us-east-1
+          VERSION: "1.0.0"
+        - REGION: us-west-2
+          VERSION: "1.0.1"
+        - REGION: eu-west-1
+          VERSION: "1.0.2"
+      maxConcurrent: 2

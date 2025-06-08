@@ -10,7 +10,6 @@ import { DAGContext } from '../../../features/dags/contexts/DAGContext';
 import { RootDAGRunContext } from '../../../features/dags/contexts/RootDAGRunContext';
 import { useQuery } from '../../../hooks/api';
 import dayjs from '../../../lib/dayjs';
-import LoadingIndicator from '../../../ui/LoadingIndicator';
 
 type Params = {
   fileName: string;
@@ -74,7 +73,7 @@ function DAGDetails() {
   );
 
   // Fetch DAG details
-  const { data: dagData, isLoading: isLoadingDag } = useQuery(
+  const { data: dagData } = useQuery(
     '/dags/{fileName}',
     {
       params: {
@@ -91,7 +90,7 @@ function DAGDetails() {
   const dagRunName = queriedDAGRunName || dagData?.dag?.name || '';
 
   // Fetch specific DAG-run data if dagRunId is provided
-  const { data: dagRunResponse, isLoading: isLoadingDAGRun } = useQuery(
+  const { data: dagRunResponse } = useQuery(
     '/dag-runs/{name}/{dagRunId}',
     {
       params: {
@@ -110,24 +109,23 @@ function DAGDetails() {
   );
 
   // Fetch child DAG-run data if needed
-  const { data: childDAGRunResponse, isLoading: isLoadingChildDAGRun } =
-    useQuery(
-      '/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}',
-      {
-        params: {
-          path: {
-            name: dagRunName,
-            dagRunId: dagRunId || '',
-            childDAGRunId: childDAGRunId || '',
-          },
-          query: { remoteNode },
+  const { data: childDAGRunResponse } = useQuery(
+    '/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}',
+    {
+      params: {
+        path: {
+          name: dagRunName,
+          dagRunId: dagRunId || '',
+          childDAGRunId: childDAGRunId || '',
         },
+        query: { remoteNode },
       },
-      {
-        refreshInterval: 1000,
-        isPaused: () => !childDAGRunId || !dagRunId || !dagRunName,
-      }
-    );
+    },
+    {
+      refreshInterval: 1000,
+      isPaused: () => !childDAGRunId || !dagRunId || !dagRunName,
+    }
+  );
 
   // Determine the current DAG-run to display
   let currentDAGRun: DAGRunDetails | undefined;
@@ -165,47 +163,11 @@ function DAGDetails() {
     }
   }, [currentDAGRun, dagData?.latestDAGRun, rootDAGRunData]);
 
-  // Determine if basic data is loading (no DAG data available at all)
-  const isBasicLoading = !fileName || isLoadingDag || !dagData || !dagData.dag;
-
-  // Determine if content is loading (DAG data is available but DAG-run details are loading)
-  let isContentLoading = false;
-
-  // For non-status tabs, we don't need to wait for DAG-run data
-  if (tab === 'status') {
-    // Child DAG-run loading state
-    if (
-      childDAGRunId &&
-      (isLoadingChildDAGRun || !childDAGRunResponse?.dagRunDetails)
-    ) {
-      isContentLoading = true;
-    }
-
-    // Specific DAG-run loading state (only for status tab)
-    else if (
-      dagRunId &&
-      !childDAGRunId &&
-      (isLoadingDAGRun || !dagRunResponse?.dagRunDetails)
-    ) {
-      isContentLoading = true;
-    }
-
-    // No DAG-run data available
-    else if (!currentDAGRun && !dagData?.latestDAGRun) {
-      isContentLoading = true;
-    }
-  }
-
   // Refresh function (placeholder for now)
   const refreshData = useCallback(() => {
     // This could be implemented to trigger a refresh of the data
     // For now it's a placeholder
   }, []);
-
-  // If basic data is loading, show full page loading indicator
-  if (isBasicLoading) {
-    return <LoadingIndicator />;
-  }
 
   // Determine which DAG-run to display in the header
   // We want to show the header even when content is loading
@@ -238,29 +200,22 @@ function DAGDetails() {
             />
           )}
 
-          {/* Show loading indicator for content area only */}
-          {isContentLoading ? (
-            <div className="flex justify-center py-8">
-              <LoadingIndicator />
-            </div>
-          ) : (
-            dagData?.dag &&
-            headerDAGRun && (
-              <DAGDetailsContent
-                fileName={fileName}
-                dag={dagData.dag}
-                currentDAGRun={headerDAGRun}
-                refreshFn={refreshData}
-                formatDuration={formatDuration}
-                activeTab={tab}
-                onTabChange={handleTabChange}
-                dagRunId={currentDAGRun?.dagRunId}
-                stepName={stepName}
-                isModal={false}
-                navigateToStatusTab={navigateToStatusTab}
-                skipHeader={true} // Skip header since we're rendering it separately
-              />
-            )
+          {/* Render content */}
+          {dagData?.dag && headerDAGRun && (
+            <DAGDetailsContent
+              fileName={fileName}
+              dag={dagData.dag}
+              currentDAGRun={headerDAGRun}
+              refreshFn={refreshData}
+              formatDuration={formatDuration}
+              activeTab={tab}
+              onTabChange={handleTabChange}
+              dagRunId={currentDAGRun?.dagRunId}
+              stepName={stepName}
+              isModal={false}
+              navigateToStatusTab={navigateToStatusTab}
+              skipHeader={true} // Skip header since we're rendering it separately
+            />
           )}
         </div>
       </RootDAGRunContext.Provider>

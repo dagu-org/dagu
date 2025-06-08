@@ -21,9 +21,22 @@ type ExitCoder interface {
 	ExitCode() int
 }
 
-// ChildDAG is an interface for child DAG executors.
-type ChildDAG interface {
-	SetDAGRunID(string)
+// DAGExecutor is an interface for child DAG executors.
+type DAGExecutor interface {
+	Executor
+	SetParams(RunParams)
+}
+
+// ParallelExecutor is an interface for parallel step executors.
+type ParallelExecutor interface {
+	Executor
+	SetParamsList([]RunParams)
+}
+
+// RunParams holds the parameters for running a child DAG.
+type RunParams struct {
+	RunID  string
+	Params string
 }
 
 // Creator is a function type that creates an Executor based on the step configuration.

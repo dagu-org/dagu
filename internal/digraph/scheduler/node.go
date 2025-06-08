@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -131,6 +132,7 @@ func (n *Node) shouldContinue(ctx context.Context) bool {
 func (n *Node) Execute(ctx context.Context) error {
 	cmd, err := n.setupExecutor(ctx)
 	if err != nil {
+		n.SetError(fmt.Errorf("failed to setup executor: %w", err))
 		return err
 	}
 
@@ -200,11 +202,13 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 
 	// Evaluate the child DAG if set
 	if child := n.Step().ChildDAG; child != nil {
-		childDAG, err := EvalObject(ctx, *child)
+		dagName, err := EvalString(ctx, child.Name)
 		if err != nil {
-			return nil, fmt.Errorf("failed to eval child DAG: %w", err)
+			return nil, fmt.Errorf("failed to eval child DAG name: %w", err)
 		}
-		n.SetChildDAG(childDAG)
+		copy := *child
+		copy.Name = dagName
+		n.SetChildDAG(copy)
 	}
 
 	// Evaluate script if set
@@ -231,13 +235,41 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 		return nil, fmt.Errorf("failed to setup executor IO: %w", err)
 	}
 
-	// If the command is a child DAG, set the dag-run ID
-	if childDAG, ok := cmd.(executor.ChildDAG); ok {
-		dagRunID, err := n.GenChildDAGRunID()
+	// Handle child DAG execution
+	if childDAG := n.Step().ChildDAG; childDAG != nil {
+		childRuns, err := n.buildChildDAGRuns(ctx, childDAG)
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate child dag-run ID: %w", err)
+			return nil, err
 		}
-		childDAG.SetDAGRunID(dagRunID)
+		n.SetChildRuns(childRuns)
+
+		// Setup the executor with child DAG run information
+		if n.Step().Parallel == nil {
+			// Single child DAG execution
+			exec, ok := cmd.(executor.DAGExecutor)
+			if !ok {
+				return nil, fmt.Errorf("executor %T does not support child DAG execution", cmd)
+			}
+			exec.SetParams(executor.RunParams{
+				RunID:  childRuns[0].DAGRunID,
+				Params: childRuns[0].Params,
+			})
+		} else {
+			// Parallel child DAG execution
+			exec, ok := cmd.(executor.ParallelExecutor)
+			if !ok {
+				return nil, fmt.Errorf("executor %T does not support parallel execution", cmd)
+			}
+			// Convert ChildDAGRun to executor.RunParams
+			var runParamsList []executor.RunParams
+			for _, childRun := range childRuns {
+				runParamsList = append(runParamsList, executor.RunParams{
+					RunID:  childRun.DAGRunID,
+					Params: childRun.Params,
+				})
+			}
+			exec.SetParamsList(runParamsList)
+		}
 	}
 
 	return cmd, nil
@@ -509,6 +541,160 @@ func (n *Node) Init() {
 	n.id = getNextNodeID()
 }
 
+// buildChildDAGRuns constructs the child DAG runs based on parallel configuration
+func (n *Node) buildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG) ([]ChildDAGRun, error) {
+	parallel := n.Step().Parallel
+
+	// Single child DAG execution (non-parallel)
+	if parallel == nil {
+		params, err := EvalString(ctx, childDAG.Params)
+		if err != nil {
+			return nil, fmt.Errorf("failed to eval child dag params: %w", err)
+		}
+		dagRunID := GenerateChildDAGRunID(ctx, params)
+		return []ChildDAGRun{{
+			DAGRunID: dagRunID,
+			Params:   params,
+		}}, nil
+	}
+
+	// Parallel execution
+	var items []any
+
+	// Handle variable reference
+	if parallel.Variable != "" {
+		value, err := EvalString(ctx, parallel.Variable)
+		if err != nil {
+			return nil, fmt.Errorf("failed to eval parallel variable %q: %w", parallel.Variable, err)
+		}
+
+		// Check if the value is JSON array or space-separated
+		if stringutil.IsJSONArray(value) {
+			if err := json.Unmarshal([]byte(value), &items); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal parallel variable %q: %w", parallel.Variable, err)
+			}
+		} else {
+			// Split by whitespace for space-separated items
+			for _, field := range strings.Fields(value) {
+				items = append(items, field)
+			}
+		}
+	} else if len(parallel.Items) > 0 {
+		// Handle static items
+		for _, item := range parallel.Items {
+			if item.Value != "" {
+				value, err := EvalString(ctx, item.Value)
+				if err != nil {
+					return nil, fmt.Errorf("failed to eval parallel item value %q: %w", item.Value, err)
+				}
+				items = append(items, value)
+			} else if len(item.Params) > 0 {
+				// evaluate each value in Params
+				m := make(digraph.DeterministicMap)
+				for key, value := range item.Params {
+					evaluatedValue, err := EvalString(ctx, value)
+					if err != nil {
+						return nil, fmt.Errorf("failed to eval parallel item param %q: %w", key, err)
+					}
+					m[key] = evaluatedValue
+				}
+				// Convert to JSON string
+				paramData, err := json.Marshal(m)
+				if err != nil {
+					return nil, fmt.Errorf("failed to marshal params: %w", err)
+				}
+				items = append(items, json.RawMessage(paramData))
+			}
+		}
+	}
+
+	// Validate we have items
+	if len(items) == 0 {
+		return nil, fmt.Errorf("parallel execution requires at least one item")
+	}
+
+	// Validate maximum number of items
+	const maxParallelItems = 1000
+	if len(items) > maxParallelItems {
+		return nil, fmt.Errorf("parallel execution exceeds maximum limit: %d items (max: %d)", len(items), maxParallelItems)
+	}
+
+	// Build child runs with deduplication
+	childRunMap := make(map[string]ChildDAGRun)
+	for i, item := range items {
+		param, err := n.itemToParam(item)
+		if err != nil {
+			return nil, fmt.Errorf("failed to process item %d: %w", i, err)
+		}
+
+		// Merge the item param with the step's params if they exist
+		finalParams := param
+		if childDAG.Params != "" {
+			// Create variables map with ITEM set to the current item value
+			variables := map[string]string{
+				"ITEM": param,
+			}
+			// Evaluate the step params with ITEM variable available
+			evaluatedStepParams, err := EvalString(ctx, childDAG.Params, cmdutil.WithVariables(variables))
+			if err != nil {
+				return nil, fmt.Errorf("failed to eval step params: %w", err)
+			}
+			finalParams = evaluatedStepParams
+		}
+
+		dagRunID := GenerateChildDAGRunID(ctx, finalParams)
+		// Use dagRunID as key to deduplicate - same params will generate same ID
+		childRunMap[dagRunID] = ChildDAGRun{
+			DAGRunID: dagRunID,
+			Params:   finalParams,
+		}
+	}
+
+	// Convert map back to slice
+	var childRuns []ChildDAGRun
+	for _, run := range childRunMap {
+		childRuns = append(childRuns, run)
+	}
+
+	// TODO: Store max concurrent for scheduler to use
+	// This will need to be implemented when parallel execution is added
+	// if parallel.MaxConcurrent > 0 {
+	//     n.SetMaxConcurrent(parallel.MaxConcurrent)
+	// } else {
+	//     n.SetMaxConcurrent(digraph.DefaultMaxConcurrent)
+	// }
+
+	return childRuns, nil
+}
+
+// itemToParam converts a parallel item to a parameter string
+func (n *Node) itemToParam(item any) (string, error) {
+	switch v := item.(type) {
+	case string:
+		return v, nil
+	case int, int8, int16, int32, int64:
+		return fmt.Sprintf("%d", v), nil
+	case uint, uint8, uint16, uint32, uint64:
+		return fmt.Sprintf("%d", v), nil
+	case float32, float64:
+		return fmt.Sprintf("%g", v), nil
+	case bool:
+		return fmt.Sprintf("%t", v), nil
+	case nil:
+		return "null", nil
+	case json.RawMessage:
+		// Already JSON, return as string
+		return string(v), nil
+	default:
+		// For complex types, marshal to JSON
+		data, err := json.Marshal(v)
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal item to JSON: %w", err)
+		}
+		return string(data), nil
+	}
+}
+
 type RetryPolicy struct {
 	Limit     int
 	Interval  time.Duration
@@ -593,8 +779,12 @@ type OutputCoordinator struct {
 	StderrRedirectFile   *os.File
 	stderrRedirectWriter *bufio.Writer
 
-	outputWriter *os.File
-	outputReader *os.File
+	// Output capture with size limits to prevent OOM
+	outputWriter   *os.File
+	outputReader   *os.File
+	outputData     string
+	outputCaptured bool
+	maxOutputSize  int64 // Max output size in bytes
 }
 
 func (oc *OutputCoordinator) StdoutFile() string {
@@ -622,7 +812,7 @@ func (oc *OutputCoordinator) setup(ctx context.Context, data NodeData) error {
 	return oc.setupStderrRedirect(ctx, data)
 }
 
-func (oc *OutputCoordinator) setupExecutorIO(_ context.Context, cmd executor.Executor, data NodeData) error {
+func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.Executor, data NodeData) error {
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
@@ -636,12 +826,21 @@ func (oc *OutputCoordinator) setupExecutorIO(_ context.Context, cmd executor.Exe
 		stdout = io.MultiWriter(oc.stdoutWriter, oc.stdoutRedirectWriter)
 	}
 
-	// Setup output capture
-	if data.Step.Output != "" {
+	// Setup output capture only if not already set up
+	if data.Step.Output != "" && oc.outputReader == nil {
 		var err error
 		if oc.outputReader, oc.outputWriter, err = os.Pipe(); err != nil {
 			return fmt.Errorf("failed to create pipe: %w", err)
 		}
+		logger.Debug(ctx, "Created new output pipes", "step", data.Step.Name, "outputVar", data.Step.Output)
+		// Reset the captured flag to allow new output capture for retry
+		oc.outputCaptured = false
+		oc.maxOutputSize = 1024 * 1024 // 1MB limit
+		// Reset the output data to empty
+		oc.outputData = ""
+	}
+
+	if oc.outputWriter != nil {
 		stdout = io.MultiWriter(stdout, oc.outputWriter)
 	}
 
@@ -672,7 +871,7 @@ func (oc *OutputCoordinator) closeResources(_ context.Context) error {
 			}
 		}
 	}
-	for _, f := range []*os.File{oc.stdoutFile, oc.stderrFile, oc.stdoutRedirectFile, oc.StderrRedirectFile} {
+	for _, f := range []*os.File{oc.stdoutFile, oc.stderrFile, oc.stdoutRedirectFile, oc.StderrRedirectFile, oc.outputReader, oc.outputWriter} {
 		if f != nil {
 			if err := f.Sync(); err != nil {
 				lastErr = err
@@ -764,18 +963,58 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
+	// Return cached result if already captured
+	if oc.outputCaptured {
+		logger.Debug(ctx, "capturedOutput: returning cached", "output", oc.outputData, "length", len(oc.outputData))
+		return oc.outputData, nil
+	}
+
 	if oc.outputReader == nil {
+		logger.Debug(ctx, "capturedOutput: no output reader")
 		return "", nil
 	}
 
-	if err := oc.outputWriter.Close(); err != nil {
-		logger.Error(ctx, "failed to close pipe writer", "err", err)
+	// Close the writer only if it hasn't been closed already
+	if oc.outputWriter != nil {
+		logger.Debug(ctx, "capturedOutput: closing output writer")
+		if err := oc.outputWriter.Close(); err != nil {
+			logger.Error(ctx, "failed to close pipe writer", "err", err)
+		}
+		oc.outputWriter = nil // Mark as closed
 	}
 
+	// Use limited reader to prevent OOM
+	limitedReader := io.LimitReader(oc.outputReader, oc.maxOutputSize)
 	var buf bytes.Buffer
-	// TODO: Handle case where output is too large
-	if _, err := io.Copy(&buf, oc.outputReader); err != nil {
+	if _, err := io.Copy(&buf, limitedReader); err != nil {
 		return "", fmt.Errorf("io: failed to read output: %w", err)
 	}
-	return strings.TrimSpace(buf.String()), nil
+
+	output := strings.TrimSpace(buf.String())
+
+	// Check if output was truncated
+	if buf.Len() == int(oc.maxOutputSize) {
+		logger.Warn(ctx, "Output truncated due to size limit", "maxSize", oc.maxOutputSize)
+		output += "\n[OUTPUT TRUNCATED]"
+	}
+
+	// Accumulate output with previous attempts (for retries)
+	if oc.outputData != "" && output != "" {
+		oc.outputData += "\n" + output
+	} else if output != "" {
+		oc.outputData = output
+	}
+
+	logger.Debug(ctx, "capturedOutput: captured", "output", oc.outputData, "length", len(oc.outputData))
+
+	// Close the reader after reading
+	if err := oc.outputReader.Close(); err != nil {
+		logger.Error(ctx, "failed to close pipe reader", "err", err)
+	}
+	oc.outputReader = nil // Mark as closed
+
+	// Mark as captured for caching
+	oc.outputCaptured = true
+
+	return oc.outputData, nil
 }

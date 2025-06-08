@@ -59,11 +59,8 @@ function NodeStatusTable({ nodes, status, fileName, onViewLog }: Props) {
                 <TableHead className="w-[10%] py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
                   Status
                 </TableHead>
-                <TableHead className="w-[25%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                  Error
-                </TableHead>
-                <TableHead className="w-[10%] py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
-                  Log
+                <TableHead className="w-[35%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 min-w-[150px]">
+                  Error / Logs
                 </TableHead>
               </TableRow>
             </TableHeader>

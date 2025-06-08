@@ -1,0 +1,7 @@
+name: parallel-variable
+params:
+  - ITEMS: '["alpha", "beta", "gamma", "delta"]'
+steps:
+  - name: process-from-var
+    run: child-echo
+    parallel: ${ITEMS}

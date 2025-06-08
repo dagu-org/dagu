@@ -11,7 +11,13 @@ import {
 } from '@/components/ui/tooltip';
 import dayjs from '@/lib/dayjs';
 import { cn } from '@/lib/utils';
-import { Code, FileText, GitBranch } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  Code,
+  FileText,
+  GitBranch,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { components, NodeStatus } from '../../../../api/v2/schema';
@@ -102,6 +108,8 @@ function NodeStatusTableRow({
   const navigate = useNavigate();
   // State to store the current duration for running tasks
   const [currentDuration, setCurrentDuration] = useState<string>('-');
+  // State for expanding/collapsing parallel executions
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Check if this is a child dagRun node
   const hasChildDAGRun =
@@ -151,9 +159,12 @@ function NodeStatusTableRow({
   };
 
   // Handle child dagRun navigation
-  const handleChildDAGRunNavigation = () => {
-    if (hasChildDAGRun && node.children && node.children[0]) {
-      const childDAGRunId = node.children[0].dagRunId;
+  const handleChildDAGRunNavigation = (
+    childIndex: number = 0,
+    e?: React.MouseEvent
+  ) => {
+    if (hasChildDAGRun && node.children && node.children[childIndex]) {
+      const childDAGRunId = node.children[childIndex].dagRunId;
 
       // Check if we're in a dagRun context or a DAG context
       // More reliable detection by checking the current URL path or the dagRun object
@@ -163,25 +174,37 @@ function NodeStatusTableRow({
         dagRun && (currentPath.startsWith('/dag-runs/') || isModal);
 
       if (isDAGRunContext) {
-        // For dagRuns, use query parameters to navigate to the dagRun details page
+        // For dagRuns, navigate to /dag-runs/{root-dag-name}/{root-dag-run-id}?childDAGRunId=...
         const searchParams = new URLSearchParams();
         searchParams.set('childDAGRunId', childDAGRunId);
 
-        // Use root dagRun information from the dagRun prop if available
+        // Determine root DAG information
+        let rootDAGRunId: string;
+        let rootDAGName: string;
+
         if (dagRun && dagRun.rootDAGRunId) {
           // If this is already a child dagRun, use its root information
+          rootDAGRunId = dagRun.rootDAGRunId;
+          rootDAGName = dagRun.rootDAGRunName;
           searchParams.set('dagRunId', dagRun.rootDAGRunId);
           searchParams.set('dagRunName', dagRun.rootDAGRunName);
         } else {
           // Otherwise, use the current dagRun as the root
+          rootDAGRunId = dagRunId || '';
+          rootDAGName = dagRun?.name || name;
           searchParams.set('dagRunId', dagRunId || '');
           searchParams.set('dagRunName', dagRun?.name || name);
         }
 
         searchParams.set('step', node.step.name);
-        navigate(
-          `/dag-runs/${dagRun?.name || name}?${searchParams.toString()}`
-        );
+        const url = `/dag-runs/${rootDAGName}/${rootDAGRunId}?${searchParams.toString()}`;
+
+        // If Cmd/Ctrl key is pressed, open in new tab
+        if (e && (e.metaKey || e.ctrlKey)) {
+          window.open(url, '_blank');
+        } else {
+          navigate(url);
+        }
       } else {
         // For DAGs, use the existing approach with query parameters
         const searchParams = new URLSearchParams();
@@ -203,7 +226,14 @@ function NodeStatusTableRow({
         }
 
         searchParams.set('step', node.step.name);
-        navigate(`/dags/${name}?${searchParams.toString()}`);
+        const url = `/dags/${name}?${searchParams.toString()}`;
+
+        // If Cmd/Ctrl key is pressed, open in new tab
+        if (e && (e.metaKey || e.ctrlKey)) {
+          window.open(url, '_blank');
+        } else {
+          navigate(url);
+        }
       }
     }
   };
@@ -259,12 +289,70 @@ function NodeStatusTableRow({
               </div>
             )}
             {hasChildDAGRun && (
-              <div
-                className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline"
-                onClick={handleChildDAGRunNavigation}
-              >
-                View Child DAG Run: {node.step.run}
-              </div>
+              <>
+                {node.children && node.children.length === 1 ? (
+                  // Single child DAG run
+                  <>
+                    <div
+                      className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline"
+                      onClick={(e) => handleChildDAGRunNavigation(0, e)}
+                      title="Click to view child DAG run (Cmd/Ctrl+Click to open in new tab)"
+                    >
+                      View Child DAG Run: {node.step.run}
+                    </div>
+                    {node.children[0]?.params && (
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        Parameters:{' '}
+                        <span className="font-mono">
+                          {node.children[0].params}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  // Multiple child DAG runs (parallel execution)
+                  <>
+                    <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setIsExpanded(!isExpanded)}
+                          className="flex items-center gap-1 text-blue-500 dark:text-blue-400 font-medium hover:underline"
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="h-3 w-3" />
+                          ) : (
+                            <ChevronRight className="h-3 w-3" />
+                          )}
+                          Parallel execution: {node.children?.length || 0} child
+                          DAG runs
+                        </button>
+                      </div>
+                      {isExpanded && node.children && (
+                        <div className="mt-2 ml-4 space-y-1 border-l border-slate-200 dark:border-slate-700 pl-3">
+                          {node.children.map((child, index) => (
+                            <div key={child.dagRunId} className="py-1">
+                              <div
+                                className="text-xs text-blue-500 dark:text-blue-400 cursor-pointer hover:underline"
+                                onClick={(e) =>
+                                  handleChildDAGRunNavigation(index, e)
+                                }
+                                title="Click to view child DAG run (Cmd/Ctrl+Click to open in new tab)"
+                              >
+                                #{index + 1}: {node.step.run}
+                              </div>
+                              {child.params && (
+                                <div className="text-xs text-slate-500 dark:text-slate-400 ml-4 font-mono">
+                                  {child.params}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </>
             )}
           </div>
         </TableCell>
@@ -351,120 +439,105 @@ function NodeStatusTableRow({
           </NodeStatusChip>
         </TableCell>
 
-        {/* Error */}
+        {/* Error / Logs */}
         <TableCell>
-          {node.error && (
-            <div className="text-xs bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800 rounded-md p-1.5 max-h-[80px] overflow-y-auto whitespace-pre-wrap break-words text-red-600 dark:text-red-400 leading-tight">
-              {node.error}
-            </div>
-          )}
-          {node.step.preconditions?.some((cond) => cond.error) && (
-            <div className="mt-2">
-              <div className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-1">
-                Precondition Unmet:
-              </div>
-              {node.step.preconditions
-                .filter((cond) => cond.error)
-                .map((cond, idx) => (
-                  <div
-                    key={idx}
-                    className="text-xs bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800 rounded-md p-1.5 mb-1 whitespace-pre-wrap break-words text-amber-600 dark:text-amber-400 leading-tight"
-                  >
-                    <div className="font-medium">
-                      Condition: {cond.condition}
-                    </div>
-                    <div>Expected: {cond.expected}</div>
-                    <div>Error: {cond.error}</div>
-                  </div>
-                ))}
-            </div>
-          )}
-        </TableCell>
-
-        {/* Log */}
-        <TableCell className="text-center">
-          {(node.stdout || node.stderr) && (
-            <div className="relative inline-flex">
-              {/* Single log file - show simple button */}
-              {(node.stdout && !node.stderr) ||
-              (!node.stdout && node.stderr) ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <a
-                      href={node.stderr ? `${url}&stream=stderr` : url}
-                      onClick={
-                        node.stderr
-                          ? (e) => {
-                              if (!(e.metaKey || e.ctrlKey) && onViewLog) {
-                                e.preventDefault();
-                                onViewLog(
-                                  `${node.step.name}_stderr`,
-                                  dagRunId || ''
-                                );
+          <div className="space-y-1.5">
+            {/* Logs */}
+            {(node.stdout || node.stderr) && (
+              <div className="flex items-center gap-1.5">
+                {/* Single log file - show simple button */}
+                {(node.stdout && !node.stderr) ||
+                (!node.stdout && node.stderr) ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <a
+                        href={node.stderr ? `${url}&stream=stderr` : url}
+                        onClick={
+                          node.stderr
+                            ? (e) => {
+                                if (!(e.metaKey || e.ctrlKey) && onViewLog) {
+                                  e.preventDefault();
+                                  onViewLog(
+                                    `${node.step.name}_stderr`,
+                                    dagRunId || ''
+                                  );
+                                }
                               }
+                            : handleViewLog
+                        }
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors duration-200 rounded cursor-pointer text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700"
+                        title={`Click to view ${node.stderr ? 'stderr' : 'stdout'} log (Cmd/Ctrl+Click to open in new tab)`}
+                      >
+                        <FileText className="h-3 w-3" />
+                        {node.stderr ? 'stderr' : 'stdout'}
+                      </a>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <span className="text-xs">
+                        {node.stderr ? 'Error' : 'Output'} Log
+                      </span>
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  /* Both stdout and stderr - show combined button with split design */
+                  <div className="inline-flex rounded overflow-hidden">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <a
+                          href={url}
+                          onClick={handleViewLog}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors duration-200 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer border-r border-slate-200 dark:border-slate-700"
+                          title="Click to view stdout log (Cmd/Ctrl+Click to open in new tab)"
+                        >
+                          <FileText className="h-3 w-3" />
+                          out
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <span className="text-xs">Output Log</span>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <a
+                          href={`${url}&stream=stderr`}
+                          onClick={(e) => {
+                            if (!(e.metaKey || e.ctrlKey) && onViewLog) {
+                              e.preventDefault();
+                              onViewLog(
+                                `${node.step.name}_stderr`,
+                                dagRunId || ''
+                              );
                             }
-                          : handleViewLog
-                      }
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 rounded-md cursor-pointer text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700"
-                      title={`Click to view ${node.stderr ? 'stderr' : 'stdout'} log (Cmd/Ctrl+Click to open in new tab)`}
-                    >
-                      <FileText className="h-3.5 w-3.5" />
-                      {node.stderr ? 'stderr' : 'stdout'}
-                    </a>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <span className="text-xs">
-                      {node.stderr ? 'Error' : 'Output'} Log
-                    </span>
-                  </TooltipContent>
-                </Tooltip>
-              ) : (
-                /* Both stdout and stderr - show combined button with split design */
-                <div className="inline-flex rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <a
-                        href={url}
-                        onClick={handleViewLog}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer border-r border-slate-200 dark:border-slate-700"
-                        title="Click to view stdout log (Cmd/Ctrl+Click to open in new tab)"
-                      >
-                        <FileText className="h-3.5 w-3.5" />
-                        stdout
-                      </a>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <span className="text-xs">Output Log</span>
-                    </TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <a
-                        href={`${url}&stream=stderr`}
-                        onClick={(e) => {
-                          if (!(e.metaKey || e.ctrlKey) && onViewLog) {
-                            e.preventDefault();
-                            onViewLog(
-                              `${node.step.name}_stderr`,
-                              dagRunId || ''
-                            );
-                          }
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                        title="Click to view stderr log (Cmd/Ctrl+Click to open in new tab)"
-                      >
-                        <FileText className="h-3.5 w-3.5" />
-                        stderr
-                      </a>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <span className="text-xs">Error Log</span>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-              )}
-            </div>
-          )}
+                          }}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors duration-200 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer"
+                          title="Click to view stderr log (Cmd/Ctrl+Click to open in new tab)"
+                        >
+                          <FileText className="h-3 w-3" />
+                          err
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <span className="text-xs">Error Log</span>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Errors - Simplified */}
+            {node.error && (
+              <div className="text-xs text-red-600 dark:text-red-400 leading-relaxed whitespace-normal break-words">
+                {node.error}
+              </div>
+            )}
+            {node.step.preconditions?.some((cond) => cond.error) && (
+              <div className="text-xs text-amber-600 dark:text-amber-400 leading-relaxed">
+                Precondition unmet
+              </div>
+            )}
+          </div>
         </TableCell>
       </StyledTableRow>
     );
@@ -507,12 +580,59 @@ function NodeStatusTableRow({
 
       {/* Child dagRun link */}
       {hasChildDAGRun && (
-        <div
-          className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline mb-3"
-          onClick={handleChildDAGRunNavigation}
-        >
-          View Child DAG Run: {node.step.run}
-        </div>
+        <>
+          {node.children && node.children.length === 1 ? (
+            // Single child DAG run
+            <>
+              <div
+                className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline mb-1"
+                onClick={(e) => handleChildDAGRunNavigation(0, e)}
+              >
+                View Child DAG Run: {node.step.run}
+              </div>
+              {node.children[0]?.params && (
+                <div className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                  Parameters:{' '}
+                  <span className="font-mono">{node.children[0].params}</span>
+                </div>
+              )}
+            </>
+          ) : (
+            // Multiple child DAG runs (parallel execution)
+            <div className="mb-3">
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="flex items-center gap-1 text-xs text-blue-500 dark:text-blue-400 font-medium hover:underline"
+              >
+                {isExpanded ? (
+                  <ChevronDown className="h-3 w-3" />
+                ) : (
+                  <ChevronRight className="h-3 w-3" />
+                )}
+                Parallel execution: {node.children?.length || 0} child DAG runs
+              </button>
+              {isExpanded && node.children && (
+                <div className="mt-2 ml-4 space-y-1 border-l border-slate-200 dark:border-slate-700 pl-3">
+                  {node.children.map((child, index) => (
+                    <div key={child.dagRunId} className="py-1">
+                      <div
+                        className="text-xs text-blue-500 dark:text-blue-400 cursor-pointer hover:underline"
+                        onClick={(e) => handleChildDAGRunNavigation(index, e)}
+                      >
+                        #{index + 1}: {node.step.run}
+                      </div>
+                      {child.params && (
+                        <div className="text-xs text-slate-500 dark:text-slate-400 ml-4 font-mono">
+                          {child.params}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {/* Command section */}
