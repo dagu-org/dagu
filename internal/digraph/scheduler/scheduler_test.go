@@ -981,7 +981,9 @@ func TestScheduler(t *testing.T) {
 
 		// Create a counter file for tracking retry attempts
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("retry_output_%s.txt", uuid.Must(uuid.NewV7()).String()))
-		defer os.Remove(counterFile)
+		defer func() {
+			_ = os.Remove(counterFile)
+		}()
 
 		// Step that outputs different values on each retry and fails until 3rd attempt
 		graph := sc.newGraph(t,
@@ -1050,7 +1052,9 @@ func TestScheduler(t *testing.T) {
 
 		// Create a counter file for tracking retry attempts
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("retry_child_output_%s.txt", uuid.Must(uuid.NewV7()).String()))
-		defer os.Remove(counterFile)
+		defer func() {
+			_ = os.Remove(counterFile)
+		}()
 
 		// Step that outputs different values on each retry and always fails
 		graph := sc.newGraph(t,
