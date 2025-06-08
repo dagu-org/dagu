@@ -865,16 +865,16 @@ steps:
 		results := value.(string)
 		t.Logf("Captured results: %s", results)
 		require.Contains(t, results, "RESULTS=")
-		
+
 		// Verify we got JSON output with both success and failure
 		require.Contains(t, results, `"total": 2`)
 		require.Contains(t, results, `"succeeded": 1`)
 		require.Contains(t, results, `"failed": 1`)
-		
+
 		// Only successful output should be captured
 		require.Contains(t, results, "Output for success")
 		require.NotContains(t, results, "Output for fail")
-		
+
 		// Verify the failed execution has no output in results
 		require.Contains(t, results, `"status": "failed"`)
 		// Outputs array should only contain the successful output
@@ -894,11 +894,11 @@ func TestParallelExecution_OutputCaptureWithRetry(t *testing.T) {
 
 	// Create a simple child DAG that fails first, succeeds on retry
 	testDir := test.TestdataPath(t, "integration")
-	
+
 	// Clean up counter file after test
 	counterFile := "/tmp/test_retry_counter.txt"
 	t.Cleanup(func() { _ = os.Remove(counterFile) })
-	
+
 	childDagFile := filepath.Join(testDir, "child-retry-simple.yaml")
 	childDagContent := `name: child-retry-simple
 steps:
@@ -961,7 +961,7 @@ steps:
 		require.Contains(t, results, "RESULTS=")
 		require.Contains(t, results, `"succeeded": 1`)
 		require.Contains(t, results, `"failed": 0`)
-		
+
 		// Should contain retry output, not first attempt
 		require.Contains(t, results, "Retry success")
 		require.NotContains(t, results, "First attempt")
@@ -1043,24 +1043,24 @@ steps:
 		results := value.(string)
 		t.Logf("Captured results: %s", results)
 		require.Contains(t, results, "RESULTS=")
-		
+
 		// Verify summary counts
 		require.Contains(t, results, `"total": 5`)
 		require.Contains(t, results, `"succeeded": 3`)
 		require.Contains(t, results, `"failed": 2`)
-		
+
 		// Successful outputs should be included
 		require.Contains(t, results, "Success output for success1")
 		require.Contains(t, results, "Success output for success2")
 		require.Contains(t, results, "Success output for success3")
-		
+
 		// Failed outputs should NOT be included
 		require.NotContains(t, results, "Failed output 1")
 		require.NotContains(t, results, "Failed output 2")
-		
+
 		// Verify outputs array only contains successful outputs
 		require.Contains(t, results, `"outputs": [`)
-		
+
 		// The outputs array should only have 3 items (successful ones)
 		// Count occurrences of RESULT in outputs array
 		outputsSection := results[strings.Index(results, `"outputs": [`):]
@@ -1080,14 +1080,14 @@ func TestParallelExecution_ExceedsMaxLimit(t *testing.T) {
 	// Create a parent DAG with more than 1000 items
 	testDir := test.TestdataPath(t, "integration")
 	dagFile := filepath.Join(testDir, "test-parallel-exceed-limit.yaml")
-	
+
 	// Generate a large list of items (1001 items)
 	items := make([]string, 1001)
 	for i := 0; i < 1001; i++ {
 		items[i] = fmt.Sprintf(`        - "item%d"`, i)
 	}
 	itemsStr := strings.Join(items, "\n")
-	
+
 	dagContent := fmt.Sprintf(`name: test-parallel-exceed-limit
 steps:
   - name: too-many-items
@@ -1096,7 +1096,7 @@ steps:
       items:
 %s
 `, itemsStr)
-	
+
 	err := os.WriteFile(dagFile, []byte(dagContent), 0600)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = os.Remove(dagFile) })
@@ -1104,7 +1104,7 @@ steps:
 	// Load and run the DAG
 	dag := th.DAG(t, filepath.Join("integration", "test-parallel-exceed-limit.yaml"))
 	agent := dag.Agent()
-	
+
 	// This should fail during execution when buildChildDAGRuns is called
 	err = agent.Run(agent.Context)
 	require.Error(t, err)
@@ -1114,20 +1114,20 @@ steps:
 // TestParallelExecution_ExactlyMaxLimit verifies that exactly 1000 items works
 func TestParallelExecution_ExactlyMaxLimit(t *testing.T) {
 	// Run this test to verify the boundary condition
-	
+
 	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
 
 	// Create a parent DAG with exactly 1000 items
 	testDir := test.TestdataPath(t, "integration")
 	dagFile := filepath.Join(testDir, "test-parallel-max-limit.yaml")
-	
+
 	// Generate exactly 1000 items
 	items := make([]string, 1000)
 	for i := 0; i < 1000; i++ {
 		items[i] = fmt.Sprintf(`        - "item%d"`, i)
 	}
 	itemsStr := strings.Join(items, "\n")
-	
+
 	dagContent := fmt.Sprintf(`name: test-parallel-max-limit
 steps:
   - name: max-items
@@ -1137,27 +1137,27 @@ steps:
 %s
       maxConcurrent: 10
 `, itemsStr)
-	
+
 	err := os.WriteFile(dagFile, []byte(dagContent), 0600)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = os.Remove(dagFile) })
 
 	// Load the DAG - this should succeed
 	dag := th.DAG(t, filepath.Join("integration", "test-parallel-max-limit.yaml"))
-	
+
 	// Load and start the DAG - this should succeed as we're at the exact limit
 	agent := dag.Agent()
-	
+
 	// Start the DAG in a goroutine
 	errChan := make(chan error, 1)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	go func() {
 		agent.Context = ctx
 		errChan <- agent.Run(agent.Context)
 	}()
-	
+
 	// Let it run for a short time to verify it starts without error
 	select {
 	case err := <-errChan:
@@ -1172,6 +1172,122 @@ steps:
 }
 
 // TestParallelExecution_DynamicFileDiscovery tests the pattern from README where files are discovered dynamically
+func TestParallelExecution_ObjectItemProperties(t *testing.T) {
+	th := test.Setup(t)
+
+	// Ensure the DAGs directory exists
+	err := os.MkdirAll(th.Config.Paths.DAGsDir, 0755)
+	require.NoError(t, err)
+
+	// Create a child DAG that processes regions and buckets
+	childDagFile := filepath.Join(th.Config.Paths.DAGsDir, "sync-data.yaml")
+	childDagContent := `name: sync-data
+params:
+  - REGION: ""
+  - BUCKET: ""
+steps:
+  - name: sync
+    script: |
+      echo "Syncing data from region: $REGION"
+      echo "Using bucket: $BUCKET"
+      echo "Sync completed for $BUCKET in $REGION"
+    output: SYNC_RESULT
+`
+	err = os.WriteFile(childDagFile, []byte(childDagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(childDagFile) })
+
+	// Create the parent DAG that uses object items with property access
+	parentDagFile := filepath.Join(th.Config.Paths.DAGsDir, "test-object-properties.yaml")
+	parentDagContent := `name: test-object-properties
+steps:
+  - name: get configs
+    command: |
+      echo '[
+        {"region": "us-east-1", "bucket": "data-us"},
+        {"region": "eu-west-1", "bucket": "data-eu"},
+        {"region": "ap-south-1", "bucket": "data-ap"}
+      ]'
+    output: CONFIGS
+  
+  - name: sync data
+    run: sync-data
+    parallel:
+      items: ${CONFIGS}
+      maxConcurrent: 2
+    params:
+      - REGION: ${ITEM.region}
+      - BUCKET: ${ITEM.bucket}
+    depends: get configs
+    output: RESULTS
+`
+	err = os.WriteFile(parentDagFile, []byte(parentDagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(parentDagFile) })
+
+	// Load and run the DAG
+	dagStruct, err := digraph.Load(th.Context, parentDagFile)
+	require.NoError(t, err)
+
+	// Create the DAG wrapper
+	dag := test.DAG{
+		Helper: &th,
+		DAG:    dagStruct,
+	}
+
+	agent := dag.Agent()
+	require.NoError(t, agent.Run(agent.Context))
+
+	// Verify successful completion
+	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+
+	// Get the latest status to verify parallel execution
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	require.Len(t, status.Nodes, 2) // get configs and sync data
+
+	// Check get configs node
+	getConfigsNode := status.Nodes[0]
+	require.Equal(t, "get configs", getConfigsNode.Step.Name)
+	require.Equal(t, scheduler.NodeStatusSuccess, getConfigsNode.Status)
+
+	// Check sync data node
+	syncNode := status.Nodes[1]
+	require.Equal(t, "sync data", syncNode.Step.Name)
+	require.Equal(t, scheduler.NodeStatusSuccess, syncNode.Status)
+
+	// Verify child DAG runs were created
+	require.NotEmpty(t, syncNode.Children)
+	require.Len(t, syncNode.Children, 3) // 3 child runs for 3 regions
+
+	// Verify parallel execution results
+	require.NotNil(t, syncNode.OutputVariables)
+	if value, ok := syncNode.OutputVariables.Load("RESULTS"); ok {
+		results := value.(string)
+		println(results)
+		require.Contains(t, results, "RESULTS=")
+		require.Contains(t, results, `"total": 3`)
+		require.Contains(t, results, `"succeeded": 3`)
+		require.Contains(t, results, `"failed": 0`)
+
+		// Verify each region/bucket was processed correctly
+		require.Contains(t, results, "Syncing data from region: us-east-1")
+		require.Contains(t, results, "Using bucket: data-us")
+		require.Contains(t, results, "Syncing data from region: eu-west-1")
+		require.Contains(t, results, "Using bucket: data-eu")
+		require.Contains(t, results, "Syncing data from region: ap-south-1")
+		require.Contains(t, results, "Using bucket: data-ap")
+
+		// Verify outputs contain the sync results
+		require.Contains(t, results, "Sync completed for data-us in us-east-1")
+		require.Contains(t, results, "Sync completed for data-eu in eu-west-1")
+		require.Contains(t, results, "Sync completed for data-ap in ap-south-1")
+	} else {
+		t.Fatal("RESULTS output not found")
+	}
+}
+
 func TestParallelExecution_DynamicFileDiscovery(t *testing.T) {
 	th := test.Setup(t)
 
@@ -1237,13 +1353,13 @@ steps:
 	// Load and run the DAG
 	dagStruct, err := digraph.Load(th.Context, parentDagFile)
 	require.NoError(t, err)
-	
+
 	// Create the DAG wrapper
 	dag := test.DAG{
 		Helper: &th,
 		DAG:    dagStruct,
 	}
-	
+
 	agent := dag.Agent()
 	require.NoError(t, agent.Run(agent.Context))
 
@@ -1290,7 +1406,7 @@ steps:
 		require.Contains(t, results, `"total": 3`)
 		require.Contains(t, results, `"succeeded": 3`)
 		require.Contains(t, results, `"failed": 0`)
-		
+
 		// Each file should have been processed
 		require.Contains(t, results, "Processing file:")
 		require.Contains(t, results, "data1.csv")
