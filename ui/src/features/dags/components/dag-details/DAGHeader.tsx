@@ -1,4 +1,4 @@
-import { Calendar, Timer } from 'lucide-react';
+import { Calendar, Terminal, Timer } from 'lucide-react';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { components } from '../../../../api/v2/schema';
@@ -167,6 +167,21 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
             </div>
           </div>
         )}
+
+      {/* Parameters - Show if present */}
+      {dagRunToDisplay.params && (
+        <div className="mt-4 border-t border-slate-200 dark:border-slate-700 pt-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Terminal className="h-4 w-4 text-slate-500" />
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Parameters
+            </span>
+          </div>
+          <div className="bg-slate-100 dark:bg-slate-800 rounded-lg px-4 py-3 font-mono text-sm text-slate-700 dark:text-slate-300 max-h-[120px] overflow-y-auto">
+            {dagRunToDisplay.params}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

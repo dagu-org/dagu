@@ -103,6 +103,21 @@ function DAGStatusOverview({
 
   return (
     <div className="space-y-3">
+      {/* Parameters - Show at the top if present */}
+      {status.params && (
+        <div className="border-b border-slate-200 dark:border-slate-700 pb-3">
+          <div className="flex items-center mb-1.5">
+            <Terminal className="h-3.5 w-3.5 mr-1 text-slate-500 dark:text-slate-400" />
+            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              Parameters
+            </span>
+          </div>
+          <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-md font-medium text-xs text-slate-700 dark:text-slate-300 font-mono max-h-[100px] overflow-y-auto w-full">
+            {status.params}
+          </div>
+        </div>
+      )}
+
       {/* Status Section - Desktop */}
       <div className="hidden md:flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
         <div className="flex items-center gap-2">
@@ -395,20 +410,6 @@ function DAGStatusOverview({
         </div>
       )}
 
-      {/* Parameters */}
-      {status.params && (
-        <div>
-          <div className="flex items-center mb-1">
-            <Terminal className="h-3.5 w-3.5 mr-1 text-slate-500 dark:text-slate-400" />
-            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-              Parameters
-            </span>
-          </div>
-          <div className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded-md font-medium text-xs text-slate-700 dark:text-slate-300 font-mono max-h-[120px] overflow-y-auto w-full">
-            {status.params}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
