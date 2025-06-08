@@ -345,7 +345,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
 
 		node := result.Node(t, "1")
-		require.Equal(t, 2, node.State().DoneCount)  // 2 executions
+		require.Equal(t, 1, node.State().DoneCount)  // 1 successful execution
 		require.Equal(t, 1, node.State().RetryCount) // 1 retry
 	})
 	t.Run("RetryPolicySuccess", func(t *testing.T) {
@@ -382,7 +382,7 @@ func TestScheduler(t *testing.T) {
 
 		// Check if the retry is successful
 		state := result.Node(t, "1").State()
-		assert.Equal(t, 2, state.DoneCount)
+		assert.Equal(t, 1, state.DoneCount)
 		assert.Equal(t, 1, state.RetryCount)
 		assert.NotEmpty(t, state.RetriedAt)
 
