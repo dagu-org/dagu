@@ -571,7 +571,8 @@ steps:
 	if value, ok := firstOutputNode.OutputVariables.Load("FIRST_OUTPUT"); ok {
 		firstOutput := value.(string)
 		require.Contains(t, firstOutput, "First output:")
-		require.Contains(t, firstOutput, "TASK_RESULT_task1")
+		// The first output could be from any of the parallel tasks
+		require.Regexp(t, `TASK_RESULT_task[123]`, firstOutput)
 	} else {
 		t.Fatal("FIRST_OUTPUT not found")
 	}
