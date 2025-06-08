@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/ui/CustomDialog';
+import { CheckCircle2, XCircle } from 'lucide-react';
 import React from 'react';
 import { components, NodeStatus } from '../../../../api/v2/schema';
 
@@ -43,6 +44,9 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
   const cancelButtonRef = React.useRef<HTMLButtonElement>(null);
   const successButtonRef = React.useRef<HTMLButtonElement>(null);
   const failedButtonRef = React.useRef<HTMLButtonElement>(null);
+  
+  // Track which button is selected (0 = success, 1 = failed)
+  const [selectedButton, setSelectedButton] = React.useState(0);
 
   // Handle keyboard events
   React.useEffect(() => {
@@ -50,50 +54,26 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
       // Only handle events when modal is visible
       if (!visible || !step) return;
 
-      // Handle Enter key
-      if (e.key === 'Enter') {
-        // Get the active element
-        const activeElement = document.activeElement;
-
-        // Don't do anything if focus is on an input element
-        const isInputFocused =
-          activeElement instanceof HTMLInputElement ||
-          activeElement instanceof HTMLTextAreaElement ||
-          activeElement instanceof HTMLSelectElement;
-
-        if (isInputFocused) {
-          return;
-        }
-
-        // If Cancel button is focused, trigger cancel
-        if (activeElement === cancelButtonRef.current) {
+      switch (e.key) {
+        case 'ArrowLeft':
+        case 'ArrowRight':
+          e.preventDefault();
+          setSelectedButton(selectedButton === 0 ? 1 : 0);
+          break;
+          
+        case 'Enter':
+          e.preventDefault();
+          if (selectedButton === 0) {
+            onSubmit(step, NodeStatus.Success);
+          } else {
+            onSubmit(step, NodeStatus.Failed);
+          }
+          break;
+          
+        case 'Escape':
           e.preventDefault();
           dismissModal();
-          return;
-        }
-
-        // If Success button is focused, trigger success
-        if (activeElement === successButtonRef.current) {
-          e.preventDefault();
-          onSubmit(step, NodeStatus.Success);
-          return;
-        }
-
-        // If Failed button is focused, trigger failed
-        if (activeElement === failedButtonRef.current) {
-          e.preventDefault();
-          onSubmit(step, NodeStatus.Failed);
-          return;
-        }
-
-        // If any other button is focused, let it handle the event naturally
-        if (activeElement instanceof HTMLButtonElement) {
-          return;
-        }
-
-        // If no specific element is focused, trigger the success action as default
-        e.preventDefault();
-        onSubmit(step, NodeStatus.Success);
+          break;
       }
     };
 
@@ -101,48 +81,70 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [visible, step, onSubmit, dismissModal]);
+  }, [visible, step, onSubmit, dismissModal, selectedButton]);
 
   // We're not using the position prop anymore as we want the modal to be centered
   // The Dialog component from shadcn/ui will center the modal by default
 
   return (
     <Dialog open={visible} onOpenChange={(open) => !open && dismissModal()}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
-          <DialogTitle>Update status of "{step.name}"</DialogTitle>
+          <DialogTitle className="text-base font-mono">
+            Update Status
+          </DialogTitle>
+          <p className="text-sm text-muted-foreground font-mono mt-1">
+            {step.name}
+          </p>
         </DialogHeader>
 
-        <div className="py-4">
-          <div className="flex justify-center space-x-4">
-            <Button
+        <div className="py-6">
+          <div className="grid grid-cols-2 gap-3">
+            <button
               ref={successButtonRef}
-              variant="default"
-              className="bg-green-600 hover:bg-green-700"
+              className={`
+                group relative overflow-hidden rounded-lg border p-4 transition-all duration-200 focus:outline-none
+                ${selectedButton === 0 
+                  ? 'border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-950/20' 
+                  : 'border-zinc-200 dark:border-zinc-800 hover:border-green-500 dark:hover:border-green-600 hover:bg-green-50 dark:hover:bg-green-950/20'
+                }
+              `}
               onClick={() => onSubmit(step, NodeStatus.Success)}
+              onMouseEnter={() => setSelectedButton(0)}
             >
-              Mark Success
-            </Button>
-            <Button
+              <div className="flex flex-col items-center gap-2">
+                <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-500" />
+                <span className="font-mono text-sm">Success</span>
+              </div>
+            </button>
+            
+            <button
               ref={failedButtonRef}
-              variant="default"
-              className="bg-red-600 hover:bg-red-700"
+              className={`
+                group relative overflow-hidden rounded-lg border p-4 transition-all duration-200 focus:outline-none
+                ${selectedButton === 1 
+                  ? 'border-red-500 dark:border-red-600 bg-red-50 dark:bg-red-950/20' 
+                  : 'border-zinc-200 dark:border-zinc-800 hover:border-red-500 dark:hover:border-red-600 hover:bg-red-50 dark:hover:bg-red-950/20'
+                }
+              `}
               onClick={() => onSubmit(step, NodeStatus.Failed)}
+              onMouseEnter={() => setSelectedButton(1)}
             >
-              Mark Failed
-            </Button>
+              <div className="flex flex-col items-center gap-2">
+                <XCircle className="h-8 w-8 text-red-600 dark:text-red-500" />
+                <span className="font-mono text-sm">Failed</span>
+              </div>
+            </button>
           </div>
         </div>
 
-        <DialogFooter>
-          <Button
-            ref={cancelButtonRef}
-            variant="outline"
-            onClick={dismissModal}
-          >
-            Cancel
-          </Button>
-        </DialogFooter>
+        <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-500 font-mono pt-2 border-t border-zinc-200 dark:border-zinc-800">
+          <span>←→ Select</span>
+          <span className="opacity-40">•</span>
+          <span>Enter: Confirm</span>
+          <span className="opacity-40">•</span>
+          <span>ESC: Cancel</span>
+        </div>
       </DialogContent>
     </Dialog>
   );
