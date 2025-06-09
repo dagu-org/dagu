@@ -136,7 +136,11 @@ These fields apply to the entire DAG. They appear at the root of the YAML file.
 
 ``maxActiveRuns``
 ~~~~~~~~~~~~~~~~~~
-  Limit on how many active DAG-runs can exist at the same time. If this limit is reached, new runs will be queued until existing ones finish.
+  Limit on how many active DAG-runs can exist at the same time. If this limit is reached, new runs will be queued until existing ones finish. Defaults to 1. Set to -1 to disable queueing for this DAG.
+
+``queue``
+~~~~~~~~~
+  Name of the queue to assign this DAG to. If not specified, defaults to the DAG name. Used with global queue configuration to control concurrent execution across multiple DAGs.
 
 ``params``
 ~~~~~~~~~

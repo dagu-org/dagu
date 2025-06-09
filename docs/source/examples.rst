@@ -377,3 +377,73 @@ Process multiple items with object parameters:
         fi
 
 For more details on parallel execution, see :ref:`Parallel Execution`.
+
+Queue Management
+---------------
+
+Control concurrent execution of DAGs using queue configuration:
+
+**Basic Queue Assignment:**
+
+.. code-block:: yaml
+
+  name: data-processing
+  queue: "batch"          # Assign to "batch" queue
+  maxActiveRuns: 2        # Allow max 2 concurrent runs
+  schedule: "*/10 * * * *"  # Run every 10 minutes
+  
+  steps:
+    - name: process
+      command: process_data.sh
+
+**Disable Queueing for Critical Jobs:**
+
+.. code-block:: yaml
+
+  name: critical-alert
+  maxActiveRuns: -1       # Disable queueing - always run immediately
+  
+  steps:
+    - name: check-alerts
+      command: check_alerts.sh
+    - name: notify
+      command: send_notifications.sh
+
+**Unified Queue Management via Base Configuration:**
+
+.. code-block:: yaml
+
+  # ~/.config/dagu/base.yaml
+  # All DAGs will use these settings by default
+  queue: "global-queue"
+  maxActiveRuns: 2
+
+**Global Queue Configuration (config.yaml):**
+
+.. code-block:: yaml
+
+  # Global queue settings
+  queues:
+    enabled: true
+    config:
+      - name: "critical"
+        maxConcurrency: 5    # Critical jobs can run 5 at a time
+      - name: "batch"
+        maxConcurrency: 1    # Batch jobs run one at a time
+      - name: "reporting"
+        maxConcurrency: 3    # Reporting can run 3 at a time
+      - name: "global-queue"
+        maxConcurrency: 10   # Shared queue for all DAGs by default
+
+**Manual Queue Management:**
+
+.. code-block:: sh
+
+  # Enqueue a DAG run with custom run ID
+  dagu enqueue batch-job.yaml --run-id=batch-2024-01-15
+  
+  # Enqueue with parameters
+  dagu enqueue process.yaml -- INPUT=/data/file.csv OUTPUT=/results/
+  
+  # Remove from queue
+  dagu dequeue --dag-run=batch-job:batch-2024-01-15

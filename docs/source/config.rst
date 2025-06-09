@@ -47,6 +47,10 @@ Authentication
 - ``DAGU_AUTH_BASIC_PASSWORD`` (``""``): Basic auth password
 - ``DAGU_AUTH_TOKEN`` (``""``): API token value
 
+Queue System
+~~~~~~~~~~~
+- ``DAGU_QUEUE_ENABLED`` (``true``): Enable/disable the queue system
+
 UI Customization
 ~~~~~~~~~~~~~~
 - ``DAGU_UI_NAVBAR_COLOR`` (``""``): Navigation bar color (e.g., ``red`` or ``#ff0000``)
@@ -75,6 +79,17 @@ Create ``config.yaml`` in ``~/.config/dagu/`` to override default settings. Belo
     dataDir: "~/.local/share/dagu/history"    # Application data location
     suspendFlagsDir: "~/.config/dagu/suspend" # DAG suspend flags location
     adminLogsDir: "~/.local/share/admin"      # Admin logs location
+
+    # Queue Configuration
+    queues:
+      enabled: true    # Enable/disable the queue system (default: true)
+      config:          # Named queue configurations
+        - name: "critical"
+          maxConcurrency: 3
+        - name: "batch"
+          maxConcurrency: 1
+        - name: "default"
+          maxConcurrency: 2
 
     # Common Configuration for all DAGs
     baseConfig: "~/.config/dagu/base.yaml"  # Base DAG config

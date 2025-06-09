@@ -31,6 +31,12 @@ The following commands are available for interacting with Dagu:
   # Dry-runs the DAG
   dagu dry <file> [-- <key>=<value> ...]
   
+  # Enqueues a DAG-run to the queue
+  dagu enqueue <file> [--run-id=<run-id>] [-- <key>=<value> ...]
+  
+  # Dequeues a DAG-run from the queue
+  dagu dequeue --dag-run=<dag-name>:<run-id>
+  
   # Launches both the web UI server and scheduler process
   dagu start-all [--host=<host>] [--port=<port>] [--dags=<path to directory>]
   

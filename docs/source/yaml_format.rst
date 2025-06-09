@@ -516,6 +516,59 @@ Example timeline:
 - At 06:00: Schedule trigger → Skips (already succeeded since 04:00)
 - At 08:00: Schedule trigger → Runs (new schedule window)
 
+Queue Management
+~~~~~~~~~~~~~~~
+Control concurrent DAG execution with queue configuration:
+
+.. code-block:: yaml
+
+  name: batch-job
+  queue: "batch"        # Assign to a named queue (default: DAG name)
+  maxActiveRuns: 2      # Max concurrent runs for this DAG (default: 1)
+  steps:
+    - name: process
+      command: process_data.sh
+
+**Queue Features:**
+
+- **Named Queues**: Assign DAGs to specific queues for better resource management
+- **Concurrency Control**: Set ``maxActiveRuns`` to control how many instances can run simultaneously
+- **Queue Disabling**: Set ``maxActiveRuns: -1`` to disable queueing for a specific DAG
+- **Global Configuration**: Define queue settings in the global config file
+
+**Global Queue Configuration (config.yaml):**
+
+.. code-block:: yaml
+
+  queues:
+    enabled: true       # Enable/disable queue system globally
+    config:
+      - name: "critical"
+        maxConcurrency: 5    # Allow 5 concurrent runs for critical queue
+      - name: "batch"
+        maxConcurrency: 1    # Only 1 batch job at a time
+      - name: "default"
+        maxConcurrency: 3    # Default queue settings
+
+**Queue Priority:**
+
+1. Global queue config (if queue name matches)
+2. DAG's ``maxActiveRuns`` setting
+3. Base configuration ``maxActiveRuns`` (from ``~/.config/dagu/base.yaml``)
+4. Default value (1)
+
+**Using Base Configuration for Unified Queue Management:**
+
+You can use the base configuration file to assign all DAGs to the same queue:
+
+.. code-block:: yaml
+
+  # ~/.config/dagu/base.yaml
+  queue: "global-queue"
+  maxActiveRuns: 3
+
+This ensures all DAGs share the same queue unless explicitly overridden.
+
 Retry Policies
 ~~~~~~~~~~~~
 Automatically retry failed steps with configurable error codes:
@@ -677,7 +730,8 @@ Complete list of DAG-level configuration options:
 - ``timeoutSec``: DAG timeout in seconds
 - ``delaySec``: Delay between steps
 - ``maxActiveSteps``: Maximum parallel steps (default: no limit)
-- ``maxActiveRuns``: Maximum parallel workflows (default: 1)
+- ``maxActiveRuns``: Maximum concurrent runs of this DAG (default: 1, negative values disable queueing)
+- ``queue``: Queue name for this DAG (default: DAG name)
 - ``params``: Default parameters
 - ``precondition``: DAG-level conditions
 - ``mailOn``: Email notification settings
@@ -788,7 +842,30 @@ Example step configuration:
 Global Configuration
 ------------------
 Common settings can be shared using ``$HOME/.config/dagu/base.yaml``. This is useful for setting default values for:
-- ``logDir``
-- ``env``
+- ``queue`` - Assign all DAGs to the same queue by default
+- ``maxActiveRuns`` - Default concurrent execution limit
+- ``logDir`` - Default log directory
+- ``env`` - Shared environment variables
 - Email settings
 - Other organizational defaults
+
+Example base configuration for queue management:
+
+.. code-block:: yaml
+
+  # ~/.config/dagu/base.yaml
+  queue: "global-queue"    # All DAGs use this queue by default
+  maxActiveRuns: 2         # Default max concurrent runs
+  logDir: /var/log/dagu
+
+Individual DAGs can override these settings:
+
+.. code-block:: yaml
+
+  # my-critical-dag.yaml
+  name: critical-process
+  queue: "critical"        # Override to use critical queue
+  maxActiveRuns: -1        # Override to disable queueing
+  steps:
+    - name: process
+      command: critical_job.sh
