@@ -213,6 +213,11 @@
             "additionalProperties": true
           },
           "description": "Named parameters as key-value pairs, accessible as ${KEY}"
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Named parameters as key-value pairs, accessible as ${KEY}"
         }
       ],
       "description": "Default parameters that can be overridden when triggering the DAG. Can be positional (accessed as $1, $2) or named (accessed as ${KEY})."
