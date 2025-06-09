@@ -90,6 +90,32 @@ The wait time after the job is stopped before restart can be configured in the D
       - name: step1
         command: python some_app.py
 
+Queue Processing
+---------------
+
+The scheduler also manages the DAG execution queue. When a DAG is scheduled or manually enqueued, it's added to a queue system that controls concurrent execution based on configured limits.
+
+**Queue Behavior:**
+
+- DAGs are processed based on their queue assignment and concurrency limits
+- Each DAG can be assigned to a named queue (defaults to the DAG name)
+- Concurrent execution is controlled by ``maxActiveRuns`` settings
+- The queue system can be disabled globally or per-DAG
+
+**Example with Queue Control:**
+
+.. code-block:: yaml
+
+    name: batch-processor
+    schedule: "0 * * * *"   # Run every hour
+    queue: "batch"          # Use the "batch" queue
+    maxActiveRuns: 2        # Allow max 2 concurrent runs
+    steps:
+      - name: process
+        command: process_batch.sh
+
+If the queue system is disabled (``DAGU_QUEUE_ENABLED=false`` or in config), scheduled DAGs will run immediately without queue control.
+
 Run Scheduler as a Daemon
 -------------------------
 

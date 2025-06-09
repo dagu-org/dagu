@@ -90,6 +90,8 @@ type DAG struct {
 	MaxCleanUpTime time.Duration `json:"maxCleanUpTime,omitempty"`
 	// HistRetentionDays is the number of days to keep the history of dag-runs.
 	HistRetentionDays int `json:"histRetentionDays,omitempty"`
+	// Queue is the name of the queue to assign this DAG to.
+	Queue string `json:"queue,omitempty"`
 	// BuildErrors contains any errors encountered while building the DAG.
 	BuildErrors []error
 }
@@ -302,6 +304,12 @@ func (d *DAG) initializeDefaults() {
 	// Set default max cleanup time to 60 seconds if not specified.
 	if d.MaxCleanUpTime == 0 {
 		d.MaxCleanUpTime = defaultMaxCleanUpTime
+	}
+
+	// Set default max active runs to 1 only when not specified (0).
+	// MaxActiveRuns < 0 means queueing is disabled for this DAG.
+	if d.MaxActiveRuns == 0 {
+		d.MaxActiveRuns = 1
 	}
 
 	// Ensure we have a valid working directory

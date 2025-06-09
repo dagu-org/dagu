@@ -30,6 +30,9 @@ Dagu was born out of a desire to make workflow orchestration feasible in any env
 4. **Keep it Simple**  
    Workflows are defined in clear, human-readable YAML with ease of development and fast onboarding. Dagu is designed to be simple to understand and use, even for non-developers.
 
-5. **Community-Driven** 
+5. **Intelligent Queue Management**
+   Built-in queue system provides flexible concurrency control, allowing you to manage resource utilization and prevent overwhelming systems without external dependencies.
+
+6. **Community-Driven** 
    As an open-source project, developers can contribute new executors, integrate emerging technologies, or propose enhancements via GitHub. This encourages rapid iteration and keeps Dagu aligned with real-world use cases.
 

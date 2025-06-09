@@ -21,6 +21,9 @@ type Config struct {
 	// UI contains settings specific to the application's user interface.
 	UI UI
 
+	// Queues contains global queue configuration settings.
+	Queues Queues
+
 	// Warnings contains a list of warnings generated during the configuration loading process.
 	Warnings []string
 }
@@ -210,4 +213,16 @@ type RemoteNode struct {
 type TLSConfig struct {
 	CertFile string
 	KeyFile  string
+}
+
+// Queues represents the global queue configuration
+type Queues struct {
+	Enabled bool
+	Config  []QueueConfig
+}
+
+// QueueConfig represents individual queue configuration
+type QueueConfig struct {
+	Name          string
+	MaxActiveRuns int
 }
