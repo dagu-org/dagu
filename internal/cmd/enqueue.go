@@ -57,6 +57,10 @@ func runEnqueue(ctx *Context, args []string) error {
 
 // enqueueDAGRun enqueues a dag-run to the queue.
 func enqueueDAGRun(ctx *Context, dag *digraph.DAG, dagRunID string) error {
+	// Check if queues are enabled
+	if !ctx.Config.Queues.Enabled {
+		return fmt.Errorf("queues are disabled in configuration")
+	}
 	logFile, err := ctx.GenLogFileName(dag, dagRunID)
 	if err != nil {
 		return fmt.Errorf("failed to generate log file name: %w", err)

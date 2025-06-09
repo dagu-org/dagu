@@ -122,6 +122,7 @@ func build(ctx BuildContext, spec *definition) (*DAG, error) {
 		Tags:           parseTags(spec.Tags),
 		MaxActiveRuns:  spec.MaxActiveRuns,
 		MaxActiveSteps: spec.MaxActiveSteps,
+		Queue:          spec.Queue,
 	}
 
 	// For backward compatibility, set MaxActiveSteps to MaxActiveRuns

@@ -62,6 +62,8 @@ type definition struct {
 	MaxCleanUpTimeSec *int
 	// Tags is the tags for the DAG.
 	Tags any
+	// Queue is the name of the queue to assign this DAG to.
+	Queue string
 }
 
 // handlerOnDef defines the steps to be executed on different events.

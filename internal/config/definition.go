@@ -62,6 +62,9 @@ type Definition struct {
 	// such as certificate and key file paths.
 	TLS *tlsConfigDef `mapstructure:"tls"`
 
+	// Queues contains global queue configuration settings.
+	Queues *queuesDef `mapstructure:"queues"`
+
 	// ----------------------------------------------------------------------------
 	// Legacy fields for backward compatibility - Start
 	// These fields are maintained for compatibility with older configuration formats.
@@ -205,4 +208,16 @@ type remoteNodeDef struct {
 type tlsConfigDef struct {
 	CertFile string `mapstructure:"certFile"`
 	KeyFile  string `mapstructure:"keyFile"`
+}
+
+// queuesDef represents the global queue configuration
+type queuesDef struct {
+	Enabled bool               `mapstructure:"enabled"`
+	Config  []queueConfigDef   `mapstructure:"config"`
+}
+
+// queueConfigDef represents individual queue configuration
+type queueConfigDef struct {
+	Name           string `mapstructure:"name"`
+	MaxActiveRuns  int    `mapstructure:"maxActiveRuns"`
 }

@@ -211,6 +211,18 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		cfg.UI.LogEncodingCharset = def.UI.LogEncodingCharset
 	}
 
+	// Set queue configuration if provided, with default enabled=true.
+	cfg.Queues.Enabled = true // Default to enabled
+	if def.Queues != nil {
+		cfg.Queues.Enabled = def.Queues.Enabled
+		for _, queueDef := range def.Queues.Config {
+			cfg.Queues.Config = append(cfg.Queues.Config, QueueConfig{
+				Name:          queueDef.Name,
+				MaxActiveRuns: queueDef.MaxActiveRuns,
+			})
+		}
+	}
+
 	// Incorporate legacy field values, which may override existing settings.
 	l.LoadLegacyFields(&cfg, def)
 	// Load legacy environment variable overrides.
@@ -375,6 +387,9 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 
 	// Logging settings
 	viper.SetDefault("logFormat", "text")
+
+	// Queue settings
+	viper.SetDefault("queues.enabled", true)
 }
 
 // bindEnvironmentVariables binds various configuration keys to environment variables.
@@ -433,6 +448,9 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 
 	// UI customization
 	l.bindEnv("latestStatusToday", "LATEST_STATUS_TODAY")
+
+	// Queue configuration
+	l.bindEnv("queues.enabled", "QUEUE_ENABLED")
 }
 
 // bindEnv constructs the full environment variable name using the app prefix and binds it to the given key.

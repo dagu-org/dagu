@@ -90,6 +90,8 @@ type DAG struct {
 	MaxCleanUpTime time.Duration `json:"maxCleanUpTime,omitempty"`
 	// HistRetentionDays is the number of days to keep the history of dag-runs.
 	HistRetentionDays int `json:"histRetentionDays,omitempty"`
+	// Queue is the name of the queue to assign this DAG to.
+	Queue string `json:"queue,omitempty"`
 	// BuildErrors contains any errors encountered while building the DAG.
 	BuildErrors []error
 }

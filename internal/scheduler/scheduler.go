@@ -43,6 +43,7 @@ type Scheduler struct {
 	cancel       context.CancelFunc
 	lock         sync.Mutex
 	queueConfigs sync.Map
+	config       *config.Config
 }
 
 type queueConfig struct {
@@ -71,6 +72,7 @@ func New(
 		dagRunStore: drs,
 		queueStore:  qs,
 		procStore:   ps,
+		config:      cfg,
 	}
 }
 
@@ -89,19 +91,22 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to start manager: %w", err)
 	}
 
-	// Start queue reader
-	queueCh := make(chan models.QueuedItem, 1)
+	// Start queue reader only if queues are enabled
+	var qr models.QueueReader
 	var wg sync.WaitGroup
-	wg.Add(1)
+	if s.config.Queues.Enabled {
+		queueCh := make(chan models.QueuedItem, 1)
+		wg.Add(1)
 
-	go func() {
-		defer wg.Done()
-		go s.handleQueue(ctx, queueCh, done)
-	}()
+		go func() {
+			defer wg.Done()
+			go s.handleQueue(ctx, queueCh, done)
+		}()
 
-	qr := s.queueStore.Reader(ctx)
-	if err := qr.Start(ctx, queueCh); err != nil {
-		return fmt.Errorf("failed to start queue reader: %w", err)
+		qr = s.queueStore.Reader(ctx)
+		if err := qr.Start(ctx, queueCh); err != nil {
+			return fmt.Errorf("failed to start queue reader: %w", err)
+		}
 	}
 
 	// Handle OS signals for graceful shutdown
@@ -115,16 +120,22 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		defer wg.Done()
 		select {
 		case <-done:
-			qr.Stop(ctx)
+			if qr != nil {
+				qr.Stop(ctx)
+			}
 			s.Stop(ctx)
 			return
 
 		case <-sig:
-			qr.Stop(ctx)
+			if qr != nil {
+				qr.Stop(ctx)
+			}
 			s.Stop(ctx)
 
 		case <-ctx.Done():
-			qr.Stop(ctx)
+			if qr != nil {
+				qr.Stop(ctx)
+			}
 			s.Stop(ctx)
 
 		}
@@ -160,6 +171,8 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				err       error
 				result    = models.QueuedItemProcessingResultRetry
 				startedAt time.Time
+				queueName string
+				queueCfg  queueConfig
 			)
 
 			alive, err := s.procStore.CountAlive(ctx, data.Name)
@@ -168,12 +181,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				goto SEND_RESULT
 			}
 
-			if alive >= s.getQueueConfig(data.Name).MaxConcurrency {
-				// If there are alive processes, skip this item
-				goto SEND_RESULT
-			}
-
-			// Fetch the DAG of the dag-run attempt
+			// Fetch the DAG of the dag-run attempt first to get queue configuration
 			attempt, err = s.dagRunStore.FindAttempt(ctx, data)
 			if err != nil {
 				result = models.QueuedItemProcessingResultInvalid
@@ -196,6 +204,16 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			dag, err = attempt.ReadDAG(ctx)
 			if err != nil {
 				logger.Error(ctx, "Failed to read dag", "err", err, "data", data)
+				goto SEND_RESULT
+			}
+
+			// Determine the queue name for this DAG
+			queueName = s.getQueueNameForDAG(dag)
+			
+			// Check concurrency limits based on queue configuration
+			queueCfg = s.getQueueConfigByName(queueName, dag)
+			if alive >= queueCfg.MaxConcurrency {
+				logger.Info(ctx, "Queue concurrency limit reached", "queue", queueName, "limit", queueCfg.MaxConcurrency, "alive", alive)
 				goto SEND_RESULT
 			}
 
@@ -250,19 +268,33 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 	}
 }
 
-// SetQueueConfig sets the queue configuration for a specific queue.
-func (s *Scheduler) getQueueConfig(name string) queueConfig {
-	cfg, ok := s.queueConfigs.Load(name)
-	if !ok {
-		return queueConfig{MaxConcurrency: 1}
+
+// getQueueNameForDAG determines the queue name for a given DAG.
+// It returns the DAG's explicitly assigned queue name, or the DAG name if none is specified.
+func (s *Scheduler) getQueueNameForDAG(dag *digraph.DAG) string {
+	if dag.Queue != "" {
+		return dag.Queue
+	}
+	return dag.Name
+}
+
+// getQueueConfigByName gets the queue configuration by queue name.
+// It checks global queue configurations first, then falls back to DAG's maxActiveRuns.
+func (s *Scheduler) getQueueConfigByName(queueName string, dag *digraph.DAG) queueConfig {
+	// Check global queue configurations
+	for _, queueCfg := range s.config.Queues.Config {
+		if queueCfg.Name == queueName {
+			return queueConfig{MaxConcurrency: max(queueCfg.MaxActiveRuns, 1)}
+		}
 	}
 
-	queueCfg, ok := cfg.(queueConfig)
-	if !ok {
-		return queueConfig{MaxConcurrency: 1}
+	// Fallback to DAG's maxActiveRuns if no global queue config is found
+	if dag.MaxActiveRuns > 0 {
+		return queueConfig{MaxConcurrency: dag.MaxActiveRuns}
 	}
 
-	return queueCfg
+	// Default configuration if no specific queue config or DAG setting is found
+	return queueConfig{MaxConcurrency: 1}
 }
 
 // start starts the scheduler.

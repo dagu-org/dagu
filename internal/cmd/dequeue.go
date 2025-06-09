@@ -37,6 +37,10 @@ func runDequeue(ctx *Context, _ []string) error {
 
 // dequeueDAGRun dequeues a dag-run from the queue.
 func dequeueDAGRun(ctx *Context, dagRun digraph.DAGRunRef) error {
+	// Check if queues are enabled
+	if !ctx.Config.Queues.Enabled {
+		return fmt.Errorf("queues are disabled in configuration")
+	}
 	attempt, err := ctx.DAGRunStore.FindAttempt(ctx, dagRun)
 	if err != nil {
 		return fmt.Errorf("failed to find the record for dag-run ID %s: %w", dagRun.ID, err)
