@@ -56,6 +56,12 @@
       ],
       "description": "Tags for categorizing and searching DAGs. Useful for filtering and organizing DAGs."
     },
+    "type": {
+      "type": "string",
+      "enum": ["graph", "chain", "agent"],
+      "default": "chain",
+      "description": "Execution type for steps. 'chain' (default) executes steps sequentially in the order they are defined, with each step automatically depending on the previous one. 'graph' uses dependency-based execution where steps run based on their 'depends' field. 'agent' is reserved for future agent-based execution."
+    },
     "env": {
       "oneOf": [
         {
@@ -206,6 +212,11 @@
             "type": "object",
             "additionalProperties": true
           },
+          "description": "Named parameters as key-value pairs, accessible as ${KEY}"
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
           "description": "Named parameters as key-value pairs, accessible as ${KEY}"
         }
       ],

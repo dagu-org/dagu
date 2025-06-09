@@ -101,6 +101,52 @@ func TestBuild(t *testing.T) {
 		th := testLoad(t, "max_cleanup_time.yaml")
 		assert.Equal(t, time.Duration(10*time.Second), th.MaxCleanUpTime)
 	})
+	t.Run("ChainTypeBasic", func(t *testing.T) {
+		th := testLoad(t, "chain_basic.yaml")
+		assert.Equal(t, digraph.TypeChain, th.Type)
+		
+		// Check that implicit dependencies were added
+		assert.Len(t, th.Steps, 4)
+		assert.Empty(t, th.Steps[0].Depends) // First step has no dependencies
+		assert.Equal(t, []string{"step1"}, th.Steps[1].Depends)
+		assert.Equal(t, []string{"step2"}, th.Steps[2].Depends)
+		assert.Equal(t, []string{"step3"}, th.Steps[3].Depends)
+	})
+	t.Run("ChainTypeWithExplicitDepends", func(t *testing.T) {
+		th := testLoad(t, "chain_with_explicit_depends.yaml")
+		assert.Equal(t, digraph.TypeChain, th.Type)
+		
+		// Check dependencies
+		assert.Len(t, th.Steps, 5)
+		assert.Empty(t, th.Steps[0].Depends) // setup
+		assert.Equal(t, []string{"setup"}, th.Steps[1].Depends) // download-a
+		assert.Equal(t, []string{"download-a"}, th.Steps[2].Depends) // download-b
+		// process-both should keep its explicit dependencies
+		assert.ElementsMatch(t, []string{"download-a", "download-b"}, th.Steps[3].Depends)
+		assert.Equal(t, []string{"process-both"}, th.Steps[4].Depends) // cleanup
+	})
+	t.Run("InvalidType", func(t *testing.T) {
+		// Test will fail with an error containing "invalid type"
+		data := test.ReadTestdata(t, filepath.Join("digraph", "invalid_type.yaml"))
+		_, err := digraph.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid type")
+	})
+	t.Run("DefaultTypeIsChain", func(t *testing.T) {
+		th := testLoad(t, "valid_command.yaml")
+		assert.Equal(t, digraph.TypeChain, th.Type)
+	})
+	t.Run("ChainTypeWithNoDependencies", func(t *testing.T) {
+		th := testLoad(t, "chain_no_dependencies.yaml")
+		assert.Equal(t, digraph.TypeChain, th.Type)
+		
+		// Check dependencies
+		assert.Len(t, th.Steps, 4)
+		assert.Empty(t, th.Steps[0].Depends) // step1
+		assert.Equal(t, []string{"step1"}, th.Steps[1].Depends) // step2
+		assert.Empty(t, th.Steps[2].Depends) // step3 - explicitly no deps
+		assert.Equal(t, []string{"step3"}, th.Steps[3].Depends) // step4 should depend on step3
+	})
 	t.Run("Preconditions", func(t *testing.T) {
 		th := testLoad(t, "preconditions.yaml")
 		assert.Len(t, th.Preconditions, 1)

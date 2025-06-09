@@ -10,6 +10,11 @@ type definition struct {
 	Group string
 	// Description is the description of the DAG.
 	Description string
+	// Type is the execution type for steps (graph, chain, or agent).
+	// Default is "graph" which uses dependency-based execution.
+	// "chain" executes steps in the order they are defined.
+	// "agent" is reserved for future agent-based execution.
+	Type string
 	// Dotenv is the path to the dotenv file (string or []string).
 	Dotenv any
 	// Schedule is the cron schedule to run the DAG.

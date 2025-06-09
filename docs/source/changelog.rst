@@ -22,8 +22,6 @@ v1.16.0 (2025-01-09)
         output: SUB_RESULT
       - name: use output
         command: echo "The result is ${SUB_RESULT.outputs.finalValue}"
-        depends:
-          - sub workflow
 
   If ``SUB_RESULT`` contains:
   
@@ -155,7 +153,6 @@ v1.16.0 (2025-01-09)
       command: some_command
     - name: some_step2
       command: some_other_command
-      depends: some_step1
 
 - **Support for environment variables in the most of the fields**: You can now use environment variables in most of the fields in the DAG configuration file.
 - **Bugfix**: Fixed the issue where the DAG can't be edited when the DAG name contains ``.``.

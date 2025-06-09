@@ -1,0 +1,21 @@
+name: chain-explicit-depends-test
+type: chain
+
+steps:
+  - name: setup
+    command: ./setup.sh
+  
+  - name: download-a
+    command: wget fileA
+  
+  - name: download-b
+    command: wget fileB
+  
+  - name: process-both
+    command: process.py fileA fileB
+    depends:  # Override chain to depend on both downloads
+      - download-a
+      - download-b
+  
+  - name: cleanup
+    command: rm -f fileA fileB

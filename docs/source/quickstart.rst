@@ -72,13 +72,9 @@ Go to the ``SPEC`` Tab and hit the ``Edit`` button. Copy & Paste the following Y
         command: |
           echo "$raw_output" | grep '^DATA:' | sed 's/^DATA: //'
         output: cleaned_data
-        depends:
-          - Simulate unclean Command Output
 
       - name: Done
         command: echo Done!
-        depends:
-          - Hello world
 
 4. Execute the DAG
 -------------------

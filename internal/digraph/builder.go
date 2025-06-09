@@ -64,6 +64,7 @@ var builderRegistry = []builderEntry{
 	{metadata: true, name: "skipIfSuccessful", fn: skipIfSuccessful},
 	{metadata: true, name: "params", fn: buildParams},
 	{metadata: true, name: "name", fn: buildName},
+	{metadata: true, name: "type", fn: buildType},
 	{name: "dotenv", fn: buildDotenv},
 	{name: "mailOn", fn: buildMailOn},
 	{name: "steps", fn: buildSteps},
@@ -114,6 +115,7 @@ func build(ctx BuildContext, spec *definition) (*DAG, error) {
 		Name:           spec.Name,
 		Group:          spec.Group,
 		Description:    spec.Description,
+		Type:           spec.Type,
 		Timeout:        time.Second * time.Duration(spec.TimeoutSec),
 		Delay:          time.Second * time.Duration(spec.DelaySec),
 		RestartWait:    time.Second * time.Duration(spec.RestartWaitSec),
@@ -334,6 +336,25 @@ func buildName(ctx BuildContext, spec *definition, dag *DAG) error {
 	return nil
 }
 
+// buildType validates and sets the execution type for the DAG
+func buildType(_ BuildContext, spec *definition, dag *DAG) error {
+	// Set default if not specified
+	if dag.Type == "" {
+		dag.Type = TypeChain
+	}
+
+	// Validate the type
+	switch dag.Type {
+	case TypeGraph, TypeChain:
+		// Valid types
+		return nil
+	case TypeAgent:
+		return wrapError("type", dag.Type, fmt.Errorf("agent type is not yet implemented"))
+	default:
+		return wrapError("type", dag.Type, fmt.Errorf("invalid type: %s (must be one of: graph, chain, agent)", dag.Type))
+	}
+}
+
 // regexName is a regular expression that matches valid names.
 // It allows alphanumeric characters, underscores, hyphens, and dots.
 var regexName = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
@@ -520,6 +541,9 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 			dag.Steps = append(dag.Steps, *step)
 		}
 
+		// Inject chain dependencies if type is chain
+		injectChainDependencies(dag)
+
 		return nil
 
 	case map[string]any:
@@ -539,6 +563,9 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 			}
 			dag.Steps = append(dag.Steps, *step)
 		}
+
+		// Inject chain dependencies if type is chain
+		injectChainDependencies(dag)
 
 		return nil
 
@@ -859,6 +886,11 @@ func buildDepends(_ BuildContext, def stepDef, step *Step) error {
 	}
 	step.Depends = deps
 
+	// Check if depends was explicitly set to empty array
+	if def.Depends != nil && len(deps) == 0 {
+		step.ExplicitlyNoDeps = true
+	}
+
 	return nil
 }
 
@@ -1114,4 +1146,29 @@ func parseParallelItems(items []any) ([]ParallelItem, error) {
 	}
 
 	return result, nil
+}
+
+// injectChainDependencies adds implicit dependencies for chain type execution
+func injectChainDependencies(dag *DAG) {
+	// Only inject dependencies for chain type
+	if dag.Type != TypeChain {
+		return
+	}
+
+	// Need at least 2 steps to create a chain
+	if len(dag.Steps) < 2 {
+		return
+	}
+
+	// For each step starting from the second one
+	for i := 1; i < len(dag.Steps); i++ {
+		step := &dag.Steps[i]
+		prevStep := &dag.Steps[i-1]
+
+		// Only add implicit dependency if the step doesn't already have dependencies
+		// and wasn't explicitly set to have no dependencies
+		if len(step.Depends) == 0 && !step.ExplicitlyNoDeps {
+			step.Depends = []string{prevStep.Name}
+		}
+	}
 }

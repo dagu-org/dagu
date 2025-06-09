@@ -27,7 +27,6 @@ Hello World
       command: echo Hello $NAME
     - name: Done
       command: echo Done!
-      depends: Hello world
 
 Using pipes (``|``) in commands:
 
@@ -86,6 +85,87 @@ Define steps as map:
       depends:
         - step1
         - step2
+
+Execution Types
+~~~~~~~~~~~~~~~
+
+Dagu supports different execution types that control how steps are executed:
+
+**Chain Type (Default)**
+
+The default execution type where steps execute sequentially in the order they are defined. Each step automatically depends on the previous one:
+
+.. code-block:: yaml
+
+  # type: chain  # Optional, this is now the default
+  steps:
+    - name: download
+      command: wget https://example.com/data.csv
+    - name: process
+      command: python process.py  # Automatically depends on "download"
+    - name: upload
+      command: aws s3 cp output.csv s3://bucket/  # Automatically depends on "process"
+
+**Graph Type**
+
+Explicit dependency-based execution where steps run based on their ``depends`` field:
+
+.. code-block:: yaml
+
+  type: graph
+  steps:
+    - name: step1
+      command: echo "First"
+    - name: step2
+      command: echo "Second"
+      depends: step1  # Explicit dependency required
+    - name: step3
+      command: echo "Third"
+      depends: step2
+
+**Overriding Chain Dependencies**
+
+You can still use explicit ``depends`` in chain type to override the automatic dependencies:
+
+.. code-block:: yaml
+
+  type: chain
+  steps:
+    - name: setup
+      command: ./setup.sh
+    - name: download-a
+      command: wget fileA
+    - name: download-b
+      command: wget fileB
+    - name: process-both
+      command: process.py fileA fileB
+      depends:  # Override chain to depend on both downloads
+        - download-a
+        - download-b
+    - name: cleanup
+      command: rm -f fileA fileB  # Back to chain: depends on "process-both"
+
+**Running Steps Without Dependencies in Chain Mode**
+
+To run a step without any dependencies (even in chain mode), explicitly set ``depends`` to an empty array:
+
+.. code-block:: yaml
+
+  type: chain
+  steps:
+    - name: step1
+      command: echo "First"
+    - name: step2
+      command: echo "Second - depends on step1"
+    - name: step3
+      command: echo "Third - runs independently"
+      depends: []  # Explicitly no dependencies
+    - name: step4
+      command: echo "Fourth - depends on step3"
+
+**Agent Type**
+
+Reserved for future agent-based execution (not yet implemented).
 
 Schema Definition
 ~~~~~~~~~~~~~~~~
@@ -239,8 +319,6 @@ Examples:
       output: SUB_RESULT
     - name: use output
       command: echo "The result is ${SUB_RESULT.outputs.finalValue}"
-      depends:
-        - sub workflow
 
 If ``SUB_RESULT`` contains:
 
@@ -420,12 +498,8 @@ Prevent unnecessary executions:
         command: extract_data.sh
       - name: transform
         command: transform_data.sh
-        depends:
-          - extract
       - name: load
         command: load_data.sh
-        depends:
-          - transform
 
 When ``skipIfSuccessful`` is ``true``, Dagu checks if there's already been a successful run since the last scheduled time. If yes, it skips the execution. This is useful for:
 
@@ -522,8 +596,6 @@ You can access the output of the sub workflow using the `output` field:
 
     - name: use sub workflow output
       command: echo $SUB_RESULT
-      depends:
-        - sub workflow
 
 .. note::
    For executing the same child DAG multiple times with different parameters in parallel, see :ref:`Parallel Execution`.
@@ -593,6 +665,7 @@ Complete list of DAG-level configuration options:
 
 - ``name``: The name of the DAG (optional, defaults to filename)
 - ``description``: Brief description of the DAG
+- ``type``: Execution type - ``chain`` (default), ``graph``, or ``agent``
 - ``schedule``: Cron expression for scheduling
 - ``skipIfSuccessful``: Skip if already succeeded since last schedule time (default: false)
 - ``group``: Optional grouping for organization

@@ -317,13 +317,9 @@ steps:
     command: |
       echo "$raw_output" | grep '^DATA:' | sed 's/^DATA: //'
     output: cleaned_data
-    depends:
-      - simulate_unclean_command_output
 
   - name: Done
     command: echo Done!
-    depends:
-      - hello_world
 ```
 
 ### 4. Execute the DAG
@@ -383,10 +379,9 @@ params:
 steps:
   - name: Hello world
     command: echo Hello $NAME
+
   - name: Done
     command: echo Done!
-    depends:
-      - Hello world
 ```
 
 Using a pipe:
@@ -419,9 +414,9 @@ params:
 steps:
   - name: Hello world
     command: echo Hello $NAME
+
   - name: Done
     command: echo Done!
-    depends: Hello world
 ```
 
 Run the DAG with custom parameters:
@@ -455,8 +450,6 @@ steps:
 
       print(f"Processing {input_file} -> {output_file} with timeout {timeout}s")
       # Add your processing logic here
-    depends:
-      - Installation
 ```
 
 Run the DAG with custom parameters:
@@ -513,7 +506,6 @@ steps:
       tar -czf archive.tar.gz *.log
       
       echo "Cleanup complete"
-    depends: data analysis
 ```
 
 ### Variable Passing
@@ -529,7 +521,6 @@ steps:
 
   - name: use id
     command: echo "Processing request ${REQUEST_ID}"
-    depends: generate id
 
 # Capture JSON output
 steps:
@@ -540,7 +531,6 @@ steps:
 
   - name: start server
     command: echo "Starting server at ${CONFIG.host}:${CONFIG.port}"
-    depends: get config
 ```
 
 ### Scheduling
@@ -589,9 +579,9 @@ steps:
   - name: run_sub-dag
     run: sub-dag
     output: OUT
+
   - name: use output
     command: echo ${OUT.outputs.result}
-    depends: run_sub-dag
 ```
 
 And here is the sub-DAG:
@@ -623,7 +613,6 @@ steps:
     parallel: ${FILES}
     params:
       - FILE_NAME: ${ITEM}  # Each item in FILES will be passed as FILE_NAME
-    depends: get files
 ```
 
 Parallel execution with object arrays and concurrency control:
@@ -645,7 +634,6 @@ steps:
       items: ${CONFIGS}
       maxConcurrent: 2  # Process only 2 regions at a time
     params: REGION=${ITEM.region}, BUCKET=${ITEM.bucket}
-    depends: get configs
 ```
 
 Static parallel execution with error handling:
@@ -806,8 +794,6 @@ steps:
         message: |
           Process completed successfully.
           Response: ${API_RESPONSE}
-
-    depends: fetch data
 ```
 
 ### Execute commands over SSH

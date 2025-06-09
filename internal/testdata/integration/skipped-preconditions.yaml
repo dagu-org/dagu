@@ -1,3 +1,4 @@
+type: graph  # Use graph mode to avoid implicit dependencies
 steps:
   - name: run-step
     command: echo "executed"

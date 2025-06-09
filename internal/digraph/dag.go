@@ -19,6 +19,16 @@ const (
 	defaultMaxCleanUpTime      = 60 * time.Second
 )
 
+// Execution type constants
+const (
+	// TypeGraph is the default execution type using dependency-based execution
+	TypeGraph = "graph"
+	// TypeChain executes steps sequentially in the order they are defined
+	TypeChain = "chain"
+	// TypeAgent is reserved for future agent-based execution
+	TypeAgent = "agent"
+)
+
 // DAG contains all information about a DAG.
 type DAG struct {
 	// Location is the absolute path to the DAG file.
@@ -27,6 +37,8 @@ type DAG struct {
 	Group string `json:"group,omitempty"`
 	// Name is the name of the DAG. The default is the filename without the extension.
 	Name string `json:"name,omitempty"`
+	// Type is the execution type (graph, chain, or agent). Default is graph.
+	Type string `json:"type,omitempty"`
 	// Dotenv is the path to the dotenv file. This is optional.
 	Dotenv []string `json:"dotenv,omitempty"`
 	// Tags contains the list of tags for the DAG. This is optional.
@@ -275,6 +287,11 @@ func (d *DAG) initializeDefaults() {
 	// Set the name if not set.
 	if d.Name == "" {
 		d.Name = defaultName(d.Location)
+	}
+
+	// Set default type to chain if not specified.
+	if d.Type == "" {
+		d.Type = TypeChain
 	}
 
 	// Set default history retention days to 30 if not specified.
