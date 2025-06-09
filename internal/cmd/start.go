@@ -11,7 +11,6 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
@@ -93,21 +92,6 @@ func runStart(ctx *Context, args []string) error {
 	// check no-queue flag
 	if ctx.Command.Flags().Changed("no-queue") {
 		disabledQueue = true
-	}
-
-	// Check if progress display will be enabled to suppress logger output early
-	progressWillBeEnabled := !ctx.Quiet && os.Getenv("DISABLE_PROGRESS") == "" && isTerminal(os.Stderr)
-	if progressWillBeEnabled {
-		// Temporarily suppress stderr logging to prevent flicker before DAG execution
-		var opts []logger.Option
-		if ctx.Config.Global.Debug {
-			opts = append(opts, logger.WithDebug())
-		}
-		opts = append(opts, logger.WithQuiet()) // Suppress stderr output
-		if ctx.Config.Global.LogFormat != "" {
-			opts = append(opts, logger.WithFormat(ctx.Config.Global.LogFormat))
-		}
-		ctx.Context = logger.WithLogger(ctx.Context, logger.NewLogger(opts...))
 	}
 
 	// Log root dag-run
@@ -225,21 +209,6 @@ func determineRootDAGRun(isChildDAGRun bool, rootDAGRun string, dag *digraph.DAG
 
 // handleChildDAGRun processes a child dag-run, checking for previous runs
 func handleChildDAGRun(ctx *Context, dag *digraph.DAG, dagRunID string, params string, root digraph.DAGRunRef, parent digraph.DAGRunRef) error {
-	// Check if progress display will be enabled to suppress logger output early
-	progressWillBeEnabled := !ctx.Quiet && os.Getenv("DISABLE_PROGRESS") == "" && isTerminal(os.Stderr)
-	if progressWillBeEnabled {
-		// Temporarily suppress stderr logging to prevent flicker before DAG execution
-		var opts []logger.Option
-		if ctx.Config.Global.Debug {
-			opts = append(opts, logger.WithDebug())
-		}
-		opts = append(opts, logger.WithQuiet()) // Suppress stderr output
-		if ctx.Config.Global.LogFormat != "" {
-			opts = append(opts, logger.WithFormat(ctx.Config.Global.LogFormat))
-		}
-		ctx.Context = logger.WithLogger(ctx.Context, logger.NewLogger(opts...))
-	}
-
 	// Log child dag-run execution
 	logger.Info(ctx, "Executing child dag-run",
 		"dag", dag.Name,
@@ -289,31 +258,6 @@ func executeDAGRun(ctx *Context, d *digraph.DAG, parent digraph.DAGRunRef, dagRu
 		_ = logFile.Close()
 	}()
 
-	// Check if we should enable progress display
-	// Enable only for TTY and when not in quiet mode
-	enableProgress := !ctx.Quiet && os.Getenv("DISABLE_PROGRESS") == "" && isTerminal(os.Stderr)
-
-	// Configure logging to the file
-	// If progress display is enabled, suppress stderr logging to prevent UI flickering
-	if enableProgress {
-		// Create a new context with quiet logging for stderr
-		var opts []logger.Option
-		if ctx.Config.Global.Debug {
-			opts = append(opts, logger.WithDebug())
-		}
-		opts = append(opts, logger.WithQuiet()) // Suppress stderr output
-		if ctx.Config.Global.LogFormat != "" {
-			opts = append(opts, logger.WithFormat(ctx.Config.Global.LogFormat))
-		}
-		if logFile != nil {
-			opts = append(opts, logger.WithWriter(logFile))
-		}
-		ctx.Context = logger.WithLogger(ctx.Context, logger.NewLogger(opts...))
-	} else {
-		// Normal logging configuration
-		ctx.LogToFile(logFile)
-	}
-
 	logger.Debug(ctx, "dag-run initiated", "DAG", d.Name, "dagRunId", dagRunID, "logFile", logFile.Name())
 
 	// Initialize DAG repository with the DAG's directory in the search path
@@ -335,34 +279,10 @@ func executeDAGRun(ctx *Context, d *digraph.DAG, parent digraph.DAGRunRef, dagRu
 		root,
 		agent.Options{
 			ParentDAGRun:    parent,
-			ProgressDisplay: enableProgress,
+			ProgressDisplay: shouldEnableProgress(ctx),
 		},
 	)
 
-	// Set up signal handling for the agent
-	listenSignals(ctx, agentInstance)
-
-	// Run the DAG
-	if err := agentInstance.Run(ctx); err != nil {
-		logger.Error(ctx, "Failed to execute dag-run", "dag", d.Name, "dagRunId", dagRunID, "err", err)
-
-		if ctx.Quiet {
-			os.Exit(1)
-		} else {
-			agentInstance.PrintSummary(ctx)
-			return fmt.Errorf("failed to execute the dag-run %s (dag-run ID: %s): %w", d.Name, dagRunID, err)
-		}
-	}
-
-	// Print the summary of the execution if the quiet flag is not set
-	if !ctx.Quiet {
-		agentInstance.PrintSummary(ctx)
-	}
-
-	return nil
-}
-
-// isTerminal checks if the given file is a terminal
-func isTerminal(f *os.File) bool {
-	return term.IsTerminal(int(f.Fd()))
+	// Use the shared agent execution function
+	return ExecuteAgent(ctx, agentInstance, d, dagRunID, logFile)
 }

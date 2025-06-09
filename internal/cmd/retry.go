@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/dagu-org/dagu/internal/agent"
@@ -78,9 +77,6 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.DAGRunStatus, r
 
 	logger.Info(ctx, "dag-run retry initiated", "DAG", dag.Name, "dagRunId", status.DAGRunID, "logFile", logFile.Name())
 
-	// Update the context with the log file
-	ctx.LogToFile(logFile)
-
 	dr, err := ctx.dagStore(nil, []string{filepath.Dir(dag.Location)})
 	if err != nil {
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
@@ -97,26 +93,12 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.DAGRunStatus, r
 		ctx.ProcStore,
 		rootRun,
 		agent.Options{
-			RetryTarget:  status,
-			ParentDAGRun: status.Parent,
+			RetryTarget:     status,
+			ParentDAGRun:    status.Parent,
+			ProgressDisplay: shouldEnableProgress(ctx),
 		},
 	)
 
-	listenSignals(ctx, agentInstance)
-
-	if err := agentInstance.Run(ctx); err != nil {
-		if ctx.Quiet {
-			os.Exit(1)
-		} else {
-			agentInstance.PrintSummary(ctx)
-			return fmt.Errorf("failed to execute the DAG %s (dag-run ID: %s): %w", dag.Name, status.DAGRunID, err)
-		}
-	}
-
-	// Print the summary of the execution if the quiet flag is not set.
-	if !ctx.Quiet {
-		agentInstance.PrintSummary(ctx)
-	}
-
-	return nil
+	// Use the shared agent execution function
+	return ExecuteAgent(ctx, agentInstance, dag, status.DAGRunID, logFile)
 }
