@@ -162,7 +162,12 @@
     },
     "maxActiveRuns": {
       "type": "integer",
-      "description": "Maximum number of concurrent DAG runs allowed. Useful for limiting resource usage and preventing overload. If exceeded, new runs will be queued until existing ones complete."
+      "default": 1,
+      "description": "Maximum number of concurrent DAG runs allowed. Useful for limiting resource usage and preventing overload. If exceeded, new runs will be queued until existing ones complete. Defaults to 1. Set to -1 to disable queueing for this DAG."
+    },
+    "queue": {
+      "type": "string",
+      "description": "Name of the queue to assign this DAG to. If not specified, defaults to the DAG name. Used with global queue configuration to control concurrent execution across multiple DAGs."
     },
     "maxActiveSteps": {
       "type": "integer",
