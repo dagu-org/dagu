@@ -104,7 +104,6 @@ Reference output from previous steps:
       - name: process-servers
         run: server-maintenance
         parallel: ${SERVER_LIST}
-        depends: get-items
 
 Dynamic File Discovery
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -124,7 +123,6 @@ A common pattern is discovering files dynamically and processing them in paralle
         params:
           - INPUT_FILE: ${ITEM}
           - FORMAT: csv
-        depends: find-csv-files
 
 .. note::
    When the output is newline-separated (like from ``find``), Dagu automatically splits it into an array for parallel processing.
@@ -213,7 +211,6 @@ You can combine the ``$ITEM`` variable with other parameters to create more comp
           - BACKUP_PATH: /backups/${ITEM}/$(date +%Y%m%d)
           - RETENTION_DAYS: 30
           - COMPRESSION: gzip
-        depends: get-databases
 
 This pattern is particularly useful when you need to pass both the dynamic item and static configuration values to child DAGs.
 
@@ -305,7 +302,6 @@ Parallel execution aggregates outputs from all child DAG executions:
           echo "Results: ${RESULTS}"
           # Access specific outputs
           echo "First result: ${RESULTS.outputs[0]}"
-        depends: parallel-calc
 
 The output structure includes:
 
@@ -353,14 +349,12 @@ The ``outputs`` array provides direct access to successful execution outputs:
     steps:
       - name: use-first-output
         command: echo "First calc result: ${RESULTS.outputs[0].CALC_RESULT}"
-        depends: parallel-calc
       
       - name: use-all-outputs
         command: |
           echo "Output 0: ${RESULTS.outputs[0].CALC_RESULT}"
           echo "Output 1: ${RESULTS.outputs[1].CALC_RESULT}"
           echo "Output 2: ${RESULTS.outputs[2].CALC_RESULT}"
-        depends: parallel-calc
 
 .. note::
    Only outputs from successful executions are included in the ``outputs`` array. Failed executions are excluded.
@@ -445,7 +439,6 @@ Process multiple data sources in parallel:
           echo "Total: ${ETL_RESULTS.summary.total}"
           echo "Succeeded: ${ETL_RESULTS.summary.succeeded}"
           echo "Failed: ${ETL_RESULTS.summary.failed}"
-        depends: extract-transform
 
 Multi-Region Deployment
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -476,7 +469,6 @@ Deploy to multiple regions with different configurations:
             exit 1
           fi
           echo "All deployments successful!"
-        depends: deploy-all-regions
 
 Test Suite Execution
 ~~~~~~~~~~~~~~~~~~~~
@@ -506,7 +498,6 @@ Run tests across multiple environments:
       - name: generate-report
         command: |
           python generate_report.py --results "${TEST_RESULTS}"
-        depends: run-test-suites
 
 Limitations and Best Practices
 ------------------------------
@@ -555,7 +546,6 @@ Build complex workflows by combining parallel execution with conditional logic:
         parallel: ${ANALYSIS.critical_items}
         continueOn:
           failure: false  # Stop on any failure
-        depends: analyze-data
         preconditions:
           - condition: "${ANALYSIS.has_critical}"
             expected: "true"
@@ -565,7 +555,6 @@ Build complex workflows by combining parallel execution with conditional logic:
         parallel: ${ANALYSIS.normal_items}
         continueOn:
           failure: true  # Continue on failures
-        depends: analyze-data
 
 Nested Parallel Execution
 ~~~~~~~~~~~~~~~~~~~~~~~~~

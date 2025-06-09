@@ -27,7 +27,6 @@ Hello World
       command: echo Hello $NAME
     - name: Done
       command: echo Done!
-      depends: Hello world
 
 Using pipes (``|``) in commands:
 
@@ -320,8 +319,6 @@ Examples:
       output: SUB_RESULT
     - name: use output
       command: echo "The result is ${SUB_RESULT.outputs.finalValue}"
-      depends:
-        - sub workflow
 
 If ``SUB_RESULT`` contains:
 
@@ -501,12 +498,8 @@ Prevent unnecessary executions:
         command: extract_data.sh
       - name: transform
         command: transform_data.sh
-        depends:
-          - extract
       - name: load
         command: load_data.sh
-        depends:
-          - transform
 
 When ``skipIfSuccessful`` is ``true``, Dagu checks if there's already been a successful run since the last scheduled time. If yes, it skips the execution. This is useful for:
 
@@ -603,8 +596,6 @@ You can access the output of the sub workflow using the `output` field:
 
     - name: use sub workflow output
       command: echo $SUB_RESULT
-      depends:
-        - sub workflow
 
 .. note::
    For executing the same child DAG multiple times with different parameters in parallel, see :ref:`Parallel Execution`.

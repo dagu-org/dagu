@@ -18,8 +18,6 @@ Hello World
       command: echo Hello $NAME
     - name: Done
       command: echo Done!
-      depends:
-        - Hello world
 
 
 Conditional Steps
@@ -27,6 +25,7 @@ Conditional Steps
 
 .. code-block:: yaml
 
+  type: graph  # Use graph type for parallel execution after step1
   params: foo
   steps:
     - name: step1
@@ -72,8 +71,6 @@ Passing Output to Next Step
       command: bash
       script: |
         echo $OUT1 world
-      depends:
-        - pass 'hello'
 
 Running a Docker Container
 --------------------------
@@ -342,13 +339,11 @@ Execute the same workflow with different parameters in parallel:
       run: process-csv
       parallel: ${FILES}
       output: RESULTS
-      depends: get-files
     
     - name: summary
       command: |
         echo "Processed files:"
         echo "${RESULTS}" | jq '.summary'
-      depends: process-files-parallel
 
 Process multiple items with object parameters:
 
@@ -380,6 +375,5 @@ Process multiple items with object parameters:
           echo "Some deployments failed!"
           exit 1
         fi
-      depends: deploy-to-regions
 
 For more details on parallel execution, see :ref:`Parallel Execution`.
