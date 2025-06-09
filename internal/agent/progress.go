@@ -128,9 +128,29 @@ func (pd *ProgressDisplay) Stop() {
 		pd.ticker.Stop()
 	}
 
-	// Show cursor and move to bottom
-	fmt.Fprint(pd.writer, "\033[?25h") // Show cursor
-	fmt.Fprintf(pd.writer, "\033[%d;1H", pd.termHeight)
+	// Wait a bit to ensure the last render completes
+	time.Sleep(50 * time.Millisecond)
+
+	// Clear screen and render final state
+	fmt.Fprint(pd.writer, "\033[H\033[2J")
+	
+	// Render the final state with all content
+	pd.mu.Lock()
+	pd.renderHeader()
+	pd.renderProgressBar()
+	pd.renderCurrentlyRunning()
+	pd.renderRecentlyCompleted()
+	pd.renderQueued()
+	pd.renderChildDAGs()
+	pd.renderFooter()
+	pd.mu.Unlock()
+	
+	// Show cursor
+	fmt.Fprint(pd.writer, "\033[?25h")
+	
+	// Add extra newlines at the bottom to ensure any following
+	// output (like "exit status 1") appears below the display
+	fmt.Fprint(pd.writer, "\n\n\n\n")
 }
 
 // UpdateNode updates the progress for a specific node
@@ -197,6 +217,13 @@ func (pd *ProgressDisplay) render() {
 	pd.mu.Lock()
 	defer pd.mu.Unlock()
 
+	// Update terminal dimensions in case of resize
+	if pd.isTTY {
+		if w, h, err := term.GetSize(int(os.Stderr.Fd())); err == nil {
+			pd.termWidth, pd.termHeight = w, h
+		}
+	}
+
 	// Increment spinner
 	pd.spinnerIndex = (pd.spinnerIndex + 1) % len(pd.spinnerFrames)
 
@@ -248,6 +275,14 @@ func (pd *ProgressDisplay) renderHeader() {
 	statusPrefix := "Status: "
 	statusValuePlain := stripANSI(statusStr)
 	
+	// Truncate time part if needed to fit within available width
+	maxTimePartLen := innerWidth - utf8.RuneCountInString(statusPrefix) - 
+		utf8.RuneCountInString(statusValuePlain) - utf8.RuneCountInString(" | ") - 4
+	if maxTimePartLen < 20 && utf8.RuneCountInString(timePart) > maxTimePartLen {
+		// Just show elapsed time if space is tight
+		timePart = fmt.Sprintf("Elapsed: %s", pd.formatDuration(elapsed))
+	}
+	
 	// Calculate available space for the middle padding
 	// Use rune count for visual width instead of byte length
 	usedSpace := utf8.RuneCountInString(statusPrefix) + utf8.RuneCountInString(statusValuePlain) + 
@@ -258,6 +293,22 @@ func (pd *ProgressDisplay) renderHeader() {
 	}
 	
 	// Build the status line with calculated padding
+	// If the content is still too wide, truncate the time part
+	if usedSpace > innerWidth {
+		// Recalculate with truncated time
+		availableForTime := innerWidth - utf8.RuneCountInString(statusPrefix) - 
+			utf8.RuneCountInString(statusValuePlain) - utf8.RuneCountInString(" | ") - 5
+		if availableForTime > 0 {
+			timeRunes := []rune(timePart)
+			if len(timeRunes) > availableForTime {
+				timePart = string(timeRunes[:availableForTime-3]) + "..."
+			}
+		} else {
+			timePart = "..."
+		}
+		middlePadding = 1
+	}
+	
 	statusLine := fmt.Sprintf(" %s%s%s | %s ",
 		statusPrefix,
 		statusStr, // This includes color codes
@@ -269,7 +320,7 @@ func (pd *ProgressDisplay) renderHeader() {
 	
 	// Calculate header padding based on plain text length
 	// We need to account for the ─ after ┌ and before ┐
-	headerPadding := innerWidth - len(header) - 2
+	headerPadding := innerWidth - utf8.RuneCountInString(stripANSI(header)) - 2
 	if headerPadding < 0 {
 		headerPadding = 0
 	}
@@ -359,7 +410,14 @@ func (pd *ProgressDisplay) renderRecentlyCompleted() {
 			color.New(color.Faint).Sprint(duration))
 		
 		if np.status == scheduler.NodeStatusError && np.node.Error != "" {
-			errorMsg := pd.truncateString(np.node.Error, 40)
+			// Calculate available space for error message
+			// Account for the line content already shown
+			lineLen := 2 + 1 + 1 + 30 + 1 + len(duration) + 8 // Approximate
+			availableSpace := pd.termWidth - lineLen - 10 // Leave some margin
+			if availableSpace < 20 {
+				availableSpace = 20
+			}
+			errorMsg := pd.truncateString(np.node.Error, availableSpace)
 			line += color.RedString(" Error: %s", errorMsg)
 		}
 		
@@ -583,19 +641,25 @@ func (pd *ProgressDisplay) getNodesWithChildren() []*nodeProgress {
 
 // stripANSI removes ANSI color codes from a string
 func stripANSI(s string) string {
-	// Simple ANSI stripping - can be enhanced if needed
-	for {
-		start := strings.Index(s, "\033[")
-		if start == -1 {
-			break
+	// Remove all ANSI escape sequences
+	var result strings.Builder
+	inEscape := false
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\033' && i+1 < len(s) && s[i+1] == '[' {
+			inEscape = true
+			i++ // Skip the '['
+			continue
 		}
-		end := strings.Index(s[start:], "m")
-		if end == -1 {
-			break
+		if inEscape {
+			// Skip until we find a letter that ends the escape sequence
+			if (s[i] >= 'A' && s[i] <= 'Z') || (s[i] >= 'a' && s[i] <= 'z') {
+				inEscape = false
+			}
+			continue
 		}
-		s = s[:start] + s[start+end+1:]
+		result.WriteByte(s[i])
 	}
-	return s
+	return result.String()
 }
 
 // SetAccentColor allows customizing the main accent color
