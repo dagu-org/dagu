@@ -132,9 +132,9 @@ func TestBuild(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid type")
 	})
-	t.Run("DefaultTypeIsGraph", func(t *testing.T) {
+	t.Run("DefaultTypeIsChain", func(t *testing.T) {
 		th := testLoad(t, "valid_command.yaml")
-		assert.Equal(t, digraph.TypeGraph, th.Type)
+		assert.Equal(t, digraph.TypeChain, th.Type)
 	})
 	t.Run("Preconditions", func(t *testing.T) {
 		th := testLoad(t, "preconditions.yaml")

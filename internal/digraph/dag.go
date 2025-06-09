@@ -289,9 +289,9 @@ func (d *DAG) initializeDefaults() {
 		d.Name = defaultName(d.Location)
 	}
 
-	// Set default type to graph if not specified.
+	// Set default type to chain if not specified.
 	if d.Type == "" {
-		d.Type = TypeGraph
+		d.Type = TypeChain
 	}
 
 	// Set default history retention days to 30 if not specified.

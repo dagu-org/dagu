@@ -87,6 +87,69 @@ Define steps as map:
         - step1
         - step2
 
+Execution Types
+~~~~~~~~~~~~~~~
+
+Dagu supports different execution types that control how steps are executed:
+
+**Chain Type (Default)**
+
+The default execution type where steps execute sequentially in the order they are defined. Each step automatically depends on the previous one:
+
+.. code-block:: yaml
+
+  # type: chain  # Optional, this is now the default
+  steps:
+    - name: download
+      command: wget https://example.com/data.csv
+    - name: process
+      command: python process.py  # Automatically depends on "download"
+    - name: upload
+      command: aws s3 cp output.csv s3://bucket/  # Automatically depends on "process"
+
+**Graph Type**
+
+Explicit dependency-based execution where steps run based on their ``depends`` field:
+
+.. code-block:: yaml
+
+  type: graph
+  steps:
+    - name: step1
+      command: echo "First"
+    - name: step2
+      command: echo "Second"
+      depends: step1  # Explicit dependency required
+    - name: step3
+      command: echo "Third"
+      depends: step2
+
+**Overriding Chain Dependencies**
+
+You can still use explicit ``depends`` in chain type to override the automatic dependencies:
+
+.. code-block:: yaml
+
+  type: chain
+  steps:
+    - name: setup
+      command: ./setup.sh
+    - name: download-a
+      command: wget fileA
+    - name: download-b
+      command: wget fileB
+    - name: process-both
+      command: process.py fileA fileB
+      depends:  # Override chain to depend on both downloads
+        - download-a
+        - download-b
+    - name: cleanup
+      command: rm -f fileA fileB  # Back to chain: depends on "process-both"
+
+**Agent Type**
+
+Reserved for future agent-based execution (not yet implemented).
+
 Schema Definition
 ~~~~~~~~~~~~~~~~
 We provide a JSON schema to validate DAG files and enable IDE auto-completion:
@@ -593,6 +656,7 @@ Complete list of DAG-level configuration options:
 
 - ``name``: The name of the DAG (optional, defaults to filename)
 - ``description``: Brief description of the DAG
+- ``type``: Execution type - ``chain`` (default), ``graph``, or ``agent``
 - ``schedule``: Cron expression for scheduling
 - ``skipIfSuccessful``: Skip if already succeeded since last schedule time (default: false)
 - ``group``: Optional grouping for organization

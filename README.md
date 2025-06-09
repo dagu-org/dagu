@@ -317,13 +317,9 @@ steps:
     command: |
       echo "$raw_output" | grep '^DATA:' | sed 's/^DATA: //'
     output: cleaned_data
-    depends:
-      - simulate_unclean_command_output
 
   - name: Done
     command: echo Done!
-    depends:
-      - hello_world
 ```
 
 ### 4. Execute the DAG

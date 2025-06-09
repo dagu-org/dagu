@@ -340,7 +340,7 @@ func buildName(ctx BuildContext, spec *definition, dag *DAG) error {
 func buildType(_ BuildContext, spec *definition, dag *DAG) error {
 	// Set default if not specified
 	if dag.Type == "" {
-		dag.Type = TypeGraph
+		dag.Type = TypeChain
 	}
 
 	// Validate the type
