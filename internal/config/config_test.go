@@ -505,3 +505,117 @@ tz: "NonExistentTimezone"
 		assert.Equal(t, time.Local, cfg.Global.Location)
 	})
 }
+
+func TestLoadConfig_WithQueueConfiguration(t *testing.T) {
+	viper.Reset()
+
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	configContent := `
+queues:
+  enabled: true
+  config:
+    - name: "globalQueue"
+      maxActiveRuns: 5
+    - name: "highPriorityQueue"
+      maxActiveRuns: 2
+    - name: "lowPriorityQueue"
+      maxActiveRuns: 10
+`
+	err := os.WriteFile(configFile, []byte(configContent), 0600)
+	require.NoError(t, err)
+
+	cfg, err := config.Load(config.WithConfigFile(configFile))
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	// Verify queue configuration is loaded correctly
+	assert.True(t, cfg.Queues.Enabled)
+	assert.Len(t, cfg.Queues.Config, 3)
+
+	// Check specific queue configurations
+	globalQueue := cfg.Queues.Config[0]
+	assert.Equal(t, "globalQueue", globalQueue.Name)
+	assert.Equal(t, 5, globalQueue.MaxActiveRuns)
+
+	highPriorityQueue := cfg.Queues.Config[1]
+	assert.Equal(t, "highPriorityQueue", highPriorityQueue.Name)
+	assert.Equal(t, 2, highPriorityQueue.MaxActiveRuns)
+
+	lowPriorityQueue := cfg.Queues.Config[2]
+	assert.Equal(t, "lowPriorityQueue", lowPriorityQueue.Name)
+	assert.Equal(t, 10, lowPriorityQueue.MaxActiveRuns)
+}
+
+func TestLoadConfig_WithQueueDisabled(t *testing.T) {
+	viper.Reset()
+
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	configContent := `
+queues:
+  enabled: false
+  config:
+    - name: "testQueue"
+      maxActiveRuns: 3
+`
+	err := os.WriteFile(configFile, []byte(configContent), 0600)
+	require.NoError(t, err)
+
+	cfg, err := config.Load(config.WithConfigFile(configFile))
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	// Verify queue is disabled but config is still loaded
+	assert.False(t, cfg.Queues.Enabled)
+	assert.Len(t, cfg.Queues.Config, 1)
+	assert.Equal(t, "testQueue", cfg.Queues.Config[0].Name)
+	assert.Equal(t, 3, cfg.Queues.Config[0].MaxActiveRuns)
+}
+
+func TestLoadConfig_DefaultQueueConfiguration(t *testing.T) {
+	viper.Reset()
+
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	configContent := `
+# No queue configuration specified
+debug: true
+`
+	err := os.WriteFile(configFile, []byte(configContent), 0600)
+	require.NoError(t, err)
+
+	cfg, err := config.Load(config.WithConfigFile(configFile))
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	// Verify default queue configuration
+	assert.True(t, cfg.Queues.Enabled) // Should default to enabled
+	assert.Len(t, cfg.Queues.Config, 0) // No queue configs by default
+}
+
+func TestLoadConfig_QueueEnvironmentOverride(t *testing.T) {
+	viper.Reset()
+
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	configContent := `
+queues:
+  enabled: true
+`
+	err := os.WriteFile(configFile, []byte(configContent), 0600)
+	require.NoError(t, err)
+
+	// Set environment variable to override
+	originalEnv := os.Getenv("DAGU_QUEUE_ENABLED")
+	defer os.Setenv("DAGU_QUEUE_ENABLED", originalEnv)
+	
+	os.Setenv("DAGU_QUEUE_ENABLED", "false")
+
+	cfg, err := config.Load(config.WithConfigFile(configFile))
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	// Verify environment variable overrides config file
+	assert.False(t, cfg.Queues.Enabled)
+}

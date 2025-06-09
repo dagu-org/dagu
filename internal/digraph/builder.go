@@ -125,11 +125,6 @@ func build(ctx BuildContext, spec *definition) (*DAG, error) {
 		Queue:          spec.Queue,
 	}
 
-	// For backward compatibility, set MaxActiveSteps to MaxActiveRuns
-	if spec.MaxActiveRuns > 0 {
-		dag.MaxActiveSteps = spec.MaxActiveRuns
-	}
-
 	var errs ErrorList
 	for _, builder := range builderRegistry {
 		if !builder.metadata && ctx.opts.OnlyMetadata {

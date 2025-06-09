@@ -527,3 +527,17 @@ func testLoad(t *testing.T, file string, opts ...testOption) DAG {
 
 	return DAG{t: t, DAG: dag}
 }
+
+func TestBuild_QueueConfiguration(t *testing.T) {
+	t.Run("ExplicitQueueAssignment", func(t *testing.T) {
+		th := testLoad(t, "queue_config.yaml")
+		assert.Equal(t, "customQueue", th.Queue)
+		assert.Equal(t, 5, th.MaxActiveRuns)
+	})
+
+	t.Run("DefaultQueueAssignment", func(t *testing.T) {
+		th := testLoad(t, "queue_default.yaml")
+		assert.Equal(t, "", th.Queue) // Should be empty in DAG struct, will be resolved at runtime
+		assert.Equal(t, 3, th.MaxActiveRuns)
+	})
+}
