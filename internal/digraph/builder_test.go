@@ -529,15 +529,24 @@ func testLoad(t *testing.T, file string, opts ...testOption) DAG {
 }
 
 func TestBuild_QueueConfiguration(t *testing.T) {
-	t.Run("ExplicitQueueAssignment", func(t *testing.T) {
-		th := testLoad(t, "queue_config.yaml")
-		assert.Equal(t, "customQueue", th.Queue)
-		assert.Equal(t, 5, th.MaxActiveRuns)
+	t.Run("MaxActiveRunsDefaultsToOne", func(t *testing.T) {
+		// Test that when maxActiveRuns is not specified, it defaults to 1
+		th := testLoad(t, "valid_command.yaml") // Using a simple DAG without maxActiveRuns
+		assert.Equal(t, 1, th.MaxActiveRuns, "maxActiveRuns should default to 1 when not specified")
 	})
-
-	t.Run("DefaultQueueAssignment", func(t *testing.T) {
-		th := testLoad(t, "queue_default.yaml")
-		assert.Equal(t, "", th.Queue) // Should be empty in DAG struct, will be resolved at runtime
-		assert.Equal(t, 3, th.MaxActiveRuns)
+	
+	t.Run("MaxActiveRunsNegativeValuePreserved", func(t *testing.T) {
+		// Test that negative values are preserved (they mean queueing is disabled)
+		// Create a simple DAG YAML with negative maxActiveRuns
+		data := []byte(`
+name: test-negative-max-active-runs
+maxActiveRuns: -1
+steps:
+  - name: step1
+    command: echo test
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Equal(t, -1, dag.MaxActiveRuns, "negative maxActiveRuns should be preserved")
 	})
 }

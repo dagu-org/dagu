@@ -76,6 +76,7 @@ var builderRegistry = []builderEntry{
 	{name: "infoMailConfig", fn: buildInfoMailConfig},
 	{name: "maxHistoryRetentionDays", fn: maxHistoryRetentionDays},
 	{name: "maxCleanUpTime", fn: maxCleanUpTime},
+	{name: "maxActiveRuns", fn: buildMaxActiveRuns},
 	{name: "preconditions", fn: buildPrecondition},
 }
 
@@ -120,7 +121,6 @@ func build(ctx BuildContext, spec *definition) (*DAG, error) {
 		Delay:          time.Second * time.Duration(spec.DelaySec),
 		RestartWait:    time.Second * time.Duration(spec.RestartWaitSec),
 		Tags:           parseTags(spec.Tags),
-		MaxActiveRuns:  spec.MaxActiveRuns,
 		MaxActiveSteps: spec.MaxActiveSteps,
 		Queue:          spec.Queue,
 	}
@@ -497,6 +497,18 @@ func parsePrecondition(ctx BuildContext, precondition any) ([]*Condition, error)
 func maxCleanUpTime(_ BuildContext, spec *definition, dag *DAG) error {
 	if spec.MaxCleanUpTimeSec != nil {
 		dag.MaxCleanUpTime = time.Second * time.Duration(*spec.MaxCleanUpTimeSec)
+	}
+	return nil
+}
+
+func buildMaxActiveRuns(_ BuildContext, spec *definition, dag *DAG) error {
+	if spec.MaxActiveRuns != 0 {
+		// Preserve the value if it's set (including negative values)
+		// MaxActiveRuns < 0 means queueing is disabled for this DAG
+		dag.MaxActiveRuns = spec.MaxActiveRuns
+	} else {
+		// Default to 1 only when not specified (0)
+		dag.MaxActiveRuns = 1
 	}
 	return nil
 }

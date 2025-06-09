@@ -306,6 +306,12 @@ func (d *DAG) initializeDefaults() {
 		d.MaxCleanUpTime = defaultMaxCleanUpTime
 	}
 
+	// Set default max active runs to 1 only when not specified (0).
+	// MaxActiveRuns < 0 means queueing is disabled for this DAG.
+	if d.MaxActiveRuns == 0 {
+		d.MaxActiveRuns = 1
+	}
+
 	// Ensure we have a valid working directory
 	var workDir = "."
 	if d.Location != "" {
