@@ -886,6 +886,11 @@ func buildDepends(_ BuildContext, def stepDef, step *Step) error {
 	}
 	step.Depends = deps
 
+	// Check if depends was explicitly set to empty array
+	if def.Depends != nil && len(deps) == 0 {
+		step.ExplicitlyNoDeps = true
+	}
+
 	return nil
 }
 
@@ -1161,7 +1166,8 @@ func injectChainDependencies(dag *DAG) {
 		prevStep := &dag.Steps[i-1]
 
 		// Only add implicit dependency if the step doesn't already have dependencies
-		if len(step.Depends) == 0 {
+		// and wasn't explicitly set to have no dependencies
+		if len(step.Depends) == 0 && !step.ExplicitlyNoDeps {
 			step.Depends = []string{prevStep.Name}
 		}
 	}

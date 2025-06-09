@@ -146,6 +146,24 @@ You can still use explicit ``depends`` in chain type to override the automatic d
     - name: cleanup
       command: rm -f fileA fileB  # Back to chain: depends on "process-both"
 
+**Running Steps Without Dependencies in Chain Mode**
+
+To run a step without any dependencies (even in chain mode), explicitly set ``depends`` to an empty array:
+
+.. code-block:: yaml
+
+  type: chain
+  steps:
+    - name: step1
+      command: echo "First"
+    - name: step2
+      command: echo "Second - depends on step1"
+    - name: step3
+      command: echo "Third - runs independently"
+      depends: []  # Explicitly no dependencies
+    - name: step4
+      command: echo "Fourth - depends on step3"
+
 **Agent Type**
 
 Reserved for future agent-based execution (not yet implemented).

@@ -136,6 +136,17 @@ func TestBuild(t *testing.T) {
 		th := testLoad(t, "valid_command.yaml")
 		assert.Equal(t, digraph.TypeChain, th.Type)
 	})
+	t.Run("ChainTypeWithNoDependencies", func(t *testing.T) {
+		th := testLoad(t, "chain_no_dependencies.yaml")
+		assert.Equal(t, digraph.TypeChain, th.Type)
+		
+		// Check dependencies
+		assert.Len(t, th.Steps, 4)
+		assert.Empty(t, th.Steps[0].Depends) // step1
+		assert.Equal(t, []string{"step1"}, th.Steps[1].Depends) // step2
+		assert.Empty(t, th.Steps[2].Depends) // step3 - explicitly no deps
+		assert.Equal(t, []string{"step3"}, th.Steps[3].Depends) // step4 should depend on step3
+	})
 	t.Run("Preconditions", func(t *testing.T) {
 		th := testLoad(t, "preconditions.yaml")
 		assert.Len(t, th.Preconditions, 1)

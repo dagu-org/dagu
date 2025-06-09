@@ -42,6 +42,8 @@ type Step struct {
 	Output string `json:"output,omitempty"`
 	// Depends contains the list of step names to depend on.
 	Depends []string `json:"depends,omitempty"`
+	// ExplicitlyNoDeps indicates the depends field was explicitly set to empty
+	ExplicitlyNoDeps bool `json:"-"`
 	// ContinueOn contains the conditions to continue on failure or skipped.
 	ContinueOn ContinueOn `json:"continueOn,omitempty"`
 	// RetryPolicy contains the retry policy for the step.
