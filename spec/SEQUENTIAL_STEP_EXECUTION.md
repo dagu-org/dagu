@@ -1,8 +1,8 @@
-# Sequential Step Execution Specification
+# Chain Step Execution Specification
 
 ## Overview
 
-This specification describes a new DAG-level field that allows users to control step execution mode. When enabled, steps will execute sequentially in the order they are defined, without requiring explicit dependency declarations.
+This specification describes a new DAG-level field `type` that allows users to control step execution mode. When set to `chain`, steps will execute sequentially in the order they are defined, without requiring explicit dependency declarations.
 
 ## Motivation
 
@@ -29,11 +29,11 @@ steps:
 
 ## Proposed Solution
 
-Add a new DAG-level field `mode` that controls how steps are executed:
+Add a new DAG-level field `type` that controls how steps are executed:
 
 ```yaml
 # New approach - clean and simple
-mode: sequential  # New field
+type: chain  # New field
 steps:
   - name: step1
     command: echo "First"
@@ -50,18 +50,19 @@ steps:
 
 ## Field Specification
 
-### Field Name: `mode`
+### Field Name: `type`
 
 - **Type**: `string`
 - **Location**: DAG-level (same level as `name`, `schedule`, etc.)
 - **Valid Values**: 
   - `"graph"` (default) - Current behavior, steps run based on dependency graph
-  - `"sequential"` - Steps run in the order they are defined
+  - `"chain"` - Steps run in the order they are defined
+  - `"agent"` - Reserved for future agent mode implementation
 - **Default**: `"graph"` (maintains backward compatibility)
 
 ## Behavior Specification
 
-### Sequential Mode (`mode: sequential`)
+### Chain Mode (`type: chain`)
 
 1. **Execution Order**: Steps execute in the exact order they appear in the YAML file
 2. **Implicit Dependencies**: Each step automatically depends on the previous step
@@ -69,32 +70,37 @@ steps:
 4. **Override**: Explicit `depends` field still honored if specified
 5. **Parallel Steps**: Steps with `parallel` field still execute their items according to their configuration
 
-### Graph Mode (`mode: graph`)
+### Graph Mode (`type: graph`)
 
 - Current behavior is maintained
 - Steps run based on their `depends` field
 - Steps without dependencies run immediately (respecting `maxActiveSteps`)
 
+### Agent Mode (`type: agent`)
+
+- Reserved for future implementation
+- Will enable specialized agent-based execution patterns
+
 ## Interaction with Other Features
 
 ### maxActiveSteps
-- In sequential mode, effectively becomes 1 for non-parallel steps
+- In chain mode, effectively becomes 1 for non-parallel steps
 - Still applies to items within parallel steps
 
 ### depends Field
-- In sequential mode, explicit `depends` overrides implicit sequential dependency
+- In chain mode, explicit `depends` overrides implicit chain dependency
 - Allows breaking out of strict sequence when needed
 
 ### parallel Field
-- Works the same in both modes
+- Works the same in all modes
 - Items within a parallel step respect their own `maxConcurrent` setting
 
 ## Examples
 
-### Basic Sequential Workflow
+### Basic Chain Workflow
 ```yaml
 name: data-pipeline
-mode: sequential
+type: chain
 
 steps:
   - name: download
@@ -110,10 +116,10 @@ steps:
     command: aws s3 cp output.csv s3://bucket/
 ```
 
-### Mixed Mode (Sequential with Parallel Branch)
+### Mixed Mode (Chain with Parallel Branch)
 ```yaml
 name: build-and-test
-mode: sequential
+type: chain
 
 steps:
   - name: checkout
@@ -133,10 +139,10 @@ steps:
     command: make package
 ```
 
-### Sequential with Explicit Dependencies
+### Chain with Explicit Dependencies
 ```yaml
 name: complex-pipeline
-mode: sequential
+type: chain
 
 steps:
   - name: setup
@@ -150,7 +156,7 @@ steps:
   
   - name: process-both
     command: process.py fileA fileB
-    depends:  # Override sequential to depend on both downloads
+    depends:  # Override chain to depend on both downloads
       - download-a
       - download-b
   
@@ -160,30 +166,31 @@ steps:
 
 ## Implementation Considerations
 
-1. **Parser Updates**: Add `mode` to DAG configuration structure
-2. **Scheduler Changes**: Modify scheduler to inject implicit dependencies in sequential mode
+1. **Parser Updates**: Add `type` to DAG configuration structure
+2. **Scheduler Changes**: Modify scheduler to inject implicit dependencies in chain mode
 3. **Validation**: Ensure no circular dependencies when mixing modes
-4. **UI Updates**: Display execution mode in DAG details
+4. **UI Updates**: Display execution type in DAG details
 5. **Migration**: No migration needed due to default value
 
 ## Benefits
 
-1. **Simplicity**: Reduces boilerplate for sequential workflows
+1. **Simplicity**: Reduces boilerplate for chain workflows
 2. **Readability**: Intent is clear from DAG-level declaration
-3. **Flexibility**: Can mix sequential and parallel patterns
+3. **Flexibility**: Can mix chain and parallel patterns
 4. **Backward Compatible**: Existing DAGs work unchanged
 
 ## Future Extensions
 
-The string-based approach allows for future execution modes:
+The string-based approach allows for future execution types:
 - `"priority"` - Execute based on step priority values
 - `"resource"` - Execute based on resource availability
 - `"conditional"` - Execute based on runtime conditions
+- `"agent"` - Agent-based execution with specialized handling
 
 ## Testing Requirements
 
-1. **Sequential Execution**: Verify steps run in order
-2. **Mixed Dependencies**: Test explicit depends in sequential mode
+1. **Chain Execution**: Verify steps run in order
+2. **Mixed Dependencies**: Test explicit depends in chain mode
 3. **Error Handling**: Ensure failures stop subsequent steps
-4. **Parallel Steps**: Verify parallel steps work within sequential DAGs
+4. **Parallel Steps**: Verify parallel steps work within chain DAGs
 5. **Performance**: No performance regression for graph mode

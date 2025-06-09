@@ -1,0 +1,21 @@
+name: chain-explicit-depends
+type: chain
+
+steps:
+  - name: setup
+    command: echo "Setting up environment"
+  
+  - name: download-a
+    command: echo "Downloading file A"
+  
+  - name: download-b
+    command: echo "Downloading file B"
+  
+  - name: process-both
+    command: echo "Processing both files A and B"
+    depends:  # Override chain to depend on both downloads
+      - download-a
+      - download-b
+  
+  - name: cleanup
+    command: echo "Cleaning up"
