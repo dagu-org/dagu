@@ -30,6 +30,10 @@ type ProgressDisplay struct {
 	isEnabled bool
 	isTTY     bool
 
+	// DAG run information
+	dagRunID string
+	params   string
+
 	// Display options
 	showChildDetails bool
 	accentColor      *color.Color
@@ -200,6 +204,12 @@ func (pd *ProgressDisplay) UpdateStatus(status *models.DAGRunStatus) {
 	pd.mu.Lock()
 	defer pd.mu.Unlock()
 	pd.status = status
+	
+	// Update DAG run info from status if available
+	if status != nil {
+		pd.dagRunID = status.DAGRunID
+		pd.params = status.Params
+	}
 }
 
 func (pd *ProgressDisplay) runDisplayLoop() {
@@ -254,8 +264,8 @@ func (pd *ProgressDisplay) renderHeader() {
 	
 	// Calculate available width
 	boxWidth := pd.termWidth
-	if boxWidth > 80 {
-		boxWidth = 80 // Cap max width for readability
+	if boxWidth > 100 {
+		boxWidth = 100 // Cap max width for readability
 	}
 	innerWidth := boxWidth - 2 // Account for box borders
 	
@@ -330,6 +340,21 @@ func (pd *ProgressDisplay) renderHeader() {
 		coloredHeader,
 		strings.Repeat("─", headerPadding))
 	fmt.Fprintln(pd.writer, "│" + statusLine + "│")
+	
+	// Add Run ID line
+	if pd.dagRunID != "" {
+		runIDStr := fmt.Sprintf("Run ID: %s", pd.truncateString(pd.dagRunID, innerWidth-12))
+		runIDLine := fmt.Sprintf(" %s%s ", runIDStr, strings.Repeat(" ", innerWidth-utf8.RuneCountInString(runIDStr)-2))
+		fmt.Fprintln(pd.writer, "│" + runIDLine + "│")
+	}
+	
+	// Add Params line if present
+	if pd.params != "" {
+		paramsStr := fmt.Sprintf("Params: %s", pd.truncateString(pd.params, innerWidth-12))
+		paramsLine := fmt.Sprintf(" %s%s ", paramsStr, strings.Repeat(" ", innerWidth-utf8.RuneCountInString(paramsStr)-2))
+		fmt.Fprintln(pd.writer, "│" + paramsLine + "│")
+	}
+	
 	fmt.Fprintf(pd.writer, "└%s┘\n\n", strings.Repeat("─", innerWidth))
 }
 
@@ -669,4 +694,12 @@ func (pd *ProgressDisplay) SetAccentColor(c *color.Color) {
 	if c != nil {
 		pd.accentColor = c
 	}
+}
+
+// SetDAGRunInfo sets the DAG run ID and parameters
+func (pd *ProgressDisplay) SetDAGRunInfo(dagRunID, params string) {
+	pd.mu.Lock()
+	defer pd.mu.Unlock()
+	pd.dagRunID = dagRunID
+	pd.params = params
 }

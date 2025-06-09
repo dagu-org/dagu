@@ -152,6 +152,8 @@ func New(
 	// Initialize progress display if enabled
 	if opts.ProgressDisplay {
 		a.progressDisplay = NewProgressDisplay(os.Stderr, dag)
+		// Set initial DAG run info
+		a.progressDisplay.SetDAGRunInfo(dagRunID, strings.Join(dag.Params, " "))
 	}
 
 	return a
