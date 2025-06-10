@@ -6,10 +6,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net"
 	"net/smtp"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/logger"
 )
@@ -45,6 +47,7 @@ var (
 	)
 	boundary     = "==simple-boundary-dagu-mailer"
 	errFileEmpty = errors.New("file is empty")
+	mailTimeout  = 30 * time.Second
 )
 
 // SendMail sends an email.
@@ -68,13 +71,33 @@ func (m *Mailer) sendWithNoAuth(
 	subject, body string,
 	attachments []string,
 ) error {
-	c, err := smtp.Dial(m.host + ":" + m.port)
+	// Create a dialer with timeout
+	dialer := &net.Dialer{
+		Timeout: mailTimeout,
+	}
+
+	// Dial with timeout
+	conn, err := dialer.Dial("tcp", m.host+":"+m.port)
 	if err != nil {
+		return err
+	}
+
+	// Set deadline for all operations
+	deadline := time.Now().Add(mailTimeout)
+	if err := conn.SetDeadline(deadline); err != nil {
+		_ = conn.Close()
+		return err
+	}
+
+	c, err := smtp.NewClient(conn, m.host)
+	if err != nil {
+		_ = conn.Close()
 		return err
 	}
 	defer func() {
 		_ = c.Close()
 	}()
+
 	if err = c.Mail(replacer.Replace(from)); err != nil {
 		return err
 	}
@@ -107,12 +130,30 @@ func (m *Mailer) sendWithAuth(
 	subject, body string,
 	attachments []string,
 ) error {
-	auth := smtp.PlainAuth("", m.username, m.password, m.host)
-	body = processEmailBody(body)
-	return smtp.SendMail(
-		m.host+":"+m.port, auth, from, to,
-		m.composeMail(to, from, subject, body, attachments),
-	)
+	// Create a channel to receive the result
+	type result struct {
+		err error
+	}
+	resultChan := make(chan result, 1)
+
+	// Run SendMail in a goroutine
+	go func() {
+		auth := smtp.PlainAuth("", m.username, m.password, m.host)
+		body = processEmailBody(body)
+		err := smtp.SendMail(
+			m.host+":"+m.port, auth, from, to,
+			m.composeMail(to, from, subject, body, attachments),
+		)
+		resultChan <- result{err: err}
+	}()
+
+	// Wait for either completion or timeout
+	select {
+	case res := <-resultChan:
+		return res.err
+	case <-time.After(mailTimeout):
+		return fmt.Errorf("mail sending timeout after %v", mailTimeout)
+	}
 }
 
 func (*Mailer) composeHeader(
