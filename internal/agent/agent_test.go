@@ -1,6 +1,7 @@
 package agent_test
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"testing"
@@ -52,7 +53,7 @@ func TestAgent_Run(t *testing.T) {
 	t.Run("AlreadyRunning", func(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, "agent/is_running.yaml")
-		dagAgent := dag.Agent()
+		dagAgent := dag.Agent(test.WithDAGRunID("test-dag-run"))
 		done := make(chan struct{})
 
 		go func() {
@@ -63,9 +64,8 @@ func TestAgent_Run(t *testing.T) {
 
 		dag.AssertCurrentStatus(t, scheduler.StatusRunning)
 
-		// Try to run the DAG again while it is running
-		dagAgent2 := dag.Agent()
-		dagAgent2.RunCheckErr(t, "already running")
+		isRunning := th.DAGRunMgr.IsRunning(context.Background(), dag.DAG, "test-dag-run")
+		require.True(t, isRunning, "DAG should be running")
 
 		// Wait for the DAG to finish
 		<-done

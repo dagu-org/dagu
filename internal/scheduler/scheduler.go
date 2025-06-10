@@ -173,19 +173,26 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				startedAt time.Time
 				queueName string
 				queueCfg  queueConfig
+				alive     int
 			)
-
-			alive, err := s.procStore.CountAlive(ctx, data.Name)
-			if err != nil {
-				logger.Error(ctx, "Failed to count alive processes", "err", err, "data", data)
-				goto SEND_RESULT
-			}
 
 			// Fetch the DAG of the dag-run attempt first to get queue configuration
 			attempt, err = s.dagRunStore.FindAttempt(ctx, data)
 			if err != nil {
 				result = models.QueuedItemProcessingResultInvalid
 				logger.Error(ctx, "Failed to find run", "err", err, "data", data)
+				goto SEND_RESULT
+			}
+
+			dag, err = attempt.ReadDAG(ctx)
+			if err != nil {
+				logger.Error(ctx, "Failed to read dag", "err", err, "data", data)
+				goto SEND_RESULT
+			}
+
+			alive, err = s.procStore.CountAlive(ctx, dag.QueueName())
+			if err != nil {
+				logger.Error(ctx, "Failed to count alive processes", "err", err, "data", data)
 				goto SEND_RESULT
 			}
 
@@ -198,12 +205,6 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			if status.Status != scheduler.StatusQueued {
 				logger.Info(ctx, "Skipping item from queue", "data", data, "status", status.Status)
 				result = models.QueuedItemProcessingResultInvalid
-				goto SEND_RESULT
-			}
-
-			dag, err = attempt.ReadDAG(ctx)
-			if err != nil {
-				logger.Error(ctx, "Failed to read dag", "err", err, "data", data)
 				goto SEND_RESULT
 			}
 

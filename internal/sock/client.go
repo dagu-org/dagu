@@ -70,3 +70,8 @@ func (cl *Client) Request(method, url string) (string, error) {
 
 	return string(body), nil
 }
+
+// SocketAddr returns the address of the unix socket.
+func (cl *Client) SocketAddr() string {
+	return cl.addr
+}

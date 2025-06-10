@@ -174,6 +174,22 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	var attempt models.DAGRunAttempt
 
+	// Check if the DAG is already running.
+	if err := a.checkIsAlreadyRunning(ctx); err != nil {
+		return err
+	}
+
+	// Create a process for heartbeat. We need to acquire proc file by queue name or dag name.
+	// This is to ensure queue scheduler can limit the number of active processes for the same queue.
+	proc, err := a.procStore.Acquire(ctx, digraph.NewDAGRunRef(a.dag.QueueName(), a.dagRunID))
+	if err != nil {
+		return fmt.Errorf("failed to get process: %w", err)
+	}
+	defer func() {
+		// Stop the process and remove it from the store.
+		_ = proc.Stop(ctx)
+	}()
+
 	if !a.dry {
 		// Setup the attempt for the dag-run.
 		// It's not required for dry-run mode.
@@ -212,23 +228,9 @@ func (a *Agent) Run(ctx context.Context) error {
 		return a.dryRun(ctx)
 	}
 
-	// Check if the DAG is already running.
-	if err := a.checkIsAlreadyRunning(ctx); err != nil {
-		a.scheduler.Cancel(ctx, a.graph)
-		return err
-	}
-
-	// Create a process for heartbeat.
-	proc, err := a.procStore.Acquire(ctx, digraph.NewDAGRunRef(a.dag.Name, a.dagRunID))
-	if err != nil {
-		return fmt.Errorf("failed to get process: %w", err)
-	}
-	defer func() {
-		// Stop the process and remove it from the store.
-		_ = proc.Stop(ctx)
-	}()
-
 	// Open the run file to write the status.
+	// TODO: Check if the run file already exists and if it does, return an error.
+	// This is to prevent duplicate execution of the same DAG run.
 	if err := attempt.Open(ctx); err != nil {
 		return fmt.Errorf("failed to open execution history: %w", err)
 	}
