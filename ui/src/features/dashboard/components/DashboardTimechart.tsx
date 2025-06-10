@@ -241,6 +241,8 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
       };
     }
 
+    const seenIds = new Set<string>();
+
     input.forEach((dagRun) => {
       const status = dagRun.status;
       const start = dagRun.startedAt;
@@ -251,13 +253,17 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
         const startDate = startMoment.tz(validTimezone).toDate();
         const endDate = end.tz(validTimezone).toDate();
 
+        const id = dagRun.name + `_${dagRun.dagRunId}`;
+        if (seenIds.has(id)) return; // Skip duplicates
+        seenIds.add(id);
+
         if (
           !isNaN(startDate.getTime()) &&
           !isNaN(endDate.getTime()) &&
           startDate <= endDate
         ) {
           items.push({
-            id: dagRun.name + `_${dagRun.dagRunId}`,
+            id,
             content: dagRun.name,
             start: startDate,
             end: endDate,
@@ -591,9 +597,7 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
 
 function TimelineWrapper({ children }: { children: React.ReactNode }) {
   return (
-    <div className="w-full h-full flex flex-col bg-background">
-      {children}
-    </div>
+    <div className="w-full h-full flex flex-col bg-background">{children}</div>
   );
 }
 
