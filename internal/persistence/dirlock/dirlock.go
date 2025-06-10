@@ -75,11 +75,11 @@ type LockInfo struct {
 
 // dirLock implements the DirLock interface
 type dirLock struct {
-	targetDir  string
-	lockPath   string
-	opts       *LockOptions
-	isHeld     bool
-	mu         sync.Mutex
+	targetDir string
+	lockPath  string
+	opts      *LockOptions
+	isHeld    bool
+	mu        sync.Mutex
 }
 
 // New creates a new directory lock instance

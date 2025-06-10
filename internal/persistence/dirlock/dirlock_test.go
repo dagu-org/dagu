@@ -395,11 +395,11 @@ func TestEdgeCases(t *testing.T) {
 		// Should succeed and create the directory
 		err = lock.TryLock()
 		require.NoError(t, err)
-		
+
 		// Verify directory was created
 		_, err = os.Stat(nonExistentDir)
 		require.NoError(t, err)
-		
+
 		err = lock.Unlock()
 		require.NoError(t, err)
 	})
