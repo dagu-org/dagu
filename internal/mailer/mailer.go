@@ -88,7 +88,7 @@ func (m *Mailer) sendWithNoAuth(
 	if err != nil {
 		return err
 	}
-	body = newlineToBrTag(body)
+	body = processEmailBody(body)
 	_, err = wc.Write(
 		m.composeMail(to, from, subject, body, attachments),
 	)
@@ -108,7 +108,7 @@ func (m *Mailer) sendWithAuth(
 	attachments []string,
 ) error {
 	auth := smtp.PlainAuth("", m.username, m.password, m.host)
-	body = newlineToBrTag(body)
+	body = processEmailBody(body)
 	return smtp.SendMail(
 		m.host+":"+m.port, auth, from, to,
 		m.composeMail(to, from, subject, body, attachments),
@@ -159,6 +159,21 @@ func newlineToBrTag(body string) string {
 	return strings.NewReplacer(
 		`\r\n`, "<br />", `\r`, "<br />", `\n`, "<br />", "\r\n", "<br />", "\r", "<br />", "\n", "<br />",
 	).Replace(body)
+}
+
+// isHTMLContent detects if the body content is HTML by checking for DOCTYPE declaration
+// This is a restrictive check to ensure we only skip newline conversion for proper HTML documents
+func isHTMLContent(body string) bool {
+	body = strings.TrimSpace(strings.ToLower(body))
+	return strings.HasPrefix(body, "<!doctype html")
+}
+
+// processEmailBody converts newlines to <br /> tags for non-HTML (plain text) content.
+func processEmailBody(body string) string {
+	if !isHTMLContent(body) {
+		return newlineToBrTag(body)
+	}
+	return body
 }
 
 func addAttachments(attachments []string) []byte {
