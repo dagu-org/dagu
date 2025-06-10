@@ -225,9 +225,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 	defer func() {
 		// Stop the process and remove it from the store.
-		if err := proc.Stop(ctx); err != nil {
-			logger.Error(ctx, "Failed to close process", "err", err)
-		}
+		_ = proc.Stop(ctx)
 	}()
 
 	// Open the run file to write the status.
@@ -341,6 +339,11 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	lastErr := a.scheduler.Schedule(ctx, a.graph, progressCh)
+
+	// Stop the process and remove it from the store.
+	if err := proc.Stop(ctx); err != nil {
+		logger.Error(ctx, "failed to stop the heartbeat", "err", err)
+	}
 
 	// Update the finished status to the runstore database.
 	finishedStatus := a.Status()

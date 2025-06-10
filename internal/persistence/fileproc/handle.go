@@ -25,6 +25,7 @@ var _ models.ProcHandle = (*ProcHandle)(nil)
 type ProcHandle struct {
 	fileName string
 	started  atomic.Bool
+	canceled atomic.Bool
 	cancel   context.CancelFunc
 	mu       sync.Mutex
 	wg       sync.WaitGroup
@@ -53,11 +54,13 @@ func (p *ProcHandle) Stop(_ context.Context) error {
 	if !p.started.Load() {
 		return fmt.Errorf("heartbeat not started")
 	}
-	if p.cancel != nil {
-		p.cancel()
+	if p.canceled.CompareAndSwap(false, true) {
+		if p.cancel != nil {
+			p.cancel()
+		}
+		// Wait for the heartbeat goroutine to finish
+		p.wg.Wait()
 	}
-	// Wait for the heartbeat goroutine to finish
-	p.wg.Wait()
 	return nil
 }
 
@@ -81,6 +84,7 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 
 	hbCtx, cancel := context.WithCancel(ctx)
 	p.cancel = cancel
+	p.canceled.Store(false)
 
 	// Write the initial heartbeat timestamp in binary format
 	buf := make([]byte, 8)
