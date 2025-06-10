@@ -300,6 +300,10 @@ func TestRetryPolicyBasicOutputCapture(t *testing.T) {
 
 	dagRunID := uuid.Must(uuid.NewV7()).String()
 	counterFile := filepath.Join("/tmp", "retry_counter_basic_"+dagRunID)
+	defer func() {
+		// Clean up the counter file after the test
+		_ = os.Remove(counterFile)
+	}()
 
 	createDAGFile("basic_retry.yaml", `
 steps:
