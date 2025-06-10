@@ -254,10 +254,7 @@ func renderHTML(nodes []*models.Node) string {
 		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"%s\">%s</td>", statusClass, status))
 
 		// Command (join args and escape HTML)
-		var command string
-		if n.Step.Args != nil {
-			command = strings.Join(n.Step.Args, " ")
-		}
+		command := n.Step.CmdWithArgs
 		command = strings.ReplaceAll(command, "&", "&amp;")
 		command = strings.ReplaceAll(command, "<", "&lt;")
 		command = strings.ReplaceAll(command, ">", "&gt;")
