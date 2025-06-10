@@ -78,7 +78,7 @@ func NewAttempt(file string, cache *fileutil.Cache[*models.DAGRunStatus], opts .
 // Exists returns true if the status file exists.
 func (att *Attempt) Exists() bool {
 	_, err := os.Stat(att.file)
-	return err == nil
+	return err == nil || !os.IsNotExist(err)
 }
 
 // ModTime returns the last modification time of the status file.

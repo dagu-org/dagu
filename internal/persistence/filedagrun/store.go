@@ -252,6 +252,8 @@ func (store *Store) CreateAttempt(ctx context.Context, dag *digraph.DAG, timesta
 	dataRoot := NewDataRoot(store.baseDir, dag.Name)
 	ts := models.NewUTC(timestamp)
 
+	// TODO: Create a directory lock to ensure only one process can create a dag-run at a time
+
 	var run *DAGRun
 	if opts.Retry {
 		r, err := dataRoot.FindByDAGRunID(ctx, dagRunID)
@@ -260,6 +262,12 @@ func (store *Store) CreateAttempt(ctx context.Context, dag *digraph.DAG, timesta
 		}
 		run = r
 	} else {
+		// Check if the dag-run already exists
+		existingRun, _ := dataRoot.FindByDAGRunID(ctx, dagRunID)
+		if existingRun != nil {
+			// Error if the dag-run already exists
+			return nil, fmt.Errorf("dag-run with ID %s already exists", dagRunID)
+		}
 		r, err := dataRoot.CreateDAGRun(ts, dagRunID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create run: %w", err)
