@@ -134,7 +134,7 @@ func (l *dirLock) TryLock() error {
 	}
 
 	// Ensure the target directory exists
-	if err := os.MkdirAll(l.targetDir, 0755); err != nil {
+	if err := os.MkdirAll(l.targetDir, 0750); err != nil {
 		return fmt.Errorf("failed to create target directory: %w", err)
 	}
 
