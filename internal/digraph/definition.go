@@ -157,7 +157,7 @@ type retryPolicyDef struct {
 // smtpConfigDef defines the SMTP configuration.
 type smtpConfigDef struct {
 	Host     string // SMTP host
-	Port     string // SMTP port
+	Port     any    // SMTP port (can be string or number)
 	Username string // SMTP username
 	Password string // SMTP password
 }

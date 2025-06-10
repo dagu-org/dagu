@@ -603,13 +603,30 @@ func validateSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 
 // buildSMTPConfig builds the SMTP configuration for the DAG.
 func buildSMTPConfig(_ BuildContext, spec *definition, dag *DAG) (err error) {
-	if spec.SMTP.Host == "" && spec.SMTP.Port == "" {
+	// Convert port to string if it's provided as a number
+	var portStr string
+	if spec.SMTP.Port != nil {
+		switch v := spec.SMTP.Port.(type) {
+		case string:
+			portStr = v
+		case int:
+			portStr = strconv.Itoa(v)
+		case float64:
+			portStr = strconv.Itoa(int(v))
+		default:
+			if spec.SMTP.Port != "" {
+				portStr = fmt.Sprintf("%v", spec.SMTP.Port)
+			}
+		}
+	}
+
+	if spec.SMTP.Host == "" && portStr == "" {
 		return nil
 	}
 
 	dag.SMTP = &SMTPConfig{
 		Host:     spec.SMTP.Host,
-		Port:     spec.SMTP.Port,
+		Port:     portStr,
 		Username: spec.SMTP.Username,
 		Password: spec.SMTP.Password,
 	}

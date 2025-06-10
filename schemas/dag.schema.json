@@ -108,7 +108,16 @@
           "description": "SMTP server hostname"
         },
         "port": {
-          "type": "string",
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "SMTP server port as string"
+            },
+            {
+              "type": "integer",
+              "description": "SMTP server port as number"
+            }
+          ],
           "description": "SMTP server port"
         },
         "username": {

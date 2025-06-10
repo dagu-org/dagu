@@ -93,6 +93,26 @@ func TestBuild(t *testing.T) {
 		assert.Equal(t, "[INFO]", th.InfoMail.Prefix)
 		assert.True(t, th.InfoMail.AttachLogs)
 	})
+	t.Run("SMTPNumericPort", func(t *testing.T) {
+		// Test SMTP configuration with numeric port
+		data := []byte(`
+smtp:
+  host: "smtp.example.com"
+  port: 587
+  username: "user@example.com"
+  password: "password"
+steps:
+  - name: test
+    command: echo test
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.NotNil(t, dag.SMTP)
+		assert.Equal(t, "smtp.example.com", dag.SMTP.Host)
+		assert.Equal(t, "587", dag.SMTP.Port)
+		assert.Equal(t, "user@example.com", dag.SMTP.Username)
+		assert.Equal(t, "password", dag.SMTP.Password)
+	})
 	t.Run("MaxHistRetentionDays", func(t *testing.T) {
 		th := testLoad(t, "hist_retention_days.yaml")
 		assert.Equal(t, 365, th.HistRetentionDays)
@@ -104,7 +124,7 @@ func TestBuild(t *testing.T) {
 	t.Run("ChainTypeBasic", func(t *testing.T) {
 		th := testLoad(t, "chain_basic.yaml")
 		assert.Equal(t, digraph.TypeChain, th.Type)
-		
+
 		// Check that implicit dependencies were added
 		assert.Len(t, th.Steps, 4)
 		assert.Empty(t, th.Steps[0].Depends) // First step has no dependencies
@@ -115,11 +135,11 @@ func TestBuild(t *testing.T) {
 	t.Run("ChainTypeWithExplicitDepends", func(t *testing.T) {
 		th := testLoad(t, "chain_with_explicit_depends.yaml")
 		assert.Equal(t, digraph.TypeChain, th.Type)
-		
+
 		// Check dependencies
 		assert.Len(t, th.Steps, 5)
-		assert.Empty(t, th.Steps[0].Depends) // setup
-		assert.Equal(t, []string{"setup"}, th.Steps[1].Depends) // download-a
+		assert.Empty(t, th.Steps[0].Depends)                         // setup
+		assert.Equal(t, []string{"setup"}, th.Steps[1].Depends)      // download-a
 		assert.Equal(t, []string{"download-a"}, th.Steps[2].Depends) // download-b
 		// process-both should keep its explicit dependencies
 		assert.ElementsMatch(t, []string{"download-a", "download-b"}, th.Steps[3].Depends)
@@ -139,12 +159,12 @@ func TestBuild(t *testing.T) {
 	t.Run("ChainTypeWithNoDependencies", func(t *testing.T) {
 		th := testLoad(t, "chain_no_dependencies.yaml")
 		assert.Equal(t, digraph.TypeChain, th.Type)
-		
+
 		// Check dependencies
 		assert.Len(t, th.Steps, 4)
-		assert.Empty(t, th.Steps[0].Depends) // step1
+		assert.Empty(t, th.Steps[0].Depends)                    // step1
 		assert.Equal(t, []string{"step1"}, th.Steps[1].Depends) // step2
-		assert.Empty(t, th.Steps[2].Depends) // step3 - explicitly no deps
+		assert.Empty(t, th.Steps[2].Depends)                    // step3 - explicitly no deps
 		assert.Equal(t, []string{"step3"}, th.Steps[3].Depends) // step4 should depend on step3
 	})
 	t.Run("Preconditions", func(t *testing.T) {
@@ -534,7 +554,7 @@ func TestBuild_QueueConfiguration(t *testing.T) {
 		th := testLoad(t, "valid_command.yaml") // Using a simple DAG without maxActiveRuns
 		assert.Equal(t, 1, th.MaxActiveRuns, "maxActiveRuns should default to 1 when not specified")
 	})
-	
+
 	t.Run("MaxActiveRunsNegativeValuePreserved", func(t *testing.T) {
 		// Test that negative values are preserved (they mean queueing is disabled)
 		// Create a simple DAG YAML with negative maxActiveRuns
