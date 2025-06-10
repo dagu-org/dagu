@@ -77,6 +77,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 3. Update corresponding transformer/handler functions
 4. Update UI components if needed
 5. Run `make test` and `make golangci-lint` to verify
+6. Run `go fmt` to format Go code
 
 **Before committing:**
 - Run `make golangci-lint` to check for lint issues

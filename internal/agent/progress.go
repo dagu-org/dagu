@@ -85,7 +85,7 @@ func NewProgressDisplay(writer io.Writer, dag *digraph.DAG) *ProgressDisplay {
 		termWidth:        termWidth,
 		termHeight:       termHeight,
 	}
-	
+
 	// Initialize all nodes from the DAG steps
 	if dag != nil {
 		for _, step := range dag.Steps {
@@ -100,7 +100,7 @@ func NewProgressDisplay(writer io.Writer, dag *digraph.DAG) *ProgressDisplay {
 			}
 		}
 	}
-	
+
 	return pd
 }
 
@@ -137,7 +137,7 @@ func (pd *ProgressDisplay) Stop() {
 
 	// Clear screen and render final state
 	fmt.Fprint(pd.writer, "\033[H\033[2J")
-	
+
 	// Render the final state with all content
 	pd.mu.Lock()
 	pd.renderHeader()
@@ -148,10 +148,10 @@ func (pd *ProgressDisplay) Stop() {
 	pd.renderChildDAGs()
 	pd.renderFooter()
 	pd.mu.Unlock()
-	
+
 	// Show cursor
 	fmt.Fprint(pd.writer, "\033[?25h")
-	
+
 	// Add extra newlines at the bottom to ensure any following
 	// output (like "exit status 1") appears below the display
 	fmt.Fprint(pd.writer, "\n\n\n\n")
@@ -204,7 +204,7 @@ func (pd *ProgressDisplay) UpdateStatus(status *models.DAGRunStatus) {
 	pd.mu.Lock()
 	defer pd.mu.Unlock()
 	pd.status = status
-	
+
 	// Update DAG run info from status if available
 	if status != nil {
 		pd.dagRunID = status.DAGRunID
@@ -258,59 +258,60 @@ func (pd *ProgressDisplay) render() {
 
 func (pd *ProgressDisplay) renderHeader() {
 	elapsed := time.Since(pd.startTime)
-	
+
 	// Build status indicator
 	statusStr := pd.formatStatus(pd.getOverallStatus())
-	
+
 	// Calculate available width
 	boxWidth := pd.termWidth
 	if boxWidth > 100 {
 		boxWidth = 100 // Cap max width for readability
 	}
 	innerWidth := boxWidth - 2 // Account for box borders
-	
+
 	// Build header
 	dagName := pd.dag.Name
 	if len(dagName) > 30 {
 		dagName = dagName[:27] + "..."
 	}
 	header := fmt.Sprintf(" DAG: %s ", dagName)
-	
+
 	// Build the time part (no colors)
 	timePart := fmt.Sprintf("Started: %s | Elapsed: %s",
 		pd.startTime.Format("15:04:05"),
 		pd.formatDuration(elapsed))
-	
+
 	// Calculate the plain text parts for spacing
 	statusPrefix := "Status: "
 	statusValuePlain := stripANSI(statusStr)
-	
+
 	// Truncate time part if needed to fit within available width
-	maxTimePartLen := innerWidth - utf8.RuneCountInString(statusPrefix) - 
+	maxTimePartLen := innerWidth - utf8.RuneCountInString(statusPrefix) -
 		utf8.RuneCountInString(statusValuePlain) - utf8.RuneCountInString(" | ") - 4
 	if maxTimePartLen < 20 && utf8.RuneCountInString(timePart) > maxTimePartLen {
 		// Just show elapsed time if space is tight
 		timePart = fmt.Sprintf("Elapsed: %s", pd.formatDuration(elapsed))
 	}
-	
+
 	// Calculate available space for the middle padding
 	// Use rune count for visual width instead of byte length
-	usedSpace := utf8.RuneCountInString(statusPrefix) + utf8.RuneCountInString(statusValuePlain) + 
+	usedSpace := utf8.RuneCountInString(statusPrefix) + utf8.RuneCountInString(statusValuePlain) +
 		utf8.RuneCountInString(" | ") + utf8.RuneCountInString(timePart) + 2 // 2 for space padding
 	middlePadding := innerWidth - usedSpace
 	if middlePadding < 1 {
 		middlePadding = 1
 	}
-	
+
 	// Build the status line with calculated padding
 	// If the content is still too wide, truncate the time part
 	if usedSpace > innerWidth {
 		// Recalculate with truncated time
-		availableForTime := innerWidth - utf8.RuneCountInString(statusPrefix) - 
+		availableForTime := innerWidth - utf8.RuneCountInString(statusPrefix) -
 			utf8.RuneCountInString(statusValuePlain) - utf8.RuneCountInString(" | ") - 5
 		if availableForTime > 0 {
 			timeRunes := []rune(timePart)
-			if len(timeRunes) > availableForTime {
+			if len(timeRunes) > availableForTime-3 && availableForTime > 3 && len(timeRunes) > 0 {
+				println(fmt.Sprintf("Truncating time part: %s availableForTime=%d", timePart, availableForTime))
 				timePart = string(timeRunes[:availableForTime-3]) + "..."
 			}
 		} else {
@@ -318,70 +319,70 @@ func (pd *ProgressDisplay) renderHeader() {
 		}
 		middlePadding = 1
 	}
-	
+
 	statusLine := fmt.Sprintf(" %s%s%s | %s ",
 		statusPrefix,
 		statusStr, // This includes color codes
 		strings.Repeat(" ", middlePadding),
 		timePart)
-	
+
 	// Apply color to header
 	coloredHeader := pd.accentColor.Sprint(header)
-	
+
 	// Calculate header padding based on plain text length
 	// We need to account for the ─ after ┌ and before ┐
 	headerPadding := innerWidth - utf8.RuneCountInString(stripANSI(header)) - 2
 	if headerPadding < 0 {
 		headerPadding = 0
 	}
-	
+
 	// Render the box
-	fmt.Fprintf(pd.writer, "┌─%s%s─┐\n", 
+	fmt.Fprintf(pd.writer, "┌─%s%s─┐\n",
 		coloredHeader,
 		strings.Repeat("─", headerPadding))
-	fmt.Fprintln(pd.writer, "│" + statusLine + "│")
-	
+	fmt.Fprintln(pd.writer, "│"+statusLine+"│")
+
 	// Add Run ID line
 	if pd.dagRunID != "" {
 		runIDStr := fmt.Sprintf("Run ID: %s", pd.truncateString(pd.dagRunID, innerWidth-12))
 		runIDLine := fmt.Sprintf(" %s%s ", runIDStr, strings.Repeat(" ", innerWidth-utf8.RuneCountInString(runIDStr)-2))
-		fmt.Fprintln(pd.writer, "│" + runIDLine + "│")
+		fmt.Fprintln(pd.writer, "│"+runIDLine+"│")
 	}
-	
+
 	// Add Params line if present
 	if pd.params != "" {
 		paramsStr := fmt.Sprintf("Params: %s", pd.truncateString(pd.params, innerWidth-12))
 		paramsLine := fmt.Sprintf(" %s%s ", paramsStr, strings.Repeat(" ", innerWidth-utf8.RuneCountInString(paramsStr)-2))
-		fmt.Fprintln(pd.writer, "│" + paramsLine + "│")
+		fmt.Fprintln(pd.writer, "│"+paramsLine+"│")
 	}
-	
+
 	fmt.Fprintf(pd.writer, "└%s┘\n\n", strings.Repeat("─", innerWidth))
 }
 
 func (pd *ProgressDisplay) renderProgressBar() {
 	completed := 0
 	total := len(pd.nodes)
-	
+
 	for _, np := range pd.nodes {
-		if np.status == scheduler.NodeStatusSuccess || 
-		   np.status == scheduler.NodeStatusError ||
-		   np.status == scheduler.NodeStatusSkipped ||
-		   np.status == scheduler.NodeStatusCancel {
+		if np.status == scheduler.NodeStatusSuccess ||
+			np.status == scheduler.NodeStatusError ||
+			np.status == scheduler.NodeStatusSkipped ||
+			np.status == scheduler.NodeStatusCancel {
 			completed++
 		}
 	}
-	
+
 	if total == 0 {
 		return
 	}
-	
+
 	percentage := (completed * 100) / total
 	barWidth := 40
 	filled := (percentage * barWidth) / 100
-	
+
 	// Build progress bar
 	bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
-	
+
 	fmt.Fprintf(pd.writer, "Progress: %s %3d%% (%d/%d steps)\n\n",
 		pd.colorizeProgressBar(bar, percentage),
 		percentage, completed, total)
@@ -392,13 +393,13 @@ func (pd *ProgressDisplay) renderCurrentlyRunning() {
 	if len(running) == 0 {
 		return
 	}
-	
+
 	fmt.Fprintln(pd.writer, color.New(color.Bold).Sprint("Currently Running:"))
-	
+
 	for _, np := range running {
 		elapsed := time.Since(np.startTime)
 		spinner := pd.spinnerFrames[pd.spinnerIndex]
-		
+
 		fmt.Fprintf(pd.writer, "  %s %s %s\n",
 			color.New(color.FgHiGreen).Sprint(spinner),
 			pd.truncateString(np.node.Step.Name, 30),
@@ -413,39 +414,39 @@ func (pd *ProgressDisplay) renderRecentlyCompleted() {
 	if len(completed) == 0 {
 		return
 	}
-	
+
 	// Show only recent ones
 	maxShow := 5
 	if len(completed) > maxShow {
 		completed = completed[len(completed)-maxShow:]
 	}
-	
+
 	fmt.Fprintln(pd.writer, color.New(color.Bold).Sprint("Recently Completed:"))
-	
+
 	for _, np := range completed {
 		statusIcon := pd.getStatusIcon(np.status)
 		duration := ""
 		if !np.endTime.IsZero() && !np.startTime.IsZero() {
 			duration = fmt.Sprintf("[%s]", pd.formatDuration(np.endTime.Sub(np.startTime)))
 		}
-		
+
 		line := fmt.Sprintf("  %s %s %s",
 			statusIcon,
 			pd.truncateString(np.node.Step.Name, 30),
 			color.New(color.Faint).Sprint(duration))
-		
+
 		if np.status == scheduler.NodeStatusError && np.node.Error != "" {
 			// Calculate available space for error message
 			// Account for the line content already shown
 			lineLen := 2 + 1 + 1 + 30 + 1 + len(duration) + 8 // Approximate
-			availableSpace := pd.termWidth - lineLen - 10 // Leave some margin
+			availableSpace := pd.termWidth - lineLen - 10     // Leave some margin
 			if availableSpace < 20 {
 				availableSpace = 20
 			}
 			errorMsg := pd.truncateString(np.node.Error, availableSpace)
 			line += color.RedString(" Error: %s", errorMsg)
 		}
-		
+
 		fmt.Fprintln(pd.writer, line)
 	}
 	fmt.Fprintln(pd.writer)
@@ -456,10 +457,10 @@ func (pd *ProgressDisplay) renderQueued() {
 	if len(queued) == 0 {
 		return
 	}
-	
+
 	maxShow := 3
 	fmt.Fprintln(pd.writer, color.New(color.Bold).Sprint("Queued:"))
-	
+
 	for i, np := range queued {
 		if i >= maxShow {
 			fmt.Fprintf(pd.writer, "  %s ... and %d more\n",
@@ -479,9 +480,9 @@ func (pd *ProgressDisplay) renderChildDAGs() {
 	if len(childNodes) == 0 {
 		return
 	}
-	
+
 	fmt.Fprintln(pd.writer, color.New(color.Bold).Sprint("Child DAGs:"))
-	
+
 	for _, np := range childNodes {
 		if len(np.children) == 1 {
 			// Single child DAG
@@ -494,10 +495,10 @@ func (pd *ProgressDisplay) renderChildDAGs() {
 			// For parallel execution, we'll show the count and basic info
 			// Actual status tracking would need to be implemented separately
 			total := len(np.children)
-			
+
 			// Show a simplified view for now
 			statusInfo := fmt.Sprintf("(%d child DAGs)", total)
-			
+
 			fmt.Fprintf(pd.writer, "  ▸ %s %s %s\n",
 				pd.truncateString(np.node.Step.Name, 20),
 				statusInfo,
@@ -586,7 +587,6 @@ func (pd *ProgressDisplay) truncateString(s string, maxLen int) string {
 	return s[:maxLen-3] + "..."
 }
 
-
 func (pd *ProgressDisplay) formatChildStatus(child models.ChildDAGRun) string {
 	// For now, just show the child DAG run ID and params
 	// Status tracking for child DAGs would need to be retrieved separately
@@ -605,19 +605,19 @@ func (pd *ProgressDisplay) getNodesByStatus(status scheduler.NodeStatus) []*node
 			nodes = append(nodes, np)
 		}
 	}
-	
+
 	// Sort by start time (earliest first) for deterministic ordering
 	// If start times are equal, sort by step name
 	for i := 0; i < len(nodes)-1; i++ {
 		for j := i + 1; j < len(nodes); j++ {
 			if nodes[i].startTime.After(nodes[j].startTime) ||
-			   (nodes[i].startTime.Equal(nodes[j].startTime) && 
-			    nodes[i].node.Step.Name > nodes[j].node.Step.Name) {
+				(nodes[i].startTime.Equal(nodes[j].startTime) &&
+					nodes[i].node.Step.Name > nodes[j].node.Step.Name) {
 				nodes[i], nodes[j] = nodes[j], nodes[i]
 			}
 		}
 	}
-	
+
 	return nodes
 }
 
@@ -625,13 +625,13 @@ func (pd *ProgressDisplay) getCompletedNodes() []*nodeProgress {
 	var nodes []*nodeProgress
 	for _, np := range pd.nodes {
 		if np.status == scheduler.NodeStatusSuccess ||
-		   np.status == scheduler.NodeStatusError ||
-		   np.status == scheduler.NodeStatusSkipped ||
-		   np.status == scheduler.NodeStatusCancel {
+			np.status == scheduler.NodeStatusError ||
+			np.status == scheduler.NodeStatusSkipped ||
+			np.status == scheduler.NodeStatusCancel {
 			nodes = append(nodes, np)
 		}
 	}
-	
+
 	// Sort by completion time
 	for i := 0; i < len(nodes)-1; i++ {
 		for j := i + 1; j < len(nodes); j++ {
@@ -640,7 +640,7 @@ func (pd *ProgressDisplay) getCompletedNodes() []*nodeProgress {
 			}
 		}
 	}
-	
+
 	return nodes
 }
 
@@ -651,7 +651,7 @@ func (pd *ProgressDisplay) getNodesWithChildren() []*nodeProgress {
 			nodes = append(nodes, np)
 		}
 	}
-	
+
 	// Sort by step name for deterministic ordering
 	for i := 0; i < len(nodes)-1; i++ {
 		for j := i + 1; j < len(nodes); j++ {
@@ -660,7 +660,7 @@ func (pd *ProgressDisplay) getNodesWithChildren() []*nodeProgress {
 			}
 		}
 	}
-	
+
 	return nodes
 }
 
