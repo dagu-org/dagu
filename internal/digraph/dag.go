@@ -96,6 +96,16 @@ type DAG struct {
 	BuildErrors []error
 }
 
+// QueueName returns the name of the queue for this DAG.
+// If the queue is not set, it returns the DAG name as the default queue name.
+func (d *DAG) QueueName() string {
+	// If the queue is not set, return the default queue name.
+	if d.Queue == "" {
+		return d.Name
+	}
+	return d.Queue
+}
+
 // FileName returns the filename of the DAG without the extension.
 func (d *DAG) FileName() string {
 	if d.Location == "" {
