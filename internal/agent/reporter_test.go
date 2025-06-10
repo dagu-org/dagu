@@ -71,6 +71,110 @@ func TestReporter(t *testing.T) {
 	}
 }
 
+func TestRenderHTMLWithDAGInfo(t *testing.T) {
+	// Create a test DAGRunStatus
+	status := models.DAGRunStatus{
+		Name:       "test-workflow",
+		DAGRunID:   "01975986-c13d-7b6d-b75e-abf4380a03fc",
+		Status:     scheduler.StatusSuccess,
+		StartedAt:  "2025-01-15T10:30:00Z",
+		FinishedAt: "2025-01-15T10:35:00Z",
+		Params:     "env=production batch_size=1000",
+		Nodes: []*models.Node{
+			{
+				Step: digraph.Step{
+					Name:        "setup-database",
+					Command:     "psql",
+					Args:        []string{"-h", "localhost", "-U", "admin", "-d", "mydb", "-f", "schema.sql"},
+					CmdWithArgs: "psql -h localhost -U admin -d mydb -f schema.sql",
+				},
+				Status:     scheduler.NodeStatusSuccess,
+				StartedAt:  "2025-01-15T10:30:00Z",
+				FinishedAt: "2025-01-15T10:30:45Z",
+				Error:      "",
+			},
+			{
+				Step: digraph.Step{
+					Name:        "run-migrations",
+					Command:     "migrate",
+					Args:        []string{"up"},
+					CmdWithArgs: "migrate up",
+				},
+				Status:     scheduler.NodeStatusError,
+				StartedAt:  "2025-01-15T10:31:00Z",
+				FinishedAt: "2025-01-15T10:31:15Z",
+				Error:      "Migration failed: Table 'users' already exists",
+			},
+		},
+	}
+
+	// Call renderHTMLWithDAGInfo to get the output
+	html := renderHTMLWithDAGInfo(status)
+
+	// Verify HTML structure and content
+	t.Run("DAG info section", func(t *testing.T) {
+		// Check DAG info section exists
+		require.Contains(t, html, "DAG Execution Details")
+		require.Contains(t, html, "dag-info")
+
+		// Check DAG name is displayed
+		require.Contains(t, html, "dag-name")
+		require.Contains(t, html, "test-workflow")
+
+		// Check DAG Run ID
+		require.Contains(t, html, "DAG Run ID")
+		require.Contains(t, html, "01975986-c13d-7b6d-b75e-abf4380a03fc")
+
+		// Check Parameters
+		require.Contains(t, html, "Parameters")
+		require.Contains(t, html, "env=production batch_size=1000")
+
+		// Check timestamps
+		require.Contains(t, html, "Started At")
+		require.Contains(t, html, "Finished At")
+		require.Contains(t, html, "2025-01-15T10:30:00Z")
+		require.Contains(t, html, "2025-01-15T10:35:00Z")
+
+		// Check status badge
+		require.Contains(t, html, "status-badge success") // CSS class for success status
+		require.Contains(t, html, "FINISHED") // Status text
+	})
+
+	t.Run("Table content", func(t *testing.T) {
+		// Check that step table is still included
+		require.Contains(t, html, "<table>")
+		require.Contains(t, html, "setup-database")
+		require.Contains(t, html, "run-migrations")
+		require.Contains(t, html, "Migration failed")
+	})
+
+	t.Run("Empty parameters", func(t *testing.T) {
+		// Test with empty parameters
+		statusNoParams := status
+		statusNoParams.Params = ""
+		htmlNoParams := renderHTMLWithDAGInfo(statusNoParams)
+
+		// Should show "(none)" for empty parameters
+		require.Contains(t, htmlNoParams, "(none)")
+	})
+
+	t.Run("HTML escaping in DAG info", func(t *testing.T) {
+		// Test HTML escaping in DAG info
+		statusWithSpecialChars := status
+		statusWithSpecialChars.Name = "test<script>alert('xss')</script>"
+		statusWithSpecialChars.DAGRunID = "id&with&ampersands"
+		statusWithSpecialChars.Params = "param=\"<value>\""
+
+		htmlEscaped := renderHTMLWithDAGInfo(statusWithSpecialChars)
+
+		// Verify dangerous HTML characters are properly escaped
+		require.NotContains(t, htmlEscaped, "<script>alert('xss')</script>")
+		require.Contains(t, htmlEscaped, "&lt;script&gt;alert('xss')&lt;/script&gt;")
+		require.Contains(t, htmlEscaped, "id&amp;with&amp;ampersands")
+		require.Contains(t, htmlEscaped, "param=&quot;&lt;value&gt;&quot;")
+	})
+}
+
 func testErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.DAG, nodes []*models.Node) {
 	dag.MailOn.Failure = true
 	dag.MailOn.Success = false
@@ -204,9 +308,10 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 		},
 		{
 			Step: digraph.Step{
-				Name:    "special-chars-test",
-				Command: "echo",
-				Args:    []string{"<script>alert('xss')</script>", "&", "\"quotes\""},
+				Name:        "special-chars-test",
+				Command:     "echo",
+				Args:        []string{"<script>alert('xss')</script>", "&", "\"quotes\""},
+				CmdWithArgs: "echo <script>alert('xss')</script> & \"quotes\"",
 			},
 			Status:     scheduler.NodeStatusError,
 			StartedAt:  "2025-01-15T10:33:00Z",
