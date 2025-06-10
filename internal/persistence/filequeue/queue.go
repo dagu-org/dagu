@@ -10,6 +10,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/persistence/dirlock"
 )
 
 // Errors for the queue
@@ -26,6 +27,8 @@ var priorities = []models.QueuePriority{
 // DualQueue represents a queue for storing dag-runs with two priorities:
 // high and low. It uses two queue files to store the items.
 type DualQueue struct {
+	dirlock.DirLock // Embed DirLock to ensure thread-safe access to the queue files
+
 	// baseDir is the base directory for the queue files
 	baseDir string
 	// name is the name of the DAGs that this queue is for
@@ -39,7 +42,12 @@ type DualQueue struct {
 // NewDualQueue creates a new queue with the specified base directory and name
 // It initializes the queue files for high and low priority
 func NewDualQueue(baseDir, name string) *DualQueue {
+	dirLock, _ := dirlock.New(baseDir, &dirlock.LockOptions{
+		StaleThreshold: 30, // seconds
+		RetryInterval:  50, // milliseconds
+	})
 	return &DualQueue{
+		DirLock: dirLock,
 		baseDir: baseDir,
 		name:    name,
 		files: map[models.QueuePriority]*QueueFile{

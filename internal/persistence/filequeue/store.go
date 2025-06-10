@@ -70,6 +70,15 @@ func (s *Store) DequeueByName(ctx context.Context, name string) (models.QueuedIt
 		s.queues[name] = s.createDualQueue(name)
 	}
 
+	if err := s.queues[name].Lock(ctx); err != nil {
+		return nil, fmt.Errorf("failed to lock queue %s: %w", name, err)
+	}
+	defer func() {
+		if err := s.queues[name].Unlock(); err != nil {
+			logger.Error(ctx, "Failed to unlock queue", "queue", name, "err", err)
+		}
+	}()
+
 	q := s.queues[name]
 	item, err := q.Dequeue(ctx)
 	if errors.Is(err, ErrQueueEmpty) {
@@ -123,6 +132,15 @@ func (s *Store) DequeueByDAGRunID(ctx context.Context, name, dagRunID string) ([
 	if _, ok := s.queues[name]; !ok {
 		s.queues[name] = s.createDualQueue(name)
 	}
+
+	if err := s.queues[name].Lock(ctx); err != nil {
+		return nil, fmt.Errorf("failed to lock queue %s: %w", name, err)
+	}
+	defer func() {
+		if err := s.queues[name].Unlock(); err != nil {
+			logger.Error(ctx, "Failed to unlock queue", "queue", name, "err", err)
+		}
+	}()
 
 	q := s.queues[name]
 	item, err := q.DequeueByDAGRunID(ctx, dagRunID)
