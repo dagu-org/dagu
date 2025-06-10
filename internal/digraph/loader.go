@@ -213,36 +213,178 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*DAG, error) {
 
 	ctx = ctx.WithFile(filePath)
 
-	dest, err := loadBaseConfigIfRequired(ctx, ctx.opts.Base)
+	// Load base config definition if specified
+	var baseDef *definition
+	if !ctx.opts.OnlyMetadata && ctx.opts.Base != "" && fileutil.FileExists(ctx.opts.Base) {
+		raw, err := readYAMLFile(ctx.opts.Base)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read base config: %w", err)
+		}
+		baseDef, err = decode(raw)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode base config: %w", err)
+		}
+	}
+
+	// Load all DAGs from the file
+	dags, err := loadDAGsFromFile(ctx, filePath, baseDef)
 	if err != nil {
 		return nil, err
 	}
 
-	raw, err := readYAMLFile(filePath)
-	if err != nil {
-		return nil, err
+	if len(dags) == 0 {
+		return nil, fmt.Errorf("no DAGs found in file %q", filePath)
 	}
 
-	spec, err := decode(raw)
-	if err != nil {
-		return nil, err
+	// Get the main DAG (first one)
+	mainDAG := dags[0]
+
+	// If there are child DAGs, add them to the main DAG
+	if len(dags) > 1 {
+		mainDAG.LocalDAGs = make(map[string]*DAG)
+		for i := 1; i < len(dags); i++ {
+			childDAG := dags[i]
+			if childDAG.Name == "" {
+				return nil, fmt.Errorf("child DAG at index %d must have a name", i)
+			}
+			mainDAG.LocalDAGs[childDAG.Name] = childDAG
+		}
 	}
 
-	target, err := build(ctx, spec)
+	mainDAG.initializeDefaults()
+
+	return mainDAG, nil
+}
+
+// loadDAGsFromFile loads all DAGs from a multi-document YAML file
+func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([]*DAG, error) {
+	// Open the file
+	f, err := os.Open(filePath) //nolint:gosec
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open file %q: %w", filePath, err)
+	}
+	defer func() { _ = f.Close() }()
+
+	var dags []*DAG
+	decoder := yaml.NewDecoder(f)
+
+	// Read all documents from the file
+	docIndex := 0
+	for {
+		var doc map[string]any
+		err := decoder.Decode(&doc)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			// Note: The YAML decoder has limitations with empty documents
+			// and may return errors for them. We skip and continue.
+			return nil, fmt.Errorf("failed to decode document %d: %w", docIndex, err)
+		}
+
+		// Skip empty documents
+		if len(doc) == 0 {
+			docIndex++
+			continue
+		}
+
+		// Decode the document into definition
+		spec, err := decode(doc)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode document %d: %w", docIndex, err)
+		}
+
+		// Build a fresh base DAG from base definition if provided
+		var dest *DAG
+		if baseDef != nil {
+			// Build a new base DAG for this document
+			baseDAG, err := build(ctx, baseDef)
+			if err != nil {
+				return nil, fmt.Errorf("failed to build base DAG for document %d: %w", docIndex, err)
+			}
+			dest = baseDAG
+		} else {
+			dest = new(DAG)
+		}
+
+		// Build the DAG from the current document
+		dag, err := build(ctx, spec)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build DAG in document %d: %w", docIndex, err)
+		}
+
+		// Merge the current DAG into the base DAG
+		if err := merge(dest, dag); err != nil {
+			return nil, fmt.Errorf("failed to merge DAG in document %d: %w", docIndex, err)
+		}
+
+		// Set the location for the DAG
+		dest.Location = filePath
+
+		dags = append(dags, dest)
+		docIndex++
 	}
 
-	// Merge the target DAG into the dest DAG.
-	dest.Location = "" // No need to set the location for the base config.
-	err = merge(dest, target)
-	if err != nil {
-		return nil, err
+	// If no documents found (empty file or single document without separator),
+	// fall back to single DAG loading
+	if len(dags) == 0 {
+		raw, err := readYAMLFile(filePath)
+		if err != nil {
+			return nil, err
+		}
+
+		spec, err := decode(raw)
+		if err != nil {
+			return nil, err
+		}
+
+		// Build a fresh base DAG from base definition if provided
+		var dest *DAG
+		if baseDef != nil {
+			// Build a new base DAG
+			baseDAG, err := build(ctx, baseDef)
+			if err != nil {
+				return nil, fmt.Errorf("failed to build base DAG: %w", err)
+			}
+			dest = baseDAG
+		} else {
+			dest = new(DAG)
+		}
+
+		// Build the DAG from the spec
+		dag, err := build(ctx, spec)
+		if err != nil {
+			return nil, err
+		}
+
+		// Merge the DAG into the base DAG
+		if err := merge(dest, dag); err != nil {
+			return nil, err
+		}
+
+		dest.Location = filePath
+		dags = append(dags, dest)
 	}
 
-	dest.initializeDefaults()
+	// Validate unique names in multi-DAG files
+	if len(dags) > 1 {
+		names := make(map[string]bool)
+		for i, dag := range dags {
+			// Skip validation for the first DAG as it's the main DAG
+			if i == 0 {
+				continue
+			}
+			if dag.Name == "" {
+				return nil, fmt.Errorf("DAG at index %d must have a name in multi-DAG file", i)
+			}
+			if names[dag.Name] {
+				return nil, fmt.Errorf("duplicate DAG name %q found", dag.Name)
+			}
+			names[dag.Name] = true
+		}
+	}
 
-	return dest, nil
+	return dags, nil
 }
 
 // defaultName returns the default name for the given file.
@@ -287,24 +429,6 @@ func resolveYamlFilePath(ctx BuildContext, file string) (string, error) {
 	return filepath.Abs(file)
 }
 
-// loadBaseConfigIfRequired loads the base config if needed, based on the given options.
-func loadBaseConfigIfRequired(ctx BuildContext, baseConfig string) (*DAG, error) {
-	if !ctx.opts.OnlyMetadata && baseConfig != "" {
-		dag, err := LoadBaseConfig(ctx, baseConfig)
-		if err != nil {
-			// Failed to load the base config.
-			return nil, err
-		}
-		if dag != nil {
-			// Found the base config.
-			return dag, nil
-		}
-	}
-
-	// No base config.
-	return new(DAG), nil
-}
-
 type mergeTransformer struct{}
 
 var _ mergo.Transformers = (*mergeTransformer)(nil)
@@ -320,6 +444,21 @@ func (*mergeTransformer) Transformer(
 			if dst.CanSet() {
 				dst.Set(src)
 			}
+
+			return nil
+		}
+	}
+
+	// Handle []string fields (like Env) by appending instead of replacing
+	if typ == reflect.TypeOf([]string{}) {
+		return func(dst, src reflect.Value) error {
+			if !dst.CanSet() || src.Len() == 0 {
+				return nil
+			}
+
+			// Append src values to dst
+			result := reflect.AppendSlice(dst, src)
+			dst.Set(result)
 
 			return nil
 		}

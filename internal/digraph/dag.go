@@ -94,6 +94,8 @@ type DAG struct {
 	Queue string `json:"queue,omitempty"`
 	// BuildErrors contains any errors encountered while building the DAG.
 	BuildErrors []error
+	// LocalDAGs contains DAGs defined in the same file, keyed by DAG name
+	LocalDAGs map[string]*DAG `json:"localDags,omitempty"`
 }
 
 // QueueName returns the name of the queue for this DAG.
