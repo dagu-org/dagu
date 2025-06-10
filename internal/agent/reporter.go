@@ -152,48 +152,132 @@ func renderStepSummary(nodes []*models.Node) string {
 
 func renderHTML(nodes []*models.Node) string {
 	var buffer bytes.Buffer
-	addValFunc := func(val string) {
-		_, _ = buffer.WriteString(
-			fmt.Sprintf(
-				"<td align=\"center\" style=\"padding: 10px;\">%s</td>",
-				val,
-			))
+
+	// Start with basic HTML structure with improved styling
+	_, _ = buffer.WriteString(`<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style type="text/css">
+        body { margin: 0; padding: 20px; background-color: #fafbfc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        table { 
+            border-collapse: separate; 
+            border-spacing: 0; 
+            width: 100%; 
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #ffffff; 
+            border-radius: 12px; 
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        th { 
+            background-color: #2563eb;
+            color: #ffffff; 
+            font-weight: 600; 
+            padding: 16px 12px; 
+            text-align: left;
+            font-size: 14px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        td { 
+            padding: 14px 12px; 
+            border-bottom: 1px solid #e8eef3; 
+            vertical-align: top;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        tr:hover { background-color: #f8f9fb; }
+        tr:last-child td { border-bottom: none; }
+        .status-finished { color: #059669; font-weight: 500; }
+        .status-failed { color: #dc2626; font-weight: 500; }
+        .status-running { color: #2563eb; font-weight: 500; }
+        .status-skipped { color: #6b7280; font-weight: 500; }
+        .row-number { 
+            background-color: #f1f5f9; 
+            font-weight: 600; 
+            text-align: center; 
+            color: #475569;
+            min-width: 40px;
+        }
+        .step-name { font-weight: 500; color: #1e293b; }
+        .command-cell { font-family: "SF Mono", Monaco, "Cascadia Code", monospace; font-size: 12px; color: #475569; }
+        .error-cell { color: #dc2626; font-size: 12px; }
+        .timestamp { color: #64748b; font-size: 12px; }
+    </style>
+</head>
+<body>
+<table>
+<thead>
+<tr>`)
+
+	// Add table headers
+	headers := []string{"#", "Step", "Started At", "Finished At", "Status", "Command", "Error"}
+	for _, header := range headers {
+		_, _ = buffer.WriteString(fmt.Sprintf("<th>%s</th>", header))
 	}
-	_, _ = buffer.WriteString(`
-	<table border="1" style="border-collapse: collapse;">
-		<thead>
-			<tr>
-				<th align="center" style="padding: 10px;">Name</th>
-				<th align="center" style="padding: 10px;">Started At</th>
-				<th align="center" style="padding: 10px;">Finished At</th>
-				<th align="center" style="padding: 10px;">Status</th>
-				<th align="center" style="padding: 10px;">Error</th>
-			</tr>
-		</thead>
-		<tbody>
-	`)
-	addStatusFunc := func(status scheduler.NodeStatus) {
-		var style string
-		if status == scheduler.NodeStatusError {
-			style = "color: #D01117;font-weight:bold;"
+	_, _ = buffer.WriteString("</tr></thead><tbody>")
+
+	// Add table rows
+	for i, n := range nodes {
+		_, _ = buffer.WriteString("<tr>")
+
+		// Row number with special styling
+		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"row-number\">%d</td>", i+1))
+
+		// Step name (escape HTML)
+		stepName := strings.ReplaceAll(n.Step.Name, "&", "&amp;")
+		stepName = strings.ReplaceAll(stepName, "<", "&lt;")
+		stepName = strings.ReplaceAll(stepName, ">", "&gt;")
+		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"step-name\">%s</td>", stepName))
+
+		// Started At with timestamp styling
+		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"timestamp\">%s</td>", n.StartedAt))
+
+		// Finished At with timestamp styling
+		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"timestamp\">%s</td>", n.FinishedAt))
+
+		// Status with conditional styling
+		status := n.Status.String()
+		statusClass := ""
+		switch status {
+		case "finished":
+			statusClass = "status-finished"
+		case "failed":
+			statusClass = "status-failed"
+		case "running":
+			statusClass = "status-running"
+		case "skipped":
+			statusClass = "status-skipped"
+		}
+		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"%s\">%s</td>", statusClass, status))
+
+		// Command (join args and escape HTML)
+		var command string
+		if n.Step.Args != nil {
+			command = strings.Join(n.Step.Args, " ")
+		}
+		command = strings.ReplaceAll(command, "&", "&amp;")
+		command = strings.ReplaceAll(command, "<", "&lt;")
+		command = strings.ReplaceAll(command, ">", "&gt;")
+		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"command-cell\">%s</td>", command))
+
+		// Error (escape HTML)
+		errorMsg := strings.ReplaceAll(n.Error, "&", "&amp;")
+		errorMsg = strings.ReplaceAll(errorMsg, "<", "&lt;")
+		errorMsg = strings.ReplaceAll(errorMsg, ">", "&gt;")
+		if errorMsg != "" {
+			_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"error-cell\">%s</td>", errorMsg))
+		} else {
+			_, _ = buffer.WriteString("<td></td>")
 		}
 
-		_, _ = buffer.WriteString(
-			fmt.Sprintf(
-				"<td align=\"center\" style=\"padding: 10px; %s\">%s</td>",
-				style, status,
-			))
-	}
-	for _, n := range nodes {
-		_, _ = buffer.WriteString("<tr>")
-		addValFunc(n.Step.Name)
-		addValFunc(n.StartedAt)
-		addValFunc(n.FinishedAt)
-		addStatusFunc(n.Status)
-		addValFunc(n.Error)
 		_, _ = buffer.WriteString("</tr>")
 	}
-	_, _ = buffer.WriteString("</table>")
+
+	_, _ = buffer.WriteString("</tbody></table></body></html>")
+
 	return buffer.String()
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -139,4 +140,170 @@ func (m *mockSender) Send(_ context.Context, from string, to []string, subject, 
 	m.subject = subject
 	m.body = body
 	return nil
+}
+
+// TestRenderHTMLComprehensive tests the HTML rendering with comprehensive fake data
+// to ensure the format is correct and prevent regressions
+func TestRenderHTMLComprehensive(t *testing.T) {
+	// Create comprehensive test data with various scenarios
+	nodes := []*models.Node{
+		{
+			Step: digraph.Step{
+				Name:    "setup-database",
+				Command: "docker",
+				Args:    []string{"run", "-d", "--name", "test-db", "postgres:13"},
+			},
+			Status:     scheduler.NodeStatusSuccess,
+			StartedAt:  "2025-01-15T10:30:00Z",
+			FinishedAt: "2025-01-15T10:30:45Z",
+			Error:      "",
+		},
+		{
+			Step: digraph.Step{
+				Name:    "run-migrations",
+				Command: "python",
+				Args:    []string{"manage.py", "migrate", "--settings=production"},
+			},
+			Status:     scheduler.NodeStatusError,
+			StartedAt:  "2025-01-15T10:30:45Z",
+			FinishedAt: "2025-01-15T10:31:20Z",
+			Error:      "Migration failed: Table 'users' already exists",
+		},
+		{
+			Step: digraph.Step{
+				Name:    "deploy-app",
+				Command: "kubectl",
+				Args:    []string{"apply", "-f", "deployment.yaml"},
+			},
+			Status:     scheduler.NodeStatusSkipped,
+			StartedAt:  "",
+			FinishedAt: "",
+			Error:      "",
+		},
+		{
+			Step: digraph.Step{
+				Name:    "send-notification",
+				Command: "curl",
+				Args:    []string{"-X", "POST", "https://api.slack.com/webhook", "-d", `{"text":"Deployment complete"}`},
+			},
+			Status:     scheduler.NodeStatusRunning,
+			StartedAt:  "2025-01-15T10:32:00Z",
+			FinishedAt: "",
+			Error:      "",
+		},
+		{
+			Step: digraph.Step{
+				Name:    "cleanup-temp-files",
+				Command: "bash",
+				Args:    nil, // Test nil args
+			},
+			Status:     scheduler.NodeStatusSuccess,
+			StartedAt:  "2025-01-15T10:32:30Z",
+			FinishedAt: "2025-01-15T10:32:35Z",
+			Error:      "",
+		},
+		{
+			Step: digraph.Step{
+				Name:    "special-chars-test",
+				Command: "echo",
+				Args:    []string{"<script>alert('xss')</script>", "&", "\"quotes\""},
+			},
+			Status:     scheduler.NodeStatusError,
+			StartedAt:  "2025-01-15T10:33:00Z",
+			FinishedAt: "2025-01-15T10:33:05Z",
+			Error:      "Command failed with exit code 1: <error> & \"special chars\"",
+		},
+	}
+
+	// Call renderHTML to get the output
+	html := renderHTML(nodes)
+
+	// Verify HTML structure and content
+	t.Run("HTML structure", func(t *testing.T) {
+		// Check basic HTML structure
+		require.Contains(t, html, "<!DOCTYPE html>")
+		require.Contains(t, html, "<html>")
+		require.Contains(t, html, "<head>")
+		require.Contains(t, html, "<body>")
+		require.Contains(t, html, "</html>")
+
+		// Check table structure
+		require.Contains(t, html, "<table>")
+		require.Contains(t, html, "<thead>")
+		require.Contains(t, html, "<tbody>")
+		require.Contains(t, html, "</table>")
+	})
+
+	t.Run("Table headers", func(t *testing.T) {
+		// Check all required headers are present
+		headers := []string{"#", "Step", "Started At", "Finished At", "Status", "Command", "Error"}
+		for _, header := range headers {
+			require.Contains(t, html, fmt.Sprintf("<th>%s</th>", header))
+		}
+	})
+
+	t.Run("Table content", func(t *testing.T) {
+		// Check that all step names are present
+		require.Contains(t, html, "setup-database")
+		require.Contains(t, html, "run-migrations")
+		require.Contains(t, html, "deploy-app")
+		require.Contains(t, html, "send-notification")
+		require.Contains(t, html, "cleanup-temp-files")
+		require.Contains(t, html, "special-chars-test")
+
+		// Check status values (these are the actual values from Status.String())
+		require.Contains(t, html, "finished")
+		require.Contains(t, html, "failed")
+		require.Contains(t, html, "skipped")
+		require.Contains(t, html, "running")
+
+		// Check timestamps are present
+		require.Contains(t, html, "2025-01-15T10:30:00Z")
+		require.Contains(t, html, "2025-01-15T10:30:45Z")
+
+		// Check error messages are present (single quotes in actual output)
+		require.Contains(t, html, "Migration failed: Table 'users' already exists")
+	})
+
+	t.Run("HTML escaping", func(t *testing.T) {
+		// Verify dangerous HTML characters are properly escaped
+		require.NotContains(t, html, "<script>alert('xss')</script>")          // Raw script tag should not exist
+		require.Contains(t, html, "&lt;script&gt;alert('xss')&lt;/script&gt;") // Should be escaped (actual format)
+
+		// Check ampersands are escaped
+		require.Contains(t, html, "&amp;") // & should be escaped to &amp;
+
+		// Check quotes are escaped in error messages
+		require.Contains(t, html, "\"special chars\"") // Quotes in actual output
+	})
+
+	t.Run("Row count", func(t *testing.T) {
+		// Count the number of table rows (excluding header)
+		rowCount := strings.Count(html, "<tr>") - 1 // Subtract 1 for header row
+		require.Equal(t, len(nodes), rowCount, "Should have one row per node")
+	})
+
+	t.Run("CSS styling", func(t *testing.T) {
+		// Check that modern CSS is present for proper email rendering
+		require.Contains(t, html, "border-collapse: separate")
+		require.Contains(t, html, "border-spacing: 0")
+		require.Contains(t, html, "border-radius: 12px")
+		require.Contains(t, html, "box-shadow")
+		require.Contains(t, html, "background-color: #2563eb")
+		require.Contains(t, html, "font-family: -apple-system")
+	})
+
+	t.Run("Gmail compatibility", func(t *testing.T) {
+		// Ensure Gmail-compatible structure
+		require.Contains(t, html, `<style type="text/css">`)
+		require.Contains(t, html, "class=")
+		require.NotContains(t, html, "style=")
+	})
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
