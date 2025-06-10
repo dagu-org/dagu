@@ -214,8 +214,8 @@ func (m *Manager) RetryDAGRun(_ context.Context, dag *digraph.DAG, dagRunID stri
 // IsRunning checks if a dag-run is currently running by querying its status.
 // Returns true if the status can be retrieved without error, indicating the DAG is running.
 func (m *Manager) IsRunning(ctx context.Context, dag *digraph.DAG, dagRunID string) bool {
-	_, err := m.currentStatus(ctx, dag, dagRunID)
-	return err == nil
+	status, _ := m.currentStatus(ctx, dag, dagRunID)
+	return status != nil && status.DAGRunID == dagRunID && status.Status == scheduler.StatusRunning
 }
 
 // GetCurrentStatus retrieves the current status of a dag-run by its run ID.
@@ -301,6 +301,12 @@ func (m *Manager) FindChildDAGRunStatus(ctx context.Context, rootDAGRun digraph.
 // This is a private method used internally by other status-related methods.
 func (*Manager) currentStatus(_ context.Context, dag *digraph.DAG, dagRunID string) (*models.DAGRunStatus, error) {
 	client := sock.NewClient(dag.SockAddr(dagRunID))
+
+	// Check if the socket file exists
+	if !fileutil.FileExists(client.SocketAddr()) {
+		return nil, fmt.Errorf("socket file does not exist for dag-run ID %s", dagRunID)
+	}
+
 	statusJSON, err := client.Request("GET", "/status")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current status: %w", err)
