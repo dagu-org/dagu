@@ -111,7 +111,7 @@ func TestIsJSONArray(t *testing.T) {
 			input:    `[["a", "b"], ["c", "d"]]`,
 			expected: true,
 		},
-		
+
 		// Invalid cases
 		{
 			name:     "empty string",

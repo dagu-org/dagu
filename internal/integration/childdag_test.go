@@ -134,7 +134,7 @@ steps:
 
 func TestRetryPolicyChildDAGRunWithOutputCapture(t *testing.T) {
 	th := test.SetupCommand(t)
-	
+
 	createDAGFile := func(name, content string) {
 		dagFile := filepath.Join(th.Config.Paths.DAGsDir, name)
 		err := os.MkdirAll(filepath.Dir(dagFile), 0750)
@@ -144,7 +144,7 @@ func TestRetryPolicyChildDAGRunWithOutputCapture(t *testing.T) {
 	}
 
 	dagRunID := uuid.Must(uuid.NewV7()).String()
-	
+
 	// Generate a unique counter file path for this test
 	counterFile := filepath.Join("/tmp", "retry_counter_"+dagRunID)
 
@@ -188,7 +188,7 @@ steps:
 	ref := digraph.NewDAGRunRef("parent_retry", dagRunID)
 	parentAttempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
-	
+
 	parentStatus, err := parentAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
 	require.Equal(t, scheduler.NodeStatusSuccess.String(), parentStatus.Status.String())
@@ -196,10 +196,10 @@ steps:
 	// Find child DAG run
 	childNode := parentStatus.Nodes[0]
 	require.Equal(t, scheduler.NodeStatusSuccess.String(), childNode.Status.String())
-	
+
 	childAttempt, err := th.DAGRunStore.FindChildAttempt(ctx, ref, childNode.Children[0].DAGRunID)
 	require.NoError(t, err)
-	
+
 	childStatus, err := childAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
 	require.Equal(t, scheduler.NodeStatusSuccess.String(), childStatus.Status.String())
@@ -207,7 +207,7 @@ steps:
 	// Verify the step in child DAG completed successfully after retry
 	retryStep := childStatus.Nodes[0]
 	require.Equal(t, scheduler.NodeStatusSuccess.String(), retryStep.Status.String())
-	
+
 	// Verify output was captured from the successful retry attempt
 	require.NotNil(t, retryStep.OutputVariables, "OutputVariables should not be nil")
 	variables := retryStep.OutputVariables.Variables()
@@ -220,7 +220,7 @@ steps:
 
 func TestBasicChildDAGOutputCapture(t *testing.T) {
 	th := test.SetupCommand(t)
-	
+
 	createDAGFile := func(name, content string) {
 		dagFile := filepath.Join(th.Config.Paths.DAGsDir, name)
 		err := os.MkdirAll(filepath.Dir(dagFile), 0750)
@@ -255,7 +255,7 @@ steps:
 	ref := digraph.NewDAGRunRef("parent_basic", dagRunID)
 	parentAttempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
-	
+
 	parentStatus, err := parentAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
 	require.Equal(t, scheduler.NodeStatusSuccess.String(), parentStatus.Status.String())
@@ -263,10 +263,10 @@ steps:
 	// Find child DAG run
 	childNode := parentStatus.Nodes[0]
 	require.Equal(t, scheduler.NodeStatusSuccess.String(), childNode.Status.String())
-	
+
 	childAttempt, err := th.DAGRunStore.FindChildAttempt(ctx, ref, childNode.Children[0].DAGRunID)
 	require.NoError(t, err)
-	
+
 	childStatus, err := childAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
 	require.Equal(t, scheduler.NodeStatusSuccess.String(), childStatus.Status.String())
@@ -274,7 +274,7 @@ steps:
 	// Verify the step in child DAG completed successfully
 	basicStep := childStatus.Nodes[0]
 	require.Equal(t, scheduler.NodeStatusSuccess.String(), basicStep.Status.String())
-	
+
 	// Debug: Print all output variables
 	if basicStep.OutputVariables != nil {
 		variables := basicStep.OutputVariables.Variables()
@@ -289,7 +289,7 @@ steps:
 
 func TestRetryPolicyBasicOutputCapture(t *testing.T) {
 	th := test.SetupCommand(t)
-	
+
 	createDAGFile := func(name, content string) {
 		dagFile := filepath.Join(th.Config.Paths.DAGsDir, name)
 		err := os.MkdirAll(filepath.Dir(dagFile), 0750)
@@ -335,7 +335,7 @@ steps:
 	ref := digraph.NewDAGRunRef("basic_retry", dagRunID)
 	attempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
-	
+
 	status, err := attempt.ReadStatus(ctx)
 	require.NoError(t, err)
 	require.Equal(t, scheduler.NodeStatusSuccess.String(), status.Status.String())
@@ -343,14 +343,14 @@ steps:
 	// Verify the step completed successfully after retry
 	retryStep := status.Nodes[0]
 	require.Equal(t, scheduler.NodeStatusSuccess.String(), retryStep.Status.String())
-	
+
 	// Debug retry output
 	require.NotNil(t, retryStep.OutputVariables, "OutputVariables should not be nil")
 	variables := retryStep.OutputVariables.Variables()
 	t.Logf("Basic retry step output variables: %+v", variables)
 	t.Logf("Basic retry step status: %s", retryStep.Status.String())
 	t.Logf("Basic retry step retry count: %d", retryStep.RetryCount)
-	
+
 	// Check if counter file was created and what it contains
 	counterFileContent, err := os.ReadFile(counterFile)
 	if err != nil {
@@ -358,7 +358,7 @@ steps:
 	} else {
 		t.Logf("Counter file content: %s", string(counterFileContent))
 	}
-	
+
 	// This is the test - does retry capture output properly?
 	require.Contains(t, variables, "STEP_OUTPUT", "Output variable STEP_OUTPUT should exist")
 	require.Contains(t, variables["STEP_OUTPUT"], "output_attempt_2_success", "Output should contain success message from retry")
@@ -366,7 +366,7 @@ steps:
 
 func TestNoRetryPolicyOutputCapture(t *testing.T) {
 	th := test.SetupCommand(t)
-	
+
 	createDAGFile := func(name, content string) {
 		dagFile := filepath.Join(th.Config.Paths.DAGsDir, name)
 		err := os.MkdirAll(filepath.Dir(dagFile), 0750)
@@ -394,7 +394,7 @@ steps:
 	ref := digraph.NewDAGRunRef("no_retry", dagRunID)
 	attempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
-	
+
 	status, err := attempt.ReadStatus(ctx)
 	require.NoError(t, err)
 	require.Equal(t, scheduler.NodeStatusSuccess.String(), status.Status.String())
@@ -402,14 +402,14 @@ steps:
 	// Verify the step completed successfully on first attempt
 	successStep := status.Nodes[0]
 	require.Equal(t, scheduler.NodeStatusSuccess.String(), successStep.Status.String())
-	
+
 	// Debug output for first attempt success
 	require.NotNil(t, successStep.OutputVariables, "OutputVariables should not be nil")
 	variables := successStep.OutputVariables.Variables()
 	t.Logf("No retry step output variables: %+v", variables)
 	t.Logf("No retry step status: %s", successStep.Status.String())
 	t.Logf("No retry step retry count: %d", successStep.RetryCount)
-	
+
 	// This should work - first attempt success captures output
 	require.Contains(t, variables, "STEP_OUTPUT", "Output variable STEP_OUTPUT should exist")
 	require.Contains(t, variables["STEP_OUTPUT"], "output_first_attempt_success", "Output should contain success message from first attempt")

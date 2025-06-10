@@ -39,15 +39,15 @@ func TestBase58EncodeSHA256(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := Base58EncodeSHA256(tt.input)
-			
+
 			// Validate result is non-empty
 			assert.NotEmpty(t, result, "base58 encoded hash should not be empty")
-			
+
 			// Validate result contains only base58 characters
 			for _, c := range result {
 				assert.Contains(t, base58Alphabet, string(c), "result should only contain base58 characters")
 			}
-			
+
 			// Validate consistency - same input should always produce same output
 			result2 := Base58EncodeSHA256(tt.input)
 			assert.Equal(t, result, result2, "same input should produce same output")
@@ -96,15 +96,14 @@ func TestBase58Encode(t *testing.T) {
 	}
 }
 
-
 func TestBase58EncodeSHA256_ChildDAGScenarios(t *testing.T) {
 	// Test specific scenarios for child DAG ID generation
 	tests := []struct {
-		name             string
-		parentRunID      string
-		stepName         string
-		params           string
-		expectedLength   int // Expected length range
+		name           string
+		parentRunID    string
+		stepName       string
+		params         string
+		expectedLength int // Expected length range
 	}{
 		{
 			name:           "simple child DAG",
@@ -133,19 +132,19 @@ func TestBase58EncodeSHA256_ChildDAGScenarios(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Construct the input as it would be in real usage
 			input := fmt.Sprintf("%s:%s:%s", tt.parentRunID, tt.stepName, tt.params)
-			
+
 			result := Base58EncodeSHA256(input)
-			
+
 			// Validate result properties
 			assert.NotEmpty(t, result)
 			assert.GreaterOrEqual(t, len(result), tt.expectedLength)
 			assert.LessOrEqual(t, len(result), tt.expectedLength+4) // Allow some variance
-			
+
 			// Ensure different inputs produce different outputs
 			altInput := input + "-modified"
 			altResult := Base58EncodeSHA256(altInput)
 			assert.NotEqual(t, result, altResult, "different inputs should produce different hashes")
-			
+
 			// Validate no ambiguous characters
 			for _, c := range result {
 				assert.NotContains(t, "0OlI", string(c), "result should not contain ambiguous characters")
@@ -154,10 +153,9 @@ func TestBase58EncodeSHA256_ChildDAGScenarios(t *testing.T) {
 	}
 }
 
-
 func BenchmarkBase58EncodeSHA256(b *testing.B) {
 	input := "parent-dag-run-12345:step-name:{\"key\":\"value\"}"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = Base58EncodeSHA256(input)
@@ -167,10 +165,9 @@ func BenchmarkBase58EncodeSHA256(b *testing.B) {
 func BenchmarkBase58Encode(b *testing.B) {
 	h := sha256.Sum256([]byte("benchmark test data"))
 	data := h[:]
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = Base58Encode(data)
 	}
 }
-

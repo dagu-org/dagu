@@ -15,14 +15,14 @@ func (m DeterministicMap) MarshalJSON() ([]byte, error) {
 	if m == nil {
 		return []byte("null"), nil
 	}
-	
+
 	// Get all keys and sort them
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	
+
 	// Build the JSON manually to ensure order
 	result := "{"
 	for i, k := range keys {
@@ -41,7 +41,7 @@ func (m DeterministicMap) MarshalJSON() ([]byte, error) {
 		result += string(keyJSON) + ":" + string(valueJSON)
 	}
 	result += "}"
-	
+
 	return []byte(result), nil
 }
 
@@ -52,7 +52,7 @@ func (m *DeterministicMap) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &temp); err != nil {
 		return err
 	}
-	
+
 	*m = DeterministicMap(temp)
 	return nil
 }
@@ -63,7 +63,7 @@ func (m DeterministicMap) String() string {
 	if len(m) == 0 {
 		return "{}"
 	}
-	
+
 	data, err := m.MarshalJSON()
 	if err != nil {
 		return "{error: " + err.Error() + "}"
@@ -76,7 +76,7 @@ func (m DeterministicMap) Clone() DeterministicMap {
 	if m == nil {
 		return nil
 	}
-	
+
 	clone := make(DeterministicMap, len(m))
 	for k, v := range m {
 		clone[k] = v
@@ -91,7 +91,7 @@ func (m DeterministicMap) Merge(other DeterministicMap) DeterministicMap {
 	if result == nil {
 		result = make(DeterministicMap)
 	}
-	
+
 	for k, v := range other {
 		result[k] = v
 	}

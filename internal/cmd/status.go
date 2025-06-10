@@ -90,15 +90,15 @@ func displayDetailedStatus(dag *digraph.DAG, status *models.DAGRunStatus) {
 	// Create header with 80 character width
 	fmt.Println()
 	headerColor := color.New(color.FgCyan, color.Bold)
-	
+
 	// Create a boxed header similar to progress display
 	fmt.Println(strings.Repeat("─", 80))
 	title := "DAG Run Status Report"
 	padding := (80 - len(title)) / 2
-	fmt.Printf("%s%s%s\n", 
-		strings.Repeat(" ", padding), 
+	fmt.Printf("%s%s%s\n",
+		strings.Repeat(" ", padding),
 		headerColor.Sprint(title),
-		strings.Repeat(" ", 80 - padding - len(title)))
+		strings.Repeat(" ", 80-padding-len(title)))
 	fmt.Println(strings.Repeat("─", 80))
 
 	// Create overview table with fixed 80-character width
@@ -186,15 +186,15 @@ func displayDetailedStatus(dag *digraph.DAG, status *models.DAGRunStatus) {
 // displayStepSummary shows a summary of all steps in the DAG run
 func displayStepSummary(nodes []*models.Node) {
 	headerColor := color.New(color.FgCyan, color.Bold)
-	
+
 	// Create a boxed header with 80 character width
 	fmt.Println(strings.Repeat("─", 80))
 	title := "Step Summary"
 	padding := (80 - len(title)) / 2
-	fmt.Printf("%s%s%s\n", 
-		strings.Repeat(" ", padding), 
+	fmt.Printf("%s%s%s\n",
+		strings.Repeat(" ", padding),
 		headerColor.Sprint(title),
-		strings.Repeat(" ", 80 - padding - len(title)))
+		strings.Repeat(" ", 80-padding-len(title)))
 	fmt.Println(strings.Repeat("─", 80))
 
 	// Count steps by status
@@ -289,15 +289,15 @@ func displayStepSummary(nodes []*models.Node) {
 
 	// Show detailed step information with log preview
 	fmt.Println()
-	
+
 	// Create a boxed header with 80 character width
 	fmt.Println(strings.Repeat("─", 80))
 	logTitle := "Step Logs Preview"
 	logPadding := (80 - len(logTitle)) / 2
-	fmt.Printf("%s%s%s\n", 
-		strings.Repeat(" ", logPadding), 
+	fmt.Printf("%s%s%s\n",
+		strings.Repeat(" ", logPadding),
 		headerColor.Sprint(logTitle),
-		strings.Repeat(" ", 80 - logPadding - len(logTitle)))
+		strings.Repeat(" ", 80-logPadding-len(logTitle)))
 	fmt.Println(strings.Repeat("─", 80))
 
 	// Create detailed table
@@ -334,7 +334,6 @@ func displayStepSummary(nodes []*models.Node) {
 
 	fmt.Println(detailTable.Render())
 }
-
 
 // readFirstLine reads the first line of a file and adds ellipsis if there's more content
 func readFirstLine(path string) string {

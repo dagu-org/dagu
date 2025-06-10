@@ -387,12 +387,12 @@ func (a *Agent) nodeToModelNode(nodeData scheduler.NodeData) *models.Node {
 	for i, child := range nodeData.State.Children {
 		children[i] = models.ChildDAGRun(child)
 	}
-	
+
 	var errText string
 	if nodeData.State.Error != nil {
 		errText = nodeData.State.Error.Error()
 	}
-	
+
 	return &models.Node{
 		Step:            nodeData.Step,
 		Stdout:          nodeData.State.Stdout,

@@ -103,16 +103,16 @@ func (pg *ProcGroup) isStale(ctx context.Context, file string) bool {
 
 	// Parse the timestamp from the file
 	unixTime := int64(binary.BigEndian.Uint64(data[:8])) // nolint:gosec
-	
+
 	// Validate the timestamp is reasonable (not in the future, not too old)
 	now := time.Now()
 	parsedTime := time.Unix(unixTime, 0)
-	
+
 	if parsedTime.After(now.Add(5 * time.Minute)) {
 		logger.Warn(ctx, "proc file %s has timestamp in the future (%s), considering it stale", file, parsedTime)
 		return true
 	}
-	
+
 	duration := now.Sub(parsedTime)
 	if duration < pg.staleTime {
 		logger.Debug(ctx, "proc file %s is not stale, last heartbeat at %s (%v ago)", file, parsedTime, duration)

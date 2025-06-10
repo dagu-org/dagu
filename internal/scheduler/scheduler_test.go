@@ -219,7 +219,7 @@ func TestScheduler_QueueDisabled(t *testing.T) {
 		th := setupTest(t)
 		// Disable queues
 		th.Config.Queues.Enabled = false
-		
+
 		entryReader := &mockJobManager{
 			Entries: []*scheduler.ScheduledJob{},
 		}

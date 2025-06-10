@@ -590,7 +590,7 @@ debug: true
 	require.NotNil(t, cfg)
 
 	// Verify default queue configuration
-	assert.True(t, cfg.Queues.Enabled) // Should default to enabled
+	assert.True(t, cfg.Queues.Enabled)  // Should default to enabled
 	assert.Len(t, cfg.Queues.Config, 0) // No queue configs by default
 }
 
@@ -609,7 +609,7 @@ queues:
 	// Set environment variable to override
 	originalEnv := os.Getenv("DAGU_QUEUE_ENABLED")
 	defer os.Setenv("DAGU_QUEUE_ENABLED", originalEnv)
-	
+
 	os.Setenv("DAGU_QUEUE_ENABLED", "false")
 
 	cfg, err := config.Load(config.WithConfigFile(configFile))

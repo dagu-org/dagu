@@ -295,11 +295,11 @@ func (a *appLogger) logWithPC(level slog.Level, msg string, tags ...any) {
 	if !a.logger.Enabled(context.Background(), level) {
 		return
 	}
-	
+
 	// Get the caller's PC
 	var pcs [1]uintptr
 	runtime.Callers(3, pcs[:]) // Skip runtime.Callers, logWithPC, and the logger method
-	
+
 	record := slog.NewRecord(time.Now(), level, msg, pcs[0])
 	record.Add(tags...)
 	_ = a.logger.Handler().Handle(context.Background(), record)

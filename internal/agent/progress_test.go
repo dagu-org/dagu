@@ -164,7 +164,7 @@ func TestProgressDisplay_RenderHeader_WithDAGRunInfo(t *testing.T) {
 func TestProgressDisplay_HeaderFormatting(t *testing.T) {
 	var buf bytes.Buffer
 	dag := &digraph.DAG{
-		Name: "data-pipeline",
+		Name:   "data-pipeline",
 		Params: []string{"ENV=staging", "VERSION=2.0"},
 	}
 	pd := NewProgressDisplay(&buf, dag)
@@ -184,7 +184,7 @@ func TestProgressDisplay_HeaderFormatting(t *testing.T) {
 	pd.renderHeader()
 
 	output := buf.String()
-	
+
 	// Verify the output contains expected information
 	assert.Contains(t, output, "DAG: data-pipeline")
 	assert.Contains(t, output, "Status:")
@@ -210,7 +210,7 @@ func TestProgressDisplay_Integration(t *testing.T) {
 	pd := NewProgressDisplay(&buf, dag)
 	pd.termWidth = 80
 	pd.termHeight = 24
-	
+
 	// Simulate agent setting DAG run info
 	pd.SetDAGRunInfo("test-run-789", "MODE=test")
 
@@ -255,7 +255,7 @@ func TestProgressDisplay_Integration(t *testing.T) {
 	pd.mu.Unlock()
 
 	output := buf.String()
-	
+
 	// Verify output contains all expected elements
 	require.Contains(t, output, "integration-test")
 	require.Contains(t, output, "test-run-789")

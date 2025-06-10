@@ -74,12 +74,12 @@ func IsJSONArray(s string) bool {
 	if len(s) < 2 {
 		return false
 	}
-	
+
 	// Quick check for brackets
 	if s[0] != '[' || s[len(s)-1] != ']' {
 		return false
 	}
-	
+
 	// Use json.Valid for accurate validation
 	return json.Valid([]byte(s))
 }

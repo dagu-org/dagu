@@ -89,27 +89,27 @@ func Write(ctx context.Context, msg string) {
 // logWithContextPC logs with the correct program counter, skipping context.go
 func logWithContextPC(ctx context.Context, level slog.Level, msg string, tags ...any) {
 	logger := FromContext(ctx)
-	
+
 	// Check if this is an appLogger with debug mode
 	if appLog, ok := logger.(*appLogger); ok && appLog.debug {
 		if !appLog.logger.Enabled(ctx, level) {
 			return
 		}
-		
+
 		// Get the caller's PC (skip runtime.Callers, this function, and the context function)
 		var pcs [1]uintptr
 		runtime.Callers(3, pcs[:])
-		
+
 		// Create record with correct PC
 		record := slog.NewRecord(time.Now(), level, msg, pcs[0])
 		if len(tags) > 0 {
 			record.Add(tags...)
 		}
-		
+
 		_ = appLog.logger.Handler().Handle(ctx, record)
 		return
 	}
-	
+
 	// Fallback to regular logging for non-appLogger or non-debug mode
 	switch level {
 	case slog.LevelDebug:

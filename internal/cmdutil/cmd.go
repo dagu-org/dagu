@@ -137,7 +137,7 @@ func unquoteToken(token string) string {
 	if len(token) < 2 {
 		return token
 	}
-	
+
 	// Check for matching quotes at start and end
 	if (token[0] == '"' && token[len(token)-1] == '"') ||
 		(token[0] == '\'' && token[len(token)-1] == '\'') {
@@ -151,7 +151,7 @@ func unquoteToken(token string) string {
 		// just remove the surrounding quotes
 		return token[1 : len(token)-1]
 	}
-	
+
 	// Don't unquote backticks - they're used for command substitution
 	return token
 }

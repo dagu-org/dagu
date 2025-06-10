@@ -13,7 +13,7 @@ const base58Alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwx
 func Base58EncodeSHA256(input string) string {
 	// Generate SHA-256 hash
 	hash := sha256.Sum256([]byte(input))
-	
+
 	// Convert hash to base58
 	return Base58Encode(hash[:])
 }
@@ -28,21 +28,21 @@ func Base58Encode(input []byte) string {
 	// Convert bytes to big integer
 	intBytes := big.NewInt(0)
 	intBytes.SetBytes(input)
-	
+
 	// Pre-allocate result with estimated capacity
 	// Base58 encoding expands by approximately 138%
 	estimatedLen := len(input)*138/100 + 1
 	result := make([]byte, 0, estimatedLen)
-	
+
 	base := big.NewInt(58)
 	zero := big.NewInt(0)
 	mod := &big.Int{}
-	
+
 	for intBytes.Cmp(zero) > 0 {
 		intBytes.DivMod(intBytes, base, mod)
 		result = append(result, base58Alphabet[mod.Int64()])
 	}
-	
+
 	// Handle leading zeros in input
 	for _, b := range input {
 		if b != 0 {
@@ -50,7 +50,7 @@ func Base58Encode(input []byte) string {
 		}
 		result = append(result, base58Alphabet[0])
 	}
-	
+
 	// Reverse the result
 	return reverseString(string(result))
 }

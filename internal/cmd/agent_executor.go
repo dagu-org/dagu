@@ -14,7 +14,7 @@ import (
 func ExecuteAgent(ctx *Context, agentInstance *agent.Agent, dag *digraph.DAG, dagRunID string, logFile *os.File) error {
 	// Check if progress display should be enabled
 	enableProgress := shouldEnableProgress(ctx)
-	
+
 	// Configure logger for progress display if needed
 	if enableProgress {
 		configureLoggerForProgress(ctx, logFile)
@@ -22,15 +22,15 @@ func ExecuteAgent(ctx *Context, agentInstance *agent.Agent, dag *digraph.DAG, da
 		// Normal logging configuration
 		ctx.LogToFile(logFile)
 	}
-	
+
 	// Set up signal handling
 	listenSignals(ctx, agentInstance)
-	
+
 	// Run the DAG
 	if err := agentInstance.Run(ctx); err != nil {
-		logger.Error(ctx, "Failed to execute dag-run", 
-			"dag", dag.Name, 
-			"dagRunId", dagRunID, 
+		logger.Error(ctx, "Failed to execute dag-run",
+			"dag", dag.Name,
+			"dagRunId", dagRunID,
 			"err", err)
 
 		if ctx.Quiet {
@@ -42,7 +42,7 @@ func ExecuteAgent(ctx *Context, agentInstance *agent.Agent, dag *digraph.DAG, da
 			if enableProgress {
 				os.Exit(1)
 			}
-			return fmt.Errorf("failed to execute the dag-run %s (dag-run ID: %s): %w", 
+			return fmt.Errorf("failed to execute the dag-run %s (dag-run ID: %s): %w",
 				dag.Name, dagRunID, err)
 		}
 	}
@@ -57,8 +57,8 @@ func ExecuteAgent(ctx *Context, agentInstance *agent.Agent, dag *digraph.DAG, da
 
 // shouldEnableProgress checks if progress display should be enabled
 func shouldEnableProgress(ctx *Context) bool {
-	return !ctx.Quiet && 
-		os.Getenv("DISABLE_PROGRESS") == "" && 
+	return !ctx.Quiet &&
+		os.Getenv("DISABLE_PROGRESS") == "" &&
 		isTerminal(os.Stderr)
 }
 

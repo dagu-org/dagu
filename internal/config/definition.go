@@ -212,12 +212,12 @@ type tlsConfigDef struct {
 
 // queuesDef represents the global queue configuration
 type queuesDef struct {
-	Enabled bool               `mapstructure:"enabled"`
-	Config  []queueConfigDef   `mapstructure:"config"`
+	Enabled bool             `mapstructure:"enabled"`
+	Config  []queueConfigDef `mapstructure:"config"`
 }
 
 // queueConfigDef represents individual queue configuration
 type queueConfigDef struct {
-	Name           string `mapstructure:"name"`
-	MaxActiveRuns  int    `mapstructure:"maxActiveRuns"`
+	Name          string `mapstructure:"name"`
+	MaxActiveRuns int    `mapstructure:"maxActiveRuns"`
 }

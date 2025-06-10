@@ -54,10 +54,10 @@ func TestShouldEnableProgress(t *testing.T) {
 			// Note: We can't easily test the terminal check in unit tests
 			// The actual shouldEnableProgress also checks isTerminal(os.Stderr)
 			// So we're mainly testing the quiet and env variable logic here
-			
+
 			// For a more complete test, we'd need to mock isTerminal
 			// but that would require refactoring the production code
-			
+
 			// Just verify the function exists and can be called
 			_ = &Context{
 				Context: context.Background(),

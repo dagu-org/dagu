@@ -26,23 +26,23 @@ type parallelExecutor struct {
 	stderr        io.Writer
 	runParamsList []RunParams
 	maxConcurrent int
-	
+
 	// Runtime state
-	running       map[string]*exec.Cmd    // Maps DAG run ID to command
-	results       map[string]*ChildResult // Maps DAG run ID to result
-	errors        []error                 // Collects errors from failed executions
-	wg            sync.WaitGroup          // Tracks running goroutines
-	cancelFunc    context.CancelFunc      // For canceling all child executions
+	running    map[string]*exec.Cmd    // Maps DAG run ID to command
+	results    map[string]*ChildResult // Maps DAG run ID to result
+	errors     []error                 // Collects errors from failed executions
+	wg         sync.WaitGroup          // Tracks running goroutines
+	cancelFunc context.CancelFunc      // For canceling all child executions
 }
 
 // ChildResult holds the result of a single child DAG execution
 type ChildResult struct {
-	RunID    string                 `json:"runId"`
-	Params   string                 `json:"params"`
-	Status   string                 `json:"status"`
+	RunID    string         `json:"runId"`
+	Params   string         `json:"params"`
+	Status   string         `json:"status"`
 	Output   map[string]any `json:"output,omitempty"`
-	Error    string                 `json:"error,omitempty"`
-	ExitCode int                    `json:"exitCode"`
+	Error    string         `json:"error,omitempty"`
+	ExitCode int            `json:"exitCode"`
 }
 
 func newParallelExecutor(
@@ -198,7 +198,7 @@ func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams
 	cmd := exec.CommandContext(ctx, executable, args...) // nolint:gosec
 	cmd.Dir = e.workDir
 	cmd.Env = append(cmd.Env, env.AllEnvs()...)
-	
+
 	// Create pipes for stdout/stderr capture
 	// We'll collect individual outputs for aggregation
 	cmd.Stdout = io.Discard // TODO: Capture individual outputs if needed
@@ -234,7 +234,7 @@ func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams
 
 	// Get the result regardless of error
 	result, resultErr := env.DB.GetChildDAGRunStatus(ctx, runParams.RunID, env.RootDAGRun)
-	
+
 	// Store the result
 	e.lock.Lock()
 	if resultErr == nil && result != nil {
@@ -243,13 +243,13 @@ func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams
 		for k, v := range result.Outputs {
 			outputs[k] = v
 		}
-		
+
 		// Determine status based on execution error
 		status := "success"
 		if err != nil {
 			status = "failed"
 		}
-		
+
 		e.results[runParams.RunID] = &ChildResult{
 			RunID:    runParams.RunID,
 			Params:   runParams.Params,
@@ -266,7 +266,7 @@ func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams
 		} else if err != nil {
 			status = "failed"
 		}
-		
+
 		e.results[runParams.RunID] = &ChildResult{
 			RunID:    runParams.RunID,
 			Params:   runParams.Params,
@@ -292,12 +292,12 @@ func (e *parallelExecutor) outputResults(_ context.Context) error {
 	// Create aggregated output
 	output := struct {
 		Summary struct {
-			Total      int `json:"total"`
-			Succeeded  int `json:"succeeded"`
-			Failed     int `json:"failed"`
-			Errors     int `json:"errors"`
+			Total     int `json:"total"`
+			Succeeded int `json:"succeeded"`
+			Failed    int `json:"failed"`
+			Errors    int `json:"errors"`
 		} `json:"summary"`
-		Results []ChildResult          `json:"results"`
+		Results []ChildResult    `json:"results"`
 		Outputs []map[string]any `json:"outputs"`
 	}{}
 
@@ -310,27 +310,27 @@ func (e *parallelExecutor) outputResults(_ context.Context) error {
 		if result, ok := e.results[params.RunID]; ok {
 			// Create a copy of the result to potentially modify it
 			resultCopy := *result
-			
+
 			// Clear output for failed executions
 			if result.Status != "success" {
 				resultCopy.Output = nil
 			}
-			
+
 			output.Results = append(output.Results, resultCopy)
-			
+
 			// Add output to the outputs array
 			// Only include outputs from successful executions
 			if result.Status == "success" && result.Output != nil {
 				output.Outputs = append(output.Outputs, result.Output)
 			}
-			
+
 			switch result.Status {
 			case "success":
 				output.Summary.Succeeded++
 			case "failed", "error":
 				output.Summary.Failed++
 			}
-			
+
 			if result.Error != "" {
 				output.Summary.Errors++
 			}

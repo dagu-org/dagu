@@ -209,7 +209,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 
 			// Determine the queue name for this DAG
 			queueName = s.getQueueNameForDAG(dag)
-			
+
 			// Check concurrency limits based on queue configuration
 			queueCfg = s.getQueueConfigByName(queueName, dag)
 			if alive >= queueCfg.MaxConcurrency {
@@ -267,7 +267,6 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 		}
 	}
 }
-
 
 // getQueueNameForDAG determines the queue name for a given DAG.
 // It returns the DAG's explicitly assigned queue name, or the DAG name if none is specified.

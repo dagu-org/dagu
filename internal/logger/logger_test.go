@@ -9,10 +9,10 @@ import (
 
 func TestLogger_SourceLocation(t *testing.T) {
 	tests := []struct {
-		name           string
-		logFunc        func(Logger)
-		expectedInLog  string
-		shouldNotHave  []string
+		name          string
+		logFunc       func(Logger)
+		expectedInLog string
+		shouldNotHave []string
 	}{
 		{
 			name: "Info method shows correct source",
@@ -93,7 +93,7 @@ func TestLogger_SourceLocation(t *testing.T) {
 			tt.logFunc(logger)
 
 			output := buf.String()
-			
+
 			// Check that the expected source location is present
 			if !strings.Contains(output, tt.expectedInLog) {
 				t.Errorf("Expected log to contain %q, but got: %s", tt.expectedInLog, output)
@@ -111,10 +111,10 @@ func TestLogger_SourceLocation(t *testing.T) {
 
 func TestLogger_SourceLocationWithContext(t *testing.T) {
 	tests := []struct {
-		name           string
-		logFunc        func(context.Context)
-		expectedInLog  string
-		shouldNotHave  []string
+		name          string
+		logFunc       func(context.Context)
+		expectedInLog string
+		shouldNotHave []string
 	}{
 		{
 			name: "Context Info shows correct source",
@@ -196,7 +196,7 @@ func TestLogger_SourceLocationWithContext(t *testing.T) {
 			tt.logFunc(ctx)
 
 			output := buf.String()
-			
+
 			// Check that the expected source location is present
 			if !strings.Contains(output, tt.expectedInLog) {
 				t.Errorf("Expected log to contain %q, but got: %s", tt.expectedInLog, output)
@@ -329,8 +329,8 @@ func TestLogger_JSONFormatSourceLocation(t *testing.T) {
 	output := buf.String()
 
 	// JSON format should also not show internal logger location
-	if strings.Contains(output, "internal/logger/logger.go") || 
-	   strings.Contains(output, "internal\\/logger\\/logger.go") {
+	if strings.Contains(output, "internal/logger/logger.go") ||
+		strings.Contains(output, "internal\\/logger\\/logger.go") {
 		t.Errorf("JSON log should not contain internal/logger/logger.go, but got: %s", output)
 	}
 
