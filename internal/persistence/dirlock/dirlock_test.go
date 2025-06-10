@@ -392,9 +392,16 @@ func TestEdgeCases(t *testing.T) {
 		lock, err := New(nonExistentDir, nil)
 		require.NoError(t, err)
 
-		// Should fail because parent directory doesn't exist
+		// Should succeed and create the directory
 		err = lock.TryLock()
-		require.Error(t, err)
+		require.NoError(t, err)
+		
+		// Verify directory was created
+		_, err = os.Stat(nonExistentDir)
+		require.NoError(t, err)
+		
+		err = lock.Unlock()
+		require.NoError(t, err)
 	})
 
 	t.Run("invalid lock directory format", func(t *testing.T) {

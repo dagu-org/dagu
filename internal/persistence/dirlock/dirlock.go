@@ -133,6 +133,11 @@ func (l *dirLock) TryLock() error {
 		}
 	}
 
+	// Ensure the target directory exists
+	if err := os.MkdirAll(l.targetDir, 0755); err != nil {
+		return fmt.Errorf("failed to create target directory: %w", err)
+	}
+
 	// Create lock directory with timestamp only
 	lockName := fmt.Sprintf(".dagu_lock.%d", time.Now().UnixNano())
 	l.lockPath = filepath.Join(l.targetDir, lockName)

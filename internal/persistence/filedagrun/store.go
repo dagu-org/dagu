@@ -252,7 +252,16 @@ func (store *Store) CreateAttempt(ctx context.Context, dag *digraph.DAG, timesta
 	dataRoot := NewDataRoot(store.baseDir, dag.Name)
 	ts := models.NewUTC(timestamp)
 
-	// TODO: Create a directory lock to ensure only one process can create a dag-run at a time
+	lockCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if err := dataRoot.Lock(lockCtx); err != nil {
+		return nil, fmt.Errorf("failed to acquire lock for dag-run %s: %w", dagRunID, err)
+	}
+	defer func() {
+		if err := dataRoot.Unlock(); err != nil {
+			logger.Error(ctx, "Failed to unlock dag-run", "dagRunID", dagRunID, "err", err)
+		}
+	}()
 
 	var run *DAGRun
 	if opts.Retry {

@@ -21,12 +21,15 @@ import (
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/persistence/dirlock"
 )
 
 // DataRoot manages the directory structure for run history data.
 // It handles the organization of run data in a hierarchical structure
 // based on year, month, and day.
 type DataRoot struct {
+	dirlock.DirLock // Directory lock for concurrent access
+
 	baseDir     string // Base directory for all DAGs
 	prefix      string // Sanitized prefix for directory names
 	dagRunsDir  string // Path to the dag-runs directory
@@ -64,6 +67,10 @@ func NewDataRoot(baseDir, dagName string) DataRoot {
 	root.prefix = prefix
 	root.dagRunsDir = filepath.Join(baseDir, root.prefix, "dag-runs")
 	root.globPattern = filepath.Join(root.dagRunsDir, "*", "*", "*", DAGRunDirPrefix+"*")
+	root.DirLock, _ = dirlock.New(root.dagRunsDir, &dirlock.LockOptions{
+		StaleThreshold: 30 * time.Second,      // Default stale threshold
+		RetryInterval:  50 * time.Millisecond, // Default retry interval
+	})
 
 	return root
 }
