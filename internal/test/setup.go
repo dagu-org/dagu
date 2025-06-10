@@ -290,6 +290,12 @@ func WithAgentOptions(options agent.Options) AgentOption {
 	}
 }
 
+func WithDAGRunID(dagRunID string) AgentOption {
+	return func(a *Agent) {
+		a.dagRunID = dagRunID
+	}
+}
+
 func (d *DAG) Agent(opts ...AgentOption) *Agent {
 	helper := &Agent{Helper: d.Helper, DAG: d.DAG}
 
@@ -300,6 +306,8 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 	var dagRunID string
 	if helper.opts.RetryTarget != nil {
 		dagRunID = helper.opts.RetryTarget.DAGRunID
+	} else if helper.dagRunID != "" {
+		dagRunID = helper.dagRunID
 	} else {
 		dagRunID = genDAGRunID()
 	}
@@ -328,7 +336,8 @@ type Agent struct {
 	*Helper
 	*digraph.DAG
 	*agent.Agent
-	opts agent.Options
+	opts     agent.Options
+	dagRunID string // the dag-run ID for this agent
 }
 
 func (a *Agent) RunError(t *testing.T) {
