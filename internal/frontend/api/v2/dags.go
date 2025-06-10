@@ -321,10 +321,10 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 		dagRun := toDAGRunSummary(dagStatuses[i])
 		dag := api.DAGFile{
 			FileName:     item.FileName(),
-			Errors:       errList,
 			LatestDAGRun: dagRun,
 			Suspended:    a.dagStore.IsSuspended(ctx, item.FileName()),
 			Dag:          toDAG(item),
+			Errors:       []string{},
 		}
 
 		resp.Dags = append(resp.Dags, dag)
