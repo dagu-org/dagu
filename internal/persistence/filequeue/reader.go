@@ -21,14 +21,15 @@ import (
 var _ models.QueueReader = (*queueReaderImpl)(nil)
 
 type queueReaderImpl struct {
-	store   *Store
-	running atomic.Bool
-	cancel  context.CancelFunc
-	mu      sync.RWMutex
-	items   []queuedItem
-	updated atomic.Bool
-	done    chan struct{}
-	watcher filenotify.FileWatcher
+	store          *Store
+	running        atomic.Bool
+	cancel         context.CancelFunc
+	mu             sync.RWMutex
+	items          []queuedItem
+	updated        atomic.Bool
+	done           chan struct{}
+	watcher        filenotify.FileWatcher
+	queueRetryTime sync.Map // map[queueName]time.Time - tracks retry times per queue
 }
 
 type queuedItem struct {
@@ -49,6 +50,7 @@ const (
 	shutdownTimeout   = 5 * time.Second
 	pollingInterval   = 2 * time.Second // For filenotify poller fallback
 	processingTimeout = 8 * time.Second
+	queueRetryDelay   = 2 * time.Second // Delay before retrying items from the same queue
 )
 
 func newQueueReader(s *Store) *queueReaderImpl {
@@ -257,6 +259,17 @@ func (q *queueReaderImpl) processItems(ctx context.Context, ch chan<- models.Que
 			continue
 		}
 
+		// Check if this queue is in retry delay period
+		if retryTime, ok := q.queueRetryTime.Load(data.Name); ok {
+			if retryAfter, ok := retryTime.(time.Time); ok {
+				if time.Now().Before(retryAfter) {
+					// Skip this queue until retry time has passed
+					processed[data.Name] = true
+					continue
+				}
+			}
+		}
+
 		q.tryProcessItem(ctx, ch, item, data, processed)
 		processed[data.Name] = true
 
@@ -278,12 +291,17 @@ func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.Q
 		case res := <-item.Result:
 			switch res {
 			case models.QueuedItemProcessingResultRetry:
-				// Item was not processed successfully
+				// Item was not processed successfully, set retry delay for this queue
 				item.status = statusNone
+				retryAfter := time.Now().Add(queueRetryDelay)
+				q.queueRetryTime.Store(data.Name, retryAfter)
+				logger.Info(ctx, "Queue full, delaying retry", "name", data.Name, "retryAfter", retryAfter.Format(time.RFC3339))
 			case models.QueuedItemProcessingResultSuccess:
 				logger.Info(ctx, "Item processed successfully", "name", data.Name, "dagRunId", data.ID)
 				item.status = statusDone
 				q.removeProcessedItem(ctx, data)
+				// Clear retry delay for this queue since we successfully processed an item
+				q.queueRetryTime.Delete(data.Name)
 			case models.QueuedItemProcessingResultInvalid:
 				logger.Info(ctx, "Item is invalid, removing", "name", data.Name, "dagRunId", data.ID)
 				item.status = statusDone
