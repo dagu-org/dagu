@@ -7,7 +7,7 @@ import (
 // Database is the interface for accessing the database to retrieve DAGs and dag-run statuses.
 type Database interface {
 	// GetDAG retrieves a DAG by its name.
-	GetDAG(ctx context.Context, parent *DAG, name string) (*DAG, error)
+	GetDAG(ctx context.Context, name string) (*DAG, error)
 	// GetChildDAGRunStatus retrieves the status of a child dag-run by its ID and the root dag-run reference.
 	GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun DAGRunRef) (*Status, error)
 }

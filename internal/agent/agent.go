@@ -782,11 +782,7 @@ func newDBClient(drs models.DAGRunStore, ds models.DAGStore) *dbClient {
 }
 
 // GetDAG implements digraph.DBClient.
-func (o *dbClient) GetDAG(ctx context.Context, parent *digraph.DAG, name string) (*digraph.DAG, error) {
-	if local, ok := parent.LocalDAGs[name]; ok {
-		// If the DAG is a local DAG, return it directly.
-		return local.DAG, nil
-	}
+func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error) {
 	return o.ds.GetDetails(ctx, name)
 }
 

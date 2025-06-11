@@ -52,7 +52,7 @@ func newParallelExecutor(
 	// as they are passed through SetParamsList
 
 	env := GetEnv(ctx)
-	dag, err := env.DB.GetDAG(ctx, env.DAG, step.ChildDAG.Name)
+	dag, err := env.DB.GetDAG(ctx, step.ChildDAG.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find DAG %q: %w", step.ChildDAG.Name, err)
 	}
