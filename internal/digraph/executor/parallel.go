@@ -10,7 +10,6 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -19,7 +18,7 @@ import (
 var _ ParallelExecutor = (*parallelExecutor)(nil)
 
 type parallelExecutor struct {
-	dag           *digraph.DAG
+	child         *ChildDAGExecutor
 	lock          sync.Mutex
 	workDir       string
 	stdout        io.Writer
@@ -51,10 +50,13 @@ func newParallelExecutor(
 	// The parallel executor doesn't use the params from the step directly
 	// as they are passed through SetParamsList
 
-	env := GetEnv(ctx)
-	dag, err := env.DB.GetDAG(ctx, step.ChildDAG.Name)
+	if step.ChildDAG == nil {
+		return nil, fmt.Errorf("child DAG configuration is missing")
+	}
+
+	child, err := NewChildDAGExecutor(ctx, step.ChildDAG.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find DAG %q: %w", step.ChildDAG.Name, err)
+		return nil, err
 	}
 
 	if step.Dir != "" && !fileutil.FileExists(step.Dir) {
@@ -67,7 +69,7 @@ func newParallelExecutor(
 	}
 
 	return &parallelExecutor{
-		dag:           dag,
+		child:         child,
 		workDir:       step.Dir,
 		maxConcurrent: maxConcurrent,
 		running:       make(map[string]*exec.Cmd),
@@ -77,6 +79,13 @@ func newParallelExecutor(
 }
 
 func (e *parallelExecutor) Run(ctx context.Context) error {
+	// Ensure cleanup happens even if there's an error
+	defer func() {
+		if err := e.child.Cleanup(ctx); err != nil {
+			logger.Error(ctx, "Failed to cleanup child DAG executor", "error", err)
+		}
+	}()
+
 	if len(e.runParamsList) == 0 {
 		return fmt.Errorf("no child DAG runs to execute")
 	}
@@ -94,7 +103,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	logger.Info(ctx, "Starting parallel execution",
 		"total", len(e.runParamsList),
 		"maxConcurrent", e.maxConcurrent,
-		"dag", e.dag.Name,
+		"dag", e.child.DAG.Name,
 	)
 
 	// Launch all child DAG executions
@@ -166,48 +175,15 @@ func (e *parallelExecutor) SetStderr(out io.Writer) {
 
 // executeChild executes a single child DAG with the given parameters
 func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams) error {
-	executable, err := executablePath()
+	cmd, err := e.child.BuildCommand(ctx, runParams, e.workDir)
 	if err != nil {
-		return fmt.Errorf("failed to find executable path: %w", err)
+		return err
 	}
-
-	env := GetEnv(ctx)
-	if env.RootDAGRun.Zero() {
-		return fmt.Errorf("root dag-run ID is not set")
-	}
-
-	args := []string{
-		"start",
-		fmt.Sprintf("--root=%s", env.RootDAGRun.String()),
-		fmt.Sprintf("--parent=%s", env.DAGRunRef().String()),
-		fmt.Sprintf("--run-id=%s", runParams.RunID),
-		"--no-queue",
-		e.dag.Location,
-	}
-
-	if configFile := config.UsedConfigFile.Load(); configFile != nil {
-		if configFile, ok := configFile.(string); ok {
-			args = append(args, "--config", configFile)
-		}
-	}
-
-	if runParams.Params != "" {
-		args = append(args, "--", runParams.Params)
-	}
-
-	cmd := exec.CommandContext(ctx, executable, args...) // nolint:gosec
-	cmd.Dir = e.workDir
-	cmd.Env = append(cmd.Env, env.AllEnvs()...)
 
 	// Create pipes for stdout/stderr capture
 	// We'll collect individual outputs for aggregation
 	cmd.Stdout = io.Discard // TODO: Capture individual outputs if needed
 	cmd.Stderr = io.Discard // TODO: Capture individual errors if needed
-
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
-		Pgid:    0,
-	}
 
 	// Store the command for potential killing
 	e.lock.Lock()
@@ -216,7 +192,7 @@ func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams
 
 	logger.Info(ctx, "Executing child DAG",
 		"dagRunId", runParams.RunID,
-		"target", e.dag.Name,
+		"target", e.child.DAG.Name,
 		"params", runParams.Params,
 	)
 
@@ -233,6 +209,7 @@ func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams
 	e.lock.Unlock()
 
 	// Get the result regardless of error
+	env := GetEnv(ctx)
 	result, resultErr := env.DB.GetChildDAGRunStatus(ctx, runParams.RunID, env.RootDAGRun)
 
 	// Store the result
