@@ -325,7 +325,7 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([
 		dest.Location = filePath
 
 		// Marshal the document back to YAML to preserve original data
-		yamlData, err := yaml.Marshal(dest)
+		yamlData, err := yaml.Marshal(doc)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal DAG in document %d: %w", docIndex, err)
 		}
