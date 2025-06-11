@@ -236,6 +236,10 @@
       ],
       "description": "Default parameters that can be overridden when triggering the DAG. Can be positional (accessed as $1, $2) or named (accessed as ${KEY})."
     },
+    "resources": {
+      "$ref": "#/definitions/resources",
+      "description": "Resource requirements for the entire DAG process. Specifies CPU and memory requests (minimum guaranteed) and limits (maximum allowed)."
+    },
     "steps": {
       "oneOf": [
         {
@@ -576,6 +580,10 @@
             }
           ],
           "description": "Configuration for parallel execution of child DAGs. Only applicable when 'run' is specified. Allows processing multiple items concurrently using the same workflow definition."
+        },
+        "resources": {
+          "$ref": "#/definitions/resources",
+          "description": "Step-specific resource requirements (CPU and memory). Overrides DAG-level resources for this step."
         }
       }
     },
@@ -614,6 +622,38 @@
         }
       },
       "description": "Configuration for email notifications, used by errorMail and infoMail settings."
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requests": {
+          "$ref": "#/definitions/resourceQuantities",
+          "description": "Minimum resources guaranteed for the process. Used for scheduling and resource reservation."
+        },
+        "limits": {
+          "$ref": "#/definitions/resourceQuantities",
+          "description": "Maximum resources the process can use. Exceeding limits may result in throttling (CPU) or termination (memory)."
+        }
+      },
+      "description": "Resource requirements specification for CPU and memory."
+    },
+    "resourceQuantities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cpu": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)?$|^[0-9]+m$",
+          "description": "CPU cores or millicores. Examples: '0.5' (half core), '2' (2 cores), '500m' (500 millicores = 0.5 cores)"
+        },
+        "memory": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)?([KMGT]i?)?$",
+          "description": "Memory amount with units. Examples: '512Mi' (512 mebibytes), '2Gi' (2 gibibytes), '1G' (1 gigabyte), '1073741824' (bytes)"
+        }
+      },
+      "description": "CPU and memory quantity specifications."
     }
   }
 }

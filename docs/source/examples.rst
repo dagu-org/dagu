@@ -447,3 +447,86 @@ Control concurrent execution of DAGs using queue configuration:
   
   # Remove from queue
   dagu dequeue --dag-run=batch-job:batch-2024-01-15
+
+Resource Management
+------------------
+
+**Basic Resource Limits:**
+
+.. code-block:: yaml
+
+  name: resource-constrained-dag
+  # DAG-level resources apply to the entire process
+  resources:
+    limits:
+      cpu: "1"        # Maximum 1 CPU core
+      memory: "1Gi"   # Maximum 1 GiB memory
+  
+  steps:
+    - name: process-data
+      command: python process.py
+
+**Step-Specific Resources:**
+
+.. code-block:: yaml
+
+  name: mixed-workload
+  # Default resources for light tasks
+  resources:
+    requests:
+      cpu: "0.5"
+      memory: "256Mi"
+    limits:
+      cpu: "1"
+      memory: "512Mi"
+  
+  steps:
+    - name: light-task
+      command: echo "Uses DAG default resources"
+    
+    - name: memory-intensive
+      command: python analyze_data.py
+      # Override for this specific step
+      resources:
+        requests:
+          memory: "2Gi"  # Needs more memory
+        limits:
+          memory: "4Gi"
+          cpu: "2"
+    
+    - name: cpu-intensive
+      command: python train_model.py
+      resources:
+        requests:
+          cpu: "4"       # Needs more CPU
+          memory: "1Gi"
+        limits:
+          cpu: "8"
+          memory: "2Gi"
+
+**Parallel Processing with Resources:**
+
+.. code-block:: yaml
+
+  name: parallel-resource-control
+  # Limit total resources for parallel execution
+  resources:
+    limits:
+      cpu: "4"        # Total 4 cores for all parallel tasks
+      memory: "8Gi"   # Total 8 GiB for all parallel tasks
+  
+  steps:
+    - name: prepare-data
+      command: split_data.sh
+    
+    - name: process-batch
+      depends: prepare-data
+      run: batch-processor.yaml
+      parallel:
+        items: ["batch1", "batch2", "batch3", "batch4"]
+        maxConcurrent: 2  # Only 2 batches at a time
+      # Each parallel instance gets these resources
+      resources:
+        limits:
+          cpu: "2"      # 2 cores per batch (4 total max)
+          memory: "4Gi"  # 4 GiB per batch (8 total max)

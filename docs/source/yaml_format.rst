@@ -802,6 +802,87 @@ Execute steps periodically:
         repeat: true
         intervalSec: 60
 
+Resource Management
+~~~~~~~~~~~~~~~~~
+Control CPU and memory usage for DAGs and individual steps:
+
+**DAG-level resources** (applies to the entire DAG process):
+
+.. code-block:: yaml
+
+  resources:
+    requests:
+      cpu: "0.5"      # Request 0.5 CPU cores
+      memory: "512Mi"  # Request 512 MiB of memory
+    limits:
+      cpu: "2"        # Limit to 2 CPU cores  
+      memory: "2Gi"   # Limit to 2 GiB of memory
+  steps:
+    - name: process data
+      command: python process.py
+
+**Step-level resources** (applies to individual steps):
+
+.. code-block:: yaml
+
+  steps:
+    - name: memory intensive task
+      command: python analyze.py
+      resources:
+        requests:
+          memory: "1Gi"  # This step needs at least 1 GiB
+        limits:
+          memory: "4Gi"  # But no more than 4 GiB
+          cpu: "1"       # And max 1 CPU core
+
+**Resource units**:
+
+- **CPU**: Specified in cores. Examples: ``"0.5"`` (half core), ``"2"`` (2 cores), ``"500m"`` (500 millicores)
+- **Memory**: Specified with units. Examples:
+  
+  - Binary units: ``"512Mi"`` (512 mebibytes), ``"2Gi"`` (2 gibibytes)
+  - Decimal units: ``"500M"`` (500 megabytes), ``"2G"`` (2 gigabytes)
+  - Raw bytes: ``"1073741824"`` (1 GiB in bytes)
+
+**Requests vs Limits**:
+
+- **Requests**: The minimum resources guaranteed for the process. Used for scheduling and resource reservation.
+- **Limits**: The maximum resources the process can use. Exceeding limits may result in throttling (CPU) or termination (memory).
+
+**Platform support**:
+
+- **Linux**: Full support via cgroups v2 (recommended) or cgroups v1
+- **macOS/Unix**: Limited support via resource limits (rlimits) - only limits are enforced, not requests
+- **Windows**: Not currently supported
+
+**Example with both DAG and step resources**:
+
+.. code-block:: yaml
+
+  # Default resources for the entire DAG
+  resources:
+    requests:
+      cpu: "0.5"
+      memory: "256Mi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+  
+  steps:
+    - name: light task
+      command: echo "Uses DAG resources"
+    
+    - name: heavy task
+      command: python train_model.py
+      # Override with step-specific resources
+      resources:
+        requests:
+          cpu: "2"
+          memory: "4Gi"
+        limits:
+          cpu: "4"
+          memory: "8Gi"
+
 Field Reference
 -------------
 
@@ -844,6 +925,7 @@ Complete list of DAG-level configuration options:
 - ``handlerOn``: Lifecycle event handlers
 - ``steps``: List of steps to execute
 - ``smtp``: SMTP settings
+- ``resources``: Resource requirements (CPU/memory requests and limits)
 
 Example DAG configuration:
 
@@ -907,6 +989,7 @@ Configuration options available for individual steps:
 - ``depends``: Dependencies
 - ``run``: Sub workflow name
 - ``params``: Sub workflow parameters
+- ``resources``: Step-specific resource requirements (CPU/memory requests and limits)
 
 Example step configuration:
 

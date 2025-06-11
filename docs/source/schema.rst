@@ -233,6 +233,26 @@ These fields apply to the entire DAG. They appear at the root of the YAML file.
       exit:
         command: echo "all done!"
 
+``resources``
+~~~~~~~~~~~
+  Resource requirements for the entire DAG process. Specifies CPU and memory requests (minimum guaranteed) and limits (maximum allowed).
+  
+  .. code-block:: yaml
+  
+    resources:
+      requests:
+        cpu: "0.5"      # Request 0.5 CPU cores
+        memory: "512Mi"  # Request 512 MiB of memory
+      limits:
+        cpu: "2"        # Limit to 2 CPU cores
+        memory: "2Gi"   # Limit to 2 GiB of memory
+  
+  **CPU units**: Cores (e.g., "0.5", "2") or millicores (e.g., "500m" = 0.5 cores)
+  
+  **Memory units**: Binary ("Ki", "Mi", "Gi") or decimal ("K", "M", "G") units, or raw bytes
+  
+  **Platform support**: Full support on Linux (cgroups), limited support on macOS/Unix (rlimits)
+
 ``steps``
 ~~~~~~~~
   A list of steps (tasks) to execute. Steps define your workflow logic and can depend on each other. See :ref:`Step Fields <step-fields>` below for details.
@@ -404,6 +424,23 @@ Each element in the top-level ``steps`` list has its own fields for customizatio
 ~~~~~~~~~~
   An executor configuration specifying how the command or script is run (e.g., Docker, SSH, HTTP, Mail, JSON).  
   For more details, see :ref:`Executors <Executors>`.
+
+``resources``
+~~~~~~~~~~~
+  Step-specific resource requirements (CPU and memory). Overrides DAG-level resources for this step.
+  
+  .. code-block:: yaml
+  
+    steps:
+      - name: heavy task
+        command: python train_model.py
+        resources:
+          requests:
+            cpu: "2"        # Request 2 CPU cores
+            memory: "4Gi"   # Request 4 GiB of memory
+          limits:
+            cpu: "4"        # Limit to 4 CPU cores
+            memory: "8Gi"   # Limit to 8 GiB of memory
 
 ------------
 
