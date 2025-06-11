@@ -653,6 +653,111 @@ You can access the output of the sub workflow using the `output` field:
 .. note::
    For executing the same child DAG multiple times with different parameters in parallel, see :ref:`Parallel Execution`.
 
+Multiple DAGs in a Single File
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Dagu supports defining multiple DAGs within a single YAML file, separated by ``---``. This feature enables:
+
+- Better organization of related workflows
+- Reusable workflow components
+- Modular workflow design
+
+**Basic Example:**
+
+.. code-block:: yaml
+
+    # main.yaml
+    name: main-workflow
+    steps:
+      - name: process-data
+        run: data-processor
+        params: "TYPE=daily"
+    
+    ---
+    
+    name: data-processor
+    params:
+      - TYPE: "batch"
+    steps:
+      - name: extract
+        command: ./extract.sh ${TYPE}
+      - name: transform
+        command: ./transform.sh
+
+When the main workflow executes, it can reference ``data-processor`` as a local DAG defined in the same file.
+
+**Complex Example with Multiple Local DAGs:**
+
+.. code-block:: yaml
+
+    # etl-pipeline.yaml
+    name: etl-orchestrator
+    schedule: "0 2 * * *"
+    steps:
+      - name: validate
+        run: validator
+        output: VALIDATION_RESULT
+      
+      - name: process
+        run: processor
+        params: "VALIDATION=${VALIDATION_RESULT}"
+        depends: validate
+      
+      - name: notify
+        run: notifier
+        params: "STATUS=completed"
+        depends: process
+    
+    ---
+    
+    name: validator
+    steps:
+      - name: check-source
+        command: test -f /data/input.csv
+      - name: validate-format
+        command: python validate.py /data/input.csv
+        output: IS_VALID
+    
+    ---
+    
+    name: processor
+    params:
+      - VALIDATION: ""
+    steps:
+      - name: process-data
+        command: python process.py
+        preconditions:
+          - condition: "${VALIDATION}"
+            expected: "true"
+    
+    ---
+    
+    name: notifier
+    params:
+      - STATUS: ""
+    steps:
+      - name: send-notification
+        command: |
+          curl -X POST https://api.example.com/notify \
+            -d "status=${STATUS}"
+
+**Key Points:**
+
+- Each DAG must have a unique ``name`` within the file
+- Local DAGs are only accessible within the same file
+- The first DAG in the file is considered the main/parent DAG
+- Local DAGs can accept parameters and return outputs just like external DAGs
+- Local DAGs are executed in separate processes for isolation
+
+**When to Use Multiple DAGs:**
+
+- **Modular Workflows**: Break complex workflows into manageable components
+- **Reusable Logic**: Define common patterns once and reuse within the file
+- **Testing**: Keep test workflows together with the main workflow
+- **Related Processes**: Group related workflows that share common logic
+
+.. note::
+   Local DAGs defined with ``---`` separator are different from external DAG files. They exist only within the context of the file where they are defined and cannot be referenced from other DAG files.
+
 Command Substitution
 ~~~~~~~~~~~~~~~~~
 Use command output in configurations:

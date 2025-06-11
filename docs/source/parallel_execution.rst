@@ -42,6 +42,57 @@ To use parallel execution, add a ``parallel`` field to a step that runs a child 
 
 This will execute the ``child-workflow`` DAG three times in parallel, each with a different item as parameter.
 
+Using Local DAGs with Parallel Execution
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Local DAGs (defined in the same file with ``---`` separator) are particularly useful with parallel execution as they keep related logic together:
+
+.. code-block:: yaml
+
+    # data-processor.yaml
+    name: batch-processor
+    steps:
+      - name: find-files
+        command: find /data -name "*.csv" -type f
+        output: CSV_FILES
+      
+      - name: process-files
+        run: file-processor  # Local DAG defined below
+        parallel: ${CSV_FILES}
+        output: RESULTS
+      
+      - name: summarize
+        command: |
+          echo "Processed ${RESULTS.summary.total} files"
+          echo "Success: ${RESULTS.summary.succeeded}"
+          echo "Failed: ${RESULTS.summary.failed}"
+    
+    ---
+    
+    name: file-processor
+    params:
+      - FILE: ""
+    steps:
+      - name: validate
+        command: test -f "$1" && file "$1" | grep -q "CSV"
+        
+      - name: process
+        command: python process_csv.py "$1"
+        depends: validate
+        output: RECORD_COUNT
+      
+      - name: cleanup
+        command: rm -f "/tmp/$(basename $1).tmp"
+        continueOn:
+          failure: true
+
+This approach offers several advantages:
+
+- **Encapsulation**: The parallel processing logic stays with the main workflow
+- **Maintainability**: Changes to the processing logic don't require updating separate files
+- **Testing**: You can test the entire workflow including parallel execution in one file
+- **Reusability**: The local DAG can be used multiple times within the same file
+
 Parallel Configuration Options
 ------------------------------
 
@@ -409,6 +460,98 @@ Apply retry policies to parallel executions:
 
 Complete Examples
 -----------------
+
+Local DAGs with Dynamic Parallel Execution
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This example shows how to use local DAGs for a multi-stage parallel processing pipeline:
+
+.. code-block:: yaml
+
+    # multi-stage-pipeline.yaml
+    name: data-pipeline
+    schedule: "0 */6 * * *"
+    
+    steps:
+      - name: discover-sources
+        command: |
+          aws s3 ls s3://data-bucket/incoming/ | 
+          grep -E '\.(csv|json)$' | 
+          awk '{print $4}'
+        output: SOURCE_FILES
+      
+      - name: validate-all
+        run: validator
+        parallel: ${SOURCE_FILES}
+        output: VALIDATION_RESULTS
+        continueOn:
+          failure: true
+      
+      - name: process-valid-files
+        run: processor
+        parallel:
+          items: ${VALIDATION_RESULTS.outputs}
+          maxConcurrent: 5
+        output: PROCESS_RESULTS
+        preconditions:
+          - condition: "${VALIDATION_RESULTS.summary.succeeded}"
+            expected: "re:[1-9][0-9]*"  # At least one file passed validation
+      
+      - name: generate-report
+        command: |
+          python generate_report.py \
+            --validated="${VALIDATION_RESULTS.summary.total}" \
+            --processed="${PROCESS_RESULTS.summary.succeeded}" \
+            --failed="${PROCESS_RESULTS.summary.failed}"
+    
+    ---
+    
+    name: validator
+    params:
+      - FILE: ""
+    steps:
+      - name: download
+        command: aws s3 cp "s3://data-bucket/incoming/$1" "/tmp/$1"
+        
+      - name: validate-structure
+        command: python validate_file.py "/tmp/$1"
+        output: IS_VALID
+        continueOn:
+          failure: true
+          markSuccess: false
+      
+      - name: move-to-staging
+        command: |
+          if [ "${IS_VALID}" = "true" ]; then
+            aws s3 mv "s3://data-bucket/incoming/$1" "s3://data-bucket/staging/$1"
+            echo "$1"  # Output the filename for processing
+          else
+            aws s3 mv "s3://data-bucket/incoming/$1" "s3://data-bucket/invalid/$1"
+          fi
+        output: STAGED_FILE
+    
+    ---
+    
+    name: processor
+    params:
+      - STAGED_FILE: ""
+    steps:
+      - name: transform
+        command: |
+          python transform_data.py \
+            --input="s3://data-bucket/staging/${STAGED_FILE}" \
+            --output="s3://data-bucket/processed/${STAGED_FILE%.csv}.parquet"
+        retryPolicy:
+          limit: 3
+          intervalSec: 30
+          exitCode: [1, 255]
+
+This example demonstrates:
+- Dynamic file discovery and parallel validation
+- Conditional processing based on validation results
+- Multi-stage pipeline with local DAGs
+- Error handling and file movement based on validation status
+- Resource control with ``maxConcurrent``
 
 ETL Pipeline Example
 ~~~~~~~~~~~~~~~~~~~~
