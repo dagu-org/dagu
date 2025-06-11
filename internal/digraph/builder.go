@@ -78,6 +78,7 @@ var builderRegistry = []builderEntry{
 	{name: "maxCleanUpTime", fn: maxCleanUpTime},
 	{name: "maxActiveRuns", fn: buildMaxActiveRuns},
 	{name: "preconditions", fn: buildPrecondition},
+	{name: "resources", fn: buildResources},
 }
 
 type builderEntry struct {
@@ -98,6 +99,7 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "signalOnStop", fn: buildSignalOnStop},
 	{name: "precondition", fn: buildStepPrecondition},
 	{name: "output", fn: buildOutput},
+	{name: "resources", fn: buildStepResources},
 	{name: "validate", fn: validateStep},
 }
 
@@ -1196,4 +1198,40 @@ func injectChainDependencies(dag *DAG) {
 			step.Depends = []string{prevStep.Name}
 		}
 	}
+}
+
+// buildResources builds the resource configuration for the DAG
+func buildResources(_ BuildContext, spec *definition, dag *DAG) error {
+	if spec.Resources == nil {
+		// Initialize empty resources
+		dag.Resources = &Resources{}
+		return nil
+	}
+
+	// Parse and validate the resources
+	resources, err := ParseResourcesConfig(spec.Resources)
+	if err != nil {
+		return wrapError("resources", spec.Resources, err)
+	}
+
+	dag.Resources = resources
+	return nil
+}
+
+// buildStepResources builds the resource configuration for a step
+func buildStepResources(_ BuildContext, def stepDef, step *Step) error {
+	if def.Resources == nil {
+		// Initialize empty resources
+		step.Resources = &Resources{}
+		return nil
+	}
+
+	// Parse and validate the resources
+	resources, err := ParseResourcesConfig(def.Resources)
+	if err != nil {
+		return wrapError("resources", def.Resources, err)
+	}
+
+	step.Resources = resources
+	return nil
 }

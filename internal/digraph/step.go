@@ -60,6 +60,8 @@ type Step struct {
 	ChildDAG *ChildDAG `json:"childDag,omitempty"`
 	// Parallel contains the configuration for parallel execution.
 	Parallel *ParallelConfig `json:"parallel,omitempty"`
+	// Resources specifies resource requirements for the step.
+	Resources *Resources `json:"resources,omitempty"`
 }
 
 // setup sets the default values for the step.

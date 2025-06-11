@@ -1,0 +1,29 @@
+name: test-resources
+resources:
+  requests:
+    cpu: "0.5"
+    memory: "1Gi"
+  limits:
+    cpu: "2"
+    memory: "4Gi"
+
+steps:
+  - name: light-task
+    command: echo "light task"
+  
+  - name: heavy-task
+    command: python process_data.py
+    resources:
+      limits:
+        cpu: "4"
+        memory: "8Gi"
+  
+  - name: medium-task
+    command: ./analyze.sh
+    resources:
+      requests:
+        cpu: "1"
+        memory: "2Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"

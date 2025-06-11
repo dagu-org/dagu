@@ -64,6 +64,8 @@ type definition struct {
 	Tags any
 	// Queue is the name of the queue to assign this DAG to.
 	Queue string
+	// Resources specifies resource requirements for the DAG.
+	Resources *ResourcesConfig
 }
 
 // handlerOnDef defines the steps to be executed on different events.
@@ -127,6 +129,8 @@ type stepDef struct {
 	// - Static array: parallel: [item1, item2]
 	// - Object configuration: parallel: {items: ${ITEMS}, maxConcurrent: 5}
 	Parallel any `yaml:"parallel,omitempty"`
+	// Resources specifies resource requirements for the step.
+	Resources *ResourcesConfig `yaml:"resources,omitempty"`
 }
 
 // continueOnDef defines the conditions to continue on failure or skipped.

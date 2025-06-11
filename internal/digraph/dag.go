@@ -96,6 +96,8 @@ type DAG struct {
 	BuildErrors []error
 	// LocalDAGs contains DAGs defined in the same file, keyed by DAG name
 	LocalDAGs map[string]LocalDAG `json:"localDAGs,omitempty"`
+	// Resources specifies resource requirements for the DAG.
+	Resources *Resources `json:"resources,omitempty"`
 }
 
 // LocalDAG is a wrapper around DAG to represent a local DAG.
