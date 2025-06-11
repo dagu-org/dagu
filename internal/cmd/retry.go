@@ -33,6 +33,12 @@ Example:
 var retryFlags = []commandLineFlag{dagRunIDFlagRetry}
 
 func runRetry(ctx *Context, args []string) error {
+	// Apply resource limits if they were passed via environment variables
+	if err := applyResourceLimits(); err != nil {
+		// Log the error but don't fail - resource limits are best-effort
+		logger.Warn(ctx, "Failed to apply resource limits", "error", err)
+	}
+	
 	dagRunID, _ := ctx.StringParam("run-id")
 	name := args[0]
 

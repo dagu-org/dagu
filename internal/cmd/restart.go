@@ -43,6 +43,12 @@ var restartFlags = []commandLineFlag{
 }
 
 func runRestart(ctx *Context, args []string) error {
+	// Apply resource limits if they were passed via environment variables
+	if err := applyResourceLimits(); err != nil {
+		// Log the error but don't fail - resource limits are best-effort
+		logger.Warn(ctx, "Failed to apply resource limits", "error", err)
+	}
+	
 	dagRunID, err := ctx.StringParam("run-id")
 	if err != nil {
 		return fmt.Errorf("failed to get dag-run ID: %w", err)

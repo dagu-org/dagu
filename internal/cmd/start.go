@@ -56,6 +56,12 @@ var startFlags = []commandLineFlag{paramsFlag, dagRunIDFlag, parentDAGRunFlag, r
 
 // runStart handles the execution of the start command
 func runStart(ctx *Context, args []string) error {
+	// Apply resource limits if they were passed via environment variables
+	if err := applyResourceLimits(); err != nil {
+		// Log the error but don't fail - resource limits are best-effort
+		logger.Warn(ctx, "Failed to apply resource limits", "error", err)
+	}
+	
 	// Get dag-run ID and references
 	dagRunID, rootRef, parentRef, isChildDAGRun, err := getDAGRunInfo(ctx)
 	if err != nil {

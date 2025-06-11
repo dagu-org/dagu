@@ -79,8 +79,8 @@ func TestActualEnforcerSelection(t *testing.T) {
 		}
 	case *RlimitEnforcer:
 		t.Log("Using rlimit enforcer")
-		if enforcer.SupportsLimits() {
-			t.Error("RlimitEnforcer currently has limits disabled")
+		if !enforcer.SupportsLimits() {
+			t.Error("RlimitEnforcer should support limits via environment variables")
 		}
 	case *NoopEnforcer:
 		t.Log("Using noop enforcer - no enforcement available")
