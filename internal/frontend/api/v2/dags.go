@@ -206,10 +206,16 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 
 	details := toDAGDetails(dag)
 
+	var localDAGs []api.LocalDag
+	for _, localDAG := range dag.LocalDAGs {
+		localDAGs = append(localDAGs, toLocalDAG(localDAG.DAG))
+	}
+
 	return api.GetDAGDetails200JSONResponse{
 		Dag:          details,
 		LatestDAGRun: toDAGRunDetails(status),
 		Suspended:    a.dagStore.IsSuspended(ctx, fileName),
+		LocalDags:    localDAGs,
 	}, nil
 }
 

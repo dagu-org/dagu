@@ -143,6 +143,14 @@ func toChildDAGRuns(childDAGRuns []models.ChildDAGRun) []api.ChildDAGRun {
 	return result
 }
 
+func toLocalDAG(dag *digraph.DAG) api.LocalDag {
+	return api.LocalDag{
+		Name:   dag.Name,
+		Dag:    toDAGDetails(dag),
+		Errors: []string{},
+	}
+}
+
 func toDAGDetails(dag *digraph.DAG) *api.DAGDetails {
 	var details *api.DAGDetails
 	if dag == nil {
