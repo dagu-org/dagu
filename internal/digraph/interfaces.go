@@ -1,6 +1,8 @@
 package digraph
 
-import "context"
+import (
+	"context"
+)
 
 // Database is the interface for accessing the database to retrieve DAGs and dag-run statuses.
 type Database interface {

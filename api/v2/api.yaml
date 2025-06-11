@@ -161,6 +161,11 @@ paths:
                 properties:
                   dag:
                     $ref: "#/components/schemas/DAGDetails"
+                  localDags:
+                    type: array
+                    description: "List of local DAGs that are part of this DAG"
+                    items:
+                      $ref: "#/components/schemas/LocalDag"
                   latestDAGRun:
                     $ref: "#/components/schemas/DAGRunDetails"
                   suspended:
@@ -174,6 +179,7 @@ paths:
                 required:
                   - latestDAGRun
                   - suspended
+                  - localDags
                   - errors
         default:
           description: "Generic error response"
@@ -1545,6 +1551,23 @@ components:
             type: string
       required:
         - name
+
+    LocalDag:
+      type: object
+      properties:
+        name:
+          type: string
+          description: "Name of the local DAG"
+        dag:
+          $ref: "#/components/schemas/DAGDetails"
+        errors:
+          type: array
+          description: "List of errors encountered while processing the local DAG"
+          items:
+            type: string
+      required:
+        - name
+        - errors
 
     HandlerOn:
       type: object

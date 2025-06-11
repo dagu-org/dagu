@@ -218,7 +218,7 @@ func TestQueueReaderRetryDelay(t *testing.T) {
 			select {
 			case item := <-ch:
 				processingAttempts = append(processingAttempts, time.Now())
-				
+
 				// Simulate queue being full for first 2 attempts
 				if retryCount < 2 {
 					retryCount++
@@ -241,7 +241,7 @@ func TestQueueReaderRetryDelay(t *testing.T) {
 
 	// Verify retry delay behavior
 	require.GreaterOrEqual(t, len(processingAttempts), 3, "expected at least 3 processing attempts")
-	
+
 	// Check that there was a delay between retry attempts
 	if len(processingAttempts) >= 2 {
 		delay := processingAttempts[1].Sub(processingAttempts[0])
@@ -262,13 +262,13 @@ func TestQueueReaderRetryDelayPerQueue(t *testing.T) {
 	// Add items from different queues
 	queue1 := "queue-1"
 	queue2 := "queue-2"
-	
+
 	err := store.Enqueue(ctx, queue1, models.QueuePriorityHigh, digraph.DAGRunRef{
 		Name: queue1,
 		ID:   "dag-1",
 	})
 	require.NoError(t, err)
-	
+
 	err = store.Enqueue(ctx, queue2, models.QueuePriorityHigh, digraph.DAGRunRef{
 		Name: queue2,
 		ID:   "dag-2",
@@ -295,7 +295,7 @@ func TestQueueReaderRetryDelayPerQueue(t *testing.T) {
 			case item := <-ch:
 				queueName := item.Data().Name
 				queueProcessing[queueName] = append(queueProcessing[queueName], time.Now())
-				
+
 				// Always return retry to test delay behavior
 				item.Result <- models.QueuedItemProcessingResultRetry
 			case <-ctx.Done():
@@ -313,7 +313,7 @@ func TestQueueReaderRetryDelayPerQueue(t *testing.T) {
 	// Verify that both queues were processed
 	require.Contains(t, queueProcessing, queue1, "expected queue-1 to be processed")
 	require.Contains(t, queueProcessing, queue2, "expected queue-2 to be processed")
-	
+
 	// Verify that retry delays are applied per queue independently
 	// Each queue should have been retried, but queue2 shouldn't be delayed by queue1's retry
 	require.GreaterOrEqual(t, len(queueProcessing[queue1]), 2, "expected queue-1 to have at least 2 attempts")

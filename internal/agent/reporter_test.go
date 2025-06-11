@@ -137,7 +137,7 @@ func TestRenderHTMLWithDAGInfo(t *testing.T) {
 
 		// Check status badge
 		require.Contains(t, html, "status-badge success") // CSS class for success status
-		require.Contains(t, html, "FINISHED") // Status text
+		require.Contains(t, html, "FINISHED")             // Status text
 	})
 
 	t.Run("Table content", func(t *testing.T) {

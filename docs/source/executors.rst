@@ -6,7 +6,7 @@ Executors
 .. contents::
     :local:
 
-Executors are specialized modules for handling different types of tasks, including :code:`docker`, :code:`http`, :code:`mail`, :code:`ssh`, and :code:`jq` (JSON) executors. Contributions of new `executors <https://github.com/dagu-org/dagu/tree/main/internal/dag/executor>`_ are very welcome.
+Executors are specialized modules for handling different types of tasks, including :code:`dag`, :code:`docker`, :code:`http`, :code:`mail`, :code:`ssh`, and :code:`jq` (JSON) executors. Contributions of new `executors <https://github.com/dagu-org/dagu/tree/main/internal/dag/executor>`_ are very welcome.
 
 .. _docker executor:
 
@@ -337,3 +337,164 @@ Expected Output:
     {
         "sample": 42
     }
+
+DAG Executor
+------------
+
+The ``dag`` executor allows you to execute other DAGs as steps within your workflow. This provides powerful workflow composition capabilities.
+
+Basic Usage
+~~~~~~~~~~~
+
+Execute another DAG file:
+
+.. code-block:: yaml
+
+    steps:
+      - name: run sub-workflow
+        executor: dag
+        command: sub-workflow.yaml
+        params: "PARAM1=value1 PARAM2=value2"
+
+Execute a local DAG defined in the same file:
+
+.. code-block:: yaml
+
+    name: main-workflow
+    steps:
+      - name: run local dag
+        executor: dag
+        command: local-processor
+        params: "TYPE=daily"
+    
+    ---
+    
+    name: local-processor
+    params:
+      - TYPE: "batch"
+    steps:
+      - name: process
+        command: echo "Processing ${TYPE} data"
+
+**Key Features:**
+
+- Execute external DAG files or local DAGs defined in the same file
+- Pass parameters to child DAGs
+- Capture outputs from child DAGs
+- Full isolation - child DAGs run in separate processes
+- Supports all DAG features (retries, error handling, etc.)
+
+Parameter Passing
+~~~~~~~~~~~~~~~~~
+
+Pass parameters using key-value pairs:
+
+.. code-block:: yaml
+
+    steps:
+      - name: process-data
+        executor: dag
+        command: processor.yaml
+        params: "INPUT=/data/file.csv OUTPUT=/results/"
+
+Pass dynamic parameters from variables:
+
+.. code-block:: yaml
+
+    env:
+      - DATA_PATH: /data/latest
+    
+    steps:
+      - name: get-date
+        command: date +%Y%m%d
+        output: TODAY
+      
+      - name: process-daily
+        executor: dag
+        command: daily-processor.yaml
+        params: "DATE=${TODAY} PATH=${DATA_PATH}"
+
+Output Handling
+~~~~~~~~~~~~~~~
+
+Capture outputs from child DAGs:
+
+.. code-block:: yaml
+
+    steps:
+      - name: analyze-data
+        executor: dag
+        command: analyzer.yaml
+        output: ANALYSIS_RESULT
+      
+      - name: use-result
+        command: echo "Analysis status: ${ANALYSIS_RESULT.outputs.status}"
+
+The output structure includes:
+
+.. code-block:: json
+
+    {
+      "name": "analyzer",
+      "params": "...",
+      "outputs": {
+        "status": "success",
+        "recordCount": 1000
+      }
+    }
+
+Error Handling
+~~~~~~~~~~~~~~
+
+Handle errors from child DAGs:
+
+.. code-block:: yaml
+
+    steps:
+      - name: may-fail
+        executor: dag
+        command: risky-operation.yaml
+        continueOn:
+          failure: true
+        output: RESULT
+      
+      - name: check-result
+        command: |
+          if [ "${RESULT.status}" = "failed" ]; then
+            echo "Operation failed, running fallback"
+            ./fallback.sh
+          fi
+
+Advanced Usage
+~~~~~~~~~~~~~~
+
+Conditional DAG execution:
+
+.. code-block:: yaml
+
+    steps:
+      - name: check-condition
+        command: test -f /data/ready
+        output: IS_READY
+      
+      - name: process-if-ready
+        executor: dag
+        command: processor.yaml
+        preconditions:
+          - condition: "${IS_READY}"
+            expected: "0"
+
+Retry child DAGs:
+
+.. code-block:: yaml
+
+    steps:
+      - name: resilient-process
+        executor: dag
+        command: important-workflow.yaml
+        retryPolicy:
+          limit: 3
+          intervalSec: 60
+
+.. note::
+   The ``dag`` executor is different from the ``run`` field. While ``run`` is a built-in step field optimized for simple child DAG execution, the ``dag`` executor provides explicit control and is useful when you need to dynamically determine which DAG to execute or when using advanced executor features.
