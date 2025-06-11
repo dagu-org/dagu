@@ -241,23 +241,26 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*DAG, error) {
 
 	// If there are child DAGs, add them to the main DAG
 	if len(dags) > 1 {
-		mainDAG.LocalDAGs = make(map[string]*DAG)
+		mainDAG.LocalDAGs = make(map[string]LocalDAG)
 		for i := 1; i < len(dags); i++ {
 			childDAG := dags[i]
 			if childDAG.Name == "" {
 				return nil, fmt.Errorf("child DAG at index %d must have a name", i)
 			}
-			mainDAG.LocalDAGs[childDAG.Name] = childDAG
+			mainDAG.LocalDAGs[childDAG.Name] = LocalDAG{
+				DAG:      childDAG.DAG,
+				YamlData: childDAG.yamlData,
+			}
 		}
 	}
 
 	mainDAG.initializeDefaults()
 
-	return mainDAG, nil
+	return mainDAG.DAG, nil
 }
 
 // loadDAGsFromFile loads all DAGs from a multi-document YAML file
-func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([]*DAG, error) {
+func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([]loadedDAG, error) {
 	// Open the file
 	f, err := os.Open(filePath) //nolint:gosec
 	if err != nil {
@@ -265,7 +268,7 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([
 	}
 	defer func() { _ = f.Close() }()
 
-	var dags []*DAG
+	var dags []loadedDAG
 	decoder := yaml.NewDecoder(f)
 
 	// Read all documents from the file
@@ -321,49 +324,17 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([
 		// Set the location for the DAG
 		dest.Location = filePath
 
-		dags = append(dags, dest)
+		// Marshal the document back to YAML to preserve original data
+		yamlData, err := yaml.Marshal(dest)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal DAG in document %d: %w", docIndex, err)
+		}
+
+		dags = append(dags, loadedDAG{
+			DAG:      dest,
+			yamlData: yamlData,
+		})
 		docIndex++
-	}
-
-	// If no documents found (empty file or single document without separator),
-	// fall back to single DAG loading
-	if len(dags) == 0 {
-		raw, err := readYAMLFile(filePath)
-		if err != nil {
-			return nil, err
-		}
-
-		spec, err := decode(raw)
-		if err != nil {
-			return nil, err
-		}
-
-		// Build a fresh base DAG from base definition if provided
-		var dest *DAG
-		if baseDef != nil {
-			// Build a new base DAG
-			baseDAG, err := build(ctx, baseDef)
-			if err != nil {
-				return nil, fmt.Errorf("failed to build base DAG: %w", err)
-			}
-			dest = baseDAG
-		} else {
-			dest = new(DAG)
-		}
-
-		// Build the DAG from the spec
-		dag, err := build(ctx, spec)
-		if err != nil {
-			return nil, err
-		}
-
-		// Merge the DAG into the base DAG
-		if err := merge(dest, dag); err != nil {
-			return nil, err
-		}
-
-		dest.Location = filePath
-		dags = append(dags, dest)
 	}
 
 	// Validate unique names in multi-DAG files
@@ -385,6 +356,12 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([
 	}
 
 	return dags, nil
+}
+
+// loadedDAG is a wrapper for a DAG that includes the original YAML data.
+type loadedDAG struct {
+	*DAG
+	yamlData []byte // Original YAML data for the DAG
 }
 
 // defaultName returns the default name for the given file.
