@@ -7,6 +7,9 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 )
 
+// Compile-time check that RlimitEnforcer implements digraph.ResourceEnforcer
+var _ digraph.ResourceEnforcer = (*RlimitEnforcer)(nil)
+
 // RlimitEnforcer implements resource enforcement using Unix rlimits
 // This works on Unix-like systems (Linux, macOS, BSD) as a fallback
 // It passes resource limits via environment variables to child processes
@@ -47,12 +50,12 @@ func (e *RlimitEnforcer) PostStart(pid int) error {
 }
 
 // GetMetrics retrieves current resource usage
-func (e *RlimitEnforcer) GetMetrics(pid int) (*Metrics, error) {
+func (e *RlimitEnforcer) GetMetrics(pid int) (*digraph.Metrics, error) {
 	return getMetricsFromPS(pid)
 }
 
 // CheckViolation checks if resource limits are being violated
-func (e *RlimitEnforcer) CheckViolation(metrics *Metrics) bool {
+func (e *RlimitEnforcer) CheckViolation(metrics *digraph.Metrics) bool {
 	// rlimits are enforced by the kernel
 	return false
 }

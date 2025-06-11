@@ -2,8 +2,10 @@ package digraph
 
 import (
 	"fmt"
+	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Resources represents resource requirements for a DAG or step (internal representation)
@@ -320,4 +322,37 @@ func (r *Resources) ToResourcesConfig() *ResourcesConfig {
 	}
 
 	return config
+}
+
+// ResourceEnforcer defines the interface for platform-specific resource enforcement
+type ResourceEnforcer interface {
+	// PreStart is called before the process starts to configure resource limits
+	PreStart(cmd *exec.Cmd) error
+	
+	// PostStart is called after the process starts with its PID
+	PostStart(pid int) error
+	
+	// GetMetrics retrieves current resource usage for the process
+	GetMetrics(pid int) (*Metrics, error)
+	
+	// CheckViolation checks if resource limits are being violated
+	CheckViolation(metrics *Metrics) bool
+	
+	// Cleanup performs any necessary cleanup when the process ends
+	Cleanup() error
+	
+	// SupportsRequests returns true if the enforcer supports resource requests
+	SupportsRequests() bool
+	
+	// SupportsLimits returns true if the enforcer supports resource limits
+	SupportsLimits() bool
+}
+
+// Metrics represents resource usage metrics
+type Metrics struct {
+	Timestamp      time.Time
+	MemoryUsage    int64 // bytes
+	MemoryLimit    int64 // bytes
+	CPUUsageMillis int   // milliseconds of CPU time
+	Throttled      bool  // CPU throttling detected
 }

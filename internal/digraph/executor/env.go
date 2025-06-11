@@ -8,6 +8,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/mailer"
+	"github.com/dagu-org/dagu/internal/resource"
 )
 
 // AllEnvs returns all environment variables that needs to be passed to the command.
@@ -36,14 +37,15 @@ func GetEnv(ctx context.Context) Env {
 type Env struct {
 	digraph.Env
 
-	Variables *SyncMap
-	Step      digraph.Step
-	Envs      map[string]string
+	Variables          *SyncMap
+	Step               digraph.Step
+	Envs               map[string]string
+	ResourceController *resource.ResourceController
 }
 
 // NewEnv creates a new execution context with the given step.
 func NewEnv(ctx context.Context, step digraph.Step) Env {
-	return Env{
+	env := Env{
 		Env:       digraph.GetEnv(ctx),
 		Variables: &SyncMap{},
 		Step:      step,
@@ -51,6 +53,15 @@ func NewEnv(ctx context.Context, step digraph.Step) Env {
 			digraph.EnvKeyDAGRunStepName: step.Name,
 		},
 	}
+	
+	// Get resource controller from context if available
+	if rc := digraph.GetResourceController(ctx); rc != nil {
+		if resourceController, ok := rc.(*resource.ResourceController); ok {
+			env.ResourceController = resourceController
+		}
+	}
+	
+	return env
 }
 
 // DAGRunRef returns the DAGRunRef for the current execution context.

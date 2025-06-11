@@ -35,7 +35,7 @@ type Capabilities struct {
 // ResourceController manages resource enforcement across different platforms
 type ResourceController struct {
 	capabilities Capabilities
-	enforcers    map[string]ResourceEnforcer
+	enforcers    map[string]digraph.ResourceEnforcer
 	mu           sync.RWMutex
 }
 
@@ -45,7 +45,7 @@ func NewResourceController() (*ResourceController, error) {
 
 	return &ResourceController{
 		capabilities: caps,
-		enforcers:    make(map[string]ResourceEnforcer),
+		enforcers:    make(map[string]digraph.ResourceEnforcer),
 	}, nil
 }
 
@@ -131,7 +131,7 @@ func (rc *ResourceController) StopProcess(name string) error {
 }
 
 // GetMetrics returns current resource metrics for a process
-func (rc *ResourceController) GetMetrics(name string, pid int) (*Metrics, error) {
+func (rc *ResourceController) GetMetrics(name string, pid int) (*digraph.Metrics, error) {
 	rc.mu.RLock()
 	enforcer, exists := rc.enforcers[name]
 	rc.mu.RUnlock()
@@ -144,7 +144,7 @@ func (rc *ResourceController) GetMetrics(name string, pid int) (*Metrics, error)
 }
 
 // createEnforcer selects the best enforcer based on platform capabilities
-func (rc *ResourceController) createEnforcer(name string, resources *digraph.Resources) (ResourceEnforcer, error) {
+func (rc *ResourceController) createEnforcer(name string, resources *digraph.Resources) (digraph.ResourceEnforcer, error) {
 	// Validate resources
 	if resources == nil {
 		return nil, fmt.Errorf("resources cannot be nil")
@@ -175,7 +175,7 @@ func (rc *ResourceController) monitorProcess(
 	ctx context.Context,
 	name string,
 	pid int,
-	enforcer ResourceEnforcer,
+	enforcer digraph.ResourceEnforcer,
 ) {
 	// Ensure cleanup when monitoring ends
 	defer func() {
@@ -223,6 +223,9 @@ func (rc *ResourceController) monitorProcess(
 	}
 }
 
+// Compile-time check that NoopEnforcer implements digraph.ResourceEnforcer
+var _ digraph.ResourceEnforcer = (*NoopEnforcer)(nil)
+
 // NoopEnforcer provides a no-op implementation when resource enforcement is not available
 type NoopEnforcer struct{}
 
@@ -232,8 +235,8 @@ func NewNoopEnforcer() *NoopEnforcer {
 
 func (n *NoopEnforcer) PreStart(cmd *exec.Cmd) error                  { return nil }
 func (n *NoopEnforcer) PostStart(pid int) error                       { return nil }
-func (n *NoopEnforcer) GetMetrics(pid int) (*Metrics, error)          { return &Metrics{}, nil }
-func (n *NoopEnforcer) CheckViolation(metrics *Metrics) bool          { return false }
+func (n *NoopEnforcer) GetMetrics(pid int) (*digraph.Metrics, error)  { return &digraph.Metrics{}, nil }
+func (n *NoopEnforcer) CheckViolation(metrics *digraph.Metrics) bool  { return false }
 func (n *NoopEnforcer) Cleanup() error                                { return nil }
 func (n *NoopEnforcer) SupportsRequests() bool                        { return false }
 func (n *NoopEnforcer) SupportsLimits() bool                          { return false }

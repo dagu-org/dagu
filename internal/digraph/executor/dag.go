@@ -25,6 +25,7 @@ type dagExecutor struct {
 	stderr    io.Writer
 	cmd       *exec.Cmd
 	runParams RunParams
+	step      digraph.Step
 }
 
 // Errors for DAG executor
@@ -51,6 +52,7 @@ func newDAGExecutor(
 	return &dagExecutor{
 		child:   child,
 		workDir: step.Dir,
+		step:    step,
 	}, nil
 }
 
@@ -70,6 +72,7 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 		return err
 	}
 
+
 	if e.stdout != nil {
 		cmd.Stdout = e.stdout
 	}
@@ -84,7 +87,16 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 		"target", e.child.DAG.Name,
 	)
 
-	err = cmd.Start()
+	// Apply resource limits if available
+	env := GetEnv(ctx)
+	if env.ResourceController != nil && e.step.Resources != nil {
+		// Generate a unique name for this child DAG execution
+		stepName := fmt.Sprintf("%s-%s-%s", env.DAG.Name, e.step.Name, e.runParams.RunID)
+		
+		err = env.ResourceController.StartProcess(ctx, cmd, e.step.Resources, stepName)
+	} else {
+		err = cmd.Start()
+	}
 	e.lock.Unlock()
 
 	if err != nil {
@@ -96,7 +108,6 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 	}
 
 	// get results from the child dag-run
-	env := GetEnv(ctx)
 	result, err := env.DB.GetChildDAGRunStatus(ctx, e.runParams.RunID, env.RootDAGRun)
 	if err != nil {
 		return fmt.Errorf("failed to find result for the child dag-run %q: %w", e.runParams.RunID, err)

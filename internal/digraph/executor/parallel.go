@@ -25,6 +25,7 @@ type parallelExecutor struct {
 	stderr        io.Writer
 	runParamsList []RunParams
 	maxConcurrent int
+	step          digraph.Step
 
 	// Runtime state
 	running    map[string]*exec.Cmd    // Maps DAG run ID to command
@@ -32,6 +33,7 @@ type parallelExecutor struct {
 	errors     []error                 // Collects errors from failed executions
 	wg         sync.WaitGroup          // Tracks running goroutines
 	cancelFunc context.CancelFunc      // For canceling all child executions
+	execIndex  int                     // Counter for unique execution IDs
 }
 
 // ChildResult holds the result of a single child DAG execution
@@ -72,6 +74,7 @@ func newParallelExecutor(
 		child:         child,
 		workDir:       step.Dir,
 		maxConcurrent: maxConcurrent,
+		step:          step,
 		running:       make(map[string]*exec.Cmd),
 		results:       make(map[string]*ChildResult),
 		errors:        make([]error, 0),
@@ -196,9 +199,25 @@ func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams
 		"params", runParams.Params,
 	)
 
-	// Start and wait for the command
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start child dag-run: %w", err)
+	// Apply resource limits if available
+	env := GetEnv(ctx)
+	if env.ResourceController != nil && e.step.Resources != nil {
+		// Generate a unique name for this parallel child execution
+		e.lock.Lock()
+		index := e.execIndex
+		e.execIndex++
+		e.lock.Unlock()
+		
+		stepName := fmt.Sprintf("%s-%s-%s-%d", env.DAG.Name, e.step.Name, runParams.RunID, index)
+		
+		if err := env.ResourceController.StartProcess(ctx, cmd, e.step.Resources, stepName); err != nil {
+			return fmt.Errorf("failed to start child dag-run with resource limits: %w", err)
+		}
+	} else {
+		// Start without resource limits
+		if err := cmd.Start(); err != nil {
+			return fmt.Errorf("failed to start child dag-run: %w", err)
+		}
 	}
 
 	err = cmd.Wait()
@@ -209,7 +228,6 @@ func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams
 	e.lock.Unlock()
 
 	// Get the result regardless of error
-	env := GetEnv(ctx)
 	result, resultErr := env.DB.GetChildDAGRunStatus(ctx, runParams.RunID, env.RootDAGRun)
 
 	// Store the result

@@ -9,6 +9,7 @@ import (
 	"slices"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -59,12 +60,26 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 
 	e.cmd = cmd
 
-	if err := e.cmd.Start(); err != nil {
-		e.exitCode = exitCodeFromError(err)
+	// Apply resource limits if available
+	env := GetEnv(ctx)
+	if env.ResourceController != nil && e.config.Resources != nil {
+		// Generate a unique name for this step execution
+		stepName := fmt.Sprintf("%s-%s-%d", env.DAG.Name, env.Step.Name, time.Now().UnixNano())
+		
+		if err := env.ResourceController.StartProcess(ctx, e.cmd, e.config.Resources, stepName); err != nil {
+			e.mu.Unlock()
+			return fmt.Errorf("failed to start process with resource limits: %w", err)
+		}
 		e.mu.Unlock()
-		return err
+	} else {
+		// Start without resource limits
+		if err := e.cmd.Start(); err != nil {
+			e.exitCode = exitCodeFromError(err)
+			e.mu.Unlock()
+			return err
+		}
+		e.mu.Unlock()
 	}
-	e.mu.Unlock()
 
 	if err := e.cmd.Wait(); err != nil {
 		e.exitCode = exitCodeFromError(err)
@@ -104,6 +119,7 @@ type commandConfig struct {
 	ShellPackages    []string
 	Stdout           io.Writer
 	Stderr           io.Writer
+	Resources        *digraph.Resources
 }
 
 func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.Cmd, error) {
@@ -251,6 +267,7 @@ func createCommandConfig(ctx context.Context, step digraph.Step) (*commandConfig
 		ShellCommand:     shellCommand,
 		ShellCommandArgs: shellCmdArgs,
 		ShellPackages:    step.ShellPackages,
+		Resources:        step.Resources,
 	}, nil
 }
 

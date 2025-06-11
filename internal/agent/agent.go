@@ -22,9 +22,11 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/mailer"
 	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/resource"
 	"github.com/dagu-org/dagu/internal/sock"
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
+
 
 // Agent is responsible for running the DAG and handling communication
 // via the unix socket. The agent performs the following tasks:
@@ -215,6 +217,14 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Create a new environment for the dag-run.
 	dbClient := newDBClient(a.dagRunStore, a.dagStore)
 	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params)
+
+	// Initialize resource controller (best effort - don't fail if it can't be created)
+	if rc, err := resource.NewResourceController(); err != nil {
+		logger.Warn(ctx, "Failed to initialize resource controller", "error", err)
+	} else {
+		ctx = digraph.WithResourceController(ctx, rc)
+		logger.Debug(ctx, "Resource controller initialized")
+	}
 
 	// Add structured logging context
 	logFields := []any{"dag", a.dag.Name, "dagRunId", a.dagRunID}

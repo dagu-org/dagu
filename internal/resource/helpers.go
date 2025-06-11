@@ -9,6 +9,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/dagu-org/dagu/internal/digraph"
 )
 
 // detectCapabilities detects platform-specific features available
@@ -58,8 +60,8 @@ func processExists(pid int) bool {
 }
 
 // getMetricsFromPS retrieves process metrics using ps command
-func getMetricsFromPS(pid int) (*Metrics, error) {
-	metrics := &Metrics{
+func getMetricsFromPS(pid int) (*digraph.Metrics, error) {
+	metrics := &digraph.Metrics{
 		Timestamp: time.Now(),
 	}
 
@@ -85,10 +87,12 @@ func getMetricsFromPS(pid int) (*Metrics, error) {
 		if rss, err := strconv.ParseInt(fields[0], 10, 64); err == nil {
 			metrics.MemoryUsage = rss * 1024 // Convert to bytes
 		}
-		// CPU percentage
+		// CPU percentage - convert to milliseconds
+		// This is a rough estimate, not exact CPU time
 		cpuStr := strings.TrimSuffix(fields[2], "%")
 		if cpu, err := strconv.ParseFloat(cpuStr, 64); err == nil {
-			metrics.CPUPercent = cpu
+			// Very rough conversion: assume 1% CPU = 10ms per second
+			metrics.CPUUsageMillis = int(cpu * 10)
 		}
 	}
 

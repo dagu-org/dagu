@@ -13,16 +13,19 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 )
 
+// Compile-time check that CgroupsV2Enforcer implements digraph.ResourceEnforcer
+var _ digraph.ResourceEnforcer = (*CgroupsV2Enforcer)(nil)
+
 const (
 	// CgroupRoot is the default cgroup v2 root path
 	CgroupRoot = "/sys/fs/cgroup"
-	
+
 	// CPUPeriodMicros is the default CPU period in microseconds
 	CPUPeriodMicros = 100000 // 100ms
-	
+
 	// MemoryViolationThreshold is the threshold for considering memory usage a violation
 	MemoryViolationThreshold = 0.95 // 95%
-	
+
 	// CPUDefaultWeight is the default CPU weight (1 CPU = 1000 millicores)
 	CPUDefaultWeight = 100
 )
@@ -38,18 +41,18 @@ type CgroupsV2Enforcer struct {
 func NewCgroupsV2Enforcer(name string, resources *digraph.Resources) (*CgroupsV2Enforcer, error) {
 	// Create a unique cgroup for this DAG run
 	cgroupPath := filepath.Join(CgroupRoot, "dagu.slice", fmt.Sprintf("dagrun-%s.scope", name))
-	
+
 	// Create the cgroup directory
 	if err := os.MkdirAll(cgroupPath, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create cgroup: %w", err)
 	}
-	
+
 	// Enable required controllers in parent cgroup
 	if err := enableControllers(filepath.Dir(cgroupPath)); err != nil {
 		os.RemoveAll(cgroupPath)
 		return nil, fmt.Errorf("failed to enable controllers: %w", err)
 	}
-	
+
 	return &CgroupsV2Enforcer{
 		name:       name,
 		resources:  resources,
@@ -61,12 +64,12 @@ func NewCgroupsV2Enforcer(name string, resources *digraph.Resources) (*CgroupsV2
 func (e *CgroupsV2Enforcer) PreStart(cmd *exec.Cmd) error {
 	// Set memory limits
 	if e.resources.MemoryLimitBytes > 0 {
-		if err := writeFile(e.cgroupPath, "memory.max", 
+		if err := writeFile(e.cgroupPath, "memory.max",
 			fmt.Sprintf("%d", e.resources.MemoryLimitBytes)); err != nil {
 			return fmt.Errorf("failed to set memory limit: %w", err)
 		}
 	}
-	
+
 	// Set memory requests (soft limit/protection)
 	if e.resources.MemoryRequestBytes > 0 {
 		// memory.low provides memory protection
@@ -76,7 +79,7 @@ func (e *CgroupsV2Enforcer) PreStart(cmd *exec.Cmd) error {
 			fmt.Fprintf(os.Stderr, "Warning: memory.low not supported: %v\n", err)
 		}
 	}
-	
+
 	// Set CPU limits
 	if e.resources.CPULimitMillis > 0 {
 		// cpu.max format: "$quota $period"
@@ -84,13 +87,13 @@ func (e *CgroupsV2Enforcer) PreStart(cmd *exec.Cmd) error {
 		// 1000 millicores = 1 CPU = 100000 microseconds per 100000 microsecond period
 		quota := e.resources.CPULimitMillis * 100 // Convert millicores to microseconds
 		period := CPUPeriodMicros
-		
+
 		if err := writeFile(e.cgroupPath, "cpu.max",
 			fmt.Sprintf("%d %d", quota, period)); err != nil {
 			return fmt.Errorf("failed to set CPU limit: %w", err)
 		}
 	}
-	
+
 	// Set CPU requests (weight for proportional share)
 	if e.resources.CPURequestMillis > 0 {
 		// cpu.weight range is 1-10000, default is 100
@@ -101,7 +104,7 @@ func (e *CgroupsV2Enforcer) PreStart(cmd *exec.Cmd) error {
 			return fmt.Errorf("failed to set CPU weight: %w", err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -112,27 +115,27 @@ func (e *CgroupsV2Enforcer) PostStart(pid int) error {
 }
 
 // GetMetrics retrieves current resource usage
-func (e *CgroupsV2Enforcer) GetMetrics(pid int) (*Metrics, error) {
-	metrics := &Metrics{
+func (e *CgroupsV2Enforcer) GetMetrics(pid int) (*digraph.Metrics, error) {
+	metrics := &digraph.Metrics{
 		Timestamp: time.Now(),
 	}
-	
+
 	// Read memory usage
 	if data, err := readFile(e.cgroupPath, "memory.current"); err == nil {
 		metrics.MemoryUsage, _ = strconv.ParseInt(strings.TrimSpace(data), 10, 64)
 	}
-	
+
 	// Read memory limit
 	if data, err := readFile(e.cgroupPath, "memory.max"); err == nil {
 		if strings.TrimSpace(data) != "max" {
 			metrics.MemoryLimit, _ = strconv.ParseInt(strings.TrimSpace(data), 10, 64)
 		}
 	}
-	
+
 	// Read CPU statistics
 	if data, err := readFile(e.cgroupPath, "cpu.stat"); err == nil {
 		metrics.CPUUsageMillis = parseCPUStat(data)
-		
+
 		// Check if throttled
 		if strings.Contains(data, "nr_throttled") {
 			lines := strings.Split(data, "\n")
@@ -147,12 +150,12 @@ func (e *CgroupsV2Enforcer) GetMetrics(pid int) (*Metrics, error) {
 			}
 		}
 	}
-	
+
 	return metrics, nil
 }
 
 // CheckViolation checks if resource limits are being violated
-func (e *CgroupsV2Enforcer) CheckViolation(metrics *Metrics) bool {
+func (e *CgroupsV2Enforcer) CheckViolation(metrics *digraph.Metrics) bool {
 	// Memory violations are handled by the kernel (OOM killer)
 	// We just report if we're close to the limit
 	if e.resources.MemoryLimitBytes > 0 && metrics.MemoryUsage > 0 {
@@ -178,7 +181,7 @@ func (e *CgroupsV2Enforcer) Cleanup() error {
 			}
 		}
 	}
-	
+
 	// Remove the cgroup
 	return os.RemoveAll(e.cgroupPath)
 }
@@ -191,33 +194,33 @@ func (e *CgroupsV2Enforcer) SupportsLimits() bool   { return true }
 // enableControllers enables CPU and memory controllers in the parent cgroup
 func enableControllers(parentPath string) error {
 	controllersFile := filepath.Join(parentPath, "cgroup.subtree_control")
-	
+
 	// Read current controllers
 	current, err := os.ReadFile(controllersFile)
 	if err != nil {
 		return err
 	}
-	
+
 	controllers := string(current)
 	modified := false
-	
+
 	// Enable CPU controller if not already enabled
 	if !strings.Contains(controllers, "cpu") {
 		controllers = strings.TrimSpace(controllers + " +cpu")
 		modified = true
 	}
-	
+
 	// Enable memory controller if not already enabled
 	if !strings.Contains(controllers, "memory") {
 		controllers = strings.TrimSpace(controllers + " +memory")
 		modified = true
 	}
-	
+
 	// Write back if modified
 	if modified {
 		return os.WriteFile(controllersFile, []byte(controllers), 0644)
 	}
-	
+
 	return nil
 }
 
@@ -276,7 +279,7 @@ func killProcess(pid int) error {
 	if err != nil {
 		return fmt.Errorf("failed to find process %d: %w", pid, err)
 	}
-	
+
 	// Send SIGTERM for graceful shutdown
 	if err := process.Signal(os.Signal(syscall.SIGTERM)); err != nil {
 		// If SIGTERM fails, the process might already be dead
@@ -285,6 +288,6 @@ func killProcess(pid int) error {
 			return fmt.Errorf("failed to send SIGTERM to process %d: %w", pid, err)
 		}
 	}
-	
+
 	return nil
 }
