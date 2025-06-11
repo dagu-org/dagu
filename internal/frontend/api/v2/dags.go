@@ -211,6 +211,11 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 		localDAGs = append(localDAGs, toLocalDAG(localDAG.DAG))
 	}
 
+	// sort localDAGs by name
+	sort.Slice(localDAGs, func(i, j int) bool {
+		return strings.Compare(localDAGs[i].Name, localDAGs[j].Name) <= 0
+	})
+
 	return api.GetDAGDetails200JSONResponse{
 		Dag:          details,
 		LatestDAGRun: toDAGRunDetails(status),

@@ -686,6 +686,13 @@ export interface components {
             /** @description List of tags for categorizing and filtering DAGs */
             tags?: string[];
         };
+        LocalDag: {
+            /** @description Name of the local DAG */
+            name: string;
+            dag?: components["schemas"]["DAGDetails"];
+            /** @description List of errors encountered while processing the local DAG */
+            errors: string[];
+        };
         /** @description Configuration for event handlers in a DAG-run */
         HandlerOn: {
             failure?: components["schemas"]["Step"];
@@ -1034,6 +1041,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         dag?: components["schemas"]["DAGDetails"];
+                        /** @description List of local DAGs that are part of this DAG */
+                        localDags: components["schemas"]["LocalDag"][];
                         latestDAGRun: components["schemas"]["DAGRunDetails"];
                         /** @description Whether the DAG is suspended */
                         suspended: boolean;

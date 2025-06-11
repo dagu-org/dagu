@@ -10,6 +10,7 @@ import { useCookies } from 'react-cookie';
 import { components } from '../../../../api/v2/schema';
 import { Button } from '../../../../components/ui/button';
 import { useSimpleToast } from '../../../../components/ui/simple-toast';
+import { Tab, Tabs } from '../../../../components/ui/tabs';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useClient, useQuery } from '../../../../hooks/api';
@@ -42,6 +43,7 @@ function DAGSpec({ fileName }: Props) {
   const [editing, setEditing] = React.useState(false);
   const [currentValue, setCurrentValue] = React.useState<string | undefined>();
   const [scrollPosition, setScrollPosition] = React.useState(0);
+  const [activeTab, setActiveTab] = React.useState('parent');
 
   // Flowchart direction preference stored in cookies
   const [cookie, setCookie] = useCookies(['flowchart']);
@@ -67,6 +69,22 @@ function DAGSpec({ fileName }: Props) {
   // Fetch DAG specification data
   const { data, isLoading } = useQuery(
     '/dags/{fileName}/spec',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
+        path: {
+          fileName: fileName,
+        },
+      },
+    },
+    { refreshInterval: 2000 } // Refresh every 2 seconds
+  );
+
+  // Fetch DAG details to get localDags
+  const { data: dagDetails } = useQuery(
+    '/dags/{fileName}',
     {
       params: {
         query: {
@@ -109,13 +127,110 @@ function DAGSpec({ fileName }: Props) {
     }
   }, [scrollPosition, editing]);
 
-  // Get lifecycle handlers from DAG definition
-  const handlers = getHandlers(data?.dag);
-
   // Show loading indicator while fetching data
   if (isLoading) {
     return <LoadingIndicator />;
   }
+
+  // Check if we have local DAGs
+  const hasLocalDags = dagDetails?.localDags && dagDetails.localDags.length > 0;
+
+  // Helper function to render DAG content (Graph, Attributes, Steps, Errors)
+  const renderDAGContent = (
+    dag: components['schemas']['DAGDetails'],
+    errors?: string[]
+  ) => (
+    <div className="space-y-6">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+        <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4 flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            Graph
+          </h2>
+          <FlowchartSwitch
+            value={cookie['flowchart']}
+            onChange={onChangeFlowchart}
+          />
+        </div>
+        <div className="p-6">
+          <BorderedBox className="py-4 px-4 flex flex-col overflow-x-auto">
+            <Graph
+              steps={dag.steps}
+              type="config"
+              flowchart={flowchart}
+              showIcons={false}
+            />
+          </BorderedBox>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+        <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            Attributes
+          </h2>
+        </div>
+        <div className="p-6">
+          <DAGAttributes dag={dag} />
+        </div>
+      </div>
+
+      {errors?.length ? (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-l-4 border-red-500 dark:border-red-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+          <div className="border-b border-slate-100 dark:border-slate-800 bg-red-50 dark:bg-red-900/10 px-6 py-4">
+            <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Configuration Errors
+            </h2>
+          </div>
+          <div className="p-6">
+            <div className="space-y-3">
+              {errors.map((e, i) => (
+                <div
+                  key={i}
+                  className="p-3 bg-red-50 dark:bg-red-900/20 rounded-md text-red-600 dark:text-red-400 font-mono text-sm"
+                >
+                  {e}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {dag.steps ? (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+          <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+              <span>Steps</span>
+              <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                {dag.steps.length} step
+                {dag.steps.length !== 1 ? 's' : ''}
+              </span>
+            </h2>
+          </div>
+          <div className="overflow-x-auto">
+            <DAGStepTable steps={dag.steps} />
+          </div>
+        </div>
+      ) : null}
+
+      {getHandlers(dag)?.length ? (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+          <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+              <span>Lifecycle Hooks</span>
+              <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                {getHandlers(dag).length} hook{getHandlers(dag).length !== 1 ? 's' : ''}
+              </span>
+            </h2>
+          </div>
+          <div className="overflow-x-auto">
+            <DAGStepTable steps={getHandlers(dag)} />
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
 
   return (
     <DAGContext.Consumer>
@@ -123,94 +238,59 @@ function DAGSpec({ fileName }: Props) {
         data?.dag && (
           <React.Fragment>
             <div className="space-y-6" ref={containerRef}>
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-                <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4 flex justify-between items-center">
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                    Graph
-                  </h2>
-                  <FlowchartSwitch
-                    value={cookie['flowchart']}
-                    onChange={onChangeFlowchart}
-                  />
-                </div>
-                <div className="p-6">
-                  <BorderedBox className="py-4 px-4 flex flex-col overflow-x-auto">
-                    <Graph
-                      steps={data.dag.steps}
-                      type="config"
-                      flowchart={flowchart}
-                      showIcons={false}
-                    />
-                  </BorderedBox>
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-                <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                    Attributes
-                  </h2>
-                </div>
-                <div className="p-6">
-                  <DAGAttributes dag={data.dag!} />
-                </div>
-              </div>
-
-              {data.errors?.length ? (
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-l-4 border-red-500 dark:border-red-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-                  <div className="border-b border-slate-100 dark:border-slate-800 bg-red-50 dark:bg-red-900/10 px-6 py-4">
-                    <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 flex items-center gap-2">
-                      <AlertTriangle className="h-5 w-5" />
-                      Configuration Errors
-                    </h2>
-                  </div>
-                  <div className="p-6">
-                    <div className="space-y-3">
-                      {data.errors?.map((e, i) => (
-                        <div
-                          key={i}
-                          className="p-3 bg-red-50 dark:bg-red-900/20 rounded-md text-red-600 dark:text-red-400 font-mono text-sm"
+              {hasLocalDags ? (
+                <div className="space-y-6">
+                  <div className="overflow-x-auto -mx-2 px-2 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
+                    <Tabs className="mb-4 w-max min-w-full">
+                      <Tab
+                        isActive={activeTab === 'parent'}
+                        onClick={() => setActiveTab('parent')}
+                        className="cursor-pointer whitespace-nowrap"
+                      >
+                        {data?.dag?.name} (Parent)
+                      </Tab>
+                      {dagDetails?.localDags?.map((localDag: components['schemas']['LocalDag']) => (
+                        <Tab
+                          key={localDag.name}
+                          isActive={activeTab === localDag.name}
+                          onClick={() => setActiveTab(localDag.name)}
+                          className="cursor-pointer whitespace-nowrap"
                         >
-                          {e}
-                        </div>
+                          {localDag.name}
+                        </Tab>
                       ))}
-                    </div>
+                    </Tabs>
                   </div>
+                  
+                  {activeTab === 'parent' && data?.dag && renderDAGContent(data.dag, data?.errors)}
+                  
+                  {dagDetails?.localDags?.map((localDag: components['schemas']['LocalDag']) => (
+                    activeTab === localDag.name && (
+                      <div key={localDag.name}>
+                        {localDag.dag ? (
+                          renderDAGContent(localDag.dag, localDag.errors)
+                        ) : (
+                          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-l-4 border-red-500 dark:border-red-700 shadow-sm p-6">
+                            <div className="text-red-600 dark:text-red-400">
+                              <AlertTriangle className="h-5 w-5 inline mr-2" />
+                              Failed to load local DAG: {localDag.name}
+                            </div>
+                            {localDag.errors?.length ? (
+                              <div className="mt-4 space-y-2">
+                                {localDag.errors.map((e: string, i: number) => (
+                                  <div key={i} className="text-sm font-mono">{e}</div>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  ))}
                 </div>
-              ) : null}
-
-              {data.dag.steps ? (
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-                  <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
-                      <span>Steps</span>
-                      <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
-                        {data.dag.steps.length} step
-                        {data.dag.steps.length !== 1 ? 's' : ''}
-                      </span>
-                    </h2>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <DAGStepTable steps={data.dag.steps} />
-                  </div>
-                </div>
-              ) : null}
-
-              {handlers?.length ? (
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-                  <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
-                      <span>Lifecycle Hooks</span>
-                      <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
-                        {handlers.length} hook{handlers.length !== 1 ? 's' : ''}
-                      </span>
-                    </h2>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <DAGStepTable steps={handlers} />
-                  </div>
-                </div>
-              ) : null}
+              ) : (
+                data?.dag && renderDAGContent(data.dag, data?.errors)
+              )}
 
               <div
                 className={`rounded-2xl border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden ${
