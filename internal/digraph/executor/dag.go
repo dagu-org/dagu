@@ -45,7 +45,7 @@ func newDAGExecutor(
 	}
 
 	env := GetEnv(ctx)
-	dag, err := env.DB.GetDAG(ctx, cfg.Name)
+	dag, err := env.DB.GetDAG(ctx, env.DAG, cfg.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find DAG %q: %w", cfg.Name, err)
 	}
