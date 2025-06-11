@@ -36,6 +36,7 @@ We're excited to announce the beta release of Dagu 1.17.0! This release brings m
 **Key Features in 1.17.0:**
 - 🎯 **Improved Performance**: Refactored execution history data for more performant history lookup
 - 🔄 **Hierarchical Execution**: Added capability for nested DAG execution
+- 📄 **Multiple DAGs in Single File**: Define multiple DAGs in one YAML file using `---` separator for better organization and reusability
 - 🚀 **Parallel Execution**: Execute commands or sub-DAGs in parallel with different parameters for batch processing ([#989](https://github.com/dagu-org/dagu/issues/989))
 - 🎨 **Enhanced Web UI**: Overall UI improvements with better user experience
 - 📊 **Advanced History Search**: New execution history page with date-range and status filters ([#933](https://github.com/dagu-org/dagu/issues/933))
@@ -613,6 +614,41 @@ steps:
     parallel: ${FILES}
     params:
       - FILE_NAME: ${ITEM}  # Each item in FILES will be passed as FILE_NAME
+```
+
+Parallel execution with local DAGs for better encapsulation:
+
+```yaml
+# main.yaml - All logic in a single file
+name: batch-processor
+steps:
+  - name: get files
+    command: find /data -name "*.csv" -printf "%f\n"
+    output: FILES
+  
+  - name: process files
+    run: file-processor  # Local DAG defined below
+    parallel: ${FILES}
+    output: RESULTS
+  
+  - name: summarize
+    command: |
+      echo "Processed ${RESULTS.summary.total} files"
+      echo "Success: ${RESULTS.summary.succeeded}, Failed: ${RESULTS.summary.failed}"
+
+---
+
+name: file-processor
+params:
+  - FILE: ""
+steps:
+  - name: validate
+    command: test -f "$1" && file "$1" | grep -q "CSV"
+  
+  - name: process
+    command: python process_csv.py "$1"
+    depends: validate
+    output: RECORD_COUNT
 ```
 
 Parallel execution with object arrays and concurrency control:
