@@ -1235,4 +1235,3 @@ func buildStepResources(_ BuildContext, def stepDef, step *Step) error {
 	step.Resources = resources
 	return nil
 }
-

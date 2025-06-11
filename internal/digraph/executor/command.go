@@ -65,7 +65,7 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 	if env.ResourceController != nil && e.config.Resources != nil {
 		// Generate a unique name for this step execution
 		stepName := fmt.Sprintf("%s-%s-%d", env.DAG.Name, env.Step.Name, time.Now().UnixNano())
-		
+
 		if err := env.ResourceController.StartProcess(ctx, e.cmd, e.config.Resources, stepName); err != nil {
 			e.mu.Unlock()
 			return fmt.Errorf("failed to start process with resource limits: %w", err)

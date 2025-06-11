@@ -27,7 +27,6 @@ import (
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
-
 // Agent is responsible for running the DAG and handling communication
 // via the unix socket. The agent performs the following tasks:
 // 1. Start the DAG.

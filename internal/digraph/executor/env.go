@@ -53,14 +53,14 @@ func NewEnv(ctx context.Context, step digraph.Step) Env {
 			digraph.EnvKeyDAGRunStepName: step.Name,
 		},
 	}
-	
+
 	// Get resource controller from context if available
 	if rc := digraph.GetResourceController(ctx); rc != nil {
 		if resourceController, ok := rc.(*resource.ResourceController); ok {
 			env.ResourceController = resourceController
 		}
 	}
-	
+
 	return env
 }
 

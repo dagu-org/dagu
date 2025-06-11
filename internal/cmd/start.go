@@ -61,7 +61,7 @@ func runStart(ctx *Context, args []string) error {
 		// Log the error but don't fail - resource limits are best-effort
 		logger.Warn(ctx, "Failed to apply resource limits", "error", err)
 	}
-	
+
 	// Get dag-run ID and references
 	dagRunID, rootRef, parentRef, isChildDAGRun, err := getDAGRunInfo(ctx)
 	if err != nil {

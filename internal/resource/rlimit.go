@@ -31,11 +31,11 @@ func NewRlimitEnforcer(name string, resources *digraph.Resources) (*RlimitEnforc
 func (e *RlimitEnforcer) PreStart(cmd *exec.Cmd) error {
 	// Pass resource limits via environment variables
 	// The child process will apply these rlimits to itself
-	
+
 	if e.resources.MemoryLimitBytes > 0 {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("DAGU_RLIMIT_MEMORY=%d", e.resources.MemoryLimitBytes))
 	}
-	
+
 	if e.resources.CPULimitMillis > 0 {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("DAGU_RLIMIT_CPU=%d", e.resources.CPULimitMillis))
 	}

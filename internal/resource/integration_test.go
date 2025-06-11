@@ -28,12 +28,12 @@ func TestResourceEnforcementIntegration(t *testing.T) {
 	// Test with memory limit
 	resources := &digraph.Resources{
 		MemoryLimitBytes: 10 * 1024 * 1024, // 10MB
-		CPULimitMillis:   100,               // 0.1 CPU
+		CPULimitMillis:   100,              // 0.1 CPU
 	}
 
 	// This command tries to allocate 20MB of memory
 	cmd := exec.Command("sh", "-c", "dd if=/dev/zero of=/dev/null bs=1M count=20")
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -44,7 +44,7 @@ func TestResourceEnforcementIntegration(t *testing.T) {
 
 	// Wait for process to complete or be killed
 	err = cmd.Wait()
-	
+
 	// On successful enforcement, the process should be killed by OOM killer
 	if err == nil {
 		t.Log("Process completed successfully - memory limit may not be enforced")

@@ -207,9 +207,9 @@ func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams
 		index := e.execIndex
 		e.execIndex++
 		e.lock.Unlock()
-		
+
 		stepName := fmt.Sprintf("%s-%s-%s-%d", env.DAG.Name, e.step.Name, runParams.RunID, index)
-		
+
 		if err := env.ResourceController.StartProcess(ctx, cmd, e.step.Resources, stepName); err != nil {
 			return fmt.Errorf("failed to start child dag-run with resource limits: %w", err)
 		}

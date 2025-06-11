@@ -10,40 +10,40 @@ import (
 
 func TestLoadDAGWithResources(t *testing.T) {
 	ctx := context.Background()
-	
+
 	dag, err := Load(ctx, "../testdata/digraph/resources_test.yaml")
 	require.NoError(t, err)
 	require.NotNil(t, dag)
-	
+
 	// Check DAG-level resources
 	require.NotNil(t, dag.Resources)
-	assert.Equal(t, 500, dag.Resources.CPURequestMillis)      // 0.5 cores
+	assert.Equal(t, 500, dag.Resources.CPURequestMillis)               // 0.5 cores
 	assert.Equal(t, int64(Gibibyte), dag.Resources.MemoryRequestBytes) // 1Gi
-	assert.Equal(t, 2000, dag.Resources.CPULimitMillis)       // 2 cores
+	assert.Equal(t, 2000, dag.Resources.CPULimitMillis)                // 2 cores
 	assert.Equal(t, int64(4*Gibibyte), dag.Resources.MemoryLimitBytes) // 4Gi
-	
+
 	// Check steps
 	require.Len(t, dag.Steps, 3)
-	
+
 	// Light task - no resources
 	assert.Equal(t, "light-task", dag.Steps[0].Name)
 	assert.NotNil(t, dag.Steps[0].Resources) // Will be empty Resources struct
 	assert.Equal(t, 0, dag.Steps[0].Resources.CPULimitMillis)
-	
+
 	// Heavy task - only limits
 	assert.Equal(t, "heavy-task", dag.Steps[1].Name)
 	require.NotNil(t, dag.Steps[1].Resources)
-	assert.Equal(t, 0, dag.Steps[1].Resources.CPURequestMillis) // No requests
-	assert.Equal(t, 4000, dag.Steps[1].Resources.CPULimitMillis) // 4 cores
+	assert.Equal(t, 0, dag.Steps[1].Resources.CPURequestMillis)                 // No requests
+	assert.Equal(t, 4000, dag.Steps[1].Resources.CPULimitMillis)                // 4 cores
 	assert.Equal(t, int64(8*Gibibyte), dag.Steps[1].Resources.MemoryLimitBytes) // 8Gi
-	
+
 	// Medium task - both requests and limits
 	assert.Equal(t, "medium-task", dag.Steps[2].Name)
 	require.NotNil(t, dag.Steps[2].Resources)
-	assert.Equal(t, 1000, dag.Steps[2].Resources.CPURequestMillis) // 1 core
+	assert.Equal(t, 1000, dag.Steps[2].Resources.CPURequestMillis)                // 1 core
 	assert.Equal(t, int64(2*Gibibyte), dag.Steps[2].Resources.MemoryRequestBytes) // 2Gi
-	assert.Equal(t, 2000, dag.Steps[2].Resources.CPULimitMillis) // 2 cores
-	assert.Equal(t, int64(4*Gibibyte), dag.Steps[2].Resources.MemoryLimitBytes) // 4Gi
+	assert.Equal(t, 2000, dag.Steps[2].Resources.CPULimitMillis)                  // 2 cores
+	assert.Equal(t, int64(4*Gibibyte), dag.Steps[2].Resources.MemoryLimitBytes)   // 4Gi
 }
 
 func TestLoadDAGWithInvalidResources(t *testing.T) {
@@ -86,7 +86,7 @@ steps:
 			wantErr: "invalid CPU quantity",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -109,8 +109,8 @@ func TestToResourcesConfig(t *testing.T) {
 			expected: nil,
 		},
 		{
-			name:  "empty resources",
-			input: &Resources{},
+			name:     "empty resources",
+			input:    &Resources{},
 			expected: &ResourcesConfig{},
 		},
 		{

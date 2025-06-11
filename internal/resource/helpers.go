@@ -66,7 +66,7 @@ func getMetricsFromPS(pid int) (*digraph.Metrics, error) {
 	}
 
 	var cmd *exec.Cmd
-	
+
 	switch runtime.GOOS {
 	case "darwin":
 		// macOS ps command format

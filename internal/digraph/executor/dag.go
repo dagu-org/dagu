@@ -72,7 +72,6 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 		return err
 	}
 
-
 	if e.stdout != nil {
 		cmd.Stdout = e.stdout
 	}
@@ -92,7 +91,7 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 	if env.ResourceController != nil && e.step.Resources != nil {
 		// Generate a unique name for this child DAG execution
 		stepName := fmt.Sprintf("%s-%s-%s", env.DAG.Name, e.step.Name, e.runParams.RunID)
-		
+
 		err = env.ResourceController.StartProcess(ctx, cmd, e.step.Resources, stepName)
 	} else {
 		err = cmd.Start()

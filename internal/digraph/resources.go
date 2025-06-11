@@ -328,22 +328,22 @@ func (r *Resources) ToResourcesConfig() *ResourcesConfig {
 type ResourceEnforcer interface {
 	// PreStart is called before the process starts to configure resource limits
 	PreStart(cmd *exec.Cmd) error
-	
+
 	// PostStart is called after the process starts with its PID
 	PostStart(pid int) error
-	
+
 	// GetMetrics retrieves current resource usage for the process
 	GetMetrics(pid int) (*Metrics, error)
-	
+
 	// CheckViolation checks if resource limits are being violated
 	CheckViolation(metrics *Metrics) bool
-	
+
 	// Cleanup performs any necessary cleanup when the process ends
 	Cleanup() error
-	
+
 	// SupportsRequests returns true if the enforcer supports resource requests
 	SupportsRequests() bool
-	
+
 	// SupportsLimits returns true if the enforcer supports resource limits
 	SupportsLimits() bool
 }

@@ -49,7 +49,7 @@ func TestParseMemory(t *testing.T) {
 		// Empty and basic
 		{"empty", "", 0, false},
 		{"bytes no unit", "1024", 1024, false},
-		
+
 		// Binary units
 		{"kibibytes lower", "1ki", Kibibyte, false},
 		{"kibibytes upper", "1Ki", Kibibyte, false},
@@ -57,7 +57,7 @@ func TestParseMemory(t *testing.T) {
 		{"mebibytes", "2Mi", 2 * Mebibyte, false},
 		{"gibibytes", "4Gi", 4 * Gibibyte, false},
 		{"tebibytes", "1Ti", Tebibyte, false},
-		
+
 		// Decimal units
 		{"kilobytes lower", "1k", Kilobyte, false},
 		{"kilobytes upper", "1K", Kilobyte, false},
@@ -65,14 +65,14 @@ func TestParseMemory(t *testing.T) {
 		{"megabytes", "2M", 2 * Megabyte, false},
 		{"gigabytes", "4G", 4 * Gigabyte, false},
 		{"terabytes", "1T", Terabyte, false},
-		
+
 		// Decimal values
 		{"decimal kibibytes", "1.5Ki", int64(1.5 * Kibibyte), false},
 		{"decimal gigabytes", "2.5Gi", int64(2.5 * Gibibyte), false},
-		
+
 		// With spaces
 		{"with spaces", " 100Mi ", 100 * Mebibyte, false},
-		
+
 		// Invalid
 		{"invalid", "abc", 0, true},
 		{"invalid unit", "100X", 0, true},
@@ -94,13 +94,13 @@ func TestParseMemory(t *testing.T) {
 
 func TestParseResourcesConfig(t *testing.T) {
 	tests := []struct {
-		name               string
-		input              *ResourcesConfig
-		wantCPURequest     int
-		wantCPULimit       int
-		wantMemRequest     int64
-		wantMemLimit       int64
-		wantErr            bool
+		name           string
+		input          *ResourcesConfig
+		wantCPURequest int
+		wantCPULimit   int
+		wantMemRequest int64
+		wantMemLimit   int64
+		wantErr        bool
 	}{
 		{
 			name:           "nil config",

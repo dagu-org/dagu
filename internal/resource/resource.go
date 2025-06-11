@@ -57,9 +57,9 @@ func (rc *ResourceController) StartProcess(
 	name string,
 ) error {
 	// Skip if no resources specified
-	if resources == nil || (resources.CPULimitMillis == 0 && 
+	if resources == nil || (resources.CPULimitMillis == 0 &&
 		resources.MemoryLimitBytes == 0 &&
-		resources.CPURequestMillis == 0 && 
+		resources.CPURequestMillis == 0 &&
 		resources.MemoryRequestBytes == 0) {
 		return cmd.Start()
 	}
@@ -77,7 +77,7 @@ func (rc *ResourceController) StartProcess(
 
 	// Variable to track if we've registered the enforcer
 	registered := false
-	
+
 	// Ensure cleanup on error
 	defer func() {
 		if err != nil && registered {
@@ -103,7 +103,7 @@ func (rc *ResourceController) StartProcess(
 	rc.enforcers[name] = enforcer
 	registered = true
 	rc.mu.Unlock()
-	
+
 	// Apply post-start configuration
 	if err := enforcer.PostStart(cmd.Process.Pid); err != nil {
 		// Kill the process if post-start fails
@@ -149,21 +149,21 @@ func (rc *ResourceController) createEnforcer(name string, resources *digraph.Res
 	if resources == nil {
 		return nil, fmt.Errorf("resources cannot be nil")
 	}
-	
+
 	switch {
 	case rc.capabilities.CgroupsV2 && runtime.GOOS == "linux":
 		// Prefer cgroups v2 on Linux
 		return NewCgroupsV2Enforcer(name, resources)
-		
+
 	case rc.capabilities.CgroupsV1 && runtime.GOOS == "linux":
 		// Fall back to cgroups v1 - use rlimit for now
 		// TODO: Implement proper cgroups v1 support
 		return NewRlimitEnforcer(name, resources)
-		
+
 	case rc.capabilities.Rlimit:
 		// Use rlimit on Unix-like systems
 		return NewRlimitEnforcer(name, resources)
-		
+
 	default:
 		// No enforcement available
 		return NewNoopEnforcer(), nil
@@ -185,7 +185,7 @@ func (rc *ResourceController) monitorProcess(
 			delete(rc.enforcers, name)
 		}
 		rc.mu.Unlock()
-		
+
 		// Always cleanup our enforcer
 		if enforcer != nil {
 			enforcer.Cleanup()
@@ -199,7 +199,7 @@ func (rc *ResourceController) monitorProcess(
 		select {
 		case <-ctx.Done():
 			return
-			
+
 		case <-ticker.C:
 			// Check if process still exists
 			if !processExists(pid) {
@@ -233,10 +233,10 @@ func NewNoopEnforcer() *NoopEnforcer {
 	return &NoopEnforcer{}
 }
 
-func (n *NoopEnforcer) PreStart(cmd *exec.Cmd) error                  { return nil }
-func (n *NoopEnforcer) PostStart(pid int) error                       { return nil }
-func (n *NoopEnforcer) GetMetrics(pid int) (*digraph.Metrics, error)  { return &digraph.Metrics{}, nil }
-func (n *NoopEnforcer) CheckViolation(metrics *digraph.Metrics) bool  { return false }
-func (n *NoopEnforcer) Cleanup() error                                { return nil }
-func (n *NoopEnforcer) SupportsRequests() bool                        { return false }
-func (n *NoopEnforcer) SupportsLimits() bool                          { return false }
+func (n *NoopEnforcer) PreStart(cmd *exec.Cmd) error                 { return nil }
+func (n *NoopEnforcer) PostStart(pid int) error                      { return nil }
+func (n *NoopEnforcer) GetMetrics(pid int) (*digraph.Metrics, error) { return &digraph.Metrics{}, nil }
+func (n *NoopEnforcer) CheckViolation(metrics *digraph.Metrics) bool { return false }
+func (n *NoopEnforcer) Cleanup() error                               { return nil }
+func (n *NoopEnforcer) SupportsRequests() bool                       { return false }
+func (n *NoopEnforcer) SupportsLimits() bool                         { return false }
