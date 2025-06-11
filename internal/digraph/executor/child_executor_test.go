@@ -36,7 +36,7 @@ func (m *MockDatabase) GetChildDAGRunStatus(ctx context.Context, dagRunID string
 func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
 	// Create a context with environment
 	ctx := context.Background()
-	
+
 	// Create a parent DAG with local DAGs
 	parentDAG := &digraph.DAG{
 		Name: "parent",
@@ -98,7 +98,7 @@ func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
 func TestNewChildDAGExecutor_RegularDAG(t *testing.T) {
 	// Create a context with environment
 	ctx := context.Background()
-	
+
 	// Create a parent DAG without local DAGs
 	parentDAG := &digraph.DAG{
 		Name: "parent",
@@ -148,7 +148,7 @@ func TestNewChildDAGExecutor_RegularDAG(t *testing.T) {
 func TestNewChildDAGExecutor_NotFound(t *testing.T) {
 	// Create a context with environment
 	ctx := context.Background()
-	
+
 	// Create a parent DAG without the requested local DAG
 	parentDAG := &digraph.DAG{
 		Name: "parent",
@@ -190,7 +190,7 @@ func TestNewChildDAGExecutor_NotFound(t *testing.T) {
 func TestBuildCommand(t *testing.T) {
 	// Create a context with environment
 	ctx := context.Background()
-	
+
 	// Set up the environment
 	mockDB := new(MockDatabase)
 	env := Env{
@@ -229,7 +229,7 @@ func TestBuildCommand(t *testing.T) {
 	// Verify command properties
 	assert.Equal(t, "/work/dir", cmd.Dir)
 	assert.Contains(t, cmd.Env, "TEST_ENV=value")
-	
+
 	// Verify args
 	args := cmd.Args
 	assert.Contains(t, args, "start")
@@ -244,7 +244,7 @@ func TestBuildCommand(t *testing.T) {
 
 func TestBuildCommand_NoRunID(t *testing.T) {
 	ctx := context.Background()
-	
+
 	// Set up the environment
 	mockDB := new(MockDatabase)
 	env := Env{
@@ -278,7 +278,7 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 
 func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 	ctx := context.Background()
-	
+
 	// Set up the environment without RootDAGRun
 	mockDB := new(MockDatabase)
 	env := Env{
@@ -323,9 +323,9 @@ func TestCleanup_LocalDAG(t *testing.T) {
 	require.NoError(t, err)
 
 	executor := &ChildDAGExecutor{
-		DAG: &digraph.DAG{Name: "test-child"},
+		DAG:      &digraph.DAG{Name: "test-child"},
 		tempFile: tempFile,
-		isLocal: true,
+		isLocal:  true,
 	}
 
 	// Verify file exists
@@ -343,9 +343,9 @@ func TestCleanup_NonExistentFile(t *testing.T) {
 	ctx := context.Background()
 
 	executor := &ChildDAGExecutor{
-		DAG: &digraph.DAG{Name: "test-child"},
+		DAG:      &digraph.DAG{Name: "test-child"},
 		tempFile: "/non/existent/file.yaml",
-		isLocal: true,
+		isLocal:  true,
 	}
 
 	// Cleanup should not error on non-existent file
