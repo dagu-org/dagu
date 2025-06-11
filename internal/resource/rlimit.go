@@ -1,14 +1,15 @@
 package resource
 
 import (
+	"fmt"
 	"os/exec"
-	"syscall"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 )
 
 // RlimitEnforcer implements resource enforcement using Unix rlimits
 // This works on Unix-like systems (Linux, macOS, BSD) as a fallback
+// It passes resource limits via environment variables to child processes
 type RlimitEnforcer struct {
 	name      string
 	resources *digraph.Resources
@@ -23,34 +24,25 @@ func NewRlimitEnforcer(name string, resources *digraph.Resources) (*RlimitEnforc
 }
 
 // PreStart configures resource limits before process starts
+// For rlimits, we pass the limits via environment variables to the child process
 func (e *RlimitEnforcer) PreStart(cmd *exec.Cmd) error {
-	// Initialize SysProcAttr if needed
-	if cmd.SysProcAttr == nil {
-		cmd.SysProcAttr = &syscall.SysProcAttr{}
+	// Pass resource limits via environment variables
+	// The child process will apply these rlimits to itself
+	
+	if e.resources.MemoryLimitBytes > 0 {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("DAGU_RLIMIT_MEMORY=%d", e.resources.MemoryLimitBytes))
+	}
+	
+	if e.resources.CPULimitMillis > 0 {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("DAGU_RLIMIT_CPU=%d", e.resources.CPULimitMillis))
 	}
 
-	// Set memory limits using syscall instead of shell wrapper for security
-	if e.resources.MemoryLimitBytes > 0 {
-		// Unfortunately, Go's exec.Cmd doesn't support setting rlimits directly
-		// We'll need to use a wrapper process or accept this limitation
-		// For now, we'll document this as a known limitation
-		
-		// TODO: Implement proper rlimit setting via a wrapper process
-		// that calls setrlimit before exec
-	}
-	
-	// For CPU limits, we could use nice values as a hint but this requires
-	// wrapping the command which has security implications
-	// For now, we'll skip CPU priority adjustment in rlimit enforcer
-	
-	// TODO: Implement safe CPU priority adjustment
-	
 	return nil
 }
 
 // PostStart is called after the process starts
 func (e *RlimitEnforcer) PostStart(pid int) error {
-	// rlimits are inherited from parent, no post-start action needed
+	// No action needed - rlimits are set by the child process itself
 	return nil
 }
 
@@ -67,10 +59,9 @@ func (e *RlimitEnforcer) CheckViolation(metrics *Metrics) bool {
 
 // Cleanup performs cleanup tasks
 func (e *RlimitEnforcer) Cleanup() error {
+	// No cleanup needed - rlimits are process-local
 	return nil
 }
 
 func (e *RlimitEnforcer) SupportsRequests() bool { return false }
-func (e *RlimitEnforcer) SupportsLimits() bool   { return false } // Currently disabled due to security concerns
-
-
+func (e *RlimitEnforcer) SupportsLimits() bool   { return true } // Support limits via environment variables

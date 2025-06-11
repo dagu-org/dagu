@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"slices"
 	"strconv"
+	"sync"
 	"syscall"
 
 	"github.com/dagu-org/dagu/internal/config"
@@ -15,6 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/resource"
 	"github.com/dagu-org/dagu/internal/sock"
 	"github.com/google/uuid"
 )
@@ -26,12 +28,13 @@ func New(
 	ps models.ProcStore,
 	executable string,
 	workDir string,
-) Manager {
-	return Manager{
+) *Manager {
+	return &Manager{
 		dagRunStore: drs,
 		procStore:   ps,
 		executable:  executable,
 		workDir:     workDir,
+		// resourceController will be lazily initialized when first needed
 	}
 }
 
@@ -42,8 +45,25 @@ type Manager struct {
 	dagRunStore models.DAGRunStore // Store interface for persisting run data
 	procStore   models.ProcStore   // Store interface for process management
 
-	executable string // Path to the executable used to run DAGs
-	workDir    string // Working directory for executing commands
+	executable         string                       // Path to the executable used to run DAGs
+	workDir            string                       // Working directory for executing commands
+	resourceController *resource.ResourceController // Controller for managing process resources
+	resourceInitOnce   sync.Once                    // Ensures resource controller is initialized only once
+	resourceInitError  error                        // Stores any initialization error
+}
+
+// getResourceController lazily initializes and returns the resource controller
+func (m *Manager) getResourceController(ctx context.Context) *resource.ResourceController {
+	m.resourceInitOnce.Do(func() {
+		controller, err := resource.NewResourceController()
+		if err != nil {
+			logger.Warn(ctx, "Failed to initialize resource controller", "error", err)
+			m.resourceInitError = err
+		} else {
+			m.resourceController = controller
+		}
+	})
+	return m.resourceController
 }
 
 // LoadYAML loads a DAG from YAML specification bytes without evaluating it.
@@ -55,6 +75,7 @@ func (m *Manager) LoadYAML(ctx context.Context, spec []byte, opts ...digraph.Loa
 
 // Stop stops a running DAG by sending a stop request to its socket.
 // If the DAG is not running, it logs a message and returns nil.
+// It also cleans up any resource enforcement for the DAG.
 func (m *Manager) Stop(ctx context.Context, dag *digraph.DAG, dagRunID string) error {
 	logger.Info(ctx, "Stopping", "name", dag.Name)
 	addr := dag.SockAddr(dagRunID)
@@ -62,6 +83,8 @@ func (m *Manager) Stop(ctx context.Context, dag *digraph.DAG, dagRunID string) e
 		logger.Info(ctx, "The DAG is not running", "name", dag.Name)
 		return nil
 	}
+
+	// Send stop request to the DAG
 	client := sock.NewClient(addr)
 	_, err := client.Request("POST", "/stop")
 	return err
@@ -78,7 +101,8 @@ func (m *Manager) GenDAGRunID(_ context.Context) (string, error) {
 
 // StartDAGRun starts a dag-run by executing the configured executable with the start command.
 // It sets up the command to run in its own process group and configures standard output/error.
-func (m *Manager) StartDAGRun(_ context.Context, dag *digraph.DAG, opts StartOptions) error {
+// If the DAG has resource requirements, they are applied to the entire DAG process tree.
+func (m *Manager) StartDAGRun(ctx context.Context, dag *digraph.DAG, opts StartOptions) error {
 	args := []string{"start"}
 	if opts.Params != "" {
 		args = append(args, "-p")
@@ -97,6 +121,7 @@ func (m *Manager) StartDAGRun(_ context.Context, dag *digraph.DAG, opts StartOpt
 		}
 	}
 	args = append(args, dag.Location)
+
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
@@ -105,7 +130,40 @@ func (m *Manager) StartDAGRun(_ context.Context, dag *digraph.DAG, opts StartOpt
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	return cmd.Start()
+	// Apply resource limits if available and configured
+	if resourceController := m.getResourceController(ctx); resourceController != nil && dag.Resources != nil {
+		// Create resource name using DAG name and run ID
+		resourceName := fmt.Sprintf("%s-%s", dag.Name, opts.DAGRunID)
+		if opts.DAGRunID == "" {
+			resourceName = dag.Name
+		}
+
+		logger.Debug(ctx, "Applying resource limits to DAG process",
+			"dag", dag.Name,
+			"resourceName", resourceName,
+			"cpu_limit", dag.Resources.CPULimitMillis,
+			"memory_limit", dag.Resources.MemoryLimitBytes)
+
+		// Use ResourceController to start the process with limits
+		if err := resourceController.StartProcess(ctx, cmd, dag.Resources, resourceName); err != nil {
+			logger.Error(ctx, "Failed to start DAG process with resource limits",
+				"dag", dag.Name, "error", err)
+			return fmt.Errorf("failed to start DAG with resource limits: %w", err)
+		}
+
+		logger.Info(ctx, "Started DAG process with resource enforcement",
+			"dag", dag.Name, "pid", cmd.Process.Pid)
+		return nil
+	}
+
+	// Fallback: start without resource management
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start DAG process: %w", err)
+	}
+
+	logger.Info(ctx, "Started DAG process without resource limits",
+		"dag", dag.Name, "pid", cmd.Process.Pid)
+	return nil
 }
 
 // EnqueueDAGRun enqueues a dag-run by executing the configured executable with the enqueue command.
@@ -171,8 +229,8 @@ func (m *Manager) DequeueDAGRun(_ context.Context, dagRun digraph.DAGRunRef) err
 }
 
 // RestartDAG restarts a DAG by executing the configured executable with the restart command.
-// It sets up the command to run in its own process group.
-func (m *Manager) RestartDAG(_ context.Context, dag *digraph.DAG, opts RestartOptions) error {
+// It sets up the command to run in its own process group and applies resource limits if configured.
+func (m *Manager) RestartDAG(ctx context.Context, dag *digraph.DAG, opts RestartOptions) error {
 	args := []string{"restart"}
 	if opts.Quiet {
 		args = append(args, "-q")
@@ -184,16 +242,44 @@ func (m *Manager) RestartDAG(_ context.Context, dag *digraph.DAG, opts RestartOp
 		}
 	}
 	args = append(args, dag.Location)
+
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	cmd.Dir = m.workDir
 	cmd.Env = os.Environ()
-	return cmd.Start()
+
+	// Apply resource limits if available and configured
+	if resourceController := m.getResourceController(ctx); resourceController != nil && dag.Resources != nil {
+		resourceName := fmt.Sprintf("%s-restart", dag.Name)
+
+		logger.Debug(ctx, "Applying resource limits to restarted DAG process",
+			"dag", dag.Name, "resourceName", resourceName)
+
+		if err := resourceController.StartProcess(ctx, cmd, dag.Resources, resourceName); err != nil {
+			logger.Error(ctx, "Failed to restart DAG process with resource limits",
+				"dag", dag.Name, "error", err)
+			return fmt.Errorf("failed to restart DAG with resource limits: %w", err)
+		}
+
+		logger.Info(ctx, "Restarted DAG process with resource enforcement",
+			"dag", dag.Name, "pid", cmd.Process.Pid)
+		return nil
+	}
+
+	// Fallback: restart without resource management
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to restart DAG process: %w", err)
+	}
+
+	logger.Info(ctx, "Restarted DAG process without resource limits",
+		"dag", dag.Name, "pid", cmd.Process.Pid)
+	return nil
 }
 
 // RetryDAGRun retries a dag-run by executing the configured executable with the retry command.
-func (m *Manager) RetryDAGRun(_ context.Context, dag *digraph.DAG, dagRunID string) error {
+// It applies resource limits if configured for the DAG.
+func (m *Manager) RetryDAGRun(ctx context.Context, dag *digraph.DAG, dagRunID string) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--run-id=%s", dagRunID))
 	if configFile := config.UsedConfigFile.Load(); configFile != nil {
@@ -203,12 +289,39 @@ func (m *Manager) RetryDAGRun(_ context.Context, dag *digraph.DAG, dagRunID stri
 		}
 	}
 	args = append(args, dag.Name)
+
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	cmd.Dir = m.workDir
 	cmd.Env = os.Environ()
-	return cmd.Start()
+
+	// Apply resource limits if available and configured
+	if resourceController := m.getResourceController(ctx); resourceController != nil && dag.Resources != nil {
+		resourceName := fmt.Sprintf("%s-retry-%s", dag.Name, dagRunID)
+
+		logger.Debug(ctx, "Applying resource limits to retried DAG process",
+			"dag", dag.Name, "dagRunID", dagRunID, "resourceName", resourceName)
+
+		if err := resourceController.StartProcess(ctx, cmd, dag.Resources, resourceName); err != nil {
+			logger.Error(ctx, "Failed to retry DAG process with resource limits",
+				"dag", dag.Name, "dagRunID", dagRunID, "error", err)
+			return fmt.Errorf("failed to retry DAG with resource limits: %w", err)
+		}
+
+		logger.Info(ctx, "Retried DAG process with resource enforcement",
+			"dag", dag.Name, "dagRunID", dagRunID, "pid", cmd.Process.Pid)
+		return nil
+	}
+
+	// Fallback: retry without resource management
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to retry DAG process: %w", err)
+	}
+
+	logger.Info(ctx, "Retried DAG process without resource limits",
+		"dag", dag.Name, "dagRunID", dagRunID, "pid", cmd.Process.Pid)
+	return nil
 }
 
 // IsRunning checks if a dag-run is currently running by querying its status.

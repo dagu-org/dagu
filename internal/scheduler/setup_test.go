@@ -39,7 +39,7 @@ func TestMain(m *testing.M) {
 
 type testHelper struct {
 	EntryReader scheduler.EntryReader
-	DAGRunMgr   dagrun.Manager
+	DAGRunMgr   *dagrun.Manager
 	DAGRunStore models.DAGRunStore
 	DAGStore    models.DAGStore
 	ProcStore   models.ProcStore

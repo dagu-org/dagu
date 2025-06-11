@@ -48,13 +48,13 @@ type entryReaderImpl struct {
 	registry   map[string]*digraph.DAG
 	lock       sync.Mutex
 	dagStore   models.DAGStore
-	dagRunMgr  dagrun.Manager
+	dagRunMgr  *dagrun.Manager
 	executable string
 	workDir    string
 }
 
 // NewEntryReader creates a new DAG manager with the given configuration.
-func NewEntryReader(dir string, dagCli models.DAGStore, drm dagrun.Manager, executable, workDir string) EntryReader {
+func NewEntryReader(dir string, dagCli models.DAGStore, drm *dagrun.Manager, executable, workDir string) EntryReader {
 	return &entryReaderImpl{
 		targetDir:  dir,
 		lock:       sync.Mutex{},

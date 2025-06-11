@@ -32,7 +32,7 @@ type DAGRunJob struct {
 	WorkDir    string
 	Next       time.Time
 	Schedule   cron.Schedule
-	Client     dagrun.Manager
+	Client     *dagrun.Manager
 }
 
 // GetDAG returns the DAG associated with this job.

@@ -1221,7 +1221,7 @@ func buildResources(_ BuildContext, spec *definition, dag *DAG) error {
 // buildStepResources builds the resource configuration for a step
 func buildStepResources(_ BuildContext, def stepDef, step *Step) error {
 	if def.Resources == nil {
-		// Initialize empty resources
+		// Initialize empty resources - inheritance will be handled later
 		step.Resources = &Resources{}
 		return nil
 	}
@@ -1235,3 +1235,4 @@ func buildStepResources(_ BuildContext, def stepDef, step *Step) error {
 	step.Resources = resources
 	return nil
 }
+

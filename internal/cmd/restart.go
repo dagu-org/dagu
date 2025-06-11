@@ -103,7 +103,7 @@ func handleRestartProcess(ctx *Context, d *digraph.DAG, dagRunID string) error {
 	return executeDAG(ctx, ctx.DAGRunMgr, d)
 }
 
-func executeDAG(ctx *Context, cli dagrun.Manager, dag *digraph.DAG) error {
+func executeDAG(ctx *Context, drm *dagrun.Manager, dag *digraph.DAG) error {
 	dagRunID, err := genRunID()
 	if err != nil {
 		return fmt.Errorf("failed to generate dag-run ID: %w", err)
@@ -131,7 +131,7 @@ func executeDAG(ctx *Context, cli dagrun.Manager, dag *digraph.DAG) error {
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
-		cli,
+		drm,
 		dr,
 		ctx.DAGRunStore,
 		ctx.ProcStore,
@@ -151,7 +151,7 @@ func executeDAG(ctx *Context, cli dagrun.Manager, dag *digraph.DAG) error {
 	return nil
 }
 
-func stopDAGIfRunning(ctx context.Context, cli dagrun.Manager, dag *digraph.DAG, dagRunID string) error {
+func stopDAGIfRunning(ctx context.Context, cli *dagrun.Manager, dag *digraph.DAG, dagRunID string) error {
 	status, err := cli.GetCurrentStatus(ctx, dag, dagRunID)
 	if err != nil {
 		return fmt.Errorf("failed to get current status: %w", err)
@@ -166,7 +166,7 @@ func stopDAGIfRunning(ctx context.Context, cli dagrun.Manager, dag *digraph.DAG,
 	return nil
 }
 
-func stopRunningDAG(ctx context.Context, cli dagrun.Manager, dag *digraph.DAG, dagRunID string) error {
+func stopRunningDAG(ctx context.Context, cli *dagrun.Manager, dag *digraph.DAG, dagRunID string) error {
 	const stopPollInterval = 100 * time.Millisecond
 	for {
 		status, err := cli.GetCurrentStatus(ctx, dag, dagRunID)

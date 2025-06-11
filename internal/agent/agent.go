@@ -52,7 +52,7 @@ type Agent struct {
 	procStore models.ProcStore
 
 	// dagRunMgr is the runstore dagRunMgr to communicate with the history.
-	dagRunMgr dagrun.Manager
+	dagRunMgr *dagrun.Manager
 
 	// scheduler is the scheduler instance to run the DAG.
 	scheduler *scheduler.Scheduler
@@ -127,7 +127,7 @@ func New(
 	dag *digraph.DAG,
 	logDir string,
 	logFile string,
-	drm dagrun.Manager,
+	drm *dagrun.Manager,
 	ds models.DAGStore,
 	drs models.DAGRunStore,
 	ps models.ProcStore,

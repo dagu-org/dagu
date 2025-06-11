@@ -31,7 +31,7 @@ type Job interface {
 }
 
 type Scheduler struct {
-	hm           dagrun.Manager
+	drm          *dagrun.Manager
 	er           EntryReader
 	logDir       string
 	stopChan     chan struct{}
@@ -53,7 +53,7 @@ type queueConfig struct {
 func New(
 	cfg *config.Config,
 	er EntryReader,
-	drm dagrun.Manager,
+	drm *dagrun.Manager,
 	drs models.DAGRunStore,
 	qs models.QueueStore,
 	ps models.ProcStore,
@@ -68,7 +68,7 @@ func New(
 		stopChan:    make(chan struct{}),
 		location:    timeLoc,
 		er:          er,
-		hm:          drm,
+		drm:         drm,
 		dagRunStore: drs,
 		queueStore:  qs,
 		procStore:   ps,
@@ -224,7 +224,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			})
 
 			startedAt = time.Now()
-			if err := s.hm.RetryDAGRun(ctx, dag, data.ID); err != nil {
+			if err := s.drm.RetryDAGRun(ctx, dag, data.ID); err != nil {
 				logger.Error(ctx, "Failed to retry dag", "err", err, "data", data)
 				goto SEND_RESULT
 			}

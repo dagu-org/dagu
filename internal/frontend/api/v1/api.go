@@ -24,7 +24,7 @@ var _ api.StrictServerInterface = (*API)(nil)
 type API struct {
 	dagStore           models.DAGStore
 	dagRunStore        models.DAGRunStore
-	dagRunManager      dagrun.Manager
+	dagRunManager      *dagrun.Manager
 	remoteNodes        map[string]config.RemoteNode
 	apiBasePath        string
 	logEncodingCharset string
@@ -34,7 +34,7 @@ type API struct {
 func New(
 	dr models.DAGStore,
 	drs models.DAGRunStore,
-	drm dagrun.Manager,
+	drm *dagrun.Manager,
 	cfg *config.Config,
 ) *API {
 	remoteNodes := make(map[string]config.RemoteNode)

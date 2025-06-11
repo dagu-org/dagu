@@ -40,7 +40,7 @@ type Context struct {
 	Quiet   bool
 
 	DAGRunStore models.DAGRunStore
-	DAGRunMgr   dagrun.Manager
+	DAGRunMgr   *dagrun.Manager
 	ProcStore   models.ProcStore
 	QueueStore  models.QueueStore
 }
@@ -137,7 +137,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 }
 
 // HistoryManager initializes a HistoryManager using the provided options. If not supplied,
-func (c *Context) HistoryManager(drs models.DAGRunStore) dagrun.Manager {
+func (c *Context) HistoryManager(drs models.DAGRunStore) *dagrun.Manager {
 	return dagrun.New(
 		drs,
 		c.ProcStore,

@@ -144,7 +144,7 @@ type Helper struct {
 	LoggingOutput *SyncBuffer
 	DAGStore      models.DAGStore
 	DAGRunStore   models.DAGRunStore
-	DAGRunMgr     dagrun.Manager
+	DAGRunMgr     *dagrun.Manager
 	ProcStore     models.ProcStore
 
 	tmpDir string
