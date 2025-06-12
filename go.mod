@@ -43,6 +43,8 @@ require (
 	mvdan.cc/sh/v3 v3.10.0
 )
 
+require github.com/kylelemons/godebug v1.1.0 // indirect
+
 require (
 	4d63.com/gocheckcompilerdirectives v1.3.0 // indirect
 	4d63.com/gochecknoglobals v0.2.2 // indirect

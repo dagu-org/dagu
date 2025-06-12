@@ -34,7 +34,15 @@
       "request": "launch",
       "mode": "auto",
       "program": "${workspaceFolder}/cmd/",
-      "args": ["start", "${input:pathToSpec}"]
+      "args": ["start", "--run-id", "xxx", "${input:pathToSpec}"]
+    },
+    {
+      "name": "Stop",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/cmd/",
+      "args": ["stop", "--run-id", "xxxy", "${input:pathToSpec}"]
     },
     {
       "name": "Status",
