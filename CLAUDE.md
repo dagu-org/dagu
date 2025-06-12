@@ -79,6 +79,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 5. Run `make test` and `make golangci-lint` to verify
 6. Run `go fmt` to format Go code
 
+**When adding new features or configuration options:**
+1. Update the code implementation
+2. Add/update tests
+3. Update CLAUDE.md documentation
+4. **Update docs/sources/*.rst files** - IMPORTANT: Don't forget the RST documentation!
+5. Add examples if applicable
+
 **Before committing:**
 - Run `make golangci-lint` to check for lint issues
 - Run `make test` to ensure all tests pass
@@ -258,6 +265,11 @@ Dagu is a **modern, powerful, yet surprisingly simple workflow orchestration eng
   - Inter-step delays
 - **Signal Handling**: Custom stop signals per step (`signalOnStop`)
 - **Working Directory Control**: Per-step directory configuration
+- **Output Size Limits**: 
+  - Configurable maximum output size per step (default 1MB)
+  - Prevents memory issues from large command outputs
+  - Returns error when limit exceeded to ensure awareness
+  - Per-DAG configuration with `maxOutputSize`
 
 ### 🎨 **Modern Web UI**
 - **Real-time Dashboard**: 
@@ -746,6 +758,7 @@ maxCleanUpTime: 300                 # Cleanup timeout in seconds
 # Data Management
 histRetentionDays: 30               # History retention
 logDir: /custom/logs                # Custom log directory
+maxOutputSize: 10485760             # Max output size per step (10MB)
 
 # Environment
 dotenv:                             # Load env files

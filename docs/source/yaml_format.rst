@@ -292,6 +292,20 @@ Store command output in variables:
       command: "echo foo"
       output: FOO  # Will contain "foo"
 
+**Output Size Limits**: To prevent memory issues from large command outputs, Dagu enforces a size limit on captured output. By default, this limit is 1MB. If a step's output exceeds this limit, the step will fail with an error.
+
+You can configure the maximum output size at the DAG level:
+
+.. code-block:: yaml
+
+  # Set maximum output size to 5MB for all steps in this DAG
+  maxOutputSize: 5242880  # 5MB in bytes
+  
+  steps:
+    - name: large-output
+      command: "cat large-file.txt"
+      output: CONTENT  # Will fail if file exceeds 5MB
+
 Redirect Output
 ~~~~~~~~~~~~~
 Send output to files:
@@ -837,6 +851,7 @@ Complete list of DAG-level configuration options:
 - ``maxActiveSteps``: Maximum parallel steps (default: no limit)
 - ``maxActiveRuns``: Maximum concurrent runs of this DAG (default: 1, negative values disable queueing)
 - ``queue``: Queue name for this DAG (default: DAG name)
+- ``maxOutputSize``: Maximum size in bytes for step output capture (default: 1048576, which is 1MB)
 - ``params``: Default parameters
 - ``precondition``: DAG-level conditions
 - ``mailOn``: Email notification settings

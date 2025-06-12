@@ -1,0 +1,5 @@
+name: large-output-64kb
+steps:
+  - name: read-64kb-file
+    command: cat large-output-64kb.txt
+    output: OUTPUT_64KB
