@@ -27,6 +27,7 @@ const (
 	StatusCancel
 	StatusSuccess
 	StatusQueued
+	StatusPartialSuccess
 )
 
 func (s Status) String() string {
@@ -41,6 +42,8 @@ func (s Status) String() string {
 		return "finished"
 	case StatusQueued:
 		return "queued"
+	case StatusPartialSuccess:
+		return "partial success"
 	case StatusNone:
 		fallthrough
 	default:
@@ -373,6 +376,11 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 	case StatusSuccess:
 		eventHandlers = append(eventHandlers, digraph.HandlerOnSuccess)
 
+	case StatusPartialSuccess:
+		// PartialSuccess is treated as success since primary work was completed
+		// despite some non-critical failures that were allowed to continue
+		eventHandlers = append(eventHandlers, digraph.HandlerOnSuccess)
+
 	case StatusError:
 		eventHandlers = append(eventHandlers, digraph.HandlerOnFailure)
 
@@ -522,6 +530,11 @@ func (sc *Scheduler) Status(g *ExecutionGraph) Status {
 	if g.IsRunning() {
 		return StatusRunning
 	}
+
+	if sc.isPartialSuccess(g) {
+		return StatusPartialSuccess
+	}
+
 	if sc.isError() {
 		return StatusError
 	}
@@ -696,6 +709,59 @@ func (sc *Scheduler) isSucceed(g *ExecutionGraph) bool {
 		return false
 	}
 	return true
+}
+
+// isPartialSuccess checks if the DAG completed with some failures that were allowed to continue.
+// This represents scenarios where primary work was completed but non-critical errors occurred.
+func (sc *Scheduler) isPartialSuccess(g *ExecutionGraph) bool {
+	sc.mu.RLock()
+	defer sc.mu.RUnlock()
+
+	hasErrors := false
+	hasSuccessOrSkipped := false
+
+	logger.Debug(context.Background(), "Checking partial success conditions", "totalNodes", len(g.nodes))
+
+	for _, node := range g.nodes {
+		nodeStatus := node.State().Status
+		logger.Debug(context.Background(), "Node status check",
+			"nodeName", node.Name(),
+			"status", nodeStatus.String(),
+			"shouldContinue", node.shouldContinue(context.Background()))
+
+		switch nodeStatus {
+		case NodeStatusSuccess, NodeStatusSkipped:
+			hasSuccessOrSkipped = true
+			logger.Debug(context.Background(), "Found success/skipped node", "nodeName", node.Name())
+		case NodeStatusError:
+			// Check if this error node was allowed to continue
+			if node.shouldContinue(context.Background()) {
+				hasErrors = true
+				logger.Debug(context.Background(), "Found error node with continueOn", "nodeName", node.Name())
+			} else {
+				// If any error node was not allowed to continue, this is not partial success
+				logger.Debug(context.Background(), "Found error node without continueOn, not partial success", "nodeName", node.Name())
+				return false
+			}
+		case NodeStatusCancel:
+			// Cancelled nodes prevent partial success
+			logger.Debug(context.Background(), "Found cancelled node, not partial success", "nodeName", node.Name())
+			return false
+		case NodeStatusRunning, NodeStatusNone:
+			// DAG is not finished yet
+			logger.Debug(context.Background(), "DAG not finished, not partial success", "nodeName", node.Name(), "status", nodeStatus.String())
+			return false
+		}
+	}
+
+	result := hasSuccessOrSkipped && hasErrors
+	logger.Debug(context.Background(), "Partial success check result",
+		"hasSuccessOrSkipped", hasSuccessOrSkipped,
+		"hasErrors", hasErrors,
+		"result", result)
+
+	// Partial success requires both successful/skipped nodes AND error nodes that were allowed to continue
+	return result
 }
 
 func (sc *Scheduler) isTimeout(startedAt time.Time) bool {
