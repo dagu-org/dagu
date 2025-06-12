@@ -24,6 +24,67 @@ import (
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
+// outputCapture handles concurrent reading from a pipe to avoid deadlocks
+// when output exceeds the pipe buffer size (typically 64KB)
+type outputCapture struct {
+	mu         sync.Mutex
+	buffer     bytes.Buffer
+	done       chan struct{}
+	err        error
+	maxSize    int64
+	truncated  bool
+}
+
+// newOutputCapture creates a new output capture handler
+func newOutputCapture(maxSize int64) *outputCapture {
+	return &outputCapture{
+		done:    make(chan struct{}),
+		maxSize: maxSize,
+	}
+}
+
+// start begins reading from the reader concurrently
+func (oc *outputCapture) start(ctx context.Context, reader io.Reader) {
+	go func() {
+		defer close(oc.done)
+		
+		limitedReader := io.LimitReader(reader, oc.maxSize)
+		written, err := io.Copy(&oc.buffer, limitedReader)
+		
+		oc.mu.Lock()
+		defer oc.mu.Unlock()
+		
+		if err != nil && err != io.EOF {
+			oc.err = fmt.Errorf("failed to read output: %w", err)
+			logger.Error(ctx, "Failed to capture output", "err", err)
+		}
+		
+		if written == oc.maxSize {
+			oc.truncated = true
+			logger.Warn(ctx, "Output truncated due to size limit", "maxSize", oc.maxSize)
+		}
+	}()
+}
+
+// wait waits for the reading to complete and returns the captured output
+func (oc *outputCapture) wait() (string, error) {
+	<-oc.done
+	
+	oc.mu.Lock()
+	defer oc.mu.Unlock()
+	
+	if oc.err != nil {
+		return "", oc.err
+	}
+	
+	output := oc.buffer.String()
+	if oc.truncated {
+		output += "\n[OUTPUT TRUNCATED]"
+	}
+	
+	return output, nil
+}
+
 // Node is a node in a DAG. It executes a command.
 type Node struct {
 	Data
@@ -498,11 +559,11 @@ func (n *Node) LogContainsPattern(ctx context.Context, patterns []string) (bool,
 	}()
 
 	// Create a buffered reader with optimal buffer size
-	reader := bufio.NewReaderSize(file, 64*1024)
+	reader := bufio.NewReaderSize(file, 1024*1024)
 
 	// Use scanner for more efficient line reading
 	scanner := bufio.NewScanner(reader)
-	scanner.Buffer(make([]byte, 64*1024), 1024*1024) // Set max line size to 1MB
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024) // Set both initial and max line size to 1MB
 
 	// Use the logLock to prevent concurrent file operations
 	n.outputs.lock()
@@ -785,6 +846,7 @@ type OutputCoordinator struct {
 	outputData     string
 	outputCaptured bool
 	maxOutputSize  int64 // Max output size in bytes
+	outputCapture  *outputCapture // Concurrent output capture handler
 }
 
 func (oc *OutputCoordinator) StdoutFile() string {
@@ -838,6 +900,10 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 		oc.maxOutputSize = 1024 * 1024 // 1MB limit
 		// Reset the output data to empty
 		oc.outputData = ""
+		
+		// Start concurrent reading to prevent deadlock
+		oc.outputCapture = newOutputCapture(oc.maxOutputSize)
+		oc.outputCapture.start(ctx, oc.outputReader)
 	}
 
 	if oc.outputWriter != nil {
@@ -871,7 +937,21 @@ func (oc *OutputCoordinator) closeResources(_ context.Context) error {
 			}
 		}
 	}
-	for _, f := range []*os.File{oc.stdoutFile, oc.stderrFile, oc.stdoutRedirectFile, oc.StderrRedirectFile, oc.outputReader, oc.outputWriter} {
+	
+	// Close the output writer first to signal EOF to any readers
+	if oc.outputWriter != nil {
+		_ = oc.outputWriter.Close()
+		oc.outputWriter = nil
+	}
+	
+	// Wait for concurrent capture to finish if it's running
+	if oc.outputCapture != nil && !oc.outputCaptured {
+		if _, err := oc.outputCapture.wait(); err != nil {
+			lastErr = err
+		}
+	}
+	
+	for _, f := range []*os.File{oc.stdoutFile, oc.stderrFile, oc.stdoutRedirectFile, oc.StderrRedirectFile, oc.outputReader} {
 		if f != nil {
 			if err := f.Sync(); err != nil {
 				lastErr = err
@@ -969,6 +1049,47 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 		return oc.outputData, nil
 	}
 
+	// If using concurrent capture, wait for it to complete
+	if oc.outputCapture != nil {
+		// Close the writer to signal EOF to the reader
+		if oc.outputWriter != nil {
+			logger.Debug(ctx, "capturedOutput: closing output writer")
+			if err := oc.outputWriter.Close(); err != nil {
+				logger.Error(ctx, "failed to close pipe writer", "err", err)
+			}
+			oc.outputWriter = nil // Mark as closed
+		}
+
+		// Wait for the concurrent reader to finish
+		output, err := oc.outputCapture.wait()
+		if err != nil {
+			return "", err
+		}
+
+		// Accumulate output with previous attempts (for retries)
+		if oc.outputData != "" && output != "" {
+			oc.outputData += "\n" + strings.TrimSpace(output)
+		} else if output != "" {
+			oc.outputData = strings.TrimSpace(output)
+		}
+
+		logger.Debug(ctx, "capturedOutput: captured", "output", oc.outputData, "length", len(oc.outputData))
+
+		// Mark as captured for caching
+		oc.outputCaptured = true
+		
+		// Close the reader
+		if oc.outputReader != nil {
+			if err := oc.outputReader.Close(); err != nil {
+				logger.Error(ctx, "failed to close pipe reader", "err", err)
+			}
+			oc.outputReader = nil
+		}
+
+		return oc.outputData, nil
+	}
+
+	// Fallback to old behavior if concurrent capture not used (shouldn't happen)
 	if oc.outputReader == nil {
 		logger.Debug(ctx, "capturedOutput: no output reader")
 		return "", nil
