@@ -81,7 +81,7 @@ func (srv *Server) Serve(ctx context.Context) error {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"}, // TODO: Update to specific origins for better security
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"*"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization", "Content-Encoding", "Accept"},
 		AllowCredentials: true,
 		MaxAge:           300, // Maximum value not ignored by any of major browsers
 	}))
