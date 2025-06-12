@@ -84,7 +84,7 @@ func (rc *ResourceController) StartProcess(
 			rc.mu.Lock()
 			delete(rc.enforcers, name)
 			rc.mu.Unlock()
-			enforcer.Cleanup()
+			_ = enforcer.Cleanup()
 		}
 	}()
 
@@ -107,7 +107,7 @@ func (rc *ResourceController) StartProcess(
 	// Apply post-start configuration
 	if err := enforcer.PostStart(cmd.Process.Pid); err != nil {
 		// Kill the process if post-start fails
-		cmd.Process.Kill()
+		_ = cmd.Process.Kill()
 		return fmt.Errorf("post-start failed: %w", err)
 	}
 
@@ -188,7 +188,7 @@ func (rc *ResourceController) monitorProcess(
 
 		// Always cleanup our enforcer
 		if enforcer != nil {
-			enforcer.Cleanup()
+			_ = enforcer.Cleanup()
 		}
 	}()
 
@@ -233,10 +233,10 @@ func NewNoopEnforcer() *NoopEnforcer {
 	return &NoopEnforcer{}
 }
 
-func (n *NoopEnforcer) PreStart(cmd *exec.Cmd) error                 { return nil }
-func (n *NoopEnforcer) PostStart(pid int) error                      { return nil }
-func (n *NoopEnforcer) GetMetrics(pid int) (*digraph.Metrics, error) { return &digraph.Metrics{}, nil }
-func (n *NoopEnforcer) CheckViolation(metrics *digraph.Metrics) bool { return false }
+func (n *NoopEnforcer) PreStart(_ *exec.Cmd) error { return nil }
+func (n *NoopEnforcer) PostStart(_ int) error { return nil }
+func (n *NoopEnforcer) GetMetrics(_ int) (*digraph.Metrics, error) { return &digraph.Metrics{}, nil }
+func (n *NoopEnforcer) CheckViolation(_ *digraph.Metrics) bool { return false }
 func (n *NoopEnforcer) Cleanup() error                               { return nil }
 func (n *NoopEnforcer) SupportsRequests() bool                       { return false }
 func (n *NoopEnforcer) SupportsLimits() bool                         { return false }

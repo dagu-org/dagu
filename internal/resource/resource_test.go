@@ -37,7 +37,7 @@ func TestStartProcessWithoutResources(t *testing.T) {
 	}
 
 	// Wait for command to complete
-	cmd.Wait()
+	_ = cmd.Wait()
 
 	// Test with empty resources
 	resources := &digraph.Resources{}
@@ -48,7 +48,7 @@ func TestStartProcessWithoutResources(t *testing.T) {
 	}
 
 	// Wait for command to complete
-	cmd.Wait()
+	_ = cmd.Wait()
 }
 
 func TestDetectCapabilities(t *testing.T) {

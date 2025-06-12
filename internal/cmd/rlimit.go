@@ -49,7 +49,7 @@ func setMemoryLimit(bytes int64) error {
 
 	// Set new limit
 	newLimit := syscall.Rlimit{
-		Cur: uint64(bytes),
+		Cur: uint64(bytes), // #nosec G115 - bytes is validated to be non-negative
 		Max: currentLimit.Max, // Keep the hard limit unchanged
 	}
 

@@ -70,10 +70,10 @@ func getMetricsFromPS(pid int) (*digraph.Metrics, error) {
 	switch runtime.GOOS {
 	case "darwin":
 		// macOS ps command format
-		cmd = exec.Command("ps", "-o", "rss=,vsz=,%cpu=", "-p", strconv.Itoa(pid))
+		cmd = exec.Command("ps", "-o", "rss=,vsz=,%cpu=", "-p", strconv.Itoa(pid)) // #nosec G204 - pid is an integer
 	default:
 		// Linux/BSD ps command format
-		cmd = exec.Command("ps", "-o", "rss=,vsz=,%cpu=", "-p", strconv.Itoa(pid))
+		cmd = exec.Command("ps", "-o", "rss=,vsz=,%cpu=", "-p", strconv.Itoa(pid)) // #nosec G204 - pid is an integer
 	}
 
 	output, err := cmd.Output()

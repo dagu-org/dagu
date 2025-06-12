@@ -8,13 +8,13 @@ import (
 type resourceControllerKey struct{}
 
 // WithResourceController returns a new context with the resource controller
-// We use interface{} to avoid circular dependency with resource package
-func WithResourceController(ctx context.Context, rc interface{}) context.Context {
+// We use any to avoid circular dependency with resource package
+func WithResourceController(ctx context.Context, rc any) context.Context {
 	return context.WithValue(ctx, resourceControllerKey{}, rc)
 }
 
 // GetResourceController returns the resource controller from the context
 // Returns nil if not found. Caller should type assert to *resource.ResourceController
-func GetResourceController(ctx context.Context) interface{} {
+func GetResourceController(ctx context.Context) any {
 	return ctx.Value(resourceControllerKey{})
 }

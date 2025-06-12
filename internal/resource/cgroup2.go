@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/fileutil"
 )
 
 // Compile-time check that CgroupsV2Enforcer implements digraph.ResourceEnforcer
@@ -40,16 +41,17 @@ type CgroupsV2Enforcer struct {
 // NewCgroupsV2Enforcer creates a new cgroups v2 enforcer
 func NewCgroupsV2Enforcer(name string, resources *digraph.Resources) (*CgroupsV2Enforcer, error) {
 	// Create a unique cgroup for this DAG run
-	cgroupPath := filepath.Join(CgroupRoot, "dagu.slice", fmt.Sprintf("dagrun-%s.scope", name))
+	safeName := fileutil.SafeName(name)
+	cgroupPath := filepath.Join(CgroupRoot, "dagu.slice", fmt.Sprintf("dagrun-%s.scope", safeName))
 
 	// Create the cgroup directory
-	if err := os.MkdirAll(cgroupPath, 0755); err != nil {
+	if err := os.MkdirAll(cgroupPath, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create cgroup: %w", err)
 	}
 
 	// Enable required controllers in parent cgroup
 	if err := enableControllers(filepath.Dir(cgroupPath)); err != nil {
-		os.RemoveAll(cgroupPath)
+		_ = os.RemoveAll(cgroupPath)
 		return nil, fmt.Errorf("failed to enable controllers: %w", err)
 	}
 
@@ -61,7 +63,7 @@ func NewCgroupsV2Enforcer(name string, resources *digraph.Resources) (*CgroupsV2
 }
 
 // PreStart configures resource limits before process starts
-func (e *CgroupsV2Enforcer) PreStart(cmd *exec.Cmd) error {
+func (e *CgroupsV2Enforcer) PreStart(_ *exec.Cmd) error {
 	// Set memory limits
 	if e.resources.MemoryLimitBytes > 0 {
 		if err := writeFile(e.cgroupPath, "memory.max",
@@ -115,7 +117,7 @@ func (e *CgroupsV2Enforcer) PostStart(pid int) error {
 }
 
 // GetMetrics retrieves current resource usage
-func (e *CgroupsV2Enforcer) GetMetrics(pid int) (*digraph.Metrics, error) {
+func (e *CgroupsV2Enforcer) GetMetrics(_ int) (*digraph.Metrics, error) {
 	metrics := &digraph.Metrics{
 		Timestamp: time.Now(),
 	}
@@ -196,7 +198,7 @@ func enableControllers(parentPath string) error {
 	controllersFile := filepath.Join(parentPath, "cgroup.subtree_control")
 
 	// Read current controllers
-	current, err := os.ReadFile(controllersFile)
+	current, err := os.ReadFile(controllersFile) // #nosec G304 - controllersFile is constructed from constants
 	if err != nil {
 		return err
 	}
@@ -218,7 +220,7 @@ func enableControllers(parentPath string) error {
 
 	// Write back if modified
 	if modified {
-		return os.WriteFile(controllersFile, []byte(controllers), 0644)
+		return os.WriteFile(controllersFile, []byte(controllers), 0600)
 	}
 
 	return nil
@@ -227,13 +229,13 @@ func enableControllers(parentPath string) error {
 // writeFile writes content to a file in the cgroup
 func writeFile(cgroupPath, filename, content string) error {
 	path := filepath.Join(cgroupPath, filename)
-	return os.WriteFile(path, []byte(content), 0644)
+	return os.WriteFile(path, []byte(content), 0600)
 }
 
 // readFile reads content from a file in the cgroup
 func readFile(cgroupPath, filename string) (string, error) {
 	path := filepath.Join(cgroupPath, filename)
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 - path is constructed from cgroupPath
 	if err != nil {
 		return "", err
 	}

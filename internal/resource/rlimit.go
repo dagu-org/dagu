@@ -44,7 +44,7 @@ func (e *RlimitEnforcer) PreStart(cmd *exec.Cmd) error {
 }
 
 // PostStart is called after the process starts
-func (e *RlimitEnforcer) PostStart(pid int) error {
+func (e *RlimitEnforcer) PostStart(_ int) error {
 	// No action needed - rlimits are set by the child process itself
 	return nil
 }
@@ -55,7 +55,7 @@ func (e *RlimitEnforcer) GetMetrics(pid int) (*digraph.Metrics, error) {
 }
 
 // CheckViolation checks if resource limits are being violated
-func (e *RlimitEnforcer) CheckViolation(metrics *digraph.Metrics) bool {
+func (e *RlimitEnforcer) CheckViolation(_ *digraph.Metrics) bool {
 	// rlimits are enforced by the kernel
 	return false
 }

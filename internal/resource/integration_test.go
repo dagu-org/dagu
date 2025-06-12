@@ -53,7 +53,7 @@ func TestResourceEnforcementIntegration(t *testing.T) {
 	}
 
 	// Cleanup
-	rc.StopProcess("test-memory-limit")
+	_ = rc.StopProcess("test-memory-limit")
 }
 
 func TestActualEnforcerSelection(t *testing.T) {
