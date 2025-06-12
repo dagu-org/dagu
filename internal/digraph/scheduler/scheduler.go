@@ -283,7 +283,12 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 								node.SetStatus(NodeStatusSuccess)
 							} else {
 								node.MarkError(execErr)
-								sc.setLastError(execErr)
+								// Only set lastError if this failure should not be allowed to continue
+								// If shouldContinue() is true, this error is allowed and should contribute
+								// to partial success rather than overall failure
+								if !node.shouldContinue(ctx) {
+									sc.setLastError(execErr)
+								}
 							}
 						}
 					}
