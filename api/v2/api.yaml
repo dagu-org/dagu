@@ -29,6 +29,8 @@ tags:
     description: "Operations for retrieving historical data and logs of DAG-run executions"
   - name: "system"
     description: "System operations for monitoring and managing the Dagu server"
+  - name: "monitoring"
+    description: "Prometheus-compatible metrics for monitoring Dagu operations"
 
 paths:
   /health:
@@ -1078,6 +1080,57 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /metrics:
+    get:
+      summary: "Get Prometheus metrics"
+      description: "Returns Prometheus-compatible metrics for monitoring Dagu operations"
+      operationId: "getMetrics"
+      tags:
+        - "monitoring"
+      responses:
+        "200":
+          description: "Prometheus metrics in text format"
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  # HELP dagu_info Dagu build information
+                  # TYPE dagu_info gauge
+                  dagu_info{version="1.14.0",build_date="2024-01-01T12:00:00Z",go_version="1.21"} 1
+                  
+                  # HELP dagu_uptime_seconds Time since server start
+                  # TYPE dagu_uptime_seconds gauge
+                  dagu_uptime_seconds 3600
+                  
+                  # HELP dagu_dag_runs_currently_running Number of currently running DAG runs
+                  # TYPE dagu_dag_runs_currently_running gauge
+                  dagu_dag_runs_currently_running 5
+                  
+                  # HELP dagu_dag_runs_queued_total Total number of DAG runs in queue
+                  # TYPE dagu_dag_runs_queued_total gauge
+                  dagu_dag_runs_queued_total 8
+                  
+                  # HELP dagu_dag_runs_total Total number of DAG runs by status
+                  # TYPE dagu_dag_runs_total counter
+                  dagu_dag_runs_total{status="success"} 2493
+                  dagu_dag_runs_total{status="error"} 15
+                  dagu_dag_runs_total{status="cancelled"} 7
+                  
+                  # HELP dagu_dags_total Total number of DAGs
+                  # TYPE dagu_dags_total gauge
+                  dagu_dags_total 45
+                  
+                  # HELP dagu_scheduler_running Whether the scheduler is running
+                  # TYPE dagu_scheduler_running gauge
+                  dagu_scheduler_running 1
         default:
           description: "Generic error response"
           content:

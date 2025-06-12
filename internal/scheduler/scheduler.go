@@ -82,6 +82,10 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	s.cancel = cancel
 	defer cancel()
+	
+	// Set scheduler as running
+	setSchedulerRunning(true)
+	defer setSchedulerRunning(false)
 
 	done := make(chan any)
 	defer close(done)
@@ -304,6 +308,7 @@ func (s *Scheduler) start(ctx context.Context) {
 	timer := time.NewTimer(0)
 
 	s.running.Store(true)
+	setSchedulerRunning(true)
 
 	for {
 		select {
@@ -332,6 +337,7 @@ func (s *Scheduler) Stop(ctx context.Context) {
 	if !s.running.CompareAndSwap(true, false) {
 		return
 	}
+	setSchedulerRunning(false)
 
 	close(s.stopChan)
 
