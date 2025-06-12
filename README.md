@@ -101,7 +101,7 @@ Dagu’s design emphasizes minimal external dependencies: it operates solely as 
   - [Via Bash script](#via-bash-script)
   - [Via GitHub Releases Page](#via-github-releases-page)
   - [Via Homebrew (macOS)](#via-homebrew-macos)
-  - [Via Docker (stable)](#via-docker-stable)
+  - [Via Docker](#via-docker)
   - [Quick Start](#quick-start)
 - [Building from Source](#building-from-source)
   - [Prerequisites](#prerequisites)
@@ -212,13 +212,14 @@ Upgrade to the latest version:
 brew upgrade dagu-org/brew/dagu
 ```
 
-### Via Docker (stable)
+### Via Docker
 
 ```sh
 docker run \
 --rm \
 -p 8080:8080 \
--v ~/.config/dagu:/config \
+-v ~/.dagu:/app/dagu \
+-e DAGU_HOME=/app/dagu \
 -e DAGU_TZ=`ls -l /etc/localtime | awk -F'/zoneinfo/' '{print $2}'` \
 ghcr.io/dagu-org/dagu:latest dagu start-all
 ```
