@@ -635,8 +635,24 @@ func (pd *ProgressDisplay) getCompletedNodes() []*nodeProgress {
 	// Sort by completion time
 	for i := 0; i < len(nodes)-1; i++ {
 		for j := i + 1; j < len(nodes); j++ {
-			if nodes[i].endTime.After(nodes[j].endTime) {
+			switch {
+			case nodes[i].endTime.IsZero() && !nodes[j].endTime.IsZero():
+				// If i has no end time, it comes after j
 				nodes[i], nodes[j] = nodes[j], nodes[i]
+			case !nodes[i].endTime.IsZero() && nodes[j].endTime.IsZero():
+				// If j has no end time, it comes after i
+				// No swap needed
+			case nodes[i].endTime.Before(nodes[j].endTime):
+				// If i ends before j, i comes first
+				// No swap needed
+			case nodes[i].endTime.After(nodes[j].endTime):
+				// If i ends after j, swap them
+				nodes[i], nodes[j] = nodes[j], nodes[i]
+			default:
+				// If end times are equal, sort by step name
+				if nodes[i].node.Step.Name > nodes[j].node.Step.Name {
+					nodes[i], nodes[j] = nodes[j], nodes[i]
+				}
 			}
 		}
 	}

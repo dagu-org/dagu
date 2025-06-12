@@ -32,6 +32,9 @@ var (
 // DAGDefinition is the name of the file where the DAG definition is stored.
 const DAGDefinition = "dag.json"
 
+// CancelRequestedFlag is a special flag used to indicate that a cancel request has been made.
+const CancelRequestedFlag = "CANCEL_REQUESTED"
+
 var _ models.DAGRunAttempt = (*Attempt)(nil)
 
 // Attempt manages an append-only status file with read, write, and compaction capabilities.
@@ -423,6 +426,46 @@ func ParseStatusFile(file string) (*models.DAGRunStatus, error) {
 			}
 		}
 	}
+}
+
+// RequestCancel implements models.DAGRunAttempt.
+// It creates a flag to indicate that the attempt should be canceled.
+func (att *Attempt) RequestCancel(ctx context.Context) error {
+	dir := filepath.Dir(att.file)
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+	cancelFile := filepath.Join(dir, CancelRequestedFlag)
+	if _, err := os.Stat(cancelFile); err == nil {
+		return fmt.Errorf("cancel request already exists: %w", ErrStatusFileOpen)
+	}
+	if err := os.WriteFile(cancelFile, []byte{}, 0600); err != nil {
+		return fmt.Errorf("failed to create cancel request file: %w", err)
+	}
+	logger.Infof(ctx, "Cancel request created for attempt %s at %s", att.id, cancelFile)
+	return nil
+}
+
+// CancelRequested checks if a cancel request has been made for this attempt.
+func (att *Attempt) CancelRequested(ctx context.Context) (bool, error) {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return false, fmt.Errorf("%w: %v", ErrContextCanceled, ctx.Err())
+	default:
+		// Continue with operation
+	}
+
+	cancelFile := filepath.Join(filepath.Dir(att.file), CancelRequestedFlag)
+	if _, err := os.Stat(cancelFile); err != nil {
+		if os.IsNotExist(err) {
+			return false, nil // No cancel request found
+		}
+		return false, fmt.Errorf("failed to check cancel request file: %w", err)
+	}
+
+	logger.Infof(ctx, "Cancel request found for attempt %s at %s", att.id, cancelFile)
+	return true, nil
 }
 
 // readLineFrom reads a line from the file starting at the specified offset.

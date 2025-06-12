@@ -340,6 +340,11 @@ func (a *Agent) Run(ctx context.Context) error {
 		)
 	}
 
+	// Start watching for cancel requests
+	go execWithRecovery(ctx, func() {
+		a.watchCancelRequested(ctx, attempt)
+	})
+
 	lastErr := a.scheduler.Schedule(ctx, a.graph, progressCh)
 
 	// Stop the process and remove it from the store.
@@ -465,6 +470,23 @@ func (a *Agent) Status() models.DAGRunStatus {
 			a.graph.StartAt(),
 			opts...,
 		)
+}
+
+// watchCancelRequested is a goroutine that watches for cancel requests
+func (a *Agent) watchCancelRequested(ctx context.Context, attempt models.DAGRunAttempt) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if cancelled, _ := attempt.CancelRequested(ctx); cancelled {
+				a.signal(ctx, syscall.SIGTERM, true)
+			}
+		}
+	}
 }
 
 // Signal sends the signal to the processes running

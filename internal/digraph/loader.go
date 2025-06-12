@@ -385,6 +385,13 @@ func resolveYamlFilePath(ctx BuildContext, file string) (string, error) {
 		return file, nil
 	}
 
+	// Replace '~' with the user's home directory if present.
+	if strings.HasPrefix(file, "~") {
+		if homeDir, err := os.UserHomeDir(); err == nil {
+			file = strings.Replace(file, "~", homeDir, 1)
+		}
+	}
+
 	// Check if the file exists in the current Directory.
 	absFile, err := filepath.Abs(file)
 	if err == nil && fileutil.FileExists(absFile) {

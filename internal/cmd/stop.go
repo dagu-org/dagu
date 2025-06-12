@@ -42,7 +42,10 @@ func runStop(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to get dag-run ID: %w", err)
 	}
 
-	name := args[0]
+	name, err := extractDAGName(ctx, args[0])
+	if err != nil {
+		return fmt.Errorf("failed to extract DAG name: %w", err)
+	}
 
 	var dag *digraph.DAG
 	if dagRunID != "" {

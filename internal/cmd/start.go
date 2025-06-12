@@ -94,6 +94,13 @@ func runStart(ctx *Context, args []string) error {
 		disabledQueue = true
 	}
 
+	// Check if the DAG run-id is unique
+	attempt, _ := ctx.DAGRunStore.FindAttempt(ctx, root)
+	if attempt != nil {
+		// If the dag-run ID already exists, we cannot start a new run with the same ID
+		return fmt.Errorf("dag-run ID %s already exists for DAG %s", dagRunID, dag.Name)
+	}
+
 	// Log root dag-run
 	logger.Info(ctx, "Executing root dag-run",
 		"dag", dag.Name,

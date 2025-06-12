@@ -62,9 +62,25 @@ func (m *Manager) Stop(ctx context.Context, dag *digraph.DAG, dagRunID string) e
 		logger.Info(ctx, "The DAG is not running", "name", dag.Name)
 		return nil
 	}
+
+	// In case the socket exists, we try to send a stop request
 	client := sock.NewClient(addr)
 	_, err := client.Request("POST", "/stop")
-	return err
+	if err == nil {
+		return nil
+	}
+
+	// Try to find the running dag-run attempt and request cancel
+	run, err := m.dagRunStore.FindAttempt(ctx, digraph.NewDAGRunRef(dag.Name, dagRunID))
+	if err == nil {
+		if err := run.RequestCancel(ctx); err != nil {
+			return fmt.Errorf("failed to request cancel for dag-run %s: %w", dagRunID, err)
+		}
+		logger.Info(ctx, "Wrote stop file for running DAG", "name", dag.Name, "runID", dagRunID)
+		return nil
+	}
+
+	return fmt.Errorf("failed to stop DAG %s: %w", dag.Name, err)
 }
 
 // GenDAGRunID generates a unique ID for a dag-run using UUID version 7.

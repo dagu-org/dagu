@@ -121,4 +121,8 @@ type DAGRunAttempt interface {
 	ReadStatus(ctx context.Context) (*DAGRunStatus, error)
 	// ReadDAG reads the DAG associated with this run attempt
 	ReadDAG(ctx context.Context) (*digraph.DAG, error)
+	// RequestCancel requests cancellation of the dag-run attempt.
+	RequestCancel(ctx context.Context) error
+	// CancelRequested checks if a cancellation has been requested for this attempt.
+	CancelRequested(ctx context.Context) (bool, error)
 }
