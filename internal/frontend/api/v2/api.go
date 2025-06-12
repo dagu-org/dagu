@@ -19,6 +19,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/go-chi/chi/v5"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var _ api.StrictServerInterface = (*API)(nil)
@@ -31,6 +32,7 @@ type API struct {
 	apiBasePath        string
 	logEncodingCharset string
 	config             *config.Config
+	metricsRegistry    *prometheus.Registry
 }
 
 func New(

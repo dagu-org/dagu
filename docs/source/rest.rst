@@ -473,3 +473,168 @@ Example Usage
            "action": "rename",
            "value": "new_dag_name"
          }'
+
+REST API Documentation (v2)
+===========================
+
+Overview
+--------
+
+Dagu server also provides a v2 REST API with additional endpoints for monitoring and enhanced functionality. The v2 API is available at ``/api/v2``.
+
+Base Configuration
+------------------
+
+**Base URL**
+    ``http://localhost:8080/api/v2``
+
+**Content Types**
+    - Request: ``application/json``
+    - Response: ``application/json`` (except metrics endpoint)
+
+Monitoring Operations
+--------------------
+
+Metrics Endpoint ``GET /metrics``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Exposes Prometheus-compatible metrics for monitoring Dagu operations. This endpoint provides real-time insights into DAG executions, system health, and performance metrics.
+
+**URL**
+    ``/metrics``
+
+**Method**
+    ``GET``
+
+**Parameters**
+    None
+
+**Success Response (200)**
+
+.. code-block:: text
+
+    # HELP dagu_info Dagu build information
+    # TYPE dagu_info gauge
+    dagu_info{version="1.14.0",build_date="2024-01-01T12:00:00Z",go_version="1.21"} 1
+    
+    # HELP dagu_uptime_seconds Time since server start
+    # TYPE dagu_uptime_seconds gauge
+    dagu_uptime_seconds 3600
+    
+    # HELP dagu_dag_runs_currently_running Number of currently running DAG runs
+    # TYPE dagu_dag_runs_currently_running gauge
+    dagu_dag_runs_currently_running 5
+    
+    # HELP dagu_dag_runs_queued_total Total number of DAG runs in queue
+    # TYPE dagu_dag_runs_queued_total gauge
+    dagu_dag_runs_queued_total 8
+    
+    # HELP dagu_dag_runs_total Total number of DAG runs by status (last 24 hours)
+    # TYPE dagu_dag_runs_total counter
+    dagu_dag_runs_total{status="success"} 2493
+    dagu_dag_runs_total{status="error"} 15
+    dagu_dag_runs_total{status="cancelled"} 7
+    dagu_dag_runs_total{status="running"} 5
+    dagu_dag_runs_total{status="queued"} 3
+    dagu_dag_runs_total{status="none"} 1
+    
+    # HELP dagu_dags_total Total number of DAGs
+    # TYPE dagu_dags_total gauge
+    dagu_dags_total 45
+    
+    # HELP dagu_scheduler_running Whether the scheduler is running
+    # TYPE dagu_scheduler_running gauge
+    dagu_scheduler_running 1
+
+**Response Headers**
+    - ``Content-Type: text/plain; version=0.0.4; charset=utf-8``
+
+Available Metrics
+~~~~~~~~~~~~~~~~
+
+.. list-table:: System Metrics
+   :widths: 30 20 50
+   :header-rows: 1
+
+   * - Metric Name
+     - Type
+     - Description
+   * - dagu_info
+     - gauge
+     - Build information with version labels
+   * - dagu_uptime_seconds
+     - gauge
+     - Time since server start in seconds
+   * - dagu_scheduler_running
+     - gauge
+     - 1 if scheduler is running, 0 otherwise
+
+.. list-table:: DAG Execution Metrics
+   :widths: 30 20 50
+   :header-rows: 1
+
+   * - Metric Name
+     - Type
+     - Description
+   * - dagu_dag_runs_currently_running
+     - gauge
+     - Number of DAG runs currently executing
+   * - dagu_dag_runs_queued_total
+     - gauge
+     - Total number of DAG runs waiting in queue (all DAGs)
+   * - dagu_dag_runs_total
+     - counter
+     - Total number of DAG runs by status (last 24 hours)
+   * - dagu_dags_total
+     - gauge
+     - Total number of registered DAGs
+
+.. note::
+   - The ``dagu_dag_runs_total`` metric only includes DAG runs from the last 24 hours due to performance considerations.
+   - Queue metrics (``dagu_dag_runs_queued_total``) count all queued items across all DAGs. Future versions may add per-DAG queue metrics.
+   - The metrics endpoint is compatible with Prometheus scraping and can be used with standard Prometheus configurations.
+
+Prometheus Configuration Example
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To scrape Dagu metrics with Prometheus, add the following to your ``prometheus.yml``:
+
+.. code-block:: yaml
+
+    scrape_configs:
+      - job_name: 'dagu'
+        static_configs:
+          - targets: ['localhost:8080']
+        metrics_path: '/api/v2/metrics'
+        scrape_interval: 15s
+
+Grafana Dashboard
+~~~~~~~~~~~~~~~~
+
+You can visualize Dagu metrics in Grafana using queries like:
+
+.. code-block:: promql
+
+    # DAG execution success rate (last 24h)
+    rate(dagu_dag_runs_total{status="success"}[5m]) / 
+    rate(dagu_dag_runs_total[5m])
+    
+    # Average queue length
+    avg_over_time(dagu_dag_runs_queued_total[5m])
+    
+    # Scheduler uptime percentage
+    avg_over_time(dagu_scheduler_running[5m]) * 100
+
+Example Usage
+~~~~~~~~~~~~
+
+.. code-block:: bash
+
+    # Get raw metrics
+    curl http://localhost:8080/api/v2/metrics
+    
+    # Check if scheduler is running
+    curl -s http://localhost:8080/api/v2/metrics | grep "dagu_scheduler_running"
+    
+    # Get current running DAGs count
+    curl -s http://localhost:8080/api/v2/metrics | grep "dagu_dag_runs_currently_running"
