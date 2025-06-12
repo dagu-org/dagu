@@ -79,6 +79,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 5. Run `make test` and `make golangci-lint` to verify
 6. Run `go fmt` to format Go code
 
+**When adding new features or configuration options:**
+1. Update the code implementation
+2. Add/update tests
+3. Update CLAUDE.md documentation
+4. **Update docs/sources/*.rst files** - IMPORTANT: Don't forget the RST documentation!
+5. Add examples if applicable
+
 **Before committing:**
 - Run `make golangci-lint` to check for lint issues
 - Run `make test` to ensure all tests pass
