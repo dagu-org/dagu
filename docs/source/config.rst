@@ -33,6 +33,7 @@ Server Configuration
 
 Directory Paths
 ~~~~~~~~~~~~~
+- ``DAGU_HOME``: Set all Dagu directories to a custom location such as ``~/.dagu``.
 - ``DAGU_DAGS_DIR`` (``~/.config/dagu/dags``): DAG definitions directory
 - ``DAGU_LOG_DIR`` (``~/.local/share/dagu/logs``): Log files directory
 - ``DAGU_DATA_DIR`` (``~/.local/share/dagu/history``): Application data directory
