@@ -164,6 +164,75 @@ func TestNode_OutputCaptureDeadlock(t *testing.T) {
 	_ = node.Teardown(ctx)
 }
 
+func TestNode_OutputExceedsLimit(t *testing.T) {
+	// Test that output exceeding the limit returns an error
+	step := digraph.Step{
+		Name:    "exceed-limit-test",
+		Command: "sh",
+		Args: []string{"-c", `
+			# Generate 2MB of output (exceeds default 1MB limit)
+			python3 -c "print('x' * (2 * 1024 * 1024))"
+		`},
+		Output: "RESULT",
+	}
+
+	node := NewNode(step, NodeState{})
+	ctx := context.Background()
+	// Set up environment context with proper DAG
+	dag := &digraph.DAG{Name: "test"}
+	ctx = digraph.SetupEnv(ctx, dag, nil, digraph.DAGRunRef{}, "exceed-limit-test", "test.log", nil)
+
+	tmpDir := t.TempDir()
+	err := node.Setup(ctx, tmpDir, "exceed-limit-test")
+	require.NoError(t, err)
+
+	// Execute should fail with output limit error
+	err = node.Execute(ctx)
+	if err != nil {
+		t.Logf("Error: %v", err)
+	}
+	assert.Error(t, err, "should return error when output exceeds limit")
+	assert.Contains(t, err.Error(), "output exceeded maximum size limit", "error should mention output size limit")
+
+	_ = node.Teardown(ctx)
+}
+
+func TestNode_CustomOutputLimit(t *testing.T) {
+	// Test with custom output limit
+	step := digraph.Step{
+		Name:    "custom-limit-test",
+		Command: "sh",
+		Args: []string{"-c", `
+			# Generate 100KB of output
+			python3 -c "print('x' * (100 * 1024))"
+		`},
+		Output: "RESULT",
+	}
+
+	node := NewNode(step, NodeState{})
+	ctx := context.Background()
+	// Set up environment context with custom limit of 50KB
+	dag := &digraph.DAG{
+		Name:          "test",
+		MaxOutputSize: 50 * 1024, // 50KB limit
+	}
+	ctx = digraph.SetupEnv(ctx, dag, nil, digraph.DAGRunRef{}, "custom-limit-test", "test.log", nil)
+
+	tmpDir := t.TempDir()
+	err := node.Setup(ctx, tmpDir, "custom-limit-test")
+	require.NoError(t, err)
+
+	// Execute should fail with output limit error
+	err = node.Execute(ctx)
+	if err != nil {
+		t.Logf("Error with custom limit: %v", err)
+	}
+	assert.Error(t, err, "should return error when output exceeds custom limit")
+	assert.Contains(t, err.Error(), "output exceeded maximum size limit", "error should mention output size limit")
+
+	_ = node.Teardown(ctx)
+}
+
 func TestNode_ConcurrentOutputCapture(t *testing.T) {
 	// Test that output capture doesn't interfere with concurrent writes
 	step := digraph.Step{

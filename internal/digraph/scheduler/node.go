@@ -27,12 +27,13 @@ import (
 // outputCapture handles concurrent reading from a pipe to avoid deadlocks
 // when output exceeds the pipe buffer size (typically 64KB)
 type outputCapture struct {
-	mu         sync.Mutex
-	buffer     bytes.Buffer
-	done       chan struct{}
-	err        error
-	maxSize    int64
-	truncated  bool
+	mu              sync.Mutex
+	buffer          bytes.Buffer
+	done            chan struct{}
+	err             error
+	maxSize         int64
+	bytesRead       int64
+	exceededLimit   bool
 }
 
 // newOutputCapture creates a new output capture handler
@@ -48,20 +49,40 @@ func (oc *outputCapture) start(ctx context.Context, reader io.Reader) {
 	go func() {
 		defer close(oc.done)
 		
-		limitedReader := io.LimitReader(reader, oc.maxSize)
-		written, err := io.Copy(&oc.buffer, limitedReader)
-		
-		oc.mu.Lock()
-		defer oc.mu.Unlock()
-		
-		if err != nil && err != io.EOF {
-			oc.err = fmt.Errorf("failed to read output: %w", err)
-			logger.Error(ctx, "Failed to capture output", "err", err)
-		}
-		
-		if written == oc.maxSize {
-			oc.truncated = true
-			logger.Warn(ctx, "Output truncated due to size limit", "maxSize", oc.maxSize)
+		// Read in chunks to detect when we exceed the limit
+		buf := make([]byte, 8192) // 8KB chunks
+		for {
+			n, err := reader.Read(buf)
+			if n > 0 {
+				oc.mu.Lock()
+				if oc.bytesRead+int64(n) > oc.maxSize {
+					// Only write up to the limit
+					remaining := oc.maxSize - oc.bytesRead
+					if remaining > 0 {
+						oc.buffer.Write(buf[:remaining])
+						oc.bytesRead += remaining
+					}
+					oc.exceededLimit = true
+					oc.mu.Unlock()
+					
+					// Continue reading to prevent pipe deadlock but discard the data
+					_, _ = io.Copy(io.Discard, reader)
+					break
+				}
+				oc.buffer.Write(buf[:n])
+				oc.bytesRead += int64(n)
+				oc.mu.Unlock()
+			}
+			
+			if err != nil {
+				if err != io.EOF {
+					oc.mu.Lock()
+					oc.err = fmt.Errorf("failed to read output: %w", err)
+					oc.mu.Unlock()
+					logger.Error(ctx, "Failed to capture output", "err", err)
+				}
+				break
+			}
 		}
 	}()
 }
@@ -77,12 +98,11 @@ func (oc *outputCapture) wait() (string, error) {
 		return "", oc.err
 	}
 	
-	output := oc.buffer.String()
-	if oc.truncated {
-		output += "\n[OUTPUT TRUNCATED]"
+	if oc.exceededLimit {
+		return oc.buffer.String(), fmt.Errorf("output exceeded maximum size limit of %d bytes", oc.maxSize)
 	}
 	
-	return output, nil
+	return oc.buffer.String(), nil
 }
 
 // Node is a node in a DAG. It executes a command.
@@ -897,7 +917,13 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 		logger.Debug(ctx, "Created new output pipes", "step", data.Step.Name, "outputVar", data.Step.Output)
 		// Reset the captured flag to allow new output capture for retry
 		oc.outputCaptured = false
-		oc.maxOutputSize = 1024 * 1024 // 1MB limit
+		
+		// Get max output size from DAG configuration, default to 1MB
+		oc.maxOutputSize = 1024 * 1024 // 1MB default
+		if env := digraph.GetEnv(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
+			oc.maxOutputSize = int64(env.DAG.MaxOutputSize)
+		}
+		
 		// Reset the output data to empty
 		oc.outputData = ""
 		

@@ -92,6 +92,9 @@ type DAG struct {
 	HistRetentionDays int `json:"histRetentionDays,omitempty"`
 	// Queue is the name of the queue to assign this DAG to.
 	Queue string `json:"queue,omitempty"`
+	// MaxOutputSize is the maximum size of step output to capture in bytes.
+	// Default is 1MB. Output exceeding this will return an error.
+	MaxOutputSize int `json:"maxOutputSize,omitempty"`
 	// BuildErrors contains any errors encountered while building the DAG.
 	BuildErrors []error
 	// LocalDAGs contains DAGs defined in the same file, keyed by DAG name

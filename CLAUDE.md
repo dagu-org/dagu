@@ -258,6 +258,11 @@ Dagu is a **modern, powerful, yet surprisingly simple workflow orchestration eng
   - Inter-step delays
 - **Signal Handling**: Custom stop signals per step (`signalOnStop`)
 - **Working Directory Control**: Per-step directory configuration
+- **Output Size Limits**: 
+  - Configurable maximum output size per step (default 1MB)
+  - Prevents memory issues from large command outputs
+  - Returns error when limit exceeded to ensure awareness
+  - Per-DAG configuration with `maxOutputSize`
 
 ### 🎨 **Modern Web UI**
 - **Real-time Dashboard**: 
@@ -746,6 +751,7 @@ maxCleanUpTime: 300                 # Cleanup timeout in seconds
 # Data Management
 histRetentionDays: 30               # History retention
 logDir: /custom/logs                # Custom log directory
+maxOutputSize: 10485760             # Max output size per step (10MB)
 
 # Environment
 dotenv:                             # Load env files
