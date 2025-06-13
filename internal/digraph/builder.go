@@ -666,6 +666,7 @@ func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
 func buildStep(ctx BuildContext, def stepDef) (*Step, error) {
 	step := &Step{
 		Name:           def.Name,
+		ID:             def.ID,
 		Description:    def.Description,
 		Shell:          def.Shell,
 		ShellPackages:  def.Packages,

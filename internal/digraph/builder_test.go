@@ -448,6 +448,24 @@ func TestBuildStep(t *testing.T) {
 		assert.Len(t, th.Steps, 1)
 		assert.Equal(t, "SIGINT", th.Steps[0].SignalOnStop)
 	})
+	t.Run("StepWithID", func(t *testing.T) {
+		t.Parallel()
+
+		th := testLoad(t, "step_with_id.yaml")
+		assert.Len(t, th.Steps, 3)
+
+		// First step has ID
+		assert.Equal(t, "step1", th.Steps[0].Name)
+		assert.Equal(t, "unique-step-1", th.Steps[0].ID)
+
+		// Second step has no ID
+		assert.Equal(t, "step2", th.Steps[1].Name)
+		assert.Equal(t, "", th.Steps[1].ID)
+
+		// Third step has ID
+		assert.Equal(t, "step3", th.Steps[2].Name)
+		assert.Equal(t, "custom-id-123", th.Steps[2].ID)
+	})
 	t.Run("Preconditions", func(t *testing.T) {
 		t.Parallel()
 

@@ -78,6 +78,8 @@ type handlerOnDef struct {
 type stepDef struct {
 	// Name is the name of the step.
 	Name string `yaml:"name,omitempty"`
+	// ID is the optional unique identifier for the step.
+	ID string `yaml:"id,omitempty"`
 	// Description is the description of the step.
 	Description string `yaml:"description,omitempty"`
 	// Dir is the working directory of the step.
