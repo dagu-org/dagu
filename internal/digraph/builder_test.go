@@ -588,3 +588,206 @@ steps:
 		assert.Equal(t, -1, dag.MaxActiveRuns, "negative maxActiveRuns should be preserved")
 	})
 }
+
+func TestStepIDValidation(t *testing.T) {
+	t.Parallel()
+	
+	t.Run("ValidID", func(t *testing.T) {
+		data := []byte(`
+name: test-valid-id
+steps:
+  - name: step1
+    id: valid_id
+    command: echo test
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		assert.Equal(t, "valid_id", dag.Steps[0].ID)
+	})
+
+	t.Run("InvalidIDFormat", func(t *testing.T) {
+		data := []byte(`
+name: test-invalid-id
+steps:
+  - name: step1
+    id: 123invalid
+    command: echo test
+`)
+		_, err := digraph.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid step ID format")
+	})
+
+	t.Run("DuplicateIDs", func(t *testing.T) {
+		data := []byte(`
+name: test-duplicate-ids
+steps:
+  - name: step1
+    id: myid
+    command: echo test1
+  - name: step2
+    id: myid
+    command: echo test2
+`)
+		_, err := digraph.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "duplicate step ID")
+	})
+
+	t.Run("IDConflictsWithStepName", func(t *testing.T) {
+		data := []byte(`
+name: test-id-name-conflict
+steps:
+  - name: step1
+    id: step2
+    command: echo test1
+  - name: step2
+    command: echo test2
+`)
+		_, err := digraph.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "conflicts with another step's name")
+	})
+
+	t.Run("NameConflictsWithStepID", func(t *testing.T) {
+		data := []byte(`
+name: test-name-id-conflict
+steps:
+  - name: step1
+    id: myid
+    command: echo test1
+  - name: myid
+    command: echo test2
+`)
+		_, err := digraph.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "conflicts with another step's name")
+	})
+
+	t.Run("ReservedWordID", func(t *testing.T) {
+		data := []byte(`
+name: test-reserved-word
+steps:
+  - name: step1
+    id: env
+    command: echo test
+`)
+		_, err := digraph.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "reserved word")
+	})
+}
+
+func TestStepIDInDependencies(t *testing.T) {
+	t.Parallel()
+
+	t.Run("DependOnStepByID", func(t *testing.T) {
+		data := []byte(`
+name: test-depend-by-id
+steps:
+  - name: step1
+    id: first
+    command: echo test1
+  - name: step2
+    depends: first
+    command: echo test2
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 2)
+		assert.Equal(t, "first", dag.Steps[0].ID)
+		assert.Equal(t, []string{"first"}, dag.Steps[1].Depends)
+	})
+
+	t.Run("DependOnStepByNameWhenIDExists", func(t *testing.T) {
+		data := []byte(`
+name: test-depend-by-name
+steps:
+  - name: step1
+    id: first
+    command: echo test1
+  - name: step2
+    depends: step1
+    command: echo test2
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 2)
+		assert.Equal(t, []string{"step1"}, dag.Steps[1].Depends)
+	})
+
+	t.Run("MultipleDependenciesWithIDs", func(t *testing.T) {
+		data := []byte(`
+name: test-multiple-deps
+steps:
+  - name: step1
+    id: first
+    command: echo test1
+  - name: step2
+    id: second
+    command: echo test2
+  - name: step3
+    depends: 
+      - first
+      - second
+    command: echo test3
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 3)
+		assert.Equal(t, []string{"first", "second"}, dag.Steps[2].Depends)
+	})
+
+	t.Run("MixOfIDAndNameDependencies", func(t *testing.T) {
+		data := []byte(`
+name: test-mixed-deps
+steps:
+  - name: step1
+    id: first
+    command: echo test1
+  - name: step2
+    command: echo test2
+  - name: step3
+    depends:
+      - first
+      - step2
+    command: echo test3
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 3)
+		assert.Equal(t, []string{"first", "step2"}, dag.Steps[2].Depends)
+	})
+}
+
+func TestChainTypeWithStepIDs(t *testing.T) {
+	t.Parallel()
+
+	data := []byte(`
+type: chain
+name: chain-with-ids
+steps:
+  - name: step1
+    id: s1
+    command: echo first
+  - name: step2
+    id: s2
+    command: echo second
+  - name: step3
+    command: echo third
+`)
+	dag, err := digraph.LoadYAML(context.Background(), data)
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 3)
+	
+	// Verify IDs are preserved
+	assert.Equal(t, "s1", dag.Steps[0].ID)
+	assert.Equal(t, "s2", dag.Steps[1].ID)
+	assert.Equal(t, "", dag.Steps[2].ID)
+	
+	// Verify chain dependencies were added
+	assert.Empty(t, dag.Steps[0].Depends)
+	assert.Equal(t, []string{"step1"}, dag.Steps[1].Depends)
+	assert.Equal(t, []string{"step2"}, dag.Steps[2].Depends)
+}

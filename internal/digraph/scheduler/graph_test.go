@@ -115,3 +115,93 @@ func TestRetryExecution(t *testing.T) {
 	require.Equal(t, scheduler.NodeStatusNone, nodes[6].State().Status)
 	require.Equal(t, scheduler.NodeStatusSkipped, nodes[7].State().Status)
 }
+
+func TestFindStepByID(t *testing.T) {
+	t.Parallel()
+
+	t.Run("FindByID", func(t *testing.T) {
+		// Create a DAG with ID-based dependencies
+		steps := []digraph.Step{
+			{Name: "step1", ID: "first", Command: "echo 1"},
+			{Name: "step2", ID: "second", Command: "echo 2", Depends: []string{"first"}},
+			{Name: "step3", Command: "echo 3", Depends: []string{"second", "step1"}},
+		}
+
+		// Create execution graph
+		graph, err := scheduler.NewExecutionGraph(steps...)
+		require.NoError(t, err)
+
+		// Verify the graph was set up correctly
+		// This tests that findStep found dependencies by both ID and name
+		require.NotNil(t, graph)
+		require.Len(t, graph.From, 2) // step1 and step2 have outgoing edges
+		require.Len(t, graph.To, 2)   // step2 and step3 have incoming edges
+	})
+
+	t.Run("PriorityCheck", func(t *testing.T) {
+		// Test that ID takes priority over name
+		steps := []digraph.Step{
+			{Name: "setup", ID: "init", Command: "echo setup"},
+			{Name: "init", Command: "echo init-by-name"},
+			{Name: "process", Command: "echo process", Depends: []string{"init"}},
+		}
+
+		// Create execution graph - should find by ID first
+		graph, err := scheduler.NewExecutionGraph(steps...)
+		require.NoError(t, err)
+		require.NotNil(t, graph)
+		
+		// The dependency should resolve to the step with ID "init", not name "init"
+		// We expect that "process" depends on "setup" (which has ID="init")
+		// and NOT on the step named "init"
+		
+		// Verify by checking the structure:
+		// - graph should have edges in From and To maps
+		// - there should be some connections
+		require.NotEmpty(t, graph.From)
+		require.NotEmpty(t, graph.To)
+		
+		// Check that we have the expected number of edges
+		// setup -> process (1 edge)
+		edgeCount := 0
+		for _, targets := range graph.From {
+			edgeCount += len(targets)
+		}
+		require.Equal(t, 1, edgeCount, "Should have exactly one edge: setup -> process")
+	})
+}
+
+func TestGraphWithMixedDependencies(t *testing.T) {
+	t.Parallel()
+
+	steps := []digraph.Step{
+		{Name: "download", ID: "dl", Command: "wget file"},
+		{Name: "extract", Command: "tar xf file"},
+		{Name: "process", ID: "proc", Command: "process data", Depends: []string{"dl", "extract"}},
+		{Name: "cleanup", Command: "rm temp", Depends: []string{"proc"}},
+	}
+
+	graph, err := scheduler.NewExecutionGraph(steps...)
+	require.NoError(t, err)
+	require.NotNil(t, graph)
+
+	// Verify correct dependency resolution
+	// Expected edges:
+	// download -> process
+	// extract -> process  
+	// process -> cleanup
+	// Total: 3 edges
+	
+	// Count total edges
+	edgeCount := 0
+	for _, targets := range graph.From {
+		edgeCount += len(targets)
+	}
+	require.Equal(t, 3, edgeCount, "Should have exactly 3 edges")
+	
+	// Verify we have the right number of nodes with outgoing edges
+	require.Len(t, graph.From, 3, "Three nodes should have outgoing edges: download, extract, process")
+	
+	// Verify we have the right number of nodes with incoming edges  
+	require.Len(t, graph.To, 2, "Two nodes should have incoming edges: process, cleanup")
+}

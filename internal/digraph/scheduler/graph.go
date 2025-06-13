@@ -254,6 +254,13 @@ func (g *ExecutionGraph) addEdge(from, to *Node) {
 }
 
 func (g *ExecutionGraph) findStep(name string) (*Node, error) {
+	// First try to find by ID
+	for _, n := range g.nodeByID {
+		if n.Step().ID == name {
+			return n, nil
+		}
+	}
+	// Then try to find by name
 	for _, n := range g.nodeByID {
 		if n.Name() == name {
 			return n, nil
