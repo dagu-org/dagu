@@ -36,6 +36,7 @@ func toStep(obj digraph.Step) api.Step {
 
 	step := api.Step{
 		Name:          obj.Name,
+		Id:            ptrOf(obj.ID),
 		Description:   ptrOf(obj.Description),
 		Args:          ptrOf(obj.Args),
 		CmdWithArgs:   ptrOf(obj.CmdWithArgs),
