@@ -769,30 +769,10 @@ func (sc *Scheduler) handleNodeRetry(ctx context.Context, node *Node, execErr er
 	if !exitCodeFound {
 		// Try to parse exit code from error string
 		errStr := execErr.Error()
-		if strings.Contains(errStr, "exit status") {
-			// Parse "exit status N" format
-			// Look for the last occurrence of "exit status" followed by a number
-			parts := strings.Split(errStr, "exit status ")
-			if len(parts) > 1 {
-				// Get the last part and extract the number
-				lastPart := parts[len(parts)-1]
-				// Extract the number from the beginning of the string
-				numStr := ""
-				for _, ch := range lastPart {
-					if ch >= '0' && ch <= '9' {
-						numStr += string(ch)
-					} else {
-						break
-					}
-				}
-				if numStr != "" {
-					if code, err := strconv.Atoi(numStr); err == nil {
-						exitCode = code
-						exitCodeFound = true
-						logger.Debug(ctx, "Parsed exit code from error string", "error", errStr, "exitCode", exitCode)
-					}
-				}
-			}
+		if code, found := parseExitCodeFromError(errStr); found {
+			exitCode = code
+			exitCodeFound = true
+			logger.Debug(ctx, "Parsed exit code from error string", "error", errStr, "exitCode", exitCode)
 		} else if strings.Contains(errStr, "signal:") {
 			// Handle signal termination
 			exitCode = -1

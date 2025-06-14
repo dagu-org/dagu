@@ -5,9 +5,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -222,8 +224,13 @@ func (n *Node) Execute(ctx context.Context) error {
 		n.SetError(err)
 
 		// Set the exit code if the command implements ExitCoder
+		var exitErr *exec.ExitError
 		if cmd, ok := cmd.(executor.ExitCoder); ok {
 			exitCode = cmd.ExitCode()
+		} else if n.Error() != nil && errors.As(n.Error(), &exitErr) {
+			exitCode = exitErr.ExitCode()
+		} else if code, found := parseExitCodeFromError(n.Error().Error()); found {
+			exitCode = code
 		} else {
 			exitCode = 1
 		}

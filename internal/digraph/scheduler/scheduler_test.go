@@ -2162,18 +2162,18 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 		)
 
 		result := graph.Schedule(t, scheduler.StatusSuccess)
-		
+
 		// All steps should succeed
 		result.AssertNodeStatus(t, "main_step", scheduler.NodeStatusSuccess)
 		result.AssertNodeStatus(t, "worker_step", scheduler.NodeStatusSuccess)
-		
+
 		// The handler should have executed
 		result.AssertNodeStatus(t, "success_handler", scheduler.NodeStatusSuccess)
-		
+
 		// Get the handler node
 		handlerNode := result.Node(t, "success_handler")
 		require.NotNil(t, handlerNode, "Success handler should have executed")
-		
+
 		// Check handler output contains references to main steps
 		handlerOutput, err := os.ReadFile(handlerNode.GetStdout())
 		require.NoError(t, err)
@@ -2205,18 +2205,18 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 		)
 
 		result := graph.Schedule(t, scheduler.StatusError)
-		
+
 		// Check step statuses
 		result.AssertNodeStatus(t, "setup", scheduler.NodeStatusSuccess)
 		result.AssertNodeStatus(t, "failing_step", scheduler.NodeStatusError)
-		
+
 		// The failure handler should have executed
 		result.AssertNodeStatus(t, "failure_handler", scheduler.NodeStatusSuccess)
-		
+
 		// Get the handler node
 		handlerNode := result.Node(t, "failure_handler")
 		require.NotNil(t, handlerNode, "Failure handler should have executed")
-		
+
 		// Check handler output
 		handlerOutput, err := os.ReadFile(handlerNode.GetStdout())
 		require.NoError(t, err)
@@ -2253,19 +2253,19 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 		)
 
 		result := graph.Schedule(t, scheduler.StatusSuccess)
-		
+
 		// All main steps should succeed
 		result.AssertNodeStatus(t, "first", scheduler.NodeStatusSuccess)
 		result.AssertNodeStatus(t, "second", scheduler.NodeStatusSuccess)
 		result.AssertNodeStatus(t, "third", scheduler.NodeStatusSuccess)
-		
+
 		// The exit handler should have executed
 		result.AssertNodeStatus(t, "exit_handler", scheduler.NodeStatusSuccess)
-		
+
 		// Get the handler node
 		handlerNode := result.Node(t, "exit_handler")
 		require.NotNil(t, handlerNode, "Exit handler should have executed")
-		
+
 		// Check handler output contains all step references
 		handlerOutput, err := os.ReadFile(handlerNode.GetStdout())
 		require.NoError(t, err)
@@ -2280,7 +2280,7 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 	t.Run("HandlerWithoutIDCannotBeReferenced", func(t *testing.T) {
 		sc := setupScheduler(t,
 			withOnExit(digraph.Step{
-				Name:    "exit_handler_no_id",
+				Name: "exit_handler_no_id",
 				// No ID field set
 				Command: "echo 'Handler executed'",
 			}),
@@ -2295,10 +2295,10 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		result.AssertNodeStatus(t, "main", scheduler.NodeStatusSuccess)
-		
+
 		// Handler should execute
 		result.AssertNodeStatus(t, "exit_handler_no_id", scheduler.NodeStatusSuccess)
-		
+
 		// Get the handler node to verify it has no ID
 		handlerNode := result.Node(t, "exit_handler_no_id")
 		assert.Empty(t, handlerNode.Step().ID, "Handler should have no ID")
@@ -2329,20 +2329,20 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		result.AssertNodeStatus(t, "main", scheduler.NodeStatusSuccess)
-		
+
 		// Both handlers should have executed
 		result.AssertNodeStatus(t, "first_handler", scheduler.NodeStatusSuccess)
 		result.AssertNodeStatus(t, "final_handler", scheduler.NodeStatusSuccess)
-		
+
 		// Get the handler nodes
 		successHandler := result.Node(t, "first_handler")
 		exitHandler := result.Node(t, "final_handler")
-		
+
 		// Check success handler output
 		successOutput, err := os.ReadFile(successHandler.GetStdout())
 		require.NoError(t, err)
 		assert.Contains(t, string(successOutput), "SUCCESS: Main returned 0")
-		
+
 		// Check exit handler output - it can reference main steps but not other handlers
 		exitOutput, err := os.ReadFile(exitHandler.GetStdout())
 		require.NoError(t, err)
