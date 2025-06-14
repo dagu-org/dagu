@@ -1443,6 +1443,153 @@ func TestEvalString_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 	}
 }
 
+// TestExpandReferencesWithSteps_SearchAcrossOutputs tests the specific case where
+// a field is not directly in outputs but needs to be found by parsing JSON in each output
+func TestExpandReferencesWithSteps_SearchAcrossOutputs(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name    string
+		input   string
+		stepMap map[string]StepInfo
+		want    string
+	}{
+		{
+			name:  "field found by searching through JSON outputs",
+			input: "Status: ${deploy.outputs.status}",
+			stepMap: map[string]StepInfo{
+				"deploy": {
+					Outputs: map[string]string{
+						"data": `{"status": "success", "code": 200}`,
+					},
+				},
+			},
+			want: "Status: success",
+		},
+		{
+			name:  "numeric field treated as array index",
+			input: "Item: ${process.outputs.2}",
+			stepMap: map[string]StepInfo{
+				"process": {
+					Outputs: map[string]string{
+						"items": `["first", "second", "third", "fourth"]`,
+					},
+				},
+			},
+			want: "Item: third",
+		},
+		{
+			name:  "field found in nested JSON structure",
+			input: "Host: ${config.outputs.database.host}",
+			stepMap: map[string]StepInfo{
+				"config": {
+					Outputs: map[string]string{
+						"app":      `{"name": "myapp", "port": 8080}`,
+						"database": `{"host": "localhost", "port": 5432}`,
+					},
+				},
+			},
+			want: "Host: localhost",
+		},
+		{
+			name:  "field not found in any output",
+			input: "Value: ${step1.outputs.nonexistent}",
+			stepMap: map[string]StepInfo{
+				"step1": {
+					Outputs: map[string]string{
+						"data1": `{"field1": "value1"}`,
+						"data2": `{"field2": "value2"}`,
+					},
+				},
+			},
+			want: "Value: <nil>",
+		},
+		{
+			name:  "field found by searching through outputs that contain JSON",
+			input: "Builder: ${build.outputs.builder}",
+			stepMap: map[string]StepInfo{
+				"build": {
+					Outputs: map[string]string{
+						"info": `{"builder": "docker", "time": "10s"}`,
+					},
+				},
+			},
+			want: "Builder: docker",
+		},
+		{
+			name:  "array access in JSON parsed output",
+			input: "First error: ${test.outputs.errors.[0]}",
+			stepMap: map[string]StepInfo{
+				"test": {
+					Outputs: map[string]string{
+						"summary": `{"passed": 10, "failed": 2}`,
+						"errors":  `["timeout in test1", "assertion failed in test2"]`,
+					},
+				},
+			},
+			want: "First error: timeout in test1",
+		},
+		{
+			name:  "complex nested path in parsed JSON",
+			input: "City: ${api.outputs.response.data.address.city}",
+			stepMap: map[string]StepInfo{
+				"api": {
+					Outputs: map[string]string{
+						"headers":  `{"content-type": "application/json"}`,
+						"response": `{"data": {"user": "john", "address": {"city": "Tokyo", "country": "Japan"}}}`,
+					},
+				},
+			},
+			want: "City: Tokyo",
+		},
+		{
+			name:  "invalid JSON in outputs - field not found",
+			input: "Value: ${step.outputs.field}",
+			stepMap: map[string]StepInfo{
+				"step": {
+					Outputs: map[string]string{
+						"data1": `not valid json`,
+						"data2": `{invalid json}`,
+					},
+				},
+			},
+			want: "Value: ${step.outputs.field}",
+		},
+		{
+			name:  "numeric index on non-array JSON",
+			input: "Value: ${step.outputs.0}",
+			stepMap: map[string]StepInfo{
+				"step": {
+					Outputs: map[string]string{
+						"config": `{"key": "value"}`,
+					},
+				},
+			},
+			want: "Value: ${step.outputs.0}",
+		},
+		{
+			name:  "search stops after finding first match",
+			input: "Name: ${step.outputs.name}",
+			stepMap: map[string]StepInfo{
+				"step": {
+					Outputs: map[string]string{
+						"user1": `{"name": "Alice", "age": 30}`,
+						"user2": `{"name": "Bob", "age": 25}`,
+					},
+				},
+			},
+			want: "Name: Alice", // Should find in first output that contains the field
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ExpandReferencesWithSteps(ctx, tt.input, map[string]string{}, tt.stepMap)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 // Helper function to create string pointer
 func ptrString(s string) *string {
 	return &s
