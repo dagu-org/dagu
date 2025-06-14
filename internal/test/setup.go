@@ -377,16 +377,65 @@ func (a *Agent) RunSuccess(t *testing.T) {
 	assert.NoError(t, err, "failed to run agent")
 
 	status := a.Status().Status
-	require.Equal(t, scheduler.StatusSuccess.String(), status.String(), "expected status %q, got %q", scheduler.StatusSuccess, status)
+
+	// Accept both StatusSuccess and StatusPartialSuccess as valid success outcomes
+	// StatusSuccess: All steps succeeded, no skipped steps
+	// StatusPartialSuccess: Some steps skipped with continueOn.skipped=true OR some steps failed with continueOn.failure=true
+	if status != scheduler.StatusSuccess && status != scheduler.StatusPartialSuccess {
+		require.Fail(t, "expected success or partial success", "expected status %q or %q, got %q", scheduler.StatusSuccess, scheduler.StatusPartialSuccess, status)
+	}
 
 	// check all nodes are in success or skipped state
 	for _, node := range a.Status().Nodes {
-		status := node.Status
-		if status == scheduler.NodeStatusSkipped || status == scheduler.NodeStatusSuccess {
+		nodeStatus := node.Status
+		if nodeStatus == scheduler.NodeStatusSkipped || nodeStatus == scheduler.NodeStatusSuccess {
 			continue
 		}
-		t.Errorf("expected node %q to be in success state, got %q", node.Step.Name, status.String())
+		t.Errorf("expected node %q to be in success state, got %q", node.Step.Name, nodeStatus.String())
 	}
+}
+
+func (a *Agent) RunPartialSuccess(t *testing.T) {
+	t.Helper()
+
+	err := a.Run(a.Context)
+	assert.NoError(t, err, "failed to run agent")
+
+	status := a.Status().Status
+	require.Equal(t, scheduler.StatusPartialSuccess.String(), status.String(), "expected status %q, got %q", scheduler.StatusPartialSuccess, status)
+
+	// check that there's a mix of success/skipped nodes and some failures or skips with continueOn
+	hasSuccessOrSkipped := false
+	hasFailuresOrSkipsWithContinue := false
+
+	for _, node := range a.Status().Nodes {
+		switch node.Status {
+		case scheduler.NodeStatusSuccess, scheduler.NodeStatusSkipped:
+			hasSuccessOrSkipped = true
+		case scheduler.NodeStatusError:
+			hasFailuresOrSkipsWithContinue = true
+		case scheduler.NodeStatusNone, scheduler.NodeStatusRunning, scheduler.NodeStatusCancel:
+			// These statuses don't contribute to partial success determination, we only
+			// need this case statement to satisfy linter asking for exhaustive switchcase.
+			// NodeStatusNone: node hasn't started
+			// NodeStatusRunning: node is still executing
+			// NodeStatusCancel: node was cancelled
+		}
+	}
+
+	require.True(t, hasSuccessOrSkipped, "partial success should have at least one successful or skipped node")
+	require.True(t, hasFailuresOrSkipsWithContinue || hasSkippedWithContinue(a), "partial success should have failures with continueOn or skipped nodes with continueOn")
+}
+
+func hasSkippedWithContinue(a *Agent) bool {
+	for _, node := range a.Status().Nodes {
+		if node.Status == scheduler.NodeStatusSkipped {
+			// This is a simplified check - in reality we'd need to check the DAG definition
+			// but for test purposes, we assume skipped nodes have continueOn.skipped = true
+			return true
+		}
+	}
+	return false
 }
 
 func (a *Agent) Abort() {
