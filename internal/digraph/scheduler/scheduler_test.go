@@ -2041,8 +2041,7 @@ func TestScheduler_RetryPolicyDefaults(t *testing.T) {
 	assert.Equal(t, 1, node.State().RetryCount)
 }
 
-
-// TestScheduler_StepIDAccess tests that step ID variables are expanded correctly  
+// TestScheduler_StepIDAccess tests that step ID variables are expanded correctly
 func TestScheduler_StepIDAccess(t *testing.T) {
 	t.Run("StepReferenceInCommand", func(t *testing.T) {
 		sc := setupScheduler(t)
@@ -2138,4 +2137,3 @@ func TestScheduler_StepIDAccess(t *testing.T) {
 		assert.Contains(t, string(stdoutContent), "Checker exit code: 42")
 	})
 }
-

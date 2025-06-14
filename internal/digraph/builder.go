@@ -610,7 +610,7 @@ func validateSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 	// First pass: collect all names and IDs
 	stepNames := make(map[string]struct{})
 	stepIDs := make(map[string]struct{})
-	
+
 	for _, step := range dag.Steps {
 		if step.Name == "" {
 			return wrapError("steps", step, ErrStepNameRequired)

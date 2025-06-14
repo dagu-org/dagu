@@ -423,7 +423,6 @@ func TestEvalStringFields_ErrorCases(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to process map")
 }
 
-
 func TestEvalOptions_Combinations(t *testing.T) {
 	// Set up environment
 	t.Setenv("TEST_ENV", "env_value")

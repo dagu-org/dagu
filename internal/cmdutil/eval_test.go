@@ -621,12 +621,12 @@ func TestEvalStringFields_Map(t *testing.T) {
 			input: map[string]any{
 				"outer": map[string]any{
 					"inner": "$MAP_ENV",
-				}
+				},
 			},
 			want: map[string]any{
 				"outer": map[string]any{
 					"inner": "map_value",
-				}
+				},
 			},
 			wantErr: false,
 		},
@@ -653,14 +653,14 @@ func TestEvalStringFields_Map(t *testing.T) {
 					Field string
 				}{
 					Field: "$MAP_ENV",
-				}
+				},
 			},
 			want: map[string]any{
 				"struct": struct {
 					Field string
 				}{
 					Field: "map_value",
-				}
+				},
 			},
 			wantErr: false,
 		},
@@ -684,7 +684,7 @@ func TestEvalStringFields_Map(t *testing.T) {
 				"ptr": "map_value",
 			},
 			wantErr: false,
-		}
+		},
 	}
 
 	for _, tt := range tests {
@@ -716,7 +716,7 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			stepMap: map[string]StepInfo{
 				"step1": {
 					Stdout: "/tmp/step1.out",
-				}
+				},
 			},
 			want: "The output is at /tmp/step1.out",
 		},
@@ -727,7 +727,7 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			stepMap: map[string]StepInfo{
 				"step1": {
 					Stderr: "/tmp/step1.err",
-				}
+				},
 			},
 			want: "Errors at /tmp/step1.err",
 		},
@@ -738,7 +738,7 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			stepMap: map[string]StepInfo{
 				"step1": {
 					ExitCode: "0",
-				}
+				},
 			},
 			want: "Exit code: 0",
 		},
@@ -749,7 +749,7 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			stepMap: map[string]StepInfo{
 				"step1": {
 					Stdout: "/tmp/step1.out",
-				}
+				},
 			},
 			want: "Missing: ${missing_step.stdout}",
 		},
@@ -760,7 +760,7 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			stepMap: map[string]StepInfo{
 				"step1": {
 					Stdout: "",
-				}
+				},
 			},
 			want: "Empty: ${step1.stdout}",
 		},
@@ -780,7 +780,7 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			stepMap: map[string]StepInfo{
 				"step1": {
 					Stdout: "/tmp/step1.out",
-				}
+				},
 			},
 			want: "Value: from_var",
 		},
@@ -791,7 +791,7 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			stepMap: map[string]StepInfo{
 				"step1": {
 					Stdout: "/tmp/out",
-				}
+				},
 			},
 			want: "Path: /tmp/out",
 		},
@@ -804,10 +804,10 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 					Stdout:   "/tmp/out",
 					Stderr:   "/tmp/err",
 					ExitCode: "1",
-				}
+				},
 			},
 			want: "Out: /tmp/out, Err: /tmp/err, Code: 1",
-		}
+		},
 	}
 
 	for _, tt := range tests {
@@ -834,7 +834,7 @@ func TestEvalString_WithStepMap(t *testing.T) {
 				WithStepMap(map[string]StepInfo{
 					"step1": {
 						Stdout: "/tmp/output.txt",
-					}
+					},
 				}),
 			},
 			want:    "Output: /tmp/output.txt",
@@ -848,12 +848,12 @@ func TestEvalString_WithStepMap(t *testing.T) {
 				WithStepMap(map[string]StepInfo{
 					"step1": {
 						ExitCode: "0",
-					}
+					},
 				}),
 			},
 			want:    "Var: value, Step: 0",
 			wantErr: false,
-		}
+		},
 	}
 
 	for _, tt := range tests {
@@ -885,12 +885,12 @@ func TestEvalIntString_WithStepMap(t *testing.T) {
 				WithStepMap(map[string]StepInfo{
 					"step1": {
 						ExitCode: "42",
-					}
+					},
 				}),
 			},
 			want:    42,
 			wantErr: false,
-		}
+		},
 	}
 
 	for _, tt := range tests {
@@ -924,7 +924,7 @@ func TestProcessStructFields_WithStepMap(t *testing.T) {
 			"step1": {
 				Stdout: "/tmp/out.txt",
 				Stderr: "/tmp/err.txt",
-			}
+			},
 		}),
 	)
 
@@ -938,7 +938,7 @@ func TestProcessMap_WithStepMap(t *testing.T) {
 		"output": "${step1.stdout}",
 		"nested": map[string]any{
 			"exit_code": "${step1.exit_code}",
-		}
+		},
 	}
 
 	ctx := context.Background()
@@ -947,7 +947,7 @@ func TestProcessMap_WithStepMap(t *testing.T) {
 			"step1": {
 				Stdout:   "/tmp/output",
 				ExitCode: "0",
-			}
+			},
 		}),
 	)
 
@@ -994,7 +994,7 @@ func TestReplaceVars_EdgeCases(t *testing.T) {
 			template: "${FOO123}",
 			vars:     map[string]string{"FOO123": "value"},
 			want:     "value",
-		}
+		},
 	}
 
 	for _, tt := range tests {
@@ -1022,7 +1022,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 					Stdout:   "/tmp/logs/download.out",
 					Stderr:   "/tmp/logs/download.err",
 					ExitCode: "0",
-				}
+				},
 			},
 			want: "Log file is at /tmp/logs/download.out",
 		},
@@ -1035,7 +1035,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 					Stdout:   "/tmp/logs/build.out",
 					Stderr:   "/tmp/logs/build.err",
 					ExitCode: "1",
-				}
+				},
 			},
 			want: "Check errors at /tmp/logs/build.err",
 		},
@@ -1048,7 +1048,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 					Stdout:   "/tmp/logs/build.out",
 					Stderr:   "/tmp/logs/build.err",
 					ExitCode: "1",
-				}
+				},
 			},
 			want: "Build exited with code 1",
 		},
@@ -1062,7 +1062,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 				},
 				"build": {
 					Stderr: "/tmp/logs/build.err",
-				}
+				},
 			},
 			want: "Download log: /tmp/logs/download.out, Build errors: /tmp/logs/build.err",
 		},
@@ -1073,7 +1073,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 			stepMap: map[string]StepInfo{
 				"known": {
 					Stdout: "/tmp/logs/known.out",
-				}
+				},
 			},
 			want: "Unknown step: ${unknown.stdout}",
 		},
@@ -1084,7 +1084,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 			stepMap: map[string]StepInfo{
 				"download": {
 					Stdout: "/tmp/logs/download.out",
-				}
+				},
 			},
 			want: "Unknown prop: ${download.unknown}",
 		},
@@ -1097,10 +1097,10 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 			stepMap: map[string]StepInfo{
 				"download": {
 					Stdout: "/tmp/logs/download.out",
-				}
+				},
 			},
 			want: "Value: from-variable",
-		}
+		},
 	}
 
 	for _, tt := range tests {
@@ -1125,10 +1125,6 @@ func TestEvalStringWithSteps(t *testing.T) {
 			Stdout:   "/var/log/process.stdout",
 			Stderr:   "/var/log/process.stderr",
 			ExitCode: "1",
-			Outputs: map[string]string{
-				"result": "success",
-				"count":  "42",
-			}
 		},
 	}
 
@@ -1151,7 +1147,7 @@ func TestEvalStringWithSteps(t *testing.T) {
 			name:  "exit code reference",
 			input: "if [ ${process.exit_code} -ne 0 ]; then echo failed; fi",
 			want:  "if [ 1 -ne 0 ]; then echo failed; fi",
-		}
+		},
 	}
 
 	for _, tt := range tests {
@@ -1181,9 +1177,6 @@ func TestEvalStringFields_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 		},
 		"test": {
 			Stdout: "/logs/test.out",
-			Outputs: map[string]string{
-				"coverage": "85%",
-			}
 		},
 	}
 
@@ -1204,14 +1197,14 @@ func TestEvalStringFields_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 			varSets: []map[string]string{
 				{"A": "alpha"},
 				{"B": "beta"},
-				{"C": "gamma"}
+				{"C": "gamma"},
 			},
 			expected: TestStruct{
 				Field1: "alpha",
 				Field2: "beta",
 				Field3: "gamma",
 				Field4: "/logs/build.err",
-			}
+			},
 		},
 		{
 			name: "step references only on last variable set",
@@ -1224,14 +1217,14 @@ func TestEvalStringFields_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 			varSets: []map[string]string{
 				{"VAR1": "first"},
 				{"VAR2": "second"},
-				{"VAR3": "third"}
+				{"VAR3": "third"},
 			},
 			expected: TestStruct{
 				Field1: "first",
 				Field2: "second",
 				Field3: "/logs/test.out",
 				Field4: "third",
-			}
+			},
 		},
 	}
 
@@ -1261,9 +1254,6 @@ func TestEvalString_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 	stepMap := map[string]StepInfo{
 		"deploy": {
 			Stdout: "/logs/deploy.out",
-			Outputs: map[string]string{
-				"url": "https://example.com",
-			}
 		},
 	}
 
@@ -1281,7 +1271,7 @@ func TestEvalString_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 				{"Z": "3"}, // Different variable, X and Y should remain from first set
 			},
 			expected: "1 and 2 with log at /logs/deploy.out",
-		}
+		},
 	}
 
 	for _, tt := range tests {
@@ -1311,8 +1301,7 @@ func TestExpandReferencesWithSteps_SearchAcrossOutputs(t *testing.T) {
 		input   string
 		stepMap map[string]StepInfo
 		want    string
-	}{
-	}
+	}{}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
