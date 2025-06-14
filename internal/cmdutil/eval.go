@@ -104,7 +104,7 @@ func EvalString(ctx context.Context, input string, opts ...EvalOption) (string, 
 		opt(options)
 	}
 	value := input
-	
+
 	// If we have a StepMap but no variables, still need to expand step references
 	if len(options.Variables) == 0 && options.StepMap != nil {
 		value = ExpandReferencesWithSteps(ctx, value, map[string]string{}, options.StepMap)
@@ -140,7 +140,7 @@ func EvalIntString(ctx context.Context, input string, opts ...EvalOption) (int, 
 		opt(options)
 	}
 	value := input
-	
+
 	// If we have a StepMap but no variables, still need to expand step references
 	if len(options.Variables) == 0 && options.StepMap != nil {
 		value = ExpandReferencesWithSteps(ctx, value, map[string]string{}, options.StepMap)
@@ -218,7 +218,7 @@ func processStructFields(ctx context.Context, v reflect.Value, opts *EvalOptions
 		switch field.Kind() {
 		case reflect.String:
 			value := field.String()
-			
+
 			// If we have a StepMap but no variables, still need to expand step references
 			if len(opts.Variables) == 0 && opts.StepMap != nil {
 				value = ExpandReferencesWithSteps(ctx, value, map[string]string{}, opts.StepMap)
@@ -297,7 +297,7 @@ func processMap(ctx context.Context, v reflect.Value, opts *EvalOptions) (reflec
 		case reflect.String:
 			// Evaluate string values
 			strVal := val.String()
-			
+
 			// If we have a StepMap but no variables, still need to expand step references
 			if len(opts.Variables) == 0 && opts.StepMap != nil {
 				strVal = ExpandReferencesWithSteps(ctx, strVal, map[string]string{}, opts.StepMap)
@@ -435,11 +435,11 @@ func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[st
 						// Check if it's .outputs.xxx
 						if strings.HasPrefix(path, ".outputs.") && len(stepInfo.Outputs) > 0 {
 							outputField := strings.TrimPrefix(path, ".outputs.")
-							
+
 							// Check if outputField contains a path (e.g., "database.host")
 							parts := strings.SplitN(outputField, ".", 2)
 							varName := parts[0]
-							
+
 							// First check if it's a direct output variable name
 							if value, ok := stepInfo.Outputs[varName]; ok {
 								if len(parts) == 1 {
@@ -461,7 +461,7 @@ func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[st
 									}
 								}
 							}
-							
+
 							// If not a direct output, try to find it within JSON outputs
 							// For each output variable, try to parse as JSON and look for the field
 							for _, v := range stepInfo.Outputs {

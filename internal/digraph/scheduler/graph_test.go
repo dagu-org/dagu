@@ -150,13 +150,13 @@ func TestExecutionGraphDependencies(t *testing.T) {
 		graph, err := scheduler.NewExecutionGraph(steps...)
 		require.NoError(t, err)
 		require.NotNil(t, graph)
-		
+
 		// Verify by checking the structure:
 		// - graph should have edges in From and To maps
 		// - there should be some connections
 		require.NotEmpty(t, graph.From)
 		require.NotEmpty(t, graph.To)
-		
+
 		// Check that we have the expected number of edges
 		// setup -> process (1 edge)
 		edgeCount := 0
@@ -185,20 +185,20 @@ func TestGraphWithMixedDependencies(t *testing.T) {
 	// Verify correct dependency resolution
 	// Expected edges:
 	// download -> process
-	// extract -> process  
+	// extract -> process
 	// process -> cleanup
 	// Total: 3 edges
-	
+
 	// Count total edges
 	edgeCount := 0
 	for _, targets := range graph.From {
 		edgeCount += len(targets)
 	}
 	require.Equal(t, 3, edgeCount, "Should have exactly 3 edges")
-	
+
 	// Verify we have the right number of nodes with outgoing edges
 	require.Len(t, graph.From, 3, "Three nodes should have outgoing edges: download, extract, process")
-	
-	// Verify we have the right number of nodes with incoming edges  
+
+	// Verify we have the right number of nodes with incoming edges
 	require.Len(t, graph.To, 2, "Two nodes should have incoming edges: process, cleanup")
 }
