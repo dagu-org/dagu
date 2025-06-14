@@ -907,6 +907,7 @@ Step Fields
 Configuration options available for individual steps:
 
 - ``name``: Step name (required)
+- ``id``: Optional short identifier for variable references (e.g., ${id.stdout})
 - ``description``: Step description
 - ``dir``: Working directory
 - ``command``: Command to execute
