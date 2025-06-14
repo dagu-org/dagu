@@ -2137,3 +2137,219 @@ func TestScheduler_StepIDAccess(t *testing.T) {
 		assert.Contains(t, string(stdoutContent), "Checker exit code: 42")
 	})
 }
+
+// TestScheduler_EventHandlerStepIDAccess tests that step ID references work in event handlers
+func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
+	t.Run("OnSuccessHandlerWithStepReferences", func(t *testing.T) {
+		sc := setupScheduler(t,
+			withOnSuccess(digraph.Step{
+				Name:    "success_handler",
+				ID:      "on_success",
+				Command: "echo 'Main output: ${main.stdout}, Worker result: ${worker.exit_code}'",
+			}),
+		)
+
+		graph := sc.newGraph(t,
+			newStep("main_step",
+				withID("main"),
+				withCommand("echo 'Main processing done'"),
+			),
+			newStep("worker_step",
+				withID("worker"),
+				withCommand("echo 'Worker processing done' && exit 0"),
+				withDepends("main_step"),
+			),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		
+		// All steps should succeed
+		result.AssertNodeStatus(t, "main_step", scheduler.NodeStatusSuccess)
+		result.AssertNodeStatus(t, "worker_step", scheduler.NodeStatusSuccess)
+		
+		// The handler should have executed
+		result.AssertNodeStatus(t, "success_handler", scheduler.NodeStatusSuccess)
+		
+		// Get the handler node
+		handlerNode := result.Node(t, "success_handler")
+		require.NotNil(t, handlerNode, "Success handler should have executed")
+		
+		// Check handler output contains references to main steps
+		handlerOutput, err := os.ReadFile(handlerNode.GetStdout())
+		require.NoError(t, err)
+		output := string(handlerOutput)
+		assert.Contains(t, output, "Main output:")
+		assert.Contains(t, output, ".out") // Should contain stdout file path
+		assert.Contains(t, output, "Worker result: 0")
+	})
+
+	t.Run("OnFailureHandlerWithStepReferences", func(t *testing.T) {
+		sc := setupScheduler(t,
+			withOnFailure(digraph.Step{
+				Name:    "failure_handler",
+				ID:      "on_fail",
+				Command: "echo 'Failed step stderr: ${failing.stderr}, exit code: ${failing.exit_code}'",
+			}),
+		)
+
+		graph := sc.newGraph(t,
+			newStep("setup",
+				withID("setup_step"),
+				withCommand("echo 'Setup complete'"),
+			),
+			newStep("failing_step",
+				withID("failing"),
+				withCommand("echo 'Error occurred' >&2 && exit 1"),
+				withDepends("setup"),
+			),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusError)
+		
+		// Check step statuses
+		result.AssertNodeStatus(t, "setup", scheduler.NodeStatusSuccess)
+		result.AssertNodeStatus(t, "failing_step", scheduler.NodeStatusError)
+		
+		// The failure handler should have executed
+		result.AssertNodeStatus(t, "failure_handler", scheduler.NodeStatusSuccess)
+		
+		// Get the handler node
+		handlerNode := result.Node(t, "failure_handler")
+		require.NotNil(t, handlerNode, "Failure handler should have executed")
+		
+		// Check handler output
+		handlerOutput, err := os.ReadFile(handlerNode.GetStdout())
+		require.NoError(t, err)
+		output := string(handlerOutput)
+		assert.Contains(t, output, "Failed step stderr:")
+		assert.Contains(t, output, ".err") // Should contain stderr file path
+		assert.Contains(t, output, "exit code: 1")
+	})
+
+	t.Run("OnExitHandlerWithMultipleStepReferences", func(t *testing.T) {
+		sc := setupScheduler(t,
+			withOnExit(digraph.Step{
+				Name:    "exit_handler",
+				ID:      "on_exit",
+				Command: "echo 'Step1: ${step1.stdout}, Step2: ${step2.exit_code}, Step3: ${step3.stderr}'",
+			}),
+		)
+
+		graph := sc.newGraph(t,
+			newStep("first",
+				withID("step1"),
+				withCommand("echo 'First step output'"),
+			),
+			newStep("second",
+				withID("step2"),
+				withCommand("exit 0"),
+				withDepends("first"),
+			),
+			newStep("third",
+				withID("step3"),
+				withCommand("echo 'Warning message' >&2"),
+				withDepends("second"),
+			),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		
+		// All main steps should succeed
+		result.AssertNodeStatus(t, "first", scheduler.NodeStatusSuccess)
+		result.AssertNodeStatus(t, "second", scheduler.NodeStatusSuccess)
+		result.AssertNodeStatus(t, "third", scheduler.NodeStatusSuccess)
+		
+		// The exit handler should have executed
+		result.AssertNodeStatus(t, "exit_handler", scheduler.NodeStatusSuccess)
+		
+		// Get the handler node
+		handlerNode := result.Node(t, "exit_handler")
+		require.NotNil(t, handlerNode, "Exit handler should have executed")
+		
+		// Check handler output contains all step references
+		handlerOutput, err := os.ReadFile(handlerNode.GetStdout())
+		require.NoError(t, err)
+		output := string(handlerOutput)
+		assert.Contains(t, output, "Step1:")
+		assert.Contains(t, output, ".out") // step1 stdout path
+		assert.Contains(t, output, "Step2: 0")
+		assert.Contains(t, output, "Step3:")
+		assert.Contains(t, output, ".err") // step3 stderr path
+	})
+
+	t.Run("HandlerWithoutIDCannotBeReferenced", func(t *testing.T) {
+		sc := setupScheduler(t,
+			withOnExit(digraph.Step{
+				Name:    "exit_handler_no_id",
+				// No ID field set
+				Command: "echo 'Handler executed'",
+			}),
+		)
+
+		graph := sc.newGraph(t,
+			newStep("main",
+				withID("main_step"),
+				withCommand("echo 'Main step'"),
+			),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		result.AssertNodeStatus(t, "main", scheduler.NodeStatusSuccess)
+		
+		// Handler should execute
+		result.AssertNodeStatus(t, "exit_handler_no_id", scheduler.NodeStatusSuccess)
+		
+		// Get the handler node to verify it has no ID
+		handlerNode := result.Node(t, "exit_handler_no_id")
+		assert.Empty(t, handlerNode.Step().ID, "Handler should have no ID")
+	})
+
+	t.Run("HandlersCanOnlyReferenceMainSteps", func(t *testing.T) {
+		// Test that handlers can reference main steps but not other handlers
+		// This is because handlers execute after all main steps are complete
+		sc := setupScheduler(t,
+			withOnSuccess(digraph.Step{
+				Name:    "first_handler",
+				ID:      "handler1",
+				Command: "echo 'SUCCESS: Main returned ${main.exit_code}'",
+			}),
+			withOnExit(digraph.Step{
+				Name:    "final_handler",
+				ID:      "handler2",
+				Command: "echo 'FINAL: Main step output at ${main.stdout}, trying handler ref: ${handler1.stdout}'",
+			}),
+		)
+
+		graph := sc.newGraph(t,
+			newStep("main",
+				withID("main"),
+				withCommand("echo 'Processing' && exit 0"),
+			),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		result.AssertNodeStatus(t, "main", scheduler.NodeStatusSuccess)
+		
+		// Both handlers should have executed
+		result.AssertNodeStatus(t, "first_handler", scheduler.NodeStatusSuccess)
+		result.AssertNodeStatus(t, "final_handler", scheduler.NodeStatusSuccess)
+		
+		// Get the handler nodes
+		successHandler := result.Node(t, "first_handler")
+		exitHandler := result.Node(t, "final_handler")
+		
+		// Check success handler output
+		successOutput, err := os.ReadFile(successHandler.GetStdout())
+		require.NoError(t, err)
+		assert.Contains(t, string(successOutput), "SUCCESS: Main returned 0")
+		
+		// Check exit handler output - it can reference main steps but not other handlers
+		exitOutput, err := os.ReadFile(exitHandler.GetStdout())
+		require.NoError(t, err)
+		output := string(exitOutput)
+		assert.Contains(t, output, "FINAL: Main step output at")
+		assert.Contains(t, output, ".out") // Should contain main's stdout path
+		// Handler reference should not be resolved
+		assert.Contains(t, output, "${handler1.stdout}") // Should remain unresolved
+	})
+}
