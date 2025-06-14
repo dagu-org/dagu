@@ -427,6 +427,22 @@ func (sc *Scheduler) teardownNode(ctx context.Context, node *Node) error {
 func (sc *Scheduler) setupEnviron(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
 	env := executor.NewEnv(ctx, node.Step())
 
+	// Populate step information for all nodes with IDs
+	for _, n := range graph.nodes {
+		if n.Step().ID != "" {
+			stepInfo := cmdutil.StepInfo{
+				Stdout:   n.GetStdout(),
+				Stderr:   n.GetStderr(),
+				ExitCode: strconv.Itoa(n.GetExitCode()),
+			}
+			// Collect output variables for this step
+			if n.inner.State.OutputVariables != nil {
+				stepInfo.Outputs = n.inner.State.OutputVariables.Variables()
+			}
+			env.StepMap[n.Step().ID] = stepInfo
+		}
+	}
+
 	curr := node.id
 	visited := make(map[int]struct{})
 	queue := []int{curr}
@@ -451,6 +467,22 @@ func (sc *Scheduler) setupEnviron(ctx context.Context, graph *ExecutionGraph, no
 
 func (sc *Scheduler) setupEnvironEventHandler(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
 	env := executor.NewEnv(ctx, node.Step())
+
+	// Populate step information for all nodes with IDs
+	for _, n := range graph.nodes {
+		if n.Step().ID != "" {
+			stepInfo := cmdutil.StepInfo{
+				Stdout:   n.GetStdout(),
+				Stderr:   n.GetStderr(),
+				ExitCode: strconv.Itoa(n.GetExitCode()),
+			}
+			// Collect output variables for this step
+			if n.inner.State.OutputVariables != nil {
+				stepInfo.Outputs = n.inner.State.OutputVariables.Variables()
+			}
+			env.StepMap[n.Step().ID] = stepInfo
+		}
+	}
 
 	// get all output variables
 	for _, node := range graph.nodes {

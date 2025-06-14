@@ -18,6 +18,7 @@ type EvalOptions struct {
 	ExpandEnv  bool
 	Substitute bool
 	Variables  []map[string]string
+	StepMap    map[string]StepInfo
 }
 
 type EvalOption func(*EvalOptions)
@@ -25,6 +26,12 @@ type EvalOption func(*EvalOptions)
 func WithVariables(vars map[string]string) EvalOption {
 	return func(opts *EvalOptions) {
 		opts.Variables = append(opts.Variables, vars)
+	}
+}
+
+func WithStepMap(stepMap map[string]StepInfo) EvalOption {
+	return func(opts *EvalOptions) {
+		opts.StepMap = stepMap
 	}
 }
 
@@ -97,9 +104,21 @@ func EvalString(ctx context.Context, input string, opts ...EvalOption) (string, 
 		opt(options)
 	}
 	value := input
-	for _, vars := range options.Variables {
-		value = ExpandReferences(ctx, value, vars)
-		value = replaceVars(value, vars)
+	
+	// If we have a StepMap but no variables, still need to expand step references
+	if len(options.Variables) == 0 && options.StepMap != nil {
+		value = ExpandReferencesWithSteps(ctx, value, map[string]string{}, options.StepMap)
+	} else {
+		// Process variables as before
+		for i, vars := range options.Variables {
+			// Use the new function with steps if available on the last variable set
+			if i == len(options.Variables)-1 && options.StepMap != nil {
+				value = ExpandReferencesWithSteps(ctx, value, vars, options.StepMap)
+			} else {
+				value = ExpandReferences(ctx, value, vars)
+			}
+			value = replaceVars(value, vars)
+		}
 	}
 	if options.Substitute {
 		var err error
@@ -121,9 +140,21 @@ func EvalIntString(ctx context.Context, input string, opts ...EvalOption) (int, 
 		opt(options)
 	}
 	value := input
-	for _, vars := range options.Variables {
-		value = ExpandReferences(ctx, value, vars)
-		value = replaceVars(value, vars)
+	
+	// If we have a StepMap but no variables, still need to expand step references
+	if len(options.Variables) == 0 && options.StepMap != nil {
+		value = ExpandReferencesWithSteps(ctx, value, map[string]string{}, options.StepMap)
+	} else {
+		// Process variables as before
+		for i, vars := range options.Variables {
+			// Use the new function with steps if available on the last variable set
+			if i == len(options.Variables)-1 && options.StepMap != nil {
+				value = ExpandReferencesWithSteps(ctx, value, vars, options.StepMap)
+			} else {
+				value = ExpandReferences(ctx, value, vars)
+			}
+			value = replaceVars(value, vars)
+		}
 	}
 	if options.ExpandEnv {
 		value = os.ExpandEnv(value)
@@ -187,8 +218,21 @@ func processStructFields(ctx context.Context, v reflect.Value, opts *EvalOptions
 		switch field.Kind() {
 		case reflect.String:
 			value := field.String()
-			for _, vars := range opts.Variables {
-				value = replaceVars(value, vars)
+			
+			// If we have a StepMap but no variables, still need to expand step references
+			if len(opts.Variables) == 0 && opts.StepMap != nil {
+				value = ExpandReferencesWithSteps(ctx, value, map[string]string{}, opts.StepMap)
+			} else {
+				// Process variables as before
+				for i, vars := range opts.Variables {
+					// Use the new function with steps if available on the last variable set
+					if i == len(opts.Variables)-1 && opts.StepMap != nil {
+						value = ExpandReferencesWithSteps(ctx, value, vars, opts.StepMap)
+					} else {
+						value = ExpandReferences(ctx, value, vars)
+					}
+					value = replaceVars(value, vars)
+				}
 			}
 
 			if opts.Substitute {
@@ -253,8 +297,21 @@ func processMap(ctx context.Context, v reflect.Value, opts *EvalOptions) (reflec
 		case reflect.String:
 			// Evaluate string values
 			strVal := val.String()
-			for _, vars := range opts.Variables {
-				strVal = replaceVars(strVal, vars)
+			
+			// If we have a StepMap but no variables, still need to expand step references
+			if len(opts.Variables) == 0 && opts.StepMap != nil {
+				strVal = ExpandReferencesWithSteps(ctx, strVal, map[string]string{}, opts.StepMap)
+			} else {
+				// Process variables as before
+				for i, vars := range opts.Variables {
+					// Use the new function with steps if available on the last variable set
+					if i == len(opts.Variables)-1 && opts.StepMap != nil {
+						strVal = ExpandReferencesWithSteps(ctx, strVal, vars, opts.StepMap)
+					} else {
+						strVal = ExpandReferences(ctx, strVal, vars)
+					}
+					strVal = replaceVars(strVal, vars)
+				}
 			}
 
 			if opts.Substitute {
@@ -301,6 +358,14 @@ func processMap(ctx context.Context, v reflect.Value, opts *EvalOptions) (reflec
 	return newMap, nil
 }
 
+// StepInfo contains metadata about a step that can be accessed via property syntax
+type StepInfo struct {
+	Stdout   string
+	Stderr   string
+	ExitCode string
+	Outputs  map[string]string
+}
+
 // ExpandReferences finds all occurrences of ${NAME.foo.bar} in the input string,
 // where "NAME" matches a key in the dataMap. The dataMap value is expected to be
 // JSON. It then uses gojq to extract the .foo.bar sub-path from that JSON
@@ -309,6 +374,12 @@ func processMap(ctx context.Context, v reflect.Value, opts *EvalOptions) (reflec
 // If dataMap[name] is invalid JSON or the sub-path does not exist,
 // the placeholder is left as-is (or you could handle it differently).
 func ExpandReferences(ctx context.Context, input string, dataMap map[string]string) string {
+	return ExpandReferencesWithSteps(ctx, input, dataMap, nil)
+}
+
+// ExpandReferencesWithSteps is like ExpandReferences but also handles step ID property access
+// like ${step_id.stdout}, ${step_id.stderr}, ${step_id.exit_code}, ${step_id.outputs.foo}
+func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[string]string, stepMap map[string]StepInfo) string {
 	// Regex to match patterns like ${FOO.bar.baz}, capturing:
 	//   group 1 => FOO  (the top-level name)
 	//   group 2 => .bar.baz (the path portion)
@@ -340,23 +411,108 @@ func ExpandReferences(ctx context.Context, input string, dataMap map[string]stri
 			path = subMatches[4] // e.g. ".bar.baz"
 		}
 
-		// Lookup the JSON content for this "name"
+		// Helper function to handle step property access
+		handleStepProperty := func() string {
+			if stepMap != nil {
+				if stepInfo, ok := stepMap[name]; ok {
+					// Handle step property access
+					switch path {
+					case ".stdout":
+						if stepInfo.Stdout == "" {
+							logger.Debug(ctx, "step stdout is empty", "step", name)
+							return match // Keep original if empty
+						}
+						return stepInfo.Stdout
+					case ".stderr":
+						if stepInfo.Stderr == "" {
+							logger.Debug(ctx, "step stderr is empty", "step", name)
+							return match // Keep original if empty
+						}
+						return stepInfo.Stderr
+					case ".exit_code":
+						return stepInfo.ExitCode
+					default:
+						// Check if it's .outputs.xxx
+						if strings.HasPrefix(path, ".outputs.") && len(stepInfo.Outputs) > 0 {
+							outputField := strings.TrimPrefix(path, ".outputs.")
+							
+							// Check if outputField contains a path (e.g., "database.host")
+							parts := strings.SplitN(outputField, ".", 2)
+							varName := parts[0]
+							
+							// First check if it's a direct output variable name
+							if value, ok := stepInfo.Outputs[varName]; ok {
+								if len(parts) == 1 {
+									// No nested path, return the value directly
+									return value
+								}
+								// There's a nested path, parse JSON and query
+								var parsed any
+								if err := json.Unmarshal([]byte(value), &parsed); err == nil {
+									queryStr := "." + parts[1]
+									query, err := gojq.Parse(queryStr)
+									if err == nil {
+										iter := query.Run(parsed)
+										if result, ok := iter.Next(); ok {
+											if _, isErr := result.(error); !isErr {
+												return fmt.Sprintf("%v", result)
+											}
+										}
+									}
+								}
+							}
+							
+							// If not a direct output, try to find it within JSON outputs
+							// For each output variable, try to parse as JSON and look for the field
+							for _, v := range stepInfo.Outputs {
+								var parsed any
+								if err := json.Unmarshal([]byte(v), &parsed); err == nil {
+									// Successfully parsed as JSON, now query for the field
+									queryStr := "." + outputField
+									// Handle numeric indices for array access
+									if _, err := strconv.Atoi(outputField); err == nil {
+										queryStr = ".[" + outputField + "]"
+									}
+									query, err := gojq.Parse(queryStr)
+									if err == nil {
+										iter := query.Run(parsed)
+										if result, ok := iter.Next(); ok {
+											if _, isErr := result.(error); !isErr {
+												return fmt.Sprintf("%v", result)
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				} else {
+					logger.Debug(ctx, "step not found in stepMap", "step", name)
+				}
+			} else {
+				logger.Debug(ctx, "stepMap is nil")
+			}
+			return match
+		}
+
+		// First try regular variable lookup
 		jsonStr, ok := dataMap[name]
 		if !ok {
 			// Find the variable from the environment
 			val, ok := os.LookupEnv(name)
-			if !ok {
-				// Not found => leave as-is or handle otherwise
-				return match
+			if ok {
+				jsonStr = val
+			} else {
+				// Not found in variables or environment, check if it's a step ID
+				return handleStepProperty()
 			}
-			jsonStr = val
 		}
 
 		// Try to parse it as JSON and evaluate path
 		var raw any
 		if err := json.Unmarshal([]byte(jsonStr), &raw); err != nil {
-			// Not valid JSON => leave as-is
-			return match
+			// Not valid JSON, but might still be a step ID property
+			return handleStepProperty()
 		}
 
 		// Build a gojq query (like .bar.baz)
@@ -371,9 +527,8 @@ func ExpandReferences(ctx context.Context, input string, dataMap map[string]stri
 		iter := query.Run(raw)
 		v, ok := iter.Next()
 		if !ok {
-			// Means no result => leave placeholder as-is
-			logger.Warn(ctx, "no result for path %q in data %q", path, name)
-			return match
+			// No result from JSON query, check if it's a step ID property
+			return handleStepProperty()
 		}
 
 		// If gojq yields an error or multiple results, handle that:
