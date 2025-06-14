@@ -756,22 +756,39 @@ func (sc *Scheduler) handleNodeRetry(ctx context.Context, node *Node, execErr er
 	var exitCode int
 	var exitCodeFound bool
 
-	// Try to extract exit code from different error types
-	if exitErr, ok := execErr.(*exec.ExitError); ok {
+	// Try to extract the exec.ExitError using errors.As
+	var exitErr *exec.ExitError
+	if errors.As(execErr, &exitErr) {
 		exitCode = exitErr.ExitCode()
 		exitCodeFound = true
 		logger.Debug(ctx, "Found exit error", "error", execErr, "exitCode", exitCode)
-	} else {
+	}
+
+	if !exitCodeFound {
 		// Try to parse exit code from error string
 		errStr := execErr.Error()
 		if strings.Contains(errStr, "exit status") {
 			// Parse "exit status N" format
-			parts := strings.Split(errStr, " ")
-			if len(parts) > 2 {
-				if code, err := strconv.Atoi(parts[2]); err == nil {
-					exitCode = code
-					exitCodeFound = true
-					logger.Debug(ctx, "Parsed exit code from error string", "error", errStr, "exitCode", exitCode)
+			// Look for the last occurrence of "exit status" followed by a number
+			parts := strings.Split(errStr, "exit status ")
+			if len(parts) > 1 {
+				// Get the last part and extract the number
+				lastPart := parts[len(parts)-1]
+				// Extract the number from the beginning of the string
+				numStr := ""
+				for _, ch := range lastPart {
+					if ch >= '0' && ch <= '9' {
+						numStr += string(ch)
+					} else {
+						break
+					}
+				}
+				if numStr != "" {
+					if code, err := strconv.Atoi(numStr); err == nil {
+						exitCode = code
+						exitCodeFound = true
+						logger.Debug(ctx, "Parsed exit code from error string", "error", errStr, "exitCode", exitCode)
+					}
 				}
 			}
 		} else if strings.Contains(errStr, "signal:") {
