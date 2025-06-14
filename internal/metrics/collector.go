@@ -175,6 +175,8 @@ func (c *Collector) collectDAGRunMetrics(ch chan<- prometheus.Metric) {
 			statusLabel = "success"
 		case scheduler.StatusError:
 			statusLabel = "error"
+		case scheduler.StatusPartialSuccess:
+			statusLabel = "partial_success"
 		case scheduler.StatusCancel:
 			statusLabel = "cancelled"
 		case scheduler.StatusRunning:

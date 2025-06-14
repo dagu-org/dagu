@@ -10,6 +10,7 @@ export const statusColorMapping: statusColorMapping = {
   [Status.Failed]: { backgroundColor: 'red', color: 'white' },
   [Status.Cancelled]: { backgroundColor: 'pink' },
   [Status.Success]: { backgroundColor: 'green', color: 'white' },
+  [Status.PartialSuccess]: { backgroundColor: '#f59e0b', color: 'white' },
 };
 
 export const nodeStatusColorMapping = {

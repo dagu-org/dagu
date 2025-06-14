@@ -174,6 +174,8 @@ func displayDetailedStatus(dag *digraph.DAG, status *models.DAGRunStatus) {
 			color.RedString("✗"), status.DAGRunID, dag.Name)
 	case scheduler.StatusSuccess:
 		fmt.Printf("%s The DAG completed successfully.\n", color.GreenString("✓"))
+	case scheduler.StatusPartialSuccess:
+		fmt.Printf("%s The DAG completed with partial success.\n", color.YellowString("⚠"))
 	case scheduler.StatusCancel:
 		fmt.Printf("%s The DAG was cancelled.\n", color.YellowString("⚠"))
 	case scheduler.StatusQueued:
@@ -429,6 +431,8 @@ func formatStatus(status scheduler.Status) string {
 		return color.GreenString("Success")
 	case scheduler.StatusError:
 		return color.RedString("Failed")
+	case scheduler.StatusPartialSuccess:
+		return color.YellowString("Partial Success")
 	case scheduler.StatusRunning:
 		return color.New(color.FgHiGreen).Sprint("Running")
 	case scheduler.StatusCancel:

@@ -42,6 +42,7 @@ const initializeMetrics = (): Metrics => {
     Status.Cancelled,
     Status.Queued,
     Status.NotStarted, // Include NotStarted if relevant
+    Status.PartialSuccess,
   ];
   relevantStatuses.forEach((status: Status) => {
     initialMetrics[status] = 0;
@@ -180,6 +181,11 @@ function Dashboard(): React.ReactElement | null {
       title: 'Success',
       value: metrics[Status.Success],
       icon: <CheckCircle className="h-5 w-5 text-[green]" />,
+    },
+    {
+      title: 'Partial Success',
+      value: metrics[Status.PartialSuccess],
+      icon: <CheckCircle className="h-5 w-5 text-[#f59e0b]" />,
     },
     {
       title: 'Failed',

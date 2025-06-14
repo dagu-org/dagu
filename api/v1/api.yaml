@@ -609,7 +609,7 @@ components:
 
     RunStatus:
       type: integer
-      enum: [0, 1, 2, 3, 4]
+      enum: [0, 1, 2, 3, 4, 6]
       description: |
         Numeric status code indicating current run state:
         0: "Not started"
@@ -617,6 +617,7 @@ components:
         2: "Failed"
         3: "Cancelled"
         4: "Success"
+        6: "Partial Success"
 
     RunStatusText:
       type: string
@@ -627,6 +628,7 @@ components:
         - "failed"
         - "cancelled"
         - "finished"
+        - "partial success"
 
     NodeStatus:
       type: integer
