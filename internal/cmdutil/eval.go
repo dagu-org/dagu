@@ -364,7 +364,6 @@ type StepInfo struct {
 	Stdout   string
 	Stderr   string
 	ExitCode string
-	Outputs  map[string]string
 }
 
 // ExpandReferences finds all occurrences of ${NAME.foo.bar} in the input string,
@@ -379,7 +378,7 @@ func ExpandReferences(ctx context.Context, input string, dataMap map[string]stri
 }
 
 // ExpandReferencesWithSteps is like ExpandReferences but also handles step ID property access
-// like ${step_id.stdout}, ${step_id.stderr}, ${step_id.exit_code}, ${step_id.outputs.foo}
+// like ${step_id.stdout}, ${step_id.stderr}, ${step_id.exit_code}
 func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[string]string, stepMap map[string]StepInfo) string {
 	// Regex to match patterns like ${FOO.bar.baz}, capturing:
 	//   group 1 => FOO  (the top-level name)
@@ -432,60 +431,6 @@ func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[st
 						return stepInfo.Stderr
 					case ".exit_code":
 						return stepInfo.ExitCode
-					default:
-						// Check if it's .outputs.xxx
-						if strings.HasPrefix(path, ".outputs.") && len(stepInfo.Outputs) > 0 {
-							outputField := strings.TrimPrefix(path, ".outputs.")
-
-							// Check if outputField contains a path (e.g., "database.host")
-							parts := strings.SplitN(outputField, ".", 2)
-							varName := parts[0]
-
-							// First check if it's a direct output variable name
-							if value, ok := stepInfo.Outputs[varName]; ok {
-								if len(parts) == 1 {
-									// No nested path, return the value directly
-									return value
-								}
-								// There's a nested path, parse JSON and query
-								var parsed any
-								if err := json.Unmarshal([]byte(value), &parsed); err == nil {
-									queryStr := "." + parts[1]
-									query, err := gojq.Parse(queryStr)
-									if err == nil {
-										iter := query.Run(parsed)
-										if result, ok := iter.Next(); ok {
-											if _, isErr := result.(error); !isErr {
-												return fmt.Sprintf("%v", result)
-											}
-										}
-									}
-								}
-							}
-
-							// If not a direct output, try to find it within JSON outputs
-							// For each output variable, try to parse as JSON and look for the field
-							for _, v := range stepInfo.Outputs {
-								var parsed any
-								if err := json.Unmarshal([]byte(v), &parsed); err == nil {
-									// Successfully parsed as JSON, now query for the field
-									queryStr := "." + outputField
-									// Handle numeric indices for array access
-									if _, err := strconv.Atoi(outputField); err == nil {
-										queryStr = ".[" + outputField + "]"
-									}
-									query, err := gojq.Parse(queryStr)
-									if err == nil {
-										iter := query.Run(parsed)
-										if result, ok := iter.Next(); ok {
-											if _, isErr := result.(error); !isErr {
-												return fmt.Sprintf("%v", result)
-											}
-										}
-									}
-								}
-							}
-						}
 					}
 				} else {
 					logger.Debug(ctx, "step not found in stepMap", "step", name)
@@ -498,34 +443,13 @@ func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[st
 
 		// First try regular variable lookup
 		jsonStr, ok := dataMap[name]
-		varExists := ok // Track if a variable with this name exists
 		if !ok {
 			// Find the variable from the environment
 			val, ok := os.LookupEnv(name)
 			if ok {
 				jsonStr = val
-				varExists = true
 			} else {
 				// Not found in variables or environment, check if it's a step ID
-				
-				// Special case: if this step has an output variable with the same name,
-				// and we're trying to access step properties, return <nil> to indicate
-				// that variables take precedence
-				if stepMap != nil {
-					if stepInfo, ok := stepMap[name]; ok {
-						if _, hasOutput := stepInfo.Outputs[name]; hasOutput {
-							switch path {
-							case ".stdout", ".stderr", ".exit_code":
-								return "<nil>"
-							default:
-								if strings.HasPrefix(path, ".outputs.") {
-									return "<nil>"
-								}
-							}
-						}
-					}
-				}
-				
 				return handleStepProperty()
 			}
 		}
@@ -551,22 +475,6 @@ func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[st
 		v, ok := iter.Next()
 		if !ok {
 			// No result from JSON query
-			// Special case: if this is a step property access (.stdout, .stderr, etc)
-			// and the variable exists (even if it doesn't have this field), return <nil>
-			// to indicate the variable takes precedence
-			if varExists && stepMap != nil {
-				if _, stepExists := stepMap[name]; stepExists {
-					switch path {
-					case ".stdout", ".stderr", ".exit_code":
-						// Check if this step has an output variable with the same name
-						if stepInfo, ok := stepMap[name]; ok {
-							if _, hasOutput := stepInfo.Outputs[name]; hasOutput {
-								return "<nil>"
-							}
-						}
-					}
-				}
-			}
 			return handleStepProperty()
 		}
 

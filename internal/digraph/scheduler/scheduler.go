@@ -435,10 +435,6 @@ func (sc *Scheduler) setupEnviron(ctx context.Context, graph *ExecutionGraph, no
 				Stderr:   n.GetStderr(),
 				ExitCode: strconv.Itoa(n.GetExitCode()),
 			}
-			// Collect output variables for this step
-			if n.inner.State.OutputVariables != nil {
-				stepInfo.Outputs = n.inner.State.OutputVariables.Variables()
-			}
 			env.StepMap[n.Step().ID] = stepInfo
 		}
 	}
@@ -485,10 +481,6 @@ func (sc *Scheduler) setupEnvironEventHandler(ctx context.Context, graph *Execut
 				Stdout:   n.GetStdout(),
 				Stderr:   n.GetStderr(),
 				ExitCode: strconv.Itoa(n.GetExitCode()),
-			}
-			// Collect output variables for this step
-			if n.inner.State.OutputVariables != nil {
-				stepInfo.Outputs = n.inner.State.OutputVariables.Variables()
 			}
 			env.StepMap[n.Step().ID] = stepInfo
 		}

@@ -423,66 +423,6 @@ func TestEvalStringFields_ErrorCases(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to process map")
 }
 
-func TestExpandReferencesWithSteps_ComplexOutputs(t *testing.T) {
-	stepMap := map[string]StepInfo{
-		"step1": {
-			Outputs: map[string]string{
-				"JSON_DATA": `{
-					"users": [
-						{"id": 1, "name": "Alice"},
-						{"id": 2, "name": "Bob"}
-					],
-					"config": {
-						"timeout": 30,
-						"retries": 3
-					}
-				}`,
-				"ARRAY_DATA": `["apple", "banana", "cherry"]`,
-				"SIMPLE":     "plain text",
-			},
-		},
-	}
-
-	tests := []struct {
-		name  string
-		input string
-		want  string
-	}{
-		{
-			name:  "nested JSON path",
-			input: "${step1.outputs.JSON_DATA.users.[0].name}",
-			want:  "Alice",
-		},
-		{
-			name:  "array in output",
-			input: "${step1.outputs.ARRAY_DATA.[1]}",
-			want:  "banana",
-		},
-		{
-			name:  "simple output",
-			input: "${step1.outputs.SIMPLE}",
-			want:  "plain text",
-		},
-		{
-			name:  "config value",
-			input: "${step1.outputs.JSON_DATA.config.timeout}",
-			want:  "30",
-		},
-		{
-			name:  "direct output variable name",
-			input: "${step1.outputs.SIMPLE}",
-			want:  "plain text", // Direct output variable access
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-			got := ExpandReferencesWithSteps(ctx, tt.input, nil, stepMap)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
 
 func TestEvalOptions_Combinations(t *testing.T) {
 	// Set up environment

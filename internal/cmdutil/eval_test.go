@@ -621,12 +621,12 @@ func TestEvalStringFields_Map(t *testing.T) {
 			input: map[string]any{
 				"outer": map[string]any{
 					"inner": "$MAP_ENV",
-				},
+				}
 			},
 			want: map[string]any{
 				"outer": map[string]any{
 					"inner": "map_value",
-				},
+				}
 			},
 			wantErr: false,
 		},
@@ -653,14 +653,14 @@ func TestEvalStringFields_Map(t *testing.T) {
 					Field string
 				}{
 					Field: "$MAP_ENV",
-				},
+				}
 			},
 			want: map[string]any{
 				"struct": struct {
 					Field string
 				}{
 					Field: "map_value",
-				},
+				}
 			},
 			wantErr: false,
 		},
@@ -684,7 +684,7 @@ func TestEvalStringFields_Map(t *testing.T) {
 				"ptr": "map_value",
 			},
 			wantErr: false,
-		},
+		}
 	}
 
 	for _, tt := range tests {
@@ -716,7 +716,7 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			stepMap: map[string]StepInfo{
 				"step1": {
 					Stdout: "/tmp/step1.out",
-				},
+				}
 			},
 			want: "The output is at /tmp/step1.out",
 		},
@@ -727,7 +727,7 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			stepMap: map[string]StepInfo{
 				"step1": {
 					Stderr: "/tmp/step1.err",
-				},
+				}
 			},
 			want: "Errors at /tmp/step1.err",
 		},
@@ -738,48 +738,9 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			stepMap: map[string]StepInfo{
 				"step1": {
 					ExitCode: "0",
-				},
+				}
 			},
 			want: "Exit code: 0",
-		},
-		{
-			name:    "step output variable reference",
-			input:   "Result: ${step1.outputs.RESULT}",
-			dataMap: map[string]string{},
-			stepMap: map[string]StepInfo{
-				"step1": {
-					Outputs: map[string]string{
-						"RESULT": "success",
-					},
-				},
-			},
-			want: "Result: success",
-		},
-		{
-			name:    "step output JSON path",
-			input:   "Value: ${step1.outputs.DATA.field}",
-			dataMap: map[string]string{},
-			stepMap: map[string]StepInfo{
-				"step1": {
-					Outputs: map[string]string{
-						"DATA": `{"field": "value123"}`,
-					},
-				},
-			},
-			want: "Value: value123",
-		},
-		{
-			name:    "step output array access",
-			input:   "First item: ${step1.outputs.ARRAY.[0]}",
-			dataMap: map[string]string{},
-			stepMap: map[string]StepInfo{
-				"step1": {
-					Outputs: map[string]string{
-						"ARRAY": `["first", "second", "third"]`,
-					},
-				},
-			},
-			want: "First item: first",
 		},
 		{
 			name:    "missing step reference",
@@ -788,7 +749,7 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			stepMap: map[string]StepInfo{
 				"step1": {
 					Stdout: "/tmp/step1.out",
-				},
+				}
 			},
 			want: "Missing: ${missing_step.stdout}",
 		},
@@ -799,7 +760,7 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			stepMap: map[string]StepInfo{
 				"step1": {
 					Stdout: "",
-				},
+				}
 			},
 			want: "Empty: ${step1.stdout}",
 		},
@@ -819,23 +780,9 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			stepMap: map[string]StepInfo{
 				"step1": {
 					Stdout: "/tmp/step1.out",
-				},
+				}
 			},
 			want: "Value: from_var",
-		},
-		{
-			name:    "step output search in any output",
-			input:   "Found: ${step1.outputs.DATA2.nested_field}",
-			dataMap: map[string]string{},
-			stepMap: map[string]StepInfo{
-				"step1": {
-					Outputs: map[string]string{
-						"DATA1": `{"other": "value"}`,
-						"DATA2": `{"nested_field": "found_it"}`,
-					},
-				},
-			},
-			want: "Found: found_it",
 		},
 		{
 			name:    "dollar sign without braces",
@@ -844,7 +791,7 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			stepMap: map[string]StepInfo{
 				"step1": {
 					Stdout: "/tmp/out",
-				},
+				}
 			},
 			want: "Path: /tmp/out",
 		},
@@ -857,36 +804,10 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 					Stdout:   "/tmp/out",
 					Stderr:   "/tmp/err",
 					ExitCode: "1",
-				},
+				}
 			},
 			want: "Out: /tmp/out, Err: /tmp/err, Code: 1",
-		},
-		{
-			name:    "invalid JSON in output",
-			input:   "Value: ${step1.outputs.DATA.field}",
-			dataMap: map[string]string{},
-			stepMap: map[string]StepInfo{
-				"step1": {
-					Outputs: map[string]string{
-						"DATA": "not json",
-					},
-				},
-			},
-			want: "Value: ${step1.outputs.DATA.field}",
-		},
-		{
-			name:    "numeric array index",
-			input:   "Item: ${step1.outputs.DATA.[1]}",
-			dataMap: map[string]string{},
-			stepMap: map[string]StepInfo{
-				"step1": {
-					Outputs: map[string]string{
-						"DATA": `["zero", "one", "two"]`,
-					},
-				},
-			},
-			want: "Item: one",
-		},
+		}
 	}
 
 	for _, tt := range tests {
@@ -913,7 +834,7 @@ func TestEvalString_WithStepMap(t *testing.T) {
 				WithStepMap(map[string]StepInfo{
 					"step1": {
 						Stdout: "/tmp/output.txt",
-					},
+					}
 				}),
 			},
 			want:    "Output: /tmp/output.txt",
@@ -927,12 +848,12 @@ func TestEvalString_WithStepMap(t *testing.T) {
 				WithStepMap(map[string]StepInfo{
 					"step1": {
 						ExitCode: "0",
-					},
+					}
 				}),
 			},
 			want:    "Var: value, Step: 0",
 			wantErr: false,
-		},
+		}
 	}
 
 	for _, tt := range tests {
@@ -964,12 +885,12 @@ func TestEvalIntString_WithStepMap(t *testing.T) {
 				WithStepMap(map[string]StepInfo{
 					"step1": {
 						ExitCode: "42",
-					},
+					}
 				}),
 			},
 			want:    42,
 			wantErr: false,
-		},
+		}
 	}
 
 	for _, tt := range tests {
@@ -1003,7 +924,7 @@ func TestProcessStructFields_WithStepMap(t *testing.T) {
 			"step1": {
 				Stdout: "/tmp/out.txt",
 				Stderr: "/tmp/err.txt",
-			},
+			}
 		}),
 	)
 
@@ -1017,7 +938,7 @@ func TestProcessMap_WithStepMap(t *testing.T) {
 		"output": "${step1.stdout}",
 		"nested": map[string]any{
 			"exit_code": "${step1.exit_code}",
-		},
+		}
 	}
 
 	ctx := context.Background()
@@ -1026,7 +947,7 @@ func TestProcessMap_WithStepMap(t *testing.T) {
 			"step1": {
 				Stdout:   "/tmp/output",
 				ExitCode: "0",
-			},
+			}
 		}),
 	)
 
@@ -1073,7 +994,7 @@ func TestReplaceVars_EdgeCases(t *testing.T) {
 			template: "${FOO123}",
 			vars:     map[string]string{"FOO123": "value"},
 			want:     "value",
-		},
+		}
 	}
 
 	for _, tt := range tests {
@@ -1101,7 +1022,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 					Stdout:   "/tmp/logs/download.out",
 					Stderr:   "/tmp/logs/download.err",
 					ExitCode: "0",
-				},
+				}
 			},
 			want: "Log file is at /tmp/logs/download.out",
 		},
@@ -1114,7 +1035,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 					Stdout:   "/tmp/logs/build.out",
 					Stderr:   "/tmp/logs/build.err",
 					ExitCode: "1",
-				},
+				}
 			},
 			want: "Check errors at /tmp/logs/build.err",
 		},
@@ -1127,26 +1048,9 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 					Stdout:   "/tmp/logs/build.out",
 					Stderr:   "/tmp/logs/build.err",
 					ExitCode: "1",
-				},
+				}
 			},
 			want: "Build exited with code 1",
-		},
-		{
-			name:    "Step ID outputs reference",
-			input:   "Database host is ${config.outputs.db_host}",
-			dataMap: map[string]string{},
-			stepMap: map[string]StepInfo{
-				"config": {
-					Stdout:   "/tmp/logs/config.out",
-					Stderr:   "/tmp/logs/config.err",
-					ExitCode: "0",
-					Outputs: map[string]string{
-						"db_host": "localhost",
-						"db_port": "5432",
-					},
-				},
-			},
-			want: "Database host is localhost",
 		},
 		{
 			name:    "Multiple step references",
@@ -1158,7 +1062,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 				},
 				"build": {
 					Stderr: "/tmp/logs/build.err",
-				},
+				}
 			},
 			want: "Download log: /tmp/logs/download.out, Build errors: /tmp/logs/build.err",
 		},
@@ -1169,7 +1073,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 			stepMap: map[string]StepInfo{
 				"known": {
 					Stdout: "/tmp/logs/known.out",
-				},
+				}
 			},
 			want: "Unknown step: ${unknown.stdout}",
 		},
@@ -1180,7 +1084,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 			stepMap: map[string]StepInfo{
 				"download": {
 					Stdout: "/tmp/logs/download.out",
-				},
+				}
 			},
 			want: "Unknown prop: ${download.unknown}",
 		},
@@ -1193,23 +1097,10 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 			stepMap: map[string]StepInfo{
 				"download": {
 					Stdout: "/tmp/logs/download.out",
-				},
+				}
 			},
 			want: "Value: from-variable",
-		},
-		{
-			name:    "Nested outputs path",
-			input:   "Nested value: ${config.outputs.database.host}",
-			dataMap: map[string]string{},
-			stepMap: map[string]StepInfo{
-				"config": {
-					Outputs: map[string]string{
-						"database": `{"host": "db.example.com", "port": 5432}`,
-					},
-				},
-			},
-			want: "Nested value: db.example.com",
-		},
+		}
 	}
 
 	for _, tt := range tests {
@@ -1237,7 +1128,7 @@ func TestEvalStringWithSteps(t *testing.T) {
 			Outputs: map[string]string{
 				"result": "success",
 				"count":  "42",
-			},
+			}
 		},
 	}
 
@@ -1260,12 +1151,7 @@ func TestEvalStringWithSteps(t *testing.T) {
 			name:  "exit code reference",
 			input: "if [ ${process.exit_code} -ne 0 ]; then echo failed; fi",
 			want:  "if [ 1 -ne 0 ]; then echo failed; fi",
-		},
-		{
-			name:  "outputs reference",
-			input: "Result was ${process.outputs.result} with count ${process.outputs.count}",
-			want:  "Result was success with count 42",
-		},
+		}
 	}
 
 	for _, tt := range tests {
@@ -1297,7 +1183,7 @@ func TestEvalStringFields_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 			Stdout: "/logs/test.out",
 			Outputs: map[string]string{
 				"coverage": "85%",
-			},
+			}
 		},
 	}
 
@@ -1307,25 +1193,6 @@ func TestEvalStringFields_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 		varSets  []map[string]string
 		expected TestStruct
 	}{
-		{
-			name: "multiple variable sets with step references",
-			input: TestStruct{
-				Field1: "${VAR1}",
-				Field2: "${VAR2}",
-				Field3: "${build.stdout}",
-				Field4: "${test.outputs.coverage}",
-			},
-			varSets: []map[string]string{
-				{"VAR1": "value1"},
-				{"VAR2": "value2"},
-			},
-			expected: TestStruct{
-				Field1: "value1",
-				Field2: "value2",
-				Field3: "/logs/build.out",
-				Field4: "85%",
-			},
-		},
 		{
 			name: "three variable sets with step references",
 			input: TestStruct{
@@ -1337,14 +1204,14 @@ func TestEvalStringFields_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 			varSets: []map[string]string{
 				{"A": "alpha"},
 				{"B": "beta"},
-				{"C": "gamma"},
+				{"C": "gamma"}
 			},
 			expected: TestStruct{
 				Field1: "alpha",
 				Field2: "beta",
 				Field3: "gamma",
 				Field4: "/logs/build.err",
-			},
+			}
 		},
 		{
 			name: "step references only on last variable set",
@@ -1357,14 +1224,14 @@ func TestEvalStringFields_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 			varSets: []map[string]string{
 				{"VAR1": "first"},
 				{"VAR2": "second"},
-				{"VAR3": "third"},
+				{"VAR3": "third"}
 			},
 			expected: TestStruct{
 				Field1: "first",
 				Field2: "second",
 				Field3: "/logs/test.out",
 				Field4: "third",
-			},
+			}
 		},
 	}
 
@@ -1396,7 +1263,7 @@ func TestEvalString_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 			Stdout: "/logs/deploy.out",
 			Outputs: map[string]string{
 				"url": "https://example.com",
-			},
+			}
 		},
 	}
 
@@ -1407,15 +1274,6 @@ func TestEvalString_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 		expected string
 	}{
 		{
-			name:  "multiple vars with step reference",
-			input: "${ENV} deployment to ${REGION} - check ${deploy.outputs.url}",
-			varSets: []map[string]string{
-				{"ENV": "staging"},
-				{"REGION": "us-west-2"},
-			},
-			expected: "staging deployment to us-west-2 - check https://example.com",
-		},
-		{
 			name:  "step references processed with last variable set",
 			input: "${X} and ${Y} with log at ${deploy.stdout}",
 			varSets: []map[string]string{
@@ -1423,7 +1281,7 @@ func TestEvalString_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 				{"Z": "3"}, // Different variable, X and Y should remain from first set
 			},
 			expected: "1 and 2 with log at /logs/deploy.out",
-		},
+		}
 	}
 
 	for _, tt := range tests {
@@ -1454,132 +1312,6 @@ func TestExpandReferencesWithSteps_SearchAcrossOutputs(t *testing.T) {
 		stepMap map[string]StepInfo
 		want    string
 	}{
-		{
-			name:  "field found by searching through JSON outputs",
-			input: "Status: ${deploy.outputs.status}",
-			stepMap: map[string]StepInfo{
-				"deploy": {
-					Outputs: map[string]string{
-						"data": `{"status": "success", "code": 200}`,
-					},
-				},
-			},
-			want: "Status: success",
-		},
-		{
-			name:  "numeric field treated as array index",
-			input: "Item: ${process.outputs.2}",
-			stepMap: map[string]StepInfo{
-				"process": {
-					Outputs: map[string]string{
-						"items": `["first", "second", "third", "fourth"]`,
-					},
-				},
-			},
-			want: "Item: third",
-		},
-		{
-			name:  "field found in nested JSON structure",
-			input: "Host: ${config.outputs.database.host}",
-			stepMap: map[string]StepInfo{
-				"config": {
-					Outputs: map[string]string{
-						"app":      `{"name": "myapp", "port": 8080}`,
-						"database": `{"host": "localhost", "port": 5432}`,
-					},
-				},
-			},
-			want: "Host: localhost",
-		},
-		{
-			name:  "field not found in any output",
-			input: "Value: ${step1.outputs.nonexistent}",
-			stepMap: map[string]StepInfo{
-				"step1": {
-					Outputs: map[string]string{
-						"data1": `{"field1": "value1"}`,
-						"data2": `{"field2": "value2"}`,
-					},
-				},
-			},
-			want: "Value: <nil>",
-		},
-		{
-			name:  "field found by searching through outputs that contain JSON",
-			input: "Builder: ${build.outputs.builder}",
-			stepMap: map[string]StepInfo{
-				"build": {
-					Outputs: map[string]string{
-						"info": `{"builder": "docker", "time": "10s"}`,
-					},
-				},
-			},
-			want: "Builder: docker",
-		},
-		{
-			name:  "array access in JSON parsed output",
-			input: "First error: ${test.outputs.errors.[0]}",
-			stepMap: map[string]StepInfo{
-				"test": {
-					Outputs: map[string]string{
-						"summary": `{"passed": 10, "failed": 2}`,
-						"errors":  `["timeout in test1", "assertion failed in test2"]`,
-					},
-				},
-			},
-			want: "First error: timeout in test1",
-		},
-		{
-			name:  "complex nested path in parsed JSON",
-			input: "City: ${api.outputs.response.data.address.city}",
-			stepMap: map[string]StepInfo{
-				"api": {
-					Outputs: map[string]string{
-						"headers":  `{"content-type": "application/json"}`,
-						"response": `{"data": {"user": "john", "address": {"city": "Tokyo", "country": "Japan"}}}`,
-					},
-				},
-			},
-			want: "City: Tokyo",
-		},
-		{
-			name:  "invalid JSON in outputs - field not found",
-			input: "Value: ${step.outputs.field}",
-			stepMap: map[string]StepInfo{
-				"step": {
-					Outputs: map[string]string{
-						"data1": `not valid json`,
-						"data2": `{invalid json}`,
-					},
-				},
-			},
-			want: "Value: ${step.outputs.field}",
-		},
-		{
-			name:  "numeric index on non-array JSON",
-			input: "Value: ${step.outputs.0}",
-			stepMap: map[string]StepInfo{
-				"step": {
-					Outputs: map[string]string{
-						"config": `{"key": "value"}`,
-					},
-				},
-			},
-			want: "Value: ${step.outputs.0}",
-		},
-		{
-			name:  "search stops after finding first match",
-			input: "Name: ${step.outputs.name}",
-			stepMap: map[string]StepInfo{
-				"step": {
-					Outputs: map[string]string{
-						"user1": `{"name": "Alice", "age": 30}`,
-						"user2": `{"name": "Bob", "age": 25}`,
-					},
-				},
-			},
-			want: "Name: Alice", // Should find in first output that contains the field
-		},
 	}
 
 	for _, tt := range tests {

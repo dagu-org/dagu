@@ -2072,99 +2072,6 @@ func TestScheduler_StepIDAccess(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, string(stdoutContent), "Step 1 stdout:")
 	})
-
-	t.Run("StepOutputVariableReference", func(t *testing.T) {
-		sc := setupScheduler(t)
-
-		tmpFile := path.Join(sc.Config.LogDir, "test_output.txt")
-		defer func() { _ = os.Remove(tmpFile) }()
-
-		// Create steps where step2 uses step1's output variable
-		graph := sc.newGraph(t,
-			newStep("step1",
-				withID("producer"),
-				withCommand(fmt.Sprintf("echo 'test data' > %s && echo %s", tmpFile, tmpFile)),
-				withOutput("DATA_FILE"),
-			),
-			newStep("step2",
-				withID("consumer"),
-				withDepends("step1"),
-				withCommand("cat ${producer.outputs.DATA_FILE}"),
-			),
-		)
-
-		result := graph.Schedule(t, scheduler.StatusSuccess)
-		result.AssertNodeStatus(t, "step1", scheduler.NodeStatusSuccess)
-		result.AssertNodeStatus(t, "step2", scheduler.NodeStatusSuccess)
-
-		// Step2 should have read the file created by step1
-		node2 := result.Node(t, "step2")
-		stdoutFile := node2.GetStdout()
-		stdoutContent, err := os.ReadFile(stdoutFile)
-		require.NoError(t, err)
-		assert.Contains(t, string(stdoutContent), "test data")
-	})
-
-	t.Run("MultipleStepReferences", func(t *testing.T) {
-		sc := setupScheduler(t)
-
-		// Create a DAG with multiple step references
-		graph := sc.newGraph(t,
-			newStep("step1",
-				withID("first"),
-				withCommand("echo 'value1'"),
-				withOutput("VAR1"),
-			),
-			newStep("step2",
-				withID("second"),
-				withCommand("echo 'value2'"),
-				withOutput("VAR2"),
-			),
-			newStep("step3",
-				withID("third"),
-				withDepends("step1", "step2"),
-				withCommand("echo 'VAR1=${first.outputs.VAR1} VAR2=${second.outputs.VAR2}'"),
-			),
-		)
-
-		result := graph.Schedule(t, scheduler.StatusSuccess)
-		result.AssertNodeStatus(t, "step1", scheduler.NodeStatusSuccess)
-		result.AssertNodeStatus(t, "step2", scheduler.NodeStatusSuccess)
-		result.AssertNodeStatus(t, "step3", scheduler.NodeStatusSuccess)
-
-		// Step3 should have access to both variables
-		node3 := result.Node(t, "step3")
-		stdoutFile := node3.GetStdout()
-		stdoutContent, err := os.ReadFile(stdoutFile)
-		require.NoError(t, err)
-		assert.Contains(t, string(stdoutContent), "VAR1=value1 VAR2=value2")
-	})
-
-	t.Run("HandlerStepReferences", func(t *testing.T) {
-		sc := setupScheduler(t,
-			withOnExit(digraph.Step{
-				Name:    "cleanup",
-				ID:      "cleanup_handler",
-				Command: "echo 'Main step result: ${main.outputs.RESULT}'",
-			}),
-		)
-
-		graph := sc.newGraph(t,
-			newStep("main_step",
-				withID("main"),
-				withCommand("echo 'doing work'"),
-				withOutput("RESULT=completed"),
-			),
-		)
-
-		result := graph.Schedule(t, scheduler.StatusSuccess)
-		result.AssertNodeStatus(t, "main_step", scheduler.NodeStatusSuccess)
-
-		// The handler should have run with access to main step's output
-		// Note: In actual implementation, we'd need to check handler execution
-		// This is a simplified test showing the concept
-	})
-
 	t.Run("StepWithoutID", func(t *testing.T) {
 		sc := setupScheduler(t)
 
@@ -2182,8 +2089,8 @@ func TestScheduler_StepIDAccess(t *testing.T) {
 			newStep("step3",
 				withID("third"),
 				withDepends("step1", "step2"),
-				// Should only be able to reference step2
-				withCommand("echo 'Can reference: ${with_id.outputs.VAR}'"),
+				// Can reference step2's stdout file path
+				withCommand("echo 'Can reference: ${with_id.stdout}'"),
 			),
 		)
 
@@ -2196,7 +2103,9 @@ func TestScheduler_StepIDAccess(t *testing.T) {
 		stdoutFile := node3.GetStdout()
 		stdoutContent, err := os.ReadFile(stdoutFile)
 		require.NoError(t, err)
-		assert.Contains(t, string(stdoutContent), "Can reference: value")
+		// Should contain the path to step2's stdout file
+		assert.Contains(t, string(stdoutContent), "Can reference:")
+		assert.Contains(t, string(stdoutContent), ".out")
 	})
 
 	t.Run("StepExitCodeReference", func(t *testing.T) {

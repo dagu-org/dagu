@@ -80,25 +80,6 @@ The implementation handles outputs efficiently:
 | `${id.stderr}` | Path to stderr log file | `${download.stderr}` | Always |
 | `${id.exit_code}` | Process exit code | `${download.exit_code}` | After execution |
 
-### 5. JSON Path Compatibility
-
-When a step with ID has an output field containing JSON, it can be accessed using JSON path syntax:
-
-```yaml
-steps:
-  - name: Get Config
-    id: config
-    command: echo '{"db": {"host": "localhost", "port": 5432}}'
-    output: config_data
-  
-  - name: Connect to DB
-    command: |
-      # Access JSON via step outputs property
-      psql -h ${config.outputs.db.host} -p ${config.outputs.db.port}
-      # Access file path
-      echo "Config log saved at: ${config.stdout}"
-```
-
 ## Implementation Architecture
 
 ### Components
