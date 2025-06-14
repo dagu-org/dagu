@@ -116,15 +116,15 @@ func TestRetryExecution(t *testing.T) {
 	require.Equal(t, scheduler.NodeStatusSkipped, nodes[7].State().Status)
 }
 
-func TestFindStepByID(t *testing.T) {
+func TestExecutionGraphDependencies(t *testing.T) {
 	t.Parallel()
 
-	t.Run("FindByID", func(t *testing.T) {
-		// Create a DAG with ID-based dependencies
+	t.Run("BasicDependencies", func(t *testing.T) {
+		// Create a DAG where IDs have been resolved to names (as done by builder)
 		steps := []digraph.Step{
 			{Name: "step1", ID: "first", Command: "echo 1"},
-			{Name: "step2", ID: "second", Command: "echo 2", Depends: []string{"first"}},
-			{Name: "step3", Command: "echo 3", Depends: []string{"second", "step1"}},
+			{Name: "step2", ID: "second", Command: "echo 2", Depends: []string{"step1"}}, // ID resolved to name
+			{Name: "step3", Command: "echo 3", Depends: []string{"step2", "step1"}},      // ID resolved to name
 		}
 
 		// Create execution graph
@@ -132,28 +132,24 @@ func TestFindStepByID(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify the graph was set up correctly
-		// This tests that findStep found dependencies by both ID and name
 		require.NotNil(t, graph)
 		require.Len(t, graph.From, 2) // step1 and step2 have outgoing edges
 		require.Len(t, graph.To, 2)   // step2 and step3 have incoming edges
 	})
 
-	t.Run("PriorityCheck", func(t *testing.T) {
-		// Test that ID takes priority over name
+	t.Run("ResolvedDependencies", func(t *testing.T) {
+		// Test with dependencies already resolved by builder
+		// In this case, the builder would have resolved "init" to "setup" based on ID
 		steps := []digraph.Step{
 			{Name: "setup", ID: "init", Command: "echo setup"},
 			{Name: "init", Command: "echo init-by-name"},
-			{Name: "process", Command: "echo process", Depends: []string{"init"}},
+			{Name: "process", Command: "echo process", Depends: []string{"setup"}}, // Resolved from ID to name
 		}
 
-		// Create execution graph - should find by ID first
+		// Create execution graph
 		graph, err := scheduler.NewExecutionGraph(steps...)
 		require.NoError(t, err)
 		require.NotNil(t, graph)
-		
-		// The dependency should resolve to the step with ID "init", not name "init"
-		// We expect that "process" depends on "setup" (which has ID="init")
-		// and NOT on the step named "init"
 		
 		// Verify by checking the structure:
 		// - graph should have edges in From and To maps
@@ -174,11 +170,12 @@ func TestFindStepByID(t *testing.T) {
 func TestGraphWithMixedDependencies(t *testing.T) {
 	t.Parallel()
 
+	// Dependencies have been resolved from IDs to names by the builder
 	steps := []digraph.Step{
 		{Name: "download", ID: "dl", Command: "wget file"},
 		{Name: "extract", Command: "tar xf file"},
-		{Name: "process", ID: "proc", Command: "process data", Depends: []string{"dl", "extract"}},
-		{Name: "cleanup", Command: "rm temp", Depends: []string{"proc"}},
+		{Name: "process", ID: "proc", Command: "process data", Depends: []string{"download", "extract"}}, // IDs resolved to names
+		{Name: "cleanup", Command: "rm temp", Depends: []string{"process"}},                              // ID resolved to name
 	}
 
 	graph, err := scheduler.NewExecutionGraph(steps...)
