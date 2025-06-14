@@ -105,14 +105,15 @@ func EvalString(ctx context.Context, input string, opts ...EvalOption) (string, 
 	}
 	value := input
 
+
 	// If we have a StepMap but no variables, still need to expand step references
 	if len(options.Variables) == 0 && options.StepMap != nil {
 		value = ExpandReferencesWithSteps(ctx, value, map[string]string{}, options.StepMap)
 	} else {
 		// Process variables as before
-		for i, vars := range options.Variables {
-			// Use the new function with steps if available on the last variable set
-			if i == len(options.Variables)-1 && options.StepMap != nil {
+		for _, vars := range options.Variables {
+			// Always use ExpandReferencesWithSteps if StepMap is available
+			if options.StepMap != nil {
 				value = ExpandReferencesWithSteps(ctx, value, vars, options.StepMap)
 			} else {
 				value = ExpandReferences(ctx, value, vars)
@@ -146,9 +147,9 @@ func EvalIntString(ctx context.Context, input string, opts ...EvalOption) (int, 
 		value = ExpandReferencesWithSteps(ctx, value, map[string]string{}, options.StepMap)
 	} else {
 		// Process variables as before
-		for i, vars := range options.Variables {
-			// Use the new function with steps if available on the last variable set
-			if i == len(options.Variables)-1 && options.StepMap != nil {
+		for _, vars := range options.Variables {
+			// Always use ExpandReferencesWithSteps if StepMap is available
+			if options.StepMap != nil {
 				value = ExpandReferencesWithSteps(ctx, value, vars, options.StepMap)
 			} else {
 				value = ExpandReferences(ctx, value, vars)
@@ -224,9 +225,9 @@ func processStructFields(ctx context.Context, v reflect.Value, opts *EvalOptions
 				value = ExpandReferencesWithSteps(ctx, value, map[string]string{}, opts.StepMap)
 			} else {
 				// Process variables as before
-				for i, vars := range opts.Variables {
-					// Use the new function with steps if available on the last variable set
-					if i == len(opts.Variables)-1 && opts.StepMap != nil {
+				for _, vars := range opts.Variables {
+					// Always use ExpandReferencesWithSteps if StepMap is available
+					if opts.StepMap != nil {
 						value = ExpandReferencesWithSteps(ctx, value, vars, opts.StepMap)
 					} else {
 						value = ExpandReferences(ctx, value, vars)
@@ -303,9 +304,9 @@ func processMap(ctx context.Context, v reflect.Value, opts *EvalOptions) (reflec
 				strVal = ExpandReferencesWithSteps(ctx, strVal, map[string]string{}, opts.StepMap)
 			} else {
 				// Process variables as before
-				for i, vars := range opts.Variables {
-					// Use the new function with steps if available on the last variable set
-					if i == len(opts.Variables)-1 && opts.StepMap != nil {
+				for _, vars := range opts.Variables {
+					// Always use ExpandReferencesWithSteps if StepMap is available
+					if opts.StepMap != nil {
 						strVal = ExpandReferencesWithSteps(ctx, strVal, vars, opts.StepMap)
 					} else {
 						strVal = ExpandReferences(ctx, strVal, vars)
