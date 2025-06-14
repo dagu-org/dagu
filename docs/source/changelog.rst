@@ -3,6 +3,28 @@
 Changelog
 =========
 
+v1.17.0 (2025-05-30)
+----------
+
+- **Step ID field**: Added optional ``id`` field to steps for creating short identifiers that can be used in variable references and dependencies. This improves readability when referencing step properties:
+
+  .. code-block:: yaml
+
+    steps:
+      - name: extract customer data from database
+        id: extract  # Short identifier
+        command: python extract.py
+        output: DATA
+      
+      - name: process data
+        command: |
+          echo "Exit code: ${extract.exit_code}"
+          echo "Output: ${extract.outputs.DATA}"
+        depends:
+          - extract  # Can use ID in dependencies
+
+  Available properties: ``${id.stdout}``, ``${id.stderr}``, ``${id.exit_code}``, ``${id.outputs.VARNAME}``
+
 v1.16.0 (2025-01-09)
 ---------------------
 
