@@ -387,7 +387,6 @@ You can assign short identifiers to steps and use them to reference step propert
         echo "Exit code: ${extract.exit_code}"
         echo "Stdout path: ${extract.stdout}"
         echo "Stderr path: ${extract.stderr}"
-        echo "Output data: ${extract.outputs.DATA}"
       depends:
         - validate
 
@@ -395,7 +394,6 @@ Available step properties when using ID references:
 - ``${id.stdout}``: Path to stdout file
 - ``${id.stderr}``: Path to stderr file  
 - ``${id.exit_code}``: Exit code of the step
-- ``${id.outputs.VARNAME}``: Value of output variable VARNAME
 
 Conditional Execution
 ------------------
