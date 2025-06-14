@@ -144,7 +144,7 @@ func TestScheduler(t *testing.T) {
 			successStep("3", "2"),
 		)
 
-		result := graph.Schedule(t, scheduler.StatusPartialSuccess)
+		result := graph.Schedule(t, scheduler.StatusSuccess)
 
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
 		result.AssertNodeStatus(t, "2", scheduler.NodeStatusSkipped)

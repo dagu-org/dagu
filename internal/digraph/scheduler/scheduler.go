@@ -716,49 +716,47 @@ func (sc *Scheduler) isSucceed(g *ExecutionGraph) bool {
 	return true
 }
 
-// isPartialSuccess checks if the DAG completed with some failures or skips that were allowed to continue.
-// This represents scenarios where primary work was completed but non-critical errors occurred or optional steps were skipped.
+// isPartialSuccess checks if the DAG completed with some failures that were allowed to continue.
+// This represents scenarios where execution continued despite failures due to continueOn conditions.
 func (sc *Scheduler) isPartialSuccess(g *ExecutionGraph) bool {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
 
-	hasErrors := false
-	hasSkippedWithContinue := false
-	hasSuccessOrSkipped := false
+	hasFailuresWithContinueOn := false
+	hasSuccessfulNodes := false
 
+	// First pass: check if any failed node is NOT allowed to continue
+	// If so, this is an error, not partial success
 	for _, node := range g.nodes {
-		nodeStatus := node.State().Status
-
-		switch nodeStatus {
-		case NodeStatusSuccess:
-			hasSuccessOrSkipped = true
-		case NodeStatusSkipped:
-			hasSuccessOrSkipped = true
-			// Check if this skip was intentional (with continueOn.skipped = true)
-			if node.shouldContinue(context.Background()) {
-				hasSkippedWithContinue = true
-			}
-		case NodeStatusError:
-			// Check if this error node was allowed to continue
-			if node.shouldContinue(context.Background()) {
-				hasErrors = true
-			} else {
-				// If any error node was not allowed to continue, this is not partial success
+		if node.State().Status == NodeStatusError {
+			if !node.shouldContinue(context.Background()) {
+				// Found a failed node that was NOT allowed to continue
+				// This disqualifies the DAG from being partial success
 				return false
 			}
-		case NodeStatusCancel:
-			// Cancelled nodes prevent partial success
-			return false
-		case NodeStatusRunning, NodeStatusNone:
-			// DAG is not finished yet
-			return false
 		}
 	}
 
-	// Partial success occurs when:
-	// 1. There are successful/skipped nodes AND error nodes that were allowed to continue, OR
-	// 2. There are nodes that were skipped with continueOn.skipped = true (indicating optional work was not completed)
-	return (hasSuccessOrSkipped && hasErrors) || hasSkippedWithContinue
+	// Second pass: check for partial success conditions
+	for _, node := range g.nodes {
+		switch node.State().Status {
+		case NodeStatusSuccess:
+			hasSuccessfulNodes = true
+		case NodeStatusError:
+			if node.shouldContinue(context.Background()) && !node.shouldMarkSuccess(context.Background()) {
+				hasFailuresWithContinueOn = true
+			}
+		case NodeStatusNone, NodeStatusRunning, NodeStatusCancel, NodeStatusSkipped:
+			// These statuses don't affect partial success determination, but are needed for linter
+		}
+	}
+
+	// Partial success requires:
+	// 1. At least one successful node (some work was actually completed)
+	// 2. At least one failed node with continueOn (some non-critical failures)
+	// 3. No failed nodes without continueOn (checked in first pass)
+	// Note: Skipped nodes alone do not count as successful completion
+	return hasSuccessfulNodes && hasFailuresWithContinueOn
 }
 
 func (sc *Scheduler) isTimeout(startedAt time.Time) bool {
