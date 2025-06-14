@@ -5,9 +5,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -27,13 +29,13 @@ import (
 // outputCapture handles concurrent reading from a pipe to avoid deadlocks
 // when output exceeds the pipe buffer size (typically 64KB)
 type outputCapture struct {
-	mu              sync.Mutex
-	buffer          bytes.Buffer
-	done            chan struct{}
-	err             error
-	maxSize         int64
-	bytesRead       int64
-	exceededLimit   bool
+	mu            sync.Mutex
+	buffer        bytes.Buffer
+	done          chan struct{}
+	err           error
+	maxSize       int64
+	bytesRead     int64
+	exceededLimit bool
 }
 
 // newOutputCapture creates a new output capture handler
@@ -48,7 +50,7 @@ func newOutputCapture(maxSize int64) *outputCapture {
 func (oc *outputCapture) start(ctx context.Context, reader io.Reader) {
 	go func() {
 		defer close(oc.done)
-		
+
 		// Read in chunks to detect when we exceed the limit
 		buf := make([]byte, 8192) // 8KB chunks
 		for {
@@ -64,7 +66,7 @@ func (oc *outputCapture) start(ctx context.Context, reader io.Reader) {
 					}
 					oc.exceededLimit = true
 					oc.mu.Unlock()
-					
+
 					// Continue reading to prevent pipe deadlock but discard the data
 					_, _ = io.Copy(io.Discard, reader)
 					break
@@ -73,7 +75,7 @@ func (oc *outputCapture) start(ctx context.Context, reader io.Reader) {
 				oc.bytesRead += int64(n)
 				oc.mu.Unlock()
 			}
-			
+
 			if err != nil {
 				if err != io.EOF {
 					oc.mu.Lock()
@@ -90,18 +92,18 @@ func (oc *outputCapture) start(ctx context.Context, reader io.Reader) {
 // wait waits for the reading to complete and returns the captured output
 func (oc *outputCapture) wait() (string, error) {
 	<-oc.done
-	
+
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
-	
+
 	if oc.err != nil {
 		return "", oc.err
 	}
-	
+
 	if oc.exceededLimit {
 		return oc.buffer.String(), fmt.Errorf("output exceeded maximum size limit of %d bytes", oc.maxSize)
 	}
-	
+
 	return oc.buffer.String(), nil
 }
 
@@ -222,8 +224,13 @@ func (n *Node) Execute(ctx context.Context) error {
 		n.SetError(err)
 
 		// Set the exit code if the command implements ExitCoder
+		var exitErr *exec.ExitError
 		if cmd, ok := cmd.(executor.ExitCoder); ok {
 			exitCode = cmd.ExitCode()
+		} else if n.Error() != nil && errors.As(n.Error(), &exitErr) {
+			exitCode = exitErr.ExitCode()
+		} else if code, found := parseExitCodeFromError(n.Error().Error()); found {
+			exitCode = code
 		} else {
 			exitCode = 1
 		}
@@ -865,7 +872,7 @@ type OutputCoordinator struct {
 	outputReader   *os.File
 	outputData     string
 	outputCaptured bool
-	maxOutputSize  int64 // Max output size in bytes
+	maxOutputSize  int64          // Max output size in bytes
 	outputCapture  *outputCapture // Concurrent output capture handler
 }
 
@@ -917,16 +924,16 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 		logger.Debug(ctx, "Created new output pipes", "step", data.Step.Name, "outputVar", data.Step.Output)
 		// Reset the captured flag to allow new output capture for retry
 		oc.outputCaptured = false
-		
+
 		// Get max output size from DAG configuration, default to 1MB
 		oc.maxOutputSize = 1024 * 1024 // 1MB default
 		if env := digraph.GetEnv(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
 			oc.maxOutputSize = int64(env.DAG.MaxOutputSize)
 		}
-		
+
 		// Reset the output data to empty
 		oc.outputData = ""
-		
+
 		// Start concurrent reading to prevent deadlock
 		oc.outputCapture = newOutputCapture(oc.maxOutputSize)
 		oc.outputCapture.start(ctx, oc.outputReader)
@@ -963,20 +970,20 @@ func (oc *OutputCoordinator) closeResources(_ context.Context) error {
 			}
 		}
 	}
-	
+
 	// Close the output writer first to signal EOF to any readers
 	if oc.outputWriter != nil {
 		_ = oc.outputWriter.Close()
 		oc.outputWriter = nil
 	}
-	
+
 	// Wait for concurrent capture to finish if it's running
 	if oc.outputCapture != nil && !oc.outputCaptured {
 		if _, err := oc.outputCapture.wait(); err != nil {
 			lastErr = err
 		}
 	}
-	
+
 	for _, f := range []*os.File{oc.stdoutFile, oc.stderrFile, oc.stdoutRedirectFile, oc.StderrRedirectFile, oc.outputReader} {
 		if f != nil {
 			if err := f.Sync(); err != nil {
@@ -1103,7 +1110,7 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 
 		// Mark as captured for caching
 		oc.outputCaptured = true
-		
+
 		// Close the reader
 		if oc.outputReader != nil {
 			if err := oc.outputReader.Close(); err != nil {

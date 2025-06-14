@@ -19,7 +19,7 @@ func (a *API) initMetrics() {
 
 	collector := metrics.NewCollector(
 		build.Version,
-		"",  // Build date not available in current build package
+		"",                           // Build date not available in current build package
 		scheduler.IsSchedulerRunning, // Use global scheduler status
 		a.dagStore,
 		a.dagRunStore,
@@ -56,4 +56,3 @@ func (r *MetricsTextResponse) VisitGetMetricsResponse(w http.ResponseWriter) err
 
 	return nil
 }
-

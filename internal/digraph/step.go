@@ -10,6 +10,8 @@ import (
 // A step is created from parsing a DAG file written in YAML.
 // It marshals/unmarshals to/from JSON when it is saved in the execution history.
 type Step struct {
+	// ID is the optional unique identifier for the step.
+	ID string `json:"id,omitempty"`
 	// Name is the name of the step.
 	Name string `json:"name"`
 	// Description is the description of the step. This is optional.

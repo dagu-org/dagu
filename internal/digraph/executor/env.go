@@ -39,6 +39,7 @@ type Env struct {
 	Variables *SyncMap
 	Step      digraph.Step
 	Envs      map[string]string
+	StepMap   map[string]cmdutil.StepInfo // Map of step ID to step info
 }
 
 // NewEnv creates a new execution context with the given step.
@@ -50,6 +51,7 @@ func NewEnv(ctx context.Context, step digraph.Step) Env {
 		Envs: map[string]string{
 			digraph.EnvKeyDAGRunStepName: step.Name,
 		},
+		StepMap: make(map[string]cmdutil.StepInfo),
 	}
 }
 
@@ -115,6 +117,10 @@ func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOptio
 	opts = append(opts, cmdutil.WithVariables(env.Envs))
 	opts = append(opts, cmdutil.WithVariables(e.Envs))
 	opts = append(opts, cmdutil.WithVariables(e.Variables.Variables()))
+	// Add step map if available
+	if len(e.StepMap) > 0 {
+		opts = append(opts, cmdutil.WithStepMap(e.StepMap))
+	}
 	return cmdutil.EvalString(ctx, s, opts...)
 }
 

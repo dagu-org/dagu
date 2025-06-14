@@ -583,7 +583,7 @@ steps:
     output: OUT
 
   - name: use output
-    command: echo ${OUT.outputs.result}
+    command: echo ${OUT.outputs.RESULT}
 ```
 
 And here is the sub-DAG:
@@ -592,7 +592,7 @@ And here is the sub-DAG:
 steps:
   - name: sub-dag
     command: echo "Hello from sub-dag"
-    output: result
+    output: RESULT
 ```
 
 THe parent DAG will call the sub-DAG and write the output to the log (stdout).

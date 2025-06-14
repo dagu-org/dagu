@@ -254,6 +254,7 @@ func (g *ExecutionGraph) addEdge(from, to *Node) {
 }
 
 func (g *ExecutionGraph) findStep(name string) (*Node, error) {
+	// Dependencies are always resolved to step names during build phase
 	for _, n := range g.nodeByID {
 		if n.Name() == name {
 			return n, nil

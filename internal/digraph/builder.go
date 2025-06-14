@@ -583,10 +583,34 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 	}
 }
 
+// stepIDPattern defines the valid format for step IDs
+var stepIDPattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_-]*$`)
+
+// isValidStepID checks if the given ID matches the required pattern
+func isValidStepID(id string) bool {
+	return stepIDPattern.MatchString(id)
+}
+
+// isReservedWord checks if the given ID is a reserved word
+func isReservedWord(id string) bool {
+	reservedWords := map[string]bool{
+		"env":     true,
+		"params":  true,
+		"args":    true,
+		"stdout":  true,
+		"stderr":  true,
+		"output":  true,
+		"outputs": true,
+	}
+	return reservedWords[strings.ToLower(id)]
+}
+
 // validateSteps validates the steps in the DAG.
 func validateSteps(ctx BuildContext, spec *definition, dag *DAG) error {
-	// No duplicate step names are allowed.
+	// First pass: collect all names and IDs
 	stepNames := make(map[string]struct{})
+	stepIDs := make(map[string]struct{})
+
 	for _, step := range dag.Steps {
 		if step.Name == "" {
 			return wrapError("steps", step, ErrStepNameRequired)
@@ -596,6 +620,83 @@ func validateSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 			return wrapError("steps", step.Name, ErrStepNameDuplicate)
 		}
 		stepNames[step.Name] = struct{}{}
+
+		// Collect IDs if present
+		if step.ID != "" {
+			// Check ID format
+			if !isValidStepID(step.ID) {
+				return wrapError("steps", step.ID, fmt.Errorf("invalid step ID format: must match pattern ^[a-zA-Z][a-zA-Z0-9_-]*$"))
+			}
+
+			// Check for duplicate IDs
+			if _, exists := stepIDs[step.ID]; exists {
+				return wrapError("steps", step.ID, fmt.Errorf("duplicate step ID: %s", step.ID))
+			}
+			stepIDs[step.ID] = struct{}{}
+
+			// Check for reserved words
+			if isReservedWord(step.ID) {
+				return wrapError("steps", step.ID, fmt.Errorf("step ID '%s' is a reserved word", step.ID))
+			}
+		}
+	}
+
+	// Second pass: check for conflicts between names and IDs
+	for _, step := range dag.Steps {
+		if step.ID != "" {
+			// Check that ID doesn't conflict with any step name
+			if _, exists := stepNames[step.ID]; exists && step.ID != step.Name {
+				return wrapError("steps", step.ID, fmt.Errorf("step ID '%s' conflicts with another step's name", step.ID))
+			}
+		}
+
+		// Check that name doesn't conflict with any ID (unless it's the same step)
+		if _, exists := stepIDs[step.Name]; exists {
+			// Find if this is the same step
+			sameStep := false
+			for _, s := range dag.Steps {
+				if s.Name == step.Name && s.ID == step.Name {
+					sameStep = true
+					break
+				}
+			}
+			if !sameStep {
+				return wrapError("steps", step.Name, fmt.Errorf("step name '%s' conflicts with another step's ID", step.Name))
+			}
+		}
+	}
+
+	// Third pass: resolve step IDs to names in depends fields
+	if err := resolveStepDependencies(dag); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// resolveStepDependencies resolves step IDs to step names in the depends field
+func resolveStepDependencies(dag *DAG) error {
+	// Build a map from ID to step name for quick lookup
+	idToName := make(map[string]string)
+	for i := range dag.Steps {
+		step := &dag.Steps[i]
+		if step.ID != "" {
+			idToName[step.ID] = step.Name
+		}
+	}
+
+	// Resolve dependencies for each step
+	for i := range dag.Steps {
+		step := &dag.Steps[i]
+		for j, dep := range step.Depends {
+			// Check if this dependency is an ID that needs to be resolved
+			if name, exists := idToName[dep]; exists {
+				// Replace the ID with the actual step name
+				step.Depends[j] = name
+			}
+			// If not found in idToName, it's either already a name or will be caught
+			// as an error during dependency validation
+		}
 	}
 
 	return nil
@@ -666,6 +767,7 @@ func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
 func buildStep(ctx BuildContext, def stepDef) (*Step, error) {
 	step := &Step{
 		Name:           def.Name,
+		ID:             def.ID,
 		Description:    def.Description,
 		Shell:          def.Shell,
 		ShellPackages:  def.Packages,
