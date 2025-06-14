@@ -1277,6 +1277,172 @@ func TestEvalStringWithSteps(t *testing.T) {
 	}
 }
 
+// TestEvalStringFields_MultipleVariablesWithStepMapOnLast tests the specific case
+// where we have multiple variable sets and StepMap is applied only with the last set
+func TestEvalStringFields_MultipleVariablesWithStepMapOnLast(t *testing.T) {
+	type TestStruct struct {
+		Field1 string
+		Field2 string
+		Field3 string
+		Field4 string
+	}
+
+	stepMap := map[string]StepInfo{
+		"build": {
+			Stdout:   "/logs/build.out",
+			Stderr:   "/logs/build.err",
+			ExitCode: "0",
+		},
+		"test": {
+			Stdout: "/logs/test.out",
+			Outputs: map[string]string{
+				"coverage": "85%",
+			},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		input    TestStruct
+		varSets  []map[string]string
+		expected TestStruct
+	}{
+		{
+			name: "multiple variable sets with step references",
+			input: TestStruct{
+				Field1: "${VAR1}",
+				Field2: "${VAR2}",
+				Field3: "${build.stdout}",
+				Field4: "${test.outputs.coverage}",
+			},
+			varSets: []map[string]string{
+				{"VAR1": "value1"},
+				{"VAR2": "value2"},
+			},
+			expected: TestStruct{
+				Field1: "value1",
+				Field2: "value2",
+				Field3: "/logs/build.out",
+				Field4: "85%",
+			},
+		},
+		{
+			name: "three variable sets with step references",
+			input: TestStruct{
+				Field1: "${A}",
+				Field2: "${B}",
+				Field3: "${C}",
+				Field4: "${build.stderr}",
+			},
+			varSets: []map[string]string{
+				{"A": "alpha"},
+				{"B": "beta"},
+				{"C": "gamma"},
+			},
+			expected: TestStruct{
+				Field1: "alpha",
+				Field2: "beta",
+				Field3: "gamma",
+				Field4: "/logs/build.err",
+			},
+		},
+		{
+			name: "step references only on last variable set",
+			input: TestStruct{
+				Field1: "${VAR1}",
+				Field2: "${VAR2}",
+				Field3: "${test.stdout}",
+				Field4: "${VAR3}",
+			},
+			varSets: []map[string]string{
+				{"VAR1": "first"},
+				{"VAR2": "second"},
+				{"VAR3": "third"},
+			},
+			expected: TestStruct{
+				Field1: "first",
+				Field2: "second",
+				Field3: "/logs/test.out",
+				Field4: "third",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			// Build options with multiple variable sets
+			opts := []EvalOption{}
+			for _, vars := range tt.varSets {
+				opts = append(opts, WithVariables(vars))
+			}
+			// Add StepMap as the last option
+			opts = append(opts, WithStepMap(stepMap))
+
+			result, err := EvalStringFields(ctx, tt.input, opts...)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestEvalString_MultipleVariablesWithStepMapOnLast tests EvalString with multiple variable sets
+func TestEvalString_MultipleVariablesWithStepMapOnLast(t *testing.T) {
+	ctx := context.Background()
+
+	stepMap := map[string]StepInfo{
+		"deploy": {
+			Stdout: "/logs/deploy.out",
+			Outputs: map[string]string{
+				"url": "https://example.com",
+			},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		input    string
+		varSets  []map[string]string
+		expected string
+	}{
+		{
+			name:  "multiple vars with step reference",
+			input: "${ENV} deployment to ${REGION} - check ${deploy.outputs.url}",
+			varSets: []map[string]string{
+				{"ENV": "staging"},
+				{"REGION": "us-west-2"},
+			},
+			expected: "staging deployment to us-west-2 - check https://example.com",
+		},
+		{
+			name:  "step references processed with last variable set",
+			input: "${X} and ${Y} with log at ${deploy.stdout}",
+			varSets: []map[string]string{
+				{"X": "1", "Y": "2"},
+				{"Z": "3"}, // Different variable, X and Y should remain from first set
+			},
+			expected: "1 and 2 with log at /logs/deploy.out",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Build options with multiple variable sets
+			opts := []EvalOption{}
+			for _, vars := range tt.varSets {
+				opts = append(opts, WithVariables(vars))
+			}
+			// Add StepMap
+			opts = append(opts, WithStepMap(stepMap))
+
+			result, err := EvalString(ctx, tt.input, opts...)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 // Helper function to create string pointer
 func ptrString(s string) *string {
 	return &s
