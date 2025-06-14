@@ -443,23 +443,33 @@ func (sc *Scheduler) setupEnviron(ctx context.Context, graph *ExecutionGraph, no
 		}
 	}
 
+	// Load output variables from predecessor nodes (dependencies)
+	// This traverses backwards from the current node to find all nodes it depends on
 	curr := node.id
 	visited := make(map[int]struct{})
-	queue := []int{curr}
+	queue := []int{}
+
+	// Start with direct dependencies (nodes this node depends on)
+	queue = append(queue, graph.To[curr]...)
+
+	// Traverse all predecessor nodes
 	for len(queue) > 0 {
-		curr, queue = queue[0], queue[1:]
-		if _, ok := visited[curr]; ok {
+		predID := queue[0]
+		queue = queue[1:]
+
+		if _, ok := visited[predID]; ok {
 			continue
 		}
-		visited[curr] = struct{}{}
-		queue = append(queue, graph.To[curr]...)
+		visited[predID] = struct{}{}
 
-		node := graph.nodeByID[curr]
-		if node.inner.State.OutputVariables == nil {
-			continue
+		// Add this node's dependencies to the queue
+		queue = append(queue, graph.To[predID]...)
+
+		// Load output variables from this predecessor node
+		predNode := graph.nodeByID[predID]
+		if predNode != nil && predNode.inner.State.OutputVariables != nil {
+			env.LoadOutputVariables(predNode.inner.State.OutputVariables)
 		}
-
-		env.LoadOutputVariables(node.inner.State.OutputVariables)
 	}
 
 	return executor.WithEnv(ctx, env)

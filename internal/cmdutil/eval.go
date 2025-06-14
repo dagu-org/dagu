@@ -498,16 +498,38 @@ func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[st
 
 		// First try regular variable lookup
 		jsonStr, ok := dataMap[name]
+		varExists := ok // Track if a variable with this name exists
 		if !ok {
 			// Find the variable from the environment
 			val, ok := os.LookupEnv(name)
 			if ok {
 				jsonStr = val
+				varExists = true
 			} else {
 				// Not found in variables or environment, check if it's a step ID
+				
+				// Special case: if this step has an output variable with the same name,
+				// and we're trying to access step properties, return <nil> to indicate
+				// that variables take precedence
+				if stepMap != nil {
+					if stepInfo, ok := stepMap[name]; ok {
+						if _, hasOutput := stepInfo.Outputs[name]; hasOutput {
+							switch path {
+							case ".stdout", ".stderr", ".exit_code":
+								return "<nil>"
+							default:
+								if strings.HasPrefix(path, ".outputs.") {
+									return "<nil>"
+								}
+							}
+						}
+					}
+				}
+				
 				return handleStepProperty()
 			}
 		}
+		
 
 		// Try to parse it as JSON and evaluate path
 		var raw any
@@ -528,7 +550,23 @@ func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[st
 		iter := query.Run(raw)
 		v, ok := iter.Next()
 		if !ok {
-			// No result from JSON query, check if it's a step ID property
+			// No result from JSON query
+			// Special case: if this is a step property access (.stdout, .stderr, etc)
+			// and the variable exists (even if it doesn't have this field), return <nil>
+			// to indicate the variable takes precedence
+			if varExists && stepMap != nil {
+				if _, stepExists := stepMap[name]; stepExists {
+					switch path {
+					case ".stdout", ".stderr", ".exit_code":
+						// Check if this step has an output variable with the same name
+						if stepInfo, ok := stepMap[name]; ok {
+							if _, hasOutput := stepInfo.Outputs[name]; hasOutput {
+								return "<nil>"
+							}
+						}
+					}
+				}
+			}
 			return handleStepProperty()
 		}
 
