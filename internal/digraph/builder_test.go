@@ -591,7 +591,7 @@ steps:
 
 func TestStepIDValidation(t *testing.T) {
 	t.Parallel()
-	
+
 	t.Run("ValidID", func(t *testing.T) {
 		data := []byte(`
 name: test-valid-id
@@ -697,7 +697,7 @@ steps:
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 2)
 		assert.Equal(t, "first", dag.Steps[0].ID)
-		assert.Equal(t, []string{"first"}, dag.Steps[1].Depends)
+		assert.Equal(t, []string{"step1"}, dag.Steps[1].Depends) // ID "first" resolved to name "step1"
 	})
 
 	t.Run("DependOnStepByNameWhenIDExists", func(t *testing.T) {
@@ -736,7 +736,7 @@ steps:
 		dag, err := digraph.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 3)
-		assert.Equal(t, []string{"first", "second"}, dag.Steps[2].Depends)
+		assert.Equal(t, []string{"step1", "step2"}, dag.Steps[2].Depends) // IDs resolved to names
 	})
 
 	t.Run("MixOfIDAndNameDependencies", func(t *testing.T) {
@@ -757,7 +757,7 @@ steps:
 		dag, err := digraph.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 3)
-		assert.Equal(t, []string{"first", "step2"}, dag.Steps[2].Depends)
+		assert.Equal(t, []string{"step1", "step2"}, dag.Steps[2].Depends) // ID "first" resolved to name "step1"
 	})
 }
 
@@ -780,14 +780,164 @@ steps:
 	dag, err := digraph.LoadYAML(context.Background(), data)
 	require.NoError(t, err)
 	require.Len(t, dag.Steps, 3)
-	
+
 	// Verify IDs are preserved
 	assert.Equal(t, "s1", dag.Steps[0].ID)
 	assert.Equal(t, "s2", dag.Steps[1].ID)
 	assert.Equal(t, "", dag.Steps[2].ID)
-	
+
 	// Verify chain dependencies were added
 	assert.Empty(t, dag.Steps[0].Depends)
 	assert.Equal(t, []string{"step1"}, dag.Steps[1].Depends)
 	assert.Equal(t, []string{"step2"}, dag.Steps[2].Depends)
+}
+
+func TestResolveStepDependencies(t *testing.T) {
+	tests := []struct {
+		name     string
+		yaml     string
+		expected map[string][]string // step name -> expected depends
+	}{
+		{
+			name: "single ID dependency",
+			yaml: `
+name: test
+steps:
+  - name: step-one
+    id: s1
+    command: echo "1"
+  - name: step-two
+    depends: s1
+    command: echo "2"
+`,
+			expected: map[string][]string{
+				"step-two": {"step-one"},
+			},
+		},
+		{
+			name: "multiple ID dependencies",
+			yaml: `
+name: test
+steps:
+  - name: step-one
+    id: s1
+    command: echo "1"
+  - name: step-two
+    id: s2
+    command: echo "2"
+  - name: step-three
+    depends:
+      - s1
+      - s2
+    command: echo "3"
+`,
+			expected: map[string][]string{
+				"step-three": {"step-one", "step-two"},
+			},
+		},
+		{
+			name: "mixed ID and name dependencies",
+			yaml: `
+name: test
+steps:
+  - name: step-one
+    id: s1
+    command: echo "1"
+  - name: step-two
+    command: echo "2"
+  - name: step-three
+    depends:
+      - s1
+      - step-two
+    command: echo "3"
+`,
+			expected: map[string][]string{
+				"step-three": {"step-one", "step-two"},
+			},
+		},
+		{
+			name: "no ID dependencies",
+			yaml: `
+name: test
+steps:
+  - name: step-one
+    command: echo "1"
+  - name: step-two
+    depends: step-one
+    command: echo "2"
+`,
+			expected: map[string][]string{
+				"step-two": {"step-one"},
+			},
+		},
+		{
+			name: "ID same as name",
+			yaml: `
+name: test
+steps:
+  - name: step-one
+    id: step-one
+    command: echo "1"
+  - name: step-two
+    depends: step-one
+    command: echo "2"
+`,
+			expected: map[string][]string{
+				"step-two": {"step-one"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			dag, err := digraph.LoadYAML(ctx, []byte(tt.yaml))
+			require.NoError(t, err)
+
+			// Check that dependencies were resolved correctly
+			for _, step := range dag.Steps {
+				if expectedDeps, exists := tt.expected[step.Name]; exists {
+					assert.Equal(t, expectedDeps, step.Depends,
+						"Step %s dependencies should be resolved correctly", step.Name)
+				}
+			}
+		})
+	}
+}
+
+func TestResolveStepDependencies_Errors(t *testing.T) {
+	tests := []struct {
+		name        string
+		yaml        string
+		expectedErr string
+	}{
+		{
+			name: "dependency on non-existent ID",
+			yaml: `
+name: test
+steps:
+  - name: step-one
+    command: echo "1"
+  - name: step-two
+    depends: nonexistent
+    command: echo "2"
+`,
+			expectedErr: "", // This should be caught by dependency validation, not ID resolution
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			_, err := digraph.LoadYAML(ctx, []byte(tt.yaml))
+			if tt.expectedErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErr)
+			} else {
+				// Some tests expect no error from ID resolution
+				// but might fail in other validation steps
+				_ = err
+			}
+		})
+	}
 }

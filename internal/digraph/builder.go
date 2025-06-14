@@ -666,6 +666,39 @@ func validateSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 		}
 	}
 
+	// Third pass: resolve step IDs to names in depends fields
+	if err := resolveStepDependencies(dag); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// resolveStepDependencies resolves step IDs to step names in the depends field
+func resolveStepDependencies(dag *DAG) error {
+	// Build a map from ID to step name for quick lookup
+	idToName := make(map[string]string)
+	for i := range dag.Steps {
+		step := &dag.Steps[i]
+		if step.ID != "" {
+			idToName[step.ID] = step.Name
+		}
+	}
+
+	// Resolve dependencies for each step
+	for i := range dag.Steps {
+		step := &dag.Steps[i]
+		for j, dep := range step.Depends {
+			// Check if this dependency is an ID that needs to be resolved
+			if name, exists := idToName[dep]; exists {
+				// Replace the ID with the actual step name
+				step.Depends[j] = name
+			}
+			// If not found in idToName, it's either already a name or will be caught
+			// as an error during dependency validation
+		}
+	}
+
 	return nil
 }
 
