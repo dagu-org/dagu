@@ -47,6 +47,11 @@ function StatusChip({ status, children, size = 'md' }: Props) {
       borderColorClass = 'border-[plum] dark:border-[mediumpurple]';
       textColorClass = 'text-[purple] dark:text-[plum]';
       break;
+    case Status.PartialSuccess: // partial success -> orange/amber
+      bgColorClass = 'bg-[rgba(251,146,60,0.1)] dark:bg-[rgba(245,158,11,0.2)]';
+      borderColorClass = 'border-[orange] dark:border-[#d97706]';
+      textColorClass = 'text-[#ea580c] dark:text-[#f59e0b]';
+      break;
     default: // Fallback to gray for any other status (including undefined)
       bgColorClass =
         'bg-[rgba(128,128,128,0.1)] dark:bg-[rgba(169,169,169,0.2)]';

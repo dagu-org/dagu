@@ -71,7 +71,7 @@ func (r *reporter) send(ctx context.Context, dag *digraph.DAG, status models.DAG
 			attachments := addAttachments(dag.ErrorMail.AttachLogs, status.Nodes)
 			return r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
 		}
-	} else if status.Status == scheduler.StatusSuccess {
+	} else if status.Status == scheduler.StatusSuccess || status.Status == scheduler.StatusPartialSuccess {
 		if dag.MailOn != nil && dag.MailOn.Success && dag.InfoMail != nil {
 			fromAddress := dag.InfoMail.From
 			toAddresses := []string{dag.InfoMail.To}
@@ -194,6 +194,7 @@ func renderHTML(nodes []*models.Node) string {
         .status-failed { color: #dc2626; font-weight: 500; }
         .status-running { color: #2563eb; font-weight: 500; }
         .status-skipped { color: #6b7280; font-weight: 500; }
+        .status-partial-success { color: #ea580c; font-weight: 500; }
         .row-number { 
             background-color: #f1f5f9; 
             font-weight: 600; 
@@ -250,6 +251,8 @@ func renderHTML(nodes []*models.Node) string {
 			statusClass = "status-running"
 		case "skipped":
 			statusClass = "status-skipped"
+		case "partial success":
+			statusClass = "status-partial-success"
 		}
 		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"%s\">%s</td>", statusClass, status))
 

@@ -2230,7 +2230,8 @@ export enum Status {
     Failed = 2,
     Cancelled = 3,
     Success = 4,
-    Queued = 5
+    Queued = 5,
+    PartialSuccess = 6
 }
 export enum StatusLabel {
     not_started = "not started",

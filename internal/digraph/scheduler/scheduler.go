@@ -27,6 +27,7 @@ const (
 	StatusCancel
 	StatusSuccess
 	StatusQueued
+	StatusPartialSuccess
 )
 
 func (s Status) String() string {
@@ -41,6 +42,8 @@ func (s Status) String() string {
 		return "finished"
 	case StatusQueued:
 		return "queued"
+	case StatusPartialSuccess:
+		return "partial success"
 	case StatusNone:
 		fallthrough
 	default:
@@ -280,7 +283,12 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 								node.SetStatus(NodeStatusSuccess)
 							} else {
 								node.MarkError(execErr)
-								sc.setLastError(execErr)
+								// Only set lastError if this failure should not be allowed to continue
+								// If shouldContinue() is true, this error is allowed and should contribute
+								// to partial success rather than overall failure
+								if !node.shouldContinue(ctx) {
+									sc.setLastError(execErr)
+								}
 							}
 						}
 					}
@@ -371,6 +379,11 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 	var eventHandlers []digraph.HandlerType
 	switch sc.Status(graph) {
 	case StatusSuccess:
+		eventHandlers = append(eventHandlers, digraph.HandlerOnSuccess)
+
+	case StatusPartialSuccess:
+		// PartialSuccess is treated as success since primary work was completed
+		// despite some non-critical failures that were allowed to continue
 		eventHandlers = append(eventHandlers, digraph.HandlerOnSuccess)
 
 	case StatusError:
@@ -522,6 +535,11 @@ func (sc *Scheduler) Status(g *ExecutionGraph) Status {
 	if g.IsRunning() {
 		return StatusRunning
 	}
+
+	if sc.isPartialSuccess(g) {
+		return StatusPartialSuccess
+	}
+
 	if sc.isError() {
 		return StatusError
 	}
@@ -696,6 +714,49 @@ func (sc *Scheduler) isSucceed(g *ExecutionGraph) bool {
 		return false
 	}
 	return true
+}
+
+// isPartialSuccess checks if the DAG completed with some failures that were allowed to continue.
+// This represents scenarios where execution continued despite failures due to continueOn conditions.
+func (sc *Scheduler) isPartialSuccess(g *ExecutionGraph) bool {
+	sc.mu.RLock()
+	defer sc.mu.RUnlock()
+
+	hasFailuresWithContinueOn := false
+	hasSuccessfulNodes := false
+
+	// First pass: check if any failed node is NOT allowed to continue
+	// If so, this is an error, not partial success
+	for _, node := range g.nodes {
+		if node.State().Status == NodeStatusError {
+			if !node.shouldContinue(context.Background()) {
+				// Found a failed node that was NOT allowed to continue
+				// This disqualifies the DAG from being partial success
+				return false
+			}
+		}
+	}
+
+	// Second pass: check for partial success conditions
+	for _, node := range g.nodes {
+		switch node.State().Status {
+		case NodeStatusSuccess:
+			hasSuccessfulNodes = true
+		case NodeStatusError:
+			if node.shouldContinue(context.Background()) && !node.shouldMarkSuccess(context.Background()) {
+				hasFailuresWithContinueOn = true
+			}
+		case NodeStatusNone, NodeStatusRunning, NodeStatusCancel, NodeStatusSkipped:
+			// These statuses don't affect partial success determination, but are needed for linter
+		}
+	}
+
+	// Partial success requires:
+	// 1. At least one successful node (some work was actually completed)
+	// 2. At least one failed node with continueOn (some non-critical failures)
+	// 3. No failed nodes without continueOn (checked in first pass)
+	// Note: Skipped nodes alone do not count as successful completion
+	return hasSuccessfulNodes && hasFailuresWithContinueOn
 }
 
 func (sc *Scheduler) isTimeout(startedAt time.Time) bool {
