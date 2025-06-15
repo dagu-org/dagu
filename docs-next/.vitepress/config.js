@@ -25,11 +25,11 @@ const fullSidebar = [
     items: [
       { text: "Introduction", link: "/writing-workflows/" },
       { text: "Basics", link: "/writing-workflows/basics" },
+      { text: "By Examples", link: "/writing-workflows/examples/" },
       { text: "Control Flow", link: "/writing-workflows/control-flow" },
       { text: "Data & Variables", link: "/writing-workflows/data-variables" },
       { text: "Error Handling", link: "/writing-workflows/error-handling" },
       { text: "Advanced Patterns", link: "/writing-workflows/advanced" },
-      { text: "Examples", link: "/writing-workflows/examples/" },
     ],
   },
   {

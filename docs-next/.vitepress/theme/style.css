@@ -112,10 +112,6 @@
   transition: all 0.2s ease;
 }
 
-.example-card:hover {
-  border-color: var(--vp-c-brand);
-  transform: translateY(-2px);
-}
 
 .example-card h3 {
   margin: 0 0 0.5rem 0;
