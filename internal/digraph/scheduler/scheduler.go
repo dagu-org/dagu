@@ -377,7 +377,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 	sc.metrics.totalExecutionTime = time.Since(sc.metrics.startTime)
 
 	var eventHandlers []digraph.HandlerType
-	switch sc.Status(graph) {
+	switch sc.Status(ctx, graph) {
 	case StatusSuccess:
 		eventHandlers = append(eventHandlers, digraph.HandlerOnSuccess)
 
@@ -395,7 +395,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 	case StatusNone, StatusRunning, StatusQueued:
 		// These states should not occur at this point
 		logger.Warn(ctx, "Unexpected final status",
-			"status", sc.Status(graph).String(),
+			"status", sc.Status(ctx, graph).String(),
 			"dagRunId", sc.dagRunID)
 	}
 
@@ -559,7 +559,7 @@ func (sc *Scheduler) Cancel(ctx context.Context, g *ExecutionGraph) {
 }
 
 // Status returns the status of the scheduler.
-func (sc *Scheduler) Status(g *ExecutionGraph) Status {
+func (sc *Scheduler) Status(ctx context.Context, g *ExecutionGraph) Status {
 	if sc.isCanceled() && !sc.isSucceed(g) {
 		return StatusCancel
 	}
@@ -570,7 +570,7 @@ func (sc *Scheduler) Status(g *ExecutionGraph) Status {
 		return StatusRunning
 	}
 
-	if sc.isPartialSuccess(g) {
+	if sc.isPartialSuccess(ctx, g) {
 		return StatusPartialSuccess
 	}
 
@@ -752,7 +752,7 @@ func (sc *Scheduler) isSucceed(g *ExecutionGraph) bool {
 
 // isPartialSuccess checks if the DAG completed with some failures that were allowed to continue.
 // This represents scenarios where execution continued despite failures due to continueOn conditions.
-func (sc *Scheduler) isPartialSuccess(g *ExecutionGraph) bool {
+func (sc *Scheduler) isPartialSuccess(ctx context.Context, g *ExecutionGraph) bool {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
 
@@ -777,7 +777,7 @@ func (sc *Scheduler) isPartialSuccess(g *ExecutionGraph) bool {
 		case NodeStatusSuccess:
 			hasSuccessfulNodes = true
 		case NodeStatusError:
-			if node.shouldContinue(context.Background()) && !node.shouldMarkSuccess(context.Background()) {
+			if node.shouldContinue(ctx) && !node.shouldMarkSuccess(ctx) {
 				hasFailuresWithContinueOn = true
 			}
 		case NodeStatusNone, NodeStatusRunning, NodeStatusCancel, NodeStatusSkipped:

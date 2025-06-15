@@ -346,7 +346,7 @@ func (a *Agent) RunError(t *testing.T) {
 	err := a.Run(a.Context)
 	assert.Error(t, err)
 
-	status := a.Status().Status
+	status := a.Status(a.Context).Status
 	require.Equal(t, scheduler.StatusError.String(), status.String())
 }
 
@@ -356,7 +356,7 @@ func (a *Agent) RunCancel(t *testing.T) {
 	err := a.Run(a.Context)
 	assert.NoError(t, err)
 
-	status := a.Status().Status
+	status := a.Status(a.Context).Status
 	require.Equal(t, scheduler.StatusCancel.String(), status.String())
 }
 
@@ -366,7 +366,7 @@ func (a *Agent) RunCheckErr(t *testing.T, expectedErr string) {
 	err := a.Run(a.Context)
 	require.Error(t, err, "expected error %q, got nil", expectedErr)
 	require.Contains(t, err.Error(), expectedErr)
-	status := a.Status()
+	status := a.Status(a.Context)
 	require.Equal(t, scheduler.StatusCancel.String(), status.Status.String())
 }
 
@@ -376,11 +376,11 @@ func (a *Agent) RunSuccess(t *testing.T) {
 	err := a.Run(a.Context)
 	assert.NoError(t, err, "failed to run agent")
 
-	status := a.Status().Status
+	status := a.Status(a.Context).Status
 	require.Equal(t, scheduler.StatusSuccess.String(), status.String(), "expected status %q, got %q", scheduler.StatusSuccess, status)
 
 	// check all nodes are in success or skipped state
-	for _, node := range a.Status().Nodes {
+	for _, node := range a.Status(a.Context).Nodes {
 		status := node.Status
 		if status == scheduler.NodeStatusSkipped || status == scheduler.NodeStatusSuccess {
 			continue

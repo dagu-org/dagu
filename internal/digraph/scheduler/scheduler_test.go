@@ -1306,8 +1306,8 @@ func (gh graphHelper) Schedule(t *testing.T, expectedStatus scheduler.Status) sc
 
 	}
 
-	require.Equal(t, expectedStatus.String(), gh.Scheduler.Status(gh.ExecutionGraph).String(),
-		"expected status %s, got %s", expectedStatus, gh.Scheduler.Status(gh.ExecutionGraph))
+	require.Equal(t, expectedStatus.String(), gh.Scheduler.Status(ctx, gh.ExecutionGraph).String(),
+		"expected status %s, got %s", expectedStatus, gh.Scheduler.Status(ctx, gh.ExecutionGraph))
 
 	// wait for items of nodeCompletedChan to be processed
 	<-done
@@ -1613,7 +1613,7 @@ func TestScheduler_DAGPreconditions(t *testing.T) {
 		require.NoError(t, err) // No error, but dag should be canceled
 
 		// Check that the scheduler was canceled
-		assert.Equal(t, scheduler.StatusCancel, sc.Scheduler.Status(graph.ExecutionGraph))
+		assert.Equal(t, scheduler.StatusCancel, sc.Scheduler.Status(ctx, graph.ExecutionGraph))
 	})
 }
 

@@ -240,7 +240,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 	}()
 
-	if err := attempt.Write(ctx, a.Status()); err != nil {
+	if err := attempt.Write(ctx, a.Status(ctx)); err != nil {
 		logger.Error(ctx, "Failed to write status", "err", err)
 	}
 
@@ -293,7 +293,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	go execWithRecovery(ctx, func() {
 		defer close(progressDone)
 		for node := range progressCh {
-			status := a.Status()
+			status := a.Status(ctx)
 			if err := attempt.Write(ctx, status); err != nil {
 				logger.Error(ctx, "Failed to write status", "err", err)
 			}
@@ -318,7 +318,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		if a.finished.Load() {
 			return
 		}
-		if err := attempt.Write(ctx, a.Status()); err != nil {
+		if err := attempt.Write(ctx, a.Status(ctx)); err != nil {
 			logger.Error(ctx, "Status write failed", "err", err)
 		}
 	})
@@ -353,7 +353,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Update the finished status to the runstore database.
-	finishedStatus := a.Status()
+	finishedStatus := a.Status(ctx)
 
 	// Send final progress update if enabled
 	if a.progressDisplay != nil {
@@ -374,7 +374,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		"finishedAt", finishedStatus.FinishedAt,
 	)
 
-	if err := attempt.Write(ctx, a.Status()); err != nil {
+	if err := attempt.Write(ctx, a.Status(ctx)); err != nil {
 		logger.Error(ctx, "Status write failed", "err", err)
 	}
 
@@ -424,18 +424,18 @@ func (a *Agent) PrintSummary(ctx context.Context) {
 	if a.progressDisplay != nil {
 		return
 	}
-	status := a.Status()
+	status := a.Status(ctx)
 	summary := a.reporter.getSummary(ctx, status, a.lastErr)
 	println(summary)
 }
 
 // Status collects the current running status of the DAG and returns it.
-func (a *Agent) Status() models.DAGRunStatus {
+func (a *Agent) Status(ctx context.Context) models.DAGRunStatus {
 	// Lock to avoid race condition.
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
-	schedulerStatus := a.scheduler.Status(a.graph)
+	schedulerStatus := a.scheduler.Status(ctx, a.graph)
 	if schedulerStatus == scheduler.StatusNone && a.graph.IsStarted() {
 		// Match the status to the execution graph.
 		schedulerStatus = scheduler.StatusRunning
@@ -510,7 +510,7 @@ func (a *Agent) HandleHTTP(ctx context.Context) sock.HTTPHandlerFunc {
 		switch {
 		case r.Method == http.MethodGet && statusRe.MatchString(r.URL.Path):
 			// Return the current status of the dag-run.
-			status := a.Status()
+			status := a.Status(ctx)
 			status.Status = scheduler.StatusRunning
 			statusJSON, err := json.Marshal(status)
 			if err != nil {
@@ -607,7 +607,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 
 	go func() {
 		for node := range progressCh {
-			status := a.Status()
+			status := a.Status(ctx)
 			_ = a.reporter.reportStep(ctx, a.dag, status, node)
 		}
 	}()

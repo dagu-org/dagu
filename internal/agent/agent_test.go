@@ -83,7 +83,7 @@ func TestAgent_Run(t *testing.T) {
 		dagAgent.RunCancel(t)
 
 		// Check if all nodes are not executed
-		status := dagAgent.Status()
+		status := dagAgent.Status(th.Context)
 		require.Equal(t, scheduler.StatusCancel.String(), status.Status.String())
 		require.Equal(t, scheduler.NodeStatusNone.String(), status.Nodes[0].Status.String())
 		require.Equal(t, scheduler.NodeStatusNone.String(), status.Nodes[1].Status.String())
@@ -95,7 +95,7 @@ func TestAgent_Run(t *testing.T) {
 		dagAgent.RunError(t)
 
 		// Check if the status is saved correctly
-		require.Equal(t, scheduler.StatusError, dagAgent.Status().Status)
+		require.Equal(t, scheduler.StatusError, dagAgent.Status(th.Context).Status)
 	})
 	t.Run("FinishWithTimeout", func(t *testing.T) {
 		th := test.Setup(t)
@@ -104,7 +104,7 @@ func TestAgent_Run(t *testing.T) {
 		dagAgent.RunError(t)
 
 		// Check if the status is saved correctly
-		require.Equal(t, scheduler.StatusError, dagAgent.Status().Status)
+		require.Equal(t, scheduler.StatusError, dagAgent.Status(th.Context).Status)
 	})
 	t.Run("ReceiveSignal", func(t *testing.T) {
 		th := test.Setup(t)
@@ -135,7 +135,7 @@ func TestAgent_Run(t *testing.T) {
 		dagAgent.RunSuccess(t)
 
 		// Check if the DAG is executed successfully
-		status := dagAgent.Status()
+		status := dagAgent.Status(th.Context)
 		require.Equal(t, scheduler.StatusSuccess.String(), status.Status.String())
 		for _, s := range status.Nodes {
 			require.Equal(t, scheduler.NodeStatusSuccess.String(), s.Status.String())
@@ -155,7 +155,7 @@ func TestAgent_DryRun(t *testing.T) {
 
 		dagAgent.RunSuccess(t)
 
-		curStatus := dagAgent.Status()
+		curStatus := dagAgent.Status(th.Context)
 		require.Equal(t, scheduler.StatusSuccess, curStatus.Status)
 
 		// Check if the status is not saved
@@ -175,7 +175,7 @@ func TestAgent_Retry(t *testing.T) {
 		dagAgent.RunError(t)
 
 		// Modify the DAG to make it successful
-		status := dagAgent.Status()
+		status := dagAgent.Status(th.Context)
 		for i := range dag.Steps {
 			dag.Steps[i].CmdWithArgs = "true"
 		}
@@ -186,7 +186,7 @@ func TestAgent_Retry(t *testing.T) {
 		}))
 		dagAgent.RunSuccess(t)
 
-		for _, node := range dagAgent.Status().Nodes {
+		for _, node := range dagAgent.Status(th.Context).Nodes {
 			if node.Status != scheduler.NodeStatusSuccess &&
 				node.Status != scheduler.NodeStatusSkipped {
 				t.Errorf("node %q is not successful: %s", node.Step.Name, node.Status)
