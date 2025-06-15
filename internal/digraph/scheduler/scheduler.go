@@ -283,12 +283,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 								node.SetStatus(NodeStatusSuccess)
 							} else {
 								node.MarkError(execErr)
-								// Only set lastError if this failure should not be allowed to continue
-								// If shouldContinue() is true, this error is allowed and should contribute
-								// to partial success rather than overall failure
-								if !node.shouldContinue(ctx) {
-									sc.setLastError(execErr)
-								}
+								sc.setLastError(execErr)
 							}
 						}
 					}
@@ -412,6 +407,11 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 			}
 		}
 	}
+
+	logger.Debug(ctx, "Scheduler execution complete",
+		"status", sc.Status(ctx, graph).String(),
+		"lastError", sc.lastError,
+	)
 
 	return sc.lastError
 }
@@ -763,7 +763,7 @@ func (sc *Scheduler) isPartialSuccess(ctx context.Context, g *ExecutionGraph) bo
 	// If so, this is an error, not partial success
 	for _, node := range g.nodes {
 		if node.State().Status == NodeStatusError {
-			if !node.shouldContinue(context.Background()) {
+			if !node.shouldContinue(ctx) {
 				// Found a failed node that was NOT allowed to continue
 				// This disqualifies the DAG from being partial success
 				return false
@@ -786,9 +786,8 @@ func (sc *Scheduler) isPartialSuccess(ctx context.Context, g *ExecutionGraph) bo
 	}
 
 	// Partial success requires:
-	// 1. At least one successful node (some work was actually completed)
-	// 2. At least one failed node with continueOn (some non-critical failures)
-	// 3. No failed nodes without continueOn (checked in first pass)
+	// 1. At least one failed node with continueOn (some non-critical failures)
+	// 2. No failed nodes without continueOn (checked in first pass)
 	// Note: Skipped nodes alone do not count as successful completion
 	return hasSuccessfulNodes && hasFailuresWithContinueOn
 }

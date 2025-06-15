@@ -760,7 +760,7 @@ steps:
 	agent := dag.Agent()
 	err = agent.Run(agent.Context)
 	// DAG should complete successfully due to continueOn.failure: true, even after retries fail
-	require.NoError(t, err)
+	require.Error(t, err)
 
 	// Get status
 	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
@@ -848,7 +848,7 @@ steps:
 	agent := dag.Agent()
 	err = agent.Run(agent.Context)
 	// Should complete successfully due to continueOn.failure: true, despite one child failing
-	require.NoError(t, err)
+	require.Error(t, err)
 
 	// Get the latest status
 	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
@@ -1026,7 +1026,7 @@ steps:
 	agent := dag.Agent()
 	err = agent.Run(agent.Context)
 	// Should complete successfully due to continueOn.failure: true, despite some children failing
-	require.NoError(t, err)
+	require.Error(t, err)
 
 	// Get the latest status
 	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
@@ -1514,7 +1514,7 @@ steps:
 	err = agent.Run(agent.Context)
 	// The DAG should complete successfully despite failures due to continueOn.failure = true
 	// but the individual steps may still show as failed
-	require.NoError(t, err)
+	require.Error(t, err)
 
 	// Get the latest status to verify parallel execution
 	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)

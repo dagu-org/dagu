@@ -1295,10 +1295,10 @@ func (gh graphHelper) Schedule(t *testing.T, expectedStatus scheduler.Status) sc
 	close(progressCh)
 
 	switch expectedStatus {
-	case scheduler.StatusSuccess, scheduler.StatusCancel, scheduler.StatusPartialSuccess:
+	case scheduler.StatusSuccess, scheduler.StatusCancel:
 		require.NoError(t, err)
 
-	case scheduler.StatusError:
+	case scheduler.StatusError, scheduler.StatusPartialSuccess:
 		require.Error(t, err)
 
 	case scheduler.StatusRunning, scheduler.StatusNone, scheduler.StatusQueued:
