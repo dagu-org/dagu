@@ -1,19 +1,18 @@
 {
-  "name": "Dagu",
+  "name": "dagu-docs",
   "version": "1.0.0",
   "description": "Dagu Documentation",
-  "main": "index.js",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "docs:dev": "vitepress dev",
-    "docs:build": "vitepress build",
-    "docs:preview": "vitepress preview"
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "packageManager": "pnpm@10.11.0",
+  "keywords": ["dagu", "workflow", "orchestration", "documentation"],
+  "author": "Dagu Contributors",
+  "license": "MIT",
   "devDependencies": {
-    "vitepress": "^1.6.3"
+    "vitepress": "^1.0.0-rc.31",
+    "vue": "^3.3.9"
   }
 }
