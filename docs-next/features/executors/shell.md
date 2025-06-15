@@ -62,16 +62,232 @@ steps:
 
 ### Nix Shell
 
-For reproducible environments, you can use nix-shell with specific packages:
+For reproducible environments, you can use nix-shell with specific packages. Dagu provides built-in support for nix-shell with automatic package management and pure environment isolation.
+
+#### Basic Nix Shell Usage
 
 ```yaml
 steps:
-  - name: nix-example
+  - name: python-with-nix
     shell: nix-shell
-    command: python --version
+    shellPackages: [python3, curl, jq]
+    command: |
+      python3 --version
+      curl --version
+      jq --version
+```
+
+#### How Nix Shell Works in Dagu
+
+When you specify `shell: nix-shell`, Dagu automatically:
+
+1. **Adds packages**: Uses the `shellPackages` field to include specified Nix packages
+2. **Creates pure environment**: Automatically adds `--pure` flag for isolation
+3. **Runs commands**: Wraps your command with `--run` to execute in the nix-shell environment
+
+The above example gets translated to:
+```bash
+nix-shell -p python3 -p curl -p jq --pure --run "python3 --version && curl --version && jq --version"
+```
+
+#### Advanced Nix Shell Configuration
+
+**Using specific package versions:**
+
+```yaml
+steps:
+  - name: specific-versions
+    shell: nix-shell
+    shellPackages:
+      - python314
+      - nodejs_24
+      - postgresql_16
     script: |
-      #!/usr/bin/env nix-shell
-      #!nix-shell -i python3 -p python3
+      python3 --version
+      node --version
+      psql --version
+```
+
+**Combining with script files:**
+
+```yaml
+steps:
+  - name: nix-script
+    shell: nix-shell
+    shellPackages: [python3, pandas, numpy]
+    script: |
+      import pandas as pd
+      import numpy as np
+      
+      print(f"Pandas version: {pd.__version__}")
+      print(f"NumPy version: {np.__version__}")
+      
+      # Your data processing logic here
+      df = pd.DataFrame({'x': range(10), 'y': np.random.randn(10)})
+      print(df.head())
+```
+
+**Complex data science environment:**
+
+```yaml
+steps:
+  - name: data-analysis
+    shell: nix-shell
+    shellPackages:
+      - python3
+      - python3Packages.pandas
+      - python3Packages.matplotlib
+      - python3Packages.jupyter
+      - python3Packages.scikit-learn
+    script: |
+      #!/usr/bin/env python3
+      import pandas as pd
+      import matplotlib.pyplot as plt
+      from sklearn.model_selection import train_test_split
+      
+      # Load and analyze data
+      data = pd.read_csv('/data/input.csv')
+      # ... your analysis code ...
+```
+
+**Mixed environments with different tools:**
+
+```yaml
+steps:
+  - name: build-and-test
+    shell: nix-shell
+    shellPackages: [nodejs, python3, go, docker, git]
+    command: |
+      # Frontend build
+      npm install && npm run build
+      
+      # Backend tests
+      python3 -m pytest tests/
+      
+      # Go service build
+      go build -o service ./cmd/service
+      
+      # Container operations
+      docker build -t myapp .
+
+  - name: deployment-tools
+    shell: nix-shell
+    shellPackages: [kubectl, terraform, awscli2, ansible]
+    command: |
+      # Infrastructure deployment
+      terraform plan
+      kubectl get pods
+      aws s3 ls
+```
+
+#### Package Discovery
+
+To find available packages, visit the [Nix Packages Search](https://search.nixos.org/packages) or use the command line. For example, to search for Python or Node.js packages, you can use:
+
+```bash
+# Search for packages
+nix search nixpkgs python
+nix search nixpkgs nodejs
+
+# List available Python packages
+nix search nixpkgs python3Packages
+```
+
+Common package categories:
+- **Languages**: `python3`, `nodejs`, `go`, `rust`, `ruby`, `php`
+- **Databases**: `postgresql`, `mysql80`, `mongodb`, `redis`
+- **Tools**: `git`, `curl`, `jq`, `docker`, `kubectl`, `terraform`
+- **Python packages**: `python3Packages.pandas`, `python3Packages.requests`
+
+#### Environment Isolation
+
+Nix shell provides complete environment isolation:
+
+```yaml
+steps:
+  - name: isolated-environment
+    shell: nix-shell
+    shellPackages: [python38]  # Specific Python version
+    command: |
+      # This runs in a pure environment with only specified packages
+      # System packages are not available
+      python3 --version  # Will use Python 3.8
+      which python3      # Shows nix store path
+      echo $PATH         # Shows only nix paths
+```
+
+#### Best Practices for Nix Shell
+
+1. **Pin package versions** for reproducibility:
+```yaml
+steps:
+  - name: pinned-versions
+    shell: nix-shell
+    shellPackages: [python39, nodejs-16_x]
+    command: python3 --version && node --version
+```
+
+2. **Use specific Python packages** instead of pip:
+```yaml
+steps:
+  - name: python-packages
+    shell: nix-shell
+    shellPackages:
+      - python3
+      - python3Packages.requests
+      - python3Packages.click
+    script: |
+      import requests
+      import click
+      # No need for pip install
+```
+
+3. **Combine with traditional package managers** when needed:
+```yaml
+steps:
+  - name: mixed-deps
+    shell: nix-shell
+    shellPackages: [python3, git]
+    command: |
+      # Use nix for core tools
+      git clone https://github.com/user/repo.git
+      cd repo
+      
+      # Use pip for Python packages not in nixpkgs
+      pip install --user some-custom-package
+```
+
+#### Troubleshooting Nix Shell
+
+**Debug nix-shell execution:**
+
+```yaml
+steps:
+  - name: debug-nix
+    shell: nix-shell
+    shellPackages: [python3]
+    command: |
+      echo "Nix store path: $(which python3)"
+      echo "Available packages:"
+      ls /nix/store/ | grep python | head -5
+      python3 -c "import sys; print(sys.path)"
+```
+
+**Handle missing packages:**
+
+```yaml
+steps:
+  - name: fallback-strategy
+    shell: nix-shell
+    shellPackages: [python3]
+    command: |
+      # Try nix package first, fallback to system
+      if command -v some-tool >/dev/null 2>&1; then
+        some-tool --version
+      else
+        echo "Tool not available in nix environment"
+        exit 1
+      fi
 ```
 
 ## Command Execution Methods

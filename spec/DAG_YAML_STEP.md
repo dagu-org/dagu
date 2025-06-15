@@ -201,12 +201,12 @@ command: echo "${array[@]}"
 ```yaml
 # Python data science environment
 shell: nix-shell
-packages: [python3, numpy, pandas, matplotlib]
+shellPackages: [python3, numpy, pandas, matplotlib]
 command: python analyze.py
 
 # Node.js development
 shell: nix-shell
-packages: [nodejs, yarn]
+shellPackages: [nodejs, yarn]
 command: yarn test
 ```
 
@@ -1208,7 +1208,7 @@ name: string               # Required, unique identifier
 description: string        # Human-readable description
 dir: string               # Working directory
 shell: string             # Shell to use (bash, sh, zsh, nix-shell)
-packages: [array]         # Packages for nix-shell
+shellPackages: [array]         # Packages for nix-shell
 
 # Command execution (one of these)
 command: string|array     # Command to execute

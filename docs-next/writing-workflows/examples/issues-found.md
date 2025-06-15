@@ -109,7 +109,7 @@ The examples use `timeout:` at the DAG level, but based on the definition.go fil
 steps:
   - name: run-with-nix
     shell: nix-shell
-    packages: [python311, nodejs]
+    shellPackages: [python311, nodejs]
     command: python script.py
 ```
 

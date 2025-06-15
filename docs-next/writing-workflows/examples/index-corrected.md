@@ -441,7 +441,7 @@ Run multi-line scripts.
 steps:
   - name: python-analysis
     shell: nix-shell
-    packages: [python311, pandas, numpy]
+    shellPackages: [python311, pandas, numpy]
     command: python analyze.py
 ```
 

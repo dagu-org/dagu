@@ -319,7 +319,7 @@
           "type": "string",
           "description": "Specific shell to use for executing the command. Defaults to $SHELL or sh if not specified."
         },
-        "packages": {
+        "shellPackages": {
           "type": "array",
           "items": {
             "type": "string"
