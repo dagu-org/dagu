@@ -45,6 +45,7 @@ We're excited to announce the beta release of Dagu 1.17.0! This release brings m
   - Show output variable values in the UI ([#916](https://github.com/dagu-org/dagu/issues/916))
   - Separate logs for stdout and stderr by default ([#687](https://github.com/dagu-org/dagu/issues/687))
 - 📋 **Queue Management**: Added enqueue functionality for API and UI ([#938](https://github.com/dagu-org/dagu/issues/938))
+- 🗿 **Partial failed**: Added partial success status ([#1011](https://github.com/dagu-org/dagu/issues/1011))
 - 🏗️ **API v2**: New `/api/v2` endpoints with refactored schema and better abstractions ([OpenAPI spec](./api/v2/api.yaml))
 - 🔧 **Various Enhancements**: Including [#925](https://github.com/dagu-org/dagu/issues/925), [#898](https://github.com/dagu-org/dagu/issues/898), [#895](https://github.com/dagu-org/dagu/issues/895), [#868](https://github.com/dagu-org/dagu/issues/868), [#903](https://github.com/dagu-org/dagu/issues/903), [#911](https://github.com/dagu-org/dagu/issues/911), [#913](https://github.com/dagu-org/dagu/issues/913), [#921](https://github.com/dagu-org/dagu/issues/921), [#923](https://github.com/dagu-org/dagu/issues/923), [#887](https://github.com/dagu-org/dagu/issues/887), [#922](https://github.com/dagu-org/dagu/issues/922), [#932](https://github.com/dagu-org/dagu/issues/932), [#962](https://github.com/dagu-org/dagu/issues/962)
 
@@ -67,6 +68,7 @@ This release wouldn’t exist without the community’s time, sweat, and ideas. 
 | Allow specifying container name & image platform ([#898]) | @vnghia |
 | Enhanced repeat-policy – conditions, expected output, and exit codes | @thefishhat |
 | Implemented queue functionality | @kriyanshii |
+| Implemented partial success status | @thefishhat |
 | Countless insightful reviews & feedback | @ghansham |
 
 *Thank you all for pushing Dagu forward! 💙*
