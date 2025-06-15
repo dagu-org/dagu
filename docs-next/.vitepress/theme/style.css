@@ -1,9 +1,9 @@
 :root {
   /* Dagu Brand Colors */
-  --vp-c-brand-1: #25b3c0;
-  --vp-c-brand-2: #00a8cc;
-  --vp-c-brand-3: #0085a3;
-  --vp-c-brand-soft: rgba(0, 217, 255, 0.14);
+  --vp-c-brand-1: #10b981; /* Emerald - fresh, positive */
+  --vp-c-brand-2: #059669; /* Darker emerald */
+  --vp-c-brand-3: #047857; /* Deep emerald */
+  --vp-c-brand-soft: rgba(16, 185, 129, 0.14);
 
   /* Override VitePress default brand colors */
   --vp-c-brand: var(--vp-c-brand-1);
