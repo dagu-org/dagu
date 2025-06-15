@@ -23,24 +23,24 @@ func TestStepIDPropertyAccess(t *testing.T) {
 		{
 			name: "Basic stdout/stderr file access",
 			yaml: `
-		name: test-step-id-files
-		steps:
-		  - name: generate-data
-		    id: gen
-		    command: |
-		      echo "Test output data"
-		      echo "Error message" >&2
-		    output: GEN_OUTPUT
+name: test-step-id-files
+steps:
+  - name: generate-data
+    id: gen
+    command: |
+      echo "Test output data"
+      echo "Error message" >&2
+    output: GEN_OUTPUT
 
-		  - name: process-files
-		    id: proc
-		    depends:
-		      - gen
-		    command: |
-		      echo "stdout_file=${gen.stdout}"
-		      echo "stderr_file=${gen.stderr}"
-		    output: FILE_PATHS
-		`,
+  - name: process-files
+    id: proc
+    depends:
+      - gen
+    command: |
+      echo "stdout_file=${gen.stdout}"
+      echo "stderr_file=${gen.stderr}"
+    output: FILE_PATHS
+`,
 			expectedStatus: scheduler.StatusSuccess,
 			expectedOutput: map[string]any{
 				"GEN_OUTPUT": "Test output data",
@@ -83,22 +83,22 @@ steps:
 		{
 			name: "Unknown step ID remains unchanged",
 			yaml: `
-		name: test-step-id-unknown
-		steps:
-		  - name: first
-		    id: first_step
-		    command: echo "Hello"
-		    output: FIRST_OUT
+name: test-step-id-unknown
+steps:
+  - name: first
+    id: first_step
+    command: echo "Hello"
+    output: FIRST_OUT
 
-		  - name: second
-		    depends:
-		      - first_step
-		    command: |
-		      echo "known=${first_step.stdout}"
-		      echo "unknown=\${unknown_step.stdout}"
-		      echo "invalid=\${first_step.unknown_property}"
-		    output: RESULT
-		`,
+  - name: second
+    depends:
+      - first_step
+    command: |
+      echo "known=${first_step.stdout}"
+      echo "unknown=\${unknown_step.stdout}"
+      echo "invalid=\${first_step.unknown_property}"
+    output: RESULT
+`,
 			expectedStatus: scheduler.StatusSuccess,
 			expectedOutput: map[string]any{
 				"FIRST_OUT": "Hello",
@@ -113,21 +113,21 @@ steps:
 		{
 			name: "Regular variable takes precedence over step ID",
 			yaml: `
-		name: test-step-id-precedence
-		steps:
-		  - name: create-var
-		    id: check
-		    command: echo '{"status":"from-step"}'
-		    output: check
+name: test-step-id-precedence
+steps:
+  - name: create-var
+    id: check
+    command: echo '{"status":"from-step"}'
+    output: check
 
-		  - name: verify-precedence
-		    depends:
-		      - check
-		    command: |
-		      echo "variable=${check.status}"
-		      echo "stdout=${check.stdout}"
-		    output: PRECEDENCE_TEST
-		`,
+  - name: verify-precedence
+    depends:
+      - check
+    command: |
+      echo "variable=${check.status}"
+      echo "stdout=${check.stdout}"
+    output: PRECEDENCE_TEST
+`,
 			expectedStatus: scheduler.StatusSuccess,
 			expectedOutput: map[string]any{
 				"check": `{"status":"from-step"}`,

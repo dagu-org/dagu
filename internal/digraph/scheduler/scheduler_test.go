@@ -2126,7 +2126,7 @@ func TestScheduler_StepIDAccess(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, scheduler.StatusError)
+		result := graph.Schedule(t, scheduler.StatusPartialSuccess)
 		result.AssertNodeStatus(t, "check", scheduler.NodeStatusError)
 		result.AssertNodeStatus(t, "verify", scheduler.NodeStatusSuccess)
 
