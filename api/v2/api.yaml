@@ -1481,7 +1481,7 @@ components:
 
     Status:
       type: integer
-      enum: [0, 1, 2, 3, 4, 5]
+      enum: [0, 1, 2, 3, 4, 5, 6]
       x-enum-varnames:
         - "NotStarted"
         - "Running"
@@ -1489,6 +1489,7 @@ components:
         - "Cancelled"
         - "Success"
         - "Queued"
+        - "PartialSuccess"
       description: |
         Numeric status code indicating current DAG-run state:
         0: "Not started"
@@ -1497,6 +1498,7 @@ components:
         3: "Cancelled"
         4: "Success"
         5: "Queued"
+        6: "Partial Success"
 
     StatusLabel:
       type: string
@@ -1508,6 +1510,7 @@ components:
         - "cancelled"
         - "finished"
         - "queued"
+        - "partial success"
 
     NodeStatus:
       type: integer

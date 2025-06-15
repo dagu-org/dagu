@@ -119,7 +119,7 @@ func TestScheduler(t *testing.T) {
 			successStep("3", "2"),
 		)
 
-		result := graph.Schedule(t, scheduler.StatusError)
+		result := graph.Schedule(t, scheduler.StatusPartialSuccess)
 
 		// 1, 2, 3 should be executed even though 2 failed
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
@@ -166,7 +166,7 @@ func TestScheduler(t *testing.T) {
 			successStep("2", "1"),
 		)
 
-		result := graph.Schedule(t, scheduler.StatusError)
+		result := graph.Schedule(t, scheduler.StatusPartialSuccess)
 
 		// 1, 2 should be executed even though 1 failed
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusError)
@@ -188,7 +188,7 @@ func TestScheduler(t *testing.T) {
 			successStep("2", "1"),
 		)
 
-		result := graph.Schedule(t, scheduler.StatusError)
+		result := graph.Schedule(t, scheduler.StatusPartialSuccess)
 
 		// 1, 2 should be executed even though 1 failed
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusError)
@@ -210,7 +210,7 @@ func TestScheduler(t *testing.T) {
 			successStep("2", "1"),
 		)
 
-		result := graph.Schedule(t, scheduler.StatusError)
+		result := graph.Schedule(t, scheduler.StatusPartialSuccess)
 
 		// 1, 2 should be
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusError)
@@ -232,7 +232,7 @@ func TestScheduler(t *testing.T) {
 			successStep("2", "1"),
 		)
 
-		result := graph.Schedule(t, scheduler.StatusError)
+		result := graph.Schedule(t, scheduler.StatusPartialSuccess)
 
 		// 1, 2 should be executed even though 1 failed
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusError)
@@ -1295,7 +1295,7 @@ func (gh graphHelper) Schedule(t *testing.T, expectedStatus scheduler.Status) sc
 	close(progressCh)
 
 	switch expectedStatus {
-	case scheduler.StatusSuccess, scheduler.StatusCancel:
+	case scheduler.StatusSuccess, scheduler.StatusCancel, scheduler.StatusPartialSuccess:
 		require.NoError(t, err)
 
 	case scheduler.StatusError:
