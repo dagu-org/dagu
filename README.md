@@ -58,6 +58,31 @@ dagu migrate history
 
 After successful migration, legacy history directories are moved to `<DAGU_DATA_DIR>/history_migrated_<timestamp>` for safekeeping. Most other functionality remains stable and compatible except for a few changes. We're committed to maintaining backward compatibility as much as possible in future releases.
 
+**⚠️ Breaking Change - DAG Type Field**: Starting from v1.17.0-beta.13, DAGs now have a `type` field that controls step execution behavior:
+- **`type: chain`** (new default): Steps are automatically connected in sequence, even if no dependencies are specified
+- **`type: graph`** (previous behavior): Steps only depend on explicitly defined dependencies
+
+To maintain the previous behavior, add `type: graph` to your DAG configuration:
+```yaml
+type: graph
+steps:
+  - name: task1
+    command: echo "runs in parallel"
+  - name: task2
+    command: echo "runs in parallel"
+```
+
+Alternatively, you can explicitly set empty dependencies for parallel steps:
+```yaml
+steps:
+  - name: task1
+    command: echo "runs in parallel"
+    depends: []
+  - name: task2
+    command: echo "runs in parallel"
+    depends: []
+```
+
 ### ❤️ Huge Thanks to Our Contributors
 
 This release wouldn’t exist without the community’s time, sweat, and ideas. In particular:
