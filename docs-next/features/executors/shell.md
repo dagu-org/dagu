@@ -223,7 +223,7 @@ steps:
 steps:
   - name: pinned-versions
     shell: nix-shell
-    shellPackages: [python39, nodejs-16_x]
+    shellPackages: [python314, nodejs_24]
     command: python3 --version && node --version
 ```
 
