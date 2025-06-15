@@ -265,6 +265,10 @@
           "type": "string",
           "description": "Unique identifier for the step within this DAG. Required field."
         },
+        "id": {
+          "type": "string",
+          "description": "Optional short identifier for the step. Can be used in variable references like ${id.stdout} to access step properties. Must be unique within the DAG if specified."
+        },
         "description": {
           "type": "string",
           "description": "Brief description of what this step does. Helps document the step's purpose."

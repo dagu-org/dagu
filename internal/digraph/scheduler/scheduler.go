@@ -440,23 +440,45 @@ func (sc *Scheduler) teardownNode(ctx context.Context, node *Node) error {
 func (sc *Scheduler) setupEnviron(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
 	env := executor.NewEnv(ctx, node.Step())
 
+	// Populate step information for all nodes with IDs
+	for _, n := range graph.nodes {
+		if n.Step().ID != "" {
+			stepInfo := cmdutil.StepInfo{
+				Stdout:   n.GetStdout(),
+				Stderr:   n.GetStderr(),
+				ExitCode: strconv.Itoa(n.GetExitCode()),
+			}
+			env.StepMap[n.Step().ID] = stepInfo
+		}
+	}
+
+	// Load output variables from predecessor nodes (dependencies)
+	// This traverses backwards from the current node to find all nodes it depends on
 	curr := node.id
 	visited := make(map[int]struct{})
-	queue := []int{curr}
+	queue := []int{}
+
+	// Start with direct dependencies (nodes this node depends on)
+	queue = append(queue, graph.To[curr]...)
+
+	// Traverse all predecessor nodes
 	for len(queue) > 0 {
-		curr, queue = queue[0], queue[1:]
-		if _, ok := visited[curr]; ok {
+		predID := queue[0]
+		queue = queue[1:]
+
+		if _, ok := visited[predID]; ok {
 			continue
 		}
-		visited[curr] = struct{}{}
-		queue = append(queue, graph.To[curr]...)
+		visited[predID] = struct{}{}
 
-		node := graph.nodeByID[curr]
-		if node.inner.State.OutputVariables == nil {
-			continue
+		// Add this node's dependencies to the queue
+		queue = append(queue, graph.To[predID]...)
+
+		// Load output variables from this predecessor node
+		predNode := graph.nodeByID[predID]
+		if predNode != nil && predNode.inner.State.OutputVariables != nil {
+			env.LoadOutputVariables(predNode.inner.State.OutputVariables)
 		}
-
-		env.LoadOutputVariables(node.inner.State.OutputVariables)
 	}
 
 	return executor.WithEnv(ctx, env)
@@ -464,6 +486,18 @@ func (sc *Scheduler) setupEnviron(ctx context.Context, graph *ExecutionGraph, no
 
 func (sc *Scheduler) setupEnvironEventHandler(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
 	env := executor.NewEnv(ctx, node.Step())
+
+	// Populate step information for all nodes with IDs
+	for _, n := range graph.nodes {
+		if n.Step().ID != "" {
+			stepInfo := cmdutil.StepInfo{
+				Stdout:   n.GetStdout(),
+				Stderr:   n.GetStderr(),
+				ExitCode: strconv.Itoa(n.GetExitCode()),
+			}
+			env.StepMap[n.Step().ID] = stepInfo
+		}
+	}
 
 	// get all output variables
 	for _, node := range graph.nodes {
@@ -785,24 +819,21 @@ func (sc *Scheduler) handleNodeRetry(ctx context.Context, node *Node, execErr er
 	var exitCode int
 	var exitCodeFound bool
 
-	// Try to extract exit code from different error types
-	if exitErr, ok := execErr.(*exec.ExitError); ok {
+	// Try to extract the exec.ExitError using errors.As
+	var exitErr *exec.ExitError
+	if errors.As(execErr, &exitErr) {
 		exitCode = exitErr.ExitCode()
 		exitCodeFound = true
 		logger.Debug(ctx, "Found exit error", "error", execErr, "exitCode", exitCode)
-	} else {
+	}
+
+	if !exitCodeFound {
 		// Try to parse exit code from error string
 		errStr := execErr.Error()
-		if strings.Contains(errStr, "exit status") {
-			// Parse "exit status N" format
-			parts := strings.Split(errStr, " ")
-			if len(parts) > 2 {
-				if code, err := strconv.Atoi(parts[2]); err == nil {
-					exitCode = code
-					exitCodeFound = true
-					logger.Debug(ctx, "Parsed exit code from error string", "error", errStr, "exitCode", exitCode)
-				}
-			}
+		if code, found := parseExitCodeFromError(errStr); found {
+			exitCode = code
+			exitCodeFound = true
+			logger.Debug(ctx, "Parsed exit code from error string", "error", errStr, "exitCode", exitCode)
 		} else if strings.Contains(errStr, "signal:") {
 			// Handle signal termination
 			exitCode = -1

@@ -1784,6 +1784,9 @@ components:
         name:
           type: string
           description: "Unique identifier for the step within the DAG-run"
+        id:
+          type: string
+          description: "Optional short identifier for the step. Can be used in variable references like ${id.stdout} to access step properties. Must be unique within the DAG if specified"
         description:
           type: string
           description: "Human-readable description of what the step does"

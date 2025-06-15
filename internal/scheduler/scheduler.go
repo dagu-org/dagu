@@ -82,7 +82,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	s.cancel = cancel
 	defer cancel()
-	
+
 	// Set scheduler as running
 	setSchedulerRunning(true)
 	defer setSchedulerRunning(false)

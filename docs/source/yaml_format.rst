@@ -71,6 +71,23 @@ Multiple dependencies:
         - step 1
         - step 2
 
+Using step IDs in dependencies:
+
+.. code-block:: yaml
+
+  steps:
+    - name: prepare data
+      id: prep
+      command: echo "data ready"
+    - name: process data
+      id: proc
+      command: echo "processing"
+    - name: finalize
+      command: echo "done"
+      depends:
+        - prep    # Reference by ID
+        - proc    # Reference by ID
+
 Define steps as map:
 
 .. code-block:: yaml
@@ -345,6 +362,38 @@ If ``SUB_RESULT`` contains:
   }
 
 Then the expanded value of ``${SUB_RESULT.outputs.finalValue}`` will be ``success``.
+
+Step ID References
+~~~~~~~~~~~~~~~~~
+You can assign short identifiers to steps and use them to reference step properties in subsequent steps. This is particularly useful when you have long step names or want cleaner variable references:
+
+.. code-block:: yaml
+
+  steps:
+    - name: extract customer data
+      id: extract  # Short identifier
+      command: python extract.py
+      output: DATA
+    
+    - name: validate extracted data
+      id: validate
+      command: python validate.py
+      depends:
+        - extract  # Can use ID in dependencies
+    
+    - name: process if valid
+      command: |
+        # Reference step properties using IDs
+        echo "Exit code: ${extract.exit_code}"
+        echo "Stdout path: ${extract.stdout}"
+        echo "Stderr path: ${extract.stderr}"
+      depends:
+        - validate
+
+Available step properties when using ID references:
+- ``${id.stdout}``: Path to stdout file
+- ``${id.stderr}``: Path to stderr file  
+- ``${id.exit_code}``: Exit code of the step
 
 Conditional Execution
 ------------------
@@ -907,6 +956,7 @@ Step Fields
 Configuration options available for individual steps:
 
 - ``name``: Step name (required)
+- ``id``: Optional short identifier for variable references (e.g., ${id.stdout})
 - ``description``: Step description
 - ``dir``: Working directory
 - ``command``: Command to execute

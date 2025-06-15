@@ -446,4 +446,3 @@ func TestNewRegistry(t *testing.T) {
 	}
 	assert.True(t, metricNames["go_goroutines"]) // Example Go metric
 }
-

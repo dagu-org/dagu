@@ -62,6 +62,11 @@ function DAGStepTableRow({ step, index }: Props) {
           <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 break-all">
             {step.name}
           </div>
+          {step.id && (
+            <div className="text-xs text-slate-600 dark:text-slate-400 font-mono">
+              ID: {step.id}
+            </div>
+          )}
           {step.description && (
             <div className="text-xs text-slate-500 dark:text-slate-400">
               {step.description}

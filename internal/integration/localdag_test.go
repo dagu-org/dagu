@@ -79,7 +79,7 @@ steps:
 		require.Equal(t, "run-local-child", status.Nodes[0].Step.Name)
 		require.Equal(t, scheduler.NodeStatusSuccess, status.Nodes[0].Status)
 
-		// Verify the second step output contains the child's output
+		// Verify the second step output
 		logContent, err := os.ReadFile(status.Nodes[1].Stdout)
 		require.NoError(t, err)
 		require.Contains(t, string(logContent), "Child said Hello, World!")
