@@ -218,10 +218,10 @@ Run workflows on a schedule, skip if already succeeded.
 ```yaml
 steps:
   - name: data-pipeline
-    run: workflows/etl.yaml
+    run: etl.yaml
     params: "ENV=prod DATE=today"
   - name: analyze
-    run: workflows/analyze.yaml
+    run: analyze.yaml
     depends: data-pipeline
 ```
 

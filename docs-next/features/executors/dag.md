@@ -22,7 +22,7 @@ The DAG executor enables you to:
 steps:
   - name: run-etl
     executor: dag
-    command: workflows/etl.yaml
+    command: etl.yaml
     params: "DATE=2024-01-01 ENV=production"
 ```
 

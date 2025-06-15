@@ -251,11 +251,11 @@ Execute other DAG files:
 ```yaml
 steps:
   - name: run-etl
-    run: workflows/etl.yaml
+    run: etl.yaml
     params: "DATE=${DATE} SOURCE=production"
     
   - name: run-analytics
-    run: workflows/analytics.yaml
+    run: analytics.yaml
     depends: run-etl
 ```
 

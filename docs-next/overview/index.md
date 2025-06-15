@@ -121,10 +121,10 @@ Build complex workflows from simple, reusable components:
 ```yaml
 steps:
   - name: data-pipeline
-    run: workflows/etl.yaml
+    run: etl.yaml
     params: "SOURCE=prod"
   - name: ml-training
-    run: workflows/train.yaml
+    run: train.yaml
     depends: data-pipeline
 ```
 

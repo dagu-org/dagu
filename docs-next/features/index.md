@@ -111,15 +111,15 @@ Build complex systems from simple parts:
 ```yaml
 steps:
   - name: data-pipeline
-    run: workflows/etl.yaml
+    run: etl.yaml
     params: "DATE=today"
     
   - name: ml-training
-    run: workflows/train.yaml
+    run: train.yaml
     depends: data-pipeline
     
   - name: deployment
-    run: workflows/deploy.yaml
+    run: deploy.yaml
     depends: ml-training
 ```
 

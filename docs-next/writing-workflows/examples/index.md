@@ -19,6 +19,13 @@ steps:
     depends: first
 ```
 
+```mermaid
+graph LR
+    A[first] --> B[second]
+    style A fill:#e8f5e8
+    style B fill:#e8f5e8
+```
+
 Execute steps one after another.
 
 <a href="/writing-workflows/basics#sequential-execution" class="learn-more">Learn more →</a>
@@ -36,6 +43,19 @@ steps:
     parallel:
       items: [A, B, C]
       maxConcurrent: 2
+```
+
+```mermaid
+graph TD
+    A[Start] --> B[Process A]
+    A --> C[Process B]
+    A --> D[Process C]
+    B --> E[End]
+    C --> E
+    D --> E
+    style B fill:#ffebee
+    style C fill:#ffebee
+    style D fill:#ffebee
 ```
 
 Process multiple items simultaneously.
@@ -63,6 +83,18 @@ steps:
     depends:
       - test-a
       - test-b
+```
+
+```mermaid
+graph TD
+    A[setup] --> B[test-a]
+    A --> C[test-b]
+    B --> D[deploy]
+    C --> D
+    style A fill:#e3f2fd
+    style B fill:#fff3e0
+    style C fill:#fff3e0
+    style D fill:#e8f5e8
 ```
 
 Define complex dependency graphs.
@@ -98,6 +130,23 @@ steps:
     depends: step1  # Explicit dependency required
 ```
 
+```mermaid
+graph LR
+    subgraph Chain[Chain Type]
+        A1[download] --> A2[process] --> A3[upload]
+    end
+    
+    subgraph Graph[Graph Type]
+        B1[step1] --> B2[step2]
+    end
+    
+    style A1 fill:#e3f2fd
+    style A2 fill:#fff3e0
+    style A3 fill:#e8f5e8
+    style B1 fill:#e3f2fd
+    style B2 fill:#e8f5e8
+```
+
 Control execution flow patterns.
 
 <a href="/writing-workflows/control-flow#execution-types" class="learn-more">Learn more →</a>
@@ -121,6 +170,19 @@ steps:
     preconditions:
       - condition: "${ENV}"
         expected: "production"
+```
+
+```mermaid
+flowchart TD
+    A[Start] --> B{ENV == production?}
+    B -->|Yes| C[deploy]
+    B -->|No| D[Skip]
+    C --> E[End]
+    D --> E
+    
+    style B fill:#fff3e0
+    style C fill:#e8f5e8
+    style D fill:#ffebee
 ```
 
 Run steps only when conditions are met.
@@ -258,6 +320,20 @@ steps:
       intervalSec: 30
 ```
 
+```mermaid
+sequenceDiagram
+    participant D as Dagu
+    participant A as API
+    D->>A: Attempt 1
+    A-->>D: ❌ Failure
+    Note over D: Wait 30s
+    D->>A: Attempt 2 (Retry 1)
+    A-->>D: ❌ Failure
+    Note over D: Wait 30s
+    D->>A: Attempt 3 (Retry 2)
+    A-->>D: ✅ Success
+```
+
 Automatically retry failed steps.
 
 <a href="/writing-workflows/error-handling#retry" class="learn-more">Learn more →</a>
@@ -299,6 +375,18 @@ handlerOn:
 steps:
   - name: main
     command: ./process.sh
+```
+
+```mermaid
+stateDiagram-v2
+    [*] --> Running
+    Running --> Success: Success
+    Running --> Failed: Failure
+    Success --> NotifySuccess: handlerOn.success
+    Failed --> CleanupFail: handlerOn.failure
+    NotifySuccess --> AlwaysCleanup: handlerOn.exit
+    CleanupFail --> AlwaysCleanup: handlerOn.exit
+    AlwaysCleanup --> [*]
 ```
 
 Run handlers on workflow events.
@@ -857,11 +945,37 @@ Send email alerts on events.
 ```yaml
 steps:
   - name: data-pipeline
-    run: workflows/etl.yaml
+    run: etl.yaml
     params: "ENV=prod DATE=today"
   - name: analyze
-    run: workflows/analyze.yaml
+    run: analyze.yaml
     depends: data-pipeline
+```
+
+```mermaid
+graph TD
+    subgraph Main[Main Workflow]
+        A[data-pipeline] --> B[analyze]
+    end
+    
+    subgraph ETL[etl.yaml]
+        C[extract] --> D[transform] --> E[load]
+    end
+    
+    subgraph Analysis[analyze.yaml]
+        F[aggregate] --> G[visualize]
+    end
+    
+    A -.-> C
+    B -.-> F
+    
+    style A fill:#e3f2fd
+    style B fill:#e3f2fd
+    style C fill:#fff3e0
+    style D fill:#fff3e0
+    style E fill:#fff3e0
+    style F fill:#e8f5e8
+    style G fill:#e8f5e8
 ```
 
 Compose workflows from reusable parts.
@@ -939,26 +1053,6 @@ steps:
 Complete DAG with all configuration options.
 
 <a href="/reference/yaml" class="learn-more">Learn more →</a>
-
-</div>
-
-<div class="example-card">
-
-### Schema Definition Usage
-
-```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/dagu-org/dagu/main/schemas/dag.schema.json
-
-name: schema-enabled-dag
-description: DAG with IDE auto-completion
-steps:
-  - name: validated-step
-    command: echo "Schema validation active"
-```
-
-Enable IDE auto-completion and validation.
-
-<a href="/reference/yaml#schema" class="learn-more">Learn more →</a>
 
 </div>
 
