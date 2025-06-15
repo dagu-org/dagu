@@ -113,11 +113,29 @@ export default withMermaid(
           href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap",
         },
       ],
+      [
+        "script",
+        {},
+        `
+          // Set dark mode as default
+          ;(function() {
+            const userMode = localStorage.getItem('vitepress-theme-appearance')
+            if (!userMode || userMode === 'auto') {
+              localStorage.setItem('vitepress-theme-appearance', 'dark')
+              document.documentElement.classList.add('dark')
+            }
+          })()
+        `
+      ]
     ],
 
     themeConfig: {
       logo: "/logo.svg",
       siteTitle: "Dagu",
+      
+      appearance: {
+        defaultTheme: 'dark'
+      },
 
       outline: {
         level: [2, 3],
