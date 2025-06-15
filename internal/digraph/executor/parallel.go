@@ -341,9 +341,8 @@ func (e *parallelExecutor) Kill(sig os.Signal) error {
 
 	// Kill all running child processes
 	var lastErr error
-	for runID, cmd := range e.running {
+	for _, cmd := range e.running {
 		if cmd != nil && cmd.Process != nil {
-			logger.Info(context.Background(), "Killing child DAG", "runId", runID)
 			if err := syscall.Kill(-cmd.Process.Pid, sig.(syscall.Signal)); err != nil {
 				lastErr = err
 			}
