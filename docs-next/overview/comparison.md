@@ -20,32 +20,27 @@ How Dagu compares to other workflow orchestration tools.
 ### Architecture
 
 **Airflow:**
-```
-┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-│  Webserver  │  │  Scheduler  │  │   Worker    │
-└──────┬──────┘  └──────┬──────┘  └──────┬──────┘
-       │                 │                 │
-       └─────────────────┴─────────────────┘
-                         │
-              ┌──────────┴──────────┐
-              │     PostgreSQL      │
-              └──────────┬──────────┘
-                         │
-              ┌──────────┴──────────┐
-              │  Redis/RabbitMQ     │
-              └─────────────────────┘
+```mermaid
+graph TD
+    A[Webserver] --> D[PostgreSQL]
+    B[Scheduler] --> D
+    C[Worker] --> D
+    D --> E[Redis/RabbitMQ]
+    
+    style A fill:#f9f9f9
+    style B fill:#f9f9f9
+    style C fill:#f9f9f9
+    style D fill:#e1f5fe
+    style E fill:#e1f5fe
 ```
 
 **Dagu:**
-```
-┌─────────────────────────┐
-│    Single Binary        │
-│  (Scheduler + UI + API) │
-└────────────┬────────────┘
-             │
-┌────────────┴────────────┐
-│     File System         │
-└─────────────────────────┘
+```mermaid
+graph TD
+    A[Single Binary<br/>Scheduler + UI + API] --> B[File System]
+    
+    style A fill:#e8f5e8
+    style B fill:#f3e5f5
 ```
 
 ### Key Differences
@@ -131,14 +126,12 @@ steps:
       
   - name: transform
     command: python transform.py
-    depends: extract
     retryPolicy:
       limit: 3
       intervalSec: 300
       
   - name: load
     command: python load.py
-    depends: transform
     retryPolicy:
       limit: 3
       intervalSec: 300

@@ -1,4 +1,5 @@
 import { defineConfig } from "vitepress";
+import { withMermaid } from "vitepress-plugin-mermaid";
 
 // Define the complete sidebar structure
 const fullSidebar = [
@@ -90,101 +91,120 @@ const fullSidebar = [
   },
 ];
 
-export default defineConfig({
-  title: "Dagu",
-  description: "Modern workflow orchestration made simple",
-
-  head: [
-    ["link", { rel: "icon", href: "/favicon.ico" }],
-    ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
-    [
-      "link",
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" },
-    ],
-    [
-      "link",
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap",
-      },
-    ],
-  ],
-
-  themeConfig: {
-    logo: "/logo.svg",
-    siteTitle: "Dagu",
-
-    outline: {
-      level: [2, 3],
-      label: "On this page"
-    },
-
-    nav: [
-      { text: "Overview", link: "/overview/", activeMatch: "/overview/" },
-      {
-        text: "Getting Started",
-        link: "/getting-started/",
-        activeMatch: "/getting-started/",
-      },
-      {
-        text: "Writing Workflows",
-        link: "/writing-workflows/",
-        activeMatch: "/writing-workflows/",
-      },
-      { text: "Features", link: "/features/", activeMatch: "/features/" },
-      {
-        text: "Configurations",
-        link: "/configurations/",
-        activeMatch: "/configurations/",
-      },
-      { text: "Reference", link: "/reference/", activeMatch: "/reference/" },
+export default withMermaid(
+  defineConfig({
+    title: "Dagu",
+    description: "Modern workflow orchestration made simple",
+    head: [
+      ["link", { rel: "icon", href: "/favicon.ico" }],
+      ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
+      [
+        "link",
+        {
+          rel: "preconnect",
+          href: "https://fonts.gstatic.com",
+          crossorigin: "",
+        },
+      ],
+      [
+        "link",
+        {
+          rel: "stylesheet",
+          href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap",
+        },
+      ],
     ],
 
-    sidebar: {
-      "/": fullSidebar,
-      "/overview/": fullSidebar,
-      "/getting-started/": fullSidebar,
-      "/writing-workflows/": fullSidebar,
-      "/features/": fullSidebar,
-      "/configurations/": fullSidebar,
-      "/reference/": fullSidebar,
-    },
+    themeConfig: {
+      logo: "/logo.svg",
+      siteTitle: "Dagu",
 
-    socialLinks: [{ icon: "github", link: "https://github.com/dagu-org/dagu" }],
+      outline: {
+        level: [2, 3],
+        label: "On this page",
+      },
 
-    footer: {
-      message: "Released under the MIT License.",
-      copyright: "Copyright © 2024 Dagu Contributors",
-    },
+      nav: [
+        { text: "Overview", link: "/overview/", activeMatch: "/overview/" },
+        {
+          text: "Getting Started",
+          link: "/getting-started/",
+          activeMatch: "/getting-started/",
+        },
+        {
+          text: "Writing Workflows",
+          link: "/writing-workflows/",
+          activeMatch: "/writing-workflows/",
+        },
+        { text: "Features", link: "/features/", activeMatch: "/features/" },
+        {
+          text: "Configurations",
+          link: "/configurations/",
+          activeMatch: "/configurations/",
+        },
+        { text: "Reference", link: "/reference/", activeMatch: "/reference/" },
+      ],
 
-    search: {
-      provider: "local",
-      options: {
-        placeholder: "Search docs...",
-        disableDetailedView: false,
-        disableQueryPersistence: false,
+      sidebar: {
+        "/": fullSidebar,
+        "/overview/": fullSidebar,
+        "/getting-started/": fullSidebar,
+        "/writing-workflows/": fullSidebar,
+        "/features/": fullSidebar,
+        "/configurations/": fullSidebar,
+        "/reference/": fullSidebar,
+      },
+
+      socialLinks: [
+        { icon: "github", link: "https://github.com/dagu-org/dagu" },
+      ],
+
+      footer: {
+        message: "Released under the MIT License.",
+        copyright: "Copyright © 2024 Dagu Contributors",
+      },
+
+      search: {
+        provider: "local",
+        options: {
+          placeholder: "Search docs...",
+          disableDetailedView: false,
+          disableQueryPersistence: false,
+        },
+      },
+
+      editLink: {
+        pattern: "https://github.com/dagu-org/dagu/edit/main/docs-next/:path",
+        text: "Edit this page on GitHub",
       },
     },
 
-    editLink: {
-      pattern: "https://github.com/dagu-org/dagu/edit/main/docs-next/:path",
-      text: "Edit this page on GitHub",
+    markdown: {
+      theme: {
+        light: "github-light",
+        dark: "github-dark",
+      },
+      lineNumbers: true,
+      config: () => {
+        // Add any markdown-it plugins here
+      },
     },
 
-    outline: {
-      level: [2, 3],
-      label: "On this page"
+    // Mermaid plugin configuration
+    mermaid: {
+      theme: "default",
+      darkMode: true,
+      themeVariables: {
+        primaryColor: "#00d9ff",
+        primaryTextColor: "#eee",
+        primaryBorderColor: "#0085a3",
+        lineColor: "#666",
+        secondaryColor: "#f3f3f3",
+        tertiaryColor: "#eee",
+      },
     },
-  },
-
-  markdown: {
-    theme: {
-      light: "github-light",
-      dark: "github-dark",
+    mermaidPlugin: {
+      class: "mermaid my-class", // set additional css classes for parent container
     },
-    lineNumbers: true,
-    config: () => {
-      // Add any markdown-it plugins here
-    },
-  },
-});
+  })
+);
