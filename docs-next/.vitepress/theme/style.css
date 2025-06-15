@@ -1,6 +1,6 @@
 :root {
   /* Dagu Brand Colors */
-  --vp-c-brand-1: #00d9ff;
+  --vp-c-brand-1: #25b3c0;
   --vp-c-brand-2: #00a8cc;
   --vp-c-brand-3: #0085a3;
   --vp-c-brand-soft: rgba(0, 217, 255, 0.14);
@@ -26,7 +26,7 @@
     monospace;
 
   /* Custom gradient for hero text */
-  --dagu-gradient: linear-gradient(120deg, #00d9ff 0%, #00a8cc 100%);
+  --dagu-gradient: linear-gradient(120deg, #2dc6d4 0%, #00a8cc 100%);
 }
 
 .dark {
@@ -111,7 +111,6 @@
   padding: 1rem;
   transition: all 0.2s ease;
 }
-
 
 .example-card h3 {
   margin: 0 0 0.5rem 0;

@@ -195,7 +195,7 @@ export default withMermaid(
       theme: "default",
       darkMode: true,
       themeVariables: {
-        primaryColor: "#00d9ff",
+        primaryColor: "#25b3c0",
         primaryTextColor: "#eee",
         primaryBorderColor: "#0085a3",
         lineColor: "#666",

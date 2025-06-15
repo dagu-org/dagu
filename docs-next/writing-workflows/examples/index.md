@@ -22,8 +22,8 @@ steps:
 ```mermaid
 graph LR
     A[first] --> B[second]
-    style A fill:#e8f5e8
-    style B fill:#e8f5e8
+    style A fill:white,stroke:lightblue,stroke-width:1.6px
+    style B fill:white,stroke:lightblue,stroke-width:1.6px
 ```
 
 Execute steps one after another.
@@ -53,9 +53,11 @@ graph TD
     B --> E[End]
     C --> E
     D --> E
-    style B fill:#ffebee
-    style C fill:#ffebee
-    style D fill:#ffebee
+    style A fill:white,stroke:lightblue,stroke-width:1.6px
+    style B fill:white,stroke:lime,stroke-width:1.6px
+    style C fill:white,stroke:lime,stroke-width:1.6px
+    style D fill:white,stroke:lime,stroke-width:1.6px
+    style E fill:white,stroke:green,stroke-width:1.6px
 ```
 
 Process multiple items simultaneously.
@@ -91,10 +93,10 @@ graph TD
     A --> C[test-b]
     B --> D[deploy]
     C --> D
-    style A fill:#e3f2fd
-    style B fill:#fff3e0
-    style C fill:#fff3e0
-    style D fill:#e8f5e8
+    style A fill:white,stroke:lightblue,stroke-width:1.6px
+    style B fill:white,stroke:lightblue,stroke-width:1.6px
+    style C fill:white,stroke:lightblue,stroke-width:1.6px
+    style D fill:white,stroke:lightblue,stroke-width:1.6px
 ```
 
 Define complex dependency graphs.
@@ -140,11 +142,11 @@ graph LR
         B1[step1] --> B2[step2]
     end
     
-    style A1 fill:#e3f2fd
-    style A2 fill:#fff3e0
-    style A3 fill:#e8f5e8
-    style B1 fill:#e3f2fd
-    style B2 fill:#e8f5e8
+    style A1 fill:white,stroke:lightblue,stroke-width:1.6px
+    style A2 fill:white,stroke:lightblue,stroke-width:1.6px
+    style A3 fill:white,stroke:lightblue,stroke-width:1.6px
+    style B1 fill:white,stroke:lightblue,stroke-width:1.6px
+    style B2 fill:white,stroke:lightblue,stroke-width:1.6px
 ```
 
 Control execution flow patterns.
@@ -180,9 +182,11 @@ flowchart TD
     C --> E[End]
     D --> E
     
-    style B fill:#fff3e0
-    style C fill:#e8f5e8
-    style D fill:#ffebee
+    style A fill:white,stroke:lightblue,stroke-width:1.6px
+    style B fill:white,stroke:lightblue,stroke-width:1.6px
+    style C fill:white,stroke:green,stroke-width:1.6px
+    style D fill:white,stroke:gray,stroke-width:1.6px
+    style E fill:white,stroke:lightblue,stroke-width:1.6px
 ```
 
 Run steps only when conditions are met.
@@ -387,6 +391,16 @@ stateDiagram-v2
     NotifySuccess --> AlwaysCleanup: handlerOn.exit
     CleanupFail --> AlwaysCleanup: handlerOn.exit
     AlwaysCleanup --> [*]
+    
+    classDef running fill:white,stroke:lime,stroke-width:1.6px
+    classDef success fill:white,stroke:green,stroke-width:1.6px
+    classDef failed fill:white,stroke:red,stroke-width:1.6px
+    classDef handler fill:white,stroke:lightblue,stroke-width:1.6px
+    
+    class Running running
+    class Success success
+    class Failed failed
+    class NotifySuccess,CleanupFail,AlwaysCleanup handler
 ```
 
 Run handlers on workflow events.
@@ -955,7 +969,7 @@ steps:
 ```mermaid
 graph TD
     subgraph Main[Main Workflow]
-        A[data-pipeline] --> B[analyze]
+        A{{data-pipeline}} --> B{{analyze}}
     end
     
     subgraph ETL[etl.yaml]
@@ -969,13 +983,13 @@ graph TD
     A -.-> C
     B -.-> F
     
-    style A fill:#e3f2fd
-    style B fill:#e3f2fd
-    style C fill:#fff3e0
-    style D fill:#fff3e0
-    style E fill:#fff3e0
-    style F fill:#e8f5e8
-    style G fill:#e8f5e8
+    style A fill:white,stroke:lightblue,stroke-width:1.6px
+    style B fill:white,stroke:lightblue,stroke-width:1.6px
+    style C fill:white,stroke:lightblue,stroke-width:1.6px
+    style D fill:white,stroke:lightblue,stroke-width:1.6px
+    style E fill:white,stroke:lightblue,stroke-width:1.6px
+    style F fill:white,stroke:lightblue,stroke-width:1.6px
+    style G fill:white,stroke:lightblue,stroke-width:1.6px
 ```
 
 Compose workflows from reusable parts.
