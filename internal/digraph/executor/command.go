@@ -160,6 +160,7 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 
 func init() {
 	Register("", newCommand)
+	Register("shell", newCommand)
 	Register("command", newCommand)
 }
 
