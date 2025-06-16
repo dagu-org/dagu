@@ -37,16 +37,6 @@ brew install dagu-org/brew/dagu
 brew upgrade dagu
 ```
 
-### Go Install
-
-If you have Go 1.21+ installed:
-
-```bash
-go install github.com/dagu-org/dagu/cmd/dagu@latest
-```
-
-This installs to `$GOPATH/bin` (usually `~/go/bin`).
-
 ## Binary Download
 
 Download pre-built binaries from [GitHub Releases](https://github.com/dagu-org/dagu/releases).

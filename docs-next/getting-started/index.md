@@ -1,78 +1,76 @@
 # Quick Start Guide
 
-Get Dagu running in 5 minutes with this simple guide.
+Get Dagu running in 5 minutes using Docker.
 
-## Step 1: Install Dagu
+## Step 1: Create Your First Workflow
 
-Choose your preferred installation method:
-
-::: code-group
-
-```bash [Script (Recommended)]
-curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
-```
-
-```bash [Homebrew]
-brew install dagu-org/brew/dagu
-```
-
-```bash [Docker]
-docker run \
-  --rm \
-  -p 8080:8080 \
-  -v ~/.dagu:/app/dagu \
-  -e DAGU_HOME=/app/dagu \
-  -e DAGU_TZ=`ls -l /etc/localtime | awk -F'/zoneinfo/' '{print $2}'` \
-  ghcr.io/dagu-org/dagu:latest dagu start-all
-
-# Options explained:
-# --rm                     Remove container after exit
-# -p 8080:8080            Map port 8080 for web UI access
-# -v ~/.dagu:/app/dagu    Mount local directory for persistent storage
-# -e DAGU_HOME=/app/dagu  Set Dagu home directory inside container
-# -e DAGU_TZ=...          Auto-detect timezone from host system
-```
-
-:::
-
-## Step 2: Create Your First Workflow
-
-Create a file named `hello.yaml` with this content:
-
-```yaml
-steps:
-  - name: step 1
-    command: echo "Hello from Dagu!"
-  - name: step 2  
-    command: echo "DAG completed successfully!"
-    depends: step 1
-```
-
-## Step 3: Run Your Workflow
-
-Execute the workflow:
+Create a workflow file in your Dagu directory:
 
 ```bash
-dagu start hello.yaml
+mkdir -p ~/.dagu/dags
+cd ~/.dagu/dags
+```
+
+Create `hello.yaml`:
+
+```bash
+cat > hello.yaml << EOF
+steps:
+  - name: greet
+    command: echo "Hello from Dagu!"
+  - name: finish  
+    command: echo "Workflow completed successfully!"
+    depends: greet
+EOF
+```
+
+## Step 2: Run Your Workflow via Docker
+
+Execute the workflow using Docker:
+
+```bash
+docker run --rm \
+  -v ~/.dagu:/app/.dagu \
+  -e DAGU_HOME=/app/.dagu \
+  ghcr.io/dagu-org/dagu:latest \
+  dagu start hello
 ```
 
 You'll see the output from both steps in your terminal.
 
-## Step 4: Launch the Web UI
+## Step 3: Start the Server via Docker
 
 Start the Dagu server and scheduler:
 
 ```bash
-dagu start-all
+docker run -d \
+  --name dagu-server \
+  -p 8080:8080 \
+  -v ~/.dagu:/app/.dagu \
+  -e DAGU_HOME=/app/.dagu \
+  ghcr.io/dagu-org/dagu:latest \
+  dagu start-all
 ```
+
+## Step 4: Open the Web UI
 
 Open your browser to http://localhost:8080
 
 You can now:
-- View all your workflows
-- Monitor execution in real-time
+- View your `hello.yaml` workflow in the DAGs list
+- Click on it to see the visual graph
+- Execute it directly from the UI
+- Monitor execution logs in real-time
 - Edit workflows in the browser
-- Check execution history
+
+## Stopping the Server
+
+To stop the Dagu server when you're done:
+
+```bash
+docker stop dagu-server
+docker rm dagu-server
+```
 
 ## Next: Create a More Complex Workflow
 

@@ -28,6 +28,7 @@ const fullSidebar = [
       { text: "Introduction", link: "/writing-workflows/" },
       { text: "Basics", link: "/writing-workflows/basics" },
       { text: "Examples", link: "/writing-workflows/examples/" },
+      { text: "Parameters", link: "/writing-workflows/parameters" },
       { text: "Control Flow", link: "/writing-workflows/control-flow" },
       { text: "Data & Variables", link: "/writing-workflows/data-variables" },
       { text: "Error Handling", link: "/writing-workflows/error-handling" },
@@ -137,6 +138,7 @@ export default withMermaid(
     themeConfig: {
       logo: "/logo.svg",
       siteTitle: "Dagu",
+      logoLink: "https://dagu.cloud/",
       
       appearance: {
         defaultTheme: 'dark'
