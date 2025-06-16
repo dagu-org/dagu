@@ -10,13 +10,13 @@ Dagu follows a simple philosophy: **do one thing well with minimal dependencies*
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                         User Interfaces                      │
+│                         User Interfaces                     │
 ├─────────────┬──────────────────┬────────────────────────────┤
 │     CLI     │     Web UI       │         REST API           │
 └─────────────┴──────────────────┴────────────────────────────┘
                               │
 ┌─────────────────────────────┴───────────────────────────────┐
-│                        Core Engine                           │
+│                        Core Engine                          │
 ├─────────────┬──────────────────┬────────────────────────────┤
 │  Scheduler  │  Executor        │    Queue Manager           │
 ├─────────────┼──────────────────┼────────────────────────────┤
@@ -24,7 +24,7 @@ Dagu follows a simple philosophy: **do one thing well with minimal dependencies*
 └─────────────┴──────────────────┴────────────────────────────┘
                               │
 ┌─────────────────────────────┴───────────────────────────────┐
-│                      Storage Layer                           │
+│                      Storage Layer                          │
 ├─────────────┬──────────────────┬────────────────────────────┤
 │  DAG Files  │    Log Files     │    State Files             │
 └─────────────┴──────────────────┴────────────────────────────┘
@@ -67,25 +67,36 @@ Dagu follows a simple philosophy: **do one thing well with minimal dependencies*
 
 ## Storage Architecture
 
-Dagu uses a file-based storage system organized as follows:
+Dagu follows the XDG Base Directory specification for file organization:
 
 ```
+~/.config/dagu/
+├── dags/              # Workflow definitions
+│   ├── my-workflow.yaml
+│   └── another-workflow.yaml
+├── config.yaml        # Main configuration
+└── base.yaml          # Shared base configuration
+
 ~/.local/share/dagu/
-├── logs/
+├── logs/              # Execution logs
+│   ├── admin/         # Admin/scheduler logs
+│   └── dags/
+│       └── my-workflow/
+│           └── 20240315_120000_abc123/
+│               ├── step1.stdout.log
+│               ├── step1.stderr.log
+│               └── status.yaml
+├── data/              # Workflow state and history
 │   └── my-workflow/
-│       └── 20240315_120000_abc123/
-│           ├── step1.stdout.log
-│           ├── step1.stderr.log
-│           └── workflow.log
-├── data/
-│   └── my-workflow/
-│       └── status.json
-├── history/
-│   └── my-workflow/
-│       └── 20240315.json
-└── suspend/
+│       ├── status.yaml
+│       └── history/
+│           └── 20240315.yaml
+└── suspend/           # Workflow suspend flags
     └── my-workflow.suspend
 ```
+
+### Legacy Mode
+If `~/.dagu` directory exists or `DAGU_HOME` environment variable is set, all files are stored under that single directory instead of following XDG specification.
 
 ### Why File-Based Storage?
 

@@ -156,9 +156,9 @@ Dagu is open source and welcomes contributions. Join us in making workflow orche
     <span class="icon">📦</span>
     <span>GitHub</span>
   </a>
-  <a href="https://github.com/dagu-org/dagu/discussions" class="community-link">
+  <a href="https://discord.gg/gpahPpqyAP" class="community-link">
     <span class="icon">💬</span>
-    <span>Discussions</span>
+    <span>Discord</span>
   </a>
   <a href="https://github.com/dagu-org/dagu/issues" class="community-link">
     <span class="icon">🐛</span>

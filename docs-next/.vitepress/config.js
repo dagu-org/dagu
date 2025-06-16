@@ -87,6 +87,7 @@ const fullSidebar = [
       { text: "Variables", link: "/reference/variables" },
       { text: "Executors", link: "/reference/executors" },
       { text: "Troubleshooting", link: "/reference/troubleshooting" },
+      { text: "Changelog", link: "/reference/changelog" },
     ],
   },
 ];

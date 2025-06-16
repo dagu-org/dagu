@@ -309,7 +309,7 @@ handlerOn:
 
 ### File Structure
 
-Dagu stores data in a predictable structure:
+Dagu follows the XDG Base Directory specification:
 
 ```
 ~/.config/dagu/
@@ -321,13 +321,22 @@ Dagu stores data in a predictable structure:
 
 ~/.local/share/dagu/
 ├── logs/              # Execution logs
+│   ├── admin/         # Scheduler/admin logs
+│   └── dags/
+│       └── etl/
+│           └── 20240115_140000_abc123/
+│               ├── step1.stdout.log
+│               ├── step1.stderr.log
+│               └── status.yaml
+├── data/              # Workflow state and history
 │   └── etl/
-│       └── 20240115_140000_abc123/
-│           ├── step1.stdout.log
-│           └── step1.stderr.log
-├── history/           # Execution history
-└── queue/             # Queued executions
+│       ├── status.yaml
+│       └── history/
+│           └── 20240115.yaml
+└── suspend/           # Workflow suspend flags
 ```
+
+**Note**: If `~/.dagu` exists or `DAGU_HOME` is set, all files are stored under that directory instead.
 
 ### Log Management
 
@@ -524,12 +533,15 @@ handlerOn:
 
 ### Log Location
 ```bash
-# Workflow logs
-~/.local/share/dagu/logs/<workflow>/<timestamp>/workflow.log
+# Step logs (stdout and stderr)
+~/.local/share/dagu/logs/dags/<workflow>/<timestamp>/<step>.stdout.log
+~/.local/share/dagu/logs/dags/<workflow>/<timestamp>/<step>.stderr.log
 
-# Step logs
-~/.local/share/dagu/logs/<workflow>/<timestamp>/<step>.stdout.log
-~/.local/share/dagu/logs/<workflow>/<timestamp>/<step>.stderr.log
+# Step status
+~/.local/share/dagu/logs/dags/<workflow>/<timestamp>/status.yaml
+
+# Admin/scheduler logs
+~/.local/share/dagu/logs/admin/
 ```
 
 ## Next Steps

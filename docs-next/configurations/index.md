@@ -53,10 +53,9 @@ auth:
     password: ${DAGU_ADMIN_PASSWORD}  # From environment
 
 # Directories
-paths:
-  dagsDir: /opt/dagu/workflows
-  logDir: /var/log/dagu
-  dataDir: /var/lib/dagu
+dagsDir: /opt/dagu/workflows
+logDir: /var/log/dagu
+dataDir: /var/lib/dagu
 ```
 
 ### Docker
@@ -133,10 +132,9 @@ permissions:
   runDAGs: true     # Can execute
 
 # Paths
-paths:
-  dagsDir: /opt/dagu/workflows
-  logDir: /var/log/dagu
-  dataDir: /var/lib/dagu
+dagsDir: /opt/dagu/workflows
+logDir: /var/log/dagu
+dataDir: /var/lib/dagu
 
 # UI
 ui:
@@ -151,9 +149,8 @@ ui:
 debug: false
 
 # Paths
-paths:
-  logDir: /var/log/dagu
-  dataDir: /var/lib/dagu
+logDir: /var/log/dagu
+dataDir: /var/lib/dagu
   
 # Note: maxActiveRuns, maxCleanUpTimeSec, and histRetentionDays 
 # are DAG-level configurations, not server configurations
@@ -168,8 +165,7 @@ port: 8080
 debug: true
 
 # Hot reload friendly
-paths:
-  dagsDir: ./workflows
+dagsDir: ./workflows
 workDir: ./
 
 # No authentication
@@ -188,7 +184,7 @@ export DAGU_HOST=0.0.0.0
 export DAGU_PORT=8080
 
 # Paths
-export DAGU_DAGS=/opt/workflows
+export DAGU_DAGS_DIR=/opt/workflows
 export DAGU_LOG_DIR=/var/log/dagu
 export DAGU_DATA_DIR=/var/lib/dagu
 
