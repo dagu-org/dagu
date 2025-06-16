@@ -131,6 +131,38 @@ steps:
 - Performance improvements for large workflows
 - Various UI/UX enhancements: #925, #898, #895, #868, #903, #911, #913, #921, #923, #887, #922, #932, #962
 
+### Breaking Changes
+
+#### ⚠️ DAG Type Field (v1.17.0-beta.13+)
+
+Starting from v1.17.0-beta.13, DAGs now have a `type` field that controls step execution behavior:
+
+- **`type: chain`** (new default): Steps are automatically connected in sequence, even if no dependencies are specified
+- **`type: graph`** (previous behavior): Steps only depend on explicitly defined dependencies
+
+To maintain the previous behavior, add `type: graph` to your DAG configuration:
+
+```yaml
+type: graph
+steps:
+  - name: task1
+    command: echo "runs in parallel"
+  - name: task2
+    command: echo "runs in parallel"
+```
+
+Alternatively, you can explicitly set empty dependencies for parallel steps:
+
+```yaml
+steps:
+  - name: task1
+    command: echo "runs in parallel"
+    depends: []
+  - name: task2
+    command: echo "runs in parallel"
+    depends: []
+```
+
 ### Migration Required
 
 ⚠️ **History Data Migration**: Due to internal improvements, history data from 1.16.x requires migration:

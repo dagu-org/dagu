@@ -27,7 +27,7 @@ const fullSidebar = [
     items: [
       { text: "Introduction", link: "/writing-workflows/" },
       { text: "Basics", link: "/writing-workflows/basics" },
-      { text: "By Examples", link: "/writing-workflows/examples/" },
+      { text: "Examples", link: "/writing-workflows/examples/" },
       { text: "Control Flow", link: "/writing-workflows/control-flow" },
       { text: "Data & Variables", link: "/writing-workflows/data-variables" },
       { text: "Error Handling", link: "/writing-workflows/error-handling" },
@@ -57,7 +57,6 @@ const fullSidebar = [
           { text: "HTTP", link: "/features/executors/http" },
           { text: "Mail", link: "/features/executors/mail" },
           { text: "JQ", link: "/features/executors/jq" },
-          { text: "DAG", link: "/features/executors/dag" },
         ],
       },
       { text: "Scheduling", link: "/features/scheduling" },

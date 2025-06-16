@@ -1,4 +1,4 @@
-# By Examples
+# Examples
 
 Quick reference for all Dagu features. Each example is minimal and copy-paste ready.
 
