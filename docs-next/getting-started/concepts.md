@@ -127,6 +127,7 @@ Each step progresses through states:
 stateDiagram-v2
     [*] --> Pending
     Pending --> Running
+    Pending --> Skipped
     Running --> Success
     Running --> Failed
     Running --> Cancelled
@@ -134,18 +135,21 @@ stateDiagram-v2
     Success --> [*]
     Failed --> [*]
     Cancelled --> [*]
+    Skipped --> [*]
     
     classDef pending stroke:gray,stroke-width:1.6px,color:#333
     classDef running stroke:lightblue,stroke-width:1.6px,color:#333
     classDef success stroke:green,stroke-width:1.6px,color:#333
     classDef failed stroke:red,stroke-width:1.6px,color:#333
     classDef cancelled stroke:orange,stroke-width:1.6px,color:#333
+    classDef skipped stroke:yellow,stroke-width:1.6px,color:#333
     
     class Pending pending
     class Running running
     class Success success
     class Failed failed
     class Cancelled cancelled
+    class Skipped skipped
 ```
 
 ### Parallel Execution
@@ -343,8 +347,8 @@ Dagu follows the XDG Base Directory specification:
 │   └── dags/
 │       └── etl/
 │           └── 20240115_140000_abc123/
-│               ├── step1.stdout.log
-│               ├── step1.stderr.log
+│               ├── step1.out
+│               ├── step1.err
 │               └── status.yaml
 ├── data/              # Workflow state and history
 │   └── etl/
@@ -470,8 +474,8 @@ See the [API Reference](/reference/api/) for full details.
 ### Log Location
 ```bash
 # Step logs (stdout and stderr)
-~/.local/share/dagu/logs/dags/<workflow>/<timestamp>/<step>.stdout.log
-~/.local/share/dagu/logs/dags/<workflow>/<timestamp>/<step>.stderr.log
+~/.local/share/dagu/logs/dags/<workflow>/<timestamp>/<step>.out
+~/.local/share/dagu/logs/dags/<workflow>/<timestamp>/<step>.err
 
 # Step status
 ~/.local/share/dagu/logs/dags/<workflow>/<timestamp>/status.yaml
