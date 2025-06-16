@@ -72,6 +72,20 @@ steps:                      # List of tasks to execute
     command: echo "..."
 ```
 
+### Workflow Execution Flow
+
+```mermaid
+graph TD
+    A[greet] --> B[show-date]
+    B --> C[done]
+    
+    style A fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
+    style B fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
+    style C fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
+```
+
+Since no dependencies are specified, steps run sequentially by default.
+
 ### Key Concepts
 
 1. **Steps**: Individual tasks in your workflow
@@ -245,7 +259,25 @@ steps:
       - process-documents
 ```
 
-The three processing steps will run in parallel!
+### Parallel Execution Flow
+
+```mermaid
+graph TD
+    A[prepare] --> B[process-images]
+    A --> C[process-videos]
+    A --> D[process-documents]
+    B --> E[combine-results]
+    C --> E
+    D --> E
+    
+    style A fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
+    style B fill:white,stroke:lime,stroke-width:1.6px,color:#333
+    style C fill:white,stroke:lime,stroke-width:1.6px,color:#333
+    style D fill:white,stroke:lime,stroke-width:1.6px,color:#333
+    style E fill:white,stroke:green,stroke-width:1.6px,color:#333
+```
+
+The three processing steps run in parallel after `prepare` completes!
 
 ## Tips for Writing Workflows
 
@@ -333,6 +365,19 @@ steps:
       - process-part-2
 ```
 
+```mermaid
+graph TD
+    A[split] --> B[process-part-1]
+    A --> C[process-part-2]
+    B --> D[merge]
+    C --> D
+    
+    style A fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
+    style B fill:white,stroke:lime,stroke-width:1.6px,color:#333
+    style C fill:white,stroke:lime,stroke-width:1.6px,color:#333
+    style D fill:white,stroke:green,stroke-width:1.6px,color:#333
+```
+
 ### Conditional Execution
 ```yaml
 steps:
@@ -346,6 +391,18 @@ steps:
     preconditions:
       - condition: "${SHOULD_PROCEED}"
         expected: "yes"
+```
+
+```mermaid
+flowchart TD
+    A[check-condition] --> B{SHOULD_PROCEED == yes?}
+    B -->|Yes| C[conditional-step]
+    B -->|No| D[Skip]
+    
+    style A fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
+    style B fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
+    style C fill:white,stroke:green,stroke-width:1.6px,color:#333
+    style D fill:white,stroke:gray,stroke-width:1.6px,color:#333
 ```
 
 ## Debugging Workflows

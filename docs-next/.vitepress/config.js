@@ -249,7 +249,7 @@ export default withMermaid(
       darkMode: true,
       themeVariables: {
         primaryColor: "#25b3c0",
-        primaryTextColor: "#eee",
+        primaryTextColor: "#333",
         primaryBorderColor: "#0085a3",
         lineColor: "#666",
         secondaryColor: "#f3f3f3",

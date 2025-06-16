@@ -350,3 +350,20 @@
 .community-link .icon {
   font-size: 1.25rem;
 }
+
+/* Mermaid diagram styling - force consistent colors */
+.mermaid .node text,
+.mermaid .edge-label text,
+.mermaid .label text {
+  fill: #333 !important;
+  color: #333 !important;
+}
+
+.mermaid .nodeLabel {
+  color: #333 !important;
+}
+
+.mermaid text {
+  fill: #333 !important;
+  color: #333 !important;
+}
