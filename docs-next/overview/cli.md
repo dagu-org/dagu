@@ -340,85 +340,6 @@ curl http://localhost:8080/api/v2/metrics
 curl -f http://localhost:8080/api/v1/health || exit 1
 ```
 
-## Best Practices
-
-### 1. **Use Dry Run for Testing**
-```bash
-# Always test complex workflows
-dagu dry complex-workflow.yaml
-```
-
-### 2. **Version Control Your Workflows**
-```bash
-# Keep workflows in git
-git add workflows/
-git commit -m "Add new ETL workflow"
-```
-
-### 3. **Use Meaningful Run IDs**
-```bash
-# For tracking
-dagu enqueue --run-id="deploy-$(date +%Y%m%d-%H%M%S)" deploy.yaml
-```
-
-### 4. **Monitor Execution**
-```bash
-# Capture output and monitor status
-dagu start my-workflow.yaml
-dagu status my-workflow.yaml
-```
-
-### 5. **Handle Signals Properly**
-```bash
-# Graceful shutdown
-trap 'dagu stop my-workflow.yaml' SIGINT SIGTERM
-dagu start my-workflow.yaml
-```
-
-## Troubleshooting
-
-### Common Issues
-
-#### Workflow Not Found
-```bash
-# Check path with dry run
-dagu dry ./workflows/my-workflow.yaml
-
-# Use absolute path
-dagu start /opt/dagu/workflows/my-workflow.yaml
-
-# Or use DAG name if already loaded
-dagu start my-workflow
-```
-
-#### Permission Denied
-```bash
-# Check file permissions
-ls -la my-workflow.yaml
-
-# Check execution permissions
-chmod +x my-workflow.yaml
-```
-
-#### Port Already in Use
-```bash
-# Find what's using the port
-lsof -i :8080
-
-# Use different port
-dagu start-all --port 9000
-```
-
-### Debug Mode
-
-```bash
-# Enable debug logging
-dagu --log-level debug start my-workflow.yaml
-
-# Verbose output
-DAGU_LOG_LEVEL=debug dagu start my-workflow.yaml
-```
-
 ## CLI Configuration
 
 ### Global Options
@@ -430,19 +351,7 @@ DAGU_LOG_LEVEL=debug dagu start my-workflow.yaml
 | `--log-format` | Output format | `text` |
 | `--quiet` | Suppress output | `false` |
 
-### Command Aliases
-
-Create shell aliases for common operations:
-
-```bash
-# ~/.bashrc or ~/.zshrc
-alias ds='dagu start'
-alias dst='dagu status'
-alias dr='dagu retry'
-alias dd='dagu dry'
-```
-
-## Next Steps
+## See Also
 
 - [Explore the REST API](/overview/api) for programmatic access
 - [Set up the Web UI](/overview/web-ui) for visual monitoring

@@ -438,108 +438,6 @@ curl -X POST http://localhost:8080/api/v1/dags/my-workflow/runs
 curl http://localhost:8080/api/v1/dags/my-workflow/status
 ```
 
-## Best Practices
-
-### 1. Name Things Clearly
-```yaml
-# Good
-- name: validate-customer-data
-- name: send-welcome-email
-
-# Avoid
-- name: step1
-- name: process
-```
-
-### 2. Handle Failures Gracefully
-```yaml
-steps:
-  - name: critical-step
-    command: ./important.sh
-    retryPolicy:
-      limit: 3
-    mailOnError: true
-```
-
-### 3. Use Dependencies Wisely
-```yaml
-# Parallel when possible
-steps:
-  - name: download-a
-    command: wget file-a.zip
-  - name: download-b
-    command: wget file-b.zip
-  - name: process-both
-    depends: [download-a, download-b]
-```
-
-### 4. Keep Workflows Focused
-- One workflow = one business process
-- Use sub-workflows for complexity
-- Avoid mixing unrelated tasks
-
-### 5. Version Control Your DAGs
-```bash
-git add workflows/
-git commit -m "Add customer onboarding workflow"
-```
-
-## Common Patterns
-
-### Setup → Process → Cleanup
-```yaml
-steps:
-  - name: setup
-    command: ./prepare-environment.sh
-    
-  - name: main-process
-    command: ./do-work.sh
-    depends: setup
-    
-  - name: cleanup
-    command: ./cleanup.sh
-    depends: main-process
-    continueOn:
-      failure: true  # Always cleanup
-```
-
-### Conditional Branching
-```yaml
-steps:
-  - name: check-mode
-    command: echo $PROCESS_MODE
-    output: MODE
-    
-  - name: fast-process
-    command: ./fast.sh
-    depends: check-mode
-    preconditions:
-      - condition: "${MODE}"
-        expected: "fast"
-        
-  - name: thorough-process
-    command: ./thorough.sh
-    depends: check-mode
-    preconditions:
-      - condition: "${MODE}"
-        expected: "thorough"
-```
-
-### Notification Pattern
-```yaml
-handlerOn:
-  failure:
-    executor:
-      type: mail
-      config:
-        to: team@example.com
-        subject: "Workflow Failed: ${DAG_NAME}"
-  success:
-    command: |
-      curl -X POST https://slack.webhook.url \
-        -d '{"text": "Workflow completed successfully!"}'
-```
-
 ## Understanding Logs
 
 ### Log Types
@@ -562,7 +460,7 @@ handlerOn:
 ~/.local/share/dagu/logs/admin/
 ```
 
-## Next Steps
+## See Also
 
 Now that you understand the core concepts:
 

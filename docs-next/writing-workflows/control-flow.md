@@ -344,15 +344,7 @@ steps:
     depends: start-time
 ```
 
-## Best Practices
-
-1. **Use Clear Condition Names**: Make conditions self-documenting
-2. **Test Regex Patterns**: Verify regex conditions work as expected
-3. **Set Reasonable Intervals**: Avoid overwhelming systems with rapid polling
-4. **Handle All Exit Codes**: Consider all possible outcomes
-5. **Use Dependencies Wisely**: Create logical workflow structure
-
-## Next Steps
+## See Also
 
 - [Error Handling](/writing-workflows/error-handling) - Handle failures gracefully
 - [Data & Variables](/writing-workflows/data-variables) - Pass data between steps

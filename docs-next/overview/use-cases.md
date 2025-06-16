@@ -58,7 +58,7 @@
 - Easy testing with dry-run
 - Version control friendly
 
-## Next Steps
+## See Also
 
 - [Getting Started](/getting-started/) - Install and create your first workflow
 - [Examples](/writing-workflows/examples/) - See more workflow patterns

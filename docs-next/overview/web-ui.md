@@ -324,7 +324,7 @@ curl http://localhost:8080/api/v1/dags/my-workflow
 ### 5. **Bulk Operations**
 Use the API for bulk operations while monitoring in UI
 
-## Next Steps
+## See Also
 
 - [Learn the REST API](/overview/api) for automation
 - [Configure authentication](/configurations/server#authentication) for security

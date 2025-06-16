@@ -181,7 +181,7 @@ steps:
     depends: process-batches
 ```
 
-## Next Steps
+## See Also
 
 - Review [security best practices](/configurations/operations#security-hardening)
 - Explore [API documentation](/reference/api) for integration

@@ -719,7 +719,7 @@ groups:
           summary: "Dagu is down"
 ```
 
-## Next Steps
+## See Also
 
 - [Server Configuration](/configurations/server) - Configure server settings
 - [Advanced Setup](/configurations/advanced) - High availability and scaling

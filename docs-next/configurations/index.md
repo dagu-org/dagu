@@ -209,67 +209,6 @@ export DAGU_PORT=9000  # Medium priority
 dagu start-all --port 8000  # Highest priority - wins
 ```
 
-## Best Practices
-
-### 1. **Use Environment Variables for Secrets**
-
-Never hardcode sensitive values:
-
-```yaml
-# Good
-smtp:
-  password: ${SMTP_PASSWORD}
-
-# Bad
-smtp:
-  password: "hardcoded-password"
-```
-
-### 2. **Separate Dev and Prod Configs**
-
-```bash
-# Development
-dagu start-all --config ~/.config/dagu/dev.yaml
-
-# Production
-dagu start-all --config /etc/dagu/prod.yaml
-```
-
-### 3. **Use Base Configurations**
-
-Share common settings across DAGs:
-
-```yaml
-# ~/.config/dagu/base.yaml
-env:
-  - COMPANY: "ACME Corp"
-  - ENVIRONMENT: production
-smtp:
-  host: smtp.company.com
-  port: 587
-```
-
-### 4. **Version Control Your Config**
-
-Keep configurations in git (excluding secrets):
-
-```
-configs/
-├── base.yaml
-├── development.yaml
-├── staging.yaml
-└── production.yaml.template
-```
-
-### 5. **Monitor Configuration Changes**
-
-Log configuration changes:
-
-```yaml
-# Start with explicit config
-dagu start-all --config /etc/dagu/config.yaml 2>&1 | tee -a /var/log/dagu-startup.log
-```
-
 ## Migration Guide
 
 ### From Cron
@@ -328,7 +267,7 @@ lsof -i :8080
 dagu start-all --port 9000
 ```
 
-## Next Steps
+## See Also
 
 - [Set up authentication](/configurations/server#authentication) for production
 - [Configure monitoring](/configurations/operations#monitoring) for visibility

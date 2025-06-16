@@ -436,7 +436,7 @@ dagu start-all --config ~/.config/dagu/config.yaml --dry-run
 3. Ensure user has read/write access
 4. Review SELinux/AppArmor policies
 
-## Next Steps
+## See Also
 
 - [Configure server settings](/configurations/server) for your environment
 - [Set up for production](/configurations/operations) with monitoring

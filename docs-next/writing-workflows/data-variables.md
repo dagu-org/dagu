@@ -259,13 +259,3 @@ logDir: /var/log/dagu
 ```
 
 Individual DAGs inherit these settings and can override them as needed.
-
-## Best Practices
-
-1. **Use meaningful variable names**: Choose descriptive names that indicate the data's purpose
-2. **Validate input data**: Add preconditions to check variable values before using them
-3. **Handle sensitive data carefully**: Use environment variables or external secret stores for credentials
-4. **Set appropriate output limits**: Configure `maxOutputSize` based on your expected data volumes
-5. **Document parameter usage**: Include descriptions in your DAG about expected parameters
-6. **Use JSON for structured data**: When passing complex data between steps, use JSON format
-7. **Leverage base configuration**: Share common variables across DAGs using base configuration

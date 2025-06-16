@@ -524,17 +524,6 @@ steps:
       exitCodes: [1]  # Retry if pods not ready
 ```
 
-## Best Practices
-
-1. **Use specific exit codes** for different error types in your scripts
-2. **Combine retry policies with continue conditions** for maximum flexibility
-3. **Always include cleanup in exit handlers** to prevent resource leaks
-4. **Use meaningful email prefixes** to help with filtering and alerting
-5. **Test error paths** by intentionally failing steps during development
-6. **Document expected failures** in step descriptions
-7. **Use markSuccess judiciously** - only for truly optional operations
-8. **Set reasonable cleanup timeouts** based on your workload characteristics
-
 ## Complete Example
 
 Here's a comprehensive example combining multiple error handling features:

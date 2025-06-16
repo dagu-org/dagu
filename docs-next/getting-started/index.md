@@ -1,6 +1,13 @@
-# Quick Start Guide
+# Getting Started
 
-Get Dagu running in 5 minutes using Docker.
+Welcome to Dagu! Choose your path to get started:
+
+## 🚀 [Quickstart](./quickstart.md)
+Get Dagu running in under 5 minutes with our step-by-step guide.
+
+## 🎯 Quick Example with Docker
+
+If you just want to try Dagu quickly using Docker:
 
 ## Step 1: Create Your First Workflow
 

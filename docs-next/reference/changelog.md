@@ -6,11 +6,11 @@ All notable changes to Dagu are documented here.
 
 ### Major Features
 
-#### 🎯 Improved Performance
+####  Improved Performance
 - Refactored execution history data for more performant history lookup
 - Optimized internal data structures for better scalability
 
-#### 🔄 Hierarchical DAG Execution
+####  Hierarchical DAG Execution
 Execute nested DAGs with full parameter passing and output bubbling:
 ```yaml
 steps:
@@ -23,7 +23,7 @@ steps:
     command: echo ${OUT.outputs.RESULT}
 ```
 
-#### 📄 Multiple DAGs in Single File
+####  Multiple DAGs in Single File
 Define multiple DAGs in one YAML file using `---` separator:
 ```yaml
 name: main-workflow
@@ -39,7 +39,7 @@ steps:
     command: echo "Hello from sub-workflow"
 ```
 
-#### 🚀 Parallel Execution with Parameters
+####  Parallel Execution with Parameters
 Execute commands or sub-DAGs in parallel with different parameters for batch processing:
 ```yaml
 steps:
@@ -54,24 +54,24 @@ steps:
       - FILE_NAME: ${ITEM}
 ```
 
-#### 🎨 Enhanced Web UI
+####  Enhanced Web UI
 - Overall UI improvements with better user experience
 - Cleaner design and more intuitive navigation
 - Better performance for large DAG visualizations
 
-#### 📊 Advanced History Search
+####  Advanced History Search
 New execution history page with:
 - Date-range filtering
 - Status filtering (success, failure, running, etc.)
 - Improved search performance
 - Better timeline visualization
 
-#### 🐛 Better Debugging
+####  Better Debugging
 - **Precondition Results**: Display actual results of precondition evaluations in the UI
 - **Output Variables**: Show output variable values in the UI for easier debugging
 - **Separate Logs**: stdout and stderr are now separated by default for clearer log analysis
 
-#### 📋 Queue Management
+####  Queue Management
 Added enqueue functionality for both API and UI:
 ```bash
 # Queue a DAG for later execution
@@ -81,10 +81,10 @@ dagu enqueue --run-id=custom-id my-dag.yaml
 dagu dequeue my-dag.yaml
 ```
 
-#### 🗿 Partial Success Status
+####  Partial Success Status
 New "partial success" status for workflows where some steps succeed and others fail, providing better visibility into complex workflow states.
 
-#### 🏗️ API v2
+####  API v2
 - New `/api/v2` endpoints with refactored schema
 - Better abstractions and cleaner interfaces
 - Improved error handling and response formats
@@ -92,13 +92,13 @@ New "partial success" status for workflows where some steps succeed and others f
 
 ### Docker Improvements
 
-#### 🐳 Optimized Images
+####  Optimized Images
 Thanks to @jerry-yuan:
 - Significantly reduced Docker image size
 - Split into three baseline images for different use cases
 - Better layer caching for faster builds
 
-#### 🔧 Container Enhancements
+####  Container Enhancements
 Thanks to @vnghia:
 - Allow specifying container name
 - Support for image platform selection
@@ -106,7 +106,7 @@ Thanks to @vnghia:
 
 ### Enhanced Features
 
-#### 🔄 Advanced Repeat Policy
+####  Advanced Repeat Policy
 Thanks to @thefishhat:
 - Conditions for repeat execution
 - Expected output matching
@@ -133,7 +133,7 @@ steps:
 
 ### Breaking Changes
 
-#### ⚠️ DAG Type Field (v1.17.0-beta.13+)
+####  DAG Type Field (v1.17.0-beta.13+)
 
 Starting from v1.17.0-beta.13, DAGs now have a `type` field that controls step execution behavior:
 
@@ -165,7 +165,7 @@ steps:
 
 ### Migration Required
 
-⚠️ **History Data Migration**: Due to internal improvements, history data from 1.16.x requires migration:
+ **History Data Migration**: Due to internal improvements, history data from 1.16.x requires migration:
 
 ```bash
 # Migrate history data
@@ -180,12 +180,12 @@ Huge thanks to our contributors for this release:
 
 | Contribution | Author |
 |--------------|--------|
-| Optimized Docker image size and split into baseline images | @jerry-yuan |
-| Container name & image platform support | @vnghia |
-| Enhanced repeat-policy conditions | @thefishhat |
-| Queue functionality implementation | @kriyanshii |
-| Partial success status | @thefishhat |
-| Countless reviews & feedback | @ghansham |
+| Optimized Docker image size and split into baseline images | [@jerry-yuan](https://github.com/jerry-yuan) |
+| Container name & image platform support | [@vnghia](https://github.com/vnghia) |
+| Enhanced repeat-policy conditions | [@thefishhat](https://github.com/thefishhat) |
+| Queue functionality implementation | [@kriyanshii](https://github.com/kriyanshii) |
+| Partial success status | [@thefishhat](https://github.com/thefishhat) |
+| Countless reviews & feedback | [@ghansham](https://github.com/ghansham) |
 
 ### Installation
 
@@ -205,12 +205,12 @@ curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.s
 
 ### New Features
 
-#### 🐳 Enhanced Docker Image
+####  Enhanced Docker Image
 - Base image updated to `ubuntu:24.04`
 - Pre-installed common tools: `sudo`, `git`, `curl`, `jq`, `python3`, and more
 - Ready for production use with essential utilities
 
-#### 📄 Dotenv File Support
+####  Dotenv File Support
 Load environment variables from `.env` files:
 
 ```yaml
@@ -243,7 +243,7 @@ If `SUB_RESULT` contains:
 ```
 Then `${SUB_RESULT.outputs.finalValue}` expands to `success`.
 
-#### 🎯 Advanced Preconditions
+####  Advanced Preconditions
 
 **Regex Support**: Use `re:` prefix for pattern matching:
 ```yaml
@@ -264,7 +264,7 @@ steps:
       - command: "test -f /tmp/some_file"
 ```
 
-#### 🔧 Enhanced Parameter Support
+####  Enhanced Parameter Support
 
 **List Format**: Define parameters as key-value pairs:
 ```yaml
@@ -285,7 +285,7 @@ dagu start my_dag -- PARAM1=value1 PARAM2=value2
 dagu start my_dag -- param1 param2 --param3 value3
 ```
 
-#### 🔄 Enhanced Continue On Conditions
+####  Enhanced Continue On Conditions
 
 **Exit Code Matching**:
 ```yaml
@@ -342,7 +342,7 @@ steps:
     shell: python3
 ```
 
-#### 📊 Sub-workflow Output
+####  Sub-workflow Output
 Parent workflows now receive structured output from sub-workflows:
 
 ```json
@@ -383,7 +383,7 @@ Thanks to our contributor for this release:
 
 | Contribution | Author |
 |--------------|--------|
-| Improved parameter handling for CLI - support for both named and positional parameters | @kriyanshii |
+| Improved parameter handling for CLI - support for both named and positional parameters | [@kriyanshii](https://github.com/kriyanshii) |
 
 ---
 

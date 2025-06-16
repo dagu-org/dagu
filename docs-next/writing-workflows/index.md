@@ -135,21 +135,6 @@ Settings are applied in this order (later overrides earlier):
      - DOCKER_REGISTRY: registry.company.com
    ```
 
-### Best Practices
-
-1. **Keep base configuration minimal** - Only include truly shared settings
-2. **Use environment variables** - For sensitive values like passwords
-3. **Document overrides** - Clearly comment when overriding base settings
-4. **Version control** - Track base.yaml in your configuration repository
-
-::: tip
-The base configuration file location is set in your Dagu configuration:
-```yaml
-# ~/.config/dagu/config.yaml
-baseConfig: ~/.config/dagu/base.yaml
-```
-:::
-
 ## Your Journey
 
 This guide is organized to take you from basics to advanced patterns:
@@ -249,57 +234,6 @@ handlerOn:
     command: ./notify_failure.sh "${DATE}"
 ```
 
-## Best Practices
-
-### 1. **Start Simple**
-Begin with basic sequential workflows and add complexity as needed.
-
-### 2. **Use Descriptive Names**
-```yaml
-# Good
-steps:
-  - name: download-customer-data
-  - name: validate-data-format
-  - name: transform-to-parquet
-
-# Bad
-steps:
-  - name: step1
-  - name: step2
-  - name: step3
-```
-
-### 3. **Handle Errors Gracefully**
-Always consider what should happen when steps fail:
-```yaml
-steps:
-  - name: critical-step
-    command: ./must-succeed.sh
-    retryPolicy:
-      limit: 3
-    continueOn:
-      failure: false  # Workflow stops here on failure
-      
-  - name: optional-step
-    command: ./nice-to-have.sh
-    continueOn:
-      failure: true   # Workflow continues even if this fails
-```
-
-### 4. **Keep Steps Focused**
-Each step should do one thing well. Use multiple steps rather than complex scripts.
-
-### 5. **Use Parameters for Flexibility**
-```yaml
-params:
-  - ENVIRONMENT: dev
-  - DRY_RUN: "false"
-
-steps:
-  - name: deploy
-    command: ./deploy.sh --env=${ENVIRONMENT} --dry-run=${DRY_RUN}
-```
-
 ## Common Patterns
 
 ### ETL Pipeline
@@ -370,7 +304,7 @@ graph TD
     style D stroke:lime,stroke-width:1.6px,color:#333
 ```
 
-## Next Steps
+## See Also
 
 Ready to start building? Head to the [Basics](/writing-workflows/basics) section to begin your journey.
 

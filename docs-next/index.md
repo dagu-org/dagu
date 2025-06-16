@@ -131,19 +131,18 @@ handlerOn:
 
 name: transform-module
 params:
+  - TYPE: "Type of data to transform"
   - INPUT: "Input data file"
 steps:
-  - name: transform-customers
-    command: python transform_customers.py --input=${INPUT}
-    
-  - name: transform-orders
-    command: python transform_orders.py --input=${INPUT}
-    
-  - name: transform-products
-    command: python transform_products.py --input=${INPUT}
+  - name: transform-data
+    command: python transform.py --type=${TYPE} --input=${INPUT}
+    output: TRANSFORMED_DATA
+
+  - name: save-results
+    command: python save.py --data=${TRANSFORMED_DATA}
 ```
 
-## Next Steps
+## See Also
 
 <div class="next-steps">
   <div class="step-card">

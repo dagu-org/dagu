@@ -165,28 +165,6 @@ dagu start my-dag.yaml
 dagu start my-dag.yaml -- DATE=2024-01-15 MODE=full
 ```
 
-## Best Practices
-
-1. **Choose Appropriate Intervals**
-   - Consider resource usage
-   - Avoid overlapping runs
-   - Account for execution time
-
-2. **Use Skip If Successful**
-   - Prevent duplicate processing
-   - Save resources
-   - Maintain idempotency
-
-3. **Set Max Active Runs**
-   - Prevent resource exhaustion
-   - Ensure sequential processing
-   - Control concurrency
-
-4. **Test Schedules**
-   - Use dry run first
-   - Monitor initial runs
-   - Check timezone settings
-
 ## Examples
 
 ### Data Pipeline Schedule

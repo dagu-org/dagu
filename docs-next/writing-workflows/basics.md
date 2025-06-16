@@ -277,14 +277,6 @@ steps:
     command: ./process.sh
 ```
 
-## Best Practices
-
-1. **Use Descriptive Names**: Make step names self-documenting
-2. **Handle Errors**: Add error checking to scripts
-3. **Use Parameters**: Make workflows reusable with parameters
-4. **Set Working Directories**: Be explicit about where commands run
-5. **Capture Important Output**: Save outputs you'll need later
-
 ## Common Patterns
 
 ### Setup and Teardown
@@ -337,7 +329,7 @@ steps:
     depends: get-files
 ```
 
-## Next Steps
+## See Also
 
 - [Control Flow](/writing-workflows/control-flow) - Dependencies and conditions
 - [Data & Variables](/writing-workflows/data-variables) - Working with data

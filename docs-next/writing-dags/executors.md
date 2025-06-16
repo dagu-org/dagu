@@ -201,26 +201,6 @@ steps:
     command: ls -la
 ```
 
-## Best Practices
-
-1. **Choose the Right Executor**
-   - Use shell for simple local commands
-   - Use Docker for isolated environments
-   - Use SSH for remote operations
-   - Use HTTP for API integrations
-
-2. **Security Considerations**
-   - Store SSH keys securely
-   - Use environment variables for secrets
-   - Limit container permissions
-   - Use read-only mounts when possible
-
-3. **Performance Tips**
-   - Reuse running containers with exec
-   - Cache Docker images locally
-   - Use connection pooling for SSH
-   - Set appropriate timeouts
-
 ## Advanced Examples
 
 ### Multi-Stage Docker Pipeline

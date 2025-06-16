@@ -453,11 +453,11 @@ launchctl unload ~/Library/LaunchAgents/org.dagu.agent.plist
 rm ~/Library/LaunchAgents/org.dagu.agent.plist
 ```
 
-## Next Steps
+## See Also
 
 Now that Dagu is installed:
 
-1. [Create your first workflow](/getting-started/first-workflow)
+1. [Quick Start](/getting-started/quickstart)
 2. [Learn core concepts](/getting-started/concepts)
 3. [Explore the Web UI](/overview/web-ui)
 4. [Configure Dagu](/configurations/) for your needs

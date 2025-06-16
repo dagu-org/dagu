@@ -22,7 +22,6 @@ const fullSidebar = [
       { text: "Overview", link: "/getting-started/" },
       { text: "Quickstart", link: "/getting-started/quickstart" },
       { text: "Installation", link: "/getting-started/installation" },
-      { text: "First Workflow", link: "/getting-started/first-workflow" },
       { text: "Core Concepts", link: "/getting-started/concepts" },
     ],
   },
@@ -91,10 +90,10 @@ export default withMermaid(
   defineConfig({
     title: "Dagu",
     description: "Modern workflow orchestration made simple",
-    lang: 'en-US',
+    lang: "en-US",
     lastUpdated: true,
     cleanUrls: true,
-    
+
     head: [
       ["link", { rel: "icon", href: "/favicon.ico" }],
       ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
@@ -125,17 +124,17 @@ export default withMermaid(
               document.documentElement.classList.add('dark')
             }
           })()
-        `
-      ]
+        `,
+      ],
     ],
 
     themeConfig: {
       logo: "/logo.svg",
       siteTitle: "Dagu",
       logoLink: "https://dagu.cloud/",
-      
+
       appearance: {
-        defaultTheme: 'dark'
+        defaultTheme: "dark",
       },
 
       outline: {
@@ -197,13 +196,13 @@ export default withMermaid(
         pattern: "https://github.com/dagu-org/dagu/edit/main/docs-next/:path",
         text: "Edit this page on GitHub",
       },
-      
+
       lastUpdated: {
-        text: 'Last updated',
+        text: "Last updated",
         formatOptions: {
-          dateStyle: 'medium',
-          timeStyle: 'short'
-        }
+          dateStyle: "medium",
+          timeStyle: "short",
+        },
       },
     },
 
@@ -216,20 +215,31 @@ export default withMermaid(
       config: (md) => {
         // Add issue links plugin
         md.use(issueLinksPlugin);
-        
+
         // Add custom link renderer to open external links in new tab
-        const defaultLinkRender = md.renderer.rules.link_open || function(tokens, idx, options, _env, self) {
-          return self.renderToken(tokens, idx, options);
-        };
-        
-        md.renderer.rules.link_open = function (tokens, idx, options, _env, self) {
+        const defaultLinkRender =
+          md.renderer.rules.link_open ||
+          function (tokens, idx, options, _env, self) {
+            return self.renderToken(tokens, idx, options);
+          };
+
+        md.renderer.rules.link_open = function (
+          tokens,
+          idx,
+          options,
+          _env,
+          self
+        ) {
           const token = tokens[idx];
-          const hrefIndex = token.attrIndex('href');
+          const hrefIndex = token.attrIndex("href");
           if (hrefIndex >= 0) {
             const href = token.attrs[hrefIndex][1];
-            if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
-              token.attrSet('target', '_blank');
-              token.attrSet('rel', 'noopener noreferrer');
+            if (
+              href &&
+              (href.startsWith("http://") || href.startsWith("https://"))
+            ) {
+              token.attrSet("target", "_blank");
+              token.attrSet("rel", "noopener noreferrer");
             }
           }
           return defaultLinkRender(tokens, idx, options, _env, self);
@@ -281,7 +291,7 @@ export default withMermaid(
         fillType4: "#ffffff",
         fillType5: "#f8f9fa",
         fillType6: "#ffffff",
-        fillType7: "#f8f9fa"
+        fillType7: "#f8f9fa",
       },
     },
     mermaidPlugin: {

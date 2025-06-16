@@ -321,7 +321,7 @@ Dagu occupies a unique position in the workflow orchestration landscape:
 
 It's the ideal choice for teams that need reliable workflow orchestration without the operational overhead of complex distributed systems.
 
-## Next Steps
+## See Also
 
 - [Getting Started](/getting-started/) - Try Dagu yourself
 - [Architecture](/overview/architecture) - Learn how Dagu works

@@ -186,7 +186,7 @@ Built for reliability:
 | No External Services | ✅ | ❌ | ❌ | ✅ |
 | Language Agnostic | ✅ | ❌ | ✅ | ✅ |
 
-## Next Steps
+## See Also
 
 Explore specific features:
 

@@ -215,15 +215,7 @@ steps:
       - task-b
 ```
 
-## Best Practices
-
-1. **Set Appropriate Concurrency**: Balance between speed and resource usage
-2. **Use Queues for Resource Management**: Prevent overloading your system
-3. **Set Reasonable Timeouts**: Prevent hung workflows
-4. **Monitor Parallel Execution**: Use the web UI to track parallel tasks
-5. **Handle Failures Gracefully**: Use `continueOn` for non-critical parallel tasks
-
-## Next Steps
+## See Also
 
 - [Error Handling](/writing-workflows/error-handling) - Handle failures gracefully
 - [Scheduling](/features/scheduling) - Schedule workflow execution

@@ -1,4 +1,4 @@
-# First Workflow
+# Quickstart
 
 Create and run your first Dagu workflow in minutes.
 
@@ -44,19 +44,21 @@ dagu start ~/.dagu/dags/hello.yaml
 
 :::
 
-You'll see output like:
+You'll see output like (when using the binary):
 ```
-Starting DAG: hello-world
-Step 'greet' started
-Hello from Dagu!
-Step 'greet' completed successfully
-Step 'show-date' started
-Mon Jan 15 10:30:45 EST 2024
-Step 'show-date' completed successfully
-Step 'done' started
-Workflow complete! 🎉
-Step 'done' completed successfully
-DAG 'hello-world' completed successfully
+┌─ DAG: hello-world ───────────────────────────────────────────────┐
+│ Status: Success ✓           | Started: 23:34:57 | Elapsed: 471ms │
+│ Run ID: 0197792a-3080-752c-bfc4-8fb                              │
+└──────────────────────────────────────────────────────────────────┘
+
+Progress: ████████████████████████████████████████ 100% (3/3 steps)
+
+Recently Completed:
+  ✓ done [0ms]
+  ✓ greet [0ms]
+  ✓ show-date [0ms]
+
+Press Ctrl+C to stop
 ```
 
 ### Step 3: Check the status
@@ -75,6 +77,28 @@ dagu status hello.yaml
 ```bash [Binary]
 dagu status hello.yaml
 ```
+
+:::
+
+### Step 4: Check the Web UI
+
+::: code-group
+
+```bash [Docker]
+docker run \
+--rm \
+-v ~/.dagu:/app/.dagu \
+-e DAGU_HOME=/app/.dagu \
+-p 8080:8080 \
+ghcr.io/dagu-org/dagu:latest \
+dagu start-all
+```
+
+```bash [Binary]
+dagu start-all
+```
+
+Open your browser to [http://localhost:8080](http://localhost:8080) to see the Dagu web interface.
 
 :::
 

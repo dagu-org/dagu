@@ -630,11 +630,3 @@ curl "http://localhost:8080/api/v2/dags/search?q=database+backup"
 ```bash
 curl "http://localhost:8080/api/v2/metrics" | grep dagu_dag_runs_currently_running
 ```
-
-## Best Practices
-
-1. **Use Pagination**: When listing DAGs or runs, use pagination parameters to avoid large responses
-2. **Handle Errors**: Always check error responses and implement retry logic with exponential backoff
-3. **Use Specific IDs**: When possible, use specific DAG run IDs instead of "latest"
-4. **Monitor Metrics**: Set up Prometheus scraping for production monitoring
-5. **Secure API Access**: Always use authentication in production environments

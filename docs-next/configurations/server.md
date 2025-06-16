@@ -430,49 +430,7 @@ openssl x509 -in cert.pem -text -noout
 openssl verify -CAfile ca.pem cert.pem
 ```
 
-## Best Practices
-
-1. **Use Environment Variables for Secrets**
-   ```yaml
-   # Good
-   password: "${ADMIN_PASSWORD}"
-   
-   # Bad
-   password: "hardcoded-password"
-   ```
-
-2. **Separate Environments**
-   ```bash
-   # Development
-   dagu start-all --config ~/.config/dagu/dev.yaml
-   
-   # Production
-   dagu start-all --config /etc/dagu/prod.yaml
-   ```
-
-3. **Lock Down Production**
-   ```yaml
-   permissions:
-     writeDAGs: false    # No editing in production
-     runDAGs: true       # Can still execute
-   ```
-
-4. **Monitor Configuration**
-   ```bash
-   # Log startup configuration
-   dagu start-all --debug 2>&1 | tee /var/log/dagu-startup.log
-   ```
-
-5. **Version Control Templates**
-   ```
-   configs/
-   ├── base.yaml
-   ├── development.yaml
-   ├── staging.yaml
-   └── production.yaml.template  # Without secrets
-   ```
-
-## Next Steps
+## See Also
 
 - [Set up authentication](#authentication) for secure access
 - [Configure remote nodes](#remote-nodes) for multi-environment management
