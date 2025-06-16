@@ -466,9 +466,10 @@ export DAGU_LOG_DIR=/var/log/dagu
 ```
 
 **Log structure**:
-- Admin logs: `{logDir}/admin/` - Server and scheduler logs
-- DAG logs: `{logDir}/dags/{dag-name}/{run-id}/` - Execution logs
-- Step outputs: Separate `stdout.log` and `stderr.log` per step
+- DAG execution logs: `{logDir}/{dag-name}/dag-run_{timestamp}_{run-id}/`
+  - Main log file: `dag-run_{timestamp}.{run-id-prefix}.log`
+  - Step outputs: `{step-name}.out` and `{step-name}.err`
+- Server/scheduler logs: Output to stdout/stderr (not file by default)
 
 #### JSON Log Format
 

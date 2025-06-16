@@ -29,6 +29,127 @@ steps:
     command: echo "Hello"
 ```
 
+## Base DAG Configuration
+
+Dagu supports a powerful feature called **base DAG configuration** that allows you to share common settings across all your workflows. This helps maintain consistency and reduces duplication.
+
+### How It Works
+
+You can create a base configuration file that all DAGs inherit from:
+
+```yaml
+# ~/.config/dagu/base.yaml (or specified in your config)
+env:
+  - LOG_LEVEL: info
+  - ENVIRONMENT: production
+  - SLACK_WEBHOOK: ${SLACK_WEBHOOK_URL}
+
+smtp:
+  host: smtp.company.com
+  port: "587"
+  username: ${SMTP_USER}
+  password: ${SMTP_PASS}
+
+errorMail:
+  from: alerts@company.com
+  to: oncall@company.com
+  prefix: "[ALERT]"
+  attachLogs: true
+
+histRetentionDays: 30
+logDir: /var/log/dagu
+maxActiveRuns: 5
+```
+
+### Using Base Configuration
+
+Any DAG automatically inherits settings from the base configuration:
+
+```yaml
+# my-workflow.yaml
+name: data-pipeline
+description: Daily data processing
+
+# This DAG automatically inherits:
+# - All env variables from base
+# - SMTP configuration
+# - Error mail settings
+# - histRetentionDays, logDir, maxActiveRuns
+
+# You can override base settings
+env:
+  - LOG_LEVEL: debug  # Overrides the base value
+  - CUSTOM_VAR: value # Adds to base env
+
+maxActiveRuns: 1  # Overrides base value of 5
+
+steps:
+  - name: process
+    command: ./process.sh
+```
+
+### Configuration Precedence
+
+Settings are applied in this order (later overrides earlier):
+
+1. **System defaults** - Built-in Dagu defaults
+2. **Base configuration** - From base.yaml
+3. **DAG configuration** - From your workflow file
+4. **Runtime parameters** - Command line arguments
+
+### Common Use Cases
+
+1. **Shared Environment Variables**
+   ```yaml
+   # base.yaml
+   env:
+     - AWS_REGION: us-east-1
+     - DATA_BUCKET: s3://company-data
+     - API_ENDPOINT: https://api.company.com
+   ```
+
+2. **Standard Error Handling**
+   ```yaml
+   # base.yaml
+   mailOn:
+     failure: true
+   
+   errorMail:
+     from: dagu@company.com
+     to: alerts@company.com
+     attachLogs: true
+   ```
+
+3. **Consistent Logging**
+   ```yaml
+   # base.yaml
+   logDir: /var/log/dagu
+   histRetentionDays: 30
+   maxOutputSize: 5242880  # 5MB
+   ```
+
+4. **Default Executors**
+   ```yaml
+   # base.yaml
+   env:
+     - DOCKER_REGISTRY: registry.company.com
+   ```
+
+### Best Practices
+
+1. **Keep base configuration minimal** - Only include truly shared settings
+2. **Use environment variables** - For sensitive values like passwords
+3. **Document overrides** - Clearly comment when overriding base settings
+4. **Version control** - Track base.yaml in your configuration repository
+
+::: tip
+The base configuration file location is set in your Dagu configuration:
+```yaml
+# ~/.config/dagu/config.yaml
+baseConfig: ~/.config/dagu/base.yaml
+```
+:::
+
 ## Your Journey
 
 This guide is organized to take you from basics to advanced patterns:
