@@ -41,22 +41,22 @@ dagu start hello.yaml
 
 ## Why Dagu?
 
-### 🚀 Zero Dependencies
+### Zero Dependencies
 No database, no message broker, no complex setup. Just a single binary that works everywhere.
 
-### 🗣️ Language Agnostic  
+### Language Agnostic  
 Run any command, script, or program. If it runs on your system, Dagu can orchestrate it.
 
-### 💪 Powerful Yet Simple
+### Powerful Yet Simple
 From simple task automation to complex data pipelines, Dagu scales with your needs.
 
-### 🎨 Built-in Web UI
+### Built-in Web UI
 Monitor workflows, view logs, and manage executions through a clean, modern interface.
 
-### 🏗️ Hierarchical Workflows
+### Hierarchical Workflows
 Compose workflows from reusable components. Build once, use everywhere.
 
-### ✅ Production Ready
+### Production Ready
 Battle-tested with robust error handling, retries, and comprehensive logging.
 
 ## Feature Comparison
@@ -166,15 +166,12 @@ Dagu is open source and welcomes contributions. Join us in making workflow orche
 
 <div class="community-links">
   <a href="https://github.com/dagu-org/dagu" class="community-link">
-    <span class="icon">📦</span>
-    <span>GitHub</span>
+    <span class="icon">GitHub</span>
   </a>
   <a href="https://discord.gg/gpahPpqyAP" class="community-link">
-    <span class="icon">💬</span>
-    <span>Discord</span>
+    <span class="icon">Discord</span>
   </a>
   <a href="https://github.com/dagu-org/dagu/issues" class="community-link">
-    <span class="icon">🐛</span>
-    <span>Issues</span>
+    <span class="icon">Issues</span>
   </a>
 </div>

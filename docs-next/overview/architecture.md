@@ -18,9 +18,9 @@ Dagu follows a simple philosophy: **do one thing well with minimal dependencies*
 ┌─────────────────────────────┴───────────────────────────────┐
 │                        Core Engine                          │
 ├─────────────┬──────────────────┬────────────────────────────┤
-│  Scheduler  │  Executor        │    Queue Manager           │
+│  Scheduler  │     Agent        │  Execution Scheduler       │
 ├─────────────┼──────────────────┼────────────────────────────┤
-│  DAG Parser │  Process Manager │    State Manager           │
+│ DAG Loader  │    Executors     │    Persistence Layer       │
 └─────────────┴──────────────────┴────────────────────────────┘
                               │
 ┌─────────────────────────────┴───────────────────────────────┐
@@ -32,41 +32,47 @@ Dagu follows a simple philosophy: **do one thing well with minimal dependencies*
 
 ## Core Components
 
-### 1. DAG Parser
-- Reads and validates YAML workflow definitions
-- Builds execution graph from dependencies
-- Handles parameter substitution and environment variables
+### 1. DAG Loader
+- Loads YAML workflow definitions and builds DAG structure
+- Handles base configuration inheritance
+- Evaluates environment variables and dynamic fields
+- Validates DAG syntax and dependencies
 
 ### 2. Scheduler
-- Manages cron-based scheduling
-- Queues workflows for execution
-- Handles schedule conflicts and overlaps
+- Monitors and triggers DAGs based on cron expressions
+- Manages start/stop/restart schedules
+- Queues DAG runs for execution
+- Coordinates with persistence layer for scheduling
 
-### 3. Executor
-- Spawns and manages system processes
-- Handles different executor types (shell, docker, ssh, etc.)
-- Manages process groups for proper cleanup
+### 3. Agent
+- Manages complete lifecycle of a single DAG run
+- Creates execution graph from DAG definition
+- Handles Unix socket communication for status updates
+- Manages process signals and graceful shutdown
+- Writes logs and updates run status
 
-### 4. Process Manager
-- Tracks running processes via Unix sockets and heartbeat files
-- Stores process heartbeats in `data/proc/` directory
-- Handles signals (SIGTERM, SIGINT, etc.) for graceful shutdown
-- Manages process groups for proper cleanup of orphaned processes
-- Coordinates between scheduler and executor processes
+### 4. Execution Scheduler
+- Orchestrates step execution within a DAG run
+- Manages dependencies and execution order
+- Handles parallel execution limits
+- Evaluates preconditions and retry policies
+- Tracks step status and output variables
 
-### 5. Queue Manager
-- File-based queue implementation using timestamped JSON files
-- Priority-based execution (high/low priority queues)
-- Atomic file operations prevent race conditions
-- Per-DAG queue directories for organization
-- Chronological processing based on file timestamps
+### 5. Executors
+- **Command**: Runs shell commands in subprocesses
+- **Docker**: Executes in containers
+- **SSH**: Remote command execution
+- **HTTP**: Makes API requests
+- **Mail**: Sends email notifications
+- **JQ**: JSON data processing
+- **Child DAG**: Runs nested workflows
 
-### 6. State Manager
-- Tracks workflow and step states using JSON Lines format
-- Manages hierarchical execution history (year/month/day structure)
-- Handles state transitions and attempt-based retries
-- Supports child DAG state tracking for nested workflows
-- Provides efficient status queries through organized file structure
+### 6. Persistence Layer
+- **FileDAG Store**: Manages DAG definitions
+- **FileDAGRun Store**: Tracks execution history and attempts
+- **FileProc Store**: Process heartbeat tracking
+- **FileQueue Store**: Dual-priority queue system
+- All state stored as files - no database required
 
 ## Storage Architecture
 

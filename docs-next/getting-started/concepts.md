@@ -18,11 +18,11 @@ graph LR
     C --> E[Send Notification]
     D --> E
     
-    style A fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style B fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style C fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style D fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style E fill:white,stroke:green,stroke-width:1.6px,color:#333
+    style A stroke:lightblue,stroke-width:1.6px,color:#333
+    style B stroke:lightblue,stroke-width:1.6px,color:#333
+    style C stroke:lightblue,stroke-width:1.6px,color:#333
+    style D stroke:lightblue,stroke-width:1.6px,color:#333
+    style E stroke:green,stroke-width:1.6px,color:#333
 ```
 
 ## Key Components
@@ -135,11 +135,11 @@ stateDiagram-v2
     Failed --> [*]
     Cancelled --> [*]
     
-    classDef pending fill:white,stroke:gray,stroke-width:1.6px,color:#333
-    classDef running fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    classDef success fill:white,stroke:green,stroke-width:1.6px,color:#333
-    classDef failed fill:white,stroke:red,stroke-width:1.6px,color:#333
-    classDef cancelled fill:white,stroke:orange,stroke-width:1.6px,color:#333
+    classDef pending stroke:gray,stroke-width:1.6px,color:#333
+    classDef running stroke:lightblue,stroke-width:1.6px,color:#333
+    classDef success stroke:green,stroke-width:1.6px,color:#333
+    classDef failed stroke:red,stroke-width:1.6px,color:#333
+    classDef cancelled stroke:orange,stroke-width:1.6px,color:#333
     
     class Pending pending
     class Running running

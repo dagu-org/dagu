@@ -8,10 +8,8 @@ Let's start with a simple "Hello World" workflow.
 
 ### Step 1: Create the workflow file
 
-Create a new file called `hello.yaml`:
-
-```yaml
-# hello.yaml
+```bash
+mkdir -p ~/.dagu/dags && cat > ~/.dagu/dags/hello.yaml << 'EOF'
 name: hello-world
 description: My first Dagu workflow
 
@@ -24,13 +22,27 @@ steps:
     
   - name: done
     command: echo "Workflow complete! 🎉"
+EOF
 ```
 
 ### Step 2: Run the workflow
 
-```bash
+::: code-group
+
+```bash [Docker]
+docker run \
+--rm \
+-v ~/.dagu:/app/.dagu \
+-e DAGU_HOME=/app/.dagu \
+ghcr.io/dagu-org/dagu:latest \
 dagu start hello.yaml
 ```
+
+```bash [Binary]
+dagu start ~/.dagu/dags/hello.yaml
+```
+
+:::
 
 You'll see output like:
 ```
@@ -49,9 +61,22 @@ DAG 'hello-world' completed successfully
 
 ### Step 3: Check the status
 
-```bash
+::: code-group
+
+```bash [Docker]
+docker run \
+--rm \
+-v ~/.dagu:/app/.dagu \
+-e DAGU_HOME=/app/.dagu \
+ghcr.io/dagu-org/dagu:latest \
 dagu status hello.yaml
 ```
+
+```bash [Binary]
+dagu status hello.yaml
+```
+
+:::
 
 ## Understanding the Workflow
 
@@ -79,9 +104,9 @@ graph TD
     A[greet] --> B[show-date]
     B --> C[done]
     
-    style A fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style B fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style C fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
+    style A stroke:lightblue,stroke-width:1.6px,color:#333
+    style B stroke:lightblue,stroke-width:1.6px,color:#333
+    style C stroke:lightblue,stroke-width:1.6px,color:#333
 ```
 
 Since no dependencies are specified, steps run sequentially by default.
@@ -130,18 +155,47 @@ steps:
 ```
 
 Run it with custom parameters:
-```bash
+
+::: code-group
+
+```bash [Docker]
+docker run \
+--rm \
+-v ~/.dagu:/app/.dagu \
+-e DAGU_HOME=/app/.dagu \
+ghcr.io/dagu-org/dagu:latest \
 dagu start backup.yaml -- SOURCE_DIR=/important/data BACKUP_DIR=/mnt/backups
 ```
+
+```bash [Binary]
+dagu start backup.yaml -- SOURCE_DIR=/important/data BACKUP_DIR=/mnt/backups
+```
+
+:::
 
 ## Viewing in the Web UI
 
 Dagu comes with a beautiful web interface to monitor your workflows.
 
 ### Start the web server:
-```bash
+
+::: code-group
+
+```bash [Docker]
+docker run \
+--rm \
+-p 8080:8080 \
+-v ~/.dagu:/app/.dagu \
+-e DAGU_HOME=/app/.dagu \
+ghcr.io/dagu-org/dagu:latest \
 dagu start-all
 ```
+
+```bash [Binary]
+dagu start-all
+```
+
+:::
 
 ### Open your browser:
 Navigate to http://localhost:8080
@@ -270,11 +324,11 @@ graph TD
     C --> E
     D --> E
     
-    style A fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style B fill:white,stroke:lime,stroke-width:1.6px,color:#333
-    style C fill:white,stroke:lime,stroke-width:1.6px,color:#333
-    style D fill:white,stroke:lime,stroke-width:1.6px,color:#333
-    style E fill:white,stroke:green,stroke-width:1.6px,color:#333
+    style A stroke:lightblue,stroke-width:1.6px,color:#333
+    style B stroke:lime,stroke-width:1.6px,color:#333
+    style C stroke:lime,stroke-width:1.6px,color:#333
+    style D stroke:lime,stroke-width:1.6px,color:#333
+    style E stroke:green,stroke-width:1.6px,color:#333
 ```
 
 The three processing steps run in parallel after `prepare` completes!
@@ -319,7 +373,22 @@ steps:
 ```
 
 ### 5. Test Before Scheduling
-```bash
+
+::: code-group
+
+```bash [Docker]
+# Dry run to validate
+docker run --rm -v ~/.dagu:/app/.dagu -e DAGU_HOME=/app/.dagu \
+ghcr.io/dagu-org/dagu:latest dagu dry hello.yaml
+
+# Run once manually
+docker run --rm -v ~/.dagu:/app/.dagu -e DAGU_HOME=/app/.dagu \
+ghcr.io/dagu-org/dagu:latest dagu start hello.yaml
+
+# Then add schedule
+```
+
+```bash [Binary]
 # Dry run to validate
 dagu dry hello.yaml
 
@@ -328,6 +397,8 @@ dagu start hello.yaml
 
 # Then add schedule
 ```
+
+:::
 
 ## Common Patterns
 
@@ -372,10 +443,10 @@ graph TD
     B --> D[merge]
     C --> D
     
-    style A fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style B fill:white,stroke:lime,stroke-width:1.6px,color:#333
-    style C fill:white,stroke:lime,stroke-width:1.6px,color:#333
-    style D fill:white,stroke:green,stroke-width:1.6px,color:#333
+    style A stroke:lightblue,stroke-width:1.6px,color:#333
+    style B stroke:lime,stroke-width:1.6px,color:#333
+    style C stroke:lime,stroke-width:1.6px,color:#333
+    style D stroke:green,stroke-width:1.6px,color:#333
 ```
 
 ### Conditional Execution
@@ -399,16 +470,29 @@ flowchart TD
     B -->|Yes| C[conditional-step]
     B -->|No| D[Skip]
     
-    style A fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style B fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style C fill:white,stroke:green,stroke-width:1.6px,color:#333
-    style D fill:white,stroke:gray,stroke-width:1.6px,color:#333
+    style A stroke:lightblue,stroke-width:1.6px,color:#333
+    style B stroke:lightblue,stroke-width:1.6px,color:#333
+    style C stroke:green,stroke-width:1.6px,color:#333
+    style D stroke:gray,stroke-width:1.6px,color:#333
 ```
 
 ## Debugging Workflows
 
 ### View Logs
-```bash
+
+::: code-group
+
+```bash [Docker]
+# See all logs for a workflow
+docker run --rm -v ~/.dagu:/app/.dagu -e DAGU_HOME=/app/.dagu \
+ghcr.io/dagu-org/dagu:latest dagu logs hello.yaml
+
+# See logs for a specific execution
+docker run --rm -v ~/.dagu:/app/.dagu -e DAGU_HOME=/app/.dagu \
+ghcr.io/dagu-org/dagu:latest dagu logs hello.yaml --run-id=20240115_103045_abc123
+```
+
+```bash [Binary]
 # See all logs for a workflow
 dagu logs hello.yaml
 
@@ -416,11 +500,24 @@ dagu logs hello.yaml
 dagu logs hello.yaml --run-id=20240115_103045_abc123
 ```
 
+:::
+
 ### Check History
-```bash
+
+::: code-group
+
+```bash [Docker]
+# View execution history
+docker run --rm -v ~/.dagu:/app/.dagu -e DAGU_HOME=/app/.dagu \
+ghcr.io/dagu-org/dagu:latest dagu history hello.yaml
+```
+
+```bash [Binary]
 # View execution history
 dagu history hello.yaml
 ```
+
+:::
 
 ### Use the Web UI
 The web interface provides:

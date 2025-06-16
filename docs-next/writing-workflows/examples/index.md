@@ -16,14 +16,13 @@ steps:
     command: echo "Step 1"
   - name: second
     command: echo "Step 2"
-    depends: first
 ```
 
 ```mermaid
 graph LR
     A[first] --> B[second]
-    style A fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style B fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
+    style A stroke:lightblue,stroke-width:1.6px,color:#333
+    style B stroke:lightblue,stroke-width:1.6px,color:#333
 ```
 
 Execute steps one after another.
@@ -53,11 +52,11 @@ graph TD
     B --> E[End]
     C --> E
     D --> E
-    style A fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style B fill:white,stroke:lime,stroke-width:1.6px,color:#333
-    style C fill:white,stroke:lime,stroke-width:1.6px,color:#333
-    style D fill:white,stroke:lime,stroke-width:1.6px,color:#333
-    style E fill:white,stroke:green,stroke-width:1.6px,color:#333
+    style A stroke:lightblue,stroke-width:1.6px,color:#333
+    style B stroke:lime,stroke-width:1.6px,color:#333
+    style C stroke:lime,stroke-width:1.6px,color:#333
+    style D stroke:lime,stroke-width:1.6px,color:#333
+    style E stroke:green,stroke-width:1.6px,color:#333
 ```
 
 Process multiple items simultaneously.
@@ -93,10 +92,10 @@ graph TD
     A --> C[test-b]
     B --> D[deploy]
     C --> D
-    style A fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style B fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style C fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style D fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
+    style A stroke:lightblue,stroke-width:1.6px,color:#333
+    style B stroke:lightblue,stroke-width:1.6px,color:#333
+    style C stroke:lightblue,stroke-width:1.6px,color:#333
+    style D stroke:lightblue,stroke-width:1.6px,color:#333
 ```
 
 Define complex dependency graphs.
@@ -142,11 +141,11 @@ graph LR
         B1[step1] --> B2[step2]
     end
     
-    style A1 fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style A2 fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style A3 fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style B1 fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style B2 fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
+    style A1 stroke:lightblue,stroke-width:1.6px,color:#333
+    style A2 stroke:lightblue,stroke-width:1.6px,color:#333
+    style A3 stroke:lightblue,stroke-width:1.6px,color:#333
+    style B1 stroke:lightblue,stroke-width:1.6px,color:#333
+    style B2 stroke:lightblue,stroke-width:1.6px,color:#333
 ```
 
 Control execution flow patterns.
@@ -182,11 +181,11 @@ flowchart TD
     C --> E[End]
     D --> E
     
-    style A fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style B fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style C fill:white,stroke:green,stroke-width:1.6px,color:#333
-    style D fill:white,stroke:gray,stroke-width:1.6px,color:#333
-    style E fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
+    style A stroke:lightblue,stroke-width:1.6px,color:#333
+    style B stroke:lightblue,stroke-width:1.6px,color:#333
+    style C stroke:green,stroke-width:1.6px,color:#333
+    style D stroke:gray,stroke-width:1.6px,color:#333
+    style E stroke:lightblue,stroke-width:1.6px,color:#333
 ```
 
 Run steps only when conditions are met.
@@ -392,10 +391,10 @@ stateDiagram-v2
     CleanupFail --> AlwaysCleanup: handlerOn.exit
     AlwaysCleanup --> [*]
     
-    classDef running fill:white,stroke:lime,stroke-width:1.6px,color:#333
-    classDef success fill:white,stroke:green,stroke-width:1.6px,color:#333
-    classDef failed fill:white,stroke:red,stroke-width:1.6px,color:#333
-    classDef handler fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
+    classDef running stroke:lime,stroke-width:1.6px,color:#333
+    classDef success stroke:green,stroke-width:1.6px,color:#333
+    classDef failed stroke:red,stroke-width:1.6px,color:#333
+    classDef handler stroke:lightblue,stroke-width:1.6px,color:#333
     
     class Running running
     class Success success
@@ -983,13 +982,13 @@ graph TD
     A -.-> C
     B -.-> F
     
-    style A fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style B fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style C fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style D fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style E fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style F fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
-    style G fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
+    style A stroke:lightblue,stroke-width:1.6px,color:#333
+    style B stroke:lightblue,stroke-width:1.6px,color:#333
+    style C stroke:lightblue,stroke-width:1.6px,color:#333
+    style D stroke:lightblue,stroke-width:1.6px,color:#333
+    style E stroke:lightblue,stroke-width:1.6px,color:#333
+    style F stroke:lightblue,stroke-width:1.6px,color:#333
+    style G stroke:lightblue,stroke-width:1.6px,color:#333
 ```
 
 Compose workflows from reusable parts.

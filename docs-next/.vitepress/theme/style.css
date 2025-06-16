@@ -351,19 +351,215 @@
   font-size: 1.25rem;
 }
 
-/* Mermaid diagram styling - force consistent colors */
+/* Mermaid diagram styling - force consistent colors for light mode */
+.mermaid text,
 .mermaid .node text,
 .mermaid .edge-label text,
-.mermaid .label text {
+.mermaid .label text,
+.mermaid .nodeLabel,
+.mermaid .edgeLabel,
+.mermaid .cluster text,
+.mermaid .actor-text,
+.mermaid .messageLine0,
+.mermaid .messageLine1,
+.mermaid .messageText,
+.mermaid .labelText,
+.mermaid .loopText,
+.mermaid .noteText,
+.mermaid .section,
+.mermaid .taskText,
+.mermaid .taskTextOutsideRight,
+.mermaid .taskTextOutsideLeft,
+.mermaid .activeText {
   fill: #333 !important;
   color: #333 !important;
 }
 
-.mermaid .nodeLabel {
+/* Force override any inherited text colors - light mode */
+.mermaid * {
   color: #333 !important;
 }
 
-.mermaid text {
+.mermaid svg text {
+  fill: #333 !important;
+}
+
+/* Dark mode overrides for all Mermaid text */
+.dark .mermaid text,
+.dark .mermaid .node text,
+.dark .mermaid .edge-label text,
+.dark .mermaid .label text,
+.dark .mermaid .nodeLabel,
+.dark .mermaid .edgeLabel,
+.dark .mermaid .cluster text,
+.dark .mermaid .actor-text,
+.dark .mermaid .messageLine0,
+.dark .mermaid .messageLine1,
+.dark .mermaid .messageText,
+.dark .mermaid .labelText,
+.dark .mermaid .loopText,
+.dark .mermaid .noteText,
+.dark .mermaid .section,
+.dark .mermaid .taskText,
+.dark .mermaid .taskTextOutsideRight,
+.dark .mermaid .taskTextOutsideLeft,
+.dark .mermaid .activeText {
+  fill: #e5e7eb !important;
+  color: #e5e7eb !important;
+}
+
+.dark .mermaid * {
+  color: #e5e7eb !important;
+}
+
+.dark .mermaid svg text {
+  fill: #e5e7eb !important;
+}
+
+/* Sequence diagram specific styling - more aggressive targeting */
+.mermaid g.sequenceDiagram text,
+.mermaid g text,
+.mermaid text.actor-text,
+.mermaid text.messageText,
+.mermaid text.labelText,
+.mermaid text.loopText,
+.mermaid text.noteText,
+.mermaid text.sequenceNumber,
+.mermaid .actor-box text,
+.mermaid .actor-line text,
+.mermaid .messageLine0 text,
+.mermaid .messageLine1 text,
+.mermaid .note-box text {
   fill: #333 !important;
   color: #333 !important;
+  font-family: var(--vp-font-family-base) !important;
+}
+
+/* Force all SVG text elements to use dark color */
+.mermaid svg g text,
+.mermaid svg text {
+  fill: #333 !important;
+  color: #333 !important;
+}
+
+/* Override any specific sequence diagram classes */
+.mermaid g[class*="actor"] text,
+.mermaid g[class*="message"] text,
+.mermaid g[class*="note"] text,
+.mermaid g[class*="loop"] text {
+  fill: #333 !important;
+  color: #333 !important;
+}
+
+/* Final nuclear option - override everything */
+.mermaid [fill="#333333"],
+.mermaid [fill="#666"],
+.mermaid [fill="#999"],
+.mermaid [fill="#ccc"],
+.mermaid [fill="#eee"],
+.mermaid [fill="currentColor"] {
+  fill: #333 !important;
+}
+
+/* Target any element with specific fill colors */
+.mermaid text[fill]:not([fill="#333"]) {
+  fill: #333 !important;
+}
+
+/* Specific targeting for sequence diagram actor boxes */
+.mermaid .actor.actor-box text,
+.mermaid .actor-box text,
+.mermaid g.actor text,
+.mermaid g.actor-box text {
+  fill: #333 !important;
+  color: #333 !important;
+}
+
+/* Target the specific class you found */
+.mermaid .actor.actor-box,
+.mermaid g[class="actor actor-box"] text,
+.mermaid g[class*="actor-box"] text {
+  fill: #333 !important;
+  color: #333 !important;
+}
+
+/* Override the specific inline styles with high specificity - light mode */
+[id^="mermaid-"] .actor > tspan,
+[id^="mermaid-"] text.actor > tspan,
+.mermaid .actor > tspan,
+.mermaid text.actor > tspan {
+  fill: #333 !important;
+  stroke: none !important;
+}
+
+/* Override any tspan elements in mermaid diagrams - light mode */
+.mermaid tspan,
+[id^="mermaid-"] tspan {
+  fill: #333 !important;
+}
+
+/* Dark mode overrides for readability */
+.dark [id^="mermaid-"] .actor > tspan,
+.dark [id^="mermaid-"] text.actor > tspan,
+.dark .mermaid .actor > tspan,
+.dark .mermaid text.actor > tspan {
+  fill: #e5e7eb !important;
+  stroke: none !important;
+}
+
+.dark .mermaid tspan,
+.dark [id^="mermaid-"] tspan {
+  fill: #e5e7eb !important;
+}
+
+/* Dark mode node backgrounds and borders */
+.dark .mermaid .node rect,
+.dark .mermaid .node circle,
+.dark .mermaid .node ellipse,
+.dark .mermaid .node polygon,
+.dark .mermaid .node path,
+.dark .mermaid .actor-box,
+.dark .mermaid .actor rect,
+.dark .mermaid .note-box,
+.dark .mermaid .note rect {
+  fill: #374151 !important;
+  stroke: #6b7280 !important;
+  stroke-width: 1.6px !important;
+}
+
+/* Dark mode sequence diagram participant boxes */
+.dark .mermaid .participant rect,
+.dark .mermaid .participant-box {
+  fill: #374151 !important;
+  stroke: #6b7280 !important;
+  stroke-width: 1.6px !important;
+}
+
+/* Dark mode flowchart nodes */
+.dark .mermaid .flowchart-node rect,
+.dark .mermaid .flowchart-node circle,
+.dark .mermaid .flowchart-node polygon {
+  fill: #374151 !important;
+  stroke: #6b7280 !important;
+}
+
+/* Dark mode sequence diagram - more aggressive targeting */
+.dark .mermaid rect,
+.dark .mermaid .actor rect,
+.dark .mermaid .participant rect,
+.dark .mermaid g rect,
+.dark [id^="mermaid-"] rect,
+.dark [id^="mermaid-"] .actor rect,
+.dark [id^="mermaid-"] .participant rect {
+  fill: #374151 !important;
+  stroke: #6b7280 !important;
+  stroke-width: 1.6px !important;
+}
+
+/* Dark mode sequence diagram notes */
+.dark .mermaid .note rect,
+.dark [id^="mermaid-"] .note rect {
+  fill: #1f2937 !important;
+  stroke: #6b7280 !important;
+  stroke-width: 1.6px !important;
 }

@@ -174,8 +174,6 @@ Dagu is perfect for:
 Dagu might not be the best choice for:
 
 - Workflows requiring sub-second scheduling precision
-- Distributed execution across multiple machines (consider Kubernetes-based solutions)
-- Workflows with extremely complex state management needs
 - Real-time streaming data processing (consider Apache Flink or Spark)
 
 ## Ready to Get Started?
@@ -184,4 +182,4 @@ Dagu transforms the chaos of scattered scripts and cron jobs into clear, managea
 
 [Continue to Getting Started →](/getting-started)
 
-Or explore [real-world examples](/examples) to see what Dagu can do.
+Or explore [examples](/writing-workflows/examples/) to see what Dagu can do.
