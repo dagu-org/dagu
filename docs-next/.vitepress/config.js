@@ -93,7 +93,8 @@ export default withMermaid(
     cleanUrls: true,
 
     head: [
-      ["link", { rel: "icon", href: "/favicon.ico" }],
+      ["link", { rel: "icon", type: "image/x-icon", href: "/favicon.ico" }],
+      ["link", { rel: "shortcut icon", href: "/favicon.ico" }],
       ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
       [
         "link",

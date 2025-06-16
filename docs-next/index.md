@@ -15,29 +15,86 @@ layout: doc
 
 ## Quick Start
 
-<div class="code-group">
-<div class="code-group-item active">
+Create and run your first Dagu workflow in minutes.
 
-```bash
-# Install Dagu
+### Step 1: Install Dagu
+
+::: code-group
+
+```bash [Docker]
+# Pull the latest image
+docker pull ghcr.io/dagu-org/dagu:latest
+```
+
+```bash [Binary]
+# Install via script (macOS, Linux, WSL)
 curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
 
-# Create your first workflow
-cat > hello.yaml << EOF
-steps:
-  - name: hello
-    command: echo "Hello from Dagu!"
-  - name: world
-    command: echo "Welcome to simple, powerful workflows!"
-    depends: hello
-EOF
+# Or via Homebrew
+brew install dagu-org/brew/dagu
+```
 
-# Run it
+:::
+
+### Step 2: Create Your First Workflow
+
+```bash
+mkdir -p ~/.dagu/dags && cat > ~/.dagu/dags/hello.yaml << 'EOF'
+name: hello-world
+description: My first Dagu workflow
+
+steps:
+  - name: greet
+    command: echo "Hello from Dagu!"
+    
+  - name: show-date
+    command: date
+    
+  - name: done
+    command: echo "Workflow complete! 🎉"
+EOF
+```
+
+### Step 3: Run the Workflow
+
+::: code-group
+
+```bash [Docker]
+docker run \
+--rm \
+-v ~/.dagu:/app/.dagu \
+-e DAGU_HOME=/app/.dagu \
+ghcr.io/dagu-org/dagu:latest \
 dagu start hello.yaml
 ```
 
-</div>
-</div>
+```bash [Binary]
+dagu start ~/.dagu/dags/hello.yaml
+```
+
+:::
+
+### Step 4: View in Web UI
+
+::: code-group
+
+```bash [Docker]
+docker run \
+--rm \
+-v ~/.dagu:/app/.dagu \
+-e DAGU_HOME=/app/.dagu \
+-p 8080:8080 \
+ghcr.io/dagu-org/dagu:latest \
+dagu start-all
+```
+
+```bash [Binary]
+dagu start-all
+```
+
+:::
+
+Open your browser to [http://localhost:8080](http://localhost:8080) to see the Dagu web interface.
 
 ## Why Dagu?
 
@@ -58,47 +115,6 @@ Compose workflows from reusable components. Build once, use everywhere.
 
 ### Production Ready
 Battle-tested with robust error handling, retries, and comprehensive logging.
-
-## Feature Comparison
-
-<div class="comparison-table">
-
-| Feature | Dagu | Airflow | Cron | GitHub Actions |
-|---------|------|---------|------|----------------|
-| **Dependencies** | <span class="feature-yes">None</span> | Python, Database, Message Broker | <span class="feature-yes">None</span> | GitHub |
-| **Installation** | <span class="feature-yes">Single Binary</span> | Complex Setup | Built-in | N/A |
-| **Web UI** | <span class="feature-yes">✓</span> | <span class="feature-yes">✓</span> | <span class="feature-no">✗</span> | <span class="feature-yes">✓</span> |
-| **Language** | <span class="feature-yes">Any</span> | Python | <span class="feature-yes">Any</span> | <span class="feature-yes">Any</span> |
-| **Local Development** | <span class="feature-yes">✓</span> | Difficult | <span class="feature-yes">✓</span> | <span class="feature-no">✗</span> |
-| **Workflow Visualization** | <span class="feature-yes">✓</span> | <span class="feature-yes">✓</span> | <span class="feature-no">✗</span> | <span class="feature-yes">✓</span> |
-| **Error Handling** | <span class="feature-yes">✓</span> | <span class="feature-yes">✓</span> | Limited | <span class="feature-yes">✓</span> |
-| **Nested Workflows** | <span class="feature-yes">✓</span> | Limited | <span class="feature-no">✗</span> | Limited |
-
-</div>
-
-## Core Features
-
-<div class="features-grid">
-
-### Scheduling
-Run workflows on a schedule with cron expressions. Skip redundant runs, set timezone, and more.
-
-### Parallel Execution
-Process multiple items concurrently. Control concurrency limits and aggregate results.
-
-### Error Handling
-Retry failed steps, continue on failure, send notifications, and run cleanup handlers.
-
-### Multiple Executors
-Run commands locally, in Docker containers, over SSH, make HTTP requests, send emails, and more.
-
-### Rich Web UI
-Monitor workflows in real-time, view logs, check history, and manage executions.
-
-### Developer Friendly
-Clear YAML syntax, comprehensive logging, fast onboarding, and excellent documentation.
-
-</div>
 
 ## Example Workflow
 
