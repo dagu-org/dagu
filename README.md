@@ -58,7 +58,7 @@ dagu migrate history
 
 After successful migration, legacy history directories are moved to `<DAGU_DATA_DIR>/history_migrated_<timestamp>` for safekeeping. Most other functionality remains stable and compatible except for a few changes. We're committed to maintaining backward compatibility as much as possible in future releases.
 
-**⚠️ Breaking Change - DAG Type Field**: Starting from v1.17.0-beta.13, DAGs now have a `type` field that controls step execution behavior:
+**⚠️ Note on DAG Type Field**: Starting from v1.17.0-beta.13, DAGs now have a `type` field that controls step execution behavior:
 - **`type: chain`** (new default): Steps are automatically connected in sequence, even if no dependencies are specified
 - **`type: graph`** (previous behavior): Steps only depend on explicitly defined dependencies
 
