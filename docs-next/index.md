@@ -8,7 +8,7 @@ layout: doc
 
 <div class="hero-section">
   <div class="hero-actions">
-    <a href="/getting-started/" class="VPButton brand">Get Started in 3 Minutes</a>
+    <a href="/getting-started/quickstart" class="VPButton brand">Get Started in 3 Minutes</a>
     <a href="/writing-workflows/examples/" class="VPButton alt">View Examples</a>
   </div>
 </div>
@@ -140,10 +140,6 @@ steps:
     retryPolicy:
       limit: 3
       intervalSec: 30
-
-handlerOn:
-  failure:
-    command: ./notify-failure.sh
 
 ---
 

@@ -37,12 +37,7 @@ dagu start-all --host 0.0.0.0 --port 9000
 
 The main dashboard shows:
 
-### Status Overview
-- **Running**: Currently executing workflows
-- **Queued**: Waiting to run
-- **Success**: Completed successfully (last 24h)
-- **Failed**: Failed executions (last 24h)
-- **Total**: All workflows in the system
+![Dashboard](/dashboard.png)
 
 ### Recent Executions
 - Timeline of recent workflow runs
@@ -54,33 +49,17 @@ The main dashboard shows:
 - Filter by status (success, failed, running)
 - Search by workflow name
 
-## Workflows
+## DAG Definitions
 
-The main workflows page shows all DAGs and their real-time status. This gives you an immediate overview of your entire workflow ecosystem.
+The DAGs page shows all DAGs and their real-time status. This gives you an immediate overview of your workflows.
 
-![Workflows](https://raw.githubusercontent.com/dagu-org/dagu/main/assets/images/ui-dags.webp)
+![Definitions](/dag-definitions.png)
 
-## Workflow Details
+## DAG Details
 
-Click any workflow to see detailed information including real-time status, logs, and DAG configurations. You can edit DAG configurations directly in the browser.
+Click any DAG to see detailed information including real-time status, logs, and DAG configurations. You can edit DAG configurations directly in the browser.
 
-![Workflow Details](https://raw.githubusercontent.com/dagu-org/dagu/main/assets/images/ui-details.webp)
-
-### Visual Graph Layout Options
-
-You can switch between horizontal and vertical graph layouts using the button on the top right corner for better visualization based on your DAG structure.
-
-![Workflow Details Vertical](https://raw.githubusercontent.com/dagu-org/dagu/main/assets/images/ui-details2.webp)
-
-### Visual Graph
-- Interactive DAG visualization
-- Node colors indicate status:
-  - 🟢 Green: Success
-  - 🔴 Red: Failed
-  - 🔵 Blue: Running
-  - ⚪ Gray: Pending
-  - ⚫ Black: Cancelled
-- Toggle between horizontal and vertical layouts
+![DAG Details](/dag-status.png)
 
 ### Controls
 - **Start**: Run the workflow
@@ -90,11 +69,17 @@ You can switch between horizontal and vertical graph layouts using the button on
 
 ### Information Tabs
 - **Graph**: Visual representation
+  - **Drill-down**: Navigate to child DAG executions by double-clicking steps
+  - **Update Status**: Change step status manually by right-clicking steps
 - **Config**: YAML definition
 - **History**: Past executions
 - **Log**: Current execution logs
 
 ## Execution Details
+
+The execution details page provides in-depth information about a specific workflow run, including real-time updates and logs.
+
+![Execution Details](/status-details.png)
 
 ### Real-time Updates
 - Live status changes
@@ -117,7 +102,7 @@ You can switch between horizontal and vertical graph layouts using the button on
 
 The execution history page shows past execution results and logs, providing a comprehensive view of workflow performance over time.
 
-![Execution History](https://raw.githubusercontent.com/dagu-org/dagu/main/assets/images/ui-history.webp)
+![Execution History](/dag-history.png)
 
 ### Execution List
 - Sortable by date, status, duration
@@ -133,11 +118,13 @@ The execution history page shows past execution results and logs, providing a co
 
 The execution log view shows detailed logs and standard output of each execution and step, helping you debug and monitor workflow behavior.
 
-![Execution Log](https://raw.githubusercontent.com/dagu-org/dagu/main/assets/images/ui-logoutput.webp)
+![Execution Log](/dag-logs.png)
 
 ## DAG Editor
 
 Edit workflows directly in the browser:
+
+![DAG Editor](/dag-editor.png)
 
 ### Features
 - Syntax highlighting
@@ -156,17 +143,11 @@ permissions:
 
 The search functionality allows you to search for specific text across all DAGs in your system, making it easy to find workflows by content, variables, or any other text within the DAG definitions.
 
-![Search](https://raw.githubusercontent.com/dagu-org/dagu/main/assets/images/ui-search.webp)
+![Search](/search.png)
 
 ### Global Search
 - Search across all DAGs
 - Find by name, tags, or content
-- Quick navigation
-
-### Log Search
-- Full-text search in logs
-- Regular expression support
-- Highlight matches
 
 ## UI Customization
 
@@ -201,74 +182,7 @@ remoteNodes:
 
 ### Features
 - Unified dashboard
-- Cross-environment monitoring
 - Centralized management
-
-## Performance
-
-### Optimizations
-- Lazy loading for large logs
-- Efficient polling intervals
-- Compressed API responses
-- Client-side caching
-
-### Recommendations
-- Use pagination for history
-- Limit dashboard items for performance
-- Archive old logs regularly
-
-## Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| `/` | Focus search |
-| `r` | Refresh current view |
-| `g d` | Go to dashboard |
-| `g s` | Go to settings |
-| `?` | Show help |
-
-## Browser Support
-
-Tested and supported:
-- Chrome/Edge (latest)
-- Firefox (latest)
-- Safari (latest)
-- Mobile browsers
-
-## Troubleshooting
-
-### UI Not Loading
-
-Check server is running:
-```bash
-curl http://localhost:8080/api/v1/health
-```
-
-### Blank Page
-
-Check browser console for errors:
-- Network issues
-- Authentication problems
-- JavaScript errors
-
-### Slow Performance
-
-- Reduce history retention
-- Increase page limits
-- Check server resources
-
-### Authentication Issues
-
-For basic auth:
-```yaml
-auth:
-  basic:
-    enabled: true
-    username: admin
-    password: secret
-```
-
-Access with: `http://admin:secret@localhost:8080`
 
 ## Security Considerations
 
@@ -279,15 +193,6 @@ tls:
   keyFile: /path/to/key.pem
 ```
 
-### Reverse Proxy
-```nginx
-location /dagu/ {
-    proxy_pass http://localhost:8080/;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-}
-```
-
 ### CORS Configuration
 Configure for API access from different domains:
 ```yaml
@@ -296,32 +201,6 @@ cors:
   allowedOrigins:
     - https://app.example.com
 ```
-
-## Tips and Tricks
-
-### 1. **Quick Status Check**
-Bookmark the dashboard with status filter:
-```
-http://localhost:8080/?status=failed
-```
-
-### 2. **Direct DAG Links**
-Share direct links to workflows:
-```
-http://localhost:8080/dags/my-workflow
-```
-
-### 3. **Mobile Access**
-The UI is responsive - monitor on the go
-
-### 4. **Export Configurations**
-Use the API to export DAG configurations:
-```bash
-curl http://localhost:8080/api/v1/dags/my-workflow
-```
-
-### 5. **Bulk Operations**
-Use the API for bulk operations while monitoring in UI
 
 ## See Also
 

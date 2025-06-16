@@ -40,11 +40,6 @@ params:
 steps:
   - name: process
     command: python process.py --date=${DATE}
-
-# Handlers
-handlerOn:
-  failure:
-    command: ./notify-failure.sh
 ```
 
 ## Steps

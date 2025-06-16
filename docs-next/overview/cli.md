@@ -92,37 +92,13 @@ dagu status --run-id=20240101_120000 my-workflow
 dagu status my-workflow.yaml
 ```
 
-Output:
-```
-Workflow: my-workflow
-Status: running
-Started: 2024-01-01 12:00:00
-Duration: 5m 23s
-
-Steps:
-  ✓ download     [completed] (2m 10s)
-  ⟳ process      [running] (3m 13s)
-  ○ upload       [pending]
-```
-
-#### View Execution History
+#### View Status of a DAG run
 ```bash
 # Check detailed status and output
 dagu status my-workflow.yaml
 
 # Note: For detailed logs, use the web UI at http://localhost:8080
 # or check log files in the configured log directory
-```
-
-### Development Commands
-
-#### Test and Validate
-```bash
-# Dry run validates syntax and shows execution plan
-dagu dry my-workflow.yaml
-
-# With parameters (use -- separator)
-dagu dry etl.yaml -- DATE=2024-01-01
 ```
 
 ### Server Commands
@@ -191,153 +167,6 @@ dagu start my-workflow.yaml -- KEY1=value1 KEY2=value2
 
 # Mixed (use -- separator)
 dagu start my-workflow.yaml -- param1 KEY=value param2
-```
-
-### Using Configuration Files
-
-```bash
-# Use custom config
-dagu --config /etc/dagu/prod.yaml start-all
-
-# Override config with flags
-dagu --config prod.yaml start-all --port 9000
-```
-
-### Environment Variables
-
-All CLI options can be set via environment:
-
-```bash
-# Set defaults
-export DAGU_HOST=0.0.0.0
-export DAGU_PORT=8080
-export DAGU_DAGS=/opt/workflows
-
-# Start with environment config
-dagu start-all
-```
-
-## Scripting with Dagu
-
-### Automation Examples
-
-#### Wait for Completion
-```bash
-#!/bin/bash
-# Start workflow and wait for completion
-
-dagu start my-workflow.yaml
-
-while true; do
-    status=$(dagu status my-workflow.yaml | grep "Status:" | awk '{print $2}')
-    if [[ "$status" != "running" ]]; then
-        echo "Workflow completed with status: $status"
-        break
-    fi
-    sleep 5
-done
-```
-
-#### Batch Processing
-```bash
-#!/bin/bash
-# Process multiple dates
-
-for date in 2024-01-{01..31}; do
-    echo "Processing $date"
-    dagu start etl.yaml -- DATE=$date
-    
-    # Wait between runs
-    sleep 60
-done
-```
-
-#### Error Handling
-```bash
-#!/bin/bash
-# Run with retry on failure
-
-if ! dagu start critical-workflow.yaml; then
-    echo "First attempt failed, retrying..."
-    sleep 30
-    
-    # Get the latest run ID to retry (this is just an example - you'd need actual logic)
-    RUN_ID=$(dagu status critical-workflow.yaml | grep "Run ID:" | awk '{print $3}')
-    
-    if ! dagu retry --run-id="$RUN_ID" critical-workflow; then
-        echo "Retry failed, sending alert"
-        # Send notification
-        exit 1
-    fi
-fi
-```
-
-### Output Parsing
-
-#### JSON Output
-```bash
-# Get status as JSON (using jq)
-dagu status my-workflow.yaml --json | jq '.status'
-
-# Get specific step status
-dagu status my-workflow.yaml --json | jq '.steps[] | select(.name=="process")'
-```
-
-#### Exit Codes
-```bash
-# Check execution success
-if dagu start my-workflow.yaml; then
-    echo "Success"
-else
-    echo "Failed with code: $?"
-fi
-```
-
-## Integration Patterns
-
-### CI/CD Integration
-
-#### GitHub Actions
-```yaml
-- name: Run Dagu Workflow
-  run: |
-    dagu start deployment.yaml -- \
-      BRANCH=${{ github.ref }} \
-      COMMIT=${{ github.sha }}
-```
-
-#### Jenkins
-```groovy
-stage('Run ETL') {
-    sh 'dagu start etl.yaml -- DATE=${BUILD_ID}'
-}
-```
-
-#### GitLab CI
-```yaml
-deploy:
-  script:
-    - dagu start deploy.yaml -- ENV=production
-```
-
-### Cron Replacement
-
-```bash
-# Instead of complex cron
-# 0 2 * * * cd /app && ./etl.sh >> /var/log/etl.log 2>&1
-
-# Use Dagu
-dagu scheduler --dags /app/workflows
-```
-
-### Monitoring Integration
-
-```bash
-# Prometheus metrics
-curl http://localhost:8080/api/v2/metrics
-
-# Health check for monitoring tools
-curl -f http://localhost:8080/api/v1/health || exit 1
 ```
 
 ## CLI Configuration
