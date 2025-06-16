@@ -357,73 +357,6 @@ graph TD
 
 The three processing steps run in parallel after `prepare` completes!
 
-## Tips for Writing Workflows
-
-### 1. Start Simple
-Begin with basic sequential steps, then add complexity.
-
-### 2. Use Descriptive Names
-```yaml
-# Good
-- name: validate-input-data
-  command: ./validate.sh
-
-# Not so good
-- name: step1
-  command: ./validate.sh
-```
-
-### 3. Handle Errors Gracefully
-```yaml
-steps:
-  - name: might-fail
-    command: ./risky-operation.sh
-    continueOn:
-      failure: true
-    retryPolicy:
-      limit: 3
-```
-
-### 4. Use Output Variables
-```yaml
-steps:
-  - name: get-version
-    command: cat VERSION
-    output: VERSION
-    
-  - name: build
-    command: docker build -t myapp:${VERSION} .
-    depends: get-version
-```
-
-### 5. Test Before Scheduling
-
-::: code-group
-
-```bash [Docker]
-# Dry run to validate
-docker run --rm -v ~/.dagu:/app/.dagu -e DAGU_HOME=/app/.dagu \
-ghcr.io/dagu-org/dagu:latest dagu dry hello.yaml
-
-# Run once manually
-docker run --rm -v ~/.dagu:/app/.dagu -e DAGU_HOME=/app/.dagu \
-ghcr.io/dagu-org/dagu:latest dagu start hello.yaml
-
-# Then add schedule
-```
-
-```bash [Binary]
-# Dry run to validate
-dagu dry hello.yaml
-
-# Run once manually
-dagu start hello.yaml
-
-# Then add schedule
-```
-
-:::
-
 ## Common Patterns
 
 ### Sequential Processing
@@ -500,70 +433,9 @@ flowchart TD
     style D stroke:gray,stroke-width:1.6px,color:#333
 ```
 
-## Debugging Workflows
-
-### View Logs
-
-::: code-group
-
-```bash [Docker]
-# See all logs for a workflow
-docker run --rm -v ~/.dagu:/app/.dagu -e DAGU_HOME=/app/.dagu \
-ghcr.io/dagu-org/dagu:latest dagu logs hello.yaml
-
-# See logs for a specific execution
-docker run --rm -v ~/.dagu:/app/.dagu -e DAGU_HOME=/app/.dagu \
-ghcr.io/dagu-org/dagu:latest dagu logs hello.yaml --run-id=20240115_103045_abc123
-```
-
-```bash [Binary]
-# See all logs for a workflow
-dagu logs hello.yaml
-
-# See logs for a specific execution
-dagu logs hello.yaml --run-id=20240115_103045_abc123
-```
-
-:::
-
-### Check History
-
-::: code-group
-
-```bash [Docker]
-# View execution history
-docker run --rm -v ~/.dagu:/app/.dagu -e DAGU_HOME=/app/.dagu \
-ghcr.io/dagu-org/dagu:latest dagu history hello.yaml
-```
-
-```bash [Binary]
-# View execution history
-dagu history hello.yaml
-```
-
-:::
-
-### Use the Web UI
-The web interface provides:
-- Visual DAG representation
-- Step-by-step execution view
-- Real-time log streaming
-- Error highlighting
-
-## What's Next?
-
-Now that you've created your first workflow, explore more:
+## See Also
 
 1. **[Core Concepts](/getting-started/concepts)** - Understand Dagu's architecture
 2. **[Examples](/writing-workflows/examples/)** - See more workflow patterns
 3. **[Writing Workflows](/writing-workflows/)** - Deep dive into workflow creation
 4. **[Features](/features/)** - Explore advanced capabilities
-
-### Try These Challenges
-
-1. **Add Email Notifications**: Modify the backup workflow to send an email on completion
-2. **Use Docker**: Create a workflow that runs steps in Docker containers
-3. **Process Data**: Build a simple ETL pipeline that extracts, transforms, and loads data
-4. **Schedule Multiple**: Create several workflows with different schedules
-
-Remember: Dagu is designed to be simple. If something seems complicated, there's probably an easier way!

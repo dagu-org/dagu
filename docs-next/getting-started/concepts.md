@@ -429,14 +429,34 @@ Visual management:
 
 ### 3. REST API
 
-Programmatic access:
-```bash
-# Start workflow
-curl -X POST http://localhost:8080/api/v1/dags/my-workflow/runs
+#### Start DAG
 
-# Get status
-curl http://localhost:8080/api/v1/dags/my-workflow/status
+**Endpoint**: `POST /api/v2/dags/{fileName}/start`
+
+Creates and starts a DAG run with optional parameters.
+
+**Request Body**:
+```json
+{
+  "params": "{\"env\": \"production\", \"version\": \"1.2.3\"}",
+  "dagRunId": "custom-run-id"
+}
 ```
+
+**Request Fields**:
+| Field | Type | Description | Required |
+|-------|------|-------------|----------|
+| params | string | JSON string of parameters | No |
+| dagRunId | string | Custom run ID | No |
+
+**Response (200)**:
+```json
+{
+  "dagRunId": "20240101_120000_abc123"
+}
+```
+
+See the [API Reference](/reference/api/) for full details.
 
 ## Understanding Logs
 

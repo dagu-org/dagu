@@ -9,7 +9,6 @@ const fullSidebar = [
     items: [
       { text: "What is Dagu?", link: "/overview/" },
       { text: "Architecture", link: "/overview/architecture" },
-      { text: "Use Cases", link: "/overview/use-cases" },
       { text: "Comparison", link: "/overview/comparison" },
       { text: "CLI", link: "/overview/cli" },
       { text: "Web UI", link: "/overview/web-ui" },
@@ -19,7 +18,6 @@ const fullSidebar = [
   {
     text: "Getting Started",
     items: [
-      { text: "Overview", link: "/getting-started/" },
       { text: "Quickstart", link: "/getting-started/quickstart" },
       { text: "Installation", link: "/getting-started/installation" },
       { text: "Core Concepts", link: "/getting-started/concepts" },
