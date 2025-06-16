@@ -19,7 +19,8 @@ const fullSidebar = [
   {
     text: "Getting Started",
     items: [
-      { text: "Quick Start", link: "/getting-started/" },
+      { text: "Overview", link: "/getting-started/" },
+      { text: "Quickstart", link: "/getting-started/quickstart" },
       { text: "Installation", link: "/getting-started/installation" },
       { text: "First Workflow", link: "/getting-started/first-workflow" },
       { text: "Core Concepts", link: "/getting-started/concepts" },
