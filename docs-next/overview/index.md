@@ -30,10 +30,10 @@ Dagu was born from a simple observation: existing workflow tools either lack fea
 
 We built Dagu around six core principles:
 
-### 1. 🏠 Local First
+### 1. Local First
 Define and execute workflows in a single, self-contained environment—no internet required. Whether you're prototyping on your laptop, running on IoT devices, or deploying to air-gapped on-premise servers, Dagu just works.
 
-### 2. 🎯 Minimal Configuration
+### 2. Minimal Configuration
 Start with just:
 - One binary
 - One YAML file
@@ -41,7 +41,7 @@ Start with just:
 
 No external databases. No message queues. Local file storage handles everything—DAG definitions, logs, and metadata. Complex infrastructure shouldn't be a prerequisite for workflow automation.
 
-### 3. 🌐 Language Agnostic
+### 3. Language Agnostic
 Your workflows, your choice:
 ```yaml
 steps:
@@ -59,7 +59,7 @@ steps:
 
 Any runtime works without extra layers of complexity. Use the tools your team already knows.
 
-### 4. 🧩 Keep it Simple
+### 4. Keep it Simple
 Workflows are defined in clear, human-readable YAML:
 
 ```yaml
@@ -78,7 +78,7 @@ steps:
 
 Simple to understand, even for non-developers. Fast onboarding for new team members.
 
-### 5. 🚦 Intelligent Queue Management
+### 5. Intelligent Queue Management
 Built-in queue system provides flexible concurrency control:
 - Manage resource utilization
 - Prevent system overload
@@ -87,7 +87,7 @@ Built-in queue system provides flexible concurrency control:
 
 Perfect for rate-limited APIs, resource-constrained environments, or when you need fine-grained control over execution flow.
 
-### 6. 🤝 Community-Driven
+### 6. Community-Driven
 As an open-source project, Dagu evolves with its users:
 - Contribute new executors
 - Integrate emerging technologies
@@ -112,10 +112,10 @@ That's it. No databases to configure. No Python environments to manage. No cloud
 
 ## Key Features
 
-### 🚀 **Zero Dependencies**
+### **Zero Dependencies**
 One binary. Works on Linux, macOS, Windows. No database, no message broker, no runtime dependencies.
 
-### 🔄 **Hierarchical DAG Composition**
+### **Hierarchical DAG Composition**
 Build complex workflows from simple, reusable components:
 
 ```yaml
@@ -128,10 +128,10 @@ steps:
     depends: data-pipeline
 ```
 
-### 📊 **Built-in Web UI**
+### **Built-in Web UI**
 Monitor workflows, view logs, and manage executions through a clean, modern interface. No additional setup required.
 
-### 🛡️ **Production Ready**
+### **Production Ready**
 - Robust error handling with configurable retries
 - Comprehensive logging with stdout/stderr separation  
 - Graceful shutdown and cleanup

@@ -148,6 +148,7 @@ export default withMermaid(
       },
 
       nav: [
+        { text: "Home", link: "/" },
         { text: "Overview", link: "/overview/", activeMatch: "/overview/" },
         {
           text: "Getting Started",
