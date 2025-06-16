@@ -71,8 +71,8 @@ const fullSidebar = [
     text: "Configurations",
     items: [
       { text: "Overview", link: "/configurations/" },
-      { text: "Installation & Setup", link: "/configurations/installation" },
       { text: "Server Configuration", link: "/configurations/server" },
+      { text: "Deployment", link: "/configurations/deployment" },
       { text: "Operations", link: "/configurations/operations" },
       { text: "Advanced Setup", link: "/configurations/advanced" },
       { text: "Configuration Reference", link: "/configurations/reference" },

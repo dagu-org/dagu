@@ -46,31 +46,45 @@ dagu enqueue my-workflow.yaml
 
 #### Stop a Running Workflow
 ```bash
+# Stop currently running workflow
+dagu stop my-workflow
+
+# Stop specific run
+dagu stop --run-id=20240101_120000 my-workflow
+
+# Can also use file path
 dagu stop my-workflow.yaml
 ```
 
 #### Restart a Workflow
 ```bash
-# Restart with same parameters
-dagu restart my-workflow.yaml
+# Restart latest run
+dagu restart my-workflow
 
-# Restart with new parameters
-dagu restart etl.yaml DATE=2024-01-02
+# Restart specific run
+dagu restart --run-id=20240101_120000 my-workflow
 ```
 
 #### Retry Failed Workflow
 ```bash
-# Retry last failed run
-dagu retry my-workflow.yaml
+# Retry specific run (run-id is required)
+dagu retry --run-id=20240101_120000 my-workflow
 
-# Retry specific run
-dagu retry --request-id=20240101_120000 my-workflow.yaml
+# Can also use file path
+dagu retry --run-id=20240101_120000 my-workflow.yaml
 ```
 
 ### Monitoring Workflows
 
 #### Check Status
 ```bash
+# Check latest run status
+dagu status my-workflow
+
+# Check specific run status
+dagu status --run-id=20240101_120000 my-workflow
+
+# Can also use file path
 dagu status my-workflow.yaml
 ```
 
@@ -156,7 +170,7 @@ dagu enqueue --run-id=custom-001 my-workflow.yaml
 # Add to queue with parameters
 dagu enqueue my-workflow.yaml -- KEY=value
 
-# Remove from queue
+# Remove from queue (requires DAG-name:run-id format)
 dagu dequeue --dag-run=my-workflow:custom-001
 ```
 
@@ -243,7 +257,10 @@ if ! dagu start critical-workflow.yaml; then
     echo "First attempt failed, retrying..."
     sleep 30
     
-    if ! dagu retry critical-workflow.yaml; then
+    # Get the latest run ID to retry (this is just an example - you'd need actual logic)
+    RUN_ID=$(dagu status critical-workflow.yaml | grep "Run ID:" | awk '{print $3}')
+    
+    if ! dagu retry --run-id="$RUN_ID" critical-workflow; then
         echo "Retry failed, sending alert"
         # Send notification
         exit 1
@@ -365,6 +382,9 @@ dagu dry ./workflows/my-workflow.yaml
 
 # Use absolute path
 dagu start /opt/dagu/workflows/my-workflow.yaml
+
+# Or use DAG name if already loaded
+dagu start my-workflow
 ```
 
 #### Permission Denied

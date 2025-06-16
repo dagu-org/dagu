@@ -13,6 +13,6 @@ For quick access to specific topics:
 Or explore the full configuration documentation:
 
 - [Configuration Overview](/configurations/) - Getting started with configuration
-- [Installation & Setup](/configurations/installation) - Initial setup guide
+- [Installation & Setup](/getting-started/installation) - Initial setup guide
 - [Operations Guide](/configurations/operations) - Production deployment
 - [Advanced Setup](/configurations/advanced) - Complex configurations

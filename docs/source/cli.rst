@@ -20,7 +20,7 @@ The following commands are available for interacting with Dagu:
   dagu status <file>
   
   # Re-runs the specified DAG-run
-  dagu retry --request-id=<request-id> <file>
+  dagu retry --run-id=<request-id> <file or dag-name>
   
   # Stops the DAG-run
   dagu stop <file>

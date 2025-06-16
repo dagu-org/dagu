@@ -2,6 +2,23 @@
 
 Complete reference for all Dagu command-line interface commands.
 
+## Important: DAG Names vs File Paths
+
+Commands accept either **DAG names** or **DAG file paths**:
+
+- **DAG Name**: The `name` field from the YAML file (e.g., `my-workflow`)
+- **DAG File Path**: Path to the YAML file (e.g., `./workflows/my-workflow.yaml`)
+
+**Commands that accept both:**
+- `start`, `stop`, `status` - Can use either DAG name or file path
+
+**Commands that require file paths:**
+- `dry`, `enqueue` - Must provide the actual YAML file
+
+**Commands that require DAG names:**
+- `restart` - Works with existing DAG runs, use DAG name only
+- `retry` - Works with existing DAG runs, accepts both DAG name and file path
+
 ## Global Options
 
 These options can be used with any command:
@@ -12,9 +29,9 @@ dagu [global options] command [command options] [arguments...]
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--config FILE` | Load configuration from FILE | `~/.config/dagu/config.yaml` |
-| `--log-level LEVEL` | Set log level (debug, info, warn, error) | `info` |
-| `--log-format FORMAT` | Set log format (text, json) | `text` |
+| `--config, -c` | Load configuration from FILE | `~/.config/dagu/config.yaml` |
+| `--quiet, -q` | Suppress output during execution | `false` |
+| `--cpu-profile` | Enable CPU profiling (saves to cpu.pprof) | `false` |
 | `--help, -h` | Show help | |
 | `--version, -v` | Print version | |
 
@@ -25,15 +42,13 @@ dagu [global options] command [command options] [arguments...]
 Run a DAG workflow.
 
 ```bash
-dagu start [options] DAG_FILE [PARAMS...]
+dagu start [options] DAG_NAME_OR_FILE [-- PARAMS...]
 ```
 
 **Options:**
-- `--params` - Specify parameters as a JSON string
-- `--run-id ID` - Specify a custom run ID
-- `--parent` - Parent DAG run ID
-- `--root` - Root DAG run ID
-- `--no-queue` - Bypass the queue
+- `--params, -p` - Specify parameters (supports key=value pairs)
+- `--run-id, -r` - Specify a custom run ID
+- `--no-queue, -n` - Do not queue the DAG run, execute immediately
 
 **Examples:**
 ```bash
@@ -58,29 +73,42 @@ dagu start --params '{"date":"2024-01-01","env":"prod"}' etl.yaml
 Stop a running DAG.
 
 ```bash
-dagu stop DAG_FILE
+dagu stop [options] DAG_NAME_OR_FILE
 ```
+
+**Options:**
+- `--run-id, -r` - Unique identifier of the DAG run to stop (optional)
 
 **Examples:**
 ```bash
+# Stop currently running DAG
+dagu stop my-workflow
+
+# Stop specific DAG run
+dagu stop --run-id=20240101_120000 my-workflow
+
+# Can also use file path
 dagu stop my-workflow.yaml
 ```
 
 ### `restart`
 
-Restart a running DAG.
+Restart a DAG run with a new ID.
 
 ```bash
-dagu restart DAG_FILE
+dagu restart [options] DAG_NAME
 ```
 
 **Options:**
-- `--params KEY=VALUE` - Override parameters for restart
+- `--run-id, -r` - Unique identifier of the DAG run to restart (optional)
 
 **Examples:**
 ```bash
-dagu restart my-workflow.yaml
-dagu restart etl.yaml DATE=2024-01-02
+# Restart latest DAG run
+dagu restart my-workflow
+
+# Restart specific DAG run
+dagu restart --run-id=20240101_120000 my-workflow
 ```
 
 ### `retry`
@@ -88,20 +116,19 @@ dagu restart etl.yaml DATE=2024-01-02
 Retry a failed DAG execution.
 
 ```bash
-dagu retry [options] DAG_FILE
+dagu retry [options] DAG_NAME_OR_FILE
 ```
 
 **Options:**
-- `--request-id ID` - Retry specific request ID
-- `--params KEY=VALUE` - Override parameters
+- `--run-id, -r` - Unique identifier of the DAG run to retry (required)
 
 **Examples:**
 ```bash
-# Retry last failed run
-dagu retry my-workflow.yaml
+# Retry specific run using DAG name
+dagu retry --run-id=20240101_120000 my-workflow
 
-# Retry specific run
-dagu retry --request-id=20240101_120000 my-workflow.yaml
+# Retry specific run using file path
+dagu retry --run-id=20240101_120000 my-workflow.yaml
 ```
 
 ### `status`
@@ -109,11 +136,21 @@ dagu retry --request-id=20240101_120000 my-workflow.yaml
 Display current status of a DAG.
 
 ```bash
-dagu status DAG_FILE
+dagu status [options] DAG_NAME_OR_FILE
 ```
+
+**Options:**
+- `--run-id, -r` - Unique identifier of the DAG run to check (optional)
 
 **Examples:**
 ```bash
+# Show status of latest DAG run
+dagu status my-workflow
+
+# Show status of specific DAG run
+dagu status --run-id=20240101_120000 my-workflow
+
+# Can also use file path
 dagu status my-workflow.yaml
 ```
 
@@ -137,9 +174,9 @@ dagu server [options]
 ```
 
 **Options:**
-- `--host HOST` - Host to bind (default: 127.0.0.1)
-- `--port PORT` - Port to bind (default: 8080)
-- `--dags DIR` - Directory containing DAG files
+- `--host, -s` - Server hostname or IP address (default: localhost)
+- `--port, -p` - Server port number (default: 8080)
+- `--dags, -d` - Directory containing DAG files (default: ~/.config/dagu/dags)
 
 **Examples:**
 ```bash
@@ -162,7 +199,7 @@ dagu scheduler [options]
 ```
 
 **Options:**
-- `--dags DIR` - Directory containing DAG files
+- `--dags, -d` - Directory containing DAG files (default: ~/.config/dagu/dags)
 
 **Examples:**
 ```bash
@@ -182,9 +219,9 @@ dagu start-all [options]
 ```
 
 **Options:**
-- `--host HOST` - Host to bind (default: 127.0.0.1)
-- `--port PORT` - Port to bind (default: 8080)
-- `--dags DIR` - Directory containing DAG files
+- `--host, -s` - Server hostname or IP address (default: localhost)
+- `--port, -p` - Server port number (default: 8080)
+- `--dags, -d` - Directory containing DAG files (default: ~/.config/dagu/dags)
 
 **Examples:**
 ```bash
@@ -203,14 +240,19 @@ dagu start-all --dags=/path/to/directory
 Validate a DAG without executing it.
 
 ```bash
-dagu dry DAG_FILE [-- PARAMS...]
+dagu dry [options] DAG_FILE [-- PARAMS...]
 ```
+
+**Options:**
+- `--params, -p` - Specify parameters for validation
 
 **Examples:**
 ```bash
 dagu dry my-workflow.yaml
 # With parameters (note the -- separator)
 dagu dry complex-etl.yaml -- DATE=2024-01-01
+# With params flag
+dagu dry --params "DATE=2024-01-01" complex-etl.yaml
 ```
 
 ### `enqueue`
@@ -222,7 +264,8 @@ dagu enqueue [options] DAG_FILE [-- PARAMS...]
 ```
 
 **Options:**
-- `--run-id ID` - Specify a custom run ID
+- `--run-id, -r` - Specify a custom run ID
+- `--params, -p` - Specify parameters for the DAG run
 
 **Examples:**
 ```bash
@@ -234,6 +277,9 @@ dagu enqueue --run-id=custom-001 my-workflow.yaml
 
 # Add with parameters
 dagu enqueue my-workflow.yaml -- KEY=value
+
+# Add with params flag
+dagu enqueue --params "KEY=value" my-workflow.yaml
 ```
 
 ### `dequeue`
@@ -241,11 +287,12 @@ dagu enqueue my-workflow.yaml -- KEY=value
 Remove a DAG from the execution queue.
 
 ```bash
-dagu dequeue DAG_FILE
+dagu dequeue [options]
 ```
 
 **Options:**
-- `--dag-run` - Specify DAG name and run ID as `<dag-name>:<run-id>`
+- `--dag-run, -d` - Specify DAG name and run ID as `<dag-name>:<run-id>` (required)
+- `--params, -p` - Parameters (not typically used)
 
 **Examples:**
 ```bash
@@ -267,6 +314,23 @@ Dagu version: 1.14.0
 Go version: go1.21.5
 Git commit: abc123def
 Built: 2024-01-01T00:00:00Z
+```
+
+### `migrate`
+
+Migrate legacy data to new format.
+
+```bash
+dagu migrate history
+```
+
+**Subcommands:**
+- `history` - Migrate DAG run history from v1.16 format to v1.17+ format
+
+**Examples:**
+```bash
+# Migrate historical data after upgrade
+dagu migrate history
 ```
 
 ## Configuration

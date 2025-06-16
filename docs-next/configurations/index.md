@@ -74,7 +74,7 @@ docker run -d \
 
 ## Configuration Topics
 
-### 📦 [Installation & Setup](/configurations/installation)
+### 📦 [Installation & Setup](/getting-started/installation)
 - Installation methods
 - System requirements  
 - Initial setup
