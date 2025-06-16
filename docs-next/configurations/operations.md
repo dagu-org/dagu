@@ -550,6 +550,44 @@ Configure logrotate (`/etc/logrotate.d/dagu`):
 
 **Note**: Dagu doesn't require USR1 signal for log rotation when using `copytruncate`.
 
+#### Automatic Log Cleanup
+
+Dagu automatically removes old execution logs based on the `histRetentionDays` setting:
+
+**How it works**:
+- Cleanup runs automatically before each DAG execution
+- Removes both execution data and log files older than retention days
+- Default retention: 30 days
+
+**Configuration**:
+```yaml
+# Per-DAG configuration
+name: my-workflow
+histRetentionDays: 7  # Keep only 7 days of logs
+
+# Or in base.yaml for all DAGs
+histRetentionDays: 14  # Global 14-day retention
+```
+
+**Special values**:
+- `0`: Delete all historical data after each run
+- `-1`: Keep logs forever (no cleanup)
+- Default: `30` days
+
+**What gets deleted**:
+- Main DAG execution logs
+- Step output files (.out and .err)
+- Status files (.jsonl)
+- Child DAG logs (for nested workflows)
+- Empty parent directories
+
+::: warning Important
+The cleanup process deletes **both data files and log files**. If you need to preserve logs for compliance, either:
+- Set a longer retention period
+- Use external log aggregation (Filebeat, Promtail)
+- Archive logs before retention expires
+:::
+
 ### Alerting
 
 #### Email Notifications
