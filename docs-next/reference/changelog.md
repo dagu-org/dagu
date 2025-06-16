@@ -129,7 +129,7 @@ steps:
 - Improved error messages and logging
 - Better handling of edge cases in DAG execution
 - Performance improvements for large workflows
-- Various UI/UX enhancements (#925, #898, #895, #868, #903, #911, #913, #921, #923, #887, #922, #932, #962)
+- Various UI/UX enhancements: #925, #898, #895, #868, #903, #911, #913, #921, #923, #887, #922, #932, #962
 
 ### Migration Required
 

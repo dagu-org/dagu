@@ -1,5 +1,6 @@
 import { defineConfig } from "vitepress";
 import { withMermaid } from "vitepress-plugin-mermaid";
+import { issueLinksPlugin } from "./theme/plugins/issueLinks.js";
 
 // Define the complete sidebar structure
 const fullSidebar = [
@@ -96,6 +97,10 @@ export default withMermaid(
   defineConfig({
     title: "Dagu",
     description: "Modern workflow orchestration made simple",
+    lang: 'en-US',
+    lastUpdated: true,
+    cleanUrls: true,
+    
     head: [
       ["link", { rel: "icon", href: "/favicon.ico" }],
       ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
@@ -196,6 +201,14 @@ export default withMermaid(
         pattern: "https://github.com/dagu-org/dagu/edit/main/docs-next/:path",
         text: "Edit this page on GitHub",
       },
+      
+      lastUpdated: {
+        text: 'Last updated',
+        formatOptions: {
+          dateStyle: 'medium',
+          timeStyle: 'short'
+        }
+      },
     },
 
     markdown: {
@@ -204,8 +217,27 @@ export default withMermaid(
         dark: "github-dark",
       },
       lineNumbers: true,
-      config: () => {
-        // Add any markdown-it plugins here
+      config: (md) => {
+        // Add issue links plugin
+        md.use(issueLinksPlugin);
+        
+        // Add custom link renderer to open external links in new tab
+        const defaultLinkRender = md.renderer.rules.link_open || function(tokens, idx, options, _env, self) {
+          return self.renderToken(tokens, idx, options);
+        };
+        
+        md.renderer.rules.link_open = function (tokens, idx, options, _env, self) {
+          const token = tokens[idx];
+          const hrefIndex = token.attrIndex('href');
+          if (hrefIndex >= 0) {
+            const href = token.attrs[hrefIndex][1];
+            if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+              token.attrSet('target', '_blank');
+              token.attrSet('rel', 'noopener noreferrer');
+            }
+          }
+          return defaultLinkRender(tokens, idx, options, _env, self);
+        };
       },
     },
 
