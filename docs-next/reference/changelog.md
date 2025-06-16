@@ -377,6 +377,14 @@ steps:
 
 - Fixed: DAGs with dots (`.`) in names can now be edited in the Web UI
 
+### Contributors
+
+Thanks to our contributor for this release:
+
+| Contribution | Author |
+|--------------|--------|
+| Improved parameter handling for CLI - support for both named and positional parameters | @kriyanshii |
+
 ---
 
 ## Previous Versions
