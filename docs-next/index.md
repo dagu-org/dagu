@@ -74,6 +74,8 @@ dagu start ~/.dagu/dags/hello.yaml
 
 :::
 
+For Docker: `--rm` removes container after execution, `-v` mounts your DAG directory, `-e` sets the home directory inside container.
+
 ### Step 4: View in Web UI
 
 ::: code-group
@@ -94,7 +96,7 @@ dagu start-all
 
 :::
 
-Open your browser to [http://localhost:8080](http://localhost:8080) to see the Dagu web interface.
+For Docker: `-p 8080:8080` exposes the web interface on port 8080. Open your browser to [http://localhost:8080](http://localhost:8080) to see the Dagu web interface.
 
 ## Why Dagu?
 

@@ -5,13 +5,12 @@ Monitor and manage workflows through Dagu's built-in web interface.
 ## Overview
 
 Dagu includes a modern, responsive web UI that provides:
-- Real-time workflow monitoring
+- Real-time DAG execution monitoring
 - Visual DAG representation
 - Log viewing and search
-- Execution history
-- Workflow editing
-- Global search across all DAGs
-- Interactive workflow execution controls
+- DAG execution history
+- DAG editing capabilities with syntax highlighting and auto-completion
+- Interactive DAG management (start, stop, retry, etc.)
 
 No additional setup required - just start Dagu and open your browser.
 

@@ -34,45 +34,34 @@ Dagu follows a simple philosophy: **do one thing well with minimal dependencies*
 
 ### 1. DAG Loader
 - Loads YAML workflow definitions and builds DAG structure
-- Handles base configuration inheritance
-- Evaluates environment variables and dynamic fields
 - Validates DAG syntax and dependencies
 
 ### 2. Scheduler
 - Monitors and triggers DAGs based on cron expressions
-- Manages start/stop/restart schedules
-- Queues DAG runs for execution
-- Coordinates with persistence layer for scheduling
+- Consumes queued DAG runs and executes them
 
 ### 3. Agent
 - Manages complete lifecycle of a single DAG run
-- Creates execution graph from DAG definition
 - Handles Unix socket communication for status updates
-- Manages process signals and graceful shutdown
 - Writes logs and updates run status
 
-### 4. Execution Scheduler
-- Orchestrates step execution within a DAG run
-- Manages dependencies and execution order
-- Handles parallel execution limits
-- Evaluates preconditions and retry policies
-- Tracks step status and output variables
-
-### 5. Executors
-- **Command**: Runs shell commands in subprocesses
+### 4. Executors
+- **Shell**: Runs shell commands in subprocesses
 - **Docker**: Executes in containers
 - **SSH**: Remote command execution
 - **HTTP**: Makes API requests
 - **Mail**: Sends email notifications
 - **JQ**: JSON data processing
-- **Child DAG**: Runs nested workflows
+- **Nested DAG**: Executes other workflows as steps
+- **Parallel Execution**: Runs multiple workflows in parallel
 
-### 6. Persistence Layer
+### 5. Persistence Layer
 - **FileDAG Store**: Manages DAG definitions
 - **FileDAGRun Store**: Tracks execution history and attempts
 - **FileProc Store**: Process heartbeat tracking
 - **FileQueue Store**: Dual-priority queue system
-- All state stored as files - no database required
+- By default, all state is stored in files under `~/.config/dagu/` and `~/.local/share/dagu/`
+- You can set a custom directory structure using the `DAGU_HOME` environment variable or configuration options
 
 ## Storage Architecture
 
