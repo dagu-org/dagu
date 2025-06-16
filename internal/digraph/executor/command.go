@@ -115,7 +115,7 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 			Args:             cfg.Args,
 			ShellCommand:     cfg.ShellCommand,
 			ShellCommandArgs: cfg.ShellCommandArgs,
-			Packages:         cfg.ShellPackages,
+			ShellPackages:    cfg.ShellPackages,
 			Script:           scriptFile,
 		}
 		c, err := builder.Build(ctx)
@@ -133,7 +133,7 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 		builder := &shellCommandBuilder{
 			ShellCommand:     cfg.ShellCommand,
 			ShellCommandArgs: cfg.ShellCommandArgs,
-			Packages:         cfg.ShellPackages,
+			ShellPackages:    cfg.ShellPackages,
 		}
 		c, err := builder.Build(ctx)
 		if err != nil {
@@ -160,6 +160,7 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 
 func init() {
 	Register("", newCommand)
+	Register("shell", newCommand)
 	Register("command", newCommand)
 }
 
@@ -181,7 +182,7 @@ type shellCommandBuilder struct {
 	Args             []string
 	ShellCommand     string
 	ShellCommandArgs string
-	Packages         []string
+	ShellPackages    []string
 	Script           string
 }
 
@@ -194,7 +195,7 @@ func (b *shellCommandBuilder) Build(ctx context.Context) (*exec.Cmd, error) {
 	switch cmd {
 	case "nix-shell":
 		// If the shell command is nix-shell, we need to pass the packages as arguments
-		for _, pkg := range b.Packages {
+		for _, pkg := range b.ShellPackages {
 			args = append(args, "-p", pkg)
 		}
 		args = append(args, "--pure")

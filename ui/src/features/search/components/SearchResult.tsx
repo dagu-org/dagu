@@ -15,11 +15,11 @@ function SearchResult({ results }: Props) {
         const ret = [] as ReactElement[];
         result.matches.forEach((m, j) => {
           ret.push(
-            <li key={`${result.name}-${m.lineNumber}`} className="py-3 px-4">
+            <li key={`${result.name}-${m.lineNumber}`} className="px-4">
               <div className="flex flex-col space-y-2 w-full">
                 {j == 0 ? (
                   <Link to={`/dags/${encodeURI(result.name)}/spec`}>
-                    <h3 className="text-lg font-semibold text-primary">
+                    <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
                       {result.name}
                     </h3>
                   </Link>
@@ -50,9 +50,7 @@ function SearchResult({ results }: Props) {
 
   useEffect(() => Prism.highlightAll(), [elements]);
 
-  return (
-    <ul className="divide-y divide-gray-100 rounded-md border">{elements}</ul>
-  );
+  return <ul className="rounded-md border">{elements}</ul>;
 }
 
 export default SearchResult;

@@ -1,0 +1,26 @@
+{
+  "name": "dagu-docs",
+  "version": "1.0.0",
+  "description": "Dagu Documentation",
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
+  },
+  "keywords": [
+    "dagu",
+    "workflow",
+    "orchestration",
+    "documentation"
+  ],
+  "author": "Dagu Contributors",
+  "license": "MIT",
+  "devDependencies": {
+    "mermaid": "^11.0.0",
+    "vitepress": "^1.0.0",
+    "vitepress-plugin-mermaid": "^2.0.17",
+    "vue": "^3.3.9"
+  },
+  "dependencies": {}
+}

@@ -59,10 +59,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 5. Web UI displays real-time status via REST API
 
 **Configuration:**
-- Default config location: `~/.config/dagu/`
+- Default config location: `~/.config/dagu/config.yaml`
 - DAG files stored in `~/.config/dagu/dags/` by default
+- Data and history stored in `~/.local/share/dagu/data/` by default
+- Logs stored in `~/.local/share/dagu/logs/` by default
 - Base configuration can be shared via `~/.config/dagu/base.yaml`
 - Environment variables prefixed with `DAGU_` for configuration
+- Legacy mode: If `~/.dagu` exists or `DAGU_HOME` is set, all files stored under that directory
 
 **Frontend Build Process:**
 - UI assets must be built with `make ui` before running server
@@ -925,9 +928,9 @@ tls:
 paths:
   dagsDir: ~/.config/dagu/dags
   logDir: ~/.local/share/dagu/logs
-  dataDir: ~/.local/share/dagu/history
-  suspendFlagsDir: ~/.config/dagu/suspend
-  adminLogsDir: ~/.local/share/admin
+  dataDir: ~/.local/share/dagu/data
+  suspendFlagsDir: ~/.local/share/dagu/suspend
+  adminLogsDir: ~/.local/share/dagu/logs/admin
   baseConfig: ~/.config/dagu/base.yaml
 
 # UI Configuration

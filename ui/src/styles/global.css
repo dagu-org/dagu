@@ -350,6 +350,18 @@
   stroke-opacity: 0.3 !important;
 }
 
+/* Enhanced line highlighting for search results and code displays */
+.line-highlight {
+  background: rgba(255, 255, 0, 0.15) !important; /* Light yellow background */
+  background: linear-gradient(to right, rgba(255, 255, 0, 0.2) 70%, rgba(255, 255, 0, 0.05)) !important;
+}
+
+/* Dark mode line highlighting */
+.dark .line-highlight {
+  background: rgba(255, 255, 100, 0.15) !important; /* Slightly different yellow for dark mode */
+  background: linear-gradient(to right, rgba(255, 255, 100, 0.2) 70%, rgba(255, 255, 100, 0.05)) !important;
+}
+
 /* Alternative: completely hide the grid in dark mode */
 .dark .mermaid defs pattern {
   display: none !important;

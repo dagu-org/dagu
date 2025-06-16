@@ -770,7 +770,7 @@ func buildStep(ctx BuildContext, def stepDef) (*Step, error) {
 		ID:             def.ID,
 		Description:    def.Description,
 		Shell:          def.Shell,
-		ShellPackages:  def.Packages,
+		ShellPackages:  def.ShellPackages,
 		Script:         def.Script,
 		Stdout:         def.Stdout,
 		Stderr:         def.Stderr,

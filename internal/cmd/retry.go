@@ -15,15 +15,16 @@ import (
 func CmdRetry() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "retry [flags] <DAG name>",
+			Use:   "retry [flags] <DAG name or file>",
 			Short: "Retry a previously executed DAG-run with the same run ID",
 			Long: `Create a new run for a previously executed DAG-run using the same DAG-run ID.
 
 Flags:
   --run-id string (required) Unique identifier of the DAG-run to retry.
 
-Example:
+Examples:
   dagu retry --run-id=abc123 my_dag
+  dagu retry --run-id=abc123 my_dag.yaml
 `,
 			Args: cobra.ExactArgs(1),
 		}, retryFlags, runRetry,
@@ -34,7 +35,11 @@ var retryFlags = []commandLineFlag{dagRunIDFlagRetry}
 
 func runRetry(ctx *Context, args []string) error {
 	dagRunID, _ := ctx.StringParam("run-id")
-	name := args[0]
+
+	name, err := extractDAGName(ctx, args[0])
+	if err != nil {
+		return fmt.Errorf("failed to extract DAG name: %w", err)
+	}
 
 	// Retrieve the previous run data for specified dag-run ID.
 	ref := digraph.NewDAGRunRef(name, dagRunID)

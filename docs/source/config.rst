@@ -36,9 +36,9 @@ Directory Paths
 - ``DAGU_HOME``: Set all Dagu directories to a custom location such as ``~/.dagu``.
 - ``DAGU_DAGS_DIR`` (``~/.config/dagu/dags``): DAG definitions directory
 - ``DAGU_LOG_DIR`` (``~/.local/share/dagu/logs``): Log files directory
-- ``DAGU_DATA_DIR`` (``~/.local/share/dagu/history``): Application data directory
-- ``DAGU_SUSPEND_FLAGS_DIR`` (``~/.config/dagu/suspend``): DAG suspend flags directory
-- ``DAGU_ADMIN_LOG_DIR`` (``~/.local/share/admin``): Admin logs directory
+- ``DAGU_DATA_DIR`` (``~/.local/share/dagu/data``): Application data directory
+- ``DAGU_SUSPEND_FLAGS_DIR`` (``~/.local/share/dagu/suspend``): DAG suspend flags directory
+- ``DAGU_ADMIN_LOG_DIR`` (``~/.local/share/dagu/logs/admin``): Admin logs directory
 - ``DAGU_BASE_CONFIG`` (``~/.config/dagu/base.yaml``): Base configuration file path
 - ``DAGU_WORK_DIR``: Default working directory for DAGs (default: DAG location)
 
@@ -77,9 +77,9 @@ Create ``config.yaml`` in ``~/.config/dagu/`` to override default settings. Belo
     dagsDir: "~/.config/dagu/dags"            # DAG definitions location
     workDir: "/path/to/work"                        # Default working directory
     logDir: "~/.local/share/dagu/logs"        # Log files location
-    dataDir: "~/.local/share/dagu/history"    # Application data location
-    suspendFlagsDir: "~/.config/dagu/suspend" # DAG suspend flags location
-    adminLogsDir: "~/.local/share/admin"      # Admin logs location
+    dataDir: "~/.local/share/dagu/data"       # Application data location
+    suspendFlagsDir: "~/.local/share/dagu/suspend" # DAG suspend flags location
+    adminLogsDir: "~/.local/share/dagu/logs/admin"      # Admin logs location
 
     # Queue Configuration
     queues:

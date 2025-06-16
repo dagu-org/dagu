@@ -90,9 +90,9 @@ type stepDef struct {
 	Command any `yaml:"command,omitempty"`
 	// Shell is the shell to run the command. Default is `$SHELL` or `sh`.
 	Shell string `yaml:"shell,omitempty"`
-	// Packages is the list of packages to install.
+	// ShellPackages is the list of packages to install.
 	// This is used only when the shell is `nix-shell`.
-	Packages []string `yaml:"packages,omitempty"`
+	ShellPackages []string `yaml:"shellPackages,omitempty"`
 	// Script is the script to run.
 	Script string `yaml:"script,omitempty"`
 	// Stdout is the file to write the stdout.
