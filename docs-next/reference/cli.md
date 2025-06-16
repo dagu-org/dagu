@@ -10,14 +10,13 @@ Commands accept either **DAG names** or **DAG file paths**:
 - **DAG File Path**: Path to the YAML file (e.g., `./workflows/my-workflow.yaml`)
 
 **Commands that accept both:**
-- `start`, `stop`, `status` - Can use either DAG name or file path
+- `start`, `stop`, `status`, `retry` - Can use either DAG name or file path
 
 **Commands that require file paths:**
 - `dry`, `enqueue` - Must provide the actual YAML file
 
 **Commands that require DAG names:**
 - `restart` - Works with existing DAG runs, use DAG name only
-- `retry` - Works with existing DAG runs, accepts both DAG name and file path
 
 ## Global Options
 

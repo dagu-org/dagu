@@ -21,11 +21,9 @@ steps:
     
   - name: show-date
     command: date
-    depends: greet
     
   - name: done
     command: echo "Workflow complete! 🎉"
-    depends: show-date
 ```
 
 ### Step 2: Run the workflow
@@ -69,18 +67,15 @@ steps:                      # List of tasks to execute
     
   - name: show-date        # Second step
     command: date
-    depends: greet         # Only runs after 'greet' completes
     
   - name: done             # Final step
     command: echo "..."
-    depends: show-date     # Only runs after 'show-date' completes
 ```
 
 ### Key Concepts
 
 1. **Steps**: Individual tasks in your workflow
-2. **Dependencies**: Control execution order with `depends`
-3. **Commands**: Any shell command you can run
+2. **Commands**: Any shell command you can run
 
 ## A More Practical Example
 
@@ -102,26 +97,22 @@ steps:
     
   - name: create-backup-dir
     command: mkdir -p ${BACKUP_DIR}/${TIMESTAMP}
-    depends: create-timestamp
     
   - name: copy-files
     command: |
       cp -r ${SOURCE_DIR}/* ${BACKUP_DIR}/${TIMESTAMP}/
       echo "Backed up to ${BACKUP_DIR}/${TIMESTAMP}"
-    depends: create-backup-dir
     
   - name: compress
     command: |
       cd ${BACKUP_DIR}
       tar -czf backup_${TIMESTAMP}.tar.gz ${TIMESTAMP}/
       rm -rf ${TIMESTAMP}/
-    depends: copy-files
     
   - name: cleanup-old
     command: |
       find ${BACKUP_DIR} -name "backup_*.tar.gz" -mtime +7 -delete
       echo "Cleaned up backups older than 7 days"
-    depends: compress
 ```
 
 Run it with custom parameters:
@@ -182,19 +173,16 @@ steps:
         exit 1
       fi
       echo "Sufficient space available"
-    depends: check-source
     
   - name: backup
     command: |
       rsync -av ${SOURCE_DIR}/ ${BACKUP_DIR}/current/
-    depends: check-space
     retryPolicy:
       limit: 3
       intervalSec: 30
     
   - name: notify
     command: echo "Backup completed successfully"
-    depends: backup
     mailOnError: true
 
 handlerOn:
