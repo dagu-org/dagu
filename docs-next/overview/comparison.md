@@ -4,14 +4,14 @@ How Dagu compares to other workflow orchestration tools.
 
 ## Quick Comparison
 
-| Feature | Dagu | Airflow | Cron | GitHub Actions | Prefect | Temporal |
-|---------|------|---------|------|----------------|---------|----------|
-| **Installation** | Single binary | Complex setup | Built-in | SaaS only | Python package | Multiple services |
-| **Dependencies** | None | PostgreSQL, Redis | None | GitHub | Python | Cassandra/PostgreSQL |
-| **Language** | Any | Python | Any | Any | Python | SDK required |
-| **UI** | Built-in | Built-in | None | Built-in | Built-in | Built-in |
-| **Local Dev** | Native | Difficult | Native | Limited | Good | Complex |
-| **Resource Usage** | Minimal | Heavy | Minimal | N/A | Moderate | Heavy |
+| Feature | Dagu | Airflow | Cron | GitHub Actions | Temporal |
+|---------|------|---------|------|----------------|----------|
+| **Installation** | Single binary | Complex setup | Built-in | SaaS only | Multiple services |
+| **Dependencies** | None | PostgreSQL, Redis | None | GitHub | Cassandra/PostgreSQL |
+| **Language** | Any | Python | Any | Any | SDK required |
+| **UI** | Built-in | Built-in | None | Built-in | Built-in |
+| **Local Dev** | Native | Difficult | Native | Limited | Complex |
+| **Resource Usage** | Minimal | Heavy | Minimal | N/A | Heavy |
 
 ## Detailed Comparisons
 
@@ -27,11 +27,11 @@ graph TD
     C[Worker] --> D
     D --> E[Redis/RabbitMQ]
     
-    style A fill:#f9f9f9
-    style B fill:#f9f9f9
-    style C fill:#f9f9f9
-    style D fill:#e1f5fe
-    style E fill:#e1f5fe
+    style A fill:#f9f9f9,color:#333
+    style B fill:#f9f9f9,color:#333
+    style C fill:#f9f9f9,color:#333
+    style D fill:#e1f5fe,color:#333
+    style E fill:#e1f5fe,color:#333
 ```
 
 **Dagu:**
@@ -39,8 +39,8 @@ graph TD
 graph TD
     A[Single Binary<br/>Scheduler + UI + API] --> B[File System]
     
-    style A fill:#e8f5e8
-    style B fill:#f3e5f5
+    style A fill:#e8f5e8,color:#333
+    style B fill:#f3e5f5,color:#333
 ```
 
 ### Key Differences
@@ -202,122 +202,6 @@ handlerOn:
 4. **Visibility**: See all jobs in one place
 5. **Testing**: Dry-run mode for validation
 
-## Dagu vs GitHub Actions
-
-### Execution Environment
-
-| Aspect | Dagu | GitHub Actions |
-|--------|------|----------------|
-| **Where it runs** | Your infrastructure | GitHub's cloud |
-| **Triggers** | Schedule, manual, API | Git events, schedule, manual |
-| **Cost** | Free (self-hosted) | Free tier, then usage-based |
-| **Privacy** | Complete control | Code on GitHub servers |
-| **Network Access** | Full control | Limited to public internet |
-
-### Use Case Comparison
-
-**GitHub Actions is better for:**
-- CI/CD triggered by git events
-- Open source project automation
-- Integration with GitHub features
-- When you want managed infrastructure
-
-**Dagu is better for:**
-- Data pipelines and ETL
-- On-premise requirements
-- Complex scheduling needs
-- Multi-system orchestration
-- When you need full control
-
-### Feature Mapping
-
-| GitHub Actions | Dagu Equivalent |
-|----------------|-----------------|
-| `on: schedule` | `schedule:` |
-| `jobs:` | `steps:` |
-| `needs:` | `depends:` |
-| `if:` | `preconditions:` |
-| `continue-on-error:` | `continueOn:` |
-| `strategy.matrix:` | `parallel:` |
-| `uses: actions/` | `executor:` |
-
-## Dagu vs Prefect
-
-### Design Philosophy
-
-| Aspect | Dagu | Prefect |
-|--------|------|---------|
-| **Approach** | Configuration-first | Code-first |
-| **Language** | Any | Python only |
-| **Deployment** | Single binary | Python environment |
-| **State Storage** | Local files | Database/API |
-| **Cloud Offering** | No | Yes (Prefect Cloud) |
-
-### Example Comparison
-
-**Prefect Flow:**
-```python
-from prefect import flow, task
-from prefect.schedules import CronSchedule
-
-@task(retries=3)
-def extract():
-    # extraction logic
-    return data
-
-@task
-def transform(data):
-    # transformation logic
-    return transformed
-
-@task
-def load(data):
-    # load logic
-    pass
-
-@flow(schedule=CronSchedule("0 2 * * *"))
-def etl_flow():
-    data = extract()
-    transformed = transform(data)
-    load(transformed)
-```
-
-**Dagu Equivalent:**
-```yaml
-name: etl_flow
-schedule: "0 2 * * *"
-
-steps:
-  - name: extract
-    command: python -c "
-      # extraction logic
-      import json
-      data = extract()
-      print(json.dumps(data))
-    "
-    output: DATA
-    retryPolicy:
-      limit: 3
-      
-  - name: transform
-    command: python -c "
-      import json
-      data = json.loads('${DATA}')
-      # transformation logic
-      transformed = transform(data)
-      print(json.dumps(transformed))
-    "
-    output: TRANSFORMED
-    depends: extract
-    
-  - name: load
-    command: python -c "
-      import json
-      data = json.loads('${TRANSFORMED}')
-      # load logic
-    "
-    depends: transform
-```
 
 ## Dagu vs Temporal
 
@@ -397,19 +281,17 @@ steps:
 ## Decision Matrix
 
 ### Choose Dagu when you need:
-- ✅ Quick setup and minimal maintenance
-- ✅ Language-agnostic orchestration
-- ✅ Local or on-premise execution
-- ✅ Simple to moderate complexity workflows
-- ✅ File-based configuration
-- ✅ Single machine execution
+- Quick setup and minimal maintenance
+- Language-agnostic orchestration
+- Local or on-premise execution
+- Simple to moderate complexity workflows
+- File-based configuration
+- Single machine execution
 
 ### Consider alternatives when you need:
-- ❌ Massive distributed scale (use Airflow/Temporal)
-- ❌ Git-triggered CI/CD (use GitHub Actions/GitLab CI)
-- ❌ Container-only workloads (use Kubernetes)
-- ❌ Streaming/real-time processing (use Kafka/Flink)
-- ❌ Complex distributed transactions (use Temporal)
+- Massive distributed scale (use Airflow/Temporal)
+- Streaming/real-time processing (use Kafka/Flink)
+- Complex distributed transactions (use Temporal)
 
 ## Migration Guides
 
@@ -428,18 +310,11 @@ steps:
 4. Recreate schedules and retries
 5. Test in parallel before switching
 
-### From GitHub Actions to Dagu
-1. Extract workflow logic from YAML
-2. Replace actions with executors
-3. Convert matrix strategies to parallel execution
-4. Move secrets to environment variables
-5. Set up local runners
-
 ## Summary
 
 Dagu occupies a unique position in the workflow orchestration landscape:
 
-- **Simpler than** Airflow, Prefect, Temporal
+- **Simpler than** Airflow, Temporal
 - **More powerful than** Cron, systemd timers
 - **More flexible than** CI/CD tools
 - **Lighter than** Kubernetes Jobs

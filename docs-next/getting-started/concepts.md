@@ -17,6 +17,12 @@ graph LR
     B --> D[Generate Report]
     C --> E[Send Notification]
     D --> E
+    
+    style A fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
+    style B fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
+    style C fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
+    style D fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
+    style E fill:white,stroke:green,stroke-width:1.6px,color:#333
 ```
 
 ## Key Components
@@ -128,6 +134,18 @@ stateDiagram-v2
     Success --> [*]
     Failed --> [*]
     Cancelled --> [*]
+    
+    classDef pending fill:white,stroke:gray,stroke-width:1.6px,color:#333
+    classDef running fill:white,stroke:lightblue,stroke-width:1.6px,color:#333
+    classDef success fill:white,stroke:green,stroke-width:1.6px,color:#333
+    classDef failed fill:white,stroke:red,stroke-width:1.6px,color:#333
+    classDef cancelled fill:white,stroke:orange,stroke-width:1.6px,color:#333
+    
+    class Pending pending
+    class Running running
+    class Success success
+    class Failed failed
+    class Cancelled cancelled
 ```
 
 ### Parallel Execution

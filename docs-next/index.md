@@ -116,11 +116,9 @@ steps:
     parallel:
       items: [customers, orders, products]
     params: "TYPE=${ITEM} INPUT=${RAW_DATA}"
-    depends: extract
     
   - name: load
     command: python load.py --date=${DATE}
-    depends: transform
     retryPolicy:
       limit: 3
       intervalSec: 30
@@ -128,6 +126,21 @@ steps:
 handlerOn:
   failure:
     command: ./notify-failure.sh
+
+---
+
+name: transform-module
+params:
+  - INPUT: "Input data file"
+steps:
+  - name: transform-customers
+    command: python transform_customers.py --input=${INPUT}
+    
+  - name: transform-orders
+    command: python transform_orders.py --input=${INPUT}
+    
+  - name: transform-products
+    command: python transform_products.py --input=${INPUT}
 ```
 
 ## Next Steps

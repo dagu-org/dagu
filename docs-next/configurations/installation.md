@@ -104,7 +104,7 @@ docker compose up -d
 Download binary from GitHub:
 
 ```bash
-# Download latest release
+# Get latest release version
 VERSION=$(curl -s https://api.github.com/repos/dagu-org/dagu/releases/latest | grep tag_name | cut -d '"' -f 4)
 PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
@@ -113,13 +113,44 @@ ARCH=$(uname -m)
 if [ "$ARCH" = "x86_64" ]; then ARCH="amd64"; fi
 if [ "$ARCH" = "aarch64" ]; then ARCH="arm64"; fi
 
-# Download binary
-curl -L -o dagu "https://github.com/dagu-org/dagu/releases/download/${VERSION}/dagu_${VERSION}_${PLATFORM}_${ARCH}.tar.gz"
+# Create filename
+FILENAME="dagu_${VERSION#v}_${PLATFORM}_${ARCH}.tar.gz"
 
-# Extract and install
-tar -xzf dagu_${VERSION}_${PLATFORM}_${ARCH}.tar.gz
+# Download archive
+curl -L -o "$FILENAME" "https://github.com/dagu-org/dagu/releases/download/${VERSION}/${FILENAME}"
+
+# Extract binary
+tar -xzf "$FILENAME"
+
+# Install binary
 sudo mv dagu /usr/local/bin/
 sudo chmod +x /usr/local/bin/dagu
+
+# Clean up
+rm "$FILENAME"
+
+# Verify installation
+dagu version
+```
+
+Or for a specific version:
+
+```bash
+VERSION="v1.17.0-beta.13"
+PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
+
+# Adjust architecture name
+if [ "$ARCH" = "x86_64" ]; then ARCH="amd64"; fi
+if [ "$ARCH" = "aarch64" ]; then ARCH="arm64"; fi
+
+# Download and install
+FILENAME="dagu_${VERSION#v}_${PLATFORM}_${ARCH}.tar.gz"
+curl -L -o "$FILENAME" "https://github.com/dagu-org/dagu/releases/download/${VERSION}/${FILENAME}"
+tar -xzf "$FILENAME"
+sudo mv dagu /usr/local/bin/
+sudo chmod +x /usr/local/bin/dagu
+rm "$FILENAME"
 
 # Verify
 dagu version
