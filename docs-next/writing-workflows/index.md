@@ -194,6 +194,15 @@ steps:
     depends: transform
 ```
 
+```mermaid
+graph LR
+    A[extract] --> B[transform]
+    B --> C[load]
+    style A stroke:lightblue,stroke-width:1.6px,color:#333
+    style B stroke:lightblue,stroke-width:1.6px,color:#333
+    style C stroke:lightblue,stroke-width:1.6px,color:#333
+```
+
 ### Conditional Deployment
 ```yaml
 steps:
@@ -207,6 +216,17 @@ steps:
         expected: "main"
 ```
 
+```mermaid
+graph TD
+    A[test] --> B{Branch == main?}
+    B -->|Yes| C[deploy]
+    B -->|No| D[Skip]
+    style A stroke:lightblue,stroke-width:1.6px,color:#333
+    style B stroke:lightblue,stroke-width:1.6px,color:#333
+    style C stroke:green,stroke-width:1.6px,color:#333
+    style D stroke:gray,stroke-width:1.6px,color:#333
+```
+
 ### Parallel Processing
 ```yaml
 steps:
@@ -216,6 +236,17 @@ steps:
     parallel: [file1, file2, file3]
     command: ./process.sh $ITEM
     depends: prepare
+```
+
+```mermaid
+graph TD
+    A[prepare] --> B[process file1]
+    A --> C[process file2]
+    A --> D[process file3]
+    style A stroke:lightblue,stroke-width:1.6px,color:#333
+    style B stroke:lime,stroke-width:1.6px,color:#333
+    style C stroke:lime,stroke-width:1.6px,color:#333
+    style D stroke:lime,stroke-width:1.6px,color:#333
 ```
 
 ## Next Steps

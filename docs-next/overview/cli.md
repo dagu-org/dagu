@@ -6,6 +6,10 @@ Master Dagu's powerful CLI for workflow management and automation.
 
 The Dagu CLI provides complete control over your workflows from the terminal. It's designed to be intuitive, scriptable, and integration-friendly.
 
+::: tip Complete Reference
+For the full CLI command reference, see [CLI Commands Reference](/reference/cli).
+:::
+
 ## Basic Usage
 
 ```bash
@@ -440,6 +444,6 @@ alias dd='dagu dry'
 
 ## Next Steps
 
-- [Explore the REST API](/features/interfaces/api) for programmatic access
-- [Set up the Web UI](/features/interfaces/web-ui) for visual monitoring
+- [Explore the REST API](/overview/api) for programmatic access
+- [Set up the Web UI](/overview/web-ui) for visual monitoring
 - [Learn workflow syntax](/writing-workflows/) to build complex DAGs

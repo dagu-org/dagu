@@ -94,7 +94,6 @@ docker run -d \
 - Performance tuning
 
 ### 🔧 [Advanced Setup](/configurations/advanced)
-- High availability patterns
 - Remote nodes configuration
 - Queue management
 - CI/CD integration

@@ -1,17 +1,17 @@
 # Operations
 
-Production deployment, monitoring, and maintenance guide for Dagu.
+Production deployment and monitoring guide for Dagu.
 
 ## Running as a Service
 
 ### systemd (Linux)
 
-Create `/etc/systemd/system/dagu.service`:
+1. **Create service file** `/etc/systemd/system/dagu.service`:
 
 ```ini
 [Unit]
 Description=Dagu Workflow Engine
-Documentation=https://dagu.readthedocs.io/
+Documentation=https://dagu.cloud/
 After=network.target
 Wants=network-online.target
 
@@ -41,39 +41,51 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/dagu
-ReadOnlyPaths=/etc/dagu
+ReadWritePaths=/opt/dagu/data /opt/dagu/logs
 
 # Resource limits
 LimitNOFILE=65536
 LimitNPROC=4096
 
 # Environment
-EnvironmentFile=/etc/dagu/environment
-Environment="DAGU_CONFIG=/etc/dagu/config.yaml"
+EnvironmentFile=-/etc/dagu/environment
+Environment="DAGU_HOME=/opt/dagu"
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-Environment file `/etc/dagu/environment`:
+2. **Create environment file** `/etc/dagu/environment`:
 ```bash
 # Server settings
 DAGU_HOST=0.0.0.0
 DAGU_PORT=8080
 
-# Paths
-DAGU_HOME=/opt/dagu
+# Timezone
+DAGU_TZ=America/New_York
 
-# Authentication
-DAGU_AUTH_BASIC_USERNAME=admin
-DAGU_AUTH_BASIC_PASSWORD=change-this-password
+# Logging
+DAGU_LOG_FORMAT=json
 
-# Performance
-GOMAXPROCS=4
+# Authentication (optional)
+# DAGU_AUTH_BASIC_USERNAME=admin
+# DAGU_AUTH_BASIC_PASSWORD=secure-password
+# DAGU_AUTH_TOKEN=your-api-token
 ```
 
-Manage the service:
+3. **Set up directories and permissions**:
+```bash
+# Create user and directories
+sudo useradd -r -s /bin/false dagu
+sudo mkdir -p /opt/dagu/{dags,data,logs}
+sudo chown -R dagu:dagu /opt/dagu
+
+# Copy DAG files
+sudo cp your-dags/*.yaml /opt/dagu/dags/
+sudo chown -R dagu:dagu /opt/dagu/dags/
+```
+
+4. **Enable and start service**:
 ```bash
 # Enable auto-start
 sudo systemctl enable dagu
@@ -86,18 +98,13 @@ sudo systemctl status dagu
 
 # View logs
 sudo journalctl -u dagu -f
-
-# Restart
-sudo systemctl restart dagu
-
-# Stop
-sudo systemctl stop dagu
 ```
 
-### Docker Compose (Production)
+### Docker Compose
+
+1. **Create `docker-compose.yml`**:
 
 ```yaml
-# docker-compose.yml
 version: '3.8'
 
 services:
@@ -106,76 +113,100 @@ services:
     container_name: dagu
     restart: unless-stopped
     
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
-    
     # Health check
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/v1/dags"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v2/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
     
-    # Networking
+    # Port mapping
     ports:
       - "8080:8080"
-    networks:
-      - dagu-network
     
-    # Environment
+    # Environment variables
     environment:
+      # Server configuration
+      - DAGU_PORT=8080
+      - DAGU_HOST=0.0.0.0
       - DAGU_TZ=America/New_York
-      - DAGU_AUTH_BASIC_USERNAME=admin
-      - DAGU_AUTH_BASIC_PASSWORD_FILE=/run/secrets/admin_password
-      - DAGU_LOG_LEVEL=info
+      
+      # Logging
+      - DAGU_LOG_FORMAT=json
+      
+      # Authentication (optional)
+      # - DAGU_AUTH_BASIC_USERNAME=admin
+      # - DAGU_AUTH_BASIC_PASSWORD=your-secure-password
+      
+      # User/Group IDs (optional)
+      # - PUID=1000
+      # - PGID=1000
+      
+      # Docker-in-Docker support (optional)
+      # - DOCKER_GID=999
     
-    # Volumes
+    # Volume mounts
     volumes:
-      - ./dags:/home/dagu/.config/dagu/dags:ro
-      - dagu-logs:/home/dagu/.local/share/dagu/logs
-      - dagu-data:/home/dagu/.local/share/dagu/data
-      - ./config/config.yaml:/home/dagu/.config/dagu/config.yaml:ro
+      # DAG definitions (read-only recommended)
+      - ./dags:/config/dags:ro
+      
+      # Persistent data
+      - dagu-data:/config/data
+      - dagu-logs:/config/logs
+      
+      # Configuration files (optional)
+      # - ./config.yaml:/config/config.yaml:ro
+      # - ./base.yaml:/config/base.yaml:ro
+      
+      # Docker socket for Docker executor (optional)
+      # - /var/run/docker.sock:/var/run/docker.sock
     
-    # Secrets
-    secrets:
-      - admin_password
-    
-    # Logging
+    # Logging configuration
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "5"
-    
-    command: dagu start-all
-
-networks:
-  dagu-network:
-    driver: bridge
 
 volumes:
-  dagu-logs:
   dagu-data:
+  dagu-logs:
+```
 
-secrets:
-  admin_password:
-    file: ./secrets/admin_password.txt
+2. **Start the service**:
+```bash
+# Start in background
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop service
+docker-compose down
+```
+
+3. **With authentication** (create `.env` file):
+```bash
+DAGU_AUTH_BASIC_USERNAME=admin
+DAGU_AUTH_BASIC_PASSWORD=your-secure-password
 ```
 
 ### Kubernetes
 
-Deployment manifest:
+1. **Create namespace and secrets**:
+```bash
+kubectl create namespace dagu
 
+# Create authentication secret (optional)
+kubectl create secret generic dagu-auth \
+  --from-literal=username=admin \
+  --from-literal=password=your-secure-password \
+  -n dagu
+```
+
+2. **Deploy Dagu** (`dagu-deployment.yaml`):
 ```yaml
-# dagu-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -191,7 +222,6 @@ spec:
       labels:
         app: dagu
     spec:
-      serviceAccountName: dagu
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -202,46 +232,51 @@ spec:
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
+          name: http
         env:
         - name: DAGU_HOST
           value: "0.0.0.0"
         - name: DAGU_PORT
           value: "8080"
-        - name: DAGU_AUTH_BASIC_USERNAME
-          valueFrom:
-            secretKeyRef:
-              name: dagu-auth
-              key: username
-        - name: DAGU_AUTH_BASIC_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: dagu-auth
-              key: password
+        - name: DAGU_TZ
+          value: "UTC"
+        - name: DAGU_LOG_FORMAT
+          value: "json"
+        # Authentication (optional)
+        # - name: DAGU_AUTH_BASIC_USERNAME
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: dagu-auth
+        #       key: username
+        # - name: DAGU_AUTH_BASIC_PASSWORD
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: dagu-auth
+        #       key: password
         volumeMounts:
         - name: dags
-          mountPath: /home/dagu/.config/dagu/dags
+          mountPath: /config/dags
         - name: data
-          mountPath: /home/dagu/.local/share/dagu
-        - name: config
-          mountPath: /home/dagu/.config/dagu/config.yaml
-          subPath: config.yaml
+          mountPath: /config/data
+        - name: logs
+          mountPath: /config/logs
         resources:
           requests:
-            memory: "512Mi"
-            cpu: "500m"
+            memory: "256Mi"
+            cpu: "100m"
           limits:
-            memory: "2Gi"
-            cpu: "2000m"
+            memory: "1Gi"
+            cpu: "1000m"
         livenessProbe:
           httpGet:
-            path: /api/v1/dags
-            port: 8080
+            path: /api/v2/health
+            port: http
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /api/v1/dags
-            port: 8080
+            path: /api/v2/health
+            port: http
           initialDelaySeconds: 5
           periodSeconds: 5
       volumes:
@@ -251,23 +286,86 @@ spec:
       - name: data
         persistentVolumeClaim:
           claimName: dagu-data
-      - name: config
-        configMap:
-          name: dagu-config
+      - name: logs
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dagu
+  namespace: dagu
+spec:
+  selector:
+    app: dagu
+  ports:
+  - port: 8080
+    targetPort: http
+    name: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dagu-data
+  namespace: dagu
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+```
+
+3. **Deploy DAG ConfigMap** (`dagu-workflows.yaml`):
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dagu-workflows
+  namespace: dagu
+data:
+  hello.yaml: |
+    steps:
+      - name: hello
+        command: echo "Hello from Kubernetes!"
+```
+
+4. **Apply manifests**:
+```bash
+kubectl apply -f dagu-deployment.yaml
+kubectl apply -f dagu-workflows.yaml
+
+# Check status
+kubectl get pods -n dagu
+kubectl logs -f deployment/dagu -n dagu
 ```
 
 ## Monitoring
 
-### Health Checks
+### Health Check Endpoints
 
-Built-in health endpoint:
+Dagu provides a health check endpoint:
+
 ```bash
-# Check if service is healthy
-curl http://localhost:8080/api/v1/dags
+curl http://localhost:8080/api/v2/health
+```
 
-# Simple health check script
+Response:
+```json
+{
+  "status": "healthy",
+  "version": "x.y.z",
+  "uptime": 3600,
+  "now": "2024-03-15T12:00:00Z"
+}
+```
+
+**Health check script**:
+```bash
 #!/bin/bash
-if curl -f -s http://localhost:8080/api/v1/dags > /dev/null; then
+HEALTH_URL="http://localhost:8080/api/v2/health"
+
+if curl -f -s "$HEALTH_URL" | grep -q '"status":"healthy"'; then
     echo "Dagu is healthy"
     exit 0
 else
@@ -278,57 +376,158 @@ fi
 
 ### Prometheus Metrics
 
-While Dagu doesn't have built-in Prometheus metrics, you can monitor:
+Dagu exposes Prometheus-compatible metrics at `/api/v2/metrics`:
 
-1. **Process metrics** using node_exporter
-2. **Log metrics** using promtail/loki
-3. **API metrics** using nginx/prometheus exporter
+**Available Metrics**:
 
-Example prometheus config:
+1. **System Metrics**:
+   - `dagu_info` - Build information (version, build date, Go version)
+   - `dagu_uptime_seconds` - Time since server start
+   - `dagu_scheduler_running` - Whether scheduler is running (0 or 1)
+
+2. **DAG Metrics**:
+   - `dagu_dags_total` - Total number of DAGs
+
+3. **DAG Run Metrics**:
+   - `dagu_dag_runs_currently_running` - Number of currently running DAG runs
+   - `dagu_dag_runs_queued_total` - Total number of DAG runs in queue
+   - `dagu_dag_runs_total` - Total DAG runs by status (last 24 hours)
+     - Labels: `status` (success, error, partial_success, cancelled, running, queued, none)
+
+4. **Standard Go Metrics**:
+   - Go runtime metrics (memory, GC, goroutines)
+   - Process metrics (CPU, memory, file descriptors)
+
+**Prometheus Configuration**:
 ```yaml
+# prometheus.yml
 scrape_configs:
-  - job_name: 'dagu-logs'
+  - job_name: 'dagu'
     static_configs:
-      - targets: ['loki:3100']
-    
-  - job_name: 'dagu-process'
-    static_configs:
-      - targets: ['node-exporter:9100']
+      - targets: ['localhost:8080']
+    metrics_path: '/api/v2/metrics'
+    scrape_interval: 30s
+```
+
+**Example Queries**:
+```promql
+# Running DAGs
+dagu_dag_runs_currently_running
+
+# Success rate (last 24h)
+rate(dagu_dag_runs_total{status="success"}[5m])
+
+# Queue depth
+dagu_dag_runs_queued_total
+
+# Uptime
+dagu_uptime_seconds
+```
+
+**Grafana Dashboard Example**:
+```json
+{
+  "panels": [
+    {
+      "title": "DAG Runs by Status",
+      "targets": [{
+        "expr": "dagu_dag_runs_total"
+      }]
+    },
+    {
+      "title": "Currently Running",
+      "targets": [{
+        "expr": "dagu_dag_runs_currently_running"
+      }]
+    }
+  ]
+}
 ```
 
 ### Logging
 
 #### Log Configuration
 
-Configure log output format:
+Dagu uses structured logging with support for text and JSON formats:
+
+**Configuration options**:
 ```yaml
 # config.yaml
-logFormat: "json"  # or "text"
-debug: false       # Enable debug logging
+logFormat: json    # Options: text, json
+debug: true       # Enable debug logging with source locations
+logDir: /var/log/dagu  # Custom log directory
+```
+
+**Environment variables**:
+```bash
+export DAGU_LOG_FORMAT=json
+export DAGU_DEBUG=true
+export DAGU_LOG_DIR=/var/log/dagu
+```
+
+**Log structure**:
+- Admin logs: `{logDir}/admin/` - Server and scheduler logs
+- DAG logs: `{logDir}/dags/{dag-name}/{run-id}/` - Execution logs
+- Step outputs: Separate `stdout.log` and `stderr.log` per step
+
+#### JSON Log Format
+
+Example JSON log entry:
+```json
+{
+  "time": "2024-03-15T12:00:00Z",
+  "level": "INFO",
+  "msg": "DAG execution started",
+  "dag": "data-pipeline",
+  "run_id": "20240315_120000_abc123",
+  "step": "extract-data"
+}
 ```
 
 #### Log Aggregation
 
-Using fluentd:
+**Using Filebeat (Elastic):**
 ```yaml
-# fluent.conf
-<source>
-  @type tail
-  path /opt/dagu/logs/**/*.log
-  pos_file /var/log/td-agent/dagu.pos
-  tag dagu.*
-  <parse>
-    @type json
-  </parse>
-</source>
+# filebeat.yml
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /opt/dagu/logs/**/*.log
+  json.keys_under_root: true
+  json.add_error_key: true
+  fields:
+    service: dagu
+  fields_under_root: true
 
-<match dagu.**>
-  @type elasticsearch
-  host elasticsearch
-  port 9200
-  index_name dagu
-  type_name _doc
-</match>
+output.elasticsearch:
+  hosts: ["elasticsearch:9200"]
+  index: "dagu-%{+yyyy.MM.dd}"
+```
+
+**Using Promtail (Loki):**
+```yaml
+# promtail.yml
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: dagu
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: dagu
+          __path__: /opt/dagu/logs/**/*.log
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            dag: dag
+            run_id: run_id
+      - labels:
+          level:
+          dag:
 ```
 
 #### Log Rotation
@@ -344,425 +543,145 @@ Configure logrotate (`/etc/logrotate.d/dagu`):
     notifempty
     create 0644 dagu dagu
     size 100M
-    sharedscripts
-    postrotate
-        # Signal Dagu to reopen log files if needed
-        pkill -USR1 dagu || true
-    endscript
+    copytruncate
 }
 ```
 
+**Note**: Dagu doesn't require USR1 signal for log rotation when using `copytruncate`.
+
 ### Alerting
 
-#### Email Alerts
+#### Email Notifications
 
-Configure email notifications for failures:
+Configure SMTP settings in `base.yaml` (applies to all DAGs) or per-DAG:
+
 ```yaml
-# base.yaml - Applied to all DAGs
+# base.yaml - Global email configuration
+smtp:
+  host: "smtp.gmail.com"
+  port: "587"
+  username: "notifications@company.com"
+  password: "${SMTP_PASSWORD}"  # Use environment variable
+
+errorMail:
+  from: "dagu@company.com"
+  to: "ops-team@company.com"
+  prefix: "[DAGU ERROR]"
+  attachLogs: true  # Attach step logs to email
+
+# Enable notifications
 mailOn:
   failure: true
   success: false
-
-smtp:
-  host: smtp.gmail.com
-  port: "587"
-  username: alerts@company.com
-  password: ${SMTP_PASSWORD}
-
-errorMail:
-  from: dagu@company.com
-  to: ops-team@company.com
-  prefix: "[DAGU ALERT]"
-  attachLogs: true
 ```
 
-#### Webhook Alerts
+**Per-DAG configuration**:
+```yaml
+name: critical-workflow
+mailOn:
+  failure: true
+  success: true
+steps:
+  - name: important-task
+    command: ./process.sh
+    mailOnError: true  # Step-specific notification
+```
 
-Use lifecycle handlers for custom alerts:
+**Email timeout**: 30 seconds (hardcoded)
+
+#### Webhook Notifications
+
+Use HTTP executor in lifecycle handlers:
+
+**Slack notification**:
 ```yaml
 handlerOn:
   failure:
     executor:
       type: http
       config:
-        url: https://hooks.slack.com/services/YOUR/WEBHOOK
+        url: "${SLACK_WEBHOOK_URL}"
         method: POST
         headers:
           Content-Type: application/json
         body: |
           {
-            "text": "Workflow failed: ${DAG_NAME}",
-            "attachments": [{
-              "color": "danger",
-              "fields": [
-                {"title": "Workflow", "value": "${DAG_NAME}", "short": true},
-                {"title": "Run ID", "value": "${DAG_RUN_ID}", "short": true},
-                {"title": "Time", "value": "`date`", "short": false}
-              ]
+            "text": "🚨 Workflow Failed",
+            "blocks": [{
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*Workflow:* ${DAG_NAME}\n*Run ID:* ${DAG_RUN_ID}\n*Time:* `date`"
+              }
             }]
           }
 ```
 
-## Backup and Recovery
-
-### Backup Strategy
-
-What to backup:
-1. **DAG definitions** (`~/.config/dagu/dags/`)
-2. **Configuration** (`~/.config/dagu/*.yaml`)
-3. **Historical data** (`~/.local/share/dagu/data/`)
-4. **Recent logs** (`~/.local/share/dagu/logs/`)
-
-Backup script:
-```bash
-#!/bin/bash
-# /opt/dagu/scripts/backup.sh
-
-set -euo pipefail
-
-BACKUP_ROOT="/backup/dagu"
-BACKUP_DIR="${BACKUP_ROOT}/$(date +%Y%m%d_%H%M%S)"
-RETENTION_DAYS=30
-
-# Create backup directory
-mkdir -p "$BACKUP_DIR"
-
-# Backup configurations
-echo "Backing up configurations..."
-cp -r /opt/dagu/dags "$BACKUP_DIR/"
-cp -r /etc/dagu "$BACKUP_DIR/"
-
-# Backup data
-echo "Backing up data..."
-cp -r /opt/dagu/data "$BACKUP_DIR/"
-
-# Backup recent logs (last 7 days)
-echo "Backing up recent logs..."
-find /opt/dagu/logs -type f -mtime -7 -exec cp --parents {} "$BACKUP_DIR/" \;
-
-# Create archive
-echo "Creating archive..."
-tar -czf "${BACKUP_DIR}.tar.gz" -C "$BACKUP_ROOT" "$(basename "$BACKUP_DIR")"
-rm -rf "$BACKUP_DIR"
-
-# Upload to S3 (optional)
-if command -v aws &> /dev/null; then
-    echo "Uploading to S3..."
-    aws s3 cp "${BACKUP_DIR}.tar.gz" s3://backup-bucket/dagu/
-fi
-
-# Clean old backups
-echo "Cleaning old backups..."
-find "$BACKUP_ROOT" -name "*.tar.gz" -mtime +$RETENTION_DAYS -delete
-
-echo "Backup completed: ${BACKUP_DIR}.tar.gz"
-```
-
-Schedule backup:
-```bash
-# Add to crontab
-0 2 * * * /opt/dagu/scripts/backup.sh >> /var/log/dagu-backup.log 2>&1
-```
-
-### Recovery Procedure
-
-1. **Stop Dagu service**
-   ```bash
-   sudo systemctl stop dagu
-   ```
-
-2. **Restore from backup**
-   ```bash
-   # Extract backup
-   tar -xzf /backup/dagu/20240115_020000.tar.gz -C /tmp/
-   
-   # Restore DAGs
-   cp -r /tmp/20240115_020000/dags/* /opt/dagu/dags/
-   
-   # Restore data
-   cp -r /tmp/20240115_020000/data/* /opt/dagu/data/
-   
-   # Restore config
-   cp /tmp/20240115_020000/etc/dagu/config.yaml /etc/dagu/
-   ```
-
-3. **Verify permissions**
-   ```bash
-   chown -R dagu:dagu /opt/dagu
-   ```
-
-4. **Start service**
-   ```bash
-   sudo systemctl start dagu
-   ```
-
-### Disaster Recovery
-
-For critical workflows:
-
-1. **Multi-region backup**
-   ```bash
-   # Sync to multiple S3 regions
-   aws s3 sync s3://backup-bucket/dagu/ s3://dr-bucket/dagu/ --source-region us-east-1 --region us-west-2
-   ```
-
-2. **Database replication** (if using external state store)
-3. **Configuration management** (Ansible, Terraform)
-4. **Automated recovery testing**
-
-## Performance Tuning
-
-### System Resources
-
-#### CPU Optimization
-
-```bash
-# Set CPU affinity for Dagu process
-taskset -c 0-3 dagu start-all
-
-# Or use systemd
-# In dagu.service:
-[Service]
-CPUAffinity=0-3
-```
-
-#### Memory Management
-
+**PagerDuty integration**:
 ```yaml
-# Limit concurrent executions
-maxActiveRuns: 10      # Global limit
-maxActiveSteps: 50     # Per-DAG limit
-
-# Configure in base.yaml
-maxCleanUpTimeSec: 300  # Cleanup timeout
-histRetentionDays: 7    # Reduce history retention
+handlerOn:
+  failure:
+    executor:
+      type: http
+      config:
+        url: https://events.pagerduty.com/v2/enqueue
+        method: POST
+        headers:
+          Content-Type: application/json
+        body: |
+          {
+            "routing_key": "${PAGERDUTY_ROUTING_KEY}",
+            "event_action": "trigger",
+            "payload": {
+              "summary": "Dagu workflow failed: ${DAG_NAME}",
+              "severity": "error",
+              "source": "dagu",
+              "custom_details": {
+                "run_id": "${DAG_RUN_ID}",
+                "log_file": "${DAG_RUN_LOG_FILE}"
+              }
+            }
+          }
 ```
 
-#### Disk I/O
+#### Prometheus Alerting
 
-```bash
-# Use separate disk for logs
-mount /dev/sdb1 /opt/dagu/logs
-
-# Enable noatime for better performance
-mount -o remount,noatime /opt/dagu
-
-# Configure log rotation to prevent disk full
-```
-
-### Database Optimization
-
-If using external database for state:
-
-```sql
--- Create indexes
-CREATE INDEX idx_dag_runs_status ON dag_runs(status);
-CREATE INDEX idx_dag_runs_created ON dag_runs(created_at);
-
--- Partition tables by date
-CREATE TABLE dag_runs_2024_01 PARTITION OF dag_runs
-FOR VALUES FROM ('2024-01-01') TO ('2024-02-01');
-```
-
-### Network Optimization
-
+Example alert rules:
 ```yaml
-# nginx reverse proxy with caching
-location /api/v1/dags {
-    proxy_pass http://localhost:8080;
-    proxy_cache dagu_cache;
-    proxy_cache_valid 200 1m;
-    proxy_cache_use_stale error timeout;
-}
-```
-
-## Security Hardening
-
-### File Permissions
-
-```bash
-# Secure directory structure
-chmod 750 /opt/dagu
-chmod 750 /opt/dagu/dags
-chmod 740 /opt/dagu/data
-chmod 740 /opt/dagu/logs
-chmod 600 /etc/dagu/config.yaml
-
-# SELinux context (if enabled)
-semanage fcontext -a -t user_home_t "/opt/dagu(/.*)?"
-restorecon -Rv /opt/dagu
-```
-
-### Network Security
-
-```bash
-# Firewall rules (UFW)
-ufw allow from 10.0.0.0/8 to any port 8080
-ufw deny 8080
-
-# iptables
-iptables -A INPUT -p tcp --dport 8080 -s 10.0.0.0/8 -j ACCEPT
-iptables -A INPUT -p tcp --dport 8080 -j DROP
-```
-
-### Audit Logging
-
-Enable audit logging for compliance:
-
-```bash
-# auditd rules
-cat >> /etc/audit/rules.d/dagu.rules << EOF
-# Monitor DAG modifications
--w /opt/dagu/dags/ -p wa -k dagu_dag_change
-
-# Monitor config changes
--w /etc/dagu/ -p wa -k dagu_config_change
-
-# Monitor service actions
--w /usr/local/bin/dagu -p x -k dagu_execution
-EOF
-
-# Reload rules
-auditctl -R /etc/audit/rules.d/dagu.rules
-```
-
-## Maintenance
-
-### Regular Tasks
-
-Daily:
-- Check service health
-- Monitor disk usage
-- Review error logs
-
-Weekly:
-- Verify backups
-- Check for updates
-- Review performance metrics
-
-Monthly:
-- Clean old logs
-- Update documentation
-- Security audit
-- Test disaster recovery
-
-### Maintenance Scripts
-
-```bash
-#!/bin/bash
-# /opt/dagu/scripts/maintenance.sh
-
-# Clean old logs
-find /opt/dagu/logs -type f -mtime +30 -delete
-
-# Vacuum data files
-find /opt/dagu/data -name "*.tmp" -delete
-
-# Check disk usage
-df -h /opt/dagu | awk 'NR==2 {if($5+0 > 80) print "WARNING: Disk usage above 80%"}'
-
-# Verify permissions
-find /opt/dagu -type f -not -user dagu -exec echo "Wrong owner: {}" \;
-
-# Test backup
-/opt/dagu/scripts/backup.sh --test
-```
-
-### Upgrade Procedure
-
-1. **Plan the upgrade**
-   - Review release notes
-   - Test in staging
-   - Schedule maintenance window
-
-2. **Backup current state**
-   ```bash
-   /opt/dagu/scripts/backup.sh
-   ```
-
-3. **Stop service**
-   ```bash
-   sudo systemctl stop dagu
-   ```
-
-4. **Upgrade binary**
-   ```bash
-   curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | sudo bash
-   ```
-
-5. **Verify configuration compatibility**
-   ```bash
-   dagu validate --config /etc/dagu/config.yaml
-   ```
-
-6. **Start service**
-   ```bash
-   sudo systemctl start dagu
-   ```
-
-7. **Verify operation**
-   ```bash
-   curl http://localhost:8080/api/v1/dags
-   systemctl status dagu
-   ```
-
-8. **Monitor for issues**
-   ```bash
-   journalctl -u dagu -f
-   ```
-
-## Troubleshooting
-
-### Common Issues
-
-#### Service Won't Start
-
-```bash
-# Check logs
-journalctl -u dagu -n 100
-
-# Verify configuration
-dagu validate --config /etc/dagu/config.yaml
-
-# Check permissions
-ls -la /opt/dagu/
-
-# Test manually
-sudo -u dagu /usr/local/bin/dagu start-all --debug
-```
-
-#### High Memory Usage
-
-```bash
-# Check process memory
-ps aux | grep dagu
-
-# Analyze memory profile
-# Enable profiling in config
-debug: true
-
-# Check for memory leaks
-pprof -http=:6060 http://localhost:8080/debug/pprof/heap
-```
-
-#### Slow Performance
-
-```bash
-# Check disk I/O
-iostat -x 1
-
-# Check CPU usage
-top -p $(pgrep dagu)
-
-# Review slow queries
-grep -i "slow" /opt/dagu/logs/admin/*.log
-
-# Analyze workflow execution times
+# prometheus-alerts.yml
+groups:
+  - name: dagu
+    rules:
+      - alert: DaguHighFailureRate
+        expr: |
+          rate(dagu_dag_runs_total{status="error"}[5m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High DAG failure rate"
+          description: "Failure rate is {{ $value }} per second"
+      
+      - alert: DaguQueueBacklog
+        expr: dagu_dag_runs_queued_total > 50
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Large queue backlog"
+          description: "{{ $value }} DAGs queued"
+      
+      - alert: DaguDown
+        expr: up{job="dagu"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Dagu is down"
 ```
 
 ## Next Steps
 
-- [Configure monitoring](#monitoring) for your environment
-- [Set up backups](#backup-and-recovery) for disaster recovery
-- [Tune performance](#performance-tuning) for your workload
-- [Review security](#security-hardening) best practices
+- [Server Configuration](/configurations/server) - Configure server settings
+- [Advanced Setup](/configurations/advanced) - High availability and scaling
+- [Reference](/configurations/reference) - Complete configuration reference

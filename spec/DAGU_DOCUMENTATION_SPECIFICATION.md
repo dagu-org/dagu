@@ -230,7 +230,6 @@ Each example is minimal (5-10 lines) with a link to detailed documentation.
   - Performance tuning
 
 - **Advanced Setup**
-  - High availability patterns
   - Remote nodes configuration
   - Queue management
   - Integration with CI/CD

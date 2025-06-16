@@ -8,13 +8,13 @@ Dagu provides a comprehensive set of features for building and managing workflow
 
 ## Feature Categories
 
-### 🖥️ [Interfaces](/features/interfaces/cli)
+### 🖥️ [Interfaces](/overview/cli)
 
 How to interact with Dagu:
 
-- **[Command Line Interface](/features/interfaces/cli)** - Run and manage workflows from the terminal
-- **[Web UI](/features/interfaces/web-ui)** - Monitor and control workflows visually  
-- **[REST API](/features/interfaces/api)** - Integrate Dagu programmatically
+- **[Command Line Interface](/overview/cli)** - Run and manage workflows from the terminal
+- **[Web UI](/overview/web-ui)** - Monitor and control workflows visually  
+- **[REST API](/overview/api)** - Integrate Dagu programmatically
 
 ### 🔧 [Executors](/features/executors/shell)
 
@@ -168,7 +168,7 @@ Built for reliability:
 
 ## Getting Started with Features
 
-1. **Start with the basics**: Learn about [Interfaces](/features/interfaces/cli) to interact with Dagu
+1. **Start with the basics**: Learn about [Interfaces](/overview/cli) to interact with Dagu
 2. **Choose your executor**: Pick the right [Executor](/features/executors/shell) for your tasks
 3. **Add scheduling**: Set up [automatic execution](/features/scheduling)
 4. **Handle errors**: Implement proper [retry and error handling](/features/execution-control)
@@ -190,7 +190,7 @@ Built for reliability:
 
 Explore specific features:
 
-- [Command Line Interface](/features/interfaces/cli) - Master the CLI
+- [Command Line Interface](/overview/cli) - Master the CLI
 - [Shell Executor](/features/executors/shell) - Run commands effectively
 - [Scheduling](/features/scheduling) - Automate workflow execution
 - [Execution Control](/features/execution-control) - Advanced patterns

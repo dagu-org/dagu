@@ -276,13 +276,6 @@ for _, step := range readySteps {
 - **Disk**: Proportional to log retention
 - **Network**: Local only (unless using SSH/HTTP executors)
 
-### Limitations
-- Single machine execution
-- File system performance dependent
-- Process spawn overhead for each step
-
-## Distributed and High Availability Patterns
-
 ### Distributed Workflow Execution
 
 Dagu's file-based architecture enables distributed execution patterns:
@@ -300,73 +293,7 @@ Dagu's file-based architecture enables distributed execution patterns:
    - **Cloud storage**: EFS (AWS), FileStore (GCP), Files (Azure)
    - **Container orchestration**: Shared volumes in Kubernetes
 
-3. **Coordination Benefits**
-   - Queue files enable work distribution
-   - Process heartbeats prevent conflicts
+3. **Benefits**
+   - Each DAG execution can run on separate nodes or containers
    - Status files provide real-time coordination
    - No complex message brokers required
-
-### High Availability Setup
-
-1. **Active-Passive Configuration**
-   ```
-   Primary Dagu → Shared Storage ← Standby Dagu
-   ```
-   - Shared storage ensures state consistency
-   - Process heartbeats prevent split-brain scenarios
-   - Automatic failover via external monitoring
-
-2. **Load Distribution**
-   ```
-   DAG Scheduler → Shared Queue → Multiple Executor Nodes
-   ```
-   - Scheduler writes to queue files
-   - Executors process from shared queue
-   - Natural load balancing via file timestamps
-
-3. **Monitoring and Health Checks**
-   - Health check endpoints
-   - Prometheus metrics
-   - Process heartbeat monitoring
-   - File system health validation
-
-## Comparison with Other Architectures
-
-### Dagu vs Airflow
-
-| Aspect | Dagu | Airflow |
-|--------|------|---------|
-| Architecture | Single Process | Distributed |
-| Storage | File System | Database |
-| Communication | Unix Sockets | Message Broker |
-| Dependencies | None | PostgreSQL, Redis/RabbitMQ |
-| Complexity | Simple | Complex |
-
-### Dagu vs Kubernetes Jobs
-
-| Aspect | Dagu | K8s Jobs |
-|--------|------|----------|
-| Scope | Workflow Engine | Container Orchestrator |
-| Resources | Single Machine | Cluster |
-| Overhead | Minimal | Significant |
-| Use Case | General Workflows | Container Workloads |
-
-## Future Architecture Considerations
-
-While maintaining simplicity, potential enhancements include:
-
-1. **Plugin System**: Extensible executors and hooks
-2. **Remote Execution**: Distributed mode (optional)
-3. **State Backends**: Pluggable storage (keeping file as default)
-4. **Event Streaming**: Real-time event bus
-
-## Summary
-
-Dagu's architecture prioritizes:
-- **Simplicity**: Single binary, no dependencies
-- **Reliability**: Process management, proper cleanup
-- **Transparency**: File-based, debuggable
-- **Performance**: Low overhead, fast startup
-- **Flexibility**: Multiple executors, extensible
-
-This design makes Dagu ideal for teams that need powerful workflow orchestration without operational complexity.

@@ -118,7 +118,7 @@ Priority files that need immediate correction:
 2. `/docs-next/reference/cli.md` - Remove non-existent commands, fix syntax
 3. `/docs-next/reference/yaml.md` - Fix field names and types
 4. `/docs-next/configurations/index.md` - Fix configuration structure
-5. `/docs-next/features/interfaces/cli.md` - Fix command examples
+5. `/docs-next/overview/cli.md` - Fix command examples
 
 ## Verification Checklist
 

@@ -15,6 +15,10 @@ Dagu includes a modern, responsive web UI that provides:
 
 No additional setup required - just start Dagu and open your browser.
 
+::: tip Configuration
+For Web UI configuration options, see [Configuration Reference](/reference/config#ui-configuration).
+:::
+
 ## Accessing the UI
 
 ```bash
@@ -322,6 +326,6 @@ Use the API for bulk operations while monitoring in UI
 
 ## Next Steps
 
-- [Learn the REST API](/features/interfaces/api) for automation
+- [Learn the REST API](/overview/api) for automation
 - [Configure authentication](/configurations/server#authentication) for security
 - [Set up monitoring](/configurations/operations#monitoring) for production

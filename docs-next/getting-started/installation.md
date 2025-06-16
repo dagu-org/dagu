@@ -459,5 +459,5 @@ Now that Dagu is installed:
 
 1. [Create your first workflow](/getting-started/first-workflow)
 2. [Learn core concepts](/getting-started/concepts)
-3. [Explore the Web UI](/features/interfaces/web-ui)
+3. [Explore the Web UI](/overview/web-ui)
 4. [Configure Dagu](/configurations/) for your needs

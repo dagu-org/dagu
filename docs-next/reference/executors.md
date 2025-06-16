@@ -6,15 +6,23 @@ Complete reference for all Dagu executors - specialized modules for handling dif
 
 Executors extend Dagu's capabilities beyond simple shell commands. Available executors:
 
-- **Shell** (default) - Execute shell commands
-- **Docker** - Run commands in Docker containers
-- **SSH** - Execute commands on remote hosts
-- **HTTP** - Make HTTP requests
-- **Mail** - Send emails
-- **JQ** - Process JSON data
+- **[Shell](/features/executors/shell)** (default) - Execute shell commands
+- **[Docker](/features/executors/docker)** - Run commands in Docker containers
+- **[SSH](/features/executors/ssh)** - Execute commands on remote hosts
+- **[HTTP](/features/executors/http)** - Make HTTP requests
+- **[Mail](/features/executors/mail)** - Send emails
+- **[JQ](/features/executors/jq)** - Process JSON data
 - **DAG** - Execute other workflows
 
+::: tip
+For detailed documentation on each executor, click the links above to visit the feature pages.
+:::
+
 ## Shell Executor (Default)
+
+::: info
+For detailed Shell executor documentation, see [Shell Executor Guide](/features/executors/shell).
+:::
 
 The default executor runs commands in the system shell.
 
@@ -45,6 +53,10 @@ steps:
 ```
 
 ## Docker Executor
+
+::: info
+For detailed Docker executor documentation, see [Docker Executor Guide](/features/executors/docker).
+:::
 
 Run commands in Docker containers for isolation and reproducibility.
 
@@ -239,6 +251,10 @@ steps:
 
 ## SSH Executor
 
+::: info
+For detailed SSH executor documentation, see [SSH Executor Guide](/features/executors/ssh).
+:::
+
 Execute commands on remote hosts over SSH.
 
 ### Basic SSH
@@ -298,6 +314,10 @@ steps:
 ```
 
 ## HTTP Executor
+
+::: info
+For detailed HTTP executor documentation, see [HTTP Executor Guide](/features/executors/http).
+:::
 
 Make HTTP requests to APIs and web services.
 
@@ -386,6 +406,10 @@ steps:
 
 ## Mail Executor
 
+::: info
+For detailed Mail executor documentation, see [Mail Executor Guide](/features/executors/mail).
+:::
+
 Send emails for notifications and alerts.
 
 ### Basic Email
@@ -472,6 +496,10 @@ steps:
 ```
 
 ## JQ Executor
+
+::: info
+For detailed JQ executor documentation, see [JQ Executor Guide](/features/executors/jq).
+:::
 
 Process and transform JSON data using jq syntax.
 
@@ -572,6 +600,10 @@ steps:
 ```
 
 ## DAG Executor
+
+::: info
+DAG executor allows running other workflows as steps. This is documented in the [Nested Workflows](/writing-workflows/advanced#nested-workflows) section.
+:::
 
 Execute other workflows as steps, enabling workflow composition.
 
@@ -773,6 +805,11 @@ steps:
 
 ## See Also
 
-- [Features Overview](/features/) - Detailed executor guides
+- [Shell Executor](/features/executors/shell) - Shell command execution details
+- [Docker Executor](/features/executors/docker) - Container execution guide
+- [SSH Executor](/features/executors/ssh) - Remote execution guide
+- [HTTP Executor](/features/executors/http) - API interaction guide
+- [Mail Executor](/features/executors/mail) - Email notification guide
+- [JQ Executor](/features/executors/jq) - JSON processing guide
 - [Writing Workflows](/writing-workflows/) - Using executors in workflows
 - [Examples](https://github.com/dagu-org/dagu/tree/main/examples) - Real-world executor usage

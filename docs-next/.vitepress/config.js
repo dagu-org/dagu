@@ -11,6 +11,9 @@ const fullSidebar = [
       { text: "Architecture", link: "/overview/architecture" },
       { text: "Use Cases", link: "/overview/use-cases" },
       { text: "Comparison", link: "/overview/comparison" },
+      { text: "CLI", link: "/overview/cli" },
+      { text: "Web UI", link: "/overview/web-ui" },
+      { text: "API", link: "/overview/api" },
     ],
   },
   {
@@ -39,15 +42,6 @@ const fullSidebar = [
     text: "Features",
     items: [
       { text: "Overview", link: "/features/" },
-      {
-        text: "Interfaces",
-        collapsed: false,
-        items: [
-          { text: "Command Line", link: "/features/interfaces/cli" },
-          { text: "Web UI", link: "/features/interfaces/web-ui" },
-          { text: "REST API", link: "/features/interfaces/api" },
-        ],
-      },
       {
         text: "Executors",
         collapsed: false,
@@ -87,7 +81,6 @@ const fullSidebar = [
       { text: "Configuration", link: "/reference/config" },
       { text: "Variables", link: "/reference/variables" },
       { text: "Executors", link: "/reference/executors" },
-      { text: "Troubleshooting", link: "/reference/troubleshooting" },
       { text: "Changelog", link: "/reference/changelog" },
     ],
   },

@@ -4,39 +4,31 @@ This document provides a complete reference for Dagu's REST API endpoints, inclu
 
 ## Base Configuration
 
-### API v1
-- **Base URL**: `http://localhost:8080/api/v1`
-- **Content-Type**: `application/json`
-- **Required Headers**: `Accept: application/json`
-
-### API v2
 - **Base URL**: `http://localhost:8080/api/v2`
-- **Content-Type**: `application/json` (except metrics endpoint)
+- **Content-Type**: `application/json`
+- **OpenAPI Version**: 3.0.0
 
 ### Authentication
 
-Currently, the API does not require authentication by default. When authentication is enabled:
+The API supports three authentication methods:
 
 - **Basic Auth**: Include `Authorization: Basic <base64(username:password)>` header
-- **Token Auth**: Include `Authorization: Bearer <token>` header
+- **Bearer Token**: Include `Authorization: Bearer <token>` header
+- **No Authentication**: When auth is disabled (default for local development)
 
-## API v1 Endpoints
+## System Endpoints
 
-### System Operations
+### Health Check
 
-#### Health Check
+**Endpoint**: `GET /api/v2/health`
 
-**Endpoint**: `GET /health`
+Checks the health status of the Dagu server.
 
-Checks the health status of the Dagu server and its dependencies.
-
-**Parameters**: None
-
-**Success Response (200)**:
+**Response (200)**:
 ```json
 {
   "status": "healthy",
-  "version": "1.0.0",
+  "version": "1.14.0",
   "uptime": 3600,
   "timestamp": "2024-02-11T12:00:00Z"
 }
@@ -46,243 +38,485 @@ Checks the health status of the Dagu server and its dependencies.
 - `status`: Server health status ("healthy" or "unhealthy")
 - `version`: Current server version
 - `uptime`: Server uptime in seconds
-- `timestamp`: Current server time in ISO 8601 format
+- `timestamp`: Current server time
 
-**Error Response (503)**:
-```json
-{
-  "status": "unhealthy",
-  "version": "1.0.0",
-  "uptime": 3600,
-  "timestamp": "2024-02-11T12:00:00Z"
-}
-```
+## DAG Management Endpoints
 
-### DAG Operations
+### List DAGs
 
-#### List DAGs
+**Endpoint**: `GET /api/v2/dags`
 
-**Endpoint**: `GET /dags`
-
-Retrieves a paginated list of available DAGs with optional filtering capabilities.
+Retrieves DAG definitions with optional filtering by name and tags.
 
 **Query Parameters**:
-| Parameter | Type | Description | Required |
-|-----------|------|-------------|----------|
-| page | integer | Page number for pagination | No |
-| limit | integer | Number of items per page | No |
-| searchName | string | Filter DAGs by matching name | No |
-| searchTag | string | Filter DAGs by matching tag | No |
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| page | integer | Page number (1-based) | 1 |
+| perPage | integer | Items per page (max 1000) | 50 |
+| name | string | Filter DAGs by name | - |
+| tag | string | Filter DAGs by tag | - |
+| remoteNode | string | Remote node name | "local" |
 
-**Success Response (200)**:
+**Response (200)**:
 ```json
 {
-  "DAGs": [
+  "dags": [
     {
-      "File": "example.yaml",
-      "Dir": "/dags",
-      "DAG": {
-        "Group": "default",
-        "Name": "example_dag",
-        "Schedule": [
-          {
-            "Expression": "0 * * * *"
-          }
-        ],
-        "Description": "Example DAG",
-        "Params": ["param1", "param2"],
-        "DefaultParams": "{}",
-        "Tags": ["example", "demo"]
+      "fileName": "example.yaml",
+      "dag": {
+        "name": "example_dag",
+        "group": "default",
+        "schedule": [{"expression": "0 * * * *"}],
+        "description": "Example DAG",
+        "params": ["param1", "param2"],
+        "defaultParams": "{}",
+        "tags": ["example", "demo"]
       },
-      "Status": {
-        "RequestId": "req-123",
-        "Name": "example_dag",
-        "Status": 1,
-        "StatusText": "running",
-        "Pid": 1234,
-        "StartedAt": "2024-02-11T10:00:00Z",
-        "FinishedAt": "",
-        "Log": "/logs/example_dag.log",
-        "Params": "{}"
+      "latestDAGRun": {
+        "dagRunId": "20240101_120000",
+        "name": "example_dag",
+        "status": 1,
+        "statusLabel": "running",
+        "startedAt": "2024-01-01T12:00:00Z",
+        "finishedAt": "",
+        "log": "/logs/example_dag.log"
       },
-      "Suspended": false,
-      "Error": ""
+      "suspended": false,
+      "errors": []
     }
   ],
-  "Errors": [],
-  "HasError": false,
-  "PageCount": 1
+  "errors": [],
+  "pagination": {
+    "totalRecords": 45,
+    "currentPage": 1,
+    "totalPages": 5,
+    "nextPage": 2,
+    "prevPage": null
+  }
 }
 ```
 
-**Response Fields**:
-- `File`: Path to the DAG definition file
-- `Dir`: Directory containing the DAG file
-- `DAG`: DAG configuration and metadata
-- `Status`: Current execution status
-- `Suspended`: Whether the DAG is suspended
-- `Error`: Error message if any
+### Create DAG
 
-#### Create DAG
+**Endpoint**: `POST /api/v2/dags`
 
-**Endpoint**: `POST /dags`
-
-Creates a new DAG definition.
+Creates a new empty DAG file with the specified name.
 
 **Request Body**:
 ```json
 {
-  "action": "create",
-  "value": "dag_definition_yaml_content"
+  "name": "my-new-dag"
+}
+```
+
+**Response (201)**:
+```json
+{
+  "name": "my-new-dag"
+}
+```
+
+### Get DAG Details
+
+**Endpoint**: `GET /api/v2/dags/{fileName}`
+
+Fetches detailed information about a specific DAG.
+
+**Path Parameters**:
+| Parameter | Type | Description | Pattern |
+|-----------|------|-------------|---------|
+| fileName | string | DAG file name | `^[a-zA-Z0-9_-]+$` |
+
+**Response (200)**:
+```json
+{
+  "dag": {
+    "name": "example_dag",
+    "schedule": [{"expression": "0 * * * *"}],
+    "steps": [
+      {
+        "name": "step1",
+        "command": "echo hello"
+      }
+    ]
+  },
+  "localDags": [],
+  "latestDAGRun": {
+    "dagRunId": "20240101_120000",
+    "status": 4,
+    "statusLabel": "finished"
+  },
+  "suspended": false,
+  "errors": []
+}
+```
+
+### Delete DAG
+
+**Endpoint**: `DELETE /api/v2/dags/{fileName}`
+
+Permanently removes a DAG definition from the system.
+
+**Response (204)**: No content
+
+### Get DAG Specification
+
+**Endpoint**: `GET /api/v2/dags/{fileName}/spec`
+
+Fetches the YAML specification of a DAG.
+
+**Response (200)**:
+```json
+{
+  "dag": {
+    "name": "example_dag"
+  },
+  "spec": "name: example_dag\nsteps:\n  - name: hello\n    command: echo Hello",
+  "errors": []
+}
+```
+
+### Update DAG Specification
+
+**Endpoint**: `PUT /api/v2/dags/{fileName}/spec`
+
+Updates the YAML specification of a DAG.
+
+**Request Body**:
+```json
+{
+  "spec": "name: example_dag\nsteps:\n  - name: hello\n    command: echo Hello World"
+}
+```
+
+**Response (200)**:
+```json
+{
+  "errors": []
+}
+```
+
+### Rename DAG
+
+**Endpoint**: `POST /api/v2/dags/{fileName}/rename`
+
+Changes the file ID of the DAG definition.
+
+**Request Body**:
+```json
+{
+  "newFileName": "new-dag-name"
+}
+```
+
+**Response (200)**: Success
+
+## DAG Execution Endpoints
+
+### Start DAG
+
+**Endpoint**: `POST /api/v2/dags/{fileName}/start`
+
+Creates and starts a DAG run with optional parameters.
+
+**Request Body**:
+```json
+{
+  "params": "{\"env\": \"production\", \"version\": \"1.2.3\"}",
+  "dagRunId": "custom-run-id"
 }
 ```
 
 **Request Fields**:
 | Field | Type | Description | Required |
 |-------|------|-------------|----------|
-| action | string | Action to perform upon creation | Yes |
-| value | string | DAG definition in YAML format | Yes |
+| params | string | JSON string of parameters | No |
+| dagRunId | string | Custom run ID | No |
 
-**Success Response (200)**:
+**Response (200)**:
 ```json
 {
-  "DagID": "new_dag_123"
+  "dagRunId": "20240101_120000_abc123"
 }
 ```
 
-#### Get DAG Details
+### Enqueue DAG
 
-**Endpoint**: `GET /dags/{dagId}`
+**Endpoint**: `POST /api/v2/dags/{fileName}/enqueue`
 
-Retrieves detailed information about a specific DAG.
+Adds a DAG run to the queue for later execution.
 
-**URL Parameters**:
-| Parameter | Type | Description | Required |
-|-----------|------|-------------|----------|
-| dagId | string | Unique identifier of the DAG | Yes |
+**Request Body**: Same as Start DAG
 
-**Query Parameters**:
-| Parameter | Type | Description | Required |
-|-----------|------|-------------|----------|
-| tab | string | Tab name for UI navigation | No |
-| file | string | Specific file related to the DAG | No |
-| step | string | Step name within the DAG | No |
+**Response (200)**:
+```json
+{
+  "dagRunId": "20240101_120000_abc123"
+}
+```
 
-#### Perform DAG Action
+### Toggle DAG Suspension
 
-**Endpoint**: `POST /dags/{dagId}`
+**Endpoint**: `POST /api/v2/dags/{fileName}/suspend`
 
-Executes various actions on a specific DAG.
-
-**URL Parameters**:
-| Parameter | Type | Description | Required |
-|-----------|------|-------------|----------|
-| dagId | string | Unique identifier of the DAG | Yes |
+Controls whether the scheduler creates runs from this DAG.
 
 **Request Body**:
 ```json
 {
-  "action": "string",
-  "value": "string",
-  "requestId": "string",
-  "step": "string",
-  "params": "string"
+  "suspend": true
 }
 ```
 
-**Request Fields**:
-| Field | Type | Description | Required |
-|-------|------|-------------|----------|
-| action | string | Action to perform (see Available Actions below) | Yes |
-| value | string | Additional value required by certain actions | No |
-| requestId | string | Required for retry, mark-success, and mark-failed actions | Conditional |
-| step | string | Required for mark-success and mark-failed actions | Conditional |
-| params | string | JSON string of parameters for DAG execution | No |
+**Response (200)**: Success
 
-**Available Actions**:
+## DAG Run History Endpoints
 
-1. **start** - Begin DAG execution
-   - Requires: none
-   - Optional: params
-   - Fails if DAG is already running
+### Get DAG Run History
 
-2. **suspend** - Toggle DAG suspension state
-   - Requires: value ("true" or "false")
+**Endpoint**: `GET /api/v2/dags/{fileName}/dag-runs`
 
-3. **stop** - Stop DAG execution
-   - Requires: none
-   - Fails if DAG is not running
+Fetches execution history of a DAG.
 
-4. **retry** - Retry a previous execution
-   - Requires: requestId
-
-5. **mark-success** - Mark a specific step as successful
-   - Requires: requestId, step
-   - Fails if DAG is running
-
-6. **mark-failed** - Mark a specific step as failed
-   - Requires: requestId, step
-   - Fails if DAG is running
-
-7. **save** - Update DAG definition
-   - Requires: value (new DAG definition)
-
-8. **rename** - Rename the DAG
-   - Requires: value (new name)
-
-**Success Response (200)**:
+**Response (200)**:
 ```json
 {
-  "newDagId": "string"
+  "dagRuns": [
+    {
+      "dagRunId": "20240101_120000",
+      "name": "example_dag",
+      "status": 4,
+      "statusLabel": "finished",
+      "startedAt": "2024-01-01T12:00:00Z",
+      "finishedAt": "2024-01-01T12:05:00Z"
+    }
+  ],
+  "gridData": [
+    {
+      "name": "step1",
+      "history": [4, 4, 2, 4]
+    }
+  ]
 }
 ```
 
-> Note: The `newDagId` field is only included in the response for the `rename` action.
+### Get Specific DAG Run
 
-**Error Responses**:
+**Endpoint**: `GET /api/v2/dags/{fileName}/dag-runs/{dagRunId}`
 
-- **400 Bad Request**
-  - Missing required action parameter
-  - Invalid action type
-  - DAG already running (for start action)
-  - DAG not running (for stop action)
-  - Missing required parameters for specific actions
-  - Step not found (for mark-success/mark-failed actions)
+Gets detailed status of a specific DAG run.
 
-- **404 Not Found**
-  - DAG not found
+**Response (200)**:
+```json
+{
+  "dagRun": {
+    "dagRunId": "20240101_120000",
+    "nodes": [
+      {
+        "step": {
+          "name": "step1",
+          "command": "echo hello"
+        },
+        "status": 4,
+        "statusLabel": "finished",
+        "startedAt": "2024-01-01T12:00:00Z",
+        "finishedAt": "2024-01-01T12:00:05Z"
+      }
+    ]
+  }
+}
+```
 
-- **500 Internal Server Error**
-  - Failed to execute the requested action
-  - Failed to update DAG status
-  - Failed to rename DAG
+## DAG Run Management Endpoints
 
-### Search Operations
+### List All DAG Runs
 
-#### Search DAGs
+**Endpoint**: `GET /api/v2/dag-runs`
 
-**Endpoint**: `GET /search`
+Retrieves all DAG runs with optional filtering.
 
-Performs a full-text search across DAG definitions.
+**Query Parameters**:
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| name | string | Filter by DAG name | - |
+| status | integer | Filter by status (0-6) | - |
+| fromDate | integer | Unix timestamp start | - |
+| toDate | integer | Unix timestamp end | - |
+| dagRunId | string | Filter by run ID | - |
+
+**Status Values**:
+- 0: Not started
+- 1: Running
+- 2: Failed
+- 3: Cancelled
+- 4: Success
+- 5: Queued
+- 6: Partial Success
+
+### Get DAG Run Details
+
+**Endpoint**: `GET /api/v2/dag-runs/{name}/{dagRunId}`
+
+Fetches detailed status of a specific DAG run.
+
+**Path Parameters**:
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| name | string | DAG name |
+| dagRunId | string | DAG run ID or "latest" |
+
+### Stop DAG Run
+
+**Endpoint**: `POST /api/v2/dag-runs/{name}/{dagRunId}/stop`
+
+Forcefully stops a running DAG run.
+
+**Response (200)**: Success
+
+### Retry DAG Run
+
+**Endpoint**: `POST /api/v2/dag-runs/{name}/{dagRunId}/retry`
+
+Creates a new DAG run based on a previous execution.
+
+**Request Body**:
+```json
+{
+  "dagRunId": "new-run-id"
+}
+```
+
+**Response (200)**: Success
+
+### Dequeue DAG Run
+
+**Endpoint**: `GET /api/v2/dag-runs/{name}/{dagRunId}/dequeue`
+
+Removes a queued DAG run from the queue.
+
+**Response (200)**: Success
+
+## Log Endpoints
+
+### Get DAG Run Log
+
+**Endpoint**: `GET /api/v2/dag-runs/{name}/{dagRunId}/log`
+
+Fetches the execution log for a DAG run.
+
+**Query Parameters**:
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| tail | integer | Lines from end | - |
+| head | integer | Lines from start | - |
+| offset | integer | Start line (1-based) | - |
+| limit | integer | Max lines (max 10000) | - |
+
+**Response (200)**:
+```json
+{
+  "content": "2024-01-01 12:00:00 INFO Starting DAG...",
+  "lineCount": 100,
+  "totalLines": 500,
+  "hasMore": true,
+  "isEstimate": false
+}
+```
+
+### Get Step Log
+
+**Endpoint**: `GET /api/v2/dag-runs/{name}/{dagRunId}/steps/{stepName}/log`
+
+Fetches the log for a specific step.
+
+**Additional Query Parameters**:
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| stream | string | "stdout" or "stderr" | "stdout" |
+
+## Step Management Endpoints
+
+### Update Step Status
+
+**Endpoint**: `PATCH /api/v2/dag-runs/{name}/{dagRunId}/steps/{stepName}/status`
+
+Manually updates a step's execution status.
+
+**Request Body**:
+```json
+{
+  "status": 4
+}
+```
+
+**Status Values**:
+- 0: Not started
+- 1: Running
+- 2: Failed
+- 3: Cancelled
+- 4: Success
+- 5: Skipped
+
+**Response (200)**: Success
+
+## Search Endpoints
+
+### Search DAGs
+
+**Endpoint**: `GET /api/v2/dags/search`
+
+Performs full-text search across DAG definitions.
 
 **Query Parameters**:
 | Parameter | Type | Description | Required |
 |-----------|------|-------------|----------|
-| q | string | Search query string | Yes |
+| q | string | Search query | Yes |
 
-## API v2 Endpoints
+**Response (200)**:
+```json
+{
+  "results": [
+    {
+      "name": "example_dag",
+      "dag": {
+        "name": "example_dag"
+      },
+      "matches": [
+        {
+          "line": "    command: database backup",
+          "lineNumber": 15,
+          "startLine": 10
+        }
+      ]
+    }
+  ],
+  "errors": []
+}
+```
 
-### Monitoring Operations
+### Get All Tags
 
-#### Metrics Endpoint
+**Endpoint**: `GET /api/v2/dags/tags`
 
-**Endpoint**: `GET /metrics`
+Retrieves all unique tags used across DAGs.
 
-Exposes Prometheus-compatible metrics for monitoring Dagu operations. This endpoint provides real-time insights into DAG executions, system health, and performance metrics.
+**Response (200)**:
+```json
+{
+  "tags": ["production", "daily", "etl", "critical"],
+  "errors": []
+}
+```
 
-**Parameters**: None
+## Monitoring Endpoints
 
-**Success Response (200)**:
+### Prometheus Metrics
+
+**Endpoint**: `GET /api/v2/metrics`
+
+Returns Prometheus-compatible metrics.
+
+**Response (200)** (text/plain):
 ```text
 # HELP dagu_info Dagu build information
 # TYPE dagu_info gauge
@@ -300,14 +534,11 @@ dagu_dag_runs_currently_running 5
 # TYPE dagu_dag_runs_queued_total gauge
 dagu_dag_runs_queued_total 8
 
-# HELP dagu_dag_runs_total Total number of DAG runs by status (last 24 hours)
+# HELP dagu_dag_runs_total Total number of DAG runs by status
 # TYPE dagu_dag_runs_total counter
 dagu_dag_runs_total{status="success"} 2493
 dagu_dag_runs_total{status="error"} 15
 dagu_dag_runs_total{status="cancelled"} 7
-dagu_dag_runs_total{status="running"} 5
-dagu_dag_runs_total{status="queued"} 3
-dagu_dag_runs_total{status="none"} 1
 
 # HELP dagu_dags_total Total number of DAGs
 # TYPE dagu_dags_total gauge
@@ -318,34 +549,9 @@ dagu_dags_total 45
 dagu_scheduler_running 1
 ```
 
-**Response Headers**:
-- `Content-Type: text/plain; version=0.0.4; charset=utf-8`
-
-**Available Metrics**:
-
-**System Metrics**:
-| Metric Name | Type | Description |
-|-------------|------|-------------|
-| dagu_info | gauge | Build information with version labels |
-| dagu_uptime_seconds | gauge | Time since server start in seconds |
-| dagu_scheduler_running | gauge | 1 if scheduler is running, 0 otherwise |
-
-**DAG Execution Metrics**:
-| Metric Name | Type | Description |
-|-------------|------|-------------|
-| dagu_dag_runs_currently_running | gauge | Number of DAG runs currently executing |
-| dagu_dag_runs_queued_total | gauge | Total number of DAG runs waiting in queue (all DAGs) |
-| dagu_dag_runs_total | counter | Total number of DAG runs by status (last 24 hours) |
-| dagu_dags_total | gauge | Total number of registered DAGs |
-
-> **Notes**: 
-> - The `dagu_dag_runs_total` metric only includes DAG runs from the last 24 hours due to performance considerations.
-> - Queue metrics (`dagu_dag_runs_queued_total`) count all queued items across all DAGs.
-> - The metrics endpoint is compatible with Prometheus scraping and can be used with standard Prometheus configurations.
-
 ## Error Handling
 
-All endpoints may return error responses in the following format:
+All endpoints return structured error responses:
 
 ```json
 {
@@ -360,157 +566,75 @@ All endpoints may return error responses in the following format:
 **Error Codes**:
 | Code | Description |
 |------|-------------|
-| validation_error | Invalid request parameters or body |
-| not_found | Requested resource doesn't exist |
+| forbidden | Insufficient permissions |
+| bad_request | Invalid request parameters |
+| not_found | Resource doesn't exist |
 | internal_error | Server-side error |
-| unauthorized | Authentication/authorization failed |
+| unauthorized | Authentication failed |
 | bad_gateway | Upstream service error |
+| remote_node_error | Remote node connection failed |
+| already_running | DAG is already running |
+| not_running | DAG is not running |
+| already_exists | Resource already exists |
+
+## Child DAG Run Endpoints
+
+### Get Child DAG Run Details
+
+**Endpoint**: `GET /api/v2/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}`
+
+Fetches detailed status of a child DAG run.
+
+### Get Child DAG Run Log
+
+**Endpoint**: `GET /api/v2/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/log`
+
+Fetches the log for a child DAG run.
+
+### Get Child Step Log
+
+**Endpoint**: `GET /api/v2/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/log`
+
+Fetches the log for a step in a child DAG run.
+
+### Update Child Step Status
+
+**Endpoint**: `PATCH /api/v2/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/status`
+
+Updates the status of a step in a child DAG run.
 
 ## Example Usage
 
 ### Start a DAG with Parameters
 ```bash
-curl -X POST "http://localhost:8080/api/v1/dags/example_dag" \
+curl -X POST "http://localhost:8080/api/v2/dags/etl-pipeline.yaml/start" \
      -H "Content-Type: application/json" \
+     -H "Authorization: Bearer your-token" \
      -d '{
-       "action": "start",
-       "params": "{\"param1\": \"value1\"}"
+       "params": "{\"date\": \"2024-01-01\", \"env\": \"prod\"}",
+       "dagRunId": "etl-20240101"
      }'
 ```
 
-### Mark a Step as Successful
+### Check DAG Run Status
 ```bash
-curl -X POST "http://localhost:8080/api/v1/dags/example_dag" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "action": "mark-success",
-       "requestId": "req_123",
-       "step": "step1"
-     }'
+curl "http://localhost:8080/api/v2/dag-runs/etl-pipeline/latest"
 ```
 
-### Rename a DAG
+### Search for DAGs
 ```bash
-curl -X POST "http://localhost:8080/api/v1/dags/example_dag" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "action": "rename",
-       "value": "new_dag_name"
-     }'
+curl "http://localhost:8080/api/v2/dags/search?q=database+backup"
 ```
 
-### Get Metrics
+### Get Metrics for Monitoring
 ```bash
-curl http://localhost:8080/api/v2/metrics
+curl "http://localhost:8080/api/v2/metrics" | grep dagu_dag_runs_currently_running
 ```
 
-### Check Scheduler Status
-```bash
-curl -s http://localhost:8080/api/v2/metrics | grep "dagu_scheduler_running"
-```
+## Best Practices
 
-### Get Current Running DAGs Count
-```bash
-curl -s http://localhost:8080/api/v2/metrics | grep "dagu_dag_runs_currently_running"
-```
-
-## Prometheus Integration
-
-### Configuration Example
-
-To scrape Dagu metrics with Prometheus, add the following to your `prometheus.yml`:
-
-```yaml
-scrape_configs:
-  - job_name: 'dagu'
-    static_configs:
-      - targets: ['localhost:8080']
-    metrics_path: '/api/v2/metrics'
-    scrape_interval: 15s
-```
-
-### Grafana Dashboard Queries
-
-Create monitoring dashboards with queries like:
-
-```promql
-# DAG execution success rate (last 24h)
-rate(dagu_dag_runs_total{status="success"}[5m]) / 
-rate(dagu_dag_runs_total[5m])
-
-# Average queue length
-avg_over_time(dagu_dag_runs_queued_total[5m])
-
-# Scheduler uptime percentage
-avg_over_time(dagu_scheduler_running[5m]) * 100
-```
-
-## Rate Limiting and Best Practices
-
-- Use appropriate polling intervals for monitoring endpoints
-- Implement exponential backoff for failed requests
-- Cache responses when appropriate to reduce server load
-- Use the search endpoint for discovery rather than listing all DAGs repeatedly
-- Monitor your API usage to avoid overwhelming the server
-
-## SDK and Client Libraries
-
-While Dagu doesn't provide official SDKs, the REST API follows standard HTTP conventions and can be easily integrated with any HTTP client library in your preferred programming language.
-
-Example client implementations:
-
-### Python
-```python
-import requests
-import json
-
-class DaguClient:
-    def __init__(self, base_url="http://localhost:8080"):
-        self.base_url = base_url
-        
-    def start_dag(self, dag_id, params=None):
-        url = f"{self.base_url}/api/v1/dags/{dag_id}"
-        payload = {"action": "start"}
-        if params:
-            payload["params"] = json.dumps(params)
-        
-        response = requests.post(url, json=payload)
-        return response.json()
-    
-    def get_health(self):
-        url = f"{self.base_url}/api/v1/health"
-        response = requests.get(url)
-        return response.json()
-```
-
-### JavaScript/Node.js
-```javascript
-class DaguClient {
-  constructor(baseUrl = 'http://localhost:8080') {
-    this.baseUrl = baseUrl;
-  }
-  
-  async startDag(dagId, params = null) {
-    const url = `${this.baseUrl}/api/v1/dags/${dagId}`;
-    const payload = { action: 'start' };
-    if (params) {
-      payload.params = JSON.stringify(params);
-    }
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    
-    return response.json();
-  }
-  
-  async getHealth() {
-    const response = await fetch(`${this.baseUrl}/api/v1/health`);
-    return response.json();
-  }
-}
-```
-
-This completes the comprehensive REST API reference documentation for Dagu.
+1. **Use Pagination**: When listing DAGs or runs, use pagination parameters to avoid large responses
+2. **Handle Errors**: Always check error responses and implement retry logic with exponential backoff
+3. **Use Specific IDs**: When possible, use specific DAG run IDs instead of "latest"
+4. **Monitor Metrics**: Set up Prometheus scraping for production monitoring
+5. **Secure API Access**: Always use authentication in production environments
