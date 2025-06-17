@@ -2,6 +2,26 @@
 
 Create and run your first Dagu workflow in minutes.
 
+## Prerequisites
+
+First, install Dagu using one of these methods:
+
+::: code-group
+
+```bash [macOS/Linux]
+# Quick install script
+curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
+```
+
+```bash [Docker]
+# Pull the Docker image
+docker pull ghcr.io/dagu-org/dagu:latest
+```
+
+:::
+
+For more installation options, see the [Installation Guide](/getting-started/installation).
+
 ## Creating Your First DAG
 
 Let's start with a simple "Hello World" workflow.
@@ -32,8 +52,7 @@ EOF
 ```bash [Docker]
 docker run \
 --rm \
--v ~/.dagu:/app/.dagu \
--e DAGU_HOME=/app/.dagu \
+-v ~/.dagu:/config \
 ghcr.io/dagu-org/dagu:latest \
 dagu start hello.yaml
 ```
@@ -68,8 +87,7 @@ Press Ctrl+C to stop
 ```bash [Docker]
 docker run \
 --rm \
--v ~/.dagu:/app/.dagu \
--e DAGU_HOME=/app/.dagu \
+-v ~/.dagu:/config \
 ghcr.io/dagu-org/dagu:latest \
 dagu status hello.yaml
 ```
@@ -87,8 +105,7 @@ dagu status hello.yaml
 ```bash [Docker]
 docker run \
 --rm \
--v ~/.dagu:/app/.dagu \
--e DAGU_HOME=/app/.dagu \
+-v ~/.dagu:/config \
 -p 8080:8080 \
 ghcr.io/dagu-org/dagu:latest \
 dagu start-all
@@ -185,8 +202,7 @@ Run it with custom parameters:
 ```bash [Docker]
 docker run \
 --rm \
--v ~/.dagu:/app/.dagu \
--e DAGU_HOME=/app/.dagu \
+-v ~/.dagu:/config \
 ghcr.io/dagu-org/dagu:latest \
 dagu start backup.yaml -- SOURCE_DIR=/important/data BACKUP_DIR=/mnt/backups
 ```
@@ -209,8 +225,7 @@ Dagu comes with a beautiful web interface to monitor your workflows.
 docker run \
 --rm \
 -p 8080:8080 \
--v ~/.dagu:/app/.dagu \
--e DAGU_HOME=/app/.dagu \
+-v ~/.dagu:/config \
 ghcr.io/dagu-org/dagu:latest \
 dagu start-all
 ```

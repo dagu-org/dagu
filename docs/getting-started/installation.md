@@ -10,8 +10,7 @@ The fastest way to get started with Docker:
 docker run \
 --rm \
 -p 8080:8080 \
--v ~/.dagu:/app/.dagu \
--e DAGU_HOME=/app/.dagu \
+-v ~/.dagu:/config \
 -e DAGU_TZ=`ls -l /etc/localtime | awk -F'/zoneinfo/' '{print $2}'` \
 ghcr.io/dagu-org/dagu:latest dagu start-all
 ```
@@ -19,8 +18,7 @@ ghcr.io/dagu-org/dagu:latest dagu start-all
 **What each parameter does:**
 - `--rm` - Automatically remove container when it exits
 - `-p 8080:8080` - Expose port 8080 for web interface
-- `-v ~/.dagu:/app/.dagu` - Mount local ~/.dagu directory for persistent data
-- `-e DAGU_HOME=/app/.dagu` - Set Dagu home directory inside container
+- `-v ~/.dagu:/config` - Mount local ~/.dagu directory for persistent data
 - `-e DAGU_TZ=...` - Set timezone for scheduler (auto-detects your system timezone)
   - Examples: `America/New_York`, `Europe/London`, `Asia/Tokyo`
   - Find your timezone: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
@@ -440,7 +438,7 @@ dagu start-all
 
 ```bash
 # Fix ownership
-docker exec dagu chown -R dagu:dagu /app/.dagu
+docker exec dagu chown -R dagu:dagu /config
 ```
 
 #### Container Exits Immediately
