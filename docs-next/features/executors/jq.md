@@ -636,6 +636,5 @@ steps:
 
 ## See Also
 
-- Learn about [DAG Executor](/features/executors/dag) for nested workflows
 - Explore [Data Flow](/features/data-flow) for managing variables
 - Check out [Writing Workflows](/writing-workflows/) for more examples

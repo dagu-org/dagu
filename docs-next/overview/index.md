@@ -136,6 +136,6 @@ Dagu might not be the best choice for:
 - Workflows requiring sub-second scheduling precision
 - Real-time streaming data processing (consider Apache Flink or Spark)
 
-[Continue to Getting Started →](/getting-started)
+[Continue to Getting Started →](/getting-started/quickstart)
 
 Or explore [examples](/writing-workflows/examples/) to see what Dagu can do.

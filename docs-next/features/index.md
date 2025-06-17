@@ -26,7 +26,6 @@ Different ways to run your commands:
 - **[HTTP](/features/executors/http)** - Make REST API calls and webhook requests
 - **[Mail](/features/executors/mail)** - Send email notifications and reports
 - **[JQ](/features/executors/jq)** - Process and transform JSON data
-- **[DAG](/features/executors/dag)** - Execute nested workflows for composition
 
 ### ⏰ [Scheduling](/features/scheduling)
 

@@ -583,5 +583,4 @@ steps:
 ## See Also
 
 - Learn about [JQ Executor](/features/executors/jq) for JSON processing
-- Explore [DAG Executor](/features/executors/dag) for nested workflows
 - Check out [Notifications](/features/notifications) for more alerting options

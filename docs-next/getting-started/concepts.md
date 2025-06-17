@@ -460,7 +460,7 @@ Creates and starts a DAG run with optional parameters.
 }
 ```
 
-See the [API Reference](/reference/api/) for full details.
+See the [API Reference](/reference/api) for full details.
 
 ## Understanding Logs
 
@@ -491,7 +491,7 @@ Now that you understand the core concepts:
 1. **[Examples](/writing-workflows/examples/)** - See these concepts in action
 2. **[Writing Workflows](/writing-workflows/)** - Deep dive into workflow creation
 3. **[Features](/features/)** - Explore advanced capabilities
-4. **[Reference](/reference/)** - Complete technical documentation
+4. **[Reference](/reference/cli)** - Complete technical documentation
 
 ### Key Takeaways
 
