@@ -103,26 +103,64 @@ docker run -d \
 Create `docker-compose.yml`:
 
 ```yaml
-version: '3.8'
-
 services:
   dagu:
-    image: ghcr.io/dagu-org/dagu:latest
+    image: "ghcr.io/dagu-org/dagu:latest"
     container_name: dagu
-    restart: unless-stopped
+    hostname: dagu
     ports:
       - "8080:8080"
-    volumes:
-      - ~/.dagu:/app/.dagu
     environment:
-      - DAGU_HOME=/app/.dagu
-    command: dagu start-all
+      - DAGU_PORT=8080 # optional. default is 8080
+      - DAGU_TZ=Asia/Tokyo # optional. default is local timezone
+      - DAGU_BASE_PATH=/dagu # optional. default is /
+      - PUID=1000 # optional. default is 1000
+      - PGID=1000 # optional. default is 1000
+      - DOCKER_GID=999 # optional. default is -1 and it will be ignored
+    volumes:
+      - dagu_config:/config
+volumes:
+  dagu_config: {}
 ```
 
 Run with:
 ```bash
 docker compose up -d
 ```
+
+**Environment Variables:**
+- `DAGU_PORT`: Port for the web UI (default: 8080)
+- `DAGU_TZ`: Timezone setting (default: local timezone)
+- `DAGU_BASE_PATH`: Base path for reverse proxy setups (default: /)
+- `PUID/PGID`: User/Group IDs for file permissions (default: 1000)
+- `DOCKER_GID`: Docker group ID for Docker-in-Docker support (default: -1, disabled)
+
+#### Docker-in-Docker Configuration
+
+To enable Docker executor support (running Docker containers from within Dagu), use this configuration:
+
+```yaml
+services:
+  dagu:
+    image: "ghcr.io/dagu-org/dagu:latest"
+    container_name: dagu
+    hostname: dagu
+    ports:
+      - "8080:8080"
+    environment:
+      - DAGU_PORT=8080
+      - DAGU_TZ=Asia/Tokyo
+      - DAGU_BASE_PATH=/dagu
+    volumes:
+      - dagu_config:/config
+      - /var/run/docker.sock:/var/run/docker.sock
+    user: "0:0"
+    entrypoint: []
+volumes:
+  dagu_config: {}
+```
+
+⚠️ **Security Note**: Mounting the Docker socket gives Dagu full access to the Docker daemon. Use with caution in production environments.
 
 ## Build from Source
 
