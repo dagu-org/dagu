@@ -644,9 +644,6 @@ func (n *Node) buildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG
 			n.AddChildRunsRepeated(n.State().Children[0])
 		}
 		dagRunID := GenerateChildDAGRunID(ctx, params, repeated)
-		if repeated {
-
-		}
 		return []ChildDAGRun{{
 			DAGRunID: dagRunID,
 			Params:   params,
