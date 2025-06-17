@@ -52,7 +52,7 @@ EOF
 ```bash [Docker]
 docker run \
 --rm \
--v ~/.dagu:/config \
+-v ~/.dagu:/dagu \
 ghcr.io/dagu-org/dagu:latest \
 dagu start hello.yaml
 ```
@@ -87,7 +87,7 @@ Press Ctrl+C to stop
 ```bash [Docker]
 docker run \
 --rm \
--v ~/.dagu:/config \
+-v ~/.dagu:/dagu \
 ghcr.io/dagu-org/dagu:latest \
 dagu status hello.yaml
 ```
@@ -105,7 +105,7 @@ dagu status hello.yaml
 ```bash [Docker]
 docker run \
 --rm \
--v ~/.dagu:/config \
+-v ~/.dagu:/dagu \
 -p 8080:8080 \
 ghcr.io/dagu-org/dagu:latest \
 dagu start-all
@@ -202,7 +202,7 @@ Run it with custom parameters:
 ```bash [Docker]
 docker run \
 --rm \
--v ~/.dagu:/config \
+-v ~/.dagu:/dagu \
 ghcr.io/dagu-org/dagu:latest \
 dagu start backup.yaml -- SOURCE_DIR=/important/data BACKUP_DIR=/mnt/backups
 ```
@@ -225,7 +225,7 @@ Dagu comes with a beautiful web interface to monitor your workflows.
 docker run \
 --rm \
 -p 8080:8080 \
--v ~/.dagu:/config \
+-v ~/.dagu:/dagu \
 ghcr.io/dagu-org/dagu:latest \
 dagu start-all
 ```

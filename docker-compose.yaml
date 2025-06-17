@@ -13,7 +13,7 @@ services:
       - PGID=1000 # optional. default is 1000
       - DOCKER_GID=999 # optional. default is -1 and it will be ignored
     volumes:
-      - dagu_config:/config
+      - dagu_config:/dagu
 volumes:
   dagu_config: {}
 #
@@ -30,7 +30,7 @@ volumes:
 #       - DAGU_TZ=Asia/Tokyo # optional. default is local timezone
 #       - DAGU_BASE_PATH=/dagu # optional. default is /
 #     volumes:
-#       - dagu_config:/config
+#       - dagu_config:/dagu
 #       - /var/run/docker.sock:/var/run/docker.sock
 #     user: "0:0"
 #     entrypoint: [] # Override any default entrypoint

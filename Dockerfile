@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 # Stage 1: UI Builder
-FROM --platform=$BUILDPLATFORM node:22-alpine AS ui-builder
+FROM --platform=$BUILDPLATFORM node:24-alpine AS ui-builder
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
@@ -58,16 +58,15 @@ RUN set -eux; \
     # Try to create group with specified GID, fallback if GID in use
     (groupadd -g "${USER_GID}" "${USER}" || groupadd "${USER}") && \
     # Try to create user with specified UID, fallback if UID in use
-    (useradd -m -d /config \
+    (useradd -m -d /home/dagu \
               -u "${USER_UID}" \
               -g "$(getent group "${USER}" | cut -d: -f3)" \
               -s /bin/bash \
               "${USER}" \
-    || useradd -m -d /config \
+    || useradd -m -d /home/dagu \
                -g "$(getent group "${USER}" | cut -d: -f3)" \
                -s /bin/bash \
                "${USER}") && \
-    chown -R "${USER}:${USER}" /config && \
     chmod +x /entrypoint.sh
 
 # Create user and set permissions
@@ -82,7 +81,7 @@ RUN set -eux; \
 # Delete the default ubuntu user
 RUN userdel -f ubuntu
 
-WORKDIR /config
+WORKDIR /dagu
 ENV DAGU_HOST=0.0.0.0
 ENV DAGU_PORT=8080
 ENV DAGU_TZ="Etc/UTC"
