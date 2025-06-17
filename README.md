@@ -54,6 +54,7 @@ Dagu’s design emphasizes minimal external dependencies: it operates solely as 
     - [3. Build the Binary](#3-build-the-binary)
   - [Run Locally from Source](#run-locally-from-source)
 - [Web UI](#web-ui)
+  - [Dashboard](#dashboard)
   - [DAG Details](#dag-details)
   - [DAGs](#dags)
   - [Search](#search)
@@ -245,11 +246,17 @@ Continue with the [Quick Start Guide](#quick-start-guide) to create and execute 
 
 ## Web UI
 
+### Dashboard
+
+The Dagu dashboard provides an overview of all workflows (DAGs) and their current status.
+
+![Dashboard](docs/public/dashboard.png)
+
 ### DAG Details
 
-Real-time status, logs, and configuration for each DAG. Toggle graph orientation from the top-right corner.
+Create and edit workflows (DAGs) with auto completion and validation. The DAG editor allows you to define steps, dependencies, and parameters in a user-friendly interface.
 
-![example](docs/public/dag-definitions.png)
+![DAG History](docs/public/dag-editor.png)
 
 ### DAGs
 
