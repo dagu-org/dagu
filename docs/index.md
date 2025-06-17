@@ -2,9 +2,19 @@
 layout: doc
 ---
 
-# Dagu
+<div class="logo-section">
+  <div class="logo-container">
+    <img src="/logo-light.svg" alt="Dagu Logo" class="logo-light logo-icon">
+    <img src="/dagu.webp" alt="Dagu Logo" class="logo-dark logo-icon">
+    <span class="logo-text">Dagu</span>
+  </div>
+</div>
 
-**Workflows that just work** - Zero dependencies. Single binary. Infinite possibilities.
+<div class="tagline">
+  <h1>A self-contained, powerful alternative to Airflow, Cron, etc.</h1>
+  <p>Dagu is a compact, portable workflow engine. It provides a declarative model for orchestrating software across diverse environments, including shell scripts, Python scripts, containerized operations.</p>
+</div>
+
 
 <div class="hero-section">
   <div class="hero-actions">
