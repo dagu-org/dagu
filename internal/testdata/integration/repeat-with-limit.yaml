@@ -1,0 +1,8 @@
+name: repeat-with-limit
+steps:
+  - name: repeat-step
+    command: echo "Executing step"
+    repeatPolicy:
+      repeat: true
+      limit: 3
+      intervalSec: 0

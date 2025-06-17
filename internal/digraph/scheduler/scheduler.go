@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime/debug"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -294,7 +295,12 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 
 					shouldRepeat := false
 					step := node.Step()
-					if step.RepeatPolicy.Condition != nil {
+
+					// Check if repeat limit has been reached
+					if step.RepeatPolicy.Limit > 0 && node.State().DoneCount >= step.RepeatPolicy.Limit {
+						// Limit reached, don't repeat
+						shouldRepeat = false
+					} else if step.RepeatPolicy.Condition != nil {
 						// Ensure node's own output variables are reloaded
 						// before evaluating the condition.
 						if node.inner.State.OutputVariables != nil {
@@ -318,12 +324,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 					} else if len(step.RepeatPolicy.ExitCode) > 0 {
 						// Repeat if last exit code matches any in ExitCode
 						lastExit := node.State().ExitCode
-						for _, code := range step.RepeatPolicy.ExitCode {
-							if lastExit == code {
-								shouldRepeat = true
-								break
-							}
-						}
+						shouldRepeat = slices.Contains(step.RepeatPolicy.ExitCode, lastExit)
 					} else if step.RepeatPolicy.Repeat {
 						// Unconditional repeat
 						shouldRepeat = (execErr == nil || step.ContinueOn.Failure)
@@ -331,6 +332,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 
 					if shouldRepeat && !sc.isCanceled() {
 						time.Sleep(step.RepeatPolicy.Interval)
+
 						if progressCh != nil {
 							progressCh <- node
 						}

@@ -1,0 +1,25 @@
+name: repeat-limit-condition
+steps:
+  - name: increment-counter
+    script: |
+      COUNTER_FILE="/tmp/dagu_repeat_counter_test2"
+      COUNT=0
+      if [ -f "$COUNTER_FILE" ]; then
+        COUNT=$(cat "$COUNTER_FILE")
+      fi
+      COUNT=$((COUNT + 1))
+      echo "$COUNT" > "$COUNTER_FILE"
+      echo "Count: $COUNT"
+      # Output the count so we can verify in test
+      echo "$COUNT"
+      # Clean up on final run
+      if [ "$COUNT" -ge 5 ]; then
+        rm -f "$COUNTER_FILE"
+      fi
+    output: FINAL_COUNT
+    repeatPolicy:
+      repeat: true
+      limit: 5
+      intervalSec: 0
+      condition: "`[ -f /tmp/dagu_repeat_counter_test2 ] && cat /tmp/dagu_repeat_counter_test2 || echo 0`"
+      expected: "10"
