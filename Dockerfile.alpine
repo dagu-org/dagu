@@ -49,7 +49,6 @@ RUN set -eux; \
                -g "$(getent group "${USER}" | cut -d: -f3)" \
                -s /bin/bash \
                "${USER}") && \
-    chown -R "${USER}:${USER}" /dagu && \
     chmod +x /entrypoint.sh
 
 # Create user and set permissions

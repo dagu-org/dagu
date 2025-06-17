@@ -58,16 +58,15 @@ RUN set -eux; \
     # Try to create group with specified GID, fallback if GID in use
     (groupadd -g "${USER_GID}" "${USER}" || groupadd "${USER}") && \
     # Try to create user with specified UID, fallback if UID in use
-    (useradd -m -d /dagu \
+    (useradd -m -d /home/dagu \
               -u "${USER_UID}" \
               -g "$(getent group "${USER}" | cut -d: -f3)" \
               -s /bin/bash \
               "${USER}" \
-    || useradd -m -d /dagu \
+    || useradd -m -d /home/dagu \
                -g "$(getent group "${USER}" | cut -d: -f3)" \
                -s /bin/bash \
                "${USER}") && \
-    chown -R "${USER}:${USER}" /dagu && \
     chmod +x /entrypoint.sh
 
 # Create user and set permissions
