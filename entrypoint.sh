@@ -1,14 +1,5 @@
 #!/usr/bin/env /bin/sh
 
-echo "Starting entrypoint.sh"
-
-echo "
-PUID=${PUID}
-PGID=${PGID}
-DOCKER_GID=${DOCKER_GID}
-TZ=${DAGU_TZ}
-"
-
 # Check if both DOCKER_GID is not -1. This indicates the desire for a docker group
 if [ "$DOCKER_GID" != "-1" ]; then
   if ! getent group docker >/dev/null; then
@@ -21,26 +12,23 @@ if [ "$DOCKER_GID" != "-1" ]; then
   groupmod -o -g "$DOCKER_GID" docker
 fi
 
-groupmod -o -g "$PGID" dagu
-usermod -o -u "$PUID" dagu
+CURRENT_UID=$(id -u dagu 2>/dev/null || echo -1)
+CURRENT_GID=$(getent group dagu | cut -d: -f3 2>/dev/null || echo -1)
+
+if [ "$CURRENT_UID" != "$PUID" ] || [ "$CURRENT_GID" != "$PGID" ]; then
+    groupmod -o -g "$PGID" dagu
+    usermod -o -u "$PUID" dagu
+fi
 
 mkdir -p /dagu
-
-chown $PUID:$PGID -R /dagu
 
 # If DAGU_HOME is not set, try to guess if the legacy /home directory is being
 # used. If so set the HOME to /home/dagu. Otherwise force the /dagu directory
 # as DAGU_HOME
 if [ -z "$DAGU_HOME" ]; then
-  if [ -d /home/dagu/.config/dagu ]; then
-    echo "WARNING: Using legacy /home/dagu directory. Please consider moving to /dagu"
-    usermod -d /home/dagu dagu
-    chown $PUID:$PGID -R /home/dagu
-  else
-    # For ease of use set DAGU_HOME to /dagu so all data is located in a
-    # single directory
-    export DAGU_HOME=/dagu
-  fi
+  # For ease of use set DAGU_HOME to /dagu so all data is located in a
+  # single directory
+  export DAGU_HOME=/dagu
 fi
 
 # Run all scripts in /etc/custom-init.d. It assumes that all scripts are
