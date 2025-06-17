@@ -144,9 +144,9 @@ export default withMermaid(
         { text: "Home", link: "/" },
         { text: "Overview", link: "/overview/", activeMatch: "/overview/" },
         {
-          text: "Getting Started",
-          link: "/getting-started/",
-          activeMatch: "/getting-started/",
+          text: "Quickstart",
+          link: "/getting-started/quickstart",
+          activeMatch: "/getting-started",
         },
         {
           text: "Writing Workflows",
@@ -159,7 +159,11 @@ export default withMermaid(
           link: "/configurations/",
           activeMatch: "/configurations/",
         },
-        { text: "Reference", link: "/reference/", activeMatch: "/reference/" },
+        {
+          text: "Reference",
+          link: "/reference/cli",
+          activeMatch: "/reference/",
+        },
       ],
 
       sidebar: {

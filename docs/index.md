@@ -11,7 +11,7 @@ layout: doc
 </div>
 
 <div class="tagline">
-  <h1>A self-contained, powerful alternative to Airflow, Cron, etc.</h1>
+  <h1>A self-contained, powerful, and language-agnostic alternative to Airflow, Cron, etc. It aims to solve greater problems.</h1>
   <p>Dagu is a compact, portable workflow engine. It provides a declarative model for orchestrating software across diverse environments, including shell scripts, Python scripts, containerized operations.</p>
 </div>
 
