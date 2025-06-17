@@ -241,3 +241,316 @@ func TestEvalObjectWithExecutorConfig(t *testing.T) {
 
 	assert.Equal(t, nestedExpected["value"], nestedResult["value"])
 }
+
+func TestGenerateChildDAGRunID(t *testing.T) {
+	// Create a test context with environment variables
+	ctx := context.Background()
+	env := executor.NewEnv(ctx, digraph.Step{Name: "test-step"})
+	env.DAGRunID = "parent-run-123"
+	env.Step.Name = "child-step"
+	ctx = executor.WithEnv(ctx, env)
+
+	tests := []struct {
+		name      string
+		params    string
+		repeated  bool
+		expectLen int // Expected length of the hash
+	}{
+		{
+			name:      "non-repeated run",
+			params:    "param1=value1",
+			repeated:  false,
+			expectLen: 11, // Base58 encoded SHA256 should be consistent length
+		},
+		{
+			name:      "repeated run",
+			params:    "param1=value1",
+			repeated:  true,
+			expectLen: 11, // Base58 encoded SHA256 should be consistent length
+		},
+		{
+			name:      "empty params",
+			params:    "",
+			repeated:  false,
+			expectLen: 11,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := scheduler.GenerateChildDAGRunID(ctx, tt.params, tt.repeated)
+			assert.NotEmpty(t, result)
+			// Base58 encoded strings should be at least this length
+			assert.GreaterOrEqual(t, len(result), tt.expectLen)
+
+			// For non-repeated runs, the same parameters should generate the same ID
+			if !tt.repeated {
+				result2 := scheduler.GenerateChildDAGRunID(ctx, tt.params, tt.repeated)
+				assert.Equal(t, result, result2)
+			} else {
+				// For repeated runs, the same parameters should generate different IDs
+				result2 := scheduler.GenerateChildDAGRunID(ctx, tt.params, tt.repeated)
+				assert.NotEqual(t, result, result2)
+			}
+		})
+	}
+}
+
+func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
+	// Create a test context with environment variables
+	ctx := context.Background()
+	env := executor.NewEnv(ctx, digraph.Step{Name: "test-step"})
+	env.Variables.Store("VAR1", "VAR1=value1")
+	env.Variables.Store("VAR2", "VAR2=value2")
+	env.Variables.Store("NUM", "NUM=42")
+	ctx = executor.WithEnv(ctx, env)
+
+	tests := []struct {
+		name     string
+		input    any
+		expected any
+	}{
+		{
+			name: "deeply nested maps",
+			input: map[string]any{
+				"level1": map[string]any{
+					"level2": map[string]any{
+						"level3": "${VAR1}",
+					},
+				},
+			},
+			expected: map[string]any{
+				"level1": map[string]any{
+					"level2": map[string]any{
+						"level3": "value1",
+					},
+				},
+			},
+		},
+		{
+			name: "array of maps",
+			input: map[string]any{
+				"items": []any{
+					map[string]any{"name": "${VAR1}"},
+					map[string]any{"name": "${VAR2}"},
+				},
+			},
+			expected: map[string]any{
+				"items": []any{
+					map[string]any{"name": "${VAR1}"},
+					map[string]any{"name": "${VAR2}"},
+				},
+			},
+		},
+		{
+			name: "mixed types in map",
+			input: map[string]any{
+				"string": "${VAR1}",
+				"number": 123,
+				"bool":   true,
+				"null":   nil,
+				"array":  []string{"a", "b"},
+			},
+			expected: map[string]any{
+				"string": "value1",
+				"number": 123,
+				"bool":   true,
+				"null":   nil,
+				"array":  []string{"a", "b"},
+			},
+		},
+		{
+			name: "map with nil values",
+			input: map[string]any{
+				"key1": nil,
+				"key2": "${VAR1}",
+			},
+			expected: map[string]any{
+				"key1": nil,
+				"key2": "value1",
+			},
+		},
+		{
+			name: "map with pointer values",
+			input: map[string]any{
+				"ptr": &TestStruct{
+					Name: "${VAR1}",
+				},
+			},
+			expected: map[string]any{
+				"ptr": TestStruct{
+					Name: "value1",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := scheduler.EvalObject(ctx, tt.input)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestEvalStringEdgeCases(t *testing.T) {
+	// Create a test context with environment variables
+	ctx := digraph.SetupEnv(context.Background(), &digraph.DAG{}, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+	env := executor.GetEnv(ctx)
+	env.Variables.Store("EMPTY", "EMPTY=")
+	env.Variables.Store("SPACES", "SPACES=  ")
+	env.Variables.Store("SPECIAL", "SPECIAL=special!@#")
+	ctx = executor.WithEnv(ctx, env)
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+		wantErr  bool
+	}{
+		{
+			name:     "empty variable",
+			input:    "${EMPTY}",
+			expected: "",
+			wantErr:  false,
+		},
+		{
+			name:     "variable with spaces",
+			input:    "${SPACES}",
+			expected: "  ",
+			wantErr:  false,
+		},
+		{
+			name:     "variable with special characters",
+			input:    "${SPECIAL}",
+			expected: "special!@#",
+			wantErr:  false,
+		},
+		{
+			name:     "nested variable references",
+			input:    "${${EMPTY}}",
+			expected: "}",
+			wantErr:  false,
+		},
+		{
+			name:     "malformed variable",
+			input:    "${",
+			expected: "",
+			wantErr:  false,
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "",
+			wantErr:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := scheduler.EvalString(ctx, tt.input)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestEvalBoolEdgeCases(t *testing.T) {
+	// Create a test context with environment variables
+	ctx := digraph.SetupEnv(context.Background(), &digraph.DAG{}, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+
+	env := executor.GetEnv(ctx)
+	env.Variables.Store("YES", "YES=yes")
+	env.Variables.Store("NO", "NO=no")
+	env.Variables.Store("ON", "ON=on")
+	env.Variables.Store("OFF", "OFF=off")
+	env.Variables.Store("T", "T=t")
+	env.Variables.Store("F", "F=f")
+
+	ctx = executor.WithEnv(ctx, env)
+
+	tests := []struct {
+		name     string
+		input    any
+		expected bool
+		wantErr  bool
+	}{
+		{
+			name:     "nil value",
+			input:    nil,
+			expected: false,
+			wantErr:  true,
+		},
+		{
+			name:     "string yes",
+			input:    "${YES}",
+			expected: false,
+			wantErr:  true,
+		},
+		{
+			name:     "string no",
+			input:    "${NO}",
+			expected: false,
+			wantErr:  true,
+		},
+		{
+			name:     "string on",
+			input:    "${ON}",
+			expected: false,
+			wantErr:  true,
+		},
+		{
+			name:     "string off",
+			input:    "${OFF}",
+			expected: false,
+			wantErr:  true,
+		},
+		{
+			name:     "string t",
+			input:    "${T}",
+			expected: true,
+			wantErr:  false,
+		},
+		{
+			name:     "string f",
+			input:    "${F}",
+			expected: false,
+			wantErr:  false,
+		},
+		{
+			name:     "struct type",
+			input:    TestStruct{},
+			expected: false,
+			wantErr:  true,
+		},
+		{
+			name:     "slice type",
+			input:    []string{"true"},
+			expected: false,
+			wantErr:  true,
+		},
+		{
+			name:     "map type",
+			input:    map[string]string{"key": "true"},
+			expected: false,
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := scheduler.EvalBool(ctx, tt.input)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}

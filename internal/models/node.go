@@ -1,7 +1,7 @@
 package models
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
@@ -46,6 +46,10 @@ func (n *Node) ToNode() *scheduler.Node {
 	for i, r := range n.ChildrenRepeated {
 		childrenRepeated[i] = scheduler.ChildDAGRun(r)
 	}
+	var err error
+	if n.Error != "" {
+		err = fmt.Errorf(n.Error)
+	}
 	return scheduler.NewNode(n.Step, scheduler.NodeState{
 		Status:           n.Status,
 		Stdout:           n.Stdout,
@@ -56,7 +60,7 @@ func (n *Node) ToNode() *scheduler.Node {
 		RetryCount:       n.RetryCount,
 		DoneCount:        n.DoneCount,
 		Repeated:         n.Repeated,
-		Error:            errors.New(n.Error),
+		Error:            err,
 		Children:         children,
 		ChildrenRepeated: childrenRepeated,
 		OutputVariables:  n.OutputVariables,
