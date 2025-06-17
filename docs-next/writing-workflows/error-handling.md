@@ -1,6 +1,6 @@
 # Error Handling and Recovery
 
-Dagu provides comprehensive error handling capabilities to ensure your workflows are resilient and can recover from failures gracefully. This guide covers all aspects of error handling including retry policies, continue conditions, lifecycle handlers, and email notifications.
+Dagu provides comprehensive error handling capabilities to ensure your DAGs are resilient and can recover from failures gracefully. This guide covers all aspects of error handling including retry policies, continue conditions, lifecycle handlers, and email notifications.
 
 ## Table of Contents
 

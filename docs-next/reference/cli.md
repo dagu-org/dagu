@@ -1,7 +1,5 @@
 # CLI Reference
 
-Complete reference for all Dagu command-line interface commands.
-
 ## Important: DAG Names vs File Paths
 
 Commands accept either **DAG names** or **DAG file paths**:

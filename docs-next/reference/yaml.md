@@ -1,7 +1,5 @@
 # YAML Specification
 
-Complete reference for Dagu YAML workflow definitions.
-
 ## Overview
 
 Dagu workflows are defined using YAML files. Each file represents a DAG (Directed Acyclic Graph) that describes your workflow steps and their relationships.

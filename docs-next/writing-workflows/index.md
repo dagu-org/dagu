@@ -1,10 +1,8 @@
 # Writing Workflows
 
-Learn how to build production-ready workflows with Dagu.
-
 ## Workflow Structure
 
-Every Dagu workflow is defined in a YAML file with this basic structure:
+Every DAG is defined in a YAML file with this basic structure:
 
 ```yaml
 # my-workflow.yaml
@@ -31,7 +29,7 @@ steps:
 
 ## Base DAG Configuration
 
-Dagu supports a powerful feature called **base DAG configuration** that allows you to share common settings across all your workflows. This helps maintain consistency and reduces duplication.
+Dagu supports a powerful feature called **base DAG configuration** that allows you to share common settings across all your DAGs. This helps maintain consistency and reduces duplication.
 
 ### How It Works
 

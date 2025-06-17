@@ -9,10 +9,8 @@ Dagu includes a modern, responsive web UI that provides:
 - Visual DAG representation
 - Log viewing and search
 - DAG execution history
-- DAG editing capabilities with syntax highlighting and auto-completion
+- DAG (YAML) editor with syntax highlighting and auto-completion
 - Interactive DAG management (start, stop, retry, etc.)
-
-No additional setup required - just start Dagu and open your browser.
 
 ::: tip Configuration
 For Web UI configuration options, see [Configuration Reference](/reference/config#ui-configuration).

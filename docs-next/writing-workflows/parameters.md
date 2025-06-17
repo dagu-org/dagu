@@ -1,7 +1,5 @@
 # Parameters
 
-Complete guide to using parameters in Dagu workflows - from basic usage to advanced patterns.
-
 ## Overview
 
 Parameters allow you to make workflows dynamic and reusable by passing values at runtime. Dagu supports both positional parameters (like shell scripts) and named parameters (like environment variables).

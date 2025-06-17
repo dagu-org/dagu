@@ -1,6 +1,6 @@
 # Control Flow
 
-Control how your workflow executes with conditions, dependencies, and repetition.
+Control how your DAGs executes with conditions, dependencies, and repetition.
 
 ## Dependencies
 

@@ -4,7 +4,7 @@ Understanding how Dagu works under the hood.
 
 ## Design Philosophy
 
-Dagu follows a simple philosophy: **do one thing well with minimal dependencies**. Unlike traditional workflow orchestrators that require complex distributed systems, Dagu runs as a single process that manages everything locally.
+Dagu follows a simple philosophy: **do one thing well with minimal dependencies**.
 
 ## System Architecture
 

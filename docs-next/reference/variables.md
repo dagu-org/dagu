@@ -1,7 +1,5 @@
 # Variables Reference
 
-Complete reference for using variables, parameters, and environment values in Dagu workflows.
-
 ## Special Environment Variables
 
 Dagu automatically sets these environment variables for every step execution:

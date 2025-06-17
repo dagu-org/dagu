@@ -1,7 +1,5 @@
 # Changelog
 
-All notable changes to Dagu are documented here.
-
 ## v1.17.0-beta (2025-05-30)
 
 ### Major Features

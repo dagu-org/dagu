@@ -1,6 +1,6 @@
 # Data and Variables
 
-Dagu provides multiple ways to handle data and variables in your workflows, from simple environment variables to complex parameter passing between steps.
+Dagu provides multiple ways to handle data and variables in your DAGs, from simple environment variables to complex parameter passing between steps.
 
 ## Environment Variables
 

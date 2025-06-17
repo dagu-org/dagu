@@ -1,7 +1,5 @@
 # Executors Reference
 
-Complete reference for all Dagu executors - specialized modules for handling different types of tasks.
-
 ## Overview
 
 Executors extend Dagu's capabilities beyond simple shell commands. Available executors:

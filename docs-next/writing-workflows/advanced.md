@@ -4,7 +4,7 @@ Master complex workflow scenarios and optimization techniques.
 
 ## Hierarchical Workflows
 
-Dagu's most powerful feature is the ability to compose workflows from other workflows, creating modular, reusable components.
+Dagu's most powerful feature is the ability to compose DAGs from other DAGs. The web UI allows you to drill down into nested workflows, making it easy to manage complex systems.
 
 ### Basic Nested Workflow
 

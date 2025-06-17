@@ -1,7 +1,5 @@
 # REST API Reference
 
-This document provides a complete reference for Dagu's REST API endpoints, including detailed parameters, responses, and examples.
-
 ## Base Configuration
 
 - **Base URL**: `http://localhost:8080/api/v2`

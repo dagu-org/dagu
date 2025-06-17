@@ -1,7 +1,5 @@
 # Workflow Basics
 
-Learn the fundamentals of writing Dagu workflows.
-
 ## Your First Workflow
 
 Create a file named `hello.yaml`:

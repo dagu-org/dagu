@@ -1,6 +1,6 @@
 # Configuration Reference
 
-This page has moved. Please visit the [Configuration Reference](/configurations/reference) page for complete configuration documentation.
+Please visit the [Configuration Reference](/configurations/reference) page for complete configuration documentation.
 
 For quick access to specific topics:
 

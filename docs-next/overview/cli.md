@@ -1,10 +1,8 @@
 # Command Line Interface
 
-Master Dagu's powerful CLI for workflow management and automation.
-
 ## Overview
 
-The Dagu CLI provides complete control over your workflows from the terminal. It's designed to be intuitive, scriptable, and integration-friendly.
+The Dagu CLI provides all the necessary commands to manage and execute DAGs (workflows) directly from the terminal. It allows you to start, stop, retry, and monitor workflows, as well as manage the underlying scheduler and web server.
 
 ::: tip Complete Reference
 For the full CLI command reference, see [CLI Commands Reference](/reference/cli).
