@@ -5,7 +5,7 @@ layout: doc
 <div class="logo-section">
   <div class="logo-container">
     <img src="/logo-light.svg" alt="Dagu Logo" class="logo-light logo-icon">
-    <img src="/dagu.webp" alt="Dagu Logo" class="logo-dark logo-icon">
+    <img src="/logo-dark.webp" alt="Dagu Logo" class="logo-dark logo-icon">
     <span class="logo-text">Dagu</span>
   </div>
 </div>
