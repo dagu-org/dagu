@@ -127,7 +127,7 @@ export default withMermaid(
     ],
 
     themeConfig: {
-      logo: "/logo.svg",
+      logo: "/logo-dark.webp",
       siteTitle: "Dagu",
       logoLink: "https://dagu.cloud/",
 
