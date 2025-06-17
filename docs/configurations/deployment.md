@@ -62,8 +62,7 @@ Run with Docker:
 docker run -d \
   --name dagu \
   -p 8080:8080 \
-  -v $HOME/.config/dagu:/app/.dagu \
-  -v /var/log/dagu:/app/logs \
+  -v $HOME/.config/dagu:/config \
   -e DAGU_HOST=0.0.0.0 \
   -e DAGU_PORT=8080 \
   --restart always \
@@ -72,31 +71,90 @@ docker run -d \
 
 ### Docker Compose
 
+Basic deployment using the official Docker image:
+
 ```yaml
 # docker-compose.yml
-version: '3.8'
-
 services:
   dagu:
-    image: ghcr.io/dagu-org/dagu:latest
+    image: "ghcr.io/dagu-org/dagu:latest"
     container_name: dagu
+    hostname: dagu
     restart: always
     ports:
       - "8080:8080"
-    volumes:
-      - ./dags:/app/dags
-      - ./logs:/app/logs
-      - ./data:/app/data
-      - ./config.yaml:/app/config.yaml:ro
     environment:
-      - DAGU_HOST=0.0.0.0
       - DAGU_PORT=8080
-      - DAGU_CONFIG=/app/config.yaml
+      - DAGU_TZ=Asia/Tokyo  # Set your timezone
+      - DAGU_BASE_PATH=/    # Change if using reverse proxy
+      - PUID=1000           # User ID for file permissions
+      - PGID=1000           # Group ID for file permissions
+    volumes:
+      - dagu_config:/config
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/status"]
       interval: 30s
       timeout: 10s
       retries: 3
+volumes:
+  dagu_config: {}
+```
+
+For custom configuration with separate volumes:
+
+```yaml
+# docker-compose.yml with custom paths
+services:
+  dagu:
+    image: "ghcr.io/dagu-org/dagu:latest"
+    container_name: dagu
+    restart: always
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./dags:/config/dags
+      - ./logs:/config/logs
+      - ./data:/config/data
+      - ./config.yaml:/config/config.yaml:ro
+    environment:
+      - DAGU_HOST=0.0.0.0
+      - DAGU_PORT=8080
+      - DAGU_CONFIG=/config/config.yaml
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+```
+
+For Docker-in-Docker support (to run Docker executors):
+
+```yaml
+# docker-compose.yml with Docker-in-Docker
+services:
+  dagu:
+    image: "ghcr.io/dagu-org/dagu:latest"
+    container_name: dagu
+    hostname: dagu
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - DAGU_PORT=8080
+      - DAGU_TZ=Asia/Tokyo
+      - DAGU_BASE_PATH=/
+    volumes:
+      - dagu_config:/config
+      - /var/run/docker.sock:/var/run/docker.sock
+    user: "0:0"
+    entrypoint: []
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+volumes:
+  dagu_config: {}
 ```
 
 ### Kubernetes

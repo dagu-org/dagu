@@ -92,8 +92,7 @@ docker run --rm -p 8080:8080 ghcr.io/dagu-org/dagu:latest dagu start-all
 docker run -d \
   --name dagu-server \
   -p 8080:8080 \
-  -v ~/.dagu:/app/.dagu \
-  -e DAGU_HOME=/app/.dagu \
+  -v ~/.config/dagu:/config \
   ghcr.io/dagu-org/dagu:latest \
   dagu start-all
 ```
