@@ -413,7 +413,7 @@ Huge shout-out to [@kriyanshii](https://github.com/kriyanshii)  for multiple awe
 # [v1.16.0](https://github.com/dagu-org/dagu/releases/tag/v1.16.0) - 2025-01-09
 
 ## Changelog
-https://dagu.readthedocs.io/en/latest/changelog.html#v1-16-0-2025-01-09
+https://docs.dagu.cloud/reference/changelog
 
 **Full Changelog**: https://github.com/dagu-org/dagu/compare/v1.15.1...v1.16.0
 
@@ -456,7 +456,7 @@ Dagu now supports managing multiple Dagu servers from a single UI through its re
 - Monitor and manage DAGs across different environments (dev, staging, prod)
 - Access multiple Dagu instances from a centralized UI
 - Switch between nodes easily through the UI dropdown
-- See [Remote Node Configuration](https://dagu.readthedocs.io/en/latest/config_remote.html) for more details.
+- See [Remote Node Configuration](https://docs.dagu.cloud/reference/changelog) for more details.
 
 **Configuration:**
 Remote nodes can be configured by creating `admin.yaml` in `$HOME/.config/dagu/`:

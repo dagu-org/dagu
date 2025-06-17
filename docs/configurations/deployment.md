@@ -13,7 +13,7 @@ Create a systemd service for automatic startup:
 [Unit]
 Description=Dagu Workflow Engine
 After=network.target
-Documentation=https://dagu.readthedocs.io
+Documentation=https://docs.dagu.cloud
 
 [Service]
 Type=simple

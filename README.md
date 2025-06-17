@@ -21,7 +21,7 @@
 
 <div align="center">
 
-[Installation](https://dagu.readthedocs.io/en/latest/installation.html) | [Community](https://discord.gg/gpahPUjGRk) | [Quick Start](https://dagu.readthedocs.io/en/latest/quickstart.html)
+[Installation](https://docs.dagu.cloud/getting-started/installation) | [Community](https://discord.gg/gpahPUjGRk) | [Quick Start](https://docs.dagu.cloud/getting-started/quickstart)
 
 </div>
 
@@ -253,7 +253,7 @@ ghcr.io/dagu-org/dagu:latest dagu start-all
 
 Note: The environment variable `DAGU_TZ` is the timezone for the scheduler and server. You can set it to your local timezone (e.g. `America/New_York`).
 
-See [Environment variables](https://dagu.readthedocs.io/en/latest/config.html#environment-variables) to configure those default directories.
+See [Environment variables](https://docs.dagu.cloud/getting-started/quickstart) to configure those default directories.
 
 ### Quick Start
 
@@ -316,7 +316,7 @@ Start the server and scheduler with the command `dagu start-all` and browse to `
 
 Navigate to the DAG List page by clicking the menu in the left panel of the Web UI. Then create a DAG by clicking the `NEW` button at the top of the page. Enter `example` in the dialog.
 
-_Note: DAG (YAML) files will be placed in `~/.config/dagu/dags` by default. See [Configuration Options](https://dagu.readthedocs.io/en/latest/config.html) for more details._
+_Note: DAG (YAML) files will be placed in `~/.config/dagu/dags` by default. See [Configuration Options](https://docs.dagu.cloud/configurations/server) for more details._
 
 ### 3. Edit the DAG
 
@@ -1044,7 +1044,7 @@ steps:
 # Output: 2
 ```
 
-More examples can be found in the [documentation](https://dagu.readthedocs.io/en/latest/yaml_format.html).
+More examples can be found in the [documentation](https://docs.dagu.cloud/configurations/server).
 
 ## Web UI
 
@@ -1082,7 +1082,7 @@ Examine detailed step-level logs and outputs.
 
 ## Contributing
 
-Contributions to Dagu are welcome. Refer to the [Contribution Guide](https://dagu.readthedocs.io/en/latest/contrib.html) for details on how to get started.
+Contributions to Dagu are welcome.
 
 ## Contributors
 
