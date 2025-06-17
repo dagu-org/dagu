@@ -57,6 +57,8 @@ type NodeState struct {
 	*Parallel
 	// Children stores the child dag-runs.
 	Children []ChildDAGRun
+	// ChildrenRepeated stores the repeated child dag-runs.
+	ChildrenRepeated []ChildDAGRun
 	// OutputVariables stores the output variables for the following steps.
 	// It only contains the local output variables.
 	OutputVariables *executor.SyncMap
@@ -212,6 +214,14 @@ func (d *Data) SetChildRuns(children []ChildDAGRun) {
 	// Clear the existing children and set the new ones
 	d.inner.State.Children = make([]ChildDAGRun, len(children))
 	copy(d.inner.State.Children, children)
+}
+
+// AddChildRunsRepeated adds the repeated child runs to the node.
+func (d *Data) AddChildRunsRepeated(child ...ChildDAGRun) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	d.inner.State.ChildrenRepeated = append(d.inner.State.ChildrenRepeated, child...)
 }
 
 func (d *Data) Setup(ctx context.Context, logFile string, startedAt time.Time) error {

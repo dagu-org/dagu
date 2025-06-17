@@ -11,19 +11,20 @@ import (
 
 // Node represents a DAG step with its execution state for persistence
 type Node struct {
-	Step            digraph.Step         `json:"step"`
-	Stdout          string               `json:"stdout"` // standard output log file path
-	Stderr          string               `json:"stderr"` // standard error log file path
-	StartedAt       string               `json:"startedAt"`
-	FinishedAt      string               `json:"finishedAt"`
-	Status          scheduler.NodeStatus `json:"status"`
-	RetriedAt       string               `json:"retriedAt,omitempty"`
-	RetryCount      int                  `json:"retryCount,omitempty"`
-	DoneCount       int                  `json:"doneCount,omitempty"`
-	Repeated        bool                 `json:"repeated,omitempty"` // indicates if the node has been repeated
-	Error           string               `json:"error,omitempty"`
-	Children        []ChildDAGRun        `json:"children,omitempty"`
-	OutputVariables *executor.SyncMap    `json:"outputVariables,omitempty"`
+	Step             digraph.Step         `json:"step"`
+	Stdout           string               `json:"stdout"` // standard output log file path
+	Stderr           string               `json:"stderr"` // standard error log file path
+	StartedAt        string               `json:"startedAt"`
+	FinishedAt       string               `json:"finishedAt"`
+	Status           scheduler.NodeStatus `json:"status"`
+	RetriedAt        string               `json:"retriedAt,omitempty"`
+	RetryCount       int                  `json:"retryCount,omitempty"`
+	DoneCount        int                  `json:"doneCount,omitempty"`
+	Repeated         bool                 `json:"repeated,omitempty"` // indicates if the node has been repeated
+	Error            string               `json:"error,omitempty"`
+	Children         []ChildDAGRun        `json:"children,omitempty"`
+	ChildrenRepeated []ChildDAGRun        `json:"childrenRepeated,omitempty"` // repeated child DAG runs
+	OutputVariables  *executor.SyncMap    `json:"outputVariables,omitempty"`
 }
 
 // ChildDAGRun represents a child DAG run associated with a node
@@ -41,19 +42,24 @@ func (n *Node) ToNode() *scheduler.Node {
 	for i, r := range n.Children {
 		children[i] = scheduler.ChildDAGRun(r)
 	}
+	childrenRepeated := make([]scheduler.ChildDAGRun, len(n.ChildrenRepeated))
+	for i, r := range n.ChildrenRepeated {
+		childrenRepeated[i] = scheduler.ChildDAGRun(r)
+	}
 	return scheduler.NewNode(n.Step, scheduler.NodeState{
-		Status:          n.Status,
-		Stdout:          n.Stdout,
-		Stderr:          n.Stderr,
-		StartedAt:       startedAt,
-		FinishedAt:      finishedAt,
-		RetriedAt:       retriedAt,
-		RetryCount:      n.RetryCount,
-		DoneCount:       n.DoneCount,
-		Repeated:        n.Repeated,
-		Error:           errors.New(n.Error),
-		Children:        children,
-		OutputVariables: n.OutputVariables,
+		Status:           n.Status,
+		Stdout:           n.Stdout,
+		Stderr:           n.Stderr,
+		StartedAt:        startedAt,
+		FinishedAt:       finishedAt,
+		RetriedAt:        retriedAt,
+		RetryCount:       n.RetryCount,
+		DoneCount:        n.DoneCount,
+		Repeated:         n.Repeated,
+		Error:            errors.New(n.Error),
+		Children:         children,
+		ChildrenRepeated: childrenRepeated,
+		OutputVariables:  n.OutputVariables,
 	})
 }
 
@@ -87,18 +93,19 @@ func newNode(node scheduler.NodeData) *Node {
 		errText = node.State.Error.Error()
 	}
 	return &Node{
-		Step:            node.Step,
-		Stdout:          node.State.Stdout,
-		Stderr:          node.State.Stderr,
-		StartedAt:       stringutil.FormatTime(node.State.StartedAt),
-		FinishedAt:      stringutil.FormatTime(node.State.FinishedAt),
-		Status:          node.State.Status,
-		RetriedAt:       stringutil.FormatTime(node.State.RetriedAt),
-		RetryCount:      node.State.RetryCount,
-		DoneCount:       node.State.DoneCount,
-		Repeated:        node.State.Repeated,
-		Error:           errText,
-		Children:        children,
-		OutputVariables: node.State.OutputVariables,
+		Step:             node.Step,
+		Stdout:           node.State.Stdout,
+		Stderr:           node.State.Stderr,
+		StartedAt:        stringutil.FormatTime(node.State.StartedAt),
+		FinishedAt:       stringutil.FormatTime(node.State.FinishedAt),
+		Status:           node.State.Status,
+		RetriedAt:        stringutil.FormatTime(node.State.RetriedAt),
+		RetryCount:       node.State.RetryCount,
+		DoneCount:        node.State.DoneCount,
+		Repeated:         node.State.Repeated,
+		Error:            errText,
+		Children:         children,
+		ChildrenRepeated: make([]ChildDAGRun, len(node.State.ChildrenRepeated)),
+		OutputVariables:  node.State.OutputVariables,
 	}
 }

@@ -639,7 +639,14 @@ func (n *Node) buildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG
 		if err != nil {
 			return nil, fmt.Errorf("failed to eval child dag params: %w", err)
 		}
-		dagRunID := GenerateChildDAGRunID(ctx, params, n.IsRepeated())
+		repeated := n.IsRepeated()
+		if repeated && len(n.State().Children) > 0 {
+			n.AddChildRunsRepeated(n.State().Children[0])
+		}
+		dagRunID := GenerateChildDAGRunID(ctx, params, repeated)
+		if repeated {
+
+		}
 		return []ChildDAGRun{{
 			DAGRunID: dagRunID,
 			Params:   params,
@@ -709,6 +716,12 @@ func (n *Node) buildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG
 
 	// Build child runs with deduplication
 	childRunMap := make(map[string]ChildDAGRun)
+	repeated := n.IsRepeated()
+
+	if repeated {
+		n.AddChildRunsRepeated(n.State().Children...)
+	}
+
 	for i, item := range items {
 		param, err := n.itemToParam(item)
 		if err != nil {
@@ -730,7 +743,7 @@ func (n *Node) buildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG
 			finalParams = evaluatedStepParams
 		}
 
-		dagRunID := GenerateChildDAGRunID(ctx, finalParams, n.IsRepeated())
+		dagRunID := GenerateChildDAGRunID(ctx, finalParams, repeated)
 		// Use dagRunID as key to deduplicate - same params will generate same ID
 		childRunMap[dagRunID] = ChildDAGRun{
 			DAGRunID: dagRunID,
@@ -743,14 +756,6 @@ func (n *Node) buildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG
 	for _, run := range childRunMap {
 		childRuns = append(childRuns, run)
 	}
-
-	// TODO: Store max concurrent for scheduler to use
-	// This will need to be implemented when parallel execution is added
-	// if parallel.MaxConcurrent > 0 {
-	//     n.SetMaxConcurrent(parallel.MaxConcurrent)
-	// } else {
-	//     n.SetMaxConcurrent(digraph.DefaultMaxConcurrent)
-	// }
 
 	return childRuns, nil
 }
