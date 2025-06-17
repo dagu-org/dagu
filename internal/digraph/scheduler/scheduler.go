@@ -331,7 +331,10 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 					}
 
 					if shouldRepeat && !sc.isCanceled() {
+						logger.Info(ctx, "Step will be repeated", "step", node.Name(), "interval", step.RepeatPolicy.Interval)
 						time.Sleep(step.RepeatPolicy.Interval)
+						node.SetRepeated(true) // mark as repeated
+						logger.Info(ctx, "Repeating step", "step", node.Name())
 
 						if progressCh != nil {
 							progressCh <- node

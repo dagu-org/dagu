@@ -320,6 +320,9 @@ func (e *parallelExecutor) outputResults(_ context.Context) error {
 		return fmt.Errorf("failed to marshal outputs: %w", err)
 	}
 
+	// Add a newline at the end of the JSON output
+	jsonData = append(jsonData, '\n')
+
 	// Write to stdout
 	if e.stdout != nil {
 		if _, err := e.stdout.Write(jsonData); err != nil {

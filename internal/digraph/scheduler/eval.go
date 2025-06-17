@@ -2,8 +2,10 @@ package scheduler
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
@@ -49,7 +51,18 @@ func EvalObject[T any](ctx context.Context, obj T) (T, error) {
 }
 
 // GenerateChildDAGRunID generates a unique run ID based on the current DAG run ID, step name, and parameters.
-func GenerateChildDAGRunID(ctx context.Context, params string) string {
+func GenerateChildDAGRunID(ctx context.Context, params string, repeated bool) string {
+	if repeated {
+		// If this is a repeated child DAG run, we need to generate a unique ID with randomness
+		// to avoid collisions with previous runs.
+		randomBytes := make([]byte, 8)
+		if _, err := rand.Read(randomBytes); err != nil {
+			randomBytes = []byte(fmt.Sprintf("%d", time.Now().UnixNano()))
+		}
+		return stringutil.Base58EncodeSHA256(
+			fmt.Sprintf("%s:%s:%s:%x", executor.GetEnv(ctx).DAGRunID, executor.GetEnv(ctx).Step.Name, params, randomBytes),
+		)
+	}
 	env := executor.GetEnv(ctx)
 	return stringutil.Base58EncodeSHA256(
 		fmt.Sprintf("%s:%s:%s", env.DAGRunID, env.Step.Name, params),

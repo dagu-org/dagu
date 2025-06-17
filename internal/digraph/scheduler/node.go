@@ -639,7 +639,7 @@ func (n *Node) buildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG
 		if err != nil {
 			return nil, fmt.Errorf("failed to eval child dag params: %w", err)
 		}
-		dagRunID := GenerateChildDAGRunID(ctx, params)
+		dagRunID := GenerateChildDAGRunID(ctx, params, n.IsRepeated())
 		return []ChildDAGRun{{
 			DAGRunID: dagRunID,
 			Params:   params,
@@ -730,7 +730,7 @@ func (n *Node) buildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG
 			finalParams = evaluatedStepParams
 		}
 
-		dagRunID := GenerateChildDAGRunID(ctx, finalParams)
+		dagRunID := GenerateChildDAGRunID(ctx, finalParams, n.IsRepeated())
 		// Use dagRunID as key to deduplicate - same params will generate same ID
 		childRunMap[dagRunID] = ChildDAGRun{
 			DAGRunID: dagRunID,

@@ -107,6 +107,9 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to marshal outputs: %w", err)
 	}
 
+	// add a newline at the end of the JSON output
+	jsonData = append(jsonData, '\n')
+
 	if e.stdout != nil {
 		if _, err := e.stdout.Write(jsonData); err != nil {
 			return fmt.Errorf("failed to write outputs: %w", err)

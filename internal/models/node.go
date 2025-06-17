@@ -20,6 +20,7 @@ type Node struct {
 	RetriedAt       string               `json:"retriedAt,omitempty"`
 	RetryCount      int                  `json:"retryCount,omitempty"`
 	DoneCount       int                  `json:"doneCount,omitempty"`
+	Repeated        bool                 `json:"repeated,omitempty"` // indicates if the node has been repeated
 	Error           string               `json:"error,omitempty"`
 	Children        []ChildDAGRun        `json:"children,omitempty"`
 	OutputVariables *executor.SyncMap    `json:"outputVariables,omitempty"`
@@ -49,6 +50,7 @@ func (n *Node) ToNode() *scheduler.Node {
 		RetriedAt:       retriedAt,
 		RetryCount:      n.RetryCount,
 		DoneCount:       n.DoneCount,
+		Repeated:        n.Repeated,
 		Error:           errors.New(n.Error),
 		Children:        children,
 		OutputVariables: n.OutputVariables,
@@ -94,6 +96,7 @@ func newNode(node scheduler.NodeData) *Node {
 		RetriedAt:       stringutil.FormatTime(node.State.RetriedAt),
 		RetryCount:      node.State.RetryCount,
 		DoneCount:       node.State.DoneCount,
+		Repeated:        node.State.Repeated,
 		Error:           errText,
 		Children:        children,
 		OutputVariables: node.State.OutputVariables,
