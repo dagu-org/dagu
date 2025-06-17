@@ -875,6 +875,7 @@ func buildRepeatPolicy(_ BuildContext, def stepDef, step *Step) error {
 		}
 		step.RepeatPolicy.Repeat = def.RepeatPolicy.Repeat
 		step.RepeatPolicy.Interval = time.Second * time.Duration(def.RepeatPolicy.IntervalSec)
+		step.RepeatPolicy.Limit = def.RepeatPolicy.Limit
 		step.RepeatPolicy.ExitCode = def.RepeatPolicy.ExitCode
 	}
 	return nil

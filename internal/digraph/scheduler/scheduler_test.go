@@ -1898,6 +1898,70 @@ func TestScheduler_RepeatPolicyWithCancel(t *testing.T) {
 	assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 }
 
+func TestScheduler_RepeatPolicyWithLimit(t *testing.T) {
+	sc := setupScheduler(t)
+
+	// Test repeat with limit
+	graph := sc.newGraph(t,
+		newStep("1",
+			withCommand("echo repeat"),
+			withRepeatPolicy(true, 100*time.Millisecond),
+			func(step *digraph.Step) {
+				step.RepeatPolicy.Limit = 3
+			},
+		),
+	)
+
+	result := graph.Schedule(t, scheduler.StatusSuccess)
+	result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
+
+	node := result.Node(t, "1")
+	// Should have executed exactly 3 times (initial + 2 repeats)
+	assert.Equal(t, 3, node.State().DoneCount)
+}
+
+func TestScheduler_RepeatPolicyWithLimitAndCondition(t *testing.T) {
+	sc := setupScheduler(t)
+
+	counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_limit_%s", uuid.Must(uuid.NewV7()).String()))
+	defer func() { _ = os.Remove(counterFile) }()
+
+	// Test repeat with limit and condition
+	graph := sc.newGraph(t,
+		newStep("1",
+			withScript(fmt.Sprintf(`
+				COUNT=0
+				if [ -f "%s" ]; then
+					COUNT=$(cat "%s")
+				fi
+				COUNT=$((COUNT + 1))
+				echo "$COUNT" > "%s"
+				echo "PENDING"
+			`, counterFile, counterFile, counterFile)),
+			withRepeatPolicy(true, 100*time.Millisecond),
+			func(step *digraph.Step) {
+				step.RepeatPolicy.Limit = 5
+				step.RepeatPolicy.Condition = &digraph.Condition{
+					Condition: "`cat " + counterFile + "`",
+					Expected:  "10", // Would repeat forever but limit stops at 5
+				}
+			},
+		),
+	)
+
+	result := graph.Schedule(t, scheduler.StatusSuccess)
+	result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
+
+	node := result.Node(t, "1")
+	// Should have executed exactly 5 times due to limit
+	assert.Equal(t, 5, node.State().DoneCount)
+
+	// Verify counter file shows 5
+	content, err := os.ReadFile(counterFile)
+	assert.NoError(t, err)
+	assert.Equal(t, "5\n", string(content))
+}
+
 func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 	t.Run("RetryWithSignalTermination", func(t *testing.T) {
 		sc := setupScheduler(t)

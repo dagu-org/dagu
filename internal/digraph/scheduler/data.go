@@ -42,6 +42,10 @@ type NodeState struct {
 	RetriedAt time.Time
 	// DoneCount is the number of times the node was executed.
 	DoneCount int
+	// Repeated is true if the node is a repeated step.
+	// This is used to generate unique run IDs for repeated steps in case the node
+	// runs nested DAGs.
+	Repeated bool
 	// Error is the error that the executor encountered.
 	Error error
 	// ExitCode is the exit code that the command exited with.
@@ -53,6 +57,8 @@ type NodeState struct {
 	*Parallel
 	// Children stores the child dag-runs.
 	Children []ChildDAGRun
+	// ChildrenRepeated stores the repeated child dag-runs.
+	ChildrenRepeated []ChildDAGRun
 	// OutputVariables stores the output variables for the following steps.
 	// It only contains the local output variables.
 	OutputVariables *executor.SyncMap
@@ -208,6 +214,14 @@ func (d *Data) SetChildRuns(children []ChildDAGRun) {
 	// Clear the existing children and set the new ones
 	d.inner.State.Children = make([]ChildDAGRun, len(children))
 	copy(d.inner.State.Children, children)
+}
+
+// AddChildRunsRepeated adds the repeated child runs to the node.
+func (d *Data) AddChildRunsRepeated(child ...ChildDAGRun) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	d.inner.State.ChildrenRepeated = append(d.inner.State.ChildrenRepeated, child...)
 }
 
 func (d *Data) Setup(ctx context.Context, logFile string, startedAt time.Time) error {
@@ -421,6 +435,20 @@ func (d *Data) IncDoneCount() {
 	defer d.mu.Unlock()
 
 	d.inner.State.DoneCount++
+}
+
+func (d *Data) SetRepeated(repeated bool) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	d.inner.State.Repeated = repeated
+}
+
+func (d *Data) IsRepeated() bool {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	return d.inner.State.Repeated
 }
 
 func (d *Data) GetDoneCount() int {

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime/debug"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -277,7 +278,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 						default:
 							// finish the node
 							node.SetStatus(NodeStatusError)
-							if node.shouldMarkSuccess(ctx) {
+							if node.ShouldMarkSuccess(ctx) {
 								// mark as success if the node should be marked as success
 								// i.e. continueOn.markSuccess is set to true
 								node.SetStatus(NodeStatusSuccess)
@@ -294,7 +295,12 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 
 					shouldRepeat := false
 					step := node.Step()
-					if step.RepeatPolicy.Condition != nil {
+
+					// Check if repeat limit has been reached
+					if step.RepeatPolicy.Limit > 0 && node.State().DoneCount >= step.RepeatPolicy.Limit {
+						// Limit reached, don't repeat
+						shouldRepeat = false
+					} else if step.RepeatPolicy.Condition != nil {
 						// Ensure node's own output variables are reloaded
 						// before evaluating the condition.
 						if node.inner.State.OutputVariables != nil {
@@ -318,19 +324,18 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 					} else if len(step.RepeatPolicy.ExitCode) > 0 {
 						// Repeat if last exit code matches any in ExitCode
 						lastExit := node.State().ExitCode
-						for _, code := range step.RepeatPolicy.ExitCode {
-							if lastExit == code {
-								shouldRepeat = true
-								break
-							}
-						}
+						shouldRepeat = slices.Contains(step.RepeatPolicy.ExitCode, lastExit)
 					} else if step.RepeatPolicy.Repeat {
 						// Unconditional repeat
 						shouldRepeat = (execErr == nil || step.ContinueOn.Failure)
 					}
 
 					if shouldRepeat && !sc.isCanceled() {
+						logger.Info(ctx, "Step will be repeated", "step", node.Name(), "interval", step.RepeatPolicy.Interval)
 						time.Sleep(step.RepeatPolicy.Interval)
+						node.SetRepeated(true) // mark as repeated
+						logger.Info(ctx, "Repeating step", "step", node.Name())
+
 						if progressCh != nil {
 							progressCh <- node
 						}
@@ -612,7 +617,7 @@ func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 			continue
 
 		case NodeStatusError:
-			if dep.shouldContinue(ctx) {
+			if dep.ShouldContinue(ctx) {
 				continue
 			}
 			ready = false
@@ -620,7 +625,7 @@ func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 			node.SetError(ErrUpstreamFailed)
 
 		case NodeStatusSkipped:
-			if dep.shouldContinue(ctx) {
+			if dep.ShouldContinue(ctx) {
 				continue
 			}
 			ready = false
@@ -763,7 +768,7 @@ func (sc *Scheduler) isPartialSuccess(ctx context.Context, g *ExecutionGraph) bo
 	// If so, this is an error, not partial success
 	for _, node := range g.nodes {
 		if node.State().Status == NodeStatusError {
-			if !node.shouldContinue(ctx) {
+			if !node.ShouldContinue(ctx) {
 				// Found a failed node that was NOT allowed to continue
 				// This disqualifies the DAG from being partial success
 				return false
@@ -777,7 +782,7 @@ func (sc *Scheduler) isPartialSuccess(ctx context.Context, g *ExecutionGraph) bo
 		case NodeStatusSuccess:
 			hasSuccessfulNodes = true
 		case NodeStatusError:
-			if node.shouldContinue(ctx) && !node.shouldMarkSuccess(ctx) {
+			if node.ShouldContinue(ctx) && !node.ShouldMarkSuccess(ctx) {
 				hasFailuresWithContinueOn = true
 			}
 		case NodeStatusNone, NodeStatusRunning, NodeStatusCancel, NodeStatusSkipped:

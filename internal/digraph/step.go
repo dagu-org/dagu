@@ -142,6 +142,8 @@ type RepeatPolicy struct {
 	Repeat bool `json:"repeat,omitempty"`
 	// Interval is the time to wait between repeats.
 	Interval time.Duration `json:"interval,omitempty"`
+	// Limit is the maximum number of times to repeat the step.
+	Limit int `json:"limit,omitempty"`
 	// Condition is the condition object to be met for the repeat.
 	Condition *Condition `json:"condition,omitempty"`
 	// ExitCode is the list of exit codes that should trigger a repeat.

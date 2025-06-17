@@ -380,6 +380,8 @@ func resolveYamlFilePath(ctx BuildContext, file string) (string, error) {
 		return "", errors.New("file path is required")
 	}
 
+	file = strings.TrimSpace(file) // Remove leading and trailing whitespace
+
 	if filepath.IsAbs(file) {
 		// If the file is an absolute path, return it as is.
 		return file, nil

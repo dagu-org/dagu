@@ -238,6 +238,25 @@ steps:
 | `mailOnError` | boolean | Send email on error | `false` |
 | `signalOnStop` | string | Signal to send on stop | `SIGTERM` |
 
+#### Retry Policy Fields
+
+| Field | Type | Description | Default |
+|-------|------|-------------|---------|
+| `limit` | integer | Maximum retry attempts | - |
+| `intervalSec` | integer | Seconds between retries | - |
+| `exitCode` | array | Exit codes that trigger retry | All non-zero |
+
+#### Repeat Policy Fields
+
+| Field | Type | Description | Default |
+|-------|------|-------------|---------|
+| `repeat` | boolean | Enable repeat mode | `false` |
+| `intervalSec` | integer | Seconds between repetitions | - |
+| `limit` | integer | Maximum number of executions | - |
+| `condition` | string | Condition to evaluate | - |
+| `expected` | string | Expected value/pattern | - |
+| `exitCode` | array | Exit codes that stop repetition | - |
+
 ```yaml
 steps:
   - name: retry-example
@@ -245,13 +264,14 @@ steps:
     retryPolicy:
       limit: 3
       intervalSec: 30
-      exitCodes: [1, 255]  # Retry only on specific codes
+      exitCode: [1, 255]  # Retry only on specific codes
     
   - name: repeat-example
     command: check-status.sh
     repeatPolicy:
       repeat: true
       intervalSec: 60
+      limit: 10
       condition: "${STATUS}"
       expected: "ready"
 ```

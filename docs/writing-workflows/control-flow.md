@@ -181,6 +181,18 @@ steps:
       intervalSec: 60  # Every minute
 ```
 
+### Repeat with Limit
+
+```yaml
+steps:
+  - name: limited-polling
+    command: ./check-status.sh
+    repeatPolicy:
+      repeat: true
+      limit: 10        # Maximum 10 executions
+      intervalSec: 30  # Every 30 seconds
+```
+
 ### Complex Repeat Conditions
 
 ```yaml
@@ -194,6 +206,22 @@ steps:
       expected: "re:COMPLETED|FAILED"  # Stop on these statuses
       intervalSec: 30
 ```
+
+### Repeat with Limit and Condition
+
+```yaml
+steps:
+  - name: wait-for-ready
+    command: ./check-readiness.sh
+    output: STATUS
+    repeatPolicy:
+      limit: 20              # Maximum 20 attempts
+      condition: "${STATUS}"
+      expected: "ready"      # Stop when status is ready
+      intervalSec: 15        # Check every 15 seconds
+```
+
+The step will stop repeating when either the condition is met or the limit is reached.
 
 ## Continue On Conditions
 
