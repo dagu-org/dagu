@@ -188,10 +188,8 @@ docker run -d \
   -e DAGU_AUTH_BASIC_ENABLED=true \
   -e DAGU_AUTH_BASIC_USERNAME=admin \
   -e DAGU_AUTH_BASIC_PASSWORD=secret \
-  -e DAGU_UI_NAVBAR_COLOR="#ff0000" \
-  -e DAGU_UI_NAVBAR_TITLE="Dagu - Docker" \
   -p 8080:8080 \
-  -v ~/.config/dagu:/config \
+  -v ~/.dagu:/dagu \
   ghcr.io/dagu-org/dagu:latest start-all
 ```
 
@@ -238,26 +236,6 @@ curl -H "Authorization: Bearer your-secret-token" \
   http://localhost:8080/api/v1/dags
 ```
 
-### Permissions
-
-Control what users can do:
-
-```yaml
-permissions:
-  writeDAGs: true    # Create, edit, delete DAGs
-  runDAGs: true      # Start, stop, retry DAGs
-```
-
-## TLS/HTTPS Configuration
-
-### Using Certificate Files
-
-```yaml
-# config.yaml
-tls:
-  certFile: "/etc/dagu/cert.pem"
-  keyFile: "/etc/dagu/key.pem"
-```
 
 ### Using Let's Encrypt
 

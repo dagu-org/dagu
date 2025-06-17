@@ -24,22 +24,22 @@ fi
 groupmod -o -g "$PGID" dagu
 usermod -o -u "$PUID" dagu
 
-mkdir -p /config
+mkdir -p /dagu
 
-chown $PUID:$PGID -R /config
+chown $PUID:$PGID -R /dagu
 
 # If DAGU_HOME is not set, try to guess if the legacy /home directory is being
-# used. If so set the HOME to /home/dagu. Otherwise force the /config directory
+# used. If so set the HOME to /home/dagu. Otherwise force the /dagu directory
 # as DAGU_HOME
 if [ -z "$DAGU_HOME" ]; then
   if [ -d /home/dagu/.config/dagu ]; then
-    echo "WARNING: Using legacy /home/dagu directory. Please consider moving to /config"
+    echo "WARNING: Using legacy /home/dagu directory. Please consider moving to /dagu"
     usermod -d /home/dagu dagu
     chown $PUID:$PGID -R /home/dagu
   else
-    # For ease of use set DAGU_HOME to /config so all data is located in a
+    # For ease of use set DAGU_HOME to /dagu so all data is located in a
     # single directory
-    export DAGU_HOME=/config
+    export DAGU_HOME=/dagu
   fi
 fi
 

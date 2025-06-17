@@ -20,7 +20,7 @@ Type=simple
 User=dagu
 Group=dagu
 WorkingDirectory=/opt/dagu
-ExecStart=/usr/local/bin/dagu start-all --config /etc/dagu/config.yaml
+ExecStart=/usr/local/bin/dagu start-all
 Restart=always
 RestartSec=10
 
@@ -62,7 +62,7 @@ Run with Docker:
 docker run -d \
   --name dagu \
   -p 8080:8080 \
-  -v $HOME/.config/dagu:/config \
+  -v $HOME/.dagu:/dagu \
   -e DAGU_HOST=0.0.0.0 \
   -e DAGU_PORT=8080 \
   --restart always \
@@ -90,7 +90,7 @@ services:
       - PUID=1000           # User ID for file permissions
       - PGID=1000           # Group ID for file permissions
     volumes:
-      - dagu_config:/config
+      - dagu:/dagu
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/status"]
       interval: 30s
@@ -112,14 +112,14 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./dags:/config/dags
-      - ./logs:/config/logs
-      - ./data:/config/data
-      - ./config.yaml:/config/config.yaml:ro
+      - ./dags:/dagu/dags
+      - ./logs:/dagu/logs
+      - ./data:/dagu/data
+      - ./config.yaml:/dagu/config.yaml:ro
     environment:
       - DAGU_HOST=0.0.0.0
       - DAGU_PORT=8080
-      - DAGU_CONFIG=/config/config.yaml
+      - DAGU_CONFIG=/dagu/config.yaml
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/status"]
       interval: 30s
@@ -144,7 +144,7 @@ services:
       - DAGU_TZ=Asia/Tokyo
       - DAGU_BASE_PATH=/
     volumes:
-      - dagu_config:/config
+      - dagu:/dagu
       - /var/run/docker.sock:/var/run/docker.sock
     user: "0:0"
     entrypoint: []
@@ -190,12 +190,10 @@ spec:
         - name: DAGU_PORT
           value: "8080"
         volumeMounts:
-        - name: dags
-          mountPath: /app/dags
-        - name: logs
-          mountPath: /app/logs
+        - name: dagu
+          mountPath: /dagu
         - name: config
-          mountPath: /app/config.yaml
+          mountPath: /dagu/config.yaml
           subPath: config.yaml
         resources:
           requests:
@@ -211,12 +209,9 @@ spec:
           initialDelaySeconds: 30
           periodSeconds: 30
       volumes:
-      - name: dags
+      - name: dagu
         persistentVolumeClaim:
-          claimName: dagu-dags-pvc
-      - name: logs
-        persistentVolumeClaim:
-          claimName: dagu-logs-pvc
+          claimName: dagu-pvc
       - name: config
         configMap:
           name: dagu-config
@@ -232,153 +227,6 @@ spec:
   - port: 8080
     targetPort: 8080
   type: LoadBalancer
-```
-
-## Reverse Proxy
-
-### Nginx
-
-```nginx
-# /etc/nginx/sites-available/dagu
-server {
-    listen 80;
-    server_name dagu.example.com;
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name dagu.example.com;
-    
-    ssl_certificate /etc/letsencrypt/live/dagu.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/dagu.example.com/privkey.pem;
-    
-    location / {
-        proxy_pass http://localhost:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        
-        # WebSocket support
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        
-        # Timeouts
-        proxy_read_timeout 86400;
-    }
-}
-```
-
-### Apache
-
-```apache
-# /etc/apache2/sites-available/dagu.conf
-<VirtualHost *:80>
-    ServerName dagu.example.com
-    Redirect permanent / https://dagu.example.com/
-</VirtualHost>
-
-<VirtualHost *:443>
-    ServerName dagu.example.com
-    
-    SSLEngine on
-    SSLCertificateFile /etc/letsencrypt/live/dagu.example.com/fullchain.pem
-    SSLCertificateKeyFile /etc/letsencrypt/live/dagu.example.com/privkey.pem
-    
-    ProxyPreserveHost On
-    ProxyPass / http://localhost:8080/
-    ProxyPassReverse / http://localhost:8080/
-    
-    # WebSocket
-    RewriteEngine on
-    RewriteCond %{HTTP:Upgrade} websocket [NC]
-    RewriteCond %{HTTP:Connection} upgrade [NC]
-    RewriteRule ^/?(.*) "ws://localhost:8080/$1" [P,L]
-</VirtualHost>
-```
-
-### Traefik
-
-```yaml
-# docker-compose.yml with Traefik
-version: '3.8'
-
-services:
-  traefik:
-    image: traefik:v2.10
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./traefik.yml:/traefik.yml:ro
-      - ./acme.json:/acme.json
-    labels:
-      - "traefik.enable=true"
-
-  dagu:
-    image: ghcr.io/dagu-org/dagu:latest
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.dagu.rule=Host(`dagu.example.com`)"
-      - "traefik.http.routers.dagu.entrypoints=websecure"
-      - "traefik.http.routers.dagu.tls.certresolver=letsencrypt"
-      - "traefik.http.services.dagu.loadbalancer.server.port=8080"
-```
-
-## High Availability
-
-### Multi-Node Setup
-
-Configure multiple Dagu instances:
-
-```yaml
-# Primary node
-host: 0.0.0.0
-port: 8080
-paths:
-  dagsDir: /shared/dags  # Shared storage
-  dataDir: /shared/data
-  logDir: /shared/logs
-
-# Secondary node (read-only)
-host: 0.0.0.0
-port: 8081
-permissions:
-  writeDAGs: false
-  runDAGs: false
-paths:
-  dagsDir: /shared/dags
-  dataDir: /shared/data
-  logDir: /shared/logs
-```
-
-### Load Balancer
-
-HAProxy configuration:
-
-```
-# /etc/haproxy/haproxy.cfg
-global
-    daemon
-
-defaults
-    mode http
-    timeout connect 5000ms
-    timeout client 50000ms
-    timeout server 50000ms
-
-frontend dagu_frontend
-    bind *:80
-    default_backend dagu_backend
-
-backend dagu_backend
-    balance roundrobin
-    option httpchk GET /api/v1/status
-    server dagu1 192.168.1.10:8080 check
-    server dagu2 192.168.1.11:8080 check backup
 ```
 
 ## Monitoring
@@ -404,191 +252,4 @@ healthcheck:
 
 ### Prometheus Metrics
 
-Export metrics via API:
-
-```yaml
-steps:
-  - name: export metrics
-    command: |
-      curl -s http://localhost:8080/api/v1/dags | \
-      jq -r '.[] | "\(.name) \(.status)"' | \
-      awk '{print "dagu_dag_status{name=\""$1"\",status=\""$2"\"} 1"}' > \
-      /var/lib/prometheus/node_exporter/dagu.prom
-    schedule: "* * * * *"
-```
-
-### Logging
-
-Configure centralized logging:
-
-```yaml
-# Fluentd configuration
-<source>
-  @type tail
-  path /var/log/dagu/*.log
-  pos_file /var/log/fluentd/dagu.pos
-  tag dagu.*
-  <parse>
-    @type json
-  </parse>
-</source>
-
-<match dagu.**>
-  @type elasticsearch
-  host elasticsearch
-  port 9200
-  logstash_format true
-  logstash_prefix dagu
-</match>
-```
-
-## Security Hardening
-
-### Network Security
-
-```yaml
-# Bind to localhost only
-host: 127.0.0.1
-port: 8080
-
-# Use reverse proxy for external access
-```
-
-### File Permissions
-
-```bash
-# Create dedicated user
-sudo useradd -r -s /bin/false dagu
-
-# Set ownership
-sudo chown -R dagu:dagu /opt/dagu
-sudo chmod 750 /opt/dagu
-
-# Secure configuration
-sudo chmod 600 /etc/dagu/config.yaml
-sudo chown dagu:dagu /etc/dagu/config.yaml
-```
-
-### Resource Limits
-
-```yaml
-# systemd resource limits
-[Service]
-# Memory
-MemoryMax=2G
-MemoryHigh=1G
-
-# CPU
-CPUQuota=100%
-
-# File descriptors
-LimitNOFILE=65536
-
-# Process limits
-LimitNPROC=4096
-```
-
-## Backup & Recovery
-
-### Backup Script
-
-```bash
-#!/bin/bash
-# /opt/dagu/backup.sh
-
-BACKUP_DIR="/backup/dagu"
-DATE=$(date +%Y%m%d_%H%M%S)
-
-# Create backup
-tar -czf "$BACKUP_DIR/dagu_backup_$DATE.tar.gz" \
-  /opt/dagu/dags \
-  /var/lib/dagu/data \
-  /var/log/dagu \
-  /etc/dagu/config.yaml
-
-# Keep last 30 days
-find "$BACKUP_DIR" -name "dagu_backup_*.tar.gz" -mtime +30 -delete
-```
-
-### Restore Procedure
-
-```bash
-# Stop Dagu
-sudo systemctl stop dagu
-
-# Restore from backup
-tar -xzf /backup/dagu/dagu_backup_20240115_120000.tar.gz -C /
-
-# Start Dagu
-sudo systemctl start dagu
-```
-
-## Performance Tuning
-
-### System Limits
-
-```bash
-# /etc/security/limits.d/dagu.conf
-dagu soft nofile 65536
-dagu hard nofile 65536
-dagu soft nproc 32768
-dagu hard nproc 32768
-```
-
-### Kernel Parameters
-
-```bash
-# /etc/sysctl.d/dagu.conf
-# Increase file watchers
-fs.inotify.max_user_watches=524288
-
-# Network tuning
-net.core.somaxconn=65535
-net.ipv4.tcp_max_syn_backlog=65535
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Port Already in Use**
-   ```bash
-   # Find process using port
-   sudo lsof -i :8080
-   
-   # Kill process
-   sudo kill -9 <PID>
-   ```
-
-2. **Permission Denied**
-   ```bash
-   # Fix permissions
-   sudo chown -R dagu:dagu /opt/dagu
-   sudo chmod -R 755 /opt/dagu/dags
-   ```
-
-3. **Memory Issues**
-   ```bash
-   # Check memory usage
-   ps aux | grep dagu
-   
-   # Increase limits
-   sudo systemctl edit dagu
-   # Add: MemoryMax=4G
-   ```
-
-### Debug Mode
-
-Enable debug logging:
-
-```yaml
-# config.yaml
-debug: true
-logFormat: json
-```
-
-Or via command line:
-
-```bash
-dagu start-all --debug --log-format=json
-```
+You can use Dagu's built-in metrics endpoint to monitor performance and health. Enable metrics in your configuration: `http://localhost:8080/api/v1/metrics`.

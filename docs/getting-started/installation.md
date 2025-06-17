@@ -10,7 +10,7 @@ The fastest way to get started with Docker:
 docker run \
 --rm \
 -p 8080:8080 \
--v ~/.dagu:/config \
+-v ~/.dagu:/dagu \
 -e DAGU_TZ=`ls -l /etc/localtime | awk -F'/zoneinfo/' '{print $2}'` \
 ghcr.io/dagu-org/dagu:latest dagu start-all
 ```
@@ -18,7 +18,7 @@ ghcr.io/dagu-org/dagu:latest dagu start-all
 **What each parameter does:**
 - `--rm` - Automatically remove container when it exits
 - `-p 8080:8080` - Expose port 8080 for web interface
-- `-v ~/.dagu:/config` - Mount local ~/.dagu directory for persistent data
+- `-v ~/.dagu:/dagu` - Mount local ~/.dagu directory for persistent data
 - `-e DAGU_TZ=...` - Set timezone for scheduler (auto-detects your system timezone)
   - Examples: `America/New_York`, `Europe/London`, `Asia/Tokyo`
   - Find your timezone: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
@@ -90,7 +90,7 @@ docker run --rm -p 8080:8080 ghcr.io/dagu-org/dagu:latest dagu start-all
 docker run -d \
   --name dagu-server \
   -p 8080:8080 \
-  -v ~/.config/dagu:/config \
+  -v ~/.config/dagu:/dagu \
   ghcr.io/dagu-org/dagu:latest \
   dagu start-all
 ```
@@ -115,7 +115,7 @@ services:
       - PGID=1000 # optional. default is 1000
       - DOCKER_GID=999 # optional. default is -1 and it will be ignored
     volumes:
-      - dagu_config:/config
+      - dagu:/dagu
 volumes:
   dagu_config: {}
 ```
@@ -149,12 +149,12 @@ services:
       - DAGU_TZ=Asia/Tokyo
       - DAGU_BASE_PATH=/dagu
     volumes:
-      - dagu_config:/config
+      - dagu:/dagu
       - /var/run/docker.sock:/var/run/docker.sock
     user: "0:0"
     entrypoint: []
 volumes:
-  dagu_config: {}
+  dagu: {}
 ```
 
 ⚠️ **Security Note**: Mounting the Docker socket gives Dagu full access to the Docker daemon. Use with caution in production environments.
@@ -274,218 +274,6 @@ After installation, verify Dagu is working:
 ```bash
 # Check version
 dagu version
-```
-
-## Running as a Service
-
-### systemd (Linux)
-
-Create `/etc/systemd/system/dagu.service`:
-
-```ini
-[Unit]
-Description=Dagu Workflow Engine
-After=network.target
-
-[Service]
-Type=simple
-User=dagu
-Group=dagu
-WorkingDirectory=/opt/dagu
-ExecStart=/usr/local/bin/dagu start-all
-Restart=always
-RestartSec=10
-
-# Security
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/opt/dagu
-
-# Environment
-Environment="DAGU_HOME=/opt/dagu"
-Environment="DAGU_HOST=0.0.0.0"
-Environment="DAGU_PORT=8080"
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Setup and start:
-
-```bash
-# Create user and directories
-sudo useradd -r -s /bin/false -d /opt/dagu dagu
-sudo mkdir -p /opt/dagu/{dags,logs,data,suspend}
-sudo chown -R dagu:dagu /opt/dagu
-
-# Enable and start service
-sudo systemctl daemon-reload
-sudo systemctl enable dagu
-sudo systemctl start dagu
-sudo systemctl status dagu
-```
-
-### launchd (macOS)
-
-Create `~/Library/LaunchAgents/org.dagu.agent.plist`:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" 
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>org.dagu.agent</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/usr/local/bin/dagu</string>
-        <string>start-all</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-    <key>StandardOutPath</key>
-    <string>/usr/local/var/log/dagu.log</string>
-    <key>StandardErrorPath</key>
-    <string>/usr/local/var/log/dagu.error.log</string>
-</dict>
-</plist>
-```
-
-Load the service:
-```bash
-launchctl load ~/Library/LaunchAgents/org.dagu.agent.plist
-```
-
-## Upgrading
-
-### Using Install Script
-
-```bash
-curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
-```
-
-### Using Homebrew
-
-```bash
-brew upgrade dagu-org/brew/dagu
-```
-
-### Manual Upgrade
-
-```bash
-# Backup current version
-sudo cp /usr/local/bin/dagu /usr/local/bin/dagu.backup
-
-# Download and install new version (use script above)
-# Then restart service
-sudo systemctl restart dagu
-```
-
-### Using Docker
-
-```bash
-# Pull latest image
-docker pull ghcr.io/dagu-org/dagu:latest
-
-# Restart container
-docker compose down
-docker compose up -d
-```
-
-## Troubleshooting
-
-### Permission Denied
-
-```bash
-# Fix binary permissions
-chmod +x /usr/local/bin/dagu
-
-# Fix directory permissions
-chown -R $USER:$USER ~/.config/dagu
-chown -R $USER:$USER ~/.local/share/dagu
-```
-
-### Command Not Found
-
-```bash
-# Add to PATH
-echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
-
-# Or create symlink
-sudo ln -s /opt/dagu/bin/dagu /usr/bin/dagu
-```
-
-### Port Already in Use
-
-```bash
-# Find process
-lsof -i :8080
-
-# Change port
-export DAGU_PORT=9000
-dagu start-all
-```
-
-### Docker Issues
-
-#### Volume Permissions
-
-```bash
-# Fix ownership
-docker exec dagu chown -R dagu:dagu /config
-```
-
-#### Container Exits Immediately
-
-```bash
-# Check logs
-docker logs dagu
-
-# Run interactively for debugging
-docker run --rm -it ghcr.io/dagu-org/dagu:latest /bin/sh
-```
-
-## Uninstalling
-
-### Remove Binary
-
-```bash
-sudo rm /usr/local/bin/dagu
-```
-
-### Remove Data (Optional)
-
-```bash
-# Remove configuration
-rm -rf ~/.config/dagu
-
-# Remove logs and data
-rm -rf ~/.local/share/dagu
-```
-
-### Homebrew
-
-```bash
-brew uninstall dagu-org/brew/dagu
-```
-
-### Stop Service
-
-```bash
-# systemd
-sudo systemctl stop dagu
-sudo systemctl disable dagu
-sudo rm /etc/systemd/system/dagu.service
-
-# launchd
-launchctl unload ~/Library/LaunchAgents/org.dagu.agent.plist
-rm ~/Library/LaunchAgents/org.dagu.agent.plist
 ```
 
 ## See Also
