@@ -1,8 +1,0 @@
-# Node modules
-node_modules/
-
-# Cache files
-.vitepress/cache
-
-# Build
-.vitepress/dist
