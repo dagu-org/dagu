@@ -1,0 +1,629 @@
+:root {
+  /* Dagu Brand Colors */
+  --vp-c-brand-1: #10b981; /* Emerald - fresh, positive */
+  --vp-c-brand-2: #059669; /* Darker emerald */
+  --vp-c-brand-3: #047857; /* Deep emerald */
+  --vp-c-brand-soft: rgba(16, 185, 129, 0.14);
+
+  /* Override VitePress default brand colors */
+  --vp-c-brand: var(--vp-c-brand-1);
+  --vp-c-brand-light: #33e4ff;
+  --vp-c-brand-lighter: #66ebff;
+  --vp-c-brand-dark: var(--vp-c-brand-2);
+  --vp-c-brand-darker: var(--vp-c-brand-3);
+
+  /* Accent Colors */
+  --vp-c-accent: #ff6b6b;
+  --vp-c-success: #4ecdc4;
+  --vp-c-warning: #ffd93d;
+
+  /* Typography */
+  --vp-font-family-base: "Inter", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans",
+    sans-serif;
+  --vp-font-family-mono: "JetBrains Mono", ui-monospace, SFMono-Regular,
+    "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
+
+  /* Custom gradient for hero text */
+  --dagu-gradient: linear-gradient(120deg, #2dc6d4 0%, #00a8cc 100%);
+}
+
+.dark {
+  /* Dark mode overrides */
+  --vp-c-bg: #0a0e27;
+  --vp-c-bg-soft: #1e2139;
+  --vp-c-bg-mute: #2d3458;
+  --vp-c-bg-alt: #0a0e27;
+}
+
+/* Hero Section Styling */
+.VPHero .name {
+  background: var(--dagu-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Custom button styles */
+.VPButton.brand {
+  background-color: var(--vp-c-brand-1);
+  color: white;
+}
+
+.VPButton.brand:hover {
+  background-color: var(--vp-c-brand-2);
+}
+
+/* Code block enhancements */
+.vp-code-group .tabs {
+  border-bottom: 1px solid var(--vp-c-divider);
+}
+
+.vp-code-group .tabs label {
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.vp-code-group .tabs label:hover {
+  color: var(--vp-c-brand);
+}
+
+/* Sidebar enhancements */
+.VPSidebar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--vp-c-brand-soft) transparent;
+}
+
+.VPSidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.VPSidebar::-webkit-scrollbar-thumb {
+  background-color: var(--vp-c-brand-soft);
+  border-radius: 3px;
+}
+
+/* Feature cards */
+.feature-card {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.feature-card:hover {
+  border-color: var(--vp-c-brand);
+  box-shadow: 0 4px 12px rgba(0, 217, 255, 0.1);
+}
+
+/* Example cards grid */
+.examples-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.example-card {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  padding: 1rem;
+  transition: all 0.2s ease;
+}
+
+.example-card h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.1rem;
+  color: var(--vp-c-text-1);
+}
+
+.example-card p {
+  margin: 0 0 1rem 0;
+  font-size: 0.875rem;
+  color: var(--vp-c-text-2);
+}
+
+.example-card .code-block {
+  margin-bottom: 1rem;
+}
+
+.example-card .learn-more {
+  color: var(--vp-c-brand);
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.example-card .learn-more:hover {
+  text-decoration: underline;
+}
+
+/* Custom container for workflow visualization */
+.workflow-visualizer {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
+  background-color: var(--vp-c-bg-soft);
+}
+
+/* Interactive terminal styling */
+.interactive-terminal {
+  background-color: #1a1b26;
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
+  font-family: var(--vp-font-family-mono);
+  font-size: 0.875rem;
+}
+
+.terminal-command {
+  color: #7dcfff;
+  margin: 0.5rem 0;
+}
+
+.terminal-command::before {
+  content: "$ ";
+  color: #565f89;
+}
+
+.terminal-output {
+  color: #a9b1d6;
+  margin: 0.5rem 0 0.5rem 1rem;
+}
+
+/* Comparison table styling */
+.comparison-table {
+  overflow-x: auto;
+  margin: 2rem 0;
+}
+
+.comparison-table table {
+  min-width: 600px;
+  border-collapse: collapse;
+}
+
+.comparison-table th {
+  background-color: var(--vp-c-bg-soft);
+  font-weight: 600;
+  text-align: left;
+  padding: 0.75rem;
+  border: 1px solid var(--vp-c-divider);
+}
+
+.comparison-table td {
+  padding: 0.75rem;
+  border: 1px solid var(--vp-c-divider);
+}
+
+.comparison-table .feature-yes {
+  color: var(--vp-c-success);
+  font-weight: 500;
+}
+
+.comparison-table .feature-no {
+  color: var(--vp-c-text-3);
+}
+
+/* Hero section for doc layout index */
+.hero-section {
+  text-align: center;
+  padding: 2rem 0 3rem;
+  border-bottom: 1px solid var(--vp-c-divider);
+  margin-bottom: 3rem;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 1.5rem;
+}
+
+.hero-actions .VPButton {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.25s;
+}
+
+.hero-actions .VPButton.brand {
+  background-color: var(--vp-c-brand-3);
+  color: white;
+}
+
+.hero-actions .VPButton.brand:hover {
+  background-color: var(--vp-c-brand-2);
+}
+
+.hero-actions .VPButton.alt {
+  background-color: var(--vp-c-gray-light-4);
+  color: var(--vp-c-text-1);
+  border: 1px solid var(--vp-c-divider);
+}
+
+.dark .hero-actions .VPButton.alt {
+  background-color: var(--vp-c-gray-dark-3);
+  border-color: var(--vp-c-divider);
+}
+
+.hero-actions .VPButton.alt:hover {
+  background-color: var(--vp-c-gray-light-3);
+  border-color: var(--vp-c-brand);
+}
+
+.dark .hero-actions .VPButton.alt:hover {
+  background-color: var(--vp-c-gray-dark-2);
+  border-color: var(--vp-c-brand);
+}
+
+/* Features grid */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  margin: 2rem 0;
+}
+
+.features-grid h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.1rem;
+  color: var(--vp-c-brand);
+}
+
+.features-grid p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--vp-c-text-2);
+}
+
+/* Next steps cards */
+.next-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  margin: 2rem 0;
+}
+
+.step-card {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.step-card:hover {
+  border-color: var(--vp-c-brand);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 217, 255, 0.1);
+}
+
+.step-card h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.25rem;
+}
+
+.step-card h3 a {
+  color: var(--vp-c-text-1);
+  text-decoration: none;
+}
+
+.step-card h3 a:hover {
+  color: var(--vp-c-brand);
+}
+
+.step-card p {
+  margin: 0;
+  color: var(--vp-c-text-2);
+  font-size: 0.9rem;
+}
+
+/* Community links */
+.community-links {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+  flex-wrap: wrap;
+}
+
+/* Logo section styling */
+.logo-section {
+  text-align: center;
+  margin: 3rem 0 2rem 0;
+  padding: 2rem 0;
+}
+
+.logo-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1rem 1.5rem;
+  background: var(--vp-c-bg-soft);
+  border-radius: 16px;
+  border: 1px solid var(--vp-c-divider);
+  transition: all 0.3s ease;
+}
+
+.logo-container:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
+  border-color: var(--vp-c-brand);
+}
+
+.dark .logo-container:hover {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+.logo-icon {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+}
+
+.logo-text {
+  font-size: 3rem;
+  font-weight: 800;
+  background: linear-gradient(120deg, var(--vp-c-brand-1) 0%, var(--vp-c-brand-2) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  display: inline-block;
+  padding: 0.1em 0;
+}
+
+/* Theme-aware logo switching */
+.logo-light {
+  display: block;
+}
+
+.logo-dark {
+  display: none;
+}
+
+.dark .logo-light {
+  display: none;
+}
+
+.dark .logo-dark {
+  display: block;
+}
+
+.community-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--vp-c-text-1);
+  transition: all 0.2s ease;
+}
+
+.community-link:hover {
+  border-color: var(--vp-c-brand);
+  color: var(--vp-c-brand);
+  transform: translateY(-1px);
+}
+
+.community-link .icon {
+  font-size: 1.25rem;
+}
+
+/* Mermaid diagram styling - force consistent colors for light mode */
+.mermaid text,
+.mermaid .node text,
+.mermaid .edge-label text,
+.mermaid .label text,
+.mermaid .nodeLabel,
+.mermaid .edgeLabel,
+.mermaid .cluster text,
+.mermaid .actor-text,
+.mermaid .messageLine0,
+.mermaid .messageLine1,
+.mermaid .messageText,
+.mermaid .labelText,
+.mermaid .loopText,
+.mermaid .noteText,
+.mermaid .section,
+.mermaid .taskText,
+.mermaid .taskTextOutsideRight,
+.mermaid .taskTextOutsideLeft,
+.mermaid .activeText {
+  fill: #333 !important;
+  color: #333 !important;
+}
+
+/* Force override any inherited text colors - light mode */
+.mermaid * {
+  color: #333 !important;
+}
+
+.mermaid svg text {
+  fill: #333 !important;
+}
+
+/* Dark mode overrides for all Mermaid text */
+.dark .mermaid text,
+.dark .mermaid .node text,
+.dark .mermaid .edge-label text,
+.dark .mermaid .label text,
+.dark .mermaid .nodeLabel,
+.dark .mermaid .edgeLabel,
+.dark .mermaid .cluster text,
+.dark .mermaid .actor-text,
+.dark .mermaid .messageLine0,
+.dark .mermaid .messageLine1,
+.dark .mermaid .messageText,
+.dark .mermaid .labelText,
+.dark .mermaid .loopText,
+.dark .mermaid .noteText,
+.dark .mermaid .section,
+.dark .mermaid .taskText,
+.dark .mermaid .taskTextOutsideRight,
+.dark .mermaid .taskTextOutsideLeft,
+.dark .mermaid .activeText {
+  fill: #e5e7eb !important;
+  color: #e5e7eb !important;
+}
+
+.dark .mermaid * {
+  color: #e5e7eb !important;
+}
+
+.dark .mermaid svg text {
+  fill: #e5e7eb !important;
+}
+
+/* Sequence diagram specific styling - more aggressive targeting */
+.mermaid g.sequenceDiagram text,
+.mermaid g text,
+.mermaid text.actor-text,
+.mermaid text.messageText,
+.mermaid text.labelText,
+.mermaid text.loopText,
+.mermaid text.noteText,
+.mermaid text.sequenceNumber,
+.mermaid .actor-box text,
+.mermaid .actor-line text,
+.mermaid .messageLine0 text,
+.mermaid .messageLine1 text,
+.mermaid .note-box text {
+  fill: #333 !important;
+  color: #333 !important;
+  font-family: var(--vp-font-family-base) !important;
+}
+
+/* Force all SVG text elements to use dark color */
+.mermaid svg g text,
+.mermaid svg text {
+  fill: #333 !important;
+  color: #333 !important;
+}
+
+/* Override any specific sequence diagram classes */
+.mermaid g[class*="actor"] text,
+.mermaid g[class*="message"] text,
+.mermaid g[class*="note"] text,
+.mermaid g[class*="loop"] text {
+  fill: #333 !important;
+  color: #333 !important;
+}
+
+/* Final nuclear option - override everything */
+.mermaid [fill="#333333"],
+.mermaid [fill="#666"],
+.mermaid [fill="#999"],
+.mermaid [fill="#ccc"],
+.mermaid [fill="#eee"],
+.mermaid [fill="currentColor"] {
+  fill: #333 !important;
+}
+
+/* Target any element with specific fill colors */
+.mermaid text[fill]:not([fill="#333"]) {
+  fill: #333 !important;
+}
+
+/* Specific targeting for sequence diagram actor boxes */
+.mermaid .actor.actor-box text,
+.mermaid .actor-box text,
+.mermaid g.actor text,
+.mermaid g.actor-box text {
+  fill: #333 !important;
+  color: #333 !important;
+}
+
+/* Target the specific class you found */
+.mermaid .actor.actor-box,
+.mermaid g[class="actor actor-box"] text,
+.mermaid g[class*="actor-box"] text {
+  fill: #333 !important;
+  color: #333 !important;
+}
+
+/* Override the specific inline styles with high specificity - light mode */
+[id^="mermaid-"] .actor > tspan,
+[id^="mermaid-"] text.actor > tspan,
+.mermaid .actor > tspan,
+.mermaid text.actor > tspan {
+  fill: #333 !important;
+  stroke: none !important;
+}
+
+/* Override any tspan elements in mermaid diagrams - light mode */
+.mermaid tspan,
+[id^="mermaid-"] tspan {
+  fill: #333 !important;
+}
+
+/* Dark mode overrides for readability */
+.dark [id^="mermaid-"] .actor > tspan,
+.dark [id^="mermaid-"] text.actor > tspan,
+.dark .mermaid .actor > tspan,
+.dark .mermaid text.actor > tspan {
+  fill: #e5e7eb !important;
+  stroke: none !important;
+}
+
+.dark .mermaid tspan,
+.dark [id^="mermaid-"] tspan {
+  fill: #e5e7eb !important;
+}
+
+/* Dark mode node backgrounds and borders */
+.dark .mermaid .node rect,
+.dark .mermaid .node circle,
+.dark .mermaid .node ellipse,
+.dark .mermaid .node polygon,
+.dark .mermaid .node path,
+.dark .mermaid .actor-box,
+.dark .mermaid .actor rect,
+.dark .mermaid .note-box,
+.dark .mermaid .note rect {
+  fill: #374151 !important;
+  stroke: #6b7280 !important;
+  stroke-width: 1.6px !important;
+}
+
+/* Dark mode sequence diagram participant boxes */
+.dark .mermaid .participant rect,
+.dark .mermaid .participant-box {
+  fill: #374151 !important;
+  stroke: #6b7280 !important;
+  stroke-width: 1.6px !important;
+}
+
+/* Dark mode flowchart nodes */
+.dark .mermaid .flowchart-node rect,
+.dark .mermaid .flowchart-node circle,
+.dark .mermaid .flowchart-node polygon {
+  fill: #374151 !important;
+  stroke: #6b7280 !important;
+}
+
+/* Dark mode sequence diagram - more aggressive targeting */
+.dark .mermaid rect,
+.dark .mermaid .actor rect,
+.dark .mermaid .participant rect,
+.dark .mermaid g rect,
+.dark [id^="mermaid-"] rect,
+.dark [id^="mermaid-"] .actor rect,
+.dark [id^="mermaid-"] .participant rect {
+  fill: #374151 !important;
+  stroke: #6b7280 !important;
+  stroke-width: 1.6px !important;
+}
+
+/* Dark mode sequence diagram notes */
+.dark .mermaid .note rect,
+.dark [id^="mermaid-"] .note rect {
+  fill: #1f2937 !important;
+  stroke: #6b7280 !important;
+  stroke-width: 1.6px !important;
+}
