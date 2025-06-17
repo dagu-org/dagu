@@ -278,7 +278,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 						default:
 							// finish the node
 							node.SetStatus(NodeStatusError)
-							if node.shouldMarkSuccess(ctx) {
+							if node.ShouldMarkSuccess(ctx) {
 								// mark as success if the node should be marked as success
 								// i.e. continueOn.markSuccess is set to true
 								node.SetStatus(NodeStatusSuccess)
@@ -617,7 +617,7 @@ func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 			continue
 
 		case NodeStatusError:
-			if dep.shouldContinue(ctx) {
+			if dep.ShouldContinue(ctx) {
 				continue
 			}
 			ready = false
@@ -625,7 +625,7 @@ func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 			node.SetError(ErrUpstreamFailed)
 
 		case NodeStatusSkipped:
-			if dep.shouldContinue(ctx) {
+			if dep.ShouldContinue(ctx) {
 				continue
 			}
 			ready = false
@@ -768,7 +768,7 @@ func (sc *Scheduler) isPartialSuccess(ctx context.Context, g *ExecutionGraph) bo
 	// If so, this is an error, not partial success
 	for _, node := range g.nodes {
 		if node.State().Status == NodeStatusError {
-			if !node.shouldContinue(ctx) {
+			if !node.ShouldContinue(ctx) {
 				// Found a failed node that was NOT allowed to continue
 				// This disqualifies the DAG from being partial success
 				return false
@@ -782,7 +782,7 @@ func (sc *Scheduler) isPartialSuccess(ctx context.Context, g *ExecutionGraph) bo
 		case NodeStatusSuccess:
 			hasSuccessfulNodes = true
 		case NodeStatusError:
-			if node.shouldContinue(ctx) && !node.shouldMarkSuccess(ctx) {
+			if node.ShouldContinue(ctx) && !node.ShouldMarkSuccess(ctx) {
 				hasFailuresWithContinueOn = true
 			}
 		case NodeStatusNone, NodeStatusRunning, NodeStatusCancel, NodeStatusSkipped:

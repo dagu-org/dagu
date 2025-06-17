@@ -144,8 +144,8 @@ func (n *Node) StdoutFile() string {
 	return n.outputs.StdoutFile()
 }
 
-func (n *Node) shouldMarkSuccess(ctx context.Context) bool {
-	if !n.shouldContinue(ctx) {
+func (n *Node) ShouldMarkSuccess(ctx context.Context) bool {
+	if !n.ShouldContinue(ctx) {
 		return false
 	}
 	n.mu.RLock()
@@ -153,7 +153,7 @@ func (n *Node) shouldMarkSuccess(ctx context.Context) bool {
 	return n.ContinueOn().MarkSuccess
 }
 
-func (n *Node) shouldContinue(ctx context.Context) bool {
+func (n *Node) ShouldContinue(ctx context.Context) bool {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -325,7 +325,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 
 	// Handle child DAG execution
 	if childDAG := n.Step().ChildDAG; childDAG != nil {
-		childRuns, err := n.buildChildDAGRuns(ctx, childDAG)
+		childRuns, err := n.BuildChildDAGRuns(ctx, childDAG)
 		if err != nil {
 			return nil, err
 		}
@@ -629,8 +629,8 @@ func (n *Node) Init() {
 	n.id = getNextNodeID()
 }
 
-// buildChildDAGRuns constructs the child DAG runs based on parallel configuration
-func (n *Node) buildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG) ([]ChildDAGRun, error) {
+// BuildChildDAGRuns constructs the child DAG runs based on parallel configuration
+func (n *Node) BuildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG) ([]ChildDAGRun, error) {
 	parallel := n.Step().Parallel
 
 	// Single child DAG execution (non-parallel)
@@ -720,7 +720,7 @@ func (n *Node) buildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG
 	}
 
 	for i, item := range items {
-		param, err := n.itemToParam(item)
+		param, err := n.ItemToParam(item)
 		if err != nil {
 			return nil, fmt.Errorf("failed to process item %d: %w", i, err)
 		}
@@ -757,8 +757,8 @@ func (n *Node) buildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG
 	return childRuns, nil
 }
 
-// itemToParam converts a parallel item to a parameter string
-func (n *Node) itemToParam(item any) (string, error) {
+// ItemToParam converts a parallel item to a parameter string
+func (n *Node) ItemToParam(item any) (string, error) {
 	switch v := item.(type) {
 	case string:
 		return v, nil
