@@ -99,6 +99,9 @@ type DAG struct {
 	BuildErrors []error
 	// LocalDAGs contains DAGs defined in the same file, keyed by DAG name
 	LocalDAGs map[string]LocalDAG `json:"localDAGs,omitempty"`
+	
+	// fileName is the full path of the DAG including prefix (not exported)
+	fileName string
 }
 
 // LocalDAG is a wrapper around DAG to represent a local DAG.
@@ -118,11 +121,24 @@ func (d *DAG) QueueName() string {
 }
 
 // FileName returns the filename of the DAG without the extension.
+// For prefixed DAGs, this includes the prefix (e.g., "workflow/task1").
 func (d *DAG) FileName() string {
 	if d.Location == "" {
 		return ""
 	}
+	
+	// If the DAG has a fileName field set, use it directly
+	if d.fileName != "" {
+		return d.fileName
+	}
+	
+	// Otherwise, extract from location (backward compatibility)
 	return fileutil.TrimYAMLFileExtension(filepath.Base(d.Location))
+}
+
+// SetFileName sets the filename for the DAG including prefix.
+func (d *DAG) SetFileName(fileName string) {
+	d.fileName = fileName
 }
 
 // Schedule contains the cron expression and the parsed cron schedule.

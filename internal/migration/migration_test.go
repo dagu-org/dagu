@@ -17,9 +17,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var _ models.DAGStore = (*mockDAGStore)(nil)
+
 // mockDAGStore implements models.DAGStore for testing
 type mockDAGStore struct {
 	dags map[string]*digraph.DAG
+}
+
+// ListWithPrefix implements models.DAGStore.
+// nolint: revive
+func (m *mockDAGStore) ListWithPrefix(_ context.Context, _ string, _ models.ListDAGsOptions) (models.PaginatedResult[*digraph.DAG], []string, []string, error) {
+	panic("unimplemented")
 }
 
 func (m *mockDAGStore) GetDetails(_ context.Context, path string, _ ...digraph.LoadOption) (*digraph.DAG, error) {

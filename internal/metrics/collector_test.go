@@ -15,9 +15,17 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 )
 
+var _ models.DAGStore = (*mockDAGStore)(nil)
+
 // Mock implementations
 type mockDAGStore struct {
 	mock.Mock
+}
+
+// ListWithPrefix implements models.DAGStore.
+// nolint: revive
+func (m *mockDAGStore) ListWithPrefix(_ context.Context, _ string, _ models.ListDAGsOptions) (models.PaginatedResult[*digraph.DAG], []string, []string, error) {
+	panic("unimplemented")
 }
 
 func (m *mockDAGStore) Create(ctx context.Context, fileName string, spec []byte) error {

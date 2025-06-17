@@ -22,6 +22,9 @@ type DAGStore interface {
 	Delete(ctx context.Context, fileName string) error
 	// List returns a paginated list of DAG definitions with filtering options
 	List(ctx context.Context, params ListDAGsOptions) (PaginatedResult[*digraph.DAG], []string, error)
+	// ListWithPrefix returns a paginated list of DAG definitions within a specific prefix/directory
+	// Returns: PaginatedResult, subdirectory prefixes, errors
+	ListWithPrefix(ctx context.Context, prefix string, params ListDAGsOptions) (PaginatedResult[*digraph.DAG], []string, []string, error)
 	// GetMetadata retrieves only the metadata of a DAG definition (faster than full load)
 	GetMetadata(ctx context.Context, fileName string) (*digraph.DAG, error)
 	// GetDetails retrieves the complete DAG definition including all fields
