@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime/debug"
 	"slices"
 	"strconv"
 	"syscall"
@@ -94,7 +95,7 @@ func (m *Manager) GenDAGRunID(_ context.Context) (string, error) {
 
 // StartDAGRun starts a dag-run by executing the configured executable with the start command.
 // It sets up the command to run in its own process group and configures standard output/error.
-func (m *Manager) StartDAGRun(_ context.Context, dag *digraph.DAG, opts StartOptions) error {
+func (m *Manager) StartDAGRun(ctx context.Context, dag *digraph.DAG, opts StartOptions) error {
 	args := []string{"start"}
 	if opts.Params != "" {
 		args = append(args, "-p")
@@ -121,7 +122,13 @@ func (m *Manager) StartDAGRun(_ context.Context, dag *digraph.DAG, opts StartOpt
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	return cmd.Start()
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start dag-run: %w", err)
+	}
+	go execWithRecovery(ctx, func() {
+		_ = cmd.Wait() // Wait for the command to finish in a goroutine to avoid blocking
+	})
+	return nil
 }
 
 // EnqueueDAGRun enqueues a dag-run by executing the configured executable with the enqueue command.
@@ -188,7 +195,7 @@ func (m *Manager) DequeueDAGRun(_ context.Context, dagRun digraph.DAGRunRef) err
 
 // RestartDAG restarts a DAG by executing the configured executable with the restart command.
 // It sets up the command to run in its own process group.
-func (m *Manager) RestartDAG(_ context.Context, dag *digraph.DAG, opts RestartOptions) error {
+func (m *Manager) RestartDAG(ctx context.Context, dag *digraph.DAG, opts RestartOptions) error {
 	args := []string{"restart"}
 	if opts.Quiet {
 		args = append(args, "-q")
@@ -205,11 +212,17 @@ func (m *Manager) RestartDAG(_ context.Context, dag *digraph.DAG, opts RestartOp
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	cmd.Dir = m.workDir
 	cmd.Env = os.Environ()
-	return cmd.Start()
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start restart command: %w", err)
+	}
+	go execWithRecovery(ctx, func() {
+		_ = cmd.Wait() // Wait for the command to finish in a goroutine to avoid blocking
+	})
+	return nil
 }
 
 // RetryDAGRun retries a dag-run by executing the configured executable with the retry command.
-func (m *Manager) RetryDAGRun(_ context.Context, dag *digraph.DAG, dagRunID string) error {
+func (m *Manager) RetryDAGRun(ctx context.Context, dag *digraph.DAG, dagRunID string) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--run-id=%s", dagRunID))
 	if configFile := config.UsedConfigFile.Load(); configFile != nil {
@@ -224,7 +237,13 @@ func (m *Manager) RetryDAGRun(_ context.Context, dag *digraph.DAG, dagRunID stri
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	cmd.Dir = m.workDir
 	cmd.Env = os.Environ()
-	return cmd.Start()
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start retry command: %w", err)
+	}
+	go execWithRecovery(ctx, func() {
+		_ = cmd.Wait() // Wait for the command to finish in a goroutine to avoid blocking
+	})
+	return nil
 }
 
 // IsRunning checks if a dag-run is currently running by querying its status.
@@ -478,4 +497,35 @@ type EnqueueOptions struct {
 // RestartOptions contains options for restarting a dag-run.
 type RestartOptions struct {
 	Quiet bool // Whether to run in quiet mode
+}
+
+// execWithRecovery executes a function with panic recovery and detailed error reporting
+// It captures stack traces and provides structured error information for debugging
+func execWithRecovery(ctx context.Context, fn func()) {
+	defer func() {
+		if panicObj := recover(); panicObj != nil {
+			stack := debug.Stack()
+
+			// Convert panic object to error
+			var err error
+			switch v := panicObj.(type) {
+			case error:
+				err = v
+			case string:
+				err = fmt.Errorf("panic: %s", v)
+			default:
+				err = fmt.Errorf("panic: %v", v)
+			}
+
+			// Log with structured information
+			logger.Error(ctx, "Recovered from panic",
+				"error", err.Error(),
+				"errorType", fmt.Sprintf("%T", panicObj),
+				"stackTrace", stack,
+				"fullStack", string(stack))
+		}
+	}()
+
+	// Execute the function
+	fn()
 }
