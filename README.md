@@ -1,294 +1,282 @@
-<p align="center">
-  <img src="./assets/images/dagu-logo.webp" width="960" alt="dagu-logo">
-</p>
-
-<p align="center">
-  <a href="https://goreportcard.com/report/github.com/dagu-org/dagu">
-    <img src="https://goreportcard.com/badge/github.com/dagu-org/dagu" />
-  </a>
-  <a href="https://codecov.io/gh/dagu-org/dagu">
-    <img src="https://codecov.io/gh/dagu-org/dagu/branch/main/graph/badge.svg?token=CODZQP61J2" />
-  </a>
-  <a href="https://github.com/dagu-org/dagu/releases">
-    <img src="https://img.shields.io/github/release/dagu-org/dagu.svg" />
-  </a>
-  <a href="https://godoc.org/github.com/dagu-org/dagu">
-    <img src="https://godoc.org/github.com/dagu-org/dagu?status.svg" />
-  </a>
-  <img src="https://github.com/dagu-org/dagu/actions/workflows/ci.yaml/badge.svg" />
-  <a href="https://deepwiki.com/dagu-org/dagu"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
-</p>
-
 <div align="center">
-
-[Installation](https://docs.dagu.cloud/getting-started/installation) | [Community](https://discord.gg/gpahPUjGRk) | [Quick Start](https://docs.dagu.cloud/getting-started/quickstart) | [Documentation](https://docs.dagu.cloud)
-
+  <img src="./assets/images/dagu-logo.webp" width="480" alt="Dagu Logo">
+  
+  <h3>Just-in-time orchestration for any workflow</h3>
+  <p>A portable, zero-dependency workflow engine that runs anywhere</p>
+  
+  <p>
+    <a href="https://github.com/dagu-org/dagu/releases"><img src="https://img.shields.io/github/release/dagu-org/dagu.svg?style=flat-square" alt="Latest Release"></a>
+    <a href="https://github.com/dagu-org/dagu/actions/workflows/ci.yaml"><img src="https://img.shields.io/github/actions/workflow/status/dagu-org/dagu/ci.yaml?style=flat-square" alt="Build Status"></a>
+    <a href="https://codecov.io/gh/dagu-org/dagu"><img src="https://img.shields.io/codecov/c/github/dagu-org/dagu?style=flat-square" alt="Code Coverage"></a>
+    <a href="https://goreportcard.com/report/github.com/dagu-org/dagu"><img src="https://goreportcard.com/badge/github.com/dagu-org/dagu?style=flat-square" alt="Go Report Card"></a>
+    <a href="https://github.com/dagu-org/dagu/blob/main/LICENSE.md"><img src="https://img.shields.io/github/license/dagu-org/dagu?style=flat-square" alt="License"></a>
+    <a href="https://discord.gg/gpahPUjGRk"><img src="https://img.shields.io/discord/1115206893105889311?style=flat-square&logo=discord" alt="Discord"></a>
+  </p>
+  
+  <p>
+    <a href="https://docs.dagu.cloud">Docs</a> •
+    <a href="#-quick-start">Quick Start</a> •
+    <a href="#-key-features">Features</a> •
+    <a href="#-installation">Installation</a> •
+    <a href="https://discord.gg/gpahPUjGRk">Community</a>
+  </p>
 </div>
 
-<h1><b>Dagu</b></h1>
+## 🎯 What is Dagu?
 
-## Overview
+**Dagu is a powerful workflow engine that's simple by design.** While others require complex setups, Dagu runs as a single binary with zero dependencies. Define your workflows in straightforward YAML, and Dagu handles the orchestration, scheduling, and monitoring. [Learn the core concepts →](https://docs.dagu.cloud/getting-started/concepts)
 
-Dagu is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.
+### Why teams choose Dagu:
 
-Dagu’s design emphasizes minimal external dependencies: it operates solely as a single binary without requiring an external database. A browser-based graphical interface (UI) is provided for real-time monitoring, rendering the status and logs of workflows. This zero-dependency structure makes the system easy to install and well-suited to various infrastructures, including local or air-gapped systems. This local-first architecture also ensures that sensitive data or proprietary workflows remain secure.
+- **🚀 Zero Dependencies** - Single binary, no database, no message queue. Just works.
+- **🛠 Language Agnostic** - Run any command: Python, Bash, Node.js, or any executable
+- **📦 Portable** - Works on laptops, servers, containers, or air-gapped environments
+- **🎨 Beautiful UI** - Monitor workflows in real-time with an intuitive web interface
+- **⚡ Fast Setup** - From download to running workflows in under 2 minutes
 
-<h2><b>Table of Contents</b></h2>
+## 📢 Latest Release
 
-- [Overview](#overview)
-- [📢 Updates](#-updates)
-- [Announcements](#announcements)
-- [Key Attributes](#key-attributes)
-- [Use Cases](#use-cases)
-- [Installation](#installation)
-  - [Via Bash script](#via-bash-script)
-  - [Via GitHub Releases Page](#via-github-releases-page)
-  - [Via Homebrew (macOS)](#via-homebrew-macos)
-  - [Via Docker](#via-docker)
-  - [Quick Start](#quick-start)
-- [Building from Source](#building-from-source)
-  - [Prerequisites](#prerequisites)
-  - [Steps to Build Locally](#steps-to-build-locally)
-    - [1. Clone the repository](#1-clone-the-repository)
-    - [2. Build the UI](#2-build-the-ui)
-    - [3. Build the Binary](#3-build-the-binary)
-  - [Run Locally from Source](#run-locally-from-source)
-- [Web UI](#web-ui)
-  - [Dashboard](#dashboard)
-  - [DAG Details](#dag-details)
-  - [DAGs](#dags)
-  - [Search](#search)
-  - [Execution History](#execution-history)
-  - [Log Viewer](#log-viewer)
-- [Contributing](#contributing)
-- [Contributors](#contributors)
-- [License](#license)
+**[v1.17.0](https://github.com/dagu-org/dagu/releases/tag/v1.17.0) - June 17, 2025**
 
-## 📢 Updates
+Major improvements including hierarchical DAG execution, enhanced UI, performance optimizations, and partial success status. [See full changelog →](https://docs.dagu.cloud/reference/changelog#v1-17-0)
 
-- **2025-06-17**: [v1.17.0](https://docs.dagu.cloud/reference/changelog#v1-17-0-2025-06-17) - Major UI improvements, hierarchical execution, performance enhancements, and partial success status
-- **2025-01-09**: [v1.16.0](https://docs.dagu.cloud/reference/changelog#v1-16-0-2025-01-09) - Dotenv support, JSON reference expansion, enhanced preconditions, and improved parameter handling
+## 🔑 Key Features
 
-## Announcements
+- **📊 DAG-based Workflows** - Define complex dependencies with simple YAML
+- **⏰ [Advanced Scheduling](https://docs.dagu.cloud/features/scheduling)** - Cron expressions, timezones, multiple schedules
+- **🔄 Smart Execution** - [Retries](https://docs.dagu.cloud/writing-workflows/error-handling), [conditional steps](https://docs.dagu.cloud/writing-workflows/control-flow), [parallel execution](https://docs.dagu.cloud/features/parallel-execution)
+- **📝 Parameters & Variables** - Pass data between steps ([variables](https://docs.dagu.cloud/writing-workflows/data-variables)), configure workflows ([parameters](https://docs.dagu.cloud/writing-workflows/parameters))
+- **🔍 Comprehensive Monitoring** - Real-time logs, execution history, status tracking
 
-**🚀 Version 1.17.0 Released - Significant Improvements & New Features**
+### Advanced Capabilities
+- **🐳 [Docker Integration](https://docs.dagu.cloud/features/executors/docker)** - Run steps in containers with full Docker control
+- **🔒 [Enterprise Security](https://docs.dagu.cloud/features/authentication)** - Authentication, TLS, permissions, API tokens
+- **🛡️ [Robust Error Handling](https://docs.dagu.cloud/writing-workflows/error-handling)** - Retries, lifecycle handlers, cleanup management
+- **🚦 [Flow Control](https://docs.dagu.cloud/writing-workflows/control-flow)** - Preconditions, repeat policies, continue-on conditions
+- **📧 [Email Notifications](https://docs.dagu.cloud/features/email-notifications)** - SMTP integration for workflow alerts
+- **🌐 Multiple Executors** - [SSH](https://docs.dagu.cloud/features/executors/ssh), [HTTP](https://docs.dagu.cloud/features/executors/http), [Mail](https://docs.dagu.cloud/features/executors/mail), [JQ](https://docs.dagu.cloud/features/executors/jq)
 
-We're excited to announce the release of Dagu 1.17.0! After a successful 2-week beta period, this release brings many improvements and new features while maintaining the core stability you rely on.
+## 🚀 Quick Start
 
-**Key Features in 1.17.0:**
-- 🎯 **Improved Performance**: Refactored execution history data for more performant history lookup
-- 🔄 **Hierarchical Execution**: Added capability for nested DAG execution
-- 📄 **Multiple DAGs in Single File**: Define multiple DAGs in one YAML file using `---` separator for better organization and reusability
-- 🚀 **Parallel Execution**: Execute commands or sub-DAGs in parallel with different parameters for batch processing ([#989](https://github.com/dagu-org/dagu/issues/989))
-- 🎨 **Enhanced Web UI**: Overall UI improvements with better user experience
-- 📊 **Advanced History Search**: New execution history page with date-range and status filters ([#933](https://github.com/dagu-org/dagu/issues/933))
-- 🐛 **Better Debugging**: 
-  - Display actual results of precondition evaluations ([#918](https://github.com/dagu-org/dagu/issues/918))
-  - Show output variable values in the UI ([#916](https://github.com/dagu-org/dagu/issues/916))
-  - Separate logs for stdout and stderr by default ([#687](https://github.com/dagu-org/dagu/issues/687))
-- 📋 **Queue Management**: Added enqueue functionality for API and UI ([#938](https://github.com/dagu-org/dagu/issues/938))
-- 🗿 **Partial failed**: Added partial success status ([#1011](https://github.com/dagu-org/dagu/issues/1011))
-- 🏗️ **API v2**: New `/api/v2` endpoints with refactored schema and better abstractions ([OpenAPI spec](./api/v2/api.yaml))
-- 🔧 **Various Enhancements**: Including [#925](https://github.com/dagu-org/dagu/issues/925), [#898](https://github.com/dagu-org/dagu/issues/898), [#895](https://github.com/dagu-org/dagu/issues/895), [#868](https://github.com/dagu-org/dagu/issues/868), [#903](https://github.com/dagu-org/dagu/issues/903), [#911](https://github.com/dagu-org/dagu/issues/911), [#913](https://github.com/dagu-org/dagu/issues/913), [#921](https://github.com/dagu-org/dagu/issues/921), [#923](https://github.com/dagu-org/dagu/issues/923), [#887](https://github.com/dagu-org/dagu/issues/887), [#922](https://github.com/dagu-org/dagu/issues/922), [#932](https://github.com/dagu-org/dagu/issues/932), [#962](https://github.com/dagu-org/dagu/issues/962)
-
-Please see the [full changelog](https://docs.dagu.cloud/reference/changelog) for all details and migration notes.
-
-<h3> ❤️ Huge Thanks to Our Contributors</h3>
-
-This release wouldn’t exist without the community’s time, sweat, and ideas. In particular:
-
-| Contribution | Author |
-|--------------|--------|
-| Optimized Docker image size **and** split into three baseline images | @jerry-yuan |
-| Allow specifying container name & image platform ([#898]) | @vnghia |
-| Enhanced repeat-policy – conditions, expected output, and exit codes | @thefishhat |
-| Implemented queue functionality | @kriyanshii |
-| Implemented partial success status ([#1011]) | @thefishhat |
-| Countless insightful reviews & feedback | @ghansham |
-
-*Thank you all for pushing Dagu forward! 💙*
-
-## Key Attributes
-
-- **Small Footprint**
-Dagu is distributed as a single binary with minimal resource overhead. It does not require additional components such as external databases, message brokers, or other services.
-
-- **Language Agnostic**: Workflows in Dagu are defined by specifying tasks (called “steps”) and their dependencies in YAML. A step can execute any command whether Python, Bash, Node.js, or other executables. This flexibility allows easy integration with existing scripts or tools.
-
-- **Local-First Architecture**: Dagu was designed to run on a single developer workstation or server. By default, all tasks, logs, and scheduling run locally, allowing run offline or in air-gapped environments. This architecture ensures that sensitive data or proprietary workflows remain secure.
-
-- **Declarative Configuration**: The workflow definition is contained in a YAML file. Dependencies, schedules, and execution details are declaratively expressed, making the workflow easy to comprehend and maintain.
-
-- **No Complex Setup**: Unlike other orchestration platforms (e.g., `Airflow`) that often require substantial infrastructure, Dagu can be installed in minutes. Just `dagu start-all` command spins up both the scheduler and web UI, ready to run tasks immediately.
-
-## Use Cases
-
-- Data ingestion pipelines
-- Data processing on small-scale/embedded systems
-- Media file conversion tasks
-- Automated workflows for employee onboarding and offboarding
-- CI/CD automation
-
-## Installation
-
-Dagu can be installed in multiple ways, such as using Homebrew or downloading a single binary from GitHub releases.
-
-### Via Bash script
-
-**Install the latest version:**
-
-```sh
+```bash
+# Install
 curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
+
+# Create a home directory
+mkdir -p ~/.config/dagu/dags
+
+# Create your first workflow
+cat > ~/.config/dagu/dags/hello-world.yaml << 'EOF'
+steps:
+  - name: hello
+    command: echo "Hello from Dagu!"
+    
+  - name: world  
+    command: echo "Running step 2"
+EOF
+
+# Run it
+dagu start hello-world
+
+# Check status
+dagu status hello-world
+
+# Start server
+dagu start-all
 ```
 
-**Install a specific version:**
+Visit `http://localhost:8080` to see your workflow in action!
 
-```sh
-curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash -s -- --version <version>
+## 📦 Installation
+
+### macOS / Linux / WSL
+```bash
+# Latest version
+curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
+
+# Specific version
+curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash -s -- --version v1.17.0
+
+# Install to a specific directory
+curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash -s -- --prefix /path/to/install
 ```
 
-The `<version>` can be a specific version (e.g. `v1.16.10`)
-
-**Install to a custom directory:**
-
-```sh
-curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash -s -- --install-dir <path>
-```
-
-### Via GitHub Releases Page
-
-Download the latest binary from the [Releases page](https://github.com/dagu-org/dagu/releases) and place it in your `$PATH` (e.g. `/usr/local/bin`).
-
-### Via Homebrew (macOS)
-
-```sh
+### Homebrew
+```bash
 brew install dagu-org/brew/dagu
 ```
 
-Upgrade to the latest version:
-
-```sh
-brew upgrade dagu-org/brew/dagu
+### Docker
+```bash
+docker run -d \
+  --name dagu \
+  -p 8080:8080 \
+  -v ~/.dagu:/dagu \
+  ghcr.io/dagu-org/dagu:latest dagu start-all
 ```
 
-### Via Docker
+### Binary
+Download from [releases page](https://github.com/dagu-org/dagu/releases) and place in your PATH.
 
-```sh
-mkdir -p ~/.dagu
-docker run \
---rm \
--p 8080:8080 \
--v ~/.dagu:/dagu \
--e DAGU_TZ=`ls -l /etc/localtime | awk -F'/zoneinfo/' '{print $2}'` \
-ghcr.io/dagu-org/dagu:latest dagu start-all
+## 📚 Documentation
+
+- **[Getting Started Guide](https://docs.dagu.cloud/getting-started/quickstart)** - Step-by-step tutorial
+- **[Core Concepts](https://docs.dagu.cloud/getting-started/concepts)** - Understand Dagu's architecture
+- **[Writing Workflows](https://docs.dagu.cloud/writing-workflows/)** - Complete workflow authoring guide
+- **[CLI Reference](https://docs.dagu.cloud/reference/cli)** - All command-line options
+- **[API Reference](https://docs.dagu.cloud/reference/api)** - REST API documentation
+- **[Configuration Guide](https://docs.dagu.cloud/reference/config)** - Server and workflow configuration
+- **[YAML Specification](https://docs.dagu.cloud/reference/yaml)** - Complete workflow YAML reference
+
+## 🎯 Examples
+
+Find more examples in our [examples documentation](https://docs.dagu.cloud/writing-workflows/examples/).
+
+### Data Pipeline
+```yaml
+name: daily-etl
+schedule: "0 2 * * *"
+steps:
+  - name: extract
+    command: python extract.py
+    output: DATA_FILE
+    
+  - name: validate
+    command: python validate.py ${DATA_FILE}
+    
+  - name: transform
+    command: python transform.py ${DATA_FILE}
+    retryPolicy:
+      limit: 3
+      
+  - name: load
+    command: python load.py ${DATA_FILE}
 ```
 
-Note: The environment variable `DAGU_TZ` is the timezone for the scheduler and server. You can set it to your local timezone (e.g. `America/New_York`).
+### Hierarchical DAGs
 
-See [Environment variables](https://docs.dagu.cloud/getting-started/quickstart) to configure those default directories.
+```yaml
+steps:
+  - name: data-pipeline
+    run: etl
+    params: "ENV=dev REGION=us-west-2"
+    
+  - name: parallel-processing
+    run: batch
+    parallel:
+      items: ["task1", "task2", "task3"]
+      maxConcurrency: 1
+    params: "TASK=${ITEM}"
+---
+name: etl
+params:
+  ENV: dev
+  REGION: us-west-2
+steps:
+  - name: etl
+    command: python etl.py ${ENV} ${REGION}
+---
+name: batch
+params:
+  - TASK: task1
+steps:
+  - name: process
+    command: python process.py ${TASK}
+```
 
-### Quick Start
+### DevOps Automation
 
-See the [Quick Start Guide](#quick-start-guide) to create and execute your first DAG!
+```yaml
+name: deployment
+params:
+  - VERSION: latest
+steps:
+  - name: test
+    command: make test
+    
+  - name: build
+    command: docker build -t app:${VERSION} .
+    
+  - name: deploy
+    command: kubectl set image deployment/app app=app:${VERSION}
+    preconditions:
+      - condition: "`date +%u`"
+        expected: "re:[1-5]"  # Weekdays only
+```
 
-## Building from Source
+## 📸 Web Interface
 
-Dagu can be built and run locally from source.
+[Learn more about the Web UI →](https://docs.dagu.cloud/overview/web-ui)
 
-### Prerequisites
+<div align="center">
+  <img src="docs/public/dashboard.png" width="720" alt="Dashboard">
+  <p><i>Real-time dashboard showing all workflows and their status</i></p>
+</div>
 
-Make sure you have the following installed on your system:
+<div align="center">
+  <img src="docs/public/dag-editor.png" width="720" alt="DAG Editor">
+  <p><i>Visual workflow editor with validation and auto-completion</i></p>
+</div>
 
-- [Go 1.24 or later](https://go.dev/doc/install)
-- [Node.js (Latest LTS or Current)](https://nodejs.org/en/download/)
-- [pnpm](https://pnpm.io/installation)
+<div align="center">
+  <img src="docs/public/dag-logs.png" width="720" alt="Log Viewer">
+  <p><i>Detailed logs with separate stdout/stderr streams</i></p>
+</div>
 
-### Steps to Build Locally
+## 🤝 Contributing
 
-#### 1. Clone the repository
+We welcome contributions! Whether it's bug reports, feature requests, documentation improvements, or code contributions.
 
-- Clone the repository to your local machine using Git.
-  ```sh
-  git clone https://github.com/dagu-org/dagu.git
-  cd dagu
-  ```
+- 💬 [Join our Discord](https://discord.gg/gpahPUjGRk) for discussions
+- 🐛 [Report issues](https://github.com/dagu-org/dagu/issues) on GitHub
+- 📖 [Read our docs](https://docs.dagu.cloud) for detailed information
 
-#### 2. Build the UI
+### Building from Source
 
-- Build the UI assets. This step is necessary to generate frontend files and copy them to the `internal/frontend/assets` directory.
-  ```sh
-  make ui
-  ```
+Prerequisites:
+- Go 1.24+
+- Node.js and pnpm (for web UI)
+- Make
 
-#### 3. Build the Binary
-- Build the binary
-  ```sh
-  make bin
-  ```
-  This produces the `dagu` binary in the `.local/bin` directory.
+```bash
+# Clone repository
+git clone https://github.com/dagu-org/dagu.git && cd dagu
 
-### Run Locally from Source
+# Build everything
+make build
 
-For a quick test of both server, scheduler, and UI:
-```sh
-# Runs "dagu start-all" with the `go run` command
+# Run locally
 make run
 ```
-Once the server is running, visit `http://127.0.0.1:8080` to see the Web UI.
 
-Continue with the [Quick Start Guide](#quick-start-guide) to create and execute your first DAG!
+## 🌟 Contributors
 
-## Web UI
-
-### Dashboard
-
-The Dagu dashboard provides an overview of all workflows (DAGs) and their current status.
-
-![Dashboard](docs/public/dashboard.png)
-
-### DAG Details
-
-Create and edit workflows (DAGs) with auto completion and validation. The DAG editor allows you to define steps, dependencies, and parameters in a user-friendly interface.
-
-![DAG History](docs/public/dag-editor.png)
-
-### DAGs
-
-View all DAGs in one place with live status updates.
-
-![DAGs](docs/public/dag-definitions.png)
-
-### Search
-
-Search across all DAG definitions.
-
-![History](docs/public/search.png)
-
-### Execution History
-
-Review past workflows and logs at a glance.
-
-![History](docs/public/history.png)
-
-### Log Viewer
-
-Examine detailed step-level logs and outputs.
-
-![DAG Log](docs/public/dag-logs.png)
-
-## Contributing
-
-Contributions to Dagu are welcome.
-
-## Contributors
+Thanks to all our amazing contributors!
 
 <a href="https://github.com/dagu-org/dagu/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=dagu-org/dagu" />
 </a>
 
-## License
+### Special Thanks
 
-Dagu is distributed under the [GNU GPLv3](./LICENSE.md).
+The v1.17.0 release was made possible by:
+
+- [@jerry-yuan](https://github.com/jerry-yuan) - Docker optimization
+- [@vnghia](https://github.com/vnghia) - Container enhancements ([#898])
+- [@thefishhat](https://github.com/thefishhat) - Repeat policies & partial success ([#1011])
+- [@kriyanshii](https://github.com/kriyanshii) - Queue functionality
+- [@ghansham](https://github.com/ghansham) - Reviews & feedback
+
+## 📄 License
+
+Dagu is open source under the [GNU GPLv3](./LICENSE.md).
+
+---
+
+<div align="center">
+  <p>⭐ If you find Dagu useful, please star the repository!</p>
+  <p>Built with ❤️ by the Dagu community</p>
+</div>
 
 [#898]: https://github.com/dagu-org/dagu/issues/898
 [#1011]: https://github.com/dagu-org/dagu/issues/1011
