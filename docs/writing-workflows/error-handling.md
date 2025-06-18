@@ -396,7 +396,6 @@ steps:
     command: |
       sleep 2  # 2 second delay
       api-call.sh
-    depends: try-1
     preconditions:
       - condition: "${try-1.exit_code}"
         expected: "re:[1-9][0-9]*"
@@ -407,7 +406,6 @@ steps:
     command: |
       sleep 4  # 4 second delay
       api-call.sh
-    depends: try-2
     preconditions:
       - condition: "${try-2.exit_code}"
         expected: "re:[1-9][0-9]*"
@@ -435,7 +433,6 @@ steps:
       
   - name: main-operation
     command: risky-operation.sh
-    depends: check-circuit
     preconditions:
       - condition: "${check-circuit.exit_code}"
         expected: "0"
@@ -452,7 +449,6 @@ steps:
         # Reset on success
         rm -f "${FAILURE_COUNT_FILE}"
       fi
-    depends: main-operation
 ```
 
 ### Pattern 3: Graceful Degradation
@@ -467,7 +463,6 @@ steps:
       
   - name: try-secondary
     command: connect-secondary-db.sh
-    depends: try-primary
     preconditions:
       - condition: "${try-primary.exit_code}"
         expected: "re:[1-9][0-9]*"
@@ -477,7 +472,6 @@ steps:
       
   - name: use-cache
     command: read-from-cache.sh
-    depends: try-secondary
     preconditions:
       - condition: "${try-secondary.exit_code}"
         expected: "re:[1-9][0-9]*"
@@ -495,13 +489,11 @@ steps:
       
   - name: run-tests
     command: integration-tests.sh
-    depends: create-resources
     continueOn:
       failure: true
       
   - name: rollback-on-failure
     command: terraform destroy -auto-approve
-    depends: run-tests
     preconditions:
       - condition: "${run-tests.exit_code}"
         expected: "re:[1-9][0-9]*"
@@ -517,7 +509,6 @@ steps:
   - name: wait-for-healthy
     command: |
       kubectl wait --for=condition=ready pod -l app=myapp --timeout=300s
-    depends: deploy-service
     retryPolicy:
       limit: 5
       intervalSec: 30
@@ -590,27 +581,23 @@ steps:
     
   - name: validate-data
     command: validate.py ${EXTRACT_RESULT}
-    depends: extract-data
     continueOn:
       exitCode: [2]  # Continue on validation warnings
       markSuccess: true
     
   - name: transform-data
     command: transform.py
-    depends: validate-data
     retryPolicy:
       limit: 2
       intervalSec: 10
     
   - name: load-primary
     command: load-to-primary-db.py
-    depends: transform-data
     continueOn:
       failure: true
     
   - name: load-backup
     command: load-to-backup-db.py
-    depends: transform-data
     preconditions:
       - condition: "${load-primary.exit_code}"
         expected: "re:[1-9][0-9]*"

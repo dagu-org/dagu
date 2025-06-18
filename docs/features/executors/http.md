@@ -190,7 +190,6 @@ steps:
 
   - name: process-user
     command: echo "User email is ${USER_PROFILE.email}"
-    depends: get-user
 ```
 
 ### Timeout Configuration
@@ -290,7 +289,6 @@ steps:
       else
         echo "Failed with status code"
       fi
-    depends: handle-status
 ```
 
 ### Retry on Failure
@@ -338,7 +336,6 @@ steps:
     preconditions:
       - condition: "${PRIMARY_RESULT}"
         expected: ""
-    depends: primary-api
 ```
 
 ### 2. Use Silent Mode for Clean Output
@@ -357,7 +354,6 @@ steps:
 
   - name: parse-json
     command: echo "${JSON_DATA}" | jq '.items | length'
-    depends: get-json
 ```
 
 ### 3. Handle Pagination
@@ -388,7 +384,6 @@ steps:
       if [ $(echo "${PAGE_DATA}" | jq '.has_next') = "true" ]; then
         echo "$((PAGE + 1))" > next_page.txt
       fi
-    depends: fetch-page
 
   - name: fetch-next
     run: self  # Recursive call
@@ -396,7 +391,6 @@ steps:
     preconditions:
       - condition: "`cat next_page.txt 2>/dev/null || echo 0`"
         expected: "!0"
-    depends: process-page
 ```
 
 ## See Also

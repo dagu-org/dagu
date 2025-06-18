@@ -19,12 +19,10 @@ steps:
   - name: transform
     run: workflows/transform.yaml
     params: "INPUT=${extract.output}"
-    depends: extract
     
   - name: load
     run: workflows/load.yaml
     params: "DATA=${transform.output}"
-    depends: transform
 ```
 
 ### Multi-Level Composition
@@ -51,7 +49,6 @@ steps:
       ENV=${ITEM}
       ARTIFACT=${BUILD_ARTIFACT}
       VERSION=${VERSION}
-    depends: build
 ```
 
 ### Sharing Data Between Workflows
@@ -66,7 +63,6 @@ steps:
     
   - name: process
     command: python process.py --input=${PREPARED_DATA.outputs.FILE_PATH}
-    depends: prepare-data
 
 # child-workflow.yaml
 params:
@@ -98,7 +94,6 @@ steps:
     
   - name: execute
     run: ${WORKFLOW_PATH}
-    depends: determine-workflow
 ```
 
 ### Dynamic Step Generation
@@ -116,7 +111,6 @@ steps:
     run: processors/csv-handler
     parallel: ${TASK_LIST}
     params: "FILE=${ITEM}"
-    depends: discover-tasks
 ```
 
 ## Parallel Processing Patterns
@@ -137,14 +131,12 @@ steps:
     parallel: ${CHUNKS}
     params: "CHUNK=${ITEM}"
     output: MAP_RESULTS
-    depends: split-data
     
   - name: reduce-phase
     command: |
       python reduce.py \
         --inputs='${MAP_RESULTS.outputs}' \
         --output=final-result.json
-    depends: map-phase
 ```
 
 ### Fork-Join Pattern
@@ -397,7 +389,6 @@ steps:
     preconditions:
       - condition: "${NEXT_STATE:-${STATE}}"
         expected: "PROCESSING"
-    depends: init-state
     output: NEXT_STATE
     
   - name: validation-state
@@ -405,7 +396,6 @@ steps:
     preconditions:
       - condition: "${NEXT_STATE:-${STATE}}"
         expected: "VALIDATION"
-    depends: processing-state
     output: NEXT_STATE
     
   - name: complete-state
@@ -413,7 +403,6 @@ steps:
     preconditions:
       - condition: "${NEXT_STATE:-${STATE}}"
         expected: "COMPLETE"
-    depends: validation-state
 ```
 
 ### Circuit Breaker
@@ -438,7 +427,6 @@ steps:
   - name: execute-if-closed
     command: |
       ./risky-operation.sh && echo 0 > ${FAILURE_COUNT_FILE}
-    depends: check-circuit
     preconditions:
       - condition: "${CIRCUIT_STATE}"
         expected: "CLOSED"
@@ -449,7 +437,6 @@ steps:
     command: |
       COUNT=$(cat ${FAILURE_COUNT_FILE} 2>/dev/null || echo 0)
       echo $((COUNT + 1)) > ${FAILURE_COUNT_FILE}
-    depends: execute-if-closed
     preconditions:
       - condition: "${execute-if-closed.exitCode}"
         expected: "re:[1-9][0-9]*"  # Non-zero exit code
@@ -475,13 +462,11 @@ steps:
       DURATION=$(($(date +%s) - START))
       echo "step_duration_seconds{workflow=\"${DAG_NAME}\",step=\"process\"} $DURATION" \
         >> /metrics/dagu.prom
-    depends: start-metrics
     
   - name: export-metrics
     command: |
       curl -X POST http://prometheus-pushgateway:9091/metrics/job/dagu \
         --data-binary @/metrics/dagu.prom
-    depends: process-with-metrics
 ```
 
 ### Structured Logging

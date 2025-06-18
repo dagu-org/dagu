@@ -379,12 +379,12 @@ The three processing steps run in parallel after `prepare` completes!
 steps:
   - name: step1
     command: echo "First"
+
   - name: step2
     command: echo "Second"
-    depends: step1
+
   - name: step3
     command: echo "Third"
-    depends: step2
 ```
 
 ### Fan-out/Fan-in

@@ -398,7 +398,6 @@ steps:
     
   - name: process-response
     command: echo "${API_RESPONSE}" | jq '.data[]'
-    depends: api-workflow
 ```
 
 ## Mail Executor
@@ -650,7 +649,6 @@ steps:
     command: |
       echo "Status: ${ANALYSIS.outputs.status}"
       echo "Count: ${ANALYSIS.outputs.record_count}"
-    depends: analyze
 ```
 
 ### Error Handling
@@ -684,7 +682,6 @@ steps:
     executor: dag
     command: ${WORKFLOW_FILE}
     params: "ENV=${ENVIRONMENT}"
-    depends: choose-workflow
 ```
 
 ## See Also

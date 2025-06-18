@@ -238,7 +238,6 @@ steps:
       
   - name: main-process
     command: ./process.sh
-    depends: optional-cleanup
 ```
 
 ### Continue on Specific Exit Codes
@@ -252,7 +251,6 @@ steps:
       
   - name: process
     command: ./process.sh
-    depends: check-optional
 ```
 
 ### Continue on Output Match
@@ -266,7 +264,6 @@ steps:
       
   - name: process
     command: ./process.sh
-    depends: validate
 ```
 
 ### Mark as Success
@@ -325,14 +322,12 @@ steps:
     preconditions:
       - condition: "${ACTION}"
         expected: "re:test|deploy"
-    depends: build
     
   - name: deploy
     command: ./deploy.sh
     preconditions:
       - condition: "${ACTION}"
         expected: "deploy"
-    depends: test
 ```
 
 ### Retry with Backoff
@@ -369,7 +364,6 @@ steps:
     repeatPolicy:
       exitCode: [2]  # Status not ready
       intervalSec: 30
-    depends: start-time
 ```
 
 ## See Also

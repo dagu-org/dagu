@@ -26,7 +26,6 @@ steps:
     
   - name: build
     command: docker build -t myapp:${VERSION} .
-    depends: get-version
 ```
 
 ### How It Works
@@ -83,7 +82,6 @@ steps:
       psql -h ${CONFIG.database.host} \
            -p ${CONFIG.database.port} \
            -U ${CONFIG.database.credentials.username}
-    depends: get-config
 ```
 
 ### Array Access
@@ -102,7 +100,6 @@ steps:
     
   - name: ping-first
     command: ping -c 1 ${SERVERS[0].ip}
-    depends: get-servers
 ```
 
 ## Environment Variables
@@ -208,7 +205,6 @@ steps:
         echo "Error log:"
         cat ${risky.stderr}
       fi
-    depends: risky-operation
 ```
 
 Available properties:
@@ -235,7 +231,6 @@ steps:
       echo "Status: ${ETL_RESULT.status}"
       echo "Records: ${ETL_RESULT.outputs.record_count}"
       echo "Duration: ${ETL_RESULT.outputs.duration}"
-    depends: run-etl
 ```
 
 ### Output Structure
@@ -291,7 +286,6 @@ steps:
       # Access individual results
       echo "US-East revenue: ${RESULTS.outputs[0].revenue}"
       echo "US-West revenue: ${RESULTS.outputs[1].revenue}"
-    depends: process-regions
 ```
 
 ### Parallel Output Structure
@@ -335,7 +329,6 @@ steps:
     
   - name: email-report
     command: mail -s "Report" user@example.com < /tmp/report.txt
-    depends: generate-report
 ```
 
 ### Working with Files
@@ -352,7 +345,6 @@ steps:
       while read file; do
         process.sh "/tmp/data/$file"
       done < /tmp/filelist.txt
-    depends: extract
 ```
 
 ## Special Environment Variables
@@ -457,7 +449,6 @@ steps:
     
   - name: load-config
     command: process --config=${CONFIG_FILE}
-    depends: check-env
 ```
 
 ### Data Validation Pipeline

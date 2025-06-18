@@ -261,7 +261,6 @@ steps:
           Business Intelligence Team
         attachments:
           - ${REPORT_FILE}
-    depends: generate-report
 ```
 
 ### Error Alert with Context
@@ -290,7 +289,6 @@ steps:
   - name: process-critical-data
     command: python critical_process.py
     mailOnError: true
-    depends: validate-input
 
   - name: verify-output
     command: |
@@ -299,7 +297,6 @@ steps:
         exit 1
       fi
     mailOnError: true
-    depends: process-critical-data
 ```
 
 ### Customer Notifications
@@ -343,7 +340,6 @@ steps:
           
           Best regards,
           The Sales Team
-    depends: get-order-details
 ```
 
 ## Advanced Features
@@ -375,7 +371,6 @@ steps:
           Please take action to free up disk space.
     preconditions:
       - condition: "test ${DISK_USAGE} -gt 80"
-    depends: check-threshold
 ```
 
 ### Email with Multiple Attachments
@@ -411,7 +406,6 @@ steps:
           - /tmp/inventory.csv
           - /tmp/metrics.csv
           - /tmp/summary.txt
-    depends: prepare-files
 ```
 
 ### Dynamic Email Content
@@ -457,7 +451,6 @@ steps:
       
       cat /tmp/email_body.txt
     output: EMAIL_BODY
-    depends: gather-metrics
 
   - name: send-summary
     executor:
@@ -467,7 +460,6 @@ steps:
         from: analytics@company.com
         subject: "📈 Daily Summary - Strong Performance"
         message: ${EMAIL_BODY}
-    depends: send-daily-summary
 ```
 
 ## Error Handling
@@ -497,7 +489,6 @@ steps:
     preconditions:
       - condition: "${MAIL_RESULT}"
         expected: ""
-    depends: primary-notification
 ```
 
 ### Retry Email Sending
@@ -546,7 +537,6 @@ steps:
           Please investigate immediately.
     preconditions:
       - condition: "test ${HTTP_STATUS} -ne 200"
-    depends: check-service-health
 ```
 
 ### With CI/CD Pipelines

@@ -71,11 +71,9 @@ steps:
     
   - name: process data
     command: python process.py data.json
-    depends: download data
     
   - name: upload results
     command: aws s3 cp results.csv s3://my-bucket/
-    depends: process data
 ```
 
 Simple to understand, even for non-developers. Fast onboarding for new team members.
@@ -104,7 +102,6 @@ steps:
     params: "SOURCE=prod"
   - name: ml-training
     run: train.yaml
-    depends: data-pipeline
 ```
 
 ### **Built-in Web UI**

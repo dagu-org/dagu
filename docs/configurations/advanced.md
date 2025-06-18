@@ -178,7 +178,6 @@ steps:
     command: |
       cat batch_*.result > final_result.csv
       rm batch_*
-    depends: process-batches
 ```
 
 ## See Also
