@@ -18,6 +18,10 @@ while [ "$#" -gt 0 ]; do
       shift
       INSTALL_DIR="$1"
       ;;
+    --prefix) # For compatibility with some conventions
+      shift
+      INSTALL_DIR="$1"
+      ;;
     *)
       ;;
   esac
