@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.17.0-beta (2025-05-30)
+## v1.17.0 (2025-06-18)
 
 ### Major Features
 
