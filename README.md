@@ -66,20 +66,14 @@ Dagu’s design emphasizes minimal external dependencies: it operates solely as 
 
 ## 📢 Updates
 
-- **2025-05-30**: [v1.17.0-beta](https://docs.dagu.cloud/reference/changelog#v1-17-0-beta-2025-05-30) - Major UI improvements, hierarchical execution, and performance enhancements
-  **Your feedback is valuable!** Please test the beta and share your experience:
-  - 💬 [Join our Discord](https://discord.gg/gpahPUjGRk) for discussions
-  - 🐛 [Report issues on GitHub](https://github.com/dagu-org/dagu/issues)
-
-  To try the beta: `docker run --rm -p 8080:8080 ghcr.io/dagu-org/dagu:latest dagu start-all`
-
+- **2025-06-17**: [v1.17.0](https://docs.dagu.cloud/reference/changelog#v1-17-0-2025-06-17) - Major UI improvements, hierarchical execution, performance enhancements, and partial success status
 - **2025-01-09**: [v1.16.0](https://docs.dagu.cloud/reference/changelog#v1-16-0-2025-01-09) - Dotenv support, JSON reference expansion, enhanced preconditions, and improved parameter handling
 
 ## Announcements
 
-**🚀 Version 1.17.0-beta Available - Significant Improvements & New Features**
+**🚀 Version 1.17.0 Released - Significant Improvements & New Features**
 
-We're excited to announce the beta release of Dagu 1.17.0! This release brings many improvements and new features while maintaining the core stability you rely on.
+We're excited to announce the release of Dagu 1.17.0! After a successful 2-week beta period, this release brings many improvements and new features while maintaining the core stability you rely on.
 
 **Key Features in 1.17.0:**
 - 🎯 **Improved Performance**: Refactored execution history data for more performant history lookup
@@ -109,7 +103,7 @@ This release wouldn’t exist without the community’s time, sweat, and ideas. 
 | Allow specifying container name & image platform ([#898]) | @vnghia |
 | Enhanced repeat-policy – conditions, expected output, and exit codes | @thefishhat |
 | Implemented queue functionality | @kriyanshii |
-| Implemented partial success status | @thefishhat |
+| Implemented partial success status ([#1011]) | @thefishhat |
 | Countless insightful reviews & feedback | @ghansham |
 
 *Thank you all for pushing Dagu forward! 💙*
@@ -295,3 +289,6 @@ Contributions to Dagu are welcome.
 ## License
 
 Dagu is distributed under the [GNU GPLv3](./LICENSE.md).
+
+[#898]: https://github.com/dagu-org/dagu/issues/898
+[#1011]: https://github.com/dagu-org/dagu/issues/1011
