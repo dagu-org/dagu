@@ -56,10 +56,10 @@ Dagu follows a simple philosophy: **do one thing well with minimal dependencies*
 - **Parallel Execution**: Runs multiple workflows in parallel
 
 ### 5. Persistence Layer
-- **FileDAG Store**: Manages DAG definitions
-- **FileDAGRun Store**: Tracks execution history and attempts
-- **FileProc Store**: Process heartbeat tracking
-- **FileQueue Store**: Dual-priority queue system
+- **DAG Store**: Manages DAG definitions
+- **DAG-run Store**: Tracks execution history and attempts
+- **Proc Store**: Process heartbeat tracking
+- **Queue Store**: Dual-priority queue system
 - By default, all state is stored in files under `~/.config/dagu/` and `~/.local/share/dagu/`
 - You can set a custom directory structure using the `DAGU_HOME` environment variable or configuration options
 
@@ -138,7 +138,6 @@ Dagu follows the XDG Base Directory specification for file organization:
 #### 4. Logs vs Data Distinction
 - **`logs/`**: Human-readable logs for debugging and UI display
 - **`data/`**: Machine-readable state for system operation
-- **Duplication**: Some output stored in both locations for different purposes
 
 ### Legacy Mode
 If `~/.dagu` directory exists or `DAGU_HOME` environment variable is set, all files are stored under that single directory instead of following XDG specification:
@@ -163,28 +162,6 @@ If `~/.dagu` directory exists or `DAGU_HOME` environment variable is set, all fi
 5. **Performance**: No network overhead for local operations
 6. **Scalability**: Hierarchical structure handles thousands of executions
 7. **Distributed Workflow Capability**: Can create distributed workflows by mounting shared storage across multiple machines, allowing DAG processes to run on separate nodes while sharing the same file-based state
-
-### File Formats and Naming Conventions
-
-#### DAG Run Timestamps
-- **DAG runs**: `dag-run_YYYYMMDD_HHMMSSZ_{run-id}/`
-- **Attempts**: `attempt_YYYYMMDD_HHMMSS_sssZ_{attempt-id}/` (includes milliseconds)
-- **Timezone**: All timestamps in UTC (Z suffix)
-
-#### Queue Files
-- **High priority**: `item_high_YYYYMMDD_HHMMSS_{sss}Z_{run-id}.json`
-- **Low priority**: `item_low_YYYYMMDD_HHMMSS_{sss}Z_{run-id}.json`
-- **Content**: JSON with DAG run metadata and parameters
-
-#### Status Files
-- **Format**: JSON Lines (`.jsonl`) for append-only status updates
-- **Real-time**: Status changes written immediately
-- **History**: Complete execution timeline preserved
-
-#### DAG Name Sanitization
-- **Safe characters**: Alphanumeric, hyphens, underscores only
-- **Unsafe replacement**: Other characters become underscores
-- **Hash suffix**: 4-character hash added if name modified for uniqueness
 
 ## Process Communication
 
@@ -234,27 +211,10 @@ for _, step := range readySteps {
 }
 ```
 
-## Security Model
-
-### Process Isolation
-- Each workflow runs with the permissions of the Dagu process
-- No privilege escalation
-- Process groups ensure cleanup
-
-### File Permissions
-- DAG files: Read access required
-- Log files: Write access to log directory
-- State files: Write access to data directory
-
-### Network Security
-- Web UI binds to localhost by default
-- TLS support for production deployments
-- Token-based API authentication
-
 ## Performance Characteristics
 
 ### Scalability
-- **Workflows**: Thousands of DAG files
+- **Workflows**: Can be distributed across multiple nodes sharing a common storage
 - **Steps**: Hundreds per workflow
 - **Parallel**: Limited by system resources
 - **History**: Configurable retention

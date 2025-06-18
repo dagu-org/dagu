@@ -154,8 +154,6 @@ steps:
       echo "Exit code: ${extract.exit_code}"
       echo "Stdout path: ${extract.stdout}"
       echo "Stderr path: ${extract.stderr}"
-    depends:
-      - validate
 ```
 
 Available step properties when using ID references:
@@ -209,7 +207,8 @@ Example output format:
 ```yaml
 steps:
   - name: get config
-    command: echo '{"env": "prod", "replicas": 3, "region": "us-east-1"}'
+    command: |
+      echo '{"env": "prod", "replicas": 3, "region": "us-east-1"}'
     output: CONFIG
   
   - name: get secrets
@@ -235,7 +234,6 @@ steps:
   
   - name: process data
     command: python process.py < /tmp/data.json
-    depends: generate data
 ```
 
 ## Global Configuration

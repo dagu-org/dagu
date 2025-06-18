@@ -151,34 +151,6 @@ Available metrics include:
 - **Execution Metrics**: Running DAGs, queued runs, execution totals by status
 - **Performance Metrics**: Success rates, queue lengths
 
-### Prometheus Integration
-
-Configure Prometheus to scrape Dagu metrics:
-
-```yaml
-scrape_configs:
-  - job_name: 'dagu'
-    static_configs:
-      - targets: ['localhost:8080']
-    metrics_path: '/api/v2/metrics'
-    scrape_interval: 15s
-```
-
-### Grafana Dashboards
-
-Create monitoring dashboards with queries like:
-
-```promql
-# DAG execution success rate
-rate(dagu_dag_runs_total{status="success"}[5m]) / rate(dagu_dag_runs_total[5m])
-
-# Current queue length
-dagu_dag_runs_queued_total
-
-# Scheduler uptime percentage
-avg_over_time(dagu_scheduler_running[5m]) * 100
-```
-
 ## Error Handling
 
 All API endpoints return structured error responses:
@@ -246,43 +218,3 @@ Common error codes:
   "timestamp": "2024-02-11T12:00:00Z"
 }
 ```
-
-## Use Cases
-
-### CI/CD Integration
-Use the API to trigger DAGs from CI/CD pipelines:
-
-```bash
-# Trigger deployment DAG with parameters
-curl -X POST http://localhost:8080/api/v2/dags/deploy-app.yaml/start \
-  -H "Content-Type: application/json" \
-  -d '{
-    "params": "{\"version\": \"v1.2.3\", \"environment\": \"production\"}",
-    "dagRunId": "deploy-v1.2.3"
-  }'
-```
-
-### Monitoring Integration
-Integrate with monitoring systems to track workflow health:
-
-```bash
-# Check for failed DAGs
-curl -s http://localhost:8080/api/v2/metrics | grep 'dagu_dag_runs_total{status="error"}'
-```
-
-### Automation Scripts
-Build automation scripts for DAG lifecycle management:
-
-```bash
-#!/bin/bash
-# Create and start new DAG
-curl -X POST http://localhost:8080/api/v2/dags \
-  -H "Content-Type: application/json" \
-  -d '{"name": "automated-dag"}'
-
-curl -X POST http://localhost:8080/api/v2/dags/automated-dag.yaml/start \
-  -H "Content-Type: application/json" \
-  -d '{"params": "{}"}'
-```
-
-The REST API provides a powerful foundation for integrating Dagu into your existing toolchain and building automated workflow management solutions.

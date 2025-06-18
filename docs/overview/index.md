@@ -1,138 +1,74 @@
 # What is Dagu?
 
-Dagu is a powerful, self-contained workflow orchestration engine that runs as a single binary with zero external dependencies—no database required. Despite its lightweight design, Dagu includes robust features such as built-in queuing, logging, execution history, and fully featured web UI for visualization. It’s designed to eliminate the complexity of workflow management without the overhead of traditional orchestration platforms.
+Dagu is a workflow engine that runs as a single binary with zero dependencies. It replaces complex orchestration platforms with a tool that just works—on your laptop, in containers, or on production servers.
 
-## Why Dagu Exists
+## The Problem
 
-Picture this: hundreds of cron jobs scattered across multiple servers, written in various languages, with hidden dependencies that only a few people understand. When something breaks at 3 AM, you're SSHing into servers, hunting through logs, trying to piece together what went wrong.
+You know the pain: hundreds of cron jobs scattered across servers, written in different languages, with hidden dependencies. When something breaks at 3 AM, you're hunting through logs, trying to understand what went wrong.
 
-Sound familiar? That's exactly why Dagu was created.
+Traditional orchestration platforms solve this but introduce new complexity: databases, message queues, language lock-in. You need a team just to manage the infrastructure.
 
-Many organizations still rely on these legacy job scheduling systems. The scripts might be in Perl, Shell, Python, or a mix of everything. Dependencies are implicit—Job B assumes Job A created a certain file, but this isn't documented anywhere. Recovery requires tribal knowledge that disappears when team members leave.
+## The Solution
 
-**Dagu eliminates this complexity** by providing a clear, visual, and understandable way to define workflows and manage dependencies.
-
-## Vision & Mission
-
-Dagu’s vision is to make software operations - including AI-agents - distributed and autonomous. Instead of relying on large, centralized orchestration platforms, Dagu enables scalable and simple operations by allowing multiple software components and AI agents to work together asynchronously, using the file system as a common hub.
-
-Our core principles:
-
-- Free from language lock-in – Use any tool, any language
-- Runs anywhere – From your laptop, or to production servers
-- Minimal overhead – Single binary, no additional infrastructure needed
-- Accessible to all – Clear YAML syntax that anyone can understand
-- Self-contained – Each process operates independently, needing only the file system
-
-We're stripping away unnecessary complexity to make robust workflows accessible to everyone, not just specialized engineers.
-
-## Core Principles
-
-Dagu was born from a simple observation: existing workflow tools either lack features (like cron) or require too much commitment (like Airflow, Prefect, or Temporal forcing you into Python or Go ecosystems).
-
-We built Dagu around six core principles:
-
-### 1. Local First
-Define and execute workflows in a single, self-contained environment—no internet required. Whether you're prototyping on your laptop, running on IoT devices, or deploying to air-gapped on-premise servers, Dagu just works.
-
-### 2. Minimal Configuration
-Start with just:
-- One binary
-- One YAML file
-- That's it!
-
-No external databases. No message queues. Local file storage handles everything—DAG definitions, logs, and metadata. Complex infrastructure shouldn't be a prerequisite for workflow automation.
-
-### 3. Language Agnostic
-Your workflows, your choice:
-```yaml
-steps:
-  - name: python-task
-    command: python analyze.py
-  - name: bash-task  
-    command: ./process.sh
-  - name: docker-task
-    executor:
-      type: docker
-      config:
-        image: node:18
-    command: npm run build
-```
-
-Any runtime works without extra layers of complexity. Use the tools your team already knows.
-
-### 4. Keep it Simple
-Workflows are defined in clear, human-readable YAML:
+Dagu provides powerful workflow orchestration without the overhead:
 
 ```yaml
 steps:
-  - name: download data
-    command: curl https://api.example.com/data.json -o data.json
+  - name: extract
+    command: python extract.py
     
-  - name: process data
-    command: python process.py data.json
+  - name: transform
+    command: ./transform.sh
     
-  - name: upload results
-    command: aws s3 cp results.csv s3://my-bucket/
+  - name: load
+    command: psql -f load.sql
+    retryPolicy:
+      limit: 3
+      intervalSec: 30
 ```
 
-Simple to understand, even for non-developers. Fast onboarding for new team members.
+Clear dependencies. Visual monitoring. One binary. No database.
 
-### 5. Community-Driven
-As an open-source project, Dagu evolves with its users:
-- Contribute new executors
-- Integrate emerging technologies
-- Propose enhancements via GitHub
-- Share workflows and best practices
+## Design Philosophy
 
-Real-world use cases drive development, keeping Dagu practical and aligned with what teams actually need.
+### 1. Single Binary
+Download and run. No installation process, no dependencies, no containers required.
 
-## Key Features
+### 2. Language Agnostic
+Use any command, any language. Your existing scripts work without modification.
 
-### **Zero Dependencies**
-One binary. Works on Linux, macOS, Windows. No database, no message broker, no runtime dependencies.
+### 3. File-Based Storage
+All state in local files. Version control your workflows. Understand exactly what's happening.
 
-### **Hierarchical DAG Composition**
-Build complex workflows from simple, reusable components:
-
-```yaml
-steps:
-  - name: data-pipeline
-    run: etl.yaml
-    params: "SOURCE=prod"
-  - name: ml-training
-    run: train.yaml
-```
-
-### **Built-in Web UI**
-Monitor workflows, view logs, and manage executions through a clean, modern interface. No additional setup required.
-
-### **Production Ready**
-- Robust error handling with configurable retries
-- Comprehensive logging with stdout/stderr separation  
-- Graceful shutdown and cleanup
-- Health checks and metrics for monitoring
-- Signal handling
-- Notifications via email or webhooks
+### 4. Production Ready
+Built-in scheduling, error handling, retries, logging, and monitoring. Everything you need.
 
 ## When to Use Dagu
 
-Dagu is perfect for:
+**Perfect for:**
+- Data pipelines and ETL
+- DevOps automation
+- Scheduled jobs and batch processing
+- Replacing cron with something manageable
+- Local development and testing
 
-- **Data Engineering**: ETL pipelines, data processing, batch jobs
-- **DevOps Automation**: Deployments, backups, system maintenance
-- **Local Development**: Test workflows on your laptop before deploying
-- **Legacy System Modernization**: Replace scattered cron jobs with managed workflows
-- **IoT & Edge Computing**: Run workflows on resource-constrained devices
-- **AI agents**: Orchestrate AI workflows with clear dependencies and execution history
+**Not ideal for:**
+- Sub-second scheduling requirements
+- Real-time stream processing
 
-## When NOT to Use Dagu
+## Quick Comparison
 
-Dagu might not be the best choice for:
+| Feature | Cron | Airflow | Dagu |
+|---------|------|---------|------|
+| Dependencies | ❌ Manual | ✅ Python only | ✅ Any language |
+| Monitoring | ❌ Log files | ✅ Web UI | ✅ Web UI |
+| Setup Time | ✅ Minutes | ❌ Hours/Days | ✅ Minutes |
+| Infrastructure | ✅ None | ❌ Database, Queue | ✅ None |
+| Error Handling | ❌ Manual | ✅ Built-in | ✅ Built-in |
+| Scheduling | ✅ Basic | ✅ Advanced | ✅ Advanced |
 
-- Workflows requiring sub-second scheduling precision
-- Real-time streaming data processing (consider Apache Flink or Spark)
+## Learn More
 
-[Continue to Getting Started →](/getting-started/quickstart)
-
-Or explore [examples](/writing-workflows/examples/) to see what Dagu can do.
+- [Quick Start Guide](/getting-started/quickstart) - Up and running in 2 minutes
+- [Core Concepts](/getting-started/concepts) - Understand how Dagu works
+- [Examples](/writing-workflows/examples/) - Ready-to-use workflow patterns

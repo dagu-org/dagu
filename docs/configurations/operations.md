@@ -1,12 +1,12 @@
 # Operations
 
-Production deployment and monitoring guide for Dagu.
+Production deployment and monitoring.
 
 ## Running as a Service
 
-### systemd (Linux)
+### systemd
 
-1. **Create service file** `/etc/systemd/system/dagu.service`:
+Create `/etc/systemd/system/dagu.service`:
 
 ```ini
 [Unit]
@@ -55,54 +55,33 @@ Environment="DAGU_HOME=/opt/dagu"
 WantedBy=multi-user.target
 ```
 
-2. **Create environment file** `/etc/dagu/environment`:
+Create `/etc/dagu/environment`:
 ```bash
-# Server settings
 DAGU_HOST=0.0.0.0
 DAGU_PORT=8080
-
-# Timezone
 DAGU_TZ=America/New_York
-
-# Logging
 DAGU_LOG_FORMAT=json
-
-# Authentication (optional)
-# DAGU_AUTH_BASIC_USERNAME=admin
-# DAGU_AUTH_BASIC_PASSWORD=secure-password
-# DAGU_AUTH_TOKEN=your-api-token
 ```
 
-3. **Set up directories and permissions**:
+Setup:
 ```bash
 # Create user and directories
 sudo useradd -r -s /bin/false dagu
 sudo mkdir -p /opt/dagu/{dags,data,logs}
 sudo chown -R dagu:dagu /opt/dagu
 
-# Copy DAG files
-sudo cp your-dags/*.yaml /opt/dagu/dags/
-sudo chown -R dagu:dagu /opt/dagu/dags/
-```
-
-4. **Enable and start service**:
-```bash
-# Enable auto-start
+# Enable and start
 sudo systemctl enable dagu
-
-# Start service
 sudo systemctl start dagu
 
 # Check status
 sudo systemctl status dagu
-
-# View logs
 sudo journalctl -u dagu -f
 ```
 
 ### Docker Compose
 
-1. **Create `docker-compose.yml`**:
+`docker-compose.yml`:
 
 ```yaml
 version: '3.8'
@@ -165,166 +144,125 @@ volumes:
   dagu-logs:
 ```
 
-2. **Start the service**:
 ```bash
-# Start in background
+# Start
 docker-compose up -d
 
-# View logs
+# Logs
 docker-compose logs -f
 
-# Stop service
+# Stop
 docker-compose down
 ```
 
-3. **With authentication** (create `.env` file):
+With authentication (`.env` file):
 ```bash
 DAGU_AUTH_BASIC_USERNAME=admin
-DAGU_AUTH_BASIC_PASSWORD=your-secure-password
+DAGU_AUTH_BASIC_PASSWORD=secure-password
 ```
 
 ### Prometheus Metrics
 
-Dagu exposes Prometheus-compatible metrics at `/api/v2/metrics`:
+Metrics available at `/api/v2/metrics`:
 
-**Available Metrics**:
+**System:**
+- `dagu_info` - Build information
+- `dagu_uptime_seconds` - Uptime
+- `dagu_scheduler_running` - Scheduler status
 
-1. **System Metrics**:
-   - `dagu_info` - Build information (version, build date, Go version)
-   - `dagu_uptime_seconds` - Time since server start
-   - `dagu_scheduler_running` - Whether scheduler is running (0 or 1)
+**DAGs:**
+- `dagu_dags_total` - Total DAGs
+- `dagu_dag_runs_currently_running` - Running DAGs
+- `dagu_dag_runs_queued_total` - Queued DAGs
+- `dagu_dag_runs_total` - DAG runs by status (24h)
 
-2. **DAG Metrics**:
-   - `dagu_dags_total` - Total number of DAGs
-
-3. **DAG Run Metrics**:
-   - `dagu_dag_runs_currently_running` - Number of currently running DAG runs
-   - `dagu_dag_runs_queued_total` - Total number of DAG runs in queue
-   - `dagu_dag_runs_total` - Total DAG runs by status (last 24 hours)
-     - Labels: `status` (success, error, partial_success, cancelled, running, queued, none)
-
-4. **Standard Go Metrics**:
-   - Go runtime metrics (memory, GC, goroutines)
-   - Process metrics (CPU, memory, file descriptors)
+**Standard:**
+- Go runtime metrics
+- Process metrics
 
 ### Logging
 
-#### Log Configuration
-
-Dagu uses structured logging with support for text and JSON formats:
-
-**Configuration options**:
 ```yaml
 # config.yaml
-logFormat: json    # Options: text, json
-debug: true       # Enable debug logging with source locations
-logDir: /var/log/dagu  # Custom log directory
+logFormat: json    # text or json
+debug: true       # Debug mode
+logDir: /var/log/dagu
 ```
 
-**Environment variables**:
 ```bash
+# Or via environment
 export DAGU_LOG_FORMAT=json
 export DAGU_DEBUG=true
 export DAGU_LOG_DIR=/var/log/dagu
 ```
 
-#### JSON Log Format
-
-Example JSON log entry:
+JSON log example:
 ```json
 {
   "time": "2024-03-15T12:00:00Z",
   "level": "INFO",
   "msg": "DAG execution started",
   "dag": "data-pipeline",
-  "run_id": "20240315_120000_abc123",
-  "step": "extract-data"
+  "run_id": "20240315_120000_abc123"
 }
 ```
 
-#### Automatic Log Cleanup
+#### Log Cleanup
 
-Dagu automatically removes old execution logs based on the `histRetentionDays` setting:
+Automatic cleanup based on `histRetentionDays`:
 
-**How it works**:
-- Cleanup runs automatically before each DAG execution
-- Removes both execution data and log files older than retention days
-- Default retention: 30 days
-
-**Configuration**:
 ```yaml
-# Per-DAG configuration
-name: my-workflow
-histRetentionDays: 7  # Keep only 7 days of logs
+# Per-DAG
+histRetentionDays: 7  # Keep 7 days
 
-# Or in base.yaml for all DAGs
-histRetentionDays: 14  # Global 14-day retention
+# Or global in base.yaml
+histRetentionDays: 30  # Default
 ```
 
-**Special values**:
-- `0`: Delete all historical data after each run
-- `-1`: Keep logs forever (no cleanup)
-- Default: `30` days
+Special values:
+- `0` - Delete after each run
+- `-1` - Keep forever
 
-**What gets deleted**:
-- Main DAG execution logs
-- Step output files (.out and .err)
+Deletes:
+- Execution logs
+- Step output (.out, .err)
 - Status files (.jsonl)
-- Child DAG logs (for nested workflows)
-- Empty parent directories
-
-::: warning Important
-The cleanup process deletes **both data files and log files**. If you need to preserve logs for compliance, either:
-- Set a longer retention period
-- Use external log aggregation (Filebeat, Promtail)
-- Archive logs before retention expires
-:::
+- Child DAG logs
 
 ### Alerting
 
-#### Email Notifications
-
-Configure SMTP settings in `base.yaml` (applies to all DAGs) or per-DAG:
+#### Email
 
 ```yaml
-# base.yaml - Global email configuration
+# base.yaml
 smtp:
   host: "smtp.gmail.com"
   port: "587"
   username: "notifications@company.com"
-  password: "${SMTP_PASSWORD}"  # Use environment variable
+  password: "${SMTP_PASSWORD}"
 
 errorMail:
   from: "dagu@company.com"
   to: "ops-team@company.com"
-  prefix: "[DAGU ERROR]"
-  attachLogs: true  # Attach step logs to email
+  prefix: "[ERROR]"
+  attachLogs: true
 
-# Enable notifications
 mailOn:
   failure: true
   success: false
 ```
 
-**Per-DAG configuration**:
+Per-step notification:
 ```yaml
-name: critical-workflow
-mailOn:
-  failure: true
-  success: true
 steps:
-  - name: important-task
+  - name: critical-task
     command: ./process.sh
-    mailOnError: true  # Step-specific notification
+    mailOnError: true
 ```
 
-**Email timeout**: 30 seconds (hardcoded)
+#### Webhooks
 
-#### Webhook Notifications
-
-Use HTTP executor in lifecycle handlers:
-
-**Slack notification**:
+**Slack:**
 ```yaml
 handlerOn:
   failure:
@@ -333,22 +271,20 @@ handlerOn:
       config:
         url: "${SLACK_WEBHOOK_URL}"
         method: POST
-        headers:
-          Content-Type: application/json
         body: |
           {
-            "text": "🚨 Workflow Failed",
+            "text": "Workflow Failed: ${DAG_NAME}",
             "blocks": [{
               "type": "section",
               "text": {
                 "type": "mrkdwn",
-                "text": "*Workflow:* ${DAG_NAME}\n*Run ID:* ${DAG_RUN_ID}\n*Time:* `date`"
+                "text": "*Run ID:* ${DAG_RUN_ID}"
               }
             }]
           }
 ```
 
-**PagerDuty integration**:
+**PagerDuty:**
 ```yaml
 handlerOn:
   failure:
@@ -356,21 +292,13 @@ handlerOn:
       type: http
       config:
         url: https://events.pagerduty.com/v2/enqueue
-        method: POST
-        headers:
-          Content-Type: application/json
         body: |
           {
-            "routing_key": "${PAGERDUTY_ROUTING_KEY}",
+            "routing_key": "${PAGERDUTY_KEY}",
             "event_action": "trigger",
             "payload": {
-              "summary": "Dagu workflow failed: ${DAG_NAME}",
-              "severity": "error",
-              "source": "dagu",
-              "custom_details": {
-                "run_id": "${DAG_RUN_ID}",
-                "log_file": "${DAG_RUN_LOG_FILE}"
-              }
+              "summary": "Failed: ${DAG_NAME}",
+              "severity": "error"
             }
           }
 ```

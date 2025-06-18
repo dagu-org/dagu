@@ -54,7 +54,6 @@ steps:
 ### Sharing Data Between Workflows
 
 ```yaml
-# parent.yaml
 steps:
   - name: prepare-data
     run: child-workflow
@@ -64,7 +63,8 @@ steps:
   - name: process
     command: python process.py --input=${PREPARED_DATA.outputs.FILE_PATH}
 
-# child-workflow.yaml
+---
+name: child-workflow
 params:
   - DATASET: ""
 steps:
@@ -73,30 +73,7 @@ steps:
     output: FILE_PATH
 ```
 
-## Dynamic Workflow Generation
-
-### Conditional Sub-workflows
-
-```yaml
-name: adaptive-pipeline
-params:
-  - MODE: "standard"  # standard, fast, thorough
-
-steps:
-  - name: determine-workflow
-    command: |
-      case "${MODE}" in
-        fast) echo "workflows/fast-process.yaml" ;;
-        thorough) echo "workflows/thorough-process.yaml" ;;
-        *) echo "workflows/standard-process.yaml" ;;
-      esac
-    output: WORKFLOW_PATH
-    
-  - name: execute
-    run: ${WORKFLOW_PATH}
-```
-
-### Dynamic Step Generation
+## Dynamic Iteration
 
 ```yaml
 name: dynamic-processor
@@ -109,7 +86,9 @@ steps:
     
   - name: process-dynamic
     run: processors/csv-handler
-    parallel: ${TASK_LIST}
+    parallel: 
+      items: ${TASK_LIST}
+      maxConcurrent: 1
     params: "FILE=${ITEM}"
 ```
 
@@ -128,7 +107,9 @@ steps:
     
   - name: map-phase
     run: mappers/process-chunk
-    parallel: ${CHUNKS}
+    parallel:
+      items: ${CHUNKS}
+      maxConcurrent: 3
     params: "CHUNK=${ITEM}"
     output: MAP_RESULTS
     
@@ -196,7 +177,6 @@ steps:
       python aggregate_regional.py \
         --data='${REGIONAL_DATA.outputs}' \
         --output=global-summary.json
-    depends: scatter-requests
 ```
 
 ## Resource Management
@@ -239,264 +219,6 @@ steps:
     
   - name: light-task
     command: echo "Quick task"
-    queue: light-jobs   # Different queue for light tasks
-```
-
-## Performance Optimization
-
-### Caching Pattern
-
-```yaml
-name: cached-pipeline
-steps:
-  - name: check-cache
-    command: |
-      CACHE_KEY=$(echo "${INPUT_PARAMS}" | sha256sum | cut -d' ' -f1)
-      if [ -f "/cache/${CACHE_KEY}" ]; then
-        echo "CACHE_HIT"
-        cat "/cache/${CACHE_KEY}"
-      else
-        echo "CACHE_MISS"
-      fi
-    output: CACHE_STATUS
-    
-  - name: compute
-    command: |
-      ./expensive-computation.sh > result.json
-      CACHE_KEY=$(echo "${INPUT_PARAMS}" | sha256sum | cut -d' ' -f1)
-      cp result.json "/cache/${CACHE_KEY}"
-      cat result.json
-    depends: check-cache
-    preconditions:
-      - condition: "${CACHE_STATUS}"
-        expected: "CACHE_MISS"
-    output: RESULT
-    
-  - name: use-cached
-    command: echo "${CACHE_STATUS}" | tail -n +2
-    depends: check-cache
-    preconditions:
-      - condition: "${CACHE_STATUS}"
-        expected: "re:CACHE_HIT.*"
-    output: RESULT
-```
-
-### Lazy Evaluation
-
-```yaml
-name: lazy-evaluation
-steps:
-  - name: check-prerequisites
-    command: |
-      # Quick checks before expensive operations
-      test -f required-file.txt && echo "READY" || echo "NOT_READY"
-    output: STATUS
-    
-  - name: expensive-operation
-    command: ./long-running-process.sh
-    depends: check-prerequisites
-    preconditions:
-      - condition: "${STATUS}"
-        expected: "READY"
-```
-
-## State Management
-
-### Checkpointing
-
-```yaml
-name: resumable-pipeline
-params:
-  - CHECKPOINT_DIR: /tmp/checkpoints
-
-steps:
-  - name: stage-1
-    command: |
-      CHECKPOINT="${CHECKPOINT_DIR}/stage-1.done"
-      if [ -f "$CHECKPOINT" ]; then
-        echo "Stage 1 already completed"
-      else
-        ./stage-1-process.sh
-        touch "$CHECKPOINT"
-      fi
-      
-  - name: stage-2
-    command: |
-      CHECKPOINT="${CHECKPOINT_DIR}/stage-2.done"
-      if [ -f "$CHECKPOINT" ]; then
-        echo "Stage 2 already completed"
-      else
-        ./stage-2-process.sh
-        touch "$CHECKPOINT"
-      fi
-    depends: stage-1
-```
-
-### Distributed Locking
-
-```yaml
-name: distributed-job
-steps:
-  - name: acquire-lock
-    command: |
-      LOCK_FILE="/tmp/locks/job.lock"
-      LOCK_ACQUIRED=false
-      
-      for i in {1..60}; do
-        if mkdir "$LOCK_FILE" 2>/dev/null; then
-          LOCK_ACQUIRED=true
-          echo $$ > "$LOCK_FILE/pid"
-          break
-        fi
-        sleep 1
-      done
-      
-      if [ "$LOCK_ACQUIRED" != "true" ]; then
-        echo "Failed to acquire lock"
-        exit 1
-      fi
-    
-  - name: critical-section
-    command: ./exclusive-operation.sh
-    depends: acquire-lock
-    
-  - name: release-lock
-    command: rm -rf "/tmp/locks/job.lock"
-    depends: critical-section
-    continueOn:
-      failure: true  # Always release lock
-```
-
-## Complex Control Flow
-
-### State Machine Pattern
-
-```yaml
-name: state-machine
-params:
-  - STATE: "INIT"
-
-steps:
-  - name: init-state
-    command: echo "Initializing..."
-    preconditions:
-      - condition: "${STATE}"
-        expected: "INIT"
-    output: NEXT_STATE
-    
-  - name: processing-state
-    command: ./process.sh
-    preconditions:
-      - condition: "${NEXT_STATE:-${STATE}}"
-        expected: "PROCESSING"
-    output: NEXT_STATE
-    
-  - name: validation-state
-    command: ./validate.sh
-    preconditions:
-      - condition: "${NEXT_STATE:-${STATE}}"
-        expected: "VALIDATION"
-    output: NEXT_STATE
-    
-  - name: complete-state
-    command: echo "Completed!"
-    preconditions:
-      - condition: "${NEXT_STATE:-${STATE}}"
-        expected: "COMPLETE"
-```
-
-### Circuit Breaker
-
-```yaml
-name: circuit-breaker-pattern
-env:
-  - FAILURE_THRESHOLD: 3
-  - FAILURE_COUNT_FILE: /tmp/failure_count
-
-steps:
-  - name: check-circuit
-    command: |
-      COUNT=$(cat ${FAILURE_COUNT_FILE} 2>/dev/null || echo 0)
-      if [ $COUNT -ge ${FAILURE_THRESHOLD} ]; then
-        echo "OPEN"
-      else
-        echo "CLOSED"
-      fi
-    output: CIRCUIT_STATE
-    
-  - name: execute-if-closed
-    command: |
-      ./risky-operation.sh && echo 0 > ${FAILURE_COUNT_FILE}
-    preconditions:
-      - condition: "${CIRCUIT_STATE}"
-        expected: "CLOSED"
-    continueOn:
-      failure: true
-      
-  - name: increment-failures
-    command: |
-      COUNT=$(cat ${FAILURE_COUNT_FILE} 2>/dev/null || echo 0)
-      echo $((COUNT + 1)) > ${FAILURE_COUNT_FILE}
-    preconditions:
-      - condition: "${execute-if-closed.exitCode}"
-        expected: "re:[1-9][0-9]*"  # Non-zero exit code
-```
-
-## Monitoring and Observability
-
-### Metrics Collection
-
-```yaml
-name: monitored-pipeline
-steps:
-  - name: start-metrics
-    command: |
-      START_TIME=$(date +%s)
-      echo "pipeline_start_time{workflow=\"${DAG_NAME}\"} $START_TIME" \
-        >> /metrics/dagu.prom
-    
-  - name: process-with-metrics
-    command: |
-      START=$(date +%s)
-      ./process.sh
-      DURATION=$(($(date +%s) - START))
-      echo "step_duration_seconds{workflow=\"${DAG_NAME}\",step=\"process\"} $DURATION" \
-        >> /metrics/dagu.prom
-    
-  - name: export-metrics
-    command: |
-      curl -X POST http://prometheus-pushgateway:9091/metrics/job/dagu \
-        --data-binary @/metrics/dagu.prom
-```
-
-### Structured Logging
-
-```yaml
-name: structured-logging
-env:
-  - LOG_FORMAT: json
-
-steps:
-  - name: log-context
-    command: |
-      jq -n \
-        --arg workflow "${DAG_NAME}" \
-        --arg run_id "${DAG_RUN_ID}" \
-        --arg step "process" \
-        --arg level "info" \
-        --arg message "Starting processing" \
-        '{timestamp: now|todate, workflow: $workflow, run_id: $run_id, step: $step, level: $level, message: $message}'
-    
-  - name: process-with-logging
-    command: |
-      ./process.sh 2>&1 | while read line; do
-        jq -n \
-          --arg workflow "${DAG_NAME}" \
-          --arg run_id "${DAG_RUN_ID}" \
-          --arg step "${DAG_RUN_STEP_NAME}" \
-          --arg output "$line" \
-          '{timestamp: now|todate, workflow: $workflow, run_id: $run_id, step: $step, output: $output}'
-      done
 ```
 
 ## See Also

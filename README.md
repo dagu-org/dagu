@@ -77,7 +77,6 @@ steps:
     
   - name: world  
     command: echo "Running step 2"
-    depends: hello
 EOF
 
 # Execute it

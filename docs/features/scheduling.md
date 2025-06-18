@@ -1,151 +1,146 @@
 # Scheduling
 
-To run DAGs automatically, you need to run the `dagu scheduler` process on your system. You can also use a [cron expression generator](https://crontab.cronhub.io/) for your scheduler calculation.
+Automate workflow execution with cron-based scheduling.
 
-## Cron Expression
+## Prerequisites
 
-You can specify the schedule with cron expression in the `schedule` field in the config file as follows:
+Start the scheduler process:
 
-```yaml
-schedule: "5 4 * * *" # Run at 04:05
-steps:
-  - name: scheduled job
-    command: job.sh
+```bash
+dagu scheduler
 ```
 
-Or you can set multiple schedules:
+Or use `dagu start-all` to run both scheduler and web server.
+
+## Basic Scheduling
+
+Schedule workflows with cron expressions:
 
 ```yaml
-schedule:
-  - "30 7 * * *" # Run at 7:30
-  - "0 20 * * *" # Also run at 20:00
+schedule: "0 2 * * *"  # Daily at 2 AM
 steps:
-  - name: scheduled job
-    command: job.sh
+  - name: nightly-job
+    command: ./process.sh
 ```
 
-You can also specify a cron expression to run within a specific timezone. See [list of tz database timezones](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones):
+## Multiple Schedules
 
-```yaml
-schedule: "CRON_TZ=Asia/Tokyo 5 9 * * *" # Run at 09:05 in Tokyo
-steps:
-  - name: scheduled job
-    command: job.sh
-```
-
-## Stop Schedule
-
-If you want to start and stop a long-running process on a fixed schedule, you can define `start` and `stop` times as follows. At the stop time, each step's process receives a stop signal:
+Run at different times:
 
 ```yaml
 schedule:
-  start: "0 8 * * *" # starts at 8:00
-  stop: "0 13 * * *" # stops at 13:00
+  - "0 9 * * MON-FRI"   # Weekdays at 9 AM
+  - "0 14 * * SAT,SUN"  # Weekends at 2 PM
 steps:
-  - name: scheduled job
-    command: job.sh
+  - name: job
+    command: ./job.sh
 ```
 
-You can also set multiple start/stop schedules. In the following example, the process will run from 0:00-5:00 and 12:00-17:00:
+## Timezone Support
+
+Specify timezone with `CRON_TZ`:
+
+```yaml
+schedule: "CRON_TZ=Asia/Tokyo 0 9 * * *"  # 9 AM Tokyo time
+```
+
+See [tz database timezones](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) for valid values.
+
+## Start/Stop Schedules
+
+Control long-running processes:
+
+```yaml
+schedule:
+  start: "0 8 * * *"   # Start at 8 AM
+  stop: "0 18 * * *"   # Stop at 6 PM
+steps:
+  - name: service
+    command: ./service.sh
+```
+
+Multiple start/stop times:
 
 ```yaml
 schedule:
   start:
-    - "0 0 * * *"
-    - "12 0 * * *"
+    - "0 0 * * *"    # Midnight
+    - "0 12 * * *"   # Noon
   stop:
-    - "5 0 * * *"
-    - "17 0 * * *"
-steps:
-  - name: some long-process
-    command: main.sh
+    - "0 6 * * *"    # 6 AM
+    - "0 18 * * *"   # 6 PM
 ```
 
 ## Restart Schedule
 
-If you want to restart a DAG process on a fixed schedule, the `restart` field is also available. At the restart time, the DAG execution will be stopped and restarted again:
+Restart workflows periodically:
 
 ```yaml
 schedule:
-  start: "0 8 * * *"    # starts at 8:00
-  restart: "0 12 * * *" # restarts at 12:00
-  stop: "0 13 * * *"    # stops at 13:00
-steps:
-  - name: scheduled job
-    command: job.sh
+  start: "0 8 * * *"     # Start at 8 AM
+  restart: "0 12 * * *"  # Restart at noon
+  stop: "0 18 * * *"     # Stop at 6 PM
+
+restartWaitSec: 60  # Wait 60s before restart
 ```
 
-The wait time after the job is stopped before restart can be configured in the DAG definition as follows. The default value is `0` (zero):
+## Skip Redundant Runs
+
+Prevent overlapping executions:
 
 ```yaml
-restartWaitSec: 60 # Wait 60s after the process is stopped, then restart the DAG
+schedule: "*/5 * * * *"  # Every 5 minutes
+skipIfSuccessful: true   # Skip if last run succeeded
+
 steps:
-  - name: step1
-    command: python some_app.py
+  - name: quick-check
+    command: ./check.sh
 ```
 
-## Queue Processing
+## Queue Management
 
-The scheduler also manages the DAG execution queue. When a DAG is scheduled or manually enqueued, it's added to a queue system that controls concurrent execution based on configured limits.
-
-**Queue Behavior:**
-
-- DAGs are processed based on their queue assignment and concurrency limits
-- Each DAG can be assigned to a named queue (defaults to the DAG name)
-- Concurrent execution is controlled by `maxActiveRuns` settings
-- The queue system can be disabled globally or per-DAG
-
-**Example with Queue Control:**
+Control concurrent executions:
 
 ```yaml
-name: batch-processor
-schedule: "0 * * * *"   # Run every hour
-queue: "batch"          # Use the "batch" queue
-maxActiveRuns: 2        # Allow max 2 concurrent runs
+maxActiveRuns: 1  # Only one instance at a time
+queue: batch-jobs # Named queue (defaults to DAG name)
+
+schedule: "*/10 * * * *"
 steps:
   - name: process
-    command: process_batch.sh
+    command: ./batch.sh
 ```
 
-If the queue system is disabled (`DAGU_QUEUE_ENABLED=false` or in config), scheduled DAGs will run immediately without queue control.
-
-## Run Scheduler as a Daemon
-
-The easiest way to make sure the process is always running on your system is to create the script below and execute it every minute using cron (you don't need `root` account in this way):
-
-```bash
-#!/bin/bash
-process="dagu scheduler"
-command="/usr/bin/dagu scheduler"
-
-if ps ax | grep -v grep | grep "$process" > /dev/null
-then
-    exit
-else
-    $command &
-fi
-
-exit
-```
-
-## Skip Successful Runs
-
-To prevent redundant executions of scheduled DAGs, you can set `skipIfSuccessful` flag to `true`. When enabled, Dagu will check if the DAG has completed successfully since its last scheduled time. If it has, the current run will be skipped:
+Disable queue processing:
 
 ```yaml
-schedule: "0 */4 * * *"  # Run every 4 hours
-skipIfSuccessful: true    # Skip if already succeeded since last schedule
-steps:
-  - name: resource-intensive-job
-    command: process_data.sh
+disableQueue: true  # Skip queue, run immediately
 ```
 
-This is particularly useful for resource-intensive tasks where unnecessary re-runs should be avoided. Note that this only affects scheduled runs - manual triggers will always execute regardless of this setting.
+## Common Patterns
 
-For example, with the above configuration:
-- If the DAG runs successfully at 04:00
-- And someone triggers it at 05:00
-- The run will be skipped because there's already a successful run since the last schedule
-- The next run will occur at the next scheduled time (08:00)
+### Business Hours Only
+```yaml
+schedule: "*/30 8-17 * * MON-FRI"  # Every 30 min, 8AM-5PM weekdays
+```
 
-The default value is `false`, meaning DAGs will run on every schedule by default.
+### End of Month
+```yaml
+schedule: "0 23 28-31 * *"  # 11 PM on last days of month
+preconditions:
+  - condition: '[ $(date +%d -d tomorrow) -eq 1 ]'
+    expected: "true"
+```
+
+### Maintenance Windows
+```yaml
+schedule:
+  start: "0 2 * * SAT"   # Saturday 2 AM
+  stop: "0 4 * * SAT"    # Saturday 4 AM
+```
+
+## See Also
+
+- [Queues](/features/queues) - Advanced queue management
+- [Error Handling](/writing-workflows/error-handling) - Handle failures in scheduled jobs
+- [Monitoring](/operations/monitoring) - Track scheduled executions

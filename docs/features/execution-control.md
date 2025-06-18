@@ -17,6 +17,15 @@ steps:
         - "file1.csv"
         - "file2.csv"
         - "file3.csv"
+    params: "FILE=${ITEM}"
+
+---
+name: file-processor
+params:
+  - FILE: ""
+steps:
+  - name: process
+    command: python process.py --file ${FILE}
 ```
 
 ### With Concurrency Control
@@ -28,6 +37,7 @@ steps:
     parallel:
       items: ${FILE_LIST}
       maxConcurrent: 2  # Process max 2 files at a time
+    params: "FILE=${ITEM}"
 ```
 
 ### Dynamic Items
@@ -41,21 +51,7 @@ steps:
   - name: process-files
     run: file-processor
     parallel: ${CSV_FILES}
-```
-
-### Using the $ITEM Variable
-
-Access the current item in the parent DAG's params field:
-
-```yaml
-steps:
-  - name: process-files
-    run: file-processor
-    parallel:
-      items: ["/path/file1.csv", "/path/file2.csv"]
-    params:
-      - FILE: ${ITEM}
-      - OUTPUT_DIR: /processed
+    params: "FILE=${ITEM}"
 ```
 
 ### Capturing Output

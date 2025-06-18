@@ -1,9 +1,5 @@
 # Features
 
-Deep dive into all Dagu capabilities.
-
-## Overview
-
 Dagu provides a comprehensive set of features for building and managing workflows. This section covers everything you need to know about each feature in detail.
 
 ## Feature Categories
@@ -82,10 +78,10 @@ Stay informed about workflow status:
 ### Zero Dependencies
 
 Unlike other workflow engines, Dagu requires:
-- ❌ No database
-- ❌ No message broker  
-- ❌ No runtime dependencies
-- ✅ Just a single binary
+- No database
+- No message broker  
+- No runtime dependencies
+- Just a single binary
 
 ### Language Agnostic
 
@@ -95,10 +91,13 @@ Run anything that works on your system:
 steps:
   - name: python
     command: python script.py
+
   - name: node
     command: npm run task
+
   - name: go
     command: go run main.go
+
   - name: bash
     command: ./script.sh
 ```
@@ -110,80 +109,44 @@ Build complex systems from simple parts:
 ```yaml
 steps:
   - name: data-pipeline
-    run: etl.yaml
+    run: etl
     params: "DATE=today"
     
   - name: ml-training
-    run: train.yaml
-    depends: data-pipeline
+    run: train
+    parallel: "image text"
+    params: "MODEL=latest TYPE=${ITEM}"
     
   - name: deployment
-    run: deploy.yaml
-    depends: ml-training
+    run: deploy
+    parallel: "staging production"
+    params: "ENV=${ITEM}"
+
+---
+name: etl
+params:
+  - DATE: today
+steps:
+  - name: etl
+    command: python etl.py
+
+---
+name: train
+params:
+  - MODEL: latest
+  - TYPE: ""
+steps:
+  - name: train
+    command: python train.py --model ${MODEL} --type ${TYPE}
+
+---
+name: deploy
+params:
+  - ENV: ""
+steps:
+  - name: deploy
+    command: kubectl apply -f deployment.yaml --env ${ENV}
 ```
-
-### Production Ready
-
-Built for reliability:
-
-- **Process Management**: Proper signal handling and graceful shutdown
-- **Error Recovery**: Configurable retry policies and failure handlers
-- **Logging**: Comprehensive logs with stdout/stderr separation
-- **Monitoring**: Built-in metrics and health checks
-
-## Common Use Cases
-
-### Data Engineering
-- ETL pipelines with dependency management
-- Parallel data processing
-- Scheduled batch jobs
-- Data quality checks
-
-### DevOps Automation
-- CI/CD pipelines
-- Infrastructure provisioning
-- Backup and restore workflows
-- System maintenance tasks
-
-### Business Process Automation
-- Report generation
-- Data synchronization
-- Customer onboarding
-- Invoice processing
-
-## Performance Characteristics
-
-### Scalability
-- Handle thousands of concurrent workflows
-- Efficient file-based storage
-- Minimal memory footprint
-- Fast startup times
-
-### Limitations
-- Single-machine execution (no distributed mode)
-- 1MB default output limit per step
-- 1000 item limit for parallel execution
-- File system dependent
-
-## Getting Started with Features
-
-1. **Start with the basics**: Learn about [Interfaces](/overview/cli) to interact with Dagu
-2. **Choose your executor**: Pick the right [Executor](/features/executors/shell) for your tasks
-3. **Add scheduling**: Set up [automatic execution](/features/scheduling)
-4. **Handle errors**: Implement proper [retry and error handling](/features/execution-control)
-5. **Scale up**: Use [queues](/features/queues) for complex orchestration
-
-## Feature Comparison
-
-| Feature | Dagu | Airflow | GitHub Actions | Cron |
-|---------|------|---------|----------------|------|
-| Local Development | ✅ | ❌ | ❌ | ✅ |
-| Web UI | ✅ | ✅ | ✅ | ❌ |
-| Dependencies | ✅ | ✅ | ✅ | ❌ |
-| Retries | ✅ | ✅ | ✅ | ❌ |
-| Parallel Execution | ✅ | ✅ | ✅ | ❌ |
-| No External Services | ✅ | ❌ | ❌ | ✅ |
-| Language Agnostic | ✅ | ❌ | ✅ | ✅ |
 
 ## See Also
 

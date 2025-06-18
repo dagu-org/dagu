@@ -1,6 +1,6 @@
 # SSH Executor
 
-Execute commands on remote servers over SSH.
+Execute commands on remote servers via SSH.
 
 ## Basic Usage
 
@@ -22,17 +22,13 @@ steps:
 |-------|----------|---------|-------------|
 | `user` | Yes | - | SSH username |
 | `ip` | Yes | - | Hostname or IP address |
-| `port` | No | "22" | SSH port number (string) |
-| `key` | No | - | Path to SSH private key file |
-| `password` | No | - | Password for authentication |
-
-**Authentication:**
-- **Key-based** (recommended): Provide `key` field
-- **Password-based**: Provide `password` field
+| `port` | No | "22" | SSH port |
+| `key` | No | - | Private key path |
+| `password` | No | - | Password (not recommended) |
 
 ## Examples
 
-### With Custom Port
+### Custom Port
 
 ```yaml
 steps:
@@ -43,179 +39,128 @@ steps:
         user: admin
         ip: example.com
         port: "2222"
-        key: ~/.ssh/private_key
+        key: ~/.ssh/id_rsa
     command: uptime
 ```
 
-### Password Authentication
-
-```yaml
-steps:
-  - name: password-auth
-    executor:
-      type: ssh
-      config:
-        user: deploy
-        ip: server.example.com
-        password: "${SSH_PASSWORD}"
-    command: systemctl status myapp
-```
-
-### Multi-line Script
-
-```yaml
-steps:
-  - name: deploy
-    executor:
-      type: ssh
-      config:
-        user: deploy
-        ip: app-server.example.com
-        key: ~/.ssh/deploy_key
-    command: |
-      cd /opt/application
-      git pull origin main
-      npm install
-      npm run build
-      sudo systemctl restart app-service
-```
-
-### With Variables
+### Multi-Server Deployment
 
 ```yaml
 params:
-  - VERSION: 1.2.3
-  - ENVIRONMENT: production
+  - VERSION: ${VERSION}
 
 steps:
-  - name: deploy-version
+  - name: deploy-web1
     executor:
       type: ssh
       config:
         user: deploy
-        ip: ${ENVIRONMENT}.example.com
+        ip: web1.example.com
         key: ~/.ssh/deploy_key
     command: |
-      echo "Deploying version ${VERSION} to ${ENVIRONMENT}"
       cd /opt/app
-      ./deploy.sh --version ${VERSION} --env ${ENVIRONMENT}
+      git pull
+      ./deploy.sh ${VERSION}
+
+  - name: deploy-web2
+    executor:
+      type: ssh
+      config:
+        user: deploy
+        ip: web2.example.com
+        key: ~/.ssh/deploy_key
+    command: |
+      cd /opt/app
+      git pull
+      ./deploy.sh ${VERSION}
+    depends: deploy-web1
 ```
 
-## Common Patterns
-
-### Health Check
+### Health Check with Retry
 
 ```yaml
 steps:
-  - name: health-check
+  - name: check-service
     executor:
       type: ssh
       config:
         user: monitor
-        ip: web1.example.com
+        ip: app.example.com
         key: ~/.ssh/monitor_key
-    command: |
-      systemctl is-active nginx || exit 1
-      netstat -tlnp | grep :80 || exit 1
+    command: systemctl is-active nginx
     retryPolicy:
       limit: 3
       intervalSec: 30
 ```
 
-### Sequential Deployment
+### Capture Remote Output
 
 ```yaml
 steps:
-  - name: deploy-app1
+  - name: get-version
     executor:
       type: ssh
       config:
-        user: deploy
+        user: admin
+        ip: server.example.com
+        key: ~/.ssh/admin_key
+    command: cat /opt/app/version.txt
+    output: REMOTE_VERSION
+
+  - name: log-version
+    command: echo "Remote version: ${REMOTE_VERSION}"
+```
+
+## Common Patterns
+
+### Database Backup
+
+```yaml
+steps:
+  - name: backup-db
+    executor:
+      type: ssh
+      config:
+        user: backup
+        ip: db.example.com
+        key: ~/.ssh/backup_key
+    command: |
+      BACKUP="/backups/db_$(date +%Y%m%d_%H%M%S).sql.gz"
+      mysqldump mydb | gzip > $BACKUP
+      echo $BACKUP
+    output: BACKUP_FILE
+```
+
+### Rolling Restart
+
+```yaml
+steps:
+  - name: restart-app1
+    executor:
+      type: ssh
+      config:
+        user: admin
         ip: app1.example.com
-        key: ~/.ssh/deploy_key
-    command: ./deploy.sh
+        key: ~/.ssh/admin_key
+    command: |
+      systemctl restart myapp
+      sleep 10
+      systemctl is-active myapp
 
-  - name: deploy-app2
+  - name: restart-app2
     executor:
       type: ssh
       config:
-        user: deploy
+        user: admin
         ip: app2.example.com
-        key: ~/.ssh/deploy_key
-    command: ./deploy.sh
-    depends: deploy-app1
-```
-
-### Backup with Output
-
-```yaml
-steps:
-  - name: create-backup
-    executor:
-      type: ssh
-      config:
-        user: backup
-        ip: db-server.example.com
-        key: ~/.ssh/backup_key
-    command: |
-      BACKUP_FILE="/backups/db_$(date +%Y%m%d_%H%M%S).sql.gz"
-      mysqldump --all-databases | gzip > $BACKUP_FILE
-      echo $BACKUP_FILE
-    output: BACKUP_PATH
-    
-  - name: verify-backup
-    executor:
-      type: ssh
-      config:
-        user: backup
-        ip: db-server.example.com
-        key: ~/.ssh/backup_key
-    command: |
-      if [ ! -s "${BACKUP_PATH}" ]; then
-        echo "Backup failed - file is empty"
-        exit 1
-      fi
-      echo "Backup successful: ${BACKUP_PATH}"
-    depends: create-backup
-```
-
-## Error Handling
-
-### Connection Retry
-
-```yaml
-steps:
-  - name: resilient-ssh
-    executor:
-      type: ssh
-      config:
-        user: admin
-        ip: server.example.com
         key: ~/.ssh/admin_key
-    command: systemctl status myapp
-    retryPolicy:
-      limit: 3
-      intervalSec: 10
-```
-
-### Continue on Failure
-
-```yaml
-steps:
-  - name: optional-cleanup
-    executor:
-      type: ssh
-      config:
-        user: admin
-        ip: server.example.com
-        key: ~/.ssh/admin_key
-    command: /opt/scripts/cleanup.sh
-    continueOn:
-      failure: true
+    command: |
+      systemctl restart myapp
+      sleep 10
+      systemctl is-active myapp
 ```
 
 ## See Also
 
-- [Docker Executor](/features/executors/docker) - Run commands in containers
-- [HTTP Executor](/features/executors/http) - Make API calls
-- [Error Handling](/writing-workflows/error-handling) - Handle failures gracefully
+- [Docker Executor](/features/executors/docker) - Container execution
+- [Shell Executor](/features/executors/shell) - Local commands

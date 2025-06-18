@@ -15,11 +15,9 @@ steps:
     
   - name: extract
     command: unzip data.zip
-    depends: download
     
   - name: process
     command: python process.py
-    depends: extract
 ```
 
 ### Multiple Dependencies
@@ -132,7 +130,7 @@ steps:
 
 ## Repetition
 
-Repeat steps until conditions are met.
+Repeat steps while conditions are met or until a limit is reached.
 
 ### Repeat While Exit Code Matches
 
@@ -141,33 +139,8 @@ steps:
   - name: wait-for-file
     command: test -f /tmp/ready.flag
     repeatPolicy:
-      exitCode: [1]      # Repeat while exit code is 1
+      exitCode: [1]      # Repeat while the exit code is 1
       intervalSec: 10    # Wait 10 seconds between attempts
-```
-
-### Repeat Until Output Matches
-
-```yaml
-steps:
-  - name: wait-for-service
-    command: curl -s http://service/health
-    output: HEALTH_STATUS
-    repeatPolicy:
-      condition: "${HEALTH_STATUS}"
-      expected: "healthy"
-      intervalSec: 30
-```
-
-### Repeat Until Command Succeeds
-
-```yaml
-steps:
-  - name: wait-for-database
-    command: pg_isready -h localhost
-    repeatPolicy:
-      condition: "`echo $?`"  # Exit code of last command
-      expected: "0"
-      intervalSec: 5
 ```
 
 ### Repeat Forever
@@ -192,36 +165,6 @@ steps:
       limit: 10        # Maximum 10 executions
       intervalSec: 30  # Every 30 seconds
 ```
-
-### Complex Repeat Conditions
-
-```yaml
-steps:
-  - name: poll-api
-    command: |
-      curl -s https://api.example.com/job/status | jq -r .status
-    output: JOB_STATUS
-    repeatPolicy:
-      condition: "${JOB_STATUS}"
-      expected: "re:COMPLETED|FAILED"  # Stop on these statuses
-      intervalSec: 30
-```
-
-### Repeat with Limit and Condition
-
-```yaml
-steps:
-  - name: wait-for-ready
-    command: ./check-readiness.sh
-    output: STATUS
-    repeatPolicy:
-      limit: 20              # Maximum 20 attempts
-      condition: "${STATUS}"
-      expected: "ready"      # Stop when status is ready
-      intervalSec: 15        # Check every 15 seconds
-```
-
-The step will stop repeating when either the condition is met or the limit is reached.
 
 ## Continue On Conditions
 
@@ -277,9 +220,9 @@ steps:
       markSuccess: true  # Mark step as successful
 ```
 
-## Workflow-Level Conditions
+## DAG-Level Conditions
 
-### Workflow Preconditions
+### Preconditions
 
 ```yaml
 preconditions:
@@ -295,7 +238,7 @@ steps:
 
 ```yaml
 schedule: "0 * * * *"  # Every hour
-skipIfSuccessful: true  # Skip if already ran successfully today
+skipIfSuccessful: true  # Skip if already ran successfully today (e.g., run manually)
 
 steps:
   - name: hourly-sync
@@ -328,42 +271,6 @@ steps:
     preconditions:
       - condition: "${ACTION}"
         expected: "deploy"
-```
-
-### Retry with Backoff
-
-```yaml
-steps:
-  - name: api-call
-    command: curl https://api.example.com
-    retryPolicy:
-      limit: 5
-      intervalSec: 30
-    repeatPolicy:
-      exitCode: [1]
-      intervalSec: 60  # Additional wait between retries
-```
-
-### Polling with Timeout
-
-```yaml
-steps:
-  - name: start-time
-    command: date +%s
-    output: START_TIME
-    
-  - name: poll-status
-    command: |
-      NOW=$(date +%s)
-      ELAPSED=$((NOW - ${START_TIME}))
-      if [ $ELAPSED -gt 3600 ]; then
-        echo "Timeout after 1 hour"
-        exit 1
-      fi
-      check-status.sh
-    repeatPolicy:
-      exitCode: [2]  # Status not ready
-      intervalSec: 30
 ```
 
 ## See Also

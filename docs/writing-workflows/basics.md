@@ -1,12 +1,14 @@
 # Workflow Basics
 
+Learn the fundamentals of writing Dagu workflows.
+
 ## Your First Workflow
 
-Create a file named `hello.yaml`:
+Create `hello.yaml`:
 
 ```yaml
 steps:
-  - name: say-hello
+  - name: hello
     command: echo "Hello from Dagu!"
 ```
 
@@ -17,169 +19,138 @@ dagu start hello.yaml
 
 ## Workflow Structure
 
-Every workflow consists of:
-- **Metadata**: Name, description, tags
-- **Configuration**: Schedule, timeouts, parameters
-- **Steps**: The actual tasks to execute
-- **Handlers**: Optional lifecycle hooks
+A complete workflow contains:
 
 ```yaml
 # Metadata
-name: my-workflow
-description: "Process daily data"
+name: data-pipeline
+description: Process daily data
 tags: [etl, production]
 
 # Configuration  
-schedule: "0 2 * * *"  # 2 AM daily
+schedule: "0 2 * * *"
 params:
-  - DATE: "`date +%Y-%m-%d`"
+  - DATE: ${DATE:-today}
 
 # Steps
 steps:
   - name: process
-    command: python process.py --date=${DATE}
+    command: python process.py ${DATE}
+
+# Handlers
+handlerOn:
+  failure:
+    command: notify-error.sh
 ```
 
 ## Steps
 
-Steps are the building blocks of workflows.
+The basic unit of execution.
 
-### Basic Command
+### Simple Commands
 
 ```yaml
 steps:
-  - name: simple-command
-    command: echo "Hello World"
+  - name: download
+    command: wget https://example.com/data.csv
 ```
 
 ### Multi-line Scripts
 
-Use the `script` field for complex commands:
-
 ```yaml
 steps:
-  - name: complex-script
+  - name: process
     script: |
       #!/bin/bash
       set -e
       
-      echo "Starting process..."
-      
-      # Download data
-      curl -o data.json https://api.example.com/data
-      
-      # Process data
-      python process.py data.json
-      
-      # Cleanup
-      rm data.json
-      
-      echo "Process complete!"
+      echo "Processing..."
+      python analyze.py data.csv
+      echo "Complete"
 ```
 
 ### Shell Selection
 
-Specify which shell to use:
-
 ```yaml
 steps:
-  - name: bash-script
+  - name: bash-task
     shell: bash
     command: echo $BASH_VERSION
     
-  - name: python-inline
+  - name: python-task
     shell: python3
     script: |
-      import sys
-      print(f"Python {sys.version}")
-      
-  - name: custom-shell
-    shell: /usr/local/bin/zsh
-    command: echo $ZSH_VERSION
+      import pandas as pd
+      df = pd.read_csv('data.csv')
+      print(df.head())
 ```
 
-## Sequential Execution
+## Dependencies
 
-By default, steps run one after another:
+Steps run sequentially by default. Use `depends` for parallel execution or to control order.
 
 ```yaml
 steps:
-  - name: first
-    command: echo "Step 1"
+  - name: download
+    command: wget data.csv
     
-  - name: second
-    command: echo "Step 2"
-    depends: first
+  - name: process
+    command: python process.py
     
-  - name: third
-    command: echo "Step 3"
-    depends: second
+  - name: upload
+    command: aws s3 cp output.csv s3://bucket/
 ```
 
-## Parallel Execution
-
-Steps without dependencies run in parallel:
+### Parallel Execution
 
 ```yaml
 steps:
-  - name: download-a
-    command: wget https://example.com/file-a.zip
+  - name: setup
+    command: echo "Setup"
     
-  - name: download-b
-    command: wget https://example.com/file-b.zip
+  - name: task1
+    command: echo "Task 1"
+    depends: setup
     
-  - name: download-c
-    command: wget https://example.com/file-c.zip
+  - name: task2
+    command: echo "Task 2"
+    depends: setup
     
-  - name: process-all
-    command: ./process.sh
-    depends:
-      - download-a
-      - download-b
-      - download-c
+  - name: finish
+    command: echo "All tasks complete"
+    depends: [task1, task2]
 ```
 
 ## Working Directory
 
-Set working directory per step:
+Set where commands execute:
 
 ```yaml
 steps:
-  - name: in-project-dir
+  - name: in-project
     dir: /home/user/project
-    command: ./build.sh
+    command: python main.py
     
-  - name: in-temp-dir
-    dir: /tmp
-    command: echo "Working in $(pwd)"
+  - name: in-data
+    dir: /data/input
+    command: ls -la
 ```
 
 ## Environment Variables
 
-### Workflow-level Environment
+### Global Environment
 
 ```yaml
 env:
-  - API_KEY: ${SECRET_API_KEY}
-  - LOG_LEVEL: debug
+  - API_KEY: secret123
+  - ENV: production
 
 steps:
   - name: use-env
-    command: echo "API Key length: ${#API_KEY}"
+    command: echo "Running in $ENV"
 ```
 
-### Step-level Environment
-
-```yaml
-steps:
-  - name: custom-env
-    env:
-      - NODE_ENV: production
-      - PORT: 3000
-    command: node server.js
-```
-
-### Loading from .env Files
+### Load from .env Files
 
 ```yaml
 dotenv:
@@ -188,142 +159,89 @@ dotenv:
 
 steps:
   - name: use-dotenv
-    command: echo "Loaded from .env: $MY_VAR"
-```
-
-## Parameters
-
-Pass parameters to workflows:
-
-```yaml
-params:
-  - NAME: World
-  - GREETING: Hello
-
-steps:
-  - name: greet
-    command: echo "${GREETING}, ${NAME}!"
-```
-
-Run with custom parameters:
-```bash
-dagu start hello.yaml -- NAME=Dagu GREETING=Hi
+    command: echo $DATABASE_URL
 ```
 
 ## Capturing Output
 
-Save command output for later use:
+Store command output in variables:
 
 ```yaml
 steps:
-  - name: get-date
-    command: date +%Y-%m-%d
-    output: TODAY
+  - name: get-version
+    command: git rev-parse --short HEAD
+    output: VERSION
     
-  - name: use-date
-    command: echo "Today is ${TODAY}"
-    depends: get-date
+  - name: build
+    command: docker build -t app:${VERSION} .
 ```
 
-## File Output
+## Basic Error Handling
 
-Redirect output to files:
-
-```yaml
-steps:
-  - name: save-logs
-    command: ./generate-report.sh
-    stdout: /logs/report.out
-    stderr: /logs/report.err
-```
-
-## Running Sub-workflows
-
-Execute other DAG files:
+### Continue on Failure
 
 ```yaml
 steps:
-  - name: run-etl
-    run: etl.yaml
-    params: "DATE=${DATE} SOURCE=production"
-    
-  - name: run-analytics
-    run: analytics.yaml
-    depends: run-etl
-```
-
-## Workflow Metadata
-
-Add metadata for organization:
-
-```yaml
-name: data-pipeline
-description: "Daily data processing pipeline"
-tags:
-  - production
-  - etl
-  - critical
-group: "Data Team"
-
-steps:
-  - name: process
-    command: ./process.sh
-```
-
-## Common Patterns
-
-### Setup and Teardown
-
-```yaml
-steps:
-  - name: setup
-    command: ./setup.sh
-    
-  - name: main-process
-    command: ./process.sh
-    depends: setup
-    
-  - name: cleanup
-    command: ./cleanup.sh
-    depends: main-process
+  - name: optional-step
+    command: maybe-fails.sh
     continueOn:
-      failure: true  # Always run cleanup
+      failure: true
+      
+  - name: always-runs
+    command: cleanup.sh
 ```
 
-### Conditional Processing
-
-```yaml
-params:
-  - ENVIRONMENT: dev
-
-steps:
-  - name: validate
-    command: ./validate.sh
-    
-  - name: deploy
-    command: ./deploy.sh
-    depends: validate
-    preconditions:
-      - condition: "${ENVIRONMENT}"
-        expected: "production"
-```
-
-### Batch Processing
+### Simple Retry
 
 ```yaml
 steps:
-  - name: get-files
-    command: ls /data/*.csv
-    output: FILES
-    
-  - name: process-files
-    run: process-single-file
-    parallel: ${FILES}
-    depends: get-files
+  - name: flaky-api
+    command: curl https://unstable-api.com
+    retryPolicy:
+      limit: 3
+```
+
+## Timeouts
+
+Prevent steps from running forever:
+
+```yaml
+steps:
+  - name: long-task
+    command: ./process.sh
+    timeoutSec: 300  # 5 minutes
+```
+
+## Step Descriptions
+
+Document your steps:
+
+```yaml
+steps:
+  - name: etl-process
+    description: |
+      Extract data from API, transform to CSV,
+      and load into data warehouse
+    command: python etl.py
+```
+
+## Tags and Organization
+
+Group related workflows:
+
+```yaml
+name: customer-report
+tags: 
+  - reports
+  - customer
+  - daily
+
+group: Analytics  # UI grouping
 ```
 
 ## See Also
 
-- [Control Flow](/writing-workflows/control-flow) - Dependencies and conditions
-- [Data & Variables](/writing-workflows/data-variables) - Working with data
-- [Error Handling](/writing-workflows/error-handling) - Handle failures
+- [Control Flow](/writing-workflows/control-flow) - Conditionals and loops
+- [Data & Variables](/writing-workflows/data-variables) - Pass data between steps
+- [Error Handling](/writing-workflows/error-handling) - Advanced error recovery
+- [Parameters](/writing-workflows/parameters) - Make workflows configurable
