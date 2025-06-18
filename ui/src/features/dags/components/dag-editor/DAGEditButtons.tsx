@@ -53,9 +53,9 @@ function DAGEditButtons({ fileName }: Props) {
               path: {
                 fileName: fileName,
               },
-            },
-            query: {
-              remoteNode: appBarContext.selectedRemoteNode || 'local',
+              query: {
+                remoteNode: appBarContext.selectedRemoteNode || 'local',
+              },
             },
             body: {
               newFileName: newFileName,
