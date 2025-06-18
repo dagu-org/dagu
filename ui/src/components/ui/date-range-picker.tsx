@@ -99,8 +99,6 @@ function CustomDateTimeInput({
     // Format: YYYY-MM-DD HH:mm:ss
     // Positions: 0-4 (year), 5-7 (month), 8-10 (day), 11-13 (hour), 14-16 (minute), 17-19 (second)
 
-    console.log('Cursor position:', pos);
-
     if (pos <= 4) {
       date.setFullYear(date.getFullYear() + increment);
     } else if (pos <= 7) {

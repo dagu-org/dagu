@@ -33,6 +33,7 @@ type Store struct {
 	latestStatusToday bool                                  // Whether to only return today's status
 	cache             *fileutil.Cache[*models.DAGRunStatus] // Optional cache for read operations
 	maxWorkers        int                                   // Maximum number of parallel workers
+	location          *time.Location                        // Timezone location for date calculations
 }
 
 // DAGRunStoreOption defines functional options for configuring local.
@@ -44,6 +45,7 @@ type DAGRunStoreOptions struct {
 	LatestStatusToday bool                                  // Whether to only return today's status
 	MaxWorkers        int                                   // Maximum number of parallel workers
 	OperationTimeout  time.Duration                         // Timeout for operations
+	Location          *time.Location                        // Timezone location for date calculations
 }
 
 // WithHistoryFileCache sets the file cache for local.
@@ -60,11 +62,19 @@ func WithLatestStatusToday(latestStatusToday bool) DAGRunStoreOption {
 	}
 }
 
+// WithLocation sets the timezone location for date calculations.
+func WithLocation(location *time.Location) DAGRunStoreOption {
+	return func(o *DAGRunStoreOptions) {
+		o.Location = location
+	}
+}
+
 // New creates a new JSONDB instance with the specified options.
 func New(baseDir string, opts ...DAGRunStoreOption) models.DAGRunStore {
 	options := &DAGRunStoreOptions{
 		LatestStatusToday: true,
 		MaxWorkers:        runtime.NumCPU(),
+		Location:          time.Local, // Default to local timezone
 	}
 
 	for _, opt := range opts {
@@ -76,6 +86,7 @@ func New(baseDir string, opts ...DAGRunStoreOption) models.DAGRunStore {
 		latestStatusToday: options.LatestStatusToday,
 		cache:             options.FileCache,
 		maxWorkers:        options.MaxWorkers,
+		location:          options.Location,
 	}
 }
 
@@ -374,7 +385,9 @@ func (store *Store) LatestAttempt(ctx context.Context, dagName string) (models.D
 	root := NewDataRoot(store.baseDir, dagName)
 
 	if store.latestStatusToday {
-		startOfDay := time.Now().Truncate(24 * time.Hour)
+		// Use the configured timezone to calculate "today"
+		now := time.Now().In(store.location)
+		startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, store.location)
 		startOfDayInUTC := models.NewUTC(startOfDay)
 
 		// Get the latest execution data after the start of the day.

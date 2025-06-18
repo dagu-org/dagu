@@ -8,7 +8,7 @@
     <title>Dagu</title>
     <script>
       // Apply theme immediately to prevent flash
-      (function() {
+      (function () {
         try {
           const saved = localStorage.getItem('user_preferences');
           const preferences = saved ? JSON.parse(saved) : { theme: 'dark' };
@@ -20,7 +20,7 @@
           document.documentElement.classList.add('dark');
         }
       })();
-      
+
       function getConfig() {
         return {
           apiURL: 'http://localhost:8080/api/v2',
@@ -31,7 +31,7 @@
           tz: '',
           tzOffsetInSec: undefined,
           maxDashboardPageLimit: '',
-          remoteNodes: 'local,dev1',
+          remoteNodes: 'local,dev,dev1',
           permissions: {
             writeDags: true,
             runDags: true,

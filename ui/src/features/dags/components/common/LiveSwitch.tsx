@@ -8,6 +8,7 @@ import React from 'react';
 import { components } from '../../../../api/v2/schema';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useClient } from '../../../../hooks/api';
+import { AppBarContext } from '@/contexts/AppBarContext';
 
 /**
  * Props for the LiveSwitch component
@@ -33,6 +34,9 @@ function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
   // Initialize state based on DAG suspension state
   const [checked, setChecked] = React.useState(!dag.suspended);
 
+  const appBarContext = React.useContext(AppBarContext);
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+
   /**
    * Submit the suspension state change to the API
    */
@@ -42,6 +46,9 @@ function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
         params: {
           path: {
             fileName: dag.fileName,
+          },
+          query: {
+            remoteNode,
           },
         },
         body: {
@@ -56,7 +63,7 @@ function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
         refresh();
       }
     },
-    [client, dag.fileName, refresh]
+    [client, dag.fileName, refresh, remoteNode] // Include remoteNode in dependencies
   );
 
   /**
@@ -76,7 +83,9 @@ function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
   return (
     <Switch
       checked={checked}
-      onCheckedChange={config.permissions.runDags ? handleCheckedChange : undefined}
+      onCheckedChange={
+        config.permissions.runDags ? handleCheckedChange : undefined
+      }
       disabled={!config.permissions.runDags}
       aria-label={ariaLabel} // Pass aria-label directly
       // Add custom styling for better visibility in both states

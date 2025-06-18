@@ -2,6 +2,7 @@ package filequeue
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -287,6 +288,7 @@ func TestQueueReaderRetryDelayPerQueue(t *testing.T) {
 
 	// Track processing by queue
 	queueProcessing := make(map[string][]time.Time)
+	var mu sync.Mutex
 
 	// Process items
 	go func() {
@@ -294,7 +296,9 @@ func TestQueueReaderRetryDelayPerQueue(t *testing.T) {
 			select {
 			case item := <-ch:
 				queueName := item.Data().Name
+				mu.Lock()
 				queueProcessing[queueName] = append(queueProcessing[queueName], time.Now())
+				mu.Unlock()
 
 				// Always return retry to test delay behavior
 				item.Result <- models.QueuedItemProcessingResultRetry
@@ -311,6 +315,8 @@ func TestQueueReaderRetryDelayPerQueue(t *testing.T) {
 	reader.Stop(ctx)
 
 	// Verify that both queues were processed
+	mu.Lock()
+	defer mu.Unlock()
 	require.Contains(t, queueProcessing, queue1, "expected queue-1 to be processed")
 	require.Contains(t, queueProcessing, queue2, "expected queue-2 to be processed")
 
