@@ -108,6 +108,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	// Initialize history repository and history manager
 	hrOpts := []filedagrun.DAGRunStoreOption{
 		filedagrun.WithLatestStatusToday(cfg.Server.LatestStatusToday),
+		filedagrun.WithLocation(cfg.Global.Location),
 	}
 
 	switch cmd.Name() {
