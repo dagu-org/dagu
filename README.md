@@ -1,7 +1,7 @@
 <div align="center">
   <img src="./assets/images/dagu-logo.webp" width="480" alt="Dagu Logo">
   
-  <h3>A portable workflow engine that runs anywhere</h3>
+  <h3>A portable, local-first, and language-agnostic workflow engine that runs anywhere</h3>
   
   <p>
     <a href="https://github.com/dagu-org/dagu/releases"><img src="https://img.shields.io/github/release/dagu-org/dagu.svg?style=flat-square" alt="Latest Release"></a>
@@ -32,8 +32,8 @@ After managing hundreds of cron jobs across multiple servers, I built Dagu to br
 
 1. **Single binary** - No databases, no message brokers. Deploy anywhere in seconds.
 2. **Language agnostic** - Execute Python, Bash, Node.js, or any command. Your existing scripts just work.
-3. **Filesystem-based** - All state in local files. Version control your workflows, back them up, understand exactly what's happening.
-4. **Hierarchical DAGs** - Compose workflows from smaller workflows. Build once, reuse everywhere.
+3. **Local First** - Define and execute workflows in a single, self-contained environment-no internet required. Whether you're prototyping on your laptop, running on IoT devices, or deploying to air-gapped on-premises servers, Dagu just works.
+5. **Hierarchical DAGs** - Compose workflows from smaller workflows.
 
 ## Latest Release
 

@@ -11,7 +11,7 @@ layout: doc
 </div>
 
 <div class="tagline">
-  <h1>A self-contained, portable, and powerful alternative to Airflow, Cron, etc.</h1>
+  <h1>A portable, local-first, and language-agnostic workflow engine that runs anywhere</h1>
   <p>Zero dependencies. Language agnostic. Production ready.</p>
 </div>
 
