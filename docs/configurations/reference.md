@@ -72,7 +72,7 @@ queues:
 # Remote Nodes Configuration
 remoteNodes:
   - name: "staging"                                # Display name for the remote node
-    apiBaseURL: "https://staging.example.com/api/v1"  # API endpoint (must end with /api/v1)
+    apiBaseURL: "https://staging.example.com/api/v2"  # API endpoint (must end with /api/v2)
     isBasicAuth: true                              # Use basic authentication
     basicAuthUsername: "admin"                     # Basic auth username
     basicAuthPassword: "password"                  # Basic auth password
@@ -362,18 +362,18 @@ queues:
 # Configuration with remote nodes
 remoteNodes:
   - name: development
-    apiBaseURL: http://dev.internal:8080/api/v1
+    apiBaseURL: http://dev.internal:8080/api/v2
     isBasicAuth: true
     basicAuthUsername: dev
     basicAuthPassword: ${DEV_PASSWORD}
     
   - name: staging
-    apiBaseURL: https://staging.company.com/api/v1
+    apiBaseURL: https://staging.company.com/api/v2
     isAuthToken: true
     authToken: ${STAGING_TOKEN}
     
   - name: production
-    apiBaseURL: https://prod.company.com/api/v1
+    apiBaseURL: https://prod.company.com/api/v2
     isAuthToken: true
     authToken: ${PROD_TOKEN}
 ```

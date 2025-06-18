@@ -24,7 +24,7 @@ export DAGU_PASSWORD=secure-password-123
 dagu status my-dag.yaml
 
 # Or use curl
-curl -u admin:secure-password-123 http://localhost:8080/api/v1/dags
+curl -u admin:secure-password-123 http://localhost:8080/api/v2/dags
 ```
 
 ## Token Authentication
@@ -48,11 +48,11 @@ dagu status my-dag.yaml
 
 # HTTP header
 curl -H "Authorization: Bearer your-secret-api-token-here" \
-     http://localhost:8080/api/v1/dags
+     http://localhost:8080/api/v2/dags
 
 # Or use X-API-Token header
 curl -H "X-API-Token: your-secret-api-token-here" \
-     http://localhost:8080/api/v1/dags
+     http://localhost:8080/api/v2/dags
 ```
 
 ## Multiple Authentication Methods
@@ -154,13 +154,13 @@ Configure authentication for remote nodes:
 ```yaml
 remoteNodes:
   - name: production
-    apiBaseURL: https://prod.example.com/api/v1
+    apiBaseURL: https://prod.example.com/api/v2
     isBasicAuth: true
     basicAuthUsername: admin
     basicAuthPassword: prod-password
     
   - name: staging
-    apiBaseURL: https://staging.example.com/api/v1
+    apiBaseURL: https://staging.example.com/api/v2
     isAuthToken: true
     authToken: staging-api-token
     skipTLSVerify: true  # For self-signed certs

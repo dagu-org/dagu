@@ -92,7 +92,7 @@ services:
     volumes:
       - dagu:/dagu
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/status"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v2/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -121,7 +121,7 @@ services:
       - DAGU_PORT=8080
       - DAGU_CONFIG=/dagu/config.yaml
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/status"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v2/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -149,7 +149,7 @@ services:
     user: "0:0"
     entrypoint: []
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/status"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v2/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -204,7 +204,7 @@ spec:
             cpu: "1000m"
         livenessProbe:
           httpGet:
-            path: /api/v1/status
+            path: /api/v2/health
             port: 8080
           initialDelaySeconds: 30
           periodSeconds: 30
@@ -237,14 +237,14 @@ spec:
 # Kubernetes readiness probe
 readinessProbe:
   httpGet:
-    path: /api/v1/status
+    path: /api/v2/health
     port: 8080
   initialDelaySeconds: 10
   periodSeconds: 5
 
 # Docker healthcheck
 healthcheck:
-  test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/v1/status"]
+  test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/v2/health"]
   interval: 30s
   timeout: 10s
   retries: 3
@@ -252,4 +252,4 @@ healthcheck:
 
 ### Prometheus Metrics
 
-You can use Dagu's built-in metrics endpoint to monitor performance and health. Enable metrics in your configuration: `http://localhost:8080/api/v1/metrics`.
+You can use Dagu's built-in metrics endpoint to monitor performance and health. Enable metrics in your configuration: `http://localhost:8080/api/v2/metrics`.

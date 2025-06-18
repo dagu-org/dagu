@@ -89,12 +89,12 @@ queues:
 # Remote Nodes
 remoteNodes:
   - name: "staging"
-    apiBaseURL: "https://staging.example.com/api/v1"
+    apiBaseURL: "https://staging.example.com/api/v2"
     isBasicAuth: true
     basicAuthUsername: "admin"
     basicAuthPassword: "password"
   - name: "production"
-    apiBaseURL: "https://prod.example.com/api/v1"
+    apiBaseURL: "https://prod.example.com/api/v2"
     isAuthToken: true
     authToken: "prod-token"
     skipTLSVerify: false
@@ -233,7 +233,7 @@ Use the token in API requests:
 
 ```bash
 curl -H "Authorization: Bearer your-secret-token" \
-  http://localhost:8080/api/v1/dags
+  http://localhost:8080/api/v2/dags
 ```
 
 
@@ -307,13 +307,13 @@ Connect to other Dagu instances:
 ```yaml
 remoteNodes:
   - name: "production"
-    apiBaseURL: "https://prod.example.com/api/v1"
+    apiBaseURL: "https://prod.example.com/api/v2"
     isBasicAuth: true
     basicAuthUsername: "admin"
     basicAuthPassword: "${PROD_PASSWORD}"
     
   - name: "staging"
-    apiBaseURL: "https://staging.example.com/api/v1"
+    apiBaseURL: "https://staging.example.com/api/v2"
     isAuthToken: true
     authToken: "${STAGING_TOKEN}"
     skipTLSVerify: false  # For self-signed certificates

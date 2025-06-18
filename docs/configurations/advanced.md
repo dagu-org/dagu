@@ -12,25 +12,25 @@ Configure Dagu to manage multiple environments from a single UI:
 # ~/.config/dagu/config.yaml
 remoteNodes:
   - name: "development"
-    apiBaseURL: "http://dev.internal:8080/api/v1"
+    apiBaseURL: "http://dev.internal:8080/api/v2"
     isBasicAuth: true
     basicAuthUsername: "dev_user"
     basicAuthPassword: "${DEV_PASSWORD}"
     
   - name: "staging"
-    apiBaseURL: "https://staging.company.com/api/v1"
+    apiBaseURL: "https://staging.company.com/api/v2"
     isAuthToken: true
     authToken: "${STAGING_TOKEN}"
     skipTLSVerify: false
     
   - name: "production"
-    apiBaseURL: "https://prod.company.com/api/v1"
+    apiBaseURL: "https://prod.company.com/api/v2"
     isAuthToken: true
     authToken: "${PROD_TOKEN}"
     skipTLSVerify: false
     
   - name: "disaster-recovery"
-    apiBaseURL: "https://dr.company.com/api/v1"
+    apiBaseURL: "https://dr.company.com/api/v2"
     isAuthToken: true
     authToken: "${DR_TOKEN}"
     skipTLSVerify: false
@@ -44,7 +44,7 @@ Set up secure remote node access with mTLS:
 # Remote node with client certificates
 remoteNodes:
   - name: "secure-prod"
-    apiBaseURL: "https://secure.company.com/api/v1"
+    apiBaseURL: "https://secure.company.com/api/v2"
     tlsConfig:
       certFile: "/etc/dagu/certs/client.crt"
       keyFile: "/etc/dagu/certs/client.key"
@@ -67,7 +67,7 @@ func discoverNodes() []RemoteNode {
     for _, service := range services {
         nodes = append(nodes, RemoteNode{
             Name: service.Name,
-            APIBaseURL: fmt.Sprintf("http://%s:%d/api/v1", 
+            APIBaseURL: fmt.Sprintf("http://%s:%d/api/v2", 
                 service.Address, service.Port),
             AuthToken: os.Getenv(service.Name + "_TOKEN"),
         })
