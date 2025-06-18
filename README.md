@@ -9,7 +9,6 @@
     <a href="https://github.com/dagu-org/dagu/actions/workflows/ci.yaml"><img src="https://img.shields.io/github/actions/workflow/status/dagu-org/dagu/ci.yaml?style=flat-square" alt="Build Status"></a>
     <a href="https://codecov.io/gh/dagu-org/dagu"><img src="https://img.shields.io/codecov/c/github/dagu-org/dagu?style=flat-square" alt="Code Coverage"></a>
     <a href="https://goreportcard.com/report/github.com/dagu-org/dagu"><img src="https://goreportcard.com/badge/github.com/dagu-org/dagu?style=flat-square" alt="Go Report Card"></a>
-    <a href="https://github.com/dagu-org/dagu/blob/main/LICENSE.md"><img src="https://img.shields.io/github/license/dagu-org/dagu?style=flat-square" alt="License"></a>
     <a href="https://discord.gg/gpahPUjGRk"><img src="https://img.shields.io/discord/1115206893105889311?style=flat-square&logo=discord" alt="Discord"></a>
   </p>
   
@@ -269,7 +268,7 @@ The v1.17.0 release was made possible by:
 
 ## 📄 License
 
-Dagu is open source under the [GNU GPLv3](./LICENSE.md).
+Dagu is open source under the [GNU GPLv3](./LICENSE).
 
 ---
 
