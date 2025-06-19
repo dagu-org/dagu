@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.17.1 (2025-06-20)
+
+### New Features
+- **One-click Step Re-run**: Retry an individual step without touching the rest of the DAG (#1030)
+- **Nested-DAG Log Viewer**: See logs for every repeated child run instead of only the last execution (#1029)
+
+### Bug Fixes
+- **Docker**: Fixed asset serving with base path and corrected storage volume locations (#1037)
+- **Docker**: Updated Docker storage paths from `/dagu` to `/var/lib/dagu`
+- **Steps**: Support camel case for step exit code field (#1031)
+
+### Contributors
+
+Thanks to our contributors for this release:
+
+| Contribution | Author |
+|--------------|--------|
+| One-click Step Re-run – retry an individual step without touching the rest of the DAG | 🛠️ [@thefishhat](https://github.com/thefishhat) |
+| Nested-DAG Log Viewer – see logs for every repeated child run | 💡 [@jeremydelattre59](https://github.com/jeremydelattre59) |
+| Docker image polish – fixes for asset paths & storage volumes | 🐳 [@jhuang732](https://github.com/jhuang732) (report) |
+
 ## v1.17.0 (2025-06-18)
 
 ### Major Features

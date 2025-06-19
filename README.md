@@ -35,12 +35,6 @@ After managing hundreds of cron jobs across multiple servers, I built Dagu to br
 3. **Local First** - Define and execute workflows in a single, self-contained environment-no internet required. Whether you're prototyping on your laptop, running on IoT devices, or deploying to air-gapped on-premises servers, Dagu just works.
 5. **Hierarchical DAGs** - Compose workflows from smaller workflows.
 
-## Latest Release
-
-[v1.17.0](https://github.com/dagu-org/dagu/releases/tag/v1.17.0) - June 17, 2025
-
-Major performance improvements, hierarchical DAG execution, enhanced UI, and partial success status. [Full changelog →](https://docs.dagu.cloud/reference/changelog#v1-17-0)
-
 ## Features
 
 - [DAG definition](https://docs.dagu.cloud/writing-workflows/examples/) - Express complex dependencies in readable YAML
@@ -261,14 +255,6 @@ Contributions are welcome. See our [documentation](https://docs.dagu.cloud) for 
 <a href="https://github.com/dagu-org/dagu/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=dagu-org/dagu" />
 </a>
-
-### v1.17.0 Contributors
-
-- [@jerry-yuan](https://github.com/jerry-yuan) - Docker optimization
-- [@vnghia](https://github.com/vnghia) - Container enhancements ([#898])
-- [@thefishhat](https://github.com/thefishhat) - Repeat policies & partial success ([#1011])
-- [@kriyanshii](https://github.com/kriyanshii) - Queue functionality
-- [@ghansham](https://github.com/ghansham) - Code reviews
 
 ## License
 
