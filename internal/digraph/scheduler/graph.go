@@ -263,8 +263,8 @@ func (g *ExecutionGraph) findStep(name string) (*Node, error) {
 	return nil, fmt.Errorf("%w: %s", errStepNotFound, name)
 }
 
-// CreateStepRetryGraph creates a new execution graph for retrying a specific step and its downstreams.
-// Only the specified step and all nodes downstream of it will be reset for re-execution, regardless of previous status or retry policy.
+// CreateStepRetryGraph creates a new execution graph for retrying a specific step.
+// Only the specified step will be reset for re-execution, leaving all downstream steps untouched.
 func CreateStepRetryGraph(_ context.Context, dag *digraph.DAG, nodes []*Node, stepName string) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
 		nodeByID: make(map[int]*Node),
@@ -286,43 +286,25 @@ func CreateStepRetryGraph(_ context.Context, dag *digraph.DAG, nodes []*Node, st
 	}
 
 	// Find the node for the specified step name
-	var startNode *Node
+	var targetNode *Node
 	for _, node := range graph.nodes {
 		if node.Name() == stepName {
-			startNode = node
+			targetNode = node
 			break
 		}
 	}
-	if startNode == nil {
+	if targetNode == nil {
 		return nil, fmt.Errorf("%w: %s", errStepNotFound, stepName)
 	}
 
-	// Collect all downstream nodes (including the start node itself)
-	downstream := make(map[int]bool)
-	var visit func(n *Node)
-	visit = func(n *Node) {
-		if downstream[n.id] {
-			return
-		}
-		downstream[n.id] = true
-		for _, childID := range graph.From[n.id] {
-			child := graph.nodeByID[childID]
-			visit(child)
-		}
+	// Reset state and remove retry policy for only the specified step
+	step, ok := steps[targetNode.Name()]
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", errStepNotFound, targetNode.Name())
 	}
-	visit(startNode)
-
-	// Reset state and remove retry policy for the specified node and all downstreams
-	for id := range downstream {
-		n := graph.nodeByID[id]
-		step, ok := steps[n.Name()]
-		if !ok {
-			return nil, fmt.Errorf("%w: %s", errStepNotFound, n.Name())
-		}
-		n.ClearState(step)
-		// Remove retry policy to force the step to be retried
-		n.retryPolicy = RetryPolicy{}
-	}
+	targetNode.ClearState(step)
+	// Remove retry policy to force the step to be retried
+	targetNode.retryPolicy = RetryPolicy{}
 
 	return graph, nil
 }

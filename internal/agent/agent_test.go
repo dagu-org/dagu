@@ -227,11 +227,12 @@ func TestAgent_Retry(t *testing.T) {
 		err := dagAgent.Run(context.Background())
 		require.NoError(t, err)
 
-		// Node 5 and its downstreams are retried
-		retried := map[string]struct{}{"5": {}, "6": {}, "7": {}, "8": {}, "9": {}}
-		// Node 2 is a false command and not part of node 5's downstreams, so it should remain failed
+		// Only node 5 is retried, downstream steps remain untouched
+		retried := map[string]struct{}{"5": {}}
+		// Node 2 is a false command and should remain failed
+		// Downstream nodes (6, 7, 8, 9) should remain in their previous state
 		falseSteps := map[string]struct{}{"2": {}}
-		// Check that step '5' and its downstreams are successful, and earlier steps are not rerun
+		// Check that only step '5' is rerun, all other steps remain unchanged
 		st := dagAgent.Status(th.Context)
 
 		for _, node := range st.Nodes {
@@ -240,6 +241,7 @@ func TestAgent_Retry(t *testing.T) {
 			now := node.FinishedAt
 
 			if _, isRetried := retried[name]; isRetried {
+				// Only step '5' should be retried and successful
 				if node.Status != scheduler.NodeStatusSuccess && node.Status != scheduler.NodeStatusSkipped {
 					t.Errorf("step %q is not successful or skipped after step retry: %s", name, node.Status)
 				}
@@ -254,7 +256,7 @@ func TestAgent_Retry(t *testing.T) {
 						t.Errorf("non-retried step %q (false command) should remain failed after step retry, got: %s", name, node.Status)
 					}
 				}
-				// FinishedAt should be unchanged
+				// FinishedAt should be unchanged for all non-retried steps
 				if prev != now {
 					t.Errorf("non-retried step %q FinishedAt changed after step retry: was %v, now %v", name, prev, now)
 				}

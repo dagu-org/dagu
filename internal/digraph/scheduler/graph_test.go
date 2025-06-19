@@ -189,14 +189,14 @@ func TestStepRetryExecution(t *testing.T) {
 	ctx := context.Background()
 	_, err := scheduler.CreateStepRetryGraph(ctx, dag, nodes, "2")
 	require.NoError(t, err)
-	// Only step 2 and its downstreams (3) should be reset to NodeStatusNone
-	require.Equal(t, scheduler.NodeStatusSuccess, nodes[0].State().Status) // 1
+	// Only step 2 should be reset to NodeStatusNone, downstream steps remain untouched
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[0].State().Status) // 1 (unchanged)
 	require.Equal(t, scheduler.NodeStatusNone, nodes[1].State().Status)    // 2 (reset)
-	require.Equal(t, scheduler.NodeStatusNone, nodes[2].State().Status)    // 3 (reset)
-	require.Equal(t, scheduler.NodeStatusSkipped, nodes[3].State().Status) // 4
-	require.Equal(t, scheduler.NodeStatusError, nodes[4].State().Status)   // 5
-	require.Equal(t, scheduler.NodeStatusSuccess, nodes[5].State().Status) // 6
-	require.Equal(t, scheduler.NodeStatusSkipped, nodes[6].State().Status) // 7
+	require.Equal(t, scheduler.NodeStatusCancel, nodes[2].State().Status)  // 3 (unchanged)
+	require.Equal(t, scheduler.NodeStatusSkipped, nodes[3].State().Status) // 4 (unchanged)
+	require.Equal(t, scheduler.NodeStatusError, nodes[4].State().Status)   // 5 (unchanged)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[5].State().Status) // 6 (unchanged)
+	require.Equal(t, scheduler.NodeStatusSkipped, nodes[6].State().Status) // 7 (unchanged)
 }
 
 func TestExecutionGraphDependencies(t *testing.T) {
