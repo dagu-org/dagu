@@ -18,7 +18,7 @@ This detects your OS/architecture and installs to `/usr/local/bin`.
 docker run -d \
   --name dagu \
   -p 8080:8080 \
-  -v ~/.dagu:/dagu \
+  -v ~/.dagu:/var/lib/dagu \
   ghcr.io/dagu-org/dagu:latest \
   dagu start-all
 ```
@@ -62,11 +62,11 @@ services:
     environment:
       - DAGU_TZ=America/New_York
       - DAGU_PORT=8080 # optional. default is 8080
-      - DAGU_HOME=/dagu # optional. default is /dagu
+      - DAGU_HOME=/dagu # optional.
       - PUID=1000 # optional. default is 1000
       - PGID=1000 # optional. default is 1000
     volumes:
-      - dagu:/dagu
+      - dagu:/var/lib/dagu
 volumes:
   dagu: {}
 ```
@@ -84,7 +84,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - dagu:/dagu
+      - dagu:/var/lib/dagu
       - /var/run/docker.sock:/var/run/docker.sock
     user: "0:0"
 volumes:

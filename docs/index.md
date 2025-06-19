@@ -83,7 +83,7 @@ dagu start hello
 
 ```bash [Docker]
 docker run --rm \
-  -v ~/.dagu:/dagu \
+  -v ~/.dagu:/var/lib/dagu \
   ghcr.io/dagu-org/dagu:latest \
   dagu start hello
 ```
@@ -113,7 +113,7 @@ dagu status hello
 
 ```bash [Docker]
 docker run --rm \
-  -v ~/.dagu:/dagu \
+  -v ~/.dagu:/var/lib/dagu \
   ghcr.io/dagu-org/dagu:latest \
   dagu status hello
 ```
@@ -131,7 +131,7 @@ dagu start-all
 ```bash [Docker]
 docker run -d \
   -p 8080:8080 \
-  -v ~/.dagu:/dagu \
+  -v ~/.dagu:/var/lib/dagu \
   ghcr.io/dagu-org/dagu:latest \
   dagu start-all
 ```

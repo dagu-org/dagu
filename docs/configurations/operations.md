@@ -127,7 +127,7 @@ services:
     
     # Volume mounts
     volumes:
-      - dagu:/dagu
+      - dagu:/var/lib/dagu
       
       # Docker socket for Docker executor (optional)
       # - /var/run/docker.sock:/var/run/docker.sock
