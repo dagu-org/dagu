@@ -217,7 +217,7 @@ func TestAgent_Retry(t *testing.T) {
 		}
 
 		// Sleep to ensure timestamps will be different
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(1 * time.Second)
 
 		// Retry from step '5' using StepRetry
 		dagAgent = dag.Agent(test.WithAgentOptions(agent.Options{
