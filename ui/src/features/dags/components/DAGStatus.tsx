@@ -24,12 +24,19 @@ function DAGStatus({ dagRun, fileName }: Props) {
     components['schemas']['Step'] | undefined
   >(undefined);
   // State for log viewer
-  const [logViewer, setLogViewer] = useState({
+  const [logViewer, setLogViewer] = useState<{
+    isOpen: boolean;
+    logType: 'execution' | 'step';
+    stepName: string;
+    dagRunId: string;
+    stream: 'stdout' | 'stderr';
+    node?: components['schemas']['Node'];
+  }>({
     isOpen: false,
-    logType: 'step' as 'execution' | 'step',
+    logType: 'step',
     stepName: '',
     dagRunId: '',
-    stream: 'stdout' as 'stdout' | 'stderr',
+    stream: 'stdout',
   });
   // State for parallel execution modal
   const [parallelExecutionModal, setParallelExecutionModal] = useState<{
@@ -90,14 +97,17 @@ function DAGStatus({ dagRun, fileName }: Props) {
       );
 
       if (n && n.step.run) {
-        // Check if there are multiple child runs (parallel execution)
-        if (n.children && n.children.length > 1) {
-          // Show modal to select which parallel execution to view
+        // Combine both regular children and repeated children
+        const allChildren = [...(n.children || []), ...(n.childrenRepeated || [])];
+        
+        // Check if there are multiple child runs (parallel execution or repeated)
+        if (allChildren.length > 1) {
+          // Show modal to select which execution to view
           setParallelExecutionModal({
             isOpen: true,
             node: n,
           });
-        } else if (n.children && n.children.length === 1) {
+        } else if (allChildren.length === 1) {
           // Single child dagRun - navigate directly
           navigateToChildDagRun(n, 0);
         }
@@ -109,7 +119,9 @@ function DAGStatus({ dagRun, fileName }: Props) {
   // Helper function to navigate to a specific child DAG run
   const navigateToChildDagRun = React.useCallback(
     (node: components['schemas']['Node'], childIndex: number, openInNewTab?: boolean) => {
-      const childDAGRun = node.children?.[childIndex];
+      // Combine both regular children and repeated children
+      const allChildren = [...(node.children || []), ...(node.childrenRepeated || [])];
+      const childDAGRun = allChildren[childIndex];
       
       if (childDAGRun && childDAGRun.dagRunId) {
         // Navigate to the child DAG-run status page
@@ -185,7 +197,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
   const handlers = getEventHandlers(dagRun);
 
   // Handler for opening log viewer
-  const handleViewLog = (stepName: string, dagRunId: string) => {
+  const handleViewLog = (stepName: string, dagRunId: string, node?: components['schemas']['Node']) => {
     // Check if this is a stderr log (indicated by _stderr suffix)
     const isStderr = stepName.endsWith('_stderr');
     const actualStepName = isStderr ? stepName.slice(0, -7) : stepName; // Remove '_stderr' suffix
@@ -196,6 +208,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
       stepName: actualStepName,
       dagRunId: dagRunId || dagRun.dagRunId,
       stream: isStderr ? 'stderr' : 'stdout',
+      node,
     });
   };
 
@@ -353,6 +366,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
         stepName={logViewer.stepName}
         dagRun={dagRun}
         stream={logViewer.stream}
+        node={logViewer.node}
       />
 
       {/* Parallel execution selection modal */}
@@ -362,7 +376,10 @@ function DAGStatus({ dagRun, fileName }: Props) {
           onClose={() => setParallelExecutionModal({ isOpen: false })}
           stepName={parallelExecutionModal.node.step.name}
           childDAGName={parallelExecutionModal.node.step.run || ''}
-          children={parallelExecutionModal.node.children || []}
+          children={[
+            ...(parallelExecutionModal.node.children || []),
+            ...(parallelExecutionModal.node.childrenRepeated || [])
+          ]}
           onSelectChild={(childIndex, openInNewTab) => {
             navigateToChildDagRun(parallelExecutionModal.node!, childIndex, openInNewTab);
             if (!openInNewTab) {

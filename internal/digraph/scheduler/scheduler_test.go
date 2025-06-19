@@ -1,6 +1,7 @@
 package scheduler_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -2103,6 +2104,157 @@ func TestScheduler_RetryPolicyDefaults(t *testing.T) {
 	node := result.Node(t, "1")
 	// Should have retried once
 	assert.Equal(t, 1, node.State().RetryCount)
+}
+
+func TestScheduler_StepRetryExecution(t *testing.T) {
+	t.Run("RetrySuccessfulStep", func(t *testing.T) {
+		sc := setupScheduler(t)
+
+		// A -> B -> C, all successful
+		dag := &digraph.DAG{
+			Steps: []digraph.Step{
+				{Name: "A", Command: "echo A"},
+				{Name: "B", Command: "echo B", Depends: []string{"A"}},
+				{Name: "C", Command: "echo C", Depends: []string{"B"}},
+			},
+		}
+
+		// Initial run - all successful
+		graph := sc.newGraph(t,
+			successStep("A"),
+			successStep("B", "A"),
+			successStep("C", "B"),
+		)
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		result.AssertNodeStatus(t, "A", scheduler.NodeStatusSuccess)
+		result.AssertNodeStatus(t, "B", scheduler.NodeStatusSuccess)
+		result.AssertNodeStatus(t, "C", scheduler.NodeStatusSuccess)
+
+		// Create nodes with their current states
+		nodes := []*scheduler.Node{
+			scheduler.NodeWithData(scheduler.NodeData{
+				Step:  dag.Steps[0],
+				State: scheduler.NodeState{Status: scheduler.NodeStatusSuccess},
+			}),
+			scheduler.NodeWithData(scheduler.NodeData{
+				Step:  dag.Steps[1],
+				State: scheduler.NodeState{Status: scheduler.NodeStatusSuccess},
+			}),
+			scheduler.NodeWithData(scheduler.NodeData{
+				Step:  dag.Steps[2],
+				State: scheduler.NodeState{Status: scheduler.NodeStatusSuccess},
+			}),
+		}
+
+		// Retry step B
+		retryGraph, err := scheduler.CreateStepRetryGraph(context.Background(), dag, nodes, "B")
+		require.NoError(t, err)
+		
+		// Schedule the retry
+		retryResult := graphHelper{testHelper: sc, ExecutionGraph: retryGraph}.Schedule(t, scheduler.StatusSuccess)
+		
+		// A and C should remain unchanged, only B should be re-executed
+		retryResult.AssertNodeStatus(t, "A", scheduler.NodeStatusSuccess)
+		retryResult.AssertNodeStatus(t, "B", scheduler.NodeStatusSuccess)
+		retryResult.AssertNodeStatus(t, "C", scheduler.NodeStatusSuccess)
+	})
+
+	t.Run("RetryCancelledStepWithFailedDependency", func(t *testing.T) {
+		sc := setupScheduler(t)
+
+		// A -> B -> C
+		// B fails, C is cancelled
+		// We retry only C
+		// Expected: C will be cancelled again because B is still failed
+		// This is the current behavior - to force C to run, users should either:
+		// 1. Use continueOn.failure for C
+		// 2. Retry from B instead
+		dag := &digraph.DAG{
+			Steps: []digraph.Step{
+				{Name: "A", Command: "echo A"},
+				{Name: "B", Command: "echo B"},
+				{Name: "C", Command: "echo C", Depends: []string{"B"}},
+			},
+		}
+
+		// Create nodes with their current states
+		nodes := []*scheduler.Node{
+			scheduler.NodeWithData(scheduler.NodeData{
+				Step:  dag.Steps[0],
+				State: scheduler.NodeState{Status: scheduler.NodeStatusSuccess},
+			}),
+			scheduler.NodeWithData(scheduler.NodeData{
+				Step:  dag.Steps[1], 
+				State: scheduler.NodeState{Status: scheduler.NodeStatusError},
+			}),
+			scheduler.NodeWithData(scheduler.NodeData{
+				Step:  dag.Steps[2],
+				State: scheduler.NodeState{Status: scheduler.NodeStatusCancel},
+			}),
+		}
+
+		// Retry only step C
+		retryGraph, err := scheduler.CreateStepRetryGraph(context.Background(), dag, nodes, "C")
+		require.NoError(t, err)
+		
+		// Verify states after CreateStepRetryGraph
+		assert.Equal(t, scheduler.NodeStatusSuccess, nodes[0].State().Status) // A unchanged
+		assert.Equal(t, scheduler.NodeStatusError, nodes[1].State().Status)   // B unchanged
+		assert.Equal(t, scheduler.NodeStatusNone, nodes[2].State().Status)    // C reset
+		
+		// Schedule the retry - C should skip because B is still failed
+		retryResult := graphHelper{testHelper: sc, ExecutionGraph: retryGraph}.Schedule(t, scheduler.StatusSuccess)
+		
+		// A and B should remain in their original states
+		retryResult.AssertNodeStatus(t, "A", scheduler.NodeStatusSuccess)
+		retryResult.AssertNodeStatus(t, "B", scheduler.NodeStatusError)
+		// C should be skipped because its dependency B is failed
+		retryResult.AssertNodeStatus(t, "C", scheduler.NodeStatusSkipped)
+	})
+
+	t.Run("RetryWithContinueOnFailure", func(t *testing.T) {
+		sc := setupScheduler(t)
+
+		// A -> B -> C
+		// B fails but has continueOn.failure = true
+		// C was cancelled, we retry only C
+		dag := &digraph.DAG{
+			Steps: []digraph.Step{
+				{Name: "A", Command: "echo A"},
+				{Name: "B", Command: "false", Depends: []string{"A"}, ContinueOn: digraph.ContinueOn{Failure: true}},
+				{Name: "C", Command: "echo C", Depends: []string{"B"}},
+			},
+		}
+
+		// Create nodes with their current states
+		nodes := []*scheduler.Node{
+			scheduler.NodeWithData(scheduler.NodeData{
+				Step:  dag.Steps[0],
+				State: scheduler.NodeState{Status: scheduler.NodeStatusSuccess},
+			}),
+			scheduler.NodeWithData(scheduler.NodeData{
+				Step:  dag.Steps[1],
+				State: scheduler.NodeState{Status: scheduler.NodeStatusError},
+			}),
+			scheduler.NodeWithData(scheduler.NodeData{
+				Step:  dag.Steps[2],
+				State: scheduler.NodeState{Status: scheduler.NodeStatusCancel},
+			}),
+		}
+
+		// Retry only step C
+		retryGraph, err := scheduler.CreateStepRetryGraph(context.Background(), dag, nodes, "C")
+		require.NoError(t, err)
+		
+		// Schedule the retry - C should execute because B has continueOn.failure
+		retryResult := graphHelper{testHelper: sc, ExecutionGraph: retryGraph}.Schedule(t, scheduler.StatusSuccess)
+		
+		// A and B should remain in their original states
+		retryResult.AssertNodeStatus(t, "A", scheduler.NodeStatusSuccess)
+		retryResult.AssertNodeStatus(t, "B", scheduler.NodeStatusError)
+		// C should execute successfully
+		retryResult.AssertNodeStatus(t, "C", scheduler.NodeStatusSuccess)
+	})
 }
 
 // TestScheduler_StepIDAccess tests that step ID variables are expanded correctly

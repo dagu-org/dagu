@@ -119,17 +119,18 @@ func toNode(node *models.Node) api.Node {
 		return api.Node{}
 	}
 	return api.Node{
-		DoneCount:   node.DoneCount,
-		FinishedAt:  node.FinishedAt,
-		Stdout:      node.Stdout,
-		Stderr:      node.Stderr,
-		RetryCount:  node.RetryCount,
-		StartedAt:   node.StartedAt,
-		Status:      api.NodeStatus(node.Status),
-		StatusLabel: api.NodeStatusLabel(node.Status.String()),
-		Step:        toStep(node.Step),
-		Error:       ptrOf(node.Error),
-		Children:    ptrOf(toChildDAGRuns(node.Children)),
+		DoneCount:        node.DoneCount,
+		FinishedAt:       node.FinishedAt,
+		Stdout:           node.Stdout,
+		Stderr:           node.Stderr,
+		RetryCount:       node.RetryCount,
+		StartedAt:        node.StartedAt,
+		Status:           api.NodeStatus(node.Status),
+		StatusLabel:      api.NodeStatusLabel(node.Status.String()),
+		Step:             toStep(node.Step),
+		Error:            ptrOf(node.Error),
+		Children:         ptrOf(toChildDAGRuns(node.Children)),
+		ChildrenRepeated: ptrOf(toChildDAGRuns(node.ChildrenRepeated)),
 	}
 }
 

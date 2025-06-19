@@ -63,8 +63,8 @@ importers:
         specifier: ^4.17.21
         version: 4.17.21
       lucide:
-        specifier: ^0.507.0
-        version: 0.507.0
+        specifier: ^0.511.0
+        version: 0.511.0
       lucide-react:
         specifier: ^0.488.0
         version: 0.488.0(react@19.1.0)
@@ -78,8 +78,8 @@ importers:
         specifier: ^5.3.1
         version: 5.3.1(monaco-editor@0.52.2)
       openapi-fetch:
-        specifier: ^0.13.5
-        version: 0.13.5
+        specifier: ^0.14.0
+        version: 0.14.0
       prism-react-renderer:
         specifier: ^2.4.1
         version: 2.4.1(react@19.1.0)
@@ -103,7 +103,7 @@ importers:
         version: 2.3.3(react@19.1.0)
       swr-openapi:
         specifier: ^5.1.4
-        version: 5.1.4(openapi-fetch@0.13.5)(openapi-typescript@7.5.2(typescript@5.8.3))(react@19.1.0)(swr@2.3.3(react@19.1.0))(typescript@5.8.3)
+        version: 5.1.4(openapi-fetch@0.14.0)(openapi-typescript@7.5.2(typescript@5.8.3))(react@19.1.0)(swr@2.3.3(react@19.1.0))(typescript@5.8.3)
       tailwind-merge:
         specifier: ^3.2.0
         version: 3.2.0
@@ -3175,8 +3175,8 @@ packages:
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
-  lucide@0.507.0:
-    resolution: {integrity: sha512-UVICRUye/KCV+UKptHbPg0gLH0shrR9qm19Bd7BNDoY52pb7DvJUyw9kNBjI2RxC9hvFqzOSqX5GNpzPnxkkbg==}
+  lucide@0.511.0:
+    resolution: {integrity: sha512-3ppKPYcCJFXBloeM1H8OyIGjzINNQgsYvAYBTYOSKO45DF/5vbTQrCvwnvMDAGgDnUlI1uFxe0gJj52jdb1JAg==}
 
   luxon@3.6.1:
     resolution: {integrity: sha512-tJLxrKJhO2ukZ5z0gyjY1zPh3Rh88Ej9P7jNrZiHMUXHae1yvI2imgOZtL1TO8TW6biMMKfTtAOoEJANgtWBMQ==}
@@ -3368,8 +3368,8 @@ packages:
     resolution: {integrity: sha512-zy1wx4+P3PfhXSEPJNtZmJXfhkkIaxU1VauWIrDZw1O7uJRDRJtKr9n3Ic4NgbA16KyOxOXO2ng9gYwCdXuSXA==}
     engines: {node: '>=18'}
 
-  openapi-fetch@0.13.5:
-    resolution: {integrity: sha512-AQK8T9GSKFREFlN1DBXTYsLjs7YV2tZcJ7zUWxbjMoQmj8dDSFRrzhLCbHPZWA1TMV3vACqfCxLEZcwf2wxV6Q==}
+  openapi-fetch@0.14.0:
+    resolution: {integrity: sha512-PshIdm1NgdLvb05zp8LqRQMNSKzIlPkyMxYFxwyHR+UlKD4t2nUjkDhNxeRbhRSEd3x5EUNh2w5sJYwkhOH4fg==}
 
   openapi-typescript-helpers@0.0.15:
     resolution: {integrity: sha512-opyTPaunsklCBpTK8JGef6mfPhLSnyy5a0IN9vKtx3+4aExf+KxEqYwIy3hqkedXIB97u357uLMJsOnm3GVjsw==}
@@ -7527,7 +7527,7 @@ snapshots:
     dependencies:
       react: 19.1.0
 
-  lucide@0.507.0: {}
+  lucide@0.511.0: {}
 
   luxon@3.6.1: {}
 
@@ -7717,7 +7717,7 @@ snapshots:
       is-inside-container: 1.0.0
       is-wsl: 3.1.0
 
-  openapi-fetch@0.13.5:
+  openapi-fetch@0.14.0:
     dependencies:
       openapi-typescript-helpers: 0.0.15
 
@@ -8551,9 +8551,9 @@ snapshots:
 
   supports-preserve-symlinks-flag@1.0.0: {}
 
-  swr-openapi@5.1.4(openapi-fetch@0.13.5)(openapi-typescript@7.5.2(typescript@5.8.3))(react@19.1.0)(swr@2.3.3(react@19.1.0))(typescript@5.8.3):
+  swr-openapi@5.1.4(openapi-fetch@0.14.0)(openapi-typescript@7.5.2(typescript@5.8.3))(react@19.1.0)(swr@2.3.3(react@19.1.0))(typescript@5.8.3):
     dependencies:
-      openapi-fetch: 0.13.5
+      openapi-fetch: 0.14.0
       openapi-typescript-helpers: 0.0.15
       react: 19.1.0
       swr: 2.3.3(react@19.1.0)

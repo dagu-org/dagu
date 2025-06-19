@@ -38,7 +38,7 @@ type Props = {
   /** DAG file name */
   name: string;
   /** Function to open log viewer */
-  onViewLog?: (stepName: string, dagRunId: string) => void;
+  onViewLog?: (stepName: string, dagRunId: string, node?: components['schemas']['Node']) => void;
   /** Full dagRun details (optional) - used to determine if this is a child dagRun */
   dagRun: components['schemas']['DAGRunDetails'];
   /** View mode: desktop or mobile */
@@ -118,8 +118,9 @@ function NodeStatusTableRow({
   const [success, setSuccess] = useState(false);
 
   // Check if this is a child dagRun node
-  const hasChildDAGRun =
-    !!node.step.run && node.children && node.children.length > 0;
+  // Include both regular children and repeated children
+  const allChildren = [...(node.children || []), ...(node.childrenRepeated || [])];
+  const hasChildDAGRun = !!node.step.run && allChildren.length > 0;
 
   // Update duration every second for running tasks
   useEffect(() => {
@@ -169,8 +170,8 @@ function NodeStatusTableRow({
     childIndex: number = 0,
     e?: React.MouseEvent
   ) => {
-    if (hasChildDAGRun && node.children && node.children[childIndex]) {
-      const childDAGRunId = node.children[childIndex].dagRunId;
+    if (hasChildDAGRun && allChildren[childIndex]) {
+      const childDAGRunId = allChildren[childIndex].dagRunId;
 
       // Check if we're in a dagRun context or a DAG context
       // More reliable detection by checking the current URL path or the dagRun object
@@ -250,7 +251,7 @@ function NodeStatusTableRow({
     // which will open the link in a new tab
     if (!(e.metaKey || e.ctrlKey) && onViewLog) {
       e.preventDefault();
-      onViewLog(node.step.name, dagRunId || '');
+      onViewLog(node.step.name, dagRunId || '', node);
     }
   };
 
@@ -313,7 +314,7 @@ function NodeStatusTableRow({
             )}
             {hasChildDAGRun && (
               <>
-                {node.children && node.children.length === 1 ? (
+                {allChildren.length === 1 ? (
                   // Single child DAG run
                   <>
                     <div
@@ -323,17 +324,17 @@ function NodeStatusTableRow({
                     >
                       View Child DAG Run: {node.step.run}
                     </div>
-                    {node.children[0]?.params && (
+                    {allChildren[0]?.params && (
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                         Parameters:{' '}
                         <span className="font-mono">
-                          {node.children[0].params}
+                          {allChildren[0].params}
                         </span>
                       </div>
                     )}
                   </>
                 ) : (
-                  // Multiple child DAG runs (parallel execution)
+                  // Multiple child DAG runs (parallel execution or repeated)
                   <>
                     <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                       <div className="flex items-center gap-1">
@@ -346,13 +347,13 @@ function NodeStatusTableRow({
                           ) : (
                             <ChevronRight className="h-3 w-3" />
                           )}
-                          Parallel execution: {node.children?.length || 0} child
+                          Multiple executions: {allChildren.length} child
                           DAG runs
                         </button>
                       </div>
-                      {isExpanded && node.children && (
+                      {isExpanded && (
                         <div className="mt-2 ml-4 space-y-1 border-l border-slate-200 dark:border-slate-700 pl-3">
-                          {node.children.map((child, index) => (
+                          {allChildren.map((child, index) => (
                             <div key={child.dagRunId} className="py-1">
                               <div
                                 className="text-xs text-blue-500 dark:text-blue-400 cursor-pointer hover:underline"
@@ -643,7 +644,7 @@ function NodeStatusTableRow({
       {/* Child dagRun link */}
       {hasChildDAGRun && (
         <>
-          {node.children && node.children.length === 1 ? (
+          {allChildren.length === 1 ? (
             // Single child DAG run
             <>
               <div
@@ -652,15 +653,15 @@ function NodeStatusTableRow({
               >
                 View Child DAG Run: {node.step.run}
               </div>
-              {node.children[0]?.params && (
+              {allChildren[0]?.params && (
                 <div className="text-xs text-slate-500 dark:text-slate-400 mb-3">
                   Parameters:{' '}
-                  <span className="font-mono">{node.children[0].params}</span>
+                  <span className="font-mono">{allChildren[0].params}</span>
                 </div>
               )}
             </>
           ) : (
-            // Multiple child DAG runs (parallel execution)
+            // Multiple child DAG runs (parallel execution or repeated)
             <div className="mb-3">
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
@@ -671,11 +672,11 @@ function NodeStatusTableRow({
                 ) : (
                   <ChevronRight className="h-3 w-3" />
                 )}
-                Parallel execution: {node.children?.length || 0} child DAG runs
+                Multiple executions: {allChildren.length} child DAG runs
               </button>
-              {isExpanded && node.children && (
+              {isExpanded && (
                 <div className="mt-2 ml-4 space-y-1 border-l border-slate-200 dark:border-slate-700 pl-3">
-                  {node.children.map((child, index) => (
+                  {allChildren.map((child, index) => (
                     <div key={child.dagRunId} className="py-1">
                       <div
                         className="text-xs text-blue-500 dark:text-blue-400 cursor-pointer hover:underline"
@@ -807,7 +808,7 @@ function NodeStatusTableRow({
                   ? (e) => {
                     if (!(e.metaKey || e.ctrlKey) && onViewLog) {
                       e.preventDefault();
-                      onViewLog(`${node.step.name}_stderr`, dagRunId || '');
+                      onViewLog(`${node.step.name}_stderr`, dagRunId || '', node);
                     }
                   }
                   : handleViewLog
@@ -835,7 +836,7 @@ function NodeStatusTableRow({
                 onClick={(e) => {
                   if (!(e.metaKey || e.ctrlKey) && onViewLog) {
                     e.preventDefault();
-                    onViewLog(`${node.step.name}_stderr`, dagRunId || '');
+                    onViewLog(`${node.step.name}_stderr`, dagRunId || '', node);
                   }
                 }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"

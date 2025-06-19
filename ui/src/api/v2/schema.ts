@@ -646,6 +646,7 @@ export interface components {
          *     3: "Cancelled"
          *     4: "Success"
          *     5: "Queued"
+         *     6: "Partial Success"
          *
          * @enum {integer}
          */
@@ -775,6 +776,8 @@ export interface components {
             doneCount: number;
             /** @description List of child DAG-runs associated with this step */
             children?: components["schemas"]["ChildDAGRun"][];
+            /** @description List of repeated child DAG-runs when using repeatPolicy */
+            childrenRepeated?: components["schemas"]["ChildDAGRun"][];
             /** @description Error message if the step failed */
             error?: string;
         };
@@ -1820,6 +1823,8 @@ export interface operations {
                 "application/json": {
                     /** @description ID of the DAG-run to retry */
                     dagRunId: string;
+                    /** @description Optional. If provided, only this step will be retried. */
+                    stepName?: string;
                 };
             };
         };
@@ -2290,7 +2295,8 @@ export enum StatusLabel {
     failed = "failed",
     cancelled = "cancelled",
     finished = "finished",
-    queued = "queued"
+    queued = "queued",
+    partial_success = "partial success"
 }
 export enum NodeStatus {
     NotStarted = 0,
