@@ -304,18 +304,38 @@ func (a *API) readHistoryData(
 
 func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (api.ListDAGsResponseObject, error) {
 	pg := models.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
-	result, errList, err := a.dagStore.List(ctx, models.ListDAGsOptions{
-		Paginator: &pg,
-		Name:      valueOf(request.Params.Name),
-		Tag:       valueOf(request.Params.Tag),
-	})
+	
+	// Determine if we should use ListWithPrefix or List
+	prefix := valueOf(request.Params.Prefix)
+	var result models.PaginatedResult[*digraph.DAG]
+	var errList []string
+	var subdirs []string
+	var err error
+	
+	if prefix != "" {
+		// Use ListWithPrefix for filtered results
+		result, subdirs, errList, err = a.dagStore.ListWithPrefix(ctx, prefix, models.ListDAGsOptions{
+			Paginator: &pg,
+			Name:      valueOf(request.Params.Name),
+			Tag:       valueOf(request.Params.Tag),
+		})
+	} else {
+		// Use List for backward compatibility (returns all DAGs at root level)
+		result, errList, err = a.dagStore.List(ctx, models.ListDAGsOptions{
+			Paginator: &pg,
+			Name:      valueOf(request.Params.Name),
+			Tag:       valueOf(request.Params.Tag),
+		})
+	}
+	
 	if err != nil {
 		return nil, fmt.Errorf("error listing DAGs: %w", err)
 	}
 
 	resp := &api.ListDAGs200JSONResponse{
-		Errors:     errList,
-		Pagination: toPagination(result),
+		Errors:         errList,
+		Pagination:     toPagination(result),
+		Subdirectories: subdirs,
 	}
 
 	// Get status for each DAG
