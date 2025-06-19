@@ -62,7 +62,7 @@ Run with Docker:
 docker run -d \
   --name dagu \
   -p 8080:8080 \
-  -v $HOME/.dagu:/dagu \
+  -v $HOME/.dagu:/var/lib/dagu \
   -e DAGU_HOST=0.0.0.0 \
   -e DAGU_PORT=8080 \
   --restart always \
@@ -90,14 +90,14 @@ services:
       - PUID=1000           # User ID for file permissions
       - PGID=1000           # Group ID for file permissions
     volumes:
-      - dagu:/dagu
+      - dagu:/var/lib/dagu
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/v2/health"]
       interval: 30s
       timeout: 10s
       retries: 3
 volumes:
-  dagu_config: {}
+  dagu: {}
 ```
 
 For custom configuration with separate volumes:
@@ -112,10 +112,10 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./dags:/dagu/dags
-      - ./logs:/dagu/logs
-      - ./data:/dagu/data
-      - ./config.yaml:/dagu/config.yaml:ro
+      - ./dags:/var/lib/dagu/dags
+      - ./logs:/var/lib/dagu/logs
+      - ./data:/var/lib/dagu/data
+      - ./config.yaml:/var/lib/dagu/config.yaml:ro
     environment:
       - DAGU_HOST=0.0.0.0
       - DAGU_PORT=8080
@@ -144,7 +144,7 @@ services:
       - DAGU_TZ=Asia/Tokyo
       - DAGU_BASE_PATH=/
     volumes:
-      - dagu:/dagu
+      - dagu:/var/lib/dagu
       - /var/run/docker.sock:/var/run/docker.sock
     user: "0:0"
     entrypoint: []
@@ -154,7 +154,7 @@ services:
       timeout: 10s
       retries: 3
 volumes:
-  dagu_config: {}
+  dagu: {}
 ```
 
 ### Kubernetes

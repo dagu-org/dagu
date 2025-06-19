@@ -55,9 +55,10 @@ RUN set -eux; \
 RUN echo "dagu ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/99-dagu \
     && chmod 440 /etc/sudoers.d/99-dagu
 
-WORKDIR /dagu
+WORKDIR /home/dagu
 ENV DAGU_HOST=0.0.0.0
 ENV DAGU_PORT=8080
+ENV DAGU_HOME=/var/lib/dagu
 ENV DAGU_TZ="Etc/UTC"
 ENV PUID=${USER_UID}
 ENV PGID=${USER_GID}

@@ -113,7 +113,7 @@ brew install dagu-org/brew/dagu
 docker run -d \
   --name dagu \
   -p 8080:8080 \
-  -v ~/.dagu:/dagu \
+  -v ~/.dagu:/var/lib/dagu \
   ghcr.io/dagu-org/dagu:latest dagu start-all
 ```
 

@@ -244,7 +244,7 @@ services:
     image: ghcr.io/dagu-org/dagu:latest
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./dags:/dagu
+      - ./dags:/var/lib/dagu/dags
     user: "0:0"  # Run as root for Docker access
 ```
 
