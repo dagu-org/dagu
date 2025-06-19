@@ -91,7 +91,7 @@
     "mermaid": "^11.6.0",
     "monaco-editor": "^0.52.2",
     "monaco-yaml": "^5.3.1",
-    "openapi-fetch": "^0.13.5",
+    "openapi-fetch": "^0.14.0",
     "prism-react-renderer": "^2.4.1",
     "react": "^19.1.0",
     "react-cookie": "^8.0.1",
