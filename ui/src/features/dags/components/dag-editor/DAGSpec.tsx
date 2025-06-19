@@ -293,29 +293,26 @@ function DAGSpec({ fileName }: Props) {
               )}
 
               <div
-                className={`rounded-2xl border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden ${
-                  editing
+                className={`rounded-2xl border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden ${editing
                     ? 'bg-white dark:bg-slate-900 border-2 border-blue-400 dark:border-blue-600'
                     : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
-                }`}
+                  }`}
               >
                 <div
-                  className={`border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex justify-between items-center ${
-                    editing
+                  className={`border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex justify-between items-center ${editing
                       ? 'bg-blue-50 dark:bg-blue-900/10'
                       : 'bg-slate-50 dark:bg-slate-800/50'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center">
                     <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mr-3">
                       Definition
                     </h2>
                     <div
-                      className={`text-xs font-medium px-2 py-1 rounded-full transition-all duration-300 ${
-                        editing
+                      className={`text-xs font-medium px-2 py-1 rounded-full transition-all duration-300 ${editing
                           ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
                           : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                      }`}
+                        }`}
                     >
                       {editing ? (
                         <div className="flex items-center">
@@ -418,8 +415,8 @@ function DAGSpec({ fileName }: Props) {
                     onChange={
                       editing && config.permissions.writeDags
                         ? (newValue) => {
-                            setCurrentValue(newValue || '');
-                          }
+                          setCurrentValue(newValue || '');
+                        }
                         : undefined
                     }
                   />

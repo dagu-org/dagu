@@ -21,6 +21,7 @@ func CmdRetry() *cobra.Command {
 
 Flags:
   --run-id string (required) Unique identifier of the DAG-run to retry.
+  --step string (optional) Retry only the specified step.
 
 Examples:
   dagu retry --run-id=abc123 my_dag
@@ -31,10 +32,16 @@ Examples:
 	)
 }
 
-var retryFlags = []commandLineFlag{dagRunIDFlagRetry}
+var retryFlags = []commandLineFlag{dagRunIDFlagRetry, {
+	name:         "step",
+	shorthand:    "",
+	usage:        "Retry only the specified step (optional)",
+	defaultValue: "",
+}}
 
 func runRetry(ctx *Context, args []string) error {
 	dagRunID, _ := ctx.StringParam("run-id")
+	stepName, _ := ctx.StringParam("step")
 
 	name, err := extractDAGName(ctx, args[0])
 	if err != nil {
@@ -61,15 +68,15 @@ func runRetry(ctx *Context, args []string) error {
 	}
 
 	// The retry command is currently only supported for root DAGs.
-	if err := executeRetry(ctx, dag, status, status.DAGRun()); err != nil {
+	if err := executeRetry(ctx, dag, status, status.DAGRun(), stepName); err != nil {
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
 
 	return nil
 }
 
-func executeRetry(ctx *Context, dag *digraph.DAG, status *models.DAGRunStatus, rootRun digraph.DAGRunRef) error {
-	logger.Debug(ctx, "Executing dag-run retry", "dag", dag.Name, "runId", status.DAGRunID)
+func executeRetry(ctx *Context, dag *digraph.DAG, status *models.DAGRunStatus, rootRun digraph.DAGRunRef, stepName string) error {
+	logger.Debug(ctx, "Executing dag-run retry", "dag", dag.Name, "runId", status.DAGRunID, "step", stepName)
 
 	// We use the same log file for the retry as the original run.
 	logFile, err := fileutil.OpenOrCreateFile(status.Log)
@@ -80,7 +87,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.DAGRunStatus, r
 		_ = logFile.Close()
 	}()
 
-	logger.Info(ctx, "dag-run retry initiated", "DAG", dag.Name, "dagRunId", status.DAGRunID, "logFile", logFile.Name())
+	logger.Info(ctx, "dag-run retry initiated", "DAG", dag.Name, "dagRunId", status.DAGRunID, "logFile", logFile.Name(), "step", stepName)
 
 	dr, err := ctx.dagStore(nil, []string{filepath.Dir(dag.Location)})
 	if err != nil {
@@ -101,6 +108,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.DAGRunStatus, r
 			RetryTarget:     status,
 			ParentDAGRun:    status.Parent,
 			ProgressDisplay: shouldEnableProgress(ctx),
+			StepRetry:       stepName,
 		},
 	)
 

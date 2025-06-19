@@ -263,6 +263,52 @@ func (g *ExecutionGraph) findStep(name string) (*Node, error) {
 	return nil, fmt.Errorf("%w: %s", errStepNotFound, name)
 }
 
+// CreateStepRetryGraph creates a new execution graph for retrying a specific step.
+// Only the specified step will be reset for re-execution, leaving all downstream steps untouched.
+func CreateStepRetryGraph(_ context.Context, dag *digraph.DAG, nodes []*Node, stepName string) (*ExecutionGraph, error) {
+	graph := &ExecutionGraph{
+		nodeByID: make(map[int]*Node),
+		From:     make(map[int][]int),
+		To:       make(map[int][]int),
+		nodes:    []*Node{},
+	}
+	steps := make(map[string]digraph.Step)
+	for _, step := range dag.Steps {
+		steps[step.Name] = step
+	}
+	for _, node := range nodes {
+		node.Init()
+		graph.nodeByID[node.id] = node
+		graph.nodes = append(graph.nodes, node)
+	}
+	if err := graph.setup(); err != nil {
+		return nil, err
+	}
+
+	// Find the node for the specified step name
+	var targetNode *Node
+	for _, node := range graph.nodes {
+		if node.Name() == stepName {
+			targetNode = node
+			break
+		}
+	}
+	if targetNode == nil {
+		return nil, fmt.Errorf("%w: %s", errStepNotFound, stepName)
+	}
+
+	// Reset state and remove retry policy for only the specified step
+	step, ok := steps[targetNode.Name()]
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", errStepNotFound, targetNode.Name())
+	}
+	targetNode.ClearState(step)
+	// Remove retry policy to force the step to be retried
+	targetNode.retryPolicy = RetryPolicy{}
+
+	return graph, nil
+}
+
 var (
 	errCycleDetected = errors.New("cycle detected")
 	errStepNotFound  = errors.New("step not found")

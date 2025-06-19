@@ -250,7 +250,7 @@ func handleChildDAGRun(ctx *Context, dag *digraph.DAG, dagRunID string, params s
 	}
 
 	// Execute as a retry of the previous run
-	return executeRetry(ctx, dag, status, root)
+	return executeRetry(ctx, dag, status, root, "")
 }
 
 // executeDAGRun handles the actual execution of a DAG

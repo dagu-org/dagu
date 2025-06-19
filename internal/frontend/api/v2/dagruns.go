@@ -402,6 +402,13 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 		return nil, fmt.Errorf("error reading DAG: %w", err)
 	}
 
+	if request.Body.StepName != nil && *request.Body.StepName != "" {
+		if err := a.dagRunMgr.RetryDAGStep(ctx, dag, request.Body.DagRunId, *request.Body.StepName); err != nil {
+			return nil, fmt.Errorf("error retrying DAG step: %w", err)
+		}
+		return api.RetryDAGRun200Response{}, nil
+	}
+
 	if err := a.dagRunMgr.RetryDAGRun(ctx, dag, request.Body.DagRunId); err != nil {
 		return nil, fmt.Errorf("error retrying DAG: %w", err)
 	}

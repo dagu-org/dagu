@@ -218,6 +218,37 @@ func TestClient_RunDAG(t *testing.T) {
 		require.Equal(t, prevDAGRunID, status.DAGRunID)
 		require.Equal(t, prevParams, status.Params)
 	})
+	t.Run("RetryStep", func(t *testing.T) {
+		dag := th.DAG(t, filepath.Join("client", "retry.yaml"))
+		ctx := th.Context
+		cli := th.DAGRunMgr
+
+		err := cli.StartDAGRun(ctx, dag.DAG, dagrun.StartOptions{})
+		require.NoError(t, err)
+
+		// Wait for the DAG to finish
+		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+
+		status, err := cli.GetLatestStatus(ctx, dag.DAG)
+		require.NoError(t, err)
+		dagRunID := status.DAGRunID
+		prevParams := status.Params
+
+		time.Sleep(1 * time.Second)
+
+		err = cli.RetryDAGStep(ctx, dag.DAG, dagRunID, "2")
+		require.NoError(t, err)
+
+		// Wait for the DAG to finish again
+		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+
+		status, err = cli.GetLatestStatus(ctx, dag.DAG)
+		require.NoError(t, err)
+
+		// Check if the params are the same as the previous run.
+		require.Equal(t, dagRunID, status.DAGRunID)
+		require.Equal(t, prevParams, status.Params)
+	})
 }
 
 func testNewStatus(dag *digraph.DAG, dagRunID string, status scheduler.Status, nodeStatus scheduler.NodeStatus) models.DAGRunStatus {

@@ -116,6 +116,89 @@ func TestRetryExecution(t *testing.T) {
 	require.Equal(t, scheduler.NodeStatusSkipped, nodes[7].State().Status)
 }
 
+func TestStepRetryExecution(t *testing.T) {
+	dag := &digraph.DAG{
+		Steps: []digraph.Step{
+			{Name: "1", Command: "true"},
+			{Name: "2", Command: "true", Depends: []string{"1"}},
+			{Name: "3", Command: "true", Depends: []string{"2"}},
+			{Name: "4", Command: "true", Depends: []string{}},
+			{Name: "5", Command: "true", Depends: []string{"4"}},
+			{Name: "6", Command: "true", Depends: []string{"5"}},
+			{Name: "7", Command: "true", Depends: []string{"6"}},
+		},
+	}
+
+	nodes := []*scheduler.Node{
+		scheduler.NodeWithData(
+			scheduler.NodeData{
+				Step: digraph.Step{Name: "1", Command: "true"},
+				State: scheduler.NodeState{
+					Status: scheduler.NodeStatusSuccess,
+				},
+			}),
+		scheduler.NodeWithData(
+			scheduler.NodeData{
+				Step: digraph.Step{Name: "2", Command: "true", Depends: []string{"1"}},
+				State: scheduler.NodeState{
+					Status: scheduler.NodeStatusError,
+				},
+			},
+		),
+		scheduler.NodeWithData(
+			scheduler.NodeData{
+				Step: digraph.Step{Name: "3", Command: "true", Depends: []string{"2"}},
+				State: scheduler.NodeState{
+					Status: scheduler.NodeStatusCancel,
+				},
+			},
+		),
+		scheduler.NodeWithData(
+			scheduler.NodeData{
+				Step: digraph.Step{Name: "4", Command: "true", Depends: []string{}},
+				State: scheduler.NodeState{
+					Status: scheduler.NodeStatusSkipped,
+				},
+			},
+		),
+		scheduler.NodeWithData(
+			scheduler.NodeData{
+				Step: digraph.Step{Name: "5", Command: "true", Depends: []string{"4"}},
+				State: scheduler.NodeState{
+					Status: scheduler.NodeStatusError,
+				},
+			},
+		),
+		scheduler.NodeWithData(
+			scheduler.NodeData{
+				Step: digraph.Step{Name: "6", Command: "true", Depends: []string{"5"}},
+				State: scheduler.NodeState{
+					Status: scheduler.NodeStatusSuccess,
+				},
+			},
+		),
+		scheduler.NodeWithData(
+			scheduler.NodeData{
+				Step: digraph.Step{Name: "7", Command: "true", Depends: []string{"6"}},
+				State: scheduler.NodeState{
+					Status: scheduler.NodeStatusSkipped,
+				},
+			},
+		),
+	}
+	ctx := context.Background()
+	_, err := scheduler.CreateStepRetryGraph(ctx, dag, nodes, "2")
+	require.NoError(t, err)
+	// Only step 2 should be reset to NodeStatusNone, downstream steps remain untouched
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[0].State().Status) // 1 (unchanged)
+	require.Equal(t, scheduler.NodeStatusNone, nodes[1].State().Status)    // 2 (reset)
+	require.Equal(t, scheduler.NodeStatusCancel, nodes[2].State().Status)  // 3 (unchanged)
+	require.Equal(t, scheduler.NodeStatusSkipped, nodes[3].State().Status) // 4 (unchanged)
+	require.Equal(t, scheduler.NodeStatusError, nodes[4].State().Status)   // 5 (unchanged)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[5].State().Status) // 6 (unchanged)
+	require.Equal(t, scheduler.NodeStatusSkipped, nodes[6].State().Status) // 7 (unchanged)
+}
+
 func TestExecutionGraphDependencies(t *testing.T) {
 	t.Parallel()
 

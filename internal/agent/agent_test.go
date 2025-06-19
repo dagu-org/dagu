@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/models"
@@ -190,6 +191,75 @@ func TestAgent_Retry(t *testing.T) {
 			if node.Status != scheduler.NodeStatusSuccess &&
 				node.Status != scheduler.NodeStatusSkipped {
 				t.Errorf("node %q is not successful: %s", node.Step.Name, node.Status)
+			}
+		}
+	})
+
+	t.Run("StepRetry", func(t *testing.T) {
+		th := test.Setup(t)
+		dag := th.DAG(t, "agent/retry.yaml")
+		dagAgent := dag.Agent()
+
+		// Run the DAG to get a failed status
+		dagAgent.RunError(t)
+		status := dagAgent.Status(th.Context)
+
+		// Save FinishedAt for all nodes before retry
+		prevFinishedAt := map[string]string{}
+		for _, node := range status.Nodes {
+			prevFinishedAt[node.Step.Name] = node.FinishedAt
+		}
+
+		// Modify the DAG to make all steps successful
+		for i := range dag.Steps {
+			dag.Steps[i].Command = "true"
+			dag.Steps[i].CmdWithArgs = "true"
+		}
+
+		// Sleep to ensure timestamps will be different
+		time.Sleep(1 * time.Second)
+
+		// Retry from step '5' using StepRetry
+		dagAgent = dag.Agent(test.WithAgentOptions(agent.Options{
+			RetryTarget: &status,
+			StepRetry:   "5",
+		}))
+		err := dagAgent.Run(context.Background())
+		require.NoError(t, err)
+
+		// Only node 5 is retried, downstream steps remain untouched
+		retried := map[string]struct{}{"5": {}}
+		// Node 2 is a false command and should remain failed
+		// Downstream nodes (6, 7, 8, 9) should remain in their previous state
+		falseSteps := map[string]struct{}{"2": {}}
+		// Check that only step '5' is rerun, all other steps remain unchanged
+		st := dagAgent.Status(th.Context)
+
+		for _, node := range st.Nodes {
+			name := node.Step.Name
+			prev := prevFinishedAt[name]
+			now := node.FinishedAt
+
+			if _, isRetried := retried[name]; isRetried {
+				// Only step '5' should be retried and successful
+				if node.Status != scheduler.NodeStatusSuccess && node.Status != scheduler.NodeStatusSkipped {
+					t.Errorf("step %q is not successful or skipped after step retry: %s", name, node.Status)
+				}
+				// FinishedAt should be fresher (more recent) than before, if it was set
+				if prev != "" && now != "" && now <= prev {
+					t.Errorf("retried step %q FinishedAt not updated: was %v, now %v", name, prev, now)
+				}
+			} else {
+				// Assert that steps with "false" commands are still failed
+				if _, isFalseStep := falseSteps[name]; isFalseStep {
+					if node.Status != scheduler.NodeStatusError {
+						t.Errorf("non-retried step %q (false command) should remain failed after step retry, got: %s", name, node.Status)
+					}
+				}
+				// FinishedAt should be unchanged for all non-retried steps
+				if prev != now {
+					t.Errorf("non-retried step %q FinishedAt changed after step retry: was %v, now %v", name, prev, now)
+				}
 			}
 		}
 	})
