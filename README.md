@@ -26,7 +26,7 @@ Dagu solves the problem of complex workflow orchestration without requiring a de
 
 After managing hundreds of cron jobs across multiple servers, I built Dagu to bring sanity to workflow automation. It handles scheduling, dependencies, error recovery, and monitoring - everything you need for production workflows, without the complexity.
 
-[**→ Learn the core concepts**](https://docs.dagu.cloud/getting-started/concepts)
+[→ Learn the core concepts](https://docs.dagu.cloud/getting-started/concepts)
 
 ### Design Philosophy
 
@@ -37,27 +37,27 @@ After managing hundreds of cron jobs across multiple servers, I built Dagu to br
 
 ## Latest Release
 
-**[v1.17.0](https://github.com/dagu-org/dagu/releases/tag/v1.17.0)** - June 17, 2025
+[v1.17.0](https://github.com/dagu-org/dagu/releases/tag/v1.17.0) - June 17, 2025
 
 Major performance improvements, hierarchical DAG execution, enhanced UI, and partial success status. [Full changelog →](https://docs.dagu.cloud/reference/changelog#v1-17-0)
 
 ## Features
 
-- **[DAG definition](https://docs.dagu.cloud/writing-workflows/examples/)** - Express complex dependencies in readable YAML
-- **[Scheduling](https://docs.dagu.cloud/features/scheduling)** - Cron expressions with timezone support
-- **[Queueing](https://docs.dagu.cloud/features/queues)** - Control concurrency with named queues
-- **[Error handling](https://docs.dagu.cloud/writing-workflows/error-handling)** - Retries, failure handlers, cleanup hooks
-- **[Conditional execution](https://docs.dagu.cloud/writing-workflows/control-flow)** - Run steps based on conditions
-- **[Parallel execution](https://docs.dagu.cloud/features/parallel-execution)** - Control concurrent step execution
-- **[Variables & Parameters](https://docs.dagu.cloud/writing-workflows/data-variables)** - Pass data between steps, parameterize workflows
-- **[Docker support](https://docs.dagu.cloud/features/executors/docker)** - Run steps in containers
-- **[SSH executor](https://docs.dagu.cloud/features/executors/ssh)** - Execute commands on remote hosts
-- **[HTTP requests](https://docs.dagu.cloud/features/executors/http)** - Integrate with APIs
-- **[Email notifications](https://docs.dagu.cloud/features/email-notifications)** - SMTP integration
-- **[Hierarchical workflows](https://docs.dagu.cloud/writing-workflows/advanced#hierarchical-workflows)** - Nest DAGs to any depth
-- **[Authentication](https://docs.dagu.cloud/features/authentication)** - Basic auth, API tokens, TLS
-- **[Web UI](https://docs.dagu.cloud/overview/web-ui)** - Real-time monitoring and control
-- **[REST API](https://docs.dagu.cloud/overview/api)** - Full programmatic access
+- [DAG definition](https://docs.dagu.cloud/writing-workflows/examples/) - Express complex dependencies in readable YAML
+- [Scheduling](https://docs.dagu.cloud/features/scheduling) - Cron expressions with timezone support
+- [Queueing](https://docs.dagu.cloud/features/queues) - Control concurrency with named queues
+- [Error handling](https://docs.dagu.cloud/writing-workflows/error-handling) - Retries, failure handlers, cleanup hooks
+- [Conditional execution](https://docs.dagu.cloud/writing-workflows/control-flow) - Run steps based on conditions
+- [Parallel execution](https://docs.dagu.cloud/features/parallel-execution) - Control concurrent step execution
+- [Variables & Parameters](https://docs.dagu.cloud/writing-workflows/data-variables) - Pass data between steps, parameterize workflows
+- [Docker support](https://docs.dagu.cloud/features/executors/docker) - Run steps in containers
+- [SSH executor](https://docs.dagu.cloud/features/executors/ssh) - Execute commands on remote hosts
+- [HTTP requests](https://docs.dagu.cloud/features/executors/http) - Integrate with APIs
+- [Email notifications](https://docs.dagu.cloud/features/email-notifications)** - SMTP integration
+- [Hierarchical workflows](https://docs.dagu.cloud/writing-workflows/advanced#hierarchical-workflows) - Nest DAGs to any depth
+- [Authentication](https://docs.dagu.cloud/features/authentication) - Basic auth, API tokens, TLS
+- [Web UI](https://docs.dagu.cloud/overview/web-ui) - Real-time monitoring and control
+- [REST API](https://docs.dagu.cloud/overview/api) - Full programmatic access
 
 ## Quick Start
 
@@ -122,12 +122,12 @@ Download from [releases](https://github.com/dagu-org/dagu/releases) and add to P
 
 ## Documentation
 
-- **[Getting Started](https://docs.dagu.cloud/getting-started/quickstart)** - Tutorial and first steps
-- **[Core Concepts](https://docs.dagu.cloud/getting-started/concepts)** - Architecture and design
-- **[Writing Workflows](https://docs.dagu.cloud/writing-workflows/)** - Complete authoring guide
-- **[CLI Reference](https://docs.dagu.cloud/reference/cli)** - Command-line usage
-- **[API Reference](https://docs.dagu.cloud/reference/api)** - REST API documentation
-- **[Configuration](https://docs.dagu.cloud/configurations/server)** - Configuration options
+- [Getting Started](https://docs.dagu.cloud/getting-started/quickstart) - Tutorial and first steps
+- [Core Concepts](https://docs.dagu.cloud/getting-started/concepts) - Architecture and design
+- [Writing Workflows](https://docs.dagu.cloud/writing-workflows/) - Complete authoring guide
+- [CLI Reference](https://docs.dagu.cloud/reference/cli) - Command-line usage
+- [API Reference](https://docs.dagu.cloud/reference/api) - REST API documentation
+- [Configuration](https://docs.dagu.cloud/configurations/server) - Configuration options
 
 ## Examples
 
