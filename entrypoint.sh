@@ -20,15 +20,15 @@ if [ "$CURRENT_UID" != "$PUID" ] || [ "$CURRENT_GID" != "$PGID" ]; then
     usermod -o -u "$PUID" dagu
 fi
 
-mkdir -p /dagu
+mkdir -p ${DAGU_HOME:-/var/lib/dagu}
 
 # If DAGU_HOME is not set, try to guess if the legacy /home directory is being
-# used. If so set the HOME to /home/dagu. Otherwise force the /dagu directory
+# used. If so set the HOME to /home/dagu. Otherwise force the /var/lib/dagu directory
 # as DAGU_HOME
 if [ -z "$DAGU_HOME" ]; then
-  # For ease of use set DAGU_HOME to /dagu so all data is located in a
-  # single directory
-  export DAGU_HOME=/dagu
+  # For ease of use set DAGU_HOME to /var/lib/dagu so all data is located in a
+  # single directory following FHS conventions
+  export DAGU_HOME=/var/lib/dagu
 fi
 
 # Run all scripts in /etc/custom-init.d. It assumes that all scripts are
