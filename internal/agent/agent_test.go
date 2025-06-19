@@ -202,7 +202,7 @@ func TestAgent_Retry(t *testing.T) {
 
 		// Run the DAG to get a failed status
 		dagAgent.RunError(t)
-		status := dagAgent.Status()
+		status := dagAgent.Status(th.Context)
 
 		// Save FinishedAt for all nodes before retry
 		prevFinishedAt := map[string]string{}
@@ -217,7 +217,7 @@ func TestAgent_Retry(t *testing.T) {
 		}
 
 		// Sleep to ensure timestamps will be different
-		time.Sleep(150 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 
 		// Retry from step '5' using StepRetry
 		dagAgent = dag.Agent(test.WithAgentOptions(agent.Options{
@@ -232,7 +232,7 @@ func TestAgent_Retry(t *testing.T) {
 		// Node 2 is a false command and not part of node 5's downstreams, so it should remain failed
 		falseSteps := map[string]struct{}{"2": {}}
 		// Check that step '5' and its downstreams are successful, and earlier steps are not rerun
-		st := dagAgent.Status()
+		st := dagAgent.Status(th.Context)
 
 		for _, node := range st.Nodes {
 			name := node.Step.Name
