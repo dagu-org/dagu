@@ -102,6 +102,9 @@ type Agent struct {
 
 	// progressDisplay is the progress display for showing real-time execution progress.
 	progressDisplay *ProgressDisplay
+
+	// stepRetry is the name of the step to retry (and its downstreams), if specified.
+	stepRetry string
 }
 
 // Options is the configuration for the Agent.
@@ -119,6 +122,8 @@ type Options struct {
 	// ProgressDisplay indicates if the progress display should be shown.
 	// This is typically enabled for CLI execution in a TTY environment.
 	ProgressDisplay bool
+	// StepRetry is the name of the step to retry (and its downstreams), if specified.
+	StepRetry string
 }
 
 // New creates a new Agent.
@@ -147,6 +152,7 @@ func New(
 		dagStore:     ds,
 		dagRunStore:  drs,
 		procStore:    ps,
+		stepRetry:    opts.StepRetry,
 	}
 
 	// Initialize progress display if enabled
@@ -693,6 +699,24 @@ func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 	for _, n := range a.retryTarget.Nodes {
 		nodes = append(nodes, n.ToNode())
 	}
+	if a.stepRetry != "" {
+		return a.setupStepRetryGraph(ctx, nodes)
+	}
+	return a.setupDefaultRetryGraph(ctx, nodes)
+}
+
+// setupStepRetryGraph sets up the graph for retrying a specific step and its downstreams.
+func (a *Agent) setupStepRetryGraph(ctx context.Context, nodes []*scheduler.Node) error {
+	graph, err := scheduler.CreateStepRetryGraph(ctx, a.dag, nodes, a.stepRetry)
+	if err != nil {
+		return err
+	}
+	a.graph = graph
+	return nil
+}
+
+// setupDefaultRetryGraph sets up the graph for the default retry behavior (all failed/canceled nodes and downstreams).
+func (a *Agent) setupDefaultRetryGraph(ctx context.Context, nodes []*scheduler.Node) error {
 	graph, err := scheduler.CreateRetryExecutionGraph(ctx, a.dag, nodes...)
 	if err != nil {
 		return err

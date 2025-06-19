@@ -263,6 +263,70 @@ func (g *ExecutionGraph) findStep(name string) (*Node, error) {
 	return nil, fmt.Errorf("%w: %s", errStepNotFound, name)
 }
 
+// CreateStepRetryGraph creates a new execution graph for retrying a specific step and its downstreams.
+// Only the specified step and all nodes downstream of it will be reset for re-execution, regardless of previous status or retry policy.
+func CreateStepRetryGraph(ctx context.Context, dag *digraph.DAG, nodes []*Node, stepName string) (*ExecutionGraph, error) {
+	graph := &ExecutionGraph{
+		nodeByID: make(map[int]*Node),
+		From:     make(map[int][]int),
+		To:       make(map[int][]int),
+		nodes:    []*Node{},
+	}
+	steps := make(map[string]digraph.Step)
+	for _, step := range dag.Steps {
+		steps[step.Name] = step
+	}
+	for _, node := range nodes {
+		node.Init()
+		graph.nodeByID[node.id] = node
+		graph.nodes = append(graph.nodes, node)
+	}
+	if err := graph.setup(); err != nil {
+		return nil, err
+	}
+
+	// Find the node for the specified step name
+	var startNode *Node
+	for _, node := range graph.nodes {
+		if node.Name() == stepName {
+			startNode = node
+			break
+		}
+	}
+	if startNode == nil {
+		return nil, fmt.Errorf("%w: %s", errStepNotFound, stepName)
+	}
+
+	// Collect all downstream nodes (including the start node itself)
+	downstream := make(map[int]bool)
+	var visit func(n *Node)
+	visit = func(n *Node) {
+		if downstream[n.id] {
+			return
+		}
+		downstream[n.id] = true
+		for _, childID := range graph.From[n.id] {
+			child := graph.nodeByID[childID]
+			visit(child)
+		}
+	}
+	visit(startNode)
+
+	// Reset state and remove retry policy for the specified node and all downstreams
+	for id := range downstream {
+		n := graph.nodeByID[id]
+		step, ok := steps[n.Name()]
+		if !ok {
+			return nil, fmt.Errorf("%w: %s", errStepNotFound, n.Name())
+		}
+		n.ClearState(step)
+		// Remove retry policy to force the step to be retried
+		n.retryPolicy = RetryPolicy{}
+	}
+
+	return graph, nil
+}
+
 var (
 	errCycleDetected = errors.New("cycle detected")
 	errStepNotFound  = errors.New("step not found")

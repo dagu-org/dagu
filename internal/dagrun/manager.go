@@ -225,6 +225,19 @@ func (m *Manager) RestartDAG(ctx context.Context, dag *digraph.DAG, opts Restart
 func (m *Manager) RetryDAGRun(ctx context.Context, dag *digraph.DAG, dagRunID string) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--run-id=%s", dagRunID))
+	return m.runRetryCommand(args, dag)
+}
+
+// RetryDAGStep retries a dag-run from a specific step by executing the configured executable with the retry command and --step flag.
+func (m *Manager) RetryDAGStep(_ context.Context, dag *digraph.DAG, dagRunID string, stepName string) error {
+	args := []string{"retry"}
+	args = append(args, fmt.Sprintf("--run-id=%s", dagRunID))
+	args = append(args, fmt.Sprintf("--step=%s", stepName))
+	return m.runRetryCommand(args, dag)
+}
+
+// runRetryCommand builds the full command and starts the process for retrying a dag-run or step.
+func (m *Manager) runRetryCommand(args []string, dag *digraph.DAG) error {
 	if configFile := config.UsedConfigFile.Load(); configFile != nil {
 		if configFile, ok := configFile.(string); ok {
 			args = append(args, "--config")

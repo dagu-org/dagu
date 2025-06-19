@@ -593,6 +593,12 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "requestId is required for retry action",
 			}
 		}
+		if request.Body.Step != nil && *request.Body.Step != "" {
+			if err := a.dagRunManager.RetryDAGStep(ctx, dag, *request.Body.RequestId, *request.Body.Step); err != nil {
+				return nil, fmt.Errorf("error retrying DAG step: %w", err)
+			}
+			return api.PostDAGAction200JSONResponse{}, nil
+		}
 		if err := a.dagRunManager.RetryDAGRun(ctx, dag, *request.Body.RequestId); err != nil {
 			return nil, fmt.Errorf("error retrying DAG: %w", err)
 		}
