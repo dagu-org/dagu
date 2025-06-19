@@ -93,12 +93,24 @@ func (store *Storage) GetMetadata(ctx context.Context, name string) (*digraph.DA
 	if err != nil {
 		return nil, fmt.Errorf("failed to locate DAG %s in search paths (%v): %w", name, store.searchPaths, err)
 	}
+
+	var dag *digraph.DAG
 	if store.fileCache == nil {
-		return digraph.Load(ctx, filePath, digraph.OnlyMetadata(), digraph.WithoutEval())
+		dag, err = digraph.Load(ctx, filePath, digraph.OnlyMetadata(), digraph.WithoutEval())
+	} else {
+		dag, err = store.fileCache.LoadLatest(filePath, func() (*digraph.DAG, error) {
+			return digraph.Load(ctx, filePath, digraph.OnlyMetadata(), digraph.WithoutEval())
+		})
 	}
-	return store.fileCache.LoadLatest(filePath, func() (*digraph.DAG, error) {
-		return digraph.Load(ctx, filePath, digraph.OnlyMetadata(), digraph.WithoutEval())
-	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Set the fileName to include the prefix
+	dag.SetFileName(name)
+
+	return dag, nil
 }
 
 // GetDetails retrieves the details of a DAG by its name.
@@ -111,11 +123,15 @@ func (store *Storage) GetDetails(ctx context.Context, name string, opts ...digra
 	loadOpts = append(loadOpts, opts...)
 	loadOpts = append(loadOpts, digraph.WithoutEval())
 
-	dat, err := digraph.Load(ctx, filePath, loadOpts...)
+	dag, err := digraph.Load(ctx, filePath, loadOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load DAG %s: %w", name, err)
 	}
-	return dat, nil
+
+	// Set the fileName to include the prefix
+	dag.SetFileName(name)
+
+	return dag, nil
 }
 
 // GetSpec retrieves the specification of a DAG by its name.
@@ -164,14 +180,31 @@ func (store *Storage) UpdateSpec(ctx context.Context, name string, spec []byte) 
 }
 
 // Create creates a new DAG with the given name and specification.
-func (store *Storage) Create(_ context.Context, name string, spec []byte) error {
+func (store *Storage) Create(ctx context.Context, name string, spec []byte) error {
 	if err := store.ensureDirExist(); err != nil {
 		return fmt.Errorf("failed to create DAGs directory %s: %w", store.baseDir, err)
 	}
+
+	// Validate the spec before saving it.
+	dag, err := digraph.LoadYAML(ctx, spec, digraph.WithoutEval())
+	if err != nil {
+		return err
+	}
+	if err := dag.Validate(); err != nil {
+		return err
+	}
+
 	filePath := store.generateFilePath(name)
 	if fileExists(filePath) {
 		return models.ErrDAGAlreadyExists
 	}
+
+	// Create parent directories if needed
+	parentDir := filepath.Dir(filePath)
+	if err := os.MkdirAll(parentDir, 0750); err != nil {
+		return fmt.Errorf("failed to create parent directories for DAG %s: %w", name, err)
+	}
+
 	if err := os.WriteFile(filePath, spec, defaultPerm); err != nil {
 		return fmt.Errorf("failed to write DAG %s: %w", name, err)
 	}
@@ -208,8 +241,17 @@ func (store *Storage) ensureDirExist() error {
 
 // List lists DAGs with pagination support.
 func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (models.PaginatedResult[*digraph.DAG], []string, error) {
+	// Use ListWithPrefix with empty prefix for backward compatibility
+	result, _, errs, err := store.ListWithPrefix(ctx, "", opts)
+	return result, errs, err
+}
+
+// ListWithPrefix lists DAGs within a specific prefix/directory with pagination support.
+// nolint: revive
+func (store *Storage) ListWithPrefix(ctx context.Context, prefix string, opts models.ListDAGsOptions) (models.PaginatedResult[*digraph.DAG], []string, []string, error) {
 	var dags []*digraph.DAG
 	var errList []string
+	var subdirs []string
 	var totalCount int
 
 	if opts.Paginator == nil {
@@ -217,23 +259,48 @@ func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (mo
 		opts.Paginator = &p
 	}
 
-	entries, err := os.ReadDir(store.baseDir)
-	if err != nil {
-		errList = append(errList, fmt.Sprintf("failed to read directory %s: %s", store.baseDir, err))
-		return models.NewPaginatedResult(dags, totalCount, *opts.Paginator), errList, err
+	// Normalize the prefix
+	prefix = fileutil.NormalizeDAGPath(prefix)
+
+	// Determine the directory to read
+	targetDir := store.baseDir
+	if prefix != "" {
+		targetDir = filepath.Join(store.baseDir, prefix)
 	}
 
+	entries, err := os.ReadDir(targetDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Return empty result if directory doesn't exist
+			return models.NewPaginatedResult(dags, totalCount, *opts.Paginator), subdirs, errList, nil
+		}
+		errList = append(errList, fmt.Sprintf("failed to read directory %s: %s", targetDir, err))
+		return models.NewPaginatedResult(dags, totalCount, *opts.Paginator), subdirs, errList, err
+	}
+
+	// Collect subdirectories
+	for _, entry := range entries {
+		if entry.IsDir() {
+			subdirs = append(subdirs, entry.Name())
+		}
+	}
+
+	// Process DAG files
 	for _, entry := range entries {
 		if entry.IsDir() || !fileutil.IsYAMLFile(entry.Name()) {
 			continue
 		}
 
 		baseName := path.Base(entry.Name())
-		dagName := strings.TrimSuffix(baseName, path.Ext(baseName))
+		nameWithoutExt := strings.TrimSuffix(baseName, path.Ext(baseName))
+
+		// Create the full DAG name with prefix
+		dagName := fileutil.JoinDAGPath(prefix, nameWithoutExt)
+
 		if opts.Name != "" && opts.Tag == "" {
 			// If tag is not provided, check before reading the file to avoid
 			// unnecessary file read and parsing.
-			if !containsSearchText(dagName, opts.Name) {
+			if !containsSearchText(nameWithoutExt, opts.Name) && !containsSearchText(dagName, opts.Name) {
 				// Return early if the name does not match the search text.
 				continue
 			}
@@ -246,7 +313,7 @@ func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (mo
 			continue
 		}
 
-		if opts.Name != "" && !containsSearchText(dagName, opts.Name) {
+		if opts.Name != "" && !containsSearchText(nameWithoutExt, opts.Name) && !containsSearchText(dagName, opts.Name) {
 			continue
 		}
 
@@ -264,7 +331,7 @@ func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (mo
 		dags, totalCount, *opts.Paginator,
 	)
 
-	return result, errList, nil
+	return result, subdirs, errList, nil
 }
 
 // Grep searches for a pattern in all DAGs.
@@ -282,17 +349,35 @@ func (store *Storage) Grep(ctx context.Context, pattern string) (
 		return
 	}
 
-	entries, err := os.ReadDir(store.baseDir)
+	// Recursively search all directories
+	err = store.grepRecursive(ctx, store.baseDir, "", pattern, &ret, &errs)
+
+	return ret, errs, err
+}
+
+// grepRecursive recursively searches for a pattern in DAG files
+func (store *Storage) grepRecursive(ctx context.Context, dir string, prefix string, pattern string,
+	results *[]*models.GrepDAGsResult, errs *[]string) error {
+
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		logger.Error(ctx, "Failed to read directory", "dir", store.baseDir, "err", err)
+		logger.Error(ctx, "Failed to read directory", "dir", dir, "err", err)
+		return err
 	}
 
 	for _, entry := range entries {
-		if fileutil.IsYAMLFile(entry.Name()) {
-			filePath := filepath.Join(store.baseDir, entry.Name())
+		if entry.IsDir() {
+			// Recursively search subdirectories
+			subPrefix := fileutil.JoinDAGPath(prefix, entry.Name())
+			subDir := filepath.Join(dir, entry.Name())
+			if err := store.grepRecursive(ctx, subDir, subPrefix, pattern, results, errs); err != nil {
+				*errs = append(*errs, fmt.Sprintf("failed to search directory %s: %s", subDir, err))
+			}
+		} else if fileutil.IsYAMLFile(entry.Name()) {
+			filePath := filepath.Join(dir, entry.Name())
 			dat, err := os.ReadFile(filePath) //nolint:gosec
 			if err != nil {
-				logger.Error(ctx, "Failed to read DAG file", "file", entry.Name(), "err", err)
+				logger.Error(ctx, "Failed to read DAG file", "file", filePath, "err", err)
 				continue
 			}
 			matches, err := grep.Grep(dat, fmt.Sprintf("(?i)%s", pattern), grep.DefaultGrepOptions)
@@ -300,22 +385,26 @@ func (store *Storage) Grep(ctx context.Context, pattern string) (
 				if errors.Is(err, grep.ErrNoMatch) {
 					continue
 				}
-				errs = append(errs, fmt.Sprintf("grep %s failed: %s", entry.Name(), err))
+				*errs = append(*errs, fmt.Sprintf("grep %s failed: %s", filePath, err))
 				continue
 			}
+
+			nameWithoutExt := strings.TrimSuffix(entry.Name(), path.Ext(entry.Name()))
+			dagName := fileutil.JoinDAGPath(prefix, nameWithoutExt)
+
 			dag, err := digraph.Load(ctx, filePath, digraph.OnlyMetadata(), digraph.WithoutEval())
 			if err != nil {
-				errs = append(errs, fmt.Sprintf("check %s failed: %s", entry.Name(), err))
+				*errs = append(*errs, fmt.Sprintf("check %s failed: %s", filePath, err))
 				continue
 			}
-			ret = append(ret, &models.GrepDAGsResult{
-				Name:    strings.TrimSuffix(entry.Name(), path.Ext(entry.Name())),
+			*results = append(*results, &models.GrepDAGsResult{
+				Name:    dagName,
 				DAG:     dag,
 				Matches: matches,
 			})
 		}
 	}
-	return ret, errs, nil
+	return nil
 }
 
 // ToggleSuspend toggles the suspension state of a DAG.
@@ -347,18 +436,28 @@ func (store *Storage) Rename(_ context.Context, oldID, newID string) error {
 	if fileExists(newFilePath) {
 		return models.ErrDAGAlreadyExists
 	}
+
+	// Create parent directory if needed
+	parentDir := filepath.Dir(newFilePath)
+	if err := os.MkdirAll(parentDir, 0750); err != nil {
+		return fmt.Errorf("failed to create parent directory for %s: %w", newID, err)
+	}
+
 	return os.Rename(oldFilePath, newFilePath)
 }
 
 // generateFilePath generates the file path for a DAG by its name.
 func (store *Storage) generateFilePath(name string) string {
-	if strings.Contains(name, string(filepath.Separator)) {
-		filePath, err := filepath.Abs(name)
-		if err == nil {
-			return filePath
-		}
+	// Normalize the DAG path
+	name = fileutil.NormalizeDAGPath(name)
+
+	// If the name already contains a separator and is an absolute path, use it
+	if filepath.IsAbs(name) {
+		return fileutil.EnsureYAMLExtension(name)
 	}
-	filePath := fileutil.EnsureYAMLExtension(path.Join(store.baseDir, name))
+
+	// Otherwise, join with base directory
+	filePath := fileutil.EnsureYAMLExtension(filepath.Join(store.baseDir, name))
 	return filepath.Clean(filePath)
 }
 
@@ -394,29 +493,10 @@ func (store *Storage) TagList(ctx context.Context) ([]string, []string, error) {
 		tagSet  = make(map[string]struct{})
 	)
 
-	entries, err := os.ReadDir(store.baseDir)
-	if err != nil {
-		errList = append(errList, fmt.Sprintf("failed to read directory %s: %s", store.baseDir, err))
+	// Recursively collect tags from all directories
+	if err := store.collectTagsRecursive(ctx, store.baseDir, "", &tagSet, &errList); err != nil {
+		errList = append(errList, fmt.Sprintf("failed to collect tags: %s", err))
 		return nil, errList, err
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() || !fileutil.IsYAMLFile(entry.Name()) {
-			continue
-		}
-
-		baseName := path.Base(entry.Name())
-		dagName := strings.TrimSuffix(baseName, path.Ext(baseName))
-
-		parsedDAG, err := store.GetMetadata(ctx, dagName)
-		if err != nil {
-			errList = append(errList, fmt.Sprintf("reading %s failed: %s", entry.Name(), err))
-			continue
-		}
-
-		for _, tag := range parsedDAG.Tags {
-			tagSet[tag] = struct{}{}
-		}
 	}
 
 	tagList := make([]string, 0, len(tagSet))
@@ -424,6 +504,43 @@ func (store *Storage) TagList(ctx context.Context) ([]string, []string, error) {
 		tagList = append(tagList, tag)
 	}
 	return tagList, errList, nil
+}
+
+// collectTagsRecursive recursively collects tags from DAG files
+func (store *Storage) collectTagsRecursive(ctx context.Context, dir string, prefix string,
+	tagSet *map[string]struct{}, errList *[]string) error {
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			// Recursively collect from subdirectories
+			subPrefix := fileutil.JoinDAGPath(prefix, entry.Name())
+			subDir := filepath.Join(dir, entry.Name())
+			if err := store.collectTagsRecursive(ctx, subDir, subPrefix, tagSet, errList); err != nil {
+				*errList = append(*errList, fmt.Sprintf("failed to read directory %s: %s", subDir, err))
+			}
+		} else if fileutil.IsYAMLFile(entry.Name()) {
+			baseName := path.Base(entry.Name())
+			nameWithoutExt := strings.TrimSuffix(baseName, path.Ext(baseName))
+			dagName := fileutil.JoinDAGPath(prefix, nameWithoutExt)
+
+			parsedDAG, err := store.GetMetadata(ctx, dagName)
+			if err != nil {
+				*errList = append(*errList, fmt.Sprintf("reading %s failed: %s", dagName, err))
+				continue
+			}
+
+			for _, tag := range parsedDAG.Tags {
+				(*tagSet)[tag] = struct{}{}
+			}
+		}
+	}
+
+	return nil
 }
 
 // CreateFlag creates the given file.

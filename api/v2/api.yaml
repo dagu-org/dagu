@@ -53,7 +53,7 @@ paths:
   /dags:
     get:
       summary: "List all available DAGs"
-      description: "Retrieves DAG definitions with optional filtering by name and tags"
+      description: "Retrieves DAG definitions with optional filtering by name and tags. Returns all DAGs recursively if no prefix is specified."
       operationId: "listDAGs"
       tags:
         - "dags"
@@ -73,6 +73,13 @@ paths:
           schema:
             type: "string"
           description: "Filter DAGs by tag"
+        - name: "prefix"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            pattern: "^[a-zA-Z0-9_-]+(/[a-zA-Z0-9_-]+)*$"
+          description: "Filter DAGs by prefix/directory (e.g., 'workflow' or 'workflow/etl')"
       responses:
         "200":
           description: "A successful response"
@@ -91,12 +98,18 @@ paths:
                     description: "List of errors encountered during the request"
                     items:
                       type: string
+                  subdirectories:
+                    type: array
+                    description: "List of subdirectories within the specified prefix"
+                    items:
+                      type: string
                   pagination:
                     $ref: "#/components/schemas/Pagination"
                 required:
                   - dags
                   - errors
                   - pagination
+                  - subdirectories
         default:
           description: "Generic error response"
           content:
@@ -106,7 +119,7 @@ paths:
 
     post:
       summary: "Create a new DAG definition"
-      description: "Creates a new empty DAG file with the specified name"
+      description: "Creates a new empty DAG file with the specified name. Supports creating DAGs in subdirectories using prefixed names."
       operationId: "createNewDAG"
       tags:
         - "dags"
@@ -120,7 +133,7 @@ paths:
               type: object
               properties:
                 name:
-                  $ref: "#/components/schemas/DAGName"
+                  $ref: "#/components/schemas/DAGFileName"
               required:
                 - name
       responses:
@@ -1346,10 +1359,11 @@ components:
 
     DAGFileName:
       type: string
-      # only allows alphanumeric characters, underscores, and hyphens
+      # allows alphanumeric characters, underscores, hyphens, and forward slashes for prefixes
       format: "regex"
-      pattern: "^[a-zA-Z0-9_-]+$"
-      description: "Name of the DAG file"
+      pattern: "^[a-zA-Z0-9_-]+(/[a-zA-Z0-9_-]+)*$"
+      description: "Name of the DAG file, optionally including directory prefix (e.g., 'workflow/task1')"
+      example: "workflow/etl/extract_users"
 
     DAGName:
       type: string
