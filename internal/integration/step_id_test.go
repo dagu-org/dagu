@@ -71,8 +71,8 @@ steps:
       - success
       - failure
     command: |
-      echo "success_code=${success.exit_code}"
-      echo "failure_code=${failure.exit_code}"
+      echo "success_code=${success.exitCode}"
+      echo "failure_code=${failure.exitCode}"
     output: EXIT_CODES
 `,
 			expectedStatus: scheduler.StatusPartialSuccess,

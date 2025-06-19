@@ -591,7 +591,7 @@ steps:
     output: DATA
   - name: process if valid
     command: |
-      echo "Exit code: ${extract.exit_code}"
+      echo "Exit code: ${extract.exitCode}"
       echo "Stdout path: ${extract.stdout}"
     depends: extract
 ```

@@ -37,7 +37,7 @@ steps:
       # Access properties via ID
       echo "Stdout file: ${download.stdout}"    # Path to stdout log file
       echo "Stderr file: ${download.stderr}"    # Path to stderr log file
-      echo "Exit code: ${download.exit_code}"   # Process exit code
+      echo "Exit code: ${download.exitCode}"   # Process exit code
 ```
 
 **Benefits:**
@@ -52,7 +52,7 @@ steps:
 |----------|-------------|---------|--------------|
 | `${id.stdout}` | Path to stdout log file | `${download.stdout}` | Always |
 | `${id.stderr}` | Path to stderr log file | `${download.stderr}` | Always |
-| `${id.exit_code}` | Process exit code | `${download.exit_code}` | After execution |
+| `${id.exitCode}` | Process exit code | `${download.exitCode}` | After execution |
 
 ## Implementation Architecture
 

@@ -151,7 +151,7 @@ steps:
   - name: process if valid
     command: |
       # Reference step properties using IDs
-      echo "Exit code: ${extract.exit_code}"
+      echo "Exit code: ${extract.exitCode}"
       echo "Stdout path: ${extract.stdout}"
       echo "Stderr path: ${extract.stderr}"
 ```
@@ -159,7 +159,7 @@ steps:
 Available step properties when using ID references:
 - `${id.stdout}`: Path to stdout file
 - `${id.stderr}`: Path to stderr file  
-- `${id.exit_code}`: Exit code of the step
+- `${id.exitCode}`: Exit code of the step
 
 ## Command Substitution
 

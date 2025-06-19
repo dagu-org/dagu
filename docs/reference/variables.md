@@ -240,18 +240,18 @@ steps:
       
   - name: check-result
     command: |
-      if [ "${risky.exit_code}" = "0" ]; then
+      if [ "${risky.exitCode}" = "0" ]; then
         echo "Success! Output was:"
         cat ${risky.stdout}
       else
-        echo "Failed with code ${risky.exit_code}"
+        echo "Failed with code ${risky.exitCode}"
         cat ${risky.stderr}
       fi
     depends: risky-operation
 ```
 
 Available properties:
-- `${id.exit_code}` - Exit code of the step
+- `${id.exitCode}` - Exit code of the step
 - `${id.stdout}` - Path to stdout log file
 - `${id.stderr}` - Path to stderr log file
 

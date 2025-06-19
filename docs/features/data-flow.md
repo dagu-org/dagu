@@ -197,18 +197,18 @@ steps:
       
   - name: check-result
     command: |
-      if [ "${risky.exit_code}" = "0" ]; then
+      if [ "${risky.exitCode}" = "0" ]; then
         echo "Success! Checking output..."
         cat ${risky.stdout}
       else
-        echo "Failed with code ${risky.exit_code}"
+        echo "Failed with code ${risky.exitCode}"
         echo "Error log:"
         cat ${risky.stderr}
       fi
 ```
 
 Available properties:
-- `${id.exit_code}` - Exit code of the step
+- `${id.exitCode}` - Exit code of the step
 - `${id.stdout}` - Path to stdout log file
 - `${id.stderr}` - Path to stderr log file
 

@@ -428,7 +428,7 @@ func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[st
 							return match // Keep original if empty
 						}
 						return stepInfo.Stderr
-					case ".exit_code":
+					case ".exitCode", ".exit_code":
 						return stepInfo.ExitCode
 					}
 				} else {
