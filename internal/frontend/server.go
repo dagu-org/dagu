@@ -152,9 +152,23 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) {
 	}
 
 	// Serve assets with proper cache control
-	r.Get("/assets/*", func(w http.ResponseWriter, r *http.Request) {
+	assetsPath := path.Join(srv.config.Server.BasePath, "assets/*")
+	if !strings.HasPrefix(assetsPath, "/") {
+		assetsPath = "/" + assetsPath
+	}
+	
+	// Create a file server for the embedded assets
+	fileServer := http.FileServer(http.FS(assetsFS))
+	
+	// If there's a base path, we need to strip it from the request URL
+	if srv.config.Server.BasePath != "" && srv.config.Server.BasePath != "/" {
+		stripPrefix := strings.TrimSuffix(srv.config.Server.BasePath, "/")
+		fileServer = http.StripPrefix(stripPrefix, fileServer)
+	}
+	
+	r.Get(assetsPath, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "max-age=86400")
-		http.FileServer(http.FS(assetsFS)).ServeHTTP(w, r)
+		fileServer.ServeHTTP(w, r)
 	})
 
 	// Serve UI pages
