@@ -265,7 +265,7 @@ func (g *ExecutionGraph) findStep(name string) (*Node, error) {
 
 // CreateStepRetryGraph creates a new execution graph for retrying a specific step and its downstreams.
 // Only the specified step and all nodes downstream of it will be reset for re-execution, regardless of previous status or retry policy.
-func CreateStepRetryGraph(ctx context.Context, dag *digraph.DAG, nodes []*Node, stepName string) (*ExecutionGraph, error) {
+func CreateStepRetryGraph(_ context.Context, dag *digraph.DAG, nodes []*Node, stepName string) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
 		nodeByID: make(map[int]*Node),
 		From:     make(map[int][]int),
