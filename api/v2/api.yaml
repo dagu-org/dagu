@@ -1753,6 +1753,11 @@ components:
           description: "List of child DAG-runs associated with this step"
           items:
             $ref: "#/components/schemas/ChildDAGRun"
+        childrenRepeated:
+          type: array
+          description: "List of repeated child DAG-runs when using repeatPolicy"
+          items:
+            $ref: "#/components/schemas/ChildDAGRun"
         error:
           type: string
           description: "Error message if the step failed"
@@ -1779,6 +1784,7 @@ components:
       required:
         - dagRunId
         - params
+
 
     Step:
       type: object

@@ -64,6 +64,7 @@ type NodeState struct {
 	OutputVariables *executor.SyncMap
 }
 
+
 // Parallel represents the evaluated parallel execution configuration for a node.
 // It contains the expanded list of items to be processed in parallel.
 type Parallel struct {

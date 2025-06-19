@@ -24,7 +24,7 @@ type Props = {
   /** DAG file name */
   fileName: string;
   /** Function to open log viewer */
-  onViewLog?: (stepName: string, dagRunId: string) => void;
+  onViewLog?: (stepName: string, dagRunId: string, node?: components['schemas']['Node']) => void;
 };
 
 /**

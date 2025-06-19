@@ -1,6 +1,7 @@
 package scheduler_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -2103,6 +2104,60 @@ func TestScheduler_RetryPolicyDefaults(t *testing.T) {
 	node := result.Node(t, "1")
 	// Should have retried once
 	assert.Equal(t, 1, node.State().RetryCount)
+}
+
+func TestScheduler_StepRetryExecution(t *testing.T) {
+	t.Run("RetrySuccessfulStep", func(t *testing.T) {
+		sc := setupScheduler(t)
+
+		// A -> B -> C, all successful
+		dag := &digraph.DAG{
+			Steps: []digraph.Step{
+				{Name: "A", Command: "echo A"},
+				{Name: "B", Command: "echo B", Depends: []string{"A"}},
+				{Name: "C", Command: "echo C", Depends: []string{"B"}},
+			},
+		}
+
+		// Initial run - all successful
+		graph := sc.newGraph(t,
+			successStep("A"),
+			successStep("B", "A"),
+			successStep("C", "B"),
+		)
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		result.AssertNodeStatus(t, "A", scheduler.NodeStatusSuccess)
+		result.AssertNodeStatus(t, "B", scheduler.NodeStatusSuccess)
+		result.AssertNodeStatus(t, "C", scheduler.NodeStatusSuccess)
+
+		// Create nodes with their current states
+		nodes := []*scheduler.Node{
+			scheduler.NodeWithData(scheduler.NodeData{
+				Step:  dag.Steps[0],
+				State: scheduler.NodeState{Status: scheduler.NodeStatusSuccess},
+			}),
+			scheduler.NodeWithData(scheduler.NodeData{
+				Step:  dag.Steps[1],
+				State: scheduler.NodeState{Status: scheduler.NodeStatusSuccess},
+			}),
+			scheduler.NodeWithData(scheduler.NodeData{
+				Step:  dag.Steps[2],
+				State: scheduler.NodeState{Status: scheduler.NodeStatusSuccess},
+			}),
+		}
+
+		// Retry step B
+		retryGraph, err := scheduler.CreateStepRetryGraph(context.Background(), dag, nodes, "B")
+		require.NoError(t, err)
+
+		// Schedule the retry
+		retryResult := graphHelper{testHelper: sc, ExecutionGraph: retryGraph}.Schedule(t, scheduler.StatusSuccess)
+
+		// A and C should remain unchanged, only B should be re-executed
+		retryResult.AssertNodeStatus(t, "A", scheduler.NodeStatusSuccess)
+		retryResult.AssertNodeStatus(t, "B", scheduler.NodeStatusSuccess)
+		retryResult.AssertNodeStatus(t, "C", scheduler.NodeStatusSuccess)
+	})
 }
 
 // TestScheduler_StepIDAccess tests that step ID variables are expanded correctly

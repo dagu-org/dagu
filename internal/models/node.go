@@ -96,6 +96,10 @@ func newNode(node scheduler.NodeData) *Node {
 	if node.State.Error != nil {
 		errText = node.State.Error.Error()
 	}
+	childrenRepeated := make([]ChildDAGRun, len(node.State.ChildrenRepeated))
+	for i, child := range node.State.ChildrenRepeated {
+		childrenRepeated[i] = ChildDAGRun(child)
+	}
 	return &Node{
 		Step:             node.Step,
 		Stdout:           node.State.Stdout,
@@ -109,7 +113,7 @@ func newNode(node scheduler.NodeData) *Node {
 		Repeated:         node.State.Repeated,
 		Error:            errText,
 		Children:         children,
-		ChildrenRepeated: make([]ChildDAGRun, len(node.State.ChildrenRepeated)),
+		ChildrenRepeated: childrenRepeated,
 		OutputVariables:  node.State.OutputVariables,
 	}
 }

@@ -14,6 +14,7 @@ type LogViewerProps = {
   isInModal?: boolean;
   dagRun?: components['schemas']['DAGRunDetails'];
   stream?: 'stdout' | 'stderr';
+  node?: components['schemas']['Node'];
 };
 
 /**
@@ -30,6 +31,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
   isInModal = true,
   dagRun,
   stream = 'stdout',
+  node,
 }) => {
   // Determine the title based on the log type
   const title =
@@ -64,6 +66,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
               stepName={stepName}
               dagRun={dagRun}
               stream={stream}
+              node={node}
             />
           )
         )}

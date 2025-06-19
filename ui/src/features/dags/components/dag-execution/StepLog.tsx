@@ -38,6 +38,8 @@ type Props = {
   dagRun?: components['schemas']['DAGRunDetails'];
   /** Whether to show stdout or stderr logs */
   stream?: 'stdout' | 'stderr';
+  /** Node information (optional) - contains repeated log files */
+  node?: components['schemas']['Node'];
 };
 
 /**
@@ -59,6 +61,7 @@ function StepLog({
   stepName,
   dagRun,
   stream = 'stdout',
+  node,
 }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const [viewMode, setViewMode] = useState<'tail' | 'head' | 'page'>('tail');
@@ -433,7 +436,7 @@ function StepLog({
           </div>
         )}
         <pre className="h-full font-mono text-sm text-white">
-          {lines.map((line, index) => (
+            {lines.map((line, index) => (
             <div
               key={index}
               className="flex hover:bg-zinc-800 px-2 py-0.5 rounded"
