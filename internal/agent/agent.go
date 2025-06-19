@@ -103,7 +103,7 @@ type Agent struct {
 	// progressDisplay is the progress display for showing real-time execution progress.
 	progressDisplay *ProgressDisplay
 
-	// stepRetry is the name of the step to retry (and its downstreams), if specified.
+	// stepRetry is the name of the step to retry, if specified.
 	stepRetry string
 }
 
@@ -122,7 +122,7 @@ type Options struct {
 	// ProgressDisplay indicates if the progress display should be shown.
 	// This is typically enabled for CLI execution in a TTY environment.
 	ProgressDisplay bool
-	// StepRetry is the name of the step to retry (and its downstreams), if specified.
+	// StepRetry is the name of the step to retry, if specified.
 	StepRetry string
 }
 
@@ -705,7 +705,7 @@ func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 	return a.setupDefaultRetryGraph(ctx, nodes)
 }
 
-// setupStepRetryGraph sets up the graph for retrying a specific step and its downstreams.
+// setupStepRetryGraph sets up the graph for retrying a specific step.
 func (a *Agent) setupStepRetryGraph(ctx context.Context, nodes []*scheduler.Node) error {
 	graph, err := scheduler.CreateStepRetryGraph(ctx, a.dag, nodes, a.stepRetry)
 	if err != nil {

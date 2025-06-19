@@ -797,7 +797,7 @@ paths:
                   description: "ID of the DAG-run to retry"
                 stepName:
                   type: string
-                  description: "Optional. If provided, only this step and its downstreams will be retried."
+                  description: "Optional. If provided, only this step will be retried."
               required:
                 - dagRunId
       responses:

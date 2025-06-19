@@ -578,7 +578,7 @@ function NodeStatusTableRow({
                 <DialogTitle>Retry from this step?</DialogTitle>
               </DialogHeader>
               <div className="py-2 text-sm">
-                This will re-execute <b>{node.step.name}</b> and all downstream steps. Are you sure?
+                This will re-execute <b>{node.step.name}</b>. Are you sure?
                 {error && <div className="text-red-500 mt-2">{error}</div>}
                 {success && <div className="text-green-600 mt-2">Retry started!</div>}
               </div>
@@ -864,7 +864,7 @@ function NodeStatusTableRow({
               <DialogTitle>Retry from this step?</DialogTitle>
             </DialogHeader>
             <div className="py-2 text-sm">
-              This will re-execute <b>{node.step.name}</b> and all downstream steps. Are you sure?
+              This will re-execute <b>{node.step.name}</b>. Are you sure?
               {error && <div className="text-red-500 mt-2">{error}</div>}
               {success && <div className="text-green-600 mt-2">Retry started!</div>}
             </div>

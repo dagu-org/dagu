@@ -21,7 +21,7 @@ func CmdRetry() *cobra.Command {
 
 Flags:
   --run-id string (required) Unique identifier of the DAG-run to retry.
-  --step string (optional) Retry only the specified step and its downstreams.
+  --step string (optional) Retry only the specified step.
 
 Examples:
   dagu retry --run-id=abc123 my_dag
@@ -35,7 +35,7 @@ Examples:
 var retryFlags = []commandLineFlag{dagRunIDFlagRetry, {
 	name:         "step",
 	shorthand:    "",
-	usage:        "Retry only the specified step and its downstreams (optional)",
+	usage:        "Retry only the specified step (optional)",
 	defaultValue: "",
 }}
 
