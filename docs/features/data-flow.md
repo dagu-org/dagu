@@ -484,4 +484,4 @@ steps:
 
 - [Writing Workflows](/writing-workflows/data-variables) - Detailed variable guide
 - [Variables Reference](/reference/variables) - Complete variable reference
-- [Examples](/writing-workflows/examples/) - Data flow examples
+- [Examples](/writing-workflows/examples) - Data flow examples

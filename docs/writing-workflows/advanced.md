@@ -223,6 +223,6 @@ steps:
 
 ## See Also
 
-- [Examples](/writing-workflows/examples/) - See these patterns in action
+- [Examples](/writing-workflows/examples) - See these patterns in action
 - [Reference](/reference/yaml) - Complete YAML specification
 - [Features](/features/) - Explore all capabilities

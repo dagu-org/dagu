@@ -90,4 +90,4 @@ steps:
 ## See Also
 
 - [Data & Variables](/writing-workflows/data-variables) - Complete variable guide
-- [Examples](/writing-workflows/examples/) - Real-world examples
+- [Examples](/writing-workflows/examples) - Real-world examples

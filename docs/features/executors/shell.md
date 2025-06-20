@@ -138,4 +138,4 @@ steps:
 
 - [Docker Executor](/features/executors/docker) - Container execution
 - [SSH Executor](/features/executors/ssh) - Remote commands
-- [Command Substitution](/features/command-substitution) - Dynamic values
+- [Command Substitution](/writing-workflows/data-variables#command-substitution) - Dynamic values

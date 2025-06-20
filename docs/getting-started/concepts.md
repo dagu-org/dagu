@@ -170,7 +170,7 @@ steps:
     shell: bash  # or sh, zsh
 ```
 
-See [Shell Executor](/features/executors/shell/) for more details.
+See [Shell Executor](/features/executors/shell) for more details.
 
 ### Docker
 
@@ -188,7 +188,7 @@ steps:
     command: python script.py
 ```
 
-See [Docker Executor](/features/executors/docker/) for more details.
+See [Docker Executor](/features/executors/docker) for more details.
 
 ### SSH
 
@@ -206,7 +206,7 @@ steps:
     command: ./remote-script.sh
 ```
 
-See [SSH Executor](/features/executors/ssh/) for more details.
+See [SSH Executor](/features/executors/ssh) for more details.
 
 ### HTTP
 
@@ -224,7 +224,7 @@ steps:
           Authorization: Bearer ${API_TOKEN}
 ```
 
-See [HTTP Executor](/features/executors/http/) for more details.
+See [HTTP Executor](/features/executors/http) for more details.
 
 ## Scheduling
 
@@ -250,7 +250,7 @@ schedule:
   stop: "0 18 * * *"   # Stop at 6 PM
 ```
 
-See [Scheduling](/features/scheduling/) for more details.
+See [Scheduling](/features/scheduling) for more details.
 
 ## Lifecycle Handlers
 
@@ -275,5 +275,5 @@ handlerOn:
 ## What's Next?
 
 - [Writing Workflows](/writing-workflows/) - Create your own workflows
-- [Examples](/writing-workflows/examples/) - Ready-to-use patterns
+- [Examples](/writing-workflows/examples) - Ready-to-use patterns
 - [CLI Reference](/reference/cli) - Command-line usage

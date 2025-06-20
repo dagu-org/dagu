@@ -447,4 +447,4 @@ None in v1.16.0
 
 - [Installation Guide](/getting-started/installation) - Upgrade instructions
 - [Configuration Reference](/reference/config) - New configuration options
-- [Examples](/writing-workflows/examples/) - New feature examples
+- [Examples](/writing-workflows/examples) - New feature examples

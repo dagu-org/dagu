@@ -143,4 +143,4 @@ schedule:
 
 - [Queues](/features/queues) - Advanced queue management
 - [Error Handling](/writing-workflows/error-handling) - Handle failures in scheduled jobs
-- [Monitoring](/operations/monitoring) - Track scheduled executions
+- [Monitoring](/configurations/operations#prometheus-metrics) - Track scheduled executions

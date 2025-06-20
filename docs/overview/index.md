@@ -71,4 +71,4 @@ Built-in scheduling, error handling, retries, logging, and monitoring. Everythin
 
 - [Quick Start Guide](/getting-started/quickstart) - Up and running in 2 minutes
 - [Core Concepts](/getting-started/concepts) - Understand how Dagu works
-- [Examples](/writing-workflows/examples/) - Ready-to-use workflow patterns
+- [Examples](/writing-workflows/examples) - Ready-to-use workflow patterns

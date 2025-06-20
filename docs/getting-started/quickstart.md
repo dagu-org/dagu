@@ -241,5 +241,5 @@ The workflow will execute every day at 2 AM.
 
 - [Core Concepts](/getting-started/concepts) - Understand Dagu's architecture
 - [Writing Workflows](/writing-workflows/) - Learn advanced features
-- [Examples](/writing-workflows/examples/) - Ready-to-use workflow patterns
+- [Examples](/writing-workflows/examples) - Ready-to-use workflow patterns
 - [CLI Reference](/reference/cli) - All command options

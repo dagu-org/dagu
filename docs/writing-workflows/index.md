@@ -161,4 +161,4 @@ The above example runs `process-file` in different processes for each file in pa
 ## Next Steps
 
 - [Basics](/writing-workflows/basics) - Start here
-- [Examples](/writing-workflows/examples/) - Complete workflow examples
+- [Examples](/writing-workflows/examples) - Complete workflow examples
