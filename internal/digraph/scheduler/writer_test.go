@@ -84,11 +84,11 @@ func TestFlushableMultiWriter_Flush(t *testing.T) {
 				var buf bytes.Buffer
 				bw := bufio.NewWriter(&buf)
 				fw := newFlushableMultiWriter(bw)
-				
+
 				// Write some data that will be buffered
 				_, err := fw.Write([]byte("buffered data"))
 				require.NoError(t, err)
-				
+
 				return fw, func() {
 					// Check that data was flushed to underlying buffer
 					assert.Equal(t, "buffered data", buf.String())
@@ -103,11 +103,11 @@ func TestFlushableMultiWriter_Flush(t *testing.T) {
 				bw1 := bufio.NewWriter(&buf1)
 				bw2 := bufio.NewWriter(&buf2)
 				fw := newFlushableMultiWriter(bw1, &buf3, bw2)
-				
+
 				// Write data
 				_, err := fw.Write([]byte("test"))
 				require.NoError(t, err)
-				
+
 				return fw, func() {
 					// Both buffered writers should be flushed
 					assert.Equal(t, "test", buf1.String())
@@ -164,11 +164,11 @@ func TestFlushableMultiWriter_Flush(t *testing.T) {
 				bw := bufio.NewWriter(&buf)
 				f := &flushableWriter{flushed: false}
 				s := &syncableWriter{synced: false}
-				
+
 				fw := newFlushableMultiWriter(bw, &bytes.Buffer{}, f, s)
 				_, err := fw.Write([]byte("mixed"))
 				require.NoError(t, err)
-				
+
 				return fw, func() {
 					assert.Equal(t, "mixed", buf.String())
 					assert.True(t, f.flushed)
