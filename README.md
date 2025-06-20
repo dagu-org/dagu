@@ -31,10 +31,9 @@ After managing hundreds of cron jobs across multiple servers, I built Dagu to br
 
 ### Design Philosophy
 
-1. **Single binary** - No databases, no message brokers. Deploy anywhere in seconds.
-2. **Language agnostic** - Execute Python, Bash, Node.js, or any command. Your existing scripts just work.
-3. **Local First** - Define and execute workflows in a single, self-contained environment-no internet required. Whether you're prototyping on your laptop, running on IoT devices, or deploying to air-gapped on-premises servers, Dagu just works.
-5. **Hierarchical DAGs** - Compose workflows from smaller workflows.
+1. **Local‑first.** Workflows should run offline on laptops, air‑gapped servers, or the cloud—your choice.  
+2. **Zero foot‑print.** One static binary; no databases, brokers, or sidecars.  
+3. **Bring‑your‑own language.** Bash, Python, Go, or anything just works.
 
 ## Features
 
@@ -234,6 +233,13 @@ steps:
 - **DevOps** - CI/CD workflows, infrastructure automation, deployment orchestration
 - **Media Processing** - Video transcoding, image manipulation, content pipelines
 - **Business Automation** - Report generation, data synchronization, scheduled tasks
+
+## Roadmap
+
+- [ ] Run steps in a DAG across multiple machines (distributed execution)
+- [ ] Track artifacts by dropping files in `$DAGU_ARTIFACTS`
+- [ ] Pause executions for webhooks, approvals, or any event (human-in-the-loop, event-driven workflows)
+- [ ] Integrate with AI agents via MCP (Model Context Protocol)
 
 ## Building from Source
 
