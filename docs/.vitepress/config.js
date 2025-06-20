@@ -178,6 +178,13 @@ export default withMermaid(
 
       socialLinks: [
         { icon: "github", link: "https://github.com/dagu-org/dagu" },
+        { 
+          icon: {
+            svg: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zM8.75 9.5c0-.69.56-1.25 1.25-1.25s1.25.56 1.25 1.25-.56 1.25-1.25 1.25S8.75 10.19 8.75 9.5zm7.25 0c0-.69.56-1.25 1.25-1.25s1.25.56 1.25 1.25-.56 1.25-1.25 1.25-1.25-.56-1.25-1.25zm-8 4c0 2.21 1.79 4 4 4s4-1.79 4-4h-8z"/></svg>'
+          }, 
+          link: "https://bsky.app/profile/dagu-org.bsky.social",
+          ariaLabel: "Bluesky"
+        },
       ],
 
       footer: {

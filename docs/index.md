@@ -210,6 +210,9 @@ steps:
   <a href="https://discord.gg/gpahPUjGRk" class="community-link">
     <span class="icon">Discord</span>
   </a>
+  <a href="https://bsky.app/profile/dagu-org.bsky.social" class="community-link">
+    <span class="icon">Bluesky</span>
+  </a>
   <a href="https://github.com/dagu-org/dagu/issues" class="community-link">
     <span class="icon">Issues</span>
   </a>
