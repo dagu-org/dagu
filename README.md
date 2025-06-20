@@ -4,7 +4,7 @@
   <h3>A portable, local-first, and language-agnostic workflow engine that runs anywhere</h3>
   
   <p>
-    <a href="https://github.com/dagu-org/dagu/releases"><img src="https://img.shields.io/github/release/dagu-org/dagu.svg?style=flat-square" alt="Latest Release"></a>
+    <a href="https://docs.dagu.cloud/reference/changelog"><img src="https://img.shields.io/github/release/dagu-org/dagu.svg?style=flat-square" alt="Latest Release"></a>
     <a href="https://github.com/dagu-org/dagu/actions/workflows/ci.yaml"><img src="https://img.shields.io/github/actions/workflow/status/dagu-org/dagu/ci.yaml?style=flat-square" alt="Build Status"></a>
     <a href="https://codecov.io/gh/dagu-org/dagu"><img src="https://img.shields.io/codecov/c/github/dagu-org/dagu?style=flat-square" alt="Code Coverage"></a>
     <a href="https://goreportcard.com/report/github.com/dagu-org/dagu"><img src="https://goreportcard.com/badge/github.com/dagu-org/dagu?style=flat-square" alt="Go Report Card"></a>
@@ -12,7 +12,7 @@
   </p>
   
   <p>
-    <a href="https://docs.dagu.cloud">Documentation</a> |
+    <a href="https://docs.dagu.cloud">Docs</a> |
     <a href="#quick-start">Quick Start</a> |
     <a href="#features">Features</a> |
     <a href="#installation">Installation</a> |
@@ -122,6 +122,7 @@ Download from [releases](https://github.com/dagu-org/dagu/releases) and add to P
 - [CLI Reference](https://docs.dagu.cloud/reference/cli) - Command-line usage
 - [API Reference](https://docs.dagu.cloud/reference/api) - REST API documentation
 - [Configuration](https://docs.dagu.cloud/configurations/server) - Configuration options
+- [Changelog](https://docs.dagu.cloud/reference/changelog) - Release notes and version history
 
 ## Examples
 
