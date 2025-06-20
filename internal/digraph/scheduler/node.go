@@ -245,8 +245,8 @@ func (n *Node) Execute(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	// Only capture output if the step succeeded
-	if output := n.Step().Output; output != "" && n.Error() == nil {
+	// Capture output if configured
+	if output := n.Step().Output; output != "" {
 		value, err := n.outputs.capturedOutput(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to capture output: %w", err)

@@ -30,11 +30,11 @@ func TestHTTPExecutor(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, status)
 
-	// Verify that only successful response is captured in output variable
+	// Verify that all responses are captured in output variables
 	dag.AssertOutputs(t, map[string]any{
 		"RET200": test.NotEmpty{},
-		"RET500": "", // Should be empty because HTTP 500 is an error
-		"RET404": "", // Should be empty because HTTP 404 is an error
+		"RET500": test.NotEmpty{}, // Now captured regardless of status code
+		"RET404": test.NotEmpty{}, // Now captured regardless of status code
 	})
 
 	// Check that HTTP responses are written to stdout for all response codes
@@ -55,13 +55,13 @@ func TestHTTPExecutor(t *testing.T) {
 			stepName:         "test_500",
 			expectedInLog:    `{"code":500,"description":"Internal Server Error"}`,
 			outputVar:        "RET500",
-			shouldHaveOutput: false, // Error responses should not be captured
+			shouldHaveOutput: true, // Now captured regardless of status code
 		},
 		{
 			stepName:         "test_404",
 			expectedInLog:    `{"code":404,"description":"Not Found"}`,
 			outputVar:        "RET404",
-			shouldHaveOutput: false, // Error responses should not be captured
+			shouldHaveOutput: true, // Now captured regardless of status code
 		},
 	}
 
@@ -141,14 +141,14 @@ func TestHTTPExecutor(t *testing.T) {
 		{
 			stepName:        "ret_500",
 			outputVar:       "RET500",
-			expectedValue:   ``, // Should be empty since RET500 is not set
-			shouldHaveValue: false,
+			expectedValue:   `{code:500,description:Internal Server Error}`, // Now captured
+			shouldHaveValue: true,
 		},
 		{
 			stepName:        "ret_404",
 			outputVar:       "RET404",
-			expectedValue:   ``, // Should be empty since RET404 is not set
-			shouldHaveValue: false,
+			expectedValue:   `{code:404,description:Not Found}`, // Now captured
+			shouldHaveValue: true,
 		},
 	}
 
