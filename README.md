@@ -1,7 +1,8 @@
 <div align="center">
   <img src="./assets/images/dagu-logo.webp" width="480" alt="Dagu Logo">
   
-  <h3>A portable, local-first, and language-agnostic workflow engine that runs anywhere</h3>
+  <h3>Local-First Workflow Engine, Built for Self-Hosting</h3>
+  <p>Zero dependencies. Language agnostic. Self-contained.</p>
   
   <p>
     <a href="https://docs.dagu.cloud/reference/changelog"><img src="https://img.shields.io/github/release/dagu-org/dagu.svg?style=flat-square" alt="Latest Release"></a>
