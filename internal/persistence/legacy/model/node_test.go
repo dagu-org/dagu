@@ -76,7 +76,7 @@ func TestFromNodes(t *testing.T) {
 	nodes := model.FromNodes(nodeDataList)
 
 	assert.Len(t, nodes, 2)
-	
+
 	// Check first node
 	assert.Equal(t, "step1", nodes[0].Step.Name)
 	assert.Equal(t, "/tmp/step1.log", nodes[0].Log)
@@ -88,7 +88,7 @@ func TestFromNodes(t *testing.T) {
 	assert.Equal(t, 2, nodes[0].RetryCount)
 	assert.Equal(t, 1, nodes[0].DoneCount)
 	assert.Empty(t, nodes[0].Error)
-	
+
 	// Check second node
 	assert.Equal(t, "step2", nodes[1].Step.Name)
 	assert.Equal(t, scheduler.NodeStatusError, nodes[1].Status)
@@ -182,16 +182,16 @@ func TestNodeToNode(t *testing.T) {
 	assert.Equal(t, modelNode.Status, schedulerNode.NodeData().State.Status)
 	assert.Equal(t, modelNode.RetryCount, schedulerNode.NodeData().State.RetryCount)
 	assert.Equal(t, modelNode.DoneCount, schedulerNode.NodeData().State.DoneCount)
-	
+
 	// Check times
 	expectedStart, _ := stringutil.ParseTime(modelNode.StartedAt)
 	expectedFinish, _ := stringutil.ParseTime(modelNode.FinishedAt)
 	expectedRetry, _ := stringutil.ParseTime(modelNode.RetriedAt)
-	
+
 	assert.Equal(t, expectedStart, schedulerNode.NodeData().State.StartedAt)
 	assert.Equal(t, expectedFinish, schedulerNode.NodeData().State.FinishedAt)
 	assert.Equal(t, expectedRetry, schedulerNode.NodeData().State.RetriedAt)
-	
+
 	// Check error
 	if modelNode.Error != "" {
 		assert.NotNil(t, schedulerNode.NodeData().State.Error)
@@ -266,7 +266,7 @@ func TestErrFromText(t *testing.T) {
 			// We need to test through the public interface
 			node := &model.Node{Error: tt.input}
 			schedulerNode := node.ToNode()
-			
+
 			if tt.expected == nil {
 				assert.Nil(t, schedulerNode.NodeData().State.Error)
 			} else {
@@ -309,7 +309,7 @@ func TestErrText(t *testing.T) {
 					Error: tt.input,
 				},
 			}
-			
+
 			node := model.FromNode(nodeData)
 			assert.Equal(t, tt.expected, node.Error)
 		})

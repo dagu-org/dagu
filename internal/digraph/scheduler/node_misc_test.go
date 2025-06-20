@@ -310,7 +310,7 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := digraph.SetupEnv(context.Background(), &digraph.DAG{}, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
-			
+
 			if tt.setupEnv != nil {
 				ctx = tt.setupEnv(ctx)
 			}
@@ -324,7 +324,7 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 
 			// Now we can test the public method directly
 			runs, err := node.BuildChildDAGRuns(ctx, tt.childDAG)
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 				if tt.errorContains != "" {
@@ -415,7 +415,7 @@ func TestNodeItemToParam(t *testing.T) {
 
 			// Now we can test the public method directly
 			result, err := node.ItemToParam(tt.item)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -528,21 +528,21 @@ func TestNodeSetupAndTeardown(t *testing.T) {
 
 func TestNodeInit(t *testing.T) {
 	step := digraph.Step{Name: "test-step"}
-	
+
 	// Create multiple nodes to verify they get different IDs
 	node1 := scheduler.NewNode(step, scheduler.NodeState{})
 	node2 := scheduler.NewNode(step, scheduler.NodeState{})
 
 	// Call Init on first node
 	node1.Init()
-	
+
 	// Call Init multiple times on same node - should be idempotent
 	node1.Init()
 	node1.Init()
-	
+
 	// Call Init on second node
 	node2.Init()
-	
+
 	// While we can't directly access the ID, we can verify that
 	// two different nodes don't interfere with each other
 	// and that multiple Init calls are safe
@@ -631,36 +631,36 @@ func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			tempDir := t.TempDir()
-			
+
 			// Create DAG with output size limit
 			dag := &digraph.DAG{
 				MaxOutputSize: tt.maxOutputSize,
 			}
-			
+
 			// Setup environment with DAG
 			ctx = digraph.SetupEnv(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
-			
+
 			step := digraph.Step{
 				Name:    "test-output-capture",
 				Command: tt.command,
 				Args:    tt.args,
 				Output:  "CAPTURED_OUTPUT",
 			}
-			
+
 			node := scheduler.NewNode(step, scheduler.NodeState{})
 			node.Init()
-			
+
 			// Setup node
 			err := node.Setup(ctx, tempDir, "test-run-output")
 			require.NoError(t, err)
-			
+
 			// Execute node
 			err = node.Execute(ctx)
-			
+
 			if tt.expectSuccess {
 				// Execution should succeed
 				assert.NoError(t, err)
-				
+
 				// Check if output was captured
 				nodeData := node.NodeData()
 				if nodeData.State.OutputVariables != nil {
@@ -668,35 +668,35 @@ func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {
 					assert.True(t, ok, "Expected output variable to be captured")
 				}
 			}
-			
+
 			// Verify that MaxOutputSize is respected in the DAG configuration
 			env := executor.GetEnv(ctx)
 			assert.Equal(t, tt.maxOutputSize, env.DAG.MaxOutputSize)
-			
+
 			// Cleanup
 			err = node.Teardown(ctx)
 			assert.NoError(t, err)
 		})
 	}
-	
+
 	// Additional test to verify configuration is respected
 	t.Run("DAG MaxOutputSize configuration", func(t *testing.T) {
 		// Test that different MaxOutputSize values are properly configured
 		sizes := []int{0, 100, 1024, 1024 * 1024}
-		
+
 		for _, size := range sizes {
 			t.Run(fmt.Sprintf("size_%d", size), func(t *testing.T) {
 				ctx := context.Background()
 				dag := &digraph.DAG{
 					MaxOutputSize: size,
 				}
-				
+
 				ctx = digraph.SetupEnv(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
 				env := executor.GetEnv(ctx)
-				
+
 				// Verify the MaxOutputSize is properly set in the environment
 				assert.Equal(t, size, env.DAG.MaxOutputSize)
-				
+
 				// Create a node with output capture
 				step := digraph.Step{
 					Name:    "test-size-config",
@@ -704,10 +704,10 @@ func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {
 					Args:    []string{"test"},
 					Output:  "TEST_VAR",
 				}
-				
+
 				node := scheduler.NewNode(step, scheduler.NodeState{})
 				node.Init()
-				
+
 				// The node should respect the configured MaxOutputSize
 				// This is validated through the DAG configuration
 				assert.NotNil(t, node)
@@ -788,7 +788,7 @@ func TestNodeShouldContinue(t *testing.T) {
 				ctx := context.Background()
 				err := node.Setup(ctx, tempDir, "test-run")
 				require.NoError(t, err)
-				
+
 				// Write test output to stdout file
 				stdoutFile := node.StdoutFile()
 				err = os.WriteFile(stdoutFile, []byte("WARNING: This is just a warning\n"), 0644)
@@ -807,7 +807,7 @@ func TestNodeShouldContinue(t *testing.T) {
 				ctx := context.Background()
 				err := node.Setup(ctx, tempDir, "test-run")
 				require.NoError(t, err)
-				
+
 				// Write test output to stdout file
 				stdoutFile := node.StdoutFile()
 				err = os.WriteFile(stdoutFile, []byte("ERROR: Connection timeout after 30 seconds\n"), 0644)
@@ -836,7 +836,7 @@ func TestNodeShouldContinue(t *testing.T) {
 			// Now we can test the public method directly
 			node.SetStatus(tt.nodeStatus)
 			node.SetExitCode(tt.exitCode)
-			
+
 			result := node.ShouldContinue(ctx)
 			assert.Equal(t, tt.expectContinue, result)
 		})

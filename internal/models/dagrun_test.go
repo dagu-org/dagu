@@ -135,7 +135,7 @@ func TestListDAGRunStatusesOptions(t *testing.T) {
 	statuses := []scheduler.Status{scheduler.StatusSuccess, scheduler.StatusError}
 
 	opts := models.ListDAGRunStatusesOptions{}
-	
+
 	// Apply options
 	models.WithFrom(from)(&opts)
 	models.WithTo(to)(&opts)
@@ -174,83 +174,83 @@ func TestDAGRunStoreInterface(t *testing.T) {
 	dag := &digraph.DAG{Name: "test-dag"}
 	ts := time.Now()
 	dagRunID := "run-123"
-	
+
 	// Test CreateAttempt
 	mockAttempt := &mockDAGRunAttempt{}
 	store.On("CreateAttempt", ctx, dag, ts, dagRunID, mock.Anything).Return(mockAttempt, nil)
-	
+
 	attempt, err := store.CreateAttempt(ctx, dag, ts, dagRunID, models.NewDAGRunAttemptOptions{})
 	assert.NoError(t, err)
 	assert.Equal(t, mockAttempt, attempt)
-	
+
 	// Test RecentAttempts
 	attempts := []models.DAGRunAttempt{mockAttempt}
 	store.On("RecentAttempts", ctx, "test-dag", 10).Return(attempts)
-	
+
 	result := store.RecentAttempts(ctx, "test-dag", 10)
 	assert.Equal(t, attempts, result)
-	
+
 	// Test LatestAttempt
 	store.On("LatestAttempt", ctx, "test-dag").Return(mockAttempt, nil)
-	
+
 	latest, err := store.LatestAttempt(ctx, "test-dag")
 	assert.NoError(t, err)
 	assert.Equal(t, mockAttempt, latest)
-	
+
 	// Test ListStatuses
 	statuses := []*models.DAGRunStatus{
 		{Name: "test-dag", Status: scheduler.StatusSuccess},
 	}
 	store.On("ListStatuses", ctx, mock.Anything).Return(statuses, nil)
-	
+
 	statusList, err := store.ListStatuses(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, statuses, statusList)
-	
+
 	// Test FindAttempt
 	dagRun := digraph.DAGRunRef{Name: "test-dag", ID: "run-123"}
 	store.On("FindAttempt", ctx, dagRun).Return(mockAttempt, nil)
-	
+
 	found, err := store.FindAttempt(ctx, dagRun)
 	assert.NoError(t, err)
 	assert.Equal(t, mockAttempt, found)
-	
+
 	// Test FindChildAttempt
 	childDAGRunID := "child-run-456"
 	store.On("FindChildAttempt", ctx, dagRun, childDAGRunID).Return(mockAttempt, nil)
-	
+
 	childFound, err := store.FindChildAttempt(ctx, dagRun, childDAGRunID)
 	assert.NoError(t, err)
 	assert.Equal(t, mockAttempt, childFound)
-	
+
 	// Test RemoveOldDAGRuns
 	store.On("RemoveOldDAGRuns", ctx, "test-dag", 30).Return(nil)
-	
+
 	err = store.RemoveOldDAGRuns(ctx, "test-dag", 30)
 	assert.NoError(t, err)
-	
+
 	// Test RenameDAGRuns
 	store.On("RenameDAGRuns", ctx, "old-name", "new-name").Return(nil)
-	
+
 	err = store.RenameDAGRuns(ctx, "old-name", "new-name")
 	assert.NoError(t, err)
-	
+
 	store.AssertExpectations(t)
 }
 
 func TestDAGRunAttemptInterface(t *testing.T) {
 	ctx := context.Background()
 	attempt := &mockDAGRunAttempt{}
-	
+
 	// Test ID
 	attempt.On("ID").Return("attempt-123")
 	assert.Equal(t, "attempt-123", attempt.ID())
-	
+
 	// Test Open
 	attempt.On("Open", ctx).Return(nil)
 	err := attempt.Open(ctx)
 	assert.NoError(t, err)
-	
+
 	// Test Write
 	status := models.DAGRunStatus{
 		Name:     "test-dag",
@@ -260,143 +260,143 @@ func TestDAGRunAttemptInterface(t *testing.T) {
 	attempt.On("Write", ctx, status).Return(nil)
 	err = attempt.Write(ctx, status)
 	assert.NoError(t, err)
-	
+
 	// Test Close
 	attempt.On("Close", ctx).Return(nil)
 	err = attempt.Close(ctx)
 	assert.NoError(t, err)
-	
+
 	// Test ReadStatus
 	attempt.On("ReadStatus", ctx).Return(&status, nil)
 	readStatus, err := attempt.ReadStatus(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, &status, readStatus)
-	
+
 	// Test ReadDAG
 	dag := &digraph.DAG{Name: "test-dag"}
 	attempt.On("ReadDAG", ctx).Return(dag, nil)
 	readDAG, err := attempt.ReadDAG(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, dag, readDAG)
-	
+
 	// Test RequestCancel
 	attempt.On("RequestCancel", ctx).Return(nil)
 	err = attempt.RequestCancel(ctx)
 	assert.NoError(t, err)
-	
+
 	// Test CancelRequested
 	attempt.On("CancelRequested", ctx).Return(true, nil)
 	canceled, err := attempt.CancelRequested(ctx)
 	assert.NoError(t, err)
 	assert.True(t, canceled)
-	
+
 	attempt.AssertExpectations(t)
 }
 
 func TestDAGRunStoreErrors(t *testing.T) {
 	ctx := context.Background()
 	store := &mockDAGRunStore{}
-	
+
 	// Test error cases
 	expectedErr := errors.New("store error")
-	
+
 	// CreateAttempt error
 	store.On("CreateAttempt", ctx, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, expectedErr)
 	_, err := store.CreateAttempt(ctx, &digraph.DAG{}, time.Now(), "run-123", models.NewDAGRunAttemptOptions{})
 	assert.Equal(t, expectedErr, err)
-	
+
 	// LatestAttempt error
 	store.On("LatestAttempt", ctx, "test-dag").Return(nil, models.ErrDAGRunIDNotFound)
 	_, err = store.LatestAttempt(ctx, "test-dag")
 	assert.Equal(t, models.ErrDAGRunIDNotFound, err)
-	
+
 	// ListStatuses error
 	store.On("ListStatuses", ctx, mock.Anything).Return(nil, expectedErr)
 	_, err = store.ListStatuses(ctx)
 	assert.Equal(t, expectedErr, err)
-	
+
 	// FindAttempt error
 	dagRun := digraph.DAGRunRef{Name: "test-dag", ID: "run-123"}
 	store.On("FindAttempt", ctx, dagRun).Return(nil, models.ErrNoStatusData)
 	_, err = store.FindAttempt(ctx, dagRun)
 	assert.Equal(t, models.ErrNoStatusData, err)
-	
+
 	store.AssertExpectations(t)
 }
 
 func TestDAGRunAttemptErrors(t *testing.T) {
 	ctx := context.Background()
 	attempt := &mockDAGRunAttempt{}
-	
+
 	expectedErr := errors.New("attempt error")
-	
+
 	// Open error
 	attempt.On("Open", ctx).Return(expectedErr)
 	err := attempt.Open(ctx)
 	assert.Equal(t, expectedErr, err)
-	
+
 	// Write error
 	status := models.DAGRunStatus{}
 	attempt.On("Write", ctx, status).Return(expectedErr)
 	err = attempt.Write(ctx, status)
 	assert.Equal(t, expectedErr, err)
-	
+
 	// ReadStatus error
 	attempt.On("ReadStatus", ctx).Return(nil, models.ErrNoStatusData)
 	_, err = attempt.ReadStatus(ctx)
 	assert.Equal(t, models.ErrNoStatusData, err)
-	
+
 	// ReadDAG error
 	attempt.On("ReadDAG", ctx).Return(nil, expectedErr)
 	_, err = attempt.ReadDAG(ctx)
 	assert.Equal(t, expectedErr, err)
-	
+
 	// CancelRequested error
 	attempt.On("CancelRequested", ctx).Return(false, expectedErr)
 	_, err = attempt.CancelRequested(ctx)
 	assert.Equal(t, expectedErr, err)
-	
+
 	attempt.AssertExpectations(t)
 }
 
 func TestRemoveOldDAGRunsEdgeCases(t *testing.T) {
 	ctx := context.Background()
 	store := &mockDAGRunStore{}
-	
+
 	// Test with negative retention days (should not delete anything)
 	store.On("RemoveOldDAGRuns", ctx, "test-dag", -1).Return(nil)
 	err := store.RemoveOldDAGRuns(ctx, "test-dag", -1)
 	assert.NoError(t, err)
-	
+
 	// Test with zero retention days (should delete all except non-final statuses)
 	store.On("RemoveOldDAGRuns", ctx, "test-dag", 0).Return(nil)
 	err = store.RemoveOldDAGRuns(ctx, "test-dag", 0)
 	assert.NoError(t, err)
-	
+
 	// Test with positive retention days
 	store.On("RemoveOldDAGRuns", ctx, "test-dag", 30).Return(nil)
 	err = store.RemoveOldDAGRuns(ctx, "test-dag", 30)
 	assert.NoError(t, err)
-	
+
 	store.AssertExpectations(t)
 }
 
 func TestListDAGRunStatusesWithOptions(t *testing.T) {
 	ctx := context.Background()
 	store := &mockDAGRunStore{}
-	
+
 	// Test with multiple options
 	from := models.NewUTC(time.Now().Add(-7 * 24 * time.Hour))
 	to := models.NewUTC(time.Now())
-	
+
 	opts := []models.ListDAGRunStatusesOption{
 		models.WithFrom(from),
 		models.WithTo(to),
 		models.WithStatuses([]scheduler.Status{scheduler.StatusSuccess}),
 		models.WithName("test"),
 	}
-	
+
 	expectedStatuses := []*models.DAGRunStatus{
 		{
 			Name:     "test-dag",
@@ -404,12 +404,12 @@ func TestListDAGRunStatusesWithOptions(t *testing.T) {
 			Status:   scheduler.StatusSuccess,
 		},
 	}
-	
+
 	store.On("ListStatuses", ctx, opts).Return(expectedStatuses, nil)
-	
+
 	statuses, err := store.ListStatuses(ctx, opts...)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedStatuses, statuses)
-	
+
 	store.AssertExpectations(t)
 }
