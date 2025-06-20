@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.17.2 (2025-06-20)
+
+### Bug Fixes
+- **HTTP Executor**: Fixed output not being written to stdout (#1042) - Thanks to [@nightly-brew](https://github.com/nightly-brew) for reporting
+
+### Contributors
+
+Thanks to our contributors for this release:
+
+| Contribution | Author |
+|--------------|--------|
+| HTTP executor output capture fix | [@nightly-brew](https://github.com/nightly-brew) (report) |
+
 ## v1.17.1 (2025-06-20)
 
 ### New Features
