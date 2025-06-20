@@ -19,6 +19,7 @@ var _ Executor = (*http)(nil)
 
 type http struct {
 	stdout    io.Writer
+	stderr    io.Writer
 	req       *resty.Request
 	reqCancel context.CancelFunc
 	url       string
@@ -79,6 +80,7 @@ func newHTTP(ctx context.Context, step digraph.Step) (Executor, error) {
 
 	return &http{
 		stdout:    os.Stdout,
+		stderr:    os.Stderr,
 		req:       req,
 		reqCancel: cancel,
 		method:    method,
@@ -92,7 +94,7 @@ func (e *http) SetStdout(out io.Writer) {
 }
 
 func (e *http) SetStderr(out io.Writer) {
-	e.stdout = out
+	e.stderr = out
 }
 
 func (e *http) Kill(_ os.Signal) error {

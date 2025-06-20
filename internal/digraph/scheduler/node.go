@@ -238,10 +238,15 @@ func (n *Node) Execute(ctx context.Context) error {
 
 	n.SetExitCode(exitCode)
 
+	// Flush all output writers to ensure data is written before capturing output
+	// This is especially important for buffered writers
+	_ = n.outputs.flushWriters()
+
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	if output := n.Step().Output; output != "" {
+	// Only capture output if the step succeeded
+	if output := n.Step().Output; output != "" && n.Error() == nil {
 		value, err := n.outputs.capturedOutput(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to capture output: %w", err)
@@ -914,7 +919,7 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 
 	// Output to both log and stdout
 	if oc.stdoutRedirectWriter != nil {
-		stdout = io.MultiWriter(oc.stdoutWriter, oc.stdoutRedirectWriter)
+		stdout = executor.NewFlushableMultiWriter(oc.stdoutWriter, oc.stdoutRedirectWriter)
 	}
 
 	// Setup output capture only if not already set up
@@ -942,7 +947,7 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 	}
 
 	if oc.outputWriter != nil {
-		stdout = io.MultiWriter(stdout, oc.outputWriter)
+		stdout = executor.NewFlushableMultiWriter(stdout, oc.outputWriter)
 	}
 
 	cmd.SetStdout(stdout)
@@ -953,14 +958,14 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 		stderr = oc.stderrWriter
 	}
 	if oc.stderrRedirectWriter != nil {
-		stderr = io.MultiWriter(oc.stderrWriter, oc.stderrRedirectWriter)
+		stderr = executor.NewFlushableMultiWriter(oc.stderrWriter, oc.stderrRedirectWriter)
 	}
 	cmd.SetStderr(stderr)
 
 	return nil
 }
 
-func (oc *OutputCoordinator) closeResources(_ context.Context) error {
+func (oc *OutputCoordinator) flushWriters() error {
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
@@ -972,6 +977,17 @@ func (oc *OutputCoordinator) closeResources(_ context.Context) error {
 			}
 		}
 	}
+	return lastErr
+}
+
+func (oc *OutputCoordinator) closeResources(_ context.Context) error {
+	// First flush all writers
+	_ = oc.flushWriters()
+
+	oc.mu.Lock()
+	defer oc.mu.Unlock()
+
+	var lastErr error
 
 	// Close the output writer first to signal EOF to any readers
 	if oc.outputWriter != nil {
