@@ -12,10 +12,10 @@
   </p>
   
   <p>
-    <a href="https://docs.dagu.cloud">Documentation</a> •
-    <a href="#quick-start">Quick Start</a> •
-    <a href="#features">Features</a> •
-    <a href="#installation">Installation</a> •
+    <a href="https://docs.dagu.cloud">Documentation</a> |
+    <a href="#quick-start">Quick Start</a> |
+    <a href="#features">Features</a> |
+    <a href="#installation">Installation</a> |
     <a href="https://discord.gg/gpahPUjGRk">Community</a>
   </p>
 </div>
@@ -47,7 +47,7 @@ After managing hundreds of cron jobs across multiple servers, I built Dagu to br
 - [Docker support](https://docs.dagu.cloud/features/executors/docker) - Run steps in containers
 - [SSH executor](https://docs.dagu.cloud/features/executors/ssh) - Execute commands on remote hosts
 - [HTTP requests](https://docs.dagu.cloud/features/executors/http) - Integrate with APIs
-- [Email notifications](https://docs.dagu.cloud/features/email-notifications)** - SMTP integration
+- [Email notifications](https://docs.dagu.cloud/features/email-notifications) - SMTP integration
 - [Hierarchical workflows](https://docs.dagu.cloud/writing-workflows/advanced#hierarchical-workflows) - Nest DAGs to any depth
 - [Authentication](https://docs.dagu.cloud/features/authentication) - Basic auth, API tokens, TLS
 - [Web UI](https://docs.dagu.cloud/overview/web-ui) - Real-time monitoring and control
