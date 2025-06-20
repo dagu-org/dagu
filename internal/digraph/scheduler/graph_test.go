@@ -237,38 +237,38 @@ func TestStepRetryExecutionForSuccessfulStep(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	
+
 	// Test retrying a successful step in the middle
 	graph, err := scheduler.CreateStepRetryGraph(ctx, dag, nodes, "step2")
 	require.NoError(t, err)
 	require.NotNil(t, graph)
-	
+
 	// Only step2 should be reset, others remain unchanged
 	require.Equal(t, scheduler.NodeStatusSuccess, nodes[0].State().Status) // step1 (unchanged)
 	require.Equal(t, scheduler.NodeStatusNone, nodes[1].State().Status)    // step2 (reset)
 	require.Equal(t, scheduler.NodeStatusSuccess, nodes[2].State().Status) // step3 (unchanged)
-	
+
 	// Test retrying the first successful step
 	// Reset nodes to original state
 	nodes[1].SetStatus(scheduler.NodeStatusSuccess)
-	
+
 	graph, err = scheduler.CreateStepRetryGraph(ctx, dag, nodes, "step1")
 	require.NoError(t, err)
 	require.NotNil(t, graph)
-	
+
 	// Only step1 should be reset
 	require.Equal(t, scheduler.NodeStatusNone, nodes[0].State().Status)    // step1 (reset)
 	require.Equal(t, scheduler.NodeStatusSuccess, nodes[1].State().Status) // step2 (unchanged)
 	require.Equal(t, scheduler.NodeStatusSuccess, nodes[2].State().Status) // step3 (unchanged)
-	
+
 	// Test retrying the last successful step
 	// Reset nodes to original state
 	nodes[0].SetStatus(scheduler.NodeStatusSuccess)
-	
+
 	graph, err = scheduler.CreateStepRetryGraph(ctx, dag, nodes, "step3")
 	require.NoError(t, err)
 	require.NotNil(t, graph)
-	
+
 	// Only step3 should be reset
 	require.Equal(t, scheduler.NodeStatusSuccess, nodes[0].State().Status) // step1 (unchanged)
 	require.Equal(t, scheduler.NodeStatusSuccess, nodes[1].State().Status) // step2 (unchanged)

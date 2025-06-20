@@ -919,7 +919,7 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 
 	// Output to both log and stdout
 	if oc.stdoutRedirectWriter != nil {
-		stdout = executor.NewFlushableMultiWriter(oc.stdoutWriter, oc.stdoutRedirectWriter)
+		stdout = newFlushableMultiWriter(oc.stdoutWriter, oc.stdoutRedirectWriter)
 	}
 
 	// Setup output capture only if not already set up
@@ -947,7 +947,7 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 	}
 
 	if oc.outputWriter != nil {
-		stdout = executor.NewFlushableMultiWriter(stdout, oc.outputWriter)
+		stdout = newFlushableMultiWriter(stdout, oc.outputWriter)
 	}
 
 	cmd.SetStdout(stdout)
@@ -958,7 +958,7 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 		stderr = oc.stderrWriter
 	}
 	if oc.stderrRedirectWriter != nil {
-		stderr = executor.NewFlushableMultiWriter(oc.stderrWriter, oc.stderrRedirectWriter)
+		stderr = newFlushableMultiWriter(oc.stderrWriter, oc.stderrRedirectWriter)
 	}
 	cmd.SetStderr(stderr)
 
