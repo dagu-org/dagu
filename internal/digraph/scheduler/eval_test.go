@@ -11,6 +11,8 @@ import (
 )
 
 func TestEvalString(t *testing.T) {
+	t.Parallel()
+
 	// Create a test context with environment variables
 	ctx := context.Background()
 	env := executor.NewEnv(ctx, digraph.Step{Name: "test-step"})
@@ -192,6 +194,8 @@ func TestEvalObject(t *testing.T) {
 
 // TestEvalObjectWithExecutorConfig tests that EvalObject works correctly with the ExecutorConfig struct
 func TestEvalObjectWithExecutorConfig(t *testing.T) {
+	t.Parallel()
+
 	// Create a test context with environment variables
 	ctx := context.Background()
 	env := executor.NewEnv(ctx, digraph.Step{Name: "test-step"})
@@ -243,6 +247,8 @@ func TestEvalObjectWithExecutorConfig(t *testing.T) {
 }
 
 func TestGenerateChildDAGRunID(t *testing.T) {
+	t.Parallel()
+
 	// Create a test context with environment variables
 	ctx := context.Background()
 	env := executor.NewEnv(ctx, digraph.Step{Name: "test-step"})
@@ -297,6 +303,8 @@ func TestGenerateChildDAGRunID(t *testing.T) {
 }
 
 func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
+	t.Parallel()
+
 	// Create a test context with environment variables
 	ctx := context.Background()
 	env := executor.NewEnv(ctx, digraph.Step{Name: "test-step"})
@@ -337,9 +345,69 @@ func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
 			},
 			expected: map[string]any{
 				"items": []any{
-					map[string]any{"name": "${VAR1}"},
-					map[string]any{"name": "${VAR2}"},
+					map[string]any{"name": "value1"},
+					map[string]any{"name": "value2"},
 				},
+			},
+		},
+		{
+			name: "slice of strings with variables",
+			input: map[string]any{
+				"commands": []string{
+					"echo ${VAR1}",
+					"echo ${VAR2}",
+					"echo ${NUM}",
+				},
+			},
+			expected: map[string]any{
+				"commands": []string{
+					"echo value1",
+					"echo value2",
+					"echo 42",
+				},
+			},
+		},
+		{
+			name: "nested slices",
+			input: map[string]any{
+				"matrix": [][]string{
+					{"${VAR1}", "${VAR2}"},
+					{"${NUM}", "static"},
+				},
+			},
+			expected: map[string]any{
+				"matrix": [][]string{
+					{"value1", "value2"},
+					{"42", "static"},
+				},
+			},
+		},
+		{
+			name: "slice of interfaces",
+			input: map[string]any{
+				"mixed": []any{
+					"${VAR1}",
+					42,
+					true,
+					map[string]any{"key": "${VAR2}"},
+				},
+			},
+			expected: map[string]any{
+				"mixed": []any{
+					"value1",
+					42,
+					true,
+					map[string]any{"key": "value2"},
+				},
+			},
+		},
+		{
+			name: "empty slice",
+			input: map[string]any{
+				"empty": []string{},
+			},
+			expected: map[string]any{
+				"empty": []string{},
 			},
 		},
 		{
@@ -395,6 +463,8 @@ func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
 }
 
 func TestEvalStringEdgeCases(t *testing.T) {
+	t.Parallel()
+
 	// Create a test context with environment variables
 	ctx := digraph.SetupEnv(context.Background(), &digraph.DAG{}, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
 	env := executor.GetEnv(ctx)
@@ -460,7 +530,91 @@ func TestEvalStringEdgeCases(t *testing.T) {
 	}
 }
 
+func TestEvalObjectWithDirectStringEvaluation(t *testing.T) {
+	// Create a test context with environment variables
+	ctx := context.Background()
+	env := executor.NewEnv(ctx, digraph.Step{Name: "test-step"})
+	env.Variables.Store("STRING_VAR", "STRING_VAR=evaluated_string")
+	env.Variables.Store("PATH_VAR", "PATH_VAR=/path/to/file")
+	env.Variables.Store("COMBINED", "COMBINED=prefix")
+	ctx = executor.WithEnv(ctx, env)
+
+	tests := []struct {
+		name     string
+		input    any
+		expected any
+		wantErr  bool
+	}{
+		{
+			name:     "direct string evaluation",
+			input:    "${STRING_VAR}",
+			expected: "evaluated_string",
+			wantErr:  false,
+		},
+		{
+			name:     "string with multiple variables",
+			input:    "${PATH_VAR}/config-${STRING_VAR}.json",
+			expected: "/path/to/file/config-evaluated_string.json",
+			wantErr:  false,
+		},
+		{
+			name:     "plain string without variables",
+			input:    "no variables here",
+			expected: "no variables here",
+			wantErr:  false,
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "",
+			wantErr:  false,
+		},
+		{
+			name:     "string within map",
+			input:    map[string]any{"key": "${STRING_VAR}"},
+			expected: map[string]any{"key": "evaluated_string"},
+			wantErr:  false,
+		},
+		{
+			name: "string within nested structure",
+			input: map[string]any{
+				"config": map[string]any{
+					"path": "${PATH_VAR}",
+					"items": []string{
+						"${STRING_VAR}",
+						"${COMBINED}_suffix",
+					},
+				},
+			},
+			expected: map[string]any{
+				"config": map[string]any{
+					"path": "/path/to/file",
+					"items": []string{
+						"evaluated_string",
+						"prefix_suffix",
+					},
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := scheduler.EvalObject(ctx, tt.input)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
 func TestEvalBoolEdgeCases(t *testing.T) {
+	t.Parallel()
+
 	// Create a test context with environment variables
 	ctx := digraph.SetupEnv(context.Background(), &digraph.DAG{}, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
 

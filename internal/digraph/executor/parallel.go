@@ -59,7 +59,8 @@ func newParallelExecutor(
 		return nil, err
 	}
 
-	if step.Dir != "" && !fileutil.FileExists(step.Dir) {
+	dir := GetEnv(ctx).WorkingDir
+	if dir != "" && !fileutil.FileExists(dir) {
 		return nil, ErrWorkingDirNotExist
 	}
 
@@ -70,7 +71,7 @@ func newParallelExecutor(
 
 	return &parallelExecutor{
 		child:         child,
-		workDir:       step.Dir,
+		workDir:       dir,
 		maxConcurrent: maxConcurrent,
 		running:       make(map[string]*exec.Cmd),
 		results:       make(map[string]*ChildResult),

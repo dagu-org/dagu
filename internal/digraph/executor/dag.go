@@ -44,13 +44,14 @@ func newDAGExecutor(
 		return nil, err
 	}
 
-	if step.Dir != "" && !fileutil.FileExists(step.Dir) {
+	dir := GetEnv(ctx).WorkingDir
+	if dir != "" && !fileutil.FileExists(dir) {
 		return nil, ErrWorkingDirNotExist
 	}
 
 	return &dagExecutor{
 		child:   child,
-		workDir: step.Dir,
+		workDir: dir,
 	}, nil
 }
 

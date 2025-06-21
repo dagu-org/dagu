@@ -40,7 +40,7 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 	}
 
 	if e.config.Script != "" {
-		scriptFile, err := setupScript(ctx, digraph.Step{Dir: e.config.Dir, Script: e.config.Script})
+		scriptFile, err := setupScript(ctx, e.config.Dir, e.config.Script)
 		if err != nil {
 			e.mu.Unlock()
 			return fmt.Errorf("failed to setup script: %w", err)
@@ -227,10 +227,6 @@ func (b *shellCommandBuilder) Build(ctx context.Context) (*exec.Cmd, error) {
 }
 
 func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
-	if len(step.Dir) > 0 && !fileutil.FileExists(step.Dir) {
-		return nil, fmt.Errorf("directory does not exist: %s", step.Dir)
-	}
-
 	cfg, err := createCommandConfig(ctx, step)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create command: %w", err)
@@ -245,7 +241,7 @@ func createCommandConfig(ctx context.Context, step digraph.Step) (*commandConfig
 
 	return &commandConfig{
 		Ctx:              ctx,
-		Dir:              step.Dir,
+		Dir:              GetEnv(ctx).WorkingDir,
 		Command:          step.Command,
 		Args:             step.Args,
 		Script:           step.Script,
@@ -255,8 +251,8 @@ func createCommandConfig(ctx context.Context, step digraph.Step) (*commandConfig
 	}, nil
 }
 
-func setupScript(_ context.Context, step digraph.Step) (string, error) {
-	file, err := os.CreateTemp(step.Dir, "dagu_script-")
+func setupScript(_ context.Context, workDir, script string) (string, error) {
+	file, err := os.CreateTemp(workDir, "dagu_script-")
 	if err != nil {
 		return "", fmt.Errorf("failed to create script file: %w", err)
 	}
@@ -264,7 +260,7 @@ func setupScript(_ context.Context, step digraph.Step) (string, error) {
 		_ = file.Close()
 	}()
 
-	if _, err = file.WriteString(step.Script); err != nil {
+	if _, err = file.WriteString(script); err != nil {
 		return "", fmt.Errorf("failed to write script to file: %w", err)
 	}
 
