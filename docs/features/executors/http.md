@@ -20,6 +20,7 @@ steps:
 | `body` | Request body | `{"name": "value"}` |
 | `timeout` | Timeout in seconds | `30` |
 | `silent` | Return body only | `true` |
+| `skipTLSVerify` | Skip TLS certificate verification | `true` |
 
 ## Examples
 
@@ -135,6 +136,20 @@ handlerOn:
         headers:
           Content-Type: application/json
     command: POST https://hooks.example.com/workflow-complete
+```
+
+### Self-Signed Certificates
+
+```yaml
+steps:
+  - name: internal-api
+    executor:
+      type: http
+      config:
+        skipTLSVerify: true  # Allow self-signed certificates
+        headers:
+          Authorization: "Bearer ${INTERNAL_TOKEN}"
+    command: GET https://internal-api.company.local/data
 ```
 
 ## See Also
