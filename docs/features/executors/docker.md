@@ -53,9 +53,8 @@ executor:
     image: node:18
     host:
       binds:
-        - /host/data:/container/data:ro      # Read-only
-        - ./output:/output:rw                 # Read-write
-        - ${PWD}/app:/app                     # Current directory
+        - /host/data:/container/data:ro # Read-only
+        - ${PWD}/app:/app               # Current directory
 ```
 
 ### Environment Variables
