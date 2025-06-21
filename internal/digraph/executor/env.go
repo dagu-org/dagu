@@ -84,11 +84,12 @@ func NewEnv(ctx context.Context, step digraph.Step) Env {
 	}
 
 	return Env{
-		Env:       digraph.GetEnv(ctx),
-		Variables: &SyncMap{},
-		Step:      step,
-		Envs:      envs,
-		StepMap:   make(map[string]cmdutil.StepInfo),
+		Env:        digraph.GetEnv(ctx),
+		Variables:  &SyncMap{},
+		Step:       step,
+		Envs:       envs,
+		StepMap:    make(map[string]cmdutil.StepInfo),
+		WorkingDir: workingDir,
 	}
 }
 
