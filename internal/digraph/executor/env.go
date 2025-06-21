@@ -3,10 +3,13 @@ package executor
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/mailer"
 )
 
@@ -36,22 +39,56 @@ func GetEnv(ctx context.Context) Env {
 type Env struct {
 	digraph.Env
 
-	Variables *SyncMap
-	Step      digraph.Step
-	Envs      map[string]string
-	StepMap   map[string]cmdutil.StepInfo // Map of step ID to step info
+	Variables  *SyncMap
+	Step       digraph.Step
+	Envs       map[string]string
+	StepMap    map[string]cmdutil.StepInfo // Map of step ID to step info
+	WorkingDir string                      // Working directory for the step
+}
+
+func (e Env) VariablesMap() map[string]string {
+	m := e.Variables.Variables()
+	for k, v := range e.Envs {
+		m[k] = v
+	}
+	return m
 }
 
 // NewEnv creates a new execution context with the given step.
 func NewEnv(ctx context.Context, step digraph.Step) Env {
+	var workingDir string
+
+	// Resolve working directory for the step
+	if dir := step.Dir; dir != "" {
+		dir, err := fileutil.ResolvePath(dir)
+		if err == nil {
+			workingDir = dir
+		} else {
+			logger.Warn(ctx, "Failed to resolve working directory for step", "step", step.Name, "dir", dir, "error", err)
+		}
+	} else {
+		// Use the current working directory if not specified
+		if wd, err := os.Getwd(); err == nil {
+			workingDir = wd
+		} else {
+			logger.Warn(ctx, "Failed to get current working directory", "error", err)
+		}
+	}
+
+	envs := map[string]string{
+		digraph.EnvKeyDAGRunStepName: step.Name,
+	}
+
+	if workingDir != "" {
+		envs["PWD"] = workingDir
+	}
+
 	return Env{
 		Env:       digraph.GetEnv(ctx),
 		Variables: &SyncMap{},
 		Step:      step,
-		Envs: map[string]string{
-			digraph.EnvKeyDAGRunStepName: step.Name,
-		},
-		StepMap: make(map[string]cmdutil.StepInfo),
+		Envs:      envs,
+		StepMap:   make(map[string]cmdutil.StepInfo),
 	}
 }
 

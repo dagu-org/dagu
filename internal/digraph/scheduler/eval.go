@@ -26,24 +26,44 @@ func EvalBool(ctx context.Context, value any) (bool, error) {
 // EvalObject recursively evaluates the string fields of the given object
 // with the variables within the execution context.
 func EvalObject[T any](ctx context.Context, obj T) (T, error) {
-	env := executor.GetEnv(ctx).Variables.Variables()
+	vars := executor.GetEnv(ctx).VariablesMap()
 
-	// Get the value of the object
+	result, err := eval(ctx, obj, vars)
+	if err != nil {
+		return obj, err
+	}
+	// If the result is not of type T, we return the original object
+	if _, ok := result.(T); !ok {
+		return obj, fmt.Errorf("expected type %T but got %T", obj, result)
+	}
+	// If the result is of type T, we return it
+	return result.(T), nil
+}
+
+// eval evaluates the given object based on its type.
+func eval(ctx context.Context, obj any, vars map[string]string) (any, error) {
 	v := reflect.ValueOf(obj)
-
 	// Handle different types
 	// nolint:exhaustive
 	switch v.Kind() {
+	case reflect.String:
+		// Evaluate string values using cmdutil.EvalString
+		strVal := v.String()
+		evalResult, err := cmdutil.EvalString(ctx, strVal, cmdutil.WithVariables(vars))
+		if err != nil {
+			return nil, err
+		}
+		return evalResult, nil
 	case reflect.Struct:
 		// Use the existing cmdutil.EvalStringFields for structs
-		return cmdutil.EvalStringFields(ctx, obj, cmdutil.WithVariables(env))
+		return cmdutil.EvalStringFields(ctx, obj, cmdutil.WithVariables(vars))
 	case reflect.Map:
 		// Process maps recursively
-		result, err := processMap(ctx, v, env)
+		result, err := processMap(ctx, v, vars)
 		if err != nil {
-			return obj, err
+			return nil, err
 		}
-		return result.Interface().(T), nil
+		return result.Interface(), nil
 	default:
 		// For other types, we can just return the object as is
 		return obj, nil
@@ -106,6 +126,19 @@ func processMap(ctx context.Context, v reflect.Value, vars map[string]string) (r
 			if err != nil {
 				return v, err
 			}
+		case reflect.Slice, reflect.Array:
+			// Process slices and arrays by evaluating each element
+			newSlice := reflect.MakeSlice(val.Type(), val.Len(), val.Cap())
+			for i := 0; i < val.Len(); i++ {
+				newVal, err := eval(ctx, val.Index(i).Interface(), vars)
+				if err != nil {
+					return v, err
+				}
+				// Set the evaluated value in the new slice
+				newSlice.Index(i).Set(reflect.ValueOf(newVal))
+			}
+			// Set the new slice in the map
+			newVal = newSlice
 		case reflect.Struct:
 			// Process structs using cmdutil.EvalStringFields
 			structVal := val.Interface()
