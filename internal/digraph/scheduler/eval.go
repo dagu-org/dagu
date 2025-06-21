@@ -64,6 +64,17 @@ func eval(ctx context.Context, obj any, vars map[string]string) (any, error) {
 			return nil, err
 		}
 		return result.Interface(), nil
+	case reflect.Slice, reflect.Array:
+		// Process slices and arrays recursively
+		newSlice := reflect.MakeSlice(v.Type(), v.Len(), v.Cap())
+		for i := 0; i < v.Len(); i++ {
+			elemVal, err := eval(ctx, v.Index(i).Interface(), vars)
+			if err != nil {
+				return nil, err
+			}
+			newSlice.Index(i).Set(reflect.ValueOf(elemVal))
+		}
+		return newSlice.Interface(), nil
 	default:
 		// For other types, we can just return the object as is
 		return obj, nil
