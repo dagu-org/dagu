@@ -34,7 +34,7 @@
       "request": "launch",
       "mode": "auto",
       "program": "${workspaceFolder}/cmd/",
-      "args": ["start", "${input:pathToSpec}"]
+      "args": ["start", "--no-queue", "${input:pathToSpec}"]
     },
     {
       "name": "Stop",
