@@ -1075,7 +1075,7 @@ func (oc *OutputCoordinator) setupWriters(_ context.Context, data NodeData) erro
 	return nil
 }
 
-func (oc *OutputCoordinator) setupFile(ctx context.Context, filePath string, data NodeData) (*os.File, error) {
+func (oc *OutputCoordinator) setupFile(ctx context.Context, filePath string, _ NodeData) (*os.File, error) {
 	absFilePath := filePath
 	if !filepath.IsAbs(absFilePath) {
 		dir := executor.GetEnv(ctx).WorkingDir
