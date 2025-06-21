@@ -380,6 +380,20 @@ steps:
     command: POST https://example.com/login
 ```
 
+### Self-Signed Certificates
+
+```yaml
+steps:
+  - name: internal-api
+    executor:
+      type: http
+      config:
+        skipTLSVerify: true  # Skip certificate verification
+        headers:
+          Authorization: Bearer ${INTERNAL_TOKEN}
+    command: GET https://internal-api.local/data
+```
+
 ### Complete HTTP Example
 
 ```yaml

@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,13 +29,14 @@ type http struct {
 }
 
 type httpConfig struct {
-	Timeout int               `json:"timeout"`
-	Headers map[string]string `json:"headers"`
-	Query   map[string]string `json:"query"`
-	Body    string            `json:"body"`
-	Silent  bool              `json:"silent"`
-	Debug   bool              `json:"debug"`
-	JSON    bool              `json:"json"`
+	Timeout       int               `json:"timeout"`
+	Headers       map[string]string `json:"headers"`
+	Query         map[string]string `json:"query"`
+	Body          string            `json:"body"`
+	Silent        bool              `json:"silent"`
+	Debug         bool              `json:"debug"`
+	JSON          bool              `json:"json"`
+	SkipTLSVerify bool              `json:"skipTLSVerify"`
 }
 
 type httpJSONResult struct {
@@ -68,6 +70,11 @@ func newHTTP(ctx context.Context, step digraph.Step) (Executor, error) {
 	}
 	if reqCfg.Timeout > 0 {
 		client.SetTimeout(time.Second * time.Duration(reqCfg.Timeout))
+	}
+	if reqCfg.SkipTLSVerify {
+		client.SetTLSClientConfig(&tls.Config{
+			InsecureSkipVerify: true, // nolint:gosec
+		})
 	}
 	req := client.R().SetContext(ctx)
 	if len(reqCfg.Headers) > 0 {
