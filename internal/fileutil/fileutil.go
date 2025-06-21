@@ -144,6 +144,9 @@ func ResolvePath(path string) (string, error) {
 		return "", nil
 	}
 
+	// Expand environment variables
+	path = os.ExpandEnv(path)
+
 	// Expand tilde to user's home directory
 	if strings.HasPrefix(path, "~") {
 		homeDir, err := os.UserHomeDir()
@@ -152,9 +155,6 @@ func ResolvePath(path string) (string, error) {
 		}
 		path = filepath.Join(homeDir, path[1:])
 	}
-
-	// Expand environment variables
-	path = os.ExpandEnv(path)
 
 	// Convert to absolute path
 	absPath, err := filepath.Abs(path)
