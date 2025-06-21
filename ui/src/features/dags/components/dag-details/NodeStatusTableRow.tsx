@@ -19,13 +19,14 @@ import {
   GitBranch,
   PlayCircle,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { components, NodeStatus } from '../../../../api/v2/schema';
 import StyledTableRow from '../../../../ui/StyledTableRow';
 import { NodeStatusChip } from '../common';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/ui/CustomDialog';
 import { useClient } from '@/hooks/api';
+import { AppBarContext } from '@/contexts/AppBarContext';
 
 /**
  * Props for the NodeStatusTableRow component
@@ -108,6 +109,8 @@ function NodeStatusTableRow({
   const { dagRunId, name: dagName } = dagRun;
   const navigate = useNavigate();
   const client = useClient();
+  const appBarContext = useContext(AppBarContext);
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
   // State to store the current duration for running tasks
   const [currentDuration, setCurrentDuration] = useState<string>('-');
   // State for expanding/collapsing parallel executions
@@ -116,7 +119,6 @@ function NodeStatusTableRow({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-
   // Check if this is a child dagRun node
   // Include both regular children and repeated children
   const allChildren = [...(node.children || []), ...(node.childrenRepeated || [])];
@@ -143,7 +145,7 @@ function NodeStatusTableRow({
 
   // Build URL for log viewing
   const searchParams = new URLSearchParams();
-  searchParams.set('remoteNode', 'local');
+  searchParams.set('remoteNode', remoteNode);
   if (node.step) {
     searchParams.set('step', node.step.name);
   }
@@ -260,7 +262,10 @@ function NodeStatusTableRow({
     setError(null);
     try {
       await client.POST('/dag-runs/{name}/{dagRunId}/retry', {
-        params: { path: { name: dagName, dagRunId } },
+        params: { 
+          path: { name: dagName, dagRunId },
+          query: { remoteNode }
+        },
         body: { dagRunId, stepName: node.step.name },
       });
       setSuccess(true);
@@ -563,45 +568,48 @@ function NodeStatusTableRow({
             )}
           </div>
         </TableCell>
-
-        <TableCell className="text-center">
-          <button
-            className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
-            title="Retry from this step"
-            onClick={() => setShowDialog(true)}
-            disabled={loading}
-          >
-            <PlayCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-          </button>
-          <Dialog open={showDialog} onOpenChange={setShowDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Retry from this step?</DialogTitle>
-              </DialogHeader>
-              <div className="py-2 text-sm">
-                This will re-execute <b>{node.step.name}</b>. Are you sure?
-                {error && <div className="text-red-500 mt-2">{error}</div>}
-                {success && <div className="text-green-600 mt-2">Retry started!</div>}
-              </div>
-              <DialogFooter>
-                <button
-                  className="px-3 py-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 mr-2"
-                  onClick={() => setShowDialog(false)}
-                  disabled={loading}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
-                  onClick={handleRetry}
-                  disabled={loading}
-                >
-                  {loading ? 'Retrying...' : 'Retry'}
-                </button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </TableCell>
+        {dagRunId && (
+          <TableCell className="text-center">
+            <button
+              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
+              title="Retry from this step"
+              onClick={() => setShowDialog(true)}
+              disabled={loading}
+            >
+              <PlayCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+            </button>
+            <Dialog open={showDialog} onOpenChange={setShowDialog}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Retry from this step?</DialogTitle>
+                </DialogHeader>
+                <div className="py-2 text-sm">
+                  This will re-execute <b>{node.step.name}</b>. Are you sure?
+                  {error && <div className="text-red-500 mt-2">{error}</div>}
+                  {success && (
+                    <div className="text-green-600 mt-2">Retry started!</div>
+                  )}
+                </div>
+                <DialogFooter>
+                  <button
+                    className="px-3 py-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 mr-2"
+                    onClick={() => setShowDialog(false)}
+                    disabled={loading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                    onClick={handleRetry}
+                    disabled={loading}
+                  >
+                    {loading ? 'Retrying...' : 'Retry'}
+                  </button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </TableCell>
+        )}
       </StyledTableRow>
     );
   }
@@ -850,44 +858,50 @@ function NodeStatusTableRow({
         </div>
       )}
 
-      <div className="flex justify-end mt-4">
-        <button
-          className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700"
-          title="Retry from this step"
-          onClick={() => setShowDialog(true)}
-          disabled={loading}
-        >
-          <PlayCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
-        </button>
-        <Dialog open={showDialog} onOpenChange={setShowDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Retry from this step?</DialogTitle>
-            </DialogHeader>
-            <div className="py-2 text-sm">
-              This will re-execute <b>{node.step.name}</b>. Are you sure?
-              {error && <div className="text-red-500 mt-2">{error}</div>}
-              {success && <div className="text-green-600 mt-2">Retry started!</div>}
-            </div>
-            <DialogFooter>
-              <button
-                className="px-3 py-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 mr-2"
-                onClick={() => setShowDialog(false)}
-                disabled={loading}
-              >
-                Cancel
-              </button>
-              <button
-                className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
-                onClick={handleRetry}
-                disabled={loading}
-              >
-                {loading ? 'Retrying...' : 'Retry'}
-              </button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+      {dagRunId && (
+        <div className="flex justify-end mt-4">
+          <button
+            className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700"
+            title="Retry from this step"
+            onClick={() => setShowDialog(true)}
+            disabled={loading}
+          >
+            <PlayCircle
+              className="h-6 w-6 text-green-600 dark:text-green-400"
+            />
+          </button>
+          <Dialog open={showDialog} onOpenChange={setShowDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Retry from this step?</DialogTitle>
+              </DialogHeader>
+              <div className="py-2 text-sm">
+                This will re-execute <b>{node.step.name}</b>. Are you sure?
+                {error && <div className="text-red-500 mt-2">{error}</div>}
+                {success && (
+                  <div className="text-green-600 mt-2">Retry started!</div>
+                )}
+              </div>
+              <DialogFooter>
+                <button
+                  className="px-3 py-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 mr-2"
+                  onClick={() => setShowDialog(false)}
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                  onClick={handleRetry}
+                  disabled={loading}
+                >
+                  {loading ? 'Retrying...' : 'Retry'}
+                </button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )}
     </div>
   );
 }
