@@ -62,9 +62,11 @@ function NodeStatusTable({ nodes, status, fileName, onViewLog }: Props) {
                 <TableHead className="w-[35%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 min-w-[150px]">
                   Error / Logs
                 </TableHead>
-                <TableHead className="w-[8%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 text-center">
-                  Actions
-                </TableHead>
+                {status?.dagRunId && (
+                  <TableHead className="w-[8%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 text-center">
+                    Actions
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
