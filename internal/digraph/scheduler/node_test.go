@@ -1125,3 +1125,179 @@ func (n nodeHelper) AssertOutput(t *testing.T, key, value string) {
 func (n nodeHelper) execContext(dagRunID string) context.Context {
 	return digraph.SetupEnv(n.Context, &digraph.DAG{}, nil, digraph.DAGRunRef{}, dagRunID, "logFile", nil)
 }
+
+func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
+	t.Parallel()
+
+	t.Run("AbsolutePathUnchanged", func(t *testing.T) {
+		tempDir := t.TempDir()
+		workDir := filepath.Join(tempDir, "work")
+		err := os.MkdirAll(workDir, 0755)
+		require.NoError(t, err)
+
+		// Absolute path for stdout
+		stdoutPath := filepath.Join(tempDir, "output.log")
+
+		step := digraph.Step{
+			Name:    "test-absolute-path",
+			Command: "echo",
+			Args:    []string{"hello world"},
+			Stdout:  stdoutPath,
+		}
+
+		node := scheduler.NewNode(step, scheduler.NodeState{})
+		node.Init()
+
+		// Setup context with working directory
+		ctx := context.Background()
+		dag := &digraph.DAG{}
+		ctx = digraph.SetupEnv(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+		env := executor.GetEnv(ctx)
+		env.WorkingDir = workDir
+		ctx = executor.WithEnv(ctx, env)
+
+		// Setup and execute node
+		err = node.Setup(ctx, tempDir, "test-run")
+		require.NoError(t, err)
+
+		err = node.Execute(ctx)
+		require.NoError(t, err)
+
+		// Verify file was created at absolute path
+		content, err := os.ReadFile(stdoutPath)
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "hello world")
+	})
+
+	t.Run("RelativePathUsesWorkingDir", func(t *testing.T) {
+		tempDir := t.TempDir()
+		workDir := filepath.Join(tempDir, "work")
+		err := os.MkdirAll(workDir, 0755)
+		require.NoError(t, err)
+
+		// Relative path for stdout
+		stdoutPath := "output.log"
+
+		step := digraph.Step{
+			Name:    "test-relative-path",
+			Command: "echo",
+			Args:    []string{"hello from working dir"},
+			Stdout:  stdoutPath,
+		}
+
+		node := scheduler.NewNode(step, scheduler.NodeState{})
+		node.Init()
+
+		// Setup context with working directory
+		ctx := context.Background()
+		dag := &digraph.DAG{}
+		ctx = digraph.SetupEnv(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+		env := executor.GetEnv(ctx)
+		env.WorkingDir = workDir
+		ctx = executor.WithEnv(ctx, env)
+
+		// Setup and execute node
+		err = node.Setup(ctx, tempDir, "test-run")
+		require.NoError(t, err)
+
+		err = node.Execute(ctx)
+		require.NoError(t, err)
+
+		// Verify file was created in working directory
+		expectedPath := filepath.Join(workDir, stdoutPath)
+		content, err := os.ReadFile(expectedPath)
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "hello from working dir")
+
+		// Verify file was NOT created in tempDir
+		_, err = os.Stat(filepath.Join(tempDir, stdoutPath))
+		assert.True(t, os.IsNotExist(err))
+	})
+
+	t.Run("StderrRedirectWithWorkingDir", func(t *testing.T) {
+		tempDir := t.TempDir()
+		workDir := filepath.Join(tempDir, "work")
+		err := os.MkdirAll(workDir, 0755)
+		require.NoError(t, err)
+
+		// Relative path for stderr
+		stderrPath := "error.log"
+
+		step := digraph.Step{
+			Name:    "test-stderr-path",
+			Command: "sh",
+			Args:    []string{"-c", "echo 'error message' >&2"},
+			Stderr:  stderrPath,
+		}
+
+		node := scheduler.NewNode(step, scheduler.NodeState{})
+		node.Init()
+
+		// Setup context with working directory
+		ctx := context.Background()
+		dag := &digraph.DAG{}
+		ctx = digraph.SetupEnv(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+		env := executor.GetEnv(ctx)
+		env.WorkingDir = workDir
+		ctx = executor.WithEnv(ctx, env)
+
+		// Setup and execute node
+		err = node.Setup(ctx, tempDir, "test-run")
+		require.NoError(t, err)
+
+		err = node.Execute(ctx)
+		require.NoError(t, err)
+
+		// Verify file was created in working directory
+		expectedPath := filepath.Join(workDir, stderrPath)
+		content, err := os.ReadFile(expectedPath)
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "error message")
+	})
+
+	t.Run("NestedRelativePath", func(t *testing.T) {
+		tempDir := t.TempDir()
+		workDir := filepath.Join(tempDir, "work")
+		err := os.MkdirAll(workDir, 0755)
+		require.NoError(t, err)
+
+		// Create nested directory in working dir
+		logsDir := filepath.Join(workDir, "logs")
+		err = os.MkdirAll(logsDir, 0755)
+		require.NoError(t, err)
+
+		// Nested relative path
+		stdoutPath := "logs/output.log"
+
+		step := digraph.Step{
+			Name:    "test-nested-path",
+			Command: "echo",
+			Args:    []string{"nested output"},
+			Stdout:  stdoutPath,
+		}
+
+		node := scheduler.NewNode(step, scheduler.NodeState{})
+		node.Init()
+
+		// Setup context with working directory
+		ctx := context.Background()
+		dag := &digraph.DAG{}
+		ctx = digraph.SetupEnv(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+		env := executor.GetEnv(ctx)
+		env.WorkingDir = workDir
+		ctx = executor.WithEnv(ctx, env)
+
+		// Setup and execute node
+		err = node.Setup(ctx, tempDir, "test-run")
+		require.NoError(t, err)
+
+		err = node.Execute(ctx)
+		require.NoError(t, err)
+
+		// Verify file was created in correct nested path
+		expectedPath := filepath.Join(workDir, stdoutPath)
+		content, err := os.ReadFile(expectedPath)
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "nested output")
+	})
+}
