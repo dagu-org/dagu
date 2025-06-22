@@ -295,39 +295,55 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 
 					shouldRepeat := false
 					step := node.Step()
+					rp := node.Step().RepeatPolicy
 
-					// Check if repeat limit has been reached
-					if step.RepeatPolicy.Limit > 0 && node.State().DoneCount >= step.RepeatPolicy.Limit {
-						// Limit reached, don't repeat
+					// First, check the hard limit. This overrides everything.
+					if rp.Limit > 0 && node.GetDoneCount() >= rp.Limit {
 						shouldRepeat = false
-					} else if step.RepeatPolicy.Condition != nil {
-						// Ensure node's own output variables are reloaded
-						// before evaluating the condition.
-						if node.inner.State.OutputVariables != nil {
-							env := executor.GetEnv(ctx)
-							env.ForceLoadOutputVariables(node.inner.State.OutputVariables)
-							ctx = executor.WithEnv(ctx, env)
-						}
-						shell := cmdutil.GetShellCommand(step.Shell)
-						err := EvalCondition(ctx, shell, step.RepeatPolicy.Condition)
-						if step.RepeatPolicy.Condition.Expected != "" {
-							// Repeat as long as condition does NOT match expected (err != nil)
-							if err != nil {
-								shouldRepeat = true
+					} else if rp.Repeat == digraph.RepeatModeWhile {
+						// It's a 'while' loop. Repeat while a condition is true.
+						if rp.Condition != nil {
+							// Ensure node's own output variables are reloaded before evaluating the condition.
+							if node.inner.State.OutputVariables != nil {
+								env := executor.GetEnv(ctx)
+								env.ForceLoadOutputVariables(node.inner.State.OutputVariables)
+								ctx = executor.WithEnv(ctx, env)
 							}
+							shell := cmdutil.GetShellCommand(node.Step().Shell)
+							err := EvalCondition(ctx, shell, rp.Condition)
+							shouldRepeat = (err == nil) // Repeat if condition is met (no error)
+						} else if len(rp.ExitCode) > 0 {
+							lastExit := node.State().ExitCode
+							shouldRepeat = slices.Contains(rp.ExitCode, lastExit) // Repeat if exit code matches
 						} else {
-							// Repeat as long as it returns exit code 0 (err == nil)
-							if err == nil {
-								shouldRepeat = true
+							// No specific condition, so it's an unconditional 'while'.
+							// Repeat as long as the step itself succeeds.
+							shouldRepeat = (execErr == nil)
+						}
+					} else if rp.Repeat == digraph.RepeatModeUntil {
+						// It's an 'until' loop. Repeat until a condition is true.
+						if rp.Condition != nil {
+							// Ensure node's own output variables are reloaded before evaluating the condition.
+							if node.inner.State.OutputVariables != nil {
+								env := executor.GetEnv(ctx)
+								env.ForceLoadOutputVariables(node.inner.State.OutputVariables)
+								ctx = executor.WithEnv(ctx, env)
+							}
+							shell := cmdutil.GetShellCommand(node.Step().Shell)
+							err := EvalCondition(ctx, shell, rp.Condition)
+							shouldRepeat = (err != nil) // Repeat if condition is NOT met (error)
+						} else if len(rp.ExitCode) > 0 {
+							lastExit := node.State().ExitCode
+							shouldRepeat = !slices.Contains(rp.ExitCode, lastExit) // Repeat if exit code does NOT match
+						} else {
+							// No specific condition, so it's an unconditional 'until'.
+							// Repeat until the step itself succeeds (i.e., repeat on failure).
+							shouldRepeat = (execErr != nil)
+							if !shouldRepeat {
+								node.SetStatus(NodeStatusSuccess)
+								sc.setLastError(nil)
 							}
 						}
-					} else if len(step.RepeatPolicy.ExitCode) > 0 {
-						// Repeat if last exit code matches any in ExitCode
-						lastExit := node.State().ExitCode
-						shouldRepeat = slices.Contains(step.RepeatPolicy.ExitCode, lastExit)
-					} else if step.RepeatPolicy.Repeat {
-						// Unconditional repeat
-						shouldRepeat = (execErr == nil || step.ContinueOn.Failure)
 					}
 
 					if shouldRepeat && !sc.isCanceled() {
@@ -539,7 +555,7 @@ func (sc *Scheduler) Signal(
 	for _, node := range graph.nodes {
 		// for a repetitive task, we'll wait for the job to finish
 		// until time reaches max wait time
-		if !node.Step().RepeatPolicy.Repeat {
+		if node.Step().RepeatPolicy.Repeat == "" {
 			node.Signal(ctx, sig, allowOverride)
 		}
 	}

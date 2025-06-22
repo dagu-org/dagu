@@ -811,6 +811,7 @@ func TestScheduler(t *testing.T) {
 			newStep("1",
 				withCommand(fmt.Sprintf("cat %s || true", file)),
 				func(step *digraph.Step) {
+					step.RepeatPolicy.Repeat = digraph.RepeatModeUntil
 					step.RepeatPolicy.Condition = &digraph.Condition{
 						Condition: fmt.Sprintf("`cat %s || true`", file),
 						Expected:  "ready",
@@ -851,6 +852,7 @@ func TestScheduler(t *testing.T) {
 			newStep("1",
 				withCommand("echo hello"),
 				func(step *digraph.Step) {
+					step.RepeatPolicy.Repeat = digraph.RepeatModeWhile
 					step.RepeatPolicy.Condition = &digraph.Condition{
 						Condition: "test ! -f " + file,
 					}
@@ -896,6 +898,7 @@ func TestScheduler(t *testing.T) {
 					MarkSuccess: true,
 				}),
 				func(step *digraph.Step) {
+					step.RepeatPolicy.Repeat = digraph.RepeatModeWhile
 					step.RepeatPolicy.ExitCode = []int{42}
 					step.RepeatPolicy.Interval = 200 * time.Millisecond
 				},
@@ -926,6 +929,7 @@ func TestScheduler(t *testing.T) {
 			newStep("1",
 				withCommand("echo $TEST_REPEAT_MATCH_EXPR"),
 				func(step *digraph.Step) {
+					step.RepeatPolicy.Repeat = digraph.RepeatModeUntil
 					step.RepeatPolicy.Condition = &digraph.Condition{
 						Condition: "$TEST_REPEAT_MATCH_EXPR",
 						Expected:  "done",
@@ -961,6 +965,7 @@ func TestScheduler(t *testing.T) {
 				withCommand(fmt.Sprintf("cat %s", file)),
 				withOutput("OUT"),
 				func(step *digraph.Step) {
+					step.RepeatPolicy.Repeat = digraph.RepeatModeUntil
 					step.RepeatPolicy.Condition = &digraph.Condition{
 						Condition: "$OUT",
 						Expected:  "done",
@@ -1132,7 +1137,9 @@ func withRetryPolicy(limit int, interval time.Duration) stepOption {
 
 func withRepeatPolicy(repeat bool, interval time.Duration) stepOption {
 	return func(step *digraph.Step) {
-		step.RepeatPolicy.Repeat = repeat
+		if repeat {
+			step.RepeatPolicy.Repeat = digraph.RepeatModeWhile
+		}
 		step.RepeatPolicy.Interval = interval
 	}
 }
@@ -1939,8 +1946,8 @@ func TestScheduler_RepeatPolicyWithLimitAndCondition(t *testing.T) {
 				echo "$COUNT" > "%s"
 				echo "PENDING"
 			`, counterFile, counterFile, counterFile)),
-			withRepeatPolicy(true, 100*time.Millisecond),
 			func(step *digraph.Step) {
+				step.RepeatPolicy.Repeat = digraph.RepeatModeUntil
 				step.RepeatPolicy.Limit = 5
 				step.RepeatPolicy.Condition = &digraph.Condition{
 					Condition: "`cat " + counterFile + "`",

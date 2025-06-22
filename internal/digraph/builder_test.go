@@ -429,7 +429,7 @@ func TestBuildStep(t *testing.T) {
 		th := testLoad(t, "repeat_policy.yaml")
 		assert.Len(t, th.Steps, 1)
 		require.NotNil(t, th.Steps[0].RepeatPolicy)
-		assert.True(t, th.Steps[0].RepeatPolicy.Repeat)
+		assert.Equal(t, digraph.RepeatModeWhile, th.Steps[0].RepeatPolicy.Repeat)
 		assert.Equal(t, 60*time.Second, th.Steps[0].RepeatPolicy.Interval)
 	})
 	t.Run("RepeatPolicyCondition", func(t *testing.T) {
