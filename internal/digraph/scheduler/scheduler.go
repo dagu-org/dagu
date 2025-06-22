@@ -257,6 +257,10 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 				for setupSucceed && !sc.isCanceled() {
 					execErr := sc.execNode(ctx, node)
 					if execErr != nil {
+						lastExit := node.State().ExitCode
+						step := node.Step()
+						shouldRepeatOnExitCode := len(step.RepeatPolicy.ExitCode) > 0 && slices.Contains(step.RepeatPolicy.ExitCode, lastExit)
+
 						status := node.State().Status
 						switch {
 						case status == NodeStatusSuccess || status == NodeStatusCancel:
@@ -274,6 +278,11 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 							if sc.handleNodeRetry(ctx, node, execErr) {
 								continue ExecRepeat
 							}
+
+						case shouldRepeatOnExitCode:
+							// The step failed with an exit code that is configured to trigger a repeat.
+							// Don't mark the node as failed, as it will be repeated.
+							// The repeat logic later in the loop will handle the repetition.
 
 						default:
 							// finish the node

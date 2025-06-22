@@ -1,0 +1,23 @@
+name: test-repeat-on-exitcode
+steps:
+  - name: repeat-on-fail
+    command: |
+      #!/bin/bash
+      COUNTER_FILE="/tmp/dagu-test-counter-repeat-on-exitcode"
+      if [ ! -f "$COUNTER_FILE" ]; then
+          echo 1 > "$COUNTER_FILE"
+          exit 1
+      fi
+
+      count=$(cat "$COUNTER_FILE")
+      if [ "$count" -lt 3 ]; then
+          echo $((count + 1)) > "$COUNTER_FILE"
+          exit 1
+      else
+          echo $((count + 1)) > "$COUNTER_FILE"
+          exit 0
+      fi
+    repeatPolicy:
+      exitCode: [1]
+      limit: 5
+      intervalSec: 1
