@@ -144,7 +144,7 @@ type continueOnDef struct {
 
 // repeatPolicyDef defines the repeat policy for a step.
 type repeatPolicyDef struct {
-	Repeat      bool   `yaml:"repeat,omitempty"`      // Flag to indicate if the step should be repeated
+	Repeat      any    `yaml:"repeat,omitempty"`      // Flag to indicate if the step should be repeated, can be bool (legacy) or string ("while" or "until")
 	IntervalSec int    `yaml:"intervalSec,omitempty"` // Interval in seconds to wait before repeating the step
 	Limit       int    `yaml:"limit,omitempty"`       // Maximum number of times to repeat the step
 	Condition   string `yaml:"condition,omitempty"`   // Condition to check before repeating

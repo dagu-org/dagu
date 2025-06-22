@@ -864,20 +864,61 @@ func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
 //
 // This mirrors the Precondition logic for consistency.
 func buildRepeatPolicy(_ BuildContext, def stepDef, step *Step) error {
-	if def.RepeatPolicy != nil {
-		if def.RepeatPolicy.Condition != "" {
-			step.RepeatPolicy.Condition = &Condition{
-				Condition: def.RepeatPolicy.Condition,
-				Expected:  def.RepeatPolicy.Expected,
-			}
-		} else {
-			step.RepeatPolicy.Condition = nil
-		}
-		step.RepeatPolicy.Repeat = def.RepeatPolicy.Repeat
-		step.RepeatPolicy.Interval = time.Second * time.Duration(def.RepeatPolicy.IntervalSec)
-		step.RepeatPolicy.Limit = def.RepeatPolicy.Limit
-		step.RepeatPolicy.ExitCode = def.RepeatPolicy.ExitCode
+	if def.RepeatPolicy == nil {
+		return nil
 	}
+	rpDef := def.RepeatPolicy
+
+	// Determine repeat mode
+	var mode RepeatMode
+	if rpDef.Repeat != nil {
+		switch v := rpDef.Repeat.(type) {
+		case bool:
+			if v {
+				mode = RepeatModeWhile
+			}
+		case string:
+			switch v {
+			case "while":
+				mode = RepeatModeWhile
+			case "until":
+				mode = RepeatModeUntil
+			default:
+				return fmt.Errorf("invalid value for repeat: '%s'. It must be 'while', 'until', or a boolean", v)
+			}
+		default:
+			return fmt.Errorf("invalid value for repeat: '%s'. It must be 'while', 'until', or a boolean", v)
+		}
+	}
+
+	// Backward compatibility: infer mode if not set
+	if mode == "" {
+		if rpDef.Condition != "" && rpDef.Expected != "" {
+			mode = RepeatModeUntil
+		} else if rpDef.Condition != "" || len(rpDef.ExitCode) > 0 {
+			mode = RepeatModeWhile
+		}
+	}
+
+	// No repeat if mode is not determined
+	if mode == "" {
+		return nil
+	}
+
+	step.RepeatPolicy.Repeat = mode
+	if rpDef.IntervalSec > 0 {
+		step.RepeatPolicy.Interval = time.Second * time.Duration(rpDef.IntervalSec)
+	}
+	step.RepeatPolicy.Limit = rpDef.Limit
+
+	if rpDef.Condition != "" {
+		step.RepeatPolicy.Condition = &Condition{
+			Condition: rpDef.Condition,
+			Expected:  rpDef.Expected,
+		}
+	}
+	step.RepeatPolicy.ExitCode = rpDef.ExitCode
+
 	return nil
 }
 

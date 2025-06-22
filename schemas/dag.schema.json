@@ -512,8 +512,16 @@
           "type": "object",
           "properties": {
             "repeat": {
-              "type": "boolean",
-              "description": "Whether to repeat this step"
+              "oneOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "enum": ["while", "until"]
+                }
+              ],
+              "description": "Determines if and how the step should be repeated. Can be a boolean or a string ('while' or 'until')."
             },
             "intervalSec": {
               "type": "integer",
