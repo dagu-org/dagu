@@ -79,7 +79,7 @@ func (e *mail) Run(ctx context.Context) error {
 		[]string{},
 	)
 	if err != nil {
-		_, _ = e.stdout.Write([]byte("error occurred."))
+		_, _ = e.stderr.Write([]byte("error occurred."))
 	} else {
 		_, _ = e.stdout.Write([]byte("sending email succeed."))
 	}

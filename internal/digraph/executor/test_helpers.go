@@ -13,4 +13,3 @@ func (tw *testWriter) Write(p []byte) (n int, err error) {
 func (tw *testWriter) String() string {
 	return string(tw.data)
 }
-
