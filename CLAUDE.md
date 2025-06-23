@@ -128,6 +128,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **NEVER ever include *Generated with* or similar in commit messages**
 - **NEVER ever include *Co-Authored-By* or similar in commit messages**
 
+# Pull Request Guidelines
+When creating pull requests, follow this style:
+- Start with a clear problem statement explaining the user need
+- Describe the solution concisely as a few paragraphs at most
+- Include issue reference and feedback-from credits on separate lines
+- Use **Changes** section with bullet points for what was modified
+- Include an **Example** section with a practical YAML snippet
+- Example format:
+  ```
+  **Overview:**
+  Users need to [problem description]. They have to [current workaround].
+
+  As a solution, [what was implemented].
+
+  Issue: #XXX
+  Feedback-from: @user1 and @user2
+
+  **Changes:**
+  - [Specific change 1]
+  - [Specific change 2]
+  - [Documentation/examples added]
+
+  **Why:** (optional)
+
+  **Example:** (optional)
+
+  **Notes:** (optional)
+
+
 ## 🎯 What is Dagu?
 
 Dagu is a **modern, powerful, yet surprisingly simple workflow orchestration engine** that runs as a single binary with zero external dependencies. Born from the frustration of managing hundreds of legacy cron jobs scattered across multiple servers, Dagu brings clarity, visibility, and control to workflow automation.
