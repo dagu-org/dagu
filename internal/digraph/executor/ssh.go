@@ -22,6 +22,7 @@ type sshExec struct {
 	config    *sshExecConfig
 	sshConfig *ssh.ClientConfig
 	stdout    io.Writer
+	stderr    io.Writer
 	session   *ssh.Session
 }
 
@@ -114,6 +115,7 @@ func newSSHExec(_ context.Context, step digraph.Step) (Executor, error) {
 		config:    &cfg,
 		sshConfig: sshConfig,
 		stdout:    os.Stdout,
+		stderr:    os.Stderr,
 	}, nil
 }
 
@@ -124,7 +126,7 @@ func (e *sshExec) SetStdout(out io.Writer) {
 }
 
 func (e *sshExec) SetStderr(out io.Writer) {
-	e.stdout = out
+	e.stderr = out
 }
 
 func (e *sshExec) Kill(_ os.Signal) error {
@@ -153,7 +155,7 @@ func (e *sshExec) Run(_ context.Context) error {
 	// Once a Session is created, you can execute a single command on
 	// the remote side using the Run method.
 	session.Stdout = e.stdout
-	session.Stderr = e.stdout
+	session.Stderr = e.stderr
 	command := strings.Join(
 		append([]string{e.step.Command}, e.step.Args...), " ",
 	)
