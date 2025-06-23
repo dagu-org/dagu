@@ -228,6 +228,7 @@ steps:
   - name: wait-for-service
     command: curl -f http://service/health
     repeatPolicy:
+      repeat: true
       intervalSec: 10
       exitCode: [1]  # Repeat while exit code is 1
 ```
@@ -247,13 +248,15 @@ steps:
   - name: wait-for-service
     command: curl -f http://service:8080/health
     repeatPolicy:
+      repeat: true
       intervalSec: 10
-      exitCode: [1]  # Repeat while curl fails
+      exitCode: [1]  # Repeat while exit code is 1
   
   - name: monitor-job
     command: ./check_job_status.sh
     output: JOB_STATUS
     repeatPolicy:
+      repeat: true
       condition: "${JOB_STATUS}"
       expected: "COMPLETED"
       intervalSec: 30

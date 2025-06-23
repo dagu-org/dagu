@@ -255,7 +255,7 @@ steps:
 | `limit` | integer | Maximum number of executions | - |
 | `condition` | string | Condition to evaluate | - |
 | `expected` | string | Expected value/pattern | - |
-| `exitCode` | array | Exit codes that stop repetition | - |
+| `exitCode` | array | Exit codes that trigger repetition | - |
 
 ```yaml
 steps:

@@ -139,7 +139,8 @@ steps:
   - name: wait-for-file
     command: test -f /tmp/ready.flag
     repeatPolicy:
-      exitCode: [1]      # Repeat while the exit code is 1
+      repeat: true
+      exitCode: [1]      # Repeat while exit code is 1
       intervalSec: 10    # Wait 10 seconds between attempts
 ```
 
