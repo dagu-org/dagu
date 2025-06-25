@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.17.3 (2025-06-25)
+
+### New Features
+- **HTTP Executor**: Added `skipTLSVerify` option to support self-signed certificates (#1046)
+
+### Bug Fixes
+- **Configuration**: Fixed DAGU_DAGS_DIR environment variable not being recognized (#1060)
+- **SSH Executor**: Fixed stdout and stderr streams being incorrectly merged (#1057)
+- **Repeat Policy**: Fixed nodes being marked as failed when using repeat policy with non-zero exit codes (#1052)
+- **UI**: Fixed retry individual step functionality for remote nodes (#1049)
+- **Environment Variables**: Fixed environment variable evaluation and working directory handling (#1045)
+- **Dashboard**: Prevented full page reload on date change and fixed invalid date handling (commit 58ad8e44)
+
+### Documentation
+- **Repeat Policy**: Corrected documentation and examples to accurately describe behavior (#1056)
+
+### Contributors
+
+Thanks to our contributors for this release:
+
+| Contribution | Author |
+|--------------|--------|
+| HTTP executor skipTLSVerify feature | [@mnmercer](https://github.com/mnmercer) (report), [@nightly-brew](https://github.com/nightly-brew) (feedback) |
+| DAGU_DAGS_DIR environment variable fix | [@Daffdi](https://github.com/Daffdi) (report) |
+| SSH executor stdout/stderr separation | [@NebulaCoding1029](https://github.com/NebulaCoding1029) (report) |
+| Repeat policy bug fixes and documentation | [@jeremydelattre59](https://github.com/jeremydelattre59) (reports) |
+| Retry individual step UI fix | [@jeremydelattre59](https://github.com/jeremydelattre59) (report), [@thefishhat](https://github.com/thefishhat) (implementation) |
+| Environment variable evaluation fixes | [@jhuang732](https://github.com/jhuang732) (report) |
+
 ## v1.17.2 (2025-06-20)
 
 ### Bug Fixes
