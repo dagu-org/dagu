@@ -7,6 +7,7 @@ import {
   XCircle,
   StopCircle,
   Clock,
+  Loader2,
 } from 'lucide-react';
 import {
   Select,
@@ -125,11 +126,6 @@ function Dashboard(): React.ReactElement | null {
   }, [appBarContext]); // Dependency array includes the context
 
   // --- Conditional Returns ---
-  // Handle loading state
-  if (isLoading) {
-    return <div className="p-4">Loading dashboard data...</div>; // Or use a spinner component
-  }
-
   // Handle error state
   if (error) {
     // Type assertion for the error object based on the default error schema
@@ -137,11 +133,6 @@ function Dashboard(): React.ReactElement | null {
     const errorMessage =
       errorData?.message || 'Unknown error loading dashboard';
     return <div className="p-4 text-red-600">Error: {errorMessage}</div>;
-  }
-
-  // Handle case where data might be null/undefined after loading
-  if (!data) {
-    return <div className="p-4">No dashboard data received.</div>;
   }
 
   // --- Calculate metrics ---
@@ -253,24 +244,33 @@ function Dashboard(): React.ReactElement | null {
               <span className="text-xs font-medium text-muted-foreground">
                 Date:
               </span>
-              <Input
-                type="date"
-                value={dayjs.unix(dateRange.startDate).format('YYYY-MM-DD')}
-                onChange={(e) => {
-                  const newDate = e.target.value;
-                  const date = dayjs(newDate);
-                  const startOfDay =
-                    config.tzOffsetInSec !== undefined
-                      ? date.utcOffset(config.tzOffsetInSec / 60).startOf('day')
-                      : date.startOf('day');
-                  const endOfDay =
-                    config.tzOffsetInSec !== undefined
-                      ? date.utcOffset(config.tzOffsetInSec / 60).endOf('day')
-                      : date.endOf('day');
-                  handleDateChange(startOfDay.unix(), endOfDay.unix());
-                }}
-                className="h-7 w-[140px] text-xs pr-8"
-              />
+              <div className="relative">
+                <Input
+                  type="date"
+                  value={dayjs.unix(dateRange.startDate).format('YYYY-MM-DD')}
+                  onChange={(e) => {
+                    const newDate = e.target.value;
+                    if (!newDate) return; // Handle empty input
+                    
+                    const date = dayjs(newDate);
+                    if (!date.isValid()) return; // Handle invalid dates
+                    
+                    const startOfDay =
+                      config.tzOffsetInSec !== undefined
+                        ? date.utcOffset(config.tzOffsetInSec / 60).startOf('day')
+                        : date.startOf('day');
+                    const endOfDay =
+                      config.tzOffsetInSec !== undefined
+                        ? date.utcOffset(config.tzOffsetInSec / 60).endOf('day')
+                        : date.endOf('day');
+                    handleDateChange(startOfDay.unix(), endOfDay.unix());
+                  }}
+                  className="h-7 w-[140px] text-xs pr-8"
+                />
+                {isLoading && (
+                  <Loader2 className="absolute right-2 top-1.5 h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+              </div>
               <Button
                 variant="outline"
                 size="sm"
