@@ -434,15 +434,15 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("tls.keyFile", "KEY_FILE")
 
 	// File paths
-	l.bindEnv("paths.dags", "DAGS")
-	l.bindEnv("paths.dags", "DAGS_DIR")
+	l.bindEnv("paths.dagsDir", "DAGS")
+	l.bindEnv("paths.dagsDir", "DAGS_DIR")
 	l.bindEnv("paths.executable", "EXECUTABLE")
 	l.bindEnv("paths.logDir", "LOG_DIR")
 	l.bindEnv("paths.dataDir", "DATA_DIR")
 	l.bindEnv("paths.suspendFlagsDir", "SUSPEND_FLAGS_DIR")
 	l.bindEnv("paths.adminLogsDir", "ADMIN_LOG_DIR")
 	l.bindEnv("paths.baseConfig", "BASE_CONFIG")
-	l.bindEnv("paths.historyDir", "DAG_RUNS_DIR")
+	l.bindEnv("paths.dagRunsDir", "DAG_RUNS_DIR")
 	l.bindEnv("paths.procDir", "PROC_DIR")
 	l.bindEnv("paths.queueDir", "QUEUE_DIR")
 
