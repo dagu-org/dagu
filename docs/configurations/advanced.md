@@ -45,16 +45,16 @@ queues:
   enabled: true
   config:
     - name: "cpu-intensive"
-      maxConcurrency: 2    # CPU cores
+      maxActiveRuns: 2    # CPU cores
       
     - name: "io-intensive"
-      maxConcurrency: 20   # High I/O
+      maxActiveRuns: 20   # High I/O
       
     - name: "batch"
-      maxConcurrency: 1    # Sequential
+      maxActiveRuns: 1    # Sequential
       
     - name: "default"
-      maxConcurrency: 5
+      maxActiveRuns: 5
 ```
 
 Per-DAG queue:

@@ -10,7 +10,6 @@ Enable username/password authentication:
 # ~/.config/dagu/config.yaml
 auth:
   basic:
-    enabled: true
     username: admin
     password: secure-password
 ```
@@ -33,7 +32,6 @@ For programmatic access:
 ```yaml
 auth:
   token:
-    enabled: true
     value: your-api-token
 ```
 
@@ -84,12 +82,12 @@ Permission levels:
 Set authentication via environment:
 
 ```bash
-export DAGU_AUTH_BASIC_ENABLED=true
+# Basic authentication (enabled when both username and password are set)
 export DAGU_AUTH_BASIC_USERNAME=admin
 export DAGU_AUTH_BASIC_PASSWORD=secret
 
-export DAGU_AUTH_TOKEN_ENABLED=true
-export DAGU_AUTH_TOKEN_VALUE=api-token
+# Token authentication (enabled when token is set)
+export DAGU_AUTH_TOKEN=api-token
 
 dagu start-all
 ```
@@ -160,7 +158,6 @@ services:
   dagu:
     image: ghcr.io/dagu-org/dagu:latest
     environment:
-      - DAGU_AUTH_BASIC_ENABLED=true
       - DAGU_AUTH_BASIC_USERNAME=admin
       - DAGU_AUTH_BASIC_PASSWORD_FILE=/run/secrets/password
     secrets:
@@ -196,13 +193,14 @@ permissions:
 ### Multi-Environment Setup
 
 ```bash
-# Development
-export DAGU_AUTH_BASIC_ENABLED=false
+# Development (no auth)
+# Simply don't set auth environment variables
 
-# Production
-export DAGU_AUTH_BASIC_ENABLED=true
-export DAGU_TLS_CERT_FILE=/etc/ssl/dagu.crt
-export DAGU_TLS_KEY_FILE=/etc/ssl/dagu.key
+# Production (with auth and TLS)
+export DAGU_AUTH_BASIC_USERNAME=admin
+export DAGU_AUTH_BASIC_PASSWORD=secure-password
+export DAGU_CERT_FILE=/etc/ssl/dagu.crt
+export DAGU_KEY_FILE=/etc/ssl/dagu.key
 ```
 
 ## Troubleshooting

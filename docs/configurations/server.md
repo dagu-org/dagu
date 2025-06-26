@@ -29,33 +29,37 @@ Location: `~/.config/dagu/config.yaml`
 host: "127.0.0.1"         # Web UI binding host
 port: 8080                # Web UI binding port
 basePath: ""              # Base path for reverse proxy (e.g., "/dagu")
+apiBasePath: "/api/v2"    # API endpoint base path
 tz: "Asia/Tokyo"          # Server timezone
 debug: false              # Debug mode
 logFormat: "text"         # Log format: "text" or "json"
 headless: false           # Run without Web UI
 
-# Directory Paths
-dagsDir: "~/.config/dagu/dags"                    # DAG definitions
-workDir: ""                                       # Default working directory
-logDir: "~/.local/share/dagu/logs"                # Log files
-dataDir: "~/.local/share/dagu/data"               # Application data
-suspendFlagsDir: "~/.local/share/dagu/suspend"    # Suspend flags
-adminLogsDir: "~/.local/share/dagu/logs/admin"    # Admin logs
-baseConfig: "~/.config/dagu/base.yaml"            # Base configuration
+# Directory Paths (must be under "paths" key)
+paths:
+  dagsDir: "~/.config/dagu/dags"                    # DAG definitions
+  workDir: ""                                       # Default working directory
+  logDir: "~/.local/share/dagu/logs"                # Log files
+  dataDir: "~/.local/share/dagu/data"               # Application data
+  suspendFlagsDir: "~/.local/share/dagu/suspend"    # Suspend flags
+  adminLogsDir: "~/.local/share/dagu/logs/admin"    # Admin logs
+  baseConfig: "~/.config/dagu/base.yaml"            # Base configuration
+  dagRunsDir: ""                                    # Auto: {dataDir}/dag-runs
+  queueDir: ""                                      # Auto: {dataDir}/queue
+  procDir: ""                                       # Auto: {dataDir}/proc
+  executable: ""                                    # Auto: current executable
 
 # Permissions
 permissions:
   writeDAGs: true         # Allow creating/editing/deleting DAGs
   runDAGs: true           # Allow running/stopping/retrying DAGs
 
-# Authentication
+# Authentication (enabled when credentials are set)
 auth:
   basic:
-    enabled: true
     username: "admin"
     password: "secret"
   token:
-    enabled: true
     value: "your-secret-token"
 
 # TLS/HTTPS Configuration
@@ -75,14 +79,14 @@ latestStatusToday: true         # Show only today's latest status
 
 # Queue System
 queues:
-  enabled: true                 # Enable queue system
+  enabled: true                 # Enable queue system (default: true)
   config:
     - name: "critical"
-      maxConcurrency: 5
+      maxActiveRuns: 5          # Maximum concurrent DAG runs
     - name: "batch"
-      maxConcurrency: 1
+      maxActiveRuns: 1
     - name: "default"
-      maxConcurrency: 2
+      maxActiveRuns: 2
 
 # Remote Nodes
 remoteNodes:
@@ -116,10 +120,9 @@ All options support `DAGU_` prefix:
 - `DAGU_DATA_DIR` - Data
 
 **Auth:**
-- `DAGU_AUTH_BASIC_ENABLED`
-- `DAGU_AUTH_BASIC_USERNAME`
-- `DAGU_AUTH_BASIC_PASSWORD`
-- `DAGU_AUTH_TOKEN`
+- `DAGU_AUTH_BASIC_USERNAME` - Basic auth username
+- `DAGU_AUTH_BASIC_PASSWORD` - Basic auth password
+- `DAGU_AUTH_TOKEN` - API token
 
 ## Common Setups
 
@@ -138,7 +141,6 @@ permissions:
   writeDAGs: false
 auth:
   basic:
-    enabled: true
     username: "admin"
     password: "${ADMIN_PASSWORD}"
 tls:
@@ -150,7 +152,6 @@ tls:
 ```bash
 docker run -d \
   -e DAGU_HOST=0.0.0.0 \
-  -e DAGU_AUTH_BASIC_ENABLED=true \
   -e DAGU_AUTH_BASIC_USERNAME=admin \
   -e DAGU_AUTH_BASIC_PASSWORD=secret \
   -p 8080:8080 \
@@ -163,7 +164,6 @@ docker run -d \
 ```yaml
 auth:
   basic:
-    enabled: true
     username: "admin"
     password: "${ADMIN_PASSWORD}"
 ```
@@ -172,7 +172,6 @@ auth:
 ```yaml
 auth:
   token:
-    enabled: true
     value: "${API_TOKEN}"
 ```
 

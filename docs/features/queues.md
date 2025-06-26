@@ -48,11 +48,11 @@ queues:
   enabled: true
   config:
     - name: "critical"
-      maxConcurrency: 5     # 5 critical jobs concurrently
+      maxActiveRuns: 5      # 5 critical jobs concurrently
     - name: "batch"
-      maxConcurrency: 1     # One batch job at a time
+      maxActiveRuns: 1      # One batch job at a time
     - name: "reporting"
-      maxConcurrency: 3     # 3 reports concurrently
+      maxActiveRuns: 3      # 3 reports concurrently
 ```
 
 ## Default Queue via Base Config

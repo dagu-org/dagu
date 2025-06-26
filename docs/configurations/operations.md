@@ -186,7 +186,8 @@ Metrics available at `/api/v2/metrics`:
 # config.yaml
 logFormat: json    # text or json
 debug: true       # Debug mode
-logDir: /var/log/dagu
+paths:
+  logDir: /var/log/dagu
 ```
 
 ```bash
