@@ -1191,3 +1191,16 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 
 	return oc.outputData, nil
 }
+
+func (node *Node) evalPreconditions(ctx context.Context) error {
+	if len(node.Step().Preconditions) == 0 {
+		return nil
+	}
+	logger.Infof(ctx, "Checking preconditions for \"%s\"", node.Name())
+	shell := cmdutil.GetShellCommand(node.Step().Shell)
+	if err := EvalConditions(ctx, shell, node.Step().Preconditions); err != nil {
+		logger.Infof(ctx, "Preconditions failed for \"%s\"", node.Name())
+		return err
+	}
+	return nil
+}
