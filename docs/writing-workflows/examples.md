@@ -950,6 +950,195 @@ Send email alerts on events.
 
 </div>
 
+## Operations & Production
+
+<div class="examples-grid">
+
+<div class="example-card">
+
+### History Retention
+
+```yaml
+name: data-archiver
+histRetentionDays: 30    # Keep 30 days of history
+schedule: "0 0 * * *"     # Daily at midnight
+steps:
+  - name: archive-old-data
+    command: ./archive.sh
+  - name: cleanup-temp
+    command: rm -rf /tmp/archive/*
+```
+
+Control how long execution history is retained.
+
+<a href="/reference/yaml#data-fields" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Output Size Management
+
+```yaml
+name: log-processor
+maxOutputSize: 10485760   # 10MB max output per step
+steps:
+  - name: process-large-logs
+    command: ./analyze-logs.sh
+    stdout: /logs/analysis.out
+  - name: summarize
+    command: tail -n 1000 /logs/analysis.out
+```
+
+Prevent memory issues from large command outputs.
+
+<a href="/reference/yaml#data-fields" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Custom Log Directory
+
+```yaml
+name: etl-pipeline
+logDir: /data/etl/logs/${DAG_NAME}
+histRetentionDays: 90
+steps:
+  - name: extract
+    command: ./extract.sh
+    stdout: extract.log
+    stderr: extract.err
+  - name: transform
+    command: ./transform.py
+    stdout: transform.log
+```
+
+Organize logs in custom directories with retention.
+
+<a href="/reference/yaml#data-fields" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Timeout & Cleanup
+
+```yaml
+name: long-running-job
+timeoutSec: 7200          # 2 hour timeout
+maxCleanUpTimeSec: 600    # 10 min cleanup window
+steps:
+  - name: data-processing
+    command: ./heavy-process.sh
+    signalOnStop: SIGTERM
+handlerOn:
+  exit:
+    command: ./cleanup-resources.sh
+```
+
+Ensure workflows don't run forever and clean up properly.
+
+<a href="/reference/yaml#execution-control-fields" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Production Monitoring
+
+```yaml
+name: critical-service
+histRetentionDays: 365    # Keep 1 year for compliance
+maxOutputSize: 5242880    # 5MB output limit
+maxActiveRuns: 1          # No overlapping runs
+mailOn:
+  failure: true
+errorMail:
+  from: alerts@company.com
+  to: oncall@company.com
+  prefix: "[CRITICAL]"
+  attachLogs: true
+infoMail:
+  from: notifications@company.com
+  to: team@company.com
+  prefix: "[SUCCESS]"
+handlerOn:
+  failure:
+    command: |
+      curl -X POST https://metrics.company.com/alerts \
+        -H "Content-Type: application/json" \
+        -d '{"service": "critical-service", "status": "failed"}'
+steps:
+  - name: health-check
+    command: ./health-check.sh
+    retryPolicy:
+      limit: 3
+      intervalSec: 30
+```
+
+Production-ready configuration with monitoring and alerts.
+
+<a href="/reference/yaml" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Execution Control
+
+```yaml
+name: batch-processor
+maxActiveSteps: 5         # Max 5 parallel steps
+maxActiveRuns: 2          # Max 2 concurrent DAG runs
+delaySec: 10              # 10 second initial delay
+skipIfSuccessful: true    # Skip if already succeeded
+steps:
+  - name: validate
+    command: ./validate.sh
+  - name: process-batch-1
+    command: ./process.sh batch1
+    depends: validate
+  - name: process-batch-2
+    command: ./process.sh batch2
+    depends: validate
+  - name: process-batch-3
+    command: ./process.sh batch3
+    depends: validate
+```
+
+Control concurrency and execution behavior.
+
+<a href="/reference/yaml#execution-control-fields" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Queue Assignment
+
+```yaml
+name: heavy-computation
+queue: compute-queue      # Assign to specific queue
+histRetentionDays: 60     # Keep 60 days history
+maxOutputSize: 20971520   # 20MB output limit
+steps:
+  - name: prepare-data
+    command: ./prepare.sh
+  - name: run-computation
+    command: ./compute.sh --intensive
+  - name: store-results
+    command: ./store.sh
+```
+
+Use queues to manage workflow execution priority and concurrency.
+
+<a href="/features/queues" class="learn-more">Learn more →</a>
+
+</div>
+
+</div>
+
 ## Advanced Patterns
 
 <div class="examples-grid">
@@ -1043,6 +1232,7 @@ tags: daily,critical
 queue: etl-queue
 maxActiveRuns: 1
 maxOutputSize: 5242880  # 5MB
+histRetentionDays: 90   # Keep history for 90 days
 env:
   - LOG_LEVEL: info
   - DATA_DIR: /data/analytics

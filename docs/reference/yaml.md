@@ -121,6 +121,7 @@ schedule:
 |-------|------|-------------|---------|
 | `mailOn` | object | Email notification triggers | - |
 | `errorMail` | object | Error email configuration | - |
+| `infoMail` | object | Info email configuration | - |
 | `smtp` | object | SMTP server configuration | - |
 
 ```yaml
@@ -133,6 +134,12 @@ errorMail:
   to: oncall@example.com
   prefix: "[ALERT]"
   attachLogs: true
+  
+infoMail:
+  from: notifications@example.com
+  to: team@example.com
+  prefix: "[INFO]"
+  attachLogs: false
   
 smtp:
   host: smtp.gmail.com
