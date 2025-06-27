@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -443,7 +444,12 @@ func (a *API) startDAGRun(ctx context.Context, dag *digraph.DAG, params, dagRunI
 	}
 
 	// Wait for the DAG to start
-	timer := time.NewTimer(3 * time.Second)
+	// Use longer timeout on Windows due to slower process startup
+	timeout := 3 * time.Second
+	if runtime.GOOS == "windows" {
+		timeout = 10 * time.Second
+	}
+	timer := time.NewTimer(timeout)
 	var running bool
 	defer timer.Stop()
 

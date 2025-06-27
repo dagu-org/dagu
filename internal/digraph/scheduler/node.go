@@ -16,7 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.org/x/sys/unix"
+	"syscall"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -480,7 +480,7 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	if status == NodeStatusRunning && n.cmd != nil {
 		sigsig := sig
 		if allowOverride && n.SignalOnStop() != "" {
-			sigsig = unix.SignalNum(n.SignalOnStop())
+			sigsig = syscall.Signal(digraph.GetSignalNum(n.SignalOnStop()))
 		}
 		logger.Info(ctx, "Sending signal", "signal", sigsig, "step", n.Name())
 		if err := n.cmd.Kill(sigsig); err != nil {
@@ -523,7 +523,7 @@ func (n *Node) Setup(ctx context.Context, logDir string, dagRunID string) error 
 	// Set the log file path
 	startedAt := time.Now()
 	safeName := fileutil.SafeName(n.Name())
-	timestamp := startedAt.Format("20060102.15:04:05.000")
+	timestamp := startedAt.Format("20060102.150405.000")
 	postfix := stringutil.TruncString(dagRunID, 8)
 	logFilename := fmt.Sprintf("%s.%s.%s", safeName, timestamp, postfix)
 	if !fileutil.FileExists(logDir) {
@@ -1075,11 +1075,10 @@ func (oc *OutputCoordinator) setupWriters(_ context.Context, data NodeData) erro
 	return nil
 }
 
-func (oc *OutputCoordinator) setupFile(ctx context.Context, filePath string, _ NodeData) (*os.File, error) {
+func (oc *OutputCoordinator) setupFile(_ context.Context, filePath string, data NodeData) (*os.File, error) {
 	absFilePath := filePath
 	if !filepath.IsAbs(absFilePath) {
-		dir := executor.GetEnv(ctx).WorkingDir
-		absFilePath = filepath.Join(dir, absFilePath)
+		absFilePath = filepath.Join(data.Step.Dir, absFilePath)
 		absFilePath = filepath.Clean(absFilePath)
 	}
 
@@ -1190,17 +1189,4 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 	oc.outputCaptured = true
 
 	return oc.outputData, nil
-}
-
-func (node *Node) evalPreconditions(ctx context.Context) error {
-	if len(node.Step().Preconditions) == 0 {
-		return nil
-	}
-	logger.Infof(ctx, "Checking preconditions for \"%s\"", node.Name())
-	shell := cmdutil.GetShellCommand(node.Step().Shell)
-	if err := EvalConditions(ctx, shell, node.Step().Preconditions); err != nil {
-		logger.Infof(ctx, "Preconditions failed for \"%s\"", node.Name())
-		return err
-	}
-	return nil
 }

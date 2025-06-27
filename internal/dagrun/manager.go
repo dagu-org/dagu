@@ -8,10 +8,10 @@ import (
 	"runtime/debug"
 	"slices"
 	"strconv"
-	"syscall"
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -116,7 +116,7 @@ func (m *Manager) StartDAGRun(ctx context.Context, dag *digraph.DAG, opts StartO
 	args = append(args, dag.Location)
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
+	executor.SetupCommand(cmd)
 	cmd.Dir = m.workDir
 	cmd.Env = os.Environ()
 	cmd.Stdout = os.Stdout
@@ -153,7 +153,7 @@ func (m *Manager) EnqueueDAGRun(_ context.Context, dag *digraph.DAG, opts Enqueu
 	args = append(args, dag.Location)
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
+	executor.SetupCommand(cmd)
 	cmd.Dir = m.workDir
 	cmd.Env = os.Environ()
 	cmd.Stdout = os.Stdout
@@ -178,7 +178,7 @@ func (m *Manager) DequeueDAGRun(_ context.Context, dagRun digraph.DAGRunRef) err
 	}
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
+	executor.SetupCommand(cmd)
 	cmd.Dir = m.workDir
 	cmd.Env = os.Environ()
 	cmd.Stdout = os.Stdout
@@ -209,7 +209,7 @@ func (m *Manager) RestartDAG(ctx context.Context, dag *digraph.DAG, opts Restart
 	args = append(args, dag.Location)
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
+	executor.SetupCommand(cmd)
 	cmd.Dir = m.workDir
 	cmd.Env = os.Environ()
 	if err := cmd.Start(); err != nil {
@@ -247,7 +247,7 @@ func (m *Manager) runRetryCommand(ctx context.Context, args []string, dag *digra
 	args = append(args, dag.Name)
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
+	executor.SetupCommand(cmd)
 	cmd.Dir = m.workDir
 	cmd.Env = os.Environ()
 	if err := cmd.Start(); err != nil {

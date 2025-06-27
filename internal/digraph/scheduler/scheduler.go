@@ -152,7 +152,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 
 	var wg = sync.WaitGroup{}
 
-	for !graph.isFinished() {
+	for !sc.isFinished(graph) {
 		if sc.isCanceled() {
 			break
 		}
@@ -165,7 +165,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 			if sc.isCanceled() {
 				break NodesIteration
 			}
-			if sc.maxActiveRuns > 0 && graph.runningCount() >= sc.maxActiveRuns {
+			if sc.maxActiveRuns > 0 && sc.runningCount(graph) >= sc.maxActiveRuns {
 				continue NodesIteration
 			}
 
@@ -182,16 +182,66 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 				defer nodeCancel()
 
 				// Recover from panics
-				defer sc.recoverNodePanic(ctx, node)
+				defer func() {
+					if panicObj := recover(); panicObj != nil {
+						stack := string(debug.Stack())
+						err := fmt.Errorf("panic recovered in node %s: %v\n%s", node.Name(), panicObj, stack)
+						logger.Error(ctx, "Panic occurred",
+							"error", err,
+							"step", node.Name(),
+							"stack", stack,
+							"dagRunId", sc.dagRunID)
+						node.MarkError(err)
+						sc.setLastError(err)
+
+						// Update metrics for failed node
+						sc.mu.Lock()
+						sc.metrics.failedNodes++
+						sc.mu.Unlock()
+					}
+				}()
 
 				// Ensure node is finished and wg is decremented
-				defer sc.finishNode(node, &wg)
+				defer func() {
+					// Update metrics based on node status
+					sc.mu.Lock()
+
+					// Update node status counts
+					switch node.State().Status {
+					case NodeStatusSuccess:
+						sc.metrics.completedNodes++
+					case NodeStatusError:
+						sc.metrics.failedNodes++
+					case NodeStatusSkipped:
+						sc.metrics.skippedNodes++
+					case NodeStatusCancel:
+						sc.metrics.canceledNodes++
+					case NodeStatusNone, NodeStatusRunning:
+						// Should not happen at this point
+					}
+					sc.mu.Unlock()
+
+					node.Finish()
+					wg.Done()
+				}()
 
 				ctx = sc.setupEnviron(nodeCtx, graph, node)
 
 				// Check preconditions
-				if !meetsPreconditions(ctx, node, progressCh) {
-					return
+				if len(node.Step().Preconditions) > 0 {
+					logger.Infof(ctx, "Checking preconditions for \"%s\"", node.Name())
+					shell := cmdutil.GetShellCommand(node.Step().Shell)
+					if err := EvalConditions(ctx, shell, node.Step().Preconditions); err != nil {
+						logger.Infof(ctx, "Preconditions failed for \"%s\"", node.Name())
+						node.SetStatus(NodeStatusSkipped)
+						if !errors.Is(err, ErrConditionNotMet) {
+							node.SetError(err)
+						}
+						if progressCh != nil {
+							progressCh <- node
+						}
+						return
+					}
 				}
 
 				setupSucceed := true
@@ -206,18 +256,89 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 			ExecRepeat: // repeat execution
 				for setupSucceed && !sc.isCanceled() {
 					execErr := sc.execNode(ctx, node)
-					isRetriable := sc.handleNodeExecutionError(ctx, graph, node, execErr)
-					if isRetriable {
-						continue ExecRepeat
+					if execErr != nil {
+						status := node.State().Status
+						switch {
+						case status == NodeStatusSuccess || status == NodeStatusCancel:
+							// do nothing
+
+						case sc.isTimeout(graph.startedAt):
+							logger.Info(ctx, "Step deadline exceeded", "step", node.Name(), "error", execErr)
+							node.SetStatus(NodeStatusCancel)
+							sc.setLastError(execErr)
+
+						case sc.isCanceled():
+							sc.setLastError(execErr)
+
+						case node.retryPolicy.Limit > node.GetRetryCount():
+							if sc.handleNodeRetry(ctx, node, execErr) {
+								continue ExecRepeat
+							}
+
+						default:
+							// finish the node
+							node.SetStatus(NodeStatusError)
+							if node.ShouldMarkSuccess(ctx) {
+								// mark as success if the node should be marked as success
+								// i.e. continueOn.markSuccess is set to true
+								node.SetStatus(NodeStatusSuccess)
+							} else {
+								node.MarkError(execErr)
+								sc.setLastError(execErr)
+							}
+						}
 					}
 
 					if node.State().Status != NodeStatusCancel {
 						node.IncDoneCount()
 					}
 
-					shouldRepeat := sc.shouldRepeatNode(ctx, node, execErr)
+					shouldRepeat := false
+					step := node.Step()
+
+					// Check if repeat limit has been reached
+					if step.RepeatPolicy.Limit > 0 && node.State().DoneCount >= step.RepeatPolicy.Limit {
+						// Limit reached, don't repeat
+						shouldRepeat = false
+					} else if step.RepeatPolicy.Condition != nil {
+						// Ensure node's own output variables are reloaded
+						// before evaluating the condition.
+						if node.inner.State.OutputVariables != nil {
+							env := executor.GetEnv(ctx)
+							env.ForceLoadOutputVariables(node.inner.State.OutputVariables)
+							ctx = executor.WithEnv(ctx, env)
+						}
+						shell := cmdutil.GetShellCommand(step.Shell)
+						err := EvalCondition(ctx, shell, step.RepeatPolicy.Condition)
+						if step.RepeatPolicy.Condition.Expected != "" {
+							// Repeat as long as condition does NOT match expected (err != nil)
+							if err != nil {
+								shouldRepeat = true
+							}
+						} else {
+							// Repeat as long as it returns exit code 0 (err == nil)
+							if err == nil {
+								shouldRepeat = true
+							}
+						}
+					} else if len(step.RepeatPolicy.ExitCode) > 0 {
+						// Repeat if last exit code matches any in ExitCode
+						lastExit := node.State().ExitCode
+						shouldRepeat = slices.Contains(step.RepeatPolicy.ExitCode, lastExit)
+					} else if step.RepeatPolicy.Repeat {
+						// Unconditional repeat
+						shouldRepeat = (execErr == nil || step.ContinueOn.Failure)
+					}
+
 					if shouldRepeat && !sc.isCanceled() {
-						sc.prepareNodeForRepeat(ctx, node, progressCh)
+						logger.Info(ctx, "Step will be repeated", "step", node.Name(), "interval", step.RepeatPolicy.Interval)
+						time.Sleep(step.RepeatPolicy.Interval)
+						node.SetRepeated(true) // mark as repeated
+						logger.Info(ctx, "Repeating step", "step", node.Name())
+
+						if progressCh != nil {
+							progressCh <- node
+						}
 						continue
 					}
 
@@ -229,8 +350,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 					break ExecRepeat
 				}
 
-				// If node is still in running state by now, it means it was not canceled
-				// and it has completed its execution without errors.
+				// finish the node
 				if node.State().Status == NodeStatusRunning {
 					node.SetStatus(NodeStatusSuccess)
 				}
@@ -602,6 +722,26 @@ func (sc *Scheduler) setCanceled() {
 	sc.canceled = 1
 }
 
+func (*Scheduler) runningCount(g *ExecutionGraph) int {
+	count := 0
+	for _, node := range g.nodes {
+		if node.State().Status == NodeStatusRunning {
+			count++
+		}
+	}
+	return count
+}
+
+func (*Scheduler) isFinished(g *ExecutionGraph) bool {
+	for _, node := range g.nodes {
+		if node.State().Status == NodeStatusRunning ||
+			node.State().Status == NodeStatusNone {
+			return false
+		}
+	}
+	return true
+}
+
 func (sc *Scheduler) isSucceed(g *ExecutionGraph) bool {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
@@ -678,8 +818,8 @@ func (sc *Scheduler) GetMetrics() map[string]any {
 	return metrics
 }
 
-// shouldRetryNode handles the retry logic for a node based on exit codes and retry policy
-func (sc *Scheduler) shouldRetryNode(ctx context.Context, node *Node, execErr error) (shouldRetry bool) {
+// handleNodeRetry handles the retry logic for a node based on exit codes and retry policy
+func (sc *Scheduler) handleNodeRetry(ctx context.Context, node *Node, execErr error) (shouldRetry bool) {
 	var exitCode int
 	var exitCodeFound bool
 
@@ -731,170 +871,4 @@ func (sc *Scheduler) shouldRetryNode(ctx context.Context, node *Node, execErr er
 	node.SetRetriedAt(time.Now())
 	node.SetStatus(NodeStatusRunning)
 	return true
-}
-
-// recoverNodePanic handles panic recovery for a node goroutine.
-func (sc *Scheduler) recoverNodePanic(ctx context.Context, node *Node) {
-	if panicObj := recover(); panicObj != nil {
-		stack := string(debug.Stack())
-		err := fmt.Errorf("panic recovered in node %s: %v\n%s", node.Name(), panicObj, stack)
-		logger.Error(ctx, "Panic occurred",
-			"error", err,
-			"step", node.Name(),
-			"stack", stack,
-			"dagRunId", sc.dagRunID)
-		node.MarkError(err)
-		sc.setLastError(err)
-
-		// Update metrics for failed node
-		sc.mu.Lock()
-		sc.metrics.failedNodes++
-		sc.mu.Unlock()
-	}
-}
-
-// finishNode updates metrics and finalizes the node.
-func (sc *Scheduler) finishNode(node *Node, wg *sync.WaitGroup) {
-	sc.mu.Lock()
-	defer sc.mu.Unlock()
-
-	switch node.State().Status {
-	case NodeStatusSuccess:
-		sc.metrics.completedNodes++
-	case NodeStatusError:
-		sc.metrics.failedNodes++
-	case NodeStatusSkipped:
-		sc.metrics.skippedNodes++
-	case NodeStatusCancel:
-		sc.metrics.canceledNodes++
-	case NodeStatusNone, NodeStatusRunning:
-		// Should not happen at this point
-	}
-
-	node.Finish()
-	wg.Done()
-}
-
-// checkPreconditions evaluates the preconditions for a node and updates its status accordingly.
-func meetsPreconditions(ctx context.Context, node *Node, progressCh chan *Node) bool {
-	err := node.evalPreconditions(ctx)
-	if err != nil {
-		// Precondition not met, skip the node
-		node.SetStatus(NodeStatusSkipped)
-		if !errors.Is(err, ErrConditionNotMet) {
-			node.SetError(err)
-		}
-		if progressCh != nil {
-			progressCh <- node
-		}
-		return false
-	}
-	return true
-}
-
-// handleNodeExecutionError processes execution errors for a node and determines if execution should be retried.
-// Returns true if the execution should be retried, false otherwise.
-func (sc *Scheduler) handleNodeExecutionError(ctx context.Context, graph *ExecutionGraph, node *Node, execErr error) (isRetriable bool) {
-	if execErr == nil {
-		return false // no error, nothing to handle
-	}
-
-	status := node.State().Status
-	switch {
-	case status == NodeStatusSuccess || status == NodeStatusCancel:
-		// do nothing
-
-	case sc.isTimeout(graph.startedAt):
-		logger.Info(ctx, "Step deadline exceeded", "step", node.Name(), "error", execErr)
-		node.SetStatus(NodeStatusCancel)
-		sc.setLastError(execErr)
-
-	case sc.isCanceled():
-		sc.setLastError(execErr)
-
-	case node.retryPolicy.Limit > node.GetRetryCount():
-		if sc.shouldRetryNode(ctx, node, execErr) {
-			return true
-		}
-
-	default:
-		// node execution error is unexpected and unrecoverable
-		node.SetStatus(NodeStatusError)
-		if node.ShouldMarkSuccess(ctx) {
-			// mark as success if the node should be force marked as success
-			// i.e. continueOn.markSuccess is set to true
-			node.SetStatus(NodeStatusSuccess)
-		} else {
-			node.MarkError(execErr)
-			sc.setLastError(execErr)
-		}
-	}
-
-	return false
-}
-
-// shouldRepeatNode determines if a node should be repeated based on its repeat policy
-func (sc *Scheduler) shouldRepeatNode(ctx context.Context, node *Node, execErr error) bool {
-	step := node.Step()
-
-	// Check if repeat limit has been reached
-	if step.RepeatPolicy.Limit > 0 && node.State().DoneCount >= step.RepeatPolicy.Limit {
-		return false
-	}
-
-	if step.RepeatPolicy.Condition != nil {
-		return sc.evaluateRepeatCondition(ctx, node, &step)
-	}
-
-	if len(step.RepeatPolicy.ExitCode) > 0 {
-		// Repeat if last exit code matches any in ExitCode
-		lastExit := node.State().ExitCode
-		return slices.Contains(step.RepeatPolicy.ExitCode, lastExit)
-	}
-
-	if step.RepeatPolicy.Repeat {
-		// Unconditional repeat
-		return execErr == nil || step.ContinueOn.Failure
-	}
-
-	return false
-}
-
-// evaluateRepeatCondition evaluates the condition-based repeat policy
-func (sc *Scheduler) evaluateRepeatCondition(ctx context.Context, node *Node, step *digraph.Step) bool {
-	// Ensure node's own output variables are reloaded before evaluating the condition
-	if node.inner.State.OutputVariables != nil {
-		env := executor.GetEnv(ctx)
-		env.ForceLoadOutputVariables(node.inner.State.OutputVariables)
-		ctx = executor.WithEnv(ctx, env)
-	}
-
-	shell := cmdutil.GetShellCommand(step.Shell)
-	err := EvalCondition(ctx, shell, step.RepeatPolicy.Condition)
-
-	if step.RepeatPolicy.Condition.Expected != "" {
-		// Repeat as long as condition does NOT match expected (err != nil)
-		return err != nil
-	}
-
-	// Repeat as long as it returns exit code 0 (err == nil)
-	return err == nil
-}
-
-// prepareNodeForRepeat sets up a node for repetition
-func (sc *Scheduler) prepareNodeForRepeat(ctx context.Context, node *Node, progressCh chan *Node) {
-	step := node.Step()
-
-	node.SetStatus(NodeStatusRunning) // reset status to running for the repeat
-	if sc.lastError == node.Error() {
-		sc.setLastError(nil) // clear last error if we are repeating
-	}
-	logger.Info(ctx, "Step will be repeated", "step", node.Name(), "interval", step.RepeatPolicy.Interval)
-	time.Sleep(step.RepeatPolicy.Interval)
-	node.SetRepeated(true) // mark as repeated
-	logger.Info(ctx, "Repeating step", "step", node.Name())
-
-	if progressCh != nil {
-		progressCh <- node
-	}
 }

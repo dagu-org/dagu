@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"sync"
-	"syscall"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
@@ -44,14 +43,13 @@ func newDAGExecutor(
 		return nil, err
 	}
 
-	dir := GetEnv(ctx).WorkingDir
-	if dir != "" && !fileutil.FileExists(dir) {
+	if step.Dir != "" && !fileutil.FileExists(step.Dir) {
 		return nil, ErrWorkingDirNotExist
 	}
 
 	return &dagExecutor{
 		child:   child,
-		workDir: dir,
+		workDir: step.Dir,
 	}, nil
 }
 
@@ -141,10 +139,7 @@ func (e *dagExecutor) SetStderr(out io.Writer) {
 func (e *dagExecutor) Kill(sig os.Signal) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
-	if e.cmd == nil || e.cmd.Process == nil {
-		return nil
-	}
-	return syscall.Kill(-e.cmd.Process.Pid, sig.(syscall.Signal))
+	return killProcessGroup(e.cmd, sig)
 }
 
 func init() {

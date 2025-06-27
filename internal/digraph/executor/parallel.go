@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"sync"
-	"syscall"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
@@ -59,8 +58,7 @@ func newParallelExecutor(
 		return nil, err
 	}
 
-	dir := GetEnv(ctx).WorkingDir
-	if dir != "" && !fileutil.FileExists(dir) {
+	if step.Dir != "" && !fileutil.FileExists(step.Dir) {
 		return nil, ErrWorkingDirNotExist
 	}
 
@@ -71,7 +69,7 @@ func newParallelExecutor(
 
 	return &parallelExecutor{
 		child:         child,
-		workDir:       dir,
+		workDir:       step.Dir,
 		maxConcurrent: maxConcurrent,
 		running:       make(map[string]*exec.Cmd),
 		results:       make(map[string]*ChildResult),
@@ -344,14 +342,7 @@ func (e *parallelExecutor) Kill(sig os.Signal) error {
 	}
 
 	// Kill all running child processes
-	var lastErr error
-	for _, cmd := range e.running {
-		if cmd != nil && cmd.Process != nil {
-			if err := syscall.Kill(-cmd.Process.Pid, sig.(syscall.Signal)); err != nil {
-				lastErr = err
-			}
-		}
-	}
+	lastErr := killMultipleProcessGroups(e.running, sig)
 
 	return lastErr
 }

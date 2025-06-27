@@ -12,7 +12,6 @@ import (
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/joho/godotenv"
-	"golang.org/x/sys/unix"
 )
 
 // BuilderFn is a function that builds a part of the DAG.
@@ -954,7 +953,7 @@ func buildStepPrecondition(ctx BuildContext, def stepDef, step *Step) error {
 func buildSignalOnStop(_ BuildContext, def stepDef, step *Step) error {
 	if def.SignalOnStop != nil {
 		sigDef := *def.SignalOnStop
-		sig := unix.SignalNum(sigDef)
+		sig := getSignalNum(sigDef)
 		if sig == 0 {
 			return fmt.Errorf("%w: %s", ErrInvalidSignal, sigDef)
 		}

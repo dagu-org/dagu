@@ -48,6 +48,10 @@ type Global struct {
 	// If not explicitly provided, it defaults to the directory where the DAG file resides.
 	WorkDir string
 
+	// DefaultShell specifies the default shell to use for command execution.
+	// If not provided, platform-specific defaults are used (PowerShell on Windows, $SHELL on Unix).
+	DefaultShell string
+
 	// ConfigPath is the path to the configuration file used to load settings.
 	ConfigPath string
 }

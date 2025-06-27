@@ -31,6 +31,10 @@ type Definition struct {
 	// If not explicitly provided, it defaults to the directory where the DAG file resides.
 	WorkDir string `mapstructure:"workDir"`
 
+	// DefaultShell specifies the default shell to use for command execution.
+	// If not provided, platform-specific defaults are used (PowerShell on Windows, $SHELL on Unix).
+	DefaultShell string `mapstructure:"defaultShell"`
+
 	// Headless determines if the application should run without a graphical user interface.
 	// Useful for automated or headless server environments.
 	Headless *bool `mapstructure:"headless"`

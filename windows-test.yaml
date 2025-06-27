@@ -1,0 +1,11 @@
+name: windows-test
+description: Test Windows auto shell detection
+steps:
+  - name: powershell-pwd
+    command: pwd
+  - name: echo-hello
+    command: Write-Host 'Hello from Dagu on Windows'
+    depends: powershell-pwd
+  - name: touch-test-file
+    command: echo $null > test.txt
+    depends: echo-hello
