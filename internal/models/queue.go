@@ -63,8 +63,8 @@ const (
 	QueuedItemProcessingResultRetry QueuedItemProcessingResult = 0
 	// QueuedItemProcessingResultSuccess indicates that the queued item was processed successfully
 	QueuedItemProcessingResultSuccess QueuedItemProcessingResult = 1
-	// QueuedItemProcessingResultInvalid indicates that the queued item was invalid so it needs to be removed
-	QueuedItemProcessingResultInvalid QueuedItemProcessingResult = 2
+	// QueuedItemProcessingResultDiscard indicates that the queued item should be discarded due to unrecoverable error
+	QueuedItemProcessingResultDiscard QueuedItemProcessingResult = 2
 )
 
 // NewQueuedItem creates a new QueuedItem

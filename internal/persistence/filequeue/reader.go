@@ -302,8 +302,8 @@ func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.Q
 				q.removeProcessedItem(ctx, data)
 				// Clear retry delay for this queue since we successfully processed an item
 				q.queueRetryTime.Delete(data.Name)
-			case models.QueuedItemProcessingResultInvalid:
-				logger.Info(ctx, "Item is invalid, removing", "name", data.Name, "dagRunId", data.ID)
+			case models.QueuedItemProcessingResultDiscard:
+				logger.Info(ctx, "Item is invalid, discarding", "name", data.Name, "dagRunId", data.ID)
 				item.status = statusDone
 				q.removeProcessedItem(ctx, data)
 			}

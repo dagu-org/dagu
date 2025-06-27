@@ -377,6 +377,9 @@ func (att *Attempt) ReadStatus(ctx context.Context) (*models.DAGRunStatus, error
 	att.mu.RUnlock()
 
 	if parseErr != nil {
+		if errors.Is(parseErr, io.EOF) {
+			return nil, models.ErrCorruptedStatusFile // This means no valid status was found in the file
+		}
 		return nil, fmt.Errorf("failed to parse status file: %w", parseErr)
 	}
 

@@ -183,8 +183,11 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			// Fetch the DAG of the dag-run attempt first to get queue configuration
 			attempt, err = s.dagRunStore.FindAttempt(ctx, data)
 			if err != nil {
-				result = models.QueuedItemProcessingResultInvalid
 				logger.Error(ctx, "Failed to find run", "err", err, "data", data)
+				// If the attempt doesn't exist at all, mark as invalid
+				if errors.Is(err, models.ErrDAGRunIDNotFound) {
+					result = models.QueuedItemProcessingResultDiscard
+				}
 				goto SEND_RESULT
 			}
 
@@ -202,13 +205,18 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 
 			status, err = attempt.ReadStatus(ctx)
 			if err != nil {
-				logger.Error(ctx, "Failed to read status", "err", err, "data", data)
+				if errors.Is(err, models.ErrCorruptedStatusFile) {
+					logger.Error(ctx, "Status file is corrupted, marking as invalid", "err", err, "data", data)
+					result = models.QueuedItemProcessingResultDiscard
+				} else {
+					logger.Error(ctx, "Failed to read status", "err", err, "data", data)
+				}
 				goto SEND_RESULT
 			}
 
 			if status.Status != scheduler.StatusQueued {
 				logger.Info(ctx, "Skipping item from queue", "data", data, "status", status.Status)
-				result = models.QueuedItemProcessingResultInvalid
+				result = models.QueuedItemProcessingResultDiscard
 				goto SEND_RESULT
 			}
 
@@ -244,11 +252,16 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				}
 				status, err := attempt.ReadStatus(ctx)
 				if err != nil {
-					logger.Error(ctx, "Failed to read status", "err", err, "data", data)
+					if errors.Is(err, models.ErrCorruptedStatusFile) {
+						logger.Error(ctx, "Status file became corrupted during wait, marking as invalid", "err", err, "data", data)
+					} else {
+						logger.Error(ctx, "Failed to read status", "err", err, "data", data)
+					}
+					result = models.QueuedItemProcessingResultDiscard
 					goto SEND_RESULT
 				}
 				if status.Status != scheduler.StatusQueued {
-					result = models.QueuedItemProcessingResultInvalid
+					result = models.QueuedItemProcessingResultDiscard
 					break WAIT_FOR_RUN
 				}
 				if time.Since(startedAt) > 10*time.Second {

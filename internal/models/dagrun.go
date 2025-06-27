@@ -11,8 +11,9 @@ import (
 
 // Errors related to dag-run management
 var (
-	ErrDAGRunIDNotFound = errors.New("dag-run ID not found")
-	ErrNoStatusData     = errors.New("no status data")
+	ErrDAGRunIDNotFound    = errors.New("dag-run ID not found")
+	ErrNoStatusData        = errors.New("no status data")
+	ErrCorruptedStatusFile = errors.New("corrupted status file") // Status file exists but contains no valid data or is corrupted
 )
 
 // DAGRunStore provides an interface for interacting with the underlying database
