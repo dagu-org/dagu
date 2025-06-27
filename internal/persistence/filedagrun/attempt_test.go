@@ -234,9 +234,9 @@ func TestAttempt_EmptyFile(t *testing.T) {
 	att, err := NewAttempt(file, nil)
 	require.NoError(t, err)
 
-	// Reading an empty file should return EOF
+	// Reading an empty file should return ErrCorruptedStatusFile
 	_, err = att.ReadStatus(context.Background())
-	assert.ErrorIs(t, err, io.EOF)
+	assert.ErrorIs(t, err, models.ErrCorruptedStatusFile)
 
 	// Compacting an empty file should be safe
 	err = att.Compact(context.Background())
@@ -264,6 +264,57 @@ func TestAttempt_InvalidJSON(t *testing.T) {
 	status, err := att.ReadStatus(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, scheduler.StatusRunning.String(), status.Status.String())
+}
+
+func TestAttempt_CorruptedStatusFile(t *testing.T) {
+	t.Run("EmptyFile", func(t *testing.T) {
+		dir := createTempDir(t)
+		file := filepath.Join(dir, "empty.jsonl")
+
+		// Create empty file
+		f, err := os.Create(file)
+		require.NoError(t, err)
+		require.NoError(t, f.Close())
+
+		att, err := NewAttempt(file, nil)
+		require.NoError(t, err)
+
+		// Should return ErrCorruptedStatusFile
+		_, err = att.ReadStatus(context.Background())
+		assert.ErrorIs(t, err, models.ErrCorruptedStatusFile)
+	})
+
+	t.Run("OnlyWhitespace", func(t *testing.T) {
+		dir := createTempDir(t)
+		file := filepath.Join(dir, "whitespace.jsonl")
+
+		// Create file with only whitespace
+		err := os.WriteFile(file, []byte("\n\n\n"), 0600)
+		require.NoError(t, err)
+
+		att, err := NewAttempt(file, nil)
+		require.NoError(t, err)
+
+		// Should return ErrCorruptedStatusFile
+		_, err = att.ReadStatus(context.Background())
+		assert.ErrorIs(t, err, models.ErrCorruptedStatusFile)
+	})
+
+	t.Run("NoValidJSON", func(t *testing.T) {
+		dir := createTempDir(t)
+		file := filepath.Join(dir, "novalid.jsonl")
+
+		// Create file with only invalid JSON
+		err := os.WriteFile(file, []byte("not json\nstill not json\n"), 0600)
+		require.NoError(t, err)
+
+		att, err := NewAttempt(file, nil)
+		require.NoError(t, err)
+
+		// Should return ErrCorruptedStatusFile
+		_, err = att.ReadStatus(context.Background())
+		assert.ErrorIs(t, err, models.ErrCorruptedStatusFile)
+	})
 }
 
 func TestReadLineFrom(t *testing.T) {
