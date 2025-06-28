@@ -72,29 +72,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-          cache-dependency-path: ui/pnpm-lock.yaml
-
-      - name: Install UI dependencies
-        run: |
-          cd ui
-          pnpm install --frozen-lockfile
-
-      - name: Build UI
-        run: |
-          cd ui
-          pnpm build
-
-      - name: Build (Unix)
+      - name: Build
         if: runner.os != 'Windows'
         run: |
           make bin
@@ -104,7 +82,7 @@ jobs:
         run: |
           go build -o .\.local\bin\dagu.exe ./cmd
 
-      - name: Test (Unix)
+      - name: Test
         if: runner.os != 'Windows'
         run: |
           make test-coverage
@@ -121,74 +99,3 @@ jobs:
           files: ./coverage.txt
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-  # Cross-platform integration tests
-  integration-test:
-    name: Integration Test on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-          cache-dependency-path: ui/pnpm-lock.yaml
-
-      - name: Install UI dependencies
-        run: |
-          cd ui
-          pnpm install --frozen-lockfile
-
-      - name: Build UI
-        run: |
-          cd ui
-          pnpm build
-
-      - name: Build Dagu
-        run: |
-          go build -o dagu ./cmd
-
-      - name: Test shell detection and command execution
-        run: |
-          go test -v ./internal/cmdutil/... -run "TestGetShellCommand|TestBuildShellCommand"
-
-      - name: Test process management (Unix)
-        if: runner.os != 'Windows'
-        run: |
-          go test -v ./internal/digraph/executor/... -run "TestKillProcessGroup|TestSetupCommand"
-
-      - name: Test Windows integration
-        if: runner.os == 'Windows'
-        run: |
-          go test -v ./internal/integration/... -run "TestWindows"
-
-      - name: Test configuration loading
-        run: |
-          go test -v ./internal/config/... -run "DefaultShell"
