@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -39,7 +40,13 @@ func NewTracer(ctx context.Context, dag *digraph.DAG) (*Tracer, error) {
 		return &Tracer{tracer: otel.Tracer(TracerName)}, nil
 	}
 
-	exporter, err := createExporter(ctx, dag.OTel)
+	cfgObj, err := cmdutil.EvalObject(ctx, *dag.OTel, map[string]string{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate OTel config: %w", err)
+	}
+	cfg := cfgObj.(digraph.OTelConfig)
+
+	exporter, err := createExporter(ctx, &cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OTel exporter: %w", err)
 	}
