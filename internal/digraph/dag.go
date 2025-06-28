@@ -208,12 +208,12 @@ type MailConfig struct {
 
 // OTelConfig contains the OpenTelemetry configuration.
 type OTelConfig struct {
-	Enabled  bool                   `json:"enabled,omitempty"`
-	Endpoint string                 `json:"endpoint,omitempty"`
-	Headers  map[string]string      `json:"headers,omitempty"`
-	Insecure bool                   `json:"insecure,omitempty"`
-	Timeout  time.Duration          `json:"timeout,omitempty"`
-	Resource map[string]interface{} `json:"resource,omitempty"`
+	Enabled  bool              `json:"enabled,omitempty"`
+	Endpoint string            `json:"endpoint,omitempty"`
+	Headers  map[string]string `json:"headers,omitempty"`
+	Insecure bool              `json:"insecure,omitempty"`
+	Timeout  time.Duration     `json:"timeout,omitempty"`
+	Resource map[string]any    `json:"resource,omitempty"`
 }
 
 // HandlerType is the type of the handler.

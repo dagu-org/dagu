@@ -183,11 +183,18 @@ func (a *Agent) Run(ctx context.Context) error {
 		// Continue without tracing
 	} else {
 		a.tracer = tracer
+		// Initialize propagators for W3C trace context
+		otel.InitializePropagators()
 		defer func() {
 			if err := tracer.Shutdown(ctx); err != nil {
 				logger.Warn(ctx, "Failed to shutdown OpenTelemetry tracer", "err", err)
 			}
 		}()
+	}
+
+	// Extract trace context from environment variables if present
+	if a.tracer != nil && a.tracer.IsEnabled() {
+		ctx = otel.ExtractTraceContext(ctx)
 	}
 
 	// Start root span for DAG execution
