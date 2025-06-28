@@ -13,6 +13,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/fileutil"
 )
 
 var _ Executor = (*sshExec)(nil)
@@ -47,14 +48,15 @@ type sshExecConfig struct {
 // If the key is provided, it will use the public key authentication method.
 // Otherwise, it will use the password authentication method.
 func selectSSHAuthMethod(cfg *sshExecConfig) (ssh.AuthMethod, error) {
-	var (
-		signer ssh.Signer
-		err    error
-	)
+	var signer ssh.Signer
 
 	if len(cfg.Key) != 0 {
 		// Create the Signer for this private key.
-		if signer, err = getPublicKeySigner(cfg.Key); err != nil {
+		keyPath, err := fileutil.ResolvePath(cfg.Key)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve key path: %w", err)
+		}
+		if signer, err = getPublicKeySigner(keyPath); err != nil {
 			return nil, err
 		}
 
