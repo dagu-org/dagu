@@ -42,8 +42,8 @@ type Config struct {
 const (
 	requestIDLenSafe  = 8
 	extDat            = ".dat"
-	dateTimeFormatUTC = "20060102.15:04:05.000Z"
-	dateTimeFormat    = "20060102.15:04:05.000"
+	dateTimeFormatUTC = "20060102.150405.000Z"
+	dateTimeFormat    = "20060102.150405.000"
 	dateFormat        = "20060102"
 )
 

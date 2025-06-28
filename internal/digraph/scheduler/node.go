@@ -16,7 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.org/x/sys/unix"
+	"syscall"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -480,7 +480,7 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	if status == NodeStatusRunning && n.cmd != nil {
 		sigsig := sig
 		if allowOverride && n.SignalOnStop() != "" {
-			sigsig = unix.SignalNum(n.SignalOnStop())
+			sigsig = syscall.Signal(digraph.GetSignalNum(n.SignalOnStop()))
 		}
 		logger.Info(ctx, "Sending signal", "signal", sigsig, "step", n.Name())
 		if err := n.cmd.Kill(sigsig); err != nil {
@@ -523,7 +523,7 @@ func (n *Node) Setup(ctx context.Context, logDir string, dagRunID string) error 
 	// Set the log file path
 	startedAt := time.Now()
 	safeName := fileutil.SafeName(n.Name())
-	timestamp := startedAt.Format("20060102.15:04:05.000")
+	timestamp := startedAt.Format("20060102.150405.000")
 	postfix := stringutil.TruncString(dagRunID, 8)
 	logFilename := fmt.Sprintf("%s.%s.%s", safeName, timestamp, postfix)
 	if !fileutil.FileExists(logDir) {

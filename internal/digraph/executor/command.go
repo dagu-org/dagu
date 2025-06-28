@@ -6,13 +6,13 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
-	"syscall"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/fileutil"
 )
 
 var _ Executor = (*commandExecutor)(nil)
@@ -33,11 +33,6 @@ func (e *commandExecutor) ExitCode() int {
 
 func (e *commandExecutor) Run(ctx context.Context) error {
 	e.mu.Lock()
-
-	if len(e.config.Dir) > 0 && !fileutil.FileExists(e.config.Dir) {
-		e.mu.Unlock()
-		return fmt.Errorf("directory does not exist: %s", e.config.Dir)
-	}
 
 	if e.config.Script != "" {
 		scriptFile, err := setupScript(ctx, e.config.Dir, e.config.Script)
@@ -86,11 +81,7 @@ func (e *commandExecutor) Kill(sig os.Signal) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	if e.cmd != nil && e.cmd.Process != nil {
-		return syscall.Kill(-e.cmd.Process.Pid, sig.(syscall.Signal))
-	}
-
-	return nil
+	return killProcessGroup(e.cmd, sig)
 }
 
 type commandConfig struct {
@@ -150,10 +141,7 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 	cmd.Dir = cfg.Dir
 	cmd.Stdout = cfg.Stdout
 	cmd.Stderr = cfg.Stderr
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
-		Pgid:    0,
-	}
+	setupCommand(cmd)
 
 	return cmd, nil
 }
@@ -192,7 +180,10 @@ func (b *shellCommandBuilder) Build(ctx context.Context) (*exec.Cmd, error) {
 		return nil, err
 	}
 
-	switch cmd {
+	// Extract just the executable name for comparison
+	cmdName := strings.ToLower(filepath.Base(cmd))
+
+	switch cmdName {
 	case "nix-shell":
 		// If the shell command is nix-shell, we need to pass the packages as arguments
 		for _, pkg := range b.ShellPackages {
@@ -210,8 +201,20 @@ func (b *shellCommandBuilder) Build(ctx context.Context) (*exec.Cmd, error) {
 		// Construct the command with the shell command and the packages
 		return exec.CommandContext(ctx, b.ShellCommand, append(args, b.ShellCommandArgs)...), nil // nolint: gosec
 
+	case "powershell.exe", "powershell":
+		// PowerShell (Windows PowerShell)
+		return b.buildPowerShellCommand(ctx, cmd, args)
+
+	case "pwsh.exe", "pwsh":
+		// PowerShell Core (cross-platform)
+		return b.buildPowerShellCommand(ctx, cmd, args)
+
+	case "cmd.exe", "cmd":
+		// Windows Command Prompt
+		return b.buildCmdCommand(ctx, cmd, args)
+
 	default:
-		// other shell
+		// other shell (sh, bash, zsh, etc.)
 		args = append(args, b.Args...)
 		if b.Command != "" && b.Script != "" {
 			return exec.CommandContext(ctx, b.Command, append(args, b.Script)...), nil // nolint: gosec
@@ -224,6 +227,42 @@ func (b *shellCommandBuilder) Build(ctx context.Context) (*exec.Cmd, error) {
 		// nolint: gosec
 		return exec.CommandContext(ctx, cmd, args...), nil
 	}
+}
+
+// buildPowerShellCommand builds a command for PowerShell (both Windows PowerShell and PowerShell Core)
+func (b *shellCommandBuilder) buildPowerShellCommand(ctx context.Context, cmd string, args []string) (*exec.Cmd, error) {
+	args = append(args, b.Args...)
+
+	if b.Command != "" && b.Script != "" {
+		return exec.CommandContext(ctx, b.Command, append(args, b.Script)...), nil // nolint: gosec
+	}
+
+	// PowerShell uses -Command instead of -c
+	if !slices.Contains(args, "-Command") && !slices.Contains(args, "-C") {
+		args = append(args, "-Command")
+	}
+	args = append(args, b.ShellCommandArgs)
+
+	// nolint: gosec
+	return exec.CommandContext(ctx, cmd, args...), nil
+}
+
+// buildCmdCommand builds a command for Windows cmd.exe
+func (b *shellCommandBuilder) buildCmdCommand(ctx context.Context, cmd string, args []string) (*exec.Cmd, error) {
+	args = append(args, b.Args...)
+
+	if b.Command != "" && b.Script != "" {
+		return exec.CommandContext(ctx, b.Command, append(args, b.Script)...), nil // nolint: gosec
+	}
+
+	// cmd.exe uses /c instead of -c
+	if !slices.Contains(args, "/c") && !slices.Contains(args, "/C") {
+		args = append(args, "/c")
+	}
+	args = append(args, b.ShellCommandArgs)
+
+	// nolint: gosec
+	return exec.CommandContext(ctx, cmd, args...), nil
 }
 
 func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {

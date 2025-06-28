@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"unicode"
@@ -34,7 +35,17 @@ func GetShellCommand(configuredShell string) string {
 		return configuredShell
 	}
 
-	// Try system shell first
+	// Check for global default shell via environment variable
+	if defaultShell := os.Getenv("DAGU_DEFAULT_SHELL"); defaultShell != "" {
+		return defaultShell
+	}
+
+	// Platform-specific default shell detection
+	if runtime.GOOS == "windows" {
+		return getWindowsDefaultShell()
+	}
+
+	// Unix-like systems: Try system shell first
 	if systemShell := os.ExpandEnv("${SHELL}"); systemShell != "" {
 		return systemShell
 	}
@@ -42,6 +53,47 @@ func GetShellCommand(configuredShell string) string {
 	// Fallback to sh if available
 	if shPath, err := exec.LookPath("sh"); err == nil {
 		return shPath
+	}
+
+	return ""
+}
+
+// GetShellCommandWithGlobal returns the shell to use for command execution,
+// optionally using a global default shell configuration
+func GetShellCommandWithGlobal(configuredShell, globalDefaultShell string) string {
+	if configuredShell != "" {
+		return configuredShell
+	}
+
+	// Check global configuration for default shell
+	if globalDefaultShell != "" {
+		return globalDefaultShell
+	}
+
+	// Fallback to regular logic
+	return GetShellCommand("")
+}
+
+// getWindowsDefaultShell returns the default shell for Windows systems
+func getWindowsDefaultShell() string {
+	// First check if SHELL environment variable is set (e.g., Git Bash, WSL)
+	if systemShell := os.ExpandEnv("${SHELL}"); systemShell != "" {
+		return systemShell
+	}
+
+	// Try PowerShell (preferred on Windows)
+	if psPath, err := exec.LookPath("powershell"); err == nil {
+		return psPath
+	}
+
+	// Try PowerShell Core (cross-platform PowerShell)
+	if pwshPath, err := exec.LookPath("pwsh"); err == nil {
+		return pwshPath
+	}
+
+	// Fallback to cmd.exe
+	if cmdPath, err := exec.LookPath("cmd"); err == nil {
+		return cmdPath
 	}
 
 	return ""

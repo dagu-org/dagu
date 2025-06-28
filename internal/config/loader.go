@@ -123,10 +123,11 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 
 	// Set global configuration values.
 	cfg.Global = Global{
-		Debug:     def.Debug,
-		LogFormat: def.LogFormat,
-		TZ:        def.TZ,
-		WorkDir:   def.WorkDir,
+		Debug:        def.Debug,
+		LogFormat:    def.LogFormat,
+		TZ:           def.TZ,
+		WorkDir:      def.WorkDir,
+		DefaultShell: def.DefaultShell,
 	}
 
 	// Initialize the timezone (loads the time.Location and sets the TZ environment variable).
@@ -406,6 +407,7 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 
 	// Global configurations
 	l.bindEnv("workDir", "WORK_DIR")
+	l.bindEnv("defaultShell", "DEFAULT_SHELL")
 
 	// UI configurations
 	l.bindEnv("ui.maxDashboardPageLimit", "UI_MAX_DASHBOARD_PAGE_LIMIT")

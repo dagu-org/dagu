@@ -17,7 +17,7 @@ builds:
       - freebsd
       - openbsd
       - netbsd
-      # - windows
+      - windows
     goarch:
       - "amd64"
       - "386"

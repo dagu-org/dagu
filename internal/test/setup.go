@@ -130,7 +130,18 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	helper.Cancel = cancel
 
 	// setup the default shell for reproducible result
-	setShell(t, "sh")
+	if runtime.GOOS == "windows" {
+		// On Windows, try PowerShell first, then cmd
+		if _, err := exec.LookPath("powershell"); err == nil {
+			setShell(t, "powershell")
+		} else if _, err := exec.LookPath("cmd"); err == nil {
+			setShell(t, "cmd")
+		} else {
+			t.Fatal("No suitable shell found on Windows")
+		}
+	} else {
+		setShell(t, "sh")
+	}
 
 	t.Cleanup(helper.Cleanup)
 	return helper

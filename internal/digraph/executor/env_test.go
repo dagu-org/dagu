@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -205,15 +206,25 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 			},
 			checkFunc: func(t *testing.T, env executor.Env) {
 				// Non-existent directory gets resolved to absolute path
-				assert.Equal(t, "/non/existent/directory", env.WorkingDir)
-				assert.Equal(t, "/non/existent/directory", env.Envs["PWD"])
+				// On Windows, this will include drive letter
+				if runtime.GOOS == "windows" {
+					assert.Contains(t, env.WorkingDir, "\\non\\existent\\directory")
+				} else {
+					assert.Equal(t, "/non/existent/directory", env.WorkingDir)
+				}
+				assert.Equal(t, env.WorkingDir, env.Envs["PWD"])
 			},
 		},
 		{
 			name: "step with environment variable in path",
 			step: digraph.Step{
 				Name: "test-step",
-				Dir:  "$HOME/testdir",
+				Dir: func() string {
+					if runtime.GOOS == "windows" {
+						return "$USERPROFILE/testdir"
+					}
+					return "$HOME/testdir"
+				}(),
 			},
 			setupFunc: func() {
 				// Create a directory in home

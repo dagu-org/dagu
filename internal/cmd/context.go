@@ -393,7 +393,7 @@ func (cfg LogConfig) LogDir() (string, error) {
 // LogFile constructs the log filename using the prefix, safe DAG name, current timestamp,
 // and a truncated version of the dag-run ID.
 func (cfg LogConfig) LogFile() string {
-	timestamp := time.Now().Format("20060102.15:04:05.000")
+	timestamp := time.Now().Format("20060102.150405.000")
 	truncDAGRunID := stringutil.TruncString(cfg.DAGRunID, 8)
 
 	return fmt.Sprintf("dag-run_%s.%s.log",

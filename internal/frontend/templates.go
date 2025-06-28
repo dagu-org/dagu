@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"path"
-	"path/filepath"
 	"strings"
 	"text/template"
 
@@ -30,7 +29,7 @@ func (srv *Server) useTemplate(ctx context.Context, layout string, name string) 
 		}
 	}
 
-	files := append(baseTemplates(), filepath.Join(templatePath, layout))
+	files := append(baseTemplates(), path.Join(templatePath, layout))
 	tmpl, err := template.New(name).Funcs(
 		defaultFunctions(srv.funcsConfig)).ParseFS(assetsFS, files...,
 	)
@@ -118,7 +117,7 @@ func baseTemplates() []string {
 	var templateFiles = []string{"base.gohtml"}
 	ret := make([]string, 0, len(templateFiles))
 	for _, t := range templateFiles {
-		ret = append(ret, filepath.Join(templatePath, t))
+		ret = append(ret, path.Join(templatePath, t))
 	}
 	return ret
 }

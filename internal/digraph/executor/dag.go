@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"sync"
-	"syscall"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
@@ -141,10 +140,7 @@ func (e *dagExecutor) SetStderr(out io.Writer) {
 func (e *dagExecutor) Kill(sig os.Signal) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
-	if e.cmd == nil || e.cmd.Process == nil {
-		return nil
-	}
-	return syscall.Kill(-e.cmd.Process.Pid, sig.(syscall.Signal))
+	return killProcessGroup(e.cmd, sig)
 }
 
 func init() {

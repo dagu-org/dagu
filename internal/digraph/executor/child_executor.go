@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"syscall"
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -109,10 +108,7 @@ func (e *ChildDAGExecutor) BuildCommand(
 	cmd := exec.CommandContext(ctx, executable, args...) // nolint:gosec
 	cmd.Dir = workDir
 	cmd.Env = append(cmd.Env, env.AllEnvs()...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
-		Pgid:    0,
-	}
+	setupCommand(cmd)
 
 	logger.Info(ctx, "Prepared child DAG command",
 		"dagRunId", runParams.RunID,

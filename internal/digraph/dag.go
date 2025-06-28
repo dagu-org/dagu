@@ -5,7 +5,9 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -396,5 +398,17 @@ func SockAddr(name, dagRunID string) string {
 	// Build the socket name
 	socketName := prefix + name + connector + hash + suffix
 
+	return getSocketPath(socketName)
+}
+
+// getSocketPath returns the appropriate socket path for the current platform.
+// On Unix systems, it uses /tmp directory.
+// On Windows, it uses the system temp directory.
+func getSocketPath(socketName string) string {
+	if runtime.GOOS == "windows" {
+		// On Windows, use the system temp directory instead of /tmp
+		return filepath.Join(os.TempDir(), socketName)
+	}
+	// On Unix systems, use /tmp
 	return filepath.Join("/tmp", socketName)
 }

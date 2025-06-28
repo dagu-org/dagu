@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"sync"
-	"syscall"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
@@ -344,14 +343,7 @@ func (e *parallelExecutor) Kill(sig os.Signal) error {
 	}
 
 	// Kill all running child processes
-	var lastErr error
-	for _, cmd := range e.running {
-		if cmd != nil && cmd.Process != nil {
-			if err := syscall.Kill(-cmd.Process.Pid, sig.(syscall.Signal)); err != nil {
-				lastErr = err
-			}
-		}
-	}
+	lastErr := killMultipleProcessGroups(e.running, sig)
 
 	return lastErr
 }
