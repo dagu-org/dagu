@@ -40,16 +40,16 @@ func buildShellCommand(shell, cmdStr string) *exec.Cmd {
 	// Extract just the executable name for comparison
 	shellName := strings.ToLower(filepath.Base(shell))
 
-	switch {
-	case shellName == "powershell.exe" || shellName == "powershell":
+	switch shellName {
+	case "powershell.exe", "powershell":
 		// PowerShell (Windows PowerShell)
 		return exec.Command(shell, "-Command", cmdStr) // nolint:gosec
 
-	case shellName == "pwsh.exe" || shellName == "pwsh":
+	case "pwsh.exe", "pwsh":
 		// PowerShell Core (cross-platform)
 		return exec.Command(shell, "-Command", cmdStr) // nolint:gosec
 
-	case shellName == "cmd.exe" || shellName == "cmd":
+	case "cmd.exe", "cmd":
 		// Windows Command Prompt
 		return exec.Command(shell, "/c", cmdStr) // nolint:gosec
 

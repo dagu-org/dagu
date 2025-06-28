@@ -1075,10 +1075,11 @@ func (oc *OutputCoordinator) setupWriters(_ context.Context, data NodeData) erro
 	return nil
 }
 
-func (oc *OutputCoordinator) setupFile(_ context.Context, filePath string, data NodeData) (*os.File, error) {
+func (oc *OutputCoordinator) setupFile(ctx context.Context, filePath string, _ NodeData) (*os.File, error) {
 	absFilePath := filePath
 	if !filepath.IsAbs(absFilePath) {
-		absFilePath = filepath.Join(data.Step.Dir, absFilePath)
+		dir := executor.GetEnv(ctx).WorkingDir
+		absFilePath = filepath.Join(dir, absFilePath)
 		absFilePath = filepath.Clean(absFilePath)
 	}
 
@@ -1189,4 +1190,17 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 	oc.outputCaptured = true
 
 	return oc.outputData, nil
+}
+
+func (node *Node) evalPreconditions(ctx context.Context) error {
+	if len(node.Step().Preconditions) == 0 {
+		return nil
+	}
+	logger.Infof(ctx, "Checking preconditions for \"%s\"", node.Name())
+	shell := cmdutil.GetShellCommand(node.Step().Shell)
+	if err := EvalConditions(ctx, shell, node.Step().Preconditions); err != nil {
+		logger.Infof(ctx, "Preconditions failed for \"%s\"", node.Name())
+		return err
+	}
+	return nil
 }

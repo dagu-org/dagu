@@ -86,7 +86,7 @@ func getWindowsDefaultShell() string {
 		return psPath
 	}
 
-	// Try PowerShell Core (cross-platform PowerShell)  
+	// Try PowerShell Core (cross-platform PowerShell)
 	if pwshPath, err := exec.LookPath("pwsh"); err == nil {
 		return pwshPath
 	}

@@ -623,7 +623,7 @@ func TestScheduler(t *testing.T) {
 
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusError)
 
-		require.Contains(t, result.Error.Error(), "directory does not exist")
+		require.Contains(t, result.Error.Error(), "no such file or directory")
 	})
 	t.Run("OutputVariables", func(t *testing.T) {
 		sc := setupScheduler(t)

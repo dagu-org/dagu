@@ -13,7 +13,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/fileutil"
 )
 
 var _ Executor = (*commandExecutor)(nil)
@@ -35,13 +34,8 @@ func (e *commandExecutor) ExitCode() int {
 func (e *commandExecutor) Run(ctx context.Context) error {
 	e.mu.Lock()
 
-	if len(e.config.Dir) > 0 && !fileutil.FileExists(e.config.Dir) {
-		e.mu.Unlock()
-		return fmt.Errorf("directory does not exist: %s", e.config.Dir)
-	}
-
 	if e.config.Script != "" {
-		scriptFile, err := setupScript(ctx, digraph.Step{Dir: e.config.Dir, Script: e.config.Script})
+		scriptFile, err := setupScript(ctx, e.config.Dir, e.config.Script)
 		if err != nil {
 			e.mu.Unlock()
 			return fmt.Errorf("failed to setup script: %w", err)
@@ -189,8 +183,8 @@ func (b *shellCommandBuilder) Build(ctx context.Context) (*exec.Cmd, error) {
 	// Extract just the executable name for comparison
 	cmdName := strings.ToLower(filepath.Base(cmd))
 
-	switch {
-	case cmdName == "nix-shell":
+	switch cmdName {
+	case "nix-shell":
 		// If the shell command is nix-shell, we need to pass the packages as arguments
 		for _, pkg := range b.ShellPackages {
 			args = append(args, "-p", pkg)
@@ -207,15 +201,15 @@ func (b *shellCommandBuilder) Build(ctx context.Context) (*exec.Cmd, error) {
 		// Construct the command with the shell command and the packages
 		return exec.CommandContext(ctx, b.ShellCommand, append(args, b.ShellCommandArgs)...), nil // nolint: gosec
 
-	case cmdName == "powershell.exe" || cmdName == "powershell":
+	case "powershell.exe", "powershell":
 		// PowerShell (Windows PowerShell)
 		return b.buildPowerShellCommand(ctx, cmd, args)
 
-	case cmdName == "pwsh.exe" || cmdName == "pwsh":
+	case "pwsh.exe", "pwsh":
 		// PowerShell Core (cross-platform)
 		return b.buildPowerShellCommand(ctx, cmd, args)
 
-	case cmdName == "cmd.exe" || cmdName == "cmd":
+	case "cmd.exe", "cmd":
 		// Windows Command Prompt
 		return b.buildCmdCommand(ctx, cmd, args)
 
@@ -238,11 +232,11 @@ func (b *shellCommandBuilder) Build(ctx context.Context) (*exec.Cmd, error) {
 // buildPowerShellCommand builds a command for PowerShell (both Windows PowerShell and PowerShell Core)
 func (b *shellCommandBuilder) buildPowerShellCommand(ctx context.Context, cmd string, args []string) (*exec.Cmd, error) {
 	args = append(args, b.Args...)
-	
+
 	if b.Command != "" && b.Script != "" {
 		return exec.CommandContext(ctx, b.Command, append(args, b.Script)...), nil // nolint: gosec
 	}
-	
+
 	// PowerShell uses -Command instead of -c
 	if !slices.Contains(args, "-Command") && !slices.Contains(args, "-C") {
 		args = append(args, "-Command")
@@ -256,11 +250,11 @@ func (b *shellCommandBuilder) buildPowerShellCommand(ctx context.Context, cmd st
 // buildCmdCommand builds a command for Windows cmd.exe
 func (b *shellCommandBuilder) buildCmdCommand(ctx context.Context, cmd string, args []string) (*exec.Cmd, error) {
 	args = append(args, b.Args...)
-	
+
 	if b.Command != "" && b.Script != "" {
 		return exec.CommandContext(ctx, b.Command, append(args, b.Script)...), nil // nolint: gosec
 	}
-	
+
 	// cmd.exe uses /c instead of -c
 	if !slices.Contains(args, "/c") && !slices.Contains(args, "/C") {
 		args = append(args, "/c")
@@ -272,10 +266,6 @@ func (b *shellCommandBuilder) buildCmdCommand(ctx context.Context, cmd string, a
 }
 
 func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
-	if len(step.Dir) > 0 && !fileutil.FileExists(step.Dir) {
-		return nil, fmt.Errorf("directory does not exist: %s", step.Dir)
-	}
-
 	cfg, err := createCommandConfig(ctx, step)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create command: %w", err)
@@ -290,7 +280,7 @@ func createCommandConfig(ctx context.Context, step digraph.Step) (*commandConfig
 
 	return &commandConfig{
 		Ctx:              ctx,
-		Dir:              step.Dir,
+		Dir:              GetEnv(ctx).WorkingDir,
 		Command:          step.Command,
 		Args:             step.Args,
 		Script:           step.Script,
@@ -300,8 +290,8 @@ func createCommandConfig(ctx context.Context, step digraph.Step) (*commandConfig
 	}, nil
 }
 
-func setupScript(_ context.Context, step digraph.Step) (string, error) {
-	file, err := os.CreateTemp(step.Dir, "dagu_script-")
+func setupScript(_ context.Context, workDir, script string) (string, error) {
+	file, err := os.CreateTemp(workDir, "dagu_script-")
 	if err != nil {
 		return "", fmt.Errorf("failed to create script file: %w", err)
 	}
@@ -309,7 +299,7 @@ func setupScript(_ context.Context, step digraph.Step) (string, error) {
 		_ = file.Close()
 	}()
 
-	if _, err = file.WriteString(step.Script); err != nil {
+	if _, err = file.WriteString(script); err != nil {
 		return "", fmt.Errorf("failed to write script to file: %w", err)
 	}
 

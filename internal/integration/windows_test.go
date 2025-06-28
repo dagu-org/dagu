@@ -189,11 +189,11 @@ func TestWindowsSocketHandling(t *testing.T) {
 		// Test Windows-specific socket path handling
 		socketPath := digraph.SockAddr("windows-test", "test-run")
 		assert.NotEmpty(t, socketPath, "Socket path should not be empty")
-		
+
 		// On Windows, socket paths have different constraints
 		t.Logf("Generated socket path: %s", socketPath)
 		t.Logf("Socket path length: %d", len(socketPath))
-		
+
 		// Verify socket directory structure
 		socketDir := filepath.Dir(socketPath)
 		assert.NotEmpty(t, socketDir, "Socket directory should not be empty")
@@ -224,7 +224,7 @@ func TestWindowsCommandQuoting(t *testing.T) {
 				expected: "hello world",
 			},
 			{
-				name:     "single quotes", 
+				name:     "single quotes",
 				command:  `echo 'hello world'`,
 				expected: "'hello world'", // cmd treats single quotes literally
 			},
@@ -240,7 +240,7 @@ func TestWindowsCommandQuoting(t *testing.T) {
 				cmd := exec.Command("cmd", "/C", tt.command)
 				output, err := cmd.Output()
 				require.NoError(t, err)
-				
+
 				result := strings.TrimSpace(string(output))
 				assert.Contains(t, result, tt.expected, "Command output should contain expected text")
 			})
@@ -350,7 +350,7 @@ func TestWindowsCommandConstruction(t *testing.T) {
 				output, err := cmd.Output()
 				assert.NoError(t, err, "Command should execute successfully")
 				assert.NotEmpty(t, output, "Command should produce output")
-				
+
 				result := strings.TrimSpace(string(output))
 				t.Logf("Shell: %s, Command: %s, Output: %s", tt.shell, tt.command, result)
 			})
@@ -415,7 +415,7 @@ func TestWindowsEnvironmentVariables(t *testing.T) {
 	t.Run("windows environment variables", func(t *testing.T) {
 		// Test that essential Windows environment variables are available
 		essentialVars := []string{"USERNAME", "COMPUTERNAME", "USERPROFILE", "TEMP", "WINDIR"}
-		
+
 		for _, varName := range essentialVars {
 			value := os.Getenv(varName)
 			assert.NotEmpty(t, value, "Environment variable %s should be available", varName)
@@ -427,13 +427,13 @@ func TestWindowsEnvironmentVariables(t *testing.T) {
 		// Test that we can distinguish between CMD and PowerShell environment variable syntax
 		cmdSyntax := "%USERNAME%"
 		psSyntax := "$env:USERNAME"
-		
+
 		// CMD syntax should contain %
 		assert.Contains(t, cmdSyntax, "%", "CMD syntax should use % delimiters")
-		
+
 		// PowerShell syntax should contain $env:
 		assert.Contains(t, psSyntax, "$env:", "PowerShell syntax should use $env: prefix")
-		
+
 		// They should be different
 		assert.NotEqual(t, cmdSyntax, psSyntax, "CMD and PowerShell syntax should be different")
 	})
