@@ -80,7 +80,7 @@ jobs:
       - name: Build (Windows)
         if: runner.os == 'Windows'
         run: |
-          go build -o .\.local\bin\dagu.exe ./cmd
+          go build -o .\.local\bin\dagu.exe .\cmd
 
       - name: Test
         if: runner.os != 'Windows'
@@ -90,7 +90,7 @@ jobs:
       - name: Test (Windows)
         if: runner.os == 'Windows'
         run: |
-          go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+          go test -v -race .\...
 
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest'
