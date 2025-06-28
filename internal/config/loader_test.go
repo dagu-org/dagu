@@ -37,7 +37,7 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 		"DAGU_HEADLESS":     "true",
 
 		// Global configurations
-		"DAGU_WORK_DIR": "/test/work",
+		"DAGU_WORK_DIR":      "/test/work",
 		"DAGU_DEFAULT_SHELL": "/bin/zsh",
 
 		// UI configurations (new keys)

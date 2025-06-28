@@ -13,52 +13,52 @@ import (
 
 func TestBuildShellCommand(t *testing.T) {
 	tests := []struct {
-		name        string
-		shell       string
-		cmdStr      string
-		expectedCmd string
+		name         string
+		shell        string
+		cmdStr       string
+		expectedCmd  string
 		expectedArgs []string
 	}{
 		{
-			name:        "bash shell",
-			shell:       "/bin/bash",
-			cmdStr:      "echo hello",
-			expectedCmd: "/bin/bash",
+			name:         "bash shell",
+			shell:        "/bin/bash",
+			cmdStr:       "echo hello",
+			expectedCmd:  "/bin/bash",
 			expectedArgs: []string{"-c", "echo hello"},
 		},
 		{
-			name:        "sh shell",
-			shell:       "/bin/sh",
-			cmdStr:      "echo hello",
-			expectedCmd: "/bin/sh",
+			name:         "sh shell",
+			shell:        "/bin/sh",
+			cmdStr:       "echo hello",
+			expectedCmd:  "/bin/sh",
 			expectedArgs: []string{"-c", "echo hello"},
 		},
 		{
-			name:        "zsh shell",
-			shell:       "/bin/zsh",
-			cmdStr:      "echo hello",
-			expectedCmd: "/bin/zsh",
+			name:         "zsh shell",
+			shell:        "/bin/zsh",
+			cmdStr:       "echo hello",
+			expectedCmd:  "/bin/zsh",
 			expectedArgs: []string{"-c", "echo hello"},
 		},
 		{
-			name:        "empty shell fallback",
-			shell:       "",
-			cmdStr:      "echo hello",
-			expectedCmd: "/bin/sh",
+			name:         "empty shell fallback",
+			shell:        "",
+			cmdStr:       "echo hello",
+			expectedCmd:  "/bin/sh",
 			expectedArgs: []string{"-c", "echo hello"},
 		},
 		{
-			name:        "powershell detection (even on unix)",
-			shell:       "/usr/local/bin/powershell",
-			cmdStr:      "echo hello",
-			expectedCmd: "/usr/local/bin/powershell",
+			name:         "powershell detection (even on unix)",
+			shell:        "/usr/local/bin/powershell",
+			cmdStr:       "echo hello",
+			expectedCmd:  "/usr/local/bin/powershell",
 			expectedArgs: []string{"-Command", "echo hello"},
 		},
 		{
-			name:        "pwsh detection",
-			shell:       "/usr/local/bin/pwsh",
-			cmdStr:      "echo hello",
-			expectedCmd: "/usr/local/bin/pwsh",
+			name:         "pwsh detection",
+			shell:        "/usr/local/bin/pwsh",
+			cmdStr:       "echo hello",
+			expectedCmd:  "/usr/local/bin/pwsh",
 			expectedArgs: []string{"-Command", "echo hello"},
 		},
 	}
@@ -67,10 +67,10 @@ func TestBuildShellCommand(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := buildShellCommand(tt.shell, tt.cmdStr)
 			require.NotNil(t, cmd)
-			
+
 			assert.Equal(t, tt.expectedCmd, cmd.Path)
 			assert.Equal(t, len(tt.expectedArgs), len(cmd.Args)-1) // -1 because Args[0] is the command itself
-			
+
 			// Check args (skip first arg which is the command path)
 			for i, expectedArg := range tt.expectedArgs {
 				assert.Equal(t, expectedArg, cmd.Args[i+1])
@@ -113,7 +113,7 @@ func TestBuildShellCommand_ComplexCommands(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := buildShellCommand(tt.shell, tt.cmdStr)
 			require.NotNil(t, cmd)
-			
+
 			// Verify it's a valid command that can be created
 			_, err := exec.LookPath(cmd.Path)
 			// Don't fail if the shell isn't found, just verify the command was built

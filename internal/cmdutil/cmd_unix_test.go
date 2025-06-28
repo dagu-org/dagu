@@ -59,7 +59,7 @@ func TestGetShellCommand_WithDAGUDefaultShell(t *testing.T) {
 	// Test with DAGU_DEFAULT_SHELL set
 	testShell := "/usr/local/bin/fish"
 	_ = os.Setenv("DAGU_DEFAULT_SHELL", testShell)
-	
+
 	result := GetShellCommand("")
 	assert.Equal(t, testShell, result)
 }
@@ -84,7 +84,7 @@ func TestGetShellCommand_UnixDefaults(t *testing.T) {
 	// Clear env vars to test fallback
 	_ = os.Unsetenv("SHELL")
 	_ = os.Unsetenv("DAGU_DEFAULT_SHELL")
-	
+
 	result := GetShellCommand("")
 	// Should find sh on Unix systems
 	assert.NotEmpty(t, result)

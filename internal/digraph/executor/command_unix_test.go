@@ -57,15 +57,15 @@ func TestKillProcessGroup(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := tt.setupCmd()
-			
+
 			err := killProcessGroup(cmd, tt.signal)
-			
+
 			if tt.shouldError {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
 			}
-			
+
 			// Clean up if process was started
 			if cmd != nil && cmd.Process != nil {
 				_ = cmd.Wait()
@@ -77,7 +77,7 @@ func TestKillProcessGroup(t *testing.T) {
 func TestKillMultipleProcessGroups(t *testing.T) {
 	// Start multiple processes
 	cmds := make(map[string]*exec.Cmd)
-	
+
 	// Start a few sleep processes
 	for i := 0; i < 3; i++ {
 		cmd := exec.Command("sleep", "10")
@@ -89,15 +89,15 @@ func TestKillMultipleProcessGroups(t *testing.T) {
 		require.NoError(t, err)
 		cmds[string(rune('a'+i))] = cmd
 	}
-	
+
 	// Add a nil command
 	cmds["nil"] = nil
-	
+
 	// Kill all processes
 	err := killMultipleProcessGroups(cmds, syscall.SIGTERM)
 	// Error might occur if process already exited, which is OK
 	_ = err
-	
+
 	// Verify processes are terminated
 	for name, cmd := range cmds {
 		if cmd != nil && cmd.Process != nil {
@@ -106,7 +106,7 @@ func TestKillMultipleProcessGroups(t *testing.T) {
 			go func(c *exec.Cmd) {
 				done <- c.Wait()
 			}(cmd)
-			
+
 			select {
 			case <-done:
 				// Process terminated
@@ -119,13 +119,13 @@ func TestKillMultipleProcessGroups(t *testing.T) {
 
 func TestSetupCommand_Unix(t *testing.T) {
 	cmd := exec.Command("echo", "test")
-	
+
 	// Verify SysProcAttr is nil before setup
 	assert.Nil(t, cmd.SysProcAttr)
-	
+
 	// Setup command
 	setupCommand(cmd)
-	
+
 	// Verify SysProcAttr is set correctly
 	require.NotNil(t, cmd.SysProcAttr)
 	assert.True(t, cmd.SysProcAttr.Setpgid)
