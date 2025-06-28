@@ -38,6 +38,7 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 
 		// Global configurations
 		"DAGU_WORK_DIR": "/test/work",
+		"DAGU_DEFAULT_SHELL": "/bin/zsh",
 
 		// UI configurations (new keys)
 		"DAGU_UI_MAX_DASHBOARD_PAGE_LIMIT": "250",
@@ -114,6 +115,7 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 
 	// Global configurations
 	assert.Equal(t, "/test/work", cfg.Global.WorkDir)
+	assert.Equal(t, "/bin/zsh", cfg.Global.DefaultShell)
 
 	// UI configurations
 	assert.Equal(t, 250, cfg.UI.MaxDashboardPageLimit)
