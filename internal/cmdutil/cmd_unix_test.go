@@ -50,15 +50,15 @@ func TestGetShellCommand_WithDAGUDefaultShell(t *testing.T) {
 	originalShell := os.Getenv("DAGU_DEFAULT_SHELL")
 	defer func() {
 		if originalShell != "" {
-			os.Setenv("DAGU_DEFAULT_SHELL", originalShell)
+			_ = os.Setenv("DAGU_DEFAULT_SHELL", originalShell)
 		} else {
-			os.Unsetenv("DAGU_DEFAULT_SHELL")
+			_ = os.Unsetenv("DAGU_DEFAULT_SHELL")
 		}
 	}()
 
 	// Test with DAGU_DEFAULT_SHELL set
 	testShell := "/usr/local/bin/fish"
-	os.Setenv("DAGU_DEFAULT_SHELL", testShell)
+	_ = os.Setenv("DAGU_DEFAULT_SHELL", testShell)
 	
 	result := GetShellCommand("")
 	assert.Equal(t, testShell, result)
@@ -70,20 +70,20 @@ func TestGetShellCommand_UnixDefaults(t *testing.T) {
 	originalDAGUShell := os.Getenv("DAGU_DEFAULT_SHELL")
 	defer func() {
 		if originalShell != "" {
-			os.Setenv("SHELL", originalShell)
+			_ = os.Setenv("SHELL", originalShell)
 		} else {
-			os.Unsetenv("SHELL")
+			_ = os.Unsetenv("SHELL")
 		}
 		if originalDAGUShell != "" {
-			os.Setenv("DAGU_DEFAULT_SHELL", originalDAGUShell)
+			_ = os.Setenv("DAGU_DEFAULT_SHELL", originalDAGUShell)
 		} else {
-			os.Unsetenv("DAGU_DEFAULT_SHELL")
+			_ = os.Unsetenv("DAGU_DEFAULT_SHELL")
 		}
 	}()
 
 	// Clear env vars to test fallback
-	os.Unsetenv("SHELL")
-	os.Unsetenv("DAGU_DEFAULT_SHELL")
+	_ = os.Unsetenv("SHELL")
+	_ = os.Unsetenv("DAGU_DEFAULT_SHELL")
 	
 	result := GetShellCommand("")
 	// Should find sh on Unix systems
