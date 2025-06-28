@@ -175,7 +175,9 @@ func ParsePipedCommand(cmdString string) ([][]string, error) {
 	var current []rune
 	var tokens []string
 
-	for _, r := range cmdString {
+	runes := []rune(cmdString)
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
 		switch {
 		case inEscape:
 			current = append(current, r)
@@ -193,11 +195,37 @@ func ParsePipedCommand(cmdString string) ([][]string, error) {
 			current = append(current, r)
 			inBacktick = !inBacktick
 		case r == '|' && !inQuote && !inSingleQuote && !inBacktick:
-			if len(current) > 0 {
-				tokens = append(tokens, string(current))
-				current = nil
+			// Check if this is part of || operator
+			if i+1 < len(runes) && runes[i+1] == '|' {
+				// This is ||, not a pipe
+				if len(current) > 0 {
+					tokens = append(tokens, string(current))
+					current = nil
+				}
+				tokens = append(tokens, "||")
+				i++ // Skip the next |
+			} else {
+				// This is a single pipe
+				if len(current) > 0 {
+					tokens = append(tokens, string(current))
+					current = nil
+				}
+				tokens = append(tokens, "|")
 			}
-			tokens = append(tokens, "|")
+		case r == '&' && !inQuote && !inSingleQuote && !inBacktick:
+			// Check if this is part of && operator
+			if i+1 < len(runes) && runes[i+1] == '&' {
+				// This is &&
+				if len(current) > 0 {
+					tokens = append(tokens, string(current))
+					current = nil
+				}
+				tokens = append(tokens, "&&")
+				i++ // Skip the next &
+			} else {
+				// Single & (background operator)
+				current = append(current, r)
+			}
 		case unicode.IsSpace(r) && !inQuote && !inSingleQuote && !inBacktick:
 			if len(current) > 0 {
 				tokens = append(tokens, string(current))

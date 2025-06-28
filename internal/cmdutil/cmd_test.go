@@ -404,3 +404,160 @@ func TestParsePipedCommandErrors(t *testing.T) {
 		})
 	}
 }
+
+// TestParsePipedCommandShellOperators tests handling of shell operators like || and &&
+func TestParsePipedCommandShellOperators(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    [][]string
+		wantErr bool
+	}{
+		{
+			name:  "OR operator - false || true",
+			input: "false || true",
+			want:  [][]string{{"false", "||", "true"}}, // Currently incorrect behavior
+		},
+		{
+			name:  "AND operator - true && echo success",
+			input: "true && echo success",
+			want:  [][]string{{"true", "&&", "echo", "success"}}, // Should be single command
+		},
+		{
+			name:  "Mixed operators - false || true && echo done",
+			input: "false || true && echo done",
+			want:  [][]string{{"false", "||", "true", "&&", "echo", "done"}}, // Should be single command
+		},
+		{
+			name:  "OR with spaces - false  ||  true",
+			input: "false  ||  true",
+			want:  [][]string{{"false", "||", "true"}}, // Should handle extra spaces
+		},
+		{
+			name:  "Single pipe vs double pipe - echo a | grep a || echo failed",
+			input: "echo a | grep a || echo failed",
+			want:  [][]string{{"echo", "a"}, {"grep", "a", "||", "echo", "failed"}}, // First | is pipe, || is OR
+		},
+		{
+			name:  "Complex shell command",
+			input: "test -f file.txt && cat file.txt || echo 'file not found'",
+			want:  [][]string{{"test", "-f", "file.txt", "&&", "cat", "file.txt", "||", "echo", "file not found"}},
+		},
+		{
+			name:  "Parentheses grouping",
+			input: "(false || true) && echo success",
+			want:  [][]string{{"(false", "||", "true)", "&&", "echo", "success"}},
+		},
+		{
+			name:  "OR in quotes should not be parsed",
+			input: `echo "false || true"`,
+			want:  [][]string{{"echo", "false || true"}}, // Quoted || should remain intact
+		},
+		{
+			name:  "AND in quotes should not be parsed",
+			input: `echo "true && false"`,
+			want:  [][]string{{"echo", "true && false"}}, // Quoted && should remain intact
+		},
+		{
+			name:  "Mixed pipe and OR",
+			input: "ps aux | grep process || echo 'not found'",
+			want:  [][]string{{"ps", "aux"}, {"grep", "process", "||", "echo", "not found"}},
+		},
+		{
+			name:  "Triple pipe edge case",
+			input: "echo a ||| echo b",
+			want:  [][]string{{"echo", "a", "||"}, {"echo", "b"}}, // ||| = | + ||
+		},
+		{
+			name:  "Semicolon operator",
+			input: "echo first; echo second",
+			want:  [][]string{{"echo", "first;", "echo", "second"}}, // Semicolon not handled specially
+		},
+		{
+			name:  "Background operator",
+			input: "sleep 10 &",
+			want:  [][]string{{"sleep", "10", "&"}}, // & not handled specially
+		},
+		{
+			name:  "Subshell with operators",
+			input: "$(false || true) && echo ok",
+			want:  [][]string{{"$(false", "||", "true)", "&&", "echo", "ok"}},
+		},
+		{
+			name:  "Issue #1065 - clamscan with grep and OR fallback",
+			input: `clamscan -r / 2>&1 | grep -A 20 "SCAN SUMMARY" || true`,
+			want:  [][]string{{"clamscan", "-r", "/", "2>&1"}, {"grep", "-A", "20", "SCAN SUMMARY", "||", "true"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParsePipedCommand(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParsePipedCommand() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ParsePipedCommand() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestSplitCommandShellOperators tests SplitCommand behavior with shell operators
+func TestSplitCommandShellOperators(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantCmd  string
+		wantArgs []string
+		wantErr  bool
+	}{
+		{
+			name:     "OR operator - false || true",
+			input:    "false || true",
+			wantCmd:  "false",
+			wantArgs: []string{"||", "true"}, // Correct behavior: || stays as single token
+		},
+		{
+			name:     "AND operator - true && echo success",
+			input:    "true && echo success",
+			wantCmd:  "true",
+			wantArgs: []string{"&&", "echo", "success"},
+		},
+		{
+			name:     "Mixed pipe and OR",
+			input:    "echo hello | grep hello || echo not found",
+			wantCmd:  "echo",
+			wantArgs: []string{"hello", "|", "grep", "hello", "||", "echo", "not", "found"}, // Fixed: || stays as single token
+		},
+		{
+			name:     "Complex conditional",
+			input:    "test -f file && cat file || touch file",
+			wantCmd:  "test",
+			wantArgs: []string{"-f", "file", "&&", "cat", "file", "||", "touch", "file"}, // Fixed: || stays as single token
+		},
+		{
+			name:     "Issue #1065 - clamscan command with pipe and OR",
+			input:    `clamscan -r / 2>&1 | grep -A 20 "SCAN SUMMARY" || true`,
+			wantCmd:  "clamscan",
+			wantArgs: []string{"-r", "/", "2>&1", "|", "grep", "-A", "20", "SCAN SUMMARY", "||", "true"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotCmd, gotArgs, err := SplitCommand(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SplitCommand() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotCmd != tt.wantCmd {
+				t.Errorf("SplitCommand() gotCmd = %v, want %v", gotCmd, tt.wantCmd)
+			}
+			if !reflect.DeepEqual(gotArgs, tt.wantArgs) {
+				t.Errorf("SplitCommand() gotArgs = %v, want %v", gotArgs, tt.wantArgs)
+			}
+		})
+	}
+}
