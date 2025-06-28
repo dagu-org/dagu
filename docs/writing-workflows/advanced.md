@@ -186,18 +186,14 @@ steps:
 ```yaml
 name: resource-aware-pipeline
 maxActiveRuns: 1        # Only one instance of this DAG
-maxActiveSteps: 5       # Max 5 steps running concurrently
+maxActiveSteps: 1       # Max 1 steps running concurrently
 
 steps:
   - name: cpu-intensive
     command: ./heavy-computation.sh
-    env:
-      - GOMAXPROCS: 4   # Limit CPU cores
       
   - name: memory-intensive
     command: ./process-large-data.sh
-    env:
-      - MEMORY_LIMIT: 8G
       
   - name: io-intensive
     parallel:

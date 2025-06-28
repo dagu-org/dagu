@@ -27,6 +27,8 @@ steps:
 ### Full Configuration
 
 ```yaml
+dotenv:
+  - .env
 otel:
   enabled: true
   endpoint: "otel-collector:4317"  # OTLP gRPC endpoint
@@ -37,7 +39,7 @@ otel:
   timeout: 30s     # Export timeout
   resource:
     # Resource attributes (all optional)
-    service.name: "dagu-${DAG_NAME}"  # Defaults to "dagu" if not specified
+    service.name: "dagu-${DAG_NAME}"  # Default value
     service.version: "1.0.0"
     deployment.environment: "${ENVIRONMENT}"
     # Custom attributes
@@ -166,6 +168,8 @@ otel:
 ### Production with OpenTelemetry Collector
 
 ```yaml
+dotenv:
+  - .env
 otel:
   enabled: true
   endpoint: "otel-collector.monitoring:4317"
@@ -176,44 +180,3 @@ otel:
     deployment.environment: "production"
     service.version: "${VERSION}"
 ```
-
-## Performance Considerations
-
-- Tracing adds minimal overhead when enabled
-- All DAG executions are traced (no sampling by default)
-- Span export is asynchronous and non-blocking
-- Failed exports do not affect DAG execution
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Connection refused errors**
-   - Verify the collector is running and accessible
-   - Check the endpoint URL and port
-   - Ensure network connectivity
-
-2. **Authentication failures**
-   - Verify headers are correctly configured
-   - Check token/credentials are valid
-
-3. **No traces appearing**
-   - Confirm `enabled: true` is set
-   - Check collector logs for errors
-   - Verify the endpoint protocol (gRPC vs HTTP)
-
-### Debug Mode
-
-To see OpenTelemetry errors in Dagu logs, run with debug mode:
-
-```bash
-dagu start --debug my-workflow.yaml
-```
-
-## Best Practices
-
-1. **Resource Attributes**: Use consistent service names and environments for better filtering
-2. **Security**: Always use TLS in production (`insecure: false`)
-3. **Token Management**: Store authentication tokens in environment variables
-4. **Monitoring**: Set up alerts on failed trace exports
-5. **Testing**: Test your OTel configuration in development before production

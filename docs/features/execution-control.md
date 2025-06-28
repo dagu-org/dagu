@@ -92,15 +92,21 @@ Output structure:
 Control how many steps run concurrently:
 
 ```yaml
-maxActiveSteps: 5  # Run up to 5 steps in parallel
+maxActiveSteps: 2  # Run up to 2 steps in parallel
 
 steps:
   - name: task1
     command: ./task1.sh
+    depends: [] # Explicitly declare no dependency
   - name: task2
     command: ./task2.sh
+    depends: []
   - name: task3
     command: ./task3.sh
+    depends: []
+  - name: task4
+    command: ./task4.sh
+    depends: []
   # All start in parallel, limited by maxActiveSteps
 ```
 
