@@ -53,9 +53,13 @@ const fullSidebar = [
       },
       { text: "Scheduling", link: "/features/scheduling" },
       { text: "Execution Control", link: "/features/execution-control" },
+      { text: "Parallel Execution", link: "/features/parallel-execution" },
       { text: "Data Flow", link: "/features/data-flow" },
       { text: "Queue System", link: "/features/queues" },
       { text: "Notifications", link: "/features/notifications" },
+      { text: "Email Notifications", link: "/features/email-notifications" },
+      { text: "Authentication", link: "/features/authentication" },
+      { text: "OpenTelemetry", link: "/features/opentelemetry" },
     ],
   },
   {
