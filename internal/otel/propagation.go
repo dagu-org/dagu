@@ -90,4 +90,3 @@ func ExtractTraceContext(ctx context.Context) context.Context {
 	// Extract the trace context from the carrier
 	return prop.Extract(ctx, carrier)
 }
-

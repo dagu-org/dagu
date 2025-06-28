@@ -1608,6 +1608,8 @@ components:
           description: "List of tags for categorizing and filtering DAGs"
           items:
             type: string
+        otel:
+          $ref: "#/components/schemas/OtelConfig"
       required:
         - name
 
@@ -1971,6 +1973,33 @@ components:
       required:
         - tags
         - errors
+
+    OtelConfig:
+      type: object
+      description: "OpenTelemetry tracing configuration for distributed tracing of DAG execution"
+      properties:
+        enabled:
+          type: boolean
+          description: "Enable or disable OpenTelemetry tracing for this DAG"
+        endpoint:
+          type: string
+          description: "OTLP endpoint URL for exporting traces (e.g., http://localhost:4317 for gRPC or http://localhost:4318/v1/traces for HTTP)"
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+          description: "Custom headers to include with OTLP export requests (e.g., for authentication)"
+        insecure:
+          type: boolean
+          description: "Skip TLS certificate verification when connecting to the OTLP endpoint"
+        timeout:
+          type: string
+          description: "Timeout for exporting traces to the OTLP endpoint (e.g., '30s', '1m')"
+        resource:
+          type: object
+          additionalProperties:
+            type: string
+          description: "Resource attributes to attach to all spans (e.g., service.name, service.version, deployment.environment)"
 
 # Apply security requirements globally
 security:

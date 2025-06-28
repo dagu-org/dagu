@@ -141,4 +141,3 @@ func TestExtractTraceContext(t *testing.T) {
 		assert.False(t, spanCtx.IsValid())
 	})
 }
-

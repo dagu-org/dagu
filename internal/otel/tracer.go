@@ -113,6 +113,7 @@ func createGRPCExporter(ctx context.Context, config *digraph.OTelConfig) (sdktra
 	}
 
 	if config.Insecure {
+		opts = append(opts, otlptracegrpc.WithInsecure())
 		opts = append(opts, otlptracegrpc.WithDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())))
 	} else {
 		opts = append(opts, otlptracegrpc.WithDialOption(grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{

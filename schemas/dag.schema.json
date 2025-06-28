@@ -253,6 +253,10 @@
           "description": "Map of step names to step definitions. Steps can depend on each other, forming a directed acyclic graph."
         }
       ]
+    },
+    "otel": {
+      "$ref": "#/definitions/otelConfig",
+      "description": "OpenTelemetry tracing configuration for distributed tracing of DAG execution."
     }
   },
   "definitions": {
@@ -623,6 +627,58 @@
         }
       },
       "description": "Configuration for email notifications, used by errorMail and infoMail settings."
+    },
+    "otelConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable or disable OpenTelemetry tracing for this DAG. When false, no traces will be exported."
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "OTLP endpoint URL for exporting traces. Supports both gRPC (e.g., http://localhost:4317) and HTTP (e.g., http://localhost:4318/v1/traces) protocols."
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Custom headers to include with OTLP export requests. Useful for authentication (e.g., Authorization: Bearer token)."
+        },
+        "insecure": {
+          "type": "boolean",
+          "default": false,
+          "description": "Skip TLS certificate verification when connecting to the OTLP endpoint. Only use in development environments."
+        },
+        "timeout": {
+          "type": "string",
+          "description": "Timeout for exporting traces to the OTLP endpoint. Accepts duration strings like '30s', '1m', '5m'."
+        },
+        "resource": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "properties": {
+            "service.name": {
+              "type": "string",
+              "description": "Service name for the traces. Defaults to 'dagu' if not specified. Can use variables like ${DAG_NAME}."
+            },
+            "service.version": {
+              "type": "string",
+              "description": "Version of the service producing the traces."
+            },
+            "deployment.environment": {
+              "type": "string",
+              "description": "Deployment environment (e.g., production, staging, development)."
+            }
+          },
+          "description": "Resource attributes to attach to all spans. Common attributes include service.name, service.version, and deployment.environment."
+        }
+      },
+      "description": "OpenTelemetry configuration for distributed tracing. Enables detailed execution traces for DAGs and steps, providing visibility into workflow performance and debugging."
     }
   }
 }
