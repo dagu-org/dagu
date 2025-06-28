@@ -483,6 +483,11 @@ func TestParsePipedCommandShellOperators(t *testing.T) {
 			input: "$(false || true) && echo ok",
 			want:  [][]string{{"$(false", "||", "true)", "&&", "echo", "ok"}},
 		},
+		{
+			name:  "Issue #1065 - clamscan with grep and OR fallback",
+			input: `clamscan -r / 2>&1 | grep -A 20 "SCAN SUMMARY" || true`,
+			want:  [][]string{{"clamscan", "-r", "/", "2>&1"}, {"grep", "-A", "20", "SCAN SUMMARY", "||", "true"}},
+		},
 	}
 
 	for _, tt := range tests {
@@ -531,6 +536,12 @@ func TestSplitCommandShellOperators(t *testing.T) {
 			input:    "test -f file && cat file || touch file",
 			wantCmd:  "test",
 			wantArgs: []string{"-f", "file", "&&", "cat", "file", "||", "touch", "file"}, // Fixed: || stays as single token
+		},
+		{
+			name:     "Issue #1065 - clamscan command with pipe and OR",
+			input:    `clamscan -r / 2>&1 | grep -A 20 "SCAN SUMMARY" || true`,
+			wantCmd:  "clamscan",
+			wantArgs: []string{"-r", "/", "2>&1", "|", "grep", "-A", "20", "SCAN SUMMARY", "||", "true"},
 		},
 	}
 
