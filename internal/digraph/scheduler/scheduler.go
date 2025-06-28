@@ -17,6 +17,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/logger"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -191,12 +192,15 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 
 				// Create span for step execution
 				spanCtx := nodeCtx
-				span := trace.SpanFromContext(nodeCtx)
-				if span.SpanContext().IsValid() {
+				parentSpan := trace.SpanFromContext(nodeCtx)
+				if parentSpan.SpanContext().IsValid() {
 					spanAttrs := []attribute.KeyValue{
 						attribute.String("step.name", node.Name()),
 					}
-					spanCtx, span = trace.SpanFromContext(nodeCtx).TracerProvider().Tracer("github.com/dagu-org/dagu").Start(
+					// Use the otel package to get the global tracer
+					tracer := otel.Tracer("github.com/dagu-org/dagu")
+					var span trace.Span
+					spanCtx, span = tracer.Start(
 						nodeCtx,
 						fmt.Sprintf("Step: %s", node.Name()),
 						trace.WithAttributes(spanAttrs...),

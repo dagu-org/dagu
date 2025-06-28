@@ -111,8 +111,17 @@ func (e *ChildDAGExecutor) BuildCommand(
 	cmd.Env = append(cmd.Env, env.AllEnvs()...)
 
 	// Inject OpenTelemetry trace context into environment variables
-	if traceEnvVars := extractTraceContext(ctx); len(traceEnvVars) > 0 {
+	traceEnvVars := extractTraceContext(ctx)
+	if len(traceEnvVars) > 0 {
 		cmd.Env = append(cmd.Env, traceEnvVars...)
+		logger.Info(ctx, "Injecting trace context into child DAG",
+			"traceEnvVars", traceEnvVars,
+			"childDAG", e.DAG.Name,
+		)
+	} else {
+		logger.Warn(ctx, "No trace context to inject into child DAG",
+			"childDAG", e.DAG.Name,
+		)
 	}
 
 	setupCommand(cmd)

@@ -33,8 +33,9 @@ func TestTraceContextCarrier(t *testing.T) {
 
 		keys := carrier.Keys()
 		assert.Len(t, keys, 2)
-		assert.Contains(t, keys, "traceparent")
-		assert.Contains(t, keys, "tracestate")
+		// Keys should be uppercase after conversion
+		assert.Contains(t, keys, "TRACEPARENT")
+		assert.Contains(t, keys, "TRACESTATE")
 	})
 
 	t.Run("ToEnv", func(t *testing.T) {
@@ -91,17 +92,17 @@ func TestInjectTraceContext(t *testing.T) {
 	// Check that environment variables are created
 	assert.NotEmpty(t, envVars)
 
-	// Should contain TRACEPARENT
+	// Should contain TRACEPARENT (uppercase)
 	found := false
 	for _, env := range envVars {
-		if len(env) > 11 && env[:11] == "traceparent" {
+		if len(env) > 11 && env[:11] == "TRACEPARENT" {
 			found = true
 			// Format: version-traceid-spanid-flags
 			assert.Contains(t, env, "00-1234567890abcdef1234567890abcdef-1234567890abcdef-01")
 			break
 		}
 	}
-	assert.True(t, found, "Expected to find traceparent in environment variables")
+	assert.True(t, found, "Expected to find TRACEPARENT in environment variables")
 }
 
 func TestExtractTraceContext(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"os"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"go.opentelemetry.io/otel"
@@ -133,10 +134,17 @@ func createResource(_ context.Context, dag *digraph.DAG) (*resource.Resource, er
 
 	// Add custom resource attributes from config
 	if dag.OTel != nil && dag.OTel.Resource != nil {
+		// Set DAG_NAME environment variable for expansion
+		if dag.Name != "" {
+			_ = os.Setenv("DAG_NAME", dag.Name)
+		}
+
 		for key, val := range dag.OTel.Resource {
 			switch v := val.(type) {
 			case string:
-				attrs = append(attrs, attribute.String(key, v))
+				// Expand environment variables in string values
+				expanded := os.ExpandEnv(v)
+				attrs = append(attrs, attribute.String(key, expanded))
 			case int:
 				attrs = append(attrs, attribute.Int(key, v))
 			case int64:

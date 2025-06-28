@@ -176,6 +176,16 @@ func (a *Agent) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	// Initialize propagators for W3C trace context before anything else
+	otel.InitializePropagators()
+
+	// Extract trace context from environment variables if present
+	// This must be done BEFORE initializing the tracer so child DAGs
+	// can continue the parent's trace
+	if a.dag.OTel != nil && a.dag.OTel.Enabled {
+		ctx = otel.ExtractTraceContext(ctx)
+	}
+
 	// Initialize OpenTelemetry tracer
 	tracer, err := otel.NewTracer(ctx, a.dag)
 	if err != nil {
@@ -183,18 +193,11 @@ func (a *Agent) Run(ctx context.Context) error {
 		// Continue without tracing
 	} else {
 		a.tracer = tracer
-		// Initialize propagators for W3C trace context
-		otel.InitializePropagators()
 		defer func() {
 			if err := tracer.Shutdown(ctx); err != nil {
 				logger.Warn(ctx, "Failed to shutdown OpenTelemetry tracer", "err", err)
 			}
 		}()
-	}
-
-	// Extract trace context from environment variables if present
-	if a.tracer != nil && a.tracer.IsEnabled() {
-		ctx = otel.ExtractTraceContext(ctx)
 	}
 
 	// Start root span for DAG execution
@@ -206,8 +209,12 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 		if a.parentDAGRun.Name != "" {
 			spanAttrs = append(spanAttrs, attribute.String("dag.parent_run_id", a.parentDAGRun.ID))
+			spanAttrs = append(spanAttrs, attribute.String("dag.parent_name", a.parentDAGRun.Name))
 		}
-		ctx, span = a.tracer.Start(ctx, fmt.Sprintf("DAG: %s", a.dag.Name), trace.WithAttributes(spanAttrs...))
+
+		// For child DAGs, ensure we're creating the span as a child of the parent context
+		spanName := fmt.Sprintf("DAG: %s", a.dag.Name)
+		ctx, span = a.tracer.Start(ctx, spanName, trace.WithAttributes(spanAttrs...))
 		defer func() {
 			// Set final status
 			status := a.Status(ctx)
