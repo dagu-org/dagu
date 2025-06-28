@@ -941,3 +941,66 @@ steps:
 		})
 	}
 }
+
+func TestBuildOTel(t *testing.T) {
+	t.Run("BasicOTelConfig", func(t *testing.T) {
+		yaml := `
+name: test
+otel:
+  enabled: true
+  endpoint: localhost:4317
+steps:
+  - name: step1
+    command: echo "test"
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag.OTel)
+		assert.True(t, dag.OTel.Enabled)
+		assert.Equal(t, "localhost:4317", dag.OTel.Endpoint)
+	})
+
+	t.Run("FullOTelConfig", func(t *testing.T) {
+		yaml := `
+name: test
+otel:
+  enabled: true
+  endpoint: otel-collector:4317
+  headers:
+    Authorization: Bearer token
+  insecure: true
+  timeout: 30s
+  resource:
+    service.name: dagu-test
+    service.version: "1.0.0"
+steps:
+  - name: step1
+    command: echo "test"
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag.OTel)
+		assert.True(t, dag.OTel.Enabled)
+		assert.Equal(t, "otel-collector:4317", dag.OTel.Endpoint)
+		assert.Equal(t, "Bearer token", dag.OTel.Headers["Authorization"])
+		assert.True(t, dag.OTel.Insecure)
+		assert.Equal(t, 30*time.Second, dag.OTel.Timeout)
+		assert.Equal(t, "dagu-test", dag.OTel.Resource["service.name"])
+		assert.Equal(t, "1.0.0", dag.OTel.Resource["service.version"])
+	})
+
+	t.Run("DisabledOTel", func(t *testing.T) {
+		yaml := `
+name: test
+steps:
+  - name: step1
+    command: echo "test"
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		assert.Nil(t, dag.OTel)
+	})
+}

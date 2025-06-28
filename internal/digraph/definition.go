@@ -64,6 +64,8 @@ type definition struct {
 	Tags any
 	// Queue is the name of the queue to assign this DAG to.
 	Queue string
+	// OTel is the OpenTelemetry configuration.
+	OTel any
 }
 
 // handlerOnDef defines the steps to be executed on different events.

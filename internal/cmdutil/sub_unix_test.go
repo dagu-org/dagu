@@ -68,7 +68,7 @@ func TestBuildShellCommand(t *testing.T) {
 				// For empty shell, just verify we got something
 				assert.NotEmpty(t, cmd.Path)
 			}
-			
+
 			assert.Equal(t, len(tt.expectedArgs), len(cmd.Args)-1) // -1 because Args[0] is the command itself
 
 			// Check args (skip first arg which is the command path)

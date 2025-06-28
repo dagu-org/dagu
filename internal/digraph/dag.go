@@ -97,6 +97,8 @@ type DAG struct {
 	// MaxOutputSize is the maximum size of step output to capture in bytes.
 	// Default is 1MB. Output exceeding this will return an error.
 	MaxOutputSize int `json:"maxOutputSize,omitempty"`
+	// OTel contains the OpenTelemetry configuration for the DAG.
+	OTel *OTelConfig `json:"otel,omitempty"`
 	// BuildErrors contains any errors encountered while building the DAG.
 	BuildErrors []error
 	// LocalDAGs contains DAGs defined in the same file, keyed by DAG name
@@ -202,6 +204,16 @@ type MailConfig struct {
 	To         string `json:"to,omitempty"`
 	Prefix     string `json:"prefix,omitempty"`
 	AttachLogs bool   `json:"attachLogs,omitempty"`
+}
+
+// OTelConfig contains the OpenTelemetry configuration.
+type OTelConfig struct {
+	Enabled  bool                   `json:"enabled,omitempty"`
+	Endpoint string                 `json:"endpoint,omitempty"`
+	Headers  map[string]string      `json:"headers,omitempty"`
+	Insecure bool                   `json:"insecure,omitempty"`
+	Timeout  time.Duration          `json:"timeout,omitempty"`
+	Resource map[string]interface{} `json:"resource,omitempty"`
 }
 
 // HandlerType is the type of the handler.

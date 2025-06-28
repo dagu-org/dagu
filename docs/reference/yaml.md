@@ -115,6 +115,28 @@ schedule:
 |-------|------|-------------|---------|
 | `queue` | string | Queue name | - |
 
+### OpenTelemetry Configuration
+
+| Field | Type | Description | Default |
+|-------|------|-------------|---------|
+| `otel` | object | OpenTelemetry tracing configuration | - |
+
+```yaml
+otel:
+  enabled: true
+  endpoint: "localhost:4317"  # OTLP gRPC endpoint
+  headers:
+    Authorization: "Bearer ${OTEL_TOKEN}"
+  insecure: false
+  timeout: 30s
+  resource:
+    service.name: "dagu-${DAG_NAME}"
+    service.version: "1.0.0"
+    deployment.environment: "${ENVIRONMENT}"
+```
+
+See [OpenTelemetry Tracing](../features/opentelemetry.md) for detailed configuration.
+
 ### Notification Fields
 
 | Field | Type | Description | Default |

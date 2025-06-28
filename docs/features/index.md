@@ -73,6 +73,15 @@ Stay informed about workflow status:
 - Log attachments
 - Flexible SMTP configuration
 
+### 🔍 [OpenTelemetry Tracing](/features/opentelemetry)
+
+Distributed tracing for observability:
+
+- End-to-end workflow visibility
+- Performance bottleneck identification
+- Nested DAG correlation
+- Integration with Jaeger, Tempo, etc.
+
 ## Feature Highlights
 
 ### Zero Dependencies

@@ -77,6 +77,7 @@ var builderRegistry = []builderEntry{
 	{name: "maxCleanUpTime", fn: maxCleanUpTime},
 	{name: "maxActiveRuns", fn: buildMaxActiveRuns},
 	{name: "preconditions", fn: buildPrecondition},
+	{name: "otel", fn: buildOTel},
 }
 
 type builderEntry struct {
@@ -1297,5 +1298,62 @@ func injectChainDependencies(dag *DAG) {
 		if len(step.Depends) == 0 && !step.ExplicitlyNoDeps {
 			step.Depends = []string{prevStep.Name}
 		}
+	}
+}
+
+// buildOTel builds the OpenTelemetry configuration for the DAG.
+func buildOTel(_ BuildContext, spec *definition, dag *DAG) error {
+	if spec.OTel == nil {
+		return nil
+	}
+
+	switch v := spec.OTel.(type) {
+	case map[string]any:
+		config := &OTelConfig{}
+
+		// Parse enabled flag
+		if enabled, ok := v["enabled"].(bool); ok {
+			config.Enabled = enabled
+		}
+
+		// Parse endpoint
+		if endpoint, ok := v["endpoint"].(string); ok {
+			config.Endpoint = endpoint
+		}
+
+		// Parse headers
+		if headers, ok := v["headers"].(map[string]any); ok {
+			config.Headers = make(map[string]string)
+			for key, val := range headers {
+				if strVal, ok := val.(string); ok {
+					config.Headers[key] = strVal
+				}
+			}
+		}
+
+		// Parse insecure flag
+		if insecure, ok := v["insecure"].(bool); ok {
+			config.Insecure = insecure
+		}
+
+		// Parse timeout
+		if timeout, ok := v["timeout"].(string); ok {
+			duration, err := time.ParseDuration(timeout)
+			if err != nil {
+				return wrapError("otel.timeout", timeout, err)
+			}
+			config.Timeout = duration
+		}
+
+		// Parse resource attributes
+		if resource, ok := v["resource"].(map[string]any); ok {
+			config.Resource = resource
+		}
+
+		dag.OTel = config
+		return nil
+
+	default:
+		return wrapError("otel", v, fmt.Errorf("otel must be a map"))
 	}
 }
