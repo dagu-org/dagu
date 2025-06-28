@@ -1085,6 +1085,35 @@ Production-ready configuration with monitoring and alerts.
 
 <div class="example-card">
 
+### Distributed Tracing
+
+```yaml
+name: data-pipeline
+otel:
+  enabled: true
+  endpoint: "otel-collector:4317"
+  resource:
+    service.name: "dagu-${DAG_NAME}"
+    deployment.environment: "${ENV}"
+steps:
+  - name: fetch-data
+    command: ./fetch.sh
+  - name: process-data
+    command: python process.py
+    depends: fetch-data
+  - name: run-sub-pipeline
+    run: pipelines/transform
+    depends: process-data
+```
+
+Enable OpenTelemetry tracing for observability.
+
+<a href="/features/opentelemetry" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
 ### Execution Control
 
 ```yaml

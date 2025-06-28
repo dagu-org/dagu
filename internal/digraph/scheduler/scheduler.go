@@ -17,6 +17,9 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/logger"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type Status int
@@ -187,7 +190,35 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 				// Ensure node is finished and wg is decremented
 				defer sc.finishNode(node, &wg)
 
-				ctx = sc.setupEnviron(nodeCtx, graph, node)
+				// Create span for step execution
+				spanCtx := nodeCtx
+				parentSpan := trace.SpanFromContext(nodeCtx)
+				if parentSpan.SpanContext().IsValid() {
+					spanAttrs := []attribute.KeyValue{
+						attribute.String("step.name", node.Name()),
+					}
+					// Use the otel package to get the global tracer
+					tracer := otel.Tracer("github.com/dagu-org/dagu")
+					var span trace.Span
+					spanCtx, span = tracer.Start(
+						nodeCtx,
+						fmt.Sprintf("Step: %s", node.Name()),
+						trace.WithAttributes(spanAttrs...),
+					)
+					defer func() {
+						// Set final step attributes
+						nodeData := node.NodeData()
+						span.SetAttributes(
+							attribute.String("step.status", nodeData.State.Status.String()),
+						)
+						if nodeData.State.ExitCode != 0 {
+							span.SetAttributes(attribute.Int("step.exit_code", nodeData.State.ExitCode))
+						}
+						span.End()
+					}()
+				}
+
+				ctx = sc.setupEnviron(spanCtx, graph, node)
 
 				// Check preconditions
 				if !meetsPreconditions(ctx, node, progressCh) {

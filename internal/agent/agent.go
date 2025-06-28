@@ -22,8 +22,11 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/mailer"
 	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/otel"
 	"github.com/dagu-org/dagu/internal/sock"
 	"github.com/dagu-org/dagu/internal/stringutil"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Agent is responsible for running the DAG and handling communication
@@ -105,6 +108,9 @@ type Agent struct {
 
 	// stepRetry is the name of the step to retry, if specified.
 	stepRetry string
+
+	// tracer is the OpenTelemetry tracer for the agent.
+	tracer *otel.Tracer
 }
 
 // Options is the configuration for the Agent.
@@ -169,6 +175,53 @@ func New(
 func (a *Agent) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	// Initialize propagators for W3C trace context before anything else
+	otel.InitializePropagators()
+
+	// Extract trace context from environment variables if present
+	// This must be done BEFORE initializing the tracer so child DAGs
+	// can continue the parent's trace
+	if a.dag.OTel != nil && a.dag.OTel.Enabled {
+		ctx = otel.ExtractTraceContext(ctx)
+	}
+
+	// Initialize OpenTelemetry tracer
+	tracer, err := otel.NewTracer(ctx, a.dag)
+	if err != nil {
+		logger.Warn(ctx, "Failed to initialize OpenTelemetry tracer", "err", err)
+		// Continue without tracing
+	} else {
+		a.tracer = tracer
+		defer func() {
+			if err := tracer.Shutdown(ctx); err != nil {
+				logger.Warn(ctx, "Failed to shutdown OpenTelemetry tracer", "err", err)
+			}
+		}()
+	}
+
+	// Start root span for DAG execution
+	var span trace.Span
+	if a.tracer != nil && a.tracer.IsEnabled() {
+		spanAttrs := []attribute.KeyValue{
+			attribute.String("dag.name", a.dag.Name),
+			attribute.String("dag.run_id", a.dagRunID),
+		}
+		if a.parentDAGRun.Name != "" {
+			spanAttrs = append(spanAttrs, attribute.String("dag.parent_run_id", a.parentDAGRun.ID))
+			spanAttrs = append(spanAttrs, attribute.String("dag.parent_name", a.parentDAGRun.Name))
+		}
+
+		// For child DAGs, ensure we're creating the span as a child of the parent context
+		spanName := fmt.Sprintf("DAG: %s", a.dag.Name)
+		ctx, span = a.tracer.Start(ctx, spanName, trace.WithAttributes(spanAttrs...))
+		defer func() {
+			// Set final status
+			status := a.Status(ctx)
+			span.SetAttributes(attribute.String("dag.status", status.Status.String()))
+			span.End()
+		}()
+	}
 
 	if a.rootDAGRun.ID != a.dagRunID {
 		logger.Debug(ctx, "Initiating a child dag-run", "root-run", a.rootDAGRun.String(), "parent-run", a.parentDAGRun.String())

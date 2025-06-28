@@ -195,7 +195,7 @@ func EvalStringFields[T any](ctx context.Context, obj T, opts ...EvalOption) (T,
 		return modified.Interface().(T), nil
 
 	case reflect.Map:
-		result, err := processMap(ctx, v, options)
+		result, err := processMapWithOpts(ctx, v, options)
 		if err != nil {
 			return obj, fmt.Errorf("failed to process map: %w", err)
 		}
@@ -260,7 +260,7 @@ func processStructFields(ctx context.Context, v reflect.Value, opts *EvalOptions
 				continue
 			}
 
-			processed, err := processMap(ctx, field, opts)
+			processed, err := processMapWithOpts(ctx, field, opts)
 			if err != nil {
 				return fmt.Errorf("field %q: %w", t.Field(i).Name, err)
 			}
@@ -271,9 +271,9 @@ func processStructFields(ctx context.Context, v reflect.Value, opts *EvalOptions
 	return nil
 }
 
-// processMap recursively processes a map, evaluating string values and recursively processing
+// processMapWithOpts recursively processes a map, evaluating string values and recursively processing
 // nested maps and structs.
-func processMap(ctx context.Context, v reflect.Value, opts *EvalOptions) (reflect.Value, error) {
+func processMapWithOpts(ctx context.Context, v reflect.Value, opts *EvalOptions) (reflect.Value, error) {
 	// Create a new map of the same type
 	mapType := v.Type()
 	newMap := reflect.MakeMap(mapType)
@@ -330,7 +330,7 @@ func processMap(ctx context.Context, v reflect.Value, opts *EvalOptions) (reflec
 
 		case reflect.Map:
 			// Recursively process nested maps
-			newVal, err = processMap(ctx, val, opts)
+			newVal, err = processMapWithOpts(ctx, val, opts)
 			if err != nil {
 				return v, err
 			}

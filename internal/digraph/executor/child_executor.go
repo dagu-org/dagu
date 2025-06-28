@@ -10,6 +10,7 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/otel"
 )
 
 // ChildDAGExecutor is a helper for executing child DAGs.
@@ -108,6 +109,21 @@ func (e *ChildDAGExecutor) BuildCommand(
 	cmd := exec.CommandContext(ctx, executable, args...) // nolint:gosec
 	cmd.Dir = workDir
 	cmd.Env = append(cmd.Env, env.AllEnvs()...)
+
+	// Inject OpenTelemetry trace context into environment variables
+	traceEnvVars := extractTraceContext(ctx)
+	if len(traceEnvVars) > 0 {
+		cmd.Env = append(cmd.Env, traceEnvVars...)
+		logger.Info(ctx, "Injecting trace context into child DAG",
+			"traceEnvVars", traceEnvVars,
+			"childDAG", e.DAG.Name,
+		)
+	} else {
+		logger.Warn(ctx, "No trace context to inject into child DAG",
+			"childDAG", e.DAG.Name,
+		)
+	}
+
 	setupCommand(cmd)
 
 	logger.Info(ctx, "Prepared child DAG command",
@@ -181,4 +197,10 @@ func executablePath() (string, error) {
 		return "", fmt.Errorf("failed to get executable path: %w", err)
 	}
 	return executable, nil
+}
+
+// extractTraceContext extracts OpenTelemetry trace context from the current context
+// and returns it as environment variables for child processes.
+func extractTraceContext(ctx context.Context) []string {
+	return otel.InjectTraceContext(ctx)
 }
