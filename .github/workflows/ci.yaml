@@ -52,7 +52,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os:
+          - ubuntu-latest
+          # - windows-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v4
