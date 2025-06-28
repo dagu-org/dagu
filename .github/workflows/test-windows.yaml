@@ -1,0 +1,74 @@
+name: Windows Build and Test
+
+on:
+  pull_request:
+    paths:
+      - '**/*windows*'
+      - '**/*Windows*'
+      - '**/cmd*.go'
+      - '**/shell*.go'
+      - '**/signal*.go'
+      - '**/executor/*.go'
+      - '.github/workflows/test-windows.yaml'
+  workflow_dispatch:
+
+jobs:
+  windows-specific-test:
+    name: Windows Specific Tests
+    runs-on: windows-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\go-build
+            ~\go\pkg\mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Test Windows shell detection
+        run: |
+          go test -v ./internal/cmdutil/... -run "TestGetShellCommand"
+
+      - name: Test Windows command building
+        run: |
+          go test -v ./internal/cmdutil/... -run "TestBuildShellCommand"
+
+      - name: Test Windows process management
+        run: |
+          go test -v ./internal/digraph/executor/...
+
+      - name: Test Windows integration
+        run: |
+          go test -v ./internal/integration/... -run "TestWindows"
+
+      - name: Build Windows executable
+        run: |
+          go build -o dagu.exe ./cmd
+
+      - name: Test executable runs
+        run: |
+          .\dagu.exe version
+
+      - name: Test with PowerShell
+        shell: powershell
+        run: |
+          Write-Host "Testing PowerShell detection"
+          $env:DAGU_DEFAULT_SHELL = "powershell"
+          go test -v ./internal/cmdutil/... -run "TestGetShellCommand"
+
+      - name: Test with cmd
+        shell: cmd
+        run: |
+          echo Testing cmd detection
+          set DAGU_DEFAULT_SHELL=cmd
+          go test -v ./internal/cmdutil/... -run "TestGetShellCommand"
