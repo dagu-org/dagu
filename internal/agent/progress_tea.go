@@ -267,6 +267,9 @@ func (m ProgressModel) renderHeader() string {
 
 	// Box width calculation
 	boxWidth := m.width
+	if boxWidth == 0 {
+		boxWidth = 80 // Default width if not set yet
+	}
 	if boxWidth > 100 {
 		boxWidth = 100
 	}
@@ -298,18 +301,33 @@ func (m ProgressModel) renderHeader() string {
 	var box strings.Builder
 	box.WriteString("┌─")
 	box.WriteString(headerStyled)
-	box.WriteString(strings.Repeat("─", innerWidth-lipgloss.Width(header)-2))
+	// Calculate header padding, ensuring it's never negative
+	headerPadding := innerWidth - lipgloss.Width(header) - 2
+	if headerPadding < 0 {
+		headerPadding = 0
+	}
+	box.WriteString(strings.Repeat("─", headerPadding))
 	box.WriteString("─┐\n")
 
 	box.WriteString("│")
 	box.WriteString(statusLine)
-	box.WriteString(strings.Repeat(" ", innerWidth-lipgloss.Width(statusLine)+2))
+	// Calculate padding, ensuring it's never negative
+	padding := innerWidth - lipgloss.Width(statusLine) + 2
+	if padding < 0 {
+		padding = 0
+	}
+	box.WriteString(strings.Repeat(" ", padding))
 	box.WriteString("│\n")
 
 	// Add Run ID line
 	if m.dagRunID != "" {
 		runIDStr := fmt.Sprintf("Run ID: %s", truncateString(m.dagRunID, innerWidth-12))
-		runIDLine := fmt.Sprintf(" %s%s ", runIDStr, strings.Repeat(" ", innerWidth-len(runIDStr)-2))
+		// Calculate padding for run ID line
+		runIDPadding := innerWidth - len(runIDStr) - 2
+		if runIDPadding < 0 {
+			runIDPadding = 0
+		}
+		runIDLine := fmt.Sprintf(" %s%s ", runIDStr, strings.Repeat(" ", runIDPadding))
 		box.WriteString("│")
 		box.WriteString(runIDLine)
 		box.WriteString("│\n")
@@ -318,14 +336,24 @@ func (m ProgressModel) renderHeader() string {
 	// Add Params line
 	if m.params != "" {
 		paramsStr := fmt.Sprintf("Params: %s", truncateString(m.params, innerWidth-12))
-		paramsLine := fmt.Sprintf(" %s%s ", paramsStr, strings.Repeat(" ", innerWidth-len(paramsStr)-2))
+		// Calculate padding for params line
+		paramsPadding := innerWidth - len(paramsStr) - 2
+		if paramsPadding < 0 {
+			paramsPadding = 0
+		}
+		paramsLine := fmt.Sprintf(" %s%s ", paramsStr, strings.Repeat(" ", paramsPadding))
 		box.WriteString("│")
 		box.WriteString(paramsLine)
 		box.WriteString("│\n")
 	}
 
 	box.WriteString("└")
-	box.WriteString(strings.Repeat("─", innerWidth))
+	// Ensure innerWidth is never negative
+	bottomPadding := innerWidth
+	if bottomPadding < 0 {
+		bottomPadding = 0
+	}
+	box.WriteString(strings.Repeat("─", bottomPadding))
 	box.WriteString("┘")
 
 	return box.String()
