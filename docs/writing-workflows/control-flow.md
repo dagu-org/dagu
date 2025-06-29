@@ -214,6 +214,22 @@ steps:
     command: ./process.sh
 ```
 
+### Continue on Skipped
+
+```yaml
+steps:
+  - name: optional-feature
+    command: ./enable-feature.sh
+    preconditions:
+      - condition: "${FEATURE_FLAG}"
+        expected: "enabled"
+    continueOn:
+      skipped: true  # Continue even if precondition fails
+      
+  - name: main-process
+    command: ./process.sh  # Runs regardless of optional feature
+```
+
 ### Mark as Success
 
 ```yaml
