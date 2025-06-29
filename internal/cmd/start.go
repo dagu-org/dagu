@@ -184,38 +184,23 @@ func loadDAGWithParams(ctx *Context, args []string) (*digraph.DAG, string, error
 			return nil, "", fmt.Errorf("failed to initialize DAG store: %w", err)
 		}
 
-		// Show interactive picker
-		selectedDAG, err := dagpicker.PickDAG(ctx, dagStore)
+		// Load DAG metadata first to pass to the picker
+		// This will be updated when user selects a DAG
+		var tempDAG *digraph.DAG
+
+		// Show unified interactive UI
+		result, err := dagpicker.PickDAGInteractive(ctx, dagStore, tempDAG)
 		if err != nil {
 			return nil, "", err
 		}
 
-		dagPath = selectedDAG
-
-		// Load the DAG first to check if it has parameters
-		tempDAG, err := digraph.Load(ctx, dagPath,
-			digraph.WithBaseConfig(ctx.Config.Paths.BaseConfig),
-			digraph.WithDAGsDir(ctx.Config.Paths.DAGsDir),
-		)
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to load DAG %s: %w", dagPath, err)
-		}
-
-		// Prompt for parameters if the DAG has them
-		interactiveParams, err = dagpicker.PromptForParams(tempDAG)
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to get parameters: %w", err)
-		}
-
-		// Confirm before running
-		confirmed, err := dagpicker.ConfirmRunDAG(tempDAG.Name, interactiveParams)
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to get confirmation: %w", err)
-		}
-		if !confirmed {
+		if result.Cancelled {
 			fmt.Println("DAG execution cancelled.")
 			os.Exit(0)
 		}
+
+		dagPath = result.DAGName
+		interactiveParams = result.Params
 	} else {
 		dagPath = args[0]
 	}

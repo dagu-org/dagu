@@ -8,7 +8,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -16,6 +18,16 @@ import (
 )
 
 var docStyle = lipgloss.NewStyle().Margin(1, 2)
+
+// State represents the current state of the picker
+type State int
+
+const (
+	StateSelectingDAG State = iota
+	StateEnteringParams
+	StateConfirming
+	StateDone
+)
 
 // DAGItem represents a DAG in the list
 type DAGItem struct {
@@ -47,35 +59,100 @@ func (i DAGItem) FilterValue() string { return i.Name }
 
 // Model represents the state of the DAG picker
 type Model struct {
-	list     list.Model
-	choice   *DAGItem
+	// State management
+	state State
+
+	// DAG selection
+	list   list.Model
+	choice *DAGItem
+
+	// Parameter input
+	paramInput textinput.Model
+	dag        *digraph.DAG
+	params     string
+
+	// Confirmation
+	confirmed bool
+
+	// General
 	quitting bool
+	width    int
+	height   int
+}
+
+// Result contains the final selections
+type Result struct {
+	DAGName   string
+	Params    string
+	Cancelled bool
 }
 
 // Init initializes the model
 func (m Model) Init() tea.Cmd {
-	return nil
+	return textinput.Blink
 }
 
 // Update handles messages
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Handle global keys first
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
 		h, v := docStyle.GetFrameSize()
 		m.list.SetSize(msg.Width-h, msg.Height-v)
 		return m, nil
 
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "esc":
+		// Ctrl+C quits from any state
+		if key.Matches(msg, key.NewBinding(key.WithKeys("ctrl+c"))) {
 			m.quitting = true
+			m.state = StateDone
+			return m, tea.Quit
+		}
+	}
+
+	// Handle state-specific updates
+	switch m.state {
+	case StateSelectingDAG:
+		return m.updateDAGSelection(msg)
+	case StateEnteringParams:
+		return m.updateParamInput(msg)
+	case StateConfirming:
+		return m.updateConfirmation(msg)
+	case StateDone:
+		return m, tea.Quit
+	default:
+		return m, nil
+	}
+}
+
+func (m Model) updateDAGSelection(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "esc":
+			m.quitting = true
+			m.state = StateDone
 			return m, tea.Quit
 
 		case "enter":
 			if item, ok := m.list.SelectedItem().(DAGItem); ok {
 				m.choice = &item
-				m.quitting = true
-				return m, tea.Quit
+
+				// Check if the selected DAG has parameters
+				hasParams := item.Params != ""
+
+				if hasParams {
+					m.state = StateEnteringParams
+					// Initialize parameter input with the display params
+					m.paramInput.SetValue(item.Params)
+					return m, textinput.Blink
+				} else {
+					// Skip to confirmation if no params needed
+					m.state = StateConfirming
+					return m, nil
+				}
 			}
 		}
 	}
@@ -85,15 +162,149 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+func (m Model) updateParamInput(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "esc":
+			// Go back to DAG selection
+			m.state = StateSelectingDAG
+			return m, nil
+
+		case "enter":
+			m.params = m.paramInput.Value()
+			m.state = StateConfirming
+			return m, nil
+		}
+	}
+
+	var cmd tea.Cmd
+	m.paramInput, cmd = m.paramInput.Update(msg)
+	return m, cmd
+}
+
+func (m Model) updateConfirmation(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch strings.ToLower(msg.String()) {
+		case "esc":
+			// Go back to parameter input or DAG selection
+			hasParams := m.choice != nil && m.choice.Params != ""
+			if hasParams {
+				m.state = StateEnteringParams
+			} else {
+				m.state = StateSelectingDAG
+			}
+			return m, nil
+
+		case "y", "enter":
+			m.confirmed = true
+			m.state = StateDone
+			return m, tea.Quit
+
+		case "n":
+			// Cancel and exit
+			m.quitting = true
+			m.state = StateDone
+			return m, tea.Quit
+		}
+	}
+
+	return m, nil
+}
+
 // View renders the UI
 func (m Model) View() string {
-	if m.quitting {
-		if m.choice != nil {
-			return ""
-		}
-		return "Selection cancelled.\n"
+	if m.state == StateDone {
+		return ""
 	}
+
+	switch m.state {
+	case StateSelectingDAG:
+		return m.viewDAGSelection()
+	case StateEnteringParams:
+		return m.viewParamInput()
+	case StateConfirming:
+		return m.viewConfirmation()
+	default:
+		return ""
+	}
+}
+
+func (m Model) viewDAGSelection() string {
 	return docStyle.Render(m.list.View())
+}
+
+func (m Model) viewParamInput() string {
+	// Define styles
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("170")).
+		MarginBottom(1)
+
+	selectedDAGStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("214")).
+		MarginBottom(2)
+
+	helpStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("241")).
+		MarginTop(2)
+
+	content := lipgloss.JoinVertical(lipgloss.Left,
+		titleStyle.Render("Enter Parameters"),
+		selectedDAGStyle.Render(fmt.Sprintf("DAG: %s", m.choice.Name)),
+		"",
+		m.paramInput.View(),
+		"",
+		helpStyle.Render("Enter: Confirm • ESC: Back • Ctrl+C: Cancel"),
+	)
+
+	return docStyle.Render(content)
+}
+
+func (m Model) viewConfirmation() string {
+	// Define styles
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("170")).
+		MarginBottom(2)
+
+	dagNameStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("214"))
+
+	paramStyle := lipgloss.NewStyle().
+		Italic(true).
+		Foreground(lipgloss.Color("243"))
+
+	promptStyle := lipgloss.NewStyle().
+		Bold(true).
+		MarginTop(2)
+
+	helpStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("241")).
+		MarginTop(1)
+
+	var content []string
+	content = append(content, titleStyle.Render("Confirm Execution"))
+	content = append(content, fmt.Sprintf("Ready to run DAG: %s", dagNameStyle.Render(m.choice.Name)))
+
+	if m.params != "" {
+		content = append(content, fmt.Sprintf("With parameters: %s", paramStyle.Render(m.params)))
+	}
+
+	content = append(content, "")
+	content = append(content, promptStyle.Render("Run this DAG? [Y/n]"))
+	content = append(content, helpStyle.Render("Y/Enter: Run • N: Cancel • ESC: Back"))
+
+	return docStyle.Render(lipgloss.JoinVertical(lipgloss.Left, content...))
+}
+
+// pickerModel holds context data for the picker
+type pickerModel struct {
+	ctx      context.Context
+	dagStore models.DAGStore
+	dagMap   map[string]*digraph.DAG
 }
 
 // customDelegate implements list.ItemDelegate with custom rendering
@@ -172,12 +383,19 @@ func (d customDelegate) Render(w io.Writer, m list.Model, index int, listItem li
 	_, _ = w.Write([]byte(buf.String()))
 }
 
-// PickDAG shows an interactive DAG picker and returns the selected DAG path
-func PickDAG(ctx context.Context, dagStore models.DAGStore) (string, error) {
+// PickDAGInteractive shows a unified fullscreen UI for DAG selection, parameter input, and confirmation
+func PickDAGInteractive(ctx context.Context, dagStore models.DAGStore, dag *digraph.DAG) (Result, error) {
+	// Create an internal picker model
+	pickerModel := &pickerModel{
+		ctx:      ctx,
+		dagStore: dagStore,
+		dagMap:   make(map[string]*digraph.DAG),
+	}
+
 	// Get list of DAGs
 	result, errs, err := dagStore.List(ctx, models.ListDAGsOptions{})
 	if err != nil {
-		return "", fmt.Errorf("failed to list DAGs: %w", err)
+		return Result{}, fmt.Errorf("failed to list DAGs: %w", err)
 	}
 
 	if len(errs) > 0 {
@@ -188,27 +406,30 @@ func PickDAG(ctx context.Context, dagStore models.DAGStore) (string, error) {
 	}
 
 	if len(result.Items) == 0 {
-		return "", fmt.Errorf("no DAGs found in the configured directory")
+		return Result{}, fmt.Errorf("no DAGs found in the configured directory")
 	}
 
 	// Convert DAGs to list items
 	items := make([]list.Item, 0, len(result.Items))
-	for _, dag := range result.Items {
+
+	for _, d := range result.Items {
 		// Format parameters for display
 		var params string
-		if dag.DefaultParams != "" {
-			params = dag.DefaultParams
-		} else if len(dag.Params) > 0 {
-			params = strings.Join(dag.Params, " ")
+		if d.DefaultParams != "" {
+			params = d.DefaultParams
+		} else if len(d.Params) > 0 {
+			params = strings.Join(d.Params, " ")
 		}
 
-		items = append(items, DAGItem{
-			Name:   dag.Name,
-			Path:   dag.Location,
-			Desc:   dag.Description,
-			Tags:   dag.Tags,
+		item := DAGItem{
+			Name:   d.Name,
+			Path:   d.Location,
+			Desc:   d.Description,
+			Tags:   d.Tags,
 			Params: params,
-		})
+		}
+		items = append(items, item)
+		pickerModel.dagMap[d.Name] = d
 	}
 
 	// Create list with custom delegate for better rendering
@@ -228,30 +449,60 @@ func PickDAG(ctx context.Context, dagStore models.DAGStore) (string, error) {
 		Foreground(lipgloss.Color("#FFFDF5")).
 		Padding(0, 1)
 
+	// Initialize parameter input
+	ti := textinput.New()
+	ti.Placeholder = "Enter parameters..."
+	ti.Focus()
+	ti.CharLimit = 1024
+	ti.Width = 60
+
 	m := Model{
-		list: l,
+		state:      StateSelectingDAG,
+		list:       l,
+		paramInput: ti,
+		dag:        dag,
 	}
+
+	// Use the default delegate since we'll handle DAG updates differently
+	m.list.SetDelegate(customDelegate{})
 
 	// Run the picker
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	finalModel, err := p.Run()
 	if err != nil {
-		return "", fmt.Errorf("failed to run DAG picker: %w", err)
+		return Result{}, fmt.Errorf("failed to run DAG picker: %w", err)
 	}
 
 	// Get the selection
 	finalM, ok := finalModel.(Model)
 	if !ok {
-		return "", fmt.Errorf("unexpected model type")
+		return Result{}, fmt.Errorf("unexpected model type")
 	}
 
-	if finalM.choice == nil {
+	// Build result
+	if finalM.quitting || finalM.choice == nil {
+		return Result{Cancelled: true}, nil
+	}
+
+	return Result{
+		DAGName:   finalM.choice.Name,
+		Params:    finalM.params,
+		Cancelled: false,
+	}, nil
+}
+
+// PickDAG shows an interactive DAG picker and returns the selected DAG path
+// Deprecated: Use PickDAGInteractive instead for a better user experience
+func PickDAG(ctx context.Context, dagStore models.DAGStore) (string, error) {
+	result, err := PickDAGInteractive(ctx, dagStore, nil)
+	if err != nil {
+		return "", err
+	}
+	if result.Cancelled {
 		fmt.Println("No DAG selected.")
 		os.Exit(0)
 	}
-
-	// Return the DAG name (which will be resolved by the loader)
-	return finalM.choice.Name, nil
+	return result.DAGName, nil
 }
 
 // PromptForParams prompts the user to enter parameters for a DAG

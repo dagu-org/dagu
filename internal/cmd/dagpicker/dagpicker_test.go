@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/models"
@@ -81,36 +82,48 @@ func TestPromptForParams(t *testing.T) {
 
 func TestModel(t *testing.T) {
 	t.Run("Model initialization", func(t *testing.T) {
-		m := Model{}
-		cmd := m.Init()
-		assert.Nil(t, cmd)
-	})
-
-	t.Run("Model view when quitting", func(t *testing.T) {
+		ti := textinput.New()
 		m := Model{
-			quitting: true,
-			choice:   nil,
+			paramInput: ti,
 		}
-
-		view := m.View()
-		assert.Equal(t, "Selection cancelled.\n", view)
+		cmd := m.Init()
+		assert.NotNil(t, cmd) // Now returns textinput.Blink
 	})
 
-	t.Run("Model view when DAG selected", func(t *testing.T) {
+	t.Run("Model view when done", func(t *testing.T) {
 		m := Model{
-			quitting: true,
-			choice: &DAGItem{
-				Name: "selected-dag",
-			},
+			state: StateDone,
 		}
 
 		view := m.View()
 		assert.Equal(t, "", view)
 	})
 
-	t.Run("Model handles escape key", func(t *testing.T) {
+	t.Run("Model view in selecting state", func(t *testing.T) {
+		items := []list.Item{
+			DAGItem{Name: "test", Desc: "Test DAG"},
+		}
+		l := list.New(items, list.NewDefaultDelegate(), 80, 20)
+
 		m := Model{
-			quitting: false,
+			state: StateSelectingDAG,
+			list:  l,
+		}
+
+		view := m.View()
+		assert.Contains(t, view, "test")     // Should show the DAG name
+		assert.Contains(t, view, "Test DAG") // Should show the description
+	})
+
+	t.Run("Model handles escape key in DAG selection", func(t *testing.T) {
+		items := []list.Item{
+			DAGItem{Name: "test", Desc: "Test DAG"},
+		}
+		l := list.New(items, list.NewDefaultDelegate(), 80, 20)
+
+		m := Model{
+			state: StateSelectingDAG,
+			list:  l,
 		}
 
 		escMsg := tea.KeyMsg{Type: tea.KeyEsc}
@@ -118,12 +131,13 @@ func TestModel(t *testing.T) {
 		updatedM := updatedModel.(Model)
 
 		assert.True(t, updatedM.quitting)
+		assert.Equal(t, StateDone, updatedM.state)
 		assert.NotNil(t, cmd)
 	})
 
 	t.Run("Model handles ctrl+c", func(t *testing.T) {
 		m := Model{
-			quitting: false,
+			state: StateSelectingDAG,
 		}
 
 		ctrlCMsg := tea.KeyMsg{Type: tea.KeyCtrlC}
@@ -131,6 +145,7 @@ func TestModel(t *testing.T) {
 		updatedM := updatedModel.(Model)
 
 		assert.True(t, updatedM.quitting)
+		assert.Equal(t, StateDone, updatedM.state)
 		assert.NotNil(t, cmd)
 	})
 
