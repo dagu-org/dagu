@@ -739,6 +739,8 @@ func sortNodesByName(nodes []*nodeProgress) {
 type ProgressTeaDisplay struct {
 	program *tea.Program
 	model   ProgressModel
+	useAltScreen bool
+	done    chan struct{}
 }
 
 // NewProgressTeaDisplay creates a new Bubble Tea-based progress display
@@ -746,19 +748,26 @@ func NewProgressTeaDisplay(dag *digraph.DAG) *ProgressTeaDisplay {
 	model := NewProgressModel(dag)
 	return &ProgressTeaDisplay{
 		model: model,
+		useAltScreen: true,
+		done: make(chan struct{}),
 	}
 }
 
 // Start initializes and runs the Bubble Tea program
 func (p *ProgressTeaDisplay) Start() {
-	p.program = tea.NewProgram(p.model, 
-		tea.WithAltScreen(),
-		tea.WithMouseCellMotion(), // This helps with cursor handling
-	)
+	p.program = tea.NewProgram(p.model, tea.WithAltScreen())
 	go func() {
 		defer func() {
-			// Ensure cursor is visible if program crashes
-			fmt.Print("\033[?25h")
+			// Ensure cursor is visible and mouse tracking is disabled if program crashes
+			fmt.Print("\033[?25h")     // Show cursor
+			fmt.Print("\033[?1000l")   // Disable mouse tracking
+			fmt.Print("\033[?1002l")   // Disable mouse cell motion tracking  
+			fmt.Print("\033[?1003l")   // Disable all mouse tracking
+			fmt.Print("\033[?1006l")   // Disable SGR mouse mode
+			// Ensure we're on a new line
+			fmt.Println()
+			// Signal that the program has exited
+			close(p.done)
 		}()
 		_, _ = p.program.Run()
 	}()
@@ -768,11 +777,9 @@ func (p *ProgressTeaDisplay) Start() {
 func (p *ProgressTeaDisplay) Stop() {
 	if p.program != nil {
 		p.program.Send(FinalizeMsg{})
-		// Give it a moment to render final state
-		time.Sleep(100 * time.Millisecond)
+		// Wait for user to press a key and the program to exit
+		<-p.done
 	}
-	// Always ensure cursor is visible when stopping
-	fmt.Print("\033[?25h")
 }
 
 // UpdateNode sends a node update to the display
