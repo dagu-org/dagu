@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmd/dagpicker"
@@ -167,7 +166,7 @@ func getDAGRunInfo(ctx *Context) (dagRunID, rootDAGRun, parentDAGRun string, isC
 // loadDAGWithParams loads the DAG and its parameters from command arguments
 func loadDAGWithParams(ctx *Context, args []string) (*digraph.DAG, string, error) {
 	var dagPath string
-	var interactiveParams []string
+	var interactiveParams string
 
 	// Check if DAG path is provided
 	if len(args) == 0 {
@@ -225,10 +224,10 @@ func loadDAGWithParams(ctx *Context, args []string) (*digraph.DAG, string, error
 	if argsLenAtDash := ctx.Command.ArgsLenAtDash(); argsLenAtDash != -1 && len(args) > 0 {
 		// Get parameters from command line arguments after "--"
 		loadOpts = append(loadOpts, digraph.WithParams(args[argsLenAtDash:]))
-	} else if len(interactiveParams) > 0 {
+	} else if interactiveParams != "" {
 		// Use interactive parameters
-		loadOpts = append(loadOpts, digraph.WithParams(interactiveParams))
-		params = strings.Join(interactiveParams, " ")
+		loadOpts = append(loadOpts, digraph.WithParams(stringutil.RemoveQuotes(interactiveParams)))
+		params = interactiveParams
 	} else {
 		// Get parameters from flags
 		params, err = ctx.Command.Flags().GetString("params")

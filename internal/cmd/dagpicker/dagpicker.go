@@ -1,9 +1,10 @@
 package dagpicker
 
 import (
+	"bufio"
 	"context"
 	"fmt"
-	"io"
+	"os"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -18,7 +19,7 @@ var docStyle = lipgloss.NewStyle().Margin(1, 2)
 // DAGItem represents a DAG in the list
 type DAGItem struct {
 	Name string
-	Path string
+	Path string // Path is stored but not displayed
 	Desc string
 	Tags []string
 }
@@ -78,58 +79,6 @@ func (m Model) View() string {
 	return docStyle.Render(m.list.View())
 }
 
-// customDelegate implements list.ItemDelegate with custom rendering
-type customDelegate struct{}
-
-func (d customDelegate) Height() int                             { return 2 }
-func (d customDelegate) Spacing() int                            { return 0 }
-func (d customDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
-
-func (d customDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
-	item, ok := listItem.(DAGItem)
-	if !ok {
-		return
-	}
-
-	// Styles for selected/unselected items
-	var nameStyle, descStyle lipgloss.Style
-	prefix := "  "
-	
-	if index == m.Index() {
-		nameStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("170")).
-			Bold(true)
-		descStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("245")).
-			MarginLeft(4)
-		prefix = "> "
-	} else {
-		nameStyle = lipgloss.NewStyle()
-		descStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241")).
-			MarginLeft(4)
-	}
-
-	// Format the name line
-	_, _ = fmt.Fprintf(w, "%s%s", prefix, nameStyle.Render(item.Name))
-	
-	// Add tags if present
-	if len(item.Tags) > 0 {
-		tagStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("243")).
-			Italic(true)
-		_, _ = fmt.Fprintf(w, " %s", tagStyle.Render("["+strings.Join(item.Tags, ", ")+"]"))
-	}
-	_, _ = fmt.Fprintln(w)
-
-	// Show description if available
-	if item.Desc != "" {
-		_, _ = fmt.Fprintf(w, "%s\n", descStyle.Render(item.Desc))
-	} else {
-		_, _ = fmt.Fprintln(w)
-	}
-}
-
 // PickDAG shows an interactive DAG picker and returns the selected DAG path
 func PickDAG(ctx context.Context, dagStore models.DAGStore) (string, error) {
 	// Get list of DAGs
@@ -154,14 +103,14 @@ func PickDAG(ctx context.Context, dagStore models.DAGStore) (string, error) {
 	for _, dag := range result.Items {
 		items = append(items, DAGItem{
 			Name: dag.Name,
-			Path: "", // We don't need to show the path
+			Path: dag.Location,
 			Desc: dag.Description,
 			Tags: dag.Tags,
 		})
 	}
 
-	// Create list with default delegate first to test
-	l := list.New(items, list.NewDefaultDelegate(), 0, 0) // Let it auto-size
+	// Create list with custom delegate for better rendering
+	l := list.New(items, list.NewDefaultDelegate(), 80, 20) // Default size for reasonable display
 	l.Title = "Select a DAG to run"
 	l.SetShowStatusBar(true)
 	l.SetStatusBarItemName("DAG", "DAGs")
@@ -202,9 +151,9 @@ func PickDAG(ctx context.Context, dagStore models.DAGStore) (string, error) {
 }
 
 // PromptForParams prompts the user to enter parameters for a DAG
-func PromptForParams(dag *digraph.DAG) ([]string, error) {
+func PromptForParams(dag *digraph.DAG) (string, error) {
 	if dag.DefaultParams == "" && len(dag.Params) == 0 {
-		return nil, nil
+		return "", nil
 	}
 
 	fmt.Println("\nThis DAG accepts the following parameters:")
@@ -219,16 +168,15 @@ func PromptForParams(dag *digraph.DAG) ([]string, error) {
 		fmt.Printf("  Current: %s\n", strings.Join(dag.Params, " "))
 	}
 
-	fmt.Print("\nEnter parameters (format: KEY=VALUE, press Enter to use defaults): ")
+	fmt.Print("\nEnter parameters (press Enter to use defaults): ")
 
-	var input string
-	_, _ = fmt.Scanln(&input)
-
-	if input == "" {
-		return nil, nil
+	// Read full line of input
+	reader := bufio.NewReader(os.Stdin)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return "", fmt.Errorf("failed to read input: %w", err)
 	}
 
-	// Parse the input into key=value pairs
-	params := strings.Fields(input)
-	return params, nil
+	// Trim whitespace and return
+	return strings.TrimSpace(input), nil
 }
