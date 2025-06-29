@@ -22,8 +22,5 @@ type ProgressReporter interface {
 	SetDAGRunInfo(dagRunID, params string)
 }
 
-// Ensure implementations satisfy the interface
-var (
-	_ ProgressReporter = (*ProgressDisplay)(nil)
-	_ ProgressReporter = (*ProgressTeaDisplay)(nil)
-)
+// Ensure implementation satisfies the interface
+var _ ProgressReporter = (*ProgressTeaDisplay)(nil)

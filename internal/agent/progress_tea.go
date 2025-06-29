@@ -14,6 +14,15 @@ import (
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
+// nodeProgress represents the progress state of a single node
+type nodeProgress struct {
+	node      *models.Node
+	startTime time.Time
+	endTime   time.Time
+	status    scheduler.NodeStatus
+	children  []models.ChildDAGRun
+}
+
 // Message types for Bubble Tea
 type (
 	// TickMsg is sent periodically to update the display
