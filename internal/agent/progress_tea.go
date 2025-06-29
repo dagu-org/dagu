@@ -158,8 +158,10 @@ func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case FinalizeMsg:
 		m.finalized = true
 		m.finishTime = time.Now()
-		// Don't quit immediately - wait for user input
-		return m, nil
+		// Quit after a short delay to ensure final render
+		return m, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+			return tea.Quit()
+		})
 
 	case spinner.TickMsg:
 		var cmd tea.Cmd
@@ -171,11 +173,6 @@ func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			m.finalized = true
 			return m, tea.Quit
-		default:
-			// If finalized, any key press exits
-			if m.finalized {
-				return m, tea.Quit
-			}
 		}
 	}
 
@@ -566,13 +563,13 @@ func (m ProgressModel) renderFooter() string {
 		status := m.getOverallStatus()
 		switch status {
 		case scheduler.StatusSuccess:
-			return m.successStyle.Render("✓ Execution completed successfully. Press any key to exit.")
+			return m.successStyle.Render("✓ Execution completed successfully")
 		case scheduler.StatusError:
-			return m.errorStyle.Render("✗ Execution failed. Press any key to exit.")
+			return m.errorStyle.Render("✗ Execution failed")
 		case scheduler.StatusCancel:
-			return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("⚠ Execution cancelled. Press any key to exit.")
+			return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("⚠ Execution cancelled")
 		default:
-			return m.boldStyle.Render("Execution finished. Press any key to exit.")
+			return m.boldStyle.Render("Execution finished")
 		}
 	}
 	return m.faintStyle.Render("Press Ctrl+C to stop")
@@ -761,7 +758,8 @@ func NewProgressTeaDisplay(dag *digraph.DAG) *ProgressTeaDisplay {
 
 // Start initializes and runs the Bubble Tea program
 func (p *ProgressTeaDisplay) Start() {
-	p.program = tea.NewProgram(p.model, tea.WithAltScreen())
+	// Don't use alternate screen - keep output in main terminal
+	p.program = tea.NewProgram(p.model)
 	go func() {
 		defer func() {
 			// Ensure cursor is visible and mouse tracking is disabled if program crashes
@@ -770,8 +768,7 @@ func (p *ProgressTeaDisplay) Start() {
 			fmt.Print("\033[?1002l") // Disable mouse cell motion tracking
 			fmt.Print("\033[?1003l") // Disable all mouse tracking
 			fmt.Print("\033[?1006l") // Disable SGR mouse mode
-			fmt.Print("\r")          // Carriage return - move cursor to beginning of line
-			fmt.Print("\033[K")      // Clear from cursor to end of line
+			fmt.Println()            // Add newline to separate from next prompt
 			// Signal that the program has exited
 			close(p.done)
 		}()
