@@ -6,6 +6,7 @@ import { components } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 import dayjs from '../../../../lib/dayjs';
+import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
 import { RootDAGRunContext } from '../../contexts/RootDAGRunContext';
@@ -81,6 +82,11 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
   // Add keyboard shortcuts
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Ignore shortcuts when user is editing text (typing in inputs, textareas, editors, etc.)
+      if (shouldIgnoreKeyboardShortcuts()) {
+        return;
+      }
+
       // Close modal with Escape key
       if (event.key === 'Escape') {
         onClose();
