@@ -35,7 +35,7 @@ Thanks to our contributors for this release:
 | Scheduler refactoring for improved maintainability | [@thefishhat](https://github.com/thefishhat) |
 | Interactive DAG selection feature request | [@yottahmd](https://github.com/yottahmd) |
 | OpenTelemetry distributed tracing feature request | [@jeremydelattre59](https://github.com/jeremydelattre59) |
-| SSH executor `||` operator bug report | [@NebulaCoding1029](https://github.com/NebulaCoding1029) |
+| SSH executor double pipe operator bug report | [@NebulaCoding1029](https://github.com/NebulaCoding1029) |
 | 'f' key interference in DAG editor bug report | [@NebulaCoding1029](https://github.com/NebulaCoding1029) |
 | Log cleanup feature request | [@NebulaCoding1029](https://github.com/NebulaCoding1029) |
 | Scheduler queue bug report | Jochen |
