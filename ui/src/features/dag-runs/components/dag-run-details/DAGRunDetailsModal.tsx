@@ -4,6 +4,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
+import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGRunContext } from '../../contexts/DAGRunContext';
 import DAGRunDetailsContent from './DAGRunDetailsContent';
@@ -76,6 +77,11 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
   // Add keyboard shortcuts
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Ignore shortcuts when user is editing text (typing in inputs, textareas, editors, etc.)
+      if (shouldIgnoreKeyboardShortcuts()) {
+        return;
+      }
+
       // Close modal with Escape key
       if (event.key === 'Escape') {
         onClose();

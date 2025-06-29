@@ -102,6 +102,16 @@ function DAGEditor({
     setTimeout(() => {
       editor.getAction('editor.action.formatDocument')?.run();
     }, 100);
+
+    // Prevent 'f' key from propagating to prevent fullscreen shortcuts
+    // when user is typing in the editor
+    editor.onKeyDown((e) => {
+      if (e.code === 'KeyF' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // Stop the 'f' key from propagating to parent components
+        // that might have fullscreen shortcuts
+        e.stopPropagation();
+      }
+    });
   };
 
   // Detect dark mode
