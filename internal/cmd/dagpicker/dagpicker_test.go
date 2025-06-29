@@ -3,6 +3,7 @@ package dagpicker
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
@@ -24,8 +25,8 @@ func TestDAGItem(t *testing.T) {
 			Params: "KEY1=value1 KEY2=value2",
 		}
 
-		assert.Equal(t, "test-dag", item.Title())
-		assert.Equal(t, "Test DAG description | params: KEY1=value1 KEY2=value2", item.Description())
+		assert.Equal(t, "test-dag [test, example]", item.Title())
+		assert.Equal(t, "Test DAG description • params: KEY1=value1 KEY2=value2", item.Description())
 		assert.Equal(t, "test-dag", item.FilterValue())
 	})
 
@@ -297,7 +298,7 @@ func TestPickDAG(t *testing.T) {
 			} else if len(dag.Params) > 0 {
 				params = strings.Join(dag.Params, " ")
 			}
-			
+
 			items = append(items, DAGItem{
 				Name:   dag.Name,
 				Path:   dag.Location,
@@ -334,5 +335,107 @@ func TestPromptForParamsReturnsInput(t *testing.T) {
 			expected := strings.TrimSpace(input)
 			assert.Equal(t, expected, strings.TrimSpace(input))
 		}
+	})
+}
+
+func TestConfirmRunDAG(t *testing.T) {
+	t.Run("AcceptWithY", func(t *testing.T) {
+		// Mock stdin with "y"
+		oldStdin := os.Stdin
+		r, w, _ := os.Pipe()
+		os.Stdin = r
+		defer func() {
+			os.Stdin = oldStdin
+			_ = r.Close()
+		}()
+
+		go func() {
+			_, _ = w.WriteString("y\n")
+			_ = w.Close()
+		}()
+
+		confirmed, err := ConfirmRunDAG("test-dag", "param1=value1")
+		assert.NoError(t, err)
+		assert.True(t, confirmed)
+	})
+
+	t.Run("AcceptWithYes", func(t *testing.T) {
+		// Mock stdin with "yes"
+		oldStdin := os.Stdin
+		r, w, _ := os.Pipe()
+		os.Stdin = r
+		defer func() {
+			os.Stdin = oldStdin
+			_ = r.Close()
+		}()
+
+		go func() {
+			_, _ = w.WriteString("yes\n")
+			_ = w.Close()
+		}()
+
+		confirmed, err := ConfirmRunDAG("test-dag", "")
+		assert.NoError(t, err)
+		assert.True(t, confirmed)
+	})
+
+	t.Run("AcceptWithEmpty", func(t *testing.T) {
+		// Mock stdin with empty (just Enter)
+		oldStdin := os.Stdin
+		r, w, _ := os.Pipe()
+		os.Stdin = r
+		defer func() {
+			os.Stdin = oldStdin
+			_ = r.Close()
+		}()
+
+		go func() {
+			_, _ = w.WriteString("\n")
+			_ = w.Close()
+		}()
+
+		confirmed, err := ConfirmRunDAG("test-dag", "param1=value1")
+		assert.NoError(t, err)
+		assert.True(t, confirmed)
+	})
+
+	t.Run("RejectWithN", func(t *testing.T) {
+		// Mock stdin with "n"
+		oldStdin := os.Stdin
+		r, w, _ := os.Pipe()
+		os.Stdin = r
+		defer func() {
+			os.Stdin = oldStdin
+			_ = r.Close()
+		}()
+
+		go func() {
+			_, _ = w.WriteString("n\n")
+			_ = w.Close()
+		}()
+
+		confirmed, err := ConfirmRunDAG("test-dag", "")
+		assert.NoError(t, err)
+		assert.False(t, confirmed)
+	})
+
+	t.Run("RejectWithNo", func(t *testing.T) {
+		// Mock stdin with "no"
+		oldStdin := os.Stdin
+		r, w, _ := os.Pipe()
+		os.Stdin = r
+		defer func() {
+			os.Stdin = oldStdin
+			_ = r.Close()
+		}()
+
+		go func() {
+			_, _ = w.WriteString("no\n")
+			_ = w.Close()
+		}()
+
+		confirmed, err := ConfirmRunDAG("test-dag", "params here")
+		assert.NoError(t, err)
+		assert.False(t, confirmed)
 	})
 }

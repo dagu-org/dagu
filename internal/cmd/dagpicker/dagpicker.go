@@ -26,7 +26,7 @@ type DAGItem struct {
 	Params string // Parameters that the DAG accepts
 }
 
-func (i DAGItem) Title() string { 
+func (i DAGItem) Title() string {
 	title := i.Name
 	if len(i.Tags) > 0 {
 		title += " [" + strings.Join(i.Tags, ", ") + "]"
@@ -246,7 +246,8 @@ func PickDAG(ctx context.Context, dagStore models.DAGStore) (string, error) {
 	}
 
 	if finalM.choice == nil {
-		return "", fmt.Errorf("no DAG selected")
+		fmt.Println("No DAG selected.")
+		os.Exit(0)
 	}
 
 	// Return the DAG name (which will be resolved by the loader)
@@ -282,4 +283,28 @@ func PromptForParams(dag *digraph.DAG) (string, error) {
 
 	// Trim whitespace and return
 	return strings.TrimSpace(input), nil
+}
+
+// ConfirmRunDAG prompts the user for Y/n confirmation before running a DAG
+func ConfirmRunDAG(dagName string, params string) (bool, error) {
+	// Build confirmation message
+	fmt.Println()
+	fmt.Printf("Ready to run DAG: %s\n", lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("170")).Render(dagName))
+	if params != "" {
+		fmt.Printf("With parameters: %s\n", lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("214")).Render(params))
+	}
+	fmt.Print("\nRun this DAG? [Y/n]: ")
+
+	// Read user input
+	reader := bufio.NewReader(os.Stdin)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return false, fmt.Errorf("failed to read input: %w", err)
+	}
+
+	// Trim and convert to lowercase
+	response := strings.ToLower(strings.TrimSpace(input))
+
+	// Accept 'y', 'yes', or empty (default to yes)
+	return response == "" || response == "y" || response == "yes", nil
 }

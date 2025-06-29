@@ -206,6 +206,16 @@ func loadDAGWithParams(ctx *Context, args []string) (*digraph.DAG, string, error
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to get parameters: %w", err)
 		}
+
+		// Confirm before running
+		confirmed, err := dagpicker.ConfirmRunDAG(tempDAG.Name, interactiveParams)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to get confirmation: %w", err)
+		}
+		if !confirmed {
+			fmt.Println("DAG execution cancelled.")
+			os.Exit(0)
+		}
 	} else {
 		dagPath = args[0]
 	}
