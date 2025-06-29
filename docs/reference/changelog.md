@@ -1,5 +1,45 @@
 # Changelog
 
+## v1.17.4 (2025-06-30)
+
+### New Features
+- **Interactive DAG Selection**: Run `dagu start` without arguments to select DAGs interactively (#1074)
+- **Bubble Tea Progress Display**: Replaced ANSI progress display with Bubble Tea TUI framework
+- **OpenTelemetry Support**: Added distributed tracing with W3C trace context propagation (#1068)
+- **Windows Support**: Initial Windows compatibility with PowerShell and cmd.exe (#1066)
+
+### Improvements
+- **Scheduler Refactoring**: Cleaned up scheduler code for better maintainability (#1062)
+- **Error Handling**: Handle corrupted status files in scheduler queue processing
+
+### Bug Fixes
+- **UI**: Fixed 'f' key triggering fullscreen mode while editing DAGs (#1075)
+- **SSH Executor**: Fixed handling of `||` and `&&` operators in command parsing (#1067)
+- **JSON Schema**: Corrected DAG JSON schema for schedule field (#1071)
+- **Scheduler**: Fixed scheduler discarding queued items when scheduled by `enqueue` (#1070)
+- **Base DAG**: Fixed parameter parsing issue in base DAG loading
+
+### Documentation
+- Updated CLI documentation for interactive DAG selection
+- Added OpenTelemetry configuration examples
+- Fixed configuration documentation to match implementation
+- Added missing feature pages to sidebar
+
+### Contributors
+
+Thanks to our contributors for this release:
+
+| Contribution | Author |
+|--------------|--------|
+| Initial Windows support - PowerShell/cmd.exe compatibility | [@pdoronila](https://github.com/pdoronila) |
+| Scheduler refactoring for improved maintainability | [@thefishhat](https://github.com/thefishhat) |
+| Interactive DAG selection feature request | [@yottahmd](https://github.com/yottahmd) |
+| OpenTelemetry distributed tracing feature request | [@jeremydelattre59](https://github.com/jeremydelattre59) |
+| SSH executor `||` operator bug report | [@NebulaCoding1029](https://github.com/NebulaCoding1029) |
+| 'f' key interference in DAG editor bug report | [@NebulaCoding1029](https://github.com/NebulaCoding1029) |
+| Log cleanup feature request | [@NebulaCoding1029](https://github.com/NebulaCoding1029) |
+| Scheduler queue bug report | Jochen |
+
 ## v1.17.3 (2025-06-25)
 
 ### New Features
