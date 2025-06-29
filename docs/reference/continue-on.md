@@ -1,0 +1,334 @@
+# Continue On Conditions
+
+The `continueOn` configuration allows workflows to continue execution even when steps encounter failures, specific exit codes, or produce certain outputs. This powerful feature enables resilient workflows that can handle errors gracefully and implement sophisticated control flow patterns.
+
+## Overview
+
+By default, Dagu stops workflow execution when a step fails (returns a non-zero exit code). The `continueOn` configuration overrides this behavior, allowing you to:
+
+- Continue execution after failures
+- Handle specific exit codes differently
+- React to command output patterns
+- Mark steps as successful despite failures
+- Build fault-tolerant workflows
+
+## Configuration Fields
+
+The `continueOn` configuration supports the following fields:
+
+| Field | Type | Description | Default |
+|-------|------|-------------|---------|
+| `failure` | boolean | Continue execution when the step fails | `false` |
+| `skipped` | boolean | Continue execution when the step is skipped | `false` |
+| `exitCode` | array | Continue execution for specific exit codes | `[]` |
+| `output` | array | Continue execution when output matches patterns | `[]` |
+| `markSuccess` | boolean | Mark the step as successful when conditions are met | `false` |
+
+## Field Details
+
+### `failure`
+
+When set to `true`, the workflow continues even if the step fails with any non-zero exit code.
+
+```yaml
+steps:
+  - name: optional-cleanup
+    command: rm -rf /tmp/cache/*
+    continueOn:
+      failure: true
+```
+
+### `skipped`
+
+When set to `true`, the workflow continues when a step is skipped due to unmet preconditions.
+
+```yaml
+steps:
+  - name: conditional-task
+    command: ./process.sh
+    preconditions:
+      - condition: "${ENABLE_FEATURE}"
+        expected: "true"
+    continueOn:
+      skipped: true
+```
+
+### `exitCode`
+
+An array of specific exit codes that should not stop the workflow. This is useful when dealing with commands that use non-zero exit codes for non-error conditions.
+
+```yaml
+steps:
+  - name: check-service
+    command: ./health-check.sh
+    continueOn:
+      exitCode: [0, 1, 2]  # 0=healthy, 1=warning, 2=maintenance
+```
+
+### `output`
+
+An array of patterns to match against the command's stdout output. Supports both literal strings and regular expressions (prefixed with `re:`).
+
+```yaml
+steps:
+  - name: validate-data
+    command: ./validate.sh
+    continueOn:
+      output:
+        - "WARNING"                    # Literal string match (substring)
+        - "SKIP"                      # Another literal string
+        - "re:^INFO:.*"               # Regex: lines starting with "INFO:"
+        - "re:WARN-[0-9]+"            # Regex: WARN- followed by numbers
+```
+
+**Pattern Matching Rules:**
+- **Literal patterns**: Matched as substrings (e.g., "WARNING" matches "WARNING: Low memory")
+- **Regex patterns**: Must start with `re:` prefix (e.g., `re:^ERROR.*`)
+- Patterns are matched against each line of **stdout only** (stderr is not checked)
+- Matching is case-sensitive
+
+### `markSuccess`
+
+When set to `true`, the step is marked as successful if any of the continue conditions are met, even if it would normally be considered a failure.
+
+```yaml
+steps:
+  - name: best-effort-optimization
+    command: ./optimize.sh
+    continueOn:
+      failure: true
+      markSuccess: true  # Step shows as successful in UI/logs
+```
+
+## Common Patterns
+
+### Optional Steps
+
+For steps that are nice-to-have but not critical:
+
+```yaml
+steps:
+  - name: cache-warmup
+    command: ./warm-cache.sh
+    continueOn:
+      failure: true
+      
+  - name: main-process
+    command: ./process.sh
+```
+
+### Handling Known Exit Codes
+
+When working with tools that use exit codes for non-error states:
+
+```yaml
+steps:
+  - name: git-diff
+    command: git diff --exit-code
+    continueOn:
+      exitCode: [0, 1]  # 0=no changes, 1=changes exist
+      
+  - name: process-changes
+    command: ./handle-changes.sh
+```
+
+### Warning Detection
+
+Continue execution but handle warnings differently:
+
+```yaml
+steps:
+  - name: lint-code
+    command: eslint .
+    continueOn:
+      output: ["WARNING", "re:.*warning.*"]
+      exitCode: [0, 1]  # 0=no issues, 1=warnings only
+      
+  - name: strict-lint
+    command: eslint . --max-warnings 0
+    continueOn:
+      failure: false  # This one must pass
+```
+
+### Graceful Degradation
+
+Build workflows that degrade gracefully:
+
+```yaml
+steps:
+  - name: try-optimal-method
+    command: ./process-optimal.sh
+    continueOn:
+      failure: true
+      
+  - name: fallback-method
+    command: ./process-fallback.sh
+    preconditions:
+      - condition: "${TRY_OPTIMAL_METHOD_EXIT_CODE}"
+        expected: "re:[1-9][0-9]*"  # Only run if previous failed
+```
+
+### Complex Output Matching
+
+React to specific output patterns:
+
+```yaml
+steps:
+  - name: deployment-check
+    command: kubectl rollout status deployment/app
+    continueOn:
+      output:
+        - "re:Waiting for.*replicas"
+        - "re:deployment.*not found"
+        - "Unable to connect"
+      exitCode: [1]
+      
+  - name: handle-deployment-issue
+    command: ./fix-deployment.sh
+```
+
+## Interaction with Other Features
+
+### With Retry Policies
+
+`continueOn` is evaluated after all retries are exhausted:
+
+```yaml
+steps:
+  - name: flaky-service
+    command: ./call-service.sh
+    retryPolicy:
+      limit: 3
+      intervalSec: 5
+    continueOn:
+      exitCode: [503]  # Continue if still 503 after retries
+```
+
+### With Lifecycle Handlers
+
+Steps that continue on failure still trigger `onFailure` handlers:
+
+```yaml
+handlerOn:
+  failure:
+    command: ./log-failure.sh
+
+steps:
+  - name: optional-step
+    command: ./optional.sh
+    continueOn:
+      failure: true  # Continues, but failure handler still runs
+```
+
+### With Dependencies
+
+Dependent steps see the actual status unless `markSuccess` is used:
+
+```yaml
+steps:
+  - name: step-a
+    command: exit 1
+    continueOn:
+      failure: true
+      markSuccess: false  # Default
+      
+  - name: step-b
+    command: echo "Step A status: failed"
+    depends: [step-a]  # Runs because of continueOn
+    
+  - name: step-c
+    command: exit 1
+    continueOn:
+      failure: true
+      markSuccess: true  # Override status
+      
+  - name: step-d
+    command: echo "Step C status: success"
+    depends: [step-c]  # Sees step-c as successful
+```
+
+## Best Practices
+
+1. **Be Specific**: Use specific exit codes or output patterns rather than blanket `failure: true`
+2. **Document Intent**: Add comments explaining why certain failures are acceptable
+3. **Use with Monitoring**: Even if steps continue, monitor and log failures
+4. **Test Patterns**: Test regex patterns carefully, especially with special characters
+5. **Consider markSuccess**: Use `markSuccess` when the failure is truly acceptable
+
+## Examples
+
+### Database Migration with Warnings
+
+```yaml
+steps:
+  - name: run-migration
+    command: ./migrate.sh
+    continueOn:
+      output:
+        - "re:WARNING:.*already exists"
+        - "re:NOTICE:.*will be created"
+      exitCode: [0, 1]  # 1 might indicate warnings
+      
+  - name: verify-migration
+    command: ./verify-db.sh
+```
+
+### Multi-Cloud Deployment
+
+```yaml
+steps:
+  - name: deploy-aws
+    command: ./deploy.sh aws
+    continueOn:
+      failure: true  # Continue even if AWS fails
+      
+  - name: deploy-gcp
+    command: ./deploy.sh gcp
+    continueOn:
+      failure: true  # Continue even if GCP fails
+      
+  - name: verify-deployment
+    command: ./verify-any-cloud.sh
+    continueOn:
+      failure: false  # At least one cloud must be working
+```
+
+### Service Health Check
+
+```yaml
+steps:
+  - name: check-primary
+    command: curl -f https://primary.example.com/health
+    continueOn:
+      exitCode: [0, 22, 7]  # 22=HTTP error, 7=connection failed
+      
+  - name: check-secondary
+    command: curl -f https://secondary.example.com/health
+    preconditions:
+      - condition: "${CHECK_PRIMARY_EXIT_CODE}"
+        expected: "re:[1-9][0-9]*"  # Only if primary failed
+```
+
+## Troubleshooting
+
+### Output Not Matching
+
+If output patterns aren't matching as expected:
+
+1. Check the exact output format using log files
+2. Remember patterns match line-by-line
+3. Use `re:.*pattern.*` for patterns that might appear mid-line
+4. Check for trailing whitespace or special characters
+
+### Exit Codes Not Working
+
+1. Verify the actual exit code using `echo $?` after the command
+2. Some shells might modify exit codes
+3. Check if the command is running through a wrapper script
+
+### Regex Pattern Errors
+
+1. Test regex patterns using online regex testers
+2. Escape special characters properly
+3. Check logs for "invalid regexp pattern" errors
+4. Remember to prefix regex patterns with `re:`

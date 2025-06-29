@@ -24,33 +24,79 @@ steps:
 
 ## Continue On Conditions
 
+Control workflow execution flow when steps encounter errors or specific conditions.
+
+### Basic Usage
+
 ```yaml
 steps:
-  # Continue on failure
-  - name: optional
+  # Continue on any failure
+  - name: optional-cleanup
     command: rm -f /tmp/cache/*
     continueOn:
       failure: true
       
   # Continue on specific exit codes
-  - name: check
+  - name: check-status
     command: check-status.sh
     continueOn:
-      exitCode: [0, 1, 2]  # Success or warnings
+      exitCode: [0, 1, 2]  # 0=success, 1=warning, 2=info
       
   # Continue on output patterns
   - name: validate
     command: validate.sh
     continueOn:
-      output: "re:WARN.*|INFO.*"
+      output: 
+        - "WARNING"
+        - "SKIP"
+        - "re:^INFO:.*"      # Regex pattern
+        - "re:WARN-[0-9]+"   # Another regex
       
-  # Mark as success
+  # Mark as success when continuing
   - name: best-effort
     command: optimize.sh
     continueOn:
       failure: true
-      markSuccess: true
+      markSuccess: true  # Shows as successful in UI
 ```
+
+### Advanced Patterns
+
+```yaml
+steps:
+  # Database migration with known warnings
+  - name: migrate-db
+    command: ./migrate.sh
+    continueOn:
+      output:
+        - "re:WARNING:.*already exists"
+        - "re:NOTICE:.*will be created"
+      exitCode: [0, 1]
+      
+  # Service health check with fallback
+  - name: check-primary
+    command: curl -f https://primary.example.com/health
+    continueOn:
+      exitCode: [0, 22, 7]  # 22=HTTP error, 7=connection failed
+      
+  # Conditional cleanup
+  - name: cleanup-temp
+    command: find /tmp -name "*.tmp" -mtime +7 -delete
+    continueOn:
+      failure: true       # Continue even if cleanup fails
+      exitCode: [0, 1]   # find returns 1 if no files found
+      
+  # Tool with non-standard exit codes
+  - name: security-scan
+    command: security-scanner --strict
+    continueOn:
+      exitCode: [0, 4, 8]  # 0=clean, 4=warnings, 8=info
+      output:
+        - "re:LOW SEVERITY:"
+        - "re:INFORMATIONAL:"
+```
+
+See the [Continue On Reference](/reference/continue-on) for complete documentation.
 
 ## Lifecycle Handlers
 

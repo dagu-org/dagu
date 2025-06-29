@@ -169,7 +169,7 @@ steps:
 
 ## Continue On Conditions
 
-Control workflow behavior when steps fail.
+Control workflow behavior when steps fail or produce specific outputs.
 
 ### Continue on Failure
 
@@ -204,7 +204,11 @@ steps:
   - name: validate
     command: ./validate.sh
     continueOn:
-      output: ["WARNING", "SKIP"]
+      output: 
+        - "WARNING"
+        - "SKIP"
+        - "re:^\[WARN\]"        # Regex: lines starting with [WARN]
+        - "re:error.*ignored"   # Regex: error...ignored pattern
       
   - name: process
     command: ./process.sh
@@ -220,6 +224,47 @@ steps:
       failure: true
       markSuccess: true  # Mark step as successful
 ```
+
+### Complex Conditions
+
+Combine multiple conditions for sophisticated control flow:
+
+```yaml
+steps:
+  # Tool with complex exit code meanings
+  - name: analysis-tool
+    command: ./analyze.sh
+    continueOn:
+      exitCode: [0, 3, 4, 5]  # Various non-error states
+      output:
+        - "Analysis complete with warnings"
+        - "re:Found [0-9]+ minor issues"
+      markSuccess: true
+      
+  # Graceful degradation pattern
+  - name: try-advanced-method
+    command: ./process-advanced.sh
+    continueOn:
+      failure: true
+      output: ["FALLBACK REQUIRED", "re:.*not available.*"]
+      
+  - name: fallback-method
+    command: ./process-simple.sh
+    preconditions:
+      - condition: "${TRY_ADVANCED_METHOD_EXIT_CODE}"
+        expected: "re:[1-9][0-9]*"
+        
+  # Skip pattern with continuation
+  - name: optional-feature
+    command: ./feature.sh
+    preconditions:
+      - condition: "${ENABLE_FEATURE}"
+        expected: "true"
+    continueOn:
+      skipped: true  # Continue if precondition not met
+```
+
+See the [Continue On Reference](/reference/continue-on) for complete documentation.
 
 ## DAG-Level Conditions
 

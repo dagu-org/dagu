@@ -238,6 +238,16 @@ steps:
 | `preconditions` | array | Conditions to check before execution | - |
 | `continueOn` | object | Continue workflow on certain conditions | - |
 
+#### ContinueOn Fields
+
+| Field | Type | Description | Default |
+|-------|------|-------------|---------|
+| `failure` | boolean | Continue execution when step fails | `false` |
+| `skipped` | boolean | Continue when step is skipped due to preconditions | `false` |
+| `exitCode` | array | List of exit codes that allow continuation | `[]` |
+| `output` | array | List of stdout patterns that allow continuation (supports regex with `re:` prefix) | `[]` |
+| `markSuccess` | boolean | Mark step as successful when continue conditions are met | `false` |
+
 ```yaml
 steps:
   - name: conditional-step
@@ -254,9 +264,11 @@ steps:
       failure: true
       skipped: true
       exitCode: [0, 1, 2]
-      output: ["WARNING", "SKIP"]
+      output: ["WARNING", "SKIP", "re:^INFO:.*"]
       markSuccess: true
 ```
+
+See the [Continue On Reference](/reference/continue-on) for detailed documentation.
 
 ### Error Handling
 
