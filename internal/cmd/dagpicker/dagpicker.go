@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -18,14 +19,30 @@ var docStyle = lipgloss.NewStyle().Margin(1, 2)
 
 // DAGItem represents a DAG in the list
 type DAGItem struct {
-	Name string
-	Path string // Path is stored but not displayed
-	Desc string
-	Tags []string
+	Name   string
+	Path   string // Path is stored but not displayed
+	Desc   string
+	Tags   []string
+	Params string // Parameters that the DAG accepts
 }
 
-func (i DAGItem) Title() string       { return i.Name }
-func (i DAGItem) Description() string { return i.Desc }
+func (i DAGItem) Title() string { 
+	title := i.Name
+	if len(i.Tags) > 0 {
+		title += " [" + strings.Join(i.Tags, ", ") + "]"
+	}
+	return title
+}
+func (i DAGItem) Description() string {
+	desc := i.Desc
+	if i.Params != "" {
+		if desc != "" {
+			desc += " • "
+		}
+		desc += "params: " + i.Params
+	}
+	return desc
+}
 func (i DAGItem) FilterValue() string { return i.Name }
 
 // Model represents the state of the DAG picker
@@ -79,6 +96,82 @@ func (m Model) View() string {
 	return docStyle.Render(m.list.View())
 }
 
+// customDelegate implements list.ItemDelegate with custom rendering
+type customDelegate struct{}
+
+func (d customDelegate) Height() int                             { return 3 } // Increased height for params
+func (d customDelegate) Spacing() int                            { return 0 }
+func (d customDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
+
+func (d customDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
+	item, ok := listItem.(DAGItem)
+	if !ok {
+		return
+	}
+
+	// Buffer output to ensure atomic writes
+	var buf strings.Builder
+
+	// Styles for selected/unselected items
+	var nameStyle, descStyle, paramStyle, tagStyle lipgloss.Style
+	prefix := "  "
+
+	if index == m.Index() {
+		nameStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("170")).
+			Bold(true)
+		descStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("245")).
+			MarginLeft(4)
+		paramStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("214")).
+			MarginLeft(4).
+			Italic(true)
+		tagStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("243")).
+			Italic(true)
+		prefix = "> "
+	} else {
+		nameStyle = lipgloss.NewStyle()
+		descStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241")).
+			MarginLeft(4)
+		paramStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("243")).
+			MarginLeft(4).
+			Italic(true)
+		tagStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")).
+			Italic(true)
+	}
+
+	// Format the name line
+	buf.WriteString(prefix)
+	buf.WriteString(nameStyle.Render(item.Name))
+
+	// Add tags if present
+	if len(item.Tags) > 0 {
+		buf.WriteString(" ")
+		buf.WriteString(tagStyle.Render("[" + strings.Join(item.Tags, ", ") + "]"))
+	}
+	buf.WriteString("\n")
+
+	// Show description if available
+	if item.Desc != "" {
+		buf.WriteString(descStyle.Render(item.Desc))
+		buf.WriteString("\n")
+	}
+
+	// Show parameters if available
+	if item.Params != "" {
+		buf.WriteString(paramStyle.Render("params: " + item.Params))
+		buf.WriteString("\n")
+	}
+
+	// Write buffered output
+	_, _ = w.Write([]byte(buf.String()))
+}
+
 // PickDAG shows an interactive DAG picker and returns the selected DAG path
 func PickDAG(ctx context.Context, dagStore models.DAGStore) (string, error) {
 	// Get list of DAGs
@@ -101,16 +194,26 @@ func PickDAG(ctx context.Context, dagStore models.DAGStore) (string, error) {
 	// Convert DAGs to list items
 	items := make([]list.Item, 0, len(result.Items))
 	for _, dag := range result.Items {
+		// Format parameters for display
+		var params string
+		if dag.DefaultParams != "" {
+			params = dag.DefaultParams
+		} else if len(dag.Params) > 0 {
+			params = strings.Join(dag.Params, " ")
+		}
+
 		items = append(items, DAGItem{
-			Name: dag.Name,
-			Path: dag.Location,
-			Desc: dag.Description,
-			Tags: dag.Tags,
+			Name:   dag.Name,
+			Path:   dag.Location,
+			Desc:   dag.Description,
+			Tags:   dag.Tags,
+			Params: params,
 		})
 	}
 
 	// Create list with custom delegate for better rendering
-	l := list.New(items, list.NewDefaultDelegate(), 80, 20) // Default size for reasonable display
+	delegate := customDelegate{}
+	l := list.New(items, delegate, 80, 20) // Default size for reasonable display
 	l.Title = "Select a DAG to run"
 	l.SetShowStatusBar(true)
 	l.SetStatusBarItemName("DAG", "DAGs")

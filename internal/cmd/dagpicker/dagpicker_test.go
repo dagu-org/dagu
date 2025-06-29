@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/models"
@@ -16,26 +17,40 @@ import (
 func TestDAGItem(t *testing.T) {
 	t.Run("DAGItem implements list.Item interface", func(t *testing.T) {
 		item := DAGItem{
-			Name: "test-dag",
-			Path: "/path/to/test.yaml",
-			Desc: "Test DAG description",
-			Tags: []string{"test", "example"},
+			Name:   "test-dag",
+			Path:   "/path/to/test.yaml",
+			Desc:   "Test DAG description",
+			Tags:   []string{"test", "example"},
+			Params: "KEY1=value1 KEY2=value2",
 		}
 
 		assert.Equal(t, "test-dag", item.Title())
-		assert.Equal(t, "Test DAG description", item.Description())
+		assert.Equal(t, "Test DAG description | params: KEY1=value1 KEY2=value2", item.Description())
 		assert.Equal(t, "test-dag", item.FilterValue())
 	})
 
-	t.Run("DAGItem with empty description", func(t *testing.T) {
+	t.Run("DAGItem with empty description but params", func(t *testing.T) {
 		item := DAGItem{
-			Name: "test-dag",
-			Path: "/path/to/test.yaml",
-			Desc: "",
-			Tags: []string{"test"},
+			Name:   "test-dag",
+			Path:   "/path/to/test.yaml",
+			Desc:   "",
+			Tags:   []string{"test"},
+			Params: "KEY=value",
 		}
 
-		assert.Equal(t, "", item.Description())
+		assert.Equal(t, "params: KEY=value", item.Description())
+	})
+
+	t.Run("DAGItem with description but no params", func(t *testing.T) {
+		item := DAGItem{
+			Name:   "test-dag",
+			Path:   "/path/to/test.yaml",
+			Desc:   "Just a description",
+			Tags:   []string{"test"},
+			Params: "",
+		}
+
+		assert.Equal(t, "Just a description", item.Description())
 	})
 }
 
@@ -116,6 +131,22 @@ func TestModel(t *testing.T) {
 
 		assert.True(t, updatedM.quitting)
 		assert.NotNil(t, cmd)
+	})
+
+	t.Run("Model handles window size", func(t *testing.T) {
+		// Create a model with an initialized list
+		items := []list.Item{
+			DAGItem{Name: "test", Desc: "Test DAG"},
+		}
+		l := list.New(items, list.NewDefaultDelegate(), 80, 20)
+		m := Model{
+			list: l,
+		}
+
+		sizeMsg := tea.WindowSizeMsg{Width: 100, Height: 50}
+		_, cmd := m.Update(sizeMsg)
+
+		assert.Nil(t, cmd)
 	})
 }
 
@@ -259,11 +290,20 @@ func TestPickDAG(t *testing.T) {
 		// Convert to DAGItems
 		items := make([]DAGItem, 0, len(dags))
 		for _, dag := range dags {
+			// Format parameters for display
+			var params string
+			if dag.DefaultParams != "" {
+				params = dag.DefaultParams
+			} else if len(dag.Params) > 0 {
+				params = strings.Join(dag.Params, " ")
+			}
+			
 			items = append(items, DAGItem{
-				Name: dag.Name,
-				Path: dag.Location,
-				Desc: dag.Description,
-				Tags: dag.Tags,
+				Name:   dag.Name,
+				Path:   dag.Location,
+				Desc:   dag.Description,
+				Tags:   dag.Tags,
+				Params: params,
 			})
 		}
 
