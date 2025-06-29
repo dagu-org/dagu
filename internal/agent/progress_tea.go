@@ -1,0 +1,754 @@
+package agent
+
+import (
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/charmbracelet/bubbles/spinner"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/stringutil"
+)
+
+// Message types for Bubble Tea
+type (
+	// TickMsg is sent periodically to update the display
+	TickMsg time.Time
+
+	// NodeUpdateMsg is sent when a node's status changes
+	NodeUpdateMsg struct {
+		Node *models.Node
+	}
+
+	// StatusUpdateMsg is sent when the overall DAG status changes
+	StatusUpdateMsg struct {
+		Status *models.DAGRunStatus
+	}
+
+	// FinalizeMsg is sent when the display should stop
+	FinalizeMsg struct{}
+)
+
+// ProgressModel represents the Bubble Tea model for progress display
+type ProgressModel struct {
+	// DAG information
+	dag      *digraph.DAG
+	status   *models.DAGRunStatus
+	dagRunID string
+	params   string
+
+	// Node tracking
+	nodes map[string]*nodeProgress
+
+	// Display state
+	startTime        time.Time
+	spinner          spinner.Model
+	width            int
+	height           int
+	finalized        bool
+	showChildDetails bool
+
+	// Styles
+	accentColor      lipgloss.Color
+	headerStyle      lipgloss.Style
+	progressBarStyle lipgloss.Style
+	sectionStyle     lipgloss.Style
+	errorStyle       lipgloss.Style
+	successStyle     lipgloss.Style
+	runningStyle     lipgloss.Style
+	faintStyle       lipgloss.Style
+	boldStyle        lipgloss.Style
+}
+
+// NewProgressModel creates a new progress model for Bubble Tea
+func NewProgressModel(dag *digraph.DAG) ProgressModel {
+	s := spinner.New()
+	s.Spinner = spinner.Spinner{
+		Frames: []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"},
+		FPS:    time.Second / 10,
+	}
+
+	// Initialize styles
+	accentColor := lipgloss.Color("6")
+
+	m := ProgressModel{
+		dag:              dag,
+		nodes:            make(map[string]*nodeProgress),
+		startTime:        time.Now(),
+		spinner:          s,
+		showChildDetails: true,
+		accentColor:      accentColor,
+		headerStyle:      lipgloss.NewStyle().Foreground(accentColor).Bold(true),
+		sectionStyle:     lipgloss.NewStyle().Bold(true),
+		errorStyle:       lipgloss.NewStyle().Foreground(lipgloss.Color("1")),
+		successStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("2")),
+		runningStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("10")),
+		faintStyle:       lipgloss.NewStyle().Faint(true),
+		boldStyle:        lipgloss.NewStyle().Bold(true),
+	}
+
+	// Initialize all nodes from the DAG steps
+	if dag != nil {
+		for _, step := range dag.Steps {
+			m.nodes[step.Name] = &nodeProgress{
+				node: &models.Node{
+					Step:       step,
+					Status:     scheduler.NodeStatusNone,
+					StartedAt:  "-",
+					FinishedAt: "-",
+				},
+				status: scheduler.NodeStatusNone,
+			}
+		}
+	}
+
+	return m
+}
+
+// Init initializes the model
+func (m ProgressModel) Init() tea.Cmd {
+	return tea.Batch(
+		m.spinner.Tick,
+		tickCmd(),
+	)
+}
+
+// Update handles messages
+func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
+
+	case TickMsg:
+		if m.finalized {
+			return m, nil
+		}
+		return m, tickCmd()
+
+	case NodeUpdateMsg:
+		m.updateNode(msg.Node)
+		return m, nil
+
+	case StatusUpdateMsg:
+		m.status = msg.Status
+		if msg.Status != nil {
+			m.dagRunID = msg.Status.DAGRunID
+			m.params = msg.Status.Params
+		}
+		return m, nil
+
+	case FinalizeMsg:
+		m.finalized = true
+		return m, tea.Quit
+
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		return m, cmd
+
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q":
+			m.finalized = true
+			return m, tea.Quit
+		}
+	}
+
+	return m, tea.Batch(cmds...)
+}
+
+// View renders the display
+func (m ProgressModel) View() string {
+	if m.finalized {
+		// Render final state
+		return m.renderFinalState()
+	}
+
+	var sections []string
+
+	// Header
+	sections = append(sections, m.renderHeader())
+
+	// Progress bar
+	if bar := m.renderProgressBar(); bar != "" {
+		sections = append(sections, bar)
+	}
+
+	// Currently running
+	if running := m.renderCurrentlyRunning(); running != "" {
+		sections = append(sections, running)
+	}
+
+	// Recently completed
+	if completed := m.renderRecentlyCompleted(); completed != "" {
+		sections = append(sections, completed)
+	}
+
+	// Queued
+	if queued := m.renderQueued(); queued != "" {
+		sections = append(sections, queued)
+	}
+
+	// Child DAGs
+	if children := m.renderChildDAGs(); children != "" {
+		sections = append(sections, children)
+	}
+
+	// Footer
+	sections = append(sections, m.renderFooter())
+
+	return strings.Join(sections, "\n\n")
+}
+
+func (m *ProgressModel) updateNode(node *models.Node) {
+	np, exists := m.nodes[node.Step.Name]
+	if !exists {
+		np = &nodeProgress{}
+		m.nodes[node.Step.Name] = np
+	}
+
+	np.node = node
+	np.status = node.Status
+
+	if node.StartedAt != "" && node.StartedAt != "-" {
+		if t, err := stringutil.ParseTime(node.StartedAt); err == nil {
+			np.startTime = t
+		}
+	}
+
+	if node.FinishedAt != "" && node.FinishedAt != "-" {
+		if t, err := stringutil.ParseTime(node.FinishedAt); err == nil {
+			np.endTime = t
+		}
+	}
+
+	if node.Children != nil {
+		np.children = node.Children
+	}
+}
+
+func (m ProgressModel) renderFinalState() string {
+	var sections []string
+
+	sections = append(sections, m.renderHeader())
+
+	if bar := m.renderProgressBar(); bar != "" {
+		sections = append(sections, bar)
+	}
+
+	// Show all completed nodes in final state
+	if completed := m.renderAllCompleted(); completed != "" {
+		sections = append(sections, completed)
+	}
+
+	if children := m.renderChildDAGs(); children != "" {
+		sections = append(sections, children)
+	}
+
+	// Add extra spacing at the end
+	sections = append(sections, "\n\n")
+
+	return strings.Join(sections, "\n\n")
+}
+
+func (m ProgressModel) renderHeader() string {
+	elapsed := time.Since(m.startTime)
+
+	// Build status indicator
+	statusStr := m.formatStatus(m.getOverallStatus())
+
+	// Box width calculation
+	boxWidth := m.width
+	if boxWidth > 100 {
+		boxWidth = 100
+	}
+	if boxWidth < 40 {
+		boxWidth = 40
+	}
+	innerWidth := boxWidth - 2
+
+	// Build header
+	dagName := m.dag.Name
+	if len(dagName) > 30 {
+		dagName = dagName[:27] + "..."
+	}
+	header := fmt.Sprintf(" DAG: %s ", dagName)
+
+	// Build the time part
+	timePart := fmt.Sprintf("Started: %s | Elapsed: %s",
+		m.startTime.Format("15:04:05"),
+		formatDuration(elapsed))
+
+	// Build status line
+	statusPrefix := "Status: "
+	statusLine := fmt.Sprintf(" %s%s | %s ", statusPrefix, statusStr, timePart)
+
+	// Apply styles
+	headerStyled := m.headerStyle.Render(header)
+
+	// Create box
+	var box strings.Builder
+	box.WriteString("┌─")
+	box.WriteString(headerStyled)
+	box.WriteString(strings.Repeat("─", innerWidth-lipgloss.Width(header)-2))
+	box.WriteString("─┐\n")
+
+	box.WriteString("│")
+	box.WriteString(statusLine)
+	box.WriteString(strings.Repeat(" ", innerWidth-lipgloss.Width(statusLine)+2))
+	box.WriteString("│\n")
+
+	// Add Run ID line
+	if m.dagRunID != "" {
+		runIDStr := fmt.Sprintf("Run ID: %s", truncateString(m.dagRunID, innerWidth-12))
+		runIDLine := fmt.Sprintf(" %s%s ", runIDStr, strings.Repeat(" ", innerWidth-len(runIDStr)-2))
+		box.WriteString("│")
+		box.WriteString(runIDLine)
+		box.WriteString("│\n")
+	}
+
+	// Add Params line
+	if m.params != "" {
+		paramsStr := fmt.Sprintf("Params: %s", truncateString(m.params, innerWidth-12))
+		paramsLine := fmt.Sprintf(" %s%s ", paramsStr, strings.Repeat(" ", innerWidth-len(paramsStr)-2))
+		box.WriteString("│")
+		box.WriteString(paramsLine)
+		box.WriteString("│\n")
+	}
+
+	box.WriteString("└")
+	box.WriteString(strings.Repeat("─", innerWidth))
+	box.WriteString("┘")
+
+	return box.String()
+}
+
+func (m ProgressModel) renderProgressBar() string {
+	completed := 0
+	total := len(m.nodes)
+
+	for _, np := range m.nodes {
+		if np.status == scheduler.NodeStatusSuccess ||
+			np.status == scheduler.NodeStatusError ||
+			np.status == scheduler.NodeStatusSkipped ||
+			np.status == scheduler.NodeStatusCancel {
+			completed++
+		}
+	}
+
+	if total == 0 {
+		return ""
+	}
+
+	percentage := (completed * 100) / total
+	barWidth := 40
+	if m.width < 60 {
+		barWidth = 20
+	}
+	filled := (percentage * barWidth) / 100
+
+	// Build progress bar
+	bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
+
+	// Colorize based on percentage
+	var barStyled string
+	if percentage >= 80 {
+		barStyled = m.successStyle.Render(bar)
+	} else if percentage >= 50 {
+		barStyled = lipgloss.NewStyle().Foreground(m.accentColor).Render(bar)
+	} else {
+		barStyled = bar
+	}
+
+	return fmt.Sprintf("Progress: %s %3d%% (%d/%d steps)",
+		barStyled, percentage, completed, total)
+}
+
+func (m ProgressModel) renderCurrentlyRunning() string {
+	running := m.getNodesByStatus(scheduler.NodeStatusRunning)
+	if len(running) == 0 {
+		return ""
+	}
+
+	var lines []string
+	lines = append(lines, m.sectionStyle.Render("Currently Running:"))
+
+	for _, np := range running {
+		elapsed := time.Since(np.startTime)
+		spinner := m.spinner.View()
+
+		line := fmt.Sprintf("  %s %s %s",
+			m.runningStyle.Render(spinner),
+			truncateString(np.node.Step.Name, 30),
+			m.faintStyle.Render(fmt.Sprintf("[Running for %s]", formatDuration(elapsed))))
+
+		lines = append(lines, line)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func (m ProgressModel) renderRecentlyCompleted() string {
+	completed := m.getCompletedNodes()
+	if len(completed) == 0 {
+		return ""
+	}
+
+	// Show only recent ones
+	maxShow := 5
+	if len(completed) > maxShow {
+		completed = completed[len(completed)-maxShow:]
+	}
+
+	var lines []string
+	lines = append(lines, m.sectionStyle.Render("Recently Completed:"))
+
+	for _, np := range completed {
+		statusIcon := m.getStatusIcon(np.status)
+		duration := ""
+		if !np.endTime.IsZero() && !np.startTime.IsZero() {
+			duration = fmt.Sprintf("[%s]", formatDuration(np.endTime.Sub(np.startTime)))
+		}
+
+		line := fmt.Sprintf("  %s %s %s",
+			statusIcon,
+			truncateString(np.node.Step.Name, 30),
+			m.faintStyle.Render(duration))
+
+		if np.status == scheduler.NodeStatusError && np.node.Error != "" {
+			availableSpace := m.width - 50
+			if availableSpace < 20 {
+				availableSpace = 20
+			}
+			errorMsg := truncateString(np.node.Error, availableSpace)
+			line += m.errorStyle.Render(fmt.Sprintf(" Error: %s", errorMsg))
+		}
+
+		lines = append(lines, line)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func (m ProgressModel) renderAllCompleted() string {
+	completed := m.getCompletedNodes()
+	if len(completed) == 0 {
+		return ""
+	}
+
+	var lines []string
+	lines = append(lines, m.sectionStyle.Render("Completed Steps:"))
+
+	for _, np := range completed {
+		statusIcon := m.getStatusIcon(np.status)
+		duration := ""
+		if !np.endTime.IsZero() && !np.startTime.IsZero() {
+			duration = fmt.Sprintf("[%s]", formatDuration(np.endTime.Sub(np.startTime)))
+		}
+
+		line := fmt.Sprintf("  %s %s %s",
+			statusIcon,
+			truncateString(np.node.Step.Name, 30),
+			m.faintStyle.Render(duration))
+
+		if np.status == scheduler.NodeStatusError && np.node.Error != "" {
+			availableSpace := m.width - 50
+			if availableSpace < 20 {
+				availableSpace = 20
+			}
+			errorMsg := truncateString(np.node.Error, availableSpace)
+			line += m.errorStyle.Render(fmt.Sprintf(" Error: %s", errorMsg))
+		}
+
+		lines = append(lines, line)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func (m ProgressModel) renderQueued() string {
+	queued := m.getNodesByStatus(scheduler.NodeStatusNone)
+	if len(queued) == 0 {
+		return ""
+	}
+
+	maxShow := 3
+	var lines []string
+	lines = append(lines, m.sectionStyle.Render("Queued:"))
+
+	for i, np := range queued {
+		if i >= maxShow {
+			lines = append(lines, fmt.Sprintf("  %s ... and %d more",
+				m.faintStyle.Render("○"),
+				len(queued)-maxShow))
+			break
+		}
+		lines = append(lines, fmt.Sprintf("  %s %s",
+			m.faintStyle.Render("○"),
+			truncateString(np.node.Step.Name, 30)))
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func (m ProgressModel) renderChildDAGs() string {
+	childNodes := m.getNodesWithChildren()
+	if len(childNodes) == 0 {
+		return ""
+	}
+
+	var lines []string
+	lines = append(lines, m.sectionStyle.Render("Child DAGs:"))
+
+	for _, np := range childNodes {
+		if len(np.children) == 1 {
+			// Single child DAG
+			child := np.children[0]
+			lines = append(lines, fmt.Sprintf("  ▸ %s → %s",
+				truncateString(np.node.Step.Name, 20),
+				m.formatChildStatus(child)))
+		} else {
+			// Parallel execution
+			total := len(np.children)
+			statusInfo := fmt.Sprintf("(%d child DAGs)", total)
+
+			lines = append(lines, fmt.Sprintf("  ▸ %s %s %s",
+				truncateString(np.node.Step.Name, 20),
+				statusInfo,
+				m.getStatusIcon(np.status)))
+		}
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func (m ProgressModel) renderFooter() string {
+	return m.faintStyle.Render("Press Ctrl+C to stop")
+}
+
+func (m ProgressModel) getOverallStatus() scheduler.Status {
+	if m.status != nil {
+		return m.status.Status
+	}
+	return scheduler.StatusRunning
+}
+
+func (m ProgressModel) formatStatus(status scheduler.Status) string {
+	switch status {
+	case scheduler.StatusSuccess:
+		return m.successStyle.Render("Success ✓")
+	case scheduler.StatusError:
+		return m.errorStyle.Render("Failed ✗")
+	case scheduler.StatusRunning:
+		return m.runningStyle.Render("Running ●")
+	case scheduler.StatusCancel:
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("Cancelled ⚠")
+	case scheduler.StatusQueued:
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Render("Queued ●")
+	default:
+		return m.faintStyle.Render("Not Started ○")
+	}
+}
+
+func (m ProgressModel) getStatusIcon(status scheduler.NodeStatus) string {
+	switch status {
+	case scheduler.NodeStatusSuccess:
+		return m.successStyle.Render("✓")
+	case scheduler.NodeStatusError:
+		return m.errorStyle.Render("✗")
+	case scheduler.NodeStatusRunning:
+		return m.runningStyle.Render("●")
+	case scheduler.NodeStatusCancel:
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("⚠")
+	case scheduler.NodeStatusSkipped:
+		return m.faintStyle.Render("⊘")
+	default:
+		return m.faintStyle.Render("○")
+	}
+}
+
+func (m ProgressModel) formatChildStatus(child models.ChildDAGRun) string {
+	params := ""
+	if child.Params != "" {
+		params = m.faintStyle.Render(fmt.Sprintf(" [%s]", truncateString(child.Params, 20)))
+	}
+	dagRunID := truncateString(child.DAGRunID, 15)
+	return fmt.Sprintf("%s%s", dagRunID, params)
+}
+
+func (m ProgressModel) getNodesByStatus(status scheduler.NodeStatus) []*nodeProgress {
+	var nodes []*nodeProgress
+	for _, np := range m.nodes {
+		if np.status == status {
+			nodes = append(nodes, np)
+		}
+	}
+
+	// Sort by start time (earliest first) for deterministic ordering
+	sortNodesByStartTime(nodes)
+	return nodes
+}
+
+func (m ProgressModel) getCompletedNodes() []*nodeProgress {
+	var nodes []*nodeProgress
+	for _, np := range m.nodes {
+		if np.status == scheduler.NodeStatusSuccess ||
+			np.status == scheduler.NodeStatusError ||
+			np.status == scheduler.NodeStatusSkipped ||
+			np.status == scheduler.NodeStatusCancel {
+			nodes = append(nodes, np)
+		}
+	}
+
+	// Sort by completion time
+	sortNodesByEndTime(nodes)
+	return nodes
+}
+
+func (m ProgressModel) getNodesWithChildren() []*nodeProgress {
+	var nodes []*nodeProgress
+	for _, np := range m.nodes {
+		if len(np.children) > 0 {
+			nodes = append(nodes, np)
+		}
+	}
+
+	// Sort by step name for deterministic ordering
+	sortNodesByName(nodes)
+	return nodes
+}
+
+// Helper functions
+
+func tickCmd() tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+		return TickMsg(t)
+	})
+}
+
+func formatDuration(d time.Duration) string {
+	if d < time.Second {
+		return fmt.Sprintf("%dms", d.Milliseconds())
+	} else if d < time.Minute {
+		return fmt.Sprintf("%.1fs", d.Seconds())
+	} else if d < time.Hour {
+		mins := int(d.Minutes())
+		secs := int(d.Seconds()) % 60
+		return fmt.Sprintf("%dm %ds", mins, secs)
+	}
+	hours := int(d.Hours())
+	mins := int(d.Minutes()) % 60
+	return fmt.Sprintf("%dh %dm", hours, mins)
+}
+
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
+}
+
+func sortNodesByStartTime(nodes []*nodeProgress) {
+	for i := 0; i < len(nodes)-1; i++ {
+		for j := i + 1; j < len(nodes); j++ {
+			if nodes[i].startTime.After(nodes[j].startTime) ||
+				(nodes[i].startTime.Equal(nodes[j].startTime) &&
+					nodes[i].node.Step.Name > nodes[j].node.Step.Name) {
+				nodes[i], nodes[j] = nodes[j], nodes[i]
+			}
+		}
+	}
+}
+
+func sortNodesByEndTime(nodes []*nodeProgress) {
+	for i := 0; i < len(nodes)-1; i++ {
+		for j := i + 1; j < len(nodes); j++ {
+			switch {
+			case nodes[i].endTime.IsZero() && !nodes[j].endTime.IsZero():
+				nodes[i], nodes[j] = nodes[j], nodes[i]
+			case !nodes[i].endTime.IsZero() && nodes[j].endTime.IsZero():
+				// No swap needed
+			case nodes[i].endTime.After(nodes[j].endTime):
+				nodes[i], nodes[j] = nodes[j], nodes[i]
+			case nodes[i].endTime.Equal(nodes[j].endTime):
+				if nodes[i].node.Step.Name > nodes[j].node.Step.Name {
+					nodes[i], nodes[j] = nodes[j], nodes[i]
+				}
+			}
+		}
+	}
+}
+
+func sortNodesByName(nodes []*nodeProgress) {
+	for i := 0; i < len(nodes)-1; i++ {
+		for j := i + 1; j < len(nodes); j++ {
+			if nodes[i].node.Step.Name > nodes[j].node.Step.Name {
+				nodes[i], nodes[j] = nodes[j], nodes[i]
+			}
+		}
+	}
+}
+
+// ProgressTeaDisplay wraps the Bubble Tea program for the progress display
+type ProgressTeaDisplay struct {
+	program *tea.Program
+	model   ProgressModel
+}
+
+// NewProgressTeaDisplay creates a new Bubble Tea-based progress display
+func NewProgressTeaDisplay(dag *digraph.DAG) *ProgressTeaDisplay {
+	model := NewProgressModel(dag)
+	return &ProgressTeaDisplay{
+		model: model,
+	}
+}
+
+// Start initializes and runs the Bubble Tea program
+func (p *ProgressTeaDisplay) Start() {
+	p.program = tea.NewProgram(p.model, tea.WithAltScreen())
+	go func() {
+		_, _ = p.program.Run()
+	}()
+}
+
+// Stop gracefully stops the display
+func (p *ProgressTeaDisplay) Stop() {
+	if p.program != nil {
+		p.program.Send(FinalizeMsg{})
+		// Give it a moment to render final state
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+// UpdateNode sends a node update to the display
+func (p *ProgressTeaDisplay) UpdateNode(node *models.Node) {
+	if p.program != nil {
+		p.program.Send(NodeUpdateMsg{Node: node})
+	}
+}
+
+// UpdateStatus sends a status update to the display
+func (p *ProgressTeaDisplay) UpdateStatus(status *models.DAGRunStatus) {
+	if p.program != nil {
+		p.program.Send(StatusUpdateMsg{Status: status})
+	}
+}
+
+// SetDAGRunInfo sets the DAG run ID and parameters
+func (p *ProgressTeaDisplay) SetDAGRunInfo(dagRunID, params string) {
+	if p.program != nil {
+		status := &models.DAGRunStatus{
+			DAGRunID: dagRunID,
+			Params:   params,
+		}
+		p.program.Send(StatusUpdateMsg{Status: status})
+	}
+}
