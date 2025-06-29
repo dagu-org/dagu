@@ -55,6 +55,7 @@ type ProgressModel struct {
 
 	// Display state
 	startTime        time.Time
+	finishTime       time.Time
 	spinner          spinner.Model
 	width            int
 	height           int
@@ -156,6 +157,7 @@ func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case FinalizeMsg:
 		m.finalized = true
+		m.finishTime = time.Now()
 		// Don't quit immediately - wait for user input
 		return m, nil
 
@@ -255,9 +257,13 @@ func (m *ProgressModel) updateNode(node *models.Node) {
 	}
 }
 
-
 func (m ProgressModel) renderHeader() string {
-	elapsed := time.Since(m.startTime)
+	var elapsed time.Duration
+	if m.finalized && !m.finishTime.IsZero() {
+		elapsed = m.finishTime.Sub(m.startTime)
+	} else {
+		elapsed = time.Since(m.startTime)
+	}
 
 	// Build status indicator
 	statusStr := m.formatStatus(m.getOverallStatus())
@@ -737,19 +743,19 @@ func sortNodesByName(nodes []*nodeProgress) {
 
 // ProgressTeaDisplay wraps the Bubble Tea program for the progress display
 type ProgressTeaDisplay struct {
-	program *tea.Program
-	model   ProgressModel
+	program      *tea.Program
+	model        ProgressModel
 	useAltScreen bool
-	done    chan struct{}
+	done         chan struct{}
 }
 
 // NewProgressTeaDisplay creates a new Bubble Tea-based progress display
 func NewProgressTeaDisplay(dag *digraph.DAG) *ProgressTeaDisplay {
 	model := NewProgressModel(dag)
 	return &ProgressTeaDisplay{
-		model: model,
+		model:        model,
 		useAltScreen: true,
-		done: make(chan struct{}),
+		done:         make(chan struct{}),
 	}
 }
 
@@ -759,13 +765,13 @@ func (p *ProgressTeaDisplay) Start() {
 	go func() {
 		defer func() {
 			// Ensure cursor is visible and mouse tracking is disabled if program crashes
-			fmt.Print("\033[?25h")     // Show cursor
-			fmt.Print("\033[?1000l")   // Disable mouse tracking
-			fmt.Print("\033[?1002l")   // Disable mouse cell motion tracking  
-			fmt.Print("\033[?1003l")   // Disable all mouse tracking
-			fmt.Print("\033[?1006l")   // Disable SGR mouse mode
-			// Ensure we're on a new line
-			fmt.Println()
+			fmt.Print("\033[?25h")   // Show cursor
+			fmt.Print("\033[?1000l") // Disable mouse tracking
+			fmt.Print("\033[?1002l") // Disable mouse cell motion tracking
+			fmt.Print("\033[?1003l") // Disable all mouse tracking
+			fmt.Print("\033[?1006l") // Disable SGR mouse mode
+			fmt.Print("\r")          // Carriage return - move cursor to beginning of line
+			fmt.Print("\033[K")      // Clear from cursor to end of line
 			// Signal that the program has exited
 			close(p.done)
 		}()
