@@ -1,5 +1,3 @@
-//go:build windows
-
 package executor
 
 import (
@@ -17,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
 
 // TestHTTPExecutor_WindowsSpecific tests the HTTP executor specifically on Windows
 func TestHTTPExecutor_WindowsSpecific(t *testing.T) {

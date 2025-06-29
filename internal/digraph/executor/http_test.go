@@ -194,7 +194,7 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				server := httptest.NewServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
 					// Echo back some request info
-					response := map[string]interface{}{
+					response := map[string]any{
 						"method":   r.Method,
 						"platform": runtime.GOOS,
 						"headers":  r.Header,
@@ -229,7 +229,7 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 				assert.NoError(t, err)
 
 				// Parse response to verify it contains expected data
-				var response map[string]interface{}
+				var response map[string]any
 				err = json.Unmarshal([]byte(out.String()), &response)
 				assert.NoError(t, err)
 				assert.Equal(t, tc.method, response["method"])
@@ -243,7 +243,7 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 	})
 
 	t.Run("JSON response formatting consistency", func(t *testing.T) {
-		server := httptest.NewServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
+		server := httptest.NewServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, _ *nethttp.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("X-Test-Header", "cross-platform")
 			w.WriteHeader(nethttp.StatusOK)
@@ -288,7 +288,7 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 		assert.Contains(t, jsonResponse.Headers, "X-Test-Header")
 		
 		// Verify response body structure
-		bodyMap, ok := jsonResponse.Body.(map[string]interface{})
+		bodyMap, ok := jsonResponse.Body.(map[string]any)
 		assert.True(t, ok)
 		assert.Equal(t, "JSON response test", bodyMap["message"])
 		assert.Equal(t, runtime.GOOS, bodyMap["platform"])
@@ -297,7 +297,7 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 	})
 
 	t.Run("Error handling consistency", func(t *testing.T) {
-		server := httptest.NewServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
+		server := httptest.NewServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, _ *nethttp.Request) {
 			w.WriteHeader(nethttp.StatusInternalServerError)
 			_, _ = w.Write([]byte("Server error for cross-platform test"))
 		}))
