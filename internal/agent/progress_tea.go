@@ -759,8 +759,8 @@ func NewProgressTeaDisplay(dag *digraph.DAG) *ProgressTeaDisplay {
 
 // Start initializes and runs the Bubble Tea program
 func (p *ProgressTeaDisplay) Start() {
-	// Use Bubble Tea's alternate screen management
-	p.program = tea.NewProgram(p.model, tea.WithAltScreen())
+	// Manually manage alternate screen to keep it after exit
+	p.program = tea.NewProgram(p.model)
 	go func() {
 		defer func() {
 			// Ensure cursor is visible and mouse tracking is disabled if program crashes
@@ -769,37 +769,29 @@ func (p *ProgressTeaDisplay) Start() {
 			fmt.Print("\033[?1002l") // Disable mouse cell motion tracking
 			fmt.Print("\033[?1003l") // Disable all mouse tracking
 			fmt.Print("\033[?1006l") // Disable SGR mouse mode
+			// DON'T exit alternate screen - keep the UI visible
 			// Signal that the program has exited
 			close(p.done)
 		}()
 
+		// Enter alternate screen manually
+		fmt.Print("\033[?1049h") // Enter alternate screen
+		fmt.Print("\033[2J")     // Clear screen
+		fmt.Print("\033[H")      // Move cursor to home
+
 		_, _ = p.program.Run()
+
+		// Don't exit alternate screen - stay in it!
 	}()
 }
 
 // Stop gracefully stops the display
 func (p *ProgressTeaDisplay) Stop() {
 	if p.program != nil {
-		// Update the model to finalized state and capture final output
-		p.model.finalized = true
-		p.model.finishTime = time.Now()
-		p.finalOutput = p.model.View()
-
 		p.program.Send(FinalizeMsg{})
 		// Wait for the program to exit
 		<-p.done
-
-		// After alternate screen is cleared by Bubble Tea
-		// Small delay to ensure alternate screen is fully exited
-		time.Sleep(50 * time.Millisecond)
-
-		// Clear the restored terminal content
-		fmt.Print("\033[2J") // Clear entire screen
-		fmt.Print("\033[H")  // Move cursor to home position
-
-		// Print the final output
-		fmt.Print(p.finalOutput)
-		fmt.Println()
+		// UI stays visible in alternate screen buffer
 	}
 }
 
