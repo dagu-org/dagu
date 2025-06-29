@@ -301,7 +301,12 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([
 		var dest *DAG
 		if baseDef != nil {
 			// Build a new base DAG for this document
-			baseDAG, err := build(ctx, baseDef)
+			buildCtx := ctx
+			// Don't parse parameters for the base DAG
+			buildCtx.opts.Parameters = ""
+			buildCtx.opts.ParametersList = nil
+			// Build the base DAG
+			baseDAG, err := build(buildCtx, baseDef)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build base DAG for document %d: %w", docIndex, err)
 			}
