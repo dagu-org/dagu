@@ -355,13 +355,19 @@ func TestPromptForParamsReturnsInput(t *testing.T) {
 
 func TestConfirmRunDAG(t *testing.T) {
 	t.Run("AcceptWithY", func(t *testing.T) {
-		// Mock stdin with "y"
+		// Mock stdin and stdout
 		oldStdin := os.Stdin
+		oldStdout := os.Stdout
 		r, w, _ := os.Pipe()
 		os.Stdin = r
+		// Redirect stdout to prevent interference with test output
+		_, stdoutW, _ := os.Pipe()
+		os.Stdout = stdoutW
 		defer func() {
 			os.Stdin = oldStdin
+			os.Stdout = oldStdout
 			_ = r.Close()
+			_ = stdoutW.Close()
 		}()
 
 		go func() {
@@ -375,13 +381,19 @@ func TestConfirmRunDAG(t *testing.T) {
 	})
 
 	t.Run("AcceptWithYes", func(t *testing.T) {
-		// Mock stdin with "yes"
+		// Mock stdin and stdout
 		oldStdin := os.Stdin
+		oldStdout := os.Stdout
 		r, w, _ := os.Pipe()
 		os.Stdin = r
+		// Redirect stdout to prevent interference with test output
+		_, stdoutW, _ := os.Pipe()
+		os.Stdout = stdoutW
 		defer func() {
 			os.Stdin = oldStdin
+			os.Stdout = oldStdout
 			_ = r.Close()
+			_ = stdoutW.Close()
 		}()
 
 		go func() {
@@ -395,13 +407,19 @@ func TestConfirmRunDAG(t *testing.T) {
 	})
 
 	t.Run("AcceptWithEmpty", func(t *testing.T) {
-		// Mock stdin with empty (just Enter)
+		// Mock stdin and stdout
 		oldStdin := os.Stdin
+		oldStdout := os.Stdout
 		r, w, _ := os.Pipe()
 		os.Stdin = r
+		// Redirect stdout to prevent interference with test output
+		_, stdoutW, _ := os.Pipe()
+		os.Stdout = stdoutW
 		defer func() {
 			os.Stdin = oldStdin
+			os.Stdout = oldStdout
 			_ = r.Close()
+			_ = stdoutW.Close()
 		}()
 
 		go func() {
@@ -415,13 +433,19 @@ func TestConfirmRunDAG(t *testing.T) {
 	})
 
 	t.Run("RejectWithN", func(t *testing.T) {
-		// Mock stdin with "n"
+		// Mock stdin and stdout
 		oldStdin := os.Stdin
+		oldStdout := os.Stdout
 		r, w, _ := os.Pipe()
 		os.Stdin = r
+		// Redirect stdout to prevent interference with test output
+		_, stdoutW, _ := os.Pipe()
+		os.Stdout = stdoutW
 		defer func() {
 			os.Stdin = oldStdin
+			os.Stdout = oldStdout
 			_ = r.Close()
+			_ = stdoutW.Close()
 		}()
 
 		go func() {
@@ -435,13 +459,19 @@ func TestConfirmRunDAG(t *testing.T) {
 	})
 
 	t.Run("RejectWithNo", func(t *testing.T) {
-		// Mock stdin with "no"
+		// Mock stdin and stdout
 		oldStdin := os.Stdin
+		oldStdout := os.Stdout
 		r, w, _ := os.Pipe()
 		os.Stdin = r
+		// Redirect stdout to prevent interference with test output
+		_, stdoutW, _ := os.Pipe()
+		os.Stdout = stdoutW
 		defer func() {
 			os.Stdin = oldStdin
+			os.Stdout = oldStdout
 			_ = r.Close()
+			_ = stdoutW.Close()
 		}()
 
 		go func() {
