@@ -789,9 +789,15 @@ func (p *ProgressTeaDisplay) Stop() {
 		// Wait for the program to exit
 		<-p.done
 
-		// After alternate screen is cleared by Bubble Tea, print the final output
-		// Small delay to ensure clean transition
+		// After alternate screen is cleared by Bubble Tea
+		// Small delay to ensure alternate screen is fully exited
 		time.Sleep(50 * time.Millisecond)
+
+		// Clear the restored terminal content
+		fmt.Print("\033[2J") // Clear entire screen
+		fmt.Print("\033[H")  // Move cursor to home position
+
+		// Print the final output
 		fmt.Print(p.finalOutput)
 		fmt.Println()
 	}
