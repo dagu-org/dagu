@@ -156,7 +156,8 @@ func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case FinalizeMsg:
 		m.finalized = true
-		return m, tea.Quit
+		// Don't quit immediately - wait for user input
+		return m, nil
 
 	case spinner.TickMsg:
 		var cmd tea.Cmd
@@ -168,6 +169,11 @@ func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			m.finalized = true
 			return m, tea.Quit
+		default:
+			// If finalized, any key press exits
+			if m.finalized {
+				return m, tea.Quit
+			}
 		}
 	}
 
@@ -176,10 +182,8 @@ func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the display
 func (m ProgressModel) View() string {
-	if m.finalized {
-		// Render final state
-		return m.renderFinalState()
-	}
+	// Always use the same rendering logic whether finalized or not
+	// This ensures the user sees the final state clearly
 
 	var sections []string
 
@@ -196,14 +200,21 @@ func (m ProgressModel) View() string {
 		sections = append(sections, running)
 	}
 
-	// Recently completed
-	if completed := m.renderRecentlyCompleted(); completed != "" {
-		sections = append(sections, completed)
-	}
+	// Show different sections based on finalized state
+	if m.finalized {
+		// Show all completed steps when finalized
+		if completed := m.renderAllCompleted(); completed != "" {
+			sections = append(sections, completed)
+		}
+	} else {
+		// Show recently completed and queued when running
+		if completed := m.renderRecentlyCompleted(); completed != "" {
+			sections = append(sections, completed)
+		}
 
-	// Queued
-	if queued := m.renderQueued(); queued != "" {
-		sections = append(sections, queued)
+		if queued := m.renderQueued(); queued != "" {
+			sections = append(sections, queued)
+		}
 	}
 
 	// Child DAGs
@@ -244,29 +255,6 @@ func (m *ProgressModel) updateNode(node *models.Node) {
 	}
 }
 
-func (m ProgressModel) renderFinalState() string {
-	var sections []string
-
-	sections = append(sections, m.renderHeader())
-
-	if bar := m.renderProgressBar(); bar != "" {
-		sections = append(sections, bar)
-	}
-
-	// Show all completed nodes in final state
-	if completed := m.renderAllCompleted(); completed != "" {
-		sections = append(sections, completed)
-	}
-
-	if children := m.renderChildDAGs(); children != "" {
-		sections = append(sections, children)
-	}
-
-	// Add extra spacing at the end
-	sections = append(sections, "\n\n")
-
-	return strings.Join(sections, "\n\n")
-}
 
 func (m ProgressModel) renderHeader() string {
 	elapsed := time.Since(m.startTime)
@@ -568,6 +556,19 @@ func (m ProgressModel) renderChildDAGs() string {
 }
 
 func (m ProgressModel) renderFooter() string {
+	if m.finalized {
+		status := m.getOverallStatus()
+		switch status {
+		case scheduler.StatusSuccess:
+			return m.successStyle.Render("✓ Execution completed successfully. Press any key to exit.")
+		case scheduler.StatusError:
+			return m.errorStyle.Render("✗ Execution failed. Press any key to exit.")
+		case scheduler.StatusCancel:
+			return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("⚠ Execution cancelled. Press any key to exit.")
+		default:
+			return m.boldStyle.Render("Execution finished. Press any key to exit.")
+		}
+	}
 	return m.faintStyle.Render("Press Ctrl+C to stop")
 }
 
@@ -750,8 +751,15 @@ func NewProgressTeaDisplay(dag *digraph.DAG) *ProgressTeaDisplay {
 
 // Start initializes and runs the Bubble Tea program
 func (p *ProgressTeaDisplay) Start() {
-	p.program = tea.NewProgram(p.model, tea.WithAltScreen())
+	p.program = tea.NewProgram(p.model, 
+		tea.WithAltScreen(),
+		tea.WithMouseCellMotion(), // This helps with cursor handling
+	)
 	go func() {
+		defer func() {
+			// Ensure cursor is visible if program crashes
+			fmt.Print("\033[?25h")
+		}()
 		_, _ = p.program.Run()
 	}()
 }
@@ -763,6 +771,8 @@ func (p *ProgressTeaDisplay) Stop() {
 		// Give it a moment to render final state
 		time.Sleep(100 * time.Millisecond)
 	}
+	// Always ensure cursor is visible when stopping
+	fmt.Print("\033[?25h")
 }
 
 // UpdateNode sends a node update to the display
