@@ -184,8 +184,9 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			attempt, err = s.dagRunStore.FindAttempt(ctx, data)
 			if err != nil {
 				logger.Error(ctx, "Failed to find run", "err", err, "data", data)
-				// If the attempt doesn't exist at all, mark as invalid
+				// If the attempt doesn't exist at all, mark as discard
 				if errors.Is(err, models.ErrDAGRunIDNotFound) {
+					logger.Error(ctx, "DAG run not found, marking as discard", "data", data)
 					result = models.QueuedItemProcessingResultDiscard
 				}
 				goto SEND_RESULT
@@ -261,6 +262,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 					goto SEND_RESULT
 				}
 				if status.Status != scheduler.StatusQueued {
+					logger.Info(ctx, "DAG run is no longer queued", "data", data, "status", status.Status)
 					result = models.QueuedItemProcessingResultDiscard
 					break WAIT_FOR_RUN
 				}

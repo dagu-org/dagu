@@ -33,8 +33,72 @@
       "description": "Specifies candidate .env files to load environment variables from. By default, no env files are loaded unless explicitly specified."
     },
     "schedule": {
-      "type": "string",
-      "description": "Cron expression that determines how often the DAG triggers (e.g., '5 4 * * *' runs daily at 04:05). If omitted, the DAG will only run manually."
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Single cron expression for starting the DAG (e.g., '5 4 * * *' runs daily at 04:05)"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Multiple cron expressions for starting the DAG at different times"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "start": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Single cron expression for starting the DAG"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Multiple cron expressions for starting the DAG"
+                }
+              ]
+            },
+            "stop": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Single cron expression for stopping the DAG"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Multiple cron expressions for stopping the DAG"
+                }
+              ]
+            },
+            "restart": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Single cron expression for restarting the DAG"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Multiple cron expressions for restarting the DAG"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "description": "Advanced scheduling with separate start, stop, and restart schedules"
+        }
+      ],
+      "description": "Schedule configuration for the DAG. Can be a simple cron expression, multiple cron expressions, or an object with start/stop/restart schedules. If omitted, the DAG will only run manually."
     },
     "skipIfSuccessful": {
       "type": "boolean",
