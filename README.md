@@ -35,6 +35,26 @@ After managing hundreds of cron jobs across multiple servers, I built Dagu to br
 2. **Zero foot‑print.** One static binary; no databases, brokers, or sidecars.  
 3. **Bring‑your‑own language.** Bash, Python, Go, or anything just works.
 
+## Recent Updates
+
+### v1.17.4
+- **Interactive DAG Selection**: Run `dagu start` without arguments to select DAGs interactively
+- **OpenTelemetry Support**: Distributed tracing with W3C trace context propagation (requested by [@jeremydelattre59](https://github.com/jeremydelattre59))
+- **Windows Support (Beta)**: Initial PowerShell and cmd.exe compatibility - basic functionality works but may have limitations ([@pdoronila](https://github.com/pdoronila))
+- **Scheduler Refactoring**: Improved maintainability ([@thefishhat](https://github.com/thefishhat))
+
+### v1.17.0
+- **Hierarchical DAG Execution**: Nest workflows with parameter passing and output bubbling
+- **Multiple DAGs in Single File**: Define workflows together using `---` separator
+- **Parallel Execution**: Run steps or sub-DAGs in parallel with different parameters
+- **Enhanced Web UI**: Performance improvements and better user interface
+- **One-click Step Re-run**: Retry individual steps without re-running entire workflow ([@thefishhat](https://github.com/thefishhat))
+- **Advanced Repeat Policy**: Conditional repeats with output matching ([@thefishhat](https://github.com/thefishhat))
+- **Queue Management**: Enqueue DAGs with custom run IDs ([@kriyanshii](https://github.com/kriyanshii))
+- **Docker Improvements**: Optimized images and better container support ([@jerry-yuan](https://github.com/jerry-yuan), [@vnghia](https://github.com/vnghia))
+
+[Full changelog →](https://docs.dagu.cloud/reference/changelog)
+
 ## Features
 
 - [DAG definition](https://docs.dagu.cloud/writing-workflows/examples/) - Express complex dependencies in readable YAML
