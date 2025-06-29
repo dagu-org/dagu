@@ -744,6 +744,7 @@ type ProgressTeaDisplay struct {
 	model        ProgressModel
 	useAltScreen bool
 	done         chan struct{}
+	finalOutput  string
 }
 
 // NewProgressTeaDisplay creates a new Bubble Tea-based progress display
@@ -758,8 +759,8 @@ func NewProgressTeaDisplay(dag *digraph.DAG) *ProgressTeaDisplay {
 
 // Start initializes and runs the Bubble Tea program
 func (p *ProgressTeaDisplay) Start() {
-	// Don't use alternate screen - keep output in main terminal
-	p.program = tea.NewProgram(p.model)
+	// Use alternate screen for full screen display
+	p.program = tea.NewProgram(p.model, tea.WithAltScreen())
 	go func() {
 		defer func() {
 			// Ensure cursor is visible and mouse tracking is disabled if program crashes
@@ -768,7 +769,6 @@ func (p *ProgressTeaDisplay) Start() {
 			fmt.Print("\033[?1002l") // Disable mouse cell motion tracking
 			fmt.Print("\033[?1003l") // Disable all mouse tracking
 			fmt.Print("\033[?1006l") // Disable SGR mouse mode
-			fmt.Println()            // Add newline to separate from next prompt
 			// Signal that the program has exited
 			close(p.done)
 		}()
@@ -779,15 +779,25 @@ func (p *ProgressTeaDisplay) Start() {
 // Stop gracefully stops the display
 func (p *ProgressTeaDisplay) Stop() {
 	if p.program != nil {
+		// Capture the final model state before sending finalize
+		p.model.finalized = true
+		p.model.finishTime = time.Now()
+		p.finalOutput = p.model.View()
+
 		p.program.Send(FinalizeMsg{})
-		// Wait for user to press a key and the program to exit
+		// Wait for the program to exit
 		<-p.done
+
+		// Print the final output to keep it visible
+		fmt.Print(p.finalOutput)
+		fmt.Println()
 	}
 }
 
 // UpdateNode sends a node update to the display
 func (p *ProgressTeaDisplay) UpdateNode(node *models.Node) {
 	if p.program != nil {
+		p.model.updateNode(node)
 		p.program.Send(NodeUpdateMsg{Node: node})
 	}
 }
@@ -795,6 +805,7 @@ func (p *ProgressTeaDisplay) UpdateNode(node *models.Node) {
 // UpdateStatus sends a status update to the display
 func (p *ProgressTeaDisplay) UpdateStatus(status *models.DAGRunStatus) {
 	if p.program != nil {
+		p.model.status = status
 		p.program.Send(StatusUpdateMsg{Status: status})
 	}
 }
