@@ -788,6 +788,10 @@ func (p *ProgressTeaDisplay) Stop() {
 		// Wait for the program to exit
 		<-p.done
 
+		// Clear the terminal and move cursor to top before printing final output
+		fmt.Print("\033[2J") // Clear entire screen
+		fmt.Print("\033[H")  // Move cursor to home position (top-left)
+
 		// Print the final output to keep it visible
 		fmt.Print(p.finalOutput)
 		fmt.Println()
