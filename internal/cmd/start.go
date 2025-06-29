@@ -7,10 +7,12 @@ import (
 	"path/filepath"
 
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/cmd/dagpicker"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
@@ -46,7 +48,7 @@ Example:
 
 This command parses the DAG definition, resolves parameters, and initiates the DAG-run execution.
 `,
-			Args: cobra.MinimumNArgs(1),
+			Args: cobra.ArbitraryArgs,
 		}, startFlags, runStart,
 	)
 }
@@ -163,8 +165,44 @@ func getDAGRunInfo(ctx *Context) (dagRunID, rootDAGRun, parentDAGRun string, isC
 
 // loadDAGWithParams loads the DAG and its parameters from command arguments
 func loadDAGWithParams(ctx *Context, args []string) (*digraph.DAG, string, error) {
+	var dagPath string
+	var interactiveParams string
+
+	// Check if DAG path is provided
 	if len(args) == 0 {
-		return nil, "", fmt.Errorf("DAG file path is required")
+		// Check if we're in an interactive terminal
+		if !term.IsTerminal(int(os.Stdin.Fd())) {
+			return nil, "", fmt.Errorf("DAG file path is required")
+		}
+
+		// Use interactive picker
+		logger.Info(ctx, "No DAG specified, opening interactive selector...")
+
+		// Get DAG store
+		dagStore, err := ctx.dagStore(nil, nil)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to initialize DAG store: %w", err)
+		}
+
+		// Load DAG metadata first to pass to the picker
+		// This will be updated when user selects a DAG
+		var tempDAG *digraph.DAG
+
+		// Show unified interactive UI
+		result, err := dagpicker.PickDAGInteractive(ctx, dagStore, tempDAG)
+		if err != nil {
+			return nil, "", err
+		}
+
+		if result.Cancelled {
+			fmt.Println("DAG execution cancelled.")
+			os.Exit(0)
+		}
+
+		dagPath = result.DAGPath
+		interactiveParams = result.Params
+	} else {
+		dagPath = args[0]
 	}
 
 	// Prepare load options with base configuration
@@ -178,9 +216,13 @@ func loadDAGWithParams(ctx *Context, args []string) (*digraph.DAG, string, error
 	var err error
 
 	// Check if parameters are provided after "--"
-	if argsLenAtDash := ctx.Command.ArgsLenAtDash(); argsLenAtDash != -1 {
+	if argsLenAtDash := ctx.Command.ArgsLenAtDash(); argsLenAtDash != -1 && len(args) > 0 {
 		// Get parameters from command line arguments after "--"
 		loadOpts = append(loadOpts, digraph.WithParams(args[argsLenAtDash:]))
+	} else if interactiveParams != "" {
+		// Use interactive parameters
+		loadOpts = append(loadOpts, digraph.WithParams(stringutil.RemoveQuotes(interactiveParams)))
+		params = interactiveParams
 	} else {
 		// Get parameters from flags
 		params, err = ctx.Command.Flags().GetString("params")
@@ -191,9 +233,9 @@ func loadDAGWithParams(ctx *Context, args []string) (*digraph.DAG, string, error
 	}
 
 	// Load the DAG from the specified file
-	dag, err := digraph.Load(ctx, args[0], loadOpts...)
+	dag, err := digraph.Load(ctx, dagPath, loadOpts...)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
+		return nil, "", fmt.Errorf("failed to load DAG from %s: %w", dagPath, err)
 	}
 
 	return dag, params, nil

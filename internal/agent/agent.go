@@ -104,7 +104,7 @@ type Agent struct {
 	isChildDAGRun atomic.Bool
 
 	// progressDisplay is the progress display for showing real-time execution progress.
-	progressDisplay *ProgressDisplay
+	progressDisplay ProgressReporter
 
 	// stepRetry is the name of the step to retry, if specified.
 	stepRetry string
@@ -163,9 +163,7 @@ func New(
 
 	// Initialize progress display if enabled
 	if opts.ProgressDisplay {
-		a.progressDisplay = NewProgressDisplay(os.Stderr, dag)
-		// Set initial DAG run info
-		a.progressDisplay.SetDAGRunInfo(dagRunID, strings.Join(dag.Params, " "))
+		a.progressDisplay = createProgressReporter(dag, dagRunID, dag.Params)
 	}
 
 	return a
