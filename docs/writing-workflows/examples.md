@@ -315,6 +315,29 @@ Handle non-critical failures gracefully.
 
 <div class="example-card">
 
+### Continue on Skipped
+
+```yaml
+steps:
+  - name: optional-feature
+    command: ./enable-feature.sh
+    preconditions:
+      - condition: "${FEATURE_FLAG}"
+        expected: "enabled"
+    continueOn:
+      skipped: true
+  - name: main-process
+    command: ./process.sh
+```
+
+Continue workflow when preconditions aren't met.
+
+<a href="/writing-workflows/control-flow#continue-on-skipped" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
 ### Retry on Failure
 
 ```yaml
