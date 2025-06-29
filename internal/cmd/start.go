@@ -199,7 +199,7 @@ func loadDAGWithParams(ctx *Context, args []string) (*digraph.DAG, string, error
 			os.Exit(0)
 		}
 
-		dagPath = result.DAGName
+		dagPath = result.DAGPath
 		interactiveParams = result.Params
 	} else {
 		dagPath = args[0]

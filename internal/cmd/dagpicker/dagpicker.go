@@ -83,6 +83,7 @@ type Model struct {
 // Result contains the final selections
 type Result struct {
 	DAGName   string
+	DAGPath   string
 	Params    string
 	Cancelled bool
 }
@@ -411,6 +412,7 @@ func PickDAGInteractive(ctx context.Context, dagStore models.DAGStore, dag *digr
 
 	return Result{
 		DAGName:   finalM.choice.Name,
+		DAGPath:   finalM.choice.Path,
 		Params:    finalM.params,
 		Cancelled: false,
 	}, nil
@@ -427,7 +429,7 @@ func PickDAG(ctx context.Context, dagStore models.DAGStore) (string, error) {
 		fmt.Println("No DAG selected.")
 		os.Exit(0)
 	}
-	return result.DAGName, nil
+	return result.DAGPath, nil
 }
 
 // PromptForParams prompts the user to enter parameters for a DAG
