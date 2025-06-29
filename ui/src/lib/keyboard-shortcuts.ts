@@ -38,7 +38,12 @@ export function shouldIgnoreKeyboardShortcuts(): boolean {
     activeElement.closest('[class*="editor"]') ||
     activeElement.closest('[data-mode-id]') ||
     activeElement.closest('.view-line') ||
-    activeElement.closest('.monaco-editor')
+    activeElement.closest('.monaco-editor') ||
+    activeElement.closest('.monaco-scrollable-element') ||
+    activeElement.closest('.lines-content') ||
+    activeElement.closest('.view-zones') ||
+    activeElement.matches('[data-mprt]') ||
+    activeElement.closest('.decorationsOverviewRuler')
   ) {
     return true;
   }
