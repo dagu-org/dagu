@@ -28,6 +28,11 @@ Run a DAG workflow.
 dagu start [options] DAG_NAME_OR_FILE [-- PARAMS...]
 ```
 
+**Interactive Mode:**
+- If no DAG file is specified, opens an interactive selector
+- Only available in terminal (TTY) environments
+- Shows enhanced progress display during execution
+
 **Options:**
 - `--params, -p` - Parameters as JSON
 - `--run-id, -r` - Custom run ID
@@ -36,6 +41,9 @@ dagu start [options] DAG_NAME_OR_FILE [-- PARAMS...]
 ```bash
 # Basic run
 dagu start my-workflow.yaml
+
+# Interactive mode (no file specified)
+dagu start
 
 # With parameters (note the -- separator)
 dagu start etl.yaml -- DATE=2024-01-01 ENV=prod

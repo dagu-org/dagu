@@ -36,6 +36,9 @@ dagu version
 # Basic execution
 dagu start my-workflow.yaml
 
+# Interactive DAG selection (when no file is specified)
+dagu start
+
 # With named parameters (use -- separator)
 dagu start etl.yaml -- DATE=2024-01-01 ENV=prod
 
@@ -133,6 +136,19 @@ dagu server --host=0.0.0.0 --port=9000
 # Custom DAGs directory
 dagu server --dags=/path/to/directory
 ```
+
+### Interactive DAG Selection
+
+When you run `dagu start` without specifying a DAG file, an interactive selector appears:
+
+```bash
+dagu start
+```
+
+Features:
+- Browse available DAGs with filtering
+- Enter parameters interactively
+- Confirm before execution
 
 ## Advanced Usage
 
