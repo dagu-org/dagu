@@ -759,7 +759,7 @@ func NewProgressTeaDisplay(dag *digraph.DAG) *ProgressTeaDisplay {
 
 // Start initializes and runs the Bubble Tea program
 func (p *ProgressTeaDisplay) Start() {
-	// Use alternate screen for full screen display
+	// Use Bubble Tea's alternate screen management
 	p.program = tea.NewProgram(p.model, tea.WithAltScreen())
 	go func() {
 		defer func() {
@@ -772,6 +772,7 @@ func (p *ProgressTeaDisplay) Start() {
 			// Signal that the program has exited
 			close(p.done)
 		}()
+
 		_, _ = p.program.Run()
 	}()
 }
@@ -779,7 +780,7 @@ func (p *ProgressTeaDisplay) Start() {
 // Stop gracefully stops the display
 func (p *ProgressTeaDisplay) Stop() {
 	if p.program != nil {
-		// Capture the final model state before sending finalize
+		// Update the model to finalized state and capture final output
 		p.model.finalized = true
 		p.model.finishTime = time.Now()
 		p.finalOutput = p.model.View()
@@ -788,11 +789,9 @@ func (p *ProgressTeaDisplay) Stop() {
 		// Wait for the program to exit
 		<-p.done
 
-		// Clear the terminal and move cursor to top before printing final output
-		fmt.Print("\033[2J") // Clear entire screen
-		fmt.Print("\033[H")  // Move cursor to home position (top-left)
-
-		// Print the final output to keep it visible
+		// After alternate screen is cleared by Bubble Tea, print the final output
+		// Small delay to ensure clean transition
+		time.Sleep(50 * time.Millisecond)
 		fmt.Print(p.finalOutput)
 		fmt.Println()
 	}
