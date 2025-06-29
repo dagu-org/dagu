@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
@@ -49,9 +48,10 @@ func (i DAGItem) Description() string {
 	desc := i.Desc
 	if i.Params != "" {
 		if desc != "" {
-			desc += " • "
+			desc += " | params: " + i.Params
+		} else {
+			desc = "params: " + i.Params
 		}
-		desc += "params: " + i.Params
 	}
 	return desc
 }
@@ -226,6 +226,8 @@ func (m Model) View() string {
 		return m.viewParamInput()
 	case StateConfirming:
 		return m.viewConfirmation()
+	case StateDone:
+		return ""
 	default:
 		return ""
 	}
@@ -307,82 +309,6 @@ type pickerModel struct {
 	dagMap   map[string]*digraph.DAG
 }
 
-// customDelegate implements list.ItemDelegate with custom rendering
-type customDelegate struct{}
-
-func (d customDelegate) Height() int                             { return 3 } // Increased height for params
-func (d customDelegate) Spacing() int                            { return 0 }
-func (d customDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
-
-func (d customDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
-	item, ok := listItem.(DAGItem)
-	if !ok {
-		return
-	}
-
-	// Buffer output to ensure atomic writes
-	var buf strings.Builder
-
-	// Styles for selected/unselected items
-	var nameStyle, descStyle, paramStyle, tagStyle lipgloss.Style
-	prefix := "  "
-
-	if index == m.Index() {
-		nameStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("170")).
-			Bold(true)
-		descStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("245")).
-			MarginLeft(4)
-		paramStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("214")).
-			MarginLeft(4).
-			Italic(true)
-		tagStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("243")).
-			Italic(true)
-		prefix = "> "
-	} else {
-		nameStyle = lipgloss.NewStyle()
-		descStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241")).
-			MarginLeft(4)
-		paramStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("243")).
-			MarginLeft(4).
-			Italic(true)
-		tagStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("240")).
-			Italic(true)
-	}
-
-	// Format the name line
-	buf.WriteString(prefix)
-	buf.WriteString(nameStyle.Render(item.Name))
-
-	// Add tags if present
-	if len(item.Tags) > 0 {
-		buf.WriteString(" ")
-		buf.WriteString(tagStyle.Render("[" + strings.Join(item.Tags, ", ") + "]"))
-	}
-	buf.WriteString("\n")
-
-	// Show description if available
-	if item.Desc != "" {
-		buf.WriteString(descStyle.Render(item.Desc))
-		buf.WriteString("\n")
-	}
-
-	// Show parameters if available
-	if item.Params != "" {
-		buf.WriteString(paramStyle.Render("params: " + item.Params))
-		buf.WriteString("\n")
-	}
-
-	// Write buffered output
-	_, _ = w.Write([]byte(buf.String()))
-}
-
 // PickDAGInteractive shows a unified fullscreen UI for DAG selection, parameter input, and confirmation
 func PickDAGInteractive(ctx context.Context, dagStore models.DAGStore, dag *digraph.DAG) (Result, error) {
 	// Create an internal picker model
@@ -433,8 +359,7 @@ func PickDAGInteractive(ctx context.Context, dagStore models.DAGStore, dag *digr
 	}
 
 	// Create list with custom delegate for better rendering
-	delegate := customDelegate{}
-	l := list.New(items, delegate, 80, 20) // Default size for reasonable display
+	l := list.New(items, list.NewDefaultDelegate(), 80, 20)
 	l.Title = "Select a DAG to run"
 	l.SetShowStatusBar(true)
 	l.SetStatusBarItemName("DAG", "DAGs")
@@ -464,7 +389,7 @@ func PickDAGInteractive(ctx context.Context, dagStore models.DAGStore, dag *digr
 	}
 
 	// Use the default delegate since we'll handle DAG updates differently
-	m.list.SetDelegate(customDelegate{})
+	m.list.SetDelegate(list.NewDefaultDelegate())
 
 	// Run the picker
 	p := tea.NewProgram(m, tea.WithAltScreen())

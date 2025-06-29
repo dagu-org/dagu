@@ -27,7 +27,7 @@ func TestDAGItem(t *testing.T) {
 		}
 
 		assert.Equal(t, "test-dag [test, example]", item.Title())
-		assert.Equal(t, "Test DAG description • params: KEY1=value1 KEY2=value2", item.Description())
+		assert.Equal(t, "Test DAG description | params: KEY1=value1 KEY2=value2", item.Description())
 		assert.Equal(t, "test-dag", item.FilterValue())
 	})
 
