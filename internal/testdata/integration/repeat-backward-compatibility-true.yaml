@@ -1,0 +1,8 @@
+name: repeat-backward-compatibility-true
+steps:
+  - name: repeat-step
+    command: echo "Boolean true compatibility test"
+    repeatPolicy:
+      repeat: true
+      limit: 4
+      intervalSec: 0

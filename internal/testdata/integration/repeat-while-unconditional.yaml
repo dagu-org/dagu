@@ -1,0 +1,8 @@
+name: repeat-while-unconditional
+steps:
+  - name: repeat-step
+    command: echo "Unconditional while loop using boolean mode"
+    repeatPolicy:
+      repeat: true
+      limit: 3
+      intervalSec: 0
