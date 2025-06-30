@@ -426,13 +426,105 @@ func TestBuildStep(t *testing.T) {
 	t.Run("RepeatPolicy", func(t *testing.T) {
 		t.Parallel()
 
+		// Test basic boolean repeat (backward compatibility)
 		th := testLoad(t, "repeat_policy.yaml")
 		assert.Len(t, th.Steps, 1)
 		require.NotNil(t, th.Steps[0].RepeatPolicy)
 		assert.Equal(t, digraph.RepeatModeWhile, th.Steps[0].RepeatPolicy.Repeat)
 		assert.Equal(t, 60*time.Second, th.Steps[0].RepeatPolicy.Interval)
+		assert.Equal(t, 0, th.Steps[0].RepeatPolicy.Limit) // No limit set
 	})
+
+	t.Run("RepeatPolicyWhileCondition", func(t *testing.T) {
+		t.Parallel()
+
+		th := testLoad(t, "repeat_policy_while_condition.yaml")
+		assert.Len(t, th.Steps, 1)
+		repeatPolicy := th.Steps[0].RepeatPolicy
+		require.NotNil(t, repeatPolicy)
+		assert.Equal(t, digraph.RepeatModeWhile, repeatPolicy.Repeat)
+		require.NotNil(t, repeatPolicy.Condition)
+		assert.Equal(t, "echo hello", repeatPolicy.Condition.Condition)
+		assert.Equal(t, "", repeatPolicy.Condition.Expected) // No expected value for while mode
+		assert.Equal(t, 5*time.Second, repeatPolicy.Interval)
+		assert.Equal(t, 3, repeatPolicy.Limit)
+	})
+
+	t.Run("RepeatPolicyUntilCondition", func(t *testing.T) {
+		t.Parallel()
+
+		th := testLoad(t, "repeat_policy_until_condition.yaml")
+		assert.Len(t, th.Steps, 1)
+		repeatPolicy := th.Steps[0].RepeatPolicy
+		require.NotNil(t, repeatPolicy)
+		assert.Equal(t, digraph.RepeatModeUntil, repeatPolicy.Repeat)
+		require.NotNil(t, repeatPolicy.Condition)
+		assert.Equal(t, "echo hello", repeatPolicy.Condition.Condition)
+		assert.Equal(t, "hello", repeatPolicy.Condition.Expected)
+		assert.Equal(t, 10*time.Second, repeatPolicy.Interval)
+		assert.Equal(t, 5, repeatPolicy.Limit)
+	})
+
+	t.Run("RepeatPolicyWhileExitCode", func(t *testing.T) {
+		t.Parallel()
+
+		th := testLoad(t, "repeat_policy_while_exitcode.yaml")
+		assert.Len(t, th.Steps, 1)
+		repeatPolicy := th.Steps[0].RepeatPolicy
+		require.NotNil(t, repeatPolicy)
+		assert.Equal(t, digraph.RepeatModeWhile, repeatPolicy.Repeat)
+		assert.Equal(t, []int{1, 2}, repeatPolicy.ExitCode)
+		assert.Equal(t, 15*time.Second, repeatPolicy.Interval)
+		assert.Nil(t, repeatPolicy.Condition) // No condition set
+	})
+
+	t.Run("RepeatPolicyUntilExitCode", func(t *testing.T) {
+		t.Parallel()
+
+		th := testLoad(t, "repeat_policy_until_exitcode.yaml")
+		assert.Len(t, th.Steps, 1)
+		repeatPolicy := th.Steps[0].RepeatPolicy
+		require.NotNil(t, repeatPolicy)
+		assert.Equal(t, digraph.RepeatModeUntil, repeatPolicy.Repeat)
+		assert.Equal(t, []int{0}, repeatPolicy.ExitCode)
+		assert.Equal(t, 20*time.Second, repeatPolicy.Interval)
+		assert.Nil(t, repeatPolicy.Condition) // No condition set
+	})
+
+	t.Run("RepeatPolicyBackwardCompatibilityUntil", func(t *testing.T) {
+		t.Parallel()
+
+		// Test backward compatibility: condition + expected should infer "until" mode
+		th := testLoad(t, "repeat_policy_backward_until.yaml")
+		assert.Len(t, th.Steps, 1)
+		repeatPolicy := th.Steps[0].RepeatPolicy
+		require.NotNil(t, repeatPolicy)
+		assert.Equal(t, digraph.RepeatModeUntil, repeatPolicy.Repeat)
+		require.NotNil(t, repeatPolicy.Condition)
+		assert.Equal(t, "echo hello", repeatPolicy.Condition.Condition)
+		assert.Equal(t, "hello", repeatPolicy.Condition.Expected)
+		assert.Equal(t, 25*time.Second, repeatPolicy.Interval)
+	})
+
+	t.Run("RepeatPolicyBackwardCompatibilityWhile", func(t *testing.T) {
+		t.Parallel()
+
+		// Test backward compatibility: condition only should infer "while" mode
+		th := testLoad(t, "repeat_policy_backward_while.yaml")
+		assert.Len(t, th.Steps, 1)
+		repeatPolicy := th.Steps[0].RepeatPolicy
+		require.NotNil(t, repeatPolicy)
+		assert.Equal(t, digraph.RepeatModeWhile, repeatPolicy.Repeat)
+		require.NotNil(t, repeatPolicy.Condition)
+		assert.Equal(t, "echo hello", repeatPolicy.Condition.Condition)
+		assert.Equal(t, "", repeatPolicy.Condition.Expected) // No expected value
+		assert.Equal(t, 30*time.Second, repeatPolicy.Interval)
+	})
+
 	t.Run("RepeatPolicyCondition", func(t *testing.T) {
+		t.Parallel()
+
+		// Test existing backward compatibility condition test
 		th := testLoad(t, "repeat_policy_condition.yaml")
 		assert.Len(t, th.Steps, 1)
 		repeatPolicy := th.Steps[0].RepeatPolicy
@@ -440,6 +532,8 @@ func TestBuildStep(t *testing.T) {
 		assert.Equal(t, "echo hello", repeatPolicy.Condition.Condition)
 		assert.Equal(t, "hello", repeatPolicy.Condition.Expected)
 		assert.Equal(t, 1*time.Second, repeatPolicy.Interval)
+		// Should infer "until" mode due to condition + expected
+		assert.Equal(t, digraph.RepeatModeUntil, repeatPolicy.Repeat)
 	})
 	t.Run("SignalOnStop", func(t *testing.T) {
 		t.Parallel()
@@ -475,11 +569,81 @@ func TestBuildStep(t *testing.T) {
 		assert.Equal(t, &digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Steps[0].Preconditions[0])
 	})
 	t.Run("RepeatPolicyExitCode", func(t *testing.T) {
+		t.Parallel()
+
+		// Test existing backward compatibility exitcode test
 		th := testLoad(t, "repeat_policy_exitcode.yaml")
 		assert.Len(t, th.Steps, 1)
 		repeatPolicy := th.Steps[0].RepeatPolicy
+		require.NotNil(t, repeatPolicy)
 		assert.Equal(t, []int{42}, repeatPolicy.ExitCode)
 		assert.Equal(t, 2*time.Second, repeatPolicy.Interval)
+		// Should infer "while" mode due to exitCode only
+		assert.Equal(t, digraph.RepeatModeWhile, repeatPolicy.Repeat)
+	})
+
+	t.Run("RepeatPolicyErrorCases", func(t *testing.T) {
+		t.Parallel()
+
+		// Test invalid repeat value
+		data := []byte(`
+name: test-invalid-repeat
+steps:
+  - name: "invalid-repeat"
+    command: "echo test"
+    repeatPolicy:
+      repeat: "invalid"
+      intervalSec: 10
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		assert.Error(t, err)
+		assert.Nil(t, dag)
+		assert.Contains(t, err.Error(), "invalid value for repeat: 'invalid'")
+
+		// Test explicit while mode without condition or exitCode
+		data = []byte(`
+name: test-while-no-condition
+steps:
+  - name: "while-no-condition"
+    command: "echo test"
+    repeatPolicy:
+      repeat: "while"
+      intervalSec: 10
+`)
+		dag, err = digraph.LoadYAML(context.Background(), data)
+		assert.Error(t, err)
+		assert.Nil(t, dag)
+		assert.Contains(t, err.Error(), "repeat mode 'while' requires either 'condition' or 'exitCode' to be specified")
+
+		// Test explicit until mode without condition or exitCode
+		data = []byte(`
+name: test-until-no-condition
+steps:
+  - name: "until-no-condition"
+    command: "echo test"
+    repeatPolicy:
+      repeat: "until"
+      intervalSec: 10
+`)
+		dag, err = digraph.LoadYAML(context.Background(), data)
+		assert.Error(t, err)
+		assert.Nil(t, dag)
+		assert.Contains(t, err.Error(), "repeat mode 'until' requires either 'condition' or 'exitCode' to be specified")
+
+		// Test invalid repeat type (not string or bool)
+		data = []byte(`
+name: test-invalid-type
+steps:
+  - name: "invalid-type"
+    command: "echo test"
+    repeatPolicy:
+      repeat: 123
+      intervalSec: 10
+`)
+		dag, err = digraph.LoadYAML(context.Background(), data)
+		assert.Error(t, err)
+		assert.Nil(t, dag)
+		assert.Contains(t, err.Error(), "invalid value for repeat")
 	})
 }
 

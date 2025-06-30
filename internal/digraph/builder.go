@@ -850,19 +850,52 @@ func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
 
 // buildRepeatPolicy sets up the repeat policy for a step.
 //
-// Semantics:
-//  1. If both "condition" and "expected" are set:
-//     - After the step runs, evaluate "condition" (may be a shell command, env var, or expression).
-//     - Compare its output to "expected". Repeat as long as the comparison does NOT match.
-//  2. If only "condition" is set (and "expected" is empty):
-//     - Repeat as long as "condition" (may be a shell command, env var, or expression) evaluates to exit code 0.
-//  3. If "exitCode" is specified (and "condition" is not set):
-//     - Repeat as long as the last step’s exit code matches any value in the list.
-//  4. If only "repeat: true", repeat unconditionally at the given interval.
+// The repeat policy supports two modes: "while" and "until", which determine when repetition stops:
+// - "while": Repeat as long as the condition is true (continues while condition matches)
+// - "until": Repeat as long as the condition is false (stops when condition matches)
 //
-// Precedence: Condition > ExitCode > Repeat.
+// Configuration options:
 //
-// This mirrors the Precondition logic for consistency.
+//  1. Explicit mode with condition:
+//     repeatPolicy:
+//     repeat: "while"  # or "until"
+//     condition: "echo test"
+//     expected: "test"  # optional, defaults to exit code 0 check
+//     intervalSec: 30
+//     limit: 10
+//
+//  2. Explicit mode with exit codes:
+//     repeatPolicy:
+//     repeat: "while"  # or "until"
+//     exitCode: [0, 1]  # repeat while/until exit code matches any in list
+//     intervalSec: 30
+//
+//  3. Boolean mode (backward compatibility):
+//     repeatPolicy:
+//     repeat: true  # equivalent to "while" mode, repeats unconditionally
+//     intervalSec: 30
+//
+//  4. Backward compatibility (mode inferred from configuration):
+//     repeatPolicy:
+//     condition: "echo test"
+//     expected: "test"     # inferred as "until" mode
+//     intervalSec: 30
+//     OR
+//     repeatPolicy:
+//     condition: "echo test"  # inferred as "while" mode (condition only)
+//     intervalSec: 30
+//     OR
+//     repeatPolicy:
+//     exitCode: [1, 2]       # inferred as "while" mode
+//     intervalSec: 30
+//
+// Validation rules:
+// - Explicit "while"/"until" modes require either 'condition' or 'exitCode' to be specified
+// - If both 'condition' and 'expected' are set, the mode defaults to "until"
+// - If only 'condition' or only 'exitCode' is set, the mode defaults to "while"
+// - Boolean true is equivalent to "while" mode with unconditional repetition
+//
+// Precedence: condition > exitCode > unconditional repeat
 func buildRepeatPolicy(_ BuildContext, def stepDef, step *Step) error {
 	if def.RepeatPolicy == nil {
 		return nil
@@ -903,6 +936,17 @@ func buildRepeatPolicy(_ BuildContext, def stepDef, step *Step) error {
 	// No repeat if mode is not determined
 	if mode == "" {
 		return nil
+	}
+
+	// Validate that explicit while/until modes have appropriate conditions
+	if rpDef.Repeat != nil {
+		// Check if mode was explicitly set (not inferred from backward compatibility)
+		switch v := rpDef.Repeat.(type) {
+		case string:
+			if (v == "while" || v == "until") && rpDef.Condition == "" && len(rpDef.ExitCode) == 0 {
+				return fmt.Errorf("repeat mode '%s' requires either 'condition' or 'exitCode' to be specified", v)
+			}
+		}
 	}
 
 	step.RepeatPolicy.Repeat = mode

@@ -1,0 +1,6 @@
+steps:
+  - name: "repeat-backward-compatibility-while"
+    command: "echo test"
+    repeatPolicy:
+      condition: "echo hello"
+      intervalSec: 30

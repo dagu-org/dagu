@@ -1,0 +1,7 @@
+steps:
+  - name: "repeat-until-exitcode"
+    command: "exit 0"
+    repeatPolicy:
+      repeat: "until"
+      exitCode: [0]
+      intervalSec: 20

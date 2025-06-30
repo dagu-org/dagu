@@ -1,0 +1,7 @@
+steps:
+  - name: "repeat-while-exitcode"
+    command: "exit 1"
+    repeatPolicy:
+      repeat: "while"
+      exitCode: [1, 2]
+      intervalSec: 15
