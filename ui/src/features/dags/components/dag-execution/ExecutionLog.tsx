@@ -51,21 +51,20 @@ const ANSI_CODES_REGEX = [
  * ExecutionLog displays the log output for a DAG run
  * Fetches log data from the API and refreshes every 30 seconds
  */
-function ExecutionLog({
-  name,
-  dagRunId,
-  dagRun,
-  stream = 'stdout',
-}: Props) {
+function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const [viewMode, setViewMode] = useState<'tail' | 'head' | 'page'>('tail');
   const [pageSize, setPageSize] = useState(1000);
   const [currentPage, setCurrentPage] = useState(1);
   const [jumpToLine, setJumpToLine] = useState<number | ''>('');
+
   // Check if the DAG is running
-  const isRunning = dagRun?.status?.status === Status.Running;
-  
-  const [isLiveMode, setIsLiveMode] = useState(isRunning);
+  const statusValue = dagRun?.status;
+  const isRunningStatus = statusValue === Status.Running;
+
+  // Default to live mode if explicitly running
+  const defaultLiveMode = isRunningStatus;
+  const [isLiveMode, setIsLiveMode] = useState(defaultLiveMode);
 
   // Keep track of previous data to prevent flashing
   const [cachedData, setCachedData] = useState<LogWithPagination | null>(null);
@@ -78,9 +77,7 @@ function ExecutionLog({
 
   // Determine if this is a child dagRun
   const isChildDAGRun =
-    dagRun &&
-    dagRun.rootDAGRunId &&
-    dagRun.rootDAGRunId !== dagRun.dagRunId;
+    dagRun && dagRun.rootDAGRunId && dagRun.rootDAGRunId !== dagRun.dagRunId;
 
   // Determine query parameters based on view mode
   const queryParams: Record<string, number | string> = {
@@ -125,7 +122,7 @@ function ExecutionLog({
       },
     },
     {
-      refreshInterval: isLiveMode && isRunning ? 2000 : 0, // 2s in live mode, 0 (disabled) otherwise
+      refreshInterval: isLiveMode ? 2000 : 0, // 2s in live mode, 0 (disabled) otherwise
       keepPreviousData: true, // Keep previous data while loading new data
       revalidateOnFocus: false, // Don't revalidate when window regains focus
       dedupingInterval: 1000, // Deduplicate requests within 1 second
@@ -358,56 +355,59 @@ function ExecutionLog({
               className={`
                 inline-flex items-center justify-center w-8 h-8 rounded-full text-xs
                 transition-all duration-200 ease-in-out
-                ${isNavigating || isLoading
-                  ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed'
-                  : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-600'
+                ${
+                  isNavigating || isLoading
+                    ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed'
+                    : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-600'
                 }
               `}
               title="Reload logs"
             >
-              <svg 
-                className={`w-4 h-4 ${isNavigating || isLoading ? 'animate-spin' : ''}`} 
-                fill="none" 
-                stroke="currentColor" 
+              <svg
+                className={`w-4 h-4 ${isNavigating || isLoading ? 'animate-spin' : ''}`}
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={2} 
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                 />
               </svg>
             </button>
 
             {/* Live mode toggle - only show when DAG is running */}
-            {isRunning && (
+            {isRunningStatus && (
               <button
                 onClick={() => setIsLiveMode(!isLiveMode)}
                 className={`
                   relative inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium
                   transition-all duration-200 ease-in-out
-                  ${isLiveMode 
-                    ? 'bg-green-500 text-white shadow-lg shadow-green-500/25' 
-                    : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-600'
+                  ${
+                    isLiveMode
+                      ? 'bg-green-500 text-white shadow-lg shadow-green-500/25'
+                      : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-600'
                   }
                 `}
               >
-                <span className={`
+                <span
+                  className={`
                   inline-block w-2 h-2 rounded-full
                   ${isLiveMode ? 'bg-white animate-pulse' : 'bg-zinc-400 dark:bg-zinc-500'}
-                `} />
+                `}
+                />
                 <span>LIVE</span>
               </button>
             )}
           </div>
         </div>
-        
+
         {/* Stats line - full width on mobile */}
         <div className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center">
           Showing {lineCount} of {totalLines} lines{' '}
-          {isEstimate ? '(estimated)' : ''}{' '}
-          {hasMore ? '(more available)' : ''}
+          {isEstimate ? '(estimated)' : ''} {hasMore ? '(more available)' : ''}
         </div>
 
         {/* Page navigation controls */}
