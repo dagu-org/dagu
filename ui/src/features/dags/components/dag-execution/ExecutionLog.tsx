@@ -65,6 +65,7 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
   // Default to live mode if explicitly running
   const defaultLiveMode = isRunningStatus;
   const [isLiveMode, setIsLiveMode] = useState(defaultLiveMode);
+  const [isReloading, setIsReloading] = useState(false);
 
   // Keep track of previous data to prevent flashing
   const [cachedData, setCachedData] = useState<LogWithPagination | null>(null);
@@ -346,25 +347,34 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
           <div className="flex items-center gap-2 ml-auto">
             {/* Reload button */}
             <button
-              onClick={() => {
+              onClick={async () => {
                 if (mutate) {
-                  mutate();
+                  setIsReloading(true);
+                  try {
+                    await mutate();
+                    // Brief success state
+                    setTimeout(() => setIsReloading(false), 500);
+                  } catch {
+                    setIsReloading(false);
+                  }
                 }
               }}
-              disabled={isNavigating || isLoading}
+              disabled={isNavigating || isLoading || isReloading}
               className={`
-                inline-flex items-center justify-center w-8 h-8 rounded-full text-xs
-                transition-all duration-200 ease-in-out
+                inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs
+                transition-all duration-200 ease-in-out transform
                 ${
-                  isNavigating || isLoading
+                  isReloading
+                    ? 'bg-blue-500 text-white scale-90'
+                    : isNavigating || isLoading
                     ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed'
-                    : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-600'
+                    : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-600 hover:scale-110 active:scale-95'
                 }
               `}
               title="Reload logs"
             >
               <svg
-                className={`w-4 h-4 ${isNavigating || isLoading ? 'animate-spin' : ''}`}
+                className={`w-4 h-4 ${isReloading || isNavigating || isLoading ? 'animate-spin' : ''} transition-transform duration-200`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
