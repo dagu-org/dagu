@@ -136,10 +136,21 @@ type RetryPolicy struct {
 	ExitCodes []int `json:"exitCode,omitempty"`
 }
 
+// RepeatMode is the type for the repeat mode.
+type RepeatMode string
+
+const (
+	// RepeatModeWhile repeats the step while the condition is met.
+	RepeatModeWhile RepeatMode = "while"
+	// RepeatModeUntil repeats the step until the condition is met.
+	RepeatModeUntil RepeatMode = "until"
+)
+
 // RepeatPolicy contains the repeat policy for a step.
 type RepeatPolicy struct {
-	// Repeat determines if the step should be repeated.
-	Repeat bool `json:"repeat,omitempty"`
+	// Repeat determines if and how the step should be repeated.
+	// It can be 'while' or 'until'.
+	Repeat RepeatMode `json:"repeat,omitempty"`
 	// Interval is the time to wait between repeats.
 	Interval time.Duration `json:"interval,omitempty"`
 	// Limit is the maximum number of times to repeat the step.

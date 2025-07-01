@@ -100,3 +100,95 @@ func TestRepeatPolicy_WithLimitReachedBeforeCondition(t *testing.T) {
 	assert.Equal(t, scheduler.NodeStatusSuccess, status.Nodes[0].Status)
 	assert.Equal(t, 3, status.Nodes[0].DoneCount, "Step should have stopped at limit of 3")
 }
+
+func TestRepeatPolicy_BooleanModeWhileUnconditional(t *testing.T) {
+	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+
+	// Load DAG with boolean repeat mode (should repeat while step succeeds, like unconditional while)
+	dag := th.DAG(t, filepath.Join("integration", "repeat-while-unconditional.yaml"))
+	agent := dag.Agent()
+
+	// Run with timeout
+	ctx, cancel := context.WithTimeout(agent.Context, 10*time.Second)
+	defer cancel()
+
+	err := agent.Run(ctx)
+	require.NoError(t, err, "DAG should complete successfully")
+
+	// Verify successful completion
+	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+
+	// Get the latest status
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+
+	// Verify the step completed successfully
+	require.Len(t, status.Nodes, 1)
+	assert.Equal(t, scheduler.NodeStatusSuccess, status.Nodes[0].Status)
+	assert.Equal(t, "repeat-step", status.Nodes[0].Step.Name)
+
+	// Verify it executed exactly 3 times (as per limit)
+	assert.Equal(t, 3, status.Nodes[0].DoneCount, "Step should have executed exactly 3 times")
+}
+
+func TestRepeatPolicy_UntilWithExitCode(t *testing.T) {
+	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+
+	// Load DAG with until mode and exitCode (should repeat until step returns exit code 0)
+	dag := th.DAG(t, filepath.Join("integration", "repeat-until-unconditional.yaml"))
+	agent := dag.Agent()
+
+	// Run with timeout
+	ctx, cancel := context.WithTimeout(agent.Context, 10*time.Second)
+	defer cancel()
+
+	err := agent.Run(ctx)
+	require.NoError(t, err, "DAG should complete successfully")
+
+	// Verify successful completion
+	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+
+	// Get the latest status
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+
+	// Verify the step completed successfully
+	require.Len(t, status.Nodes, 1)
+	assert.Equal(t, scheduler.NodeStatusSuccess, status.Nodes[0].Status)
+
+	// Verify it executed exactly 3 times (until it gets exit code 0)
+	assert.Equal(t, 3, status.Nodes[0].DoneCount, "Step should have executed exactly 3 times until exit code 0")
+}
+
+func TestRepeatPolicy_BackwardCompatibilityTrue(t *testing.T) {
+	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+
+	// Load DAG with repeat: true (should work as "while" mode)
+	dag := th.DAG(t, filepath.Join("integration", "repeat-backward-compatibility-true.yaml"))
+	agent := dag.Agent()
+
+	// Run with timeout
+	ctx, cancel := context.WithTimeout(agent.Context, 10*time.Second)
+	defer cancel()
+
+	err := agent.Run(ctx)
+	require.NoError(t, err, "DAG should complete successfully")
+
+	// Verify successful completion
+	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+
+	// Get the latest status
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+
+	// Verify the step completed successfully
+	require.Len(t, status.Nodes, 1)
+	assert.Equal(t, scheduler.NodeStatusSuccess, status.Nodes[0].Status)
+	assert.Equal(t, "repeat-step", status.Nodes[0].Step.Name)
+
+	// Verify it executed exactly 4 times (as per limit, confirming repeat: true works)
+	assert.Equal(t, 4, status.Nodes[0].DoneCount, "Step should have executed exactly 4 times")
+}

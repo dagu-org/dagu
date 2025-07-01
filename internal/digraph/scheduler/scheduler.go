@@ -450,7 +450,7 @@ func (sc *Scheduler) Signal(
 	for _, node := range graph.nodes {
 		// for a repetitive task, we'll wait for the job to finish
 		// until time reaches max wait time
-		if !node.Step().RepeatPolicy.Repeat {
+		if node.Step().RepeatPolicy.Repeat == "" {
 			node.Signal(ctx, sig, allowOverride)
 		}
 	}
@@ -867,49 +867,57 @@ func (sc *Scheduler) handleNodeExecutionError(ctx context.Context, graph *Execut
 // shouldRepeatNode determines if a node should be repeated based on its repeat policy
 func (sc *Scheduler) shouldRepeatNode(ctx context.Context, node *Node, execErr error) bool {
 	step := node.Step()
+	rp := step.RepeatPolicy
 
-	// Check if repeat limit has been reached
-	if step.RepeatPolicy.Limit > 0 && node.State().DoneCount >= step.RepeatPolicy.Limit {
+	// First, check the hard limit. This overrides everything.
+	if rp.Limit > 0 && node.State().DoneCount >= rp.Limit {
 		return false
 	}
 
-	if step.RepeatPolicy.Condition != nil {
-		return sc.evaluateRepeatCondition(ctx, node, &step)
-	}
-
-	if len(step.RepeatPolicy.ExitCode) > 0 {
-		// Repeat if last exit code matches any in ExitCode
-		lastExit := node.State().ExitCode
-		return slices.Contains(step.RepeatPolicy.ExitCode, lastExit)
-	}
-
-	if step.RepeatPolicy.Repeat {
-		// Unconditional repeat
-		return execErr == nil || step.ContinueOn.Failure
+	switch rp.Repeat {
+	case digraph.RepeatModeWhile:
+		// It's a 'while' loop. Repeat while a condition is true.
+		if rp.Condition != nil {
+			// Ensure node's own output variables are reloaded before evaluating the condition.
+			if node.inner.State.OutputVariables != nil {
+				env := executor.GetEnv(ctx)
+				env.ForceLoadOutputVariables(node.inner.State.OutputVariables)
+				ctx = executor.WithEnv(ctx, env)
+			}
+			shell := cmdutil.GetShellCommand(node.Step().Shell)
+			err := EvalCondition(ctx, shell, rp.Condition)
+			return (err == nil) // Repeat if condition is met (no error)
+		} else if len(rp.ExitCode) > 0 {
+			lastExit := node.State().ExitCode
+			return slices.Contains(rp.ExitCode, lastExit) // Repeat if exit code matches
+		} else {
+			// No specific condition, so it's an unconditional 'while'.
+			// Repeat as long as the step itself succeeds.
+			return (execErr == nil)
+		}
+	case digraph.RepeatModeUntil:
+		// It's an 'until' loop. Repeat until a condition is true.
+		if rp.Condition != nil {
+			// Ensure node's own output variables are reloaded before evaluating the condition.
+			if node.inner.State.OutputVariables != nil {
+				env := executor.GetEnv(ctx)
+				env.ForceLoadOutputVariables(node.inner.State.OutputVariables)
+				ctx = executor.WithEnv(ctx, env)
+			}
+			shell := cmdutil.GetShellCommand(node.Step().Shell)
+			err := EvalCondition(ctx, shell, rp.Condition)
+			return (err != nil) // Repeat if condition is NOT met (error)
+		} else if len(rp.ExitCode) > 0 {
+			lastExit := node.State().ExitCode
+			return !slices.Contains(rp.ExitCode, lastExit) // Repeat if exit code does NOT match
+		} else {
+			// No specific condition, so it's an unconditional 'until'.
+			// Repeat until the step itself succeeds (i.e., repeat on failure).
+			return (execErr != nil)
+		}
 	}
 
 	return false
-}
-
-// evaluateRepeatCondition evaluates the condition-based repeat policy
-func (sc *Scheduler) evaluateRepeatCondition(ctx context.Context, node *Node, step *digraph.Step) bool {
-	// Ensure node's own output variables are reloaded before evaluating the condition
-	if node.inner.State.OutputVariables != nil {
-		env := executor.GetEnv(ctx)
-		env.ForceLoadOutputVariables(node.inner.State.OutputVariables)
-		ctx = executor.WithEnv(ctx, env)
-	}
-
-	shell := cmdutil.GetShellCommand(step.Shell)
-	err := EvalCondition(ctx, shell, step.RepeatPolicy.Condition)
-
-	if step.RepeatPolicy.Condition.Expected != "" {
-		// Repeat as long as condition does NOT match expected (err != nil)
-		return err != nil
-	}
-
-	// Repeat as long as it returns exit code 0 (err == nil)
-	return err == nil
 }
 
 // prepareNodeForRepeat sets up a node for repetition

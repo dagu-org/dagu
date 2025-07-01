@@ -18,7 +18,7 @@ steps:
       fi
     output: FINAL_COUNT
     repeatPolicy:
-      repeat: true
+      repeat: until
       limit: 5
       intervalSec: 0
       condition: "`[ -f /tmp/dagu_repeat_counter_test2 ] && cat /tmp/dagu_repeat_counter_test2 || echo 0`"

@@ -815,7 +815,7 @@ func toStep(obj digraph.Step) api.Step {
 	}
 
 	repeatPolicy := api.RepeatPolicy{
-		Repeat:   ptrOf(obj.RepeatPolicy.Repeat),
+		Repeat:   ptrOf(obj.RepeatPolicy.Repeat != ""),
 		Interval: ptrOf(int(obj.RepeatPolicy.Interval.Seconds())),
 	}
 
