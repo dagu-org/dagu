@@ -6,6 +6,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { components, Status } from '../../../../api/v2/schema';
 import { Button } from '../../../../components/ui/button';
+import { ReloadButton } from '../../../../components/ui/reload-button';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
@@ -65,7 +66,6 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
   // Default to live mode if explicitly running
   const defaultLiveMode = isRunningStatus;
   const [isLiveMode, setIsLiveMode] = useState(defaultLiveMode);
-  const [isReloading, setIsReloading] = useState(false);
 
   // Keep track of previous data to prevent flashing
   const [cachedData, setCachedData] = useState<LogWithPagination | null>(null);
@@ -346,47 +346,15 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
           {/* Live mode toggle and reload button */}
           <div className="flex items-center gap-2 ml-auto">
             {/* Reload button */}
-            <button
-              onClick={async () => {
+            <ReloadButton
+              onReload={async () => {
                 if (mutate) {
-                  setIsReloading(true);
-                  try {
-                    await mutate();
-                    // Brief success state
-                    setTimeout(() => setIsReloading(false), 500);
-                  } catch {
-                    setIsReloading(false);
-                  }
+                  await mutate();
                 }
               }}
-              disabled={isNavigating || isLoading || isReloading}
-              className={`
-                inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs
-                transition-all duration-200 ease-in-out transform
-                ${
-                  isReloading
-                    ? 'bg-blue-500 text-white scale-90'
-                    : isNavigating || isLoading
-                    ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed'
-                    : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-600 hover:scale-110 active:scale-95'
-                }
-              `}
+              isLoading={isNavigating || isLoading}
               title="Reload logs"
-            >
-              <svg
-                className={`w-4 h-4 ${isReloading || isNavigating || isLoading ? 'animate-spin' : ''} transition-transform duration-200`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-            </button>
+            />
 
             {/* Live mode toggle - only show when DAG is running */}
             {isRunningStatus && (
