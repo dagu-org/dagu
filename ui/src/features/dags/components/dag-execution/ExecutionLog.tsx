@@ -4,8 +4,9 @@
  * @module features/dags/components/dag-execution
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { components } from '../../../../api/v2/schema';
+import { components, Status } from '../../../../api/v2/schema';
 import { Button } from '../../../../components/ui/button';
+import { ReloadButton } from '../../../../components/ui/reload-button';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
@@ -51,17 +52,20 @@ const ANSI_CODES_REGEX = [
  * ExecutionLog displays the log output for a DAG run
  * Fetches log data from the API and refreshes every 30 seconds
  */
-function ExecutionLog({
-  name,
-  dagRunId,
-  dagRun,
-  stream = 'stdout',
-}: Props) {
+function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const [viewMode, setViewMode] = useState<'tail' | 'head' | 'page'>('tail');
   const [pageSize, setPageSize] = useState(1000);
   const [currentPage, setCurrentPage] = useState(1);
   const [jumpToLine, setJumpToLine] = useState<number | ''>('');
+
+  // Check if the DAG is running
+  const statusValue = dagRun?.status;
+  const isRunningStatus = statusValue === Status.Running;
+
+  // Default to live mode if explicitly running
+  const defaultLiveMode = isRunningStatus;
+  const [isLiveMode, setIsLiveMode] = useState(defaultLiveMode);
 
   // Keep track of previous data to prevent flashing
   const [cachedData, setCachedData] = useState<LogWithPagination | null>(null);
@@ -74,9 +78,7 @@ function ExecutionLog({
 
   // Determine if this is a child dagRun
   const isChildDAGRun =
-    dagRun &&
-    dagRun.rootDAGRunId &&
-    dagRun.rootDAGRunId !== dagRun.dagRunId;
+    dagRun && dagRun.rootDAGRunId && dagRun.rootDAGRunId !== dagRun.dagRunId;
 
   // Determine query parameters based on view mode
   const queryParams: Record<string, number | string> = {
@@ -112,7 +114,7 @@ function ExecutionLog({
       };
 
   // Fetch log data with periodic refresh
-  const { data, isLoading, error } = useQuery(
+  const { data, isLoading, error, mutate } = useQuery(
     apiEndpoint,
     {
       params: {
@@ -121,7 +123,7 @@ function ExecutionLog({
       },
     },
     {
-      refreshInterval: 30000, // Refresh every 30 seconds
+      refreshInterval: isLiveMode ? 2000 : 0, // 2s in live mode, 0 (disabled) otherwise
       keepPreviousData: true, // Keep previous data while loading new data
       revalidateOnFocus: false, // Don't revalidate when window regains focus
       dedupingInterval: 1000, // Deduplicate requests within 1 second
@@ -340,13 +342,50 @@ function ExecutionLog({
             <option value="5000">5000 lines</option>
             <option value="10000">10000 lines</option>
           </select>
+
+          {/* Live mode toggle and reload button */}
+          <div className="flex items-center gap-2 ml-auto">
+            {/* Reload button */}
+            <ReloadButton
+              onReload={async () => {
+                if (mutate) {
+                  await mutate();
+                }
+              }}
+              isLoading={isNavigating || isLoading}
+              title="Reload logs"
+            />
+
+            {/* Live mode toggle - only show when DAG is running */}
+            {isRunningStatus && (
+              <button
+                onClick={() => setIsLiveMode(!isLiveMode)}
+                className={`
+                  relative inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium
+                  transition-all duration-200 ease-in-out
+                  ${
+                    isLiveMode
+                      ? 'bg-green-500 text-white shadow-lg shadow-green-500/25'
+                      : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-600'
+                  }
+                `}
+              >
+                <span
+                  className={`
+                  inline-block w-2 h-2 rounded-full
+                  ${isLiveMode ? 'bg-white animate-pulse' : 'bg-zinc-400 dark:bg-zinc-500'}
+                `}
+                />
+                <span>LIVE</span>
+              </button>
+            )}
+          </div>
         </div>
-        
+
         {/* Stats line - full width on mobile */}
         <div className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center">
           Showing {lineCount} of {totalLines} lines{' '}
-          {isEstimate ? '(estimated)' : ''}{' '}
-          {hasMore ? '(more available)' : ''}
+          {isEstimate ? '(estimated)' : ''} {hasMore ? '(more available)' : ''}
         </div>
 
         {/* Page navigation controls */}
