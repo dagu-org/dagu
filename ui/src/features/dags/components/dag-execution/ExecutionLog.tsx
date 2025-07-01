@@ -116,7 +116,7 @@ function ExecutionLog({
       };
 
   // Fetch log data with periodic refresh
-  const { data, isLoading, error } = useQuery(
+  const { data, isLoading, error, mutate } = useQuery(
     apiEndpoint,
     {
       params: {
@@ -345,9 +345,43 @@ function ExecutionLog({
             <option value="10000">10000 lines</option>
           </select>
 
-          {/* Live mode toggle - only show when DAG is running */}
-          {isRunning && (
-            <div className="flex items-center gap-1 ml-auto">
+          {/* Live mode toggle and reload button */}
+          <div className="flex items-center gap-2 ml-auto">
+            {/* Reload button */}
+            <button
+              onClick={() => {
+                if (mutate) {
+                  mutate();
+                }
+              }}
+              disabled={isNavigating || isLoading}
+              className={`
+                inline-flex items-center justify-center w-8 h-8 rounded-full text-xs
+                transition-all duration-200 ease-in-out
+                ${isNavigating || isLoading
+                  ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed'
+                  : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-600'
+                }
+              `}
+              title="Reload logs"
+            >
+              <svg 
+                className={`w-4 h-4 ${isNavigating || isLoading ? 'animate-spin' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth={2} 
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
+                />
+              </svg>
+            </button>
+
+            {/* Live mode toggle - only show when DAG is running */}
+            {isRunning && (
               <button
                 onClick={() => setIsLiveMode(!isLiveMode)}
                 className={`
@@ -365,8 +399,8 @@ function ExecutionLog({
                 `} />
                 <span>LIVE</span>
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
         
         {/* Stats line - full width on mobile */}
