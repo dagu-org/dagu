@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 // TestHTTPExecutor_WindowsSpecific tests the HTTP executor specifically on Windows
 func TestHTTPExecutor_WindowsSpecific(t *testing.T) {
 	// Ensure we're actually running on Windows
@@ -60,10 +59,10 @@ func TestHTTPExecutor_WindowsSpecific(t *testing.T) {
 		server := httptest.NewServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
 			assert.Equal(t, "POST", r.Method)
 			assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-			
+
 			err := json.NewDecoder(r.Body).Decode(&receivedBody)
 			require.NoError(t, err)
-			
+
 			w.WriteHeader(nethttp.StatusCreated)
 			response := map[string]interface{}{
 				"received": receivedBody,
@@ -126,11 +125,11 @@ func TestHTTPExecutor_WindowsSpecific(t *testing.T) {
 			// Verify custom headers
 			assert.Equal(t, "Bearer windows-token", r.Header.Get("Authorization"))
 			assert.Equal(t, "Dagu-Windows/1.0", r.Header.Get("User-Agent"))
-			
+
 			// Verify query parameters
 			assert.Equal(t, "windows", r.URL.Query().Get("os"))
 			assert.Equal(t, "test", r.URL.Query().Get("environment"))
-			
+
 			w.WriteHeader(nethttp.StatusOK)
 			_, _ = w.Write([]byte("Headers and params received"))
 		}))
@@ -211,7 +210,7 @@ func TestHTTPExecutor_WindowsSpecific(t *testing.T) {
 
 	t.Run("Error status codes on Windows", func(t *testing.T) {
 		testCases := []struct {
-			statusCode int
+			statusCode  int
 			expectError bool
 		}{
 			{200, false},
@@ -252,7 +251,7 @@ func TestHTTPExecutor_WindowsSpecific(t *testing.T) {
 				httpExec.SetStderr(&testWriter{})
 
 				err = httpExec.Run(context.Background())
-				
+
 				if tc.expectError {
 					assert.Error(t, err)
 					assert.Contains(t, err.Error(), "http status code not 2xx")
@@ -388,15 +387,15 @@ func TestHTTPExecutor_WindowsPerformance(t *testing.T) {
 		start := time.Now()
 		err = httpExec.Run(context.Background())
 		duration := time.Since(start)
-		
+
 		require.NoError(t, err)
 		totalDuration += duration
 	}
 
 	avgDuration := totalDuration / numRequests
 	t.Logf("Windows HTTP executor average execution time: %v", avgDuration)
-	
+
 	// Performance should be reasonable (less than 1 second for local requests)
-	assert.Less(t, avgDuration, 1*time.Second, 
+	assert.Less(t, avgDuration, 1*time.Second,
 		"HTTP executor performance on Windows seems slow: %v average", avgDuration)
 }

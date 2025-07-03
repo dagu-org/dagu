@@ -1,0 +1,10 @@
+steps:
+  - name: extract-strings-raw
+    executor: 
+      type: jq
+      config:
+        raw: true
+    script: |
+      { "messages": ["hello", "world"] }
+    command: '.messages[]'
+    output: RESULT
