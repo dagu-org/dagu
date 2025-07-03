@@ -101,7 +101,7 @@ func TrimYAMLFileExtension(filename string) string {
 	ext := filepath.Ext(filename)
 	switch ext {
 	case ymlExtension:
-		return strings.TrimSuffix(filename, ymlExtension) + yamlExtension
+		return strings.TrimSuffix(filename, ymlExtension)
 	case yamlExtension:
 		return strings.TrimSuffix(filename, yamlExtension)
 	default:
