@@ -1,0 +1,10 @@
+steps:
+  - name: extract-array-raw
+    executor: 
+      type: jq
+      config:
+        raw: true
+    script: |
+      { "data": [1, 2, 3] }
+    command: '.data[]'
+    output: RESULT

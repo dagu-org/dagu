@@ -1,0 +1,10 @@
+steps:
+  - name: extract-strings-json
+    executor: 
+      type: jq
+      config:
+        raw: false
+    script: |
+      { "messages": ["hello", "world"] }
+    command: '.messages[]'
+    output: RESULT

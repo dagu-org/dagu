@@ -82,9 +82,10 @@ func (e *jq) Run(_ context.Context) error {
 		}
 		if e.cfg.Raw {
 			s := string(val)
-			_, _ = e.stdout.Write([]byte(strings.Trim(s, `"`)))
+			_, _ = fmt.Fprintln(e.stdout, strings.Trim(s, `"`))
 		} else {
 			_, _ = e.stdout.Write(val)
+			_, _ = e.stdout.Write([]byte("\n"))
 		}
 	}
 	return nil
