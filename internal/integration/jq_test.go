@@ -62,4 +62,17 @@ func TestJQExecutor(t *testing.T) {
 			"RESULT": "\"hello\"\n\"world\"",
 		})
 	})
+
+	t.Run("TSVOutputWithRawTrue", func(t *testing.T) {
+		th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+		dag := th.DAG(t, filepath.Join("integration", "jq-raw-tsv.yaml"))
+		agent := dag.Agent()
+
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+		dag.AssertOutputs(t, map[string]any{
+			"RESULT": "1\t100\n2\t200\n3\t300",
+		})
+	})
 }

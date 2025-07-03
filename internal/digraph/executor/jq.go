@@ -75,15 +75,27 @@ func (e *jq) Run(_ context.Context) error {
 			_, _ = fmt.Fprintf(e.stderr, "failed to run jq query: %v", err)
 			continue
 		}
-		val, err := json.MarshalIndent(v, "", "    ")
-		if err != nil {
-			_, _ = fmt.Fprintf(e.stderr, "failed to marshal jq output: %v", err)
-			continue
-		}
 		if e.cfg.Raw {
-			s := string(val)
-			_, _ = fmt.Fprintln(e.stdout, strings.Trim(s, `"`))
+			// In raw mode, handle strings specially to preserve tabs, newlines, etc
+			switch v := v.(type) {
+			case string:
+				_, _ = fmt.Fprintln(e.stdout, v)
+			default:
+				// For non-strings, convert to string representation
+				val, err := json.Marshal(v)
+				if err != nil {
+					_, _ = fmt.Fprintf(e.stderr, "failed to marshal jq output: %v", err)
+					continue
+				}
+				_, _ = fmt.Fprintln(e.stdout, strings.Trim(string(val), `"`))
+			}
 		} else {
+			// In non-raw mode, use JSON formatting
+			val, err := json.MarshalIndent(v, "", "    ")
+			if err != nil {
+				_, _ = fmt.Fprintf(e.stderr, "failed to marshal jq output: %v", err)
+				continue
+			}
 			_, _ = e.stdout.Write(val)
 			_, _ = e.stdout.Write([]byte("\n"))
 		}
