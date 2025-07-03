@@ -839,11 +839,9 @@ steps:
     output: API_RESPONSE
   
   - name: extract-emails
-    executor:
-      type: jq
-      config:
-        query: '.data[] | select(.active == true) | .email'
-    command: echo "${API_RESPONSE}"
+    executor: jq
+    command: '.data[] | select(.active == true) | .email'
+    script: ${API_RESPONSE}
     output: USER_EMAILS
 ```
 
