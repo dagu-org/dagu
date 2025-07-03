@@ -200,7 +200,7 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 						"headers":  r.Header,
 						"url":      r.URL.String(),
 					}
-					
+
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(nethttp.StatusOK)
 					_ = json.NewEncoder(w).Encode(response)
@@ -234,9 +234,9 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, tc.method, response["method"])
 				assert.Equal(t, runtime.GOOS, response["platform"])
-				
+
 				// Log platform-specific information for comparison
-				t.Logf("Platform: %s, Method: %s, Response length: %d", 
+				t.Logf("Platform: %s, Method: %s, Response length: %d",
 					runtime.GOOS, tc.method, len(out.String()))
 			})
 		}
@@ -248,7 +248,7 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 			w.Header().Set("X-Test-Header", "cross-platform")
 			w.WriteHeader(nethttp.StatusOK)
 			_ = json.NewEncoder(w).Encode(map[string]string{
-				"message": "JSON response test",
+				"message":  "JSON response test",
 				"platform": runtime.GOOS,
 			})
 		}))
@@ -286,7 +286,7 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 		assert.NotEmpty(t, jsonResponse.Headers)
 		assert.Contains(t, jsonResponse.Headers, "Content-Type")
 		assert.Contains(t, jsonResponse.Headers, "X-Test-Header")
-		
+
 		// Verify response body structure
 		bodyMap, ok := jsonResponse.Body.(map[string]any)
 		assert.True(t, ok)
@@ -325,17 +325,17 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 		httpExec.SetStderr(stderr)
 
 		err = httpExec.Run(context.Background())
-		
+
 		// Error handling should be consistent across platforms
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "http status code not 2xx")
 		assert.Contains(t, err.Error(), "500")
-		
+
 		// Output should contain status information
 		output := out.String()
 		assert.Contains(t, output, "500")
 		assert.Contains(t, output, "Internal Server Error")
-		
+
 		t.Logf("Platform: %s, Error handling verified", runtime.GOOS)
 	})
 }
