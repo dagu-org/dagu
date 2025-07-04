@@ -10,6 +10,40 @@ steps:
     command: echo "Hello, World!"  # Shell executor is default
 ```
 
+## Errexit Mode (Exit on Error)
+
+Starting from v1.XX, Dagu enables the errexit flag (`-e`) by default for shell executors when no specific shell is configured. This means multi-line commands will stop execution on the first error:
+
+```yaml
+steps:
+  # Default behavior - errexit enabled
+  - name: safe-by-default
+    command: |
+      false  # This will cause the step to fail
+      echo "This won't execute"  # Script stops here
+
+  # Specify shell to control errexit
+  - name: continue-on-error
+    shell: bash  # No -e flag when shell is specified
+    command: |
+      false  # Command fails but continues
+      echo "This will execute"
+
+  # Explicitly enable errexit
+  - name: explicit-errexit
+    shell: bash -e
+    command: |
+      false  # Step fails immediately
+      echo "This won't execute"
+
+  # Disable errexit if needed
+  - name: disable-errexit
+    command: |
+      set +e  # Disable errexit
+      false  # Command fails but continues
+      echo "This will execute"
+```
+
 ## Writing Scripts
 
 ```yaml
@@ -17,7 +51,7 @@ steps:
   - name: script-example
     shell: bash  # Specify shell if needed
     script: |
-      set -e  # Exit on error
+      # No need for 'set -e' with default shell
       echo "Running script..."
       python process.py  # Run a Python script
 ```
@@ -104,7 +138,7 @@ steps:
   - name: script
     script: |
       #!/bin/bash
-      set -e
+      # errexit is enabled by default, no need for 'set -e'
       find /data -name "*.csv" -exec process {} \;
       
   # Working directory

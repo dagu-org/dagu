@@ -85,16 +85,17 @@ func (e *commandExecutor) Kill(sig os.Signal) error {
 }
 
 type commandConfig struct {
-	Ctx              context.Context
-	Dir              string
-	Command          string
-	Args             []string
-	Script           string
-	ShellCommand     string
-	ShellCommandArgs string
-	ShellPackages    []string
-	Stdout           io.Writer
-	Stderr           io.Writer
+	Ctx                context.Context
+	Dir                string
+	Command            string
+	Args               []string
+	Script             string
+	ShellCommand       string
+	ShellCommandArgs   string
+	ShellPackages      []string
+	Stdout             io.Writer
+	Stderr             io.Writer
+	UserSpecifiedShell bool
 }
 
 func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.Cmd, error) {
@@ -275,19 +276,64 @@ func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
 }
 
 func createCommandConfig(ctx context.Context, step digraph.Step) (*commandConfig, error) {
-	shellCommand := cmdutil.GetShellCommand(step.Shell)
+	var shellCommand string
 	shellCmdArgs := step.ShellCmdArgs
+	userSpecifiedShell := step.Shell != ""
+
+	if userSpecifiedShell {
+		// User explicitly set shell - respect their choice exactly
+		shellCommand = cmdutil.GetShellCommand(step.Shell)
+	} else {
+		// No shell specified - use default with errexit
+		defaultShell := cmdutil.GetShellCommand("")
+
+		// Special handling for nix-shell - don't add -e to nix-shell itself
+		shellName := filepath.Base(defaultShell)
+		if shellName == "nix-shell" {
+			// For nix-shell, prepend set -e to the command
+			shellCommand = defaultShell
+			if shellCmdArgs != "" && !strings.HasPrefix(shellCmdArgs, "set -e") {
+				shellCmdArgs = "set -e; " + shellCmdArgs
+			}
+		} else if isUnixLikeShell(defaultShell) {
+			// Add errexit flag for Unix-like shells
+			shellCommand = defaultShell + " -e"
+		} else {
+			shellCommand = defaultShell
+		}
+	}
 
 	return &commandConfig{
-		Ctx:              ctx,
-		Dir:              GetEnv(ctx).WorkingDir,
-		Command:          step.Command,
-		Args:             step.Args,
-		Script:           step.Script,
-		ShellCommand:     shellCommand,
-		ShellCommandArgs: shellCmdArgs,
-		ShellPackages:    step.ShellPackages,
+		Ctx:                ctx,
+		Dir:                GetEnv(ctx).WorkingDir,
+		Command:            step.Command,
+		Args:               step.Args,
+		Script:             step.Script,
+		ShellCommand:       shellCommand,
+		ShellCommandArgs:   shellCmdArgs,
+		ShellPackages:      step.ShellPackages,
+		UserSpecifiedShell: userSpecifiedShell,
 	}, nil
+}
+
+// isUnixLikeShell returns true if the shell supports -e flag
+func isUnixLikeShell(shell string) bool {
+	if shell == "" {
+		return false
+	}
+
+	// Extract just the executable name (handle full paths)
+	shellName := filepath.Base(shell)
+
+	switch shellName {
+	case "sh", "bash", "zsh", "ksh", "ash", "dash":
+		return true
+	case "fish":
+		// Fish shell doesn't support -e flag
+		return false
+	default:
+		return false
+	}
 }
 
 func setupScript(_ context.Context, workDir, script string) (string, error) {
