@@ -130,41 +130,89 @@ steps:
 
 ## Repetition
 
-Repeat steps while conditions are met or until a limit is reached.
+Repeat steps with explicit 'while' or 'until' modes for clear control flow.
 
-### Repeat While Exit Code Matches
+### Repeat While Mode
+
+The 'while' mode repeats a step while a condition is true.
 
 ```yaml
 steps:
-  - name: wait-for-file
-    command: test -f /tmp/ready.flag
+  - name: wait-for-service
+    command: nc -z localhost 8080
     repeatPolicy:
-      repeat: true
-      exitCode: [1]      # Repeat while exit code is 1
+      repeat: while
+      exitCode: [1]      # Repeat WHILE connection fails (exit code 1)
       intervalSec: 10    # Wait 10 seconds between attempts
+      limit: 30          # Maximum 30 attempts
 ```
 
-### Repeat Forever
+### Repeat Until Mode
+
+The 'until' mode repeats a step until a condition becomes true.
 
 ```yaml
 steps:
-  - name: monitoring
-    command: ./check-metrics.sh
+  - name: wait-for-completion
+    command: check-job-status.sh
+    output: STATUS
     repeatPolicy:
-      repeat: true
-      intervalSec: 60  # Every minute
+      repeat: until
+      condition: "${STATUS}"
+      expected: "COMPLETED"   # Repeat UNTIL status is COMPLETED
+      intervalSec: 30
+      limit: 120              # Maximum 1 hour
 ```
 
-### Repeat with Limit
+### Conditional Repeat Patterns
+
+#### While Process is Running
+```yaml
+steps:
+  - name: monitor-process
+    command: pgrep -f "my-app"
+    repeatPolicy:
+      repeat: while
+      exitCode: [0]      # Exit code 0 means process found
+      intervalSec: 60    # Check every minute
+```
+
+#### Until File Exists
+```yaml
+steps:
+  - name: wait-for-output
+    command: test -f /tmp/output.csv
+    repeatPolicy:
+      repeat: until
+      exitCode: [0]      # Exit code 0 means file exists
+      intervalSec: 5
+      limit: 60          # Maximum 5 minutes
+```
+
+#### While Condition with Output
+```yaml
+steps:
+  - name: keep-alive
+    command: curl -s http://api/health
+    output: HEALTH_STATUS
+    repeatPolicy:
+      repeat: while
+      condition: "${HEALTH_STATUS}"
+      expected: "healthy"
+      intervalSec: 30
+```
+
+### Legacy Format (Deprecated)
+
+The old boolean format is still supported but deprecated:
 
 ```yaml
 steps:
-  - name: limited-polling
-    command: ./check-status.sh
+  - name: old-style
+    command: ./check.sh
     repeatPolicy:
-      repeat: true
-      limit: 10        # Maximum 10 executions
-      intervalSec: 30  # Every 30 seconds
+      repeat: true       # Deprecated: use 'while' or 'until' instead
+      intervalSec: 60
 ```
 
 ## Continue On Conditions

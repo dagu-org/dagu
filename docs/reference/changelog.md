@@ -209,8 +209,9 @@ Thanks to @vnghia:
 
 ####  Advanced Repeat Policy
 Thanks to @thefishhat:
+- **Enhanced in v1.17.5**: Explicit 'while' and 'until' modes for clear repeat logic
 - Conditions for repeat execution
-- Expected output matching
+- Expected output matching  
 - Exit code-based repeats
 
 ```yaml
@@ -218,10 +219,18 @@ steps:
   - name: wait for service
     command: check_service.sh
     repeatPolicy:
+      repeat: until        # NEW: Explicit mode (while/until)
       condition: "${STATUS}"
-      expected: "ready"
+      expected: "ready"    # Repeat UNTIL status is ready
       intervalSec: 30
-      exitCode: [0, 1]
+      limit: 60           # Maximum attempts
+      
+  - name: monitor process
+    command: pgrep myapp
+    repeatPolicy:
+      repeat: while       # Repeat WHILE process exists
+      exitCode: [0]       # Exit code 0 means found
+      intervalSec: 10
 ```
 
 ### Bug Fixes & Improvements
