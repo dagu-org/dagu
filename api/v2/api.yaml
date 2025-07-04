@@ -1945,14 +1945,25 @@ components:
 
     RepeatPolicy:
       type: object
-      description: "Configuration for step retry behavior"
+      description: "Configuration for step repeat behavior"
       properties:
         repeat:
-          type: boolean
-          description: "Whether the step should be retried on failure"
+          type: string
+          enum: ["", "while", "until"]
+          description: "Repeat mode - 'while' repeats while condition is true, 'until' repeats until condition is true"
         interval:
           type: integer
-          description: "Time in seconds to wait between retry attempts"
+          description: "Time in seconds to wait between repeat attempts"
+        limit:
+          type: integer
+          description: "Maximum number of times to repeat the step"
+        condition:
+          $ref: "#/components/schemas/Condition"
+        exitCode:
+          type: array
+          description: "List of exit codes that trigger repeat behavior"
+          items:
+            type: integer
 
     ListTagResponse:
       type: object
