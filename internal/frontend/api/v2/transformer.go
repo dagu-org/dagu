@@ -29,9 +29,21 @@ func toStep(obj digraph.Step) api.Step {
 		conditions = append(conditions, toPrecondition(obj.Preconditions[i]))
 	}
 
+	var repeatMode *api.RepeatMode
+	if obj.RepeatPolicy.RepeatMode != "" {
+		mode := api.RepeatMode(obj.RepeatPolicy.RepeatMode)
+		repeatMode = &mode
+	}
+
 	repeatPolicy := api.RepeatPolicy{
-		Repeat:   ptrOf(obj.RepeatPolicy.Repeat != ""),
+		Repeat:   repeatMode,
 		Interval: ptrOf(int(obj.RepeatPolicy.Interval.Seconds())),
+		Limit:    ptrOf(obj.RepeatPolicy.Limit),
+		ExitCode: ptrOf(obj.RepeatPolicy.ExitCode),
+	}
+
+	if obj.RepeatPolicy.Condition != nil {
+		repeatPolicy.Condition = ptrOf(toPrecondition(obj.RepeatPolicy.Condition))
 	}
 
 	step := api.Step{

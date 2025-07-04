@@ -266,11 +266,14 @@ Dagu is a **modern, powerful, yet surprisingly simple workflow orchestration eng
   - Exit code-based retry triggers
   - Exponential backoff support
 - **Repeat Policies**:
-  - Repeat indefinitely with intervals
+  - Explicit 'while' and 'until' modes for clear repeat logic
+  - **While mode**: Repeats while condition is true
+  - **Until mode**: Repeats until condition is true
   - Conditional repeats based on:
-    - Command output matching
+    - Command output matching (with expected values)
     - Exit codes
     - Command evaluation results
+  - Configurable intervals and limits
 - **Continue On Conditions**:
   - Continue on failure or skipped steps
   - Continue based on specific exit codes
@@ -518,16 +521,27 @@ steps:
   - name: wait for service
     command: nc -z localhost 8080
     repeatPolicy:
-      exitCode: [1]  # Repeat while connection fails
+      repeat: while         # Repeat WHILE connection fails
+      exitCode: [1]         # Exit code 1 means connection failed
       intervalSec: 10
+      limit: 30             # Maximum 30 attempts (5 minutes total)
   
   - name: monitor until complete
     command: check_job_status.sh
     output: JOB_STATUS
     repeatPolicy:
+      repeat: until         # Repeat UNTIL status is COMPLETED
       condition: "${JOB_STATUS}"
       expected: "COMPLETED"
       intervalSec: 60
+      limit: 60             # Maximum 1 hour of monitoring
+  
+  - name: keep alive while processing
+    command: check_process.sh
+    repeatPolicy:
+      repeat: while         # Repeat WHILE process is running
+      condition: "pgrep -f 'my-process'"  # Exit code 0 = process found
+      intervalSec: 30       # Check every 30 seconds
 ```
 
 ### Complex DAG Composition
@@ -883,9 +897,13 @@ steps:
       exitCode: [1, 255]
     
     repeatPolicy:
+      repeat: while         # 'while' or 'until' mode
       intervalSec: 300
+      limit: 10            # Maximum repeat count
       condition: "${STATUS}"
-      expected: "PENDING"
+      expected: "PENDING"   # For 'while': repeat while STATUS=PENDING
+                           # For 'until': repeat until STATUS=PENDING
+      exitCode: [0, 1]     # Exit codes that trigger repeat
     
     # Notifications
     mailOnError: true

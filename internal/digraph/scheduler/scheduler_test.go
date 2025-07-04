@@ -811,7 +811,7 @@ func TestScheduler(t *testing.T) {
 			newStep("1",
 				withCommand(fmt.Sprintf("cat %s || true", file)),
 				func(step *digraph.Step) {
-					step.RepeatPolicy.Repeat = digraph.RepeatModeUntil
+					step.RepeatPolicy.RepeatMode = digraph.RepeatModeUntil
 					step.RepeatPolicy.Condition = &digraph.Condition{
 						Condition: fmt.Sprintf("`cat %s || true`", file),
 						Expected:  "ready",
@@ -852,7 +852,7 @@ func TestScheduler(t *testing.T) {
 			newStep("1",
 				withCommand("echo hello"),
 				func(step *digraph.Step) {
-					step.RepeatPolicy.Repeat = digraph.RepeatModeWhile
+					step.RepeatPolicy.RepeatMode = digraph.RepeatModeWhile
 					step.RepeatPolicy.Condition = &digraph.Condition{
 						Condition: "test ! -f " + file,
 					}
@@ -891,7 +891,7 @@ func TestScheduler(t *testing.T) {
 			newStep("1",
 				withCommand("echo hello"),
 				func(step *digraph.Step) {
-					step.RepeatPolicy.Repeat = digraph.RepeatModeWhile
+					step.RepeatPolicy.RepeatMode = digraph.RepeatModeWhile
 					step.RepeatPolicy.Condition = &digraph.Condition{
 						Condition: "test ! -f " + file,
 					}
@@ -932,7 +932,7 @@ func TestScheduler(t *testing.T) {
 			newStep("1",
 				withScript(script),
 				func(step *digraph.Step) {
-					step.RepeatPolicy.Repeat = digraph.RepeatModeWhile
+					step.RepeatPolicy.RepeatMode = digraph.RepeatModeWhile
 					step.RepeatPolicy.ExitCode = []int{42}
 					step.RepeatPolicy.Interval = 200 * time.Millisecond
 				},
@@ -963,7 +963,7 @@ func TestScheduler(t *testing.T) {
 			newStep("1",
 				withCommand("echo $TEST_REPEAT_MATCH_EXPR"),
 				func(step *digraph.Step) {
-					step.RepeatPolicy.Repeat = digraph.RepeatModeUntil
+					step.RepeatPolicy.RepeatMode = digraph.RepeatModeUntil
 					step.RepeatPolicy.Condition = &digraph.Condition{
 						Condition: "$TEST_REPEAT_MATCH_EXPR",
 						Expected:  "done",
@@ -999,7 +999,7 @@ func TestScheduler(t *testing.T) {
 				withCommand(fmt.Sprintf("cat %s", file)),
 				withOutput("OUT"),
 				func(step *digraph.Step) {
-					step.RepeatPolicy.Repeat = digraph.RepeatModeUntil
+					step.RepeatPolicy.RepeatMode = digraph.RepeatModeUntil
 					step.RepeatPolicy.Condition = &digraph.Condition{
 						Condition: "$OUT",
 						Expected:  "done",
@@ -1172,7 +1172,7 @@ func withRetryPolicy(limit int, interval time.Duration) stepOption {
 func withRepeatPolicy(repeat bool, interval time.Duration) stepOption {
 	return func(step *digraph.Step) {
 		if repeat {
-			step.RepeatPolicy.Repeat = digraph.RepeatModeWhile
+			step.RepeatPolicy.RepeatMode = digraph.RepeatModeWhile
 		}
 		step.RepeatPolicy.Interval = interval
 	}
@@ -1981,7 +1981,7 @@ func TestScheduler_RepeatPolicyWithLimitAndCondition(t *testing.T) {
 				echo "PENDING"
 			`, counterFile, counterFile, counterFile)),
 			func(step *digraph.Step) {
-				step.RepeatPolicy.Repeat = digraph.RepeatModeUntil
+				step.RepeatPolicy.RepeatMode = digraph.RepeatModeUntil
 				step.RepeatPolicy.Limit = 5
 				step.RepeatPolicy.Condition = &digraph.Condition{
 					Condition: "`cat " + counterFile + "`",
@@ -2073,7 +2073,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			newStep("1",
 				withCommand("echo boolean true mode"),
 				func(step *digraph.Step) {
-					step.RepeatPolicy.Repeat = digraph.RepeatModeWhile // This is what repeat: true becomes
+					step.RepeatPolicy.RepeatMode = digraph.RepeatModeWhile // This is what repeat: true becomes
 					step.RepeatPolicy.Interval = 100 * time.Millisecond
 					step.RepeatPolicy.Limit = 3 // Limit to prevent infinite loop
 					// No condition, no exitCode - should repeat while step succeeds
@@ -2112,7 +2112,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 					fi
 				`, counterFile, counterFile, counterFile)),
 				func(step *digraph.Step) {
-					step.RepeatPolicy.Repeat = digraph.RepeatModeWhile // Boolean true mode
+					step.RepeatPolicy.RepeatMode = digraph.RepeatModeWhile // Boolean true mode
 					step.RepeatPolicy.Interval = 100 * time.Millisecond
 					// No condition, no exitCode - should stop when step fails
 				},
@@ -2155,7 +2155,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 					MarkSuccess: true,
 				}),
 				func(step *digraph.Step) {
-					step.RepeatPolicy.Repeat = digraph.RepeatModeUntil
+					step.RepeatPolicy.RepeatMode = digraph.RepeatModeUntil
 					step.RepeatPolicy.Interval = 100 * time.Millisecond
 					// No condition, no exitCode - should repeat until step succeeds
 				},
@@ -2189,7 +2189,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			newStep("1",
 				withCommand("cat "+counterFile+" || echo notfound"),
 				func(step *digraph.Step) {
-					step.RepeatPolicy.Repeat = digraph.RepeatModeWhile
+					step.RepeatPolicy.RepeatMode = digraph.RepeatModeWhile
 					step.RepeatPolicy.Condition = &digraph.Condition{
 						Condition: fmt.Sprintf("test ! -f %s", counterFile),
 					}
@@ -2227,7 +2227,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			newStep("1",
 				withCommand("echo while with expected"),
 				func(step *digraph.Step) {
-					step.RepeatPolicy.Repeat = digraph.RepeatModeWhile
+					step.RepeatPolicy.RepeatMode = digraph.RepeatModeWhile
 					step.RepeatPolicy.Condition = &digraph.Condition{
 						Condition: fmt.Sprintf("`cat %s`", counterFile),
 						Expected:  "continue",
@@ -2270,7 +2270,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			newStep("1",
 				withCommand("cat "+counterFile+" || echo notfound"),
 				func(step *digraph.Step) {
-					step.RepeatPolicy.Repeat = digraph.RepeatModeUntil
+					step.RepeatPolicy.RepeatMode = digraph.RepeatModeUntil
 					step.RepeatPolicy.Condition = &digraph.Condition{
 						Condition: fmt.Sprintf("test -f %s", counterFile),
 					}
@@ -2308,7 +2308,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			newStep("1",
 				withCommand("echo until with expected"),
 				func(step *digraph.Step) {
-					step.RepeatPolicy.Repeat = digraph.RepeatModeUntil
+					step.RepeatPolicy.RepeatMode = digraph.RepeatModeUntil
 					step.RepeatPolicy.Condition = &digraph.Condition{
 						Condition: fmt.Sprintf("`cat %s`", counterFile),
 						Expected:  "ready",
@@ -2360,7 +2360,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 					MarkSuccess: true,
 				}),
 				func(step *digraph.Step) {
-					step.RepeatPolicy.Repeat = digraph.RepeatModeUntil
+					step.RepeatPolicy.RepeatMode = digraph.RepeatModeUntil
 					step.RepeatPolicy.ExitCode = []int{42}
 					step.RepeatPolicy.Interval = 100 * time.Millisecond
 				},
@@ -2400,7 +2400,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			newStep("1",
 				withCommand("cat "+file+" || echo notfound"),
 				func(step *digraph.Step) {
-					step.RepeatPolicy.Repeat = digraph.RepeatModeUntil
+					step.RepeatPolicy.RepeatMode = digraph.RepeatModeUntil
 					step.RepeatPolicy.Condition = &digraph.Condition{
 						Condition: fmt.Sprintf("test -f %s", file),
 					}
@@ -2447,7 +2447,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 				`, counterFile, counterFile, counterFile)),
 				withOutput("COUNTER"),
 				func(step *digraph.Step) {
-					step.RepeatPolicy.Repeat = digraph.RepeatModeUntil
+					step.RepeatPolicy.RepeatMode = digraph.RepeatModeUntil
 					step.RepeatPolicy.Condition = &digraph.Condition{
 						Condition: "$COUNTER",
 						Expected:  "3",

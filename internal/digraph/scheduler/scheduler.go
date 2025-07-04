@@ -450,7 +450,7 @@ func (sc *Scheduler) Signal(
 	for _, node := range graph.nodes {
 		// for a repetitive task, we'll wait for the job to finish
 		// until time reaches max wait time
-		if node.Step().RepeatPolicy.Repeat == "" {
+		if node.Step().RepeatPolicy.RepeatMode == "" {
 			node.Signal(ctx, sig, allowOverride)
 		}
 	}
@@ -874,7 +874,7 @@ func (sc *Scheduler) shouldRepeatNode(ctx context.Context, node *Node, execErr e
 		return false
 	}
 
-	switch rp.Repeat {
+	switch rp.RepeatMode {
 	case digraph.RepeatModeWhile:
 		// It's a 'while' loop. Repeat while a condition is true.
 		if rp.Condition != nil {

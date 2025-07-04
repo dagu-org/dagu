@@ -291,13 +291,16 @@ See the [Continue On Reference](/reference/continue-on) for detailed documentati
 
 | Field | Type | Description | Default |
 |-------|------|-------------|---------|
-| `repeat` | boolean | Enable repeat mode | `false` |
+| `repeat` | string | Repeat mode: `"while"` or `"until"` | - |
 | `intervalSec` | integer | Seconds between repetitions | - |
 | `limit` | integer | Maximum number of executions | - |
 | `condition` | string | Condition to evaluate | - |
 | `expected` | string | Expected value/pattern | - |
-| `exitCode` | array | Exit codes that trigger repetition | - |
+| `exitCode` | array | Exit codes that trigger repeat | - |
 
+**Repeat Modes:**
+- `while`: Repeats while the condition is true or exit code matches
+- `until`: Repeats until the condition is true or exit code matches
 ```yaml
 steps:
   - name: retry-example
@@ -307,14 +310,23 @@ steps:
       intervalSec: 30
       exitCode: [1, 255]  # Retry only on specific codes
     
-  - name: repeat-example
-    command: check-status.sh
+  - name: repeat-while-example
+    command: check-process.sh
     repeatPolicy:
-      repeat: true
+      repeat: while        # Repeat WHILE process is running
+      exitCode: [0]        # Exit code 0 means process found
       intervalSec: 60
-      limit: 10
+      limit: 30
+      
+  - name: repeat-until-example
+    command: check-status.sh
+    output: STATUS
+    repeatPolicy:
+      repeat: until        # Repeat UNTIL status is ready
       condition: "${STATUS}"
       expected: "ready"
+      intervalSec: 30
+      limit: 60
 ```
 
 ### Executor Configuration

@@ -49,7 +49,7 @@ After managing hundreds of cron jobs across multiple servers, I built Dagu to br
 - **Parallel Execution**: Run steps or sub-DAGs in parallel with different parameters
 - **Enhanced Web UI**: Performance improvements and better user interface
 - **One-click Step Re-run**: Retry individual steps without re-running entire workflow ([@thefishhat](https://github.com/thefishhat))
-- **Advanced Repeat Policy**: Conditional repeats with output matching ([@thefishhat](https://github.com/thefishhat))
+- **Enhanced Repeat Policy**: Explicit 'while'/'until' modes for clear repeat logic ([@thefishhat](https://github.com/thefishhat))
 - **Queue Management**: Enqueue DAGs with custom run IDs ([@kriyanshii](https://github.com/kriyanshii))
 - **Docker Improvements**: Optimized images and better container support ([@jerry-yuan](https://github.com/jerry-yuan), [@vnghia](https://github.com/vnghia))
 

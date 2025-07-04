@@ -169,18 +169,66 @@ function DAGStepTableRow({ step, index }: Props) {
         <div className="space-y-1.5">
           {/* Repeat Policy */}
           {step.repeatPolicy?.repeat && (
-            <Badge
-              variant="outline"
-              className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 px-2 py-0.5 text-xs"
-            >
-              <RefreshCw className="h-3 w-3" />
-              <span>
-                Repeat
-                {step.repeatPolicy.interval
-                  ? ` (${step.repeatPolicy.interval}s)`
-                  : ''}
-              </span>
-            </Badge>
+            <div className="space-y-1">
+              <Badge
+                variant="outline"
+                className={`flex items-center gap-1.5 px-2 py-0.5 text-xs ${
+                  step.repeatPolicy.repeat === 'while'
+                    ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800'
+                    : step.repeatPolicy.repeat === 'until'
+                    ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800'
+                    : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800'
+                }`}
+              >
+                <RefreshCw className="h-3 w-3" />
+                <span className="font-medium uppercase tracking-wider text-[10px]">
+                  {step.repeatPolicy.repeat === 'while' ? 'WHILE' : 
+                   step.repeatPolicy.repeat === 'until' ? 'UNTIL' : 'REPEAT'}
+                </span>
+                {step.repeatPolicy.interval && (
+                  <span className="text-[10px] opacity-75">
+                    {step.repeatPolicy.interval}s
+                  </span>
+                )}
+                {step.repeatPolicy.limit && (
+                  <span className="text-[10px] opacity-75">
+                    ×{step.repeatPolicy.limit}
+                  </span>
+                )}
+              </Badge>
+              
+              {/* Repeat Condition */}
+              {step.repeatPolicy.condition && (
+                <div className="text-[10px] bg-slate-100 dark:bg-slate-800 rounded px-1.5 py-0.5 font-mono">
+                  <span className="text-slate-500 dark:text-slate-400">
+                    {step.repeatPolicy.repeat === 'while' ? '↻ while' : '↻ until'}:
+                  </span>{' '}
+                  <span className="text-slate-700 dark:text-slate-300">
+                    {step.repeatPolicy.condition.condition}
+                  </span>
+                  {step.repeatPolicy.condition.expected && (
+                    <>
+                      <span className="text-slate-500 dark:text-slate-400"> = </span>
+                      <span className="text-emerald-600 dark:text-emerald-400">
+                        {step.repeatPolicy.condition.expected}
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+              
+              {/* Exit Codes */}
+              {step.repeatPolicy.exitCode && step.repeatPolicy.exitCode.length > 0 && (
+                <div className="text-[10px] bg-slate-100 dark:bg-slate-800 rounded px-1.5 py-0.5">
+                  <span className="text-slate-500 dark:text-slate-400">
+                    exit codes:
+                  </span>{' '}
+                  <span className="font-mono text-amber-600 dark:text-amber-400">
+                    [{step.repeatPolicy.exitCode.join(', ')}]
+                  </span>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Mail on Error */}

@@ -248,21 +248,23 @@ steps:
   - name: wait-for-service
     command: curl -f http://service:8080/health
     repeatPolicy:
-      repeat: true
+      repeat: until        # Repeat UNTIL service is healthy
+      exitCode: [0]        # Exit code 0 means success
       intervalSec: 10
-      exitCode: [1]  # Repeat while exit code is 1
+      limit: 30           # Maximum 5 minutes
   
   - name: monitor-job
     command: ./check_job_status.sh
     output: JOB_STATUS
     repeatPolicy:
-      repeat: true
+      repeat: until        # Repeat UNTIL job completes
       condition: "${JOB_STATUS}"
       expected: "COMPLETED"
       intervalSec: 30
+      limit: 120          # Maximum 1 hour
 ```
 
-Wait for external dependencies and job completion.
+Wait for external dependencies and job completion with clear semantics.
 
 <a href="/writing-workflows/control-flow#repeat" class="learn-more">Learn more →</a>
 
@@ -274,14 +276,22 @@ Wait for external dependencies and job completion.
 
 ```yaml
 steps:
-  - name: repeating task
-    command: main.sh
+  - name: keep-alive-task
+    command: heartbeat.sh
     repeatPolicy:
-      repeat: true
+      repeat: while        # Repeat indefinitely while successful
       intervalSec: 60
+      
+  - name: monitor-until-done
+    command: check-status.sh
+    repeatPolicy:
+      repeat: until        # Repeat until exit code 0
+      exitCode: [0]
+      intervalSec: 30
+      limit: 20           # Maximum 10 minutes
 ```
 
-Execute steps periodically.
+Execute steps with clear repeat semantics.
 
 <a href="/writing-workflows/control-flow#repeat-basic" class="learn-more">Learn more →</a>
 

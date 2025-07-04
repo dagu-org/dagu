@@ -430,7 +430,7 @@ func TestBuildStep(t *testing.T) {
 		th := testLoad(t, "repeat_policy.yaml")
 		assert.Len(t, th.Steps, 1)
 		require.NotNil(t, th.Steps[0].RepeatPolicy)
-		assert.Equal(t, digraph.RepeatModeWhile, th.Steps[0].RepeatPolicy.Repeat)
+		assert.Equal(t, digraph.RepeatModeWhile, th.Steps[0].RepeatPolicy.RepeatMode)
 		assert.Equal(t, 60*time.Second, th.Steps[0].RepeatPolicy.Interval)
 		assert.Equal(t, 0, th.Steps[0].RepeatPolicy.Limit) // No limit set
 	})
@@ -442,7 +442,7 @@ func TestBuildStep(t *testing.T) {
 		assert.Len(t, th.Steps, 1)
 		repeatPolicy := th.Steps[0].RepeatPolicy
 		require.NotNil(t, repeatPolicy)
-		assert.Equal(t, digraph.RepeatModeWhile, repeatPolicy.Repeat)
+		assert.Equal(t, digraph.RepeatModeWhile, repeatPolicy.RepeatMode)
 		require.NotNil(t, repeatPolicy.Condition)
 		assert.Equal(t, "echo hello", repeatPolicy.Condition.Condition)
 		assert.Equal(t, "", repeatPolicy.Condition.Expected) // No expected value for while mode
@@ -457,7 +457,7 @@ func TestBuildStep(t *testing.T) {
 		assert.Len(t, th.Steps, 1)
 		repeatPolicy := th.Steps[0].RepeatPolicy
 		require.NotNil(t, repeatPolicy)
-		assert.Equal(t, digraph.RepeatModeUntil, repeatPolicy.Repeat)
+		assert.Equal(t, digraph.RepeatModeUntil, repeatPolicy.RepeatMode)
 		require.NotNil(t, repeatPolicy.Condition)
 		assert.Equal(t, "echo hello", repeatPolicy.Condition.Condition)
 		assert.Equal(t, "hello", repeatPolicy.Condition.Expected)
@@ -472,7 +472,7 @@ func TestBuildStep(t *testing.T) {
 		assert.Len(t, th.Steps, 1)
 		repeatPolicy := th.Steps[0].RepeatPolicy
 		require.NotNil(t, repeatPolicy)
-		assert.Equal(t, digraph.RepeatModeWhile, repeatPolicy.Repeat)
+		assert.Equal(t, digraph.RepeatModeWhile, repeatPolicy.RepeatMode)
 		assert.Equal(t, []int{1, 2}, repeatPolicy.ExitCode)
 		assert.Equal(t, 15*time.Second, repeatPolicy.Interval)
 		assert.Nil(t, repeatPolicy.Condition) // No condition set
@@ -485,7 +485,7 @@ func TestBuildStep(t *testing.T) {
 		assert.Len(t, th.Steps, 1)
 		repeatPolicy := th.Steps[0].RepeatPolicy
 		require.NotNil(t, repeatPolicy)
-		assert.Equal(t, digraph.RepeatModeUntil, repeatPolicy.Repeat)
+		assert.Equal(t, digraph.RepeatModeUntil, repeatPolicy.RepeatMode)
 		assert.Equal(t, []int{0}, repeatPolicy.ExitCode)
 		assert.Equal(t, 20*time.Second, repeatPolicy.Interval)
 		assert.Nil(t, repeatPolicy.Condition) // No condition set
@@ -499,7 +499,7 @@ func TestBuildStep(t *testing.T) {
 		assert.Len(t, th.Steps, 1)
 		repeatPolicy := th.Steps[0].RepeatPolicy
 		require.NotNil(t, repeatPolicy)
-		assert.Equal(t, digraph.RepeatModeUntil, repeatPolicy.Repeat)
+		assert.Equal(t, digraph.RepeatModeUntil, repeatPolicy.RepeatMode)
 		require.NotNil(t, repeatPolicy.Condition)
 		assert.Equal(t, "echo hello", repeatPolicy.Condition.Condition)
 		assert.Equal(t, "hello", repeatPolicy.Condition.Expected)
@@ -514,7 +514,7 @@ func TestBuildStep(t *testing.T) {
 		assert.Len(t, th.Steps, 1)
 		repeatPolicy := th.Steps[0].RepeatPolicy
 		require.NotNil(t, repeatPolicy)
-		assert.Equal(t, digraph.RepeatModeWhile, repeatPolicy.Repeat)
+		assert.Equal(t, digraph.RepeatModeWhile, repeatPolicy.RepeatMode)
 		require.NotNil(t, repeatPolicy.Condition)
 		assert.Equal(t, "echo hello", repeatPolicy.Condition.Condition)
 		assert.Equal(t, "", repeatPolicy.Condition.Expected) // No expected value
@@ -533,7 +533,7 @@ func TestBuildStep(t *testing.T) {
 		assert.Equal(t, "hello", repeatPolicy.Condition.Expected)
 		assert.Equal(t, 1*time.Second, repeatPolicy.Interval)
 		// Should infer "until" mode due to condition + expected
-		assert.Equal(t, digraph.RepeatModeUntil, repeatPolicy.Repeat)
+		assert.Equal(t, digraph.RepeatModeUntil, repeatPolicy.RepeatMode)
 	})
 	t.Run("SignalOnStop", func(t *testing.T) {
 		t.Parallel()
@@ -579,7 +579,7 @@ func TestBuildStep(t *testing.T) {
 		assert.Equal(t, []int{42}, repeatPolicy.ExitCode)
 		assert.Equal(t, 2*time.Second, repeatPolicy.Interval)
 		// Should infer "while" mode due to exitCode only
-		assert.Equal(t, digraph.RepeatModeWhile, repeatPolicy.Repeat)
+		assert.Equal(t, digraph.RepeatModeWhile, repeatPolicy.RepeatMode)
 	})
 
 	t.Run("RepeatPolicyErrorCases", func(t *testing.T) {

@@ -949,7 +949,7 @@ func buildRepeatPolicy(_ BuildContext, def stepDef, step *Step) error {
 		}
 	}
 
-	step.RepeatPolicy.Repeat = mode
+	step.RepeatPolicy.RepeatMode = mode
 	if rpDef.IntervalSec > 0 {
 		step.RepeatPolicy.Interval = time.Second * time.Duration(rpDef.IntervalSec)
 	}
