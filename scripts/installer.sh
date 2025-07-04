@@ -50,6 +50,8 @@ ARCHITECTURE="$(uname -m)"
 case "$ARCHITECTURE" in
   x86_64) ARCHITECTURE="amd64" ;;
   aarch64) ARCHITECTURE="arm64" ;;
+  armv7l) ARCHITECTURE="armv7" ;;
+  armv6l) ARCHITECTURE="armv6" ;;
 esac
 
 # Create temporary working directory
