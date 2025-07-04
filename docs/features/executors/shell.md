@@ -22,19 +22,26 @@ steps:
       false  # This will cause the step to fail
       echo "This won't execute"  # Script stops here
 
-  # Specify shell to control errexit
+  # Specify shell to bypass default errexit
   - name: continue-on-error
     shell: bash  # No -e flag when shell is specified
     command: |
       false  # Command fails but continues
       echo "This will execute"
 
-  # Explicitly enable errexit
+  # Explicitly enable errexit with options
   - name: explicit-errexit
-    shell: bash -e
+    shell: bash -e  # Add -e flag manually
     command: |
       false  # Step fails immediately
       echo "This won't execute"
+      
+  # Multiple shell options
+  - name: strict-mode
+    shell: bash -euo pipefail  # Enable strict error handling
+    command: |
+      set -x  # Also enable debug output
+      echo "Running with strict mode"
 
   # Disable errexit if needed
   - name: disable-errexit
@@ -70,6 +77,10 @@ steps:
   - name: custom-shell
     shell: /usr/local/bin/fish
     command: echo "Using Fish shell"
+    
+  - name: with-options
+    shell: bash -euo pipefail  # Add custom shell options
+    command: echo "Strict mode enabled"
 ```
 
 ### Nix Shell
