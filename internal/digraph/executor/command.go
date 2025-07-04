@@ -216,10 +216,12 @@ func (b *shellCommandBuilder) Build(ctx context.Context) (*exec.Cmd, error) {
 
 	default:
 		// other shell (sh, bash, zsh, etc.)
-		args = append(args, b.Args...)
 		if b.Command != "" && b.Script != "" {
-			return exec.CommandContext(ctx, b.Command, append(args, b.Script)...), nil // nolint: gosec
+			// When running a command directly with a script (e.g., perl script.pl),
+			// don't include shell arguments like -e
+			return exec.CommandContext(ctx, b.Command, append(b.Args, b.Script)...), nil // nolint: gosec
 		}
+		args = append(args, b.Args...)
 		if !slices.Contains(args, "-c") {
 			args = append(args, "-c")
 		}
