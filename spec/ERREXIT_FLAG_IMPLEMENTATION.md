@@ -242,45 +242,7 @@ Ensure existing DAGs continue to work:
 - DAGs relying on error continuation
 - DAGs with custom error handling
 
-## Migration Guide
-
-### For Users
-
-#### No Action Required If:
-- You explicitly set the `shell` field in your steps
-- You want the new safer behavior for steps without `shell` field
-
-#### Action Required If:
-- You have steps without `shell` field that rely on continuing after errors
-- Solution: Add `shell: bash` (or your preferred shell) to those steps
-
-#### Examples:
-
-```yaml
-# Before: This might break with the update
-steps:
-  - name: cleanup
-    command: |
-      rm -f /tmp/file1  # Might fail if doesn't exist
-      rm -f /tmp/file2  # Previously would continue
-      
-# After: Explicitly disable errexit
-steps:
-  - name: cleanup
-    shell: bash  # Or use: shell: bash +e
-    command: |
-      rm -f /tmp/file1
-      rm -f /tmp/file2
-      
-# Alternative: Use proper error handling
-steps:
-  - name: cleanup
-    command: |
-      rm -f /tmp/file1 || true
-      rm -f /tmp/file2 || true
-```
-
-### Documentation Updates
+## Documentation Updates
 
 1. Remove `set -e` from examples (no longer needed)
 2. Add section explaining errexit is default
