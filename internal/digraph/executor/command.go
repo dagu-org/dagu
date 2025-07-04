@@ -196,7 +196,19 @@ func (b *shellCommandBuilder) Build(ctx context.Context) (*exec.Cmd, error) {
 		}
 
 		if b.Command != "" && b.Script != "" {
-			return exec.CommandContext(ctx, b.Command, append(args, b.Script)...), nil // nolint: gosec
+			// When using nix-shell with a direct command and script,
+			// we need to run the command inside nix-shell, not pass nix-shell args to the command
+			cmdParts := []string{b.Command}
+			cmdParts = append(cmdParts, b.Args...)
+			cmdParts = append(cmdParts, b.Script)
+			cmdStr := strings.Join(cmdParts, " ")
+			
+			// If ShellCommandArgs contains "set -e", we need to apply it
+			if strings.HasPrefix(b.ShellCommandArgs, "set -e") {
+				cmdStr = b.ShellCommandArgs + " " + cmdStr
+			}
+			
+			return exec.CommandContext(ctx, cmd, append(args, cmdStr)...), nil // nolint: gosec
 		}
 
 		// Construct the command with the shell command and the packages
@@ -234,12 +246,12 @@ func (b *shellCommandBuilder) Build(ctx context.Context) (*exec.Cmd, error) {
 
 // buildPowerShellCommand builds a command for PowerShell (both Windows PowerShell and PowerShell Core)
 func (b *shellCommandBuilder) buildPowerShellCommand(ctx context.Context, cmd string, args []string) (*exec.Cmd, error) {
-	args = append(args, b.Args...)
-
 	if b.Command != "" && b.Script != "" {
-		return exec.CommandContext(ctx, b.Command, append(args, b.Script)...), nil // nolint: gosec
+		// When running a command directly with a script, don't include PowerShell arguments
+		return exec.CommandContext(ctx, b.Command, append(b.Args, b.Script)...), nil // nolint: gosec
 	}
 
+	args = append(args, b.Args...)
 	// PowerShell uses -Command instead of -c
 	if !slices.Contains(args, "-Command") && !slices.Contains(args, "-C") {
 		args = append(args, "-Command")
@@ -252,11 +264,12 @@ func (b *shellCommandBuilder) buildPowerShellCommand(ctx context.Context, cmd st
 
 // buildCmdCommand builds a command for Windows cmd.exe
 func (b *shellCommandBuilder) buildCmdCommand(ctx context.Context, cmd string, args []string) (*exec.Cmd, error) {
-	args = append(args, b.Args...)
-
 	if b.Command != "" && b.Script != "" {
-		return exec.CommandContext(ctx, b.Command, append(args, b.Script)...), nil // nolint: gosec
+		// When running a command directly with a script, don't include cmd.exe arguments
+		return exec.CommandContext(ctx, b.Command, append(b.Args, b.Script)...), nil // nolint: gosec
 	}
+
+	args = append(args, b.Args...)
 
 	// cmd.exe uses /c instead of -c
 	if !slices.Contains(args, "/c") && !slices.Contains(args, "/C") {
