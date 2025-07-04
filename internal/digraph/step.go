@@ -165,37 +165,49 @@ type RepeatPolicy struct {
 // UnmarshalJSON implements the json.Unmarshaler interface for RepeatPolicy.
 // It handles the legacy boolean repeat field and the new string repeat modes.
 func (r *RepeatPolicy) UnmarshalJSON(data []byte) error {
+	// Use a type alias to avoid infinite recursion
 	type Alias RepeatPolicy
-	aux := &struct {
-		*Alias
-		Repeat bool `json:"repeat,omitempty"`
-	}{
-		Alias: (*Alias)(r),
-	}
+
+	// First, unmarshal into the alias to get the new format fields
+	var aux Alias
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
 
-	switch {
-	case aux.Repeat && r.RepeatMode == "":
-		// If the repeat field is true, set the repeat mode to "while" by default.
-		r.RepeatMode = RepeatModeWhile
-	case !aux.Repeat && r.RepeatMode == "":
-		if r.Condition != nil {
-			// If the repeat field is false and no repeat mode is set, default to "until" if a condition is present.
-			r.RepeatMode = RepeatModeUntil
-		} else if len(r.ExitCode) > 0 {
-			// If the repeat field is false and no repeat mode is set, default to "while" if exit codes are present.
-			r.RepeatMode = RepeatModeWhile
-		} else {
-			r.RepeatMode = RepeatModeWhile // Default to "while" if no repeat mode is set.
-		}
-	}
-
-	r.Interval = r.Interval
-	r.Limit = r.Limit
+	// Copy the fields
+	r.RepeatMode = aux.RepeatMode
+	r.Interval = aux.Interval
+	r.Limit = aux.Limit
 	r.Condition = aux.Condition
 	r.ExitCode = aux.ExitCode
+
+	// If RepeatMode is already set, we're done (new format)
+	if r.RepeatMode != "" {
+		return nil
+	}
+
+	// Otherwise, check for legacy format
+	var legacy struct {
+		Repeat bool `json:"repeat"`
+	}
+
+	if err := json.Unmarshal(data, &legacy); err == nil && data != nil {
+		// Successfully parsed legacy format
+		if legacy.Repeat {
+			// Legacy repeat: true -> while mode
+			r.RepeatMode = RepeatModeWhile
+		} else {
+			// Legacy repeat: false -> infer based on conditions
+			if r.Condition != nil && r.Condition.Expected != "" {
+				// Condition with expected value -> "until" mode
+				r.RepeatMode = RepeatModeUntil
+			} else if r.Condition != nil || len(r.ExitCode) > 0 {
+				// Just condition or exit code -> "while" mode
+				r.RepeatMode = RepeatModeWhile
+			}
+			// Otherwise leave RepeatMode empty (no repeat)
+		}
+	}
 
 	return nil
 }
