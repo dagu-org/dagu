@@ -18,6 +18,7 @@ import {
   FileText,
   GitBranch,
   PlayCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -317,6 +318,47 @@ function NodeStatusTableRow({
                 {node.step.description}
               </div>
             )}
+            
+            {/* Repeat Policy */}
+            {node.step.repeatPolicy?.repeat && (
+              <div className="flex items-start gap-1 mt-1">
+                <span className={`inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                  node.step.repeatPolicy.repeat === 'while'
+                    ? 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'
+                    : node.step.repeatPolicy.repeat === 'until'
+                    ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                }`}>
+                  <RefreshCw className="h-2.5 w-2.5" />
+                  {node.step.repeatPolicy.repeat === 'while' ? 'WHILE' : 
+                   node.step.repeatPolicy.repeat === 'until' ? 'UNTIL' : 'REPEAT'}
+                  {node.step.repeatPolicy.interval && (
+                    <span className="opacity-75">{node.step.repeatPolicy.interval}s</span>
+                  )}
+                  {node.step.repeatPolicy.limit && (
+                    <span className="opacity-75">×{node.step.repeatPolicy.limit}</span>
+                  )}
+                </span>
+                
+                {node.step.repeatPolicy.condition && (
+                  <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono">
+                    {node.step.repeatPolicy.condition.condition}
+                    {node.step.repeatPolicy.condition.expected && (
+                      <span className="text-emerald-600 dark:text-emerald-400">
+                        ={node.step.repeatPolicy.condition.expected}
+                      </span>
+                    )}
+                  </span>
+                )}
+                
+                {node.step.repeatPolicy.exitCode && node.step.repeatPolicy.exitCode.length > 0 && (
+                  <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono">
+                    exit:[{node.step.repeatPolicy.exitCode.join(',')}]
+                  </span>
+                )}
+              </div>
+            )}
+            
             {hasChildDAGRun && (
               <>
                 {allChildren.length === 1 ? (

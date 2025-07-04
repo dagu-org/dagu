@@ -871,12 +871,21 @@ export interface components {
             /** @description Whether the condition was met */
             matched?: boolean;
         };
-        /** @description Configuration for step retry behavior */
+        /**
+         * @description Repeat execution mode for steps
+         * @enum {string}
+         */
+        RepeatMode: RepeatMode;
+        /** @description Configuration for step repeat behavior */
         RepeatPolicy: {
-            /** @description Whether the step should be retried on failure */
-            repeat?: boolean;
-            /** @description Time in seconds to wait between retry attempts */
+            repeat?: components["schemas"]["RepeatMode"];
+            /** @description Time in seconds to wait between repeat attempts */
             interval?: number;
+            /** @description Maximum number of times to repeat the step */
+            limit?: number;
+            condition?: components["schemas"]["Condition"];
+            /** @description List of exit codes that trigger repeat behavior */
+            exitCode?: number[];
         };
         /** @description Response object for listing all tags */
         ListTagResponse: {
@@ -2313,4 +2322,8 @@ export enum NodeStatusLabel {
     canceled = "canceled",
     finished = "finished",
     skipped = "skipped"
+}
+export enum RepeatMode {
+    While = "while",
+    Until = "until"
 }

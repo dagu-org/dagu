@@ -1943,14 +1943,22 @@ components:
       required:
         - condition
 
+    RepeatMode:
+      type: string
+      description: "Repeat execution mode for steps"
+      enum:
+        - "while"
+        - "until"
+      x-enum-varnames:
+        - "While"
+        - "Until"
+
     RepeatPolicy:
       type: object
       description: "Configuration for step repeat behavior"
       properties:
         repeat:
-          type: string
-          enum: ["", "while", "until"]
-          description: "Repeat mode - 'while' repeats while condition is true, 'until' repeats until condition is true"
+          $ref: "#/components/schemas/RepeatMode"
         interval:
           type: integer
           description: "Time in seconds to wait between repeat attempts"
