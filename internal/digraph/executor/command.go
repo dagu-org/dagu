@@ -85,16 +85,17 @@ func (e *commandExecutor) Kill(sig os.Signal) error {
 }
 
 type commandConfig struct {
-	Ctx              context.Context
-	Dir              string
-	Command          string
-	Args             []string
-	Script           string
-	ShellCommand     string
-	ShellCommandArgs string
-	ShellPackages    []string
-	Stdout           io.Writer
-	Stderr           io.Writer
+	Ctx                context.Context
+	Dir                string
+	Command            string
+	Args               []string
+	Script             string
+	ShellCommand       string
+	ShellCommandArgs   string
+	ShellPackages      []string
+	Stdout             io.Writer
+	Stderr             io.Writer
+	UserSpecifiedShell bool
 }
 
 func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.Cmd, error) {
@@ -195,7 +196,19 @@ func (b *shellCommandBuilder) Build(ctx context.Context) (*exec.Cmd, error) {
 		}
 
 		if b.Command != "" && b.Script != "" {
-			return exec.CommandContext(ctx, b.Command, append(args, b.Script)...), nil // nolint: gosec
+			// When using nix-shell with a direct command and script,
+			// we need to run the command inside nix-shell, not pass nix-shell args to the command
+			cmdParts := []string{b.Command}
+			cmdParts = append(cmdParts, b.Args...)
+			cmdParts = append(cmdParts, b.Script)
+			cmdStr := strings.Join(cmdParts, " ")
+			
+			// If ShellCommandArgs contains "set -e", we need to apply it
+			if strings.HasPrefix(b.ShellCommandArgs, "set -e") {
+				cmdStr = b.ShellCommandArgs + " " + cmdStr
+			}
+			
+			return exec.CommandContext(ctx, cmd, append(args, cmdStr)...), nil // nolint: gosec
 		}
 
 		// Construct the command with the shell command and the packages
@@ -215,10 +228,12 @@ func (b *shellCommandBuilder) Build(ctx context.Context) (*exec.Cmd, error) {
 
 	default:
 		// other shell (sh, bash, zsh, etc.)
-		args = append(args, b.Args...)
 		if b.Command != "" && b.Script != "" {
-			return exec.CommandContext(ctx, b.Command, append(args, b.Script)...), nil // nolint: gosec
+			// When running a command directly with a script (e.g., perl script.pl),
+			// don't include shell arguments like -e
+			return exec.CommandContext(ctx, b.Command, append(b.Args, b.Script)...), nil // nolint: gosec
 		}
+		args = append(args, b.Args...)
 		if !slices.Contains(args, "-c") {
 			args = append(args, "-c")
 		}
@@ -231,12 +246,12 @@ func (b *shellCommandBuilder) Build(ctx context.Context) (*exec.Cmd, error) {
 
 // buildPowerShellCommand builds a command for PowerShell (both Windows PowerShell and PowerShell Core)
 func (b *shellCommandBuilder) buildPowerShellCommand(ctx context.Context, cmd string, args []string) (*exec.Cmd, error) {
-	args = append(args, b.Args...)
-
 	if b.Command != "" && b.Script != "" {
-		return exec.CommandContext(ctx, b.Command, append(args, b.Script)...), nil // nolint: gosec
+		// When running a command directly with a script, don't include PowerShell arguments
+		return exec.CommandContext(ctx, b.Command, append(b.Args, b.Script)...), nil // nolint: gosec
 	}
 
+	args = append(args, b.Args...)
 	// PowerShell uses -Command instead of -c
 	if !slices.Contains(args, "-Command") && !slices.Contains(args, "-C") {
 		args = append(args, "-Command")
@@ -249,11 +264,12 @@ func (b *shellCommandBuilder) buildPowerShellCommand(ctx context.Context, cmd st
 
 // buildCmdCommand builds a command for Windows cmd.exe
 func (b *shellCommandBuilder) buildCmdCommand(ctx context.Context, cmd string, args []string) (*exec.Cmd, error) {
-	args = append(args, b.Args...)
-
 	if b.Command != "" && b.Script != "" {
-		return exec.CommandContext(ctx, b.Command, append(args, b.Script)...), nil // nolint: gosec
+		// When running a command directly with a script, don't include cmd.exe arguments
+		return exec.CommandContext(ctx, b.Command, append(b.Args, b.Script)...), nil // nolint: gosec
 	}
+
+	args = append(args, b.Args...)
 
 	// cmd.exe uses /c instead of -c
 	if !slices.Contains(args, "/c") && !slices.Contains(args, "/C") {
@@ -275,19 +291,64 @@ func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
 }
 
 func createCommandConfig(ctx context.Context, step digraph.Step) (*commandConfig, error) {
-	shellCommand := cmdutil.GetShellCommand(step.Shell)
+	var shellCommand string
 	shellCmdArgs := step.ShellCmdArgs
+	userSpecifiedShell := step.Shell != ""
+
+	if userSpecifiedShell {
+		// User explicitly set shell - respect their choice exactly
+		shellCommand = cmdutil.GetShellCommand(step.Shell)
+	} else {
+		// No shell specified - use default with errexit
+		defaultShell := cmdutil.GetShellCommand("")
+
+		// Special handling for nix-shell - don't add -e to nix-shell itself
+		shellName := filepath.Base(defaultShell)
+		if shellName == "nix-shell" {
+			// For nix-shell, prepend set -e to the command
+			shellCommand = defaultShell
+			if shellCmdArgs != "" && !strings.HasPrefix(shellCmdArgs, "set -e") {
+				shellCmdArgs = "set -e; " + shellCmdArgs
+			}
+		} else if isUnixLikeShell(defaultShell) {
+			// Add errexit flag for Unix-like shells
+			shellCommand = defaultShell + " -e"
+		} else {
+			shellCommand = defaultShell
+		}
+	}
 
 	return &commandConfig{
-		Ctx:              ctx,
-		Dir:              GetEnv(ctx).WorkingDir,
-		Command:          step.Command,
-		Args:             step.Args,
-		Script:           step.Script,
-		ShellCommand:     shellCommand,
-		ShellCommandArgs: shellCmdArgs,
-		ShellPackages:    step.ShellPackages,
+		Ctx:                ctx,
+		Dir:                GetEnv(ctx).WorkingDir,
+		Command:            step.Command,
+		Args:               step.Args,
+		Script:             step.Script,
+		ShellCommand:       shellCommand,
+		ShellCommandArgs:   shellCmdArgs,
+		ShellPackages:      step.ShellPackages,
+		UserSpecifiedShell: userSpecifiedShell,
 	}, nil
+}
+
+// isUnixLikeShell returns true if the shell supports -e flag
+func isUnixLikeShell(shell string) bool {
+	if shell == "" {
+		return false
+	}
+
+	// Extract just the executable name (handle full paths)
+	shellName := filepath.Base(shell)
+
+	switch shellName {
+	case "sh", "bash", "zsh", "ksh", "ash", "dash":
+		return true
+	case "fish":
+		// Fish shell doesn't support -e flag
+		return false
+	default:
+		return false
+	}
 }
 
 func setupScript(_ context.Context, workDir, script string) (string, error) {
