@@ -1,6 +1,7 @@
 package digraph
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -148,9 +149,9 @@ const (
 
 // RepeatPolicy contains the repeat policy for a step.
 type RepeatPolicy struct {
-	// Repeat determines if and how the step should be repeated.
+	// RepeatMode determines if and how the step should be repeated.
 	// It can be 'while' or 'until'.
-	Repeat RepeatMode `json:"repeat,omitempty"`
+	RepeatMode RepeatMode `json:"repeatMode,omitempty"`
 	// Interval is the time to wait between repeats.
 	Interval time.Duration `json:"interval,omitempty"`
 	// Limit is the maximum number of times to repeat the step.
@@ -159,6 +160,44 @@ type RepeatPolicy struct {
 	Condition *Condition `json:"condition,omitempty"`
 	// ExitCode is the list of exit codes that should trigger a repeat.
 	ExitCode []int `json:"exitCode,omitempty"`
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface for RepeatPolicy.
+// It handles the legacy boolean repeat field and the new string repeat modes.
+func (r *RepeatPolicy) UnmarshalJSON(data []byte) error {
+	type Alias RepeatPolicy
+	aux := &struct {
+		*Alias
+		Repeat bool `json:"repeat,omitempty"`
+	}{
+		Alias: (*Alias)(r),
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	switch {
+	case aux.Repeat && r.RepeatMode == "":
+		// If the repeat field is true, set the repeat mode to "while" by default.
+		r.RepeatMode = RepeatModeWhile
+	case !aux.Repeat && r.RepeatMode == "":
+		if r.Condition != nil {
+			// If the repeat field is false and no repeat mode is set, default to "until" if a condition is present.
+			r.RepeatMode = RepeatModeUntil
+		} else if len(r.ExitCode) > 0 {
+			// If the repeat field is false and no repeat mode is set, default to "while" if exit codes are present.
+			r.RepeatMode = RepeatModeWhile
+		} else {
+			r.RepeatMode = RepeatModeWhile // Default to "while" if no repeat mode is set.
+		}
+	}
+
+	r.Interval = r.Interval
+	r.Limit = r.Limit
+	r.Condition = aux.Condition
+	r.ExitCode = aux.ExitCode
+
+	return nil
 }
 
 // ContinueOn contains the conditions to continue on failure or skipped.
