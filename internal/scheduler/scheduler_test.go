@@ -29,7 +29,8 @@ func TestScheduler(t *testing.T) {
 		}
 
 		th := setupTest(t)
-		sc := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
+		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
+		require.NoError(t, err)
 
 		ctx := context.Background()
 		go func() {
@@ -42,6 +43,7 @@ func TestScheduler(t *testing.T) {
 		require.Equal(t, int32(1), entryReader.Entries[0].Job.(*mockJob).RunCount.Load())
 		require.Equal(t, int32(0), entryReader.Entries[1].Job.(*mockJob).RunCount.Load())
 	})
+
 	t.Run("Restart", func(t *testing.T) {
 		now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 		scheduler.SetFixedTime(now)
@@ -53,7 +55,8 @@ func TestScheduler(t *testing.T) {
 		}
 
 		th := setupTest(t)
-		sc := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
+		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
+		require.NoError(t, err)
 
 		go func() {
 			_ = sc.Start(context.Background())
@@ -69,7 +72,8 @@ func TestScheduler(t *testing.T) {
 		scheduler.SetFixedTime(now)
 
 		th := setupTest(t)
-		schedulerInstance := scheduler.New(th.Config, &mockJobManager{}, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
+		schedulerInstance, err := scheduler.New(th.Config, &mockJobManager{}, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
+		require.NoError(t, err)
 
 		next := schedulerInstance.NextTick(now)
 		require.Equal(t, time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC), next)
@@ -224,7 +228,8 @@ func TestScheduler_QueueDisabled(t *testing.T) {
 			Entries: []*scheduler.ScheduledJob{},
 		}
 
-		sc := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
+		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
+		require.NoError(t, err)
 
 		ctx := context.Background()
 		go func() {
@@ -237,5 +242,168 @@ func TestScheduler_QueueDisabled(t *testing.T) {
 
 		// Test passes if no panics occur when queues are disabled
 		require.True(t, true)
+	})
+}
+
+func TestFileLockPreventsMultipleInstances(t *testing.T) {
+	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	scheduler.SetFixedTime(now)
+
+	entryReader := &mockJobManager{
+		Entries: []*scheduler.ScheduledJob{},
+	}
+
+	th := setupTest(t)
+
+	// Create first scheduler instance
+	sc1, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
+	require.NoError(t, err)
+
+	// Start first scheduler
+	ctx := context.Background()
+	errCh1 := make(chan error, 1)
+	go func() {
+		errCh1 <- sc1.Start(ctx)
+	}()
+
+	// Give first scheduler time to acquire lock
+	time.Sleep(time.Millisecond * 100)
+
+	// Create second scheduler instance with same config
+	sc2, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
+	require.NoError(t, err)
+
+	// Try to start second scheduler - should fail due to lock conflict
+	err = sc2.Start(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "scheduler lock is already held by another process")
+
+	// Stop first scheduler
+	sc1.Stop(ctx)
+
+	// Wait for first scheduler to finish
+	select {
+	case err := <-errCh1:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("First scheduler did not stop in time")
+	}
+
+	// Now second scheduler should be able to start
+	errCh2 := make(chan error, 1)
+	go func() {
+		errCh2 <- sc2.Start(ctx)
+	}()
+
+	// Give second scheduler time to start
+	time.Sleep(time.Millisecond * 100)
+
+	// Stop second scheduler
+	sc2.Stop(ctx)
+
+	// Wait for second scheduler to finish
+	select {
+	case err := <-errCh2:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Second scheduler did not stop in time")
+	}
+}
+
+func TestSchedulerLockUtilities(t *testing.T) {
+	th := setupTest(t)
+
+	t.Run("IsLocked returns false when no lock exists", func(t *testing.T) {
+		require.False(t, scheduler.IsLocked(th.Config))
+	})
+
+	t.Run("ForceUnlock succeeds when no lock exists", func(t *testing.T) {
+		// ForceUnlock should succeed even if the directory doesn't exist
+		err := scheduler.ForceUnlock(th.Config)
+		// This might return an error if directory doesn't exist, which is acceptable
+		if err != nil {
+			require.Contains(t, err.Error(), "no such file or directory")
+		}
+	})
+
+	t.Run("LockInfo returns nil when no lock exists", func(t *testing.T) {
+		info, err := scheduler.LockInfo(th.Config)
+		// This might return an error if directory doesn't exist, which is acceptable
+		if err != nil {
+			require.Contains(t, err.Error(), "no such file or directory")
+		} else {
+			require.Nil(t, info)
+		}
+	})
+
+	t.Run("IsLocked returns true when scheduler is running", func(t *testing.T) {
+		entryReader := &mockJobManager{Entries: []*scheduler.ScheduledJob{}}
+		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
+		require.NoError(t, err)
+
+		ctx := context.Background()
+		errCh := make(chan error, 1)
+		go func() {
+			errCh <- sc.Start(ctx)
+		}()
+
+		// Give scheduler time to acquire lock
+		time.Sleep(time.Millisecond * 100)
+
+		require.True(t, scheduler.IsLocked(th.Config))
+
+		// Check lock info
+		info, err := scheduler.LockInfo(th.Config)
+		require.NoError(t, err)
+		require.NotNil(t, info)
+		require.Contains(t, info.LockDirName, ".dagu_lock.")
+
+		// Stop scheduler
+		sc.Stop(ctx)
+
+		// Wait for scheduler to finish
+		select {
+		case err := <-errCh:
+			require.NoError(t, err)
+		case <-time.After(5 * time.Second):
+			t.Fatal("Scheduler did not stop in time")
+		}
+
+		// Lock should be released
+		require.False(t, scheduler.IsLocked(th.Config))
+	})
+
+	t.Run("ForceUnlock removes existing lock", func(t *testing.T) {
+		entryReader := &mockJobManager{Entries: []*scheduler.ScheduledJob{}}
+		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
+		require.NoError(t, err)
+
+		ctx := context.Background()
+		errCh := make(chan error, 1)
+		go func() {
+			errCh <- sc.Start(ctx)
+		}()
+
+		// Give scheduler time to acquire lock
+		time.Sleep(time.Millisecond * 100)
+
+		require.True(t, scheduler.IsLocked(th.Config))
+
+		// Force unlock should remove the lock
+		err = scheduler.ForceUnlock(th.Config)
+		require.NoError(t, err)
+
+		// Stop scheduler (it should handle the missing lock gracefully)
+		sc.Stop(ctx)
+
+		// Wait for scheduler to finish
+		select {
+		case err := <-errCh:
+			require.NoError(t, err)
+		case <-time.After(5 * time.Second):
+			t.Fatal("Scheduler did not stop in time")
+		}
+
+		require.False(t, scheduler.IsLocked(th.Config))
 	})
 }

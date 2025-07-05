@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/adrg/xdg"
 	"github.com/dagu-org/dagu/internal/build"
@@ -123,11 +124,29 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 
 	// Set global configuration values.
 	cfg.Global = Global{
-		Debug:        def.Debug,
-		LogFormat:    def.LogFormat,
-		TZ:           def.TZ,
-		WorkDir:      def.WorkDir,
-		DefaultShell: def.DefaultShell,
+		Debug:                       def.Debug,
+		LogFormat:                   def.LogFormat,
+		TZ:                          def.TZ,
+		WorkDir:                     def.WorkDir,
+		DefaultShell:                def.DefaultShell,
+		SchedulerLockStaleThreshold: 30 * time.Second,
+		SchedulerLockRetryInterval:  50 * time.Millisecond,
+	}
+
+	if def.SchedulerLockStaleThreshold != "" {
+		if duration, err := time.ParseDuration(def.SchedulerLockStaleThreshold); err == nil {
+			cfg.Global.SchedulerLockStaleThreshold = duration
+		} else {
+			l.warnings = append(l.warnings, fmt.Sprintf("Invalid schedulerLockStaleThreshold value: %s, using default 30s", def.SchedulerLockStaleThreshold))
+		}
+	}
+
+	if def.SchedulerLockRetryInterval != "" {
+		if duration, err := time.ParseDuration(def.SchedulerLockRetryInterval); err == nil {
+			cfg.Global.SchedulerLockRetryInterval = duration
+		} else {
+			l.warnings = append(l.warnings, fmt.Sprintf("Invalid schedulerLockRetryInterval value: %s, using default 50ms", def.SchedulerLockRetryInterval))
+		}
 	}
 
 	// Initialize the timezone (loads the time.Location and sets the TZ environment variable).
@@ -391,6 +410,10 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 
 	// Queue settings
 	viper.SetDefault("queues.enabled", true)
+
+	// Scheduler lock settings
+	viper.SetDefault("schedulerLockStaleThreshold", "30s")
+	viper.SetDefault("schedulerLockRetryInterval", "50ms")
 }
 
 // bindEnvironmentVariables binds various configuration keys to environment variables.
@@ -408,6 +431,10 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	// Global configurations
 	l.bindEnv("workDir", "WORK_DIR")
 	l.bindEnv("defaultShell", "DEFAULT_SHELL")
+
+	// Scheduler lock configurations
+	l.bindEnv("schedulerLockStaleThreshold", "SCHEDULER_LOCK_STALE_THRESHOLD")
+	l.bindEnv("schedulerLockRetryInterval", "SCHEDULER_LOCK_RETRY_INTERVAL")
 
 	// UI configurations
 	l.bindEnv("ui.maxDashboardPageLimit", "UI_MAX_DASHBOARD_PAGE_LIMIT")
