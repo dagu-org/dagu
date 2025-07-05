@@ -150,8 +150,9 @@ type Definition struct {
 
 // authDef holds the authentication configuration for the application.
 type authDef struct {
-	Basic *authBasicDef `mapstructure:"basic"`
-	Token *authTokenDef `mapstructure:"token"`
+	Basic          *authBasicDef `mapstructure:"basic"`
+	Token          *authTokenDef `mapstructure:"token"`
+	NodeSigningKey string        `mapstructure:"nodeSigningKey"` // Used for signing key for JWT
 }
 
 // authBasicDef represents the basic authentication configuration

@@ -47,9 +47,10 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 		"DAGU_UI_NAVBAR_TITLE":             "Test Dagu",
 
 		// Authentication configurations (new keys)
-		"DAGU_AUTH_BASIC_USERNAME": "testuser",
-		"DAGU_AUTH_BASIC_PASSWORD": "testpass",
-		"DAGU_AUTH_TOKEN":          "test-token-123",
+		"DAGU_AUTH_BASIC_USERNAME":   "testuser",
+		"DAGU_AUTH_BASIC_PASSWORD":   "testpass",
+		"DAGU_AUTH_TOKEN":            "test-token-123",
+		"DAGU_AUTH_NODE_SIGNING_KEY": "test-signing-key-abc123",
 
 		// TLS configurations
 		"DAGU_CERT_FILE": "/test/cert.pem",
@@ -127,6 +128,7 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 	assert.Equal(t, "testuser", cfg.Server.Auth.Basic.Username)
 	assert.Equal(t, "testpass", cfg.Server.Auth.Basic.Password)
 	assert.Equal(t, "test-token-123", cfg.Server.Auth.Token.Value)
+	assert.Equal(t, "test-signing-key-abc123", cfg.Server.Auth.NodeSigningKey)
 	assert.True(t, cfg.Server.Auth.Basic.Enabled())
 	assert.True(t, cfg.Server.Auth.Token.Enabled())
 
@@ -152,4 +154,127 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 
 	// Queue configuration
 	assert.False(t, cfg.Queues.Enabled)
+}
+
+// TestConfigLoader_NodeSigningKey tests the NodeSigningKey configuration
+func TestConfigLoader_NodeSigningKey(t *testing.T) {
+	t.Run("LoadFromYAML", func(t *testing.T) {
+		// Reset viper to ensure clean state
+		viper.Reset()
+		defer viper.Reset()
+
+		// Create a config file with NodeSigningKey
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+auth:
+  nodeSigningKey: "yaml-signing-key-123"
+  basic:
+    username: "admin"
+    password: "pass"
+  token:
+    value: "api-token"
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		// Load configuration
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// Verify NodeSigningKey is loaded from YAML
+		assert.Equal(t, "yaml-signing-key-123", cfg.Server.Auth.NodeSigningKey)
+		assert.Equal(t, "admin", cfg.Server.Auth.Basic.Username)
+		assert.Equal(t, "pass", cfg.Server.Auth.Basic.Password)
+		assert.Equal(t, "api-token", cfg.Server.Auth.Token.Value)
+	})
+
+	t.Run("EnvironmentVariableOverride", func(t *testing.T) {
+		// Reset viper to ensure clean state
+		viper.Reset()
+		defer viper.Reset()
+
+		// Create a config file with NodeSigningKey
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+auth:
+  nodeSigningKey: "yaml-signing-key"
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		// Set environment variable
+		os.Setenv("DAGU_AUTH_NODE_SIGNING_KEY", "env-signing-key-override")
+		defer os.Unsetenv("DAGU_AUTH_NODE_SIGNING_KEY")
+
+		// Load configuration
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// Verify environment variable overrides YAML
+		assert.Equal(t, "env-signing-key-override", cfg.Server.Auth.NodeSigningKey)
+	})
+
+	t.Run("EmptyNodeSigningKey", func(t *testing.T) {
+		// Reset viper to ensure clean state
+		viper.Reset()
+		defer viper.Reset()
+
+		// Create a minimal config file without NodeSigningKey
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+auth:
+  basic:
+    username: "user"
+    password: "pass"
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		// Load configuration
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// Verify NodeSigningKey is empty when not provided
+		assert.Equal(t, "", cfg.Server.Auth.NodeSigningKey)
+		assert.Equal(t, "user", cfg.Server.Auth.Basic.Username)
+		assert.Equal(t, "pass", cfg.Server.Auth.Basic.Password)
+	})
+
+	t.Run("NestedAuthConfig", func(t *testing.T) {
+		// Reset viper to ensure clean state
+		viper.Reset()
+		defer viper.Reset()
+
+		// Create a config with all auth fields
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+auth:
+  nodeSigningKey: "master-signing-key"
+  basic:
+    username: "testuser"
+    password: "testpass"
+  token:
+    value: "test-token"
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		// Load configuration
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// Verify all auth fields are loaded correctly
+		assert.Equal(t, "master-signing-key", cfg.Server.Auth.NodeSigningKey)
+		assert.Equal(t, "testuser", cfg.Server.Auth.Basic.Username)
+		assert.Equal(t, "testpass", cfg.Server.Auth.Basic.Password)
+		assert.Equal(t, "test-token", cfg.Server.Auth.Token.Value)
+	})
 }

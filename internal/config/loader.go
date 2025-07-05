@@ -185,6 +185,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		if def.Auth.Token != nil {
 			cfg.Server.Auth.Token.Value = def.Auth.Token.Value
 		}
+		cfg.Server.Auth.NodeSigningKey = def.Auth.NodeSigningKey
 	}
 
 	// Normalize the BasePath value for proper URL construction.
@@ -425,6 +426,7 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("auth.basic.username", "AUTH_BASIC_USERNAME")
 	l.bindEnv("auth.basic.password", "AUTH_BASIC_PASSWORD")
 	l.bindEnv("auth.token.value", "AUTH_TOKEN")
+	l.bindEnv("auth.nodeSigningKey", "AUTH_NODE_SIGNING_KEY")
 
 	// Authentication configurations (legacy keys)
 	l.bindEnv("auth.basic.username", "BASICAUTH_USERNAME")

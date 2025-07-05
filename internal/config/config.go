@@ -157,6 +157,9 @@ func (cfg *Server) cleanBasePath() {
 type Auth struct {
 	Basic AuthBasic
 	Token AuthToken
+
+	// NodeSigningKey is used for signing JWT tokens for node authentication
+	NodeSigningKey string
 }
 
 // AuthBasic represents the basic authentication configuration
