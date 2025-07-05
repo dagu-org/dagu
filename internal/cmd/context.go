@@ -25,6 +25,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
+	"github.com/dagu-org/dagu/internal/worker"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -112,7 +113,13 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	}
 
 	switch cmd.Name() {
-	case "server", "scheduler", "start-all":
+	case "server":
+		// For server, we setup worker manager
+		wm := worker.NewWorkerManager()
+		ctx = worker.WithWorkerManager(ctx, wm)
+
+		fallthrough
+	case "scheduler", "start-all":
 		// For long-running process, we setup file cache for better performance
 		hc := fileutil.NewCache[*models.DAGRunStatus](0, time.Hour*12)
 		hc.StartEviction(ctx)
