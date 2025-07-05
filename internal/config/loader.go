@@ -185,7 +185,6 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		if def.Auth.Token != nil {
 			cfg.Server.Auth.Token.Value = def.Auth.Token.Value
 		}
-		cfg.Server.Auth.NodeSigningKey = def.Auth.NodeSigningKey
 	}
 
 	// Normalize the BasePath value for proper URL construction.
@@ -223,6 +222,11 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 				MaxActiveRuns: queueDef.MaxActiveRuns,
 			})
 		}
+	}
+
+	// Set worker configuration if provided.
+	if def.Worker != nil {
+		cfg.Worker.SigningKey = def.Worker.SigningKey
 	}
 
 	// Incorporate legacy field values, which may override existing settings.
@@ -426,7 +430,6 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("auth.basic.username", "AUTH_BASIC_USERNAME")
 	l.bindEnv("auth.basic.password", "AUTH_BASIC_PASSWORD")
 	l.bindEnv("auth.token.value", "AUTH_TOKEN")
-	l.bindEnv("auth.nodeSigningKey", "AUTH_NODE_SIGNING_KEY")
 
 	// Authentication configurations (legacy keys)
 	l.bindEnv("auth.basic.username", "BASICAUTH_USERNAME")
@@ -455,6 +458,9 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 
 	// Queue configuration
 	l.bindEnv("queues.enabled", "QUEUE_ENABLED")
+
+	// Worker configuration
+	l.bindEnv("worker.signingKey", "WORKER_SIGNING_KEY")
 }
 
 // bindEnv constructs the full environment variable name using the app prefix and binds it to the given key.

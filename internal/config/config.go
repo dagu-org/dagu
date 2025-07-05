@@ -24,6 +24,9 @@ type Config struct {
 	// Queues contains global queue configuration settings.
 	Queues Queues
 
+	// Worker defines the worker configuration for executing tasks.
+	Worker Worker
+
 	// Warnings contains a list of warnings generated during the configuration loading process.
 	Warnings []string
 }
@@ -157,9 +160,6 @@ func (cfg *Server) cleanBasePath() {
 type Auth struct {
 	Basic AuthBasic
 	Token AuthToken
-
-	// NodeSigningKey is used for signing JWT tokens for node authentication
-	NodeSigningKey string
 }
 
 // AuthBasic represents the basic authentication configuration
@@ -232,4 +232,9 @@ type Queues struct {
 type QueueConfig struct {
 	Name          string
 	MaxActiveRuns int
+}
+
+// Worker represents the worker configuration
+type Worker struct {
+	SigningKey string // Used for signing key for JWT
 }

@@ -69,6 +69,9 @@ type Definition struct {
 	// Queues contains global queue configuration settings.
 	Queues *queuesDef `mapstructure:"queues"`
 
+	// Worker contains worker configuration settings.
+	Worker *workerDef `mapstructure:"worker"`
+
 	// ----------------------------------------------------------------------------
 	// Legacy fields for backward compatibility - Start
 	// These fields are maintained for compatibility with older configuration formats.
@@ -150,9 +153,8 @@ type Definition struct {
 
 // authDef holds the authentication configuration for the application.
 type authDef struct {
-	Basic          *authBasicDef `mapstructure:"basic"`
-	Token          *authTokenDef `mapstructure:"token"`
-	NodeSigningKey string        `mapstructure:"nodeSigningKey"` // Used for signing key for JWT
+	Basic *authBasicDef `mapstructure:"basic"`
+	Token *authTokenDef `mapstructure:"token"`
 }
 
 // authBasicDef represents the basic authentication configuration
@@ -225,4 +227,9 @@ type queuesDef struct {
 type queueConfigDef struct {
 	Name          string `mapstructure:"name"`
 	MaxActiveRuns int    `mapstructure:"maxActiveRuns"`
+}
+
+// workerDef represents the worker configuration
+type workerDef struct {
+	SigningKey string `mapstructure:"signingKey"`
 }
