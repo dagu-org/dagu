@@ -27,6 +27,8 @@ tags:
     description: "Operations for managing and creating DAG definitions"
   - name: "dag-runs"
     description: "Operations for retrieving historical data and logs of DAG-run executions"
+  - name: "worker"
+    description: "Operations for managing workers and their execution status"
   - name: "system"
     description: "System operations for monitoring and managing the Dagu server"
   - name: "monitoring"
@@ -1090,6 +1092,57 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /workers/poll:
+    post:
+      summary: "Worker poll endpoint"
+      description: "Used by workers to poll for a task to execute"
+      operationId: "workerPoll"
+      tags:
+        - "worker"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                workerId:
+                  type: string
+                  description: "Unique identifier for the worker polling for tasks"
+                labels:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: "Labels of the worker, used for task filtering"
+                maxActiveTasks:
+                  type: integer
+                  description: "Maximum number of active tasks the worker can handle at once"
+              required:
+                - workerId
+                - labels
+                - maxActiveTasks
+      responses:
+        "200":
+          description: "A successful response with tasks for the worker"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tasks:
+                    type: array
+                    description: "List of tasks assigned to the worker"
+                    items:
+                      $ref: "#/components/schemas/WorkerTask"
+                required:
+                  - tasks
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /metrics:
     get:
       summary: "Get Prometheus metrics"
@@ -1108,29 +1161,29 @@ paths:
                   # HELP dagu_info Dagu build information
                   # TYPE dagu_info gauge
                   dagu_info{version="1.14.0",build_date="2024-01-01T12:00:00Z",go_version="1.21"} 1
-                  
+
                   # HELP dagu_uptime_seconds Time since server start
                   # TYPE dagu_uptime_seconds gauge
                   dagu_uptime_seconds 3600
-                  
+
                   # HELP dagu_dag_runs_currently_running Number of currently running DAG runs
                   # TYPE dagu_dag_runs_currently_running gauge
                   dagu_dag_runs_currently_running 5
-                  
+
                   # HELP dagu_dag_runs_queued_total Total number of DAG runs in queue
                   # TYPE dagu_dag_runs_queued_total gauge
                   dagu_dag_runs_queued_total 8
-                  
+
                   # HELP dagu_dag_runs_total Total number of DAG runs by status
                   # TYPE dagu_dag_runs_total counter
                   dagu_dag_runs_total{status="success"} 2493
                   dagu_dag_runs_total{status="error"} 15
                   dagu_dag_runs_total{status="cancelled"} 7
-                  
+
                   # HELP dagu_dags_total Total number of DAGs
                   # TYPE dagu_dags_total gauge
                   dagu_dags_total 45
-                  
+
                   # HELP dagu_scheduler_running Whether the scheduler is running
                   # TYPE dagu_scheduler_running gauge
                   dagu_scheduler_running 1
@@ -1785,7 +1838,6 @@ components:
         - dagRunId
         - params
 
-
     Step:
       type: object
       description: "Individual task definition that performs a specific operation in a DAG-run"
@@ -1972,6 +2024,13 @@ components:
           description: "List of exit codes that trigger repeat behavior"
           items:
             type: integer
+
+    WorkerTask:
+      type: object
+      description: "Task assigned to a worker for execution"
+      properties:
+        dag:
+          $ref: "#/components/schemas/DAGRunSummary"
 
     ListTagResponse:
       type: object
