@@ -27,6 +27,9 @@ type Config struct {
 	// Coordinator defines the coordinator service configuration.
 	Coordinator Coordinator
 
+	// Worker defines the worker configuration.
+	Worker Worker
+
 	// Warnings contains a list of warnings generated during the configuration loading process.
 	Warnings []string
 }
@@ -220,6 +223,7 @@ type RemoteNode struct {
 type TLSConfig struct {
 	CertFile string
 	KeyFile  string
+	CAFile   string
 }
 
 // Queues represents the global queue configuration
@@ -240,4 +244,15 @@ type Coordinator struct {
 	Port       int        // gRPC server port number
 	SigningKey string     // Used for signing key for JWT
 	TLS        *TLSConfig // TLS configuration for secure connections
+}
+
+// Worker represents the worker configuration
+type Worker struct {
+	ID                string     // Worker instance ID (default: hostname@PID)
+	MaxConcurrentRuns int        // Maximum concurrent task executions (default: 100)
+	CoordinatorHost   string     // Coordinator gRPC server host (default: 127.0.0.1)
+	CoordinatorPort   int        // Coordinator gRPC server port (default: 50051)
+	TLS               *TLSConfig // TLS configuration for coordinator connection
+	Insecure          bool       // Use insecure connection (h2c) - must be explicitly enabled
+	SkipTLSVerify     bool       // Skip TLS certificate verification
 }

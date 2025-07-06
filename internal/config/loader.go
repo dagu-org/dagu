@@ -173,6 +173,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		cfg.Server.TLS = &TLSConfig{
 			CertFile: def.TLS.CertFile,
 			KeyFile:  def.TLS.KeyFile,
+			CAFile:   def.TLS.CAFile,
 		}
 	}
 
@@ -244,6 +245,40 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 			cfg.Coordinator.TLS = &TLSConfig{
 				CertFile: def.Coordinator.TLS.CertFile,
 				KeyFile:  def.Coordinator.TLS.KeyFile,
+				CAFile:   def.Coordinator.TLS.CAFile,
+			}
+		}
+	}
+
+	// Set worker configuration
+	cfg.Worker.MaxConcurrentRuns = viper.GetInt("worker.maxConcurrentRuns")
+	cfg.Worker.CoordinatorHost = viper.GetString("worker.coordinatorHost")
+	cfg.Worker.CoordinatorPort = viper.GetInt("worker.coordinatorPort")
+	cfg.Worker.Insecure = viper.GetBool("worker.insecure")
+	cfg.Worker.SkipTLSVerify = viper.GetBool("worker.skipTLSVerify")
+
+	if def.Worker != nil {
+		if def.Worker.ID != "" {
+			cfg.Worker.ID = def.Worker.ID
+		}
+		if def.Worker.MaxConcurrentRuns > 0 {
+			cfg.Worker.MaxConcurrentRuns = def.Worker.MaxConcurrentRuns
+		}
+		if def.Worker.CoordinatorHost != "" {
+			cfg.Worker.CoordinatorHost = def.Worker.CoordinatorHost
+		}
+		if def.Worker.CoordinatorPort > 0 {
+			cfg.Worker.CoordinatorPort = def.Worker.CoordinatorPort
+		}
+		cfg.Worker.Insecure = def.Worker.Insecure
+		cfg.Worker.SkipTLSVerify = def.Worker.SkipTLSVerify
+
+		// Set TLS configuration if available
+		if def.Worker.TLS != nil {
+			cfg.Worker.TLS = &TLSConfig{
+				CertFile: def.Worker.TLS.CertFile,
+				KeyFile:  def.Worker.TLS.KeyFile,
+				CAFile:   def.Worker.TLS.CAFile,
 			}
 		}
 	}
@@ -409,6 +444,12 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	viper.SetDefault("coordinator.host", "127.0.0.1")
 	viper.SetDefault("coordinator.port", 50051)
 
+	// Worker settings
+	viper.SetDefault("worker.maxConcurrentRuns", 100)
+	viper.SetDefault("worker.coordinatorHost", "127.0.0.1")
+	viper.SetDefault("worker.coordinatorPort", 50051)
+	viper.SetDefault("worker.insecure", false) // Secure by default - TLS required
+
 	// UI settings
 	viper.SetDefault("ui.navbarTitle", build.AppName)
 	viper.SetDefault("ui.maxDashboardPageLimit", 100)
@@ -486,6 +527,17 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("coordinator.host", "COORDINATOR_HOST")
 	l.bindEnv("coordinator.port", "COORDINATOR_PORT")
 	l.bindEnv("coordinator.signingKey", "COORDINATOR_SIGNING_KEY")
+
+	// Worker configuration
+	l.bindEnv("worker.id", "WORKER_ID")
+	l.bindEnv("worker.maxConcurrentRuns", "WORKER_MAX_CONCURRENT_RUNS")
+	l.bindEnv("worker.coordinatorHost", "WORKER_COORDINATOR_HOST")
+	l.bindEnv("worker.coordinatorPort", "WORKER_COORDINATOR_PORT")
+	l.bindEnv("worker.insecure", "WORKER_INSECURE")
+	l.bindEnv("worker.skipTLSVerify", "WORKER_SKIP_TLS_VERIFY")
+	l.bindEnv("worker.tls.certFile", "WORKER_TLS_CERT_FILE")
+	l.bindEnv("worker.tls.keyFile", "WORKER_TLS_KEY_FILE")
+	l.bindEnv("worker.tls.caFile", "WORKER_TLS_CA_FILE")
 }
 
 // bindEnv constructs the full environment variable name using the app prefix and binds it to the given key.

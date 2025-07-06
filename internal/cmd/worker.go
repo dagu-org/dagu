@@ -65,50 +65,68 @@ var workerFlags = []commandLineFlag{
 }
 
 func runWorker(ctx *Context, _ []string) error {
-	// Get worker ID (optional, defaults to hostname@PID)
-	workerID, _ := ctx.Command.Flags().GetString("worker-id")
-
-	// Get max concurrent runs
-	maxConcurrentRunsStr, _ := ctx.Command.Flags().GetString("max-concurrent-runs")
-	maxConcurrentRuns, err := strconv.Atoi(maxConcurrentRunsStr)
-	if err != nil {
-		return fmt.Errorf("invalid max-concurrent-runs value: %w", err)
+	// Use config values as defaults, command-line flags override
+	workerID := ctx.Config.Worker.ID
+	if id, _ := ctx.Command.Flags().GetString("worker-id"); id != "" && ctx.Command.Flags().Changed("worker-id") {
+		workerID = id
 	}
 
-	// Override config with command line flags if explicitly provided
-	coordinatorHost := ctx.Config.Coordinator.Host
-	coordinatorPort := ctx.Config.Coordinator.Port
+	// Get max concurrent runs
+	maxConcurrentRuns := ctx.Config.Worker.MaxConcurrentRuns
+	if ctx.Command.Flags().Changed("max-concurrent-runs") {
+		if str, _ := ctx.Command.Flags().GetString("max-concurrent-runs"); str != "" {
+			if val, err := strconv.Atoi(str); err == nil {
+				maxConcurrentRuns = val
+			} else {
+				return fmt.Errorf("invalid max-concurrent-runs value: %w", err)
+			}
+		}
+	}
 
+	// Use worker config for coordinator connection
+	coordinatorHost := ctx.Config.Worker.CoordinatorHost
 	if ctx.Command.Flags().Changed("coordinator-host") {
 		if host, _ := ctx.Command.Flags().GetString("coordinator-host"); host != "" {
 			coordinatorHost = host
 		}
 	}
+
+	coordinatorPort := ctx.Config.Worker.CoordinatorPort
 	if ctx.Command.Flags().Changed("coordinator-port") {
 		if portStr, _ := ctx.Command.Flags().GetString("coordinator-port"); portStr != "" {
-			port, err := strconv.Atoi(portStr)
-			if err == nil {
+			if port, err := strconv.Atoi(portStr); err == nil {
 				coordinatorPort = port
 			}
 		}
 	}
 
-	// Build TLS configuration
-	tlsConfig := &worker.TLSConfig{}
-
-	// Check if insecure flag is set
-	if insecure, _ := ctx.Command.Flags().GetBool("coordinator-insecure"); insecure {
-		tlsConfig.Insecure = true
+	// Build TLS configuration from config, then override with flags
+	tlsConfig := &worker.TLSConfig{
+		Insecure:      ctx.Config.Worker.Insecure,
+		SkipTLSVerify: ctx.Config.Worker.SkipTLSVerify,
 	}
 
-	// Get TLS certificate files
-	tlsConfig.CertFile, _ = ctx.Command.Flags().GetString("coordinator-tls-cert")
-	tlsConfig.KeyFile, _ = ctx.Command.Flags().GetString("coordinator-tls-key")
-	tlsConfig.CAFile, _ = ctx.Command.Flags().GetString("coordinator-tls-ca")
+	if ctx.Config.Worker.TLS != nil {
+		tlsConfig.CertFile = ctx.Config.Worker.TLS.CertFile
+		tlsConfig.KeyFile = ctx.Config.Worker.TLS.KeyFile
+		tlsConfig.CAFile = ctx.Config.Worker.TLS.CAFile
+	}
 
-	// Check skip TLS verify flag
-	if skipVerify, _ := ctx.Command.Flags().GetBool("coordinator-skip-tls-verify"); skipVerify {
-		tlsConfig.SkipTLSVerify = true
+	// Command-line flags override config
+	if ctx.Command.Flags().Changed("coordinator-insecure") {
+		tlsConfig.Insecure, _ = ctx.Command.Flags().GetBool("coordinator-insecure")
+	}
+	if ctx.Command.Flags().Changed("coordinator-skip-tls-verify") {
+		tlsConfig.SkipTLSVerify, _ = ctx.Command.Flags().GetBool("coordinator-skip-tls-verify")
+	}
+	if cert, _ := ctx.Command.Flags().GetString("coordinator-tls-cert"); cert != "" && ctx.Command.Flags().Changed("coordinator-tls-cert") {
+		tlsConfig.CertFile = cert
+	}
+	if key, _ := ctx.Command.Flags().GetString("coordinator-tls-key"); key != "" && ctx.Command.Flags().Changed("coordinator-tls-key") {
+		tlsConfig.KeyFile = key
+	}
+	if ca, _ := ctx.Command.Flags().GetString("coordinator-tls-ca"); ca != "" && ctx.Command.Flags().Changed("coordinator-tls-ca") {
+		tlsConfig.CAFile = ca
 	}
 
 	// Create and start the worker

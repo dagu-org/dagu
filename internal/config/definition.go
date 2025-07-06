@@ -72,6 +72,9 @@ type Definition struct {
 	// Coordinator contains the coordinator service configuration.
 	Coordinator *coordinatorDef `mapstructure:"coordinator"`
 
+	// Worker contains the worker configuration.
+	Worker *workerDef `mapstructure:"worker"`
+
 	// ----------------------------------------------------------------------------
 	// Legacy fields for backward compatibility - Start
 	// These fields are maintained for compatibility with older configuration formats.
@@ -215,6 +218,7 @@ type remoteNodeDef struct {
 type tlsConfigDef struct {
 	CertFile string `mapstructure:"certFile"`
 	KeyFile  string `mapstructure:"keyFile"`
+	CAFile   string `mapstructure:"caFile"`
 }
 
 // queuesDef represents the global queue configuration
@@ -235,4 +239,15 @@ type coordinatorDef struct {
 	Port       int           `mapstructure:"port"`
 	SigningKey string        `mapstructure:"signingKey"`
 	TLS        *tlsConfigDef `mapstructure:"tls"`
+}
+
+// workerDef represents the worker configuration
+type workerDef struct {
+	ID                string        `mapstructure:"id"`
+	MaxConcurrentRuns int           `mapstructure:"maxConcurrentRuns"`
+	CoordinatorHost   string        `mapstructure:"coordinatorHost"`
+	CoordinatorPort   int           `mapstructure:"coordinatorPort"`
+	TLS               *tlsConfigDef `mapstructure:"tls"`
+	Insecure          bool          `mapstructure:"insecure"`
+	SkipTLSVerify     bool          `mapstructure:"skipTLSVerify"`
 }
