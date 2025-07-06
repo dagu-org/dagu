@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CoordinatorService_Poll_FullMethodName = "/coordinator.v1.CoordinatorService/Poll"
+	CoordinatorService_Poll_FullMethodName     = "/coordinator.v1.CoordinatorService/Poll"
+	CoordinatorService_Dispatch_FullMethodName = "/coordinator.v1.CoordinatorService/Dispatch"
 )
 
 // CoordinatorServiceClient is the client API for CoordinatorService service.
@@ -30,6 +31,8 @@ const (
 type CoordinatorServiceClient interface {
 	// Poll is called by workers to process a task.
 	Poll(ctx context.Context, in *PollRequest, opts ...grpc.CallOption) (*PollResponse, error)
+	// Dispatch is called to dispatch a task to a worker.
+	Dispatch(ctx context.Context, in *DispatchRequest, opts ...grpc.CallOption) (*DispatchResponse, error)
 }
 
 type coordinatorServiceClient struct {
@@ -50,6 +53,16 @@ func (c *coordinatorServiceClient) Poll(ctx context.Context, in *PollRequest, op
 	return out, nil
 }
 
+func (c *coordinatorServiceClient) Dispatch(ctx context.Context, in *DispatchRequest, opts ...grpc.CallOption) (*DispatchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DispatchResponse)
+	err := c.cc.Invoke(ctx, CoordinatorService_Dispatch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CoordinatorServiceServer is the server API for CoordinatorService service.
 // All implementations must embed UnimplementedCoordinatorServiceServer
 // for forward compatibility.
@@ -58,6 +71,8 @@ func (c *coordinatorServiceClient) Poll(ctx context.Context, in *PollRequest, op
 type CoordinatorServiceServer interface {
 	// Poll is called by workers to process a task.
 	Poll(context.Context, *PollRequest) (*PollResponse, error)
+	// Dispatch is called to dispatch a task to a worker.
+	Dispatch(context.Context, *DispatchRequest) (*DispatchResponse, error)
 	mustEmbedUnimplementedCoordinatorServiceServer()
 }
 
@@ -70,6 +85,9 @@ type UnimplementedCoordinatorServiceServer struct{}
 
 func (UnimplementedCoordinatorServiceServer) Poll(context.Context, *PollRequest) (*PollResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Poll not implemented")
+}
+func (UnimplementedCoordinatorServiceServer) Dispatch(context.Context, *DispatchRequest) (*DispatchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Dispatch not implemented")
 }
 func (UnimplementedCoordinatorServiceServer) mustEmbedUnimplementedCoordinatorServiceServer() {}
 func (UnimplementedCoordinatorServiceServer) testEmbeddedByValue()                            {}
@@ -110,6 +128,24 @@ func _CoordinatorService_Poll_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CoordinatorService_Dispatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DispatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoordinatorServiceServer).Dispatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoordinatorService_Dispatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoordinatorServiceServer).Dispatch(ctx, req.(*DispatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CoordinatorService_ServiceDesc is the grpc.ServiceDesc for CoordinatorService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -120,6 +156,10 @@ var CoordinatorService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Poll",
 			Handler:    _CoordinatorService_Poll_Handler,
+		},
+		{
+			MethodName: "Dispatch",
+			Handler:    _CoordinatorService_Dispatch_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

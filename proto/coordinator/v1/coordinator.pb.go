@@ -111,6 +111,88 @@ func (x *PollResponse) GetTask() *Task {
 	return nil
 }
 
+// Request message for dispatching a task.
+type DispatchRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Task          *Task                  `protobuf:"bytes,1,opt,name=task,proto3" json:"task,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DispatchRequest) Reset() {
+	*x = DispatchRequest{}
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DispatchRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DispatchRequest) ProtoMessage() {}
+
+func (x *DispatchRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DispatchRequest.ProtoReflect.Descriptor instead.
+func (*DispatchRequest) Descriptor() ([]byte, []int) {
+	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *DispatchRequest) GetTask() *Task {
+	if x != nil {
+		return x.Task
+	}
+	return nil
+}
+
+// Response message for dispatching a task.
+type DispatchResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DispatchResponse) Reset() {
+	*x = DispatchResponse{}
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DispatchResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DispatchResponse) ProtoMessage() {}
+
+func (x *DispatchResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DispatchResponse.ProtoReflect.Descriptor instead.
+func (*DispatchResponse) Descriptor() ([]byte, []int) {
+	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{3}
+}
+
 // Task to process.
 type Task struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
@@ -125,7 +207,7 @@ type Task struct {
 
 func (x *Task) Reset() {
 	*x = Task{}
-	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[2]
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -137,7 +219,7 @@ func (x *Task) String() string {
 func (*Task) ProtoMessage() {}
 
 func (x *Task) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[2]
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -150,7 +232,7 @@ func (x *Task) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Task.ProtoReflect.Descriptor instead.
 func (*Task) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{2}
+	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Task) GetRootDagRunName() string {
@@ -196,16 +278,20 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\vPollRequest\x12\x1b\n" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\"8\n" +
 	"\fPollResponse\x12(\n" +
-	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\"\xd0\x01\n" +
+	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\";\n" +
+	"\x0fDispatchRequest\x12(\n" +
+	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\"\x12\n" +
+	"\x10DispatchResponse\"\xd0\x01\n" +
 	"\x04Task\x12)\n" +
 	"\x11root_dag_run_name\x18\x01 \x01(\tR\x0erootDagRunName\x12%\n" +
 	"\x0froot_dag_run_id\x18\x02 \x01(\tR\frootDagRunId\x12-\n" +
 	"\x13parent_dag_run_name\x18\x03 \x01(\tR\x10parentDagRunName\x12)\n" +
 	"\x11parent_dag_run_id\x18\x04 \x01(\tR\x0eparentDagRunId\x12\x1c\n" +
 	"\n" +
-	"dag_run_id\x18\x05 \x01(\tR\bdagRunId2W\n" +
+	"dag_run_id\x18\x05 \x01(\tR\bdagRunId2\xa6\x01\n" +
 	"\x12CoordinatorService\x12A\n" +
-	"\x04Poll\x12\x1b.coordinator.v1.PollRequest\x1a\x1c.coordinator.v1.PollResponseB=Z;github.com/dagu-org/dagu/proto/coordinator/v1;coordinatorv1b\x06proto3"
+	"\x04Poll\x12\x1b.coordinator.v1.PollRequest\x1a\x1c.coordinator.v1.PollResponse\x12M\n" +
+	"\bDispatch\x12\x1f.coordinator.v1.DispatchRequest\x1a .coordinator.v1.DispatchResponseB=Z;github.com/dagu-org/dagu/proto/coordinator/v1;coordinatorv1b\x06proto3"
 
 var (
 	file_proto_coordinator_v1_coordinator_proto_rawDescOnce sync.Once
@@ -219,21 +305,26 @@ func file_proto_coordinator_v1_coordinator_proto_rawDescGZIP() []byte {
 	return file_proto_coordinator_v1_coordinator_proto_rawDescData
 }
 
-var file_proto_coordinator_v1_coordinator_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_proto_coordinator_v1_coordinator_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_proto_coordinator_v1_coordinator_proto_goTypes = []any{
-	(*PollRequest)(nil),  // 0: coordinator.v1.PollRequest
-	(*PollResponse)(nil), // 1: coordinator.v1.PollResponse
-	(*Task)(nil),         // 2: coordinator.v1.Task
+	(*PollRequest)(nil),      // 0: coordinator.v1.PollRequest
+	(*PollResponse)(nil),     // 1: coordinator.v1.PollResponse
+	(*DispatchRequest)(nil),  // 2: coordinator.v1.DispatchRequest
+	(*DispatchResponse)(nil), // 3: coordinator.v1.DispatchResponse
+	(*Task)(nil),             // 4: coordinator.v1.Task
 }
 var file_proto_coordinator_v1_coordinator_proto_depIdxs = []int32{
-	2, // 0: coordinator.v1.PollResponse.task:type_name -> coordinator.v1.Task
-	0, // 1: coordinator.v1.CoordinatorService.Poll:input_type -> coordinator.v1.PollRequest
-	1, // 2: coordinator.v1.CoordinatorService.Poll:output_type -> coordinator.v1.PollResponse
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	4, // 0: coordinator.v1.PollResponse.task:type_name -> coordinator.v1.Task
+	4, // 1: coordinator.v1.DispatchRequest.task:type_name -> coordinator.v1.Task
+	0, // 2: coordinator.v1.CoordinatorService.Poll:input_type -> coordinator.v1.PollRequest
+	2, // 3: coordinator.v1.CoordinatorService.Dispatch:input_type -> coordinator.v1.DispatchRequest
+	1, // 4: coordinator.v1.CoordinatorService.Poll:output_type -> coordinator.v1.PollResponse
+	3, // 5: coordinator.v1.CoordinatorService.Dispatch:output_type -> coordinator.v1.DispatchResponse
+	4, // [4:6] is the sub-list for method output_type
+	2, // [2:4] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_proto_coordinator_v1_coordinator_proto_init() }
@@ -247,7 +338,7 @@ func file_proto_coordinator_v1_coordinator_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_coordinator_v1_coordinator_proto_rawDesc), len(file_proto_coordinator_v1_coordinator_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

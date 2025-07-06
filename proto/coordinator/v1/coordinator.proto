@@ -10,6 +10,8 @@ option go_package = "github.com/dagu-org/dagu/proto/coordinator/v1;coordinatorv1
 service CoordinatorService {
   // Poll is called by workers to process a task.
   rpc Poll (PollRequest) returns (PollResponse);
+  // Dispatch is called to dispatch a task to a worker.
+  rpc Dispatch (DispatchRequest) returns (DispatchResponse);
 }
 
 // Request message for polling a task.
@@ -20,6 +22,16 @@ message PollRequest {
 // Response message for polling a task.
 message PollResponse {
   Task task = 1; // The task to process.
+}
+
+// Request message for dispatching a task.
+message DispatchRequest {
+  Task task = 1;
+}
+
+// Response message for dispatching a task.
+message DispatchResponse {
+  // No field
 }
 
 // Task to process.
