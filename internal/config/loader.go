@@ -238,6 +238,14 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 			cfg.Coordinator.Port = def.Coordinator.Port
 		}
 		cfg.Coordinator.SigningKey = def.Coordinator.SigningKey
+
+		// Set TLS configuration if available
+		if def.Coordinator.TLS != nil {
+			cfg.Coordinator.TLS = &TLSConfig{
+				CertFile: def.Coordinator.TLS.CertFile,
+				KeyFile:  def.Coordinator.TLS.KeyFile,
+			}
+		}
 	}
 
 	// Incorporate legacy field values, which may override existing settings.

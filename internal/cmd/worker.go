@@ -27,12 +27,24 @@ Flags:
   --max-concurrent-runs int       Maximum concurrent task executions (default: 100)
   --coordinator-host string       Coordinator gRPC server host (default: 127.0.0.1)
   --coordinator-port int          Coordinator gRPC server port (default: 50051)
+  --coordinator-insecure          Use insecure connection (h2c) instead of TLS
+  --coordinator-tls-cert string   Path to TLS certificate file for mutual TLS
+  --coordinator-tls-key string    Path to TLS key file for mutual TLS
+  --coordinator-tls-ca string     Path to CA certificate file for server verification
+  --coordinator-skip-tls-verify   Skip TLS certificate verification (insecure)
 
 Example:
   dagu worker
   dagu worker --max-concurrent-runs=50
   dagu worker --coordinator-host=coordinator.example.com --coordinator-port=50051
   dagu worker --worker-id=worker-1 --max-concurrent-runs=200
+  
+  # For HTTPS/TLS connections:
+  dagu worker --coordinator-host=coordinator.example.com
+  dagu worker --coordinator-tls-cert=client.crt --coordinator-tls-key=client.key
+  dagu worker --coordinator-tls-ca=ca.crt
+  dagu worker --coordinator-skip-tls-verify  # For self-signed certificates
+  dagu worker --coordinator-insecure         # For h2c (HTTP/2 without TLS)
 
 This process runs continuously in the foreground until terminated.
 `,
@@ -45,6 +57,11 @@ var workerFlags = []commandLineFlag{
 	maxConcurrentRunsFlag,
 	coordinatorHostFlag,
 	coordinatorPortFlag,
+	coordinatorInsecureFlag,
+	coordinatorTLSCertFlag,
+	coordinatorTLSKeyFlag,
+	coordinatorTLSCAFlag,
+	coordinatorSkipTLSVerifyFlag,
 }
 
 func runWorker(ctx *Context, _ []string) error {
@@ -76,8 +93,26 @@ func runWorker(ctx *Context, _ []string) error {
 		}
 	}
 
+	// Build TLS configuration
+	tlsConfig := &worker.TLSConfig{}
+
+	// Check if insecure flag is set
+	if insecure, _ := ctx.Command.Flags().GetBool("coordinator-insecure"); insecure {
+		tlsConfig.Insecure = true
+	}
+
+	// Get TLS certificate files
+	tlsConfig.CertFile, _ = ctx.Command.Flags().GetString("coordinator-tls-cert")
+	tlsConfig.KeyFile, _ = ctx.Command.Flags().GetString("coordinator-tls-key")
+	tlsConfig.CAFile, _ = ctx.Command.Flags().GetString("coordinator-tls-ca")
+
+	// Check skip TLS verify flag
+	if skipVerify, _ := ctx.Command.Flags().GetBool("coordinator-skip-tls-verify"); skipVerify {
+		tlsConfig.SkipTLSVerify = true
+	}
+
 	// Create and start the worker
-	w := worker.NewWorker(workerID, maxConcurrentRuns, coordinatorHost, coordinatorPort)
+	w := worker.NewWorker(workerID, maxConcurrentRuns, coordinatorHost, coordinatorPort, tlsConfig)
 
 	logger.Info(ctx, "Starting worker",
 		"worker_id", workerID,

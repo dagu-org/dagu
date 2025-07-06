@@ -166,6 +166,43 @@ var (
 		usage:        "Maximum number of concurrent task executions (default: 100)",
 		bindViper:    true,
 	}
+
+	// coordinatorInsecureFlag disables TLS verification for coordinator connection.
+	coordinatorInsecureFlag = commandLineFlag{
+		name:      "coordinator-insecure",
+		usage:     "Disable TLS verification for coordinator connection (use for development only)",
+		isBool:    true,
+		bindViper: true,
+	}
+
+	// coordinatorTLSCertFlag is the path to the TLS certificate for coordinator connection.
+	coordinatorTLSCertFlag = commandLineFlag{
+		name:      "coordinator-tls-cert",
+		usage:     "Path to TLS certificate file for coordinator connection",
+		bindViper: true,
+	}
+
+	// coordinatorTLSKeyFlag is the path to the TLS key for coordinator connection.
+	coordinatorTLSKeyFlag = commandLineFlag{
+		name:      "coordinator-tls-key",
+		usage:     "Path to TLS key file for coordinator connection",
+		bindViper: true,
+	}
+
+	// coordinatorTLSCAFlag is the path to the CA certificate for coordinator connection.
+	coordinatorTLSCAFlag = commandLineFlag{
+		name:      "coordinator-tls-ca",
+		usage:     "Path to CA certificate file for coordinator connection",
+		bindViper: true,
+	}
+
+	// coordinatorSkipTLSVerifyFlag skips TLS certificate verification.
+	coordinatorSkipTLSVerifyFlag = commandLineFlag{
+		name:      "coordinator-skip-tls-verify",
+		usage:     "Skip TLS certificate verification (insecure, use for development only)",
+		isBool:    true,
+		bindViper: true,
+	}
 )
 
 type commandLineFlag struct {
