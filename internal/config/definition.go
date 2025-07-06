@@ -69,8 +69,8 @@ type Definition struct {
 	// Queues contains global queue configuration settings.
 	Queues *queuesDef `mapstructure:"queues"`
 
-	// Worker contains worker configuration settings.
-	Worker *workerDef `mapstructure:"worker"`
+	// Core contains the core service configuration.
+	Core *coreDef `mapstructure:"core"`
 
 	// ----------------------------------------------------------------------------
 	// Legacy fields for backward compatibility - Start
@@ -229,7 +229,7 @@ type queueConfigDef struct {
 	MaxActiveRuns int    `mapstructure:"maxActiveRuns"`
 }
 
-// workerDef represents the worker configuration
-type workerDef struct {
+// coreDef represents the core service configuration
+type coreDef struct {
 	SigningKey string `mapstructure:"signingKey"`
 }

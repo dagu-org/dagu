@@ -51,8 +51,8 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 		"DAGU_AUTH_BASIC_PASSWORD": "testpass",
 		"DAGU_AUTH_TOKEN":          "test-token-123",
 
-		// Worker configurations
-		"DAGU_WORKER_SIGNING_KEY": "test-signing-key-abc123",
+		// Core configurations
+		"DAGU_CORE_SIGNING_KEY": "test-signing-key-abc123",
 
 		// TLS configurations
 		"DAGU_CERT_FILE": "/test/cert.pem",
@@ -133,8 +133,8 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 	assert.True(t, cfg.Server.Auth.Basic.Enabled())
 	assert.True(t, cfg.Server.Auth.Token.Enabled())
 
-	// Worker configurations
-	assert.Equal(t, "test-signing-key-abc123", cfg.Worker.SigningKey)
+	// Core configurations
+	assert.Equal(t, "test-signing-key-abc123", cfg.Core.SigningKey)
 
 	// TLS configurations
 	require.NotNil(t, cfg.Server.TLS)
@@ -160,18 +160,17 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 	assert.False(t, cfg.Queues.Enabled)
 }
 
-// TestConfigLoader_WorkerSigningKey tests the WorkerSigningKey configuration
-func TestConfigLoader_WorkerSigningKey(t *testing.T) {
+func TestConfigLoader_CoreSigningKey(t *testing.T) {
 	t.Run("LoadFromYAML", func(t *testing.T) {
 		// Reset viper to ensure clean state
 		viper.Reset()
 		defer viper.Reset()
 
-		// Create a config file with WorkerSigningKey
+		// Create a config file with CoreSigningKey
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
-worker:
+core:
   signingKey: "yaml-signing-key-123"
 auth:
   basic:
@@ -188,8 +187,8 @@ auth:
 		require.NoError(t, err)
 		require.NotNil(t, cfg)
 
-		// Verify WorkerSigningKey is loaded from YAML
-		assert.Equal(t, "yaml-signing-key-123", cfg.Worker.SigningKey)
+		// Verify CoreSigningKey is loaded from YAML
+		assert.Equal(t, "yaml-signing-key-123", cfg.Core.SigningKey)
 		assert.Equal(t, "admin", cfg.Server.Auth.Basic.Username)
 		assert.Equal(t, "pass", cfg.Server.Auth.Basic.Password)
 		assert.Equal(t, "api-token", cfg.Server.Auth.Token.Value)
@@ -200,19 +199,19 @@ auth:
 		viper.Reset()
 		defer viper.Reset()
 
-		// Create a config file with WorkerSigningKey
+		// Create a config file with CoreSigningKey
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
-worker:
+core:
   signingKey: "yaml-signing-key"
 `
 		err := os.WriteFile(configFile, []byte(configContent), 0600)
 		require.NoError(t, err)
 
 		// Set environment variable
-		os.Setenv("DAGU_WORKER_SIGNING_KEY", "env-signing-key-override")
-		defer os.Unsetenv("DAGU_WORKER_SIGNING_KEY")
+		os.Setenv("DAGU_CORE_SIGNING_KEY", "env-signing-key-override")
+		defer os.Unsetenv("DAGU_CORE_SIGNING_KEY")
 
 		// Load configuration
 		cfg, err := config.Load(config.WithConfigFile(configFile))
@@ -220,15 +219,15 @@ worker:
 		require.NotNil(t, cfg)
 
 		// Verify environment variable overrides YAML
-		assert.Equal(t, "env-signing-key-override", cfg.Worker.SigningKey)
+		assert.Equal(t, "env-signing-key-override", cfg.Core.SigningKey)
 	})
 
-	t.Run("EmptyWorkerSigningKey", func(t *testing.T) {
+	t.Run("EmptyCoreSigningKey", func(t *testing.T) {
 		// Reset viper to ensure clean state
 		viper.Reset()
 		defer viper.Reset()
 
-		// Create a minimal config file without WorkerSigningKey
+		// Create a minimal config file without CoreSigningKey
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
@@ -245,8 +244,8 @@ auth:
 		require.NoError(t, err)
 		require.NotNil(t, cfg)
 
-		// Verify WorkerSigningKey is empty when not provided
-		assert.Equal(t, "", cfg.Worker.SigningKey)
+		// Verify CoreSigningKey is empty when not provided
+		assert.Equal(t, "", cfg.Core.SigningKey)
 		assert.Equal(t, "user", cfg.Server.Auth.Basic.Username)
 		assert.Equal(t, "pass", cfg.Server.Auth.Basic.Password)
 	})
@@ -260,7 +259,7 @@ auth:
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
-worker:
+core:
   signingKey: "master-signing-key"
 auth:
   basic:
@@ -278,7 +277,7 @@ auth:
 		require.NotNil(t, cfg)
 
 		// Verify all auth fields are loaded correctly
-		assert.Equal(t, "master-signing-key", cfg.Worker.SigningKey)
+		assert.Equal(t, "master-signing-key", cfg.Core.SigningKey)
 		assert.Equal(t, "testuser", cfg.Server.Auth.Basic.Username)
 		assert.Equal(t, "testpass", cfg.Server.Auth.Basic.Password)
 		assert.Equal(t, "test-token", cfg.Server.Auth.Token.Value)

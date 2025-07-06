@@ -24,8 +24,8 @@ type Config struct {
 	// Queues contains global queue configuration settings.
 	Queues Queues
 
-	// Worker defines the worker configuration for executing tasks.
-	Worker Worker
+	// Core defines the core service configuration.
+	Core Core
 
 	// Warnings contains a list of warnings generated during the configuration loading process.
 	Warnings []string
@@ -234,7 +234,7 @@ type QueueConfig struct {
 	MaxActiveRuns int
 }
 
-// Worker represents the worker configuration
-type Worker struct {
+// Core represents the core service configuration
+type Core struct {
 	SigningKey string // Used for signing key for JWT
 }
