@@ -236,5 +236,7 @@ type QueueConfig struct {
 
 // Coordinator represents the coordinator service configuration
 type Coordinator struct {
+	Host       string // gRPC server host address
+	Port       int    // gRPC server port number
 	SigningKey string // Used for signing key for JWT
 }

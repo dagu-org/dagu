@@ -231,5 +231,7 @@ type queueConfigDef struct {
 
 // coordinatorDef represents the coordinator service configuration
 type coordinatorDef struct {
+	Host       string `mapstructure:"host"`
+	Port       int    `mapstructure:"port"`
 	SigningKey string `mapstructure:"signingKey"`
 }

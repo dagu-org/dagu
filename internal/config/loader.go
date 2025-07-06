@@ -224,8 +224,19 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		}
 	}
 
-	// Set coordinator service configuration if provided.
+	// Set coordinator service configuration.
+	// Initialize with defaults from viper
+	cfg.Coordinator.Host = viper.GetString("coordinator.host")
+	cfg.Coordinator.Port = viper.GetInt("coordinator.port")
+
+	// Override with values from config file if provided
 	if def.Coordinator != nil {
+		if def.Coordinator.Host != "" {
+			cfg.Coordinator.Host = def.Coordinator.Host
+		}
+		if def.Coordinator.Port > 0 {
+			cfg.Coordinator.Port = def.Coordinator.Port
+		}
 		cfg.Coordinator.SigningKey = def.Coordinator.SigningKey
 	}
 
@@ -386,6 +397,10 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	viper.SetDefault("apiBasePath", "/api/v2")
 	viper.SetDefault("latestStatusToday", false)
 
+	// Coordinator settings
+	viper.SetDefault("coordinator.host", "127.0.0.1")
+	viper.SetDefault("coordinator.port", 9000)
+
 	// UI settings
 	viper.SetDefault("ui.navbarTitle", build.AppName)
 	viper.SetDefault("ui.maxDashboardPageLimit", 100)
@@ -460,6 +475,8 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("queues.enabled", "QUEUE_ENABLED")
 
 	// Coordinator service configuration
+	l.bindEnv("coordinator.host", "COORDINATOR_HOST")
+	l.bindEnv("coordinator.port", "COORDINATOR_PORT")
 	l.bindEnv("coordinator.signingKey", "COORDINATOR_SIGNING_KEY")
 }
 

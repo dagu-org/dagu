@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -24,10 +25,12 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
 	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/scheduler"
+	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"google.golang.org/grpc"
 )
 
 // Context holds the configuration for a command.
@@ -174,6 +177,26 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 
 	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, c.Config.Paths.Executable, c.Config.Global.WorkDir)
 	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore), nil
+}
+
+// NewCoordinator creates a new Coordinator service instance.
+// It sets up a gRPC server and listener for distributed task coordination.
+func (c *Context) NewCoordinator() (*coordinator.Service, error) {
+	// Create gRPC server
+	grpcServer := grpc.NewServer()
+
+	// Create listener
+	addr := fmt.Sprintf("%s:%d", c.Config.Coordinator.Host, c.Config.Coordinator.Port)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create listener on %s: %w", addr, err)
+	}
+
+	// Create handler
+	handler := &coordinator.Handler{}
+
+	// Create and return service
+	return coordinator.NewService(grpcServer, handler, listener), nil
 }
 
 // StringParam retrieves a string parameter from the command line flags.

@@ -132,6 +132,24 @@ var (
 		usage:  "Enable CPU profiling (saves to cpu.pprof)",
 		isBool: true,
 	}
+
+	// coordinatorHostFlag is the hostname or IP address for the coordinator gRPC server.
+	coordinatorHostFlag = commandLineFlag{
+		name:         "coordinator-host",
+		shorthand:    "H",
+		defaultValue: "127.0.0.1",
+		usage:        "Coordinator gRPC server host (default: 127.0.0.1)",
+		bindViper:    true,
+	}
+
+	// coordinatorPortFlag is the port number for the coordinator gRPC server.
+	coordinatorPortFlag = commandLineFlag{
+		name:         "coordinator-port",
+		shorthand:    "P",
+		defaultValue: "9000",
+		usage:        "Coordinator gRPC server port (default: 9000)",
+		bindViper:    true,
+	}
 )
 
 type commandLineFlag struct {
