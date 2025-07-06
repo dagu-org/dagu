@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package workerservice.v1;
+
+// protolint:disable:next MAX_LINE_LENGTH
+option go_package = "github.com/dagu-org/dagu/proto/workerservice/v1;workerservicev1";
+
+
+// Service definition for Worker Service.
+service WorkerService {
+  // Poll is called by workers to process a task.
+  rpc Poll (PollRequest) returns (PollResponse);
+}
+
+// Request message for polling a task.
+message PollRequest {
+  string worker_id = 1;
+}
+
+// Response message for polling a task.
+message PollResponse {
+  Task task = 1; // The task to process.
+}
+
+// Task to process.
+message Task {
+  string root_dag_run_name = 1;
+  string root_dag_run_id = 2;
+  string parent_dag_run_name = 3;
+  string parent_dag_run_id = 4;
+  string dag_run_id = 5;
+}

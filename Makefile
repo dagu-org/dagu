@@ -68,6 +68,9 @@ PKG_addlicense=github.com/google/addlicense
 PKG_changelog-from-release=github.com/rhysd/changelog-from-release/v3@latest
 PKG_oapi_codegen=github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
 PKG_kin_openapi_validate=github.com/getkin/kin-openapi/cmd/validate
+PKG_protolint=github.com/yoheimuta/protolint/cmd/protolint
+PKG_protoc_gen_go=google.golang.org/protobuf/cmd/protoc-gen-go
+PKG_protoc_gen_go_grpc=google.golang.org/grpc/cmd/protoc-gen-go-grpc
 
 # Certificates for the development environment
 
@@ -87,6 +90,29 @@ CLIENT_CERT_REQ=${CERTS_DIR}/client-req.pem
 CLIENT_CERT_FILE=${CERTS_DIR}/client-cert.pem
 CLIENT_KEY_FILE=${CERTS_DIR}/client-key.pem
 OPENSSL_CONF=${CONFIG_DIR}/openssl.local.conf
+
+# Variables for installing protoc
+
+# Detect the OS
+OS := $(shell uname -s)
+ifeq (${OS},Darwin)
+	OS := osx
+else
+	OS := linux
+endif
+
+# Detect the Architecture
+ARCH := $(shell uname -m)
+ifeq (${ARCH},arm64)
+	ARCH := aarch_64
+else
+	ARCH := x86_64
+endif
+
+# Protobuf release URL
+PB_RELEASE_URL=https://github.com/protocolbuffers/protobuf/releases
+PB_VERSION=31.1
+PB_RELEASE_NAME=protoc-${PB_VERSION}-${OS}-${ARCH}
 
 ##############################################################################
 # Targets
@@ -178,6 +204,33 @@ apiv1-validate:
 # api generates the swagger server code.
 .PHONY: swagger
 swagger: clean-swagger gen-swagger
+
+.PHONY: proto
+proto: protolint protoc
+
+# Lint proto files
+protolint:
+	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_protolint}
+	@echo "${GREEN}Linting proto files...${NC}"
+	@${LOCAL_BIN_DIR}/protolint lint ${SCRIPT_DIR}/proto
+
+# Generate Go code from proto files
+protoc: ${LOCAL_DIR}/${PB_RELEASE_NAME}
+	@ln -sf ${LOCAL_DIR}/${PB_RELEASE_NAME}/bin/protoc ${LOCAL_BIN_DIR}/protoc
+	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_protoc_gen_go}
+	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_protoc_gen_go_grpc}
+	@echo "${GREEN}Generating Go code from proto files...${NC}"
+	@env PATH="${LOCAL_BIN_DIR}:/usr/local/bin:/usr/bin:/bin" ${LOCAL_BIN_DIR}/protoc --go_out=. --go_opt=paths=source_relative \
+	    --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+	    proto/internal/workerservice/v1/*.proto
+
+# Download protoc
+${LOCAL_DIR}/${PB_RELEASE_NAME}:
+	@echo "${GREEN}Downloading protoc...${NC}"
+	@mkdir -p ${LOCAL_BIN_DIR}
+	@curl -L ${PB_RELEASE_URL}/download/v${PB_VERSION}/${PB_RELEASE_NAME}.zip -o ${LOCAL_DIR}/${PB_RELEASE_NAME}.zip
+	@unzip ${LOCAL_DIR}/${PB_RELEASE_NAME} -d ${LOCAL_DIR}/${PB_RELEASE_NAME}
+	@rm ${LOCAL_DIR}/${PB_RELEASE_NAME}.zip
 
 # certs generates the certificates to use in the development environment.
 .PHONY: certs
