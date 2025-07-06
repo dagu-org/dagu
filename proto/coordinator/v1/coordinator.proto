@@ -1,13 +1,13 @@
 syntax = "proto3";
 
-package workerservice.v1;
+package coordinator.v1;
 
 // protolint:disable:next MAX_LINE_LENGTH
-option go_package = "github.com/dagu-org/dagu/proto/workerservice/v1;workerservicev1";
+option go_package = "github.com/dagu-org/dagu/proto/coordinator/v1;coordinatorv1";
 
 
-// Service definition for Worker Service.
-service WorkerService {
+// Service definition for Coordinator Service.
+service CoordinatorService {
   // Poll is called by workers to process a task.
   rpc Poll (PollRequest) returns (PollResponse);
 }

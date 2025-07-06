@@ -1,4 +1,4 @@
-package worker
+package coordinator
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/logger"
-	workerservicev1 "github.com/dagu-org/dagu/proto/core/workerservice/v1"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"google.golang.org/grpc"
 )
 
@@ -29,12 +29,12 @@ func NewService(
 }
 
 func (srv *Service) Start(ctx context.Context) error {
-	workerservicev1.RegisterWorkerServiceServer(srv.server, srv.handler)
+	coordinatorv1.RegisterCoordinatorServiceServer(srv.server, srv.handler)
 
 	go func() {
-		logger.Info(ctx, "Starting to serve on worker service")
+		logger.Info(ctx, "Starting to serve on coordinator service")
 		if err := srv.server.Serve(srv.grpcListener); err != nil {
-			logger.Fatal(ctx, "Failed to serve on worker service listener")
+			logger.Fatal(ctx, "Failed to serve on coordinator service listener")
 		}
 	}()
 

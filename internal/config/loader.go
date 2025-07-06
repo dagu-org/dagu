@@ -224,9 +224,9 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		}
 	}
 
-	// Set core service configuration if provided.
-	if def.Core != nil {
-		cfg.Core.SigningKey = def.Core.SigningKey
+	// Set coordinator service configuration if provided.
+	if def.Coordinator != nil {
+		cfg.Coordinator.SigningKey = def.Coordinator.SigningKey
 	}
 
 	// Incorporate legacy field values, which may override existing settings.
@@ -459,8 +459,8 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	// Queue configuration
 	l.bindEnv("queues.enabled", "QUEUE_ENABLED")
 
-	// Core service configuration
-	l.bindEnv("core.signingKey", "CORE_SIGNING_KEY")
+	// Coordinator service configuration
+	l.bindEnv("coordinator.signingKey", "COORDINATOR_SIGNING_KEY")
 }
 
 // bindEnv constructs the full environment variable name using the app prefix and binds it to the given key.

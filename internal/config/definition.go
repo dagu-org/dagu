@@ -69,8 +69,8 @@ type Definition struct {
 	// Queues contains global queue configuration settings.
 	Queues *queuesDef `mapstructure:"queues"`
 
-	// Core contains the core service configuration.
-	Core *coreDef `mapstructure:"core"`
+	// Coordinator contains the coordinator service configuration.
+	Coordinator *coordinatorDef `mapstructure:"coordinator"`
 
 	// ----------------------------------------------------------------------------
 	// Legacy fields for backward compatibility - Start
@@ -229,7 +229,7 @@ type queueConfigDef struct {
 	MaxActiveRuns int    `mapstructure:"maxActiveRuns"`
 }
 
-// coreDef represents the core service configuration
-type coreDef struct {
+// coordinatorDef represents the coordinator service configuration
+type coordinatorDef struct {
 	SigningKey string `mapstructure:"signingKey"`
 }

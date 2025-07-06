@@ -24,8 +24,8 @@ type Config struct {
 	// Queues contains global queue configuration settings.
 	Queues Queues
 
-	// Core defines the core service configuration.
-	Core Core
+	// Coordinator defines the coordinator service configuration.
+	Coordinator Coordinator
 
 	// Warnings contains a list of warnings generated during the configuration loading process.
 	Warnings []string
@@ -234,7 +234,7 @@ type QueueConfig struct {
 	MaxActiveRuns int
 }
 
-// Core represents the core service configuration
-type Core struct {
+// Coordinator represents the coordinator service configuration
+type Coordinator struct {
 	SigningKey string // Used for signing key for JWT
 }

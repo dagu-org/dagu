@@ -222,7 +222,7 @@ protoc: ${LOCAL_DIR}/${PB_RELEASE_NAME}
 	@echo "${GREEN}Generating Go code from proto files...${NC}"
 	@env PATH="${LOCAL_BIN_DIR}:/usr/local/bin:/usr/bin:/bin" ${LOCAL_BIN_DIR}/protoc --go_out=. --go_opt=paths=source_relative \
 	    --go-grpc_out=. --go-grpc_opt=paths=source_relative \
-	    proto/core/workerservice/v1/*.proto
+	    proto/coordinator/v1/*.proto
 
 # Download protoc
 ${LOCAL_DIR}/${PB_RELEASE_NAME}:
