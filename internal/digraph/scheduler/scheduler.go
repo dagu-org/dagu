@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"runtime/debug"
@@ -929,11 +930,20 @@ func (sc *Scheduler) prepareNodeForRepeat(ctx context.Context, node *Node, progr
 		sc.setLastError(nil) // clear last error if we are repeating
 	}
 	logger.Info(ctx, "Step will be repeated", "step", node.Name(), "interval", step.RepeatPolicy.Interval)
-	time.Sleep(step.RepeatPolicy.Interval)
+	time.Sleep(getNextRetryTime(node))
 	node.SetRepeated(true) // mark as repeated
 	logger.Info(ctx, "Repeating step", "step", node.Name())
 
 	if progressCh != nil {
 		progressCh <- node
+	}
+}
+
+func getNextRetryTime(node *Node) time.Duration {
+	if node.Step().RepeatPolicy.ExponentialBackoff {
+		sleeptime := math.Pow(2, float64(node.State().DoneCount))
+		return time.Duration(sleeptime) * time.Second
+	} else {
+		return node.Step().RepeatPolicy.Interval
 	}
 }

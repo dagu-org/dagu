@@ -156,6 +156,8 @@ type RepeatPolicy struct {
 	Interval time.Duration `json:"interval,omitempty"`
 	// Limit is the maximum number of times to repeat the step.
 	Limit int `json:"limit,omitempty"`
+	// Exponential backoff to let retry in exponential time,accepted values true/ false
+	ExponentialBackoff bool `json:"exponentialBackoff,omitempty"`
 	// Condition is the condition object to be met for the repeat.
 	Condition *Condition `json:"condition,omitempty"`
 	// ExitCode is the list of exit codes that should trigger a repeat.
@@ -180,6 +182,7 @@ func (r *RepeatPolicy) UnmarshalJSON(data []byte) error {
 	r.Limit = aux.Limit
 	r.Condition = aux.Condition
 	r.ExitCode = aux.ExitCode
+	r.ExponentialBackoff = aux.ExponentialBackoff
 
 	// If RepeatMode is already set, we're done (new format)
 	if r.RepeatMode != "" {
