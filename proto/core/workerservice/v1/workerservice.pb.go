@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        v6.31.1
-// source: proto/internal/workerservice/v1/workerservice.proto
+// source: proto/core/workerservice/v1/workerservice.proto
 
 package workerservicev1
 
@@ -31,7 +31,7 @@ type PollRequest struct {
 
 func (x *PollRequest) Reset() {
 	*x = PollRequest{}
-	mi := &file_proto_internal_workerservice_v1_workerservice_proto_msgTypes[0]
+	mi := &file_proto_core_workerservice_v1_workerservice_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +43,7 @@ func (x *PollRequest) String() string {
 func (*PollRequest) ProtoMessage() {}
 
 func (x *PollRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_internal_workerservice_v1_workerservice_proto_msgTypes[0]
+	mi := &file_proto_core_workerservice_v1_workerservice_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +56,7 @@ func (x *PollRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PollRequest.ProtoReflect.Descriptor instead.
 func (*PollRequest) Descriptor() ([]byte, []int) {
-	return file_proto_internal_workerservice_v1_workerservice_proto_rawDescGZIP(), []int{0}
+	return file_proto_core_workerservice_v1_workerservice_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *PollRequest) GetWorkerId() string {
@@ -76,7 +76,7 @@ type PollResponse struct {
 
 func (x *PollResponse) Reset() {
 	*x = PollResponse{}
-	mi := &file_proto_internal_workerservice_v1_workerservice_proto_msgTypes[1]
+	mi := &file_proto_core_workerservice_v1_workerservice_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -88,7 +88,7 @@ func (x *PollResponse) String() string {
 func (*PollResponse) ProtoMessage() {}
 
 func (x *PollResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_internal_workerservice_v1_workerservice_proto_msgTypes[1]
+	mi := &file_proto_core_workerservice_v1_workerservice_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -101,7 +101,7 @@ func (x *PollResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PollResponse.ProtoReflect.Descriptor instead.
 func (*PollResponse) Descriptor() ([]byte, []int) {
-	return file_proto_internal_workerservice_v1_workerservice_proto_rawDescGZIP(), []int{1}
+	return file_proto_core_workerservice_v1_workerservice_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *PollResponse) GetTask() *Task {
@@ -125,7 +125,7 @@ type Task struct {
 
 func (x *Task) Reset() {
 	*x = Task{}
-	mi := &file_proto_internal_workerservice_v1_workerservice_proto_msgTypes[2]
+	mi := &file_proto_core_workerservice_v1_workerservice_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -137,7 +137,7 @@ func (x *Task) String() string {
 func (*Task) ProtoMessage() {}
 
 func (x *Task) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_internal_workerservice_v1_workerservice_proto_msgTypes[2]
+	mi := &file_proto_core_workerservice_v1_workerservice_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -150,7 +150,7 @@ func (x *Task) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Task.ProtoReflect.Descriptor instead.
 func (*Task) Descriptor() ([]byte, []int) {
-	return file_proto_internal_workerservice_v1_workerservice_proto_rawDescGZIP(), []int{2}
+	return file_proto_core_workerservice_v1_workerservice_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Task) GetRootDagRunName() string {
@@ -188,11 +188,11 @@ func (x *Task) GetDagRunId() string {
 	return ""
 }
 
-var File_proto_internal_workerservice_v1_workerservice_proto protoreflect.FileDescriptor
+var File_proto_core_workerservice_v1_workerservice_proto protoreflect.FileDescriptor
 
-const file_proto_internal_workerservice_v1_workerservice_proto_rawDesc = "" +
+const file_proto_core_workerservice_v1_workerservice_proto_rawDesc = "" +
 	"\n" +
-	"3proto/internal/workerservice/v1/workerservice.proto\x12\x10workerservice.v1\"*\n" +
+	"/proto/core/workerservice/v1/workerservice.proto\x12\x10workerservice.v1\"*\n" +
 	"\vPollRequest\x12\x1b\n" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\":\n" +
 	"\fPollResponse\x12*\n" +
@@ -208,24 +208,24 @@ const file_proto_internal_workerservice_v1_workerservice_proto_rawDesc = "" +
 	"\x04Poll\x12\x1d.workerservice.v1.PollRequest\x1a\x1e.workerservice.v1.PollResponseBAZ?github.com/dagu-org/dagu/proto/workerservice/v1;workerservicev1b\x06proto3"
 
 var (
-	file_proto_internal_workerservice_v1_workerservice_proto_rawDescOnce sync.Once
-	file_proto_internal_workerservice_v1_workerservice_proto_rawDescData []byte
+	file_proto_core_workerservice_v1_workerservice_proto_rawDescOnce sync.Once
+	file_proto_core_workerservice_v1_workerservice_proto_rawDescData []byte
 )
 
-func file_proto_internal_workerservice_v1_workerservice_proto_rawDescGZIP() []byte {
-	file_proto_internal_workerservice_v1_workerservice_proto_rawDescOnce.Do(func() {
-		file_proto_internal_workerservice_v1_workerservice_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_internal_workerservice_v1_workerservice_proto_rawDesc), len(file_proto_internal_workerservice_v1_workerservice_proto_rawDesc)))
+func file_proto_core_workerservice_v1_workerservice_proto_rawDescGZIP() []byte {
+	file_proto_core_workerservice_v1_workerservice_proto_rawDescOnce.Do(func() {
+		file_proto_core_workerservice_v1_workerservice_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_core_workerservice_v1_workerservice_proto_rawDesc), len(file_proto_core_workerservice_v1_workerservice_proto_rawDesc)))
 	})
-	return file_proto_internal_workerservice_v1_workerservice_proto_rawDescData
+	return file_proto_core_workerservice_v1_workerservice_proto_rawDescData
 }
 
-var file_proto_internal_workerservice_v1_workerservice_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
-var file_proto_internal_workerservice_v1_workerservice_proto_goTypes = []any{
+var file_proto_core_workerservice_v1_workerservice_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_proto_core_workerservice_v1_workerservice_proto_goTypes = []any{
 	(*PollRequest)(nil),  // 0: workerservice.v1.PollRequest
 	(*PollResponse)(nil), // 1: workerservice.v1.PollResponse
 	(*Task)(nil),         // 2: workerservice.v1.Task
 }
-var file_proto_internal_workerservice_v1_workerservice_proto_depIdxs = []int32{
+var file_proto_core_workerservice_v1_workerservice_proto_depIdxs = []int32{
 	2, // 0: workerservice.v1.PollResponse.task:type_name -> workerservice.v1.Task
 	0, // 1: workerservice.v1.WorkerService.Poll:input_type -> workerservice.v1.PollRequest
 	1, // 2: workerservice.v1.WorkerService.Poll:output_type -> workerservice.v1.PollResponse
@@ -236,26 +236,26 @@ var file_proto_internal_workerservice_v1_workerservice_proto_depIdxs = []int32{
 	0, // [0:1] is the sub-list for field type_name
 }
 
-func init() { file_proto_internal_workerservice_v1_workerservice_proto_init() }
-func file_proto_internal_workerservice_v1_workerservice_proto_init() {
-	if File_proto_internal_workerservice_v1_workerservice_proto != nil {
+func init() { file_proto_core_workerservice_v1_workerservice_proto_init() }
+func file_proto_core_workerservice_v1_workerservice_proto_init() {
+	if File_proto_core_workerservice_v1_workerservice_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_internal_workerservice_v1_workerservice_proto_rawDesc), len(file_proto_internal_workerservice_v1_workerservice_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_core_workerservice_v1_workerservice_proto_rawDesc), len(file_proto_core_workerservice_v1_workerservice_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_internal_workerservice_v1_workerservice_proto_goTypes,
-		DependencyIndexes: file_proto_internal_workerservice_v1_workerservice_proto_depIdxs,
-		MessageInfos:      file_proto_internal_workerservice_v1_workerservice_proto_msgTypes,
+		GoTypes:           file_proto_core_workerservice_v1_workerservice_proto_goTypes,
+		DependencyIndexes: file_proto_core_workerservice_v1_workerservice_proto_depIdxs,
+		MessageInfos:      file_proto_core_workerservice_v1_workerservice_proto_msgTypes,
 	}.Build()
-	File_proto_internal_workerservice_v1_workerservice_proto = out.File
-	file_proto_internal_workerservice_v1_workerservice_proto_goTypes = nil
-	file_proto_internal_workerservice_v1_workerservice_proto_depIdxs = nil
+	File_proto_core_workerservice_v1_workerservice_proto = out.File
+	file_proto_core_workerservice_v1_workerservice_proto_goTypes = nil
+	file_proto_core_workerservice_v1_workerservice_proto_depIdxs = nil
 }
