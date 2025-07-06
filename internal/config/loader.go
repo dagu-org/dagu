@@ -399,7 +399,7 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 
 	// Coordinator settings
 	viper.SetDefault("coordinator.host", "127.0.0.1")
-	viper.SetDefault("coordinator.port", 9000)
+	viper.SetDefault("coordinator.port", 50051)
 
 	// UI settings
 	viper.SetDefault("ui.navbarTitle", build.AppName)

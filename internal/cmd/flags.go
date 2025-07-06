@@ -146,8 +146,8 @@ var (
 	coordinatorPortFlag = commandLineFlag{
 		name:         "coordinator-port",
 		shorthand:    "P",
-		defaultValue: "9000",
-		usage:        "Coordinator gRPC server port (default: 9000)",
+		defaultValue: "50051",
+		usage:        "Coordinator gRPC server port (default: 50051)",
 		bindViper:    true,
 	}
 )

@@ -26,10 +26,10 @@ supports authentication via signing keys configured in the system.
 
 Flags:
   --coordinator-host string   Host address to bind the gRPC server to (default: 127.0.0.1)
-  --coordinator-port int      Port number for the gRPC server to listen on (default: 9000)
+  --coordinator-port int      Port number for the gRPC server to listen on (default: 50051)
 
 Example:
-  dagu coordinator --coordinator-host=0.0.0.0 --coordinator-port=9000
+  dagu coordinator --coordinator-host=0.0.0.0 --coordinator-port=50051
 
 This process runs continuously in the foreground until terminated.
 `,
