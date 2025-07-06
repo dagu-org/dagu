@@ -66,6 +66,34 @@ func toStep(obj digraph.Step) api.Step {
 		step.Run = ptrOf(obj.ChildDAG.Name)
 		step.Params = ptrOf(obj.ChildDAG.Params)
 	}
+	if obj.Parallel != nil {
+		parallel := struct {
+			Items         *api.Step_Parallel_Items `json:"items,omitempty"`
+			MaxConcurrent *int                     `json:"maxConcurrent,omitempty"`
+		}{
+			MaxConcurrent: ptrOf(obj.Parallel.MaxConcurrent),
+		}
+
+		if obj.Parallel.Variable != "" {
+			// Variable reference (string)
+			items := &api.Step_Parallel_Items{}
+			if err := items.FromStepParallelItems1(obj.Parallel.Variable); err == nil {
+				parallel.Items = items
+			}
+		} else if len(obj.Parallel.Items) > 0 {
+			// Convert items to string array
+			var itemStrings []string
+			for _, item := range obj.Parallel.Items {
+				itemStrings = append(itemStrings, item.Value)
+			}
+			// Array of strings
+			items := &api.Step_Parallel_Items{}
+			if err := items.FromStepParallelItems0(itemStrings); err == nil {
+				parallel.Items = items
+			}
+		}
+		step.Parallel = &parallel
+	}
 	return step
 }
 
@@ -214,7 +242,7 @@ func toDAGDetails(dag *digraph.DAG) *api.DAGDetails {
 		HandlerOn:         ptrOf(handlerOn),
 		HistRetentionDays: ptrOf(dag.HistRetentionDays),
 		LogDir:            ptrOf(dag.LogDir),
-		MaxActiveDAGRuns:  ptrOf(dag.MaxActiveRuns),
+		MaxActiveRuns:     ptrOf(dag.MaxActiveRuns),
 		MaxActiveSteps:    ptrOf(dag.MaxActiveSteps),
 		Params:            ptrOf(dag.Params),
 		Preconditions:     ptrOf(preconditions),

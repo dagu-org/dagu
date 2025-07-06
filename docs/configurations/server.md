@@ -244,11 +244,11 @@ queues:
   enabled: true
   config:
     - name: "critical"
-      maxConcurrency: 5
+      maxActiveRuns: 5
     - name: "batch"
-      maxConcurrency: 1
+      maxActiveRuns: 1
     - name: "default"
-      maxConcurrency: 2
+      maxActiveRuns: 2
 ```
 
 ## Base Configuration

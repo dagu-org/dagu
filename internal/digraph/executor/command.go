@@ -202,12 +202,12 @@ func (b *shellCommandBuilder) Build(ctx context.Context) (*exec.Cmd, error) {
 			cmdParts = append(cmdParts, b.Args...)
 			cmdParts = append(cmdParts, b.Script)
 			cmdStr := strings.Join(cmdParts, " ")
-			
+
 			// If ShellCommandArgs contains "set -e", we need to apply it
 			if strings.HasPrefix(b.ShellCommandArgs, "set -e") {
 				cmdStr = b.ShellCommandArgs + " " + cmdStr
 			}
-			
+
 			return exec.CommandContext(ctx, cmd, append(args, cmdStr)...), nil // nolint: gosec
 		}
 

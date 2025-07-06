@@ -1589,12 +1589,12 @@ components:
           description: "Conditions that must be met before a DAG-run can start"
           items:
             $ref: "#/components/schemas/Condition"
-        maxActiveDAGRuns:
+        maxActiveRuns:
           type: integer
           description: "Maximum number of concurrent DAG-runs allowed from this DAG"
         maxActiveSteps:
           type: integer
-          description: "Maximum number of concurrent DAG-runs allowed from this DAG"
+          description: "Maximum number of concurrent steps allowed in a DAG run"
         params:
           type: array
           description: "List of parameter names that can be passed to DAG-runs created from this DAG"
@@ -1831,6 +1831,21 @@ components:
         params:
           type: string
           description: "Parameters to pass to the child DAG-run in JSON format"
+        parallel:
+          type: object
+          description: "Configuration for parallel execution of the step"
+          properties:
+            items:
+              description: "Array of items to process in parallel. Can be a static array or a reference to a variable containing an array"
+              oneOf:
+                - type: array
+                  items:
+                    type: string
+                - type: string
+            maxConcurrent:
+              type: integer
+              description: "Maximum number of parallel executions. Default is 10 if not specified"
+              minimum: 1
         depends:
           type: array
           description: "List of step names that must complete before this step can start"

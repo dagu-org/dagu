@@ -697,8 +697,8 @@ export interface components {
             /** @description Conditions that must be met before a DAG-run can start */
             preconditions?: components["schemas"]["Condition"][];
             /** @description Maximum number of concurrent DAG-runs allowed from this DAG */
-            maxActiveDAGRuns?: number;
-            /** @description Maximum number of concurrent DAG-runs allowed from this DAG */
+            maxActiveRuns?: number;
+            /** @description Maximum number of concurrent steps allowed in a DAG run */
             maxActiveSteps?: number;
             /** @description List of parameter names that can be passed to DAG-runs created from this DAG */
             params?: string[];
@@ -815,6 +815,13 @@ export interface components {
             run?: string;
             /** @description Parameters to pass to the child DAG-run in JSON format */
             params?: string;
+            /** @description Configuration for parallel execution of the step */
+            parallel?: {
+                /** @description Array of items to process in parallel. Can be a static array or a reference to a variable containing an array */
+                items?: string[] | string;
+                /** @description Maximum number of parallel executions. Default is 10 if not specified */
+                maxConcurrent?: number;
+            };
             /** @description List of step names that must complete before this step can start */
             depends?: string[];
             repeatPolicy?: components["schemas"]["RepeatPolicy"];
