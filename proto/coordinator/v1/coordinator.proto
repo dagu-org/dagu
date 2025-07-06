@@ -17,6 +17,7 @@ service CoordinatorService {
 // Request message for polling a task.
 message PollRequest {
   string worker_id = 1;
+  string poller_id = 2; // Unique ID for this poll request
 }
 
 // Response message for polling a task.

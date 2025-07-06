@@ -193,7 +193,7 @@ func (c *Context) NewCoordinator() (*coordinator.Service, error) {
 	}
 
 	// Create handler
-	handler := &coordinator.Handler{}
+	handler := coordinator.NewHandler()
 
 	// Create and return service
 	return coordinator.NewService(grpcServer, handler, listener), nil
