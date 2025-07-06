@@ -150,6 +150,22 @@ var (
 		usage:        "Coordinator gRPC server port (default: 50051)",
 		bindViper:    true,
 	}
+
+	// workerIDFlag is the unique identifier for the worker instance.
+	workerIDFlag = commandLineFlag{
+		name:      "worker-id",
+		shorthand: "w",
+		usage:     "Worker instance ID (default: hostname@PID)",
+	}
+
+	// maxConcurrentRunsFlag is the maximum number of concurrent task executions.
+	maxConcurrentRunsFlag = commandLineFlag{
+		name:         "max-concurrent-runs",
+		shorthand:    "m",
+		defaultValue: "100",
+		usage:        "Maximum number of concurrent task executions (default: 100)",
+		bindViper:    true,
+	}
 )
 
 type commandLineFlag struct {
