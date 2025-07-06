@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -18,6 +19,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/persistence/dirlock"
 )
 
 // Job is the interface for the actual DAG.
@@ -44,6 +46,7 @@ type Scheduler struct {
 	lock         sync.Mutex
 	queueConfigs sync.Map
 	config       *config.Config
+	dirLock      dirlock.DirLock // File-based lock to prevent multiple scheduler instances
 }
 
 type queueConfig struct {
@@ -57,10 +60,16 @@ func New(
 	drs models.DAGRunStore,
 	qs models.QueueStore,
 	ps models.ProcStore,
-) *Scheduler {
+) (*Scheduler, error) {
 	timeLoc := cfg.Global.Location
 	if timeLoc == nil {
 		timeLoc = time.Local
+	}
+
+	// Initialize directory lock for scheduler
+	dirLock, err := createSchedulerLock(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize scheduler lock at %s: %w", schedulerLockDir(cfg), err)
 	}
 
 	return &Scheduler{
@@ -73,10 +82,40 @@ func New(
 		queueStore:  qs,
 		procStore:   ps,
 		config:      cfg,
-	}
+		dirLock:     dirLock,
+	}, nil
 }
 
 func (s *Scheduler) Start(ctx context.Context) error {
+	// Acquire directory lock first to prevent multiple scheduler instances
+	if err := s.dirLock.TryLock(); err != nil {
+		if errors.Is(err, dirlock.ErrLockConflict) {
+			lockInfo, infoErr := s.dirLock.Info()
+			if infoErr == nil && lockInfo != nil {
+				return fmt.Errorf("scheduler lock is already held by another process (acquired at %s): %w",
+					lockInfo.AcquiredAt.Format(time.RFC3339), err)
+			}
+			return fmt.Errorf("scheduler lock is already held by another process: %w", err)
+		}
+		return fmt.Errorf("failed to acquire scheduler lock: %w", err)
+	}
+
+	logger.Info(ctx, "Acquired scheduler lock",
+		"lockDir", schedulerLockDir(s.config),
+		"staleThreshold", s.config.Global.SchedulerLockStaleThreshold.String(),
+		"retryInterval", s.config.Global.SchedulerLockRetryInterval.String())
+
+	// Ensure lock is always released
+	defer func() {
+		if s.dirLock.IsHeldByMe() {
+			if err := s.dirLock.Unlock(); err != nil {
+				logger.Error(ctx, "Failed to release scheduler lock in defer", "err", err)
+			} else {
+				logger.Info(ctx, "Released scheduler lock in defer")
+			}
+		}
+	}()
+
 	sig := make(chan os.Signal, 1)
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -363,6 +402,15 @@ func (s *Scheduler) Stop(ctx context.Context) {
 	}
 	s.lock.Unlock()
 
+	// Release directory lock
+	if s.dirLock.IsHeldByMe() {
+		if err := s.dirLock.Unlock(); err != nil {
+			logger.Error(ctx, "Failed to release scheduler lock in Stop", "err", err)
+		} else {
+			logger.Info(ctx, "Released scheduler lock in Stop")
+		}
+	}
+
 	logger.Info(ctx, "Scheduler stopped")
 }
 
@@ -463,4 +511,49 @@ func Now() time.Time {
 	}
 
 	return fixedTime
+}
+
+// ForceUnlock forcibly removes the scheduler lock (administrative operation).
+// This function can be used to clean up abandoned locks when a scheduler process
+// has terminated unexpectedly.
+func ForceUnlock(cfg *config.Config) error {
+	if err := dirlock.ForceUnlock(schedulerLockDir(cfg)); err != nil {
+		return fmt.Errorf("failed to force unlock scheduler lock: %w", err)
+	}
+
+	return nil
+}
+
+// IsLocked checks if the scheduler lock is currently held by any process.
+func IsLocked(cfg *config.Config) bool {
+	lock, err := createSchedulerLock(cfg)
+	if err != nil {
+		return false
+	}
+
+	return lock.IsLocked()
+}
+
+// LockInfo returns information about the current scheduler lock holder.
+func LockInfo(cfg *config.Config) (*dirlock.LockInfo, error) {
+	lock, err := createSchedulerLock(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create lock instance: %w", err)
+	}
+
+	return lock.Info()
+}
+
+// schedulerLockDir returns the directory path where the scheduler lock is stored.
+func schedulerLockDir(cfg *config.Config) string {
+	return filepath.Join(cfg.Paths.DataDir, "scheduler.lock")
+}
+
+// createSchedulerLock creates a new directory lock instance for the scheduler
+// using the configuration settings from the provided config.
+func createSchedulerLock(cfg *config.Config) (dirlock.DirLock, error) {
+	return dirlock.New(schedulerLockDir(cfg), &dirlock.LockOptions{
+		StaleThreshold: cfg.Global.SchedulerLockStaleThreshold,
+		RetryInterval:  cfg.Global.SchedulerLockRetryInterval,
+	})
 }

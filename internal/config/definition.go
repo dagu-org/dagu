@@ -69,6 +69,14 @@ type Definition struct {
 	// Queues contains global queue configuration settings.
 	Queues *queuesDef `mapstructure:"queues"`
 
+	// SchedulerLockStaleThreshold is the time after which a scheduler lock is considered stale.
+	// Default is 30 seconds.
+	SchedulerLockStaleThreshold string `mapstructure:"schedulerLockStaleThreshold"`
+
+	// SchedulerLockRetryInterval is the interval between lock acquisition attempts.
+	// Default is 50 milliseconds.
+	SchedulerLockRetryInterval string `mapstructure:"schedulerLockRetryInterval"`
+
 	// ----------------------------------------------------------------------------
 	// Legacy fields for backward compatibility - Start
 	// These fields are maintained for compatibility with older configuration formats.
