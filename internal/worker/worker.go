@@ -14,11 +14,9 @@ import (
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health/grpc_health_v1"
-	"google.golang.org/grpc/status"
 )
 
 // TLSConfig holds TLS configuration for the worker
@@ -123,6 +121,17 @@ func (w *Worker) Stop(ctx context.Context) error {
 	return nil
 }
 
+// handleRetryError handles retry errors consistently, returning nil for successful retries.
+func handleRetryError(ctx context.Context, retryErr error) error {
+	if retryErr == nil {
+		return nil
+	}
+	if retryErr == backoff.ErrOperationCanceled {
+		return ctx.Err()
+	}
+	return retryErr
+}
+
 // waitForHealthy waits for the coordinator to become healthy using exponential backoff with jitter.
 func (w *Worker) waitForHealthy(ctx context.Context) error {
 	// Create exponential backoff policy with jitter for health checks
@@ -164,13 +173,8 @@ func (w *Worker) waitForHealthy(ctx context.Context) error {
 				"err", err)
 
 			// Apply backoff before retrying
-			retryErr := retrier.Next(ctx, err)
-			if retryErr != nil {
-				if retryErr == backoff.ErrOperationCanceled {
-					return fmt.Errorf("health check canceled during backoff: %w", ctx.Err())
-				}
-				// This shouldn't happen with MaxRetries = 0
-				return fmt.Errorf("health check retry exhausted: %w", retryErr)
+			if err := handleRetryError(ctx, retrier.Next(ctx, err)); err != nil {
+				return err
 			}
 		}
 	}
@@ -214,44 +218,8 @@ func (w *Worker) runPoller(ctx context.Context, pollerIndex int) {
 					"worker_id", w.id,
 					"poller_id", pollerID)
 
-				// Check if this is a connection error that requires health checking
-				if isConnectionError(err) {
-					logger.Warn(ctx, "Connection error detected, switching to health check mode",
-						"worker_id", w.id,
-						"poller_index", pollerIndex,
-						"error", err)
-
-					// Wait for coordinator to become healthy again
-					if healthErr := w.waitForHealthy(ctx); healthErr != nil {
-						logger.Error(ctx, "Failed during health check recovery",
-							"worker_id", w.id,
-							"poller_index", pollerIndex,
-							"error", healthErr)
-						return
-					}
-
-					// Health check succeeded, reset retrier and continue polling
-					retrier = backoff.NewRetrier(policy)
-					logger.Info(ctx, "Resuming polling after health check recovery",
-						"worker_id", w.id,
-						"poller_index", pollerIndex)
-					continue
-				}
-
-				// For non-connection errors, apply normal backoff
-				retryErr := retrier.Next(ctx, err)
-				if retryErr != nil {
-					if retryErr == backoff.ErrOperationCanceled {
-						logger.Debug(ctx, "Poller retry canceled",
-							"worker_id", w.id,
-							"poller_index", pollerIndex)
-						return
-					}
-					// This shouldn't happen with MaxRetries = 0, but log it just in case
-					logger.Error(ctx, "Retry exhausted",
-						"error", retryErr,
-						"worker_id", w.id,
-						"poller_index", pollerIndex)
+				// Apply backoff before retrying
+				if err := handleRetryError(ctx, retrier.Next(ctx, err)); err != nil {
 					return
 				}
 				continue
@@ -328,30 +296,4 @@ func (w *Worker) getDialOptions() ([]grpc.DialOption, error) {
 	return []grpc.DialOption{
 		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
 	}, nil
-}
-
-// isConnectionError checks if the error indicates a connection problem that requires health checking.
-func isConnectionError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	// Check for gRPC status codes that indicate connection issues
-	st, ok := status.FromError(err)
-	if !ok {
-		// Not a gRPC error, could still be a connection issue
-		return true
-	}
-
-	switch st.Code() {
-	case codes.Unavailable, codes.Internal, codes.Unknown:
-		// These typically indicate server or connection problems
-		return true
-	case codes.DeadlineExceeded, codes.Canceled:
-		// Could be connection-related timeouts
-		return true
-	default:
-		// Other errors like InvalidArgument, NotFound, etc. are not connection errors
-		return false
-	}
 }
