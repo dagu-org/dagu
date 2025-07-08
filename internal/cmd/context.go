@@ -31,6 +31,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
 // Context holds the configuration for a command.
@@ -185,6 +187,10 @@ func (c *Context) NewCoordinator() (*coordinator.Service, error) {
 	// Create gRPC server
 	grpcServer := grpc.NewServer()
 
+	// Create health service
+	healthServer := health.NewServer()
+	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
+
 	// Create listener
 	addr := fmt.Sprintf("%s:%d", c.Config.Coordinator.Host, c.Config.Coordinator.Port)
 	listener, err := net.Listen("tcp", addr)
@@ -196,7 +202,7 @@ func (c *Context) NewCoordinator() (*coordinator.Service, error) {
 	handler := coordinator.NewHandler()
 
 	// Create and return service
-	return coordinator.NewService(grpcServer, handler, listener), nil
+	return coordinator.NewService(grpcServer, handler, listener, healthServer), nil
 }
 
 // StringParam retrieves a string parameter from the command line flags.
