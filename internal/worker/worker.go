@@ -14,8 +14,11 @@ import (
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/status"
 )
 
 // TLSConfig holds TLS configuration for the worker
@@ -34,6 +37,7 @@ type Worker struct {
 	coordinatorAddr   string
 	tlsConfig         *TLSConfig
 	client            coordinatorv1.CoordinatorServiceClient
+	healthClient      grpc_health_v1.HealthClient
 	conn              *grpc.ClientConn
 }
 
@@ -72,10 +76,20 @@ func (w *Worker) Start(ctx context.Context) error {
 	}
 	w.conn = conn
 	w.client = coordinatorv1.NewCoordinatorServiceClient(conn)
+	w.healthClient = grpc_health_v1.NewHealthClient(conn)
 
-	logger.Info(ctx, "Worker started",
+	logger.Info(ctx, "Worker connected to coordinator",
 		"worker_id", w.id,
 		"coordinator", w.coordinatorAddr,
+		"max_concurrent_runs", w.maxConcurrentRuns)
+
+	// Wait for coordinator to be healthy before starting polling
+	if err := w.waitForHealthy(ctx); err != nil {
+		return fmt.Errorf("failed waiting for coordinator to become healthy: %w", err)
+	}
+
+	logger.Info(ctx, "Starting polling goroutines",
+		"worker_id", w.id,
 		"max_concurrent_runs", w.maxConcurrentRuns)
 
 	// Create a wait group to track all polling goroutines
@@ -107,6 +121,59 @@ func (w *Worker) Stop(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// waitForHealthy waits for the coordinator to become healthy using exponential backoff with jitter.
+func (w *Worker) waitForHealthy(ctx context.Context) error {
+	// Create exponential backoff policy with jitter for health checks
+	basePolicy := backoff.NewExponentialBackoffPolicy(time.Second)
+	basePolicy.BackoffFactor = 2.0
+	basePolicy.MaxInterval = time.Minute
+	basePolicy.MaxRetries = 0 // Retry indefinitely
+
+	// Add full jitter to prevent thundering herd
+	policy := backoff.WithJitter(basePolicy, backoff.FullJitter)
+	retrier := backoff.NewRetrier(policy)
+
+	logger.Info(ctx, "Waiting for coordinator to become healthy",
+		"worker_id", w.id,
+		"coordinator", w.coordinatorAddr)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("health check canceled: %w", ctx.Err())
+		default:
+			// Perform health check
+			req := &grpc_health_v1.HealthCheckRequest{
+				Service: "", // Check overall server health
+			}
+
+			resp, err := w.healthClient.Check(ctx, req)
+			if err == nil && resp.Status == grpc_health_v1.HealthCheckResponse_SERVING {
+				logger.Info(ctx, "Coordinator is healthy",
+					"worker_id", w.id,
+					"coordinator", w.coordinatorAddr)
+				return nil
+			}
+
+			// Log the health check failure
+			logger.Warn(ctx, "Health check failed",
+				"worker_id", w.id,
+				"coordinator", w.coordinatorAddr,
+				"err", err)
+
+			// Apply backoff before retrying
+			retryErr := retrier.Next(ctx, err)
+			if retryErr != nil {
+				if retryErr == backoff.ErrOperationCanceled {
+					return fmt.Errorf("health check canceled during backoff: %w", ctx.Err())
+				}
+				// This shouldn't happen with MaxRetries = 0
+				return fmt.Errorf("health check retry exhausted: %w", retryErr)
+			}
+		}
+	}
 }
 
 // runPoller runs a single polling loop that continuously polls for tasks.
@@ -147,7 +214,31 @@ func (w *Worker) runPoller(ctx context.Context, pollerIndex int) {
 					"worker_id", w.id,
 					"poller_id", pollerID)
 
-				// Apply backoff with jitter before retrying
+				// Check if this is a connection error that requires health checking
+				if isConnectionError(err) {
+					logger.Warn(ctx, "Connection error detected, switching to health check mode",
+						"worker_id", w.id,
+						"poller_index", pollerIndex,
+						"error", err)
+
+					// Wait for coordinator to become healthy again
+					if healthErr := w.waitForHealthy(ctx); healthErr != nil {
+						logger.Error(ctx, "Failed during health check recovery",
+							"worker_id", w.id,
+							"poller_index", pollerIndex,
+							"error", healthErr)
+						return
+					}
+
+					// Health check succeeded, reset retrier and continue polling
+					retrier = backoff.NewRetrier(policy)
+					logger.Info(ctx, "Resuming polling after health check recovery",
+						"worker_id", w.id,
+						"poller_index", pollerIndex)
+					continue
+				}
+
+				// For non-connection errors, apply normal backoff
 				retryErr := retrier.Next(ctx, err)
 				if retryErr != nil {
 					if retryErr == backoff.ErrOperationCanceled {
@@ -237,4 +328,30 @@ func (w *Worker) getDialOptions() ([]grpc.DialOption, error) {
 	return []grpc.DialOption{
 		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
 	}, nil
+}
+
+// isConnectionError checks if the error indicates a connection problem that requires health checking.
+func isConnectionError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Check for gRPC status codes that indicate connection issues
+	st, ok := status.FromError(err)
+	if !ok {
+		// Not a gRPC error, could still be a connection issue
+		return true
+	}
+
+	switch st.Code() {
+	case codes.Unavailable, codes.Internal, codes.Unknown:
+		// These typically indicate server or connection problems
+		return true
+	case codes.DeadlineExceeded, codes.Canceled:
+		// Could be connection-related timeouts
+		return true
+	default:
+		// Other errors like InvalidArgument, NotFound, etc. are not connection errors
+		return false
+	}
 }
