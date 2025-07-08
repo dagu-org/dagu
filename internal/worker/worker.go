@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/backoff"
 	"github.com/dagu-org/dagu/internal/logger"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/google/uuid"
@@ -110,8 +111,15 @@ func (w *Worker) Stop(ctx context.Context) error {
 
 // runPoller runs a single polling loop that continuously polls for tasks.
 func (w *Worker) runPoller(ctx context.Context, pollerIndex int) {
-	backoff := time.Second
-	maxBackoff := time.Minute
+	// Create exponential backoff policy with jitter
+	basePolicy := backoff.NewExponentialBackoffPolicy(time.Second)
+	basePolicy.BackoffFactor = 2.0
+	basePolicy.MaxInterval = time.Minute
+	basePolicy.MaxRetries = 0 // Retry indefinitely
+
+	// Add full jitter to prevent thundering herd when multiple pollers reconnect
+	policy := backoff.WithJitter(basePolicy, backoff.FullJitter)
+	retrier := backoff.NewRetrier(policy)
 
 	for {
 		select {
@@ -136,20 +144,29 @@ func (w *Worker) runPoller(ctx context.Context, pollerIndex int) {
 				logger.Error(ctx, "Poll failed",
 					"error", err,
 					"worker_id", w.id,
-					"poller_id", pollerID,
-					"backoff", backoff)
+					"poller_id", pollerID)
 
-				// Apply exponential backoff
-				time.Sleep(backoff)
-				backoff = backoff * 2
-				if backoff > maxBackoff {
-					backoff = maxBackoff
+				// Apply backoff with jitter before retrying
+				retryErr := retrier.Next(ctx, err)
+				if retryErr != nil {
+					if retryErr == backoff.ErrOperationCanceled {
+						logger.Debug(ctx, "Poller retry canceled",
+							"worker_id", w.id,
+							"poller_index", pollerIndex)
+						return
+					}
+					// This shouldn't happen with MaxRetries = 0, but log it just in case
+					logger.Error(ctx, "Retry exhausted",
+						"error", retryErr,
+						"worker_id", w.id,
+						"poller_index", pollerIndex)
+					return
 				}
 				continue
 			}
 
-			// Reset backoff on successful poll
-			backoff = time.Second
+			// Reset retrier on successful poll
+			retrier = backoff.NewRetrier(policy)
 
 			// Handle the received task
 			if resp.Task != nil {
