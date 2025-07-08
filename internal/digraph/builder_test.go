@@ -423,6 +423,28 @@ func TestBuildStep(t *testing.T) {
 		assert.Equal(t, 3, th.Steps[0].RetryPolicy.Limit)
 		assert.Equal(t, 10*time.Second, th.Steps[0].RetryPolicy.Interval)
 	})
+	t.Run("RetryPolicyWithBackoff", func(t *testing.T) {
+		t.Parallel()
+
+		th := testLoad(t, "retry_policy_backoff.yaml")
+		assert.Len(t, th.Steps, 1)
+		require.NotNil(t, th.Steps[0].RetryPolicy)
+		assert.Equal(t, 5, th.Steps[0].RetryPolicy.Limit)
+		assert.Equal(t, 2*time.Second, th.Steps[0].RetryPolicy.Interval)
+		assert.Equal(t, 2.0, th.Steps[0].RetryPolicy.Backoff)
+		assert.Equal(t, 30*time.Second, th.Steps[0].RetryPolicy.MaxInterval)
+	})
+	t.Run("RetryPolicyWithBackoffBool", func(t *testing.T) {
+		t.Parallel()
+
+		th := testLoad(t, "retry_policy_backoff_bool.yaml")
+		assert.Len(t, th.Steps, 1)
+		require.NotNil(t, th.Steps[0].RetryPolicy)
+		assert.Equal(t, 3, th.Steps[0].RetryPolicy.Limit)
+		assert.Equal(t, 1*time.Second, th.Steps[0].RetryPolicy.Interval)
+		assert.Equal(t, 2.0, th.Steps[0].RetryPolicy.Backoff) // true converts to 2.0
+		assert.Equal(t, 10*time.Second, th.Steps[0].RetryPolicy.MaxInterval)
+	})
 	t.Run("RepeatPolicy", func(t *testing.T) {
 		t.Parallel()
 
@@ -580,6 +602,38 @@ func TestBuildStep(t *testing.T) {
 		assert.Equal(t, 2*time.Second, repeatPolicy.Interval)
 		// Should infer "while" mode due to exitCode only
 		assert.Equal(t, digraph.RepeatModeWhile, repeatPolicy.RepeatMode)
+	})
+
+	t.Run("RepeatPolicyWithBackoff", func(t *testing.T) {
+		t.Parallel()
+
+		th := testLoad(t, "repeat_policy_backoff.yaml")
+		assert.Len(t, th.Steps, 1)
+		repeatPolicy := th.Steps[0].RepeatPolicy
+		require.NotNil(t, repeatPolicy)
+		assert.Equal(t, digraph.RepeatModeWhile, repeatPolicy.RepeatMode)
+		assert.Equal(t, 5*time.Second, repeatPolicy.Interval)
+		assert.Equal(t, 1.5, repeatPolicy.Backoff)
+		assert.Equal(t, 60*time.Second, repeatPolicy.MaxInterval)
+		assert.Equal(t, 10, repeatPolicy.Limit)
+		assert.Equal(t, []int{1}, repeatPolicy.ExitCode)
+	})
+
+	t.Run("RepeatPolicyWithBackoffBool", func(t *testing.T) {
+		t.Parallel()
+
+		th := testLoad(t, "repeat_policy_backoff_bool.yaml")
+		assert.Len(t, th.Steps, 1)
+		repeatPolicy := th.Steps[0].RepeatPolicy
+		require.NotNil(t, repeatPolicy)
+		assert.Equal(t, digraph.RepeatModeUntil, repeatPolicy.RepeatMode)
+		assert.Equal(t, 2*time.Second, repeatPolicy.Interval)
+		assert.Equal(t, 2.0, repeatPolicy.Backoff) // true converts to 2.0
+		assert.Equal(t, 20*time.Second, repeatPolicy.MaxInterval)
+		assert.Equal(t, 5, repeatPolicy.Limit)
+		require.NotNil(t, repeatPolicy.Condition)
+		assert.Equal(t, "echo done", repeatPolicy.Condition.Condition)
+		assert.Equal(t, "done", repeatPolicy.Condition.Expected)
 	})
 
 	t.Run("RepeatPolicyErrorCases", func(t *testing.T) {

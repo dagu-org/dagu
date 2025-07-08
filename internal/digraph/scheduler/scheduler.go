@@ -940,10 +940,13 @@ func (sc *Scheduler) prepareNodeForRepeat(ctx context.Context, node *Node, progr
 }
 
 func getNextRetryTime(node *Node) time.Duration {
-	if node.Step().RepeatPolicy.ExponentialBackoff {
-		sleeptime := math.Pow(2, float64(node.State().DoneCount))
-		return time.Duration(sleeptime) * time.Second
-	} else {
-		return node.Step().RepeatPolicy.Interval
+	policy := node.Step().RepeatPolicy
+	if policy.Backoff > 0 {
+		sleeptime := float64(policy.Interval) * math.Pow(policy.Backoff, float64(node.State().DoneCount))
+		if policy.MaxInterval > 0 && time.Duration(sleeptime) > policy.MaxInterval {
+			return policy.MaxInterval
+		}
+		return time.Duration(sleeptime)
 	}
+	return policy.Interval
 }

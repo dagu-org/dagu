@@ -144,19 +144,23 @@ type continueOnDef struct {
 
 // repeatPolicyDef defines the repeat policy for a step.
 type repeatPolicyDef struct {
-	Repeat      any    `yaml:"repeat,omitempty"`      // Flag to indicate if the step should be repeated, can be bool (legacy) or string ("while" or "until")
-	IntervalSec int    `yaml:"intervalSec,omitempty"` // Interval in seconds to wait before repeating the step
-	Limit       int    `yaml:"limit,omitempty"`       // Maximum number of times to repeat the step
-	Condition   string `yaml:"condition,omitempty"`   // Condition to check before repeating
-	Expected    string `yaml:"expected,omitempty"`    // Expected output to match before repeating
-	ExitCode    []int  `yaml:"exitCode,omitempty"`    // List of exit codes to consider for repeating the step
+	Repeat         any    `yaml:"repeat,omitempty"`         // Flag to indicate if the step should be repeated, can be bool (legacy) or string ("while" or "until")
+	IntervalSec    int    `yaml:"intervalSec,omitempty"`    // Interval in seconds to wait before repeating the step
+	Limit          int    `yaml:"limit,omitempty"`          // Maximum number of times to repeat the step
+	Condition      string `yaml:"condition,omitempty"`      // Condition to check before repeating
+	Expected       string `yaml:"expected,omitempty"`       // Expected output to match before repeating
+	ExitCode       []int  `yaml:"exitCode,omitempty"`       // List of exit codes to consider for repeating the step
+	Backoff        any    `yaml:"backoff,omitempty"`        // Accepts bool or float
+	MaxIntervalSec int    `yaml:"maxIntervalSec,omitempty"` // Maximum interval in seconds
 }
 
 // retryPolicyDef defines the retry policy for a step.
 type retryPolicyDef struct {
-	Limit       any   `yaml:"limit,omitempty"`
-	IntervalSec any   `yaml:"intervalSec,omitempty"`
-	ExitCode    []int `yaml:"exitCode,omitempty"`
+	Limit          any   `yaml:"limit,omitempty"`
+	IntervalSec    any   `yaml:"intervalSec,omitempty"`
+	ExitCode       []int `yaml:"exitCode,omitempty"`
+	Backoff        any   `yaml:"backoff,omitempty"` // Accepts bool or float
+	MaxIntervalSec int   `yaml:"maxIntervalSec,omitempty"`
 }
 
 // smtpConfigDef defines the SMTP configuration.

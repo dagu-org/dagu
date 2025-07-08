@@ -844,6 +844,29 @@ func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
 		if def.RetryPolicy.ExitCode != nil {
 			step.RetryPolicy.ExitCodes = def.RetryPolicy.ExitCode
 		}
+
+		// Parse backoff field
+		if def.RetryPolicy.Backoff != nil {
+			switch v := def.RetryPolicy.Backoff.(type) {
+			case bool:
+				if v {
+					step.RetryPolicy.Backoff = 2.0 // Default multiplier when true
+				}
+			case int:
+				step.RetryPolicy.Backoff = float64(v)
+			case int64:
+				step.RetryPolicy.Backoff = float64(v)
+			case float64:
+				step.RetryPolicy.Backoff = v
+			default:
+				return wrapError("retryPolicy.Backoff", v, fmt.Errorf("invalid type: %T", v))
+			}
+		}
+
+		// Parse maxIntervalSec
+		if def.RetryPolicy.MaxIntervalSec > 0 {
+			step.RetryPolicy.MaxInterval = time.Second * time.Duration(def.RetryPolicy.MaxIntervalSec)
+		}
 	}
 	return nil
 }
@@ -962,6 +985,29 @@ func buildRepeatPolicy(_ BuildContext, def stepDef, step *Step) error {
 		}
 	}
 	step.RepeatPolicy.ExitCode = rpDef.ExitCode
+
+	// Parse backoff field
+	if rpDef.Backoff != nil {
+		switch v := rpDef.Backoff.(type) {
+		case bool:
+			if v {
+				step.RepeatPolicy.Backoff = 2.0 // Default multiplier when true
+			}
+		case int:
+			step.RepeatPolicy.Backoff = float64(v)
+		case int64:
+			step.RepeatPolicy.Backoff = float64(v)
+		case float64:
+			step.RepeatPolicy.Backoff = v
+		default:
+			return fmt.Errorf("invalid value for backoff: '%v'. It must be a boolean or number", v)
+		}
+	}
+
+	// Parse maxIntervalSec
+	if rpDef.MaxIntervalSec > 0 {
+		step.RepeatPolicy.MaxInterval = time.Second * time.Duration(rpDef.MaxIntervalSec)
+	}
 
 	return nil
 }
