@@ -127,12 +127,12 @@ func displayDetailedStatus(dag *digraph.DAG, status *models.DAGRunStatus) {
 			finishedAt, _ := stringutil.ParseTime(status.FinishedAt)
 			if !startedAt.IsZero() && !finishedAt.IsZero() {
 				duration := finishedAt.Sub(startedAt)
-				t.AppendRow(table.Row{"Duration", formatDuration(duration)})
+				t.AppendRow(table.Row{"Duration", stringutil.FormatDuration(duration)})
 			}
 			t.AppendRow(table.Row{"Finished At", status.FinishedAt})
 		} else if status.Status == scheduler.StatusRunning && !startedAt.IsZero() {
 			elapsed := time.Since(startedAt)
-			t.AppendRow(table.Row{"Running For", formatDuration(elapsed)})
+			t.AppendRow(table.Row{"Running For", stringutil.FormatDuration(elapsed)})
 		}
 	}
 
@@ -245,10 +245,10 @@ func displayStepSummary(nodes []*models.Node) {
 			if node.FinishedAt != "" && node.FinishedAt != "-" {
 				finishedAt, _ := stringutil.ParseTime(node.FinishedAt)
 				if !startedAt.IsZero() && !finishedAt.IsZero() {
-					duration = formatDuration(finishedAt.Sub(startedAt))
+					duration = stringutil.FormatDuration(finishedAt.Sub(startedAt))
 				}
 			} else if node.Status == scheduler.NodeStatusRunning && !startedAt.IsZero() {
-				duration = formatDuration(time.Since(startedAt))
+				duration = stringutil.FormatDuration(time.Since(startedAt))
 			}
 		}
 
@@ -472,22 +472,6 @@ func formatPID(pid models.PID) string {
 		return fmt.Sprintf("%d", pid)
 	}
 	return "-"
-}
-
-// formatDuration formats a duration in a human-readable way
-func formatDuration(d time.Duration) string {
-	if d < time.Second {
-		return fmt.Sprintf("%dms", d.Milliseconds())
-	} else if d < time.Minute {
-		return fmt.Sprintf("%.1fs", d.Seconds())
-	} else if d < time.Hour {
-		mins := int(d.Minutes())
-		secs := int(d.Seconds()) % 60
-		return fmt.Sprintf("%dm %ds", mins, secs)
-	}
-	hours := int(d.Hours())
-	mins := int(d.Minutes()) % 60
-	return fmt.Sprintf("%dh %dm", hours, mins)
 }
 
 func extractDAGName(ctx *Context, name string) (string, error) {
