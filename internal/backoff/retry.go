@@ -31,6 +31,8 @@ type (
 		// Next waits for the next retry interval or returns an error if retries are exhausted.
 		// It blocks until the interval has passed or the context is canceled.
 		Next(ctx context.Context, err error) error
+		// Reset resets the retrier to its initial state.
+		Reset()
 	}
 )
 
@@ -197,4 +199,12 @@ func (r *retrierImpl) Next(ctx context.Context, err error) error {
 	case <-ctx.Done():
 		return ErrOperationCanceled
 	}
+}
+
+// Reset resets the retrier to its initial state.
+func (r *retrierImpl) Reset() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.retryCount = 0
+	r.startTime = time.Time{}
 }

@@ -492,6 +492,84 @@ func TestNewLinearBackoffPolicy(t *testing.T) {
 	assert.Equal(t, defaultMaxRetries, policy.MaxRetries)
 }
 
+func TestRetrier_Reset(t *testing.T) {
+	t.Run("ResetAfterRetries", func(t *testing.T) {
+		// Create a policy with short intervals for testing
+		policy := &ExponentialBackoffPolicy{
+			InitialInterval: 10 * time.Millisecond,
+			BackoffFactor:   2.0,
+			MaxInterval:     100 * time.Millisecond,
+			MaxRetries:      0,
+		}
+
+		retrier := NewRetrier(policy)
+		ctx := context.Background()
+
+		// Perform a few retries
+		for i := 0; i < 3; i++ {
+			err := retrier.Next(ctx, errors.New("test error"))
+			if err != nil {
+				t.Fatalf("unexpected error on retry %d: %v", i, err)
+			}
+		}
+
+		// Reset the retrier
+		retrier.Reset()
+
+		// After reset, the next retry should use the initial interval
+		start := time.Now()
+		err := retrier.Next(ctx, errors.New("test error"))
+		elapsed := time.Since(start)
+
+		if err != nil {
+			t.Fatalf("unexpected error after reset: %v", err)
+		}
+
+		// Check that the interval is close to the initial interval
+		expectedDuration := 10 * time.Millisecond
+		tolerance := 5 * time.Millisecond
+		if elapsed < expectedDuration-tolerance || elapsed > expectedDuration+tolerance {
+			t.Errorf("expected interval around %v, got %v", expectedDuration, elapsed)
+		}
+	})
+
+	t.Run("ResetWithMaxRetries", func(t *testing.T) {
+		// Create a policy with max retries
+		policy := &ConstantBackoffPolicy{
+			Interval:   10 * time.Millisecond,
+			MaxRetries: 2,
+		}
+
+		retrier := NewRetrier(policy)
+		ctx := context.Background()
+
+		// Exhaust retries
+		for i := 0; i < 2; i++ {
+			err := retrier.Next(ctx, errors.New("test error"))
+			if err != nil {
+				t.Fatalf("unexpected error on retry %d: %v", i, err)
+			}
+		}
+
+		// Next retry should fail
+		err := retrier.Next(ctx, errors.New("test error"))
+		if err != ErrRetriesExhausted {
+			t.Errorf("expected ErrRetriesExhausted, got %v", err)
+		}
+
+		// Reset the retrier
+		retrier.Reset()
+
+		// After reset, retries should work again
+		for i := 0; i < 2; i++ {
+			err := retrier.Next(ctx, errors.New("test error"))
+			if err != nil {
+				t.Fatalf("unexpected error on retry %d after reset: %v", i, err)
+			}
+		}
+	})
+}
+
 func TestRetrier_WithDifferentPolicies(t *testing.T) {
 	t.Run("ConstantBackoff", func(t *testing.T) {
 		policy := NewConstantBackoffPolicy(50 * time.Millisecond)

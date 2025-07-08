@@ -226,7 +226,7 @@ func (w *Worker) runPoller(ctx context.Context, pollerIndex int) {
 			}
 
 			// Reset retrier on successful poll
-			retrier = backoff.NewRetrier(policy)
+			retrier.Reset()
 
 			// Handle the received task
 			if resp.Task != nil {
