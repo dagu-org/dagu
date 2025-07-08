@@ -121,15 +121,21 @@ func (w *Worker) Stop(ctx context.Context) error {
 	return nil
 }
 
-// handleRetryError handles retry errors consistently, returning nil for successful retries.
-func handleRetryError(ctx context.Context, retryErr error) error {
-	if retryErr == nil {
+// waitForInterval waits for the specified interval or until context is canceled.
+func waitForInterval(ctx context.Context, interval time.Duration) error {
+	if interval <= 0 {
 		return nil
 	}
-	if retryErr == backoff.ErrOperationCanceled {
+
+	timer := time.NewTimer(interval)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
 		return ctx.Err()
 	}
-	return retryErr
 }
 
 // waitForHealthy waits for the coordinator to become healthy using exponential backoff with jitter.
@@ -172,9 +178,15 @@ func (w *Worker) waitForHealthy(ctx context.Context) error {
 				"coordinator", w.coordinatorAddr,
 				"err", err)
 
-			// Apply backoff before retrying
-			if err := handleRetryError(ctx, retrier.Next(ctx, err)); err != nil {
-				return err
+			// Get next retry interval
+			interval, retryErr := retrier.Next(err)
+			if retryErr != nil {
+				return fmt.Errorf("health check retry failed: %w", retryErr)
+			}
+
+			// Wait for the interval
+			if err := waitForInterval(ctx, interval); err != nil {
+				return fmt.Errorf("health check canceled: %w", err)
 			}
 		}
 	}
@@ -218,8 +230,16 @@ func (w *Worker) runPoller(ctx context.Context, pollerIndex int) {
 					"worker_id", w.id,
 					"poller_id", pollerID)
 
-				// Apply backoff before retrying
-				if err := handleRetryError(ctx, retrier.Next(ctx, err)); err != nil {
+				// Get next retry interval
+				interval, retryErr := retrier.Next(err)
+				if retryErr != nil {
+					// Retries exhausted
+					return
+				}
+
+				// Wait for the interval
+				if err := waitForInterval(ctx, interval); err != nil {
+					// Context canceled
 					return
 				}
 				continue
