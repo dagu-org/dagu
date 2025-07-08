@@ -135,6 +135,10 @@ type RetryPolicy struct {
 	IntervalSecStr string `json:"intervalSecStr,omitempty"`
 	// ExitCodes is the list of exit codes that should trigger a retry.
 	ExitCodes []int `json:"exitCode,omitempty"`
+	// Backoff is the exponential backoff multiplier (e.g., 2.0 for doubling).
+	Backoff float64 `json:"backoff,omitempty"`
+	// MaxInterval is the maximum interval cap for exponential backoff.
+	MaxInterval time.Duration `json:"maxInterval,omitempty"`
 }
 
 // RepeatMode is the type for the repeat mode.
@@ -156,6 +160,10 @@ type RepeatPolicy struct {
 	Interval time.Duration `json:"interval,omitempty"`
 	// Limit is the maximum number of times to repeat the step.
 	Limit int `json:"limit,omitempty"`
+	// Backoff is the exponential backoff multiplier (e.g., 2.0 for doubling).
+	Backoff float64 `json:"backoff,omitempty"`
+	// MaxInterval is the maximum interval cap for exponential backoff.
+	MaxInterval time.Duration `json:"maxInterval,omitempty"`
 	// Condition is the condition object to be met for the repeat.
 	Condition *Condition `json:"condition,omitempty"`
 	// ExitCode is the list of exit codes that should trigger a repeat.
@@ -180,6 +188,8 @@ func (r *RepeatPolicy) UnmarshalJSON(data []byte) error {
 	r.Limit = aux.Limit
 	r.Condition = aux.Condition
 	r.ExitCode = aux.ExitCode
+	r.Backoff = aux.Backoff
+	r.MaxInterval = aux.MaxInterval
 
 	// If RepeatMode is already set, we're done (new format)
 	if r.RepeatMode != "" {

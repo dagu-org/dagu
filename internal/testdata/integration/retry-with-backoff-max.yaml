@@ -1,0 +1,12 @@
+name: retry-with-backoff-max
+steps:
+  - name: failing-step
+    command: |
+      echo "Attempt at $(date +%s.%N)"
+      exit 1
+    retryPolicy:
+      limit: 5
+      intervalSec: 1
+      backoff: 3.0
+      maxIntervalSec: 5  # Cap at 5 seconds
+      exitCode: [1]

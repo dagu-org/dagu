@@ -1,0 +1,11 @@
+steps:
+  - name: "test_repeat_backoff_bool"
+    command: "echo test"
+    repeatPolicy:
+      repeat: until
+      intervalSec: 2
+      backoff: true
+      maxIntervalSec: 20
+      limit: 5
+      condition: "echo done"
+      expected: "done"

@@ -284,15 +284,22 @@ See the [Continue On Reference](/reference/continue-on) for detailed documentati
 | Field | Type | Description | Default |
 |-------|------|-------------|---------|
 | `limit` | integer | Maximum retry attempts | - |
-| `intervalSec` | integer | Seconds between retries | - |
+| `intervalSec` | integer | Base interval between retries (seconds) | - |
+| `backoff` | any | Exponential backoff multiplier. `true` = 2.0, or specify custom number > 1.0 | - |
+| `maxIntervalSec` | integer | Maximum interval between retries (seconds) | - |
 | `exitCode` | array | Exit codes that trigger retry | All non-zero |
+
+**Exponential Backoff**: When `backoff` is set, intervals increase exponentially using the formula:  
+`interval * (backoff ^ attemptCount)`
 
 #### Repeat Policy Fields
 
 | Field | Type | Description | Default |
 |-------|------|-------------|---------|
 | `repeat` | string | Repeat mode: `"while"` or `"until"` | - |
-| `intervalSec` | integer | Seconds between repetitions | - |
+| `intervalSec` | integer | Base interval between repetitions (seconds) | - |
+| `backoff` | any | Exponential backoff multiplier. `true` = 2.0, or specify custom number > 1.0 | - |
+| `maxIntervalSec` | integer | Maximum interval between repetitions (seconds) | - |
 | `limit` | integer | Maximum number of executions | - |
 | `condition` | string | Condition to evaluate | - |
 | `expected` | string | Expected value/pattern | - |
@@ -301,6 +308,9 @@ See the [Continue On Reference](/reference/continue-on) for detailed documentati
 **Repeat Modes:**
 - `while`: Repeats while the condition is true or exit code matches
 - `until`: Repeats until the condition is true or exit code matches
+
+**Exponential Backoff**: When `backoff` is set, intervals increase exponentially using the formula:  
+`interval * (backoff ^ attemptCount)`
 ```yaml
 steps:
   - name: retry-example
@@ -309,6 +319,15 @@ steps:
       limit: 3
       intervalSec: 30
       exitCode: [1, 255]  # Retry only on specific codes
+      
+  - name: retry-with-backoff
+    command: curl https://api.example.com
+    retryPolicy:
+      limit: 5
+      intervalSec: 2
+      backoff: true        # Exponential backoff (2.0x multiplier)
+      maxIntervalSec: 60   # Cap at 60 seconds
+      exitCode: [429, 503] # Rate limit or unavailable
     
   - name: repeat-while-example
     command: check-process.sh
@@ -318,14 +337,16 @@ steps:
       intervalSec: 60
       limit: 30
       
-  - name: repeat-until-example
+  - name: repeat-until-with-backoff
     command: check-status.sh
     output: STATUS
     repeatPolicy:
       repeat: until        # Repeat UNTIL status is ready
       condition: "${STATUS}"
       expected: "ready"
-      intervalSec: 30
+      intervalSec: 5
+      backoff: 1.5         # Custom backoff multiplier
+      maxIntervalSec: 300  # Cap at 5 minutes
       limit: 60
 ```
 

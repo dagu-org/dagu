@@ -264,7 +264,9 @@ Dagu is a **modern, powerful, yet surprisingly simple workflow orchestration eng
 - **Retry Policies**: 
   - Configurable retry limits and intervals
   - Exit code-based retry triggers
-  - Exponential backoff support
+  - Exponential backoff support with `backoff` field (boolean or numeric multiplier)
+  - Maximum interval capping with `maxIntervalSec`
+  - Backoff formula: `interval * (backoff ^ attemptCount)`
 - **Repeat Policies**:
   - Explicit 'while' and 'until' modes for clear repeat logic
   - **While mode**: Repeats while condition is true
@@ -274,6 +276,8 @@ Dagu is a **modern, powerful, yet surprisingly simple workflow orchestration eng
     - Exit codes
     - Command evaluation results
   - Configurable intervals and limits
+  - Exponential backoff support with `backoff` field (boolean or numeric multiplier)
+  - Maximum interval capping with `maxIntervalSec`
 - **Continue On Conditions**:
   - Continue on failure or skipped steps
   - Continue based on specific exit codes
@@ -518,6 +522,15 @@ steps:
       intervalSec: 30
       exitCode: [429, 503]  # Retry only on rate limit or service unavailable
   
+  - name: api call with exponential backoff
+    command: curl -f https://api.example.com/data
+    retryPolicy:
+      limit: 5
+      intervalSec: 2
+      backoff: 2.0          # 2s, 4s, 8s, 16s, 32s
+      maxIntervalSec: 30    # Cap at 30 seconds
+      exitCode: [429, 503]
+  
   - name: wait for service
     command: nc -z localhost 8080
     repeatPolicy:
@@ -525,6 +538,16 @@ steps:
       exitCode: [1]         # Exit code 1 means connection failed
       intervalSec: 10
       limit: 30             # Maximum 30 attempts (5 minutes total)
+  
+  - name: wait for service with backoff
+    command: nc -z localhost 8080
+    repeatPolicy:
+      repeat: while         # Repeat WHILE connection fails
+      exitCode: [1]
+      intervalSec: 1
+      backoff: true         # Default 2.0 multiplier: 1s, 2s, 4s, 8s...
+      maxIntervalSec: 60    # Cap at 60 seconds
+      limit: 30
   
   - name: monitor until complete
     command: check_job_status.sh
@@ -535,6 +558,18 @@ steps:
       expected: "COMPLETED"
       intervalSec: 60
       limit: 60             # Maximum 1 hour of monitoring
+  
+  - name: monitor with custom backoff
+    command: check_job_status.sh
+    output: JOB_STATUS
+    repeatPolicy:
+      repeat: until
+      condition: "${JOB_STATUS}"
+      expected: "COMPLETED"
+      intervalSec: 5
+      backoff: 1.5          # 5s, 7.5s, 11.25s, 16.875s...
+      maxIntervalSec: 120   # Cap at 2 minutes
+      limit: 60
   
   - name: keep alive while processing
     command: check_process.sh

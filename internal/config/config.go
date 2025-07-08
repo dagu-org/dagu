@@ -60,6 +60,14 @@ type Global struct {
 
 	// ConfigPath is the path to the configuration file used to load settings.
 	ConfigPath string
+
+	// SchedulerLockStaleThreshold is the time after which a scheduler lock is considered stale.
+	// Default is 30 seconds.
+	SchedulerLockStaleThreshold time.Duration
+
+	// SchedulerLockRetryInterval is the interval between lock acquisition attempts.
+	// Default is 50 milliseconds.
+	SchedulerLockRetryInterval time.Duration
 }
 
 func (cfg *Global) setTimezone() error {

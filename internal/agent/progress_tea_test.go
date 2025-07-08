@@ -200,23 +200,6 @@ func TestProgressModel_NodeSorting(t *testing.T) {
 	assert.Equal(t, "b", nodes[2].node.Step.Name)
 }
 
-func TestProgressModel_DurationFormatting(t *testing.T) {
-	tests := []struct {
-		duration time.Duration
-		expected string
-	}{
-		{500 * time.Millisecond, "500ms"},
-		{5 * time.Second, "5.0s"},
-		{2*time.Minute + 30*time.Second, "2m 30s"},
-		{3*time.Hour + 15*time.Minute, "3h 15m"},
-	}
-
-	for _, tt := range tests {
-		result := formatDuration(tt.duration)
-		assert.Equal(t, tt.expected, result)
-	}
-}
-
 func TestProgressModel_TruncateString(t *testing.T) {
 	tests := []struct {
 		input    string

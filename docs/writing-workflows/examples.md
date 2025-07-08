@@ -401,6 +401,86 @@ Targeted retry policies for different error types.
 
 <div class="example-card">
 
+### Retry with Exponential Backoff
+
+```yaml
+steps:
+  - name: api-with-backoff
+    command: curl https://api.example.com/data
+    retryPolicy:
+      limit: 5
+      intervalSec: 2
+      backoff: true        # 2x multiplier
+      maxIntervalSec: 60   # Cap at 60s
+      # Intervals: 2s, 4s, 8s, 16s, 32s → 60s
+```
+
+```mermaid
+sequenceDiagram
+    participant D as Dagu
+    participant A as API
+    D->>A: Attempt 1
+    A-->>D: ❌ Failure
+    Note over D: Wait 2s
+    D->>A: Retry 1
+    A-->>D: ❌ Failure
+    Note over D: Wait 4s
+    D->>A: Retry 2
+    A-->>D: ❌ Failure
+    Note over D: Wait 8s
+    D->>A: Retry 3
+    A-->>D: ✅ Success
+```
+
+Avoid overwhelming failed services with exponential backoff.
+
+<a href="/writing-workflows/error-handling#exponential-backoff" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Repeat with Backoff
+
+```yaml
+steps:
+  - name: wait-for-service
+    command: nc -z localhost 8080
+    repeatPolicy:
+      repeat: while
+      exitCode: [1]        # While connection fails
+      intervalSec: 1
+      backoff: 2.0
+      maxIntervalSec: 30
+      limit: 20
+      # Check intervals: 1s, 2s, 4s, 8s, 16s, 30s...
+```
+
+```mermaid
+graph LR
+    A[Check Service] -->|Fail| B[Wait 1s]
+    B --> C[Check Again]
+    C -->|Fail| D[Wait 2s]
+    D --> E[Check Again]
+    E -->|Fail| F[Wait 4s]
+    F --> G[Check Again]
+    G -->|Success| H[Continue]
+    
+    style A stroke:lightblue,stroke-width:1.6px,color:#333
+    style C stroke:lightblue,stroke-width:1.6px,color:#333
+    style E stroke:lightblue,stroke-width:1.6px,color:#333
+    style G stroke:lightblue,stroke-width:1.6px,color:#333
+    style H stroke:green,stroke-width:1.6px,color:#333
+```
+
+Gradually increase polling intervals to reduce load.
+
+<a href="/writing-workflows/control-flow#exponential-backoff-for-repeats" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
 ### Lifecycle Handlers
 
 ```yaml

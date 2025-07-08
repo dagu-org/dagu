@@ -288,7 +288,7 @@ func (m ProgressModel) renderHeader() string {
 	// Build the time part
 	timePart := fmt.Sprintf("Started: %s | Elapsed: %s",
 		m.startTime.Format("15:04:05"),
-		formatDuration(elapsed))
+		stringutil.FormatDuration(elapsed))
 
 	// Build status line
 	statusPrefix := "Status: "
@@ -312,7 +312,7 @@ func (m ProgressModel) renderHeader() string {
 	box.WriteString("│")
 	box.WriteString(statusLine)
 	// Calculate padding, ensuring it's never negative
-	padding := innerWidth - lipgloss.Width(statusLine) + 2
+	padding := innerWidth - lipgloss.Width(statusLine)
 	if padding < 0 {
 		padding = 0
 	}
@@ -410,13 +410,16 @@ func (m ProgressModel) renderCurrentlyRunning() string {
 	lines = append(lines, m.sectionStyle.Render("Currently Running:"))
 
 	for _, np := range running {
-		elapsed := time.Since(np.startTime)
+		var elapsed time.Duration
+		if !np.startTime.IsZero() {
+			elapsed = time.Since(np.startTime)
+		}
 		spinner := m.spinner.View()
 
 		line := fmt.Sprintf("  %s %s %s",
 			m.runningStyle.Render(spinner),
 			truncateString(np.node.Step.Name, 30),
-			m.faintStyle.Render(fmt.Sprintf("[Running for %s]", formatDuration(elapsed))))
+			m.faintStyle.Render(fmt.Sprintf("[Running for %s]", stringutil.FormatDuration(elapsed))))
 
 		lines = append(lines, line)
 	}
@@ -443,7 +446,7 @@ func (m ProgressModel) renderRecentlyCompleted() string {
 		statusIcon := m.getStatusIcon(np.status)
 		duration := ""
 		if !np.endTime.IsZero() && !np.startTime.IsZero() {
-			duration = fmt.Sprintf("[%s]", formatDuration(np.endTime.Sub(np.startTime)))
+			duration = fmt.Sprintf("[%s]", stringutil.FormatDuration(np.endTime.Sub(np.startTime)))
 		}
 
 		line := fmt.Sprintf("  %s %s %s",
@@ -479,7 +482,7 @@ func (m ProgressModel) renderAllCompleted() string {
 		statusIcon := m.getStatusIcon(np.status)
 		duration := ""
 		if !np.endTime.IsZero() && !np.startTime.IsZero() {
-			duration = fmt.Sprintf("[%s]", formatDuration(np.endTime.Sub(np.startTime)))
+			duration = fmt.Sprintf("[%s]", stringutil.FormatDuration(np.endTime.Sub(np.startTime)))
 		}
 
 		line := fmt.Sprintf("  %s %s %s",
@@ -673,21 +676,6 @@ func tickCmd() tea.Cmd {
 	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
 		return TickMsg(t)
 	})
-}
-
-func formatDuration(d time.Duration) string {
-	if d < time.Second {
-		return fmt.Sprintf("%dms", d.Milliseconds())
-	} else if d < time.Minute {
-		return fmt.Sprintf("%.1fs", d.Seconds())
-	} else if d < time.Hour {
-		mins := int(d.Minutes())
-		secs := int(d.Seconds()) % 60
-		return fmt.Sprintf("%dm %ds", mins, secs)
-	}
-	hours := int(d.Hours())
-	mins := int(d.Minutes()) % 60
-	return fmt.Sprintf("%dh %dm", hours, mins)
 }
 
 func truncateString(s string, maxLen int) string {

@@ -1036,6 +1036,16 @@ components:
         Interval:
           type: integer
           description: "Time in seconds to wait between retry attempts"
+        Backoff:
+          oneOf:
+            - type: boolean
+              description: "When true, uses default multiplier of 2.0"
+            - type: number
+              format: float
+              description: "Custom exponential backoff multiplier"
+        MaxIntervalSec:
+          type: integer
+          description: "Maximum interval in seconds (caps exponential growth)"
 
     ListTagResponse:
       type: object

@@ -1,0 +1,8 @@
+steps:
+  - name: "test_backoff"
+    command: "echo test"
+    retryPolicy:
+      limit: 5
+      intervalSec: 2
+      backoff: 2.0
+      maxIntervalSec: 30

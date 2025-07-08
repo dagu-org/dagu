@@ -74,6 +74,13 @@ type Definition struct {
 
 	// Worker contains the worker configuration.
 	Worker *workerDef `mapstructure:"worker"`
+	// SchedulerLockStaleThreshold is the time after which a scheduler lock is considered stale.
+	// Default is 30 seconds.
+	SchedulerLockStaleThreshold string `mapstructure:"schedulerLockStaleThreshold"`
+
+	// SchedulerLockRetryInterval is the interval between lock acquisition attempts.
+	// Default is 50 milliseconds.
+	SchedulerLockRetryInterval string `mapstructure:"schedulerLockRetryInterval"`
 
 	// ----------------------------------------------------------------------------
 	// Legacy fields for backward compatibility - Start

@@ -217,6 +217,116 @@ steps:
       - task-b
 ```
 
+## Retry and Repeat Control
+
+### Exponential Backoff
+
+Control retry and repeat intervals with exponential backoff to avoid overwhelming systems:
+
+#### Retry with Backoff
+
+```yaml
+steps:
+  # API call with exponential backoff
+  - name: resilient-api-call
+    command: curl https://api.example.com/data
+    retryPolicy:
+      limit: 6
+      intervalSec: 1
+      backoff: 2.0         # Double interval each time
+      maxIntervalSec: 60   # Cap at 60 seconds
+      exitCode: [429, 503] # Rate limit or service unavailable
+      # Intervals: 1s, 2s, 4s, 8s, 16s, 32s → 60s
+```
+
+#### Repeat with Backoff
+
+```yaml
+steps:
+  # Service health check with backoff
+  - name: wait-for-healthy
+    command: ./health-check.sh
+    output: STATUS
+    repeatPolicy:
+      repeat: until
+      condition: "${STATUS}"
+      expected: "healthy"
+      intervalSec: 2
+      backoff: 1.5         # Gentler backoff (1.5x)
+      maxIntervalSec: 120  # Cap at 2 minutes
+      limit: 50
+      # Intervals: 2s, 3s, 4.5s, 6.75s, 10.125s...
+```
+
+#### Practical Examples
+
+**Database Connection Retry**:
+```yaml
+steps:
+  - name: connect-db
+    command: psql -h db.example.com -c "SELECT 1"
+    retryPolicy:
+      limit: 10
+      intervalSec: 0.5
+      backoff: true        # true = 2.0 multiplier
+      maxIntervalSec: 30
+      # Quick initial retries, backing off to 30s max
+```
+
+**Service Startup Monitoring**:
+```yaml
+steps:
+  - name: start-service
+    command: systemctl start myservice
+    
+  - name: wait-for-ready
+    command: systemctl is-active myservice
+    repeatPolicy:
+      repeat: until
+      exitCode: [0]        # Exit 0 means service is active
+      intervalSec: 1
+      backoff: 2.0
+      maxIntervalSec: 60
+      limit: 30
+      # Check frequently at first, then less often
+```
+
+**API Polling with Rate Limit Awareness**:
+```yaml
+steps:
+  - name: poll-job-status
+    command: |
+      response=$(curl -s https://api.example.com/job/123)
+      echo "$response" | jq -r '.status'
+    output: JOB_STATUS
+    repeatPolicy:
+      repeat: until
+      condition: "${JOB_STATUS}"
+      expected: "re:completed|failed"
+      intervalSec: 5
+      backoff: 1.5
+      maxIntervalSec: 300  # Max 5 minutes between checks
+      limit: 100
+```
+
+### Backoff Benefits
+
+1. **Resource Efficiency**: Reduces load on failing services
+2. **Cost Optimization**: Fewer API calls means lower costs
+3. **Better Recovery**: Gives services time to recover
+4. **Rate Limit Compliance**: Naturally backs off when hitting limits
+5. **Network Stability**: Reduces network congestion during outages
+
+### Configuration Tips
+
+- **Start Small**: Begin with short intervals for quick recovery
+- **Choose Multipliers**: 
+  - `2.0`: Standard exponential (1, 2, 4, 8...)
+  - `1.5`: Gentler increase (1, 1.5, 2.25...)
+  - `3.0`: Aggressive backoff (1, 3, 9, 27...)
+- **Set Caps**: Always use `maxIntervalSec` to prevent excessive waits
+- **Consider Limits**: Set reasonable retry/repeat limits
+
 ## See Also
 
 - [Error Handling](/writing-workflows/error-handling) - Handle failures gracefully

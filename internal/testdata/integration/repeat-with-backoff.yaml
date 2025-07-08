@@ -1,0 +1,12 @@
+name: repeat-with-backoff
+steps:
+  - name: repeat-step
+    command: |
+      echo "Execution at $(date +%s.%N)"
+      exit 0
+    repeatPolicy:
+      repeat: while
+      limit: 4
+      intervalSec: 1
+      backoff: 2.0
+      exitCode: [0]  # Repeat while exit code is 0

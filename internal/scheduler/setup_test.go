@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/config"
@@ -67,7 +68,11 @@ func setupTest(t *testing.T) testHelper {
 			SuspendFlagsDir: tempDir,
 			DAGRunsDir:      filepath.Join(tempDir, "."+build.Slug, "data", "dag-runs"),
 		},
-		Global: config.Global{WorkDir: tempDir},
+		Global: config.Global{
+			WorkDir:                     tempDir,
+			SchedulerLockStaleThreshold: 30 * time.Second,
+			SchedulerLockRetryInterval:  50 * time.Millisecond,
+		},
 	}
 
 	ds := filedag.New(cfg.Paths.DAGsDir, filedag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))

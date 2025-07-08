@@ -176,7 +176,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	}
 
 	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, c.Config.Paths.Executable, c.Config.Global.WorkDir)
-	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore), nil
+	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore)
 }
 
 // NewCoordinator creates a new Coordinator service instance.
