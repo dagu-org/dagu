@@ -128,6 +128,7 @@ func (w *Worker) runPoller(ctx context.Context, pollerIndex int) {
 				"worker_id", w.id,
 				"poller_index", pollerIndex)
 			return
+
 		default:
 			// Generate a fresh UUID for this poll request
 			pollerID := uuid.New().String()
