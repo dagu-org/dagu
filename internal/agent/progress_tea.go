@@ -312,7 +312,7 @@ func (m ProgressModel) renderHeader() string {
 	box.WriteString("│")
 	box.WriteString(statusLine)
 	// Calculate padding, ensuring it's never negative
-	padding := innerWidth - lipgloss.Width(statusLine) + 2
+	padding := innerWidth - lipgloss.Width(statusLine)
 	if padding < 0 {
 		padding = 0
 	}
@@ -410,7 +410,10 @@ func (m ProgressModel) renderCurrentlyRunning() string {
 	lines = append(lines, m.sectionStyle.Render("Currently Running:"))
 
 	for _, np := range running {
-		elapsed := time.Since(np.startTime)
+		var elapsed time.Duration
+		if !np.startTime.IsZero() {
+			elapsed = time.Since(np.startTime)
+		}
 		spinner := m.spinner.View()
 
 		line := fmt.Sprintf("  %s %s %s",
