@@ -445,6 +445,25 @@ func TestBuildStep(t *testing.T) {
 		assert.Equal(t, 2.0, th.Steps[0].RetryPolicy.Backoff) // true converts to 2.0
 		assert.Equal(t, 10*time.Second, th.Steps[0].RetryPolicy.MaxInterval)
 	})
+	t.Run("RetryPolicyInvalidBackoff", func(t *testing.T) {
+		t.Parallel()
+
+		// Test backoff value <= 1.0
+		data := []byte(`
+name: test-invalid-backoff
+steps:
+  - name: "test"
+    command: "echo test"
+    retryPolicy:
+      limit: 3
+      intervalSec: 1
+      backoff: 0.8
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		assert.Error(t, err)
+		assert.Nil(t, dag)
+		assert.Contains(t, err.Error(), "backoff must be greater than 1.0")
+	})
 	t.Run("RepeatPolicy", func(t *testing.T) {
 		t.Parallel()
 
@@ -698,6 +717,44 @@ steps:
 		assert.Error(t, err)
 		assert.Nil(t, dag)
 		assert.Contains(t, err.Error(), "invalid value for repeat")
+	})
+
+	t.Run("PolicyBackoffValidation", func(t *testing.T) {
+		t.Parallel()
+
+		// Test repeat policy invalid backoff
+		data := []byte(`
+name: test-invalid-backoff
+steps:
+  - name: "test"
+    command: "echo test"
+    repeatPolicy:
+      repeat: "while"
+      intervalSec: 1
+      backoff: 1.0
+      exitCode: [1]
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		assert.Error(t, err)
+		assert.Nil(t, dag)
+		assert.Contains(t, err.Error(), "backoff must be greater than 1.0")
+
+		// Test with backoff = 0.5
+		data = []byte(`
+name: test-invalid-backoff-2
+steps:
+  - name: "test"
+    command: "echo test"
+    repeatPolicy:
+      repeat: "while"
+      intervalSec: 1
+      backoff: 0.5
+      exitCode: [1]
+`)
+		dag, err = digraph.LoadYAML(context.Background(), data)
+		assert.Error(t, err)
+		assert.Nil(t, dag)
+		assert.Contains(t, err.Error(), "backoff must be greater than 1.0")
 	})
 }
 
