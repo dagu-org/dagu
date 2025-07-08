@@ -4,9 +4,11 @@ Build resilient workflows with retries, handlers, and notifications.
 
 ## Retry Policies
 
+### Basic Retry
+
 ```yaml
 steps:
-  # Basic retry
+  # Basic retry with fixed interval
   - name: flaky-api
     command: curl https://api.example.com
     retryPolicy:
@@ -21,6 +23,45 @@ steps:
       intervalSec: 30
       exitCodes: [429, 503]  # Rate limit or unavailable
 ```
+
+### Exponential Backoff
+
+Increase retry intervals exponentially to avoid overwhelming failed services:
+
+```yaml
+steps:
+  # Exponential backoff with default multiplier (2.0)
+  - name: api-with-backoff
+    command: curl https://api.example.com/data
+    retryPolicy:
+      limit: 5
+      intervalSec: 2
+      backoff: true        # true = 2.0 multiplier
+      # Intervals: 2s, 4s, 8s, 16s, 32s
+      
+  # Custom backoff multiplier
+  - name: gentle-backoff
+    command: ./check-service.sh
+    retryPolicy:
+      limit: 4
+      intervalSec: 1
+      backoff: 1.5         # Custom multiplier
+      # Intervals: 1s, 1.5s, 2.25s, 3.375s
+      
+  # Backoff with max interval cap
+  - name: capped-backoff
+    command: ./sync-data.sh
+    retryPolicy:
+      limit: 10
+      intervalSec: 1
+      backoff: 2.0
+      maxIntervalSec: 30   # Cap at 30 seconds
+      # Intervals: 1s, 2s, 4s, 8s, 16s, 30s, 30s, 30s...
+```
+
+**Backoff Formula**: `interval * (backoff ^ attemptCount)`
+
+**Note**: Backoff values must be greater than 1.0 for exponential growth.
 
 ## Continue On Conditions
 

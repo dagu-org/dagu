@@ -202,6 +202,58 @@ steps:
       intervalSec: 30
 ```
 
+### Exponential Backoff for Repeats
+
+Gradually increase intervals between repeat attempts:
+
+```yaml
+steps:
+  # Exponential backoff with while mode
+  - name: wait-for-service-backoff
+    command: nc -z localhost 8080
+    repeatPolicy:
+      repeat: while
+      exitCode: [1]        # Repeat while connection fails
+      intervalSec: 1       # Start with 1 second
+      backoff: true        # true = 2.0 multiplier
+      limit: 10
+      # Intervals: 1s, 2s, 4s, 8s, 16s, 32s...
+      
+  # Custom backoff multiplier with until mode
+  - name: monitor-job-backoff
+    command: check-job-status.sh
+    output: STATUS
+    repeatPolicy:
+      repeat: until
+      condition: "${STATUS}"
+      expected: "COMPLETED"
+      intervalSec: 5
+      backoff: 1.5         # Gentler backoff
+      limit: 20
+      # Intervals: 5s, 7.5s, 11.25s, 16.875s...
+      
+  # Backoff with max interval cap
+  - name: poll-api-capped
+    command: curl -s https://api.example.com/status
+    output: API_STATUS
+    repeatPolicy:
+      repeat: until
+      condition: "${API_STATUS}"
+      expected: "ready"
+      intervalSec: 2
+      backoff: 2.0
+      maxIntervalSec: 60   # Never wait more than 1 minute
+      limit: 100
+      # Intervals: 2s, 4s, 8s, 16s, 32s, 60s, 60s, 60s...
+```
+
+**Backoff Formula**: `interval * (backoff ^ attemptCount)`
+
+**Use Cases**:
+- **Service startup**: Start checking frequently, then reduce load
+- **API polling**: Avoid rate limits with increasing intervals  
+- **Resource monitoring**: Balance responsiveness with efficiency
+
 ### Legacy Format (Deprecated)
 
 The old boolean format is still supported but deprecated:
