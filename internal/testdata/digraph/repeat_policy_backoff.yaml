@@ -1,0 +1,10 @@
+steps:
+  - name: "test_repeat_backoff"
+    command: "echo test"
+    repeatPolicy:
+      repeat: while
+      intervalSec: 5
+      backoff: 1.5
+      maxIntervalSec: 60
+      limit: 10
+      exitCode: [1]

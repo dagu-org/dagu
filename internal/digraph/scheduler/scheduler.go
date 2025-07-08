@@ -759,7 +759,13 @@ func (sc *Scheduler) shouldRetryNode(ctx context.Context, node *Node, execErr er
 
 	// Set the node status to none so that it can be retried
 	node.IncRetryCount()
-	time.Sleep(node.retryPolicy.Interval)
+	interval := calculateBackoffInterval(
+		node.Step().RetryPolicy.Interval,
+		node.Step().RetryPolicy.Backoff,
+		node.Step().RetryPolicy.MaxInterval,
+		node.GetRetryCount()-1, // -1 because we just incremented
+	)
+	time.Sleep(interval)
 	node.SetRetriedAt(time.Now())
 	node.SetStatus(NodeStatusRunning)
 	return true
@@ -930,7 +936,13 @@ func (sc *Scheduler) prepareNodeForRepeat(ctx context.Context, node *Node, progr
 		sc.setLastError(nil) // clear last error if we are repeating
 	}
 	logger.Info(ctx, "Step will be repeated", "step", node.Name(), "interval", step.RepeatPolicy.Interval)
-	time.Sleep(getNextRetryTime(node))
+	interval := calculateBackoffInterval(
+		step.RepeatPolicy.Interval,
+		step.RepeatPolicy.Backoff,
+		step.RepeatPolicy.MaxInterval,
+		node.State().DoneCount,
+	)
+	time.Sleep(interval)
 	node.SetRepeated(true) // mark as repeated
 	logger.Info(ctx, "Repeating step", "step", node.Name())
 
@@ -939,11 +951,13 @@ func (sc *Scheduler) prepareNodeForRepeat(ctx context.Context, node *Node, progr
 	}
 }
 
-func getNextRetryTime(node *Node) time.Duration {
-	if node.Step().RepeatPolicy.ExponentialBackoff {
-		sleeptime := math.Pow(2, float64(node.State().DoneCount))
-		return time.Duration(sleeptime) * time.Second
-	} else {
-		return node.Step().RepeatPolicy.Interval
+func calculateBackoffInterval(interval time.Duration, backoff float64, maxInterval time.Duration, attemptCount int) time.Duration {
+	if backoff > 0 {
+		sleeptime := float64(interval) * math.Pow(backoff, float64(attemptCount))
+		if maxInterval > 0 && time.Duration(sleeptime) > maxInterval {
+			return maxInterval
+		}
+		return time.Duration(sleeptime)
 	}
+	return interval
 }

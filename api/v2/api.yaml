@@ -1980,6 +1980,16 @@ components:
         limit:
           type: integer
           description: "Maximum number of times to repeat the step"
+        backoff:
+          oneOf:
+            - type: boolean
+              description: "When true, uses default multiplier of 2.0"
+            - type: number
+              format: float
+              description: "Custom exponential backoff multiplier"
+        maxIntervalSec:
+          type: integer
+          description: "Maximum interval in seconds (caps exponential growth)"
         condition:
           $ref: "#/components/schemas/Condition"
         exitCode:

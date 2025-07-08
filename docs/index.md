@@ -175,6 +175,8 @@ steps:
     command: python load.py
     retryPolicy:
       limit: 3
+      intervalSec: 2
+      backoff: true      # Exponential backoff
 
 ---
 name: transform-data
