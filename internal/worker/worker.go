@@ -33,11 +33,11 @@ type TaskExecutor interface {
 	Execute(ctx context.Context, task *coordinatorv1.Task) error
 }
 
-// DefaultTaskExecutor is the default implementation that simulates task execution
-type DefaultTaskExecutor struct{}
+// taskExecutorImpl is the default implementation that simulates task execution
+type taskExecutorImpl struct{}
 
 // Execute simulates task execution with a short delay
-func (e *DefaultTaskExecutor) Execute(ctx context.Context, task *coordinatorv1.Task) error {
+func (e *taskExecutorImpl) Execute(ctx context.Context, task *coordinatorv1.Task) error {
 	logger.Info(ctx, "Executing task (TODO: implement actual execution)",
 		"dag_run_id", task.DagRunId)
 
@@ -87,7 +87,7 @@ func NewWorker(workerID string, maxConcurrentRuns int, coordinatorHost string, c
 		maxConcurrentRuns: maxConcurrentRuns,
 		coordinatorAddr:   coordinatorAddr,
 		tlsConfig:         tlsConfig,
-		taskExecutor:      &DefaultTaskExecutor{},
+		taskExecutor:      &taskExecutorImpl{},
 	}
 }
 
