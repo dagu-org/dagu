@@ -66,10 +66,11 @@ func TestWorkerConnection(t *testing.T) {
 		// Setup coordinator
 		coord := test.SetupCoordinator(t)
 
-		// Create worker
+		// Create worker with instant mock executor
 		w := worker.NewWorker("test-worker-1", 1, "127.0.0.1", coord.Port(), &worker.TLSConfig{
 			Insecure: true,
 		})
+		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
 
 		// Start worker in a goroutine
 		ctx, cancel := context.WithCancel(context.Background())
@@ -99,11 +100,12 @@ func TestWorkerConnection(t *testing.T) {
 		// Setup coordinator
 		coord := test.SetupCoordinator(t)
 
-		// Create worker with custom ID
+		// Create worker with custom ID and instant mock executor
 		customID := "custom-worker-id"
 		w := worker.NewWorker(customID, 1, "127.0.0.1", coord.Port(), &worker.TLSConfig{
 			Insecure: true,
 		})
+		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
 
 		// Start worker
 		ctx, cancel := context.WithCancel(context.Background())
@@ -261,10 +263,11 @@ func TestWorkerReconnection(t *testing.T) {
 		coord := test.SetupCoordinator(t)
 		port := coord.Port()
 
-		// Create worker
+		// Create worker with instant mock executor
 		w := worker.NewWorker("test-worker", 1, "127.0.0.1", port, &worker.TLSConfig{
 			Insecure: true,
 		})
+		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
 
 		// Start worker
 		ctx, cancel := context.WithCancel(context.Background())
@@ -302,10 +305,11 @@ func TestWorkerWithTLS(t *testing.T) {
 		// Setup coordinator
 		coord := test.SetupCoordinator(t)
 
-		// Create worker with insecure connection
+		// Create worker with insecure connection and instant mock executor
 		w := worker.NewWorker("test-worker", 1, "127.0.0.1", coord.Port(), &worker.TLSConfig{
 			Insecure: true,
 		})
+		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
 
 		// Start worker
 		ctx, cancel := context.WithCancel(context.Background())
@@ -331,8 +335,9 @@ func TestWorkerWithTLS(t *testing.T) {
 		// Setup coordinator
 		coord := test.SetupCoordinator(t)
 
-		// Create worker with nil TLS config (should default to insecure)
+		// Create worker with nil TLS config (should default to insecure) and instant mock executor
 		w := worker.NewWorker("test-worker", 1, "127.0.0.1", coord.Port(), nil)
+		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
 
 		// Start worker
 		ctx, cancel := context.WithCancel(context.Background())
@@ -360,10 +365,11 @@ func TestWorkerShutdown(t *testing.T) {
 		// Setup coordinator
 		coord := test.SetupCoordinator(t)
 
-		// Create worker
+		// Create worker with instant mock executor
 		w := worker.NewWorker("test-worker", 2, "127.0.0.1", coord.Port(), &worker.TLSConfig{
 			Insecure: true,
 		})
+		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
 
 		// Start worker
 		ctx, cancel := context.WithCancel(context.Background())
@@ -389,10 +395,11 @@ func TestWorkerShutdown(t *testing.T) {
 	})
 
 	t.Run("StopWithoutStart", func(t *testing.T) {
-		// Create worker
+		// Create worker with instant mock executor
 		w := worker.NewWorker("test-worker", 1, "127.0.0.1", 50051, &worker.TLSConfig{
 			Insecure: true,
 		})
+		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
 
 		// Stop should work without error even if not started
 		err := w.Stop(context.Background())
@@ -472,10 +479,11 @@ func TestWorkerConcurrency(t *testing.T) {
 
 func TestWorkerErrorHandling(t *testing.T) {
 	t.Run("InvalidCoordinatorAddress", func(t *testing.T) {
-		// Create worker with invalid coordinator address
+		// Create worker with invalid coordinator address and instant mock executor
 		w := worker.NewWorker("test-worker", 1, "invalid-host", 99999, &worker.TLSConfig{
 			Insecure: true,
 		})
+		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
 
 		// Start should fail with connection error
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -487,10 +495,11 @@ func TestWorkerErrorHandling(t *testing.T) {
 	})
 
 	t.Run("ContextCancellationDuringHealthCheck", func(t *testing.T) {
-		// Create worker pointing to non-existent coordinator
+		// Create worker pointing to non-existent coordinator with instant mock executor
 		w := worker.NewWorker("test-worker", 1, "127.0.0.1", 65535, &worker.TLSConfig{
 			Insecure: true,
 		})
+		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
 
 		// Start with very short timeout
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
