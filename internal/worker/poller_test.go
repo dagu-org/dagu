@@ -41,9 +41,9 @@ func TestPollerStateTracking(t *testing.T) {
 	t.Run("InitialStateIsConnected", func(t *testing.T) {
 		mockClient := &MockCoordinatorClient{}
 		mockExecutor := &MockTaskExecutor{}
-		
+
 		poller := worker.NewPoller("test-worker", "localhost:8080", mockClient, mockExecutor, 0)
-		
+
 		// Check initial state
 		isConnected, consecutiveFails, lastError := poller.GetState()
 		assert.True(t, isConnected)
@@ -57,7 +57,7 @@ func TestPollerStateTracking(t *testing.T) {
 
 		pollCount := 0
 		connectionError := status.Error(codes.Unavailable, "connection refused")
-		
+
 		mockClient := &MockCoordinatorClient{
 			PollFunc: func(_ context.Context, _ *coordinatorv1.PollRequest, _ ...grpc.CallOption) (*coordinatorv1.PollResponse, error) {
 				pollCount++
@@ -69,30 +69,38 @@ func TestPollerStateTracking(t *testing.T) {
 				return &coordinatorv1.PollResponse{}, nil
 			},
 		}
-		
+
 		mockExecutor := &MockTaskExecutor{}
 		poller := worker.NewPoller("test-worker", "localhost:8080", mockClient, mockExecutor, 0)
-		
+
 		// Run poller in background
 		go poller.Run(ctx)
-		
+
 		// Wait for first failure
 		time.Sleep(100 * time.Millisecond)
-		
+
 		// State should show disconnected
 		isConnected, consecutiveFails, lastError := poller.GetState()
 		assert.False(t, isConnected)
 		assert.Greater(t, consecutiveFails, 0)
 		assert.Equal(t, connectionError, lastError)
-		
-		// Wait for reconnection
-		time.Sleep(5 * time.Second)
-		
-		// State should show connected again
-		isConnected, consecutiveFails, lastError = poller.GetState()
-		assert.True(t, isConnected)
-		assert.Equal(t, 0, consecutiveFails)
-		assert.Nil(t, lastError)
+
+		// Wait for reconnection (need to wait for exponential backoff)
+		// 1s + 2s + 4s = 7s total before 4th attempt succeeds
+		maxWait := time.Now().Add(10 * time.Second)
+		for time.Now().Before(maxWait) {
+			isConnected, consecutiveFails, lastError = poller.GetState()
+			if isConnected && consecutiveFails == 0 && lastError == nil {
+				// Successfully reconnected
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+
+		// Verify reconnection succeeded
+		assert.True(t, isConnected, "Should be reconnected")
+		assert.Equal(t, 0, consecutiveFails, "Failure count should reset")
+		assert.Nil(t, lastError, "Error should be cleared")
 	})
 
 	t.Run("TracksConsecutiveFailures", func(t *testing.T) {
@@ -107,20 +115,20 @@ func TestPollerStateTracking(t *testing.T) {
 				return nil, status.Error(codes.Unavailable, "connection refused")
 			},
 		}
-		
+
 		mockExecutor := &MockTaskExecutor{}
 		poller := worker.NewPoller("test-worker", "localhost:8080", mockClient, mockExecutor, 0)
-		
+
 		// Run poller in background
 		go poller.Run(ctx)
-		
+
 		// Wait and check that failures accumulate
 		time.Sleep(100 * time.Millisecond)
 		_, failures1, _ := poller.GetState()
-		
+
 		time.Sleep(2 * time.Second)
 		_, failures2, _ := poller.GetState()
-		
+
 		assert.Greater(t, failures2, failures1, "Consecutive failures should increase")
 	})
 }
@@ -147,24 +155,24 @@ func TestPollerTaskExecution(t *testing.T) {
 				return nil, ctx.Err()
 			},
 		}
-		
+
 		mockExecutor := &MockTaskExecutor{
 			ExecutionTime: 50 * time.Millisecond,
 		}
-		
+
 		poller := worker.NewPoller("test-worker", "localhost:8080", mockClient, mockExecutor, 0)
-		
+
 		// Run poller
 		go poller.Run(ctx)
-		
+
 		// Wait for task execution
 		time.Sleep(200 * time.Millisecond)
-		
+
 		// Verify task was executed
 		mockExecutor.mu.Lock()
 		executedTasks := mockExecutor.ExecutedTasks
 		mockExecutor.mu.Unlock()
-		
+
 		require.Len(t, executedTasks, 1)
 		assert.Equal(t, "test-run-123", executedTasks[0])
 	})
@@ -176,7 +184,7 @@ func TestPollerTaskExecution(t *testing.T) {
 		taskSent := false
 		executionError := fmt.Errorf("task execution failed")
 		var executedWithError bool
-		
+
 		mockClient := &MockCoordinatorClient{
 			PollFunc: func(ctx context.Context, _ *coordinatorv1.PollRequest, _ ...grpc.CallOption) (*coordinatorv1.PollResponse, error) {
 				if !taskSent {
@@ -192,25 +200,25 @@ func TestPollerTaskExecution(t *testing.T) {
 				return nil, ctx.Err()
 			},
 		}
-		
+
 		mockExecutor := &MockTaskExecutor{
 			ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
 				executedWithError = true
 				return executionError
 			},
 		}
-		
+
 		poller := worker.NewPoller("test-worker", "localhost:8080", mockClient, mockExecutor, 0)
-		
+
 		// Run poller
 		go poller.Run(ctx)
-		
+
 		// Wait for task execution
 		time.Sleep(200 * time.Millisecond)
-		
+
 		// Verify error was handled gracefully
 		assert.True(t, executedWithError, "Task should have been executed even though it failed")
-		
+
 		// Poller should still be running (not crashed)
 		isConnected, _, _ := poller.GetState()
 		assert.True(t, isConnected, "Poller should remain connected after task execution error")
@@ -222,9 +230,9 @@ func TestPollerConcurrency(t *testing.T) {
 	t.Run("ConcurrentStateAccess", func(_ *testing.T) {
 		mockClient := &MockCoordinatorClient{}
 		mockExecutor := &MockTaskExecutor{}
-		
+
 		poller := worker.NewPoller("test-worker", "localhost:8080", mockClient, mockExecutor, 0)
-		
+
 		// Run multiple goroutines accessing state concurrently
 		var wg sync.WaitGroup
 		for i := 0; i < 10; i++ {
@@ -240,7 +248,7 @@ func TestPollerConcurrency(t *testing.T) {
 				}
 			}()
 		}
-		
+
 		wg.Wait()
 	})
 }
@@ -249,7 +257,7 @@ func TestPollerConcurrency(t *testing.T) {
 func TestPollerContextCancellation(t *testing.T) {
 	t.Run("StopsOnContextCancel", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
-		
+
 		pollCount := 0
 		mockClient := &MockCoordinatorClient{
 			PollFunc: func(ctx context.Context, _ *coordinatorv1.PollRequest, _ ...grpc.CallOption) (*coordinatorv1.PollResponse, error) {
@@ -263,24 +271,24 @@ func TestPollerContextCancellation(t *testing.T) {
 				}
 			},
 		}
-		
+
 		mockExecutor := &MockTaskExecutor{}
 		poller := worker.NewPoller("test-worker", "localhost:8080", mockClient, mockExecutor, 0)
-		
+
 		// Run poller
 		done := make(chan struct{})
 		go func() {
 			poller.Run(ctx)
 			close(done)
 		}()
-		
+
 		// Let it poll a few times
 		time.Sleep(300 * time.Millisecond)
 		initialPollCount := pollCount
-		
+
 		// Cancel context
 		cancel()
-		
+
 		// Wait for poller to stop
 		select {
 		case <-done:
@@ -288,7 +296,7 @@ func TestPollerContextCancellation(t *testing.T) {
 		case <-time.After(2 * time.Second):
 			t.Fatal("Poller did not stop after context cancellation")
 		}
-		
+
 		// Verify polling stopped
 		assert.Greater(t, initialPollCount, 0, "Should have polled at least once")
 	})

@@ -191,4 +191,3 @@ func (p *Poller) GetState() (isConnected bool, consecutiveFails int, lastError e
 	defer p.state.mu.Unlock()
 	return p.state.isConnected, p.state.consecutiveFails, p.state.lastError
 }
-
