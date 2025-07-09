@@ -230,7 +230,7 @@ type mockRetryPolicy struct {
 	callCount int
 }
 
-func (m *mockRetryPolicy) ComputeNextInterval(retryCount int, elapsedTime time.Duration, err error) (time.Duration, error) {
+func (m *mockRetryPolicy) ComputeNextInterval(retryCount int, _ time.Duration, _ error) (time.Duration, error) {
 	if retryCount >= len(m.intervals) {
 		return 0, ErrRetriesExhausted
 	}

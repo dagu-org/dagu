@@ -416,7 +416,7 @@ func TestWorkerConcurrency(t *testing.T) {
 
 		// Create mock executor that holds tasks to simulate long-running execution
 		mockExecutor := &MockTaskExecutor{
-			ExecuteFunc: func(ctx context.Context, task *coordinatorv1.Task) error {
+			ExecuteFunc: func(ctx context.Context, _ *coordinatorv1.Task) error {
 				// Hold the task for a long time to ensure all workers become busy
 				select {
 				case <-time.After(10 * time.Second):

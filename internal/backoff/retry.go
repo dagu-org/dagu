@@ -18,7 +18,7 @@ type (
 func Retry(ctx context.Context, op Operation, policy RetryPolicy, isRetriable IsRetriableFunc) error {
 	// Default to retrying all errors if no function provided
 	if isRetriable == nil {
-		isRetriable = func(err error) bool { return true }
+		isRetriable = func(_ error) bool { return true }
 	}
 
 	retrier := NewRetrier(policy)

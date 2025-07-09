@@ -63,7 +63,7 @@ type ExponentialBackoffPolicy struct {
 }
 
 // ComputeNextInterval computes the next retry interval using exponential backoff.
-func (p *ExponentialBackoffPolicy) ComputeNextInterval(retryCount int, elapsedTime time.Duration, err error) (time.Duration, error) {
+func (p *ExponentialBackoffPolicy) ComputeNextInterval(retryCount int, _ time.Duration, _ error) (time.Duration, error) {
 	// Check if max retries is reached
 	if p.MaxRetries > 0 && retryCount >= p.MaxRetries {
 		return 0, ErrRetriesExhausted
@@ -97,7 +97,7 @@ func NewConstantBackoffPolicy(interval time.Duration) *ConstantBackoffPolicy {
 }
 
 // ComputeNextInterval returns a constant interval for each retry.
-func (p *ConstantBackoffPolicy) ComputeNextInterval(retryCount int, elapsedTime time.Duration, err error) (time.Duration, error) {
+func (p *ConstantBackoffPolicy) ComputeNextInterval(retryCount int, _ time.Duration, _ error) (time.Duration, error) {
 	// Check if max retries is reached
 	if p.MaxRetries > 0 && retryCount >= p.MaxRetries {
 		return 0, ErrRetriesExhausted
@@ -129,7 +129,7 @@ func NewLinearBackoffPolicy(initialInterval, increment time.Duration) *LinearBac
 }
 
 // ComputeNextInterval computes the next retry interval using linear backoff.
-func (p *LinearBackoffPolicy) ComputeNextInterval(retryCount int, elapsedTime time.Duration, err error) (time.Duration, error) {
+func (p *LinearBackoffPolicy) ComputeNextInterval(retryCount int, _ time.Duration, _ error) (time.Duration, error) {
 	// Check if max retries is reached
 	if p.MaxRetries > 0 && retryCount >= p.MaxRetries {
 		return 0, ErrRetriesExhausted

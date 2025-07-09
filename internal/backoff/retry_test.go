@@ -14,7 +14,7 @@ func TestRetry(t *testing.T) {
 	t.Run("SuccessfulRetry", func(t *testing.T) {
 		// Operation succeeds after 2 failures
 		attempts := 0
-		op := func(ctx context.Context) error {
+		op := func(_ context.Context) error {
 			attempts++
 			if attempts < 3 {
 				return errors.New("temporary error")
@@ -33,7 +33,7 @@ func TestRetry(t *testing.T) {
 		// Operation returns non-retriable error
 		permanentErr := errors.New("permanent error")
 		attempts := 0
-		op := func(ctx context.Context) error {
+		op := func(_ context.Context) error {
 			attempts++
 			return permanentErr
 		}
@@ -69,7 +69,7 @@ func TestRetry(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		attempts := 0
 
-		op := func(ctx context.Context) error {
+		op := func(_ context.Context) error {
 			attempts++
 			if attempts == 1 {
 				// Cancel after first attempt
@@ -94,7 +94,7 @@ func TestRetry(t *testing.T) {
 		// Operation never succeeds, retries exhausted
 		attempts := 0
 		testErr := errors.New("test error")
-		op := func(ctx context.Context) error {
+		op := func(_ context.Context) error {
 			attempts++
 			return testErr
 		}
@@ -110,7 +110,7 @@ func TestRetry(t *testing.T) {
 	t.Run("NilIsRetriableFunc", func(t *testing.T) {
 		// When isRetriable is nil, all errors should be retriable
 		attempts := 0
-		op := func(ctx context.Context) error {
+		op := func(_ context.Context) error {
 			attempts++
 			if attempts < 3 {
 				return errors.New("any error")
@@ -128,7 +128,7 @@ func TestRetry(t *testing.T) {
 	t.Run("ExponentialBackoffWithJitter", func(t *testing.T) {
 		// Test with exponential backoff and jitter
 		attempts := int32(0)
-		op := func(ctx context.Context) error {
+		op := func(_ context.Context) error {
 			atomic.AddInt32(&attempts, 1)
 			if atomic.LoadInt32(&attempts) < 3 {
 				return errors.New("retry me")
@@ -153,7 +153,7 @@ func TestRetry(t *testing.T) {
 	t.Run("ZeroInterval", func(t *testing.T) {
 		// Test that zero intervals don't cause delays
 		attempts := 0
-		op := func(ctx context.Context) error {
+		op := func(_ context.Context) error {
 			attempts++
 			if attempts < 5 {
 				return errors.New("retry")

@@ -32,6 +32,7 @@ type jitterImpl struct {
 func NewJitterFunc(jitterType JitterType) JitterFunc {
 	j := &jitterImpl{
 		jitterType: jitterType,
+		// nolint:gosec // G404: Use of weak RNG is acceptable for jitter calculation
 		randSource: rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 	return j.Apply
