@@ -12,7 +12,6 @@ import (
 	"github.com/dagu-org/dagu/internal/backoff"
 	"github.com/dagu-org/dagu/internal/logger"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
-	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -129,7 +128,8 @@ func (w *Worker) Start(ctx context.Context) error {
 		wg.Add(1)
 		go func(pollerIndex int) {
 			defer wg.Done()
-			w.runPoller(ctx, pollerIndex)
+			poller := NewPoller(w.id, w.coordinatorAddr, w.client, w.taskExecutor, pollerIndex)
+			poller.Run(ctx)
 		}(i)
 	}
 
@@ -193,110 +193,6 @@ func (w *Worker) waitForHealthy(ctx context.Context) error {
 			"coordinator", w.coordinatorAddr)
 		return nil
 	}, policy, nil)
-}
-
-// runPoller runs a single polling loop that continuously polls for tasks.
-func (w *Worker) runPoller(ctx context.Context, pollerIndex int) {
-	// Set up retry policy for poll failures only
-	basePolicy := backoff.NewExponentialBackoffPolicy(time.Second)
-	basePolicy.BackoffFactor = 2.0
-	basePolicy.MaxInterval = time.Minute
-	basePolicy.MaxRetries = 0 // Retry indefinitely
-
-	policy := backoff.WithJitter(basePolicy, backoff.FullJitter)
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Debug(ctx, "Poller stopping due to context cancellation",
-				"worker_id", w.id,
-				"poller_index", pollerIndex)
-			return
-		default:
-			// Poll for a task
-			task, err := w.pollForTask(ctx, pollerIndex, policy)
-			if err != nil {
-				// Context canceled, exit gracefully
-				if ctx.Err() != nil {
-					return
-				}
-				// Poll failed, but will be retried by pollForTask
-				continue
-			}
-
-			// If we got a task, execute it
-			if task != nil {
-				logger.Info(ctx, "Task received, starting execution",
-					"worker_id", w.id,
-					"poller_index", pollerIndex,
-					"dag_run_id", task.DagRunId)
-
-				// Execute the task using the TaskExecutor
-				err := w.taskExecutor.Execute(ctx, task)
-				if err != nil {
-					if ctx.Err() != nil {
-						// Context cancelled, exit gracefully
-						return
-					}
-					logger.Error(ctx, "Task execution failed",
-						"worker_id", w.id,
-						"poller_index", pollerIndex,
-						"dag_run_id", task.DagRunId,
-						"error", err)
-					// TODO: Report failure back to coordinator
-				} else {
-					logger.Info(ctx, "Task execution completed successfully",
-						"worker_id", w.id,
-						"poller_index", pollerIndex,
-						"dag_run_id", task.DagRunId)
-					// TODO: Report success back to coordinator
-				}
-			}
-			// Continue polling for the next task
-		}
-	}
-}
-
-// pollForTask polls the coordinator for a task with retry on failure
-func (w *Worker) pollForTask(ctx context.Context, pollerIndex int, policy backoff.RetryPolicy) (*coordinatorv1.Task, error) {
-	pollerID := uuid.New().String()
-
-	var task *coordinatorv1.Task
-	err := backoff.Retry(ctx, func(ctx context.Context) error {
-		req := &coordinatorv1.PollRequest{
-			WorkerId: w.id,
-			PollerId: pollerID,
-		}
-
-		// Perform the poll (this is a long-polling call)
-		resp, err := w.client.Poll(ctx, req)
-		if err != nil {
-			logger.Error(ctx, "Poll failed",
-				"error", err,
-				"worker_id", w.id,
-				"poller_id", pollerID,
-				"poller_index", pollerIndex)
-			return err // Will be retried with backoff
-		}
-
-		// Handle the received task
-		if resp.Task != nil {
-			logger.Info(ctx, "Task received",
-				"worker_id", w.id,
-				"poller_id", pollerID,
-				"poller_index", pollerIndex,
-				"root_dag_run_name", resp.Task.RootDagRunName,
-				"root_dag_run_id", resp.Task.RootDagRunId,
-				"parent_dag_run_name", resp.Task.ParentDagRunName,
-				"parent_dag_run_id", resp.Task.ParentDagRunId,
-				"dag_run_id", resp.Task.DagRunId)
-			task = resp.Task
-		}
-
-		return nil
-	}, policy, nil)
-
-	return task, err
 }
 
 // getDialOptions returns the appropriate gRPC dial options based on TLS configuration
