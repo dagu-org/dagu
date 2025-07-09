@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -183,7 +184,7 @@ func TestPollerTaskExecution(t *testing.T) {
 
 		taskSent := false
 		executionError := fmt.Errorf("task execution failed")
-		var executedWithError bool
+		var executedWithError atomic.Bool
 
 		mockClient := &MockCoordinatorClient{
 			PollFunc: func(ctx context.Context, _ *coordinatorv1.PollRequest, _ ...grpc.CallOption) (*coordinatorv1.PollResponse, error) {
@@ -203,7 +204,7 @@ func TestPollerTaskExecution(t *testing.T) {
 
 		mockExecutor := &MockTaskExecutor{
 			ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
-				executedWithError = true
+				executedWithError.Store(true)
 				return executionError
 			},
 		}
@@ -217,7 +218,7 @@ func TestPollerTaskExecution(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 
 		// Verify error was handled gracefully
-		assert.True(t, executedWithError, "Task should have been executed even though it failed")
+		assert.True(t, executedWithError.Load(), "Task should have been executed even though it failed")
 
 		// Poller should still be running (not crashed)
 		isConnected, _, _ := poller.GetState()
@@ -258,10 +259,10 @@ func TestPollerContextCancellation(t *testing.T) {
 	t.Run("StopsOnContextCancel", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 
-		pollCount := 0
+		var pollCount atomic.Int32
 		mockClient := &MockCoordinatorClient{
 			PollFunc: func(ctx context.Context, _ *coordinatorv1.PollRequest, _ ...grpc.CallOption) (*coordinatorv1.PollResponse, error) {
-				pollCount++
+				pollCount.Add(1)
 				// Simulate long polling
 				select {
 				case <-time.After(100 * time.Millisecond):
@@ -284,7 +285,7 @@ func TestPollerContextCancellation(t *testing.T) {
 
 		// Let it poll a few times
 		time.Sleep(300 * time.Millisecond)
-		initialPollCount := pollCount
+		initialPollCount := pollCount.Load()
 
 		// Cancel context
 		cancel()
@@ -298,6 +299,6 @@ func TestPollerContextCancellation(t *testing.T) {
 		}
 
 		// Verify polling stopped
-		assert.Greater(t, initialPollCount, 0, "Should have polled at least once")
+		assert.Greater(t, initialPollCount, int32(0), "Should have polled at least once")
 	})
 }
