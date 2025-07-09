@@ -17,6 +17,7 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/sock"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/google/uuid"
 )
 
@@ -28,11 +29,19 @@ func New(
 	executable string,
 	workDir string,
 ) Manager {
+	var configFile string
+	if cfg := config.UsedConfigFile.Load(); cfg != nil {
+		if cfgStr, ok := cfg.(string); ok {
+			configFile = cfgStr
+		}
+	}
+
 	return Manager{
 		dagRunStore: drs,
 		procStore:   ps,
 		executable:  executable,
 		workDir:     workDir,
+		configFile:  configFile,
 	}
 }
 
@@ -45,6 +54,7 @@ type Manager struct {
 
 	executable string // Path to the executable used to run DAGs
 	workDir    string // Working directory for executing commands
+	configFile string // Path to the config file (if any)
 }
 
 // LoadYAML loads a DAG from YAML specification bytes without evaluating it.
@@ -107,11 +117,9 @@ func (m *Manager) StartDAGRunAsync(ctx context.Context, dag *digraph.DAG, opts S
 	if opts.DAGRunID != "" {
 		args = append(args, fmt.Sprintf("--run-id=%s", opts.DAGRunID))
 	}
-	if configFile := config.UsedConfigFile.Load(); configFile != nil {
-		if configFile, ok := configFile.(string); ok {
-			args = append(args, "--config")
-			args = append(args, configFile)
-		}
+	if m.configFile != "" {
+		args = append(args, "--config")
+		args = append(args, m.configFile)
 	}
 	args = append(args, dag.Location)
 	// nolint:gosec
@@ -144,11 +152,9 @@ func (m *Manager) EnqueueDAGRun(_ context.Context, dag *digraph.DAG, opts Enqueu
 	if opts.DAGRunID != "" {
 		args = append(args, fmt.Sprintf("--run-id=%s", opts.DAGRunID))
 	}
-	if configFile := config.UsedConfigFile.Load(); configFile != nil {
-		if configFile, ok := configFile.(string); ok {
-			args = append(args, "--config")
-			args = append(args, configFile)
-		}
+	if m.configFile != "" {
+		args = append(args, "--config")
+		args = append(args, m.configFile)
 	}
 	args = append(args, dag.Location)
 	// nolint:gosec
@@ -170,11 +176,9 @@ func (m *Manager) EnqueueDAGRun(_ context.Context, dag *digraph.DAG, opts Enqueu
 
 func (m *Manager) DequeueDAGRun(_ context.Context, dagRun digraph.DAGRunRef) error {
 	args := []string{"dequeue", fmt.Sprintf("--dag-run=%s", dagRun.String())}
-	if configFile := config.UsedConfigFile.Load(); configFile != nil {
-		if configFile, ok := configFile.(string); ok {
-			args = append(args, "--config")
-			args = append(args, configFile)
-		}
+	if m.configFile != "" {
+		args = append(args, "--config")
+		args = append(args, m.configFile)
 	}
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
@@ -200,11 +204,9 @@ func (m *Manager) RestartDAG(ctx context.Context, dag *digraph.DAG, opts Restart
 	if opts.Quiet {
 		args = append(args, "-q")
 	}
-	if configFile := config.UsedConfigFile.Load(); configFile != nil {
-		if configFile, ok := configFile.(string); ok {
-			args = append(args, "--config")
-			args = append(args, configFile)
-		}
+	if m.configFile != "" {
+		args = append(args, "--config")
+		args = append(args, m.configFile)
 	}
 	args = append(args, dag.Location)
 	// nolint:gosec
@@ -238,11 +240,9 @@ func (m *Manager) RetryDAGStep(ctx context.Context, dag *digraph.DAG, dagRunID s
 
 // runRetryCommand builds the full command and starts the process for retrying a dag-run or step.
 func (m *Manager) runRetryCommand(ctx context.Context, args []string, dag *digraph.DAG) error {
-	if configFile := config.UsedConfigFile.Load(); configFile != nil {
-		if configFile, ok := configFile.(string); ok {
-			args = append(args, "--config")
-			args = append(args, configFile)
-		}
+	if m.configFile != "" {
+		args = append(args, "--config")
+		args = append(args, m.configFile)
 	}
 	args = append(args, dag.Name)
 	// nolint:gosec
@@ -510,6 +510,86 @@ type EnqueueOptions struct {
 // RestartOptions contains options for restarting a dag-run.
 type RestartOptions struct {
 	Quiet bool // Whether to run in quiet mode
+}
+
+// HandleTask executes a DAG run synchronously based on the task information.
+// It handles both START (new runs) and RETRY (resume existing runs) operations.
+func (m *Manager) HandleTask(ctx context.Context, task *coordinatorv1.Task) error {
+	var args []string
+
+	switch task.Operation {
+	case coordinatorv1.Operation_OPERATION_START:
+		args = m.buildStartCommand(task)
+	case coordinatorv1.Operation_OPERATION_RETRY:
+		args = m.buildRetryCommand(task)
+	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
+		return fmt.Errorf("operation not specified")
+	default:
+		return fmt.Errorf("unknown operation: %v", task.Operation)
+	}
+
+	// Execute synchronously
+	// nolint:gosec
+	cmd := exec.CommandContext(ctx, m.executable, args...)
+	executor.SetupCommand(cmd)
+	cmd.Dir = m.workDir
+	cmd.Env = os.Environ()
+
+	// Execute and capture output
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%v failed: %w\noutput: %s", task.Operation, err, output)
+	}
+
+	return nil
+}
+
+// buildStartCommand builds the command arguments for starting a new DAG run.
+func (m *Manager) buildStartCommand(task *coordinatorv1.Task) []string {
+	args := []string{"start"}
+
+	// Add hierarchy flags for child DAGs
+	if task.RootDagRunId != "" {
+		args = append(args, fmt.Sprintf("--root=%s:%s", task.RootDagRunName, task.RootDagRunId))
+	}
+	if task.ParentDagRunId != "" {
+		args = append(args, fmt.Sprintf("--parent=%s:%s", task.ParentDagRunName, task.ParentDagRunId))
+	}
+
+	args = append(args,
+		fmt.Sprintf("--run-id=%s", task.DagRunId),
+		"--no-queue", // Always bypass queue for worker execution
+	)
+
+	m.addConfigFlag(&args)
+	args = append(args, task.Target)
+
+	if task.Params != "" {
+		args = append(args, "--", task.Params)
+	}
+
+	return args
+}
+
+// buildRetryCommand builds the command arguments for retrying an existing DAG run.
+func (m *Manager) buildRetryCommand(task *coordinatorv1.Task) []string {
+	args := []string{"retry", fmt.Sprintf("--run-id=%s", task.DagRunId)}
+
+	if task.Step != "" {
+		args = append(args, fmt.Sprintf("--step=%s", task.Step))
+	}
+
+	m.addConfigFlag(&args)
+	args = append(args, task.Target) // DAG name
+
+	return args
+}
+
+// addConfigFlag adds the config file flag if one is set.
+func (m *Manager) addConfigFlag(args *[]string) {
+	if m.configFile != "" {
+		*args = append(*args, "--config", m.configFile)
+	}
 }
 
 // execWithRecovery executes a function with panic recovery and detailed error reporting

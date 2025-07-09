@@ -21,6 +21,55 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type Operation int32
+
+const (
+	Operation_OPERATION_UNSPECIFIED Operation = 0
+	Operation_OPERATION_START       Operation = 1 // Start a new DAG run
+	Operation_OPERATION_RETRY       Operation = 2 // Retry an existing run
+)
+
+// Enum value maps for Operation.
+var (
+	Operation_name = map[int32]string{
+		0: "OPERATION_UNSPECIFIED",
+		1: "OPERATION_START",
+		2: "OPERATION_RETRY",
+	}
+	Operation_value = map[string]int32{
+		"OPERATION_UNSPECIFIED": 0,
+		"OPERATION_START":       1,
+		"OPERATION_RETRY":       2,
+	}
+)
+
+func (x Operation) Enum() *Operation {
+	p := new(Operation)
+	*p = x
+	return p
+}
+
+func (x Operation) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Operation) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_coordinator_v1_coordinator_proto_enumTypes[0].Descriptor()
+}
+
+func (Operation) Type() protoreflect.EnumType {
+	return &file_proto_coordinator_v1_coordinator_proto_enumTypes[0]
+}
+
+func (x Operation) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Operation.Descriptor instead.
+func (Operation) EnumDescriptor() ([]byte, []int) {
+	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{0}
+}
+
 // Request message for polling a task.
 type PollRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -204,11 +253,15 @@ func (*DispatchResponse) Descriptor() ([]byte, []int) {
 // Task to process.
 type Task struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
+	Operation        Operation              `protobuf:"varint,6,opt,name=operation,proto3,enum=coordinator.v1.Operation" json:"operation,omitempty"`
 	RootDagRunName   string                 `protobuf:"bytes,1,opt,name=root_dag_run_name,json=rootDagRunName,proto3" json:"root_dag_run_name,omitempty"`
 	RootDagRunId     string                 `protobuf:"bytes,2,opt,name=root_dag_run_id,json=rootDagRunId,proto3" json:"root_dag_run_id,omitempty"`
 	ParentDagRunName string                 `protobuf:"bytes,3,opt,name=parent_dag_run_name,json=parentDagRunName,proto3" json:"parent_dag_run_name,omitempty"`
 	ParentDagRunId   string                 `protobuf:"bytes,4,opt,name=parent_dag_run_id,json=parentDagRunId,proto3" json:"parent_dag_run_id,omitempty"`
 	DagRunId         string                 `protobuf:"bytes,5,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"`
+	Target           string                 `protobuf:"bytes,7,opt,name=target,proto3" json:"target,omitempty"` // DAG name or path
+	Params           string                 `protobuf:"bytes,8,opt,name=params,proto3" json:"params,omitempty"` // Optional: parameters
+	Step             string                 `protobuf:"bytes,9,opt,name=step,proto3" json:"step,omitempty"`     // Optional: specific step (for RETRY)
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -241,6 +294,13 @@ func (x *Task) ProtoReflect() protoreflect.Message {
 // Deprecated: Use Task.ProtoReflect.Descriptor instead.
 func (*Task) Descriptor() ([]byte, []int) {
 	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *Task) GetOperation() Operation {
+	if x != nil {
+		return x.Operation
+	}
+	return Operation_OPERATION_UNSPECIFIED
 }
 
 func (x *Task) GetRootDagRunName() string {
@@ -278,6 +338,27 @@ func (x *Task) GetDagRunId() string {
 	return ""
 }
 
+func (x *Task) GetTarget() string {
+	if x != nil {
+		return x.Target
+	}
+	return ""
+}
+
+func (x *Task) GetParams() string {
+	if x != nil {
+		return x.Params
+	}
+	return ""
+}
+
+func (x *Task) GetStep() string {
+	if x != nil {
+		return x.Step
+	}
+	return ""
+}
+
 var File_proto_coordinator_v1_coordinator_proto protoreflect.FileDescriptor
 
 const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
@@ -290,14 +371,22 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\";\n" +
 	"\x0fDispatchRequest\x12(\n" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\"\x12\n" +
-	"\x10DispatchResponse\"\xd0\x01\n" +
-	"\x04Task\x12)\n" +
+	"\x10DispatchResponse\"\xcd\x02\n" +
+	"\x04Task\x127\n" +
+	"\toperation\x18\x06 \x01(\x0e2\x19.coordinator.v1.OperationR\toperation\x12)\n" +
 	"\x11root_dag_run_name\x18\x01 \x01(\tR\x0erootDagRunName\x12%\n" +
 	"\x0froot_dag_run_id\x18\x02 \x01(\tR\frootDagRunId\x12-\n" +
 	"\x13parent_dag_run_name\x18\x03 \x01(\tR\x10parentDagRunName\x12)\n" +
 	"\x11parent_dag_run_id\x18\x04 \x01(\tR\x0eparentDagRunId\x12\x1c\n" +
 	"\n" +
-	"dag_run_id\x18\x05 \x01(\tR\bdagRunId2\xa6\x01\n" +
+	"dag_run_id\x18\x05 \x01(\tR\bdagRunId\x12\x16\n" +
+	"\x06target\x18\a \x01(\tR\x06target\x12\x16\n" +
+	"\x06params\x18\b \x01(\tR\x06params\x12\x12\n" +
+	"\x04step\x18\t \x01(\tR\x04step*P\n" +
+	"\tOperation\x12\x19\n" +
+	"\x15OPERATION_UNSPECIFIED\x10\x00\x12\x13\n" +
+	"\x0fOPERATION_START\x10\x01\x12\x13\n" +
+	"\x0fOPERATION_RETRY\x10\x022\xa6\x01\n" +
 	"\x12CoordinatorService\x12A\n" +
 	"\x04Poll\x12\x1b.coordinator.v1.PollRequest\x1a\x1c.coordinator.v1.PollResponse\x12M\n" +
 	"\bDispatch\x12\x1f.coordinator.v1.DispatchRequest\x1a .coordinator.v1.DispatchResponseB=Z;github.com/dagu-org/dagu/proto/coordinator/v1;coordinatorv1b\x06proto3"
@@ -314,26 +403,29 @@ func file_proto_coordinator_v1_coordinator_proto_rawDescGZIP() []byte {
 	return file_proto_coordinator_v1_coordinator_proto_rawDescData
 }
 
+var file_proto_coordinator_v1_coordinator_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_proto_coordinator_v1_coordinator_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_proto_coordinator_v1_coordinator_proto_goTypes = []any{
-	(*PollRequest)(nil),      // 0: coordinator.v1.PollRequest
-	(*PollResponse)(nil),     // 1: coordinator.v1.PollResponse
-	(*DispatchRequest)(nil),  // 2: coordinator.v1.DispatchRequest
-	(*DispatchResponse)(nil), // 3: coordinator.v1.DispatchResponse
-	(*Task)(nil),             // 4: coordinator.v1.Task
+	(Operation)(0),           // 0: coordinator.v1.Operation
+	(*PollRequest)(nil),      // 1: coordinator.v1.PollRequest
+	(*PollResponse)(nil),     // 2: coordinator.v1.PollResponse
+	(*DispatchRequest)(nil),  // 3: coordinator.v1.DispatchRequest
+	(*DispatchResponse)(nil), // 4: coordinator.v1.DispatchResponse
+	(*Task)(nil),             // 5: coordinator.v1.Task
 }
 var file_proto_coordinator_v1_coordinator_proto_depIdxs = []int32{
-	4, // 0: coordinator.v1.PollResponse.task:type_name -> coordinator.v1.Task
-	4, // 1: coordinator.v1.DispatchRequest.task:type_name -> coordinator.v1.Task
-	0, // 2: coordinator.v1.CoordinatorService.Poll:input_type -> coordinator.v1.PollRequest
-	2, // 3: coordinator.v1.CoordinatorService.Dispatch:input_type -> coordinator.v1.DispatchRequest
-	1, // 4: coordinator.v1.CoordinatorService.Poll:output_type -> coordinator.v1.PollResponse
-	3, // 5: coordinator.v1.CoordinatorService.Dispatch:output_type -> coordinator.v1.DispatchResponse
-	4, // [4:6] is the sub-list for method output_type
-	2, // [2:4] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	5, // 0: coordinator.v1.PollResponse.task:type_name -> coordinator.v1.Task
+	5, // 1: coordinator.v1.DispatchRequest.task:type_name -> coordinator.v1.Task
+	0, // 2: coordinator.v1.Task.operation:type_name -> coordinator.v1.Operation
+	1, // 3: coordinator.v1.CoordinatorService.Poll:input_type -> coordinator.v1.PollRequest
+	3, // 4: coordinator.v1.CoordinatorService.Dispatch:input_type -> coordinator.v1.DispatchRequest
+	2, // 5: coordinator.v1.CoordinatorService.Poll:output_type -> coordinator.v1.PollResponse
+	4, // 6: coordinator.v1.CoordinatorService.Dispatch:output_type -> coordinator.v1.DispatchResponse
+	5, // [5:7] is the sub-list for method output_type
+	3, // [3:5] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_proto_coordinator_v1_coordinator_proto_init() }
@@ -346,13 +438,14 @@ func file_proto_coordinator_v1_coordinator_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_coordinator_v1_coordinator_proto_rawDesc), len(file_proto_coordinator_v1_coordinator_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_proto_coordinator_v1_coordinator_proto_goTypes,
 		DependencyIndexes: file_proto_coordinator_v1_coordinator_proto_depIdxs,
+		EnumInfos:         file_proto_coordinator_v1_coordinator_proto_enumTypes,
 		MessageInfos:      file_proto_coordinator_v1_coordinator_proto_msgTypes,
 	}.Build()
 	File_proto_coordinator_v1_coordinator_proto = out.File

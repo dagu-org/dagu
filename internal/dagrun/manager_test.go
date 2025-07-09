@@ -1,6 +1,7 @@
 package dagrun_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/sock"
 	"github.com/dagu-org/dagu/internal/test"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
 func TestManager(t *testing.T) {
@@ -256,4 +258,133 @@ func testNewStatus(dag *digraph.DAG, dagRunID string, status scheduler.Status, n
 	tm := time.Now()
 	startedAt := &tm
 	return models.NewStatusBuilder(dag).Create(dagRunID, status, 0, *startedAt, models.WithNodes(nodes))
+}
+
+func TestHandleTask(t *testing.T) {
+	t.Parallel()
+	th := test.Setup(t)
+
+	t.Run("HandleTaskRetry", func(t *testing.T) {
+		dag := th.DAG(t, filepath.Join("client", "retry.yaml"))
+		ctx := th.Context
+		cli := th.DAGRunMgr
+
+		// First, start a DAG run
+		err := cli.StartDAGRunAsync(ctx, dag.DAG, dagrun.StartOptions{})
+		require.NoError(t, err)
+
+		// Wait for the DAG to finish
+		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+
+		// Get the status to get the dag-run ID
+		status, err := cli.GetLatestStatus(ctx, dag.DAG)
+		require.NoError(t, err)
+		dagRunID := status.DAGRunID
+
+		// Create a retry task
+		task := &coordinatorv1.Task{
+			Operation: coordinatorv1.Operation_OPERATION_RETRY,
+			DagRunId:  dagRunID,
+			Target:    dag.Name,
+		}
+
+		// Create a context with timeout for the task execution
+		taskCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+
+		// Execute the task
+		err = cli.HandleTask(taskCtx, task)
+		require.NoError(t, err)
+
+		// Verify the DAG ran again successfully
+		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+	})
+
+	t.Run("HandleTaskRetryWithStep", func(t *testing.T) {
+		dag := th.DAG(t, filepath.Join("client", "retry.yaml"))
+		ctx := th.Context
+		cli := th.DAGRunMgr
+
+		// First, start a DAG run
+		err := cli.StartDAGRunAsync(ctx, dag.DAG, dagrun.StartOptions{})
+		require.NoError(t, err)
+
+		// Wait for the DAG to finish
+		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+
+		// Get the status to get the dag-run ID
+		status, err := cli.GetLatestStatus(ctx, dag.DAG)
+		require.NoError(t, err)
+		dagRunID := status.DAGRunID
+
+		// Create a retry task with specific step
+		task := &coordinatorv1.Task{
+			Operation: coordinatorv1.Operation_OPERATION_RETRY,
+			DagRunId:  dagRunID,
+			Target:    dag.Name,
+			Step:      "1",
+		}
+
+		// Create a context with timeout for the task execution
+		taskCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+
+		// Execute the task
+		err = cli.HandleTask(taskCtx, task)
+		require.NoError(t, err)
+
+		// Verify the DAG ran again successfully
+		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+	})
+
+	t.Run("HandleTaskStart", func(t *testing.T) {
+		dag := th.DAG(t, filepath.Join("client", "run_dag.yaml"))
+		ctx := th.Context
+		cli := th.DAGRunMgr
+
+		// Generate a new dag-run ID
+		dagRunID := uuid.Must(uuid.NewV7()).String()
+
+		// Create a start task
+		task := &coordinatorv1.Task{
+			Operation: coordinatorv1.Operation_OPERATION_START,
+			DagRunId:  dagRunID,
+			Target:    dag.Location,
+			Params:    "param1=value1",
+		}
+
+		// Create a context with timeout for the task execution
+		taskCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+
+		// Execute the task
+		err := cli.HandleTask(taskCtx, task)
+		require.NoError(t, err)
+
+		// Verify the DAG ran successfully
+		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+
+		// Verify the params were passed
+		status, err := cli.GetLatestStatus(ctx, dag.DAG)
+		require.NoError(t, err)
+		require.Equal(t, dagRunID, status.DAGRunID)
+		require.Equal(t, "param1=value1", status.Params)
+	})
+
+	t.Run("HandleTaskInvalidOperation", func(t *testing.T) {
+		ctx := th.Context
+		cli := th.DAGRunMgr
+
+		// Create a task with invalid operation
+		task := &coordinatorv1.Task{
+			Operation: coordinatorv1.Operation_OPERATION_UNSPECIFIED,
+			DagRunId:  "test-id",
+			Target:    "test-dag",
+		}
+
+		// Execute the task
+		err := cli.HandleTask(ctx, task)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "operation not specified")
+	})
 }

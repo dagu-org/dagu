@@ -23,10 +23,10 @@ import (
 
 // MockTaskExecutor is a mock implementation of TaskExecutor for testing
 type MockTaskExecutor struct {
-	ExecuteFunc      func(ctx context.Context, task *coordinatorv1.Task) error
-	ExecutedTasks    []string
-	ExecutionTime    time.Duration
-	mu               sync.Mutex
+	ExecuteFunc   func(ctx context.Context, task *coordinatorv1.Task) error
+	ExecutedTasks []string
+	ExecutionTime time.Duration
+	mu            sync.Mutex
 }
 
 // Execute implements the TaskExecutor interface
@@ -55,7 +55,7 @@ func (m *MockTaskExecutor) Execute(ctx context.Context, task *coordinatorv1.Task
 func (m *MockTaskExecutor) GetExecutedTasks() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	result := make([]string, len(m.ExecutedTasks))
 	copy(result, m.ExecutedTasks)
 	return result
@@ -240,7 +240,7 @@ func TestWorkerPolling(t *testing.T) {
 		// Verify all tasks were executed
 		executedTasks := mockExecutor.GetExecutedTasks()
 		require.Len(t, executedTasks, 5)
-		
+
 		// Check that all expected tasks were executed
 		executedMap := make(map[string]bool)
 		for _, taskID := range executedTasks {

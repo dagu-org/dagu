@@ -37,9 +37,19 @@ message DispatchResponse {
 
 // Task to process.
 message Task {
+  Operation operation = 6;
   string root_dag_run_name = 1;
   string root_dag_run_id = 2;
   string parent_dag_run_name = 3;
   string parent_dag_run_id = 4;
   string dag_run_id = 5;
+  string target = 7; // DAG name or path
+  string params = 8; // Optional: parameters
+  string step = 9;   // Optional: specific step (for RETRY)
+}
+
+enum Operation {
+  OPERATION_UNSPECIFIED = 0;
+  OPERATION_START = 1;    // Start a new DAG run
+  OPERATION_RETRY = 2;    // Retry an existing run
 }
