@@ -21,8 +21,6 @@ import (
 )
 
 func TestManager(t *testing.T) {
-	t.Parallel()
-
 	th := test.Setup(t)
 
 	t.Run("Valid", func(t *testing.T) {
@@ -101,7 +99,7 @@ func TestManager(t *testing.T) {
 	t.Run("UpdateChildDAGRunStatus", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "tree_parent.yaml"))
 
-		err := th.DAGRunMgr.StartDAGRunAsync(th.Context, dag.DAG, dagrun.StartOptions{Quiet: true})
+		err := th.DAGRunMgr.StartDAGRunAsync(th.Context, dag.DAG, dagrun.StartOptions{})
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
@@ -261,7 +259,6 @@ func testNewStatus(dag *digraph.DAG, dagRunID string, status scheduler.Status, n
 }
 
 func TestHandleTask(t *testing.T) {
-	t.Parallel()
 	th := test.Setup(t)
 
 	t.Run("HandleTaskRetry", func(t *testing.T) {
