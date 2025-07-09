@@ -93,9 +93,9 @@ func (m *Manager) GenDAGRunID(_ context.Context) (string, error) {
 	return id.String(), nil
 }
 
-// StartDAGRun starts a dag-run by executing the configured executable with the start command.
+// StartDAGRunAsync starts a dag-run by executing the configured executable with the start command.
 // It sets up the command to run in its own process group and configures standard output/error.
-func (m *Manager) StartDAGRun(ctx context.Context, dag *digraph.DAG, opts StartOptions) error {
+func (m *Manager) StartDAGRunAsync(ctx context.Context, dag *digraph.DAG, opts StartOptions) error {
 	args := []string{"start"}
 	if opts.Params != "" {
 		args = append(args, "-p")
