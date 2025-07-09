@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/dagu-org/dagu/internal/worker"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -61,13 +62,19 @@ func (m *MockTaskExecutor) GetExecutedTasks() []string {
 	return result
 }
 
+// createTestWorker creates a worker with a mock dagrun.Manager for testing
+func createTestWorker(workerID string, maxConcurrentRuns int, host string, port int, tlsConfig *worker.TLSConfig) *worker.Worker {
+	mockMgr := dagrun.New(nil, nil, "dagu", ".")
+	return worker.NewWorker(workerID, maxConcurrentRuns, host, port, tlsConfig, mockMgr)
+}
+
 func TestWorkerConnection(t *testing.T) {
 	t.Run("ConnectToCoordinator", func(t *testing.T) {
 		// Setup coordinator
 		coord := test.SetupCoordinator(t)
 
 		// Create worker with instant mock executor
-		w := worker.NewWorker("test-worker-1", 1, "127.0.0.1", coord.Port(), &worker.TLSConfig{
+		w := createTestWorker("test-worker-1", 1, "127.0.0.1", coord.Port(), &worker.TLSConfig{
 			Insecure: true,
 		})
 		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
@@ -102,7 +109,7 @@ func TestWorkerConnection(t *testing.T) {
 
 		// Create worker with custom ID and instant mock executor
 		customID := "custom-worker-id"
-		w := worker.NewWorker(customID, 1, "127.0.0.1", coord.Port(), &worker.TLSConfig{
+		w := createTestWorker(customID, 1, "127.0.0.1", coord.Port(), &worker.TLSConfig{
 			Insecure: true,
 		})
 		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
@@ -139,7 +146,7 @@ func TestWorkerPolling(t *testing.T) {
 		}
 
 		// Create worker
-		w := worker.NewWorker("test-worker", 1, "127.0.0.1", coord.Port(), &worker.TLSConfig{
+		w := createTestWorker("test-worker", 1, "127.0.0.1", coord.Port(), &worker.TLSConfig{
 			Insecure: true,
 		})
 		w.SetTaskExecutor(mockExecutor)
@@ -196,7 +203,7 @@ func TestWorkerPolling(t *testing.T) {
 		// Create multiple workers
 		workers := make([]*worker.Worker, 3)
 		for i := 0; i < 3; i++ {
-			workers[i] = worker.NewWorker(
+			workers[i] = createTestWorker(
 				"",
 				2, // 2 concurrent runs each
 				"127.0.0.1",
@@ -264,7 +271,7 @@ func TestWorkerReconnection(t *testing.T) {
 		port := coord.Port()
 
 		// Create worker with instant mock executor
-		w := worker.NewWorker("test-worker", 1, "127.0.0.1", port, &worker.TLSConfig{
+		w := createTestWorker("test-worker", 1, "127.0.0.1", port, &worker.TLSConfig{
 			Insecure: true,
 		})
 		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
@@ -306,7 +313,7 @@ func TestWorkerWithTLS(t *testing.T) {
 		coord := test.SetupCoordinator(t)
 
 		// Create worker with insecure connection and instant mock executor
-		w := worker.NewWorker("test-worker", 1, "127.0.0.1", coord.Port(), &worker.TLSConfig{
+		w := createTestWorker("test-worker", 1, "127.0.0.1", coord.Port(), &worker.TLSConfig{
 			Insecure: true,
 		})
 		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
@@ -336,7 +343,7 @@ func TestWorkerWithTLS(t *testing.T) {
 		coord := test.SetupCoordinator(t)
 
 		// Create worker with nil TLS config (should default to insecure) and instant mock executor
-		w := worker.NewWorker("test-worker", 1, "127.0.0.1", coord.Port(), nil)
+		w := createTestWorker("test-worker", 1, "127.0.0.1", coord.Port(), nil)
 		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
 
 		// Start worker
@@ -366,7 +373,7 @@ func TestWorkerShutdown(t *testing.T) {
 		coord := test.SetupCoordinator(t)
 
 		// Create worker with instant mock executor
-		w := worker.NewWorker("test-worker", 2, "127.0.0.1", coord.Port(), &worker.TLSConfig{
+		w := createTestWorker("test-worker", 2, "127.0.0.1", coord.Port(), &worker.TLSConfig{
 			Insecure: true,
 		})
 		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
@@ -396,7 +403,7 @@ func TestWorkerShutdown(t *testing.T) {
 
 	t.Run("StopWithoutStart", func(t *testing.T) {
 		// Create worker with instant mock executor
-		w := worker.NewWorker("test-worker", 1, "127.0.0.1", 50051, &worker.TLSConfig{
+		w := createTestWorker("test-worker", 1, "127.0.0.1", 50051, &worker.TLSConfig{
 			Insecure: true,
 		})
 		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
@@ -428,7 +435,7 @@ func TestWorkerConcurrency(t *testing.T) {
 		}
 
 		// Create worker with specific max concurrent runs
-		w := worker.NewWorker("test-worker", maxConcurrent, "127.0.0.1", coord.Port(), &worker.TLSConfig{
+		w := createTestWorker("test-worker", maxConcurrent, "127.0.0.1", coord.Port(), &worker.TLSConfig{
 			Insecure: true,
 		})
 		w.SetTaskExecutor(mockExecutor)
@@ -480,7 +487,7 @@ func TestWorkerConcurrency(t *testing.T) {
 func TestWorkerErrorHandling(t *testing.T) {
 	t.Run("InvalidCoordinatorAddress", func(t *testing.T) {
 		// Create worker with invalid coordinator address and instant mock executor
-		w := worker.NewWorker("test-worker", 1, "invalid-host", 99999, &worker.TLSConfig{
+		w := createTestWorker("test-worker", 1, "invalid-host", 99999, &worker.TLSConfig{
 			Insecure: true,
 		})
 		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
@@ -496,7 +503,7 @@ func TestWorkerErrorHandling(t *testing.T) {
 
 	t.Run("ContextCancellationDuringHealthCheck", func(t *testing.T) {
 		// Create worker pointing to non-existent coordinator with instant mock executor
-		w := worker.NewWorker("test-worker", 1, "127.0.0.1", 65535, &worker.TLSConfig{
+		w := createTestWorker("test-worker", 1, "127.0.0.1", 65535, &worker.TLSConfig{
 			Insecure: true,
 		})
 		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})

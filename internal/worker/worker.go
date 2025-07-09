@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/backoff"
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/logger"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"google.golang.org/grpc"
@@ -32,23 +33,31 @@ type TaskExecutor interface {
 	Execute(ctx context.Context, task *coordinatorv1.Task) error
 }
 
-// taskExecutorImpl is the default implementation that simulates task execution
-type taskExecutorImpl struct{}
+// dagRunTaskExecutor is the implementation that uses dagrun.Manager to execute tasks
+type dagRunTaskExecutor struct {
+	manager dagrun.Manager
+}
 
-// Execute simulates task execution with a short delay
-func (e *taskExecutorImpl) Execute(ctx context.Context, task *coordinatorv1.Task) error {
-	logger.Info(ctx, "Executing task (TODO: implement actual execution)",
-		"dag_run_id", task.DagRunId)
+// Execute runs the task using the dagrun.Manager
+func (e *dagRunTaskExecutor) Execute(ctx context.Context, task *coordinatorv1.Task) error {
+	logger.Info(ctx, "Executing task",
+		"operation", task.Operation.String(),
+		"target", task.Target,
+		"dag_run_id", task.DagRunId,
+		"root_dag_run_id", task.RootDagRunId,
+		"parent_dag_run_id", task.ParentDagRunId)
 
-	// Simulate task execution time (100ms for testing)
-	select {
-	case <-time.After(100 * time.Millisecond):
-		logger.Info(ctx, "Task execution completed (simulated)",
-			"dag_run_id", task.DagRunId)
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
+	err := e.manager.HandleTask(ctx, task)
+	if err != nil {
+		logger.Error(ctx, "Task execution failed",
+			"dag_run_id", task.DagRunId,
+			"error", err)
+		return err
 	}
+
+	logger.Info(ctx, "Task execution completed successfully",
+		"dag_run_id", task.DagRunId)
+	return nil
 }
 
 // Worker represents a worker instance that polls for tasks from the coordinator.
@@ -69,7 +78,7 @@ func (w *Worker) SetTaskExecutor(executor TaskExecutor) {
 }
 
 // NewWorker creates a new worker instance.
-func NewWorker(workerID string, maxConcurrentRuns int, coordinatorHost string, coordinatorPort int, tlsConfig *TLSConfig) *Worker {
+func NewWorker(workerID string, maxConcurrentRuns int, coordinatorHost string, coordinatorPort int, tlsConfig *TLSConfig, dagRunMgr dagrun.Manager) *Worker {
 	// Generate default worker ID if not provided
 	if workerID == "" {
 		hostname, err := os.Hostname()
@@ -86,7 +95,7 @@ func NewWorker(workerID string, maxConcurrentRuns int, coordinatorHost string, c
 		maxConcurrentRuns: maxConcurrentRuns,
 		coordinatorAddr:   coordinatorAddr,
 		tlsConfig:         tlsConfig,
-		taskExecutor:      &taskExecutorImpl{},
+		taskExecutor:      &dagRunTaskExecutor{manager: dagRunMgr},
 	}
 }
 

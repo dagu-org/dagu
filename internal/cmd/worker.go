@@ -130,7 +130,7 @@ func runWorker(ctx *Context, _ []string) error {
 	}
 
 	// Create and start the worker
-	w := worker.NewWorker(workerID, maxConcurrentRuns, coordinatorHost, coordinatorPort, tlsConfig)
+	w := worker.NewWorker(workerID, maxConcurrentRuns, coordinatorHost, coordinatorPort, tlsConfig, ctx.DAGRunMgr)
 
 	logger.Info(ctx, "Starting worker",
 		"worker_id", workerID,
