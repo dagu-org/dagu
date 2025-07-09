@@ -28,6 +28,30 @@ type TLSConfig struct {
 	SkipTLSVerify bool
 }
 
+// TaskExecutor defines the interface for executing tasks
+type TaskExecutor interface {
+	Execute(ctx context.Context, task *coordinatorv1.Task) error
+}
+
+// DefaultTaskExecutor is the default implementation that simulates task execution
+type DefaultTaskExecutor struct{}
+
+// Execute simulates task execution with a 5-second delay
+func (e *DefaultTaskExecutor) Execute(ctx context.Context, task *coordinatorv1.Task) error {
+	logger.Info(ctx, "Executing task (TODO: implement actual execution)",
+		"dag_run_id", task.DagRunId)
+
+	// Simulate task execution time
+	select {
+	case <-time.After(5 * time.Second):
+		logger.Info(ctx, "Task execution completed (simulated)",
+			"dag_run_id", task.DagRunId)
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 // Worker represents a worker instance that polls for tasks from the coordinator.
 type Worker struct {
 	id                string
@@ -37,6 +61,12 @@ type Worker struct {
 	client            coordinatorv1.CoordinatorServiceClient
 	healthClient      grpc_health_v1.HealthClient
 	conn              *grpc.ClientConn
+	taskExecutor      TaskExecutor
+}
+
+// SetTaskExecutor sets a custom task executor for testing or custom execution logic
+func (w *Worker) SetTaskExecutor(executor TaskExecutor) {
+	w.taskExecutor = executor
 }
 
 // NewWorker creates a new worker instance.
@@ -57,6 +87,7 @@ func NewWorker(workerID string, maxConcurrentRuns int, coordinatorHost string, c
 		maxConcurrentRuns: maxConcurrentRuns,
 		coordinatorAddr:   coordinatorAddr,
 		tlsConfig:         tlsConfig,
+		taskExecutor:      &DefaultTaskExecutor{},
 	}
 }
 
@@ -195,23 +226,30 @@ func (w *Worker) runPoller(ctx context.Context, pollerIndex int) {
 
 			// If we got a task, execute it
 			if task != nil {
-				// TODO: Execute the task here
-				// This should block until the task is complete
-				// For now, we just log and simulate execution time
-				logger.Info(ctx, "Executing task (TODO: implement actual execution)",
+				logger.Info(ctx, "Task received, starting execution",
 					"worker_id", w.id,
 					"poller_index", pollerIndex,
 					"dag_run_id", task.DagRunId)
 
-				// Simulate task execution time
-				select {
-				case <-time.After(5 * time.Second):
-					logger.Info(ctx, "Task execution completed (simulated)",
+				// Execute the task using the TaskExecutor
+				err := w.taskExecutor.Execute(ctx, task)
+				if err != nil {
+					if ctx.Err() != nil {
+						// Context cancelled, exit gracefully
+						return
+					}
+					logger.Error(ctx, "Task execution failed",
+						"worker_id", w.id,
+						"poller_index", pollerIndex,
+						"dag_run_id", task.DagRunId,
+						"error", err)
+					// TODO: Report failure back to coordinator
+				} else {
+					logger.Info(ctx, "Task execution completed successfully",
 						"worker_id", w.id,
 						"poller_index", pollerIndex,
 						"dag_run_id", task.DagRunId)
-				case <-ctx.Done():
-					return
+					// TODO: Report success back to coordinator
 				}
 			}
 			// Continue polling for the next task
