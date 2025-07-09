@@ -301,7 +301,7 @@ func TestHandleTask(t *testing.T) {
 	})
 
 	t.Run("HandleTaskRetryWithStep", func(t *testing.T) {
-		dag := th.DAG(t, filepath.Join("client", "handle_task_retry.yaml"))
+		dag := th.DAG(t, filepath.Join("client", "handle_task_retry_step.yaml"))
 		ctx := th.Context
 		cli := th.DAGRunMgr
 
