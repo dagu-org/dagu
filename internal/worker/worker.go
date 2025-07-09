@@ -36,14 +36,14 @@ type TaskExecutor interface {
 // DefaultTaskExecutor is the default implementation that simulates task execution
 type DefaultTaskExecutor struct{}
 
-// Execute simulates task execution with a 5-second delay
+// Execute simulates task execution with a short delay
 func (e *DefaultTaskExecutor) Execute(ctx context.Context, task *coordinatorv1.Task) error {
 	logger.Info(ctx, "Executing task (TODO: implement actual execution)",
 		"dag_run_id", task.DagRunId)
 
-	// Simulate task execution time
+	// Simulate task execution time (100ms for testing)
 	select {
-	case <-time.After(5 * time.Second):
+	case <-time.After(100 * time.Millisecond):
 		logger.Info(ctx, "Task execution completed (simulated)",
 			"dag_run_id", task.DagRunId)
 		return nil
