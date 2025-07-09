@@ -121,88 +121,58 @@ func (w *Worker) Stop(ctx context.Context) error {
 	return nil
 }
 
-// waitForInterval waits for the specified interval or until context is canceled.
-func waitForInterval(ctx context.Context, interval time.Duration) error {
-	if interval <= 0 {
-		return nil
-	}
-
-	timer := time.NewTimer(interval)
-	defer timer.Stop()
-
-	select {
-	case <-timer.C:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
 // waitForHealthy waits for the coordinator to become healthy using exponential backoff with jitter.
 func (w *Worker) waitForHealthy(ctx context.Context) error {
-	// Create exponential backoff policy with jitter for health checks
 	basePolicy := backoff.NewExponentialBackoffPolicy(time.Second)
 	basePolicy.BackoffFactor = 2.0
 	basePolicy.MaxInterval = time.Minute
 	basePolicy.MaxRetries = 0 // Retry indefinitely
 
-	// Add full jitter to prevent thundering herd
 	policy := backoff.WithJitter(basePolicy, backoff.FullJitter)
-	retrier := backoff.NewRetrier(policy)
 
 	logger.Info(ctx, "Waiting for coordinator to become healthy",
 		"worker_id", w.id,
 		"coordinator", w.coordinatorAddr)
 
-	for {
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("health check canceled: %w", ctx.Err())
-		default:
-			// Perform health check
-			req := &grpc_health_v1.HealthCheckRequest{
-				Service: "", // Check overall server health
-			}
+	return backoff.Retry(ctx, func(ctx context.Context) error {
+		req := &grpc_health_v1.HealthCheckRequest{
+			Service: "", // Check overall server health
+		}
 
-			resp, err := w.healthClient.Check(ctx, req)
-			if err == nil && resp.Status == grpc_health_v1.HealthCheckResponse_SERVING {
-				logger.Info(ctx, "Coordinator is healthy",
-					"worker_id", w.id,
-					"coordinator", w.coordinatorAddr)
-				return nil
-			}
-
-			// Log the health check failure
+		resp, err := w.healthClient.Check(ctx, req)
+		if err != nil {
 			logger.Warn(ctx, "Health check failed",
 				"worker_id", w.id,
 				"coordinator", w.coordinatorAddr,
 				"err", err)
-
-			// Get next retry interval
-			interval, retryErr := retrier.Next(err)
-			if retryErr != nil {
-				return fmt.Errorf("health check retry failed: %w", retryErr)
-			}
-
-			// Wait for the interval
-			if err := waitForInterval(ctx, interval); err != nil {
-				return fmt.Errorf("health check canceled: %w", err)
-			}
+			return err
 		}
-	}
+
+		if resp.Status != grpc_health_v1.HealthCheckResponse_SERVING {
+			err := fmt.Errorf("coordinator not healthy: %s", resp.Status)
+			logger.Warn(ctx, "Coordinator not healthy",
+				"worker_id", w.id,
+				"coordinator", w.coordinatorAddr,
+				"status", resp.Status.String())
+			return err
+		}
+
+		logger.Info(ctx, "Coordinator is healthy",
+			"worker_id", w.id,
+			"coordinator", w.coordinatorAddr)
+		return nil
+	}, policy, nil)
 }
 
 // runPoller runs a single polling loop that continuously polls for tasks.
 func (w *Worker) runPoller(ctx context.Context, pollerIndex int) {
-	// Create exponential backoff policy with jitter
+	// Set up retry policy for poll failures only
 	basePolicy := backoff.NewExponentialBackoffPolicy(time.Second)
 	basePolicy.BackoffFactor = 2.0
 	basePolicy.MaxInterval = time.Minute
 	basePolicy.MaxRetries = 0 // Retry indefinitely
 
-	// Add full jitter to prevent thundering herd when multiple pollers reconnect
 	policy := backoff.WithJitter(basePolicy, backoff.FullJitter)
-	retrier := backoff.NewRetrier(policy)
 
 	for {
 		select {
@@ -211,59 +181,84 @@ func (w *Worker) runPoller(ctx context.Context, pollerIndex int) {
 				"worker_id", w.id,
 				"poller_index", pollerIndex)
 			return
-
 		default:
-			// Generate a fresh UUID for this poll request
-			pollerID := uuid.New().String()
-
-			// Create poll request
-			req := &coordinatorv1.PollRequest{
-				WorkerId: w.id,
-				PollerId: pollerID,
-			}
-
-			// Perform the poll (this is a long-polling call)
-			resp, err := w.client.Poll(ctx, req)
+			// Poll for a task
+			task, err := w.pollForTask(ctx, pollerIndex, policy)
 			if err != nil {
-				logger.Error(ctx, "Poll failed",
-					"error", err,
-					"worker_id", w.id,
-					"poller_id", pollerID)
-
-				// Get next retry interval
-				interval, retryErr := retrier.Next(err)
-				if retryErr != nil {
-					// Retries exhausted
+				// Context canceled, exit gracefully
+				if ctx.Err() != nil {
 					return
 				}
-
-				// Wait for the interval
-				if err := waitForInterval(ctx, interval); err != nil {
-					// Context canceled
-					return
-				}
+				// Poll failed, but will be retried by pollForTask
 				continue
 			}
 
-			// Reset retrier on successful poll
-			retrier.Reset()
-
-			// Handle the received task
-			if resp.Task != nil {
-				logger.Info(ctx, "Task received",
+			// If we got a task, execute it
+			if task != nil {
+				// TODO: Execute the task here
+				// This should block until the task is complete
+				// For now, we just log and simulate execution time
+				logger.Info(ctx, "Executing task (TODO: implement actual execution)",
 					"worker_id", w.id,
-					"poller_id", pollerID,
-					"root_dag_run_name", resp.Task.RootDagRunName,
-					"root_dag_run_id", resp.Task.RootDagRunId,
-					"parent_dag_run_name", resp.Task.ParentDagRunName,
-					"parent_dag_run_id", resp.Task.ParentDagRunId,
-					"dag_run_id", resp.Task.DagRunId)
+					"poller_index", pollerIndex,
+					"dag_run_id", task.DagRunId)
 
-				// TODO: Execute the task
-				// For now, we just log that we received it
+				// Simulate task execution time
+				select {
+				case <-time.After(5 * time.Second):
+					logger.Info(ctx, "Task execution completed (simulated)",
+						"worker_id", w.id,
+						"poller_index", pollerIndex,
+						"dag_run_id", task.DagRunId)
+				case <-ctx.Done():
+					return
+				}
 			}
+			// Continue polling for the next task
 		}
 	}
+}
+
+// pollForTask polls the coordinator for a task with retry on failure
+func (w *Worker) pollForTask(ctx context.Context, pollerIndex int, policy backoff.RetryPolicy) (*coordinatorv1.Task, error) {
+	pollerID := uuid.New().String()
+
+	var task *coordinatorv1.Task
+	err := backoff.Retry(ctx, func(ctx context.Context) error {
+		req := &coordinatorv1.PollRequest{
+			WorkerId: w.id,
+			PollerId: pollerID,
+		}
+
+		// Perform the poll (this is a long-polling call)
+		resp, err := w.client.Poll(ctx, req)
+		if err != nil {
+			logger.Error(ctx, "Poll failed",
+				"error", err,
+				"worker_id", w.id,
+				"poller_id", pollerID,
+				"poller_index", pollerIndex)
+			return err // Will be retried with backoff
+		}
+
+		// Handle the received task
+		if resp.Task != nil {
+			logger.Info(ctx, "Task received",
+				"worker_id", w.id,
+				"poller_id", pollerID,
+				"poller_index", pollerIndex,
+				"root_dag_run_name", resp.Task.RootDagRunName,
+				"root_dag_run_id", resp.Task.RootDagRunId,
+				"parent_dag_run_name", resp.Task.ParentDagRunName,
+				"parent_dag_run_id", resp.Task.ParentDagRunId,
+				"dag_run_id", resp.Task.DagRunId)
+			task = resp.Task
+		}
+
+		return nil
+	}, policy, nil)
+
+	return task, err
 }
 
 // getDialOptions returns the appropriate gRPC dial options based on TLS configuration
