@@ -238,4 +238,19 @@ func TestKebabToCamel(t *testing.T) {
 		result := stringutil.KebabToCamel("a-b-c")
 		require.Equal(t, "aBC", result)
 	})
+	
+	t.Run("WithDots", func(t *testing.T) {
+		result := stringutil.KebabToCamel("main-func.foo-bar")
+		require.Equal(t, "mainFunc.fooBar", result)
+	})
+	
+	t.Run("MultipleDots", func(t *testing.T) {
+		result := stringutil.KebabToCamel("com.example.my-package.my-class")
+		require.Equal(t, "com.example.myPackage.myClass", result)
+	})
+	
+	t.Run("DotsOnly", func(t *testing.T) {
+		result := stringutil.KebabToCamel("com.example.package")
+		require.Equal(t, "com.example.package", result)
+	})
 }

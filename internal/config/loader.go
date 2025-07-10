@@ -170,8 +170,14 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	if def.Permissions.WriteDAGs != nil {
 		cfg.Server.Permissions[PermissionWriteDAGs] = *def.Permissions.WriteDAGs
 	}
+	if def.PermissionWriteDAGs != nil {
+		cfg.Server.Permissions[PermissionWriteDAGs] = *def.PermissionWriteDAGs
+	}
 	if def.Permissions.RunDAGs != nil {
 		cfg.Server.Permissions[PermissionRunDAGs] = *def.Permissions.RunDAGs
+	}
+	if def.PermissionRunDAGs != nil {
+		cfg.Server.Permissions[PermissionRunDAGs] = *def.PermissionRunDAGs
 	}
 
 	// Process remote node definitions.
@@ -244,29 +250,16 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		}
 	}
 
-	// Set coordinator service configuration.
-	// Initialize with defaults from viper
-	cfg.Coordinator.Host = viper.GetString("coordinator.host")
-	cfg.Coordinator.Port = viper.GetInt("coordinator.port")
-
 	// Override with values from config file if provided
-	if def.Coordinator != nil {
-		if def.Coordinator.Host != "" {
-			cfg.Coordinator.Host = def.Coordinator.Host
-		}
-		if def.Coordinator.Port > 0 {
-			cfg.Coordinator.Port = def.Coordinator.Port
-		}
-		cfg.Coordinator.SigningKey = def.Coordinator.SigningKey
+	cfg.Coordinator.Host = def.CoordinatorHost
+	cfg.Coordinator.Port = def.CoordinatorPort
+	cfg.Coordinator.SigningKey = def.CoordinatorSigningKey
 
-		// Set TLS configuration if available
-		if def.Coordinator.TLS != nil {
-			cfg.Coordinator.TLS = &TLSConfig{
-				CertFile: def.Coordinator.TLS.CertFile,
-				KeyFile:  def.Coordinator.TLS.KeyFile,
-				CAFile:   def.Coordinator.TLS.CAFile,
-			}
-		}
+	// Set TLS configuration if available
+	cfg.Coordinator.TLS = &TLSConfig{
+		CertFile: def.CoordinatorCertFile,
+		KeyFile:  def.CoordinatorKeyFile,
+		CAFile:   def.CoordinatorCAFile,
 	}
 
 	// Set worker configuration
@@ -460,8 +453,12 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	viper.SetDefault("latestStatusToday", false)
 
 	// Coordinator settings
-	viper.SetDefault("coordinator.host", "127.0.0.1")
-	viper.SetDefault("coordinator.port", 50051)
+	viper.SetDefault("coordinatorHost", "127.0.0.1")
+	viper.SetDefault("coordinatorPort", 50051)
+	viper.SetDefault("coordinatorSigningKey", "")
+	viper.SetDefault("coordinatorCertFile", "")
+	viper.SetDefault("coordinatorKeyFile", "")
+	viper.SetDefault("coordinatorCAFile", "")
 
 	// Worker settings
 	viper.SetDefault("worker.maxConcurrentRuns", 100)

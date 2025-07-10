@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
@@ -40,22 +39,6 @@ This process runs continuously in the foreground until terminated.
 var coordinatorFlags = []commandLineFlag{coordinatorHostFlag, coordinatorPortFlag}
 
 func runCoordinator(ctx *Context, _ []string) error {
-	// Override config with command line flags if explicitly provided
-	if ctx.Command.Flags().Changed("coordinator-host") {
-		if host, _ := ctx.Command.Flags().GetString("coordinator-host"); host != "" {
-			ctx.Config.Coordinator.Host = host
-		}
-	}
-	if ctx.Command.Flags().Changed("coordinator-port") {
-		if portStr, _ := ctx.Command.Flags().GetString("coordinator-port"); portStr != "" {
-			// Convert string port to int
-			port, err := strconv.Atoi(portStr)
-			if err == nil {
-				ctx.Config.Coordinator.Port = port
-			}
-		}
-	}
-
 	logger.Info(ctx, "Coordinator initialization", "host", ctx.Config.Coordinator.Host, "port", ctx.Config.Coordinator.Port)
 
 	coordinator, err := ctx.NewCoordinator()

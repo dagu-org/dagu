@@ -234,6 +234,11 @@ type TLSConfig struct {
 	CAFile   string
 }
 
+// IsEnabled checks if TLS is enabled by verifying that all necessary files are provided
+func (cfg *TLSConfig) IsEnabled() bool {
+	return cfg.CertFile != "" && cfg.KeyFile != "" && cfg.CAFile != ""
+}
+
 // Queues represents the global queue configuration
 type Queues struct {
 	Enabled bool
