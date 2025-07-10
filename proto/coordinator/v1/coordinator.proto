@@ -48,6 +48,7 @@ message Task {
   string params = 8; // Optional: parameters
   string step = 9;   // Optional: specific step (for RETRY)
   map<string, string> worker_selector = 10; // Required worker labels for execution
+  string definition = 11; // Optional: DAG definition (YAML) for local DAGs
 }
 
 enum Operation {

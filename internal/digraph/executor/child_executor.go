@@ -25,15 +25,11 @@ type ChildDAGExecutor struct {
 	// This will be cleaned up after execution.
 	tempFile string
 
-	// isLocal indicates whether this is a local DAG.
-	isLocal bool
-
 	// workerSelector contains the worker selector requirements from the step
 	workerSelector map[string]string
-}
 
-func (c *ChildDAGExecutor) Local() bool {
-	return c.isLocal
+	// yamlData holds the YAML content for local DAGs (needed for distributed execution)
+	yamlData []byte
 }
 
 // NewChildDAGExecutor creates a new ChildDAGExecutor.
@@ -58,7 +54,7 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 			return &ChildDAGExecutor{
 				DAG:      &dag,
 				tempFile: tempFile,
-				isLocal:  true,
+				yamlData: localDAG.YamlData,
 			}, nil
 		}
 	}
@@ -70,8 +66,7 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 	}
 
 	return &ChildDAGExecutor{
-		DAG:     dag,
-		isLocal: false,
+		DAG: dag,
 	}, nil
 }
 
@@ -138,7 +133,6 @@ func (e *ChildDAGExecutor) BuildCommand(
 		"dagRunId", runParams.RunID,
 		"target", e.DAG.Name,
 		"args", args,
-		"isLocal", e.isLocal,
 	)
 
 	return cmd, nil
@@ -183,10 +177,18 @@ func (e *ChildDAGExecutor) BuildCoordinatorTask(
 		WorkerSelector:   e.workerSelector,
 	}
 
+	// For local DAGs, include the YAML definition
+	if len(e.yamlData) > 0 {
+		task.Definition = string(e.yamlData)
+		// Use the DAG name as target instead of the temp file path
+		task.Target = e.DAG.Name
+	}
+
 	logger.Info(ctx, "Built coordinator task for child DAG",
 		"dagRunId", runParams.RunID,
 		"target", e.DAG.Name,
 		"workerSelector", e.workerSelector,
+		"hasDefinition", len(task.Definition) > 0,
 	)
 
 	return task, nil

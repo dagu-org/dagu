@@ -271,6 +271,7 @@ type Task struct {
 	Params           string                 `protobuf:"bytes,8,opt,name=params,proto3" json:"params,omitempty"`                                                                                                                  // Optional: parameters
 	Step             string                 `protobuf:"bytes,9,opt,name=step,proto3" json:"step,omitempty"`                                                                                                                      // Optional: specific step (for RETRY)
 	WorkerSelector   map[string]string      `protobuf:"bytes,10,rep,name=worker_selector,json=workerSelector,proto3" json:"worker_selector,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Required worker labels for execution
+	Definition       string                 `protobuf:"bytes,11,opt,name=definition,proto3" json:"definition,omitempty"`                                                                                                         // Optional: DAG definition (YAML) for local DAGs
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -375,6 +376,13 @@ func (x *Task) GetWorkerSelector() map[string]string {
 	return nil
 }
 
+func (x *Task) GetDefinition() string {
+	if x != nil {
+		return x.Definition
+	}
+	return ""
+}
+
 var File_proto_coordinator_v1_coordinator_proto protoreflect.FileDescriptor
 
 const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
@@ -391,7 +399,7 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\";\n" +
 	"\x0fDispatchRequest\x12(\n" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\"\x12\n" +
-	"\x10DispatchResponse\"\xe3\x03\n" +
+	"\x10DispatchResponse\"\x83\x04\n" +
 	"\x04Task\x127\n" +
 	"\toperation\x18\x06 \x01(\x0e2\x19.coordinator.v1.OperationR\toperation\x12)\n" +
 	"\x11root_dag_run_name\x18\x01 \x01(\tR\x0erootDagRunName\x12%\n" +
@@ -404,7 +412,10 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\x06params\x18\b \x01(\tR\x06params\x12\x12\n" +
 	"\x04step\x18\t \x01(\tR\x04step\x12Q\n" +
 	"\x0fworker_selector\x18\n" +
-	" \x03(\v2(.coordinator.v1.Task.WorkerSelectorEntryR\x0eworkerSelector\x1aA\n" +
+	" \x03(\v2(.coordinator.v1.Task.WorkerSelectorEntryR\x0eworkerSelector\x12\x1e\n" +
+	"\n" +
+	"definition\x18\v \x01(\tR\n" +
+	"definition\x1aA\n" +
 	"\x13WorkerSelectorEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01*P\n" +

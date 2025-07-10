@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime/debug"
 	"slices"
 	"strconv"
@@ -516,6 +517,33 @@ type RestartOptions struct {
 // It handles both START (new runs) and RETRY (resume existing runs) operations.
 func (m *Manager) HandleTask(ctx context.Context, task *coordinatorv1.Task) error {
 	var args []string
+	var tempFile string
+
+	// If definition is provided, create a temporary DAG file
+	if task.Definition != "" {
+		logger.Info(ctx, "Creating temporary DAG file from definition",
+			"dagName", task.Target,
+			"definitionSize", len(task.Definition))
+		
+		tf, err := m.createTempDAGFile(task.Target, []byte(task.Definition))
+		if err != nil {
+			return fmt.Errorf("failed to create temp DAG file: %w", err)
+		}
+		tempFile = tf
+		defer func() {
+			// Clean up the temporary file
+			if err := os.Remove(tempFile); err != nil && !os.IsNotExist(err) {
+				logger.Errorf(ctx, "Failed to remove temp DAG file: %v", err)
+			}
+		}()
+		// Update the target to use the temp file
+		originalTarget := task.Target
+		task.Target = tempFile
+		
+		logger.Info(ctx, "Created temporary DAG file",
+			"tempFile", tempFile,
+			"originalTarget", originalTarget)
+	}
 
 	switch task.Operation {
 	case coordinatorv1.Operation_OPERATION_START:
@@ -621,4 +649,31 @@ func execWithRecovery(ctx context.Context, fn func()) {
 
 	// Execute the function
 	fn()
+}
+
+// createTempDAGFile creates a temporary file with the DAG definition content.
+func (m *Manager) createTempDAGFile(dagName string, yamlData []byte) (string, error) {
+	// Create a temporary directory if it doesn't exist
+	tempDir := filepath.Join(os.TempDir(), "dagu", "worker-dags")
+	if err := os.MkdirAll(tempDir, 0750); err != nil {
+		return "", fmt.Errorf("failed to create temp directory: %w", err)
+	}
+
+	// Create a temporary file with a meaningful name
+	pattern := fmt.Sprintf("%s-*.yaml", dagName)
+	tempFile, err := os.CreateTemp(tempDir, pattern)
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer func() {
+		_ = tempFile.Close()
+	}()
+
+	// Write the YAML data
+	if _, err := tempFile.Write(yamlData); err != nil {
+		_ = os.Remove(tempFile.Name())
+		return "", fmt.Errorf("failed to write YAML data: %w", err)
+	}
+
+	return tempFile.Name(), nil
 }
