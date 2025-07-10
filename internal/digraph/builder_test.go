@@ -187,7 +187,7 @@ steps:
 
 		// Test default maxOutputSize when not specified
 		th2 := testLoad(t, "default.yaml")
-		assert.Equal(t, 1024*1024, th2.MaxOutputSize) // Default 1MB
+		assert.Equal(t, 0, th2.MaxOutputSize) // Default 1MB
 	})
 	t.Run("ValidationError", func(t *testing.T) {
 		type testCase struct {

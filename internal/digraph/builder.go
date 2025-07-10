@@ -76,7 +76,6 @@ var builderRegistry = []builderEntry{
 	{name: "maxHistoryRetentionDays", fn: maxHistoryRetentionDays},
 	{name: "maxCleanUpTime", fn: maxCleanUpTime},
 	{name: "maxActiveRuns", fn: buildMaxActiveRuns},
-	{name: "maxOutputSize", fn: buildMaxOutputSize},
 	{name: "preconditions", fn: buildPrecondition},
 	{name: "otel", fn: buildOTel},
 }
@@ -511,14 +510,6 @@ func buildMaxActiveRuns(_ BuildContext, spec *definition, dag *DAG) error {
 	} else {
 		// Default to 1 only when not specified (0)
 		dag.MaxActiveRuns = 1
-	}
-	return nil
-}
-
-func buildMaxOutputSize(_ BuildContext, spec *definition, dag *DAG) error {
-	if spec.MaxOutputSize == 0 {
-		// Default to 1MB if not specified
-		dag.MaxOutputSize = 1024 * 1024
 	}
 	return nil
 }
