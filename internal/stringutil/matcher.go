@@ -16,7 +16,8 @@ const rePrefix = "re:"
 type MatchOption func(*matchOptions)
 
 type matchOptions struct {
-	exactMatch bool
+	exactMatch    bool
+	maxBufferSize int
 }
 
 // WithExactMatch configures the matcher to use exact string matching for literal patterns
@@ -26,29 +27,43 @@ func WithExactMatch() MatchOption {
 	}
 }
 
+// WithMaxBufferSize configures the maximum buffer size for handling long lines
+func WithMaxBufferSize(size int) MatchOption {
+	return func(o *matchOptions) {
+		o.maxBufferSize = size
+	}
+}
+
 // MatchPattern matches content against patterns using either literal or regex matching.
 // For files or large content, use MatchPatternScanner instead.
 func MatchPattern(ctx context.Context, content string, patterns []string, opts ...MatchOption) bool {
+	// Apply options to get configuration
+	options := &matchOptions{
+		maxBufferSize: 1024 * 1024, // Default 1MB
+	}
+	for _, opt := range opts {
+		opt(options)
+	}
+
 	scanner := bufio.NewScanner(strings.NewReader(content))
-	
+
 	// First try with default buffer
 	matched, err := matchPatternWithScanner(ctx, scanner, patterns, opts...)
 	if err == nil {
 		return matched
 	}
-	
+
 	// If we got a "token too long" error, retry with larger buffer
 	if errors.Is(err, bufio.ErrTooLong) {
-		logger.Debug(ctx, "token too long, retrying with larger buffer", "contentSize", len(content))
+		logger.Debug(ctx, "token too long, retrying with larger buffer", "contentSize", len(content), "maxBufferSize", options.maxBufferSize)
 		scanner = bufio.NewScanner(strings.NewReader(content))
-		// Use a buffer size that matches the output capture limit (1MB by default)
-		const maxTokenSize = 1024 * 1024 // 1MB
-		buf := make([]byte, 0, 64*1024)  // Start with 64KB buffer
-		scanner.Buffer(buf, maxTokenSize)
+		// Use configured buffer size
+		buf := make([]byte, 0, 64*1024) // Start with 64KB buffer
+		scanner.Buffer(buf, options.maxBufferSize)
 		matched, _ = matchPatternWithScanner(ctx, scanner, patterns, opts...)
 		return matched
 	}
-	
+
 	return matched
 }
 
@@ -93,7 +108,7 @@ func matchPatternWithScanner(ctx context.Context, scanner *bufio.Scanner, patter
 		if err := scanner.Err(); err != nil {
 			return false, err
 		}
-		
+
 		// Check for empty string patterns
 		for _, p := range literalPatterns {
 			if p == "" {

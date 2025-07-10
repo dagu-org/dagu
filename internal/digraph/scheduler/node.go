@@ -590,12 +590,17 @@ func (n *Node) LogContainsPattern(ctx context.Context, patterns []string) (bool,
 		_ = file.Close()
 	}()
 
-	// Create a buffered reader with optimal buffer size
-	reader := bufio.NewReaderSize(file, 1024*1024)
+	// Get maxOutputSize from DAG configuration
+	var maxOutputSize = 1024 * 1024 // Default 1MB
+	if env := digraph.GetEnv(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
+		maxOutputSize = env.DAG.MaxOutputSize
+	}
 
-	// Use scanner for more efficient line reading
-	scanner := bufio.NewScanner(reader)
-	scanner.Buffer(make([]byte, 1024*1024), 1024*1024) // Set both initial and max line size to 1MB
+	// Create scanner with default buffer, but configure max size based on DAG config
+	scanner := bufio.NewScanner(file)
+	// Set scanner buffer to handle lines up to maxOutputSize
+	// Start with default 64KB initial buffer, but allow growth up to maxOutputSize
+	scanner.Buffer(make([]byte, 0, 64*1024), maxOutputSize)
 
 	// Use the logLock to prevent concurrent file operations
 	n.outputs.lock()
