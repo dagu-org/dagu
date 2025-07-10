@@ -67,7 +67,7 @@ type DAG struct {
 	// Steps contains the list of steps in the DAG.
 	Steps []Step `json:"steps,omitempty"`
 	// HandlerOn contains the steps to be executed on different events.
-	HandlerOn HandlerOn `json:"handlerOn,omitempty"`
+	HandlerOn HandlerOn `json:"handlerOn,omitzero"`
 	// Preconditions contains the conditions to be met before running the DAG.
 	Preconditions []*Condition `json:"preconditions,omitempty"`
 	// SMTP contains the SMTP configuration.
