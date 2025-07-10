@@ -256,42 +256,28 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	cfg.Coordinator.SigningKey = def.CoordinatorSigningKey
 
 	// Set TLS configuration if available
-	cfg.Coordinator.TLS = &TLSConfig{
-		CertFile: def.CoordinatorCertFile,
-		KeyFile:  def.CoordinatorKeyFile,
-		CAFile:   def.CoordinatorCAFile,
+	if def.CoordinatorCertFile != "" || def.CoordinatorKeyFile != "" || def.CoordinatorCAFile != "" {
+		cfg.Coordinator.TLS = &TLSConfig{
+			CertFile: def.CoordinatorCertFile,
+			KeyFile:  def.CoordinatorKeyFile,
+			CAFile:   def.CoordinatorCAFile,
+		}
 	}
 
-	// Set worker configuration
-	cfg.Worker.MaxConcurrentRuns = viper.GetInt("worker.maxConcurrentRuns")
-	cfg.Worker.CoordinatorHost = viper.GetString("worker.coordinatorHost")
-	cfg.Worker.CoordinatorPort = viper.GetInt("worker.coordinatorPort")
-	cfg.Worker.Insecure = viper.GetBool("worker.insecure")
-	cfg.Worker.SkipTLSVerify = viper.GetBool("worker.skipTLSVerify")
+	// Set worker configuration from flat fields
+	cfg.Worker.ID = def.WorkerID
+	cfg.Worker.MaxConcurrentRuns = def.WorkerMaxConcurrentRuns
+	cfg.Worker.CoordinatorHost = def.WorkerCoordinatorHost
+	cfg.Worker.CoordinatorPort = def.WorkerCoordinatorPort
+	cfg.Worker.Insecure = def.WorkerInsecure
+	cfg.Worker.SkipTLSVerify = def.WorkerSkipTLSVerify
 
-	if def.Worker != nil {
-		if def.Worker.ID != "" {
-			cfg.Worker.ID = def.Worker.ID
-		}
-		if def.Worker.MaxConcurrentRuns > 0 {
-			cfg.Worker.MaxConcurrentRuns = def.Worker.MaxConcurrentRuns
-		}
-		if def.Worker.CoordinatorHost != "" {
-			cfg.Worker.CoordinatorHost = def.Worker.CoordinatorHost
-		}
-		if def.Worker.CoordinatorPort > 0 {
-			cfg.Worker.CoordinatorPort = def.Worker.CoordinatorPort
-		}
-		cfg.Worker.Insecure = def.Worker.Insecure
-		cfg.Worker.SkipTLSVerify = def.Worker.SkipTLSVerify
-
-		// Set TLS configuration if available
-		if def.Worker.TLS != nil {
-			cfg.Worker.TLS = &TLSConfig{
-				CertFile: def.Worker.TLS.CertFile,
-				KeyFile:  def.Worker.TLS.KeyFile,
-				CAFile:   def.Worker.TLS.CAFile,
-			}
+	// Set worker TLS configuration if available
+	if def.WorkerTLSCertFile != "" || def.WorkerTLSKeyFile != "" || def.WorkerTLSCAFile != "" {
+		cfg.Worker.TLS = &TLSConfig{
+			CertFile: def.WorkerTLSCertFile,
+			KeyFile:  def.WorkerTLSKeyFile,
+			CAFile:   def.WorkerTLSCAFile,
 		}
 	}
 
@@ -461,10 +447,14 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	viper.SetDefault("coordinatorCAFile", "")
 
 	// Worker settings
-	viper.SetDefault("worker.maxConcurrentRuns", 100)
-	viper.SetDefault("worker.coordinatorHost", "127.0.0.1")
-	viper.SetDefault("worker.coordinatorPort", 50051)
-	viper.SetDefault("worker.insecure", false) // Secure by default - TLS required
+	viper.SetDefault("workerMaxConcurrentRuns", 100)
+	viper.SetDefault("workerCoordinatorHost", "127.0.0.1")
+	viper.SetDefault("workerCoordinatorPort", 50051)
+	viper.SetDefault("workerInsecure", false) // Secure by default - TLS required
+	viper.SetDefault("workerSkipTlsVerify", false)
+	viper.SetDefault("workerTlsCertFile", "")
+	viper.SetDefault("workerTlsKeyFile", "")
+	viper.SetDefault("workerTlsCaFile", "")
 
 	// UI settings
 	viper.SetDefault("ui.navbarTitle", build.AppName)
@@ -547,21 +537,24 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	// Queue configuration
 	l.bindEnv("queues.enabled", "QUEUE_ENABLED")
 
-	// Coordinator service configuration
-	l.bindEnv("coordinator.host", "COORDINATOR_HOST")
-	l.bindEnv("coordinator.port", "COORDINATOR_PORT")
-	l.bindEnv("coordinator.signingKey", "COORDINATOR_SIGNING_KEY")
+	// Coordinator service configuration (flat structure)
+	l.bindEnv("coordinatorHost", "COORDINATOR_HOST")
+	l.bindEnv("coordinatorPort", "COORDINATOR_PORT")
+	l.bindEnv("coordinatorSigningKey", "COORDINATOR_SIGNING_KEY")
+	l.bindEnv("coordinatorCertFile", "COORDINATOR_CERT_FILE")
+	l.bindEnv("coordinatorKeyFile", "COORDINATOR_KEY_FILE")
+	l.bindEnv("coordinatorCaFile", "COORDINATOR_CA_FILE")
 
-	// Worker configuration
-	l.bindEnv("worker.id", "WORKER_ID")
-	l.bindEnv("worker.maxConcurrentRuns", "WORKER_MAX_CONCURRENT_RUNS")
-	l.bindEnv("worker.coordinatorHost", "WORKER_COORDINATOR_HOST")
-	l.bindEnv("worker.coordinatorPort", "WORKER_COORDINATOR_PORT")
-	l.bindEnv("worker.insecure", "WORKER_INSECURE")
-	l.bindEnv("worker.skipTLSVerify", "WORKER_SKIP_TLS_VERIFY")
-	l.bindEnv("worker.tls.certFile", "WORKER_TLS_CERT_FILE")
-	l.bindEnv("worker.tls.keyFile", "WORKER_TLS_KEY_FILE")
-	l.bindEnv("worker.tls.caFile", "WORKER_TLS_CA_FILE")
+	// Worker configuration (flat structure)
+	l.bindEnv("workerId", "WORKER_ID")
+	l.bindEnv("workerMaxConcurrentRuns", "WORKER_MAX_CONCURRENT_RUNS")
+	l.bindEnv("workerCoordinatorHost", "WORKER_COORDINATOR_HOST")
+	l.bindEnv("workerCoordinatorPort", "WORKER_COORDINATOR_PORT")
+	l.bindEnv("workerInsecure", "WORKER_INSECURE")
+	l.bindEnv("workerSkipTlsVerify", "WORKER_SKIP_TLS_VERIFY")
+	l.bindEnv("workerTlsCertFile", "WORKER_TLS_CERT_FILE")
+	l.bindEnv("workerTlsKeyFile", "WORKER_TLS_KEY_FILE")
+	l.bindEnv("workerTlsCaFile", "WORKER_TLS_CA_FILE")
 }
 
 // bindEnv constructs the full environment variable name using the app prefix and binds it to the given key.

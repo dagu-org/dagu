@@ -164,51 +164,89 @@ var (
 		name:      "worker-id",
 		shorthand: "w",
 		usage:     "Worker instance ID (default: hostname@PID)",
+		bindViper: true,
 	}
 
-	// maxConcurrentRunsFlag is the maximum number of concurrent task executions.
-	maxConcurrentRunsFlag = commandLineFlag{
-		name:         "max-concurrent-runs",
+	// workerMaxConcurrentRunsFlag is the maximum number of concurrent task executions.
+	workerMaxConcurrentRunsFlag = commandLineFlag{
+		name:         "worker-max-concurrent-runs",
 		shorthand:    "m",
 		defaultValue: "100",
 		usage:        "Maximum number of concurrent task executions (default: 100)",
 		bindViper:    true,
 	}
 
-	// coordinatorInsecureFlag disables TLS verification for coordinator connection.
-	coordinatorInsecureFlag = commandLineFlag{
-		name:      "coordinator-insecure",
-		usage:     "Disable TLS verification for coordinator connection (use for development only)",
+	// workerCoordinatorHostFlag is the coordinator host for worker connection.
+	workerCoordinatorHostFlag = commandLineFlag{
+		name:         "worker-coordinator-host",
+		defaultValue: "127.0.0.1",
+		usage:        "Coordinator gRPC server host (default: 127.0.0.1)",
+		bindViper:    true,
+	}
+
+	// workerCoordinatorPortFlag is the coordinator port for worker connection.
+	workerCoordinatorPortFlag = commandLineFlag{
+		name:         "worker-coordinator-port",
+		defaultValue: "50051",
+		usage:        "Coordinator gRPC server port (default: 50051)",
+		bindViper:    true,
+	}
+
+	// workerInsecureFlag disables TLS for worker connection.
+	workerInsecureFlag = commandLineFlag{
+		name:      "worker-insecure",
+		usage:     "Use insecure connection (h2c) instead of TLS",
 		isBool:    true,
 		bindViper: true,
 	}
 
-	// coordinatorTLSCertFlag is the path to the TLS certificate for coordinator connection.
+	// workerSkipTLSVerifyFlag skips TLS certificate verification for worker.
+	workerSkipTLSVerifyFlag = commandLineFlag{
+		name:      "worker-skip-tls-verify",
+		usage:     "Skip TLS certificate verification (insecure)",
+		isBool:    true,
+		bindViper: true,
+	}
+
+	// workerTLSCertFlag is the TLS certificate for worker connection.
+	workerTLSCertFlag = commandLineFlag{
+		name:      "worker-tls-cert",
+		usage:     "Path to TLS certificate file for mutual TLS",
+		bindViper: true,
+	}
+
+	// workerTLSKeyFlag is the TLS key for worker connection.
+	workerTLSKeyFlag = commandLineFlag{
+		name:      "worker-tls-key",
+		usage:     "Path to TLS key file for mutual TLS",
+		bindViper: true,
+	}
+
+	// workerTLSCAFlag is the CA certificate for worker connection.
+	workerTLSCAFlag = commandLineFlag{
+		name:      "worker-tls-ca",
+		usage:     "Path to CA certificate file for server verification",
+		bindViper: true,
+	}
+
+	// coordinatorTLSCertFlag is the path to the TLS certificate for coordinator server.
 	coordinatorTLSCertFlag = commandLineFlag{
 		name:      "coordinator-tls-cert",
-		usage:     "Path to TLS certificate file for coordinator connection",
+		usage:     "Path to TLS certificate file for the coordinator server",
 		bindViper: true,
 	}
 
-	// coordinatorTLSKeyFlag is the path to the TLS key for coordinator connection.
+	// coordinatorTLSKeyFlag is the path to the TLS key for coordinator server.
 	coordinatorTLSKeyFlag = commandLineFlag{
 		name:      "coordinator-tls-key",
-		usage:     "Path to TLS key file for coordinator connection",
+		usage:     "Path to TLS key file for the coordinator server",
 		bindViper: true,
 	}
 
-	// coordinatorTLSCAFlag is the path to the CA certificate for coordinator connection.
+	// coordinatorTLSCAFlag is the path to the CA certificate for coordinator server.
 	coordinatorTLSCAFlag = commandLineFlag{
 		name:      "coordinator-tls-ca",
-		usage:     "Path to CA certificate file for coordinator connection",
-		bindViper: true,
-	}
-
-	// coordinatorSkipTLSVerifyFlag skips TLS certificate verification.
-	coordinatorSkipTLSVerifyFlag = commandLineFlag{
-		name:      "coordinator-skip-tls-verify",
-		usage:     "Skip TLS certificate verification (insecure, use for development only)",
-		isBool:    true,
+		usage:     "Path to CA certificate file for client verification (mTLS)",
 		bindViper: true,
 	}
 )

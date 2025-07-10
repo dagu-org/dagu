@@ -93,8 +93,33 @@ type Definition struct {
 	// CoordinatorCAFile is the path to the coordinator's CA certificate file.
 	CoordinatorCAFile string `mapstructure:"coordinatorCaFile"`
 
-	// Worker contains the worker configuration.
-	Worker *workerDef `mapstructure:"worker"`
+	// WorkerID is the unique identifier for the worker instance.
+	WorkerID string `mapstructure:"workerId"`
+
+	// WorkerMaxConcurrentRuns is the maximum number of concurrent task executions.
+	WorkerMaxConcurrentRuns int `mapstructure:"workerMaxConcurrentRuns"`
+
+	// WorkerCoordinatorHost is the hostname or IP address for connecting to the coordinator.
+	WorkerCoordinatorHost string `mapstructure:"workerCoordinatorHost"`
+
+	// WorkerCoordinatorPort is the port number for connecting to the coordinator.
+	WorkerCoordinatorPort int `mapstructure:"workerCoordinatorPort"`
+
+	// WorkerInsecure indicates whether to use insecure connection (h2c) instead of TLS.
+	WorkerInsecure bool `mapstructure:"workerInsecure"`
+
+	// WorkerSkipTLSVerify indicates whether to skip TLS certificate verification.
+	WorkerSkipTLSVerify bool `mapstructure:"workerSkipTlsVerify"`
+
+	// WorkerTLSCertFile is the path to the worker's TLS certificate file for mutual TLS.
+	WorkerTLSCertFile string `mapstructure:"workerTlsCertFile"`
+
+	// WorkerTLSKeyFile is the path to the worker's TLS key file for mutual TLS.
+	WorkerTLSKeyFile string `mapstructure:"workerTlsKeyFile"`
+
+	// WorkerTLSCAFile is the path to the CA certificate file for server verification.
+	WorkerTLSCAFile string `mapstructure:"workerTlsCaFile"`
+
 	// SchedulerLockStaleThreshold is the time after which a scheduler lock is considered stale.
 	// Default is 30 seconds.
 	SchedulerLockStaleThreshold string `mapstructure:"schedulerLockStaleThreshold"`
@@ -238,13 +263,3 @@ type queueConfigDef struct {
 	MaxActiveRuns int    `mapstructure:"maxActiveRuns"`
 }
 
-// workerDef represents the worker configuration
-type workerDef struct {
-	ID                string        `mapstructure:"id"`
-	MaxConcurrentRuns int           `mapstructure:"maxConcurrentRuns"`
-	CoordinatorHost   string        `mapstructure:"coordinatorHost"`
-	CoordinatorPort   int           `mapstructure:"coordinatorPort"`
-	TLS               *tlsConfigDef `mapstructure:"tls"`
-	Insecure          bool          `mapstructure:"insecure"`
-	SkipTLSVerify     bool          `mapstructure:"skipTLSVerify"`
-}

@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/worker"
@@ -23,28 +22,28 @@ poller_id for every poll request.
 By default, the worker ID is set to hostname@PID, but can be overridden.
 
 Flags:
-  --worker-id string              Worker instance ID (default: hostname@PID)
-  --max-concurrent-runs int       Maximum concurrent task executions (default: 100)
-  --coordinator-host string       Coordinator gRPC server host (default: 127.0.0.1)
-  --coordinator-port int          Coordinator gRPC server port (default: 50051)
-  --coordinator-insecure          Use insecure connection (h2c) instead of TLS
-  --coordinator-tls-cert string   Path to TLS certificate file for mutual TLS
-  --coordinator-tls-key string    Path to TLS key file for mutual TLS
-  --coordinator-tls-ca string     Path to CA certificate file for server verification
-  --coordinator-skip-tls-verify   Skip TLS certificate verification (insecure)
+  --worker-id string                       Worker instance ID (default: hostname@PID)
+  --worker-max-concurrent-runs int         Maximum concurrent task executions (default: 100)
+  --worker-coordinator-host string         Coordinator gRPC server host (default: 127.0.0.1)
+  --worker-coordinator-port int            Coordinator gRPC server port (default: 50051)
+  --worker-insecure                        Use insecure connection (h2c) instead of TLS
+  --worker-tls-cert string                 Path to TLS certificate file for mutual TLS
+  --worker-tls-key string                  Path to TLS key file for mutual TLS
+  --worker-tls-ca string                   Path to CA certificate file for server verification
+  --worker-skip-tls-verify                 Skip TLS certificate verification (insecure)
 
 Example:
   dagu worker
-  dagu worker --max-concurrent-runs=50
-  dagu worker --coordinator-host=coordinator.example.com --coordinator-port=50051
-  dagu worker --worker-id=worker-1 --max-concurrent-runs=200
+  dagu worker --worker-max-concurrent-runs=50
+  dagu worker --worker-coordinator-host=coordinator.example.com --worker-coordinator-port=50051
+  dagu worker --worker-id=worker-1 --worker-max-concurrent-runs=200
   
   # For HTTPS/TLS connections:
-  dagu worker --coordinator-host=coordinator.example.com
-  dagu worker --coordinator-tls-cert=client.crt --coordinator-tls-key=client.key
-  dagu worker --coordinator-tls-ca=ca.crt
-  dagu worker --coordinator-skip-tls-verify  # For self-signed certificates
-  dagu worker --coordinator-insecure         # For h2c (HTTP/2 without TLS)
+  dagu worker --worker-coordinator-host=coordinator.example.com
+  dagu worker --worker-tls-cert=client.crt --worker-tls-key=client.key
+  dagu worker --worker-tls-ca=ca.crt
+  dagu worker --worker-skip-tls-verify  # For self-signed certificates
+  dagu worker --worker-insecure         # For h2c (HTTP/2 without TLS)
 
 This process runs continuously in the foreground until terminated.
 `,
@@ -54,53 +53,24 @@ This process runs continuously in the foreground until terminated.
 
 var workerFlags = []commandLineFlag{
 	workerIDFlag,
-	maxConcurrentRunsFlag,
-	coordinatorHostFlag,
-	coordinatorPortFlag,
-	coordinatorInsecureFlag,
-	coordinatorTLSCertFlag,
-	coordinatorTLSKeyFlag,
-	coordinatorTLSCAFlag,
-	coordinatorSkipTLSVerifyFlag,
+	workerMaxConcurrentRunsFlag,
+	workerCoordinatorHostFlag,
+	workerCoordinatorPortFlag,
+	workerInsecureFlag,
+	workerTLSCertFlag,
+	workerTLSKeyFlag,
+	workerTLSCAFlag,
+	workerSkipTLSVerifyFlag,
 }
 
 func runWorker(ctx *Context, _ []string) error {
-	// Use config values as defaults, command-line flags override
+	// Use config values directly - viper binding handles flag overrides
 	workerID := ctx.Config.Worker.ID
-	if id, _ := ctx.Command.Flags().GetString("worker-id"); id != "" && ctx.Command.Flags().Changed("worker-id") {
-		workerID = id
-	}
-
-	// Get max concurrent runs
 	maxConcurrentRuns := ctx.Config.Worker.MaxConcurrentRuns
-	if ctx.Command.Flags().Changed("max-concurrent-runs") {
-		if str, _ := ctx.Command.Flags().GetString("max-concurrent-runs"); str != "" {
-			if val, err := strconv.Atoi(str); err == nil {
-				maxConcurrentRuns = val
-			} else {
-				return fmt.Errorf("invalid max-concurrent-runs value: %w", err)
-			}
-		}
-	}
-
-	// Use worker config for coordinator connection
 	coordinatorHost := ctx.Config.Worker.CoordinatorHost
-	if ctx.Command.Flags().Changed("coordinator-host") {
-		if host, _ := ctx.Command.Flags().GetString("coordinator-host"); host != "" {
-			coordinatorHost = host
-		}
-	}
-
 	coordinatorPort := ctx.Config.Worker.CoordinatorPort
-	if ctx.Command.Flags().Changed("coordinator-port") {
-		if portStr, _ := ctx.Command.Flags().GetString("coordinator-port"); portStr != "" {
-			if port, err := strconv.Atoi(portStr); err == nil {
-				coordinatorPort = port
-			}
-		}
-	}
 
-	// Build TLS configuration from config, then override with flags
+	// Build TLS configuration from config
 	tlsConfig := &worker.TLSConfig{
 		Insecure:      ctx.Config.Worker.Insecure,
 		SkipTLSVerify: ctx.Config.Worker.SkipTLSVerify,
@@ -110,23 +80,6 @@ func runWorker(ctx *Context, _ []string) error {
 		tlsConfig.CertFile = ctx.Config.Worker.TLS.CertFile
 		tlsConfig.KeyFile = ctx.Config.Worker.TLS.KeyFile
 		tlsConfig.CAFile = ctx.Config.Worker.TLS.CAFile
-	}
-
-	// Command-line flags override config
-	if ctx.Command.Flags().Changed("coordinator-insecure") {
-		tlsConfig.Insecure, _ = ctx.Command.Flags().GetBool("coordinator-insecure")
-	}
-	if ctx.Command.Flags().Changed("coordinator-skip-tls-verify") {
-		tlsConfig.SkipTLSVerify, _ = ctx.Command.Flags().GetBool("coordinator-skip-tls-verify")
-	}
-	if cert, _ := ctx.Command.Flags().GetString("coordinator-tls-cert"); cert != "" && ctx.Command.Flags().Changed("coordinator-tls-cert") {
-		tlsConfig.CertFile = cert
-	}
-	if key, _ := ctx.Command.Flags().GetString("coordinator-tls-key"); key != "" && ctx.Command.Flags().Changed("coordinator-tls-key") {
-		tlsConfig.KeyFile = key
-	}
-	if ca, _ := ctx.Command.Flags().GetString("coordinator-tls-ca"); ca != "" && ctx.Command.Flags().Changed("coordinator-tls-ca") {
-		tlsConfig.CAFile = ca
 	}
 
 	// Create and start the worker

@@ -193,8 +193,7 @@ func TestConfigLoader_CoordinatorSigningKey(t *testing.T) {
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
-coordinator:
-  signingKey: "yaml-signing-key-123"
+coordinatorSigningKey: "yaml-signing-key-123"
 auth:
   basic:
     username: "admin"
@@ -226,8 +225,7 @@ auth:
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
-coordinator:
-  signingKey: "yaml-signing-key"
+coordinatorSigningKey: "yaml-signing-key"
 `
 		err := os.WriteFile(configFile, []byte(configContent), 0600)
 		require.NoError(t, err)
@@ -282,8 +280,7 @@ auth:
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
-coordinator:
-  signingKey: "master-signing-key"
+coordinatorSigningKey: "master-signing-key"
 auth:
   basic:
     username: "testuser"
@@ -317,17 +314,15 @@ func TestConfigLoader_WorkerConfiguration(t *testing.T) {
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
-worker:
-  id: "yaml-worker-01"
-  maxConcurrentRuns: 50
-  coordinatorHost: "coordinator.example.com"
-  coordinatorPort: 8080
-  insecure: true
-  skipTLSVerify: true
-  tls:
-    certFile: "/path/to/worker/cert.pem"
-    keyFile: "/path/to/worker/key.pem"
-    caFile: "/path/to/worker/ca.pem"
+workerId: "yaml-worker-01"
+workerMaxConcurrentRuns: 50
+workerCoordinatorHost: "coordinator.example.com"
+workerCoordinatorPort: 8080
+workerInsecure: true
+workerSkipTlsVerify: true
+workerTlsCertFile: "/path/to/worker/cert.pem"
+workerTlsKeyFile: "/path/to/worker/key.pem"
+workerTlsCaFile: "/path/to/worker/ca.pem"
 `
 		err := os.WriteFile(configFile, []byte(configContent), 0600)
 		require.NoError(t, err)
@@ -359,12 +354,11 @@ worker:
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
-worker:
-  id: "yaml-worker"
-  maxConcurrentRuns: 10
-  coordinatorHost: "localhost"
-  coordinatorPort: 5000
-  insecure: false
+workerId: "yaml-worker"
+workerMaxConcurrentRuns: 10
+workerCoordinatorHost: "localhost"
+workerCoordinatorPort: 5000
+workerInsecure: false
 `
 		err := os.WriteFile(configFile, []byte(configContent), 0600)
 		require.NoError(t, err)
@@ -461,9 +455,8 @@ port: 8080
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
-worker:
-  coordinatorHost: "secure.example.com"
-  coordinatorPort: 443
+workerCoordinatorHost: "secure.example.com"
+workerCoordinatorPort: 443
 `
 		err := os.WriteFile(configFile, []byte(configContent), 0600)
 		require.NoError(t, err)
@@ -489,9 +482,7 @@ worker:
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
-worker:
-  tls:
-    caFile: "/path/to/ca.pem"
+workerTlsCaFile: "/path/to/ca.pem"
 `
 		err := os.WriteFile(configFile, []byte(configContent), 0600)
 		require.NoError(t, err)
