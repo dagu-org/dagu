@@ -11,6 +11,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/otel"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
 // ChildDAGExecutor is a helper for executing child DAGs.
@@ -26,6 +27,9 @@ type ChildDAGExecutor struct {
 
 	// isLocal indicates whether this is a local DAG.
 	isLocal bool
+
+	// workerSelector contains the worker selector requirements from the step
+	workerSelector map[string]string
 }
 
 // NewChildDAGExecutor creates a new ChildDAGExecutor.
@@ -134,6 +138,54 @@ func (e *ChildDAGExecutor) BuildCommand(
 	)
 
 	return cmd, nil
+}
+
+// SetWorkerSelector sets the worker selector requirements for the child DAG execution
+func (e *ChildDAGExecutor) SetWorkerSelector(selector map[string]string) {
+	e.workerSelector = selector
+}
+
+// ShouldUseDistributedExecution checks if this child DAG should be executed via coordinator
+func (e *ChildDAGExecutor) ShouldUseDistributedExecution() bool {
+	// Only use distributed execution if worker selector is specified
+	return len(e.workerSelector) > 0
+}
+
+// BuildCoordinatorTask creates a coordinator task for distributed execution
+func (e *ChildDAGExecutor) BuildCoordinatorTask(
+	ctx context.Context,
+	runParams RunParams,
+) (*coordinatorv1.Task, error) {
+	env := GetEnv(ctx)
+
+	if runParams.RunID == "" {
+		return nil, fmt.Errorf("dag-run ID is not set")
+	}
+
+	if env.RootDAGRun.Zero() {
+		return nil, fmt.Errorf("root dag-run ID is not set")
+	}
+
+	// Build task for coordinator dispatch
+	task := &coordinatorv1.Task{
+		Operation:        coordinatorv1.Operation_OPERATION_START,
+		RootDagRunName:   env.RootDAGRun.Name,
+		RootDagRunId:     env.RootDAGRun.ID,
+		ParentDagRunName: env.DAG.Name,
+		ParentDagRunId:   env.DAGRunID,
+		DagRunId:         runParams.RunID,
+		Target:           e.DAG.Location,
+		Params:           runParams.Params,
+		WorkerSelector:   e.workerSelector,
+	}
+
+	logger.Info(ctx, "Built coordinator task for child DAG",
+		"dagRunId", runParams.RunID,
+		"target", e.DAG.Name,
+		"workerSelector", e.workerSelector,
+	)
+
+	return task, nil
 }
 
 // Cleanup removes any temporary files created for local DAGs.

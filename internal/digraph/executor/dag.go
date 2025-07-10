@@ -24,6 +24,7 @@ type dagExecutor struct {
 	stderr    io.Writer
 	cmd       *exec.Cmd
 	runParams RunParams
+	step      digraph.Step
 }
 
 // Errors for DAG executor
@@ -43,6 +44,9 @@ func newDAGExecutor(
 		return nil, err
 	}
 
+	// Set the worker selector from the step
+	child.SetWorkerSelector(step.WorkerSelector)
+
 	dir := GetEnv(ctx).WorkingDir
 	if dir != "" && !fileutil.FileExists(dir) {
 		return nil, ErrWorkingDirNotExist
@@ -51,6 +55,7 @@ func newDAGExecutor(
 	return &dagExecutor{
 		child:   child,
 		workDir: dir,
+		step:    step,
 	}, nil
 }
 
@@ -61,6 +66,30 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 			logger.Error(ctx, "Failed to cleanup child DAG executor", "error", err)
 		}
 	}()
+
+	// Check if we should use distributed execution
+	if e.child.ShouldUseDistributedExecution() {
+		logger.Info(ctx, "Worker selector specified for child DAG execution",
+			"dag", e.child.DAG.Name,
+			"workerSelector", e.step.WorkerSelector,
+		)
+
+		// Build the coordinator task
+		task, err := e.child.BuildCoordinatorTask(ctx, e.runParams)
+		if err != nil {
+			return fmt.Errorf("failed to build coordinator task: %w", err)
+		}
+
+		// Log the task that would be dispatched
+		logger.Info(ctx, "Would dispatch task to coordinator",
+			"task", task,
+			"workerSelector", task.WorkerSelector,
+		)
+
+		// TODO: Implement actual coordinator client and dispatch
+		// For now, fall through to local execution
+		logger.Warn(ctx, "Distributed execution not yet implemented, executing locally")
+	}
 
 	e.lock.Lock()
 
