@@ -250,6 +250,11 @@
       "type": "integer",
       "description": "Maximum time in seconds to spend cleaning up (stopping steps, finalizing logs) before forcing shutdown. If exceeded, processes will be killed."
     },
+    "maxOutputSize": {
+      "type": "integer",
+      "default": 1048576,
+      "description": "Maximum size in bytes for the output of each step. If a step's output exceeds this limit, it will fail with an error. Defaults to 1MB (1048576 bytes). This limit also applies to pattern matching in preconditions and continueOn conditions."
+    },
     "precondition": {
       "oneOf": [
         {
