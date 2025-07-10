@@ -123,6 +123,7 @@ func build(ctx BuildContext, spec *definition) (*DAG, error) {
 		Tags:           parseTags(spec.Tags),
 		MaxActiveSteps: spec.MaxActiveSteps,
 		Queue:          spec.Queue,
+		MaxOutputSize:  spec.MaxOutputSize,
 	}
 
 	var errs ErrorList
@@ -861,10 +862,10 @@ func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
 			default:
 				return wrapError("retryPolicy.Backoff", v, fmt.Errorf("invalid type: %T", v))
 			}
-			
+
 			// Validate backoff value
 			if step.RetryPolicy.Backoff > 0 && step.RetryPolicy.Backoff <= 1.0 {
-				return wrapError("retryPolicy.Backoff", step.RetryPolicy.Backoff, 
+				return wrapError("retryPolicy.Backoff", step.RetryPolicy.Backoff,
 					fmt.Errorf("backoff must be greater than 1.0 for exponential growth"))
 			}
 		}
@@ -1008,10 +1009,10 @@ func buildRepeatPolicy(_ BuildContext, def stepDef, step *Step) error {
 		default:
 			return fmt.Errorf("invalid value for backoff: '%v'. It must be a boolean or number", v)
 		}
-		
+
 		// Validate backoff value
 		if step.RepeatPolicy.Backoff > 0 && step.RepeatPolicy.Backoff <= 1.0 {
-			return fmt.Errorf("backoff must be greater than 1.0 for exponential growth, got: %v", 
+			return fmt.Errorf("backoff must be greater than 1.0 for exponential growth, got: %v",
 				step.RepeatPolicy.Backoff)
 		}
 	}

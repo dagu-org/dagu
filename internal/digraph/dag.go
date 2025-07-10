@@ -347,6 +347,11 @@ func (d *DAG) initializeDefaults() {
 		d.MaxActiveRuns = 1
 	}
 
+	// Set default max output size to 1MB if not specified.
+	if d.MaxOutputSize == 0 {
+		d.MaxOutputSize = 1024 * 1024 // 1MB
+	}
+
 	// Ensure we have a valid working directory
 	var workDir = "."
 	if d.Location != "" {
