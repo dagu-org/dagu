@@ -182,3 +182,60 @@ func TestIsJSONArray(t *testing.T) {
 		})
 	}
 }
+
+func TestKebabToCamel(t *testing.T) {
+	t.Run("SimpleKebabCase", func(t *testing.T) {
+		result := stringutil.KebabToCamel("hello-world")
+		require.Equal(t, "helloWorld", result)
+	})
+
+	t.Run("MultipleWords", func(t *testing.T) {
+		result := stringutil.KebabToCamel("hello-world-foo-bar")
+		require.Equal(t, "helloWorldFooBar", result)
+	})
+
+	t.Run("SingleWord", func(t *testing.T) {
+		result := stringutil.KebabToCamel("hello")
+		require.Equal(t, "hello", result)
+	})
+
+	t.Run("EmptyString", func(t *testing.T) {
+		result := stringutil.KebabToCamel("")
+		require.Equal(t, "", result)
+	})
+
+	t.Run("LeadingHyphen", func(t *testing.T) {
+		result := stringutil.KebabToCamel("-hello-world")
+		require.Equal(t, "helloWorld", result)
+	})
+
+	t.Run("TrailingHyphen", func(t *testing.T) {
+		result := stringutil.KebabToCamel("hello-world-")
+		require.Equal(t, "helloWorld", result)
+	})
+
+	t.Run("MultipleConsecutiveHyphens", func(t *testing.T) {
+		result := stringutil.KebabToCamel("hello--world")
+		require.Equal(t, "helloWorld", result)
+	})
+
+	t.Run("AllUpperCase", func(t *testing.T) {
+		result := stringutil.KebabToCamel("HELLO-WORLD")
+		require.Equal(t, "HELLOWORLD", result)
+	})
+
+	t.Run("MixedCase", func(t *testing.T) {
+		result := stringutil.KebabToCamel("Hello-World")
+		require.Equal(t, "HelloWorld", result)
+	})
+
+	t.Run("NumbersInString", func(t *testing.T) {
+		result := stringutil.KebabToCamel("test-123-case")
+		require.Equal(t, "test123Case", result)
+	})
+
+	t.Run("SingleLetter", func(t *testing.T) {
+		result := stringutil.KebabToCamel("a-b-c")
+		require.Equal(t, "aBC", result)
+	})
+}
