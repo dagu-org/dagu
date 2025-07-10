@@ -3,6 +3,7 @@ package stringutil
 import (
 	"bufio"
 	"context"
+	"errors"
 	"regexp"
 	"strings"
 
@@ -29,12 +30,37 @@ func WithExactMatch() MatchOption {
 // For files or large content, use MatchPatternScanner instead.
 func MatchPattern(ctx context.Context, content string, patterns []string, opts ...MatchOption) bool {
 	scanner := bufio.NewScanner(strings.NewReader(content))
-	return MatchPatternScanner(ctx, scanner, patterns, opts...)
+	
+	// First try with default buffer
+	matched, err := matchPatternWithScanner(ctx, scanner, patterns, opts...)
+	if err == nil {
+		return matched
+	}
+	
+	// If we got a "token too long" error, retry with larger buffer
+	if errors.Is(err, bufio.ErrTooLong) {
+		logger.Debug(ctx, "token too long, retrying with larger buffer", "contentSize", len(content))
+		scanner = bufio.NewScanner(strings.NewReader(content))
+		// Use a buffer size that matches the output capture limit (1MB by default)
+		const maxTokenSize = 1024 * 1024 // 1MB
+		buf := make([]byte, 0, 64*1024)  // Start with 64KB buffer
+		scanner.Buffer(buf, maxTokenSize)
+		matched, _ = matchPatternWithScanner(ctx, scanner, patterns, opts...)
+		return matched
+	}
+	
+	return matched
 }
 
 func MatchPatternScanner(ctx context.Context, scanner *bufio.Scanner, patterns []string, opts ...MatchOption) bool {
+	matched, _ := matchPatternWithScanner(ctx, scanner, patterns, opts...)
+	return matched
+}
+
+// matchPatternWithScanner is the internal implementation that returns both result and error
+func matchPatternWithScanner(ctx context.Context, scanner *bufio.Scanner, patterns []string, opts ...MatchOption) (bool, error) {
 	if len(patterns) == 0 {
-		return false
+		return false, nil
 	}
 
 	// Apply options
@@ -56,13 +82,6 @@ func MatchPatternScanner(ctx context.Context, scanner *bufio.Scanner, patterns [
 				continue
 			}
 			regexps = append(regexps, re)
-		case strings.HasPrefix(pattern, rePrefix):
-			re, err := regexp.Compile(strings.TrimPrefix(pattern, rePrefix))
-			if err != nil {
-				logger.Error(ctx, "invalid regexp pattern", "pattern", pattern, "err", err)
-				continue
-			}
-			regexps = append(regexps, re)
 		default:
 			literalPatterns = append(literalPatterns, pattern)
 		}
@@ -70,39 +89,47 @@ func MatchPatternScanner(ctx context.Context, scanner *bufio.Scanner, patterns [
 
 	// Special case: if scanner is empty and we're looking for empty string
 	if !scanner.Scan() {
+		// Check if scan failed due to an error
+		if err := scanner.Err(); err != nil {
+			return false, err
+		}
+		
 		// Check for empty string patterns
 		for _, p := range literalPatterns {
 			if p == "" {
-				return true
+				return true, nil
 			}
 		}
 		// Check regex patterns against empty string
 		for _, re := range regexps {
 			if re.MatchString("") {
-				return true
+				return true, nil
 			}
 		}
-		return false
+		return false, nil
 	}
 
 	// Process first line (already read by scanner.Scan() above)
 	line := scanner.Text()
 	if matchLine(line, literalPatterns, regexps, options) {
-		return true
+		return true, nil
 	}
 
 	// Process remaining lines
 	for scanner.Scan() {
 		if matchLine(scanner.Text(), literalPatterns, regexps, options) {
-			return true
+			return true, nil
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		logger.Error(ctx, "scanner error", "err", err)
+		if !errors.Is(err, bufio.ErrTooLong) {
+			logger.Error(ctx, "scanner error", "err", err)
+		}
+		return false, err
 	}
 
-	return false
+	return false, nil
 }
 
 // matchLine checks if a single line matches any of the patterns
