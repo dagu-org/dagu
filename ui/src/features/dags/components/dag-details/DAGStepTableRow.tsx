@@ -8,6 +8,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { CommandDisplay } from '@/components/ui/command-display';
 import {
   ArrowRight,
   FileText,
@@ -15,7 +16,6 @@ import {
   GitBranch,
   Mail,
   RefreshCw,
-  Terminal,
 } from 'lucide-react';
 import { components } from '../../../../api/v2/schema';
 import { Badge } from '../../../../components/ui/badge';
@@ -88,29 +88,12 @@ function DAGStepTableRow({ step, index }: Props) {
         <div className="space-y-1.5">
           {/* Command & Args */}
           {(step.command || step.cmdWithArgs) && (
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5 text-xs">
-                <Terminal className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400" />
-                <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-2 py-0.5 font-medium text-xs text-slate-700 dark:text-slate-300">
-                  {step.command || step.cmdWithArgs?.split(' ')[0]}
-                </span>
-              </div>
-
-              {step.args && step.args.length > 0 && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="pl-5 text-xs text-slate-500 dark:text-slate-400 font-mono truncate cursor-pointer leading-tight">
-                      {step.args.join(' ')}
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <span className="max-w-[400px] break-all font-mono text-xs">
-                      {step.args.join(' ')}
-                    </span>
-                  </TooltipContent>
-                </Tooltip>
-              )}
-            </div>
+            <CommandDisplay
+              command={step.command || step.cmdWithArgs || ''}
+              args={step.command ? step.args : undefined}
+              icon="terminal"
+              maxLength={50}
+            />
           )}
 
           {/* Script */}
