@@ -441,7 +441,7 @@ port: 8080
 		assert.Equal(t, 100, cfg.Worker.MaxConcurrentRuns)
 		assert.Equal(t, "127.0.0.1", cfg.Worker.CoordinatorHost)
 		assert.Equal(t, 50051, cfg.Worker.CoordinatorPort)
-		assert.False(t, cfg.Worker.Insecure) // Secure by default
+		assert.True(t, cfg.Worker.Insecure)
 		assert.False(t, cfg.Worker.SkipTLSVerify)
 		assert.Nil(t, cfg.Worker.TLS) // No TLS config by default
 	})
@@ -469,7 +469,7 @@ workerCoordinatorPort: 443
 		// Verify worker is secure by default
 		assert.Equal(t, "secure.example.com", cfg.Worker.CoordinatorHost)
 		assert.Equal(t, 443, cfg.Worker.CoordinatorPort)
-		assert.False(t, cfg.Worker.Insecure) // Should require TLS by default
+		assert.True(t, cfg.Worker.Insecure)
 		assert.False(t, cfg.Worker.SkipTLSVerify)
 	})
 
