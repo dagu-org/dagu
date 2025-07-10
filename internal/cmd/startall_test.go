@@ -17,8 +17,12 @@ func TestStartAllCommand(t *testing.T) {
 			th.Cancel()
 		}()
 		th.RunCommand(t, cmd.CmdStartAll(), test.CmdTest{
-			Args:        []string{"start-all", fmt.Sprintf("--port=%s", findPort(t))},
-			ExpectedOut: []string{"Server is starting"},
+			Args: []string{
+				"start-all",
+				fmt.Sprintf("--port=%s", findPort(t)),
+				fmt.Sprintf("--coordinator-port=%s", findPort(t)),
+			},
+			ExpectedOut: []string{"Server initialization", "Scheduler initialization", "Coordinator initialization"},
 		})
 
 	})
@@ -29,8 +33,12 @@ func TestStartAllCommand(t *testing.T) {
 			th.Cancel()
 		}()
 		th.RunCommand(t, cmd.CmdStartAll(), test.CmdTest{
-			Args:        []string{"start-all", "--config", test.TestdataPath(t, "cmd/config_startall.yaml")},
-			ExpectedOut: []string{"54322", "dagu_test"},
+			Args: []string{
+				"start-all",
+				"--config", test.TestdataPath(t, "cmd/config_startall.yaml"),
+				fmt.Sprintf("--coordinator-port=%s", findPort(t)),
+			},
+			ExpectedOut: []string{"54322", "dagu_test", "Coordinator initialization"},
 		})
 	})
 }
