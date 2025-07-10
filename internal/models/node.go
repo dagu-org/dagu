@@ -1,7 +1,7 @@
 package models
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
@@ -48,7 +48,7 @@ func (n *Node) ToNode() *scheduler.Node {
 	}
 	var err error
 	if n.Error != "" {
-		err = fmt.Errorf(n.Error)
+		err = errors.New(n.Error)
 	}
 	return scheduler.NewNode(n.Step, scheduler.NodeState{
 		Status:           n.Status,
