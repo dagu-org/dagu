@@ -262,4 +262,3 @@ type queueConfigDef struct {
 	Name          string `mapstructure:"name"`
 	MaxActiveRuns int    `mapstructure:"maxActiveRuns"`
 }
-

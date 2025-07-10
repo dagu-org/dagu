@@ -26,7 +26,7 @@ Flags:
   --worker-max-concurrent-runs int         Maximum concurrent task executions (default: 100)
   --worker-coordinator-host string         Coordinator gRPC server host (default: 127.0.0.1)
   --worker-coordinator-port int            Coordinator gRPC server port (default: 50051)
-  --worker-insecure                        Use insecure connection (h2c) instead of TLS
+  --worker-insecure                        Use insecure connection (h2c) instead of TLS (default: true)
   --worker-tls-cert string                 Path to TLS certificate file for mutual TLS
   --worker-tls-key string                  Path to TLS key file for mutual TLS
   --worker-tls-ca string                   Path to CA certificate file for server verification
@@ -38,12 +38,11 @@ Example:
   dagu worker --worker-coordinator-host=coordinator.example.com --worker-coordinator-port=50051
   dagu worker --worker-id=worker-1 --worker-max-concurrent-runs=200
   
-  # For HTTPS/TLS connections:
-  dagu worker --worker-coordinator-host=coordinator.example.com
-  dagu worker --worker-tls-cert=client.crt --worker-tls-key=client.key
-  dagu worker --worker-tls-ca=ca.crt
-  dagu worker --worker-skip-tls-verify  # For self-signed certificates
-  dagu worker --worker-insecure         # For h2c (HTTP/2 without TLS)
+  # For TLS connections (when coordinator has TLS enabled):
+  dagu worker --worker-insecure=false --worker-coordinator-host=coordinator.example.com
+  dagu worker --worker-insecure=false --worker-tls-cert=client.crt --worker-tls-key=client.key
+  dagu worker --worker-insecure=false --worker-tls-ca=ca.crt
+  dagu worker --worker-insecure=false --worker-skip-tls-verify  # For self-signed certificates
 
 This process runs continuously in the foreground until terminated.
 `,

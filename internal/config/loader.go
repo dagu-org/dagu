@@ -450,7 +450,7 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	viper.SetDefault("workerMaxConcurrentRuns", 100)
 	viper.SetDefault("workerCoordinatorHost", "127.0.0.1")
 	viper.SetDefault("workerCoordinatorPort", 50051)
-	viper.SetDefault("workerInsecure", false) // Secure by default - TLS required
+	viper.SetDefault("workerInsecure", true) // Insecure by default to match coordinator
 	viper.SetDefault("workerSkipTlsVerify", false)
 	viper.SetDefault("workerTlsCertFile", "")
 	viper.SetDefault("workerTlsKeyFile", "")
