@@ -1,0 +1,9 @@
+name: test-max-output-size
+description: Test DAG with custom maxOutputSize
+
+# Custom maxOutputSize of 512KB
+maxOutputSize: 524288
+
+steps:
+  - name: step1
+    command: echo "test output"
