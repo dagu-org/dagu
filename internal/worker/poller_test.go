@@ -43,7 +43,7 @@ func TestPollerStateTracking(t *testing.T) {
 		mockClient := &MockCoordinatorClient{}
 		mockExecutor := &MockTaskExecutor{}
 
-		poller := worker.NewPoller("test-worker", "localhost:8080", mockClient, mockExecutor, 0)
+		poller := worker.NewPoller("test-worker", "localhost:8080", mockClient, mockExecutor, 0, nil)
 
 		// Check initial state
 		isConnected, consecutiveFails, lastError := poller.GetState()
@@ -72,7 +72,7 @@ func TestPollerStateTracking(t *testing.T) {
 		}
 
 		mockExecutor := &MockTaskExecutor{}
-		poller := worker.NewPoller("test-worker", "localhost:8080", mockClient, mockExecutor, 0)
+		poller := worker.NewPoller("test-worker", "localhost:8080", mockClient, mockExecutor, 0, nil)
 
 		// Run poller in background
 		go poller.Run(ctx)
@@ -118,7 +118,7 @@ func TestPollerStateTracking(t *testing.T) {
 		}
 
 		mockExecutor := &MockTaskExecutor{}
-		poller := worker.NewPoller("test-worker", "localhost:8080", mockClient, mockExecutor, 0)
+		poller := worker.NewPoller("test-worker", "localhost:8080", mockClient, mockExecutor, 0, nil)
 
 		// Run poller in background
 		go poller.Run(ctx)
@@ -161,7 +161,7 @@ func TestPollerTaskExecution(t *testing.T) {
 			ExecutionTime: 50 * time.Millisecond,
 		}
 
-		poller := worker.NewPoller("test-worker", "localhost:8080", mockClient, mockExecutor, 0)
+		poller := worker.NewPoller("test-worker", "localhost:8080", mockClient, mockExecutor, 0, nil)
 
 		// Run poller
 		go poller.Run(ctx)
@@ -209,7 +209,7 @@ func TestPollerTaskExecution(t *testing.T) {
 			},
 		}
 
-		poller := worker.NewPoller("test-worker", "localhost:8080", mockClient, mockExecutor, 0)
+		poller := worker.NewPoller("test-worker", "localhost:8080", mockClient, mockExecutor, 0, nil)
 
 		// Run poller
 		go poller.Run(ctx)
@@ -232,7 +232,7 @@ func TestPollerConcurrency(t *testing.T) {
 		mockClient := &MockCoordinatorClient{}
 		mockExecutor := &MockTaskExecutor{}
 
-		poller := worker.NewPoller("test-worker", "localhost:8080", mockClient, mockExecutor, 0)
+		poller := worker.NewPoller("test-worker", "localhost:8080", mockClient, mockExecutor, 0, nil)
 
 		// Run multiple goroutines accessing state concurrently
 		var wg sync.WaitGroup
@@ -274,7 +274,7 @@ func TestPollerContextCancellation(t *testing.T) {
 		}
 
 		mockExecutor := &MockTaskExecutor{}
-		poller := worker.NewPoller("test-worker", "localhost:8080", mockClient, mockExecutor, 0)
+		poller := worker.NewPoller("test-worker", "localhost:8080", mockClient, mockExecutor, 0, nil)
 
 		// Run poller
 		done := make(chan struct{})

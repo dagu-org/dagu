@@ -9,16 +9,21 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+type workerInfo struct {
+	taskChan chan *coordinatorv1.Task
+	labels   map[string]string
+}
+
 type Handler struct {
 	coordinatorv1.UnimplementedCoordinatorServiceServer
 
 	mu             sync.Mutex
-	waitingPollers map[string]chan *coordinatorv1.Task // pollerID -> channel
+	waitingPollers map[string]*workerInfo // pollerID -> worker info
 }
 
 func NewHandler() *Handler {
 	return &Handler{
-		waitingPollers: make(map[string]chan *coordinatorv1.Task),
+		waitingPollers: make(map[string]*workerInfo),
 	}
 }
 
@@ -31,7 +36,10 @@ func (h *Handler) Poll(ctx context.Context, req *coordinatorv1.PollRequest) (*co
 	// Register this poller to wait for a task
 	h.mu.Lock()
 	taskChan := make(chan *coordinatorv1.Task, 1)
-	h.waitingPollers[req.PollerId] = taskChan
+	h.waitingPollers[req.PollerId] = &workerInfo{
+		taskChan: taskChan,
+		labels:   req.Labels,
+	}
 	h.mu.Unlock()
 
 	// Wait for a task or context cancellation
@@ -53,7 +61,7 @@ func (h *Handler) Poll(ctx context.Context, req *coordinatorv1.PollRequest) (*co
 }
 
 // Dispatch tries to send a task to a waiting poller
-// It fails if no pollers are available
+// It fails if no pollers are available or no workers match the selector
 func (h *Handler) Dispatch(_ context.Context, req *coordinatorv1.DispatchRequest) (*coordinatorv1.DispatchResponse, error) {
 	if req.Task == nil {
 		return nil, status.Error(codes.InvalidArgument, "task is required")
@@ -62,10 +70,15 @@ func (h *Handler) Dispatch(_ context.Context, req *coordinatorv1.DispatchRequest
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	// Try to find a waiting poller
-	for pollerID, taskChan := range h.waitingPollers {
+	// Try to find a waiting poller that matches the worker selector
+	for pollerID, worker := range h.waitingPollers {
+		// Check if worker matches the selector
+		if !matchesSelector(worker.labels, req.Task.WorkerSelector) {
+			continue
+		}
+
 		select {
-		case taskChan <- req.Task:
+		case worker.taskChan <- req.Task:
 			// Successfully dispatched to a waiting poller
 			delete(h.waitingPollers, pollerID)
 			return &coordinatorv1.DispatchResponse{}, nil
@@ -75,6 +88,25 @@ func (h *Handler) Dispatch(_ context.Context, req *coordinatorv1.DispatchRequest
 		}
 	}
 
-	// No available pollers - dispatch fails
+	// No available matching pollers - dispatch fails
+	if len(req.Task.WorkerSelector) > 0 {
+		return nil, status.Error(codes.FailedPrecondition, "no workers match the required selector")
+	}
 	return nil, status.Error(codes.FailedPrecondition, "no available workers")
+}
+
+// matchesSelector checks if worker labels match all required selector labels
+func matchesSelector(workerLabels, selector map[string]string) bool {
+	// Empty selector matches any worker
+	if len(selector) == 0 {
+		return true
+	}
+
+	// Check all selector requirements are met
+	for key, value := range selector {
+		if workerLabels[key] != value {
+			return false
+		}
+	}
+	return true
 }

@@ -27,10 +27,11 @@ type Poller struct {
 	taskExecutor    TaskExecutor
 	index           int
 	state           *pollState
+	labels          map[string]string
 }
 
 // NewPoller creates a new poller instance
-func NewPoller(workerID string, coordinatorAddr string, client coordinatorv1.CoordinatorServiceClient, taskExecutor TaskExecutor, index int) *Poller {
+func NewPoller(workerID string, coordinatorAddr string, client coordinatorv1.CoordinatorServiceClient, taskExecutor TaskExecutor, index int, labels map[string]string) *Poller {
 	return &Poller{
 		workerID:        workerID,
 		coordinatorAddr: coordinatorAddr,
@@ -40,6 +41,7 @@ func NewPoller(workerID string, coordinatorAddr string, client coordinatorv1.Coo
 		state: &pollState{
 			isConnected: true, // Assume connected initially
 		},
+		labels: labels,
 	}
 }
 
@@ -112,6 +114,7 @@ func (p *Poller) pollForTask(ctx context.Context, policy backoff.RetryPolicy) (*
 		req := &coordinatorv1.PollRequest{
 			WorkerId: p.workerID,
 			PollerId: pollerID,
+			Labels:   p.labels,
 		}
 
 		// Perform the poll (this is a long-polling call)

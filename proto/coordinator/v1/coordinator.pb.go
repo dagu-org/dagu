@@ -74,7 +74,8 @@ func (Operation) EnumDescriptor() ([]byte, []int) {
 type PollRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
-	PollerId      string                 `protobuf:"bytes,2,opt,name=poller_id,json=pollerId,proto3" json:"poller_id,omitempty"` // Unique ID for this poll request
+	PollerId      string                 `protobuf:"bytes,2,opt,name=poller_id,json=pollerId,proto3" json:"poller_id,omitempty"`                                                       // Unique ID for this poll request
+	Labels        map[string]string      `protobuf:"bytes,3,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Worker labels for task matching
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -121,6 +122,13 @@ func (x *PollRequest) GetPollerId() string {
 		return x.PollerId
 	}
 	return ""
+}
+
+func (x *PollRequest) GetLabels() map[string]string {
+	if x != nil {
+		return x.Labels
+	}
+	return nil
 }
 
 // Response message for polling a task.
@@ -259,9 +267,10 @@ type Task struct {
 	ParentDagRunName string                 `protobuf:"bytes,3,opt,name=parent_dag_run_name,json=parentDagRunName,proto3" json:"parent_dag_run_name,omitempty"`
 	ParentDagRunId   string                 `protobuf:"bytes,4,opt,name=parent_dag_run_id,json=parentDagRunId,proto3" json:"parent_dag_run_id,omitempty"`
 	DagRunId         string                 `protobuf:"bytes,5,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"`
-	Target           string                 `protobuf:"bytes,7,opt,name=target,proto3" json:"target,omitempty"` // DAG name or path
-	Params           string                 `protobuf:"bytes,8,opt,name=params,proto3" json:"params,omitempty"` // Optional: parameters
-	Step             string                 `protobuf:"bytes,9,opt,name=step,proto3" json:"step,omitempty"`     // Optional: specific step (for RETRY)
+	Target           string                 `protobuf:"bytes,7,opt,name=target,proto3" json:"target,omitempty"`                                                                                                                  // DAG name or path
+	Params           string                 `protobuf:"bytes,8,opt,name=params,proto3" json:"params,omitempty"`                                                                                                                  // Optional: parameters
+	Step             string                 `protobuf:"bytes,9,opt,name=step,proto3" json:"step,omitempty"`                                                                                                                      // Optional: specific step (for RETRY)
+	WorkerSelector   map[string]string      `protobuf:"bytes,10,rep,name=worker_selector,json=workerSelector,proto3" json:"worker_selector,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Required worker labels for execution
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -359,19 +368,30 @@ func (x *Task) GetStep() string {
 	return ""
 }
 
+func (x *Task) GetWorkerSelector() map[string]string {
+	if x != nil {
+		return x.WorkerSelector
+	}
+	return nil
+}
+
 var File_proto_coordinator_v1_coordinator_proto protoreflect.FileDescriptor
 
 const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\n" +
-	"&proto/coordinator/v1/coordinator.proto\x12\x0ecoordinator.v1\"G\n" +
+	"&proto/coordinator/v1/coordinator.proto\x12\x0ecoordinator.v1\"\xc3\x01\n" +
 	"\vPollRequest\x12\x1b\n" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12\x1b\n" +
-	"\tpoller_id\x18\x02 \x01(\tR\bpollerId\"8\n" +
+	"\tpoller_id\x18\x02 \x01(\tR\bpollerId\x12?\n" +
+	"\x06labels\x18\x03 \x03(\v2'.coordinator.v1.PollRequest.LabelsEntryR\x06labels\x1a9\n" +
+	"\vLabelsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"8\n" +
 	"\fPollResponse\x12(\n" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\";\n" +
 	"\x0fDispatchRequest\x12(\n" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\"\x12\n" +
-	"\x10DispatchResponse\"\xcd\x02\n" +
+	"\x10DispatchResponse\"\xe3\x03\n" +
 	"\x04Task\x127\n" +
 	"\toperation\x18\x06 \x01(\x0e2\x19.coordinator.v1.OperationR\toperation\x12)\n" +
 	"\x11root_dag_run_name\x18\x01 \x01(\tR\x0erootDagRunName\x12%\n" +
@@ -382,7 +402,12 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"dag_run_id\x18\x05 \x01(\tR\bdagRunId\x12\x16\n" +
 	"\x06target\x18\a \x01(\tR\x06target\x12\x16\n" +
 	"\x06params\x18\b \x01(\tR\x06params\x12\x12\n" +
-	"\x04step\x18\t \x01(\tR\x04step*P\n" +
+	"\x04step\x18\t \x01(\tR\x04step\x12Q\n" +
+	"\x0fworker_selector\x18\n" +
+	" \x03(\v2(.coordinator.v1.Task.WorkerSelectorEntryR\x0eworkerSelector\x1aA\n" +
+	"\x13WorkerSelectorEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01*P\n" +
 	"\tOperation\x12\x19\n" +
 	"\x15OPERATION_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fOPERATION_START\x10\x01\x12\x13\n" +
@@ -404,7 +429,7 @@ func file_proto_coordinator_v1_coordinator_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_coordinator_v1_coordinator_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_coordinator_v1_coordinator_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_proto_coordinator_v1_coordinator_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_proto_coordinator_v1_coordinator_proto_goTypes = []any{
 	(Operation)(0),           // 0: coordinator.v1.Operation
 	(*PollRequest)(nil),      // 1: coordinator.v1.PollRequest
@@ -412,20 +437,24 @@ var file_proto_coordinator_v1_coordinator_proto_goTypes = []any{
 	(*DispatchRequest)(nil),  // 3: coordinator.v1.DispatchRequest
 	(*DispatchResponse)(nil), // 4: coordinator.v1.DispatchResponse
 	(*Task)(nil),             // 5: coordinator.v1.Task
+	nil,                      // 6: coordinator.v1.PollRequest.LabelsEntry
+	nil,                      // 7: coordinator.v1.Task.WorkerSelectorEntry
 }
 var file_proto_coordinator_v1_coordinator_proto_depIdxs = []int32{
-	5, // 0: coordinator.v1.PollResponse.task:type_name -> coordinator.v1.Task
-	5, // 1: coordinator.v1.DispatchRequest.task:type_name -> coordinator.v1.Task
-	0, // 2: coordinator.v1.Task.operation:type_name -> coordinator.v1.Operation
-	1, // 3: coordinator.v1.CoordinatorService.Poll:input_type -> coordinator.v1.PollRequest
-	3, // 4: coordinator.v1.CoordinatorService.Dispatch:input_type -> coordinator.v1.DispatchRequest
-	2, // 5: coordinator.v1.CoordinatorService.Poll:output_type -> coordinator.v1.PollResponse
-	4, // 6: coordinator.v1.CoordinatorService.Dispatch:output_type -> coordinator.v1.DispatchResponse
-	5, // [5:7] is the sub-list for method output_type
-	3, // [3:5] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	6, // 0: coordinator.v1.PollRequest.labels:type_name -> coordinator.v1.PollRequest.LabelsEntry
+	5, // 1: coordinator.v1.PollResponse.task:type_name -> coordinator.v1.Task
+	5, // 2: coordinator.v1.DispatchRequest.task:type_name -> coordinator.v1.Task
+	0, // 3: coordinator.v1.Task.operation:type_name -> coordinator.v1.Operation
+	7, // 4: coordinator.v1.Task.worker_selector:type_name -> coordinator.v1.Task.WorkerSelectorEntry
+	1, // 5: coordinator.v1.CoordinatorService.Poll:input_type -> coordinator.v1.PollRequest
+	3, // 6: coordinator.v1.CoordinatorService.Dispatch:input_type -> coordinator.v1.DispatchRequest
+	2, // 7: coordinator.v1.CoordinatorService.Poll:output_type -> coordinator.v1.PollResponse
+	4, // 8: coordinator.v1.CoordinatorService.Dispatch:output_type -> coordinator.v1.DispatchResponse
+	7, // [7:9] is the sub-list for method output_type
+	5, // [5:7] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_proto_coordinator_v1_coordinator_proto_init() }
@@ -439,7 +468,7 @@ func file_proto_coordinator_v1_coordinator_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_coordinator_v1_coordinator_proto_rawDesc), len(file_proto_coordinator_v1_coordinator_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   5,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

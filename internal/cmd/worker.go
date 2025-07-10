@@ -82,7 +82,9 @@ func runWorker(ctx *Context, _ []string) error {
 	}
 
 	// Create and start the worker
-	w := worker.NewWorker(workerID, maxConcurrentRuns, coordinatorHost, coordinatorPort, tlsConfig, ctx.DAGRunMgr)
+	// TODO: Add support for configuring worker labels
+	labels := make(map[string]string)
+	w := worker.NewWorker(workerID, maxConcurrentRuns, coordinatorHost, coordinatorPort, tlsConfig, ctx.DAGRunMgr, labels)
 
 	logger.Info(ctx, "Starting worker",
 		"worker_id", workerID,

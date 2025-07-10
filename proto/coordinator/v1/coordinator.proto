@@ -18,6 +18,7 @@ service CoordinatorService {
 message PollRequest {
   string worker_id = 1;
   string poller_id = 2; // Unique ID for this poll request
+  map<string, string> labels = 3; // Worker labels for task matching
 }
 
 // Response message for polling a task.
@@ -46,6 +47,7 @@ message Task {
   string target = 7; // DAG name or path
   string params = 8; // Optional: parameters
   string step = 9;   // Optional: specific step (for RETRY)
+  map<string, string> worker_selector = 10; // Required worker labels for execution
 }
 
 enum Operation {

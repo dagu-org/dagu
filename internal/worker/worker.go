@@ -70,6 +70,7 @@ type Worker struct {
 	healthClient      grpc_health_v1.HealthClient
 	conn              *grpc.ClientConn
 	taskExecutor      TaskExecutor
+	labels            map[string]string
 }
 
 // SetTaskExecutor sets a custom task executor for testing or custom execution logic
@@ -78,7 +79,7 @@ func (w *Worker) SetTaskExecutor(executor TaskExecutor) {
 }
 
 // NewWorker creates a new worker instance.
-func NewWorker(workerID string, maxConcurrentRuns int, coordinatorHost string, coordinatorPort int, tlsConfig *TLSConfig, dagRunMgr dagrun.Manager) *Worker {
+func NewWorker(workerID string, maxConcurrentRuns int, coordinatorHost string, coordinatorPort int, tlsConfig *TLSConfig, dagRunMgr dagrun.Manager, labels map[string]string) *Worker {
 	// Generate default worker ID if not provided
 	if workerID == "" {
 		hostname, err := os.Hostname()
@@ -96,6 +97,7 @@ func NewWorker(workerID string, maxConcurrentRuns int, coordinatorHost string, c
 		coordinatorAddr:   coordinatorAddr,
 		tlsConfig:         tlsConfig,
 		taskExecutor:      &dagRunTaskExecutor{manager: dagRunMgr},
+		labels:            labels,
 	}
 }
 
@@ -137,7 +139,7 @@ func (w *Worker) Start(ctx context.Context) error {
 		wg.Add(1)
 		go func(pollerIndex int) {
 			defer wg.Done()
-			poller := NewPoller(w.id, w.coordinatorAddr, w.client, w.taskExecutor, pollerIndex)
+			poller := NewPoller(w.id, w.coordinatorAddr, w.client, w.taskExecutor, pollerIndex, w.labels)
 			poller.Run(ctx)
 		}(i)
 	}
