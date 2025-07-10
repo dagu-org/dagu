@@ -32,6 +32,10 @@ type ChildDAGExecutor struct {
 	workerSelector map[string]string
 }
 
+func (c *ChildDAGExecutor) Local() bool {
+	return c.isLocal
+}
+
 // NewChildDAGExecutor creates a new ChildDAGExecutor.
 // It handles the logic for finding the DAG - either from the database
 // or from local DAGs defined in the parent.

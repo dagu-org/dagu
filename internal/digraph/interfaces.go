@@ -22,4 +22,7 @@ type Status struct {
 	Params string `json:"params,omitempty"`
 	// Outputs is the outputs of the dag-run.
 	Outputs map[string]string `json:"outputs,omitempty"`
+	// Success indicates if the dag-run completed successfully.
+	// True means the DAG finished with success status, false means it failed, was canceled, or had partial success.
+	Success bool `json:"success"`
 }

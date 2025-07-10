@@ -907,10 +907,15 @@ func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, ro
 		}
 	}
 
+	// Check if the execution was successful
+	// scheduler.StatusSuccess is the only status considered as success
+	isSuccess := status.Status == scheduler.StatusSuccess
+
 	return &digraph.Status{
 		Outputs:  outputVariables,
 		Name:     status.Name,
 		DAGRunID: status.DAGRunID,
 		Params:   status.Params,
+		Success:  isSuccess,
 	}, nil
 }
