@@ -100,6 +100,11 @@ steps:
         expected: "re:[1-5]"  # Monday-Friday
 ```
 
+**Note**: When using regex patterns with command outputs, be aware that:
+- Lines over 64KB are automatically handled with larger buffers  
+- If the total output exceeds `maxOutputSize` (default 1MB), the step will fail with an error and the output variable won't be set
+- For `continueOn.output` patterns in log files, lines up to `maxOutputSize` can be matched
+
 ### Multiple Conditions
 
 All conditions must pass:

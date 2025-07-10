@@ -3,6 +3,7 @@ package fileutil
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -220,6 +221,11 @@ func readFirstLines(filePath string, n int, totalLines int) (*LogResult, error) 
 	}
 
 	if err := scanner.Err(); err != nil {
+		if errors.Is(err, bufio.ErrTooLong) {
+			return &LogResult{
+				Lines: []string{"Error: Line too long to read."},
+			}, nil
+		}
 		return nil, err
 	}
 
@@ -271,6 +277,11 @@ func readLastLines(filePath string, n int, totalLines int) (*LogResult, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
+		if errors.Is(err, bufio.ErrTooLong) {
+			return &LogResult{
+				Lines: []string{"Error: Line too long to read."},
+			}, nil
+		}
 		return nil, err
 	}
 

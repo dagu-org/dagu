@@ -173,8 +173,8 @@ func StatusFromJSON(s string) (*DAGRunStatus, error) {
 
 // DAGRunStatus represents the complete execution state of a dag-run.
 type DAGRunStatus struct {
-	Root          digraph.DAGRunRef    `json:"root,omitempty"`
-	Parent        digraph.DAGRunRef    `json:"parent,omitempty"`
+	Root          digraph.DAGRunRef    `json:"root,omitzero"`
+	Parent        digraph.DAGRunRef    `json:"parent,omitzero"`
 	Name          string               `json:"name"`
 	DAGRunID      string               `json:"dagRunId"`
 	AttemptID     string               `json:"attemptId"`

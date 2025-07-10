@@ -120,3 +120,63 @@ func TestMatchPattern(t *testing.T) {
 		})
 	}
 }
+
+func TestMatchPattern_LongLines(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name     string
+		size     int
+		pattern  string
+		expected bool
+	}{
+		{
+			name:     "under default buffer limit",
+			size:     50_000,
+			pattern:  "re:.+",
+			expected: true,
+		},
+		{
+			name:     "over default buffer limit (user's case)",
+			size:     78_000,
+			pattern:  "re:.+",
+			expected: true,
+		},
+		{
+			name:     "empty string doesn't match .+ regex",
+			size:     0,
+			pattern:  "re:.+",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			content := strings.Repeat("x", tt.size)
+			result := stringutil.MatchPattern(ctx, content, []string{tt.pattern})
+
+			if result != tt.expected {
+				t.Errorf("MatchPattern() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestMatchPattern_WithMaxBufferSize(t *testing.T) {
+	ctx := context.Background()
+
+	// Test with 2MB line and custom buffer size
+	content := strings.Repeat("x", 2_000_000) // 2MB
+
+	// Should fail with default 1MB buffer
+	result := stringutil.MatchPattern(ctx, content, []string{"re:.+"})
+	if result {
+		t.Error("Expected match to fail with default 1MB buffer")
+	}
+
+	// Should succeed with 3MB buffer
+	result = stringutil.MatchPattern(ctx, content, []string{"re:.+"}, stringutil.WithMaxBufferSize(3*1024*1024))
+	if !result {
+		t.Error("Expected match to succeed with 3MB buffer")
+	}
+}

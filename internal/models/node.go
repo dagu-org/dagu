@@ -1,7 +1,7 @@
 package models
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
@@ -11,7 +11,7 @@ import (
 
 // Node represents a DAG step with its execution state for persistence
 type Node struct {
-	Step             digraph.Step         `json:"step"`
+	Step             digraph.Step         `json:"step,omitzero"`
 	Stdout           string               `json:"stdout"` // standard output log file path
 	Stderr           string               `json:"stderr"` // standard error log file path
 	StartedAt        string               `json:"startedAt"`
@@ -48,7 +48,7 @@ func (n *Node) ToNode() *scheduler.Node {
 	}
 	var err error
 	if n.Error != "" {
-		err = fmt.Errorf(n.Error)
+		err = errors.New(n.Error)
 	}
 	return scheduler.NewNode(n.Step, scheduler.NodeState{
 		Status:           n.Status,

@@ -24,7 +24,7 @@ type Step struct {
 	// Dir is the working directory for the step.
 	Dir string `json:"dir,omitempty"`
 	// ExecutorConfig contains the configuration for the executor.
-	ExecutorConfig ExecutorConfig `json:"executorConfig,omitempty"`
+	ExecutorConfig ExecutorConfig `json:"executorConfig,omitzero"`
 	// CmdWithArgs is the command with arguments (only display purpose).
 	CmdWithArgs string `json:"cmdWithArgs,omitempty"`
 	// CmdArgsSys is the command with arguments for the system.
@@ -48,11 +48,11 @@ type Step struct {
 	// ExplicitlyNoDeps indicates the depends field was explicitly set to empty
 	ExplicitlyNoDeps bool `json:"-"`
 	// ContinueOn contains the conditions to continue on failure or skipped.
-	ContinueOn ContinueOn `json:"continueOn,omitempty"`
+	ContinueOn ContinueOn `json:"continueOn,omitzero"`
 	// RetryPolicy contains the retry policy for the step.
-	RetryPolicy RetryPolicy `json:"retryPolicy,omitempty"`
+	RetryPolicy RetryPolicy `json:"retryPolicy,omitzero"`
 	// RepeatPolicy contains the repeat policy for the step.
-	RepeatPolicy RepeatPolicy `json:"repeatPolicy,omitempty"`
+	RepeatPolicy RepeatPolicy `json:"repeatPolicy,omitzero"`
 	// MailOnError is the flag to send mail on error.
 	MailOnError bool `json:"mailOnError,omitempty"`
 	// Preconditions contains the conditions to be met before running the step.

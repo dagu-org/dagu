@@ -123,6 +123,7 @@ func build(ctx BuildContext, spec *definition) (*DAG, error) {
 		Tags:           parseTags(spec.Tags),
 		MaxActiveSteps: spec.MaxActiveSteps,
 		Queue:          spec.Queue,
+		MaxOutputSize:  spec.MaxOutputSize,
 	}
 
 	var errs ErrorList
