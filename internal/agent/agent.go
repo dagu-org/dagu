@@ -16,6 +16,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/coordinator/client"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
@@ -271,7 +273,11 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create a new environment for the dag-run.
 	dbClient := newDBClient(a.dagRunStore, a.dagStore)
-	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params)
+	
+	// Initialize coordinator client factory for distributed execution
+	coordinatorFactory := a.createCoordinatorClientFactory(ctx)
+	
+	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorFactory)
 
 	// Add structured logging context
 	logFields := []any{"dag", a.dag.Name, "dagRunId", a.dagRunID}
@@ -652,6 +658,56 @@ func (a *Agent) newScheduler() *scheduler.Scheduler {
 	return scheduler.New(cfg)
 }
 
+// createCoordinatorClientFactory creates a coordinator client factory for distributed execution
+func (a *Agent) createCoordinatorClientFactory(ctx context.Context) *client.Factory {
+	// Load configuration
+	cfg, err := config.Load()
+	if err != nil {
+		logger.Error(ctx, "Failed to load configuration for coordinator client", "error", err)
+		return nil
+	}
+
+	// Use worker configuration for coordinator connection
+	host := cfg.Worker.CoordinatorHost
+	port := cfg.Worker.CoordinatorPort
+	
+	// Default values if not configured
+	if host == "" {
+		host = "localhost"
+	}
+	if port == 0 {
+		port = 8084
+	}
+
+	// Create and configure factory
+	factory := client.NewFactory().
+		WithHost(host).
+		WithPort(port)
+
+	// Configure TLS if provided
+	if cfg.Worker.TLS != nil && cfg.Worker.TLS.CertFile != "" {
+		factory.WithTLS(
+			cfg.Worker.TLS.CertFile,
+			cfg.Worker.TLS.KeyFile,
+			cfg.Worker.TLS.CAFile,
+		)
+		if cfg.Worker.SkipTLSVerify {
+			factory.WithSkipTLSVerify(true)
+		}
+	} else {
+		// Default to insecure if not specified
+		factory.WithInsecure()
+	}
+
+	logger.Info(ctx, "Created coordinator client factory",
+		"host", host,
+		"port", port,
+		"insecure", cfg.Worker.TLS == nil || cfg.Worker.TLS.CertFile == "",
+	)
+
+	return factory
+}
+
 // dryRun performs a dry-run of the DAG. It only simulates the execution of
 // the DAG without running the actual command.
 func (a *Agent) dryRun(ctx context.Context) error {
@@ -670,7 +726,8 @@ func (a *Agent) dryRun(ctx context.Context) error {
 	}()
 
 	db := newDBClient(a.dagRunStore, a.dagStore)
-	dagCtx := digraph.SetupEnv(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params)
+	coordinatorFactory := a.createCoordinatorClientFactory(ctx)
+	dagCtx := digraph.SetupEnv(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorFactory)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, progressCh)
 	a.lastErr = lastErr
 

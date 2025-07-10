@@ -70,14 +70,10 @@ func newClient(ctx context.Context, config *Config) (*coordinatorClient, error) 
 		return nil, fmt.Errorf("failed to configure gRPC connection: %w", err)
 	}
 
-	// Add timeout for initial connection
-	dialCtx, cancel := context.WithTimeout(ctx, config.DialTimeout)
-	defer cancel()
-
-	// Create gRPC connection
-	conn, err := grpc.DialContext(dialCtx, addr, dialOpts...)
+	// Create gRPC connection using the newer NewClient API
+	conn, err := grpc.NewClient(addr, dialOpts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to coordinator at %s: %w", addr, err)
+		return nil, fmt.Errorf("failed to create coordinator client for %s: %w", addr, err)
 	}
 
 	client := &coordinatorClient{
@@ -199,11 +195,12 @@ func (c *coordinatorClient) waitForHealthy(ctx context.Context) error {
 
 // getDialOptions returns the appropriate gRPC dial options based on TLS configuration
 func getDialOptions(config *Config) ([]grpc.DialOption, error) {
+	opts := []grpc.DialOption{}
+
 	if config.Insecure {
 		// Use insecure connection (h2c)
-		return []grpc.DialOption{
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		}, nil
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		return opts, nil
 	}
 
 	// Configure TLS
@@ -244,7 +241,6 @@ func getDialOptions(config *Config) ([]grpc.DialOption, error) {
 		tlsConfig.RootCAs = certPool
 	}
 
-	return []grpc.DialOption{
-		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
-	}, nil
+	opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
+	return opts, nil
 }

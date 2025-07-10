@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/coordinator/client"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
@@ -207,52 +206,17 @@ func (e *dagExecutor) runDistributed(ctx context.Context) error {
 	return nil
 }
 
-// getCoordinatorClient creates a coordinator client using system configuration
+// getCoordinatorClient gets a coordinator client using the factory from environment
 func (e *dagExecutor) getCoordinatorClient(ctx context.Context) (client.Client, error) {
-	// Load configuration
-	cfg, err := config.Load()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load configuration: %w", err)
+	env := GetEnv(ctx)
+	
+	// Factory should be initialized when Env is created
+	if env.CoordinatorClientFactory == nil {
+		return nil, fmt.Errorf("coordinator client factory not initialized in environment")
 	}
 
-	// Use worker configuration for coordinator connection
-	// Workers connect to the coordinator, so we use the worker's coordinator settings
-	host := cfg.Worker.CoordinatorHost
-	port := cfg.Worker.CoordinatorPort
-
-	// Default values if not configured
-	if host == "" {
-		host = "localhost"
-	}
-	if port == 0 {
-		port = 8084
-	}
-
-	// Create client factory
-	factory := client.NewFactory().
-		WithHost(host).
-		WithPort(port)
-
-	// Configure TLS if provided
-	if cfg.Worker.TLS != nil && cfg.Worker.TLS.CertFile != "" {
-		factory.WithTLS(
-			cfg.Worker.TLS.CertFile,
-			cfg.Worker.TLS.KeyFile,
-			cfg.Worker.TLS.CAFile,
-		)
-		if cfg.Worker.SkipTLSVerify {
-			factory.WithSkipTLSVerify(true)
-		}
-	} else if cfg.Worker.Insecure {
-		// Explicitly insecure connection
-		factory.WithInsecure()
-	} else {
-		// Default to insecure if not specified
-		factory.WithInsecure()
-	}
-
-	// Build and return the client
-	return factory.Build(ctx)
+	// Build client from factory
+	return env.CoordinatorClientFactory.Build(ctx)
 }
 
 // waitForDistributedExecution polls for the completion of a distributed task

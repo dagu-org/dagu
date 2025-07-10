@@ -483,7 +483,7 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := digraph.SetupEnv(context.Background(), &digraph.DAG{}, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+			ctx := digraph.SetupEnvForTest(context.Background(), &digraph.DAG{}, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
 
 			if tt.setupEnv != nil {
 				ctx = tt.setupEnv(ctx)
@@ -812,7 +812,7 @@ func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {
 			}
 
 			// Setup environment with DAG
-			ctx = digraph.SetupEnv(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+			ctx = digraph.SetupEnvForTest(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
 
 			step := digraph.Step{
 				Name:    "test-output-capture",
@@ -865,7 +865,7 @@ func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {
 					MaxOutputSize: size,
 				}
 
-				ctx = digraph.SetupEnv(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+				ctx = digraph.SetupEnvForTest(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
 				env := executor.GetEnv(ctx)
 
 				// Verify the MaxOutputSize is properly set in the environment
@@ -1123,7 +1123,7 @@ func (n nodeHelper) AssertOutput(t *testing.T, key, value string) {
 }
 
 func (n nodeHelper) execContext(dagRunID string) context.Context {
-	return digraph.SetupEnv(n.Context, &digraph.DAG{}, nil, digraph.DAGRunRef{}, dagRunID, "logFile", nil)
+	return digraph.SetupEnvForTest(n.Context, &digraph.DAG{}, nil, digraph.DAGRunRef{}, dagRunID, "logFile", nil)
 }
 
 func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
@@ -1151,7 +1151,7 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		// Setup context with working directory
 		ctx := context.Background()
 		dag := &digraph.DAG{}
-		ctx = digraph.SetupEnv(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+		ctx = digraph.SetupEnvForTest(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
 		env := executor.GetEnv(ctx)
 		env.WorkingDir = workDir
 		ctx = executor.WithEnv(ctx, env)
@@ -1191,7 +1191,7 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		// Setup context with working directory
 		ctx := context.Background()
 		dag := &digraph.DAG{}
-		ctx = digraph.SetupEnv(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+		ctx = digraph.SetupEnvForTest(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
 		env := executor.GetEnv(ctx)
 		env.WorkingDir = workDir
 		ctx = executor.WithEnv(ctx, env)
@@ -1236,7 +1236,7 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		// Setup context with working directory
 		ctx := context.Background()
 		dag := &digraph.DAG{}
-		ctx = digraph.SetupEnv(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+		ctx = digraph.SetupEnvForTest(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
 		env := executor.GetEnv(ctx)
 		env.WorkingDir = workDir
 		ctx = executor.WithEnv(ctx, env)
@@ -1282,7 +1282,7 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		// Setup context with working directory
 		ctx := context.Background()
 		dag := &digraph.DAG{}
-		ctx = digraph.SetupEnv(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+		ctx = digraph.SetupEnvForTest(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
 		env := executor.GetEnv(ctx)
 		env.WorkingDir = workDir
 		ctx = executor.WithEnv(ctx, env)
