@@ -100,6 +100,8 @@ steps:
         expected: "re:[1-5]"  # Monday-Friday
 ```
 
+**Note**: When using regex patterns with command outputs, be aware that very long lines (over 64KB) are automatically handled but may impact performance. Lines exceeding 1MB (or the configured `maxOutputSize`) will be truncated before pattern matching.
+
 ### Multiple Conditions
 
 All conditions must pass:
