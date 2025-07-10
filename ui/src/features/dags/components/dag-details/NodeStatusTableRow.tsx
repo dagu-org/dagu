@@ -9,6 +9,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { CommandDisplay } from '@/components/ui/command-display';
 import dayjs from '@/lib/dayjs';
 import { cn } from '@/lib/utils';
 import {
@@ -430,57 +431,14 @@ function NodeStatusTableRow({
 
         {/* Combined Command & Args */}
         <TableCell>
-          <div className="space-y-1.5">
-            {!node.step.command && node.step.cmdWithArgs ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center gap-1.5 text-xs font-medium cursor-pointer">
-                    <Code className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-                    <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-1.5 py-0.5 text-slate-700 dark:text-slate-300 break-all">
-                      {node.step.cmdWithArgs}
-                    </span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <pre className="max-w-[500px] whitespace-pre-wrap break-all text-xs">
-                    {node.step.cmdWithArgs}
-                  </pre>
-                </TooltipContent>
-              </Tooltip>
-            ) : null}
-
-            {node.step.command && (
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5 text-xs font-medium">
-                  <Code className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-                  <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-1.5 py-0.5 text-slate-700 dark:text-slate-300 break-all">
-                    {node.step.command}
-                  </span>
-                </div>
-
-                {node.step.args && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="pl-5 text-xs font-medium text-slate-500 dark:text-slate-400 cursor-pointer leading-tight">
-                        <span className="break-all whitespace-pre-wrap">
-                          {Array.isArray(node.step.args)
-                            ? node.step.args.join(' ')
-                            : node.step.args}
-                        </span>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <pre className="max-w-[500px] whitespace-pre-wrap break-all text-xs">
-                        {Array.isArray(node.step.args)
-                          ? node.step.args.join(' ')
-                          : node.step.args}
-                      </pre>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-              </div>
-            )}
-          </div>
+          {(node.step.command || node.step.cmdWithArgs) && (
+            <CommandDisplay
+              command={node.step.command || node.step.cmdWithArgs || ''}
+              args={node.step.command ? node.step.args : undefined}
+              icon="code"
+              maxLength={50}
+            />
+          )}
         </TableCell>
 
         {/* Last Run & Duration */}

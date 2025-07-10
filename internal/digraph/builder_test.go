@@ -180,6 +180,15 @@ steps:
 		th := testLoad(t, "max_active_steps.yaml")
 		assert.Equal(t, 3, th.MaxActiveSteps)
 	})
+	t.Run("MaxOutputSize", func(t *testing.T) {
+		// Test custom maxOutputSize
+		th := testLoad(t, "valid_max_output_size.yaml")
+		assert.Equal(t, 524288, th.MaxOutputSize) // 512KB
+
+		// Test default maxOutputSize when not specified
+		th2 := testLoad(t, "default.yaml")
+		assert.Equal(t, 0, th2.MaxOutputSize) // Default 1MB
+	})
 	t.Run("ValidationError", func(t *testing.T) {
 		type testCase struct {
 			name        string

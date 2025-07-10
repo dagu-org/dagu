@@ -64,6 +64,8 @@ type definition struct {
 	Tags any
 	// Queue is the name of the queue to assign this DAG to.
 	Queue string
+	// MaxOutputSize is the maximum size of the output for each step.
+	MaxOutputSize int
 	// OTel is the OpenTelemetry configuration.
 	OTel any
 }

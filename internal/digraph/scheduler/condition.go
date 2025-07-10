@@ -62,7 +62,19 @@ func matchCondition(ctx context.Context, c *digraph.Condition) error {
 	if err != nil {
 		return fmt.Errorf("failed to evaluate the value: Error=%v", err)
 	}
-	if stringutil.MatchPattern(ctx, evaluatedVal, []string{c.Expected}, stringutil.WithExactMatch()) {
+
+	// Get maxOutputSize from DAG configuration
+	var maxOutputSize = 1024 * 1024 // Default 1MB
+	if env := digraph.GetEnv(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
+		maxOutputSize = env.DAG.MaxOutputSize
+	}
+
+	matchOpts := []stringutil.MatchOption{
+		stringutil.WithExactMatch(),
+		stringutil.WithMaxBufferSize(maxOutputSize),
+	}
+
+	if stringutil.MatchPattern(ctx, evaluatedVal, []string{c.Expected}, matchOpts...) {
 		return nil
 	}
 	// Return an helpful error message if the condition is not met
