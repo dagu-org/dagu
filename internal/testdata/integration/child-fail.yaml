@@ -1,0 +1,4 @@
+name: child-fail
+steps:
+  - name: fail
+    command: exit 1

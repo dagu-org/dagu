@@ -1,0 +1,11 @@
+name: test-parallel-minimal
+steps:
+  - name: parallel-execution
+    run: child-fail
+    parallel:
+      items:
+        - "item1"
+    retryPolicy:
+      limit: 1
+      intervalSec: 1
+    output: RESULTS
