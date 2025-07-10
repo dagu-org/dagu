@@ -480,4 +480,36 @@ steps:
 		// Verify dependencies in child DAG
 		assert.Contains(t, extractDAG.DAG.Steps[1].Depends, "validate")
 	})
+
+	t.Run("WorkerSelector", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := test.TestdataPath(t, filepath.Join("digraph", "worker_selector.yaml"))
+		dag, err := digraph.Load(context.Background(), testDAG)
+		require.NoError(t, err)
+
+		// Verify DAG loaded successfully
+		assert.Equal(t, "worker-selector-test", dag.Name)
+		assert.Equal(t, "Test DAG with worker selector", dag.Description)
+		assert.Len(t, dag.Steps, 3)
+
+		// Verify first step with GPU selector
+		gpuTask := dag.Steps[0]
+		assert.Equal(t, "gpu-task", gpuTask.Name)
+		assert.NotNil(t, gpuTask.WorkerSelector)
+		assert.Equal(t, "true", gpuTask.WorkerSelector["gpu"])
+		assert.Equal(t, "64G", gpuTask.WorkerSelector["memory"])
+
+		// Verify second step with CPU selector
+		cpuTask := dag.Steps[1]
+		assert.Equal(t, "cpu-task", cpuTask.Name)
+		assert.NotNil(t, cpuTask.WorkerSelector)
+		assert.Equal(t, "amd64", cpuTask.WorkerSelector["cpu-arch"])
+		assert.Equal(t, "us-east-1", cpuTask.WorkerSelector["region"])
+
+		// Verify third step without selector
+		anyWorkerTask := dag.Steps[2]
+		assert.Equal(t, "any-worker-task", anyWorkerTask.Name)
+		assert.Nil(t, anyWorkerTask.WorkerSelector)
+	})
 }
