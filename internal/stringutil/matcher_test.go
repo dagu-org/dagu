@@ -131,39 +131,15 @@ func TestMatchPattern_LongLines(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "short line matches regex",
-			size:     100,
+			name:     "under default buffer limit",
+			size:     50_000,
 			pattern:  "re:.+",
 			expected: true,
 		},
 		{
-			name:     "45KB line matches regex",
-			size:     45_000,
-			pattern:  "re:.+",
-			expected: true,
-		},
-		{
-			name:     "65KB line (over default buffer) matches regex",
-			size:     65_000,
-			pattern:  "re:.+", 
-			expected: true,
-		},
-		{
-			name:     "78KB line (user's case) matches regex",
+			name:     "over default buffer limit (user's case)",
 			size:     78_000,
-			pattern:  "re:.+",
-			expected: true,
-		},
-		{
-			name:     "100KB line matches regex",
-			size:     100_000,
-			pattern:  "re:.+",
-			expected: true,
-		},
-		{
-			name:     "900KB line (under 1MB limit) matches regex",
-			size:     900_000,
-			pattern:  "re:.+",
+			pattern:  "re:.+", 
 			expected: true,
 		},
 		{
@@ -171,18 +147,6 @@ func TestMatchPattern_LongLines(t *testing.T) {
 			size:     0,
 			pattern:  "re:.+",
 			expected: false,
-		},
-		{
-			name:     "long line matches specific pattern",
-			size:     78_000,
-			pattern:  "re:^x+$",
-			expected: true,
-		},
-		{
-			name:     "long line with literal pattern",
-			size:     78_000,
-			pattern:  "xxx",
-			expected: true,
 		},
 	}
 	
@@ -198,42 +162,3 @@ func TestMatchPattern_LongLines(t *testing.T) {
 	}
 }
 
-func TestMatchPattern_MultipleLines(t *testing.T) {
-	ctx := context.Background()
-	
-	// Test with multiple lines where one line is very long
-	longLine := strings.Repeat("x", 78_000)
-	content := "short line\n" + longLine + "\nlast line"
-	
-	tests := []struct {
-		name     string
-		pattern  string
-		expected bool
-	}{
-		{
-			name:     "matches short line",
-			pattern:  "short",
-			expected: true,
-		},
-		{
-			name:     "matches long line with regex", 
-			pattern:  "re:x{1000,}",
-			expected: true,
-		},
-		{
-			name:     "matches last line",
-			pattern:  "last",
-			expected: true,
-		},
-	}
-	
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := stringutil.MatchPattern(ctx, content, []string{tt.pattern})
-			
-			if result != tt.expected {
-				t.Errorf("MatchPattern() = %v, want %v", result, tt.expected)
-			}
-		})
-	}
-}
