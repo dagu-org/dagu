@@ -65,7 +65,7 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 	// Ensure cleanup happens even if there's an error
 	defer func() {
 		if err := e.child.Cleanup(ctx); err != nil {
-			logger.Error(ctx, "Failed to cleanup child DAG executor", "error", err)
+			logger.Error(ctx, "Failed to cleanup child DAG executor", "err", err)
 		}
 	}()
 
@@ -80,7 +80,7 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 		err := e.runDistributed(ctx)
 		if err != nil {
 			// Distributed execution was requested but failed - return error
-			return fmt.Errorf("distributed execution failed for DAG %s: %w", e.child.DAG.Name, err)
+			return fmt.Errorf("distributed execution failed for DAG %q: %w", e.child.DAG.Name, err)
 		}
 		// Distributed execution succeeded
 		return nil
@@ -182,7 +182,7 @@ func (e *dagExecutor) runDistributed(ctx context.Context) error {
 	}
 	defer func() {
 		if err := coordinatorClient.Close(); err != nil {
-			logger.Error(ctx, "Failed to close coordinator client", "error", err)
+			logger.Error(ctx, "Failed to close coordinator client", "err", err)
 		}
 	}()
 
@@ -198,12 +198,7 @@ func (e *dagExecutor) runDistributed(ctx context.Context) error {
 	}
 
 	// Wait for distributed execution to complete
-	err = e.waitForDistributedExecution(ctx, e.runParams.RunID)
-	if err != nil {
-		return fmt.Errorf("distributed execution failed: %w", err)
-	}
-
-	return nil
+	return e.waitForDistributedExecution(ctx, e.runParams.RunID)
 }
 
 // getCoordinatorClient gets a coordinator client using the factory from environment
@@ -224,7 +219,7 @@ func (e *dagExecutor) waitForDistributedExecution(ctx context.Context, dagRunID 
 	env := GetEnv(ctx)
 
 	// Poll for completion
-	pollInterval := 5 * time.Second
+	pollInterval := 1 * time.Second
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 
@@ -234,12 +229,29 @@ func (e *dagExecutor) waitForDistributedExecution(ctx context.Context, dagRunID 
 			return fmt.Errorf("distributed execution cancelled: %w", ctx.Err())
 		case <-ticker.C:
 			// Check if the child DAG run has completed
+			isCompleted, err := env.DB.IsChildDAGRunCompleted(ctx, dagRunID, env.RootDAGRun)
+			if err != nil {
+				logger.Error(ctx, "Failed to check child DAG run completion",
+					"dag_run_id", dagRunID,
+					"err", err,
+				)
+				continue // Retry on error
+			}
+
+			if !isCompleted {
+				logger.Debug(ctx, "Child DAG run not completed yet",
+					"dag_run_id", dagRunID,
+				)
+				continue // Not completed, keep polling
+			}
+
+			// Check the final status of the child DAG run
 			result, err := env.DB.GetChildDAGRunStatus(ctx, dagRunID, env.RootDAGRun)
 			if err != nil {
 				// Not found yet, continue polling
 				logger.Debug(ctx, "Child DAG run status not available yet",
 					"dag_run_id", dagRunID,
-					"error", err,
+					"err", err,
 				)
 				continue
 			}

@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var _ digraph.Database = (*MockDatabase)(nil)
+
 // MockDatabase is a mock implementation of digraph.Database
 type MockDatabase struct {
 	mock.Mock
@@ -31,6 +33,11 @@ func (m *MockDatabase) GetChildDAGRunStatus(ctx context.Context, dagRunID string
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*digraph.Status), args.Error(1)
+}
+
+// IsChildDAGRunCompleted implements digraph.Database.
+func (m *MockDatabase) IsChildDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) (bool, error) {
+	panic("unimplemented")
 }
 
 func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {

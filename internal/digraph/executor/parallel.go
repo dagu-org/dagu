@@ -82,7 +82,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	// Ensure cleanup happens even if there's an error
 	defer func() {
 		if err := e.child.Cleanup(ctx); err != nil {
-			logger.Error(ctx, "Failed to cleanup child DAG executor", "error", err)
+			logger.Error(ctx, "Failed to cleanup child DAG executor", "err", err)
 		}
 	}()
 
@@ -125,7 +125,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 			if err := e.executeChild(ctx, runParams); err != nil {
 				logger.Error(ctx, "Child DAG execution failed",
 					"runId", runParams.RunID,
-					"error", err,
+					"err", err,
 				)
 				errChan <- fmt.Errorf("child DAG %s failed: %w", runParams.RunID, err)
 			}
@@ -144,7 +144,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	// Always output aggregated results, even if some executions failed
 	if err := e.outputResults(ctx); err != nil {
 		// Log the output error but don't fail the entire execution because of it
-		logger.Error(ctx, "Failed to output results", "error", err)
+		logger.Error(ctx, "Failed to output results", "err", err)
 	}
 
 	// Check if any executions failed

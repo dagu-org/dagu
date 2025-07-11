@@ -401,7 +401,7 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 			if err == nil {
 				status = currentStatus
 			} else {
-				logger.Debug(ctx, "Failed to get current status from socket", "error", err)
+				logger.Debug(ctx, "Failed to get current status from socket", "err", err)
 			}
 		}
 	}
@@ -640,8 +640,8 @@ func execWithRecovery(ctx context.Context, fn func()) {
 
 			// Log with structured information
 			logger.Error(ctx, "Recovered from panic",
-				"error", err.Error(),
-				"errorType", fmt.Sprintf("%T", panicObj),
+				"err", err.Error(),
+				"errType", fmt.Sprintf("%T", panicObj),
 				"stackTrace", stack,
 				"fullStack", string(stack))
 		}

@@ -92,7 +92,7 @@ func (p *Poller) Run(ctx context.Context) {
 						"worker_id", p.workerID,
 						"poller_index", p.index,
 						"dag_run_id", task.DagRunId,
-						"error", err)
+						"err", err)
 				} else {
 					logger.Info(ctx, "Task execution completed successfully",
 						"worker_id", p.workerID,
@@ -132,7 +132,7 @@ func (p *Poller) pollForTask(ctx context.Context, policy backoff.RetryPolicy) (*
 			if wasConnected {
 				// First failure after being connected - log as ERROR
 				logger.Error(ctx, "Poll failed - lost connection to coordinator",
-					"error", err,
+					"err", err,
 					"worker_id", p.workerID,
 					"poller_id", pollerID,
 					"poller_index", p.index,
@@ -140,7 +140,7 @@ func (p *Poller) pollForTask(ctx context.Context, policy backoff.RetryPolicy) (*
 			} else {
 				// Subsequent failures - log as DEBUG
 				logger.Debug(ctx, "Poll still failing",
-					"error", err,
+					"err", err,
 					"worker_id", p.workerID,
 					"poller_id", pollerID,
 					"poller_index", p.index,

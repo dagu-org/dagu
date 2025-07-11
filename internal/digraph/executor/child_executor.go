@@ -210,7 +210,7 @@ func (e *ChildDAGExecutor) Cleanup(ctx context.Context) error {
 		logger.Error(ctx, "Failed to remove temporary DAG file",
 			"dag", e.DAG.Name,
 			"tempFile", e.tempFile,
-			"error", err,
+			"err", err,
 		)
 		return fmt.Errorf("failed to remove temp file: %w", err)
 	}

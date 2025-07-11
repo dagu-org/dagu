@@ -10,6 +10,8 @@ type Database interface {
 	GetDAG(ctx context.Context, name string) (*DAG, error)
 	// GetChildDAGRunStatus retrieves the status of a child dag-run by its ID and the root dag-run reference.
 	GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun DAGRunRef) (*Status, error)
+	// IsChildDAGRunCompleted checks if a child dag-run has completed.
+	IsChildDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun DAGRunRef) (bool, error)
 }
 
 // Status is the result of a dag-run.

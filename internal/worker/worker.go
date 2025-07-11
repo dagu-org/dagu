@@ -52,7 +52,7 @@ func (e *dagRunTaskExecutor) Execute(ctx context.Context, task *coordinatorv1.Ta
 	if err != nil {
 		logger.Error(ctx, "Task execution failed",
 			"dag_run_id", task.DagRunId,
-			"error", err)
+			"err", err)
 		return err
 	}
 
@@ -290,7 +290,7 @@ func (w *Worker) sendHeartbeats(ctx context.Context) {
 			if err := w.sendHeartbeat(ctx); err != nil {
 				logger.Error(ctx, "Failed to send heartbeat",
 					"worker_id", w.id,
-					"error", err)
+					"err", err)
 			}
 		}
 	}

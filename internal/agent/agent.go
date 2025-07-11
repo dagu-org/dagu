@@ -663,7 +663,7 @@ func (a *Agent) createCoordinatorClientFactory(ctx context.Context) *client.Fact
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
-		logger.Error(ctx, "Failed to load configuration for coordinator client", "error", err)
+		logger.Error(ctx, "Failed to load configuration for coordinator client", "err", err)
 		return nil
 	}
 
@@ -895,8 +895,8 @@ func execWithRecovery(ctx context.Context, fn func()) {
 
 			// Log with structured information
 			logger.Error(ctx, "Recovered from panic",
-				"error", err.Error(),
-				"errorType", fmt.Sprintf("%T", panicObj),
+				"err", err.Error(),
+				"errType", fmt.Sprintf("%T", panicObj),
 				"stackTrace", stack,
 				"fullStack", string(stack))
 		}
@@ -964,15 +964,24 @@ func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, ro
 		}
 	}
 
-	// Check if the execution was successful
-	// scheduler.StatusSuccess is the only status considered as success
-	isSuccess := status.Status == scheduler.StatusSuccess
-
 	return &digraph.Status{
 		Outputs:  outputVariables,
 		Name:     status.Name,
 		DAGRunID: status.DAGRunID,
 		Params:   status.Params,
-		Success:  isSuccess,
+		Success:  status.Status.IsSuccess(),
 	}, nil
+}
+
+func (o *dbClient) IsChildDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) (bool, error) {
+	childAttempt, err := o.drs.FindChildAttempt(ctx, rootDAGRun, dagRunID)
+	if err != nil {
+		return false, fmt.Errorf("failed to find run for dag-run ID %s: %w", dagRunID, err)
+	}
+	status, err := childAttempt.ReadStatus(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to read status: %w", err)
+	}
+
+	return !status.Status.IsActive(), nil
 }

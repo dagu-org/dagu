@@ -24,6 +24,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List distributed workers
+         * @description Retrieves information about distributed workers connected to the coordinator
+         */
+        get: operations["getWorkers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dags": {
         parameters: {
             query?: never;
@@ -890,6 +910,9 @@ export interface components {
             interval?: number;
             /** @description Maximum number of times to repeat the step */
             limit?: number;
+            backoff?: boolean | number;
+            /** @description Maximum interval in seconds (caps exponential growth) */
+            maxIntervalSec?: number;
             condition?: components["schemas"]["Condition"];
             /** @description List of exit codes that trigger repeat behavior */
             exitCode?: number[];
@@ -900,6 +923,39 @@ export interface components {
             tags: string[];
             /** @description List of errors encountered during the request */
             errors: string[];
+        };
+        /** @description Response object for listing distributed workers */
+        WorkersListResponse: {
+            /** @description List of distributed workers */
+            workers: components["schemas"]["Worker"][];
+            /** @description List of errors encountered during the request */
+            errors: string[];
+        };
+        /** @description Information about a distributed worker */
+        Worker: {
+            /** @description Unique identifier for the worker */
+            id: string;
+            /** @description Key-value pairs of labels assigned to the worker */
+            labels: {
+                [key: string]: string;
+            };
+            /** @description Total number of pollers configured for this worker */
+            totalPollers: number;
+            /** @description Number of pollers currently executing tasks */
+            busyPollers: number;
+            /** @description List of tasks currently being executed by this worker */
+            runningTasks: components["schemas"]["RunningTask"][];
+            /** @description RFC3339 timestamp of the last heartbeat received from this worker */
+            lastHeartbeatAt: string;
+        };
+        /** @description Information about a task currently being executed */
+        RunningTask: {
+            /** @description ID of the DAG run being executed */
+            dagRunId: string;
+            /** @description Name of the DAG being executed */
+            dagName: string;
+            /** @description RFC3339 timestamp when the task started */
+            startedAt: string;
         };
     };
     responses: never;
@@ -969,6 +1025,44 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    getWorkers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkersListResponse"];
+                };
+            };
+            /** @description Coordinator service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };
