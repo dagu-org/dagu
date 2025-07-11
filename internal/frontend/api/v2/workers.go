@@ -75,6 +75,21 @@ func (a *API) GetWorkers(ctx context.Context, _ api.GetWorkersRequestObject) (ap
 
 	// Transform the response
 	for _, w := range resp.Workers {
+		// Transform protobuf health status to API health status
+		var healthStatus api.WorkerHealthStatus
+		switch w.HealthStatus {
+		case coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_HEALTHY:
+			healthStatus = api.WorkerHealthStatusHealthy
+		case coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_WARNING:
+			healthStatus = api.WorkerHealthStatusWarning
+		case coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_UNHEALTHY:
+			healthStatus = api.WorkerHealthStatusUnhealthy
+		case coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_UNSPECIFIED:
+			healthStatus = api.WorkerHealthStatusHealthy // Default to healthy if unspecified
+		default:
+			healthStatus = api.WorkerHealthStatusHealthy // Fallback for any future status values
+		}
+
 		worker := api.Worker{
 			Id:              w.WorkerId,
 			Labels:          w.Labels,
@@ -82,6 +97,7 @@ func (a *API) GetWorkers(ctx context.Context, _ api.GetWorkersRequestObject) (ap
 			BusyPollers:     int(w.BusyPollers),
 			RunningTasks:    transformRunningTasks(w.RunningTasks),
 			LastHeartbeatAt: time.Unix(w.LastHeartbeatAt, 0).Format(time.RFC3339),
+			HealthStatus:    healthStatus,
 		}
 		workers = append(workers, worker)
 	}

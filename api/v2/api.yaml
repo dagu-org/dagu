@@ -1574,6 +1574,14 @@ components:
         - "finished"
         - "skipped"
 
+    WorkerHealthStatus:
+      type: string
+      description: "Health status of the worker based on heartbeat recency"
+      enum:
+        - "healthy"
+        - "warning"
+        - "unhealthy"
+
     DAGDetails:
       type: object
       description: "Detailed DAG configuration information"
@@ -2089,6 +2097,8 @@ components:
         lastHeartbeatAt:
           type: string
           description: "RFC3339 timestamp of the last heartbeat received from this worker"
+        healthStatus:
+          $ref: "#/components/schemas/WorkerHealthStatus"
       required:
         - id
         - labels
@@ -2096,6 +2106,7 @@ components:
         - busyPollers
         - runningTasks
         - lastHeartbeatAt
+        - healthStatus
 
     RunningTask:
       type: object

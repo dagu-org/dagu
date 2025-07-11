@@ -88,7 +88,7 @@ function WorkerList({ workers, isLoading, errors }: WorkerListProps) {
               </div>
 
               {/* Health indicator */}
-              <WorkerHealth lastHeartbeat={worker.lastHeartbeatAt} />
+              <WorkerHealth healthStatus={worker.healthStatus} />
 
               {/* Worker ID */}
               <div className="flex-1 min-w-0">

@@ -134,11 +134,27 @@ func (h *Handler) GetWorkers(_ context.Context, _ *coordinatorv1.GetWorkersReque
 
 	// Return aggregated worker info from heartbeats
 	workers := make([]*coordinatorv1.WorkerInfo, 0, len(h.heartbeats))
+	now := time.Now()
+
 	for _, hb := range h.heartbeats {
+		// Calculate health status based on heartbeat recency
+		secondsSinceHeartbeat := now.Sub(hb.lastHeartbeatAt).Seconds()
+		var healthStatus coordinatorv1.WorkerHealthStatus
+
+		switch {
+		case secondsSinceHeartbeat < 5:
+			healthStatus = coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_HEALTHY
+		case secondsSinceHeartbeat < 15:
+			healthStatus = coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_WARNING
+		default:
+			healthStatus = coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_UNHEALTHY
+		}
+
 		workerInfo := &coordinatorv1.WorkerInfo{
 			WorkerId:        hb.workerID,
 			Labels:          hb.labels,
 			LastHeartbeatAt: hb.lastHeartbeatAt.Unix(),
+			HealthStatus:    healthStatus,
 		}
 
 		// Add stats if available

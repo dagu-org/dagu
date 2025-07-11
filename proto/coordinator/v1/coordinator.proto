@@ -61,6 +61,14 @@ enum Operation {
   OPERATION_RETRY = 2;    // Retry an existing run
 }
 
+// Health status of a worker based on heartbeat recency.
+enum WorkerHealthStatus {
+  WORKER_HEALTH_STATUS_UNSPECIFIED = 0;
+  WORKER_HEALTH_STATUS_HEALTHY = 1;      // Last heartbeat < 5 seconds
+  WORKER_HEALTH_STATUS_WARNING = 2;      // Last heartbeat 5-15 seconds
+  WORKER_HEALTH_STATUS_UNHEALTHY = 3;    // Last heartbeat > 15 seconds
+}
+
 // Request message for getting workers.
 message GetWorkersRequest {
   // No fields needed for now
@@ -82,6 +90,7 @@ message WorkerInfo {
   int32 busy_pollers = 6;
   repeated RunningTask running_tasks = 7;
   int64 last_heartbeat_at = 8; // Unix timestamp of last heartbeat
+  WorkerHealthStatus health_status = 9; // Health status based on heartbeat recency
 }
 
 // Request message for heartbeat.

@@ -693,6 +693,11 @@ export interface components {
          * @enum {string}
          */
         NodeStatusLabel: NodeStatusLabel;
+        /**
+         * @description Health status of the worker based on heartbeat recency
+         * @enum {string}
+         */
+        WorkerHealthStatus: WorkerHealthStatus;
         /** @description Detailed DAG configuration information */
         DAGDetails: {
             /** @description Logical grouping of related DAGs for organizational purposes */
@@ -947,6 +952,7 @@ export interface components {
             runningTasks: components["schemas"]["RunningTask"][];
             /** @description RFC3339 timestamp of the last heartbeat received from this worker */
             lastHeartbeatAt: string;
+            healthStatus: components["schemas"]["WorkerHealthStatus"];
         };
         /** @description Information about a task currently being executed */
         RunningTask: {
@@ -2434,6 +2440,11 @@ export enum NodeStatusLabel {
     canceled = "canceled",
     finished = "finished",
     skipped = "skipped"
+}
+export enum WorkerHealthStatus {
+    healthy = "healthy",
+    warning = "warning",
+    unhealthy = "unhealthy"
 }
 export enum RepeatMode {
     While = "while",
