@@ -27,6 +27,9 @@ type Client interface {
 	// supports status queries
 	GetTaskStatus(ctx context.Context, dagRunID string) (*TaskStatus, error)
 
+	// GetGRPCClient returns the underlying gRPC client
+	GetGRPCClient() coordinatorv1.CoordinatorServiceClient
+
 	// Close closes the client connection
 	Close() error
 }
@@ -156,6 +159,11 @@ func (c *coordinatorClient) dispatchWithRetry(ctx context.Context, req *coordina
 func (c *coordinatorClient) GetTaskStatus(_ context.Context, _ string) (*TaskStatus, error) {
 	// TODO: Implement when coordinator supports status queries
 	return nil, fmt.Errorf("task status query not implemented")
+}
+
+// GetGRPCClient returns the underlying gRPC client
+func (c *coordinatorClient) GetGRPCClient() coordinatorv1.CoordinatorServiceClient {
+	return c.client
 }
 
 // Close closes the client connection

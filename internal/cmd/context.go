@@ -15,6 +15,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/coordinator"
+	coordinatorclient "github.com/dagu-org/dagu/internal/coordinator/client"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
@@ -163,7 +164,10 @@ func (c *Context) NewServer() (*frontend.Server, error) {
 		return nil, err
 	}
 
-	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.DAGRunMgr), nil
+	// Create coordinator client factory (may be nil if not configured)
+	coordinatorClientFactory := c.NewCoordinatorClientFactory()
+
+	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.DAGRunMgr, coordinatorClientFactory), nil
 }
 
 // NewScheduler creates a new NewScheduler instance using the default client.
@@ -203,6 +207,33 @@ func (c *Context) NewCoordinator() (*coordinator.Service, error) {
 
 	// Create and return service
 	return coordinator.NewService(grpcServer, handler, listener, healthServer), nil
+}
+
+// NewCoordinatorClientFactory creates a configured coordinator client factory.
+// It returns nil if coordinator is not configured.
+func (c *Context) NewCoordinatorClientFactory() *coordinatorclient.Factory {
+	// Check if coordinator is configured
+	if c.Config.Coordinator.Host == "" || c.Config.Coordinator.Port <= 0 {
+		logger.Info(c, "Coordinator not configured, distributed execution disabled")
+		return nil
+	}
+
+	// Build factory with configuration
+	factory := coordinatorclient.NewFactory().
+		WithHost(c.Config.Coordinator.Host).
+		WithPort(c.Config.Coordinator.Port).
+		WithInsecure() // Default to insecure for now
+
+	// Configure TLS if available
+	if c.Config.Coordinator.TLS != nil {
+		factory.WithTLS(
+			c.Config.Coordinator.TLS.CertFile,
+			c.Config.Coordinator.TLS.KeyFile,
+			c.Config.Coordinator.TLS.CAFile,
+		)
+	}
+
+	return factory
 }
 
 // StringParam retrieves a string parameter from the command line flags.
