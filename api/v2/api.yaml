@@ -57,6 +57,8 @@ paths:
       operationId: "getWorkers"
       tags:
         - "system"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
       responses:
         "200":
           description: "A successful response"
@@ -2108,6 +2110,18 @@ components:
         startedAt:
           type: string
           description: "RFC3339 timestamp when the task started"
+        rootDagRunName:
+          type: string
+          description: "Name of the root DAG run"
+        rootDagRunId:
+          type: string
+          description: "ID of the root DAG run"
+        parentDagRunName:
+          type: string
+          description: "Name of the parent DAG run"
+        parentDagRunId:
+          type: string
+          description: "ID of the parent DAG run"
       required:
         - dagRunId
         - dagName

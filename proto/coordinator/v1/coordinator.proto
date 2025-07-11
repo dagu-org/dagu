@@ -116,4 +116,8 @@ message RunningTask {
   string dag_run_id = 1;
   string dag_name = 2;
   int64 started_at = 3;         // Unix timestamp in seconds
+  string root_dag_run_name = 4;
+  string root_dag_run_id = 5;
+  string parent_dag_run_name = 6;
+  string parent_dag_run_id = 7;
 }

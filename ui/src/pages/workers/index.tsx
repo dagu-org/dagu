@@ -21,21 +21,16 @@ function Workers() {
     appBarContext.setTitle('Workers');
   }, [appBarContext]);
 
-  const { data, error, isLoading, mutate } = useQuery<WorkersListResponse>(
-    '/workers',
-    {
-      params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-        },
+  const { data, error, isLoading, mutate } = useQuery('/workers', {
+    params: {
+      query: {
+        remoteNode: appBarContext.selectedRemoteNode || 'local',
       },
     },
-    {
-      refreshInterval: 1000, // Refresh every second for real-time updates
-      revalidateOnFocus: true,
-      revalidateOnReconnect: true,
-    }
-  );
+    refreshInterval: 1000, // Refresh every second for real-time updates
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+  });
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

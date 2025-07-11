@@ -97,9 +97,13 @@ func transformRunningTasks(tasks []*coordinatorv1.RunningTask) []api.RunningTask
 	result := make([]api.RunningTask, len(tasks))
 	for i, task := range tasks {
 		result[i] = api.RunningTask{
-			DagRunId:  task.DagRunId,
-			DagName:   task.DagName,
-			StartedAt: time.Unix(task.StartedAt, 0).Format(time.RFC3339),
+			DagRunId:         task.DagRunId,
+			DagName:          task.DagName,
+			StartedAt:        time.Unix(task.StartedAt, 0).Format(time.RFC3339),
+			RootDagRunName:   &task.RootDagRunName,
+			RootDagRunId:     &task.RootDagRunId,
+			ParentDagRunName: &task.ParentDagRunName,
+			ParentDagRunId:   &task.ParentDagRunId,
 		}
 	}
 	return result

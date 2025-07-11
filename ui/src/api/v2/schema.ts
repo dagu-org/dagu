@@ -956,6 +956,14 @@ export interface components {
             dagName: string;
             /** @description RFC3339 timestamp when the task started */
             startedAt: string;
+            /** @description Name of the root DAG run */
+            rootDagRunName?: string;
+            /** @description ID of the root DAG run */
+            rootDagRunId?: string;
+            /** @description Name of the parent DAG run */
+            parentDagRunName?: string;
+            /** @description ID of the parent DAG run */
+            parentDagRunId?: string;
         };
     };
     responses: never;
@@ -1030,7 +1038,10 @@ export interface operations {
     };
     getWorkers: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path?: never;
             cookie?: never;

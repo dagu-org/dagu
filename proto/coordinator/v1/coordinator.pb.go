@@ -786,12 +786,16 @@ func (x *WorkerStats) GetRunningTasks() []*RunningTask {
 
 // Information about a running task.
 type RunningTask struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	DagRunId      string                 `protobuf:"bytes,1,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"`
-	DagName       string                 `protobuf:"bytes,2,opt,name=dag_name,json=dagName,proto3" json:"dag_name,omitempty"`
-	StartedAt     int64                  `protobuf:"varint,3,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"` // Unix timestamp in seconds
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	DagRunId         string                 `protobuf:"bytes,1,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"`
+	DagName          string                 `protobuf:"bytes,2,opt,name=dag_name,json=dagName,proto3" json:"dag_name,omitempty"`
+	StartedAt        int64                  `protobuf:"varint,3,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"` // Unix timestamp in seconds
+	RootDagRunName   string                 `protobuf:"bytes,4,opt,name=root_dag_run_name,json=rootDagRunName,proto3" json:"root_dag_run_name,omitempty"`
+	RootDagRunId     string                 `protobuf:"bytes,5,opt,name=root_dag_run_id,json=rootDagRunId,proto3" json:"root_dag_run_id,omitempty"`
+	ParentDagRunName string                 `protobuf:"bytes,6,opt,name=parent_dag_run_name,json=parentDagRunName,proto3" json:"parent_dag_run_name,omitempty"`
+	ParentDagRunId   string                 `protobuf:"bytes,7,opt,name=parent_dag_run_id,json=parentDagRunId,proto3" json:"parent_dag_run_id,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *RunningTask) Reset() {
@@ -843,6 +847,34 @@ func (x *RunningTask) GetStartedAt() int64 {
 		return x.StartedAt
 	}
 	return 0
+}
+
+func (x *RunningTask) GetRootDagRunName() string {
+	if x != nil {
+		return x.RootDagRunName
+	}
+	return ""
+}
+
+func (x *RunningTask) GetRootDagRunId() string {
+	if x != nil {
+		return x.RootDagRunId
+	}
+	return ""
+}
+
+func (x *RunningTask) GetParentDagRunName() string {
+	if x != nil {
+		return x.ParentDagRunName
+	}
+	return ""
+}
+
+func (x *RunningTask) GetParentDagRunId() string {
+	if x != nil {
+		return x.ParentDagRunId
+	}
+	return ""
 }
 
 var File_proto_coordinator_v1_coordinator_proto protoreflect.FileDescriptor
@@ -909,13 +941,17 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\vWorkerStats\x12#\n" +
 	"\rtotal_pollers\x18\x01 \x01(\x05R\ftotalPollers\x12!\n" +
 	"\fbusy_pollers\x18\x02 \x01(\x05R\vbusyPollers\x12@\n" +
-	"\rrunning_tasks\x18\x03 \x03(\v2\x1b.coordinator.v1.RunningTaskR\frunningTasks\"e\n" +
+	"\rrunning_tasks\x18\x03 \x03(\v2\x1b.coordinator.v1.RunningTaskR\frunningTasks\"\x91\x02\n" +
 	"\vRunningTask\x12\x1c\n" +
 	"\n" +
 	"dag_run_id\x18\x01 \x01(\tR\bdagRunId\x12\x19\n" +
 	"\bdag_name\x18\x02 \x01(\tR\adagName\x12\x1d\n" +
 	"\n" +
-	"started_at\x18\x03 \x01(\x03R\tstartedAt*P\n" +
+	"started_at\x18\x03 \x01(\x03R\tstartedAt\x12)\n" +
+	"\x11root_dag_run_name\x18\x04 \x01(\tR\x0erootDagRunName\x12%\n" +
+	"\x0froot_dag_run_id\x18\x05 \x01(\tR\frootDagRunId\x12-\n" +
+	"\x13parent_dag_run_name\x18\x06 \x01(\tR\x10parentDagRunName\x12)\n" +
+	"\x11parent_dag_run_id\x18\a \x01(\tR\x0eparentDagRunId*P\n" +
 	"\tOperation\x12\x19\n" +
 	"\x15OPERATION_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fOPERATION_START\x10\x01\x12\x13\n" +

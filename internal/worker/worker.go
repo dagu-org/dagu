@@ -348,9 +348,13 @@ func (t *trackingTaskExecutor) Execute(ctx context.Context, task *coordinatorv1.
 	// Mark task as running
 	t.worker.pollersMu.Lock()
 	t.worker.runningTasks[pollerID] = &coordinatorv1.RunningTask{
-		DagRunId:  task.DagRunId,
-		DagName:   task.Target,
-		StartedAt: time.Now().Unix(),
+		DagRunId:         task.DagRunId,
+		DagName:          task.Target,
+		StartedAt:        time.Now().Unix(),
+		RootDagRunName:   task.RootDagRunName,
+		RootDagRunId:     task.RootDagRunId,
+		ParentDagRunName: task.ParentDagRunName,
+		ParentDagRunId:   task.ParentDagRunId,
 	}
 	t.worker.pollersMu.Unlock()
 

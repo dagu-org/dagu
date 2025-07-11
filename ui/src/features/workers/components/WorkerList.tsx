@@ -188,6 +188,8 @@ function TaskRow({ task }: { task: RunningTask }) {
     return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
   }, [task.startedAt]);
 
+  const isNestedTask = task.rootDagRunName && task.rootDagRunName !== task.dagName;
+
   return (
     <div className="flex items-center gap-3 p-1.5 rounded bg-background/50">
       <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
@@ -196,6 +198,17 @@ function TaskRow({ task }: { task: RunningTask }) {
         <div className="text-[10px] text-muted-foreground font-mono truncate">
           {task.dagRunId}
         </div>
+        {isNestedTask && (
+          <div className="text-[10px] text-muted-foreground mt-0.5">
+            <span className="opacity-60">root:</span> {task.rootDagRunName} 
+            <span className="opacity-40 ml-1">({task.rootDagRunId})</span>
+          </div>
+        )}
+        {task.parentDagRunName && task.parentDagRunName !== task.dagName && (
+          <div className="text-[10px] text-muted-foreground">
+            <span className="opacity-60">parent:</span> {task.parentDagRunName}
+          </div>
+        )}
       </div>
       <div className="text-xs text-muted-foreground whitespace-nowrap">
         {duration}
