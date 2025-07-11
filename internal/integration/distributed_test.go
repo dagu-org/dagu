@@ -94,7 +94,9 @@ steps:
 			}
 		}()
 		t.Cleanup(func() {
-			workerInst.Stop(ctx)
+			if err := workerInst.Stop(ctx); err != nil {
+				t.Logf("Error stopping worker: %v", err)
+			}
 		})
 
 		// Give worker time to connect
