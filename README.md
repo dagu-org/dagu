@@ -69,6 +69,7 @@ After managing hundreds of cron jobs across multiple servers, I built Dagu to br
 - [HTTP requests](https://docs.dagu.cloud/features/executors/http) - Integrate with APIs
 - [Email notifications](https://docs.dagu.cloud/features/email-notifications) - SMTP integration
 - [Hierarchical workflows](https://docs.dagu.cloud/writing-workflows/advanced#hierarchical-workflows) - Nest DAGs to any depth
+- [Distributed execution](https://docs.dagu.cloud/features/distributed-execution) - Scale across multiple machines
 - [Authentication](https://docs.dagu.cloud/features/authentication) - Basic auth, API tokens, TLS
 - [Web UI](https://docs.dagu.cloud/overview/web-ui) - Real-time monitoring and control
 - [REST API](https://docs.dagu.cloud/overview/api) - Full programmatic access
@@ -227,6 +228,28 @@ steps:
         expected: "re:[1-5]"  # Weekdays only
 ```
 
+### Distributed Execution
+```yaml
+name: distributed-workflow
+steps:
+  - name: gpu-training
+    command: python train_model.py
+    workerSelector:
+      gpu: "true"
+      memory: "64G"
+    
+  - name: data-processing-us
+    command: python process.py --region us
+    workerSelector:
+      region: "us-east-1"
+    
+  - name: data-processing-eu
+    command: python process.py --region eu
+    workerSelector:
+      region: "eu-west-1"
+      compliance: "gdpr"
+```
+
 ## Web Interface
 
 [Learn more about the Web UI →](https://docs.dagu.cloud/overview/web-ui)
@@ -256,7 +279,7 @@ steps:
 
 ## Roadmap
 
-- [ ] Run steps in a DAG across multiple machines (distributed execution)
+- [x] Run steps in a DAG across multiple machines (distributed execution) - **Available in v1.18.0**
 - [ ] Track artifacts by dropping files in `$DAGU_ARTIFACTS`
 - [ ] Pause executions for webhooks, approvals, or any event (human-in-the-loop, event-driven workflows)
 - [ ] Integrate with AI agents via MCP (Model Context Protocol)

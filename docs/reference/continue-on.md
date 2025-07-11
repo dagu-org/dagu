@@ -247,14 +247,6 @@ steps:
     depends: [step-c]  # Sees step-c as successful
 ```
 
-## Best Practices
-
-1. **Be Specific**: Use specific exit codes or output patterns rather than blanket `failure: true`
-2. **Document Intent**: Add comments explaining why certain failures are acceptable
-3. **Use with Monitoring**: Even if steps continue, monitor and log failures
-4. **Test Patterns**: Test regex patterns carefully, especially with special characters
-5. **Consider markSuccess**: Use `markSuccess` when the failure is truly acceptable
-
 ## Examples
 
 ### Database Migration with Warnings
@@ -308,27 +300,3 @@ steps:
       - condition: "${CHECK_PRIMARY_EXIT_CODE}"
         expected: "re:[1-9][0-9]*"  # Only if primary failed
 ```
-
-## Troubleshooting
-
-### Output Not Matching
-
-If output patterns aren't matching as expected:
-
-1. Check the exact output format using log files
-2. Remember patterns match line-by-line
-3. Use `re:.*pattern.*` for patterns that might appear mid-line
-4. Check for trailing whitespace or special characters
-
-### Exit Codes Not Working
-
-1. Verify the actual exit code using `echo $?` after the command
-2. Some shells might modify exit codes
-3. Check if the command is running through a wrapper script
-
-### Regex Pattern Errors
-
-1. Test regex patterns using online regex testers
-2. Escape special characters properly
-3. Check logs for "invalid regexp pattern" errors
-4. Remember to prefix regex patterns with `re:`
