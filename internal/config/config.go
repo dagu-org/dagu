@@ -261,11 +261,12 @@ type Coordinator struct {
 
 // Worker represents the worker configuration
 type Worker struct {
-	ID                string     // Worker instance ID (default: hostname@PID)
-	MaxConcurrentRuns int        // Maximum concurrent task executions (default: 100)
-	CoordinatorHost   string     // Coordinator gRPC server host (default: 127.0.0.1)
-	CoordinatorPort   int        // Coordinator gRPC server port (default: 50051)
-	TLS               *TLSConfig // TLS configuration for coordinator connection
-	Insecure          bool       // Use insecure connection (h2c) - must be explicitly enabled
-	SkipTLSVerify     bool       // Skip TLS certificate verification
+	ID                string            // Worker instance ID (default: hostname@PID)
+	MaxConcurrentRuns int               // Maximum concurrent task executions (default: 100)
+	CoordinatorHost   string            // Coordinator gRPC server host (default: 127.0.0.1)
+	CoordinatorPort   int               // Coordinator gRPC server port (default: 50051)
+	TLS               *TLSConfig        // TLS configuration for coordinator connection
+	Insecure          bool              // Use insecure connection (h2c) - must be explicitly enabled
+	SkipTLSVerify     bool              // Skip TLS certificate verification
+	Labels            map[string]string // Worker labels for capability matching
 }

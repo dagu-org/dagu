@@ -281,6 +281,32 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		}
 	}
 
+	// Parse worker labels - can be either string or map
+	if def.WorkerLabels != nil {
+		switch v := def.WorkerLabels.(type) {
+		case string:
+			if v != "" {
+				cfg.Worker.Labels = parseLabels(v)
+			}
+		case map[string]interface{}:
+			cfg.Worker.Labels = make(map[string]string)
+			for key, val := range v {
+				if strVal, ok := val.(string); ok {
+					cfg.Worker.Labels[key] = strVal
+				}
+			}
+		case map[interface{}]interface{}:
+			cfg.Worker.Labels = make(map[string]string)
+			for key, val := range v {
+				if keyStr, ok := key.(string); ok {
+					if valStr, ok := val.(string); ok {
+						cfg.Worker.Labels[keyStr] = valStr
+					}
+				}
+			}
+		}
+	}
+
 	// Incorporate legacy field values, which may override existing settings.
 	l.LoadLegacyFields(&cfg, def)
 	// Load legacy environment variable overrides.
@@ -552,6 +578,7 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("workerCoordinatorPort", "WORKER_COORDINATOR_PORT")
 	l.bindEnv("workerInsecure", "WORKER_INSECURE")
 	l.bindEnv("workerSkipTlsVerify", "WORKER_SKIP_TLS_VERIFY")
+	l.bindEnv("workerLabels", "WORKER_LABELS")
 	l.bindEnv("workerTlsCertFile", "WORKER_TLS_CERT_FILE")
 	l.bindEnv("workerTlsKeyFile", "WORKER_TLS_KEY_FILE")
 	l.bindEnv("workerTlsCaFile", "WORKER_TLS_CA_FILE")
@@ -649,4 +676,32 @@ func (l *ConfigLoader) validateConfig(cfg *Config) error {
 	}
 
 	return nil
+}
+
+// parseLabels parses a comma-separated string of key=value pairs into a map.
+// Example: "gpu=true,memory=64G" -> map[string]string{"gpu": "true", "memory": "64G"}
+func parseLabels(labelsStr string) map[string]string {
+	labels := make(map[string]string)
+	if labelsStr == "" {
+		return labels
+	}
+
+	pairs := strings.Split(labelsStr, ",")
+	for _, pair := range pairs {
+		pair = strings.TrimSpace(pair)
+		if pair == "" {
+			continue
+		}
+
+		parts := strings.SplitN(pair, "=", 2)
+		if len(parts) == 2 {
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			if key != "" {
+				labels[key] = value
+			}
+		}
+	}
+
+	return labels
 }

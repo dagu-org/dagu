@@ -279,7 +279,7 @@ func (w *Worker) getDialOptions() ([]grpc.DialOption, error) {
 
 // sendHeartbeats sends periodic heartbeats to the coordinator
 func (w *Worker) sendHeartbeats(ctx context.Context) {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	for {

@@ -31,12 +31,17 @@ Flags:
   --worker-tls-key string                  Path to TLS key file for mutual TLS
   --worker-tls-ca string                   Path to CA certificate file for server verification
   --worker-skip-tls-verify                 Skip TLS certificate verification (insecure)
+  --worker-labels -l string                Worker labels for capability matching (format: key1=value1,key2=value2)
 
 Example:
   dagu worker
   dagu worker --worker-max-concurrent-runs=50
   dagu worker --worker-coordinator-host=coordinator.example.com --worker-coordinator-port=50051
   dagu worker --worker-id=worker-1 --worker-max-concurrent-runs=200
+  
+  # Worker with labels for capability matching:
+  dagu worker --worker-labels gpu=true,memory=64G,region=us-east-1
+  dagu worker --worker-labels cpu-arch=amd64,instance-type=m5.xlarge
   
   # For TLS connections (when coordinator has TLS enabled):
   dagu worker --worker-insecure=false --worker-coordinator-host=coordinator.example.com
@@ -60,6 +65,7 @@ var workerFlags = []commandLineFlag{
 	workerTLSKeyFlag,
 	workerTLSCAFlag,
 	workerSkipTLSVerifyFlag,
+	workerLabelsFlag,
 }
 
 func runWorker(ctx *Context, _ []string) error {
@@ -82,15 +88,18 @@ func runWorker(ctx *Context, _ []string) error {
 	}
 
 	// Create and start the worker
-	// TODO: Add support for configuring worker labels
-	labels := make(map[string]string)
+	labels := ctx.Config.Worker.Labels
+	if labels == nil {
+		labels = make(map[string]string)
+	}
 	w := worker.NewWorker(workerID, maxConcurrentRuns, coordinatorHost, coordinatorPort, tlsConfig, ctx.DAGRunMgr, labels)
 
 	logger.Info(ctx, "Starting worker",
 		"worker_id", workerID,
 		"max_concurrent_runs", maxConcurrentRuns,
 		"coordinator_host", coordinatorHost,
-		"coordinator_port", coordinatorPort)
+		"coordinator_port", coordinatorPort,
+		"labels", labels)
 
 	// Start the worker in a goroutine to allow for graceful shutdown
 	errCh := make(chan error, 1)

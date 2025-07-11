@@ -229,6 +229,14 @@ var (
 		bindViper: true,
 	}
 
+	// workerLabelsFlag is the labels for worker capabilities.
+	workerLabelsFlag = commandLineFlag{
+		name:      "worker-labels",
+		shorthand: "l",
+		usage:     "Worker labels for capability matching (format: key1=value1,key2=value2)",
+		bindViper: true,
+	}
+
 	// coordinatorTLSCertFlag is the path to the TLS certificate for coordinator server.
 	coordinatorTLSCertFlag = commandLineFlag{
 		name:      "coordinator-tls-cert",

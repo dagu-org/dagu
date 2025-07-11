@@ -120,6 +120,10 @@ type Definition struct {
 	// WorkerTLSCAFile is the path to the CA certificate file for server verification.
 	WorkerTLSCAFile string `mapstructure:"workerTlsCaFile"`
 
+	// WorkerLabels are the worker labels for capability matching.
+	// Can be either a string (key1=value1,key2=value2) or a map in YAML.
+	WorkerLabels interface{} `mapstructure:"workerLabels"`
+
 	// SchedulerLockStaleThreshold is the time after which a scheduler lock is considered stale.
 	// Default is 30 seconds.
 	SchedulerLockStaleThreshold string `mapstructure:"schedulerLockStaleThreshold"`

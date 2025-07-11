@@ -499,3 +499,99 @@ workerTlsCaFile: "/path/to/ca.pem"
 		assert.Equal(t, "/path/to/ca.pem", cfg.Worker.TLS.CAFile)
 	})
 }
+
+func TestWorkerLabels(t *testing.T) {
+	t.Run("LabelsFromString", func(t *testing.T) {
+		// Create config with worker labels as string
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+workerLabels: "gpu=true,memory=64G,region=us-east-1"
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		// Load configuration
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// Verify labels are parsed correctly
+		expected := map[string]string{
+			"gpu":    "true",
+			"memory": "64G",
+			"region": "us-east-1",
+		}
+		assert.Equal(t, expected, cfg.Worker.Labels)
+	})
+
+	t.Run("LabelsFromMap", func(t *testing.T) {
+		// Create config with worker labels as map
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+workerLabels:
+  gpu: "true"
+  memory: "64G"
+  region: "us-west-2"
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		// Load configuration
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// Verify labels are loaded correctly
+		expected := map[string]string{
+			"gpu":    "true",
+			"memory": "64G",
+			"region": "us-west-2",
+		}
+		assert.Equal(t, expected, cfg.Worker.Labels)
+	})
+
+	t.Run("LabelsFromEnvironment", func(t *testing.T) {
+		// Set environment variable
+		os.Setenv("DAGU_WORKER_LABELS", "instance-type=m5.xlarge,cpu-arch=amd64")
+		defer os.Unsetenv("DAGU_WORKER_LABELS")
+
+		// Create minimal config
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		err := os.WriteFile(configFile, []byte("# minimal config"), 0600)
+		require.NoError(t, err)
+
+		// Load configuration
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// Verify labels from environment are parsed correctly
+		expected := map[string]string{
+			"instance-type": "m5.xlarge",
+			"cpu-arch":      "amd64",
+		}
+		assert.Equal(t, expected, cfg.Worker.Labels)
+	})
+
+	t.Run("EmptyLabels", func(t *testing.T) {
+		// Create config without worker labels
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+workerMaxConcurrentRuns: 50
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		// Load configuration
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// Verify labels are nil or empty
+		assert.True(t, cfg.Worker.Labels == nil || len(cfg.Worker.Labels) == 0)
+	})
+}
