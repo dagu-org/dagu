@@ -7,15 +7,19 @@ import { useQuery } from '../../hooks/api';
 import type { components } from '../../api/v2/schema';
 import WorkerList from '../../features/workers/components/WorkerList';
 import WorkerMetrics from '../../features/workers/components/WorkerMetrics';
+import { DAGRunDetailsModal } from '../../features/dag-runs/components/dag-run-details';
 import { cn } from '../../lib/utils';
-
-type Worker = components['schemas']['Worker'];
-type WorkersListResponse = components['schemas']['WorkersListResponse'];
 
 function Workers() {
   const appBarContext = React.useContext(AppBarContext);
   const [searchText, setSearchText] = React.useState('');
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+  
+  // State for DAG run modal
+  const [modalDAGRun, setModalDAGRun] = React.useState<{
+    name: string;
+    dagRunId: string;
+  } | null>(null);
 
   React.useEffect(() => {
     appBarContext.setTitle('Workers');
@@ -84,6 +88,30 @@ function Workers() {
       utilization,
     };
   }, [data?.workers]);
+
+  // Handle task click
+  const handleTaskClick = React.useCallback((task: components['schemas']['RunningTask']) => {
+    // For nested tasks, we need to set up the URL params for child DAG view
+    if (task.parentDagRunName && task.parentDagRunId) {
+      const searchParams = new URLSearchParams();
+      searchParams.set('childDAGRunId', task.dagRunId);
+      searchParams.set('dagRunId', task.parentDagRunId);
+      searchParams.set('dagRunName', task.parentDagRunName);
+      window.history.pushState({}, '', `${window.location.pathname}?${searchParams.toString()}`);
+      
+      // Open modal with parent DAG info
+      setModalDAGRun({
+        name: task.parentDagRunName,
+        dagRunId: task.parentDagRunId,
+      });
+    } else {
+      // For root tasks, open directly
+      setModalDAGRun({
+        name: task.dagName,
+        dagRunId: task.dagRunId,
+      });
+    }
+  }, []);
 
   if (error) {
     const errorData = error as components['schemas']['Error'];
@@ -176,9 +204,24 @@ function Workers() {
             workers={filteredWorkers} 
             isLoading={isLoading && !data}
             errors={data?.errors}
+            onTaskClick={handleTaskClick}
           />
         </div>
       </div>
+      
+      {/* DAG Run Details Modal */}
+      {modalDAGRun && (
+        <DAGRunDetailsModal
+          name={modalDAGRun.name}
+          dagRunId={modalDAGRun.dagRunId}
+          isOpen={!!modalDAGRun}
+          onClose={() => {
+            setModalDAGRun(null);
+            // Clear URL params when closing modal
+            window.history.pushState({}, '', window.location.pathname);
+          }}
+        />
+      )}
     </div>
   );
 }

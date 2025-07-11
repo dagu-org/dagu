@@ -11,9 +11,10 @@ interface WorkerListProps {
   workers: Worker[];
   isLoading: boolean;
   errors?: string[];
+  onTaskClick?: (task: RunningTask) => void;
 }
 
-function WorkerList({ workers, isLoading, errors }: WorkerListProps) {
+function WorkerList({ workers, isLoading, errors, onTaskClick }: WorkerListProps) {
   const [expandedWorkers, setExpandedWorkers] = React.useState<Set<string>>(new Set());
 
   const toggleExpanded = (workerId: string) => {
@@ -139,7 +140,7 @@ function WorkerList({ workers, isLoading, errors }: WorkerListProps) {
                     Running Tasks ({worker.runningTasks.length})
                   </div>
                   {worker.runningTasks.map((task: RunningTask) => (
-                    <TaskRow key={task.dagRunId} task={task} />
+                    <TaskRow key={task.dagRunId} task={task} onTaskClick={onTaskClick} />
                   ))}
                 </div>
               </div>
@@ -176,7 +177,7 @@ function UtilizationBar({ busy, total }: { busy: number; total: number }) {
   );
 }
 
-function TaskRow({ task }: { task: RunningTask }) {
+function TaskRow({ task, onTaskClick }: { task: RunningTask; onTaskClick?: (task: RunningTask) => void }) {
   const duration = React.useMemo(() => {
     if (!task.startedAt) return '';
     const start = new Date(task.startedAt).getTime();
@@ -190,8 +191,31 @@ function TaskRow({ task }: { task: RunningTask }) {
 
   const isNestedTask = task.rootDagRunName && task.rootDagRunName !== task.dagName;
 
+  const handleClick = (e: React.MouseEvent) => {
+    if (e.metaKey || e.ctrlKey) {
+      // Open in new tab
+      let url: string;
+      if (task.parentDagRunName && task.parentDagRunId) {
+        const searchParams = new URLSearchParams();
+        searchParams.set('childDAGRunId', task.dagRunId);
+        searchParams.set('dagRunId', task.parentDagRunId);
+        searchParams.set('dagRunName', task.parentDagRunName);
+        url = `/dag-runs/${task.parentDagRunName}/${task.parentDagRunId}?${searchParams.toString()}`;
+      } else {
+        url = `/dag-runs/${task.dagName}/${task.dagRunId}`;
+      }
+      window.open(url, '_blank');
+    } else if (onTaskClick) {
+      // Open modal
+      onTaskClick(task);
+    }
+  };
+
   return (
-    <div className="flex items-center gap-3 p-1.5 rounded bg-background/50">
+    <div 
+      className="flex items-center gap-3 p-1.5 rounded bg-background/50 cursor-pointer hover:bg-background/80 transition-colors"
+      onClick={handleClick}
+    >
       <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
       <div className="flex-1 min-w-0">
         <div className="text-xs font-medium truncate">{task.dagName}</div>
