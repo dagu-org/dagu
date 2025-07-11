@@ -85,7 +85,7 @@ func newClient(ctx context.Context, config *Config) (*coordinatorClient, error) 
 
 	// Wait for coordinator to be healthy
 	if err := client.waitForHealthy(ctx); err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return nil, fmt.Errorf("coordinator not healthy: %w", err)
 	}
 
@@ -153,7 +153,7 @@ func (c *coordinatorClient) dispatchWithRetry(ctx context.Context, req *coordina
 // GetTaskStatus queries the status of a dispatched task
 // Note: This is a placeholder implementation. The coordinator service
 // doesn't currently support status queries.
-func (c *coordinatorClient) GetTaskStatus(ctx context.Context, dagRunID string) (*TaskStatus, error) {
+func (c *coordinatorClient) GetTaskStatus(_ context.Context, _ string) (*TaskStatus, error) {
 	// TODO: Implement when coordinator supports status queries
 	return nil, fmt.Errorf("task status query not implemented")
 }

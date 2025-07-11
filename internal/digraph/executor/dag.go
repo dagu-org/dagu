@@ -79,15 +79,11 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 		// Try distributed execution
 		err := e.runDistributed(ctx)
 		if err != nil {
-			// Log the error but fall through to local execution
-			logger.Warn(ctx, "Distributed execution failed, falling back to local execution",
-				"error", err,
-				"dag", e.child.DAG.Name,
-			)
-		} else {
-			// Distributed execution succeeded
-			return nil
+			// Distributed execution was requested but failed - return error
+			return fmt.Errorf("distributed execution failed for DAG %s: %w", e.child.DAG.Name, err)
 		}
+		// Distributed execution succeeded
+		return nil
 	}
 
 	e.lock.Lock()
@@ -184,7 +180,11 @@ func (e *dagExecutor) runDistributed(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create coordinator client: %w", err)
 	}
-	defer coordinatorClient.Close()
+	defer func() {
+		if err := coordinatorClient.Close(); err != nil {
+			logger.Error(ctx, "Failed to close coordinator client", "error", err)
+		}
+	}()
 
 	// Dispatch the task
 	logger.Info(ctx, "Dispatching task to coordinator",
@@ -209,7 +209,7 @@ func (e *dagExecutor) runDistributed(ctx context.Context) error {
 // getCoordinatorClient gets a coordinator client using the factory from environment
 func (e *dagExecutor) getCoordinatorClient(ctx context.Context) (client.Client, error) {
 	env := GetEnv(ctx)
-	
+
 	// Factory should be initialized when Env is created
 	if env.CoordinatorClientFactory == nil {
 		return nil, fmt.Errorf("coordinator client factory not initialized in environment")

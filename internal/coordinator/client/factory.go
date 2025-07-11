@@ -98,7 +98,7 @@ func (f *Factory) Build(ctx context.Context) (Client, error) {
 }
 
 // BuildFromSystemConfig creates a client using the system configuration
-func BuildFromSystemConfig(ctx context.Context, cfg interface{}) (Client, error) {
+func BuildFromSystemConfig(ctx context.Context, cfg any) (Client, error) {
 	// Type assert to the expected configuration structure
 	type systemConfig interface {
 		GetCoordinatorHost() string

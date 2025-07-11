@@ -273,10 +273,10 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create a new environment for the dag-run.
 	dbClient := newDBClient(a.dagRunStore, a.dagStore)
-	
+
 	// Initialize coordinator client factory for distributed execution
 	coordinatorFactory := a.createCoordinatorClientFactory(ctx)
-	
+
 	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorFactory)
 
 	// Add structured logging context
@@ -670,7 +670,7 @@ func (a *Agent) createCoordinatorClientFactory(ctx context.Context) *client.Fact
 	// Use worker configuration for coordinator connection
 	host := cfg.Worker.CoordinatorHost
 	port := cfg.Worker.CoordinatorPort
-	
+
 	// Default values if not configured
 	if host == "" {
 		host = "localhost"

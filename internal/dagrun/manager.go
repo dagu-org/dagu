@@ -524,7 +524,7 @@ func (m *Manager) HandleTask(ctx context.Context, task *coordinatorv1.Task) erro
 		logger.Info(ctx, "Creating temporary DAG file from definition",
 			"dagName", task.Target,
 			"definitionSize", len(task.Definition))
-		
+
 		tf, err := m.createTempDAGFile(task.Target, []byte(task.Definition))
 		if err != nil {
 			return fmt.Errorf("failed to create temp DAG file: %w", err)
@@ -539,7 +539,7 @@ func (m *Manager) HandleTask(ctx context.Context, task *coordinatorv1.Task) erro
 		// Update the target to use the temp file
 		originalTarget := task.Target
 		task.Target = tempFile
-		
+
 		logger.Info(ctx, "Created temporary DAG file",
 			"tempFile", tempFile,
 			"originalTarget", originalTarget)
