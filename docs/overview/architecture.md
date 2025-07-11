@@ -246,3 +246,137 @@ Dagu's file-based architecture enables distributed execution patterns:
    - Each DAG execution can run on separate nodes or containers
    - Status files provide real-time coordination
    - No complex message brokers required
+
+## Distributed Execution Architecture
+
+Dagu supports distributed execution through a coordinator-worker model. Workers require access to shared storage for DAG files and execution state.
+
+### Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Dagu Instance                           │
+├──────────────┬────────────────┬─────────────────────────────┤
+│  Scheduler   │   Web UI       │      Coordinator Service   │
+│              │                │         (gRPC Server)       │
+└──────────────┴────────────────┴─────────────────────────────┘
+                                              │
+                                              │ gRPC (Long Polling)
+                                              │
+                ┌─────────────────────────────┴────────────────┐
+                │                                              │
+         ┌──────▼───────┐                            ┌────────▼──────┐
+         │   Worker 1   │                            │   Worker N    │
+         │              │                            │               │
+         │ Labels:      │                            │ Labels:       │
+         │ - gpu=true   │                            │ - region=eu   │
+         │ - memory=64G │                            │ - cpu=high    │
+         └──────────────┘                            └───────────────┘
+```
+
+### Core Components
+
+#### 1. Coordinator Service
+- **gRPC Server**: Listens on configurable port (default: 50051)
+- **Task Distribution**: Routes tasks to appropriate workers based on labels
+- **Long Polling**: Workers poll for tasks using efficient long-polling mechanism
+- **Health Monitoring**: Tracks worker heartbeats and health status
+- **Authentication**: Supports signing keys and mutual TLS
+
+#### 2. Worker Service
+- **Task Polling**: Multiple concurrent pollers per worker
+- **Label-Based Routing**: Workers advertise capabilities via labels
+- **Task Execution**: Runs DAGs using the same execution engine
+- **Heartbeat**: Regular health updates to coordinator
+- **Graceful Shutdown**: Completes running tasks before terminating
+
+#### 3. Task Routing
+
+Tasks are routed to workers based on `workerSelector` in DAG definitions:
+
+```yaml
+steps:
+  - name: gpu-training
+    command: python train.py
+    workerSelector:
+      gpu: "true"
+      memory: "64G"
+```
+
+### Communication Protocol
+
+1. **Worker Registration**
+   - Workers connect to coordinator via gRPC
+   - Send regular heartbeats with status updates
+   - Advertise labels for capability matching
+
+2. **Task Assignment**
+   - Scheduler creates tasks with worker requirements
+   - Coordinator matches tasks to eligible workers
+   - Workers poll and receive matching tasks
+
+3. **Status Updates**
+   - Workers track task execution status
+   - Real-time updates visible in Web UI
+   - Hierarchical DAG tracking (root/parent/child)
+
+### Health Monitoring
+
+Worker health is determined by heartbeat recency:
+- **Healthy**: Last heartbeat < 5 seconds ago (green)
+- **Warning**: Last heartbeat 5-15 seconds ago (yellow)
+- **Unhealthy**: Last heartbeat > 15 seconds ago (red)
+- **Offline**: No heartbeat for > 30 seconds (removed)
+
+### Security Features
+
+1. **TLS Support**
+   - Server certificates for encrypted communication
+   - Client certificates for mutual TLS authentication
+   - CA certificate validation
+
+2. **Authentication**
+   - Signing key for request validation
+
+3. **Network Security**
+   - Configurable bind addresses
+   - Firewall-friendly single port
+
+### Deployment Patterns
+
+#### 1. Single Coordinator, Multiple Workers
+```bash
+# Start coordinator on main server
+dagu coordinator --coordinator-host=0.0.0.0
+
+# Start workers on compute nodes
+dagu worker --worker-labels gpu=true --worker-coordinator-host=coordinator.internal
+dagu worker --worker-labels region=us-east-1 --worker-coordinator-host=coordinator.internal
+```
+
+#### 2. Container Orchestration
+```yaml
+# Kubernetes example
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dagu-worker-gpu
+spec:
+  replicas: 5
+  template:
+    spec:
+      containers:
+      - name: worker
+        image: dagu:latest
+        command: ["dagu", "worker"]
+        args:
+          - --worker-labels=gpu=true,node-type=gpu
+          - --worker-coordinator-host=dagu-coordinator
+```
+
+### Requirements
+
+- Workers need access to the same DAG files and data directories as the main Dagu instance
+  - Exception: When DAG definitions are embedded in the task (e.g., local DAGs defined within a parent DAG file)
+- Shared storage can be provided via NFS, cloud storage (EFS, GCS, Azure Files), or distributed filesystems
+- Workers execute DAGs using the same file-based storage system described above

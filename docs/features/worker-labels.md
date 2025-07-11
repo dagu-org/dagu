@@ -2,6 +2,10 @@
 
 Worker labels allow you to tag workers with specific capabilities and route tasks to appropriate workers based on their requirements.
 
+::: tip
+Worker labels are a key component of Dagu's [Distributed Execution](/features/distributed-execution) feature. Make sure to understand the distributed execution architecture before implementing worker labels.
+:::
+
 ## Configuring Worker Labels
 
 ### Command Line
@@ -124,3 +128,65 @@ steps:
     workerSelector:
       memory: "128G"
 ```
+
+### Environment-Based Routing
+```yaml
+# Development worker
+dagu worker --worker-labels env=dev,access=internal
+
+# Production worker
+dagu worker --worker-labels env=prod,access=secure,compliance=soc2
+
+# Environment-specific tasks
+steps:
+  - name: dev-test
+    workerSelector:
+      env: "dev"
+  - name: prod-deployment
+    workerSelector:
+      env: "prod"
+      compliance: "soc2"
+```
+
+## Integration with Orchestrators
+
+### Kubernetes Labels
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dagu-worker
+spec:
+  containers:
+  - name: worker
+    image: dagu:latest
+    command: ["dagu", "worker"]
+    env:
+    - name: NODE_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: spec.nodeName
+    - name: DAGU_WORKER_LABELS
+      value: "kubernetes.node=$(NODE_NAME),kubernetes.namespace=default"
+```
+
+### Docker Compose
+```yaml
+services:
+  worker-gpu:
+    image: dagu:latest
+    command: >
+      worker
+      --worker-labels=container=docker,gpu=${GPU_DEVICE}
+    environment:
+      - GPU_DEVICE=0
+    devices:
+      - /dev/nvidia0
+```
+
+## See Also
+
+- [Distributed Execution](/features/distributed-execution) - Complete guide to distributed execution
+- [YAML Reference](/reference/yaml#distributed-execution) - workerSelector configuration
+- [CLI Reference](/reference/cli#worker) - Worker command options
+- [Configuration Reference](/configurations/reference#worker) - Worker configuration

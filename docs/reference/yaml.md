@@ -370,6 +370,44 @@ steps:
     command: python process.py
 ```
 
+### Distributed Execution
+
+| Field | Type | Description | Default |
+|-------|------|-------------|---------|
+| `workerSelector` | object | Worker label requirements for distributed execution | - |
+
+When using distributed execution, specify `workerSelector` to route tasks to workers with matching labels:
+
+```yaml
+steps:
+  - name: gpu-training
+    command: python train_model.py
+    workerSelector:
+      gpu: "true"
+      cuda: "11.8"
+      memory: "64G"
+    
+  - name: data-processing-eu
+    command: ./process_eu_data.sh
+    workerSelector:
+      region: "eu-west-1"
+      compliance: "gdpr"
+    
+  - name: high-memory-task
+    command: analyze_large_dataset.py
+    workerSelector:
+      memory: "128G"
+      cpu-cores: "32"
+```
+
+**Worker Selection Rules:**
+- All labels in `workerSelector` must match exactly on the worker
+- Label values are case-sensitive strings
+- Steps without `workerSelector` can run on any available worker
+- If no workers match the selector, the task waits until a matching worker is available
+
+See [Distributed Execution](/features/distributed-execution) for complete documentation.
+
 ## Variable Substitution
 
 ### Parameter References

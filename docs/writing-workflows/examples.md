@@ -1435,8 +1435,235 @@ Two ways to define steps.
 </div>
 
 
+## Distributed Execution
+
+<div class="examples-grid">
+
+<div class="example-card">
+
+### GPU Task Routing
+
+```yaml
+name: ml-training-pipeline
+steps:
+  - name: prepare-data
+    command: python prepare_dataset.py
+    
+  - name: train-model
+    command: python train.py --gpu
+    workerSelector:
+      gpu: "true"
+      cuda: "11.8"
+      memory: "64G"
+    depends: prepare-data
+    
+  - name: evaluate-model
+    command: python evaluate.py
+    workerSelector:
+      gpu: "true"
+    depends: train-model
+```
+
+Route GPU tasks to GPU-enabled workers.
+
+<a href="/features/distributed-execution" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Multi-Region Processing
+
+```yaml
+name: global-data-pipeline
+steps:
+  - name: process-us-data
+    command: ./process_data.sh us-east-1
+    workerSelector:
+      region: "us-east-1"
+      
+  - name: process-eu-data
+    command: ./process_data.sh eu-west-1
+    workerSelector:
+      region: "eu-west-1"
+      compliance: "gdpr"
+      
+  - name: process-apac-data
+    command: ./process_data.sh ap-southeast-1
+    workerSelector:
+      region: "ap-southeast-1"
+      
+  - name: aggregate-results
+    command: ./aggregate.py
+    depends:
+      - process-us-data
+      - process-eu-data
+      - process-apac-data
+```
+
+Process data in specific regions for compliance.
+
+<a href="/features/worker-labels#multi-region-deployment" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Resource-Based Distribution
+
+```yaml
+name: data-analysis-pipeline
+steps:
+  - name: light-preprocessing
+    command: python preprocess.py
+    workerSelector:
+      cpu-cores: "4"
+      memory: "8G"
+      
+  - name: heavy-computation
+    command: python analyze.py --large
+    workerSelector:
+      cpu-cores: "32"
+      memory: "128G"
+      instance-type: "compute-optimized"
+    depends: light-preprocessing
+    
+  - name: ml-inference
+    command: python inference.py
+    workerSelector:
+      gpu: "true"
+      gpu-memory: "24G"
+    depends: heavy-computation
+```
+
+Match tasks to appropriate hardware resources.
+
+<a href="/features/worker-labels#resource-based-routing" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Mixed Local and Distributed
+
+```yaml
+name: hybrid-workflow
+steps:
+  # Runs on any available worker (local or remote)
+  - name: fetch-data
+    command: wget https://data.example.com/dataset.tar.gz
+    
+  # Must run on specific worker type
+  - name: process-on-gpu
+    command: python gpu_process.py
+    workerSelector:
+      gpu: "true"
+      gpu-model: "nvidia-a100"
+    depends: fetch-data
+    
+  # Runs locally (no selector)
+  - name: notify-completion
+    command: ./notify.sh "Processing complete"
+    depends: process-on-gpu
+```
+
+Combine local and distributed execution.
+
+<a href="/features/distributed-execution#task-routing" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Environment-Specific Workers
+
+```yaml
+name: deployment-pipeline
+steps:
+  - name: build
+    command: docker build -t myapp:latest .
+    workerSelector:
+      capability: "docker"
+      
+  - name: test-dev
+    command: ./deploy.sh dev
+    workerSelector:
+      env: "dev"
+      access: "internal"
+    depends: build
+    
+  - name: test-staging
+    command: ./deploy.sh staging
+    workerSelector:
+      env: "staging"
+      access: "secure"
+    depends: test-dev
+    
+  - name: deploy-prod
+    command: ./deploy.sh production
+    workerSelector:
+      env: "prod"
+      compliance: "soc2"
+      access: "restricted"
+    depends: test-staging
+    preconditions:
+      - condition: "${APPROVED}"
+        expected: "true"
+```
+
+Route tasks based on environment access.
+
+<a href="/features/worker-labels#environment-based-routing" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Parallel Distributed Tasks
+
+```yaml
+name: distributed-batch-processing
+steps:
+  - name: split-data
+    command: python split_data.py --chunks=10
+    output: CHUNKS
+    
+  - name: process-chunks
+    run: chunk-processor
+    parallel:
+      items: ${CHUNKS}
+      maxConcurrent: 5
+    params: "CHUNK=${ITEM}"
+    workerSelector:
+      memory: "16G"
+      cpu-cores: "8"
+    depends: split-data
+    
+  - name: merge-results
+    command: python merge_results.py
+    depends: process-chunks
+
+---
+name: chunk-processor
+params:
+  - CHUNK: ""
+steps:
+  - name: process
+    command: python process_chunk.py ${CHUNK}
+```
+
+Distribute parallel tasks across workers.
+
+<a href="/features/execution-control#parallel" class="learn-more">Learn more →</a>
+
+</div>
+
+</div>
+
 ## Learn More
 
 - [Writing Workflows Guide](/writing-workflows/) - Complete guide to building workflows
 - [Feature Documentation](/features/) - Deep dive into all features
 - [Configuration Reference](/reference/yaml) - Complete YAML specification
+- [Distributed Execution](/features/distributed-execution) - Scale across multiple machines
+- [Worker Labels](/features/worker-labels) - Task routing with labels
