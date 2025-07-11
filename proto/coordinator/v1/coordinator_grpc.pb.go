@@ -19,8 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CoordinatorService_Poll_FullMethodName     = "/coordinator.v1.CoordinatorService/Poll"
-	CoordinatorService_Dispatch_FullMethodName = "/coordinator.v1.CoordinatorService/Dispatch"
+	CoordinatorService_Poll_FullMethodName       = "/coordinator.v1.CoordinatorService/Poll"
+	CoordinatorService_Dispatch_FullMethodName   = "/coordinator.v1.CoordinatorService/Dispatch"
+	CoordinatorService_GetWorkers_FullMethodName = "/coordinator.v1.CoordinatorService/GetWorkers"
+	CoordinatorService_Heartbeat_FullMethodName  = "/coordinator.v1.CoordinatorService/Heartbeat"
 )
 
 // CoordinatorServiceClient is the client API for CoordinatorService service.
@@ -33,6 +35,10 @@ type CoordinatorServiceClient interface {
 	Poll(ctx context.Context, in *PollRequest, opts ...grpc.CallOption) (*PollResponse, error)
 	// Dispatch is called to dispatch a task to a worker.
 	Dispatch(ctx context.Context, in *DispatchRequest, opts ...grpc.CallOption) (*DispatchResponse, error)
+	// GetWorkers returns the list of connected workers and their pollers.
+	GetWorkers(ctx context.Context, in *GetWorkersRequest, opts ...grpc.CallOption) (*GetWorkersResponse, error)
+	// Heartbeat is called by workers to report their status.
+	Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error)
 }
 
 type coordinatorServiceClient struct {
@@ -63,6 +69,26 @@ func (c *coordinatorServiceClient) Dispatch(ctx context.Context, in *DispatchReq
 	return out, nil
 }
 
+func (c *coordinatorServiceClient) GetWorkers(ctx context.Context, in *GetWorkersRequest, opts ...grpc.CallOption) (*GetWorkersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetWorkersResponse)
+	err := c.cc.Invoke(ctx, CoordinatorService_GetWorkers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coordinatorServiceClient) Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HeartbeatResponse)
+	err := c.cc.Invoke(ctx, CoordinatorService_Heartbeat_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CoordinatorServiceServer is the server API for CoordinatorService service.
 // All implementations must embed UnimplementedCoordinatorServiceServer
 // for forward compatibility.
@@ -73,6 +99,10 @@ type CoordinatorServiceServer interface {
 	Poll(context.Context, *PollRequest) (*PollResponse, error)
 	// Dispatch is called to dispatch a task to a worker.
 	Dispatch(context.Context, *DispatchRequest) (*DispatchResponse, error)
+	// GetWorkers returns the list of connected workers and their pollers.
+	GetWorkers(context.Context, *GetWorkersRequest) (*GetWorkersResponse, error)
+	// Heartbeat is called by workers to report their status.
+	Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error)
 	mustEmbedUnimplementedCoordinatorServiceServer()
 }
 
@@ -88,6 +118,12 @@ func (UnimplementedCoordinatorServiceServer) Poll(context.Context, *PollRequest)
 }
 func (UnimplementedCoordinatorServiceServer) Dispatch(context.Context, *DispatchRequest) (*DispatchResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Dispatch not implemented")
+}
+func (UnimplementedCoordinatorServiceServer) GetWorkers(context.Context, *GetWorkersRequest) (*GetWorkersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetWorkers not implemented")
+}
+func (UnimplementedCoordinatorServiceServer) Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Heartbeat not implemented")
 }
 func (UnimplementedCoordinatorServiceServer) mustEmbedUnimplementedCoordinatorServiceServer() {}
 func (UnimplementedCoordinatorServiceServer) testEmbeddedByValue()                            {}
@@ -146,6 +182,42 @@ func _CoordinatorService_Dispatch_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CoordinatorService_GetWorkers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetWorkersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoordinatorServiceServer).GetWorkers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoordinatorService_GetWorkers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoordinatorServiceServer).GetWorkers(ctx, req.(*GetWorkersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CoordinatorService_Heartbeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HeartbeatRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoordinatorServiceServer).Heartbeat(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoordinatorService_Heartbeat_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoordinatorServiceServer).Heartbeat(ctx, req.(*HeartbeatRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CoordinatorService_ServiceDesc is the grpc.ServiceDesc for CoordinatorService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -160,6 +232,14 @@ var CoordinatorService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Dispatch",
 			Handler:    _CoordinatorService_Dispatch_Handler,
+		},
+		{
+			MethodName: "GetWorkers",
+			Handler:    _CoordinatorService_GetWorkers_Handler,
+		},
+		{
+			MethodName: "Heartbeat",
+			Handler:    _CoordinatorService_Heartbeat_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

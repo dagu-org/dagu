@@ -3,6 +3,7 @@ package coordinator
 import (
 	"context"
 	"sync"
+	"time"
 
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"google.golang.org/grpc/codes"
@@ -10,20 +11,32 @@ import (
 )
 
 type workerInfo struct {
-	taskChan chan *coordinatorv1.Task
-	labels   map[string]string
+	workerID    string
+	pollerID    string
+	taskChan    chan *coordinatorv1.Task
+	labels      map[string]string
+	connectedAt time.Time
+}
+
+type heartbeatInfo struct {
+	workerID        string
+	labels          map[string]string
+	stats           *coordinatorv1.WorkerStats
+	lastHeartbeatAt time.Time
 }
 
 type Handler struct {
 	coordinatorv1.UnimplementedCoordinatorServiceServer
 
 	mu             sync.Mutex
-	waitingPollers map[string]*workerInfo // pollerID -> worker info
+	waitingPollers map[string]*workerInfo    // pollerID -> worker info
+	heartbeats     map[string]*heartbeatInfo // workerID -> heartbeat info
 }
 
 func NewHandler() *Handler {
 	return &Handler{
 		waitingPollers: make(map[string]*workerInfo),
+		heartbeats:     make(map[string]*heartbeatInfo),
 	}
 }
 
@@ -37,8 +50,11 @@ func (h *Handler) Poll(ctx context.Context, req *coordinatorv1.PollRequest) (*co
 	h.mu.Lock()
 	taskChan := make(chan *coordinatorv1.Task, 1)
 	h.waitingPollers[req.PollerId] = &workerInfo{
-		taskChan: taskChan,
-		labels:   req.Labels,
+		workerID:    req.WorkerId,
+		pollerID:    req.PollerId,
+		taskChan:    taskChan,
+		labels:      req.Labels,
+		connectedAt: time.Now(),
 	}
 	h.mu.Unlock()
 
@@ -109,4 +125,61 @@ func matchesSelector(workerLabels, selector map[string]string) bool {
 		}
 	}
 	return true
+}
+
+// GetWorkers returns the list of currently connected workers
+func (h *Handler) GetWorkers(_ context.Context, _ *coordinatorv1.GetWorkersRequest) (*coordinatorv1.GetWorkersResponse, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	// Return aggregated worker info from heartbeats
+	workers := make([]*coordinatorv1.WorkerInfo, 0, len(h.heartbeats))
+	for _, hb := range h.heartbeats {
+		workerInfo := &coordinatorv1.WorkerInfo{
+			WorkerId:        hb.workerID,
+			Labels:          hb.labels,
+			LastHeartbeatAt: hb.lastHeartbeatAt.Unix(),
+		}
+
+		// Add stats if available
+		if hb.stats != nil {
+			workerInfo.TotalPollers = hb.stats.TotalPollers
+			workerInfo.BusyPollers = hb.stats.BusyPollers
+			workerInfo.RunningTasks = hb.stats.RunningTasks
+		}
+
+		workers = append(workers, workerInfo)
+	}
+
+	return &coordinatorv1.GetWorkersResponse{
+		Workers: workers,
+	}, nil
+}
+
+// Heartbeat receives periodic status updates from workers
+func (h *Handler) Heartbeat(_ context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error) {
+	if req.WorkerId == "" {
+		return nil, status.Error(codes.InvalidArgument, "worker_id is required")
+	}
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	// Update or create heartbeat info
+	h.heartbeats[req.WorkerId] = &heartbeatInfo{
+		workerID:        req.WorkerId,
+		labels:          req.Labels,
+		stats:           req.Stats,
+		lastHeartbeatAt: time.Now(),
+	}
+
+	// Clean up stale heartbeats (older than 30 seconds)
+	staleThreshold := time.Now().Add(-30 * time.Second)
+	for workerID, info := range h.heartbeats {
+		if info.lastHeartbeatAt.Before(staleThreshold) {
+			delete(h.heartbeats, workerID)
+		}
+	}
+
+	return &coordinatorv1.HeartbeatResponse{}, nil
 }

@@ -12,6 +12,10 @@ service CoordinatorService {
   rpc Poll (PollRequest) returns (PollResponse);
   // Dispatch is called to dispatch a task to a worker.
   rpc Dispatch (DispatchRequest) returns (DispatchResponse);
+  // GetWorkers returns the list of connected workers and their pollers.
+  rpc GetWorkers (GetWorkersRequest) returns (GetWorkersResponse);
+  // Heartbeat is called by workers to report their status.
+  rpc Heartbeat (HeartbeatRequest) returns (HeartbeatResponse);
 }
 
 // Request message for polling a task.
@@ -55,4 +59,61 @@ enum Operation {
   OPERATION_UNSPECIFIED = 0;
   OPERATION_START = 1;    // Start a new DAG run
   OPERATION_RETRY = 2;    // Retry an existing run
+}
+
+// Request message for getting workers.
+message GetWorkersRequest {
+  // No fields needed for now
+}
+
+// Response message for getting workers.
+message GetWorkersResponse {
+  repeated WorkerInfo workers = 1;
+}
+
+// Information about a worker and its pollers.
+message WorkerInfo {
+  string worker_id = 1;
+  string poller_id = 2;  // Deprecated: Only used for backward compatibility
+  map<string, string> labels = 3;
+  int64 connected_at = 4; // Unix timestamp in seconds
+  WorkerStatus status = 5; // Deprecated: Use stats instead
+  // Aggregated stats from heartbeat
+  int32 total_pollers = 6;
+  int32 busy_pollers = 7;
+  repeated RunningTask running_tasks = 8;
+  int64 last_heartbeat_at = 9; // Unix timestamp of last heartbeat
+}
+
+// Status of a worker.
+enum WorkerStatus {
+  WORKER_STATUS_UNSPECIFIED = 0;
+  WORKER_STATUS_WAITING = 1;    // Waiting for tasks
+  WORKER_STATUS_BUSY = 2;       // Currently processing a task
+}
+
+// Request message for heartbeat.
+message HeartbeatRequest {
+  string worker_id = 1;
+  map<string, string> labels = 2;
+  WorkerStats stats = 3;
+}
+
+// Response message for heartbeat.
+message HeartbeatResponse {
+  // Empty for now
+}
+
+// Worker statistics reported via heartbeat.
+message WorkerStats {
+  int32 total_pollers = 1;      // Total number of pollers
+  int32 busy_pollers = 2;       // Number currently processing tasks
+  repeated RunningTask running_tasks = 3; // Details of running tasks
+}
+
+// Information about a running task.
+message RunningTask {
+  string dag_run_id = 1;
+  string dag_name = 2;
+  int64 started_at = 3;         // Unix timestamp in seconds
 }

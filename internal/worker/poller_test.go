@@ -19,8 +19,10 @@ import (
 
 // MockCoordinatorClient is a mock implementation of CoordinatorServiceClient
 type MockCoordinatorClient struct {
-	PollFunc     func(ctx context.Context, in *coordinatorv1.PollRequest, opts ...grpc.CallOption) (*coordinatorv1.PollResponse, error)
-	DispatchFunc func(ctx context.Context, in *coordinatorv1.DispatchRequest, opts ...grpc.CallOption) (*coordinatorv1.DispatchResponse, error)
+	PollFunc       func(ctx context.Context, in *coordinatorv1.PollRequest, opts ...grpc.CallOption) (*coordinatorv1.PollResponse, error)
+	DispatchFunc   func(ctx context.Context, in *coordinatorv1.DispatchRequest, opts ...grpc.CallOption) (*coordinatorv1.DispatchResponse, error)
+	GetWorkersFunc func(ctx context.Context, in *coordinatorv1.GetWorkersRequest, opts ...grpc.CallOption) (*coordinatorv1.GetWorkersResponse, error)
+	HeartbeatFunc  func(ctx context.Context, in *coordinatorv1.HeartbeatRequest, opts ...grpc.CallOption) (*coordinatorv1.HeartbeatResponse, error)
 }
 
 func (m *MockCoordinatorClient) Poll(ctx context.Context, in *coordinatorv1.PollRequest, opts ...grpc.CallOption) (*coordinatorv1.PollResponse, error) {
@@ -35,6 +37,20 @@ func (m *MockCoordinatorClient) Dispatch(ctx context.Context, in *coordinatorv1.
 		return m.DispatchFunc(ctx, in, opts...)
 	}
 	return &coordinatorv1.DispatchResponse{}, nil
+}
+
+func (m *MockCoordinatorClient) GetWorkers(ctx context.Context, in *coordinatorv1.GetWorkersRequest, opts ...grpc.CallOption) (*coordinatorv1.GetWorkersResponse, error) {
+	if m.GetWorkersFunc != nil {
+		return m.GetWorkersFunc(ctx, in, opts...)
+	}
+	return &coordinatorv1.GetWorkersResponse{}, nil
+}
+
+func (m *MockCoordinatorClient) Heartbeat(ctx context.Context, in *coordinatorv1.HeartbeatRequest, opts ...grpc.CallOption) (*coordinatorv1.HeartbeatResponse, error) {
+	if m.HeartbeatFunc != nil {
+		return m.HeartbeatFunc(ctx, in, opts...)
+	}
+	return &coordinatorv1.HeartbeatResponse{}, nil
 }
 
 // TestPollerStateTracking tests that the poller correctly tracks connection state
