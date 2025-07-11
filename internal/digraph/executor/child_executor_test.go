@@ -37,7 +37,8 @@ func (m *MockDatabase) GetChildDAGRunStatus(ctx context.Context, dagRunID string
 
 // IsChildDAGRunCompleted implements digraph.Database.
 func (m *MockDatabase) IsChildDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) (bool, error) {
-	panic("unimplemented")
+	args := m.Called(ctx, dagRunID, rootDAGRun)
+	return args.Bool(0), args.Error(1)
 }
 
 func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
