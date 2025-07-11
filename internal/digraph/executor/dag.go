@@ -19,14 +19,17 @@ import (
 var _ DAGExecutor = (*dagExecutor)(nil)
 
 type dagExecutor struct {
-	child     *ChildDAGExecutor
-	lock      sync.Mutex
-	workDir   string
-	stdout    io.Writer
-	stderr    io.Writer
-	cmd       *exec.Cmd
-	runParams RunParams
-	step      digraph.Step
+	child         *ChildDAGExecutor
+	lock          sync.Mutex
+	workDir       string
+	stdout        io.Writer
+	stderr        io.Writer
+	cmd           *exec.Cmd
+	runParams     RunParams
+	step          digraph.Step
+	isDistributed bool
+	childDAGRunID string
+	env           Env
 }
 
 // Errors for DAG executor
@@ -58,6 +61,7 @@ func newDAGExecutor(
 		child:   child,
 		workDir: dir,
 		step:    step,
+		env:     GetEnv(ctx),
 	}, nil
 }
 
@@ -164,6 +168,17 @@ func (e *dagExecutor) SetStderr(out io.Writer) {
 func (e *dagExecutor) Kill(sig os.Signal) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
+
+	// If running distributed, request cancellation
+	if e.isDistributed && e.childDAGRunID != "" {
+		ctx := context.Background()
+		if err := e.env.DB.RequestChildCancel(ctx, e.childDAGRunID, e.env.RootDAGRun); err != nil {
+			logger.Error(ctx, "Failed to request child DAG cancellation",
+				"dagRunId", e.childDAGRunID, "err", err)
+		}
+	}
+
+	// Still kill local process if any
 	return killProcessGroup(e.cmd, sig)
 }
 
@@ -174,6 +189,12 @@ func (e *dagExecutor) runDistributed(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to build coordinator task: %w", err)
 	}
+
+	// Mark as distributed and store the child DAG run ID
+	e.lock.Lock()
+	e.isDistributed = true
+	e.childDAGRunID = e.runParams.RunID
+	e.lock.Unlock()
 
 	// Create coordinator client
 	coordinatorClient, err := e.getCoordinatorClient(ctx)

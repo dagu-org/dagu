@@ -41,6 +41,12 @@ func (m *MockDatabase) IsChildDAGRunCompleted(ctx context.Context, dagRunID stri
 	return args.Bool(0), args.Error(1)
 }
 
+// RequestChildCancel implements digraph.Database.
+func (m *MockDatabase) RequestChildCancel(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) error {
+	args := m.Called(ctx, dagRunID, rootDAGRun)
+	return args.Error(0)
+}
+
 func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
 	// Create a context with environment
 	ctx := context.Background()

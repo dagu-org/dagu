@@ -12,6 +12,8 @@ type Database interface {
 	GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun DAGRunRef) (*Status, error)
 	// IsChildDAGRunCompleted checks if a child dag-run has completed.
 	IsChildDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun DAGRunRef) (bool, error)
+	// RequestChildCancel requests cancellation of a child dag-run.
+	RequestChildCancel(ctx context.Context, dagRunID string, rootDAGRun DAGRunRef) error
 }
 
 // Status is the result of a dag-run.

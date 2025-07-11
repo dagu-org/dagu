@@ -70,3 +70,11 @@ func (o *dbClient) IsChildDAGRunCompleted(ctx context.Context, dagRunID string, 
 
 	return !status.Status.IsActive(), nil
 }
+
+func (o *dbClient) RequestChildCancel(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) error {
+	childAttempt, err := o.drs.FindChildAttempt(ctx, rootDAGRun, dagRunID)
+	if err != nil {
+		return fmt.Errorf("failed to find child attempt for dag-run ID %s: %w", dagRunID, err)
+	}
+	return childAttempt.RequestCancel(ctx)
+}
