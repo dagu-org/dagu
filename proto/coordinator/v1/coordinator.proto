@@ -77,19 +77,11 @@ message WorkerInfo {
   string poller_id = 2;  // Deprecated: Only used for backward compatibility
   map<string, string> labels = 3;
   int64 connected_at = 4; // Unix timestamp in seconds
-  WorkerStatus status = 5; // Deprecated: Use stats instead
   // Aggregated stats from heartbeat
-  int32 total_pollers = 6;
-  int32 busy_pollers = 7;
-  repeated RunningTask running_tasks = 8;
-  int64 last_heartbeat_at = 9; // Unix timestamp of last heartbeat
-}
-
-// Status of a worker.
-enum WorkerStatus {
-  WORKER_STATUS_UNSPECIFIED = 0;
-  WORKER_STATUS_WAITING = 1;    // Waiting for tasks
-  WORKER_STATUS_BUSY = 2;       // Currently processing a task
+  int32 total_pollers = 5;
+  int32 busy_pollers = 6;
+  repeated RunningTask running_tasks = 7;
+  int64 last_heartbeat_at = 8; // Unix timestamp of last heartbeat
 }
 
 // Request message for heartbeat.

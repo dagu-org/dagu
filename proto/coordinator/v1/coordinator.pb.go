@@ -70,56 +70,6 @@ func (Operation) EnumDescriptor() ([]byte, []int) {
 	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{0}
 }
 
-// Status of a worker.
-type WorkerStatus int32
-
-const (
-	WorkerStatus_WORKER_STATUS_UNSPECIFIED WorkerStatus = 0
-	WorkerStatus_WORKER_STATUS_WAITING     WorkerStatus = 1 // Waiting for tasks
-	WorkerStatus_WORKER_STATUS_BUSY        WorkerStatus = 2 // Currently processing a task
-)
-
-// Enum value maps for WorkerStatus.
-var (
-	WorkerStatus_name = map[int32]string{
-		0: "WORKER_STATUS_UNSPECIFIED",
-		1: "WORKER_STATUS_WAITING",
-		2: "WORKER_STATUS_BUSY",
-	}
-	WorkerStatus_value = map[string]int32{
-		"WORKER_STATUS_UNSPECIFIED": 0,
-		"WORKER_STATUS_WAITING":     1,
-		"WORKER_STATUS_BUSY":        2,
-	}
-)
-
-func (x WorkerStatus) Enum() *WorkerStatus {
-	p := new(WorkerStatus)
-	*p = x
-	return p
-}
-
-func (x WorkerStatus) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (WorkerStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_coordinator_v1_coordinator_proto_enumTypes[1].Descriptor()
-}
-
-func (WorkerStatus) Type() protoreflect.EnumType {
-	return &file_proto_coordinator_v1_coordinator_proto_enumTypes[1]
-}
-
-func (x WorkerStatus) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use WorkerStatus.Descriptor instead.
-func (WorkerStatus) EnumDescriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{1}
-}
-
 // Request message for polling a task.
 type PollRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -521,13 +471,12 @@ type WorkerInfo struct {
 	WorkerId    string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
 	PollerId    string                 `protobuf:"bytes,2,opt,name=poller_id,json=pollerId,proto3" json:"poller_id,omitempty"` // Deprecated: Only used for backward compatibility
 	Labels      map[string]string      `protobuf:"bytes,3,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	ConnectedAt int64                  `protobuf:"varint,4,opt,name=connected_at,json=connectedAt,proto3" json:"connected_at,omitempty"`     // Unix timestamp in seconds
-	Status      WorkerStatus           `protobuf:"varint,5,opt,name=status,proto3,enum=coordinator.v1.WorkerStatus" json:"status,omitempty"` // Deprecated: Use stats instead
+	ConnectedAt int64                  `protobuf:"varint,4,opt,name=connected_at,json=connectedAt,proto3" json:"connected_at,omitempty"` // Unix timestamp in seconds
 	// Aggregated stats from heartbeat
-	TotalPollers    int32          `protobuf:"varint,6,opt,name=total_pollers,json=totalPollers,proto3" json:"total_pollers,omitempty"`
-	BusyPollers     int32          `protobuf:"varint,7,opt,name=busy_pollers,json=busyPollers,proto3" json:"busy_pollers,omitempty"`
-	RunningTasks    []*RunningTask `protobuf:"bytes,8,rep,name=running_tasks,json=runningTasks,proto3" json:"running_tasks,omitempty"`
-	LastHeartbeatAt int64          `protobuf:"varint,9,opt,name=last_heartbeat_at,json=lastHeartbeatAt,proto3" json:"last_heartbeat_at,omitempty"` // Unix timestamp of last heartbeat
+	TotalPollers    int32          `protobuf:"varint,5,opt,name=total_pollers,json=totalPollers,proto3" json:"total_pollers,omitempty"`
+	BusyPollers     int32          `protobuf:"varint,6,opt,name=busy_pollers,json=busyPollers,proto3" json:"busy_pollers,omitempty"`
+	RunningTasks    []*RunningTask `protobuf:"bytes,7,rep,name=running_tasks,json=runningTasks,proto3" json:"running_tasks,omitempty"`
+	LastHeartbeatAt int64          `protobuf:"varint,8,opt,name=last_heartbeat_at,json=lastHeartbeatAt,proto3" json:"last_heartbeat_at,omitempty"` // Unix timestamp of last heartbeat
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -588,13 +537,6 @@ func (x *WorkerInfo) GetConnectedAt() int64 {
 		return x.ConnectedAt
 	}
 	return 0
-}
-
-func (x *WorkerInfo) GetStatus() WorkerStatus {
-	if x != nil {
-		return x.Status
-	}
-	return WorkerStatus_WORKER_STATUS_UNSPECIFIED
 }
 
 func (x *WorkerInfo) GetTotalPollers() int32 {
@@ -915,18 +857,17 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x13\n" +
 	"\x11GetWorkersRequest\"J\n" +
 	"\x12GetWorkersResponse\x124\n" +
-	"\aworkers\x18\x01 \x03(\v2\x1a.coordinator.v1.WorkerInfoR\aworkers\"\xd0\x03\n" +
+	"\aworkers\x18\x01 \x03(\v2\x1a.coordinator.v1.WorkerInfoR\aworkers\"\x9a\x03\n" +
 	"\n" +
 	"WorkerInfo\x12\x1b\n" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12\x1b\n" +
 	"\tpoller_id\x18\x02 \x01(\tR\bpollerId\x12>\n" +
 	"\x06labels\x18\x03 \x03(\v2&.coordinator.v1.WorkerInfo.LabelsEntryR\x06labels\x12!\n" +
-	"\fconnected_at\x18\x04 \x01(\x03R\vconnectedAt\x124\n" +
-	"\x06status\x18\x05 \x01(\x0e2\x1c.coordinator.v1.WorkerStatusR\x06status\x12#\n" +
-	"\rtotal_pollers\x18\x06 \x01(\x05R\ftotalPollers\x12!\n" +
-	"\fbusy_pollers\x18\a \x01(\x05R\vbusyPollers\x12@\n" +
-	"\rrunning_tasks\x18\b \x03(\v2\x1b.coordinator.v1.RunningTaskR\frunningTasks\x12*\n" +
-	"\x11last_heartbeat_at\x18\t \x01(\x03R\x0flastHeartbeatAt\x1a9\n" +
+	"\fconnected_at\x18\x04 \x01(\x03R\vconnectedAt\x12#\n" +
+	"\rtotal_pollers\x18\x05 \x01(\x05R\ftotalPollers\x12!\n" +
+	"\fbusy_pollers\x18\x06 \x01(\x05R\vbusyPollers\x12@\n" +
+	"\rrunning_tasks\x18\a \x03(\v2\x1b.coordinator.v1.RunningTaskR\frunningTasks\x12*\n" +
+	"\x11last_heartbeat_at\x18\b \x01(\x03R\x0flastHeartbeatAt\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe3\x01\n" +
@@ -955,11 +896,7 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\tOperation\x12\x19\n" +
 	"\x15OPERATION_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fOPERATION_START\x10\x01\x12\x13\n" +
-	"\x0fOPERATION_RETRY\x10\x02*`\n" +
-	"\fWorkerStatus\x12\x1d\n" +
-	"\x19WORKER_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
-	"\x15WORKER_STATUS_WAITING\x10\x01\x12\x16\n" +
-	"\x12WORKER_STATUS_BUSY\x10\x022\xcd\x02\n" +
+	"\x0fOPERATION_RETRY\x10\x022\xcd\x02\n" +
 	"\x12CoordinatorService\x12A\n" +
 	"\x04Poll\x12\x1b.coordinator.v1.PollRequest\x1a\x1c.coordinator.v1.PollResponse\x12M\n" +
 	"\bDispatch\x12\x1f.coordinator.v1.DispatchRequest\x1a .coordinator.v1.DispatchResponse\x12S\n" +
@@ -979,54 +916,52 @@ func file_proto_coordinator_v1_coordinator_proto_rawDescGZIP() []byte {
 	return file_proto_coordinator_v1_coordinator_proto_rawDescData
 }
 
-var file_proto_coordinator_v1_coordinator_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_proto_coordinator_v1_coordinator_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_proto_coordinator_v1_coordinator_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_proto_coordinator_v1_coordinator_proto_goTypes = []any{
 	(Operation)(0),             // 0: coordinator.v1.Operation
-	(WorkerStatus)(0),          // 1: coordinator.v1.WorkerStatus
-	(*PollRequest)(nil),        // 2: coordinator.v1.PollRequest
-	(*PollResponse)(nil),       // 3: coordinator.v1.PollResponse
-	(*DispatchRequest)(nil),    // 4: coordinator.v1.DispatchRequest
-	(*DispatchResponse)(nil),   // 5: coordinator.v1.DispatchResponse
-	(*Task)(nil),               // 6: coordinator.v1.Task
-	(*GetWorkersRequest)(nil),  // 7: coordinator.v1.GetWorkersRequest
-	(*GetWorkersResponse)(nil), // 8: coordinator.v1.GetWorkersResponse
-	(*WorkerInfo)(nil),         // 9: coordinator.v1.WorkerInfo
-	(*HeartbeatRequest)(nil),   // 10: coordinator.v1.HeartbeatRequest
-	(*HeartbeatResponse)(nil),  // 11: coordinator.v1.HeartbeatResponse
-	(*WorkerStats)(nil),        // 12: coordinator.v1.WorkerStats
-	(*RunningTask)(nil),        // 13: coordinator.v1.RunningTask
-	nil,                        // 14: coordinator.v1.PollRequest.LabelsEntry
-	nil,                        // 15: coordinator.v1.Task.WorkerSelectorEntry
-	nil,                        // 16: coordinator.v1.WorkerInfo.LabelsEntry
-	nil,                        // 17: coordinator.v1.HeartbeatRequest.LabelsEntry
+	(*PollRequest)(nil),        // 1: coordinator.v1.PollRequest
+	(*PollResponse)(nil),       // 2: coordinator.v1.PollResponse
+	(*DispatchRequest)(nil),    // 3: coordinator.v1.DispatchRequest
+	(*DispatchResponse)(nil),   // 4: coordinator.v1.DispatchResponse
+	(*Task)(nil),               // 5: coordinator.v1.Task
+	(*GetWorkersRequest)(nil),  // 6: coordinator.v1.GetWorkersRequest
+	(*GetWorkersResponse)(nil), // 7: coordinator.v1.GetWorkersResponse
+	(*WorkerInfo)(nil),         // 8: coordinator.v1.WorkerInfo
+	(*HeartbeatRequest)(nil),   // 9: coordinator.v1.HeartbeatRequest
+	(*HeartbeatResponse)(nil),  // 10: coordinator.v1.HeartbeatResponse
+	(*WorkerStats)(nil),        // 11: coordinator.v1.WorkerStats
+	(*RunningTask)(nil),        // 12: coordinator.v1.RunningTask
+	nil,                        // 13: coordinator.v1.PollRequest.LabelsEntry
+	nil,                        // 14: coordinator.v1.Task.WorkerSelectorEntry
+	nil,                        // 15: coordinator.v1.WorkerInfo.LabelsEntry
+	nil,                        // 16: coordinator.v1.HeartbeatRequest.LabelsEntry
 }
 var file_proto_coordinator_v1_coordinator_proto_depIdxs = []int32{
-	14, // 0: coordinator.v1.PollRequest.labels:type_name -> coordinator.v1.PollRequest.LabelsEntry
-	6,  // 1: coordinator.v1.PollResponse.task:type_name -> coordinator.v1.Task
-	6,  // 2: coordinator.v1.DispatchRequest.task:type_name -> coordinator.v1.Task
+	13, // 0: coordinator.v1.PollRequest.labels:type_name -> coordinator.v1.PollRequest.LabelsEntry
+	5,  // 1: coordinator.v1.PollResponse.task:type_name -> coordinator.v1.Task
+	5,  // 2: coordinator.v1.DispatchRequest.task:type_name -> coordinator.v1.Task
 	0,  // 3: coordinator.v1.Task.operation:type_name -> coordinator.v1.Operation
-	15, // 4: coordinator.v1.Task.worker_selector:type_name -> coordinator.v1.Task.WorkerSelectorEntry
-	9,  // 5: coordinator.v1.GetWorkersResponse.workers:type_name -> coordinator.v1.WorkerInfo
-	16, // 6: coordinator.v1.WorkerInfo.labels:type_name -> coordinator.v1.WorkerInfo.LabelsEntry
-	1,  // 7: coordinator.v1.WorkerInfo.status:type_name -> coordinator.v1.WorkerStatus
-	13, // 8: coordinator.v1.WorkerInfo.running_tasks:type_name -> coordinator.v1.RunningTask
-	17, // 9: coordinator.v1.HeartbeatRequest.labels:type_name -> coordinator.v1.HeartbeatRequest.LabelsEntry
-	12, // 10: coordinator.v1.HeartbeatRequest.stats:type_name -> coordinator.v1.WorkerStats
-	13, // 11: coordinator.v1.WorkerStats.running_tasks:type_name -> coordinator.v1.RunningTask
-	2,  // 12: coordinator.v1.CoordinatorService.Poll:input_type -> coordinator.v1.PollRequest
-	4,  // 13: coordinator.v1.CoordinatorService.Dispatch:input_type -> coordinator.v1.DispatchRequest
-	7,  // 14: coordinator.v1.CoordinatorService.GetWorkers:input_type -> coordinator.v1.GetWorkersRequest
-	10, // 15: coordinator.v1.CoordinatorService.Heartbeat:input_type -> coordinator.v1.HeartbeatRequest
-	3,  // 16: coordinator.v1.CoordinatorService.Poll:output_type -> coordinator.v1.PollResponse
-	5,  // 17: coordinator.v1.CoordinatorService.Dispatch:output_type -> coordinator.v1.DispatchResponse
-	8,  // 18: coordinator.v1.CoordinatorService.GetWorkers:output_type -> coordinator.v1.GetWorkersResponse
-	11, // 19: coordinator.v1.CoordinatorService.Heartbeat:output_type -> coordinator.v1.HeartbeatResponse
-	16, // [16:20] is the sub-list for method output_type
-	12, // [12:16] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	14, // 4: coordinator.v1.Task.worker_selector:type_name -> coordinator.v1.Task.WorkerSelectorEntry
+	8,  // 5: coordinator.v1.GetWorkersResponse.workers:type_name -> coordinator.v1.WorkerInfo
+	15, // 6: coordinator.v1.WorkerInfo.labels:type_name -> coordinator.v1.WorkerInfo.LabelsEntry
+	12, // 7: coordinator.v1.WorkerInfo.running_tasks:type_name -> coordinator.v1.RunningTask
+	16, // 8: coordinator.v1.HeartbeatRequest.labels:type_name -> coordinator.v1.HeartbeatRequest.LabelsEntry
+	11, // 9: coordinator.v1.HeartbeatRequest.stats:type_name -> coordinator.v1.WorkerStats
+	12, // 10: coordinator.v1.WorkerStats.running_tasks:type_name -> coordinator.v1.RunningTask
+	1,  // 11: coordinator.v1.CoordinatorService.Poll:input_type -> coordinator.v1.PollRequest
+	3,  // 12: coordinator.v1.CoordinatorService.Dispatch:input_type -> coordinator.v1.DispatchRequest
+	6,  // 13: coordinator.v1.CoordinatorService.GetWorkers:input_type -> coordinator.v1.GetWorkersRequest
+	9,  // 14: coordinator.v1.CoordinatorService.Heartbeat:input_type -> coordinator.v1.HeartbeatRequest
+	2,  // 15: coordinator.v1.CoordinatorService.Poll:output_type -> coordinator.v1.PollResponse
+	4,  // 16: coordinator.v1.CoordinatorService.Dispatch:output_type -> coordinator.v1.DispatchResponse
+	7,  // 17: coordinator.v1.CoordinatorService.GetWorkers:output_type -> coordinator.v1.GetWorkersResponse
+	10, // 18: coordinator.v1.CoordinatorService.Heartbeat:output_type -> coordinator.v1.HeartbeatResponse
+	15, // [15:19] is the sub-list for method output_type
+	11, // [11:15] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_proto_coordinator_v1_coordinator_proto_init() }
@@ -1039,7 +974,7 @@ func file_proto_coordinator_v1_coordinator_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_coordinator_v1_coordinator_proto_rawDesc), len(file_proto_coordinator_v1_coordinator_proto_rawDesc)),
-			NumEnums:      2,
+			NumEnums:      1,
 			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
