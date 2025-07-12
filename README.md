@@ -1,8 +1,7 @@
 <div align="center">
   <img src="./assets/images/dagu-logo.webp" width="480" alt="Dagu Logo">
   
-  <h3>Local-First Workflow Engine, Built for Self-Hosting</h3>
-  <p>Zero dependencies. Language agnostic. Self-contained.</p>
+  <h3>The workflow orchestrator that will make you forget your spaghetti crontab.</h3>
   
   <p>
     <a href="https://docs.dagu.cloud/reference/changelog"><img src="https://img.shields.io/github/release/dagu-org/dagu.svg?style=flat-square" alt="Latest Release"></a>
@@ -283,6 +282,17 @@ Contributions are welcome. See our [documentation](https://docs.dagu.cloud) for 
 <a href="https://github.com/dagu-org/dagu/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=dagu-org/dagu" />
 </a>
+
+## Sponsors & Supporters
+
+<a href="https://github.com/Arvintian">
+  <img src="https://github.com/Arvintian.png" width="64" alt="@Arvintian"style="border-radius: 50%;"  />
+</a>
+<a href="https://github.com/yurivish">
+  <img src="https://github.com/yurivish.png" width="64" alt="@yurivish"style="border-radius: 50%;"  />
+</a>
+
+Thanks for supporting Dagu’s development! Join our supporters: [GitHub Sponsors](https://github.com/sponsors/dagu-org)
 
 ## License
 
