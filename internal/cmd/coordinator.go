@@ -24,25 +24,25 @@ This server uses gRPC for efficient communication with remote workers and
 supports authentication via signing keys and TLS encryption.
 
 Flags:
-  --coordinator-host string         Host address to bind the gRPC server to (default: 127.0.0.1)
-  --coordinator-port int            Port number for the gRPC server to listen on (default: 50051)
-  --coordinator-signing-key string  Signing key for coordinator authentication
-  --coordinator-tls-cert string     Path to TLS certificate file for the coordinator server
-  --coordinator-tls-key string      Path to TLS key file for the coordinator server
-  --coordinator-tls-ca string       Path to CA certificate file for client verification (mTLS)
+  --coordinator.host string         Host address to bind the gRPC server to (default: 127.0.0.1)
+  --coordinator.port int            Port number for the gRPC server to listen on (default: 50051)
+  --coordinator.signing-key string  Signing key for coordinator authentication
+  --coordinator.tls-cert string     Path to TLS certificate file for the coordinator server
+  --coordinator.tls-key string      Path to TLS key file for the coordinator server
+  --coordinator.tls-ca string       Path to CA certificate file for client verification (mTLS)
 
 Example:
   # Basic usage
-  dagu coordinator --coordinator-host=0.0.0.0 --coordinator-port=50051
+  dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50051
 
   # With authentication
-  dagu coordinator --coordinator-signing-key=mysecretkey
+  dagu coordinator --coordinator.signing-key=mysecretkey
 
   # With TLS
-  dagu coordinator --coordinator-tls-cert=server.crt --coordinator-tls-key=server.key
+  dagu coordinator --coordinator.tls-cert=server.crt --coordinator.tls-key=server.key
 
   # With mutual TLS
-  dagu coordinator --coordinator-tls-cert=server.crt --coordinator-tls-key=server.key --coordinator-tls-ca=ca.crt
+  dagu coordinator --coordinator.tls-cert=server.crt --coordinator.tls-key=server.key --coordinator.tls-ca=ca.crt
 
 This process runs continuously in the foreground until terminated.
 `,

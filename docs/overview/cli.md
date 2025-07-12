@@ -145,15 +145,15 @@ dagu server --dags=/path/to/directory
 dagu coordinator
 
 # Custom host and port
-dagu coordinator --coordinator-host=0.0.0.0 --coordinator-port=50051
+dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50051
 
 # With authentication
-dagu coordinator --coordinator-signing-key=mysecretkey
+dagu coordinator --coordinator.signing-key=mysecretkey
 
 # With TLS
 dagu coordinator \
-  --coordinator-tls-cert=server.crt \
-  --coordinator-tls-key=server.key
+  --coordinator.tls-cert=server.crt \
+  --coordinator.tls-key=server.key
 ```
 
 The coordinator service manages task distribution to workers for distributed execution.

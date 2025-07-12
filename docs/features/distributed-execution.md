@@ -47,7 +47,7 @@ The coordinator service is automatically started when you use `dagu start-all`:
 dagu start-all --host=0.0.0.0 --port=8080
 
 # Or start coordinator separately
-dagu coordinator --coordinator-host=0.0.0.0 --coordinator-port=50051
+dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50051
 ```
 
 ### Step 2: Deploy Workers
@@ -228,17 +228,17 @@ curl -H "Authorization: Bearer $TOKEN" \
 #### Server-side TLS (Coordinator)
 ```bash
 dagu coordinator \
-  --coordinator-tls-cert=server.crt \
-  --coordinator-tls-key=server.key
+  --coordinator.tls-cert=server.crt \
+  --coordinator.tls-key=server.key
 ```
 
 #### Mutual TLS (mTLS)
 ```bash
 # Coordinator with client verification
 dagu coordinator \
-  --coordinator-tls-cert=server.crt \
-  --coordinator-tls-key=server.key \
-  --coordinator-tls-ca=ca.crt
+  --coordinator.tls-cert=server.crt \
+  --coordinator.tls-key=server.key \
+  --coordinator.tls-ca=ca.crt
 
 # Worker with client certificate
 dagu worker \
@@ -254,7 +254,7 @@ Use signing keys for additional security:
 
 ```bash
 # Coordinator
-dagu coordinator --coordinator-signing-key=your-secret-key
+dagu coordinator --coordinator.signing-key=your-secret-key
 
 # Worker (key configured in coordinator)
 dagu worker --worker-coordinator-host=secure-coordinator.example.com

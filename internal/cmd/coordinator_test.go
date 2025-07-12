@@ -18,7 +18,7 @@ func TestCoordinatorCommand(t *testing.T) {
 		}()
 		port := findPort(t)
 		th.RunCommand(t, cmd.CmdCoordinator(), test.CmdTest{
-			Args:        []string{"coordinator", fmt.Sprintf("--coordinator-port=%s", port)},
+			Args:        []string{"coordinator", fmt.Sprintf("--coordinator.port=%s", port)},
 			ExpectedOut: []string{"Coordinator initialization", port},
 		})
 	})
@@ -31,7 +31,7 @@ func TestCoordinatorCommand(t *testing.T) {
 		}()
 		port := findPort(t)
 		th.RunCommand(t, cmd.CmdCoordinator(), test.CmdTest{
-			Args:        []string{"coordinator", "--coordinator-host=0.0.0.0", fmt.Sprintf("--coordinator-port=%s", port)},
+			Args:        []string{"coordinator", "--coordinator.host=0.0.0.0", fmt.Sprintf("--coordinator.port=%s", port)},
 			ExpectedOut: []string{"Coordinator initialization", "0.0.0.0", port},
 		})
 	})
@@ -56,7 +56,7 @@ func TestCoordinatorCommand(t *testing.T) {
 		}()
 		port := findPort(t)
 		th.RunCommand(t, cmd.CmdCoordinator(), test.CmdTest{
-			Args:        []string{"coordinator", fmt.Sprintf("--coordinator-port=%s", port), "--coordinator-signing-key=test-secret-key"},
+			Args:        []string{"coordinator", fmt.Sprintf("--coordinator.port=%s", port), "--coordinator.signing-key=test-secret-key"},
 			ExpectedOut: []string{"Coordinator initialization", port},
 		})
 	})
@@ -71,9 +71,9 @@ func TestCoordinatorCommand(t *testing.T) {
 		th.RunCommand(t, cmd.CmdCoordinator(), test.CmdTest{
 			Args: []string{
 				"coordinator",
-				fmt.Sprintf("--coordinator-port=%s", port),
-				"--coordinator-tls-cert=/path/to/cert.pem",
-				"--coordinator-tls-key=/path/to/key.pem",
+				fmt.Sprintf("--coordinator.port=%s", port),
+				"--coordinator.tls-cert=/path/to/cert.pem",
+				"--coordinator.tls-key=/path/to/key.pem",
 			},
 			ExpectedOut: []string{"Coordinator initialization", port},
 		})
@@ -89,10 +89,10 @@ func TestCoordinatorCommand(t *testing.T) {
 		th.RunCommand(t, cmd.CmdCoordinator(), test.CmdTest{
 			Args: []string{
 				"coordinator",
-				fmt.Sprintf("--coordinator-port=%s", port),
-				"--coordinator-tls-cert=/path/to/cert.pem",
-				"--coordinator-tls-key=/path/to/key.pem",
-				"--coordinator-tls-ca=/path/to/ca.pem",
+				fmt.Sprintf("--coordinator.port=%s", port),
+				"--coordinator.tls-cert=/path/to/cert.pem",
+				"--coordinator.tls-key=/path/to/key.pem",
+				"--coordinator.tls-ca=/path/to/ca.pem",
 			},
 			ExpectedOut: []string{"Coordinator initialization", port},
 		})

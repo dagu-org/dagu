@@ -251,16 +251,18 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	}
 
 	// Override with values from config file if provided
-	cfg.Coordinator.Host = def.CoordinatorHost
-	cfg.Coordinator.Port = def.CoordinatorPort
-	cfg.Coordinator.SigningKey = def.CoordinatorSigningKey
+	if def.Coordinator != nil {
+		cfg.Coordinator.Host = def.Coordinator.Host
+		cfg.Coordinator.Port = def.Coordinator.Port
+		cfg.Coordinator.SigningKey = def.Coordinator.SigningKey
 
-	// Set TLS configuration if available
-	if def.CoordinatorCertFile != "" || def.CoordinatorKeyFile != "" || def.CoordinatorCAFile != "" {
-		cfg.Coordinator.TLS = &TLSConfig{
-			CertFile: def.CoordinatorCertFile,
-			KeyFile:  def.CoordinatorKeyFile,
-			CAFile:   def.CoordinatorCAFile,
+		// Set TLS configuration if available
+		if def.Coordinator.CertFile != "" || def.Coordinator.KeyFile != "" || def.Coordinator.CAFile != "" {
+			cfg.Coordinator.TLS = &TLSConfig{
+				CertFile: def.Coordinator.CertFile,
+				KeyFile:  def.Coordinator.KeyFile,
+				CAFile:   def.Coordinator.CAFile,
+			}
 		}
 	}
 

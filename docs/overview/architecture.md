@@ -347,7 +347,7 @@ Worker health is determined by heartbeat recency:
 #### 1. Single Coordinator, Multiple Workers
 ```bash
 # Start coordinator on main server
-dagu coordinator --coordinator-host=0.0.0.0
+dagu coordinator --coordinator.host=0.0.0.0
 
 # Start workers on compute nodes
 dagu worker --worker-labels gpu=true --worker-coordinator-host=coordinator.internal

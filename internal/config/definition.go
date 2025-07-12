@@ -75,23 +75,8 @@ type Definition struct {
 	// Queues contains global queue configuration settings.
 	Queues *queuesDef `mapstructure:"queues"`
 
-	// CoordinatorHost is the hostname or IP address for the coordinator service.
-	CoordinatorHost string `mapstructure:"coordinatorHost"`
-
-	// CoordinatorPort is the port number for the coordinator service.
-	CoordinatorPort int `mapstructure:"coordinatorPort"`
-
-	// CoordinatorSigningKey is the key used for signing requests to the coordinator service.
-	CoordinatorSigningKey string `mapstructure:"coordinatorSigningKey"`
-
-	// CoordinatorCertFile is the path to the coordinator's TLS certificate file.
-	CoordinatorCertFile string `mapstructure:"coordinatorCertFile"`
-
-	// CoordinatorKeyFile is the path to the coordinator's TLS key file.
-	CoordinatorKeyFile string `mapstructure:"coordinatorKeyFile"`
-
-	// CoordinatorCAFile is the path to the coordinator's CA certificate file.
-	CoordinatorCAFile string `mapstructure:"coordinatorCaFile"`
+	// Coordinator contains configuration for the coordinator server.
+	Coordinator *coordinatorDef `mapstructure:"coordinator"`
 
 	// WorkerID is the unique identifier for the worker instance.
 	WorkerID string `mapstructure:"workerId"`
@@ -265,4 +250,25 @@ type queuesDef struct {
 type queueConfigDef struct {
 	Name          string `mapstructure:"name"`
 	MaxActiveRuns int    `mapstructure:"maxActiveRuns"`
+}
+
+// coordinatorDef holds the configuration for the coordinator service.
+type coordinatorDef struct {
+	// Host is the hostname or IP address for the coordinator service.
+	Host string `mapstructure:"host"`
+
+	// Port is the port number for the coordinator service.
+	Port int `mapstructure:"port"`
+
+	// SigningKey is the key used for signing requests to the coordinator service.
+	SigningKey string `mapstructure:"signingKey"`
+
+	// CertFile is the path to the coordinator's TLS certificate file.
+	CertFile string `mapstructure:"certFile"`
+
+	// KeyFile is the path to the coordinator's TLS key file.
+	KeyFile string `mapstructure:"keyFile"`
+
+	// CAFile is the path to the coordinator's CA certificate file.
+	CAFile string `mapstructure:"caFile"`
 }

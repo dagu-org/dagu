@@ -28,15 +28,15 @@ Flags:
   --host string                     Host address to bind the web server to (default: 127.0.0.1)
   --port int                        Port number for the web server to listen on (default: 8080)
   --dags string                     Path to the directory containing DAG definition files
-  --coordinator-host string         Host address to bind the coordinator gRPC server to (default: 127.0.0.1)
-  --coordinator-port int            Port number for the coordinator gRPC server (default: 50051)
-  --coordinator-signing-key string  Signing key for coordinator authentication
-  --coordinator-tls-cert string     Path to TLS certificate file for the coordinator server
-  --coordinator-tls-key string      Path to TLS key file for the coordinator server
-  --coordinator-tls-ca string       Path to CA certificate file for client verification (mTLS)
+  --coordinator.host string         Host address to bind the coordinator gRPC server to (default: 127.0.0.1)
+  --coordinator.port int            Port number for the coordinator gRPC server (default: 50051)
+  --coordinator.signing-key string  Signing key for coordinator authentication
+  --coordinator.tls-cert string     Path to TLS certificate file for the coordinator server
+  --coordinator.tls-key string      Path to TLS key file for the coordinator server
+  --coordinator.tls-ca string       Path to CA certificate file for client verification (mTLS)
 
 Example:
-  dagu start-all --host=0.0.0.0 --port=8080 --dags=/path/to/dags --coordinator-port=50051
+  dagu start-all --host=0.0.0.0 --port=8080 --dags=/path/to/dags --coordinator.port=50051
 
 This process runs continuously in the foreground until terminated.
 `,

@@ -20,7 +20,7 @@ func TestStartAllCommand(t *testing.T) {
 			Args: []string{
 				"start-all",
 				fmt.Sprintf("--port=%s", findPort(t)),
-				fmt.Sprintf("--coordinator-port=%s", findPort(t)),
+				fmt.Sprintf("--coordinator.port=%s", findPort(t)),
 			},
 			ExpectedOut: []string{"Server initialization", "Scheduler initialization", "Coordinator initialization"},
 		})
@@ -36,7 +36,7 @@ func TestStartAllCommand(t *testing.T) {
 			Args: []string{
 				"start-all",
 				"--config", test.TestdataPath(t, "cmd/config_startall.yaml"),
-				fmt.Sprintf("--coordinator-port=%s", findPort(t)),
+				fmt.Sprintf("--coordinator.port=%s", findPort(t)),
 			},
 			ExpectedOut: []string{"54322", "dagu_test", "Coordinator initialization"},
 		})

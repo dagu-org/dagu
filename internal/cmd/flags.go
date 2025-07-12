@@ -136,7 +136,7 @@ var (
 
 	// coordinatorHostFlag is the hostname or IP address for the coordinator gRPC server.
 	coordinatorHostFlag = commandLineFlag{
-		name:         "coordinator-host",
+		name:         "coordinator.host",
 		shorthand:    "H",
 		defaultValue: "127.0.0.1",
 		usage:        "Coordinator gRPC server host (default: 127.0.0.1)",
@@ -145,7 +145,7 @@ var (
 
 	// coordinatorPortFlag is the port number for the coordinator gRPC server.
 	coordinatorPortFlag = commandLineFlag{
-		name:         "coordinator-port",
+		name:         "coordinator.port",
 		shorthand:    "P",
 		defaultValue: "50051",
 		usage:        "Coordinator gRPC server port (default: 50051)",
@@ -154,7 +154,7 @@ var (
 
 	// coordinatorSigningKeyFlag is the signing key for the coordinator service.
 	coordinatorSigningKeyFlag = commandLineFlag{
-		name:      "coordinator-signing-key",
+		name:      "coordinator.signing-key",
 		usage:     "Signing key for coordinator authentication",
 		bindViper: true,
 	}
@@ -239,21 +239,21 @@ var (
 
 	// coordinatorTLSCertFlag is the path to the TLS certificate for coordinator server.
 	coordinatorTLSCertFlag = commandLineFlag{
-		name:      "coordinator-tls-cert",
+		name:      "coordinator.tls-cert",
 		usage:     "Path to TLS certificate file for the coordinator server",
 		bindViper: true,
 	}
 
 	// coordinatorTLSKeyFlag is the path to the TLS key for coordinator server.
 	coordinatorTLSKeyFlag = commandLineFlag{
-		name:      "coordinator-tls-key",
+		name:      "coordinator.tls-key",
 		usage:     "Path to TLS key file for the coordinator server",
 		bindViper: true,
 	}
 
 	// coordinatorTLSCAFlag is the path to the CA certificate for coordinator server.
 	coordinatorTLSCAFlag = commandLineFlag{
-		name:      "coordinator-tls-ca",
+		name:      "coordinator.tls-ca",
 		usage:     "Path to CA certificate file for client verification (mTLS)",
 		bindViper: true,
 	}
@@ -264,6 +264,7 @@ type commandLineFlag struct {
 	required                             bool
 	isBool                               bool
 	bindViper                            bool
+	bindKey                              string
 }
 
 func initFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {

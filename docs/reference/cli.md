@@ -246,30 +246,30 @@ dagu coordinator [options]
 ```
 
 **Options:**
-- `--coordinator-host` - Host address to bind (default: `127.0.0.1`)
-- `--coordinator-port` - Port number (default: `50051`)
-- `--coordinator-signing-key` - Signing key for authentication
-- `--coordinator-tls-cert` - Path to TLS certificate file
-- `--coordinator-tls-key` - Path to TLS key file
-- `--coordinator-tls-ca` - Path to CA certificate file (for mTLS)
+- `--coordinator.host` - Host address to bind (default: `127.0.0.1`)
+- `--coordinator.port` - Port number (default: `50051`)
+- `--coordinator.signing-key` - Signing key for authentication
+- `--coordinator.tls-cert` - Path to TLS certificate file
+- `--coordinator.tls-key` - Path to TLS key file
+- `--coordinator.tls-ca` - Path to CA certificate file (for mTLS)
 
 ```bash
 # Basic usage
-dagu coordinator --coordinator-host=0.0.0.0 --coordinator-port=50051
+dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50051
 
 # With authentication
-dagu coordinator --coordinator-signing-key=mysecretkey
+dagu coordinator --coordinator.signing-key=mysecretkey
 
 # With TLS
 dagu coordinator \
-  --coordinator-tls-cert=server.crt \
-  --coordinator-tls-key=server.key
+  --coordinator.tls-cert=server.crt \
+  --coordinator.tls-key=server.key
 
 # With mutual TLS
 dagu coordinator \
-  --coordinator-tls-cert=server.crt \
-  --coordinator-tls-key=server.key \
-  --coordinator-tls-ca=ca.crt
+  --coordinator.tls-cert=server.crt \
+  --coordinator.tls-key=server.key \
+  --coordinator.tls-ca=ca.crt
 ```
 
 The coordinator service enables distributed task execution by:
