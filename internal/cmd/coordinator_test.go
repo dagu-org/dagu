@@ -44,7 +44,7 @@ func TestCoordinatorCommand(t *testing.T) {
 		}()
 		th.RunCommand(t, cmd.CmdCoordinator(), test.CmdTest{
 			Args:        []string{"coordinator", "--config", test.TestdataPath(t, "cmd/config_test.yaml")},
-			ExpectedOut: []string{"Coordinator initialization", "50051"},
+			ExpectedOut: []string{"Coordinator initialization", "9876"},
 		})
 	})
 

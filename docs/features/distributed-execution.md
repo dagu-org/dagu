@@ -149,8 +149,9 @@ coordinator:
 worker:
   id: "worker-gpu-01"  # Defaults to hostname@PID
   maxActiveRuns: 10
-  coordinatorHost: coordinator.example.com
-  coordinatorPort: 50051
+  coordinator:
+    host: coordinator.example.com
+    port: 50051
   labels:
     gpu: "true"
     memory: "64G"

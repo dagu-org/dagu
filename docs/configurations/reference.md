@@ -96,8 +96,9 @@ coordinator:
 worker:
   id: ""                  # Worker ID (default: hostname@PID)
   maxActiveRuns: 100      # Max parallel task executions
-  coordinatorHost: "127.0.0.1"
-  coordinatorPort: 50051
+  coordinator:
+    host: "127.0.0.1"
+    port: 50051
   insecure: true          # Use h2c instead of TLS
   skipTLSVerify: false    # Skip cert verification
   labels:                 # Worker capabilities
@@ -360,8 +361,9 @@ coordinator:
 worker:
   id: gpu-worker-01
   maxActiveRuns: 10
-  coordinatorHost: coordinator.internal
-  coordinatorPort: 50051
+  coordinator:
+    host: coordinator.internal
+    port: 50051
   insecure: false
   labels:
     gpu: "true"
