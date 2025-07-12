@@ -266,7 +266,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 
 	// Set worker configuration from flat fields
 	cfg.Worker.ID = def.WorkerID
-	cfg.Worker.MaxConcurrentRuns = def.WorkerMaxConcurrentRuns
+	cfg.Worker.MaxActiveRuns = def.WorkerMaxActiveRuns
 	cfg.Worker.CoordinatorHost = def.WorkerCoordinatorHost
 	cfg.Worker.CoordinatorPort = def.WorkerCoordinatorPort
 	cfg.Worker.Insecure = def.WorkerInsecure
@@ -473,7 +473,7 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	viper.SetDefault("coordinatorCAFile", "")
 
 	// Worker settings
-	viper.SetDefault("workerMaxConcurrentRuns", 100)
+	viper.SetDefault("workerMaxActiveRuns", 100)
 	viper.SetDefault("workerCoordinatorHost", "127.0.0.1")
 	viper.SetDefault("workerCoordinatorPort", 50051)
 	viper.SetDefault("workerInsecure", true) // Insecure by default to match coordinator
@@ -573,7 +573,7 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 
 	// Worker configuration (flat structure)
 	l.bindEnv("workerId", "WORKER_ID")
-	l.bindEnv("workerMaxConcurrentRuns", "WORKER_MAX_CONCURRENT_RUNS")
+	l.bindEnv("workerMaxActiveRuns", "WORKER_MAX_ACTIVE_RUNS")
 	l.bindEnv("workerCoordinatorHost", "WORKER_COORDINATOR_HOST")
 	l.bindEnv("workerCoordinatorPort", "WORKER_COORDINATOR_PORT")
 	l.bindEnv("workerInsecure", "WORKER_INSECURE")

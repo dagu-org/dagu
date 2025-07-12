@@ -23,7 +23,7 @@ By default, the worker ID is set to hostname@PID, but can be overridden.
 
 Flags:
   --worker-id string                       Worker instance ID (default: hostname@PID)
-  --worker-max-concurrent-runs int         Maximum concurrent task executions (default: 100)
+  --worker-max-active-runs int             Maximum number of active runs (default: 100)
   --worker-coordinator-host string         Coordinator gRPC server host (default: 127.0.0.1)
   --worker-coordinator-port int            Coordinator gRPC server port (default: 50051)
   --worker-insecure                        Use insecure connection (h2c) instead of TLS (default: true)
@@ -35,9 +35,9 @@ Flags:
 
 Example:
   dagu worker
-  dagu worker --worker-max-concurrent-runs=50
+  dagu worker --worker-max-active-runs=50
   dagu worker --worker-coordinator-host=coordinator.example.com --worker-coordinator-port=50051
-  dagu worker --worker-id=worker-1 --worker-max-concurrent-runs=200
+  dagu worker --worker-id=worker-1 --worker-max-active-runs=200
   
   # Worker with labels for capability matching:
   dagu worker --worker-labels gpu=true,memory=64G,region=us-east-1
@@ -57,7 +57,7 @@ This process runs continuously in the foreground until terminated.
 
 var workerFlags = []commandLineFlag{
 	workerIDFlag,
-	workerMaxConcurrentRunsFlag,
+	workerMaxActiveRunsFlag,
 	workerCoordinatorHostFlag,
 	workerCoordinatorPortFlag,
 	workerInsecureFlag,
@@ -71,7 +71,7 @@ var workerFlags = []commandLineFlag{
 func runWorker(ctx *Context, _ []string) error {
 	// Use config values directly - viper binding handles flag overrides
 	workerID := ctx.Config.Worker.ID
-	maxConcurrentRuns := ctx.Config.Worker.MaxConcurrentRuns
+	maxActiveRuns := ctx.Config.Worker.MaxActiveRuns
 	coordinatorHost := ctx.Config.Worker.CoordinatorHost
 	coordinatorPort := ctx.Config.Worker.CoordinatorPort
 
@@ -92,11 +92,11 @@ func runWorker(ctx *Context, _ []string) error {
 	if labels == nil {
 		labels = make(map[string]string)
 	}
-	w := worker.NewWorker(workerID, maxConcurrentRuns, coordinatorHost, coordinatorPort, tlsConfig, ctx.DAGRunMgr, labels)
+	w := worker.NewWorker(workerID, maxActiveRuns, coordinatorHost, coordinatorPort, tlsConfig, ctx.DAGRunMgr, labels)
 
 	logger.Info(ctx, "Starting worker",
 		"worker_id", workerID,
-		"max_concurrent_runs", maxConcurrentRuns,
+		"max_active_runs", maxActiveRuns,
 		"coordinator_host", coordinatorHost,
 		"coordinator_port", coordinatorPort,
 		"labels", labels)

@@ -148,7 +148,7 @@ coordinator:
 # config.yaml
 worker:
   id: "worker-gpu-01"  # Defaults to hostname@PID
-  maxConcurrentRuns: 10
+  maxActiveRuns: 10
   coordinatorHost: coordinator.example.com
   coordinatorPort: 50051
   labels:

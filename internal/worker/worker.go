@@ -63,15 +63,15 @@ func (e *dagRunTaskExecutor) Execute(ctx context.Context, task *coordinatorv1.Ta
 
 // Worker represents a worker instance that polls for tasks from the coordinator.
 type Worker struct {
-	id                string
-	maxConcurrentRuns int
-	coordinatorAddr   string
-	tlsConfig         *TLSConfig
-	client            coordinatorv1.CoordinatorServiceClient
-	healthClient      grpc_health_v1.HealthClient
-	conn              *grpc.ClientConn
-	taskExecutor      TaskExecutor
-	labels            map[string]string
+	id              string
+	maxActiveRuns   int
+	coordinatorAddr string
+	tlsConfig       *TLSConfig
+	client          coordinatorv1.CoordinatorServiceClient
+	healthClient    grpc_health_v1.HealthClient
+	conn            *grpc.ClientConn
+	taskExecutor    TaskExecutor
+	labels          map[string]string
 
 	// For tracking poller states and heartbeats
 	pollersMu    sync.Mutex
@@ -84,7 +84,7 @@ func (w *Worker) SetTaskExecutor(executor TaskExecutor) {
 }
 
 // NewWorker creates a new worker instance.
-func NewWorker(workerID string, maxConcurrentRuns int, coordinatorHost string, coordinatorPort int, tlsConfig *TLSConfig, dagRunMgr dagrun.Manager, labels map[string]string) *Worker {
+func NewWorker(workerID string, maxActiveRuns int, coordinatorHost string, coordinatorPort int, tlsConfig *TLSConfig, dagRunMgr dagrun.Manager, labels map[string]string) *Worker {
 	// Generate default worker ID if not provided
 	if workerID == "" {
 		hostname, err := os.Hostname()
@@ -97,13 +97,13 @@ func NewWorker(workerID string, maxConcurrentRuns int, coordinatorHost string, c
 	coordinatorAddr := fmt.Sprintf("%s:%d", coordinatorHost, coordinatorPort)
 
 	return &Worker{
-		id:                workerID,
-		maxConcurrentRuns: maxConcurrentRuns,
-		coordinatorAddr:   coordinatorAddr,
-		tlsConfig:         tlsConfig,
-		taskExecutor:      &dagRunTaskExecutor{manager: dagRunMgr},
-		labels:            labels,
-		runningTasks:      make(map[string]*coordinatorv1.RunningTask),
+		id:              workerID,
+		maxActiveRuns:   maxActiveRuns,
+		coordinatorAddr: coordinatorAddr,
+		tlsConfig:       tlsConfig,
+		taskExecutor:    &dagRunTaskExecutor{manager: dagRunMgr},
+		labels:          labels,
+		runningTasks:    make(map[string]*coordinatorv1.RunningTask),
 	}
 }
 
@@ -126,7 +126,7 @@ func (w *Worker) Start(ctx context.Context) error {
 	logger.Info(ctx, "Worker connected to coordinator",
 		"worker_id", w.id,
 		"coordinator", w.coordinatorAddr,
-		"max_concurrent_runs", w.maxConcurrentRuns)
+		"max_active_runs", w.maxActiveRuns)
 
 	// Wait for coordinator to be healthy before starting polling
 	if err := w.waitForHealthy(ctx); err != nil {
@@ -135,13 +135,13 @@ func (w *Worker) Start(ctx context.Context) error {
 
 	logger.Info(ctx, "Starting polling goroutines",
 		"worker_id", w.id,
-		"max_concurrent_runs", w.maxConcurrentRuns)
+		"max_active_runs", w.maxActiveRuns)
 
 	// Create a wait group to track all polling goroutines
 	var wg sync.WaitGroup
 
 	// Launch polling goroutines
-	for i := 0; i < w.maxConcurrentRuns; i++ {
+	for i := 0; i < w.maxActiveRuns; i++ {
 		wg.Add(1)
 		go func(pollerIndex int) {
 			defer wg.Done()
@@ -311,8 +311,8 @@ func (w *Worker) sendHeartbeat(ctx context.Context) error {
 
 	// Safely convert to int32, capping at max int32 if needed
 	totalPollers := int32(math.MaxInt32)
-	if w.maxConcurrentRuns <= math.MaxInt32 {
-		totalPollers = int32(w.maxConcurrentRuns) //nolint:gosec // Already checked above
+	if w.maxActiveRuns <= math.MaxInt32 {
+		totalPollers = int32(w.maxActiveRuns) //nolint:gosec // Already checked above
 	}
 
 	busyCount32 := int32(math.MaxInt32)

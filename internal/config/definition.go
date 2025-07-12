@@ -96,8 +96,8 @@ type Definition struct {
 	// WorkerID is the unique identifier for the worker instance.
 	WorkerID string `mapstructure:"workerId"`
 
-	// WorkerMaxConcurrentRuns is the maximum number of concurrent task executions.
-	WorkerMaxConcurrentRuns int `mapstructure:"workerMaxConcurrentRuns"`
+	// WorkerMaxActiveRuns is the maximum number of active runs for the worker.
+	WorkerMaxActiveRuns int `mapstructure:"workerMaxActiveRuns"`
 
 	// WorkerCoordinatorHost is the hostname or IP address for connecting to the coordinator.
 	WorkerCoordinatorHost string `mapstructure:"workerCoordinatorHost"`

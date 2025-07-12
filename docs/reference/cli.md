@@ -288,7 +288,7 @@ dagu worker [options]
 
 **Options:**
 - `--worker-id` - Worker instance ID (default: `hostname@PID`)
-- `--worker-max-concurrent-runs` - Maximum concurrent task executions (default: `100`)
+- `--worker-max-active-runs` - Maximum number of active runs (default: `100`)
 - `--worker-coordinator-host` - Coordinator gRPC server host (default: `127.0.0.1`)
 - `--worker-coordinator-port` - Coordinator gRPC server port (default: `50051`)
 - `--worker-insecure` - Use insecure connection (h2c) instead of TLS (default: `true`)
@@ -305,7 +305,7 @@ dagu worker
 # With custom configuration
 dagu worker \
   --worker-id=worker-1 \
-  --worker-max-concurrent-runs=50 \
+  --worker-max-active-runs=50 \
   --worker-coordinator-host=coordinator.example.com
 
 # With labels for capability matching

@@ -77,7 +77,7 @@ steps:
 		// Create and start worker with selector labels
 		workerInst := worker.NewWorker(
 			"test-worker-1",
-			10, // maxConcurrentRuns
+			10, // maxActiveRuns
 			"127.0.0.1",
 			coord.Port(),
 			tlsConfig,

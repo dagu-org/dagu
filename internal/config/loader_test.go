@@ -78,7 +78,7 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 
 		// Worker configuration
 		"DAGU_WORKER_ID":                  "test-worker-123",
-		"DAGU_WORKER_MAX_CONCURRENT_RUNS": "200",
+		"DAGU_WORKER_MAX_ACTIVE_RUNS": "200",
 		"DAGU_WORKER_COORDINATOR_HOST":    "worker.example.com",
 		"DAGU_WORKER_COORDINATOR_PORT":    "60051",
 		"DAGU_WORKER_INSECURE":            "true",
@@ -172,7 +172,7 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 
 	// Worker configuration
 	assert.Equal(t, "test-worker-123", cfg.Worker.ID)
-	assert.Equal(t, 200, cfg.Worker.MaxConcurrentRuns)
+	assert.Equal(t, 200, cfg.Worker.MaxActiveRuns)
 	assert.Equal(t, "worker.example.com", cfg.Worker.CoordinatorHost)
 	assert.Equal(t, 60051, cfg.Worker.CoordinatorPort)
 	assert.True(t, cfg.Worker.Insecure)
@@ -315,7 +315,7 @@ func TestConfigLoader_WorkerConfiguration(t *testing.T) {
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
 workerId: "yaml-worker-01"
-workerMaxConcurrentRuns: 50
+workerMaxActiveRuns: 50
 workerCoordinatorHost: "coordinator.example.com"
 workerCoordinatorPort: 8080
 workerInsecure: true
@@ -334,7 +334,7 @@ workerTlsCaFile: "/path/to/worker/ca.pem"
 
 		// Verify Worker configuration is loaded from YAML
 		assert.Equal(t, "yaml-worker-01", cfg.Worker.ID)
-		assert.Equal(t, 50, cfg.Worker.MaxConcurrentRuns)
+		assert.Equal(t, 50, cfg.Worker.MaxActiveRuns)
 		assert.Equal(t, "coordinator.example.com", cfg.Worker.CoordinatorHost)
 		assert.Equal(t, 8080, cfg.Worker.CoordinatorPort)
 		assert.True(t, cfg.Worker.Insecure)
@@ -355,7 +355,7 @@ workerTlsCaFile: "/path/to/worker/ca.pem"
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
 workerId: "yaml-worker"
-workerMaxConcurrentRuns: 10
+workerMaxActiveRuns: 10
 workerCoordinatorHost: "localhost"
 workerCoordinatorPort: 5000
 workerInsecure: false
@@ -366,7 +366,7 @@ workerInsecure: false
 		// Set environment variables
 		envs := map[string]string{
 			"DAGU_WORKER_ID":                  "env-worker-override",
-			"DAGU_WORKER_MAX_CONCURRENT_RUNS": "300",
+			"DAGU_WORKER_MAX_ACTIVE_RUNS": "300",
 			"DAGU_WORKER_COORDINATOR_HOST":    "env.coordinator.com",
 			"DAGU_WORKER_COORDINATOR_PORT":    "9090",
 			"DAGU_WORKER_INSECURE":            "true",
@@ -405,7 +405,7 @@ workerInsecure: false
 
 		// Verify environment variables override YAML
 		assert.Equal(t, "env-worker-override", cfg.Worker.ID)
-		assert.Equal(t, 300, cfg.Worker.MaxConcurrentRuns)
+		assert.Equal(t, 300, cfg.Worker.MaxActiveRuns)
 		assert.Equal(t, "env.coordinator.com", cfg.Worker.CoordinatorHost)
 		assert.Equal(t, 9090, cfg.Worker.CoordinatorPort)
 		assert.True(t, cfg.Worker.Insecure)
@@ -438,7 +438,7 @@ port: 8080
 
 		// Verify default Worker configuration values
 		assert.Equal(t, "", cfg.Worker.ID) // No default ID
-		assert.Equal(t, 100, cfg.Worker.MaxConcurrentRuns)
+		assert.Equal(t, 100, cfg.Worker.MaxActiveRuns)
 		assert.Equal(t, "127.0.0.1", cfg.Worker.CoordinatorHost)
 		assert.Equal(t, 50051, cfg.Worker.CoordinatorPort)
 		assert.True(t, cfg.Worker.Insecure)
@@ -581,7 +581,7 @@ workerLabels:
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
-workerMaxConcurrentRuns: 50
+workerMaxActiveRuns: 50
 `
 		err := os.WriteFile(configFile, []byte(configContent), 0600)
 		require.NoError(t, err)

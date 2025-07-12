@@ -167,12 +167,12 @@ var (
 		bindViper: true,
 	}
 
-	// workerMaxConcurrentRunsFlag is the maximum number of concurrent task executions.
-	workerMaxConcurrentRunsFlag = commandLineFlag{
-		name:         "worker-max-concurrent-runs",
+	// workerMaxActiveRunsFlag is the maximum number of active runs for the worker.
+	workerMaxActiveRunsFlag = commandLineFlag{
+		name:         "worker-max-active-runs",
 		shorthand:    "m",
 		defaultValue: "100",
-		usage:        "Maximum number of concurrent task executions (default: 100)",
+		usage:        "Maximum number of active runs (default: 100)",
 		bindViper:    true,
 	}
 

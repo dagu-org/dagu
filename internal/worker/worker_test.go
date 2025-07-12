@@ -63,10 +63,10 @@ func (m *MockTaskExecutor) GetExecutedTasks() []string {
 }
 
 // createTestWorker creates a worker with a mock dagrun.Manager for testing
-func createTestWorker(workerID string, maxConcurrentRuns int, host string, port int, tlsConfig *worker.TLSConfig) *worker.Worker {
+func createTestWorker(workerID string, maxActiveRuns int, host string, port int, tlsConfig *worker.TLSConfig) *worker.Worker {
 	mockMgr := dagrun.New(nil, nil, "dagu", ".")
 	labels := make(map[string]string)
-	return worker.NewWorker(workerID, maxConcurrentRuns, host, port, tlsConfig, mockMgr, labels)
+	return worker.NewWorker(workerID, maxActiveRuns, host, port, tlsConfig, mockMgr, labels)
 }
 
 func TestWorkerConnection(t *testing.T) {
@@ -416,7 +416,7 @@ func TestWorkerShutdown(t *testing.T) {
 }
 
 func TestWorkerConcurrency(t *testing.T) {
-	t.Run("MaxConcurrentRuns", func(t *testing.T) {
+	t.Run("MaxActiveRuns", func(t *testing.T) {
 		// Setup coordinator
 		coord := test.SetupCoordinator(t)
 

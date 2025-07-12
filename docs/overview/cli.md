@@ -174,7 +174,7 @@ dagu worker \
 # With custom worker ID and concurrency
 dagu worker \
   --worker-id=gpu-worker-01 \
-  --worker-max-concurrent-runs=50
+  --worker-max-active-runs=50
 ```
 
 Workers poll the coordinator for matching tasks based on their labels.
