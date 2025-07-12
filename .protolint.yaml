@@ -1,0 +1,5 @@
+lint:
+  rules:
+    remove:
+      # Remove the rule that checks for line length
+      - MAX_LINE_LENGTH

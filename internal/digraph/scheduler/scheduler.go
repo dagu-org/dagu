@@ -61,6 +61,11 @@ func (s Status) IsActive() bool {
 	return s == StatusRunning || s == StatusQueued
 }
 
+// IsSuccess checks if the status is a success.
+func (s Status) IsSuccess() bool {
+	return s == StatusSuccess || s == StatusPartialSuccess
+}
+
 var (
 	ErrUpstreamFailed  = fmt.Errorf("upstream failed")
 	ErrUpstreamSkipped = fmt.Errorf("upstream skipped")
@@ -720,7 +725,7 @@ func (sc *Scheduler) shouldRetryNode(ctx context.Context, node *Node, execErr er
 	if errors.As(execErr, &exitErr) {
 		exitCode = exitErr.ExitCode()
 		exitCodeFound = true
-		logger.Debug(ctx, "Found exit error", "error", execErr, "exitCode", exitCode)
+		logger.Debug(ctx, "Found exit error", "err", execErr, "exitCode", exitCode)
 	}
 
 	if !exitCodeFound {
@@ -729,17 +734,17 @@ func (sc *Scheduler) shouldRetryNode(ctx context.Context, node *Node, execErr er
 		if code, found := parseExitCodeFromError(errStr); found {
 			exitCode = code
 			exitCodeFound = true
-			logger.Debug(ctx, "Parsed exit code from error string", "error", errStr, "exitCode", exitCode)
+			logger.Debug(ctx, "Parsed exit code from error string", "err", errStr, "exitCode", exitCode)
 		} else if strings.Contains(errStr, "signal:") {
 			// Handle signal termination
 			exitCode = -1
 			exitCodeFound = true
-			logger.Debug(ctx, "Process terminated by signal", "error", errStr)
+			logger.Debug(ctx, "Process terminated by signal", "err", errStr)
 		}
 	}
 
 	if !exitCodeFound {
-		logger.Debug(ctx, "Could not determine exit code", "error", execErr, "errorType", fmt.Sprintf("%T", execErr))
+		logger.Debug(ctx, "Could not determine exit code", "err", execErr, "errorType", fmt.Sprintf("%T", execErr))
 		// Default to exit code 1 if we can't determine the actual code
 		exitCode = 1
 	}
@@ -755,7 +760,7 @@ func (sc *Scheduler) shouldRetryNode(ctx context.Context, node *Node, execErr er
 		return false
 	}
 
-	logger.Info(ctx, "Step execution failed. Retrying...", "step", node.Name(), "error", execErr, "retry", node.GetRetryCount(), "exitCode", exitCode)
+	logger.Info(ctx, "Step execution failed. Retrying...", "step", node.Name(), "err", execErr, "retry", node.GetRetryCount(), "exitCode", exitCode)
 
 	// Set the node status to none so that it can be retried
 	node.IncRetryCount()
@@ -777,7 +782,7 @@ func (sc *Scheduler) recoverNodePanic(ctx context.Context, node *Node) {
 		stack := string(debug.Stack())
 		err := fmt.Errorf("panic recovered in node %s: %v\n%s", node.Name(), panicObj, stack)
 		logger.Error(ctx, "Panic occurred",
-			"error", err,
+			"err", err,
 			"step", node.Name(),
 			"stack", stack,
 			"dagRunId", sc.dagRunID)
@@ -843,7 +848,7 @@ func (sc *Scheduler) handleNodeExecutionError(ctx context.Context, graph *Execut
 		// do nothing
 
 	case sc.isTimeout(graph.startedAt):
-		logger.Info(ctx, "Step deadline exceeded", "step", node.Name(), "error", execErr)
+		logger.Info(ctx, "Step deadline exceeded", "step", node.Name(), "err", execErr)
 		node.SetStatus(NodeStatusCancel)
 		sc.setLastError(execErr)
 

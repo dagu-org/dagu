@@ -6,16 +6,18 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
+	"github.com/dagu-org/dagu/internal/coordinator/client"
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
 // Env contains the execution metadata for a dag-run.
 type Env struct {
-	DAGRunID   string
-	RootDAGRun DAGRunRef
-	DAG        *DAG
-	DB         Database
-	Envs       map[string]string
+	DAGRunID                 string
+	RootDAGRun               DAGRunRef
+	DAG                      *DAG
+	DB                       Database
+	Envs                     map[string]string
+	CoordinatorClientFactory *client.Factory
 }
 
 func (e Env) AllEnvs() []string {
@@ -42,7 +44,7 @@ func (e Env) ApplyEnvs(ctx context.Context) {
 
 // SetupEnv sets up the execution context for a dag-run.
 // It initializes the environment variables and the DAG metadata.
-func SetupEnv(ctx context.Context, dag *DAG, db Database, rootDAGRun DAGRunRef, dagRunID, logFile string, params []string) context.Context {
+func SetupEnv(ctx context.Context, dag *DAG, db Database, rootDAGRun DAGRunRef, dagRunID, logFile string, params []string, coordinatorFactory *client.Factory) context.Context {
 	var envs = map[string]string{
 		EnvKeyDAGRunLogFile: logFile,
 		EnvKeyDAGRunID:      dagRunID,
@@ -58,12 +60,18 @@ func SetupEnv(ctx context.Context, dag *DAG, db Database, rootDAGRun DAGRunRef, 
 	}
 
 	return context.WithValue(ctx, envCtxKey{}, Env{
-		RootDAGRun: rootDAGRun,
-		DAG:        dag,
-		DB:         db,
-		Envs:       envs,
-		DAGRunID:   dagRunID,
+		RootDAGRun:               rootDAGRun,
+		DAG:                      dag,
+		DB:                       db,
+		Envs:                     envs,
+		DAGRunID:                 dagRunID,
+		CoordinatorClientFactory: coordinatorFactory,
 	})
+}
+
+// SetupEnvForTest is a convenience function for tests that don't need coordinator client
+func SetupEnvForTest(ctx context.Context, dag *DAG, db Database, rootDAGRun DAGRunRef, dagRunID, logFile string, params []string) context.Context {
+	return SetupEnv(ctx, dag, db, rootDAGRun, dagRunID, logFile, params, nil)
 }
 
 func GetEnv(ctx context.Context) Env {

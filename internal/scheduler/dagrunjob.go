@@ -58,7 +58,7 @@ func (j *DAGRunJob) Start(ctx context.Context) error {
 	}
 
 	// Job is ready; proceed to start.
-	return j.Client.StartDAGRun(ctx, j.DAG, dagrun.StartOptions{Quiet: true})
+	return j.Client.StartDAGRunAsync(ctx, j.DAG, dagrun.StartOptions{Quiet: true})
 }
 
 // Ready checks whether the job can be safely started based on the latest status.

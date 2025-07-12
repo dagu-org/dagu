@@ -24,7 +24,7 @@ func TestCommandExecutor_ErrexitSimple(t *testing.T) {
 		}
 
 		// Set up the digraph environment
-		ctx := digraph.SetupEnv(
+		ctx := digraph.SetupEnvForTest(
 			context.Background(),
 			dag,
 			nil, // database

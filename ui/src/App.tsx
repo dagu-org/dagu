@@ -13,6 +13,7 @@ import DAGDetails from './pages/dags/dag';
 import Search from './pages/search';
 import DAGRuns from './pages/dag-runs';
 import DAGRunDetails from './pages/dag-runs/dag-run';
+import Workers from './pages/workers';
 
 type Props = {
   config: Config;
@@ -104,6 +105,7 @@ function App({ config }: Props) {
                       path="/dag-runs/:name/:dagRunId"
                       element={<DAGRunDetails />}
                     />
+                    <Route path="/workers" element={<Workers />} />
                   </Routes>
                 </Layout>
               </BrowserRouter>

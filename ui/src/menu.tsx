@@ -1,7 +1,7 @@
 import logoDark from '@/assets/images/logo_dark.png';
 import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils'; // Assuming cn utility is available
-import { BarChart2, GitBranch, List, Search } from 'lucide-react';
+import { BarChart2, GitBranch, List, Search, Server } from 'lucide-react';
 import * as React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -91,6 +91,13 @@ export const mainListItems = React.forwardRef<
           isOpen={isOpen}
           onClick={onNavItemClick}
         />
+        <NavItem
+          to="/workers"
+          text="Workers"
+          icon={<Server size={18} />}
+          isOpen={isOpen}
+          onClick={onNavItemClick}
+        />
       </nav>
       {/* Version display - only shown when sidebar is expanded */}
       {isOpen && (
@@ -140,7 +147,9 @@ function NavItem({ to, icon, text, isOpen, onClick }: NavItemProps) {
           </div>
 
           {/* Text with fade-in animation */}
-          <span className="font-medium text-primary-foreground text-xs ml-3">{text}</span>
+          <span className="font-medium text-primary-foreground text-xs ml-3">
+            {text}
+          </span>
         </Link>
       </div>
     );

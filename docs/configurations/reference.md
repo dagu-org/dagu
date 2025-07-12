@@ -81,6 +81,34 @@ remoteNodes:
     isAuthToken: true
     authToken: "prod-token"
     skipTLSVerify: false
+
+# Coordinator (for distributed execution)
+coordinator:
+  host: "127.0.0.1"       # Bind address
+  port: 50051             # gRPC port
+  signingKey: ""          # Authentication key
+  tls:
+    certFile: ""          # Server certificate
+    keyFile: ""           # Server key
+    caFile: ""            # CA for client verification (mTLS)
+
+# Worker (for distributed execution)
+worker:
+  id: ""                  # Worker ID (default: hostname@PID)
+  maxActiveRuns: 100      # Max parallel task executions
+  coordinator:
+    host: "127.0.0.1"
+    port: 50051
+  insecure: true          # Use h2c instead of TLS
+  skipTLSVerify: false    # Skip cert verification
+  labels:                 # Worker capabilities
+    gpu: "false"
+    memory: "16G"
+    region: "us-east-1"
+  tls:
+    certFile: ""          # Client certificate (mTLS)
+    keyFile: ""           # Client key
+    caFile: ""            # CA for server verification
 ```
 
 ## Environment Variables
@@ -130,6 +158,26 @@ All options support `DAGU_` prefix.
 
 ### Queue
 - `DAGU_QUEUE_ENABLED` - Enable queue system (default: true)
+
+### Coordinator
+- `DAGU_COORDINATOR_HOST` - Coordinator bind address (default: `127.0.0.1`)
+- `DAGU_COORDINATOR_PORT` - Coordinator gRPC port (default: `50051`)
+- `DAGU_COORDINATOR_SIGNING_KEY` - Authentication signing key
+- `DAGU_COORDINATOR_TLS_CERT` - TLS certificate file path
+- `DAGU_COORDINATOR_TLS_KEY` - TLS key file path
+- `DAGU_COORDINATOR_TLS_CA` - CA certificate for client verification
+
+### Worker
+- `DAGU_WORKER_ID` - Worker instance ID (default: `hostname@PID`)
+- `DAGU_WORKER_MAX_ACTIVE_RUNS` - Max concurrent task executions (default: `100`)
+- `DAGU_WORKER_COORDINATOR_HOST` - Coordinator host to connect to
+- `DAGU_WORKER_COORDINATOR_PORT` - Coordinator port (default: `50051`)
+- `DAGU_WORKER_LABELS` - Worker labels (format: `key1=value1,key2=value2`)
+- `DAGU_WORKER_INSECURE` - Use insecure connection (default: `true`)
+- `DAGU_WORKER_TLS_CERT` - Client certificate for mTLS
+- `DAGU_WORKER_TLS_KEY` - Client key for mTLS
+- `DAGU_WORKER_TLS_CA` - CA certificate for server verification
+- `DAGU_WORKER_SKIP_TLS_VERIFY` - Skip TLS certificate verification
 
 ### Legacy Environment Variables (Deprecated)
 These variables are maintained for backward compatibility but should not be used in new deployments:
@@ -295,6 +343,37 @@ remoteNodes:
     authToken: ${PROD_TOKEN}
 ```
 
+### Distributed Execution
+```yaml
+# Main instance with coordinator
+host: 0.0.0.0
+port: 8080
+
+coordinator:
+  host: 0.0.0.0
+  port: 50051
+  signingKey: ${COORDINATOR_KEY}
+  tls:
+    certFile: /etc/dagu/tls/server.crt
+    keyFile: /etc/dagu/tls/server.key
+
+# Worker configuration
+worker:
+  id: gpu-worker-01
+  maxActiveRuns: 10
+  coordinatorHost: coordinator.internal
+  coordinatorPort: 50051
+  insecure: false
+  labels:
+    gpu: "true"
+    cuda: "11.8"
+    memory: "64G"
+    region: "us-east-1"
+  certFile: /etc/dagu/tls/client.crt
+  keyFile: /etc/dagu/tls/client.key
+  caFile: /etc/dagu/tls/ca.crt
+```
+
 ## Validation
 
 ```bash
@@ -324,22 +403,6 @@ When not specified, these paths are automatically set based on `paths.dataDir`:
 - `paths.queueDir`: `{paths.dataDir}/queue` - Stores queue data
 - `paths.procDir`: `{paths.dataDir}/proc` - Stores process data
 - `paths.executable`: Current executable path - Auto-detected from running process
-
-## Troubleshooting
-
-**Configuration not loading:**
-- Check file exists: `ls -la ~/.config/dagu/config.yaml`
-- Validate YAML syntax
-- Enable debug: `--debug`
-
-**Environment variables not working:**
-- Use `DAGU_` prefix
-- Export properly: `export DAGU_PORT=8080`
-- Check precedence (CLI > env > file)
-
-**Permission errors:**
-- Fix ownership: `chown -R $USER ~/.config/dagu`
-- Check permissions: `chmod 755 ~/.config/dagu`
 
 ## See Also
 

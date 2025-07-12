@@ -8,7 +8,9 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+	"time"
 
+	"github.com/dagu-org/dagu/internal/coordinator/client"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -17,13 +19,17 @@ import (
 var _ DAGExecutor = (*dagExecutor)(nil)
 
 type dagExecutor struct {
-	child     *ChildDAGExecutor
-	lock      sync.Mutex
-	workDir   string
-	stdout    io.Writer
-	stderr    io.Writer
-	cmd       *exec.Cmd
-	runParams RunParams
+	child         *ChildDAGExecutor
+	lock          sync.Mutex
+	workDir       string
+	stdout        io.Writer
+	stderr        io.Writer
+	cmd           *exec.Cmd
+	runParams     RunParams
+	step          digraph.Step
+	isDistributed bool
+	childDAGRunID string
+	env           Env
 }
 
 // Errors for DAG executor
@@ -43,6 +49,9 @@ func newDAGExecutor(
 		return nil, err
 	}
 
+	// Set the worker selector from the step
+	child.SetWorkerSelector(step.WorkerSelector)
+
 	dir := GetEnv(ctx).WorkingDir
 	if dir != "" && !fileutil.FileExists(dir) {
 		return nil, ErrWorkingDirNotExist
@@ -51,6 +60,8 @@ func newDAGExecutor(
 	return &dagExecutor{
 		child:   child,
 		workDir: dir,
+		step:    step,
+		env:     GetEnv(ctx),
 	}, nil
 }
 
@@ -58,9 +69,26 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 	// Ensure cleanup happens even if there's an error
 	defer func() {
 		if err := e.child.Cleanup(ctx); err != nil {
-			logger.Error(ctx, "Failed to cleanup child DAG executor", "error", err)
+			logger.Error(ctx, "Failed to cleanup child DAG executor", "err", err)
 		}
 	}()
+
+	// Check if we should use distributed execution
+	if e.child.ShouldUseDistributedExecution() {
+		logger.Info(ctx, "Worker selector specified for child DAG execution",
+			"dag", e.child.DAG.Name,
+			"workerSelector", e.step.WorkerSelector,
+		)
+
+		// Try distributed execution
+		err := e.runDistributed(ctx)
+		if err != nil {
+			// Distributed execution was requested but failed - return error
+			return fmt.Errorf("distributed execution failed for DAG %q: %w", e.child.DAG.Name, err)
+		}
+		// Distributed execution succeeded
+		return nil
+	}
 
 	e.lock.Lock()
 
@@ -140,7 +168,143 @@ func (e *dagExecutor) SetStderr(out io.Writer) {
 func (e *dagExecutor) Kill(sig os.Signal) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
+
+	// If running distributed, request cancellation
+	if e.isDistributed && e.childDAGRunID != "" {
+		ctx := context.Background()
+		if err := e.env.DB.RequestChildCancel(ctx, e.childDAGRunID, e.env.RootDAGRun); err != nil {
+			logger.Error(ctx, "Failed to request child DAG cancellation",
+				"dagRunId", e.childDAGRunID, "err", err)
+		}
+	}
+
+	// Still kill local process if any
 	return killProcessGroup(e.cmd, sig)
+}
+
+// runDistributed attempts to execute the child DAG via the coordinator
+func (e *dagExecutor) runDistributed(ctx context.Context) error {
+	// Build the coordinator task
+	task, err := e.child.BuildCoordinatorTask(ctx, e.runParams)
+	if err != nil {
+		return fmt.Errorf("failed to build coordinator task: %w", err)
+	}
+
+	// Mark as distributed and store the child DAG run ID
+	e.lock.Lock()
+	e.isDistributed = true
+	e.childDAGRunID = e.runParams.RunID
+	e.lock.Unlock()
+
+	// Create coordinator client
+	coordinatorClient, err := e.getCoordinatorClient(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create coordinator client: %w", err)
+	}
+	defer func() {
+		if err := coordinatorClient.Close(); err != nil {
+			logger.Error(ctx, "Failed to close coordinator client", "err", err)
+		}
+	}()
+
+	// Dispatch the task
+	logger.Info(ctx, "Dispatching task to coordinator",
+		"dag_run_id", task.DagRunId,
+		"target", task.Target,
+		"worker_selector", task.WorkerSelector,
+	)
+
+	if err := coordinatorClient.Dispatch(ctx, task); err != nil {
+		return fmt.Errorf("failed to dispatch task: %w", err)
+	}
+
+	// Wait for distributed execution to complete
+	return e.waitForDistributedExecution(ctx, e.runParams.RunID)
+}
+
+// getCoordinatorClient gets a coordinator client using the factory from environment
+func (e *dagExecutor) getCoordinatorClient(ctx context.Context) (client.Client, error) {
+	env := GetEnv(ctx)
+
+	// Factory should be initialized when Env is created
+	if env.CoordinatorClientFactory == nil {
+		return nil, fmt.Errorf("coordinator client factory not initialized in environment")
+	}
+
+	// Build client from factory
+	return env.CoordinatorClientFactory.Build(ctx)
+}
+
+// waitForDistributedExecution polls for the completion of a distributed task
+func (e *dagExecutor) waitForDistributedExecution(ctx context.Context, dagRunID string) error {
+	env := GetEnv(ctx)
+
+	// Poll for completion
+	pollInterval := 1 * time.Second
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("distributed execution cancelled: %w", ctx.Err())
+		case <-ticker.C:
+			// Check if the child DAG run has completed
+			isCompleted, err := env.DB.IsChildDAGRunCompleted(ctx, dagRunID, env.RootDAGRun)
+			if err != nil {
+				logger.Error(ctx, "Failed to check child DAG run completion",
+					"dag_run_id", dagRunID,
+					"err", err,
+				)
+				continue // Retry on error
+			}
+
+			if !isCompleted {
+				logger.Debug(ctx, "Child DAG run not completed yet",
+					"dag_run_id", dagRunID,
+				)
+				continue // Not completed, keep polling
+			}
+
+			// Check the final status of the child DAG run
+			result, err := env.DB.GetChildDAGRunStatus(ctx, dagRunID, env.RootDAGRun)
+			if err != nil {
+				// Not found yet, continue polling
+				logger.Debug(ctx, "Child DAG run status not available yet",
+					"dag_run_id", dagRunID,
+					"err", err,
+				)
+				continue
+			}
+
+			// If we got a result, the child DAG has completed
+			logger.Info(ctx, "Distributed execution completed",
+				"dag_run_id", dagRunID,
+				"name", result.Name,
+				"is_success", result.Success,
+			)
+
+			// Write the results to stdout if available
+			if e.stdout != nil {
+				jsonData, err := json.MarshalIndent(result, "", "  ")
+				if err != nil {
+					return fmt.Errorf("failed to marshal outputs: %w", err)
+				}
+				jsonData = append(jsonData, '\n')
+
+				if _, err := e.stdout.Write(jsonData); err != nil {
+					return fmt.Errorf("failed to write outputs: %w", err)
+				}
+			}
+
+			// Check if the execution was successful
+			if !result.Success {
+				return fmt.Errorf("child DAG execution failed")
+			}
+
+			return nil
+		}
+	}
 }
 
 func init() {

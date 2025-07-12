@@ -11,6 +11,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/otel"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
 // ChildDAGExecutor is a helper for executing child DAGs.
@@ -24,8 +25,11 @@ type ChildDAGExecutor struct {
 	// This will be cleaned up after execution.
 	tempFile string
 
-	// isLocal indicates whether this is a local DAG.
-	isLocal bool
+	// workerSelector contains the worker selector requirements from the step
+	workerSelector map[string]string
+
+	// yamlData holds the YAML content for local DAGs (needed for distributed execution)
+	yamlData []byte
 }
 
 // NewChildDAGExecutor creates a new ChildDAGExecutor.
@@ -50,7 +54,7 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 			return &ChildDAGExecutor{
 				DAG:      &dag,
 				tempFile: tempFile,
-				isLocal:  true,
+				yamlData: localDAG.YamlData,
 			}, nil
 		}
 	}
@@ -62,8 +66,7 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 	}
 
 	return &ChildDAGExecutor{
-		DAG:     dag,
-		isLocal: false,
+		DAG: dag,
 	}, nil
 }
 
@@ -130,10 +133,65 @@ func (e *ChildDAGExecutor) BuildCommand(
 		"dagRunId", runParams.RunID,
 		"target", e.DAG.Name,
 		"args", args,
-		"isLocal", e.isLocal,
 	)
 
 	return cmd, nil
+}
+
+// SetWorkerSelector sets the worker selector requirements for the child DAG execution
+func (e *ChildDAGExecutor) SetWorkerSelector(selector map[string]string) {
+	e.workerSelector = selector
+}
+
+// ShouldUseDistributedExecution checks if this child DAG should be executed via coordinator
+func (e *ChildDAGExecutor) ShouldUseDistributedExecution() bool {
+	// Only use distributed execution if worker selector is specified
+	return len(e.workerSelector) > 0
+}
+
+// BuildCoordinatorTask creates a coordinator task for distributed execution
+func (e *ChildDAGExecutor) BuildCoordinatorTask(
+	ctx context.Context,
+	runParams RunParams,
+) (*coordinatorv1.Task, error) {
+	env := GetEnv(ctx)
+
+	if runParams.RunID == "" {
+		return nil, fmt.Errorf("dag-run ID is not set")
+	}
+
+	if env.RootDAGRun.Zero() {
+		return nil, fmt.Errorf("root dag-run ID is not set")
+	}
+
+	// Build task for coordinator dispatch
+	task := &coordinatorv1.Task{
+		Operation:        coordinatorv1.Operation_OPERATION_START,
+		RootDagRunName:   env.RootDAGRun.Name,
+		RootDagRunId:     env.RootDAGRun.ID,
+		ParentDagRunName: env.DAG.Name,
+		ParentDagRunId:   env.DAGRunID,
+		DagRunId:         runParams.RunID,
+		Target:           e.DAG.Location,
+		Params:           runParams.Params,
+		WorkerSelector:   e.workerSelector,
+	}
+
+	// For local DAGs, include the YAML definition
+	if len(e.yamlData) > 0 {
+		task.Definition = string(e.yamlData)
+		// Use the DAG name as target instead of the temp file path
+		task.Target = e.DAG.Name
+	}
+
+	logger.Info(ctx, "Built coordinator task for child DAG",
+		"dagRunId", runParams.RunID,
+		"target", e.DAG.Name,
+		"workerSelector", e.workerSelector,
+		"hasDefinition", len(task.Definition) > 0,
+	)
+
+	return task, nil
 }
 
 // Cleanup removes any temporary files created for local DAGs.
@@ -152,7 +210,7 @@ func (e *ChildDAGExecutor) Cleanup(ctx context.Context) error {
 		logger.Error(ctx, "Failed to remove temporary DAG file",
 			"dag", e.DAG.Name,
 			"tempFile", e.tempFile,
-			"error", err,
+			"err", err,
 		)
 		return fmt.Errorf("failed to remove temp file: %w", err)
 	}

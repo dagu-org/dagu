@@ -25,14 +25,15 @@ import (
 var _ api.StrictServerInterface = (*API)(nil)
 
 type API struct {
-	dagStore           models.DAGStore
-	dagRunStore        models.DAGRunStore
-	dagRunMgr          dagrun.Manager
-	remoteNodes        map[string]config.RemoteNode
-	apiBasePath        string
-	logEncodingCharset string
-	config             *config.Config
-	metricsRegistry    *prometheus.Registry
+	dagStore                 models.DAGStore
+	dagRunStore              models.DAGRunStore
+	dagRunMgr                dagrun.Manager
+	remoteNodes              map[string]config.RemoteNode
+	apiBasePath              string
+	logEncodingCharset       string
+	config                   *config.Config
+	metricsRegistry          *prometheus.Registry
+	coordinatorClientFactory any
 }
 
 func New(
@@ -40,6 +41,7 @@ func New(
 	drs models.DAGRunStore,
 	drm dagrun.Manager,
 	cfg *config.Config,
+	coordinatorClientFactory any,
 ) *API {
 	remoteNodes := make(map[string]config.RemoteNode)
 	for _, n := range cfg.Server.RemoteNodes {
@@ -47,13 +49,14 @@ func New(
 	}
 
 	return &API{
-		dagStore:           dr,
-		dagRunStore:        drs,
-		dagRunMgr:          drm,
-		logEncodingCharset: cfg.UI.LogEncodingCharset,
-		remoteNodes:        remoteNodes,
-		apiBasePath:        cfg.Server.APIBasePath,
-		config:             cfg,
+		dagStore:                 dr,
+		dagRunStore:              drs,
+		dagRunMgr:                drm,
+		logEncodingCharset:       cfg.UI.LogEncodingCharset,
+		remoteNodes:              remoteNodes,
+		apiBasePath:              cfg.Server.APIBasePath,
+		config:                   cfg,
+		coordinatorClientFactory: coordinatorClientFactory,
 	}
 }
 

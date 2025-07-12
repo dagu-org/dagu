@@ -106,7 +106,7 @@ dagu status my-workflow.yaml
 
 #### Start Everything
 ```bash
-# Start scheduler and web UI (default: localhost:8080)
+# Start scheduler, web UI, and coordinator service (default: localhost:8080)
 dagu start-all
 
 # Custom host and port
@@ -136,6 +136,48 @@ dagu server --host=0.0.0.0 --port=9000
 # Custom DAGs directory
 dagu server --dags=/path/to/directory
 ```
+
+### Distributed Execution Commands
+
+#### Start Coordinator
+```bash
+# Start the coordinator gRPC server
+dagu coordinator
+
+# Custom host and port
+dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50051
+
+# With authentication
+dagu coordinator --coordinator.signing-key=mysecretkey
+
+# With TLS
+dagu coordinator \
+  --coordinator.tls-cert=server.crt \
+  --coordinator.tls-key=server.key
+```
+
+The coordinator service manages task distribution to workers for distributed execution.
+
+#### Start Worker
+```bash
+# Start a worker that polls for tasks
+dagu worker
+
+# With labels for capability matching
+dagu worker --worker.labels gpu=true,memory=64G,region=us-east-1
+
+# Connect to remote coordinator
+dagu worker \
+  --worker.coordinator-host=coordinator.example.com \
+  --worker.coordinator-port=50051
+
+# With custom worker ID and concurrency
+dagu worker \
+  --worker.id=gpu-worker-01 \
+  --worker.max-active-runs=50
+```
+
+Workers poll the coordinator for matching tasks based on their labels.
 
 ### Interactive DAG Selection
 
@@ -199,3 +241,4 @@ dagu start my-workflow.yaml -- param1 KEY=value param2
 - [Explore the REST API](/overview/api) for programmatic access
 - [Set up the Web UI](/overview/web-ui) for visual monitoring
 - [Learn workflow syntax](/writing-workflows/) to build complex DAGs
+- [Configure distributed execution](/features/distributed-execution) for scaling workflows

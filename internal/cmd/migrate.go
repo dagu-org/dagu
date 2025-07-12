@@ -93,7 +93,7 @@ func runMigration(ctx *Context) error {
 		logger.Warn(ctx.Context, "Migration completed with errors", "error_count", len(result.Errors))
 		for i, err := range result.Errors {
 			if i < 10 { // Limit error output
-				logger.Error(ctx.Context, "Migration error", "error", err)
+				logger.Error(ctx.Context, "Migration error", "err", err)
 			}
 		}
 		if len(result.Errors) > 10 {
@@ -104,7 +104,7 @@ func runMigration(ctx *Context) error {
 	// Move legacy data to archive if migration was successful
 	if result.FailedRuns == 0 {
 		if err := migrator.MoveLegacyData(ctx.Context); err != nil {
-			logger.Error(ctx.Context, "Failed to move legacy data to archive", "error", err)
+			logger.Error(ctx.Context, "Failed to move legacy data to archive", "err", err)
 			logger.Info(ctx.Context, "Legacy data remains in original location", "path", filepath.Join(ctx.Config.Paths.DataDir, "history"))
 		}
 	} else {

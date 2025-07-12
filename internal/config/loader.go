@@ -170,8 +170,14 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	if def.Permissions.WriteDAGs != nil {
 		cfg.Server.Permissions[PermissionWriteDAGs] = *def.Permissions.WriteDAGs
 	}
+	if def.PermissionWriteDAGs != nil {
+		cfg.Server.Permissions[PermissionWriteDAGs] = *def.PermissionWriteDAGs
+	}
 	if def.Permissions.RunDAGs != nil {
 		cfg.Server.Permissions[PermissionRunDAGs] = *def.Permissions.RunDAGs
+	}
+	if def.PermissionRunDAGs != nil {
+		cfg.Server.Permissions[PermissionRunDAGs] = *def.PermissionRunDAGs
 	}
 
 	// Process remote node definitions.
@@ -192,6 +198,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		cfg.Server.TLS = &TLSConfig{
 			CertFile: def.TLS.CertFile,
 			KeyFile:  def.TLS.KeyFile,
+			CAFile:   def.TLS.CAFile,
 		}
 	}
 
@@ -240,6 +247,67 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 				Name:          queueDef.Name,
 				MaxActiveRuns: queueDef.MaxActiveRuns,
 			})
+		}
+	}
+
+	// Override with values from config file if provided
+	if def.Coordinator != nil {
+		cfg.Coordinator.Host = def.Coordinator.Host
+		cfg.Coordinator.Port = def.Coordinator.Port
+		cfg.Coordinator.SigningKey = def.Coordinator.SigningKey
+
+		// Set TLS configuration if available
+		if def.Coordinator.CertFile != "" || def.Coordinator.KeyFile != "" || def.Coordinator.CAFile != "" {
+			cfg.Coordinator.TLS = &TLSConfig{
+				CertFile: def.Coordinator.CertFile,
+				KeyFile:  def.Coordinator.KeyFile,
+				CAFile:   def.Coordinator.CAFile,
+			}
+		}
+	}
+
+	// Set worker configuration from nested structure
+	if def.Worker != nil {
+		cfg.Worker.ID = def.Worker.ID
+		cfg.Worker.MaxActiveRuns = def.Worker.MaxActiveRuns
+		cfg.Worker.CoordinatorHost = def.Worker.CoordinatorHost
+		cfg.Worker.CoordinatorPort = def.Worker.CoordinatorPort
+		cfg.Worker.Insecure = def.Worker.Insecure
+		cfg.Worker.SkipTLSVerify = def.Worker.SkipTLSVerify
+
+		// Set worker TLS configuration if available
+		if def.Worker.CertFile != "" || def.Worker.KeyFile != "" || def.Worker.CAFile != "" {
+			cfg.Worker.TLS = &TLSConfig{
+				CertFile: def.Worker.CertFile,
+				KeyFile:  def.Worker.KeyFile,
+				CAFile:   def.Worker.CAFile,
+			}
+		}
+
+		// Parse worker labels - can be either string or map
+		if def.Worker.Labels != nil {
+			switch v := def.Worker.Labels.(type) {
+			case string:
+				if v != "" {
+					cfg.Worker.Labels = parseLabels(v)
+				}
+			case map[string]interface{}:
+				cfg.Worker.Labels = make(map[string]string)
+				for key, val := range v {
+					if strVal, ok := val.(string); ok {
+						cfg.Worker.Labels[key] = strVal
+					}
+				}
+			case map[interface{}]interface{}:
+				cfg.Worker.Labels = make(map[string]string)
+				for key, val := range v {
+					if keyStr, ok := key.(string); ok {
+						if valStr, ok := val.(string); ok {
+							cfg.Worker.Labels[keyStr] = valStr
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -400,6 +468,21 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	viper.SetDefault("apiBasePath", "/api/v2")
 	viper.SetDefault("latestStatusToday", false)
 
+	// Coordinator settings
+	viper.SetDefault("coordinatorHost", "127.0.0.1")
+	viper.SetDefault("coordinatorPort", 50051)
+	viper.SetDefault("coordinatorSigningKey", "")
+	viper.SetDefault("coordinatorCertFile", "")
+	viper.SetDefault("coordinatorKeyFile", "")
+	viper.SetDefault("coordinatorCAFile", "")
+
+	// Worker settings - nested structure
+	viper.SetDefault("worker.maxActiveRuns", 100)
+	viper.SetDefault("worker.coordinatorHost", "127.0.0.1")
+	viper.SetDefault("worker.coordinatorPort", 50051)
+	viper.SetDefault("worker.insecure", true) // Insecure by default to match coordinator
+	viper.SetDefault("worker.skipTlsVerify", false)
+
 	// UI settings
 	viper.SetDefault("ui.navbarTitle", build.AppName)
 	viper.SetDefault("ui.maxDashboardPageLimit", 100)
@@ -480,6 +563,26 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 
 	// Queue configuration
 	l.bindEnv("queues.enabled", "QUEUE_ENABLED")
+
+	// Coordinator service configuration (flat structure)
+	l.bindEnv("coordinatorHost", "COORDINATOR_HOST")
+	l.bindEnv("coordinatorPort", "COORDINATOR_PORT")
+	l.bindEnv("coordinatorSigningKey", "COORDINATOR_SIGNING_KEY")
+	l.bindEnv("coordinatorCertFile", "COORDINATOR_CERT_FILE")
+	l.bindEnv("coordinatorKeyFile", "COORDINATOR_KEY_FILE")
+	l.bindEnv("coordinatorCaFile", "COORDINATOR_CA_FILE")
+
+	// Worker configuration (nested structure)
+	l.bindEnv("worker.id", "WORKER_ID")
+	l.bindEnv("worker.maxActiveRuns", "WORKER_MAX_ACTIVE_RUNS")
+	l.bindEnv("worker.coordinatorHost", "WORKER_COORDINATOR_HOST")
+	l.bindEnv("worker.coordinatorPort", "WORKER_COORDINATOR_PORT")
+	l.bindEnv("worker.insecure", "WORKER_INSECURE")
+	l.bindEnv("worker.skipTlsVerify", "WORKER_SKIP_TLS_VERIFY")
+	l.bindEnv("worker.labels", "WORKER_LABELS")
+	l.bindEnv("worker.certFile", "WORKER_TLS_CERT_FILE")
+	l.bindEnv("worker.keyFile", "WORKER_TLS_KEY_FILE")
+	l.bindEnv("worker.caFile", "WORKER_TLS_CA_FILE")
 }
 
 // bindEnv constructs the full environment variable name using the app prefix and binds it to the given key.
@@ -574,4 +677,32 @@ func (l *ConfigLoader) validateConfig(cfg *Config) error {
 	}
 
 	return nil
+}
+
+// parseLabels parses a comma-separated string of key=value pairs into a map.
+// Example: "gpu=true,memory=64G" -> map[string]string{"gpu": "true", "memory": "64G"}
+func parseLabels(labelsStr string) map[string]string {
+	labels := make(map[string]string)
+	if labelsStr == "" {
+		return labels
+	}
+
+	pairs := strings.Split(labelsStr, ",")
+	for _, pair := range pairs {
+		pair = strings.TrimSpace(pair)
+		if pair == "" {
+			continue
+		}
+
+		parts := strings.SplitN(pair, "=", 2)
+		if len(parts) == 2 {
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			if key != "" {
+				labels[key] = value
+			}
+		}
+	}
+
+	return labels
 }

@@ -382,44 +382,6 @@ wait
 # Check Jaeger for all traces
 ```
 
-## Trace Analysis
-
-### What to Look For
-
-1. **Execution Timeline**
-   - Which steps took the longest?
-   - Are parallel steps actually running concurrently?
-   - Any unexpected gaps between steps?
-
-2. **Span Attributes**
-   - Verify all expected attributes are present
-   - Check exit codes for failures
-   - Confirm resource attributes
-
-3. **Trace Structure**
-   - Root span should be the DAG
-   - Each step should be a child span
-   - Nested DAGs should maintain hierarchy
-
-### Example Trace Analysis
-
-In Jaeger UI:
-1. Click on a trace
-2. Expand all spans
-3. Check the timeline view
-4. Review span tags (attributes)
-5. Look for errors or warnings
-
-Expected structure:
-```
-DAG: otel-test (2.5s)
-├── Step: fetch-data (1s)
-├── Step: process-data (2s)
-├── Step: analyze-batch-1 (1s)
-├── Step: analyze-batch-2 (1s)
-└── Step: aggregate-results (0.1s)
-```
-
 ## Integration Testing
 
 ### Test with Your Observability Stack
@@ -453,16 +415,3 @@ export ENVIRONMENT="staging"
 
 dagu start production-like-test.yaml
 ```
-
-## Troubleshooting Checklist
-
-- [ ] Is Docker running? (for Jaeger/Collector)
-- [ ] Are ports 4317/4318 available?
-- [ ] Is `otel.enabled` set to `true`?
-- [ ] Is the endpoint URL correct?
-- [ ] For HTTPS endpoints, is `insecure: false`?
-- [ ] Are there any error messages in debug logs?
-- [ ] Can you connect to the endpoint manually?
-- [ ] Are traces appearing in your backend?
-- [ ] Do nested DAGs show proper parent-child relationships?
-- [ ] Are all expected span attributes present?

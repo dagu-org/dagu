@@ -24,6 +24,12 @@ type Config struct {
 	// Queues contains global queue configuration settings.
 	Queues Queues
 
+	// Coordinator defines the coordinator service configuration.
+	Coordinator Coordinator
+
+	// Worker defines the worker configuration.
+	Worker Worker
+
 	// Warnings contains a list of warnings generated during the configuration loading process.
 	Warnings []string
 }
@@ -225,6 +231,12 @@ type RemoteNode struct {
 type TLSConfig struct {
 	CertFile string
 	KeyFile  string
+	CAFile   string
+}
+
+// IsEnabled checks if TLS is enabled by verifying that all necessary files are provided
+func (cfg *TLSConfig) IsEnabled() bool {
+	return cfg.CertFile != "" && cfg.KeyFile != "" && cfg.CAFile != ""
 }
 
 // Queues represents the global queue configuration
@@ -237,4 +249,24 @@ type Queues struct {
 type QueueConfig struct {
 	Name          string
 	MaxActiveRuns int
+}
+
+// Coordinator represents the coordinator service configuration
+type Coordinator struct {
+	Host       string     // gRPC server host address
+	Port       int        // gRPC server port number
+	SigningKey string     // Used for signing key for JWT
+	TLS        *TLSConfig // TLS configuration for secure connections
+}
+
+// Worker represents the worker configuration
+type Worker struct {
+	ID              string            // Worker instance ID (default: hostname@PID)
+	MaxActiveRuns   int               // Maximum number of active runs (default: 100)
+	CoordinatorHost string            // Coordinator gRPC server host (default: 127.0.0.1)
+	CoordinatorPort int               // Coordinator gRPC server port (default: 50051)
+	TLS             *TLSConfig        // TLS configuration for coordinator connection
+	Insecure        bool              // Use insecure connection (h2c) - must be explicitly enabled
+	SkipTLSVerify   bool              // Skip TLS certificate verification
+	Labels          map[string]string // Worker labels for capability matching
 }

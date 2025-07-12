@@ -147,6 +147,43 @@ The search functionality allows you to search for specific text across all DAGs 
 - Search across all DAGs
 - Find by name, tags, or content
 
+## Workers
+
+![Workers](/workers.webp)
+
+The Workers page provides real-time monitoring of distributed execution workers connected to the coordinator service.
+
+### Worker List
+- **Worker ID**: Unique identifier for each worker
+- **Labels**: Capability labels (GPU, memory, region, etc.)
+- **Health Status**: Visual health indicators
+  - Green: Healthy (< 5s since last heartbeat)
+  - Yellow: Warning (5-15s since last heartbeat)
+  - Red: Unhealthy (> 15s since last heartbeat)
+- **Last Heartbeat**: Time since last communication
+- **Running Tasks**: Currently executing DAG runs
+
+### Running Task Details
+For each running task, you can see:
+- **DAG Name**: The workflow being executed
+- **DAG Run ID**: Unique execution identifier
+- **Root DAG**: Top-level workflow (for nested DAGs)
+- **Parent DAG**: Immediate parent (for child DAGs)
+- **Started At**: Task start time
+
+### Navigating to Task Details
+Click on any running task to open the DAG run details modal:
+- For root tasks: Opens DAG run details directly
+- For child tasks: Opens parent DAG with child view and breadcrumb navigation
+- Ctrl/Cmd+Click: Opens task details in a new tab
+
+### Worker Labels Display
+Each worker shows its capability labels as badges:
+```
+Worker: gpu-worker-01
+Labels: [gpu=true] [cuda=11.8] [memory=64G] [region=us-east-1]
+```
+
 ## UI Customization
 
 ### Branding

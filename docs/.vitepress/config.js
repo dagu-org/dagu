@@ -59,6 +59,14 @@ const fullSidebar = [
       { text: "Email Notifications", link: "/features/email-notifications" },
       { text: "Authentication", link: "/features/authentication" },
       { text: "OpenTelemetry", link: "/features/opentelemetry" },
+      {
+        text: "Distributed Execution",
+        collapsed: false,
+        items: [
+          { text: "Overview", link: "/features/distributed-execution" },
+          { text: "Worker Labels", link: "/features/worker-labels" },
+        ],
+      },
     ],
   },
   {

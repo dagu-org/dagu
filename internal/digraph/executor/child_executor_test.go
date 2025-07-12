@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var _ digraph.Database = (*MockDatabase)(nil)
+
 // MockDatabase is a mock implementation of digraph.Database
 type MockDatabase struct {
 	mock.Mock
@@ -31,6 +33,18 @@ func (m *MockDatabase) GetChildDAGRunStatus(ctx context.Context, dagRunID string
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*digraph.Status), args.Error(1)
+}
+
+// IsChildDAGRunCompleted implements digraph.Database.
+func (m *MockDatabase) IsChildDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) (bool, error) {
+	args := m.Called(ctx, dagRunID, rootDAGRun)
+	return args.Bool(0), args.Error(1)
+}
+
+// RequestChildCancel implements digraph.Database.
+func (m *MockDatabase) RequestChildCancel(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) error {
+	args := m.Called(ctx, dagRunID, rootDAGRun)
+	return args.Error(0)
 }
 
 func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
@@ -74,8 +88,8 @@ func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, executor)
 
-	// Verify it's marked as local
-	assert.True(t, executor.isLocal)
+	// Verify it has yaml data (indicating it's local)
+	assert.NotEmpty(t, executor.yamlData)
 	assert.Equal(t, "local-child", executor.DAG.Name)
 	assert.NotEmpty(t, executor.tempFile)
 	assert.Contains(t, executor.tempFile, "local-child")
@@ -132,8 +146,8 @@ func TestNewChildDAGExecutor_RegularDAG(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, executor)
 
-	// Verify it's not marked as local
-	assert.False(t, executor.isLocal)
+	// Verify it doesn't have yaml data (not local)
+	assert.Empty(t, executor.yamlData)
 	assert.Equal(t, "regular-child", executor.DAG.Name)
 	assert.Equal(t, "/path/to/regular-child.yaml", executor.DAG.Location)
 	assert.Empty(t, executor.tempFile)
@@ -213,7 +227,6 @@ func TestBuildCommand(t *testing.T) {
 			Name:     "test-child",
 			Location: "/path/to/test.yaml",
 		},
-		isLocal: false,
 	}
 
 	// Build command
@@ -325,7 +338,7 @@ func TestCleanup_LocalDAG(t *testing.T) {
 	executor := &ChildDAGExecutor{
 		DAG:      &digraph.DAG{Name: "test-child"},
 		tempFile: tempFile,
-		isLocal:  true,
+		yamlData: []byte("test content"), // Set yamlData to indicate it's a local DAG
 	}
 
 	// Verify file exists
@@ -345,7 +358,7 @@ func TestCleanup_NonExistentFile(t *testing.T) {
 	executor := &ChildDAGExecutor{
 		DAG:      &digraph.DAG{Name: "test-child"},
 		tempFile: "/non/existent/file.yaml",
-		isLocal:  true,
+		yamlData: []byte("test content"), // Set yamlData to indicate it's a local DAG
 	}
 
 	// Cleanup should not error on non-existent file

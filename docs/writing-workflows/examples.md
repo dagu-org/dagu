@@ -1435,8 +1435,132 @@ Two ways to define steps.
 </div>
 
 
+## Distributed Execution
+
+<div class="examples-grid">
+
+<div class="example-card">
+
+### GPU Task Routing
+
+```yaml
+name: ml-training-pipeline
+steps:
+  - name: prepare-data
+    command: python prepare_dataset.py
+    
+  - name: train-model
+    run: train-model
+    
+  - name: evaluate-model
+    run: evaluate-model
+
+---
+name: train-model
+workerSelector:
+  gpu: "true"
+  cuda: "11.8"
+  memory: "64G"
+steps:
+  - name: train-model
+    command: python train.py --gpu
+
+---
+name: evaluate-model
+workerSelector:
+  gpu: "true"
+steps:
+  - name: evaluate-model
+    command: python evaluate.py
+```
+
+Route GPU tasks to GPU-enabled workers.
+
+<a href="/features/distributed-execution" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Mixed Local and Distributed
+
+```yaml
+name: hybrid-workflow
+steps:
+  # Runs on any available worker (local or remote)
+  - name: fetch-data
+    command: wget https://data.example.com/dataset.tar.gz
+    
+  # Must run on specific worker type
+  - name: process-on-gpu
+    run: process-on-gpu
+    
+  # Runs locally (no selector)
+  - name: notify-completion
+    command: ./notify.sh "Processing complete"
+    depends: process-on-gpu
+
+---
+name: process-on-gpu
+workerSelector:
+  gpu: "true"
+  gpu-model: "nvidia-a100"
+steps:
+  - name: process-on-gpu
+    command: python gpu_process.py
+```
+
+Combine local and distributed execution.
+
+<a href="/features/distributed-execution#task-routing" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Parallel Distributed Tasks
+
+```yaml
+name: distributed-batch-processing
+steps:
+  - name: split-data
+    command: python split_data.py --chunks=10
+    output: CHUNKS
+    
+  - name: process-chunks
+    run: chunk-processor
+    parallel:
+      items: ${CHUNKS}
+      maxConcurrent: 5
+    params: "CHUNK=${ITEM}"
+    
+  - name: merge-results
+    command: python merge_results.py
+
+---
+name: chunk-processor
+workerSelector:
+  memory: "16G"
+  cpu-cores: "8"
+params:
+  - CHUNK: ""
+steps:
+  - name: process
+    command: python process_chunk.py ${CHUNK}
+```
+
+Distribute parallel tasks across workers.
+
+<a href="/features/execution-control#parallel" class="learn-more">Learn more →</a>
+
+</div>
+
+</div>
+
 ## Learn More
 
 - [Writing Workflows Guide](/writing-workflows/) - Complete guide to building workflows
 - [Feature Documentation](/features/) - Deep dive into all features
 - [Configuration Reference](/reference/yaml) - Complete YAML specification
+- [Distributed Execution](/features/distributed-execution) - Scale across multiple machines
+- [Worker Labels](/features/worker-labels) - Task routing with labels

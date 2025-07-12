@@ -469,7 +469,7 @@ func (m *HistoryMigrator) MoveLegacyData(ctx context.Context) error {
 		// Move this legacy directory to archive
 		archivePath := filepath.Join(archiveDir, entry.Name())
 		if err := os.Rename(dirPath, archivePath); err != nil {
-			logger.Warn(ctx, "Failed to move legacy directory", "dir", entry.Name(), "error", err)
+			logger.Warn(ctx, "Failed to move legacy directory", "dir", entry.Name(), "err", err)
 		} else {
 			movedCount++
 			logger.Debug(ctx, "Moved legacy directory", "dir", entry.Name())
