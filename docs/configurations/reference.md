@@ -361,19 +361,17 @@ coordinator:
 worker:
   id: gpu-worker-01
   maxActiveRuns: 10
-  coordinator:
-    host: coordinator.internal
-    port: 50051
+  coordinatorHost: coordinator.internal
+  coordinatorPort: 50051
   insecure: false
   labels:
     gpu: "true"
     cuda: "11.8"
     memory: "64G"
     region: "us-east-1"
-  tls:
-    certFile: /etc/dagu/tls/client.crt
-    keyFile: /etc/dagu/tls/client.key
-    caFile: /etc/dagu/tls/ca.crt
+  certFile: /etc/dagu/tls/client.crt
+  keyFile: /etc/dagu/tls/client.key
+  caFile: /etc/dagu/tls/ca.crt
 ```
 
 ## Validation

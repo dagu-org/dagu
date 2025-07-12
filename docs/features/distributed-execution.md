@@ -57,18 +57,18 @@ Start workers on your compute nodes with appropriate labels:
 ```bash
 # GPU-enabled worker
 dagu worker \
-  --worker-labels gpu=true,cuda=11.8,memory=64G \
-  --worker-coordinator-host=coordinator.example.com
+  --worker.labels gpu=true,cuda=11.8,memory=64G \
+  --worker.coordinator-host=coordinator.example.com
 
 # CPU-optimized worker
 dagu worker \
-  --worker-labels cpu-arch=amd64,cpu-cores=32,region=us-east-1 \
-  --worker-coordinator-host=coordinator.example.com
+  --worker.labels cpu-arch=amd64,cpu-cores=32,region=us-east-1 \
+  --worker.coordinator-host=coordinator.example.com
 
 # Region-specific worker
 dagu worker \
-  --worker-labels region=eu-west-1,compliance=gdpr \
-  --worker-coordinator-host=coordinator.example.com
+  --worker.labels region=eu-west-1,compliance=gdpr \
+  --worker.coordinator-host=coordinator.example.com
 ```
 
 ### Step 3: Route Tasks to Workers
@@ -80,21 +80,18 @@ name: distributed-pipeline
 steps:
   # This task requires GPU
   - name: train-model
-    command: python train_model.py
+    run: train-model
     workerSelector:
       gpu: "true"
-      cuda: "11.8"
-  
-  # This task must run in EU region
-  - name: process-eu-data
-    command: ./process_gdpr_data.sh
-    workerSelector:
-      region: "eu-west-1"
-      compliance: "gdpr"
-  
-  # This task can run on any worker (no selector)
-  - name: send-notification
-    command: notify.sh "Training complete"
+
+---
+name: train-model
+command: python train_model.py
+workerSelector:
+  gpu: "true"
+steps:
+  - name: train-model
+    command: python train_model.py
 ```
 
 ## Worker Labels
@@ -105,19 +102,19 @@ Worker labels are key-value pairs that describe worker capabilities:
 
 ```bash
 # Hardware capabilities
---worker-labels gpu=true,gpu-model=a100,vram=40G
+--worker.labels gpu=true,gpu-model=a100,vram=40G
 
 # Geographic location
---worker-labels region=us-east-1,zone=us-east-1a,datacenter=dc1
+--worker.labels region=us-east-1,zone=us-east-1a,datacenter=dc1
 
 # Resource specifications
---worker-labels memory=128G,cpu-cores=64,storage=fast-nvme
+--worker.labels memory=128G,cpu-cores=64,storage=fast-nvme
 
 # Software environment
---worker-labels python=3.11,cuda=11.8,torch=2.0
+--worker.labels python=3.11,cuda=11.8,torch=2.0
 
 # Compliance and security
---worker-labels compliance=hipaa,security-clearance=high
+--worker.labels compliance=hipaa,security-clearance=high
 ```
 
 ### Label Matching Rules
@@ -149,9 +146,8 @@ coordinator:
 worker:
   id: "worker-gpu-01"  # Defaults to hostname@PID
   maxActiveRuns: 10
-  coordinator:
-    host: coordinator.example.com
-    port: 50051
+  coordinatorHost: coordinator.example.com
+  coordinatorPort: 50051
   labels:
     gpu: "true"
     memory: "64G"
@@ -243,10 +239,10 @@ dagu coordinator \
 
 # Worker with client certificate
 dagu worker \
-  --worker-insecure=false \
-  --worker-tls-cert=client.crt \
-  --worker-tls-key=client.key \
-  --worker-tls-ca=ca.crt
+  --worker.insecure=false \
+  --worker.tls-cert=client.crt \
+  --worker.tls-key=client.key \
+  --worker.tls-ca=ca.crt
 ```
 
 ### Authentication
@@ -258,7 +254,7 @@ Use signing keys for additional security:
 dagu coordinator --coordinator.signing-key=your-secret-key
 
 # Worker (key configured in coordinator)
-dagu worker --worker-coordinator-host=secure-coordinator.example.com
+dagu worker --worker.coordinator-host=secure-coordinator.example.com
 ```
 
 ## Deployment Examples
@@ -283,9 +279,9 @@ services:
     image: dagu:latest
     command: >
       worker
-      --worker-labels=gpu=true,cuda=11.8
-      --worker-coordinator-host=dagu-main
-      --worker-coordinator-port=50051
+      --worker.labels=gpu=true,cuda=11.8
+      --worker.coordinator-host=dagu-main
+      --worker.coordinator-port=50051
     deploy:
       replicas: 2
       resources:
@@ -297,9 +293,9 @@ services:
     image: dagu:latest
     command: >
       worker
-      --worker-labels=cpu-only=true,region=us-east-1
-      --worker-coordinator-host=dagu-main
-      --worker-coordinator-port=50051
+      --worker.labels=cpu-only=true,region=us-east-1
+      --worker.coordinator-host=dagu-main
+      --worker.coordinator-port=50051
     deploy:
       replicas: 5
 ```
@@ -354,9 +350,9 @@ spec:
         image: dagu:latest
         command: ["dagu", "worker"]
         args:
-        - --worker-labels=gpu=true,node-type=gpu-node
-        - --worker-coordinator-host=dagu-coordinator
-        - --worker-coordinator-port=50051
+        - --worker.labels=gpu=true,node-type=gpu-node
+        - --worker.coordinator-host=dagu-coordinator
+        - --worker.coordinator-port=50051
         resources:
           limits:
             nvidia.com/gpu: 1
@@ -382,9 +378,9 @@ spec:
         image: dagu:latest
         command: ["dagu", "worker"]
         args:
-        - --worker-labels=cpu-optimized=true,region=us-east-1
-        - --worker-coordinator-host=dagu-coordinator
-        - --worker-coordinator-port=50051
+        - --worker.labels=cpu-optimized=true,region=us-east-1
+        - --worker.coordinator-host=dagu-coordinator
+        - --worker.coordinator-port=50051
 ```
 
 ## See Also

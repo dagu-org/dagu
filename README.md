@@ -233,21 +233,18 @@ steps:
 name: distributed-workflow
 steps:
   - name: gpu-training
-    command: python train_model.py
-    workerSelector:
-      gpu: "true"
-      memory: "64G"
+    run: gpu-training
+    params: "REGION=${ITEM}"
+    parallel: ["us-east-1", "eu-west-1"]
     
-  - name: data-processing-us
-    command: python process.py --region us
-    workerSelector:
-      region: "us-east-1"
-    
-  - name: data-processing-eu
-    command: python process.py --region eu
-    workerSelector:
-      region: "eu-west-1"
-      compliance: "gdpr"
+---
+name: gpu-training
+params: "REGION=region"
+workerSelector:
+  gpu: "true"
+steps:
+  - name: gpu-training
+    command: python train_model.py ${REGION}
 ```
 
 ## Web Interface

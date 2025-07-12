@@ -287,16 +287,16 @@ dagu worker [options]
 ```
 
 **Options:**
-- `--worker-id` - Worker instance ID (default: `hostname@PID`)
-- `--worker-max-active-runs` - Maximum number of active runs (default: `100`)
-- `--worker-coordinator-host` - Coordinator gRPC server host (default: `127.0.0.1`)
-- `--worker-coordinator-port` - Coordinator gRPC server port (default: `50051`)
-- `--worker-insecure` - Use insecure connection (h2c) instead of TLS (default: `true`)
-- `--worker-tls-cert` - Path to TLS certificate file for mutual TLS
-- `--worker-tls-key` - Path to TLS key file for mutual TLS
-- `--worker-tls-ca` - Path to CA certificate file for server verification
-- `--worker-skip-tls-verify` - Skip TLS certificate verification (insecure)
-- `--worker-labels, -l` - Worker labels for capability matching (format: `key1=value1,key2=value2`)
+- `--worker.id` - Worker instance ID (default: `hostname@PID`)
+- `--worker.max-active-runs` - Maximum number of active runs (default: `100`)
+- `--worker.coordinator-host` - Coordinator gRPC server host (default: `127.0.0.1`)
+- `--worker.coordinator-port` - Coordinator gRPC server port (default: `50051`)
+- `--worker.insecure` - Use insecure connection (h2c) instead of TLS (default: `true`)
+- `--worker.tls-cert` - Path to TLS certificate file for mutual TLS
+- `--worker.tls-key` - Path to TLS key file for mutual TLS
+- `--worker.tls-ca` - Path to CA certificate file for server verification
+- `--worker.skip-tls-verify` - Skip TLS certificate verification (insecure)
+- `--worker.labels, -l` - Worker labels for capability matching (format: `key1=value1,key2=value2`)
 
 ```bash
 # Basic usage
@@ -304,30 +304,30 @@ dagu worker
 
 # With custom configuration
 dagu worker \
-  --worker-id=worker-1 \
-  --worker-max-active-runs=50 \
-  --worker-coordinator-host=coordinator.example.com
+  --worker.id=worker-1 \
+  --worker.max-active-runs=50 \
+  --worker.coordinator-host=coordinator.example.com
 
 # With labels for capability matching
-dagu worker --worker-labels gpu=true,memory=64G,region=us-east-1
-dagu worker --worker-labels cpu-arch=amd64,instance-type=m5.xlarge
+dagu worker --worker.labels gpu=true,memory=64G,region=us-east-1
+dagu worker --worker.labels cpu-arch=amd64,instance-type=m5.xlarge
 
 # With TLS connection
 dagu worker \
-  --worker-insecure=false \
-  --worker-coordinator-host=coordinator.example.com
+  --worker.insecure=false \
+  --worker.coordinator-host=coordinator.example.com
 
 # With mutual TLS
 dagu worker \
-  --worker-insecure=false \
-  --worker-tls-cert=client.crt \
-  --worker-tls-key=client.key \
-  --worker-tls-ca=ca.crt
+  --worker.insecure=false \
+  --worker.tls-cert=client.crt \
+  --worker.tls-key=client.key \
+  --worker.tls-ca=ca.crt
 
 # With self-signed certificates
 dagu worker \
-  --worker-insecure=false \
-  --worker-skip-tls-verify
+  --worker.insecure=false \
+  --worker.skip-tls-verify
 ```
 
 Workers poll the coordinator for tasks matching their labels and execute them locally.

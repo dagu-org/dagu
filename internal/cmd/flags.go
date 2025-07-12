@@ -161,7 +161,7 @@ var (
 
 	// workerIDFlag is the unique identifier for the worker instance.
 	workerIDFlag = commandLineFlag{
-		name:      "worker-id",
+		name:      "worker.id",
 		shorthand: "w",
 		usage:     "Worker instance ID (default: hostname@PID)",
 		bindViper: true,
@@ -169,7 +169,7 @@ var (
 
 	// workerMaxActiveRunsFlag is the maximum number of active runs for the worker.
 	workerMaxActiveRunsFlag = commandLineFlag{
-		name:         "worker-max-active-runs",
+		name:         "worker.max-active-runs",
 		shorthand:    "m",
 		defaultValue: "100",
 		usage:        "Maximum number of active runs (default: 100)",
@@ -178,7 +178,7 @@ var (
 
 	// workerCoordinatorHostFlag is the coordinator host for worker connection.
 	workerCoordinatorHostFlag = commandLineFlag{
-		name:         "worker-coordinator-host",
+		name:         "worker.coordinator-host",
 		defaultValue: "127.0.0.1",
 		usage:        "Coordinator gRPC server host (default: 127.0.0.1)",
 		bindViper:    true,
@@ -186,7 +186,7 @@ var (
 
 	// workerCoordinatorPortFlag is the coordinator port for worker connection.
 	workerCoordinatorPortFlag = commandLineFlag{
-		name:         "worker-coordinator-port",
+		name:         "worker.coordinator-port",
 		defaultValue: "50051",
 		usage:        "Coordinator gRPC server port (default: 50051)",
 		bindViper:    true,
@@ -194,7 +194,7 @@ var (
 
 	// workerInsecureFlag disables TLS for worker connection.
 	workerInsecureFlag = commandLineFlag{
-		name:      "worker-insecure",
+		name:      "worker.insecure",
 		usage:     "Use insecure connection (h2c) instead of TLS",
 		isBool:    true,
 		bindViper: true,
@@ -202,7 +202,7 @@ var (
 
 	// workerSkipTLSVerifyFlag skips TLS certificate verification for worker.
 	workerSkipTLSVerifyFlag = commandLineFlag{
-		name:      "worker-skip-tls-verify",
+		name:      "worker.skip-tls-verify",
 		usage:     "Skip TLS certificate verification (insecure)",
 		isBool:    true,
 		bindViper: true,
@@ -210,28 +210,28 @@ var (
 
 	// workerTLSCertFlag is the TLS certificate for worker connection.
 	workerTLSCertFlag = commandLineFlag{
-		name:      "worker-tls-cert",
+		name:      "worker.tls-cert",
 		usage:     "Path to TLS certificate file for mutual TLS",
 		bindViper: true,
 	}
 
 	// workerTLSKeyFlag is the TLS key for worker connection.
 	workerTLSKeyFlag = commandLineFlag{
-		name:      "worker-tls-key",
+		name:      "worker.tls-key",
 		usage:     "Path to TLS key file for mutual TLS",
 		bindViper: true,
 	}
 
 	// workerTLSCAFlag is the CA certificate for worker connection.
 	workerTLSCAFlag = commandLineFlag{
-		name:      "worker-tls-ca",
+		name:      "worker.tls-ca",
 		usage:     "Path to CA certificate file for server verification",
 		bindViper: true,
 	}
 
 	// workerLabelsFlag is the labels for worker capabilities.
 	workerLabelsFlag = commandLineFlag{
-		name:      "worker-labels",
+		name:      "worker.labels",
 		shorthand: "l",
 		usage:     "Worker labels for capability matching (format: key1=value1,key2=value2)",
 		bindViper: true,
@@ -264,7 +264,6 @@ type commandLineFlag struct {
 	required                             bool
 	isBool                               bool
 	bindViper                            bool
-	bindKey                              string
 }
 
 func initFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {

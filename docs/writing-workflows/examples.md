@@ -1450,95 +1450,33 @@ steps:
     command: python prepare_dataset.py
     
   - name: train-model
-    command: python train.py --gpu
-    workerSelector:
-      gpu: "true"
-      cuda: "11.8"
-      memory: "64G"
-    depends: prepare-data
+    run: train-model
     
   - name: evaluate-model
+    run: evaluate-model
+
+---
+name: train-model
+workerSelector:
+  gpu: "true"
+  cuda: "11.8"
+  memory: "64G"
+steps:
+  - name: train-model
+    command: python train.py --gpu
+
+---
+name: evaluate-model
+workerSelector:
+  gpu: "true"
+steps:
+  - name: evaluate-model
     command: python evaluate.py
-    workerSelector:
-      gpu: "true"
-    depends: train-model
 ```
 
 Route GPU tasks to GPU-enabled workers.
 
 <a href="/features/distributed-execution" class="learn-more">Learn more →</a>
-
-</div>
-
-<div class="example-card">
-
-### Multi-Region Processing
-
-```yaml
-name: global-data-pipeline
-steps:
-  - name: process-us-data
-    command: ./process_data.sh us-east-1
-    workerSelector:
-      region: "us-east-1"
-      
-  - name: process-eu-data
-    command: ./process_data.sh eu-west-1
-    workerSelector:
-      region: "eu-west-1"
-      compliance: "gdpr"
-      
-  - name: process-apac-data
-    command: ./process_data.sh ap-southeast-1
-    workerSelector:
-      region: "ap-southeast-1"
-      
-  - name: aggregate-results
-    command: ./aggregate.py
-    depends:
-      - process-us-data
-      - process-eu-data
-      - process-apac-data
-```
-
-Process data in specific regions for compliance.
-
-<a href="/features/worker-labels#multi-region-deployment" class="learn-more">Learn more →</a>
-
-</div>
-
-<div class="example-card">
-
-### Resource-Based Distribution
-
-```yaml
-name: data-analysis-pipeline
-steps:
-  - name: light-preprocessing
-    command: python preprocess.py
-    workerSelector:
-      cpu-cores: "4"
-      memory: "8G"
-      
-  - name: heavy-computation
-    command: python analyze.py --large
-    workerSelector:
-      cpu-cores: "32"
-      memory: "128G"
-      instance-type: "compute-optimized"
-    depends: light-preprocessing
-    
-  - name: ml-inference
-    command: python inference.py
-    workerSelector:
-      gpu: "true"
-      gpu-memory: "24G"
-    depends: heavy-computation
-```
-
-Match tasks to appropriate hardware resources.
-
-<a href="/features/worker-labels#resource-based-routing" class="learn-more">Learn more →</a>
 
 </div>
 
@@ -1555,65 +1493,26 @@ steps:
     
   # Must run on specific worker type
   - name: process-on-gpu
-    command: python gpu_process.py
-    workerSelector:
-      gpu: "true"
-      gpu-model: "nvidia-a100"
-    depends: fetch-data
+    run: process-on-gpu
     
   # Runs locally (no selector)
   - name: notify-completion
     command: ./notify.sh "Processing complete"
     depends: process-on-gpu
+
+---
+name: process-on-gpu
+workerSelector:
+  gpu: "true"
+  gpu-model: "nvidia-a100"
+steps:
+  - name: process-on-gpu
+    command: python gpu_process.py
 ```
 
 Combine local and distributed execution.
 
 <a href="/features/distributed-execution#task-routing" class="learn-more">Learn more →</a>
-
-</div>
-
-<div class="example-card">
-
-### Environment-Specific Workers
-
-```yaml
-name: deployment-pipeline
-steps:
-  - name: build
-    command: docker build -t myapp:latest .
-    workerSelector:
-      capability: "docker"
-      
-  - name: test-dev
-    command: ./deploy.sh dev
-    workerSelector:
-      env: "dev"
-      access: "internal"
-    depends: build
-    
-  - name: test-staging
-    command: ./deploy.sh staging
-    workerSelector:
-      env: "staging"
-      access: "secure"
-    depends: test-dev
-    
-  - name: deploy-prod
-    command: ./deploy.sh production
-    workerSelector:
-      env: "prod"
-      compliance: "soc2"
-      access: "restricted"
-    depends: test-staging
-    preconditions:
-      - condition: "${APPROVED}"
-        expected: "true"
-```
-
-Route tasks based on environment access.
-
-<a href="/features/worker-labels#environment-based-routing" class="learn-more">Learn more →</a>
 
 </div>
 
@@ -1634,17 +1533,15 @@ steps:
       items: ${CHUNKS}
       maxConcurrent: 5
     params: "CHUNK=${ITEM}"
-    workerSelector:
-      memory: "16G"
-      cpu-cores: "8"
-    depends: split-data
     
   - name: merge-results
     command: python merge_results.py
-    depends: process-chunks
 
 ---
 name: chunk-processor
+workerSelector:
+  memory: "16G"
+  cpu-cores: "8"
 params:
   - CHUNK: ""
 steps:

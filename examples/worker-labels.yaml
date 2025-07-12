@@ -12,8 +12,8 @@ steps:
       gpu: "true"
       memory: "64G"
     description: "Trains ML model on GPU-enabled worker with 64GB memory"
-  
-  # Data preprocessing on CPU-optimized worker  
+
+  # Data preprocessing on CPU-optimized worker
   - name: preprocess-data
     command: python preprocess.py --input raw_data.csv
     workerSelector:
@@ -21,7 +21,7 @@ steps:
       cpu-cores: "16"
     depends: []
     description: "Preprocesses data on CPU-optimized worker"
-  
+
   # Region-specific task for compliance
   - name: process-eu-data
     command: ./process_gdpr_data.sh
@@ -29,7 +29,7 @@ steps:
       region: "eu-west-1"
       compliance: "gdpr"
     description: "Processes EU data on GDPR-compliant worker in EU region"
-  
+
   # High-memory task for large dataset analysis
   - name: analyze-large-dataset
     command: spark-submit --class DataAnalysis analysis.jar
@@ -39,7 +39,7 @@ steps:
     depends:
       - preprocess-data
     description: "Analyzes large dataset on high-memory worker"
-  
+
   # Generic task that can run on any worker
   - name: send-notifications
     command: python notify.py --status complete
@@ -48,20 +48,19 @@ steps:
       - train-model
       - analyze-large-dataset
     description: "Sends completion notifications (runs on any worker)"
-
 # Example worker startup commands:
-# 
+#
 # GPU worker:
-#   dagu worker --worker-labels gpu=true,memory=64G,region=us-east-1
+#   dagu worker --worker.labels gpu=true,memory=64G,region=us-east-1
 #
 # CPU-optimized worker:
-#   dagu worker --worker-labels cpu-arch=amd64,cpu-cores=16,region=us-west-2
+#   dagu worker --worker.labels cpu-arch=amd64,cpu-cores=16,region=us-west-2
 #
 # EU compliance worker:
-#   dagu worker --worker-labels region=eu-west-1,compliance=gdpr
+#   dagu worker --worker.labels region=eu-west-1,compliance=gdpr
 #
 # High-memory worker:
-#   dagu worker --worker-labels memory=128G,instance-type=r5.4xlarge
+#   dagu worker --worker.labels memory=128G,instance-type=r5.4xlarge
 #
 # Configuration file example:
 # worker:

@@ -164,17 +164,17 @@ The coordinator service manages task distribution to workers for distributed exe
 dagu worker
 
 # With labels for capability matching
-dagu worker --worker-labels gpu=true,memory=64G,region=us-east-1
+dagu worker --worker.labels gpu=true,memory=64G,region=us-east-1
 
 # Connect to remote coordinator
 dagu worker \
-  --worker-coordinator-host=coordinator.example.com \
-  --worker-coordinator-port=50051
+  --worker.coordinator-host=coordinator.example.com \
+  --worker.coordinator-port=50051
 
 # With custom worker ID and concurrency
 dagu worker \
-  --worker-id=gpu-worker-01 \
-  --worker-max-active-runs=50
+  --worker.id=gpu-worker-01 \
+  --worker.max-active-runs=50
 ```
 
 Workers poll the coordinator for matching tasks based on their labels.

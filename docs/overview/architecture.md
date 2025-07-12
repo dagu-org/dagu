@@ -295,12 +295,12 @@ Dagu supports distributed execution through a coordinator-worker model. Workers 
 Tasks are routed to workers based on `workerSelector` in DAG definitions:
 
 ```yaml
+workerSelector:
+  gpu: "true"
+  memory: "64G"
 steps:
   - name: gpu-training
     command: python train.py
-    workerSelector:
-      gpu: "true"
-      memory: "64G"
 ```
 
 ### Communication Protocol
@@ -350,8 +350,8 @@ Worker health is determined by heartbeat recency:
 dagu coordinator --coordinator.host=0.0.0.0
 
 # Start workers on compute nodes
-dagu worker --worker-labels gpu=true --worker-coordinator-host=coordinator.internal
-dagu worker --worker-labels region=us-east-1 --worker-coordinator-host=coordinator.internal
+dagu worker --worker.labels gpu=true --worker.coordinator-host=coordinator.internal
+dagu worker --worker.labels region=us-east-1 --worker.coordinator-host=coordinator.internal
 ```
 
 #### 2. Container Orchestration
@@ -370,8 +370,8 @@ spec:
         image: dagu:latest
         command: ["dagu", "worker"]
         args:
-          - --worker-labels=gpu=true,node-type=gpu
-          - --worker-coordinator-host=dagu-coordinator
+          - --worker.labels=gpu=true,node-type=gpu
+          - --worker.coordinator-host=dagu-coordinator
 ```
 
 ### Requirements

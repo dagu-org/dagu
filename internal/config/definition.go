@@ -78,36 +78,8 @@ type Definition struct {
 	// Coordinator contains configuration for the coordinator server.
 	Coordinator *coordinatorDef `mapstructure:"coordinator"`
 
-	// WorkerID is the unique identifier for the worker instance.
-	WorkerID string `mapstructure:"workerId"`
-
-	// WorkerMaxActiveRuns is the maximum number of active runs for the worker.
-	WorkerMaxActiveRuns int `mapstructure:"workerMaxActiveRuns"`
-
-	// WorkerCoordinatorHost is the hostname or IP address for connecting to the coordinator.
-	WorkerCoordinatorHost string `mapstructure:"workerCoordinatorHost"`
-
-	// WorkerCoordinatorPort is the port number for connecting to the coordinator.
-	WorkerCoordinatorPort int `mapstructure:"workerCoordinatorPort"`
-
-	// WorkerInsecure indicates whether to use insecure connection (h2c) instead of TLS.
-	WorkerInsecure bool `mapstructure:"workerInsecure"`
-
-	// WorkerSkipTLSVerify indicates whether to skip TLS certificate verification.
-	WorkerSkipTLSVerify bool `mapstructure:"workerSkipTlsVerify"`
-
-	// WorkerTLSCertFile is the path to the worker's TLS certificate file for mutual TLS.
-	WorkerTLSCertFile string `mapstructure:"workerTlsCertFile"`
-
-	// WorkerTLSKeyFile is the path to the worker's TLS key file for mutual TLS.
-	WorkerTLSKeyFile string `mapstructure:"workerTlsKeyFile"`
-
-	// WorkerTLSCAFile is the path to the CA certificate file for server verification.
-	WorkerTLSCAFile string `mapstructure:"workerTlsCaFile"`
-
-	// WorkerLabels are the worker labels for capability matching.
-	// Can be either a string (key1=value1,key2=value2) or a map in YAML.
-	WorkerLabels interface{} `mapstructure:"workerLabels"`
+	// Worker contains configuration for the worker.
+	Worker *workerDef `mapstructure:"worker"`
 
 	// SchedulerLockStaleThreshold is the time after which a scheduler lock is considered stale.
 	// Default is 30 seconds.
@@ -270,5 +242,39 @@ type coordinatorDef struct {
 	KeyFile string `mapstructure:"keyFile"`
 
 	// CAFile is the path to the coordinator's CA certificate file.
+	CAFile string `mapstructure:"caFile"`
+}
+
+// workerDef holds the configuration for the worker.
+type workerDef struct {
+	// ID is the unique identifier for the worker instance.
+	ID string `mapstructure:"id"`
+
+	// MaxActiveRuns is the maximum number of active runs for the worker.
+	MaxActiveRuns int `mapstructure:"maxActiveRuns"`
+
+	// CoordinatorHost is the hostname or IP address for connecting to the coordinator.
+	CoordinatorHost string `mapstructure:"coordinatorHost"`
+
+	// CoordinatorPort is the port number for connecting to the coordinator.
+	CoordinatorPort int `mapstructure:"coordinatorPort"`
+
+	// Insecure indicates whether to use insecure connection (h2c) instead of TLS.
+	Insecure bool `mapstructure:"insecure"`
+
+	// SkipTLSVerify indicates whether to skip TLS certificate verification.
+	SkipTLSVerify bool `mapstructure:"skipTlsVerify"`
+
+	// Labels are the worker labels for capability matching.
+	// Can be either a string (key1=value1,key2=value2) or a map in YAML.
+	Labels interface{} `mapstructure:"labels"`
+
+	// CertFile is the path to the worker's TLS certificate file for mutual TLS.
+	CertFile string `mapstructure:"certFile"`
+
+	// KeyFile is the path to the worker's TLS key file for mutual TLS.
+	KeyFile string `mapstructure:"keyFile"`
+
+	// CAFile is the path to the CA certificate file for server verification.
 	CAFile string `mapstructure:"caFile"`
 }

@@ -77,16 +77,16 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 		// Queue configuration
 		"DAGU_QUEUE_ENABLED": "false",
 
-		// Worker configuration
-		"DAGU_WORKER_ID":                  "test-worker-123",
-		"DAGU_WORKER_MAX_ACTIVE_RUNS": "200",
-		"DAGU_WORKER_COORDINATOR_HOST":    "worker.example.com",
-		"DAGU_WORKER_COORDINATOR_PORT":    "60051",
-		"DAGU_WORKER_INSECURE":            "true",
-		"DAGU_WORKER_SKIP_TLS_VERIFY":     "true",
-		"DAGU_WORKER_TLS_CERT_FILE":       "/test/worker/cert.pem",
-		"DAGU_WORKER_TLS_KEY_FILE":        "/test/worker/key.pem",
-		"DAGU_WORKER_TLS_CA_FILE":         "/test/worker/ca.pem",
+		// Worker configuration - env vars still bound but to nested structure
+		"DAGU_WORKER_ID":               "test-worker-123",
+		"DAGU_WORKER_MAX_ACTIVE_RUNS":  "200",
+		"DAGU_WORKER_COORDINATOR_HOST": "worker.example.com",
+		"DAGU_WORKER_COORDINATOR_PORT": "60051",
+		"DAGU_WORKER_INSECURE":         "true",
+		"DAGU_WORKER_SKIP_TLS_VERIFY":  "true",
+		"DAGU_WORKER_TLS_CERT_FILE":    "/test/worker/cert.pem",
+		"DAGU_WORKER_TLS_KEY_FILE":     "/test/worker/key.pem",
+		"DAGU_WORKER_TLS_CA_FILE":      "/test/worker/ca.pem",
 	}
 
 	// Save and clear existing environment variables
@@ -322,15 +322,16 @@ func TestConfigLoader_WorkerConfiguration(t *testing.T) {
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
-workerId: "yaml-worker-01"
-workerMaxActiveRuns: 50
-workerCoordinatorHost: "coordinator.example.com"
-workerCoordinatorPort: 8080
-workerInsecure: true
-workerSkipTlsVerify: true
-workerTlsCertFile: "/path/to/worker/cert.pem"
-workerTlsKeyFile: "/path/to/worker/key.pem"
-workerTlsCaFile: "/path/to/worker/ca.pem"
+worker:
+  id: "yaml-worker-01"
+  maxActiveRuns: 50
+  coordinatorHost: "coordinator.example.com"
+  coordinatorPort: 8080
+  insecure: true
+  skipTlsVerify: true
+  certFile: "/path/to/worker/cert.pem"
+  keyFile: "/path/to/worker/key.pem"
+  caFile: "/path/to/worker/ca.pem"
 `
 		err := os.WriteFile(configFile, []byte(configContent), 0600)
 		require.NoError(t, err)
@@ -362,26 +363,27 @@ workerTlsCaFile: "/path/to/worker/ca.pem"
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
-workerId: "yaml-worker"
-workerMaxActiveRuns: 10
-workerCoordinatorHost: "localhost"
-workerCoordinatorPort: 5000
-workerInsecure: false
+worker:
+  id: "yaml-worker"
+  maxActiveRuns: 10
+  coordinatorHost: "localhost"
+  coordinatorPort: 5000
+  insecure: false
 `
 		err := os.WriteFile(configFile, []byte(configContent), 0600)
 		require.NoError(t, err)
 
 		// Set environment variables
 		envs := map[string]string{
-			"DAGU_WORKER_ID":                  "env-worker-override",
-			"DAGU_WORKER_MAX_ACTIVE_RUNS": "300",
-			"DAGU_WORKER_COORDINATOR_HOST":    "env.coordinator.com",
-			"DAGU_WORKER_COORDINATOR_PORT":    "9090",
-			"DAGU_WORKER_INSECURE":            "true",
-			"DAGU_WORKER_SKIP_TLS_VERIFY":     "true",
-			"DAGU_WORKER_TLS_CERT_FILE":       "/env/cert.pem",
-			"DAGU_WORKER_TLS_KEY_FILE":        "/env/key.pem",
-			"DAGU_WORKER_TLS_CA_FILE":         "/env/ca.pem",
+			"DAGU_WORKER_ID":               "env-worker-override",
+			"DAGU_WORKER_MAX_ACTIVE_RUNS":  "300",
+			"DAGU_WORKER_COORDINATOR_HOST": "env.coordinator.com",
+			"DAGU_WORKER_COORDINATOR_PORT": "9090",
+			"DAGU_WORKER_INSECURE":         "true",
+			"DAGU_WORKER_SKIP_TLS_VERIFY":  "true",
+			"DAGU_WORKER_TLS_CERT_FILE":    "/env/cert.pem",
+			"DAGU_WORKER_TLS_KEY_FILE":     "/env/key.pem",
+			"DAGU_WORKER_TLS_CA_FILE":      "/env/ca.pem",
 		}
 
 		// Save and clear existing environment variables
@@ -463,8 +465,9 @@ port: 8080
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
-workerCoordinatorHost: "secure.example.com"
-workerCoordinatorPort: 443
+worker:
+  coordinatorHost: "secure.example.com"
+  coordinatorPort: 443
 `
 		err := os.WriteFile(configFile, []byte(configContent), 0600)
 		require.NoError(t, err)
@@ -490,7 +493,8 @@ workerCoordinatorPort: 443
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
-workerTlsCaFile: "/path/to/ca.pem"
+worker:
+  caFile: "/path/to/ca.pem"
 `
 		err := os.WriteFile(configFile, []byte(configContent), 0600)
 		require.NoError(t, err)
@@ -514,7 +518,8 @@ func TestWorkerLabels(t *testing.T) {
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
-workerLabels: "gpu=true,memory=64G,region=us-east-1"
+worker:
+  labels: "gpu=true,memory=64G,region=us-east-1"
 `
 		err := os.WriteFile(configFile, []byte(configContent), 0600)
 		require.NoError(t, err)
@@ -538,10 +543,11 @@ workerLabels: "gpu=true,memory=64G,region=us-east-1"
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
-workerLabels:
-  gpu: "true"
-  memory: "64G"
-  region: "us-west-2"
+worker:
+  labels:
+    gpu: "true"
+    memory: "64G"
+    region: "us-west-2"
 `
 		err := os.WriteFile(configFile, []byte(configContent), 0600)
 		require.NoError(t, err)
@@ -589,7 +595,8 @@ workerLabels:
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
-workerMaxActiveRuns: 50
+worker:
+  maxActiveRuns: 50
 `
 		err := os.WriteFile(configFile, []byte(configContent), 0600)
 		require.NoError(t, err)

@@ -266,43 +266,45 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		}
 	}
 
-	// Set worker configuration from flat fields
-	cfg.Worker.ID = def.WorkerID
-	cfg.Worker.MaxActiveRuns = def.WorkerMaxActiveRuns
-	cfg.Worker.CoordinatorHost = def.WorkerCoordinatorHost
-	cfg.Worker.CoordinatorPort = def.WorkerCoordinatorPort
-	cfg.Worker.Insecure = def.WorkerInsecure
-	cfg.Worker.SkipTLSVerify = def.WorkerSkipTLSVerify
+	// Set worker configuration from nested structure
+	if def.Worker != nil {
+		cfg.Worker.ID = def.Worker.ID
+		cfg.Worker.MaxActiveRuns = def.Worker.MaxActiveRuns
+		cfg.Worker.CoordinatorHost = def.Worker.CoordinatorHost
+		cfg.Worker.CoordinatorPort = def.Worker.CoordinatorPort
+		cfg.Worker.Insecure = def.Worker.Insecure
+		cfg.Worker.SkipTLSVerify = def.Worker.SkipTLSVerify
 
-	// Set worker TLS configuration if available
-	if def.WorkerTLSCertFile != "" || def.WorkerTLSKeyFile != "" || def.WorkerTLSCAFile != "" {
-		cfg.Worker.TLS = &TLSConfig{
-			CertFile: def.WorkerTLSCertFile,
-			KeyFile:  def.WorkerTLSKeyFile,
-			CAFile:   def.WorkerTLSCAFile,
+		// Set worker TLS configuration if available
+		if def.Worker.CertFile != "" || def.Worker.KeyFile != "" || def.Worker.CAFile != "" {
+			cfg.Worker.TLS = &TLSConfig{
+				CertFile: def.Worker.CertFile,
+				KeyFile:  def.Worker.KeyFile,
+				CAFile:   def.Worker.CAFile,
+			}
 		}
-	}
 
-	// Parse worker labels - can be either string or map
-	if def.WorkerLabels != nil {
-		switch v := def.WorkerLabels.(type) {
-		case string:
-			if v != "" {
-				cfg.Worker.Labels = parseLabels(v)
-			}
-		case map[string]interface{}:
-			cfg.Worker.Labels = make(map[string]string)
-			for key, val := range v {
-				if strVal, ok := val.(string); ok {
-					cfg.Worker.Labels[key] = strVal
+		// Parse worker labels - can be either string or map
+		if def.Worker.Labels != nil {
+			switch v := def.Worker.Labels.(type) {
+			case string:
+				if v != "" {
+					cfg.Worker.Labels = parseLabels(v)
 				}
-			}
-		case map[interface{}]interface{}:
-			cfg.Worker.Labels = make(map[string]string)
-			for key, val := range v {
-				if keyStr, ok := key.(string); ok {
-					if valStr, ok := val.(string); ok {
-						cfg.Worker.Labels[keyStr] = valStr
+			case map[string]interface{}:
+				cfg.Worker.Labels = make(map[string]string)
+				for key, val := range v {
+					if strVal, ok := val.(string); ok {
+						cfg.Worker.Labels[key] = strVal
+					}
+				}
+			case map[interface{}]interface{}:
+				cfg.Worker.Labels = make(map[string]string)
+				for key, val := range v {
+					if keyStr, ok := key.(string); ok {
+						if valStr, ok := val.(string); ok {
+							cfg.Worker.Labels[keyStr] = valStr
+						}
 					}
 				}
 			}
@@ -474,15 +476,12 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	viper.SetDefault("coordinatorKeyFile", "")
 	viper.SetDefault("coordinatorCAFile", "")
 
-	// Worker settings
-	viper.SetDefault("workerMaxActiveRuns", 100)
-	viper.SetDefault("workerCoordinatorHost", "127.0.0.1")
-	viper.SetDefault("workerCoordinatorPort", 50051)
-	viper.SetDefault("workerInsecure", true) // Insecure by default to match coordinator
-	viper.SetDefault("workerSkipTlsVerify", false)
-	viper.SetDefault("workerTlsCertFile", "")
-	viper.SetDefault("workerTlsKeyFile", "")
-	viper.SetDefault("workerTlsCaFile", "")
+	// Worker settings - nested structure
+	viper.SetDefault("worker.maxActiveRuns", 100)
+	viper.SetDefault("worker.coordinatorHost", "127.0.0.1")
+	viper.SetDefault("worker.coordinatorPort", 50051)
+	viper.SetDefault("worker.insecure", true) // Insecure by default to match coordinator
+	viper.SetDefault("worker.skipTlsVerify", false)
 
 	// UI settings
 	viper.SetDefault("ui.navbarTitle", build.AppName)
@@ -573,17 +572,17 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("coordinatorKeyFile", "COORDINATOR_KEY_FILE")
 	l.bindEnv("coordinatorCaFile", "COORDINATOR_CA_FILE")
 
-	// Worker configuration (flat structure)
-	l.bindEnv("workerId", "WORKER_ID")
-	l.bindEnv("workerMaxActiveRuns", "WORKER_MAX_ACTIVE_RUNS")
-	l.bindEnv("workerCoordinatorHost", "WORKER_COORDINATOR_HOST")
-	l.bindEnv("workerCoordinatorPort", "WORKER_COORDINATOR_PORT")
-	l.bindEnv("workerInsecure", "WORKER_INSECURE")
-	l.bindEnv("workerSkipTlsVerify", "WORKER_SKIP_TLS_VERIFY")
-	l.bindEnv("workerLabels", "WORKER_LABELS")
-	l.bindEnv("workerTlsCertFile", "WORKER_TLS_CERT_FILE")
-	l.bindEnv("workerTlsKeyFile", "WORKER_TLS_KEY_FILE")
-	l.bindEnv("workerTlsCaFile", "WORKER_TLS_CA_FILE")
+	// Worker configuration (nested structure)
+	l.bindEnv("worker.id", "WORKER_ID")
+	l.bindEnv("worker.maxActiveRuns", "WORKER_MAX_ACTIVE_RUNS")
+	l.bindEnv("worker.coordinatorHost", "WORKER_COORDINATOR_HOST")
+	l.bindEnv("worker.coordinatorPort", "WORKER_COORDINATOR_PORT")
+	l.bindEnv("worker.insecure", "WORKER_INSECURE")
+	l.bindEnv("worker.skipTlsVerify", "WORKER_SKIP_TLS_VERIFY")
+	l.bindEnv("worker.labels", "WORKER_LABELS")
+	l.bindEnv("worker.certFile", "WORKER_TLS_CERT_FILE")
+	l.bindEnv("worker.keyFile", "WORKER_TLS_KEY_FILE")
+	l.bindEnv("worker.caFile", "WORKER_TLS_CA_FILE")
 }
 
 // bindEnv constructs the full environment variable name using the app prefix and binds it to the given key.

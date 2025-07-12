@@ -381,23 +381,16 @@ When using distributed execution, specify `workerSelector` to route tasks to wor
 ```yaml
 steps:
   - name: gpu-training
+    run: gpu-training
+---
+# Run on a worker with gpu
+name: gpu-training
+workerSelector:
+  gpu: "true"
+  memory: "64G"
+steps:
+  - name: gpu-training
     command: python train_model.py
-    workerSelector:
-      gpu: "true"
-      cuda: "11.8"
-      memory: "64G"
-    
-  - name: data-processing-eu
-    command: ./process_eu_data.sh
-    workerSelector:
-      region: "eu-west-1"
-      compliance: "gdpr"
-    
-  - name: high-memory-task
-    command: analyze_large_dataset.py
-    workerSelector:
-      memory: "128G"
-      cpu-cores: "32"
 ```
 
 **Worker Selection Rules:**

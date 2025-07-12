@@ -22,32 +22,32 @@ poller_id for every poll request.
 By default, the worker ID is set to hostname@PID, but can be overridden.
 
 Flags:
-  --worker-id string                       Worker instance ID (default: hostname@PID)
-  --worker-max-active-runs int             Maximum number of active runs (default: 100)
-  --worker-coordinator-host string         Coordinator gRPC server host (default: 127.0.0.1)
-  --worker-coordinator-port int            Coordinator gRPC server port (default: 50051)
-  --worker-insecure                        Use insecure connection (h2c) instead of TLS (default: true)
-  --worker-tls-cert string                 Path to TLS certificate file for mutual TLS
-  --worker-tls-key string                  Path to TLS key file for mutual TLS
-  --worker-tls-ca string                   Path to CA certificate file for server verification
-  --worker-skip-tls-verify                 Skip TLS certificate verification (insecure)
-  --worker-labels -l string                Worker labels for capability matching (format: key1=value1,key2=value2)
+  --worker.id string                       Worker instance ID (default: hostname@PID)
+  --worker.max-active-runs int             Maximum number of active runs (default: 100)
+  --worker.coordinator-host string         Coordinator gRPC server host (default: 127.0.0.1)
+  --worker.coordinator-port int            Coordinator gRPC server port (default: 50051)
+  --worker.insecure                        Use insecure connection (h2c) instead of TLS (default: true)
+  --worker.tls-cert string                 Path to TLS certificate file for mutual TLS
+  --worker.tls-key string                  Path to TLS key file for mutual TLS
+  --worker.tls-ca string                   Path to CA certificate file for server verification
+  --worker.skip-tls-verify                 Skip TLS certificate verification (insecure)
+  --worker.labels -l string                Worker labels for capability matching (format: key1=value1,key2=value2)
 
 Example:
   dagu worker
-  dagu worker --worker-max-active-runs=50
-  dagu worker --worker-coordinator-host=coordinator.example.com --worker-coordinator-port=50051
-  dagu worker --worker-id=worker-1 --worker-max-active-runs=200
+  dagu worker --worker.max-active-runs=50
+  dagu worker --worker.coordinator-host=coordinator.example.com --worker.coordinator-port=50051
+  dagu worker --worker.id=worker-1 --worker.max-active-runs=200
   
   # Worker with labels for capability matching:
-  dagu worker --worker-labels gpu=true,memory=64G,region=us-east-1
-  dagu worker --worker-labels cpu-arch=amd64,instance-type=m5.xlarge
+  dagu worker --worker.labels gpu=true,memory=64G,region=us-east-1
+  dagu worker --worker.labels cpu-arch=amd64,instance-type=m5.xlarge
   
   # For TLS connections (when coordinator has TLS enabled):
-  dagu worker --worker-insecure=false --worker-coordinator-host=coordinator.example.com
-  dagu worker --worker-insecure=false --worker-tls-cert=client.crt --worker-tls-key=client.key
-  dagu worker --worker-insecure=false --worker-tls-ca=ca.crt
-  dagu worker --worker-insecure=false --worker-skip-tls-verify  # For self-signed certificates
+  dagu worker --worker.insecure=false --worker.coordinator-host=coordinator.example.com
+  dagu worker --worker.insecure=false --worker.tls-cert=client.crt --worker.tls-key=client.key
+  dagu worker --worker.insecure=false --worker.tls-ca=ca.crt
+  dagu worker --worker.insecure=false --worker.skip-tls-verify  # For self-signed certificates
 
 This process runs continuously in the foreground until terminated.
 `,

@@ -14,13 +14,13 @@ Specify labels when starting a worker using the `--worker-labels` flag:
 
 ```bash
 # GPU-enabled worker
-dagu worker --worker-labels gpu=true,memory=64G,region=us-east-1
+dagu worker --worker.labels gpu=true,memory=64G,region=us-east-1
 
 # CPU-optimized worker  
-dagu worker --worker-labels cpu-arch=amd64,cpu-cores=16,instance-type=m5.large
+dagu worker --worker.labels cpu-arch=amd64,cpu-cores=16,instance-type=m5.large
 
 # Region-specific worker
-dagu worker --worker-labels region=eu-west-1,compliance=gdpr
+dagu worker --worker.labels region=eu-west-1,compliance=gdpr
 ```
 
 ### Configuration File
@@ -53,21 +53,16 @@ Specify `workerSelector` on any step to route it to workers with matching labels
 steps:
   # This task will only run on workers with gpu=true label
   - name: train-model
+    run: train
+
+---
+name: train
+workerSelector:
+  gpu: "true"
+steps:
+  - name: train
     command: python train.py
-    workerSelector:
-      gpu: "true"
-      memory: "64G"
-  
-  # This task requires a specific region
-  - name: process-eu-data
-    command: ./process_data.sh
-    workerSelector:
-      region: "eu-west-1"
-      compliance: "gdpr"
-  
-  # This task can run on any worker (no selector)
-  - name: send-notification
-    command: notify.sh
+
 ```
 
 ## Label Matching Rules
@@ -81,107 +76,36 @@ steps:
 ### GPU/CPU Task Routing
 ```yaml
 # GPU worker
-dagu worker --worker-labels gpu=true,cuda=11.8
+dagu worker --worker.labels gpu=true
 
 # CPU worker  
-dagu worker --worker-labels cpu-only=true,avx2=true
+dagu worker --worker.labels cpu=true
 
 # DAG
 steps:
   - name: gpu-task
-    workerSelector:
-      gpu: "true"
+    run: gpu-task
+
   - name: cpu-task
-    workerSelector:
-      cpu-only: "true"
-```
+    run: cpu-task
 
-### Multi-Region Deployment
-```yaml
-# US worker
-dagu worker --worker-labels region=us-east-1,az=us-east-1a
-
-# EU worker
-dagu worker --worker-labels region=eu-west-1,az=eu-west-1a
-
-# DAG with region requirements
+---
+# Run on a worker with gpu
+name: gpu-task
+workerSelector:
+  gpu-task: "true"
 steps:
-  - name: process-us-data
-    workerSelector:
-      region: "us-east-1"
-  - name: process-eu-data
-    workerSelector:
-      region: "eu-west-1"
-```
+  - name: gpu task
+    command: python gpu-task.py
 
-### Resource-Based Routing
-```yaml
-# High-memory worker
-dagu worker --worker-labels memory=128G,instance-type=r5.4xlarge
-
-# Standard worker
-dagu worker --worker-labels memory=16G,instance-type=m5.large
-
-# Memory-intensive task
+---
+# Run on a worker with faster cpu
+name: cpu-task
+workerSelector:
+  cpu-task: "true"
 steps:
-  - name: large-dataset-analysis
-    workerSelector:
-      memory: "128G"
-```
-
-### Environment-Based Routing
-```yaml
-# Development worker
-dagu worker --worker-labels env=dev,access=internal
-
-# Production worker
-dagu worker --worker-labels env=prod,access=secure,compliance=soc2
-
-# Environment-specific tasks
-steps:
-  - name: dev-test
-    workerSelector:
-      env: "dev"
-  - name: prod-deployment
-    workerSelector:
-      env: "prod"
-      compliance: "soc2"
-```
-
-## Integration with Orchestrators
-
-### Kubernetes Labels
-```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: dagu-worker
-spec:
-  containers:
-  - name: worker
-    image: dagu:latest
-    command: ["dagu", "worker"]
-    env:
-    - name: NODE_NAME
-      valueFrom:
-        fieldRef:
-          fieldPath: spec.nodeName
-    - name: DAGU_WORKER_LABELS
-      value: "kubernetes.node=$(NODE_NAME),kubernetes.namespace=default"
-```
-
-### Docker Compose
-```yaml
-services:
-  worker-gpu:
-    image: dagu:latest
-    command: >
-      worker
-      --worker-labels=container=docker,gpu=${GPU_DEVICE}
-    environment:
-      - GPU_DEVICE=0
-    devices:
-      - /dev/nvidia0
+  - name: cpu task
+    command: python cpu-task.py
 ```
 
 ## See Also
