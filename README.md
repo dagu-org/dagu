@@ -27,13 +27,13 @@ Dagu solves the problem of complex workflow orchestration without requiring a de
 
 After managing hundreds of cron jobs across multiple servers, I built Dagu to bring sanity to workflow automation. It handles scheduling, dependencies, error recovery, and monitoring - everything you need for production workflows, without the complexity.
 
-[→ Learn the core concepts](https://docs.dagu.cloud/getting-started/concepts)
+[Learn the core concepts](https://docs.dagu.cloud/getting-started/concepts)
 
 ### Design Philosophy
 
-1. **Local‑first.** Workflows should run offline on laptops, air‑gapped servers, or the cloud—your choice.  
-2. **Zero foot‑print.** One static binary; no databases, brokers, or sidecars.  
-3. **Bring‑your‑own language.** Bash, Python, Go, or anything just works.
+1. **Local‑first**: Workflows should run offline on laptops, air‑gapped servers, or the cloud—your choice.  
+2. **Zero dependencies**: One static binary; no databases, brokers, or sidecars.  
+3. **Language agnostic**: Your existing programs or commands should be integrated without any modification.
 
 ## Recent Updates
 
@@ -53,7 +53,7 @@ After managing hundreds of cron jobs across multiple servers, I built Dagu to br
 - **Queue Management**: Enqueue DAGs with custom run IDs ([@kriyanshii](https://github.com/kriyanshii))
 - **Docker Improvements**: Optimized images and better container support ([@jerry-yuan](https://github.com/jerry-yuan), [@vnghia](https://github.com/vnghia))
 
-[Full changelog →](https://docs.dagu.cloud/reference/changelog)
+[Full changelog](https://docs.dagu.cloud/reference/changelog)
 
 ## Features
 
@@ -229,7 +229,7 @@ steps:
 
 ## Web Interface
 
-[Learn more about the Web UI →](https://docs.dagu.cloud/overview/web-ui)
+[Learn more about the Web UI](https://docs.dagu.cloud/overview/web-ui)
 
 <div align="center">
   <img src="docs/public/dashboard.png" width="720" alt="Dashboard">
@@ -283,6 +283,17 @@ Contributions are welcome. See our [documentation](https://docs.dagu.cloud) for 
 <a href="https://github.com/dagu-org/dagu/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=dagu-org/dagu" />
 </a>
+
+## Sponsors & Supporters
+
+<a href="https://github.com/Arvintian">
+  <img src="https://github.com/Arvintian.png" width="64" alt="@Arvintian"style="border-radius: 50%;"  />
+</a>
+<a href="https://github.com/yurivish">
+  <img src="https://github.com/yurivish.png" width="64" alt="@yurivish"style="border-radius: 50%;"  />
+</a>
+
+Thanks for supporting Dagu’s development! Join our supporters: [GitHub Sponsors](https://github.com/sponsors/dagu-org)
 
 ## License
 
