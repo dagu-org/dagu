@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/fileutil"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/robfig/cron/v3"
 )
 
@@ -94,6 +95,9 @@ type DAG struct {
 	HistRetentionDays int `json:"histRetentionDays,omitempty"`
 	// Queue is the name of the queue to assign this DAG to.
 	Queue string `json:"queue,omitempty"`
+	// WorkerSelector defines labels required for worker selection in distributed execution.
+	// If specified, the DAG will only run on workers with matching labels.
+	WorkerSelector map[string]string `json:"workerSelector,omitempty"`
 	// MaxOutputSize is the maximum size of step output to capture in bytes.
 	// Default is 1MB. Output exceeding this will return an error.
 	MaxOutputSize int `json:"maxOutputSize,omitempty"`
@@ -105,6 +109,90 @@ type DAG struct {
 	LocalDAGs map[string]*DAG `json:"localDAGs,omitempty"`
 	// YamlData contains the raw YAML data of the DAG.
 	YamlData []byte `json:"yamlData,omitempty"`
+}
+
+// CreateTask creates a coordinator task from this DAG for distributed execution.
+// It constructs a task with the given operation and run ID, setting the DAG's name
+// as both the root DAG and target, and includes the DAG's YAML definition.
+//
+// Parameters:
+//   - op: The operation type (START or RETRY)
+//   - runID: The unique identifier for this DAG run
+//   - opts: Optional task modifiers (e.g., WithTaskParams, WithWorkerSelector)
+//
+// Example:
+//
+//	task := dag.CreateTask(
+//	    coordinatorv1.Operation_OPERATION_START,
+//	    "run-123",
+//	    digraph.WithTaskParams("env=prod"),
+//	    digraph.WithWorkerSelector(map[string]string{"gpu": "true"}),
+//	)
+func (d *DAG) CreateTask(
+	op coordinatorv1.Operation,
+	runID string,
+	opts ...TaskOption,
+) *coordinatorv1.Task {
+	task := &coordinatorv1.Task{
+		RootDagRunName: d.Name,
+		RootDagRunId:   runID,
+		Operation:      op,
+		DagRunId:       runID,
+		Target:         d.Name,
+		Definition:     string(d.YamlData),
+	}
+
+	for _, opt := range opts {
+		opt(task)
+	}
+
+	return task
+}
+
+// TaskOption is a function that modifies a coordinatorv1.Task.
+type TaskOption func(*coordinatorv1.Task)
+
+// WithRootDagRun sets the root DAG run name and ID in the task.
+func WithRootDagRun(ref DAGRunRef) TaskOption {
+	return func(task *coordinatorv1.Task) {
+		if ref.Name == "" || ref.ID == "" {
+			return // No root DAG run reference provided
+		}
+		task.RootDagRunName = ref.Name
+		task.RootDagRunId = ref.ID
+	}
+}
+
+// WithParentDagRun sets the parent DAG run name and ID in the task.
+func WithParentDagRun(ref DAGRunRef) TaskOption {
+	return func(task *coordinatorv1.Task) {
+		if ref.Name == "" || ref.ID == "" {
+			return // No parent DAG run reference provided
+		}
+		task.ParentDagRunName = ref.Name
+		task.ParentDagRunId = ref.ID
+	}
+}
+
+// WithTaskParams sets the parameters for the task.
+func WithTaskParams(params string) TaskOption {
+	return func(task *coordinatorv1.Task) {
+		task.Params = params
+	}
+}
+
+// WithWorkerSelector sets the worker selector labels for the task.
+func WithWorkerSelector(selector map[string]string) TaskOption {
+	return func(task *coordinatorv1.Task) {
+		task.WorkerSelector = selector
+	}
+}
+
+// WithStep sets the step name for retry operations.
+func WithStep(step string) TaskOption {
+	return func(task *coordinatorv1.Task) {
+		task.Step = step
+	}
 }
 
 // QueueName returns the name of the queue for this DAG.
