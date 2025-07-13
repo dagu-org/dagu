@@ -54,13 +54,11 @@ func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
 	// Create a parent DAG with local DAGs
 	parentDAG := &digraph.DAG{
 		Name: "parent",
-		LocalDAGs: map[string]digraph.LocalDAG{
-			"local-child": {
-				DAG: &digraph.DAG{
-					Name: "local-child",
-					Steps: []digraph.Step{
-						{Name: "step1", Command: "echo hello"},
-					},
+		LocalDAGs: map[string]*digraph.DAG{
+			"local-child": &digraph.DAG{
+				Name: "local-child",
+				Steps: []digraph.Step{
+					{Name: "step1", Command: "echo hello"},
 				},
 				YamlData: []byte("name: local-child\nsteps:\n  - name: step1\n    command: echo hello"),
 			},
@@ -166,10 +164,8 @@ func TestNewChildDAGExecutor_NotFound(t *testing.T) {
 	// Create a parent DAG without the requested local DAG
 	parentDAG := &digraph.DAG{
 		Name: "parent",
-		LocalDAGs: map[string]digraph.LocalDAG{
-			"other-child": {
-				DAG: &digraph.DAG{Name: "other-child"},
-			},
+		LocalDAGs: map[string]*digraph.DAG{
+			"other-child": &digraph.DAG{Name: "other-child"},
 		},
 	}
 

@@ -102,12 +102,8 @@ type DAG struct {
 	// BuildErrors contains any errors encountered while building the DAG.
 	BuildErrors []error
 	// LocalDAGs contains DAGs defined in the same file, keyed by DAG name
-	LocalDAGs map[string]LocalDAG `json:"localDAGs,omitempty"`
-}
-
-// LocalDAG is a wrapper around DAG to represent a local DAG.
-type LocalDAG struct {
-	DAG      *DAG   `json:"dag,omitempty"`
+	LocalDAGs map[string]*DAG `json:"localDAGs,omitempty"`
+	// YamlData contains the raw YAML data of the DAG.
 	YamlData []byte `json:"yamlData,omitempty"`
 }
 

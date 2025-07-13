@@ -48,7 +48,7 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 			}
 
 			// Set the location to the temporary file
-			dag := *localDAG.DAG // copy the DAG to avoid modifying the original
+			dag := *localDAG // copy the DAG to avoid modifying the original
 			dag.Location = tempFile
 
 			return &ChildDAGExecutor{
