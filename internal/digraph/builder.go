@@ -124,6 +124,7 @@ func build(ctx BuildContext, spec *definition) (*DAG, error) {
 		MaxActiveSteps: spec.MaxActiveSteps,
 		Queue:          spec.Queue,
 		MaxOutputSize:  spec.MaxOutputSize,
+		WorkerSelector: spec.WorkerSelector,
 	}
 
 	var errs ErrorList
@@ -778,7 +779,6 @@ func buildStep(ctx BuildContext, def stepDef) (*Step, error) {
 		Dir:            def.Dir,
 		MailOnError:    def.MailOnError,
 		ExecutorConfig: ExecutorConfig{Config: make(map[string]any)},
-		WorkerSelector: def.WorkerSelector,
 	}
 
 	for _, entry := range stepBuilderRegistry {

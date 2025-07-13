@@ -491,25 +491,11 @@ steps:
 		// Verify DAG loaded successfully
 		assert.Equal(t, "worker-selector-test", dag.Name)
 		assert.Equal(t, "Test DAG with worker selector", dag.Description)
-		assert.Len(t, dag.Steps, 3)
+		assert.Len(t, dag.Steps, 1)
 
-		// Verify first step with GPU selector
-		gpuTask := dag.Steps[0]
-		assert.Equal(t, "gpu-task", gpuTask.Name)
-		assert.NotNil(t, gpuTask.WorkerSelector)
-		assert.Equal(t, "true", gpuTask.WorkerSelector["gpu"])
-		assert.Equal(t, "64G", gpuTask.WorkerSelector["memory"])
-
-		// Verify second step with CPU selector
-		cpuTask := dag.Steps[1]
-		assert.Equal(t, "cpu-task", cpuTask.Name)
-		assert.NotNil(t, cpuTask.WorkerSelector)
-		assert.Equal(t, "amd64", cpuTask.WorkerSelector["cpu-arch"])
-		assert.Equal(t, "us-east-1", cpuTask.WorkerSelector["region"])
-
-		// Verify third step without selector
-		anyWorkerTask := dag.Steps[2]
-		assert.Equal(t, "any-worker-task", anyWorkerTask.Name)
-		assert.Nil(t, anyWorkerTask.WorkerSelector)
+		// Verify the step with GPU selector
+		assert.NotNil(t, dag.WorkerSelector)
+		assert.Equal(t, "true", dag.WorkerSelector["gpu"])
+		assert.Equal(t, "64G", dag.WorkerSelector["memory"])
 	})
 }

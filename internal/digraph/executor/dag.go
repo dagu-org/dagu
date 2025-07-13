@@ -49,9 +49,6 @@ func newDAGExecutor(
 		return nil, err
 	}
 
-	// Set the worker selector from the step
-	child.SetWorkerSelector(step.WorkerSelector)
-
 	dir := GetEnv(ctx).WorkingDir
 	if dir != "" && !fileutil.FileExists(dir) {
 		return nil, ErrWorkingDirNotExist

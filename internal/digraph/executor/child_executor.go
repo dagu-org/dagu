@@ -24,9 +24,6 @@ type ChildDAGExecutor struct {
 	// tempFile holds the temporary file path for local DAGs.
 	// This will be cleaned up after execution.
 	tempFile string
-
-	// workerSelector contains the worker selector requirements from the step
-	workerSelector map[string]string
 }
 
 // NewChildDAGExecutor creates a new ChildDAGExecutor.
@@ -134,15 +131,10 @@ func (e *ChildDAGExecutor) BuildCommand(
 	return cmd, nil
 }
 
-// SetWorkerSelector sets the worker selector requirements for the child DAG execution
-func (e *ChildDAGExecutor) SetWorkerSelector(selector map[string]string) {
-	e.workerSelector = selector
-}
-
 // ShouldUseDistributedExecution checks if this child DAG should be executed via coordinator
 func (e *ChildDAGExecutor) ShouldUseDistributedExecution() bool {
 	// Only use distributed execution if worker selector is specified
-	return len(e.workerSelector) > 0
+	return len(e.DAG.WorkerSelector) > 0
 }
 
 // BuildCoordinatorTask creates a coordinator task for distributed execution
@@ -170,13 +162,13 @@ func (e *ChildDAGExecutor) BuildCoordinatorTask(
 			ID:   env.DAGRunID,
 		}),
 		digraph.WithTaskParams(runParams.Params),
-		digraph.WithWorkerSelector(e.workerSelector),
+		digraph.WithWorkerSelector(e.DAG.WorkerSelector),
 	)
 
 	logger.Info(ctx, "Built coordinator task for child DAG",
 		"dagRunId", runParams.RunID,
 		"target", e.DAG.Name,
-		"workerSelector", e.workerSelector,
+		"workerSelector", e.DAG.WorkerSelector,
 	)
 
 	return task, nil

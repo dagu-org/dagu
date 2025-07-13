@@ -27,13 +27,12 @@ name: parent-distributed
 steps:
   - name: run-local-on-worker
     run: local-child
-    workerSelector:
-      type: test-worker
     output: RESULT
 
 ---
-
 name: local-child
+workerSelector:
+  type: test-worker
 steps:
   - name: worker-task
     command: echo "Hello from worker"
@@ -163,13 +162,13 @@ name: parent-distributed
 steps:
   - name: run-local-on-worker
     run: local-child
-    workerSelector:
-      type: test-worker
     output: RESULT
 
 ---
 
 name: local-child
+workerSelector:
+  type: test-worker
 steps:
   - name: worker-task
     command: echo "Hello from worker"
@@ -200,9 +199,6 @@ steps:
 		childExec, err := executor.NewChildDAGExecutor(ctx, "local-child")
 		require.NoError(t, err)
 
-		// Set worker selector
-		childExec.SetWorkerSelector(map[string]string{"type": "test-worker"})
-
 		// Verify it should use distributed execution
 		require.True(t, childExec.ShouldUseDistributedExecution())
 
@@ -228,13 +224,13 @@ name: parent-distributed-fail
 steps:
   - name: run-on-nonexistent-worker
     run: local-child
-    workerSelector:
-      type: nonexistent-worker
     output: RESULT
 
 ---
 
 name: local-child
+workerSelector:
+  type: nonexistent-worker
 steps:
   - name: worker-task
     command: echo "Should not run"
