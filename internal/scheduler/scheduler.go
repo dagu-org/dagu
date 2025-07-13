@@ -427,6 +427,13 @@ func (s *Scheduler) Stop(ctx context.Context) {
 	}
 	s.lock.Unlock()
 
+	// Close DAG executor to release gRPC connections
+	if s.dagExecutor != nil {
+		if err := s.dagExecutor.Close(); err != nil {
+			logger.Error(ctx, "Failed to close DAG executor", "err", err)
+		}
+	}
+
 	// Release directory lock
 	if s.dirLock.IsHeldByMe() {
 		if err := s.dirLock.Unlock(); err != nil {

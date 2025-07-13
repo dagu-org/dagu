@@ -210,3 +210,16 @@ func (e *DAGExecutor) dispatchToCoordinator(ctx context.Context, task *coordinat
 
 	return nil
 }
+
+// Close closes any resources held by the DAGExecutor, including the coordinator client
+func (e *DAGExecutor) Close() error {
+	e.coordinatorClientMu.Lock()
+	defer e.coordinatorClientMu.Unlock()
+	
+	if e.coordinatorClient != nil {
+		err := e.coordinatorClient.Close()
+		e.coordinatorClient = nil
+		return err
+	}
+	return nil
+}
