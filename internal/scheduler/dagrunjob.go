@@ -3,10 +3,8 @@ package scheduler
 import (
 	"context"
 	"errors"
-	"sync"
 	"time"
 
-	coordinatorclient "github.com/dagu-org/dagu/internal/coordinator/client"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
@@ -30,15 +28,13 @@ var _ Job = (*DAGRunJob)(nil)
 
 // DAGRunJob represents a job that runs a DAG.
 type DAGRunJob struct {
-	DAG                      *digraph.DAG
-	Executable               string
-	WorkDir                  string
-	Next                     time.Time
-	Schedule                 cron.Schedule
-	Client                   dagrun.Manager
-	CoordinatorClientFactory *coordinatorclient.Factory
-	coordinatorClient        coordinatorclient.Client
-	coordinatorClientMu      sync.Mutex
+	DAG         *digraph.DAG
+	Executable  string
+	WorkDir     string
+	Next        time.Time
+	Schedule    cron.Schedule
+	Client      dagrun.Manager
+	DAGExecutor *DAGExecutor
 }
 
 // GetDAG returns the DAG associated with this job.
@@ -63,26 +59,14 @@ func (j *DAGRunJob) Start(ctx context.Context) error {
 		return err
 	}
 
-	// Check if we should use distributed execution
-	if j.shouldUseDistributedExecution() {
-		// Create a unique run ID for this scheduled execution
-		runID, err := j.Client.GenDAGRunID(ctx)
-		if err != nil {
-			return err
-		}
-
-		// Create task for coordinator
-		task := j.DAG.CreateTask(
-			coordinatorv1.Operation_OPERATION_START,
-			runID,
-			digraph.WithWorkerSelector(j.DAG.WorkerSelector),
-		)
-
-		return j.dispatchToCoordinator(ctx, task)
+	// Create a unique run ID for this scheduled execution
+	runID, err := j.Client.GenDAGRunID(ctx)
+	if err != nil {
+		return err
 	}
 
-	// Job is ready; proceed to start locally.
-	return j.Client.StartDAGRunAsync(ctx, j.DAG, dagrun.StartOptions{Quiet: true})
+	// Execute the DAG (handles both local and distributed execution)
+	return j.DAGExecutor.ExecuteDAG(ctx, j.DAG, coordinatorv1.Operation_OPERATION_START, runID)
 }
 
 // Ready checks whether the job can be safely started based on the latest status.
@@ -154,64 +138,4 @@ func (j *DAGRunJob) Restart(ctx context.Context) error {
 // String returns a string representation of the job, which is the DAG's name.
 func (j *DAGRunJob) String() string {
 	return j.DAG.Name
-}
-
-// shouldUseDistributedExecution checks if distributed execution should be used.
-// Returns true only if coordinator is configured AND the DAG has workerSelector labels.
-func (j *DAGRunJob) shouldUseDistributedExecution() bool {
-	return j.CoordinatorClientFactory != nil && j.DAG != nil && len(j.DAG.WorkerSelector) > 0
-}
-
-// getCoordinatorClient returns the coordinator client, creating it lazily if needed.
-// Returns nil if no coordinator is configured.
-func (j *DAGRunJob) getCoordinatorClient(ctx context.Context) (coordinatorclient.Client, error) {
-	// If no factory configured, distributed execution is disabled
-	if j.CoordinatorClientFactory == nil {
-		return nil, nil
-	}
-
-	// Check if client already exists
-	j.coordinatorClientMu.Lock()
-	defer j.coordinatorClientMu.Unlock()
-
-	if j.coordinatorClient != nil {
-		return j.coordinatorClient, nil
-	}
-
-	// Create client
-	client, err := j.CoordinatorClientFactory.Build(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	j.coordinatorClient = client
-	logger.Info(ctx, "Coordinator client initialized for distributed execution in DAGRunJob")
-	return client, nil
-}
-
-// dispatchToCoordinator dispatches a task to the coordinator for distributed execution.
-func (j *DAGRunJob) dispatchToCoordinator(ctx context.Context, task *coordinatorv1.Task) error {
-	client, err := j.getCoordinatorClient(ctx)
-	if err != nil {
-		logger.Error(ctx, "Failed to get coordinator client", "err", err)
-		return err
-	}
-
-	if client == nil {
-		// Should not happen if shouldUseDistributedExecution is checked
-		return errors.New("coordinator client not available")
-	}
-
-	err = client.Dispatch(ctx, task)
-	if err != nil {
-		logger.Error(ctx, "Failed to dispatch task", "err", err)
-		return err
-	}
-
-	logger.Info(ctx, "Task dispatched to coordinator",
-		"target", task.Target,
-		"runID", task.DagRunId,
-		"operation", task.Operation.String())
-
-	return nil
 }

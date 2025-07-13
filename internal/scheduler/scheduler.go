@@ -35,23 +35,21 @@ type Job interface {
 }
 
 type Scheduler struct {
-	hm                       dagrun.Manager
-	er                       EntryReader
-	logDir                   string
-	stopChan                 chan struct{}
-	running                  atomic.Bool
-	location                 *time.Location
-	dagRunStore              models.DAGRunStore
-	queueStore               models.QueueStore
-	procStore                models.ProcStore
-	cancel                   context.CancelFunc
-	lock                     sync.Mutex
-	queueConfigs             sync.Map
-	config                   *config.Config
-	dirLock                  dirlock.DirLock // File-based lock to prevent multiple scheduler instances
-	coordinatorClientFactory *coordinatorclient.Factory
-	coordinatorClient        coordinatorclient.Client
-	coordinatorClientMu      sync.Mutex
+	hm           dagrun.Manager
+	er           EntryReader
+	logDir       string
+	stopChan     chan struct{}
+	running      atomic.Bool
+	location     *time.Location
+	dagRunStore  models.DAGRunStore
+	queueStore   models.QueueStore
+	procStore    models.ProcStore
+	cancel       context.CancelFunc
+	lock         sync.Mutex
+	queueConfigs sync.Map
+	config       *config.Config
+	dirLock      dirlock.DirLock // File-based lock to prevent multiple scheduler instances
+	dagExecutor  *DAGExecutor
 }
 
 type queueConfig struct {
@@ -78,18 +76,21 @@ func New(
 		return nil, fmt.Errorf("failed to initialize scheduler lock at %s: %w", schedulerLockDir(cfg), err)
 	}
 
+	// Create DAG executor
+	dagExecutor := NewDAGExecutor(coordinatorClientFactory, drm)
+
 	return &Scheduler{
-		logDir:                   cfg.Paths.LogDir,
-		stopChan:                 make(chan struct{}),
-		location:                 timeLoc,
-		er:                       er,
-		hm:                       drm,
-		dagRunStore:              drs,
-		queueStore:               qs,
-		procStore:                ps,
-		config:                   cfg,
-		dirLock:                  dirLock,
-		coordinatorClientFactory: coordinatorClientFactory,
+		logDir:      cfg.Paths.LogDir,
+		stopChan:    make(chan struct{}),
+		location:    timeLoc,
+		er:          er,
+		hm:          drm,
+		dagRunStore: drs,
+		queueStore:  qs,
+		procStore:   ps,
+		config:      cfg,
+		dirLock:     dirLock,
+		dagExecutor: dagExecutor,
 	}, nil
 }
 
@@ -284,24 +285,10 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 
 			startedAt = time.Now()
 
-			// Check if we should use distributed execution
-			if s.shouldUseDistributedExecution(dag) {
-				// Create task for coordinator
-				task := dag.CreateTask(
-					coordinatorv1.Operation_OPERATION_RETRY,
-					data.ID,
-					digraph.WithWorkerSelector(dag.WorkerSelector),
-				)
-				if err := s.dispatchToCoordinator(ctx, task); err != nil {
-					logger.Error(ctx, "Failed to dispatch dag to coordinator", "err", err, "data", data)
-					goto SEND_RESULT
-				}
-			} else {
-				// Local execution
-				if err := s.hm.RetryDAGRun(ctx, dag, data.ID); err != nil {
-					logger.Error(ctx, "Failed to retry dag", "err", err, "data", data)
-					goto SEND_RESULT
-				}
+			// Execute the DAG (handles both local and distributed execution)
+			if err := s.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, data.ID); err != nil {
+				logger.Error(ctx, "Failed to execute dag", "err", err, "data", data)
+				goto SEND_RESULT
 			}
 
 			// For now we need to wait for the DAG started
@@ -508,64 +495,6 @@ func (s *ScheduledJob) invoke(ctx context.Context) error {
 		return fmt.Errorf("unknown schedule type: %v", s.Type)
 
 	}
-}
-
-// getCoordinatorClient returns the coordinator client, creating it lazily if needed.
-// Returns nil if no coordinator is configured.
-func (s *Scheduler) getCoordinatorClient(ctx context.Context) (coordinatorclient.Client, error) {
-	// If no factory configured, distributed execution is disabled
-	if s.coordinatorClientFactory == nil {
-		return nil, nil
-	}
-
-	// Check if client already exists
-	s.coordinatorClientMu.Lock()
-	defer s.coordinatorClientMu.Unlock()
-
-	if s.coordinatorClient != nil {
-		return s.coordinatorClient, nil
-	}
-
-	// Create client
-	client, err := s.coordinatorClientFactory.Build(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create coordinator client: %w", err)
-	}
-
-	s.coordinatorClient = client
-	logger.Info(ctx, "Coordinator client initialized for distributed execution")
-	return client, nil
-}
-
-// shouldUseDistributedExecution checks if distributed execution should be used.
-// Returns true only if coordinator is configured AND the DAG has workerSelector labels.
-func (s *Scheduler) shouldUseDistributedExecution(dag *digraph.DAG) bool {
-	return s.coordinatorClientFactory != nil && dag != nil && len(dag.WorkerSelector) > 0
-}
-
-// dispatchToCoordinator dispatches a task to the coordinator for distributed execution.
-func (s *Scheduler) dispatchToCoordinator(ctx context.Context, task *coordinatorv1.Task) error {
-	client, err := s.getCoordinatorClient(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get coordinator client: %w", err)
-	}
-
-	if client == nil {
-		// Should not happen if shouldUseDistributedExecution is checked
-		return fmt.Errorf("coordinator client not available")
-	}
-
-	err = client.Dispatch(ctx, task)
-	if err != nil {
-		return fmt.Errorf("failed to dispatch task: %w", err)
-	}
-
-	logger.Info(ctx, "Task dispatched to coordinator",
-		"target", task.Target,
-		"runID", task.DagRunId,
-		"operation", task.Operation.String())
-
-	return nil
 }
 
 var (

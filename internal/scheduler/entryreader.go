@@ -45,27 +45,30 @@ var _ EntryReader = (*entryReaderImpl)(nil)
 
 // entryReaderImpl manages DAGs on local filesystem.
 type entryReaderImpl struct {
-	targetDir                string
-	registry                 map[string]*digraph.DAG
-	lock                     sync.Mutex
-	dagStore                 models.DAGStore
-	dagRunMgr                dagrun.Manager
-	executable               string
-	workDir                  string
-	coordinatorClientFactory *coordinatorclient.Factory
+	targetDir   string
+	registry    map[string]*digraph.DAG
+	lock        sync.Mutex
+	dagStore    models.DAGStore
+	dagRunMgr   dagrun.Manager
+	executable  string
+	workDir     string
+	dagExecutor *DAGExecutor
 }
 
 // NewEntryReader creates a new DAG manager with the given configuration.
 func NewEntryReader(dir string, dagCli models.DAGStore, drm dagrun.Manager, executable, workDir string, coordinatorClientFactory *coordinatorclient.Factory) EntryReader {
+	// Create DAG executor
+	dagExecutor := NewDAGExecutor(coordinatorClientFactory, drm)
+
 	return &entryReaderImpl{
-		targetDir:                dir,
-		lock:                     sync.Mutex{},
-		registry:                 map[string]*digraph.DAG{},
-		dagStore:                 dagCli,
-		dagRunMgr:                drm,
-		executable:               executable,
-		workDir:                  workDir,
-		coordinatorClientFactory: coordinatorClientFactory,
+		targetDir:   dir,
+		lock:        sync.Mutex{},
+		registry:    map[string]*digraph.DAG{},
+		dagStore:    dagCli,
+		dagRunMgr:   drm,
+		executable:  executable,
+		workDir:     workDir,
+		dagExecutor: dagExecutor,
 	}
 }
 
@@ -114,13 +117,13 @@ func (er *entryReaderImpl) Next(ctx context.Context, now time.Time) ([]*Schedule
 
 func (er *entryReaderImpl) createJob(dag *digraph.DAG, next time.Time, schedule cron.Schedule) Job {
 	return &DAGRunJob{
-		DAG:                      dag,
-		Executable:               er.executable,
-		WorkDir:                  er.workDir,
-		Next:                     next,
-		Schedule:                 schedule,
-		Client:                   er.dagRunMgr,
-		CoordinatorClientFactory: er.coordinatorClientFactory,
+		DAG:         dag,
+		Executable:  er.executable,
+		WorkDir:     er.workDir,
+		Next:        next,
+		Schedule:    schedule,
+		Client:      er.dagRunMgr,
+		DAGExecutor: er.dagExecutor,
 	}
 }
 
