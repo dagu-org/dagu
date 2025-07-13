@@ -50,6 +50,35 @@ paths:
         default:
           description: "Unexpected error"
 
+  /workers:
+    get:
+      summary: "List distributed workers"
+      description: "Retrieves information about distributed workers connected to the coordinator"
+      operationId: "getWorkers"
+      tags:
+        - "system"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkersListResponse"
+        "503":
+          description: "Coordinator service unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dags:
     get:
       summary: "List all available DAGs"
@@ -1545,6 +1574,14 @@ components:
         - "finished"
         - "skipped"
 
+    WorkerHealthStatus:
+      type: string
+      description: "Health status of the worker based on heartbeat recency"
+      enum:
+        - "healthy"
+        - "warning"
+        - "unhealthy"
+
     DAGDetails:
       type: object
       description: "Detailed DAG configuration information"
@@ -2015,6 +2052,91 @@ components:
       required:
         - tags
         - errors
+
+    WorkersListResponse:
+      type: object
+      description: "Response object for listing distributed workers"
+      properties:
+        workers:
+          type: array
+          description: "List of distributed workers"
+          items:
+            $ref: "#/components/schemas/Worker"
+        errors:
+          type: array
+          description: "List of errors encountered during the request"
+          items:
+            type: string
+      required:
+        - workers
+        - errors
+
+    Worker:
+      type: object
+      description: "Information about a distributed worker"
+      properties:
+        id:
+          type: string
+          description: "Unique identifier for the worker"
+        labels:
+          type: object
+          description: "Key-value pairs of labels assigned to the worker"
+          additionalProperties:
+            type: string
+        totalPollers:
+          type: integer
+          description: "Total number of pollers configured for this worker"
+        busyPollers:
+          type: integer
+          description: "Number of pollers currently executing tasks"
+        runningTasks:
+          type: array
+          description: "List of tasks currently being executed by this worker"
+          items:
+            $ref: "#/components/schemas/RunningTask"
+        lastHeartbeatAt:
+          type: string
+          description: "RFC3339 timestamp of the last heartbeat received from this worker"
+        healthStatus:
+          $ref: "#/components/schemas/WorkerHealthStatus"
+      required:
+        - id
+        - labels
+        - totalPollers
+        - busyPollers
+        - runningTasks
+        - lastHeartbeatAt
+        - healthStatus
+
+    RunningTask:
+      type: object
+      description: "Information about a task currently being executed"
+      properties:
+        dagRunId:
+          type: string
+          description: "ID of the DAG run being executed"
+        dagName:
+          type: string
+          description: "Name of the DAG being executed"
+        startedAt:
+          type: string
+          description: "RFC3339 timestamp when the task started"
+        rootDagRunName:
+          type: string
+          description: "Name of the root DAG run"
+        rootDagRunId:
+          type: string
+          description: "ID of the root DAG run"
+        parentDagRunName:
+          type: string
+          description: "Name of the parent DAG run"
+        parentDagRunId:
+          type: string
+          description: "ID of the parent DAG run"
+      required:
+        - dagRunId
+        - dagName
+        - startedAt
 
 # Apply security requirements globally
 security:

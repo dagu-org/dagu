@@ -1,0 +1,5 @@
+steps:
+  - name: "1"
+    command: "echo step1"
+  - name: "2"
+    command: "echo step2"

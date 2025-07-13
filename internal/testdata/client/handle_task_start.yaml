@@ -1,0 +1,3 @@
+steps:
+  - name: "process"
+    command: "echo processing $1"

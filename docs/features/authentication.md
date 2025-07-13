@@ -110,63 +110,6 @@ remoteNodes:
     authToken: staging-token
 ```
 
-## Security Best Practices
-
-### Strong Credentials
-
-Generate secure passwords:
-```bash
-openssl rand -base64 32
-```
-
-### Token Rotation
-
-Rotate API tokens regularly:
-```bash
-NEW_TOKEN=$(openssl rand -hex 32)
-# Update config with new token
-```
-
-### Network Security
-
-Bind to localhost in production:
-```yaml
-host: 127.0.0.1  # Local only
-port: 8080
-```
-
-Use reverse proxy for external access:
-```nginx
-server {
-    listen 443 ssl;
-    server_name dagu.example.com;
-    
-    ssl_certificate /etc/ssl/certs/dagu.crt;
-    ssl_certificate_key /etc/ssl/private/dagu.key;
-    
-    location / {
-        proxy_pass http://localhost:8080;
-        proxy_set_header Authorization $http_authorization;
-    }
-}
-```
-
-### Docker Security
-
-```yaml
-services:
-  dagu:
-    image: ghcr.io/dagu-org/dagu:latest
-    environment:
-      - DAGU_AUTH_BASIC_USERNAME=admin
-      - DAGU_AUTH_BASIC_PASSWORD_FILE=/run/secrets/password
-    secrets:
-      - password
-secrets:
-  password:
-    file: ./dagu-password.txt
-```
-
 ## Common Patterns
 
 ### CI/CD Integration
@@ -202,22 +145,6 @@ export DAGU_AUTH_BASIC_PASSWORD=secure-password
 export DAGU_CERT_FILE=/etc/ssl/dagu.crt
 export DAGU_KEY_FILE=/etc/ssl/dagu.key
 ```
-
-## Troubleshooting
-
-### Authentication Failed
-
-1. Check credentials are correct
-2. Verify authentication is enabled
-3. Check environment variables
-4. Review server logs: `dagu logs admin`
-
-### TLS Issues
-
-1. Verify certificate paths
-2. Check certificate validity
-3. For self-signed certs, use `skipTLSVerify: true`
-4. Ensure proper file permissions
 
 ## See Also
 

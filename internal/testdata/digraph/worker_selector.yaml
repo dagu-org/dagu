@@ -1,0 +1,19 @@
+name: worker-selector-test
+description: Test DAG with worker selector
+
+steps:
+  - name: gpu-task
+    command: echo "Running on GPU worker"
+    workerSelector:
+      gpu: "true"
+      memory: "64G"
+  
+  - name: cpu-task
+    command: echo "Running on CPU worker"
+    workerSelector:
+      cpu-arch: "amd64"
+      region: "us-east-1"
+  
+  - name: any-worker-task
+    command: echo "Running on any worker"
+    # No workerSelector - can run on any worker

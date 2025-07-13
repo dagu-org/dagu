@@ -269,27 +269,6 @@ env:
   - ENVIRONMENT: production
 ```
 
-## Troubleshooting
-
-**Config not loading:**
-```bash
-ls -la ~/.config/dagu/config.yaml
-yamllint ~/.config/dagu/config.yaml
-env | grep DAGU_
-```
-
-**Port in use:**
-```bash
-lsof -i :8080
-dagu start-all --port 9000
-```
-
-**Permissions:**
-```bash
-chmod 755 ~/.config/dagu
-chown -R $USER:$USER ~/.config/dagu
-```
-
 ## See Also
 
 - [Set up authentication](#authentication) for secure access

@@ -10,12 +10,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime/debug"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/coordinator/client"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
@@ -271,7 +272,11 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create a new environment for the dag-run.
 	dbClient := newDBClient(a.dagRunStore, a.dagStore)
-	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params)
+
+	// Initialize coordinator client factory for distributed execution
+	coordinatorFactory := a.createCoordinatorClientFactory(ctx)
+
+	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorFactory)
 
 	// Add structured logging context
 	logFields := []any{"dag", a.dag.Name, "dagRunId", a.dagRunID}
@@ -652,6 +657,56 @@ func (a *Agent) newScheduler() *scheduler.Scheduler {
 	return scheduler.New(cfg)
 }
 
+// createCoordinatorClientFactory creates a coordinator client factory for distributed execution
+func (a *Agent) createCoordinatorClientFactory(ctx context.Context) *client.Factory {
+	// Load configuration
+	cfg, err := config.Load()
+	if err != nil {
+		logger.Error(ctx, "Failed to load configuration for coordinator client", "err", err)
+		return nil
+	}
+
+	// Use worker configuration for coordinator connection
+	host := cfg.Worker.CoordinatorHost
+	port := cfg.Worker.CoordinatorPort
+
+	// Default values if not configured
+	if host == "" {
+		host = "localhost"
+	}
+	if port == 0 {
+		port = 8084
+	}
+
+	// Create and configure factory
+	factory := client.NewFactory().
+		WithHost(host).
+		WithPort(port)
+
+	// Configure TLS if provided
+	if cfg.Worker.TLS != nil && cfg.Worker.TLS.CertFile != "" {
+		factory.WithTLS(
+			cfg.Worker.TLS.CertFile,
+			cfg.Worker.TLS.KeyFile,
+			cfg.Worker.TLS.CAFile,
+		)
+		if cfg.Worker.SkipTLSVerify {
+			factory.WithSkipTLSVerify(true)
+		}
+	} else {
+		// Default to insecure if not specified
+		factory.WithInsecure()
+	}
+
+	logger.Info(ctx, "Created coordinator client factory",
+		"host", host,
+		"port", port,
+		"insecure", cfg.Worker.TLS == nil || cfg.Worker.TLS.CertFile == "",
+	)
+
+	return factory
+}
+
 // dryRun performs a dry-run of the DAG. It only simulates the execution of
 // the DAG without running the actual command.
 func (a *Agent) dryRun(ctx context.Context) error {
@@ -670,7 +725,8 @@ func (a *Agent) dryRun(ctx context.Context) error {
 	}()
 
 	db := newDBClient(a.dagRunStore, a.dagStore)
-	dagCtx := digraph.SetupEnv(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params)
+	coordinatorFactory := a.createCoordinatorClientFactory(ctx)
+	dagCtx := digraph.SetupEnv(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorFactory)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, progressCh)
 	a.lastErr = lastErr
 
@@ -838,8 +894,8 @@ func execWithRecovery(ctx context.Context, fn func()) {
 
 			// Log with structured information
 			logger.Error(ctx, "Recovered from panic",
-				"error", err.Error(),
-				"errorType", fmt.Sprintf("%T", panicObj),
+				"err", err.Error(),
+				"errType", fmt.Sprintf("%T", panicObj),
 				"stackTrace", stack,
 				"fullStack", string(stack))
 		}
@@ -865,52 +921,4 @@ func encodeError(w http.ResponseWriter, err error) {
 	} else {
 		http.Error(w, httpErr.Error(), http.StatusInternalServerError)
 	}
-}
-
-var _ digraph.Database = &dbClient{}
-
-type dbClient struct {
-	ds  models.DAGStore
-	drs models.DAGRunStore
-}
-
-func newDBClient(drs models.DAGRunStore, ds models.DAGStore) *dbClient {
-	return &dbClient{drs: drs, ds: ds}
-}
-
-// GetDAG implements digraph.DBClient.
-func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error) {
-	return o.ds.GetDetails(ctx, name)
-}
-
-func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) (*digraph.Status, error) {
-	childAttempt, err := o.drs.FindChildAttempt(ctx, rootDAGRun, dagRunID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find run for dag-run ID %s: %w", dagRunID, err)
-	}
-	status, err := childAttempt.ReadStatus(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read status: %w", err)
-	}
-
-	outputVariables := map[string]string{}
-	for _, node := range status.Nodes {
-		if node.OutputVariables != nil {
-			node.OutputVariables.Range(func(_, value any) bool {
-				// split the value by '=' to get the key and value
-				parts := strings.SplitN(value.(string), "=", 2)
-				if len(parts) == 2 {
-					outputVariables[parts[0]] = parts[1]
-				}
-				return true
-			})
-		}
-	}
-
-	return &digraph.Status{
-		Outputs:  outputVariables,
-		Name:     status.Name,
-		DAGRunID: status.DAGRunID,
-		Params:   status.Params,
-	}, nil
 }

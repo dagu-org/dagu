@@ -778,6 +778,7 @@ func buildStep(ctx BuildContext, def stepDef) (*Step, error) {
 		Dir:            def.Dir,
 		MailOnError:    def.MailOnError,
 		ExecutorConfig: ExecutorConfig{Config: make(map[string]any)},
+		WorkerSelector: def.WorkerSelector,
 	}
 
 	for _, entry := range stepBuilderRegistry {

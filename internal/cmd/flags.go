@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -132,6 +133,130 @@ var (
 		usage:  "Enable CPU profiling (saves to cpu.pprof)",
 		isBool: true,
 	}
+
+	// coordinatorHostFlag is the hostname or IP address for the coordinator gRPC server.
+	coordinatorHostFlag = commandLineFlag{
+		name:         "coordinator.host",
+		shorthand:    "H",
+		defaultValue: "127.0.0.1",
+		usage:        "Coordinator gRPC server host (default: 127.0.0.1)",
+		bindViper:    true,
+	}
+
+	// coordinatorPortFlag is the port number for the coordinator gRPC server.
+	coordinatorPortFlag = commandLineFlag{
+		name:         "coordinator.port",
+		shorthand:    "P",
+		defaultValue: "50051",
+		usage:        "Coordinator gRPC server port (default: 50051)",
+		bindViper:    true,
+	}
+
+	// coordinatorSigningKeyFlag is the signing key for the coordinator service.
+	coordinatorSigningKeyFlag = commandLineFlag{
+		name:      "coordinator.signing-key",
+		usage:     "Signing key for coordinator authentication",
+		bindViper: true,
+	}
+
+	// workerIDFlag is the unique identifier for the worker instance.
+	workerIDFlag = commandLineFlag{
+		name:      "worker.id",
+		shorthand: "w",
+		usage:     "Worker instance ID (default: hostname@PID)",
+		bindViper: true,
+	}
+
+	// workerMaxActiveRunsFlag is the maximum number of active runs for the worker.
+	workerMaxActiveRunsFlag = commandLineFlag{
+		name:         "worker.max-active-runs",
+		shorthand:    "m",
+		defaultValue: "100",
+		usage:        "Maximum number of active runs (default: 100)",
+		bindViper:    true,
+	}
+
+	// workerCoordinatorHostFlag is the coordinator host for worker connection.
+	workerCoordinatorHostFlag = commandLineFlag{
+		name:         "worker.coordinator-host",
+		defaultValue: "127.0.0.1",
+		usage:        "Coordinator gRPC server host (default: 127.0.0.1)",
+		bindViper:    true,
+	}
+
+	// workerCoordinatorPortFlag is the coordinator port for worker connection.
+	workerCoordinatorPortFlag = commandLineFlag{
+		name:         "worker.coordinator-port",
+		defaultValue: "50051",
+		usage:        "Coordinator gRPC server port (default: 50051)",
+		bindViper:    true,
+	}
+
+	// workerInsecureFlag disables TLS for worker connection.
+	workerInsecureFlag = commandLineFlag{
+		name:      "worker.insecure",
+		usage:     "Use insecure connection (h2c) instead of TLS",
+		isBool:    true,
+		bindViper: true,
+	}
+
+	// workerSkipTLSVerifyFlag skips TLS certificate verification for worker.
+	workerSkipTLSVerifyFlag = commandLineFlag{
+		name:      "worker.skip-tls-verify",
+		usage:     "Skip TLS certificate verification (insecure)",
+		isBool:    true,
+		bindViper: true,
+	}
+
+	// workerTLSCertFlag is the TLS certificate for worker connection.
+	workerTLSCertFlag = commandLineFlag{
+		name:      "worker.tls-cert",
+		usage:     "Path to TLS certificate file for mutual TLS",
+		bindViper: true,
+	}
+
+	// workerTLSKeyFlag is the TLS key for worker connection.
+	workerTLSKeyFlag = commandLineFlag{
+		name:      "worker.tls-key",
+		usage:     "Path to TLS key file for mutual TLS",
+		bindViper: true,
+	}
+
+	// workerTLSCAFlag is the CA certificate for worker connection.
+	workerTLSCAFlag = commandLineFlag{
+		name:      "worker.tls-ca",
+		usage:     "Path to CA certificate file for server verification",
+		bindViper: true,
+	}
+
+	// workerLabelsFlag is the labels for worker capabilities.
+	workerLabelsFlag = commandLineFlag{
+		name:      "worker.labels",
+		shorthand: "l",
+		usage:     "Worker labels for capability matching (format: key1=value1,key2=value2)",
+		bindViper: true,
+	}
+
+	// coordinatorTLSCertFlag is the path to the TLS certificate for coordinator server.
+	coordinatorTLSCertFlag = commandLineFlag{
+		name:      "coordinator.tls-cert",
+		usage:     "Path to TLS certificate file for the coordinator server",
+		bindViper: true,
+	}
+
+	// coordinatorTLSKeyFlag is the path to the TLS key for coordinator server.
+	coordinatorTLSKeyFlag = commandLineFlag{
+		name:      "coordinator.tls-key",
+		usage:     "Path to TLS key file for the coordinator server",
+		bindViper: true,
+	}
+
+	// coordinatorTLSCAFlag is the path to the CA certificate for coordinator server.
+	coordinatorTLSCAFlag = commandLineFlag{
+		name:      "coordinator.tls-ca",
+		usage:     "Path to CA certificate file for client verification (mTLS)",
+		bindViper: true,
+	}
 )
 
 type commandLineFlag struct {
@@ -161,7 +286,7 @@ func bindFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
 
 	for _, flag := range flags {
 		if flag.bindViper {
-			_ = viper.BindPFlag(flag.name, cmd.Flags().Lookup(flag.name))
+			_ = viper.BindPFlag(stringutil.KebabToCamel(flag.name), cmd.Flags().Lookup(flag.name))
 		}
 	}
 }

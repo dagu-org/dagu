@@ -10,6 +10,10 @@ type Database interface {
 	GetDAG(ctx context.Context, name string) (*DAG, error)
 	// GetChildDAGRunStatus retrieves the status of a child dag-run by its ID and the root dag-run reference.
 	GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun DAGRunRef) (*Status, error)
+	// IsChildDAGRunCompleted checks if a child dag-run has completed.
+	IsChildDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun DAGRunRef) (bool, error)
+	// RequestChildCancel requests cancellation of a child dag-run.
+	RequestChildCancel(ctx context.Context, dagRunID string, rootDAGRun DAGRunRef) error
 }
 
 // Status is the result of a dag-run.
@@ -22,4 +26,7 @@ type Status struct {
 	Params string `json:"params,omitempty"`
 	// Outputs is the outputs of the dag-run.
 	Outputs map[string]string `json:"outputs,omitempty"`
+	// Success indicates if the dag-run completed successfully.
+	// True means the DAG finished with success status, false means it failed, was canceled, or had partial success.
+	Success bool `json:"success"`
 }
