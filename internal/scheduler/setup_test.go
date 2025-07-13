@@ -81,7 +81,7 @@ func setupTest(t *testing.T) testHelper {
 	qs := filequeue.New(cfg.Paths.QueueDir)
 
 	drm := dagrun.New(drs, ps, cfg.Paths.Executable, cfg.Global.WorkDir)
-	em := scheduler.NewEntryReader(testdataDir, ds, drm, "", "")
+	em := scheduler.NewEntryReader(testdataDir, ds, drm, "", "", nil)
 
 	return testHelper{
 		EntryReader: em,

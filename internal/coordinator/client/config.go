@@ -28,7 +28,7 @@ type Config struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Host:           "localhost",
-		Port:           8084,
+		Port:           50051,
 		Insecure:       true,
 		DialTimeout:    10 * time.Second,
 		RequestTimeout: 5 * time.Minute,
