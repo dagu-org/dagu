@@ -27,9 +27,6 @@ type ChildDAGExecutor struct {
 
 	// workerSelector contains the worker selector requirements from the step
 	workerSelector map[string]string
-
-	// yamlData holds the YAML content for local DAGs (needed for distributed execution)
-	yamlData []byte
 }
 
 // NewChildDAGExecutor creates a new ChildDAGExecutor.
@@ -54,7 +51,6 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 			return &ChildDAGExecutor{
 				DAG:      &dag,
 				tempFile: tempFile,
-				yamlData: localDAG.YamlData,
 			}, nil
 		}
 	}
@@ -66,8 +62,7 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 	}
 
 	return &ChildDAGExecutor{
-		DAG:      dag,
-		yamlData: dag.YamlData,
+		DAG: dag,
 	}, nil
 }
 
@@ -165,23 +160,18 @@ func (e *ChildDAGExecutor) BuildCoordinatorTask(
 		return nil, fmt.Errorf("root dag-run ID is not set")
 	}
 
-	if len(e.yamlData) == 0 {
-		return nil, fmt.Errorf("no DAG definition available for child DAG %s", e.DAG.Name)
-	}
-
-	// Build task for coordinator dispatch
-	task := &coordinatorv1.Task{
-		Operation:        coordinatorv1.Operation_OPERATION_START,
-		RootDagRunName:   env.RootDAGRun.Name,
-		RootDagRunId:     env.RootDAGRun.ID,
-		ParentDagRunName: env.DAG.Name,
-		ParentDagRunId:   env.DAGRunID,
-		DagRunId:         runParams.RunID,
-		Target:           e.DAG.Name,
-		Params:           runParams.Params,
-		WorkerSelector:   e.workerSelector,
-		Definition:       string(e.yamlData),
-	}
+	// Build task for coordinator dispatch using DAG.CreateTask
+	task := e.DAG.CreateTask(
+		coordinatorv1.Operation_OPERATION_START,
+		runParams.RunID,
+		digraph.WithRootDagRun(env.RootDAGRun),
+		digraph.WithParentDagRun(digraph.DAGRunRef{
+			Name: env.DAG.Name,
+			ID:   env.DAGRunID,
+		}),
+		digraph.WithTaskParams(runParams.Params),
+		digraph.WithWorkerSelector(e.workerSelector),
+	)
 
 	logger.Info(ctx, "Built coordinator task for child DAG",
 		"dagRunId", runParams.RunID,

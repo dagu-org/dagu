@@ -87,7 +87,6 @@ func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
 	require.NotNil(t, executor)
 
 	// Verify it has yaml data (indicating it's local)
-	assert.NotEmpty(t, executor.yamlData)
 	assert.Equal(t, "local-child", executor.DAG.Name)
 	assert.NotEmpty(t, executor.tempFile)
 	assert.Contains(t, executor.tempFile, "local-child")
@@ -145,7 +144,6 @@ func TestNewChildDAGExecutor_RegularDAG(t *testing.T) {
 	require.NotNil(t, executor)
 
 	// Verify it doesn't have yaml data (not local)
-	assert.Empty(t, executor.yamlData)
 	assert.Equal(t, "regular-child", executor.DAG.Name)
 	assert.Empty(t, executor.tempFile)
 
@@ -333,7 +331,6 @@ func TestCleanup_LocalDAG(t *testing.T) {
 	executor := &ChildDAGExecutor{
 		DAG:      &digraph.DAG{Name: "test-child"},
 		tempFile: tempFile,
-		yamlData: []byte("test content"), // Set yamlData to indicate it's a local DAG
 	}
 
 	// Verify file exists
@@ -353,7 +350,6 @@ func TestCleanup_NonExistentFile(t *testing.T) {
 	executor := &ChildDAGExecutor{
 		DAG:      &digraph.DAG{Name: "test-child"},
 		tempFile: "/non/existent/file.yaml",
-		yamlData: []byte("test content"), // Set yamlData to indicate it's a local DAG
 	}
 
 	// Cleanup should not error on non-existent file
