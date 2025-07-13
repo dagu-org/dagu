@@ -201,6 +201,14 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	return nil
 }
 
+// handleQueue processes queued DAG runs from the persistence layer.
+// This is the second phase of the persistence-first architecture:
+// - Phase 1: Scheduled jobs are enqueued by HandleJob (status=QUEUED)
+// - Phase 2: This handler picks up queued items and executes/dispatches them
+//
+// The handler uses OPERATION_RETRY for all executions, which means "retry the dispatch"
+// rather than "retry a failed execution". This allows the system to retry dispatching
+// to the coordinator if it was temporarily unavailable.
 func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, done chan any) {
 	for {
 		select {
@@ -285,7 +293,14 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 
 			startedAt = time.Now()
 
-			// Execute the DAG (handles both local and distributed execution)
+			// Execute the DAG that was previously enqueued.
+			// IMPORTANT: We use OPERATION_RETRY here, which means "retry the dispatch", not "retry a failed execution".
+			// This is part of the persistence-first approach:
+			// 1. Scheduled jobs (via HandleJob) enqueue with status=QUEUED
+			// 2. Queue handler (here) picks up and dispatches with OPERATION_RETRY
+			// 3. For distributed execution, this dispatches to coordinator
+			// 4. For local execution, this runs the DAG
+			// The RETRY operation ensures the queue handler can retry dispatch if coordinator is temporarily down.
 			if err := s.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, data.ID); err != nil {
 				logger.Error(ctx, "Failed to execute dag", "err", err, "data", data)
 				goto SEND_RESULT
