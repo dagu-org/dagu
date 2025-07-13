@@ -65,17 +65,9 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 		return nil, fmt.Errorf("failed to find DAG %q: %w", childName, err)
 	}
 
-	// Create a temporary file for the local DAG
-	tempFile, err := createTempDAGFile(childName, dag.YamlData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create temp file for local DAG: %w", err)
-	}
-
-	// Set the location to the temporary file
-	dag.Location = tempFile
-
 	return &ChildDAGExecutor{
-		DAG: dag,
+		DAG:      dag,
+		yamlData: dag.YamlData,
 	}, nil
 }
 
@@ -173,6 +165,10 @@ func (e *ChildDAGExecutor) BuildCoordinatorTask(
 		return nil, fmt.Errorf("root dag-run ID is not set")
 	}
 
+	if len(e.yamlData) == 0 {
+		return nil, fmt.Errorf("no DAG definition available for child DAG %s", e.DAG.Name)
+	}
+
 	// Build task for coordinator dispatch
 	task := &coordinatorv1.Task{
 		Operation:        coordinatorv1.Operation_OPERATION_START,
@@ -181,23 +177,16 @@ func (e *ChildDAGExecutor) BuildCoordinatorTask(
 		ParentDagRunName: env.DAG.Name,
 		ParentDagRunId:   env.DAGRunID,
 		DagRunId:         runParams.RunID,
-		Target:           e.DAG.Location,
+		Target:           e.DAG.Name,
 		Params:           runParams.Params,
 		WorkerSelector:   e.workerSelector,
-	}
-
-	// For local DAGs, include the YAML definition
-	if len(e.yamlData) > 0 {
-		task.Definition = string(e.yamlData)
-		// Use the DAG name as target instead of the temp file path
-		task.Target = e.DAG.Name
+		Definition:       string(e.yamlData),
 	}
 
 	logger.Info(ctx, "Built coordinator task for child DAG",
 		"dagRunId", runParams.RunID,
 		"target", e.DAG.Name,
 		"workerSelector", e.workerSelector,
-		"hasDefinition", len(task.Definition) > 0,
 	)
 
 	return task, nil
