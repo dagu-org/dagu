@@ -265,8 +265,14 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([
 	}
 	defer func() { _ = f.Close() }()
 
+	// Read data from the file
+	dat, err := io.ReadAll(f)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file %q", filePath)
+	}
+
 	var dags []*DAG
-	decoder := yaml.NewDecoder(f)
+	decoder := yaml.NewDecoder(bytes.NewReader(dat))
 
 	// Read all documents from the file
 	docIndex := 0
@@ -326,13 +332,17 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([
 		// Set the location for the DAG
 		dest.Location = filePath
 
-		// Marshal the document back to YAML to preserve original data
-		yamlData, err := yaml.Marshal(doc)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal DAG in document %d: %w", docIndex, err)
+		if docIndex == 0 {
+			// If this is the first document, set the entire DAG
+			dest.YamlData = dat
+		} else {
+			// Marshal the document back to YAML to preserve original data
+			yamlData, err := yaml.Marshal(doc)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal DAG in document %d: %w", docIndex, err)
+			}
+			dest.YamlData = yamlData
 		}
-
-		dest.YamlData = yamlData
 
 		dags = append(dags, dest)
 		docIndex++

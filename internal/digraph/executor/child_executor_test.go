@@ -147,7 +147,6 @@ func TestNewChildDAGExecutor_RegularDAG(t *testing.T) {
 	// Verify it doesn't have yaml data (not local)
 	assert.Empty(t, executor.yamlData)
 	assert.Equal(t, "regular-child", executor.DAG.Name)
-	assert.Equal(t, "/path/to/regular-child.yaml", executor.DAG.Location)
 	assert.Empty(t, executor.tempFile)
 
 	// Cleanup should do nothing for regular DAGs

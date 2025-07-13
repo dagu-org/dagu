@@ -65,6 +65,15 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 		return nil, fmt.Errorf("failed to find DAG %q: %w", childName, err)
 	}
 
+	// Create a temporary file for the local DAG
+	tempFile, err := createTempDAGFile(childName, dag.YamlData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp file for local DAG: %w", err)
+	}
+
+	// Set the location to the temporary file
+	dag.Location = tempFile
+
 	return &ChildDAGExecutor{
 		DAG: dag,
 	}, nil
