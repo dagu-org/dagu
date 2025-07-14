@@ -179,6 +179,12 @@ func (e *parallelExecutor) SetStderr(out io.Writer) {
 
 // executeChild executes a single child DAG with the given parameters
 func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams) error {
+	// Check if we should use distributed execution
+	if e.child.ShouldUseDistributedExecution() {
+		return e.executeChildDistributed(ctx, runParams)
+	}
+
+	// Local execution path
 	cmd, err := e.child.BuildCommand(ctx, runParams, e.workDir)
 	if err != nil {
 		return err
@@ -194,7 +200,7 @@ func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams
 	e.running[runParams.RunID] = cmd
 	e.lock.Unlock()
 
-	logger.Info(ctx, "Executing child DAG",
+	logger.Info(ctx, "Executing child DAG locally",
 		"dagRunId", runParams.RunID,
 		"target", e.child.DAG.Name,
 		"params", runParams.Params,
@@ -226,7 +232,7 @@ func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams
 		}
 
 		// Determine status based on execution error
-		status := "success"
+		status := "succeeded"
 		if err != nil {
 			status = "failed"
 		}
@@ -243,7 +249,7 @@ func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams
 		status := "error"
 		if err == nil && resultErr != nil {
 			// Command succeeded but couldn't get result
-			status = "success"
+			status = "succeeded"
 		} else if err != nil {
 			status = "failed"
 		}
@@ -261,6 +267,45 @@ func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams
 	if err != nil {
 		return fmt.Errorf("child dag-run failed: %w", err)
 	}
+
+	return nil
+}
+
+// executeChildDistributed executes a child DAG via coordinator
+func (e *parallelExecutor) executeChildDistributed(ctx context.Context, runParams RunParams) error {
+	// Mark as distributed
+	e.lock.Lock()
+	e.distributedChildren[runParams.RunID] = true
+	e.lock.Unlock()
+
+	// Create distributed executor
+	distExec := NewDistributedExecutor(ctx)
+
+	// Dispatch to coordinator
+	if err := distExec.DispatchToCoordinator(ctx, e.child, runParams); err != nil {
+		return fmt.Errorf("failed to dispatch child DAG: %w", err)
+	}
+
+	// Wait for completion and get result
+	result, err := distExec.WaitForCompletionWithResult(ctx, runParams.RunID)
+	if err != nil {
+		// Store error result
+		e.lock.Lock()
+		e.results[runParams.RunID] = &ChildResult{
+			RunID:    runParams.RunID,
+			Params:   runParams.Params,
+			Status:   "failed",
+			Error:    err.Error(),
+			ExitCode: 1,
+		}
+		e.lock.Unlock()
+		return err
+	}
+
+	// Store successful result
+	e.lock.Lock()
+	e.results[runParams.RunID] = result
+	e.lock.Unlock()
 
 	return nil
 }
@@ -293,7 +338,7 @@ func (e *parallelExecutor) outputResults(_ context.Context) error {
 			resultCopy := *result
 
 			// Clear output for failed executions
-			if result.Status != "success" {
+			if result.Status != "succeeded" {
 				resultCopy.Output = nil
 			}
 
@@ -301,12 +346,12 @@ func (e *parallelExecutor) outputResults(_ context.Context) error {
 
 			// Add output to the outputs array
 			// Only include outputs from successful executions
-			if result.Status == "success" && result.Output != nil {
+			if result.Status == "succeeded" && result.Output != nil {
 				output.Outputs = append(output.Outputs, result.Output)
 			}
 
 			switch result.Status {
-			case "success":
+			case "succeeded":
 				output.Summary.Succeeded++
 			case "failed", "error":
 				output.Summary.Failed++
