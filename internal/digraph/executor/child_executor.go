@@ -33,9 +33,9 @@ type ChildDAGExecutor struct {
 	// coordinatorClientFactory is used for distributed execution
 	coordinatorClientFactory *client.Factory
 
-	// Process tracking for local execution
-	mu  sync.Mutex
-	cmd *exec.Cmd
+	// Process tracking for ALL executions
+	mu   sync.Mutex
+	cmds map[string]*exec.Cmd // runID -> cmd
 }
 
 // NewChildDAGExecutor creates a new ChildDAGExecutor.
@@ -61,6 +61,7 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 				DAG:                      &dag,
 				tempFile:                 tempFile,
 				coordinatorClientFactory: env.CoordinatorClientFactory,
+				cmds:                     make(map[string]*exec.Cmd),
 			}, nil
 		}
 	}
@@ -74,6 +75,7 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 	return &ChildDAGExecutor{
 		DAG:                      dag,
 		coordinatorClientFactory: env.CoordinatorClientFactory,
+		cmds:                     make(map[string]*exec.Cmd),
 	}, nil
 }
 
@@ -244,13 +246,13 @@ func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunP
 
 	// Store command reference for Kill
 	e.mu.Lock()
-	e.cmd = cmd
+	e.cmds[runParams.RunID] = cmd
 	e.mu.Unlock()
 
 	// Ensure we clear command reference when done
 	defer func() {
 		e.mu.Lock()
-		e.cmd = nil
+		delete(e.cmds, runParams.RunID)
 		e.mu.Unlock()
 	}()
 
@@ -325,13 +327,13 @@ func (e *ChildDAGExecutor) executeLocal(ctx context.Context, runParams RunParams
 
 	// Store command reference for Kill
 	e.mu.Lock()
-	e.cmd = cmd
+	e.cmds[runParams.RunID] = cmd
 	e.mu.Unlock()
 
 	// Ensure we clear command reference when done
 	defer func() {
 		e.mu.Lock()
-		e.cmd = nil
+		delete(e.cmds, runParams.RunID)
 		e.mu.Unlock()
 	}()
 
@@ -592,21 +594,31 @@ func getExitCode(success bool) int {
 	return 1
 }
 
-// Kill terminates the running child DAG process
+// Kill terminates all running child DAG processes
 func (e *ChildDAGExecutor) Kill(sig os.Signal) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	if e.cmd != nil {
-		logger.Info(context.Background(), "Killing child DAG process",
-			"dag", e.DAG.Name,
-			"pid", e.cmd.Process.Pid,
-			"signal", sig,
-		)
-		return killProcessGroup(e.cmd, sig)
+	var lastErr error
+	for runID, cmd := range e.cmds {
+		if cmd != nil && cmd.Process != nil {
+			logger.Info(context.Background(), "Killing child DAG process",
+				"dag", e.DAG.Name,
+				"runId", runID,
+				"pid", cmd.Process.Pid,
+				"signal", sig,
+			)
+			if err := killProcessGroup(cmd, sig); err != nil {
+				logger.Error(context.Background(), "Failed to kill process",
+					"runId", runID,
+					"err", err,
+				)
+				lastErr = err
+			}
+		}
 	}
 
-	return nil
+	return lastErr
 }
 
 // convertOutputsToMap converts string map to map[string]any
