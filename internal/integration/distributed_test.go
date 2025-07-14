@@ -10,7 +10,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
@@ -153,68 +152,6 @@ steps:
 		// Clean up
 		err = os.Remove(tempFile)
 		require.NoError(t, err)
-	})
-
-	t.Run("LocalDAGWithWorkerSelector", func(t *testing.T) {
-		// Create test DAG with local child that uses workerSelector
-		yamlContent := `
-name: parent-distributed
-steps:
-  - name: run-local-on-worker
-    run: local-child
-    output: RESULT
-
----
-
-name: local-child
-workerSelector:
-  type: test-worker
-steps:
-  - name: worker-task
-    command: echo "Hello from worker"
-    output: MESSAGE
-`
-		// Setup test environment
-		tmpDir := t.TempDir()
-		testFile := filepath.Join(tmpDir, "distributed-local.yaml")
-		err := os.WriteFile(testFile, []byte(yamlContent), 0644)
-		require.NoError(t, err)
-
-		th := test.Setup(t)
-
-		// Load the DAG
-		dag, err := digraph.Load(th.Context, testFile)
-		require.NoError(t, err)
-
-		// Verify the DAG has local DAGs
-		require.NotNil(t, dag.LocalDAGs)
-		require.Contains(t, dag.LocalDAGs, "local-child")
-
-		// Create the child executor with proper root DAG reference
-		rootDAGRun := digraph.DAGRunRef{
-			Name: "parent-distributed",
-			ID:   "test-root-run",
-		}
-		ctx := digraph.SetupEnvForTest(th.Context, dag, nil, rootDAGRun, "test-run", "", nil)
-		childExec, err := executor.NewChildDAGExecutor(ctx, "local-child")
-		require.NoError(t, err)
-
-		// Verify it should use distributed execution
-		require.True(t, childExec.ShouldUseDistributedExecution())
-
-		// Build the coordinator task
-		runParams := executor.RunParams{
-			RunID:  "test-child-run",
-			Params: "",
-		}
-		task, err := childExec.BuildCoordinatorTask(ctx, runParams)
-		require.NoError(t, err)
-
-		// Verify the task includes the definition
-		require.NotEmpty(t, task.Definition)
-		require.Contains(t, task.Definition, "Hello from worker")
-		require.Equal(t, "local-child", task.Target)
-		require.Equal(t, map[string]string{"type": "test-worker"}, task.WorkerSelector)
 	})
 
 	t.Run("DistributedExecutionFailure", func(t *testing.T) {

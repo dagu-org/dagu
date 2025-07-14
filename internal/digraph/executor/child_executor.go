@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
@@ -31,6 +32,10 @@ type ChildDAGExecutor struct {
 
 	// coordinatorClientFactory is used for distributed execution
 	coordinatorClientFactory *client.Factory
+
+	// Process tracking for local execution
+	mu  sync.Mutex
+	cmd *exec.Cmd
 }
 
 // NewChildDAGExecutor creates a new ChildDAGExecutor.
@@ -237,6 +242,18 @@ func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunP
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
 
+	// Store command reference for Kill
+	e.mu.Lock()
+	e.cmd = cmd
+	e.mu.Unlock()
+
+	// Ensure we clear command reference when done
+	defer func() {
+		e.mu.Lock()
+		e.cmd = nil
+		e.mu.Unlock()
+	}()
+
 	logger.Info(ctx, "Executing child DAG locally",
 		"dagRunId", runParams.RunID,
 		"target", e.DAG.Name,
@@ -305,6 +322,18 @@ func (e *ChildDAGExecutor) executeLocal(ctx context.Context, runParams RunParams
 	if stdout != nil {
 		cmd.Stdout = stdout
 	}
+
+	// Store command reference for Kill
+	e.mu.Lock()
+	e.cmd = cmd
+	e.mu.Unlock()
+
+	// Ensure we clear command reference when done
+	defer func() {
+		e.mu.Lock()
+		e.cmd = nil
+		e.mu.Unlock()
+	}()
 
 	logger.Info(ctx, "Executing child DAG locally",
 		"dagRunId", runParams.RunID,
@@ -561,6 +590,23 @@ func getExitCode(success bool) int {
 		return 0
 	}
 	return 1
+}
+
+// Kill terminates the running child DAG process
+func (e *ChildDAGExecutor) Kill(sig os.Signal) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	if e.cmd != nil {
+		logger.Info(context.Background(), "Killing child DAG process",
+			"dag", e.DAG.Name,
+			"pid", e.cmd.Process.Pid,
+			"signal", sig,
+		)
+		return killProcessGroup(e.cmd, sig)
+	}
+
+	return nil
 }
 
 // convertOutputsToMap converts string map to map[string]any

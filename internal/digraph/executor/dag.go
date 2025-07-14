@@ -65,16 +65,16 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 		}
 	}()
 
-	// Execute using the simplified API
-	err := e.child.Execute(ctx, e.runParams, e.workDir, e.stdout)
-
-	// Track distributed execution state for Kill method
+	// Track distributed execution state BEFORE execution starts
 	if e.child.ShouldUseDistributedExecution() {
 		e.lock.Lock()
 		e.isDistributed = true
 		e.childDAGRunID = e.runParams.RunID
 		e.lock.Unlock()
 	}
+
+	// Execute using the simplified API
+	err := e.child.Execute(ctx, e.runParams, e.workDir, e.stdout)
 
 	return err
 }
@@ -99,18 +99,26 @@ func (e *dagExecutor) SetStderr(out io.Writer) {
 
 func (e *dagExecutor) Kill(sig os.Signal) error {
 	e.lock.Lock()
-	defer e.lock.Unlock()
+	isDistributed := e.isDistributed
+	childDAGRunID := e.childDAGRunID
+	e.lock.Unlock()
 
 	// If running distributed, request cancellation
-	if e.isDistributed && e.childDAGRunID != "" {
+	if isDistributed && childDAGRunID != "" {
 		ctx := context.Background()
-		if err := e.env.DB.RequestChildCancel(ctx, e.childDAGRunID, e.env.RootDAGRun); err != nil {
+		if err := e.env.DB.RequestChildCancel(ctx, childDAGRunID, e.env.RootDAGRun); err != nil {
 			logger.Error(ctx, "Failed to request child DAG cancellation",
-				"dagRunId", e.childDAGRunID, "err", err)
+				"dagRunId", childDAGRunID, "err", err)
+			return err
 		}
+		return nil
 	}
 
-	// For local processes, the Kill logic is handled inside ChildDAGExecutor
+	// For local processes, call Kill on the child executor
+	if e.child != nil {
+		return e.child.Kill(sig)
+	}
+
 	return nil
 }
 

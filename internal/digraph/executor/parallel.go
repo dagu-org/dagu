@@ -196,15 +196,15 @@ func (e *parallelExecutor) SetStderr(out io.Writer) {
 
 // executeChild executes a single child DAG with the given parameters
 func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams) error {
-	// Use the new ExecuteWithResult API
-	result, err := e.child.ExecuteWithResult(ctx, runParams, e.workDir)
-
 	// Store the command for distributed tracking if needed
 	if e.child.ShouldUseDistributedExecution() {
 		e.lock.Lock()
 		e.distributedChildren[runParams.RunID] = true
 		e.lock.Unlock()
 	}
+
+	// Use the new ExecuteWithResult API
+	result, err := e.child.ExecuteWithResult(ctx, runParams, e.workDir)
 
 	// Store the result
 	e.lock.Lock()
@@ -318,7 +318,11 @@ func (e *parallelExecutor) Kill(sig os.Signal) error {
 		}
 	}
 
-	// For local processes, the Kill logic is handled inside ChildDAGExecutor
+	// For local processes, kill the child executor
+	if e.child != nil {
+		return e.child.Kill(sig)
+	}
+	
 	return nil
 }
 
