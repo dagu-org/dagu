@@ -300,7 +300,7 @@ func (e *parallelExecutor) Kill(sig os.Signal) error {
 	if e.child != nil {
 		return e.child.Kill(sig)
 	}
-	
+
 	return nil
 }
 

@@ -138,12 +138,12 @@ steps:
 		// Wait for the agent to finish
 		err = <-errChan
 		require.Error(t, err, "agent should return an error when cancelled")
-		
+
 		// The error should indicate cancellation
 		require.True(t,
-			strings.Contains(err.Error(), "context canceled") || 
-			strings.Contains(err.Error(), "cancelled") ||
-			strings.Contains(err.Error(), "killed"),
+			strings.Contains(err.Error(), "context canceled") ||
+				strings.Contains(err.Error(), "cancelled") ||
+				strings.Contains(err.Error(), "killed"),
 			"error should indicate cancellation: %v", err)
 
 		// Get the latest status
@@ -464,7 +464,7 @@ steps:
 			scheduler.NodeStatusNone,
 			scheduler.NodeStatusSuccess, // Some children might have completed before cancellation
 		}
-		
+
 		statusFound := false
 		for _, validStatus := range validStatuses {
 			if concurrentNode.Status == validStatus {

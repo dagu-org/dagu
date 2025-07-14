@@ -80,9 +80,9 @@ func TestChildDAGExecutor_Kill_OnlyDistributed(t *testing.T) {
 
 	// Create child executor with only distributed processes
 	executor := &ChildDAGExecutor{
-		DAG:             childDAG,
-		env:             env,
-		cmds:            make(map[string]*exec.Cmd),
+		DAG:  childDAG,
+		env:  env,
+		cmds: make(map[string]*exec.Cmd),
 		distributedRuns: map[string]bool{
 			"distributed-run-1": true,
 			"distributed-run-2": true,

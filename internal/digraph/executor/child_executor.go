@@ -229,7 +229,7 @@ func (e *ChildDAGExecutor) Execute(ctx context.Context, runParams RunParams, wor
 		e.mu.Lock()
 		e.distributedRuns[runParams.RunID] = true
 		e.mu.Unlock()
-		
+
 		return e.executeDistributed(ctx, runParams, stdout)
 	}
 
@@ -246,7 +246,7 @@ func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunP
 		e.mu.Lock()
 		e.distributedRuns[runParams.RunID] = true
 		e.mu.Unlock()
-		
+
 		return e.executeDistributedWithResult(ctx, runParams)
 	}
 
