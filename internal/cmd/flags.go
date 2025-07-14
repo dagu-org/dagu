@@ -147,8 +147,8 @@ var (
 	coordinatorPortFlag = commandLineFlag{
 		name:         "coordinator.port",
 		shorthand:    "P",
-		defaultValue: "50051",
-		usage:        "Coordinator gRPC server port (default: 50051)",
+		defaultValue: "50055",
+		usage:        "Coordinator gRPC server port (default: 50055)",
 		bindViper:    true,
 	}
 
@@ -187,8 +187,8 @@ var (
 	// workerCoordinatorPortFlag is the coordinator port for worker connection.
 	workerCoordinatorPortFlag = commandLineFlag{
 		name:         "worker.coordinator-port",
-		defaultValue: "50051",
-		usage:        "Coordinator gRPC server port (default: 50051)",
+		defaultValue: "50055",
+		usage:        "Coordinator gRPC server port (default: 50055)",
 		bindViper:    true,
 	}
 

@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en">
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quick Start Guide &mdash; Dagu  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Command Line Interface" href="cli.html" />
+    <link rel="prev" title="Installation" href="installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Dagu
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Installation</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Quick Start Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#launch-the-web-ui">1. Launch the Web UI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#create-a-new-dag">2. Create a New DAG</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#edit-the-dag">3. Edit the DAG</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#execute-the-dag">4. Execute the DAG</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#next-steps">5. Next Steps</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Interface</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="web_interface.html">Web Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="rest.html">REST API Documentation (v1)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Writing DAGs</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="yaml_format.html">Writing DAGs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="executors.html">Executors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="base_config.html">Base Configuration for all DAGs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="special_env.html">Special Environment Variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="schema.html">Schema Reference</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Configuration</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="config.html">Configurations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config_remote.html">Remote Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scheduler.html">Scheduler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="email.html">Email Notifications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auth.html">Basic Authentication</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_token.html">API Token</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Container Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="docker.html">Building Docker Image</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docker-compose.html">Using Docker Compose</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contrib.html">Contribution Guide</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Dagu</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Quick Start Guide</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/quickstart.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="quick-start-guide">
+<h1>Quick Start Guide<a class="headerlink" href="#quick-start-guide" title="Permalink to this heading"></a></h1>
+<nav class="contents local" id="contents">
+<ul class="simple">
+<li><p><a class="reference internal" href="#launch-the-web-ui" id="id2">1. Launch the Web UI</a></p></li>
+<li><p><a class="reference internal" href="#create-a-new-dag" id="id3">2. Create a New DAG</a></p></li>
+<li><p><a class="reference internal" href="#edit-the-dag" id="id4">3. Edit the DAG</a></p></li>
+<li><p><a class="reference internal" href="#execute-the-dag" id="id5">4. Execute the DAG</a></p></li>
+<li><p><a class="reference internal" href="#next-steps" id="id6">5. Next Steps</a></p></li>
+</ul>
+</nav>
+<section id="launch-the-web-ui">
+<h2><a class="toc-backref" href="#id2" role="doc-backlink">1. Launch the Web UI</a><a class="headerlink" href="#launch-the-web-ui" title="Permalink to this heading"></a></h2>
+<p>There are two ways to launch the Dagu Web UI:</p>
+<p><strong>Option A: Direct Launch</strong></p>
+<p>Start the server with <code class="docutils literal notranslate"><span class="pre">dagu</span> <span class="pre">start-all</span></code> and browse to <a class="reference external" href="http://127.0.0.1:8080">http://127.0.0.1:8080</a> to explore the Web UI.
+After the Web UI loads, navigate to the DAGs page by either:</p>
+<ol class="arabic simple">
+<li><p>Clicking the second button from the top in the left sidebar (the one that looks like a list)</p></li>
+<li><p>Directly accessing <a class="reference external" href="http://localhost:8080/dags">http://localhost:8080/dags</a></p></li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The server will be started on port <code class="docutils literal notranslate"><span class="pre">8080</span></code> by default. You can change the port by passing <code class="docutils literal notranslate"><span class="pre">--port</span></code> option. See <a class="reference external" href="/config.html">configurations options</a> for more details.</p>
+</div>
+<p><strong>Option B: Using Docker Compose</strong></p>
+<p>If you prefer using Docker, you can use <a class="reference external" href="https://github.com/dagu-org/dagu/blob/main/docker-compose.yaml">docker-compose.yaml</a> to launch the Web UI:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Clone the repository</span>
+git<span class="w"> </span>clone<span class="w"> </span>https://github.com/dagu-org/dagu.git
+<span class="c1"># Navigate to the project root</span>
+<span class="nb">cd</span><span class="w"> </span>dagu
+<span class="c1"># Launch with docker compose from the project root</span>
+docker<span class="w"> </span>compose<span class="w"> </span>up
+</pre></div>
+</div>
+<p>Then browse to <a class="reference external" href="http://127.0.0.1:8080/dags">http://127.0.0.1:8080/dags</a> to access the Web UI.
+After the Web UI loads, navigate to the DAGs page by either:</p>
+<ol class="arabic simple">
+<li><p>Clicking the second button from the top in the left sidebar (the one that looks like a list)</p></li>
+<li><p>Directly accessing <a class="reference external" href="http://localhost:8080/dags">http://localhost:8080/dags</a></p></li>
+</ol>
+</section>
+<section id="create-a-new-dag">
+<h2><a class="toc-backref" href="#id3" role="doc-backlink">2. Create a New DAG</a><a class="headerlink" href="#create-a-new-dag" title="Permalink to this heading"></a></h2>
+<p>Create a DAG by clicking the <code class="docutils literal notranslate"><span class="pre">New</span> <span class="pre">DAG</span></code> button on the top page of the web UI. Input <code class="docutils literal notranslate"><span class="pre">example</span></code> in the dialog.</p>
+</section>
+<section id="edit-the-dag">
+<h2><a class="toc-backref" href="#id4" role="doc-backlink">3. Edit the DAG</a><a class="headerlink" href="#edit-the-dag" title="Permalink to this heading"></a></h2>
+<p>Go to the <code class="docutils literal notranslate"><span class="pre">SPEC</span></code> Tab and hit the <code class="docutils literal notranslate"><span class="pre">Edit</span></code> button. Copy &amp; Paste the following YAML code into the editor.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">schedule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*&quot;</span><span class="w"> </span><span class="c1"># Run the DAG every minute</span>
+<span class="nt">params</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">NAME</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Dagu&quot;</span>
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Hello world</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo Hello $NAME</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Simulate unclean Command Output</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">cat &lt;&lt;EOF</span>
+<span class="w">      </span><span class="no">INFO: Starting process...</span>
+<span class="w">      </span><span class="no">DEBUG: Initializing variables...</span>
+<span class="w">      </span><span class="no">DATA: User count is 42</span>
+<span class="w">      </span><span class="no">INFO: Process completed successfully.</span>
+<span class="w">      </span><span class="no">EOF</span>
+<span class="w">    </span><span class="nt">output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw_output</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Extract Relevant Data</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">echo &quot;$raw_output&quot; | grep &#39;^DATA:&#39; | sed &#39;s/^DATA: //&#39;</span>
+<span class="w">    </span><span class="nt">output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cleaned_data</span>
+<span class="w">    </span><span class="nt">depends</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Simulate unclean Command Output</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Done</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo Done!</span>
+<span class="w">    </span><span class="nt">depends</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Hello world</span>
+</pre></div>
+</div>
+</section>
+<section id="execute-the-dag">
+<h2><a class="toc-backref" href="#id5" role="doc-backlink">4. Execute the DAG</a><a class="headerlink" href="#execute-the-dag" title="Permalink to this heading"></a></h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>In the <a class="reference external" href="https://github.com/dagu-org/dagu">project root</a>, there is a <a class="reference external" href="https://github.com/dagu-org/dagu/blob/main/docker-compose.yaml">docker-compose.yaml</a> which can be used to test out DAGs, and get up to speed with examples like the above.</p>
+</div>
+<p>You can execute the example by pressing the <cite>Start</cite> button.</p>
+</section>
+<section id="next-steps">
+<h2><a class="toc-backref" href="#id6" role="doc-backlink">5. Next Steps</a><a class="headerlink" href="#next-steps" title="Permalink to this heading"></a></h2>
+<p>Check out the <a class="reference external" href="https://github.com/dagu-org/dagu/tree/main/examples">Examples provided by Dagu team</a> to learn more</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="installation.html" class="btn btn-neutral float-left" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="cli.html" class="btn btn-neutral float-right" title="Command Line Interface" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024 Yota Hamada.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

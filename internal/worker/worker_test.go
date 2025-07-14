@@ -404,7 +404,7 @@ func TestWorkerShutdown(t *testing.T) {
 
 	t.Run("StopWithoutStart", func(t *testing.T) {
 		// Create worker with instant mock executor
-		w := createTestWorker("test-worker", 1, "127.0.0.1", 50051, &worker.TLSConfig{
+		w := createTestWorker("test-worker", 1, "127.0.0.1", 50055, &worker.TLSConfig{
 			Insecure: true,
 		})
 		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})

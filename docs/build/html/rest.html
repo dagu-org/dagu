@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en">
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>REST API Documentation (v1) &mdash; Dagu  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Writing DAGs" href="yaml_format.html" />
+    <link rel="prev" title="Web Interface" href="web_interface.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Dagu
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Installation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Interface</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="web_interface.html">Web Interface</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">REST API Documentation (v1)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#base-configuration">Base Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#system-operations">System Operations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#health-check-get-health">Health Check <code class="docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/health</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#dag-operations">DAG Operations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#list-dags-get-dags">List DAGs <code class="docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/dags</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#create-dag-post-dags">Create DAG <code class="docutils literal notranslate"><span class="pre">POST</span> <span class="pre">/dags</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#get-dag-details-get-dags-dagid">Get DAG Details <code class="docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/dags/{dagId}</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#perform-dag-action-post-dags-dagid">Perform DAG Action <code class="docutils literal notranslate"><span class="pre">POST</span> <span class="pre">/dags/{dagId}</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#search-operations">Search Operations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#search-dags-get-search">Search DAGs <code class="docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/search</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#error-handling">Error Handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example-usage">Example Usage</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Writing DAGs</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="yaml_format.html">Writing DAGs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="executors.html">Executors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="parallel_execution.html">Parallel Execution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="base_config.html">Base Configuration for all DAGs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="special_env.html">Special Environment Variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="schema.html">Schema Reference</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Configuration</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="config.html">Configurations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config_remote.html">Remote Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scheduler.html">Scheduler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="email.html">Email Notifications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auth.html">Basic Authentication</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_token.html">API Token</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Container Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="docker.html">Building Docker Image</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docker-compose.html">Using Docker Compose</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contrib.html">Contribution Guide</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Dagu</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">REST API Documentation (v1)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/rest.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="rest-api-documentation-v1">
+<span id="rest-api"></span><h1>REST API Documentation (v1)<a class="headerlink" href="#rest-api-documentation-v1" title="Permalink to this heading"></a></h1>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this heading"></a></h2>
+<p>Dagu server provides a comprehensive REST API for querying and controlling DAGs. The API enables programmatic control over workflow orchestration, including DAG management, execution control, monitoring, and system operations.</p>
+</section>
+<section id="base-configuration">
+<h2>Base Configuration<a class="headerlink" href="#base-configuration" title="Permalink to this heading"></a></h2>
+<dl class="simple">
+<dt><strong>Base URL</strong></dt><dd><p><code class="docutils literal notranslate"><span class="pre">http://localhost:8080/api/v1</span></code></p>
+</dd>
+<dt><strong>Content Types</strong></dt><dd><ul class="simple">
+<li><p>Request: <code class="docutils literal notranslate"><span class="pre">application/json</span></code></p></li>
+<li><p>Response: <code class="docutils literal notranslate"><span class="pre">application/json</span></code></p></li>
+</ul>
+</dd>
+<dt><strong>Required Headers</strong></dt><dd><ul class="simple">
+<li><p>For all requests: <code class="docutils literal notranslate"><span class="pre">Accept:</span> <span class="pre">application/json</span></code></p></li>
+<li><p>For POST/PUT requests: <code class="docutils literal notranslate"><span class="pre">Content-Type:</span> <span class="pre">application/json</span></code></p></li>
+</ul>
+</dd>
+<dt>Authentication</dt><dd><p>Currently, the API does not require authentication.</p>
+</dd>
+</dl>
+</section>
+<section id="system-operations">
+<h2>System Operations<a class="headerlink" href="#system-operations" title="Permalink to this heading"></a></h2>
+<section id="health-check-get-health">
+<h3>Health Check <code class="docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/health</span></code><a class="headerlink" href="#health-check-get-health" title="Permalink to this heading"></a></h3>
+<p>Checks the health status of the Dagu server and its dependencies.</p>
+<dl class="simple">
+<dt><strong>URL</strong></dt><dd><p><code class="docutils literal notranslate"><span class="pre">/health</span></code></p>
+</dd>
+<dt><strong>Method</strong></dt><dd><p><code class="docutils literal notranslate"><span class="pre">GET</span></code></p>
+</dd>
+<dt><strong>Parameters</strong></dt><dd><p>None</p>
+</dd>
+</dl>
+<p><strong>Success Response (200)</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;healthy&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.0.0&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;uptime&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3600</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-02-11T12:00:00Z&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-text">Response Fields</span><a class="headerlink" href="#id1" title="Permalink to this table"></a></caption>
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 80.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Field</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>status</p></td>
+<td><p>Server health status (“healthy” or “unhealthy”)</p></td>
+</tr>
+<tr class="row-odd"><td><p>version</p></td>
+<td><p>Current server version</p></td>
+</tr>
+<tr class="row-even"><td><p>uptime</p></td>
+<td><p>Server uptime in seconds</p></td>
+</tr>
+<tr class="row-odd"><td><p>timestamp</p></td>
+<td><p>Current server time in ISO 8601 format</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Error Response (503)</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;unhealthy&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.0.0&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;uptime&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3600</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-02-11T12:00:00Z&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="dag-operations">
+<h2>DAG Operations<a class="headerlink" href="#dag-operations" title="Permalink to this heading"></a></h2>
+<section id="list-dags-get-dags">
+<h3>List DAGs <code class="docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/dags</span></code><a class="headerlink" href="#list-dags-get-dags" title="Permalink to this heading"></a></h3>
+<p>Retrieves a paginated list of available DAGs with optional filtering capabilities.</p>
+<dl class="simple">
+<dt><strong>URL</strong></dt><dd><p><code class="docutils literal notranslate"><span class="pre">/dags</span></code></p>
+</dd>
+<dt><strong>Method</strong></dt><dd><p><code class="docutils literal notranslate"><span class="pre">GET</span></code></p>
+</dd>
+</dl>
+<table class="docutils align-default" id="id2">
+<caption><span class="caption-text">Query Parameters</span><a class="headerlink" href="#id2" title="Permalink to this table"></a></caption>
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 15.0%" />
+<col style="width: 50.0%" />
+<col style="width: 15.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Required</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>page</p></td>
+<td><p>integer</p></td>
+<td><p>Page number for pagination</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>limit</p></td>
+<td><p>integer</p></td>
+<td><p>Number of items per page</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>searchName</p></td>
+<td><p>string</p></td>
+<td><p>Filter DAGs by matching name</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>searchTag</p></td>
+<td><p>string</p></td>
+<td><p>Filter DAGs by matching tag</p></td>
+<td><p>No</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Success Response (200)</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;DAGs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;File&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;example.yaml&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;Dir&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/dags&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;DAG&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="nt">&quot;Group&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;default&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;Name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;example_dag&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;Schedule&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">                    </span><span class="p">{</span>
+<span class="w">                        </span><span class="nt">&quot;Expression&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0 * * * *&quot;</span>
+<span class="w">                    </span><span class="p">}</span>
+<span class="w">                </span><span class="p">],</span>
+<span class="w">                </span><span class="nt">&quot;Description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Example DAG&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;Params&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;param1&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;param2&quot;</span><span class="p">],</span>
+<span class="w">                </span><span class="nt">&quot;DefaultParams&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;{}&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;Tags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;example&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;demo&quot;</span><span class="p">]</span>
+<span class="w">            </span><span class="p">},</span>
+<span class="w">            </span><span class="nt">&quot;Status&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="nt">&quot;RequestId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;req-123&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;Name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;example_dag&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;Status&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;StatusText&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;running&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;Pid&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1234</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;StartedAt&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-02-11T10:00:00Z&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;FinishedAt&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;Log&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/logs/example_dag.log&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;Params&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;{}&quot;</span>
+<span class="w">            </span><span class="p">},</span>
+<span class="w">            </span><span class="nt">&quot;Suspended&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;Error&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;Errors&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">    </span><span class="nt">&quot;HasError&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;PageCount&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Response Fields Description</strong></p>
+<dl class="simple">
+<dt>DAG Object:</dt><dd><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">File</span></code>: Path to the DAG definition file</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Dir</span></code>: Directory containing the DAG file</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DAG</span></code>: DAG configuration and metadata</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Status</span></code>: Current execution status</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Suspended</span></code>: Whether the DAG is suspended</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Error</span></code>: Error message if any</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+<section id="create-dag-post-dags">
+<h3>Create DAG <code class="docutils literal notranslate"><span class="pre">POST</span> <span class="pre">/dags</span></code><a class="headerlink" href="#create-dag-post-dags" title="Permalink to this heading"></a></h3>
+<p>Creates a new DAG definition.</p>
+<dl class="simple">
+<dt><strong>URL</strong></dt><dd><p><code class="docutils literal notranslate"><span class="pre">/dags</span></code></p>
+</dd>
+<dt><strong>Method</strong></dt><dd><p><code class="docutils literal notranslate"><span class="pre">POST</span></code></p>
+</dd>
+</dl>
+<p><strong>Request Body</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;action&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;create&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;dag_definition_yaml_content&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<table class="docutils align-default" id="id3">
+<caption><span class="caption-text">Request Fields</span><a class="headerlink" href="#id3" title="Permalink to this table"></a></caption>
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 15.0%" />
+<col style="width: 50.0%" />
+<col style="width: 15.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Field</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Required</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>action</p></td>
+<td><p>string</p></td>
+<td><p>Action to perform upon creation</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>value</p></td>
+<td><p>string</p></td>
+<td><p>DAG definition in YAML format</p></td>
+<td><p>Yes</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Success Response (200)</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;DagID&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;new_dag_123&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="get-dag-details-get-dags-dagid">
+<h3>Get DAG Details <code class="docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/dags/{dagId}</span></code><a class="headerlink" href="#get-dag-details-get-dags-dagid" title="Permalink to this heading"></a></h3>
+<p>Retrieves detailed information about a specific DAG.</p>
+<dl class="simple">
+<dt><strong>URL</strong></dt><dd><p><code class="docutils literal notranslate"><span class="pre">/dags/{dagId}</span></code></p>
+</dd>
+<dt><strong>Method</strong></dt><dd><p><code class="docutils literal notranslate"><span class="pre">GET</span></code></p>
+</dd>
+</dl>
+<table class="docutils align-default" id="id4">
+<caption><span class="caption-text">URL Parameters</span><a class="headerlink" href="#id4" title="Permalink to this table"></a></caption>
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 15.0%" />
+<col style="width: 50.0%" />
+<col style="width: 15.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Required</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>dagId</p></td>
+<td><p>string</p></td>
+<td><p>Unique identifier of the DAG</p></td>
+<td><p>Yes</p></td>
+</tr>
+</tbody>
+</table>
+<table class="docutils align-default" id="id5">
+<caption><span class="caption-text">Query Parameters</span><a class="headerlink" href="#id5" title="Permalink to this table"></a></caption>
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 15.0%" />
+<col style="width: 50.0%" />
+<col style="width: 15.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Required</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>tab</p></td>
+<td><p>string</p></td>
+<td><p>Tab name for UI navigation</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>file</p></td>
+<td><p>string</p></td>
+<td><p>Specific file related to the DAG</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>step</p></td>
+<td><p>string</p></td>
+<td><p>Step name within the DAG</p></td>
+<td><p>No</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="perform-dag-action-post-dags-dagid">
+<h3>Perform DAG Action <code class="docutils literal notranslate"><span class="pre">POST</span> <span class="pre">/dags/{dagId}</span></code><a class="headerlink" href="#perform-dag-action-post-dags-dagid" title="Permalink to this heading"></a></h3>
+<p>Executes various actions on a specific DAG.</p>
+<dl class="simple">
+<dt><strong>URL</strong></dt><dd><p><code class="docutils literal notranslate"><span class="pre">/dags/{dagId}</span></code></p>
+</dd>
+<dt><strong>Method</strong></dt><dd><p><code class="docutils literal notranslate"><span class="pre">POST</span></code></p>
+</dd>
+</dl>
+<table class="docutils align-default" id="id6">
+<caption><span class="caption-text">URL Parameters</span><a class="headerlink" href="#id6" title="Permalink to this table"></a></caption>
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 15.0%" />
+<col style="width: 50.0%" />
+<col style="width: 15.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Required</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>dagId</p></td>
+<td><p>string</p></td>
+<td><p>Unique identifier of the DAG</p></td>
+<td><p>Yes</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Request Body</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;action&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;requestId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;step&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;params&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<table class="docutils align-default" id="id7">
+<caption><span class="caption-text">Request Fields</span><a class="headerlink" href="#id7" title="Permalink to this table"></a></caption>
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 15.0%" />
+<col style="width: 50.0%" />
+<col style="width: 15.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Field</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Required</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>action</p></td>
+<td><p>string</p></td>
+<td><p>Action to perform (see Available Actions below)</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>value</p></td>
+<td><p>string</p></td>
+<td><p>Additional value required by certain actions</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>requestId</p></td>
+<td><p>string</p></td>
+<td><p>Required for retry, mark-success, and mark-failed actions</p></td>
+<td><p>Conditional</p></td>
+</tr>
+<tr class="row-odd"><td><p>step</p></td>
+<td><p>string</p></td>
+<td><p>Required for mark-success and mark-failed actions</p></td>
+<td><p>Conditional</p></td>
+</tr>
+<tr class="row-even"><td><p>params</p></td>
+<td><p>string</p></td>
+<td><p>JSON string of parameters for DAG-run</p></td>
+<td><p>No</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="simple">
+<dt>Available Actions:</dt><dd><ul class="simple">
+<li><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">start</span></code>: Begin DAG-run</dt><dd><ul>
+<li><p>Requires: none</p></li>
+<li><p>Optional: params</p></li>
+<li><p>Fails if DAG is already running</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">suspend</span></code>: Toggle DAG suspension state</dt><dd><ul>
+<li><p>Requires: value (“true” or “false”)</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">stop</span></code>: Stop DAG-run</dt><dd><ul>
+<li><p>Requires: none</p></li>
+<li><p>Fails if DAG is not running</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">retry</span></code>: Retry a previous execution</dt><dd><ul>
+<li><p>Requires: requestId</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">mark-success</span></code>: Mark a specific step as successful</dt><dd><ul>
+<li><p>Requires: requestId, step</p></li>
+<li><p>Fails if DAG is running</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">mark-failed</span></code>: Mark a specific step as failed</dt><dd><ul>
+<li><p>Requires: requestId, step</p></li>
+<li><p>Fails if DAG is running</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">save</span></code>: Update DAG definition</dt><dd><ul>
+<li><p>Requires: value (new DAG definition)</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">rename</span></code>: Rename the DAG</dt><dd><ul>
+<li><p>Requires: value (new name)</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</dd>
+</dl>
+<p><strong>Success Response (200)</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;newDagId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">newDagId</span></code> field is only included in the response for the <code class="docutils literal notranslate"><span class="pre">rename</span></code> action.</p>
+</div>
+<p><strong>Error Responses</strong></p>
+<ul class="simple">
+<li><p><strong>400 Bad Request</strong>
+- Missing required action parameter
+- Invalid action type
+- DAG already running (for start action)
+- DAG not running (for stop action)
+- Missing required parameters for specific actions
+- Step not found (for mark-success/mark-failed actions)</p></li>
+<li><p><strong>404 Not Found</strong>
+- DAG not found</p></li>
+<li><p><strong>500 Internal Server Error</strong>
+- Failed to execute the requested action
+- Failed to update DAG status
+- Failed to rename DAG</p></li>
+</ul>
+</section>
+</section>
+<section id="search-operations">
+<h2>Search Operations<a class="headerlink" href="#search-operations" title="Permalink to this heading"></a></h2>
+<section id="search-dags-get-search">
+<h3>Search DAGs <code class="docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/search</span></code><a class="headerlink" href="#search-dags-get-search" title="Permalink to this heading"></a></h3>
+<p>Performs a full-text search across DAG definitions.</p>
+<dl class="simple">
+<dt><strong>URL</strong></dt><dd><p><code class="docutils literal notranslate"><span class="pre">/search</span></code></p>
+</dd>
+<dt><strong>Method</strong></dt><dd><p><code class="docutils literal notranslate"><span class="pre">GET</span></code></p>
+</dd>
+</dl>
+<table class="docutils align-default" id="id8">
+<caption><span class="caption-text">Query Parameters</span><a class="headerlink" href="#id8" title="Permalink to this table"></a></caption>
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 15.0%" />
+<col style="width: 50.0%" />
+<col style="width: 15.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Required</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>q</p></td>
+<td><p>string</p></td>
+<td><p>Search query string</p></td>
+<td><p>Yes</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="error-handling">
+<h2>Error Handling<a class="headerlink" href="#error-handling" title="Permalink to this heading"></a></h2>
+<p>All endpoints may return error responses in the following format:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;code&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;error_code&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Human readable error message&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;details&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;additional&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;error details&quot;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<table class="docutils align-default" id="id9">
+<caption><span class="caption-text">Error Codes</span><a class="headerlink" href="#id9" title="Permalink to this table"></a></caption>
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Code</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>validation_error</p></td>
+<td><p>Invalid request parameters or body</p></td>
+</tr>
+<tr class="row-odd"><td><p>not_found</p></td>
+<td><p>Requested resource doesn’t exist</p></td>
+</tr>
+<tr class="row-even"><td><p>internal_error</p></td>
+<td><p>Server-side error</p></td>
+</tr>
+<tr class="row-odd"><td><p>unauthorized</p></td>
+<td><p>Authentication/authorization failed</p></td>
+</tr>
+<tr class="row-even"><td><p>bad_gateway</p></td>
+<td><p>Upstream service error</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="example-usage">
+<h2>Example Usage<a class="headerlink" href="#example-usage" title="Permalink to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Start a DAG with parameters</span>
+curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">&quot;http://localhost:8080/api/v1/dags/example_dag&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">     </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">     </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
+<span class="s1">       &quot;action&quot;: &quot;start&quot;,</span>
+<span class="s1">       &quot;params&quot;: &quot;{\&quot;param1\&quot;: \&quot;value1\&quot;}&quot;</span>
+<span class="s1">     }&#39;</span>
+
+<span class="c1"># Mark a step as successful</span>
+curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">&quot;http://localhost:8080/api/v1/dags/example_dag&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">     </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">     </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
+<span class="s1">       &quot;action&quot;: &quot;mark-success&quot;,</span>
+<span class="s1">       &quot;requestId&quot;: &quot;req_123&quot;,</span>
+<span class="s1">       &quot;step&quot;: &quot;step1&quot;</span>
+<span class="s1">     }&#39;</span>
+
+<span class="c1"># Rename a DAG</span>
+curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">&quot;http://localhost:8080/api/v1/dags/example_dag&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">     </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">     </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
+<span class="s1">       &quot;action&quot;: &quot;rename&quot;,</span>
+<span class="s1">       &quot;value&quot;: &quot;new_dag_name&quot;</span>
+<span class="s1">     }&#39;</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="web_interface.html" class="btn btn-neutral float-left" title="Web Interface" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="yaml_format.html" class="btn btn-neutral float-right" title="Writing DAGs" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024 Yota Hamada.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

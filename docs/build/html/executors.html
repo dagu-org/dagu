@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en">
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Executors &mdash; Dagu  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Parallel Execution" href="parallel_execution.html" />
+    <link rel="prev" title="Writing DAGs" href="yaml_format.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Dagu
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Installation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Interface</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="web_interface.html">Web Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="rest.html">REST API Documentation (v1)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Writing DAGs</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="yaml_format.html">Writing DAGs</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Executors</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#docker-executor">Docker Executor</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#execute-an-image">Execute an Image</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#execute-commands-in-existing-containers">Execute Commands in Existing Containers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#use-host-s-docker-environment">Use Host’s Docker Environment</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#http-executor">HTTP Executor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mail-executor">Mail Executor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#ssh-executor">SSH Executor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#json-executor">JSON Executor</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#formatting-json">Formatting JSON</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#querying-data">Querying data</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="parallel_execution.html">Parallel Execution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="base_config.html">Base Configuration for all DAGs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="special_env.html">Special Environment Variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="schema.html">Schema Reference</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Configuration</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="config.html">Configurations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config_remote.html">Remote Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scheduler.html">Scheduler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="email.html">Email Notifications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auth.html">Basic Authentication</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_token.html">API Token</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Container Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="docker.html">Building Docker Image</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docker-compose.html">Using Docker Compose</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contrib.html">Contribution Guide</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Dagu</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Executors</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/executors.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="executors">
+<span id="id1"></span><h1>Executors<a class="headerlink" href="#executors" title="Permalink to this heading"></a></h1>
+<nav class="contents local" id="contents">
+<ul class="simple">
+<li><p><a class="reference internal" href="#docker-executor" id="id4">Docker Executor</a></p>
+<ul>
+<li><p><a class="reference internal" href="#execute-an-image" id="id5">Execute an Image</a></p></li>
+<li><p><a class="reference internal" href="#execute-commands-in-existing-containers" id="id6">Execute Commands in Existing Containers</a></p></li>
+<li><p><a class="reference internal" href="#use-host-s-docker-environment" id="id7">Use Host’s Docker Environment</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#http-executor" id="id8">HTTP Executor</a></p></li>
+<li><p><a class="reference internal" href="#mail-executor" id="id9">Mail Executor</a></p></li>
+<li><p><a class="reference internal" href="#ssh-executor" id="id10">SSH Executor</a></p></li>
+<li><p><a class="reference internal" href="#json-executor" id="id11">JSON Executor</a></p>
+<ul>
+<li><p><a class="reference internal" href="#formatting-json" id="id12">Formatting JSON</a></p></li>
+<li><p><a class="reference internal" href="#querying-data" id="id13">Querying data</a></p></li>
+</ul>
+</li>
+</ul>
+</nav>
+<p>Executors are specialized modules for handling different types of tasks, including <code class="code docutils literal notranslate"><span class="pre">docker</span></code>, <code class="code docutils literal notranslate"><span class="pre">http</span></code>, <code class="code docutils literal notranslate"><span class="pre">mail</span></code>, <code class="code docutils literal notranslate"><span class="pre">ssh</span></code>, and <code class="code docutils literal notranslate"><span class="pre">jq</span></code> (JSON) executors. Contributions of new <a class="reference external" href="https://github.com/dagu-org/dagu/tree/main/internal/dag/executor">executors</a> are very welcome.</p>
+<section id="docker-executor">
+<span id="id3"></span><h2><a class="toc-backref" href="#id4" role="doc-backlink">Docker Executor</a><a class="headerlink" href="#docker-executor" title="Permalink to this heading"></a></h2>
+<section id="execute-an-image">
+<h3><a class="toc-backref" href="#id5" role="doc-backlink">Execute an Image</a><a class="headerlink" href="#execute-an-image" title="Permalink to this heading"></a></h3>
+<p><em>Note: It requires Docker daemon running on the host.</em></p>
+<p>The <cite>docker</cite> executor allows us to run Docker containers instead of bare commands. This can be useful for running commands in isolated environments or for reproducibility purposes.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hello</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docker</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">alpine</span>
+<span class="w">        </span><span class="nt">autoRemove</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;hello&quot;</span>
+</pre></div>
+</div>
+<p>Example Log output:</p>
+<img alt="https://raw.githubusercontent.com/dagu-org/dagu/main/examples/images/docker.png" src="https://raw.githubusercontent.com/dagu-org/dagu/main/examples/images/docker.png" />
+<p>By default, Dagu will try to pull the Docker image. For images built locally this will fail. If you want to skip image pull, pass <code class="code docutils literal notranslate"><span class="pre">pull:</span> <span class="pre">false</span></code> in executor config.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hello</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docker</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">alpine</span>
+<span class="w">        </span><span class="nt">pull</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">never</span>
+<span class="w">        </span><span class="nt">autoRemove</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;hello&quot;</span>
+</pre></div>
+</div>
+<p>You can config the Docker container (e.g., <cite>volumes</cite>, <cite>env</cite>, etc) by passing more detailed options.</p>
+<p>For example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hello</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docker</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">alpine</span>
+<span class="w">        </span><span class="nt">pull</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">never</span>
+<span class="w">        </span><span class="nt">host</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">binds</span><span class="p">:</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/app:/app</span>
+<span class="w">        </span><span class="nt">container</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">env</span><span class="p">:</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FOO=BAR</span>
+<span class="w">        </span><span class="nt">autoRemove</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;${FOO}&quot;</span>
+</pre></div>
+</div>
+<p>The container’s network can be configured as well.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hello</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docker</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">alpine</span>
+<span class="w">        </span><span class="nt">pull</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">never</span>
+<span class="w">        </span><span class="nt">network</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">EndpointsConfig</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">my-network</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">Aliases</span><span class="p">:</span>
+<span class="w">                </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-alias</span>
+<span class="w">        </span><span class="nt">autoRemove</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;hello&quot;</span>
+</pre></div>
+</div>
+<p>Note that the environment variables of the host (where <cite>dagu</cite> is running) will not be passed to <cite>docker</cite> executor automatically but you can explicitly tell <cite>dagu</cite> to pass the environment like below example. This is particularly useful when combining with <cite>dotenv</cite>.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">env</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">TEST_ENV</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test_value</span>
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hello</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docker</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">alpine</span>
+<span class="w">        </span><span class="nt">pull</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">never</span>
+<span class="w">        </span><span class="nt">container</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">env</span><span class="p">:</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TEST_ENV=${TEST_ENV}</span>
+<span class="w">        </span><span class="nt">autoRemove</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">printenv</span>
+</pre></div>
+</div>
+<p>Available creating container configuration options:</p>
+<ul class="simple">
+<li><p><cite>image</cite>: Name or ID of the image to create the container (required)</p></li>
+<li><p><cite>containerName</cite>: Name of the newly created container (optional)</p></li>
+<li><p><cite>pull</cite>:
+- <cite>always</cite>: Always pull the image from the internet
+- <cite>missing</cite>: Only pull the image if it is not available locally (default)
+- <cite>never</cite>: Never pull any image
+- <cite>true</cite>: Same effect as <cite>always</cite> and only kept for backward compatibility.
+- <cite>false</cite>: Same effect as <cite>never</cite> and only kept for backward compatibility.</p></li>
+<li><p><cite>platform</cite>: Create and run a container on specific platform, default to the platform of the current docker host</p></li>
+</ul>
+<p>For further customizing the newly created container, check the Docker’s API document:</p>
+<ul class="simple">
+<li><p>For <cite>container</cite>, see <a class="reference external" href="https://pkg.go.dev/github.com/docker/docker/api/types/container#Config">ContainerConfig</a>.</p></li>
+<li><p>For <cite>host</cite>, see <a class="reference external" href="https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig">HostConfig</a>.</p></li>
+<li><p>For <cite>network</cite>, see <a class="reference external" href="https://pkg.go.dev/github.com/docker/docker/api/types/network#NetworkingConfig">NetworkingConfig</a>.</p></li>
+</ul>
+</section>
+<section id="execute-commands-in-existing-containers">
+<h3><a class="toc-backref" href="#id6" role="doc-backlink">Execute Commands in Existing Containers</a><a class="headerlink" href="#execute-commands-in-existing-containers" title="Permalink to this heading"></a></h3>
+<p>The Docker executor also supports executing commands in already-running containers using Docker’s exec functionality, similar to <cite>docker exec</cite>. This is useful when you need to run commands in containers that are already running as part of your infrastructure.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">exec-in-existing</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docker</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">containerName</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my-running-container&quot;</span><span class="w">  </span><span class="c1"># Name of existing container</span>
+<span class="w">        </span><span class="nt">autoRemove</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">        </span><span class="nt">exec</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">root</span><span class="w">          </span><span class="c1"># Optional: user to run as</span>
+<span class="w">          </span><span class="nt">workingDir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/app</span><span class="w">   </span><span class="c1"># Optional: working directory</span>
+<span class="w">          </span><span class="nt">env</span><span class="p">:</span><span class="w">               </span><span class="c1"># Optional: environment variables</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MY_VAR=value</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;Hello from existing container&quot;</span>
+</pre></div>
+</div>
+<p>Available exec configuration options:</p>
+<ul class="simple">
+<li><p><cite>containerName</cite>: Name or ID of the existing container (required)</p></li>
+<li><dl class="simple">
+<dt><cite>exec</cite>:</dt><dd><ul>
+<li><p><cite>user</cite>: Username or UID to execute command as (optional)</p></li>
+<li><p><cite>workingDir</cite>: Working directory for command execution (optional)</p></li>
+<li><p><cite>env</cite>: List of environment variables (optional)</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+<p>For comparison, here’s how you would create and run in a new container:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">create-new</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docker</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">alpine:latest</span>
+<span class="w">        </span><span class="nt">autoRemove</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;Hello from new container&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="use-host-s-docker-environment">
+<h3><a class="toc-backref" href="#id7" role="doc-backlink">Use Host’s Docker Environment</a><a class="headerlink" href="#use-host-s-docker-environment" title="Permalink to this heading"></a></h3>
+<p>If you are running <cite>dagu</cite> using a container, there are two options to use the host’s Docker environment.</p>
+<ol class="arabic simple">
+<li><p>Mount the Docker socket to the container and pass through the host’s docker group id. See the example in <a class="reference internal" href="docker-compose.html#using-docker-compose"><span class="std std-ref">Using Docker Compose</span></a></p></li>
+</ol>
+<p>Or</p>
+<ol class="arabic simple">
+<li><p>Run a <cite>socat</cite> container with the command below.</p></li>
+</ol>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>run<span class="w"> </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span>-p<span class="w"> </span><span class="m">2376</span>:2375<span class="w"> </span>bobrik/socat<span class="w"> </span>TCP4-LISTEN:2375,fork,reuseaddr<span class="w"> </span>UNIX-CONNECT:/var/run/docker.sock
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li><p>Then you can set the <cite>DOCKER_HOST</cite> environment as follows.</p></li>
+</ol>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">env</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">DOCKER_HOST </span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tcp://host.docker.internal:2376&quot;</span>
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hello</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docker</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">alpine</span>
+<span class="w">        </span><span class="nt">autoRemove</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;hello&quot;</span>
+</pre></div>
+</div>
+<p>For more details, see <a class="reference external" href="https://forums.docker.com/t/remote-api-with-docker-for-mac-beta/15639/2">this page</a>.</p>
+</section>
+</section>
+<section id="http-executor">
+<h2><a class="toc-backref" href="#id8" role="doc-backlink">HTTP Executor</a><a class="headerlink" href="#http-executor" title="Permalink to this heading"></a></h2>
+<p>The <cite>http</cite> executor allows us to make an arbitrary HTTP request. This can be useful for interacting with web services or APIs.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">send POST request</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">POST https://foo.bar.com</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">        </span><span class="nt">headers</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">Authorization</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Bearer</span><span class="nv"> </span><span class="s">$TOKEN&quot;</span>
+<span class="w">        </span><span class="nt">silent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w"> </span><span class="c1"># If silent is true, it outputs response body only.</span>
+<span class="w">        </span><span class="nt">query</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;value&quot;</span>
+<span class="w">        </span><span class="nt">body</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;post</span><span class="nv"> </span><span class="s">body&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="mail-executor">
+<h2><a class="toc-backref" href="#id9" role="doc-backlink">Mail Executor</a><a class="headerlink" href="#mail-executor" title="Permalink to this heading"></a></h2>
+<p>The <cite>mail</cite> executor can be used to send email. This can be useful for sending notifications or alerts.</p>
+<p>Example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">smtp</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;smtp.foo.bar&quot;</span>
+<span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;587&quot;</span>
+<span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;username&gt;&quot;</span>
+<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;password&gt;&quot;</span>
+
+<span class="nt">params</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">RECIPIENT_NAME</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">XXX</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">RECIPIENT_EMAIL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example@company.com</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">MESSAGE</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Hello</span><span class="nv"> </span><span class="s">[RECIPIENT_NAME]&quot;</span>
+
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step1</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mail</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">to</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$RECIPIENT_EMAIL</span>
+<span class="w">        </span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dagu@dagu.com</span>
+<span class="w">        </span><span class="nt">subject</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Hello</span><span class="nv"> </span><span class="s">[RECIPIENT_NAME]&quot;</span>
+<span class="w">        </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$MESSAGE</span>
+</pre></div>
+</div>
+</section>
+<section id="ssh-executor">
+<span id="command-execution-over-ssh"></span><h2><a class="toc-backref" href="#id10" role="doc-backlink">SSH Executor</a><a class="headerlink" href="#ssh-executor" title="Permalink to this heading"></a></h2>
+<p>The <cite>ssh</cite> executor allows us to execute commands on remote hosts over SSH.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step1</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ssh</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dagu</span>
+<span class="w">        </span><span class="nt">ip</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">XXX.XXX.XXX.XXX</span>
+<span class="w">        </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">22</span>
+<span class="w">        </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/Users/dagu/.ssh/private.pem</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/usr/sbin/ifconfig</span>
+</pre></div>
+</div>
+</section>
+<section id="json-executor">
+<h2><a class="toc-backref" href="#id11" role="doc-backlink">JSON Executor</a><a class="headerlink" href="#json-executor" title="Permalink to this heading"></a></h2>
+<p>The <cite>jq</cite> executor can be used to transform, query, and format JSON. This can be useful for working with JSON data in pipelines or for data processing.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run query</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jq</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;{(.id):</span><span class="nv"> </span><span class="s">.[&quot;10&quot;].b}&#39;</span>
+<span class="w">    </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">{&quot;id&quot;: &quot;sample&quot;, &quot;10&quot;: {&quot;b&quot;: 42}}</span>
+</pre></div>
+</div>
+<p><strong>Output:</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;sample&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<section id="formatting-json">
+<h3><a class="toc-backref" href="#id12" role="doc-backlink">Formatting JSON</a><a class="headerlink" href="#formatting-json" title="Permalink to this heading"></a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">format json</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jq</span>
+<span class="w">    </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">{&quot;id&quot;: &quot;sample&quot;, &quot;10&quot;: {&quot;b&quot;: 42}}</span>
+</pre></div>
+</div>
+<p><strong>Output:</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;10&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;b&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sample&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="querying-data">
+<h3><a class="toc-backref" href="#id13" role="doc-backlink">Querying data</a><a class="headerlink" href="#querying-data" title="Permalink to this heading"></a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run query</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jq</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;{(.id):</span><span class="nv"> </span><span class="s">.[&quot;10&quot;].b}&#39;</span>
+<span class="w">    </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">{&quot;id&quot;: &quot;sample&quot;, &quot;10&quot;: {&quot;b&quot;: 42}}</span>
+</pre></div>
+</div>
+<p>Expected Output:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;sample&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="yaml_format.html" class="btn btn-neutral float-left" title="Writing DAGs" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="parallel_execution.html" class="btn btn-neutral float-right" title="Parallel Execution" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024 Yota Hamada.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

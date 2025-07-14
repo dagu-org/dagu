@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en">
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Writing DAGs &mdash; Dagu  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Executors" href="executors.html" />
+    <link rel="prev" title="REST API Documentation (v1)" href="rest.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Dagu
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Installation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Interface</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="web_interface.html">Web Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="rest.html">REST API Documentation (v1)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Writing DAGs</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Writing DAGs</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#introduction">Introduction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#core-concepts">Core Concepts</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#hello-world">Hello World</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#schema-definition">Schema Definition</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#working-directory">Working Directory</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#basic-features">Basic Features</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#environment-variables">Environment Variables</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dotenv-files">Dotenv Files</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#parameters">Parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#named-parameters">Named Parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#code-snippets">Code Snippets</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#output-handling">Output Handling</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#capture-output">Capture Output</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#redirect-output">Redirect Output</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#conditional-execution">Conditional Execution</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#precondition">Precondition</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#continue-on-failure">Continue on Failure</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#scheduling">Scheduling</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#basic-scheduling">Basic Scheduling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#skip-redundant-runs">Skip Redundant Runs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#retry-policies">Retry Policies</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#advanced-features">Advanced Features</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#running-sub-workflows">Running sub workflows</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#command-substitution">Command Substitution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#lifecycle-hooks">Lifecycle Hooks</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#repeat-steps">Repeat Steps</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#field-reference">Field Reference</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#quick-reference">Quick Reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dag-fields">DAG Fields</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#step-fields">Step Fields</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#global-configuration">Global Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="executors.html">Executors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="parallel_execution.html">Parallel Execution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="base_config.html">Base Configuration for all DAGs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="special_env.html">Special Environment Variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="schema.html">Schema Reference</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Configuration</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="config.html">Configurations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config_remote.html">Remote Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scheduler.html">Scheduler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="email.html">Email Notifications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auth.html">Basic Authentication</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_token.html">API Token</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Container Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="docker.html">Building Docker Image</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docker-compose.html">Using Docker Compose</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contrib.html">Contribution Guide</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Dagu</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Writing DAGs</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/yaml_format.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="writing-dags">
+<span id="yaml-format"></span><h1>Writing DAGs<a class="headerlink" href="#writing-dags" title="Permalink to this heading"></a></h1>
+<nav class="contents local" id="contents">
+<ul class="simple">
+<li><p><a class="reference internal" href="#introduction" id="id1">Introduction</a></p></li>
+<li><p><a class="reference internal" href="#core-concepts" id="id2">Core Concepts</a></p>
+<ul>
+<li><p><a class="reference internal" href="#hello-world" id="id3">Hello World</a></p></li>
+<li><p><a class="reference internal" href="#schema-definition" id="id4">Schema Definition</a></p></li>
+<li><p><a class="reference internal" href="#working-directory" id="id5">Working Directory</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#basic-features" id="id6">Basic Features</a></p>
+<ul>
+<li><p><a class="reference internal" href="#environment-variables" id="id7">Environment Variables</a></p></li>
+<li><p><a class="reference internal" href="#dotenv-files" id="id8">Dotenv Files</a></p></li>
+<li><p><a class="reference internal" href="#parameters" id="id9">Parameters</a></p></li>
+<li><p><a class="reference internal" href="#named-parameters" id="id10">Named Parameters</a></p></li>
+<li><p><a class="reference internal" href="#code-snippets" id="id11">Code Snippets</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#output-handling" id="id12">Output Handling</a></p>
+<ul>
+<li><p><a class="reference internal" href="#capture-output" id="id13">Capture Output</a></p></li>
+<li><p><a class="reference internal" href="#redirect-output" id="id14">Redirect Output</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#conditional-execution" id="id15">Conditional Execution</a></p>
+<ul>
+<li><p><a class="reference internal" href="#precondition" id="id16">Precondition</a></p></li>
+<li><p><a class="reference internal" href="#continue-on-failure" id="id17">Continue on Failure</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#scheduling" id="id18">Scheduling</a></p>
+<ul>
+<li><p><a class="reference internal" href="#basic-scheduling" id="id19">Basic Scheduling</a></p></li>
+<li><p><a class="reference internal" href="#skip-redundant-runs" id="id20">Skip Redundant Runs</a></p></li>
+<li><p><a class="reference internal" href="#retry-policies" id="id21">Retry Policies</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#advanced-features" id="id22">Advanced Features</a></p>
+<ul>
+<li><p><a class="reference internal" href="#running-sub-workflows" id="id23">Running sub workflows</a></p></li>
+<li><p><a class="reference internal" href="#command-substitution" id="id24">Command Substitution</a></p></li>
+<li><p><a class="reference internal" href="#lifecycle-hooks" id="id25">Lifecycle Hooks</a></p></li>
+<li><p><a class="reference internal" href="#repeat-steps" id="id26">Repeat Steps</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#field-reference" id="id27">Field Reference</a></p>
+<ul>
+<li><p><a class="reference internal" href="#quick-reference" id="id28">Quick Reference</a></p></li>
+<li><p><a class="reference internal" href="#dag-fields" id="id29">DAG Fields</a></p></li>
+<li><p><a class="reference internal" href="#step-fields" id="id30">Step Fields</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#global-configuration" id="id31">Global Configuration</a></p></li>
+</ul>
+</nav>
+<section id="introduction">
+<h2><a class="toc-backref" href="#id1" role="doc-backlink">Introduction</a><a class="headerlink" href="#introduction" title="Permalink to this heading"></a></h2>
+<p>Dagu uses YAML files to define Directed Acyclic Graphs (DAGs) for workflow orchestration. This document covers everything you need to know about writing DAG definitions, from basic usage to advanced features.</p>
+</section>
+<section id="core-concepts">
+<h2><a class="toc-backref" href="#id2" role="doc-backlink">Core Concepts</a><a class="headerlink" href="#core-concepts" title="Permalink to this heading"></a></h2>
+<p>Before diving into specific features, let’s understand the basic structure of a DAG file and how steps are defined.</p>
+<section id="hello-world">
+<h3><a class="toc-backref" href="#id3" role="doc-backlink">Hello World</a><a class="headerlink" href="#hello-world" title="Permalink to this heading"></a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">schedule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*&quot;</span><span class="w"> </span><span class="c1"># Run the DAG every minute</span>
+<span class="nt">params</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">NAME</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Dagu&quot;</span>
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Hello world</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo Hello $NAME</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Done</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo Done!</span>
+<span class="w">    </span><span class="nt">depends</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Hello world</span>
+</pre></div>
+</div>
+<p>Using pipes (<code class="docutils literal notranslate"><span class="pre">|</span></code>) in commands:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Hello world with pipe</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo hello world | xargs echo</span>
+</pre></div>
+</div>
+<p>Specifying a shell:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Hello world with shell</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo hello world | xargs echo</span>
+<span class="w">    </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span>
+</pre></div>
+</div>
+<p>Running a script:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Hello world with script</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span>
+<span class="w">    </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">echo hello world</span>
+<span class="w">      </span><span class="no">echo goodbye world</span>
+</pre></div>
+</div>
+<p>Multiple dependencies:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step 1</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo hello</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step 2</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo world</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step 3</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo hello world</span>
+<span class="w">    </span><span class="nt">depends</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step 1</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step 2</span>
+</pre></div>
+</div>
+<p>Define steps as map:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">step1</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo hello</span>
+<span class="w">  </span><span class="nt">step2</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo world</span>
+<span class="w">  </span><span class="nt">step3</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo hello world</span>
+<span class="w">    </span><span class="nt">depends</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step1</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step2</span>
+</pre></div>
+</div>
+</section>
+<section id="schema-definition">
+<h3><a class="toc-backref" href="#id4" role="doc-backlink">Schema Definition</a><a class="headerlink" href="#schema-definition" title="Permalink to this heading"></a></h3>
+<p>We provide a JSON schema to validate DAG files and enable IDE auto-completion:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># yaml-language-server: $schema=https://raw.githubusercontent.com/dagu-org/dagu/main/schemas/dag.schema.json</span>
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step 1</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo hello</span>
+</pre></div>
+</div>
+<p>The schema is available at <a class="reference external" href="https://github.com/dagu-org/dagu/blob/main/schemas/dag.schema.json">dag.schema.json</a>.</p>
+</section>
+<section id="working-directory">
+<h3><a class="toc-backref" href="#id5" role="doc-backlink">Working Directory</a><a class="headerlink" href="#working-directory" title="Permalink to this heading"></a></h3>
+<p>Control where each step executes:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step 1</span>
+<span class="w">    </span><span class="nt">dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/working/directory</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">some command</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="basic-features">
+<h2><a class="toc-backref" href="#id6" role="doc-backlink">Basic Features</a><a class="headerlink" href="#basic-features" title="Permalink to this heading"></a></h2>
+<section id="environment-variables">
+<h3><a class="toc-backref" href="#id7" role="doc-backlink">Environment Variables</a><a class="headerlink" href="#environment-variables" title="Permalink to this heading"></a></h3>
+<p>Define variables accessible throughout the DAG:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">env</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">SOME_DIR</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${HOME}/batch</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">SOME_FILE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${SOME_DIR}/some_file</span>
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">task</span>
+<span class="w">    </span><span class="nt">dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${SOME_DIR}</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python main.py ${SOME_FILE}</span>
+</pre></div>
+</div>
+</section>
+<section id="dotenv-files">
+<h3><a class="toc-backref" href="#id8" role="doc-backlink">Dotenv Files</a><a class="headerlink" href="#dotenv-files" title="Permalink to this heading"></a></h3>
+<p>Specify candidate <code class="docutils literal notranslate"><span class="pre">.env</span></code> files to load environment variables from. By default, no env files are loaded unless explicitly specified.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">dotenv</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">.env</span><span class="w">  </span><span class="c1"># Specify a candidate dotenv file</span>
+
+<span class="c1"># Or specify multiple candidate files</span>
+<span class="nt">dotenv</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">.env</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">.env.local</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configs/.env.prod</span>
+</pre></div>
+</div>
+<p>Files can be specified as:</p>
+<ul class="simple">
+<li><p>Absolute paths</p></li>
+<li><p>Relative to the DAG file directory</p></li>
+<li><p>Relative to the base config directory</p></li>
+<li><p>Relative to the user’s home directory</p></li>
+</ul>
+</section>
+<section id="parameters">
+<h3><a class="toc-backref" href="#id9" role="doc-backlink">Parameters</a><a class="headerlink" href="#parameters" title="Permalink to this heading"></a></h3>
+<p>Define default positional parameters that can be overridden:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">params</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">param1 param2</span><span class="w">  </span><span class="c1"># Default values for $1 and $2</span>
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">parameterized task</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python main.py $1 $2</span><span class="w">      </span><span class="c1"># Will use command-line args or defaults</span>
+</pre></div>
+</div>
+</section>
+<section id="named-parameters">
+<h3><a class="toc-backref" href="#id10" role="doc-backlink">Named Parameters</a><a class="headerlink" href="#named-parameters" title="Permalink to this heading"></a></h3>
+<p>Define default named parameters that can be overridden:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">params</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">FOO</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span><span class="w">           </span><span class="c1"># Default value for ${FOO}</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">BAR</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;`echo</span><span class="nv"> </span><span class="s">2`&quot;</span><span class="w">  </span><span class="c1"># Default value for ${BAR}, using command substitution</span>
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">named params task</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python main.py ${FOO} ${BAR}</span><span class="w">  </span><span class="c1"># Will use command-line args or defaults</span>
+</pre></div>
+</div>
+</section>
+<section id="code-snippets">
+<h3><a class="toc-backref" href="#id11" role="doc-backlink">Code Snippets</a><a class="headerlink" href="#code-snippets" title="Permalink to this heading"></a></h3>
+<p>Run shell script with <cite>$SHELL</cite>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">script step</span>
+<span class="w">    </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">cd /tmp</span>
+<span class="w">      </span><span class="no">echo &quot;hello world&quot; &gt; hello</span>
+<span class="w">      </span><span class="no">cat hello</span>
+</pre></div>
+</div>
+<p>You can run arbitrary script with the <cite>script</cite> field. The script will be executed with the program specified in the <cite>command</cite> field. If <cite>command</cite> is not specified, the default shell will be used.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">script step</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python</span>
+<span class="w">    </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">import os</span>
+<span class="w">      </span><span class="no">print(os.getcwd())</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="output-handling">
+<h2><a class="toc-backref" href="#id12" role="doc-backlink">Output Handling</a><a class="headerlink" href="#output-handling" title="Permalink to this heading"></a></h2>
+<section id="capture-output">
+<h3><a class="toc-backref" href="#id13" role="doc-backlink">Capture Output</a><a class="headerlink" href="#capture-output" title="Permalink to this heading"></a></h3>
+<p>Store command output in variables:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">capture</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;echo</span><span class="nv"> </span><span class="s">foo&quot;</span>
+<span class="w">    </span><span class="nt">output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FOO</span><span class="w">  </span><span class="c1"># Will contain &quot;foo&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="redirect-output">
+<h3><a class="toc-backref" href="#id14" role="doc-backlink">Redirect Output</a><a class="headerlink" href="#redirect-output" title="Permalink to this heading"></a></h3>
+<p>Send output to files:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">redirect stdout</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;echo</span><span class="nv"> </span><span class="s">hello&quot;</span>
+<span class="w">    </span><span class="nt">stdout</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/tmp/hello&quot;</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">redirect stderr</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;echo</span><span class="nv"> </span><span class="s">error</span><span class="nv"> </span><span class="s">message</span><span class="nv"> </span><span class="s">&gt;&amp;2&quot;</span>
+<span class="w">    </span><span class="nt">stderr</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/tmp/error.txt&quot;</span>
+</pre></div>
+</div>
+<p>You can use JSON references in fields to dynamically expand values from variables. JSON references are denoted using the <code class="docutils literal notranslate"><span class="pre">${NAME.path.to.value}</span></code> syntax, where <code class="docutils literal notranslate"><span class="pre">NAME</span></code> refers to a variable name and <code class="docutils literal notranslate"><span class="pre">path.to.value</span></code> specifies the path in the JSON to resolve. If the data is not JSON format, the value will not be expanded.</p>
+<p>Examples:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">child DAG</span>
+<span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sub_workflow</span>
+<span class="w">    </span><span class="nt">output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SUB_RESULT</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">use output</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;The result is ${SUB_RESULT.outputs.finalValue}&quot;</span>
+<span class="w">    </span><span class="nt">depends</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sub workflow</span>
+</pre></div>
+</div>
+<p>If <code class="docutils literal notranslate"><span class="pre">SUB_RESULT</span></code> contains:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;outputs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;finalValue&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;success&quot;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Then the expanded value of <code class="docutils literal notranslate"><span class="pre">${SUB_RESULT.outputs.finalValue}</span></code> will be <code class="docutils literal notranslate"><span class="pre">success</span></code>.</p>
+</section>
+</section>
+<section id="conditional-execution">
+<h2><a class="toc-backref" href="#id15" role="doc-backlink">Conditional Execution</a><a class="headerlink" href="#conditional-execution" title="Permalink to this heading"></a></h2>
+<section id="precondition">
+<h3><a class="toc-backref" href="#id16" role="doc-backlink">Precondition</a><a class="headerlink" href="#precondition" title="Permalink to this heading"></a></h3>
+<p>Run steps only when conditions are met:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">monthly task</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">monthly.sh</span>
+<span class="w">    </span><span class="nt">preconditions</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;test</span><span class="nv"> </span><span class="s">-f</span><span class="nv"> </span><span class="s">file.txt&quot;</span><span class="w"> </span><span class="c1"># Run only if the file exists</span>
+</pre></div>
+</div>
+<p>Use multiple conditions:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">monthly task</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">monthly.sh</span>
+<span class="w">    </span><span class="nt">preconditions</span><span class="p">:</span><span class="w"> </span><span class="c1"># Run only if all commands exit with 0</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;test</span><span class="nv"> </span><span class="s">-f</span><span class="nv"> </span><span class="s">file.txt&quot;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;test</span><span class="nv"> </span><span class="s">-d</span><span class="nv"> </span><span class="s">dir&quot;</span>
+</pre></div>
+</div>
+<p>Use environment variables in conditions:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">monthly task</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">monthly.sh</span>
+<span class="w">    </span><span class="nt">preconditions</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">condition</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${TODAY}&quot;</span><span class="w"> </span><span class="c1"># Run only if TODAY is set as &quot;01&quot;</span>
+<span class="w">        </span><span class="nt">expected</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;01&quot;</span>
+</pre></div>
+</div>
+<p>Use command substitution in conditions:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">monthly task</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">monthly.sh</span>
+<span class="w">    </span><span class="nt">preconditions</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">condition</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;`date</span><span class="nv"> </span><span class="s">&#39;+%d&#39;`&quot;</span>
+<span class="w">        </span><span class="nt">expected</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;01&quot;</span>
+</pre></div>
+</div>
+<p>Use regex in conditions:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">monthly task</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">monthly.sh</span>
+<span class="w">    </span><span class="nt">preconditions</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">condition</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;`date</span><span class="nv"> </span><span class="s">&#39;+%d&#39;`&quot;</span>
+<span class="w">        </span><span class="nt">expected</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;re:0[1-9]&quot;</span><span class="w"> </span><span class="c1"># Run only if the day is between 01 and 09</span>
+</pre></div>
+</div>
+</section>
+<section id="continue-on-failure">
+<h3><a class="toc-backref" href="#id17" role="doc-backlink">Continue on Failure</a><a class="headerlink" href="#continue-on-failure" title="Permalink to this heading"></a></h3>
+<p>Continue to the next step even if the current step fails:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">optional task</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">task.sh</span>
+<span class="w">    </span><span class="nt">continueOn</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</pre></div>
+</div>
+<p>Continue to the next step even if the current step skipped by preconditions:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">optional task</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">task.sh</span>
+<span class="w">    </span><span class="nt">preconditions</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">condition</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;`date</span><span class="nv"> </span><span class="s">&#39;+%d&#39;`&quot;</span>
+<span class="w">        </span><span class="nt">expected</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;01&quot;</span>
+<span class="w">    </span><span class="nt">continueOn</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">skipped</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</pre></div>
+</div>
+<p>Based on exit code:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">optional task</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">task.sh</span>
+<span class="w">    </span><span class="nt">continueOn</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">exitCode</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">1</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">2</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="c1"># Continue if exit code is 1 or 2</span>
+</pre></div>
+</div>
+<p>Based on output:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">optional task</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">task.sh</span>
+<span class="w">    </span><span class="nt">continueOn</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">output</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;error&quot;</span><span class="w"> </span><span class="c1"># Continue if output (stdout or stderr) contains &quot;error&quot;</span>
+</pre></div>
+</div>
+<p>Use regular expressions:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">optional task</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">task.sh</span>
+<span class="w">    </span><span class="nt">continueOn</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">output</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;re:SUCCE.*&quot;</span><span class="w"> </span><span class="c1"># Continue if output (stdout or stderr) matches &quot;SUCCE.*&quot;</span>
+</pre></div>
+</div>
+<p>Multiple output conditions:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">optional task</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">task.sh</span>
+<span class="w">    </span><span class="nt">continueOn</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">output</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;complete&quot;</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;re:SUCCE.*&quot;</span>
+</pre></div>
+</div>
+<p>Mark as Success even if the step fails but continue to the next step:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">optional task</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">task.sh</span>
+<span class="w">    </span><span class="nt">continueOn</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">output</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;complete&quot;</span>
+<span class="w">      </span><span class="nt">markSuccess</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w"> </span><span class="c1"># default is false</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="scheduling">
+<h2><a class="toc-backref" href="#id18" role="doc-backlink">Scheduling</a><a class="headerlink" href="#scheduling" title="Permalink to this heading"></a></h2>
+<section id="basic-scheduling">
+<h3><a class="toc-backref" href="#id19" role="doc-backlink">Basic Scheduling</a><a class="headerlink" href="#basic-scheduling" title="Permalink to this heading"></a></h3>
+<p>Use cron expressions to schedule DAGs:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">schedule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;5</span><span class="nv"> </span><span class="s">4</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*&quot;</span><span class="w">  </span><span class="c1"># Run at 04:05</span>
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">scheduled job</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">job.sh</span>
+</pre></div>
+</div>
+</section>
+<section id="skip-redundant-runs">
+<h3><a class="toc-backref" href="#id20" role="doc-backlink">Skip Redundant Runs</a><a class="headerlink" href="#skip-redundant-runs" title="Permalink to this heading"></a></h3>
+<p>Prevent unnecessary executions:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Daily Data Processing</span>
+<span class="nt">schedule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0</span><span class="nv"> </span><span class="s">*/4</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*&quot;</span>
+<span class="nt">skipIfSuccessful</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">extract</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">extract_data.sh</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">transform</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">transform_data.sh</span>
+<span class="w">    </span><span class="nt">depends</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">extract</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">load</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">load_data.sh</span>
+<span class="w">    </span><span class="nt">depends</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">transform</span>
+</pre></div>
+</div>
+<p>When <code class="docutils literal notranslate"><span class="pre">skipIfSuccessful</span></code> is <code class="docutils literal notranslate"><span class="pre">true</span></code>, Dagu checks if there’s already been a successful run since the last scheduled time. If yes, it skips the execution. This is useful for:</p>
+<ul class="simple">
+<li><p>Resource-intensive tasks</p></li>
+<li><p>Data processing jobs that shouldn’t run twice</p></li>
+<li><p>Tasks that are expensive to run</p></li>
+</ul>
+<p>Note: Manual triggers always execute regardless of this setting.</p>
+<p>Example timeline:
+- Schedule: Every 4 hours (00:00, 04:00, 08:00, …)
+- At 04:00: Runs successfully
+- At 05:00: Manual trigger → Runs (manual triggers always run)
+- At 06:00: Schedule trigger → Skips (already succeeded since 04:00)
+- At 08:00: Schedule trigger → Runs (new schedule window)</p>
+</section>
+<section id="retry-policies">
+<h3><a class="toc-backref" href="#id21" role="doc-backlink">Retry Policies</a><a class="headerlink" href="#retry-policies" title="Permalink to this heading"></a></h3>
+<p>Automatically retry failed steps with configurable error codes:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">retryable task</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">main.sh</span>
+<span class="w">    </span><span class="nt">retryPolicy</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w">      </span><span class="nt">intervalSec</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<span class="w">      </span><span class="nt">exitCodes</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">1</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">2</span><span class="p p-Indicator">]</span><span class="w">  </span><span class="c1"># Optional: List of exit codes that should trigger a retry</span>
+</pre></div>
+</div>
+<p>The retry policy supports the following parameters:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">limit</span></code>: Maximum number of retry attempts (required)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">intervalSec</span></code>: Time in seconds to wait between retries (required)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">exitCodes</span></code>: List of exit codes that should trigger a retry (optional)</p></li>
+</ul>
+<p>If <code class="docutils literal notranslate"><span class="pre">exitCodes</span></code> is not specified, any non-zero exit code will trigger a retry. When <code class="docutils literal notranslate"><span class="pre">exitCodes</span></code> is specified, only the listed exit codes will trigger a retry.</p>
+<p>Example with custom error codes:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api call</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">make-api-request</span>
+<span class="w">    </span><span class="nt">retryPolicy</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w">      </span><span class="nt">intervalSec</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span>
+<span class="w">      </span><span class="nt">exitCodes</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">429</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">503</span><span class="p p-Indicator">]</span><span class="w">  </span><span class="c1"># Retry on rate limit and service unavailable errors</span>
+</pre></div>
+</div>
+<p>In this example:
+- The command will be retried up to 3 times
+- There will be a 30-second wait between retries
+- Retries will only occur if the command exits with code 429 (Too Many Requests) or 503 (Service Unavailable)
+- Other error codes will cause immediate failure</p>
+</section>
+</section>
+<section id="advanced-features">
+<h2><a class="toc-backref" href="#id22" role="doc-backlink">Advanced Features</a><a class="headerlink" href="#advanced-features" title="Permalink to this heading"></a></h2>
+<section id="running-sub-workflows">
+<h3><a class="toc-backref" href="#id23" role="doc-backlink">Running sub workflows</a><a class="headerlink" href="#running-sub-workflows" title="Permalink to this heading"></a></h3>
+<p>Organize complex workflows using sub workflow:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sub workflow</span>
+<span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sub_workflow</span>
+<span class="w">    </span><span class="nt">params</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;FOO=BAR&quot;</span>
+</pre></div>
+</div>
+<p>The result of the sub workflow will be available from the standard output of the sub workflow in JSON format.</p>
+<p>Example:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="nt">&quot;sub_workflow&quot;</span>
+<span class="w">  </span><span class="nt">&quot;params&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;FOO=BAR&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;outputs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;RESULT&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ok&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>You can access the output of the sub workflow using the <cite>output</cite> field:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sub workflow</span>
+<span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sub_workflow</span>
+<span class="w">    </span><span class="nt">params</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;FOO=BAR&quot;</span>
+<span class="w">    </span><span class="nt">output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SUB_RESULT</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">use sub workflow output</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo $SUB_RESULT</span>
+<span class="w">    </span><span class="nt">depends</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sub workflow</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For executing the same child DAG multiple times with different parameters in parallel, see <a class="reference internal" href="parallel_execution.html#parallel-execution"><span class="std std-ref">Parallel Execution</span></a>.</p>
+</div>
+</section>
+<section id="command-substitution">
+<h3><a class="toc-backref" href="#id24" role="doc-backlink">Command Substitution</a><a class="headerlink" href="#command-substitution" title="Permalink to this heading"></a></h3>
+<p>Use command output in configurations:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">env</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">TODAY</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;`date</span><span class="nv"> </span><span class="s">&#39;+%Y%m%d&#39;`&quot;</span>
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">use date</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;echo</span><span class="nv"> </span><span class="s">hello,</span><span class="nv"> </span><span class="s">today</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">${TODAY}&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="lifecycle-hooks">
+<h3><a class="toc-backref" href="#id25" role="doc-backlink">Lifecycle Hooks</a><a class="headerlink" href="#lifecycle-hooks" title="Permalink to this heading"></a></h3>
+<p>React to DAG state changes:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">handlerOn</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">success</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;succeeded!&quot;</span>
+<span class="w">  </span><span class="nt">cancel</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;cancelled!&quot;</span>
+<span class="w">  </span><span class="nt">failure</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;failed!&quot;</span>
+<span class="w">  </span><span class="nt">exit</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;exited!&quot;</span>
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">main task</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo hello</span>
+</pre></div>
+</div>
+</section>
+<section id="repeat-steps">
+<h3><a class="toc-backref" href="#id26" role="doc-backlink">Repeat Steps</a><a class="headerlink" href="#repeat-steps" title="Permalink to this heading"></a></h3>
+<p>Execute steps periodically:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">repeating task</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">main.sh</span>
+<span class="w">    </span><span class="nt">repeatPolicy</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">repeat</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">      </span><span class="nt">intervalSec</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="field-reference">
+<h2><a class="toc-backref" href="#id27" role="doc-backlink">Field Reference</a><a class="headerlink" href="#field-reference" title="Permalink to this heading"></a></h2>
+<section id="quick-reference">
+<h3><a class="toc-backref" href="#id28" role="doc-backlink">Quick Reference</a><a class="headerlink" href="#quick-reference" title="Permalink to this heading"></a></h3>
+<p>Common fields you’ll use most often:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">name</span></code>: DAG name</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">schedule</span></code>: Cron schedule</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">steps</span></code>: Task definitions</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">depends</span></code>: Step dependencies</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">skipIfSuccessful</span></code>: Skip redundant runs</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">env</span></code>: Environment variables</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">retryPolicy</span></code>: Retry configuration</p></li>
+</ul>
+</section>
+<section id="dag-fields">
+<h3><a class="toc-backref" href="#id29" role="doc-backlink">DAG Fields</a><a class="headerlink" href="#dag-fields" title="Permalink to this heading"></a></h3>
+<p>Complete list of DAG-level configuration options:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">name</span></code>: The name of the DAG (optional, defaults to filename)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">description</span></code>: Brief description of the DAG</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">schedule</span></code>: Cron expression for scheduling</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">skipIfSuccessful</span></code>: Skip if already succeeded since last schedule time (default: false)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">group</span></code>: Optional grouping for organization</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tags</span></code>: Comma-separated categorization tags</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">env</span></code>: Environment variables</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">logDir</span></code>: Output directory (default: ${HOME}/.local/share/logs)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">restartWaitSec</span></code>: Seconds to wait before restart</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">histRetentionDays</span></code>: Days to keep execution history</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">timeoutSec</span></code>: DAG timeout in seconds</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">delaySec</span></code>: Delay between steps</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">maxActiveSteps</span></code>: Maximum parallel steps (default: no limit)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">maxActiveRuns</span></code>: Maximum parallel workflows (default: 1)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">params</span></code>: Default parameters</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">precondition</span></code>: DAG-level conditions</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mailOn</span></code>: Email notification settings</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">MaxCleanUpTimeSec</span></code>: Cleanup timeout</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">handlerOn</span></code>: Lifecycle event handlers</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">steps</span></code>: List of steps to execute</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">smtp</span></code>: SMTP settings</p></li>
+</ul>
+<p>Example DAG configuration:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DAG name</span>
+<span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run a DAG</span>
+<span class="nt">schedule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*&quot;</span>
+<span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DailyJobs</span>
+<span class="nt">tags</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example</span>
+<span class="nt">env</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">LOG_DIR</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${HOME}/logs</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">PATH</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/usr/local/bin:${PATH}</span>
+<span class="nt">logDir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${LOG_DIR}</span>
+<span class="nt">restartWaitSec</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span>
+<span class="nt">histRetentionDays</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="nt">timeoutSec</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3600</span>
+<span class="nt">delaySec</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="nt">maxActiveSteps</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="nt">params</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">param1 param2</span>
+<span class="nt">precondition</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">condition</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;`echo</span><span class="nv"> </span><span class="s">$2`&quot;</span>
+<span class="w">    </span><span class="nt">expected</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;param2&quot;</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;test</span><span class="nv"> </span><span class="s">-f</span><span class="nv"> </span><span class="s">file.txt&quot;</span>
+<span class="nt">mailOn</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">success</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">MaxCleanUpTimeSec</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">300</span>
+<span class="nt">handlerOn</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">success</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;succeed&quot;</span>
+<span class="w">  </span><span class="nt">failure</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;failed&quot;</span>
+<span class="w">  </span><span class="nt">cancel</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;canceled&quot;</span>
+<span class="w">  </span><span class="nt">exit</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;finished&quot;</span>
+<span class="nt">smtp</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;smtp.foo.bar&quot;</span>
+<span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;587&quot;</span>
+<span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;username&gt;&quot;</span>
+<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;password&gt;&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="step-fields">
+<h3><a class="toc-backref" href="#id30" role="doc-backlink">Step Fields</a><a class="headerlink" href="#step-fields" title="Permalink to this heading"></a></h3>
+<p>Configuration options available for individual steps:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">name</span></code>: Step name (required)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">description</span></code>: Step description</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dir</span></code>: Working directory</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">command</span></code>: Command to execute</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">stdout</span></code>: Standard output file</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">output</span></code>: Output variable name</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">script</span></code>: Inline script content</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">signalOnStop</span></code>: Stop signal (e.g., SIGINT)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mailOn</span></code>: Step-level notifications</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">continueOn</span></code>: Failure handling</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">retryPolicy</span></code>: Retry configuration</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">repeatPolicy</span></code>: Repeat configuration</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">preconditions</span></code>: Step conditions</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">depends</span></code>: Dependencies</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">run</span></code>: Sub workflow name</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">params</span></code>: Sub workflow parameters</p></li>
+</ul>
+<p>Example step configuration:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">complete example</span>
+<span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">demonstrates all fields</span>
+<span class="w">    </span><span class="nt">dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${HOME}/logs</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span>
+<span class="w">    </span><span class="nt">stdout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/tmp/outfile</span>
+<span class="w">    </span><span class="nt">output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RESULT_VARIABLE</span>
+<span class="w">    </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">echo &quot;any script&quot;</span>
+<span class="w">    </span><span class="nt">signalOnStop</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;SIGINT&quot;</span>
+<span class="w">    </span><span class="nt">mailOn</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">      </span><span class="nt">success</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">continueOn</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">      </span><span class="nt">skipped</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">      </span><span class="nt">exitCode</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">1</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">2</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">markSuccess</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">retryPolicy</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="w">      </span><span class="nt">intervalSec</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<span class="w">    </span><span class="nt">repeatPolicy</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">repeat</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">      </span><span class="nt">intervalSec</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span>
+<span class="w">    </span><span class="nt">preconditions</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">condition</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;`echo</span><span class="nv"> </span><span class="s">$1`&quot;</span>
+<span class="w">        </span><span class="nt">expected</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;param1&quot;</span>
+<span class="w">    </span><span class="nt">depends</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">other_step_name</span>
+<span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sub_dag</span>
+<span class="w">    </span><span class="nt">params</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;FOO=BAR&quot;</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="global-configuration">
+<h2><a class="toc-backref" href="#id31" role="doc-backlink">Global Configuration</a><a class="headerlink" href="#global-configuration" title="Permalink to this heading"></a></h2>
+<p>Common settings can be shared using <code class="docutils literal notranslate"><span class="pre">$HOME/.config/dagu/base.yaml</span></code>. This is useful for setting default values for:
+- <code class="docutils literal notranslate"><span class="pre">logDir</span></code>
+- <code class="docutils literal notranslate"><span class="pre">env</span></code>
+- Email settings
+- Other organizational defaults</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="rest.html" class="btn btn-neutral float-left" title="REST API Documentation (v1)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="executors.html" class="btn btn-neutral float-right" title="Executors" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024 Yota Hamada.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

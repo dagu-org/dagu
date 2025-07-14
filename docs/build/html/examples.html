@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en">
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Examples &mdash; Dagu  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Special Environment Variables" href="special_env.html" />
+    <link rel="prev" title="Base Configuration for all DAGs" href="base_config.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Dagu
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Installation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Interface</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="web_interface.html">Web Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="rest.html">REST API Documentation (v1)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Writing DAGs</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="yaml_format.html">Writing DAGs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="executors.html">Executors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="parallel_execution.html">Parallel Execution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="base_config.html">Base Configuration for all DAGs</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#hello-world">Hello World</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#conditional-steps">Conditional Steps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#file-output">File Output</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#passing-output-to-next-step">Passing Output to Next Step</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#running-a-docker-container">Running a Docker Container</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#sending-http-requests">Sending HTTP Requests</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#querying-json-data-with-jq">Querying JSON Data with jq</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#formatting-json-data-with-jq">Formatting JSON Data with jq</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#outputting-raw-values-with-jq">Outputting Raw Values with jq</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#sending-email-notifications">Sending Email Notifications</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#sending-email">Sending Email</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#sending-email-with-attachments">Sending Email with Attachments</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#customizing-signal-handling-on-stop">Customizing Signal Handling on Stop</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#advanced-step-repetition-repeatpolicy">Advanced Step Repetition (repeatPolicy)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#parallel-execution">Parallel Execution</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="special_env.html">Special Environment Variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="schema.html">Schema Reference</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Configuration</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="config.html">Configurations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config_remote.html">Remote Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scheduler.html">Scheduler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="email.html">Email Notifications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auth.html">Basic Authentication</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_token.html">API Token</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Container Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="docker.html">Building Docker Image</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docker-compose.html">Using Docker Compose</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contrib.html">Contribution Guide</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Dagu</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Examples</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/examples.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="examples">
+<span id="id1"></span><h1>Examples<a class="headerlink" href="#examples" title="Permalink to this heading"></a></h1>
+<nav class="contents local" id="contents">
+<ul class="simple">
+<li><p><a class="reference internal" href="#hello-world" id="id2">Hello World</a></p></li>
+<li><p><a class="reference internal" href="#conditional-steps" id="id3">Conditional Steps</a></p></li>
+<li><p><a class="reference internal" href="#file-output" id="id4">File Output</a></p></li>
+<li><p><a class="reference internal" href="#passing-output-to-next-step" id="id5">Passing Output to Next Step</a></p></li>
+<li><p><a class="reference internal" href="#running-a-docker-container" id="id6">Running a Docker Container</a></p></li>
+<li><p><a class="reference internal" href="#sending-http-requests" id="id7">Sending HTTP Requests</a></p></li>
+<li><p><a class="reference internal" href="#querying-json-data-with-jq" id="id8">Querying JSON Data with jq</a></p></li>
+<li><p><a class="reference internal" href="#formatting-json-data-with-jq" id="id9">Formatting JSON Data with jq</a></p></li>
+<li><p><a class="reference internal" href="#outputting-raw-values-with-jq" id="id10">Outputting Raw Values with jq</a></p></li>
+<li><p><a class="reference internal" href="#sending-email-notifications" id="id11">Sending Email Notifications</a></p></li>
+<li><p><a class="reference internal" href="#sending-email" id="id12">Sending Email</a></p></li>
+<li><p><a class="reference internal" href="#sending-email-with-attachments" id="id13">Sending Email with Attachments</a></p></li>
+<li><p><a class="reference internal" href="#customizing-signal-handling-on-stop" id="id14">Customizing Signal Handling on Stop</a></p></li>
+<li><p><a class="reference internal" href="#advanced-step-repetition-repeatpolicy" id="id15">Advanced Step Repetition (repeatPolicy)</a></p></li>
+<li><p><a class="reference internal" href="#parallel-execution" id="id16">Parallel Execution</a></p></li>
+</ul>
+</nav>
+<section id="hello-world">
+<h2><a class="toc-backref" href="#id2" role="doc-backlink">Hello World</a><a class="headerlink" href="#hello-world" title="Permalink to this heading"></a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">params</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">NAME</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Dagu&quot;</span>
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Hello world</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo Hello $NAME</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Done</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo Done!</span>
+<span class="w">    </span><span class="nt">depends</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Hello world</span>
+</pre></div>
+</div>
+</section>
+<section id="conditional-steps">
+<h2><a class="toc-backref" href="#id3" role="doc-backlink">Conditional Steps</a><a class="headerlink" href="#conditional-steps" title="Permalink to this heading"></a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">params</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">foo</span>
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step1</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo start</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">foo</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo foo</span>
+<span class="w">    </span><span class="nt">depends</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step1</span>
+<span class="w">    </span><span class="nt">preconditions</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">condition</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;$1&quot;</span>
+<span class="w">        </span><span class="nt">expected</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">foo</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bar</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo bar</span>
+<span class="w">    </span><span class="nt">depends</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step1</span>
+<span class="w">    </span><span class="nt">preconditions</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">condition</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;$1&quot;</span>
+<span class="w">        </span><span class="nt">expected</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bar</span>
+</pre></div>
+</div>
+<img alt="https://raw.githubusercontent.com/dagu-org/dagu/main/examples/images/conditional.png" src="https://raw.githubusercontent.com/dagu-org/dagu/main/examples/images/conditional.png" />
+</section>
+<section id="file-output">
+<h2><a class="toc-backref" href="#id4" role="doc-backlink">File Output</a><a class="headerlink" href="#file-output" title="Permalink to this heading"></a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write hello to &#39;/tmp/hello.txt&#39;</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo hello</span>
+<span class="w">    </span><span class="nt">stdout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/tmp/hello.txt</span>
+</pre></div>
+</div>
+</section>
+<section id="passing-output-to-next-step">
+<h2><a class="toc-backref" href="#id5" role="doc-backlink">Passing Output to Next Step</a><a class="headerlink" href="#passing-output-to-next-step" title="Permalink to this heading"></a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pass &#39;hello&#39;</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo hello</span>
+<span class="w">    </span><span class="nt">output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">OUT1</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">output &#39;hello world&#39;</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span>
+<span class="w">    </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">echo $OUT1 world</span>
+<span class="w">    </span><span class="nt">depends</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pass &#39;hello&#39;</span>
+</pre></div>
+</div>
+</section>
+<section id="running-a-docker-container">
+<h2><a class="toc-backref" href="#id6" role="doc-backlink">Running a Docker Container</a><a class="headerlink" href="#running-a-docker-container" title="Permalink to this heading"></a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deno_hello_world</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docker</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;denoland/deno:latest&quot;</span>
+<span class="w">        </span><span class="nt">autoRemove</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run https://docs.deno.com/examples/scripts/hello_world.ts</span>
+</pre></div>
+</div>
+<p>See <a class="reference internal" href="executors.html#docker-executor"><span class="std std-ref">Docker Executor</span></a> for more details.</p>
+</section>
+<section id="sending-http-requests">
+<h2><a class="toc-backref" href="#id7" role="doc-backlink">Sending HTTP Requests</a><a class="headerlink" href="#sending-http-requests" title="Permalink to this heading"></a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">get fake json data</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GET https://jsonplaceholder.typicode.com/comments</span>
+<span class="w">    </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">{</span>
+<span class="w">        </span><span class="no">&quot;timeout&quot;: 10,</span>
+<span class="w">        </span><span class="no">&quot;headers&quot;: {},</span>
+<span class="w">        </span><span class="no">&quot;query&quot;: {</span>
+<span class="w">          </span><span class="no">&quot;postId&quot;: &quot;1&quot;</span>
+<span class="w">        </span><span class="no">},</span>
+<span class="w">        </span><span class="no">&quot;body&quot;: &quot;&quot;</span>
+<span class="w">      </span><span class="no">}</span>
+</pre></div>
+</div>
+</section>
+<section id="querying-json-data-with-jq">
+<h2><a class="toc-backref" href="#id8" role="doc-backlink">Querying JSON Data with jq</a><a class="headerlink" href="#querying-json-data-with-jq" title="Permalink to this heading"></a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run query</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jq</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;{(.id):</span><span class="nv"> </span><span class="s">.[&quot;10&quot;].b}&#39;</span>
+<span class="w">    </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">{&quot;id&quot;: &quot;sample&quot;, &quot;10&quot;: {&quot;b&quot;: 42}}</span>
+</pre></div>
+</div>
+<p>Expected Output:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;sample&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="formatting-json-data-with-jq">
+<h2><a class="toc-backref" href="#id9" role="doc-backlink">Formatting JSON Data with jq</a><a class="headerlink" href="#formatting-json-data-with-jq" title="Permalink to this heading"></a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">format json</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jq</span>
+<span class="w">    </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">{&quot;id&quot;: &quot;sample&quot;, &quot;10&quot;: {&quot;b&quot;: 42}}</span>
+</pre></div>
+</div>
+<p>Expected Output:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;10&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;b&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sample&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="outputting-raw-values-with-jq">
+<h2><a class="toc-backref" href="#id10" role="doc-backlink">Outputting Raw Values with jq</a><a class="headerlink" href="#outputting-raw-values-with-jq" title="Permalink to this heading"></a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">output raw value</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jq</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">raw</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;.id&#39;</span>
+<span class="w">    </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">{&quot;id&quot;: &quot;sample&quot;, &quot;10&quot;: {&quot;b&quot;: 42}}</span>
+</pre></div>
+</div>
+<p>Expected Output:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>sample
+</pre></div>
+</div>
+</section>
+<section id="sending-email-notifications">
+<h2><a class="toc-backref" href="#id11" role="doc-backlink">Sending Email Notifications</a><a class="headerlink" href="#sending-email-notifications" title="Permalink to this heading"></a></h2>
+<img alt="https://raw.githubusercontent.com/dagu-org/dagu/main/examples/images/email.png" src="https://raw.githubusercontent.com/dagu-org/dagu/main/examples/images/email.png" />
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Sending Email on Finish or Error</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;hello world&quot;</span>
+
+<span class="nt">mailOn</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">success</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+
+<span class="nt">smtp</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;smtp.foo.bar&quot;</span>
+<span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;587&quot;</span>
+<span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;username&gt;&quot;</span>
+<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;password&gt;&quot;</span>
+<span class="nt">errorMail</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;foo@bar.com&quot;</span>
+<span class="w">  </span><span class="nt">to</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;foo@bar.com&quot;</span>
+<span class="w">  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;[Error]&quot;</span>
+<span class="w">  </span><span class="nt">attachLogs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">infoMail</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;foo@bar.com&quot;</span>
+<span class="w">  </span><span class="nt">to</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;foo@bar.com&quot;</span>
+<span class="w">  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;[Info]&quot;</span>
+<span class="w">  </span><span class="nt">attachLogs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</pre></div>
+</div>
+</section>
+<section id="sending-email">
+<h2><a class="toc-backref" href="#id12" role="doc-backlink">Sending Email</a><a class="headerlink" href="#sending-email" title="Permalink to this heading"></a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">smtp</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;smtp.foo.bar&quot;</span>
+<span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;587&quot;</span>
+<span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;username&gt;&quot;</span>
+<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;password&gt;&quot;</span>
+
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step1</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mail</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">to</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;to address&gt;</span>
+<span class="w">        </span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;from address&gt;</span>
+<span class="w">        </span><span class="nt">subject</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Sample</span><span class="nv"> </span><span class="s">Email&quot;</span>
+<span class="w">        </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">          </span><span class="no">Hello world</span>
+</pre></div>
+</div>
+</section>
+<section id="sending-email-with-attachments">
+<h2><a class="toc-backref" href="#id13" role="doc-backlink">Sending Email with Attachments</a><a class="headerlink" href="#sending-email-with-attachments" title="Permalink to this heading"></a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">smtp</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;smtp.foo.bar&quot;</span>
+<span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;587&quot;</span>
+<span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;username&gt;&quot;</span>
+<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;password&gt;&quot;</span>
+
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step1</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mail</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">to</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;to address&gt;</span>
+<span class="w">        </span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;from address&gt;</span>
+<span class="w">        </span><span class="nt">subject</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Sample</span><span class="nv"> </span><span class="s">Email&quot;</span>
+<span class="w">        </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">          </span><span class="no">Hello world</span>
+<span class="w">        </span><span class="nt">attachments</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/tmp/email-attachment.txt</span>
+</pre></div>
+</div>
+</section>
+<section id="customizing-signal-handling-on-stop">
+<h2><a class="toc-backref" href="#id14" role="doc-backlink">Customizing Signal Handling on Stop</a><a class="headerlink" href="#customizing-signal-handling-on-stop" title="Permalink to this heading"></a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step1</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span>
+<span class="w">    </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">for s in {1..64}; do trap &quot;echo trap $s&quot; $s; done</span>
+<span class="w">      </span><span class="no">sleep 60</span>
+<span class="w">    </span><span class="nt">signalOnStop</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;SIGINT&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="advanced-step-repetition-repeatpolicy">
+<h2><a class="toc-backref" href="#id15" role="doc-backlink">Advanced Step Repetition (repeatPolicy)</a><a class="headerlink" href="#advanced-step-repetition-repeatpolicy" title="Permalink to this heading"></a></h2>
+<p>Dagu supports advanced repeat-until logic for steps using the <code class="docutils literal notranslate"><span class="pre">repeatPolicy</span></code> field. You can repeat a step until a command output matches a string or regex, or until a specific exit code is returned.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">repeat-until-string-match</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo foo</span>
+<span class="w">    </span><span class="nt">output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RESULT</span>
+<span class="w">    </span><span class="nt">repeatPolicy</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">condition</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;$RESULT&quot;</span>
+<span class="w">      </span><span class="nt">expected</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;foo&quot;</span>
+<span class="w">      </span><span class="nt">intervalSec</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">repeat-until-condition-exits-non-zero</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;checking&quot;</span>
+<span class="w">    </span><span class="nt">repeatPolicy</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">condition</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;test</span><span class="nv"> </span><span class="s">-f</span><span class="nv"> </span><span class="s">/tmp/flag&quot;</span>
+<span class="w">      </span><span class="nt">intervalSec</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">repeat-while-exitcode-matches</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test -f /tmp/flag</span>
+<span class="w">    </span><span class="nt">repeatPolicy</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">exitCode</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">intervalSec</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">repeat-forever</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &#39;hello&#39;</span>
+<span class="w">    </span><span class="nt">repeatPolicy</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">repeat</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">      </span><span class="nt">intervalSec</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">condition</span></code>: Command or expression to evaluate after each run.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">expected</span></code>: Value or regex to match the output of <code class="docutils literal notranslate"><span class="pre">condition</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">exitCode</span></code>: Integer or list of integers; repeat if the last command exits with one of these codes.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">repeat</span></code>: Boolean; if true, repeat the step unconditionally. This is equivalent to setting <code class="docutils literal notranslate"><span class="pre">condition:</span> <span class="pre">&quot;true&quot;</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">intervalSec</span></code>: Time in seconds to wait before repeating the step.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>repeatPolicy precedence and semantics (Dagu 2025.05):</strong></p>
+<ol class="arabic simple">
+<li><p>If both <code class="docutils literal notranslate"><span class="pre">condition</span></code> and <code class="docutils literal notranslate"><span class="pre">expected</span></code> are set:
+- After the step runs, evaluate <code class="docutils literal notranslate"><span class="pre">condition</span></code> (may be a shell command, env var, or expression).
+- Compare its output to <code class="docutils literal notranslate"><span class="pre">expected</span></code>. Repeat as long as the comparison does not match.</p></li>
+<li><p>If only <code class="docutils literal notranslate"><span class="pre">condition</span></code> is set (and <code class="docutils literal notranslate"><span class="pre">expected</span></code> is empty):
+- Repeat as long as <code class="docutils literal notranslate"><span class="pre">condition</span></code> (may be a shell command, env var, or expression) evaluates to exit code 0.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">exitCode</span></code> is specified (and <code class="docutils literal notranslate"><span class="pre">condition</span></code> is not set):
+- Repeat as long as the last step’s exit code matches any value in the list.</p></li>
+<li><p>If only <code class="docutils literal notranslate"><span class="pre">repeat:</span> <span class="pre">true</span></code>, repeat unconditionally at the given interval.</p></li>
+</ol>
+<p>The evaluation order is: <code class="docutils literal notranslate"><span class="pre">condition</span></code> &gt; <code class="docutils literal notranslate"><span class="pre">exitCode</span></code> &gt; <code class="docutils literal notranslate"><span class="pre">repeat</span></code>. This mirrors the <code class="docutils literal notranslate"><span class="pre">precondition</span></code> logic for consistency.</p>
+</div>
+</section>
+<section id="parallel-execution">
+<h2><a class="toc-backref" href="#id16" role="doc-backlink">Parallel Execution</a><a class="headerlink" href="#parallel-execution" title="Permalink to this heading"></a></h2>
+<p>Execute the same workflow with different parameters in parallel:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">batch-processing</span>
+
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">get-files</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ls /data/*.csv | head -10</span>
+<span class="w">    </span><span class="nt">output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FILES</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">process-files-parallel</span>
+<span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">process-csv</span>
+<span class="w">    </span><span class="nt">parallel</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${FILES}</span>
+<span class="w">    </span><span class="nt">output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RESULTS</span>
+<span class="w">    </span><span class="nt">depends</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">get-files</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">summary</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">echo &quot;Processed files:&quot;</span>
+<span class="w">      </span><span class="no">echo &quot;${RESULTS}&quot; | jq &#39;.summary&#39;</span>
+<span class="w">    </span><span class="nt">depends</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">process-files-parallel</span>
+</pre></div>
+</div>
+<p>Process multiple items with object parameters:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">multi-region-deployment</span>
+
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deploy-to-regions</span>
+<span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deploy-stack</span>
+<span class="w">    </span><span class="nt">parallel</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">items</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">REGION</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;us-east-1&quot;</span>
+<span class="w">          </span><span class="nt">STACK</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;web-app&quot;</span>
+<span class="w">          </span><span class="nt">VERSION</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;v1.2.0&quot;</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">REGION</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;eu-west-1&quot;</span>
+<span class="w">          </span><span class="nt">STACK</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;web-app&quot;</span>
+<span class="w">          </span><span class="nt">VERSION</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;v1.2.0&quot;</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">REGION</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ap-south-1&quot;</span>
+<span class="w">          </span><span class="nt">STACK</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;web-app&quot;</span>
+<span class="w">          </span><span class="nt">VERSION</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;v1.1.9&quot;</span>
+<span class="w">      </span><span class="nt">maxConcurrent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w">  </span><span class="c1"># Deploy to 2 regions at a time</span>
+<span class="w">    </span><span class="nt">output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DEPLOY_RESULTS</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verify-deployments</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">FAILED=$(echo &quot;${DEPLOY_RESULTS}&quot; | jq &#39;.summary.failed&#39;)</span>
+<span class="w">      </span><span class="no">if [ &quot;$FAILED&quot; -gt 0 ]; then</span>
+<span class="w">        </span><span class="no">echo &quot;Some deployments failed!&quot;</span>
+<span class="w">        </span><span class="no">exit 1</span>
+<span class="w">      </span><span class="no">fi</span>
+<span class="w">    </span><span class="nt">depends</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deploy-to-regions</span>
+</pre></div>
+</div>
+<p>For more details on parallel execution, see <a class="reference internal" href="parallel_execution.html#parallel-execution"><span class="std std-ref">Parallel Execution</span></a>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="base_config.html" class="btn btn-neutral float-left" title="Base Configuration for all DAGs" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="special_env.html" class="btn btn-neutral float-right" title="Special Environment Variables" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024 Yota Hamada.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

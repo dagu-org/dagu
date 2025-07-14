@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en">
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Schema Reference &mdash; Dagu  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Configurations" href="config.html" />
+    <link rel="prev" title="Special Environment Variables" href="special_env.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Dagu
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Installation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Interface</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="web_interface.html">Web Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="rest.html">REST API Documentation (v1)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Writing DAGs</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="yaml_format.html">Writing DAGs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="executors.html">Executors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="parallel_execution.html">Parallel Execution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="base_config.html">Base Configuration for all DAGs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="special_env.html">Special Environment Variables</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Schema Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#introduction">Introduction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dag-level-fields">DAG-Level Fields</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#name"><code class="docutils literal notranslate"><span class="pre">name</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#description"><code class="docutils literal notranslate"><span class="pre">description</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#schedule"><code class="docutils literal notranslate"><span class="pre">schedule</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dotenv"><code class="docutils literal notranslate"><span class="pre">dotenv</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#skipifsuccessful"><code class="docutils literal notranslate"><span class="pre">skipIfSuccessful</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#group"><code class="docutils literal notranslate"><span class="pre">group</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tags"><code class="docutils literal notranslate"><span class="pre">tags</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#env"><code class="docutils literal notranslate"><span class="pre">env</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#logdir"><code class="docutils literal notranslate"><span class="pre">logDir</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#restartwaitsec"><code class="docutils literal notranslate"><span class="pre">restartWaitSec</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#histretentiondays"><code class="docutils literal notranslate"><span class="pre">histRetentionDays</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#timeoutsec"><code class="docutils literal notranslate"><span class="pre">timeoutSec</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#delaysec"><code class="docutils literal notranslate"><span class="pre">delaySec</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#maxactivesteps"><code class="docutils literal notranslate"><span class="pre">maxActiveSteps</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#maxactiveruns"><code class="docutils literal notranslate"><span class="pre">maxActiveRuns</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#params"><code class="docutils literal notranslate"><span class="pre">params</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#precondition"><code class="docutils literal notranslate"><span class="pre">precondition</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#mailon"><code class="docutils literal notranslate"><span class="pre">mailOn</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#maxcleanuptimesec"><code class="docutils literal notranslate"><span class="pre">MaxCleanUpTimeSec</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#handleron"><code class="docutils literal notranslate"><span class="pre">handlerOn</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#steps"><code class="docutils literal notranslate"><span class="pre">steps</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#smtp"><code class="docutils literal notranslate"><span class="pre">smtp</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#step-fields">Step Fields</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id3"><code class="docutils literal notranslate"><span class="pre">name</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id4"><code class="docutils literal notranslate"><span class="pre">description</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dir"><code class="docutils literal notranslate"><span class="pre">dir</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#command"><code class="docutils literal notranslate"><span class="pre">command</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#script"><code class="docutils literal notranslate"><span class="pre">script</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#stdout"><code class="docutils literal notranslate"><span class="pre">stdout</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#stderr"><code class="docutils literal notranslate"><span class="pre">stderr</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#output"><code class="docutils literal notranslate"><span class="pre">output</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#signalonstop"><code class="docutils literal notranslate"><span class="pre">signalOnStop</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id5"><code class="docutils literal notranslate"><span class="pre">mailOn</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#continueon"><code class="docutils literal notranslate"><span class="pre">continueOn</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#retrypolicy"><code class="docutils literal notranslate"><span class="pre">retryPolicy</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#repeatpolicy"><code class="docutils literal notranslate"><span class="pre">repeatPolicy</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id6"><code class="docutils literal notranslate"><span class="pre">precondition</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#depends"><code class="docutils literal notranslate"><span class="pre">depends</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#run"><code class="docutils literal notranslate"><span class="pre">run</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id7"><code class="docutils literal notranslate"><span class="pre">params</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#parallel"><code class="docutils literal notranslate"><span class="pre">parallel</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#executor"><code class="docutils literal notranslate"><span class="pre">executor</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#global-configuration">Global Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#executors">Executors</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#docker-executor">Docker Executor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#use-host-s-docker-environment">Use Host’s Docker Environment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#http-executor">HTTP Executor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#mail-executor">Mail Executor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ssh-executor">SSH Executor</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#json-executor">JSON Executor</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#querying-data">Querying data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#formatting-json">Formatting JSON</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Configuration</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="config.html">Configurations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config_remote.html">Remote Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scheduler.html">Scheduler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="email.html">Email Notifications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auth.html">Basic Authentication</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_token.html">API Token</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Container Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="docker.html">Building Docker Image</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docker-compose.html">Using Docker Compose</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contrib.html">Contribution Guide</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Dagu</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Schema Reference</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/schema.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="schema-reference">
+<span id="id1"></span><h1>Schema Reference<a class="headerlink" href="#schema-reference" title="Permalink to this heading"></a></h1>
+<nav class="contents local" id="contents">
+<ul class="simple">
+<li><p><a class="reference internal" href="#introduction" id="id11">Introduction</a></p></li>
+<li><p><a class="reference internal" href="#dag-level-fields" id="id12">DAG-Level Fields</a></p>
+<ul>
+<li><p><a class="reference internal" href="#name" id="id13"><code class="docutils literal notranslate"><span class="pre">name</span></code></a></p></li>
+<li><p><a class="reference internal" href="#description" id="id14"><code class="docutils literal notranslate"><span class="pre">description</span></code></a></p></li>
+<li><p><a class="reference internal" href="#schedule" id="id15"><code class="docutils literal notranslate"><span class="pre">schedule</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dotenv" id="id16"><code class="docutils literal notranslate"><span class="pre">dotenv</span></code></a></p></li>
+<li><p><a class="reference internal" href="#skipifsuccessful" id="id17"><code class="docutils literal notranslate"><span class="pre">skipIfSuccessful</span></code></a></p></li>
+<li><p><a class="reference internal" href="#group" id="id18"><code class="docutils literal notranslate"><span class="pre">group</span></code></a></p></li>
+<li><p><a class="reference internal" href="#tags" id="id19"><code class="docutils literal notranslate"><span class="pre">tags</span></code></a></p></li>
+<li><p><a class="reference internal" href="#env" id="id20"><code class="docutils literal notranslate"><span class="pre">env</span></code></a></p></li>
+<li><p><a class="reference internal" href="#logdir" id="id21"><code class="docutils literal notranslate"><span class="pre">logDir</span></code></a></p></li>
+<li><p><a class="reference internal" href="#restartwaitsec" id="id22"><code class="docutils literal notranslate"><span class="pre">restartWaitSec</span></code></a></p></li>
+<li><p><a class="reference internal" href="#histretentiondays" id="id23"><code class="docutils literal notranslate"><span class="pre">histRetentionDays</span></code></a></p></li>
+<li><p><a class="reference internal" href="#timeoutsec" id="id24"><code class="docutils literal notranslate"><span class="pre">timeoutSec</span></code></a></p></li>
+<li><p><a class="reference internal" href="#delaysec" id="id25"><code class="docutils literal notranslate"><span class="pre">delaySec</span></code></a></p></li>
+<li><p><a class="reference internal" href="#maxactivesteps" id="id26"><code class="docutils literal notranslate"><span class="pre">maxActiveSteps</span></code></a></p></li>
+<li><p><a class="reference internal" href="#maxactiveruns" id="id27"><code class="docutils literal notranslate"><span class="pre">maxActiveRuns</span></code></a></p></li>
+<li><p><a class="reference internal" href="#params" id="id28"><code class="docutils literal notranslate"><span class="pre">params</span></code></a></p></li>
+<li><p><a class="reference internal" href="#precondition" id="id29"><code class="docutils literal notranslate"><span class="pre">precondition</span></code></a></p></li>
+<li><p><a class="reference internal" href="#mailon" id="id30"><code class="docutils literal notranslate"><span class="pre">mailOn</span></code></a></p></li>
+<li><p><a class="reference internal" href="#maxcleanuptimesec" id="id31"><code class="docutils literal notranslate"><span class="pre">MaxCleanUpTimeSec</span></code></a></p></li>
+<li><p><a class="reference internal" href="#handleron" id="id32"><code class="docutils literal notranslate"><span class="pre">handlerOn</span></code></a></p></li>
+<li><p><a class="reference internal" href="#steps" id="id33"><code class="docutils literal notranslate"><span class="pre">steps</span></code></a></p></li>
+<li><p><a class="reference internal" href="#smtp" id="id34"><code class="docutils literal notranslate"><span class="pre">smtp</span></code></a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#step-fields" id="id35">Step Fields</a></p>
+<ul>
+<li><p><a class="reference internal" href="#id3" id="id36"><code class="docutils literal notranslate"><span class="pre">name</span></code></a></p></li>
+<li><p><a class="reference internal" href="#id4" id="id37"><code class="docutils literal notranslate"><span class="pre">description</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dir" id="id38"><code class="docutils literal notranslate"><span class="pre">dir</span></code></a></p></li>
+<li><p><a class="reference internal" href="#command" id="id39"><code class="docutils literal notranslate"><span class="pre">command</span></code></a></p></li>
+<li><p><a class="reference internal" href="#script" id="id40"><code class="docutils literal notranslate"><span class="pre">script</span></code></a></p></li>
+<li><p><a class="reference internal" href="#stdout" id="id41"><code class="docutils literal notranslate"><span class="pre">stdout</span></code></a></p></li>
+<li><p><a class="reference internal" href="#stderr" id="id42"><code class="docutils literal notranslate"><span class="pre">stderr</span></code></a></p></li>
+<li><p><a class="reference internal" href="#output" id="id43"><code class="docutils literal notranslate"><span class="pre">output</span></code></a></p></li>
+<li><p><a class="reference internal" href="#signalonstop" id="id44"><code class="docutils literal notranslate"><span class="pre">signalOnStop</span></code></a></p></li>
+<li><p><a class="reference internal" href="#id5" id="id45"><code class="docutils literal notranslate"><span class="pre">mailOn</span></code></a></p></li>
+<li><p><a class="reference internal" href="#continueon" id="id46"><code class="docutils literal notranslate"><span class="pre">continueOn</span></code></a></p></li>
+<li><p><a class="reference internal" href="#retrypolicy" id="id47"><code class="docutils literal notranslate"><span class="pre">retryPolicy</span></code></a></p></li>
+<li><p><a class="reference internal" href="#repeatpolicy" id="id48"><code class="docutils literal notranslate"><span class="pre">repeatPolicy</span></code></a></p></li>
+<li><p><a class="reference internal" href="#id6" id="id49"><code class="docutils literal notranslate"><span class="pre">precondition</span></code></a></p></li>
+<li><p><a class="reference internal" href="#depends" id="id50"><code class="docutils literal notranslate"><span class="pre">depends</span></code></a></p></li>
+<li><p><a class="reference internal" href="#run" id="id51"><code class="docutils literal notranslate"><span class="pre">run</span></code></a></p></li>
+<li><p><a class="reference internal" href="#id7" id="id52"><code class="docutils literal notranslate"><span class="pre">params</span></code></a></p></li>
+<li><p><a class="reference internal" href="#parallel" id="id53"><code class="docutils literal notranslate"><span class="pre">parallel</span></code></a></p></li>
+<li><p><a class="reference internal" href="#executor" id="id54"><code class="docutils literal notranslate"><span class="pre">executor</span></code></a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#global-configuration" id="id55">Global Configuration</a></p></li>
+<li><p><a class="reference internal" href="#executors" id="id56">Executors</a></p>
+<ul>
+<li><p><a class="reference internal" href="#docker-executor" id="id57">Docker Executor</a></p></li>
+<li><p><a class="reference internal" href="#use-host-s-docker-environment" id="id58">Use Host’s Docker Environment</a></p></li>
+<li><p><a class="reference internal" href="#http-executor" id="id59">HTTP Executor</a></p></li>
+<li><p><a class="reference internal" href="#mail-executor" id="id60">Mail Executor</a></p></li>
+<li><p><a class="reference internal" href="#ssh-executor" id="id61">SSH Executor</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#json-executor" id="id62">JSON Executor</a></p>
+<ul>
+<li><p><a class="reference internal" href="#querying-data" id="id63">Querying data</a></p></li>
+<li><p><a class="reference internal" href="#formatting-json" id="id64">Formatting JSON</a></p></li>
+</ul>
+</li>
+</ul>
+</nav>
+<section id="introduction">
+<h2><a class="toc-backref" href="#id11" role="doc-backlink">Introduction</a><a class="headerlink" href="#introduction" title="Permalink to this heading"></a></h2>
+<p>Dagu uses YAML files to define Directed Acyclic Graphs (DAGs). This page lists all supported fields in the Dagu schema and explains how each field is used. For hands-on guides, see <a class="reference internal" href="yaml_format.html#yaml-format"><span class="std std-ref">Yaml Format</span></a>.</p>
+<p>The official schema definition is published here:</p>
+<ul class="simple">
+<li><p>JSON Schema URL:
+<a class="reference external" href="https://github.com/dagu-org/dagu/blob/main/schemas/dag.schema.json">dag.schema.json</a></p></li>
+</ul>
+<p>You can use a YAML language server with the schema URL to get IDE auto-completion and validation:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># yaml-language-server: $schema=https://raw.githubusercontent.com/dagu-org/dagu/main/schemas/dag.schema.json</span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MyDAG</span>
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step_1</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;hello&quot;</span>
+</pre></div>
+</div>
+</section>
+<hr class="docutils" />
+<section id="dag-level-fields">
+<h2><a class="toc-backref" href="#id12" role="doc-backlink">DAG-Level Fields</a><a class="headerlink" href="#dag-level-fields" title="Permalink to this heading"></a></h2>
+<p>These fields apply to the entire DAG. They appear at the root of the YAML file.</p>
+<section id="name">
+<h3><a class="toc-backref" href="#id13" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">name</span></code></a><a class="headerlink" href="#name" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>The name of the DAG. If omitted, Dagu defaults the name to the YAML filename without the extension.</p>
+<p><strong>Example</strong>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">My Daily DAG</span>
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="description">
+<h3><a class="toc-backref" href="#id14" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">description</span></code></a><a class="headerlink" href="#description" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>A short description of what the DAG does.</p>
+<p><strong>Example</strong>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">This DAG processes daily data and sends notifications.</span>
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="schedule">
+<h3><a class="toc-backref" href="#id15" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">schedule</span></code></a><a class="headerlink" href="#schedule" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>A cron expression (<code class="docutils literal notranslate"><span class="pre">*</span> <span class="pre">*</span> <span class="pre">*</span> <span class="pre">*</span> <span class="pre">*</span></code>) that determines how often the DAG-runs.
+If omitted, the DAG will only run manually (unless triggered via CLI or another mechanism).</p>
+<p><strong>Example</strong>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">schedule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;5</span><span class="nv"> </span><span class="s">4</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*&quot;</span><span class="w">  </span><span class="c1"># runs daily at 04:05</span>
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="dotenv">
+<h3><a class="toc-backref" href="#id16" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">dotenv</span></code></a><a class="headerlink" href="#dotenv" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Path to a <cite>.env</cite> file or a list of paths to load environment variables from.
+Dagu reads these files before running the DAG.</p>
+<p><strong>Example</strong>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">dotenv</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/.env</span>
+</pre></div>
+</div>
+<p>Files can be specified as:</p>
+<ul class="simple">
+<li><p>Absolute paths</p></li>
+<li><p>Relative to the DAG file directory</p></li>
+<li><p>Relative to the base config directory</p></li>
+<li><p>Relative to the user’s home directory</p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="skipifsuccessful">
+<h3><a class="toc-backref" href="#id17" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">skipIfSuccessful</span></code></a><a class="headerlink" href="#skipifsuccessful" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>If true, Dagu checks whether this DAG has already succeeded since the last scheduled time. If it did, Dagu will skip the current scheduled run. Manual triggers always run regardless of this setting.</p>
+<p><strong>Example</strong>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">skipIfSuccessful</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="group">
+<h3><a class="toc-backref" href="#id18" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">group</span></code></a><a class="headerlink" href="#group" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>An organizational label you can use to group DAGs (e.g., “DailyJobs”, “Analytics”).</p>
+</div></blockquote>
+</section>
+<section id="tags">
+<h3><a class="toc-backref" href="#id19" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">tags</span></code></a><a class="headerlink" href="#tags" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>A comma-separated list of tags. Useful for searching, grouping, or labeling runs (e.g., “finance, daily”).</p>
+</div></blockquote>
+</section>
+<section id="env">
+<h3><a class="toc-backref" href="#id20" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">env</span></code></a><a class="headerlink" href="#env" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Environment variables available to all steps in the DAG. These can use shell expansions, references to other environment variables, or command substitutions. They won’t be stored in execution history data for security reasons, so if you want to retry a failed run, you need to have the same environment variables available.</p>
+<p><strong>Example</strong>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">env</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">LOG_DIR</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${HOME}/logs</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">PATH</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/usr/local/bin:${PATH}</span>
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="logdir">
+<h3><a class="toc-backref" href="#id21" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">logDir</span></code></a><a class="headerlink" href="#logdir" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>The base directory in which logs for this DAG are stored.</p>
+</div></blockquote>
+</section>
+<section id="restartwaitsec">
+<h3><a class="toc-backref" href="#id22" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">restartWaitSec</span></code></a><a class="headerlink" href="#restartwaitsec" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Number of seconds to wait before restarting a failed or stopped DAG. Typically used with a process supervisor.</p>
+</div></blockquote>
+</section>
+<section id="histretentiondays">
+<h3><a class="toc-backref" href="#id23" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">histRetentionDays</span></code></a><a class="headerlink" href="#histretentiondays" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>How many days of historical run data to retain for this DAG. After this period, older run logs/history can be purged.</p>
+</div></blockquote>
+</section>
+<section id="timeoutsec">
+<h3><a class="toc-backref" href="#id24" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">timeoutSec</span></code></a><a class="headerlink" href="#timeoutsec" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Maximum number of seconds for the entire DAG to finish. If the DAG hasn’t finished after this time, it’s considered timed out.</p>
+</div></blockquote>
+</section>
+<section id="delaysec">
+<h3><a class="toc-backref" href="#id25" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">delaySec</span></code></a><a class="headerlink" href="#delaysec" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Delay (in seconds) before starting each step in a DAG-run. This can be useful to stagger workloads.</p>
+</div></blockquote>
+</section>
+<section id="maxactivesteps">
+<h3><a class="toc-backref" href="#id26" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">maxActiveSteps</span></code></a><a class="headerlink" href="#maxactivesteps" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Limit on how many steps can run concurrently in this DAG.</p>
+</div></blockquote>
+</section>
+<section id="maxactiveruns">
+<h3><a class="toc-backref" href="#id27" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">maxActiveRuns</span></code></a><a class="headerlink" href="#maxactiveruns" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Limit on how many active DAG-runs can exist at the same time. If this limit is reached, new runs will be queued until existing ones finish.</p>
+</div></blockquote>
+</section>
+<section id="params">
+<h3><a class="toc-backref" href="#id28" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">params</span></code></a><a class="headerlink" href="#params" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Default parameters for the entire DAG, either positional or named. Steps can reference these as environment variables (<code class="docutils literal notranslate"><span class="pre">$1,</span> <span class="pre">$2,</span> <span class="pre">...</span></code> for positional or <code class="docutils literal notranslate"><span class="pre">$KEY</span></code> for named).</p>
+<p><strong>Example (positional)</strong>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">params</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">param1 param2</span>
+</pre></div>
+</div>
+<p><strong>Example (named)</strong>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">params</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">FOO</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">BAR</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;`echo</span><span class="nv"> </span><span class="s">2`&quot;</span>
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="precondition">
+<h3><a class="toc-backref" href="#id29" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">precondition</span></code></a><a class="headerlink" href="#precondition" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>The condition(s) that must be satisfied before the DAG can run. Each condition can use shell expansions or command substitutions to validate external states.</p>
+<p><strong>Example</strong>: Condition based on command exit code:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">precondition</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;test</span><span class="nv"> </span><span class="s">-f</span><span class="nv"> </span><span class="s">/path/to/file&quot;</span>
+
+<span class="c1"># or more simply</span>
+<span class="nt">precondition</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;test</span><span class="nv"> </span><span class="s">-f</span><span class="nv"> </span><span class="s">/path/to/file&quot;</span>
+</pre></div>
+</div>
+<p><strong>Example</strong>: Condition based on environment variables:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">precondition</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">condition</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;$ENV_VAR&quot;</span>
+<span class="w">    </span><span class="nt">expected</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;value&quot;</span>
+</pre></div>
+</div>
+<p><strong>Example</strong>: Condition based on command output (stdout):</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">precondition</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">condition</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;`echo</span><span class="nv"> </span><span class="s">$2`&quot;</span>
+<span class="w">    </span><span class="nt">expected</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;param2&quot;</span>
+</pre></div>
+</div>
+<p><strong>Example</strong>: Use regular expressions:
+.. code-block:: yaml</p>
+<blockquote>
+<div><dl class="simple">
+<dt>precondition:</dt><dd><ul class="simple">
+<li><p>condition: “<cite>date ‘+%d’</cite>”
+expected: “re:0[1-9]” # Run only if the day is between 01 and 09</p></li>
+</ul>
+</dd>
+</dl>
+</div></blockquote>
+<p>Note: Regular expressions are supported with the <code class="docutils literal notranslate"><span class="pre">re:</span></code> prefix (e.g., <code class="docutils literal notranslate"><span class="pre">re:[0-9]{3}</span></code>) in the format of Golang’s <code class="docutils literal notranslate"><span class="pre">regexp</span></code> package.</p>
+</div></blockquote>
+</section>
+<section id="mailon">
+<h3><a class="toc-backref" href="#id30" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">mailOn</span></code></a><a class="headerlink" href="#mailon" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Email notifications at DAG-level events, such as <code class="docutils literal notranslate"><span class="pre">failure</span></code> or <code class="docutils literal notranslate"><span class="pre">success</span></code>. Also supports <code class="docutils literal notranslate"><span class="pre">cancel</span></code> and <code class="docutils literal notranslate"><span class="pre">exit</span></code>.</p>
+<p><strong>Example</strong>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">mailOn</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">success</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="maxcleanuptimesec">
+<h3><a class="toc-backref" href="#id31" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">MaxCleanUpTimeSec</span></code></a><a class="headerlink" href="#maxcleanuptimesec" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Maximum number of seconds Dagu will spend cleaning up (stopping steps, finalizing logs, etc.) before forcing shutdown.</p>
+</div></blockquote>
+</section>
+<section id="handleron">
+<h3><a class="toc-backref" href="#id32" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">handlerOn</span></code></a><a class="headerlink" href="#handleron" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Lifecycle event hooks at the DAG level. For each event (<code class="docutils literal notranslate"><span class="pre">success</span></code>, <code class="docutils literal notranslate"><span class="pre">failure</span></code>, <code class="docutils literal notranslate"><span class="pre">cancel</span></code>, <code class="docutils literal notranslate"><span class="pre">exit</span></code>), you can run an additional command or script.</p>
+<p><strong>Example</strong>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">handlerOn</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">success</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;succeeded!&quot;</span>
+<span class="w">  </span><span class="nt">failure</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;failed!&quot;</span>
+<span class="w">  </span><span class="nt">cancel</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;canceled!&quot;</span>
+<span class="w">  </span><span class="nt">exit</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;all done!&quot;</span>
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="steps">
+<h3><a class="toc-backref" href="#id33" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">steps</span></code></a><a class="headerlink" href="#steps" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>A list of steps (tasks) to execute. Steps define your workflow logic and can depend on each other. See <a class="reference internal" href="#step-fields"><span class="std std-ref">Step Fields</span></a> below for details.</p>
+</div></blockquote>
+</section>
+<section id="smtp">
+<h3><a class="toc-backref" href="#id34" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">smtp</span></code></a><a class="headerlink" href="#smtp" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>SMTP server configuration for sending email notifications. This is necessary if you use the <code class="docutils literal notranslate"><span class="pre">mail</span></code> executor or <code class="docutils literal notranslate"><span class="pre">mailOn</span></code> field.</p>
+<p><strong>Example</strong>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">smtp</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$SMTP_HOST</span>
+<span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;587&quot;</span>
+<span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$SMTP_USER</span>
+<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$SMTP_PASS</span>
+</pre></div>
+</div>
+</div></blockquote>
+<hr class="docutils" />
+</section>
+</section>
+<section id="step-fields">
+<span id="id2"></span><h2><a class="toc-backref" href="#id35" role="doc-backlink">Step Fields</a><a class="headerlink" href="#step-fields" title="Permalink to this heading"></a></h2>
+<p>Each element in the top-level <code class="docutils literal notranslate"><span class="pre">steps</span></code> list has its own fields for customization. A step object looks like this:</p>
+<section id="id3">
+<h3><a class="toc-backref" href="#id36" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">name</span></code></a><a class="headerlink" href="#id3" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>A unique identifier for the step within this DAG.</p>
+</div></blockquote>
+</section>
+<section id="id4">
+<h3><a class="toc-backref" href="#id37" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">description</span></code></a><a class="headerlink" href="#id4" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Brief description of what this step does.</p>
+</div></blockquote>
+</section>
+<section id="dir">
+<h3><a class="toc-backref" href="#id38" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">dir</span></code></a><a class="headerlink" href="#dir" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Working directory in which this step’s command or script is executed.</p>
+</div></blockquote>
+</section>
+<section id="command">
+<h3><a class="toc-backref" href="#id39" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">command</span></code></a><a class="headerlink" href="#command" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>The command or executable to run for this step.
+Examples include <code class="docutils literal notranslate"><span class="pre">bash</span></code>, <code class="docutils literal notranslate"><span class="pre">python</span></code>, or direct shell commands like <code class="docutils literal notranslate"><span class="pre">echo</span> <span class="pre">hello</span></code>.</p>
+</div></blockquote>
+</section>
+<section id="script">
+<h3><a class="toc-backref" href="#id40" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">script</span></code></a><a class="headerlink" href="#script" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Multi-line inline script content that will be piped into the command.
+If <code class="docutils literal notranslate"><span class="pre">command</span></code> is omitted, the script is executed with the system’s default shell.</p>
+</div></blockquote>
+</section>
+<section id="stdout">
+<h3><a class="toc-backref" href="#id41" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">stdout</span></code></a><a class="headerlink" href="#stdout" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Path to a file in which to store the standard output (STDOUT) of the step’s command.</p>
+</div></blockquote>
+</section>
+<section id="stderr">
+<h3><a class="toc-backref" href="#id42" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">stderr</span></code></a><a class="headerlink" href="#stderr" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Path to a file in which to store the standard error (STDERR) of the step’s command.</p>
+</div></blockquote>
+</section>
+<section id="output">
+<h3><a class="toc-backref" href="#id43" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">output</span></code></a><a class="headerlink" href="#output" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>A variable name to store the command’s STDOUT contents. You can reuse this variable in subsequent steps.</p>
+</div></blockquote>
+</section>
+<section id="signalonstop">
+<h3><a class="toc-backref" href="#id44" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">signalOnStop</span></code></a><a class="headerlink" href="#signalonstop" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>If you manually stop this step (e.g., via CLI), the signal that Dagu sends to kill the process (e.g., <code class="docutils literal notranslate"><span class="pre">SIGINT</span></code>).</p>
+</div></blockquote>
+</section>
+<section id="id5">
+<h3><a class="toc-backref" href="#id45" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">mailOn</span></code></a><a class="headerlink" href="#id5" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Email notifications at the step level (same structure as DAG-level <code class="docutils literal notranslate"><span class="pre">mailOn</span></code>).</p>
+</div></blockquote>
+</section>
+<section id="continueon">
+<h3><a class="toc-backref" href="#id46" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">continueOn</span></code></a><a class="headerlink" href="#continueon" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Controls how Dagu handles cases where the step is skipped or fails.</p>
+<ul class="simple">
+<li><p><strong>failure</strong>: If true, continue the DAG even if this step fails.</p></li>
+<li><p><strong>skipped</strong>: If true, continue the DAG even if preconditions cause this step to skip.</p></li>
+<li><p><strong>output</strong>: Specify text or list of text to continue on. If the output (stdout or stderr) contains this text, the step is considered successful. Regular expressions are supported with the <code class="docutils literal notranslate"><span class="pre">re:</span></code> prefix (e.g., <code class="docutils literal notranslate"><span class="pre">re:[0-9]{3}</span></code>) in the format of Golang’s <code class="docutils literal notranslate"><span class="pre">regexp</span></code> package.</p></li>
+<li><p><strong>markSuccess</strong>: If true, mark the step as successful even if it fails.</p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="retrypolicy">
+<h3><a class="toc-backref" href="#id47" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">retryPolicy</span></code></a><a class="headerlink" href="#retrypolicy" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Defines automatic retries for this step when it fails.</p>
+<ul class="simple">
+<li><p><strong>limit</strong> (integer): How many times to retry.</p></li>
+<li><p><strong>intervalSec</strong> (integer): How many seconds to wait between retries.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">retryPolicy</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w">  </span><span class="nt">intervalSec</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="repeatpolicy">
+<h3><a class="toc-backref" href="#id48" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">repeatPolicy</span></code></a><a class="headerlink" href="#repeatpolicy" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Allows repeating a step multiple times in a single run.</p>
+<ul class="simple">
+<li><p><strong>repeat</strong> (boolean): Whether to repeat.</p></li>
+<li><p><strong>intervalSec</strong> (integer): Interval in seconds between repeats.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">repeatPolicy</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">repeat</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">intervalSec</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span><span class="w">  </span><span class="c1"># run every minute</span>
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="id6">
+<h3><a class="toc-backref" href="#id49" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">precondition</span></code></a><a class="headerlink" href="#id6" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Condition(s) that must be met for this step to run. It works same as the DAG-level <code class="docutils literal notranslate"><span class="pre">precondition</span></code> field. See <span class="xref std std-ref">DAG-Level Fields</span> for examples.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="c1"># Example 1: based on exit code</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">daily task</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">daily.sh</span>
+<span class="w">    </span><span class="nt">precondition</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;test</span><span class="nv"> </span><span class="s">-f</span><span class="nv"> </span><span class="s">/path/to/file&quot;</span>
+
+<span class="w">  </span><span class="c1"># Example 2: based on command output (stdout)</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">monthly task</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">monthly.sh</span>
+<span class="w">    </span><span class="nt">precondition</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">condition</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;`date</span><span class="nv"> </span><span class="s">&#39;+%d&#39;`&quot;</span>
+<span class="w">        </span><span class="nt">expected</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;01&quot;</span>
+
+<span class="w">  </span><span class="c1"># Example 3: based on environment variables</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">weekly task</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">weekly.sh</span>
+<span class="w">    </span><span class="nt">precondition</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">condition</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;$WEEKDAY&quot;</span>
+<span class="w">        </span><span class="nt">expected</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Friday&quot;</span>
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="depends">
+<h3><a class="toc-backref" href="#id50" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">depends</span></code></a><a class="headerlink" href="#depends" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Names of other steps that must complete before this step can run. It can be a single step name or a list of step names.</p>
+</div></blockquote>
+</section>
+<section id="run">
+<h3><a class="toc-backref" href="#id51" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">run</span></code></a><a class="headerlink" href="#run" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Reference to another YAML file (sub workflow) to run at this step.
+If present, the sub workflow is executed in place of a command.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sub workflow</span>
+<span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sub_dag.yaml</span>
+<span class="w">    </span><span class="nt">params</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FOO=BAR</span>
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="id7">
+<h3><a class="toc-backref" href="#id52" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">params</span></code></a><a class="headerlink" href="#id7" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Parameters to pass into a sub workflow if this step references one (via <code class="docutils literal notranslate"><span class="pre">run</span></code>). You can also treat these as environment variables in the workflow.</p>
+</div></blockquote>
+</section>
+<section id="parallel">
+<h3><a class="toc-backref" href="#id53" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">parallel</span></code></a><a class="headerlink" href="#parallel" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>Configuration for parallel execution of child DAGs. Only applicable when <code class="docutils literal notranslate"><span class="pre">run</span></code> is specified.</p>
+<ul class="simple">
+<li><p><strong>items</strong>: Array of parameters to execute in parallel</p></li>
+<li><p><strong>maxConcurrent</strong>: Maximum number of concurrent executions (default: 8, maximum: 1000)</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">parallel processing</span>
+<span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">process-item.yaml</span>
+<span class="w">    </span><span class="nt">parallel</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">items</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;item1&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;item2&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;item3&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">maxConcurrent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+</pre></div>
+</div>
+<p>See <a class="reference internal" href="parallel_execution.html#parallel-execution"><span class="std std-ref">Parallel Execution</span></a> for detailed documentation.</p>
+</div></blockquote>
+</section>
+<section id="executor">
+<h3><a class="toc-backref" href="#id54" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">executor</span></code></a><a class="headerlink" href="#executor" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>An executor configuration specifying how the command or script is run (e.g., Docker, SSH, HTTP, Mail, JSON).
+For more details, see <span class="xref std std-ref">Executors</span>.</p>
+</div></blockquote>
+</section>
+</section>
+<hr class="docutils" />
+<section id="global-configuration">
+<h2><a class="toc-backref" href="#id55" role="doc-backlink">Global Configuration</a><a class="headerlink" href="#global-configuration" title="Permalink to this heading"></a></h2>
+<p>You can place global defaults in <code class="docutils literal notranslate"><span class="pre">$HOME/.config/dagu/base.yaml</span></code>. This file can contain:</p>
+<ul class="simple">
+<li><p>Default environment variables or dotenv files</p></li>
+<li><p>Email notification settings</p></li>
+<li><p>A global <code class="docutils literal notranslate"><span class="pre">logDir</span></code></p></li>
+<li><p>Common organizational patterns</p></li>
+</ul>
+<p>Example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># $HOME/.config/dagu/base.yaml</span>
+<span class="nt">logDir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/log/dagu</span>
+<span class="nt">env</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">GLOBAL_VAR</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;HelloFromGlobalConfig&quot;</span>
+<span class="nt">dotenv</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/.env</span>
+<span class="nt">mailOn</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">success</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</pre></div>
+</div>
+<hr class="docutils" />
+</section>
+<section id="executors">
+<span id="id8"></span><h2><a class="toc-backref" href="#id56" role="doc-backlink">Executors</a><a class="headerlink" href="#executors" title="Permalink to this heading"></a></h2>
+<p>Executors are specialized modules for handling different types of tasks, including <code class="code docutils literal notranslate"><span class="pre">docker</span></code>, <code class="code docutils literal notranslate"><span class="pre">http</span></code>, <code class="code docutils literal notranslate"><span class="pre">mail</span></code>, <code class="code docutils literal notranslate"><span class="pre">ssh</span></code>, and <code class="code docutils literal notranslate"><span class="pre">jq</span></code> (JSON) executors. You can configure an executor in any step by specifying:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docker</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;alpine:latest&quot;</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;Hello from Docker!&quot;</span>
+</pre></div>
+</div>
+<p>Contributions of new <a class="reference external" href="https://github.com/dagu-org/dagu/tree/main/internal/dag/executor">executors</a> are welcome.</p>
+<section id="docker-executor">
+<h3><a class="toc-backref" href="#id57" role="doc-backlink">Docker Executor</a><a class="headerlink" href="#docker-executor" title="Permalink to this heading"></a></h3>
+<p id="id10"><strong>Execute an Image</strong></p>
+<p><em>Note: Requires Docker daemon running on the host.</em></p>
+<p>The <code class="docutils literal notranslate"><span class="pre">docker</span></code> executor runs commands inside Docker containers. This can help you isolate environments or ensure reproducibility. Example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deno_hello_world</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docker</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;denoland/deno:latest&quot;</span>
+<span class="w">        </span><span class="nt">autoRemove</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run https://docs.deno.com/examples/scripts/hello_world.ts</span>
+</pre></div>
+</div>
+<p>By default, Dagu pulls the Docker image. If you’re using a local image, set <code class="code docutils literal notranslate"><span class="pre">pull:</span> <span class="pre">false</span></code>.</p>
+<p>You can also configure volumes, environment variables, etc.:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deno_hello_world</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docker</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;denoland/deno:latest&quot;</span>
+<span class="w">        </span><span class="nt">host</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">binds</span><span class="p">:</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/app:/app</span>
+<span class="w">          </span><span class="nt">env</span><span class="p">:</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FOO=BAR</span>
+<span class="w">        </span><span class="nt">autoRemove</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run https://docs.deno.com/examples/scripts/hello_world.ts</span>
+</pre></div>
+</div>
+<p><strong>Execute Commands in Existing Containers</strong></p>
+<p>You can also run commands in existing containers (like <cite>docker exec</cite>):</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">exec-in-existing</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docker</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">containerName</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my-running-container&quot;</span>
+<span class="w">        </span><span class="nt">autoRemove</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">        </span><span class="nt">exec</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">root</span>
+<span class="w">          </span><span class="nt">workingDir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/app</span>
+<span class="w">          </span><span class="nt">env</span><span class="p">:</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MY_VAR=value</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;Hello from existing container&quot;</span>
+</pre></div>
+</div>
+<p><strong>exec</strong> config includes:</p>
+<ul class="simple">
+<li><p><cite>containerName</cite>: Name or ID of the existing container (required)</p></li>
+<li><p><cite>user</cite>: Username or UID</p></li>
+<li><p><cite>workingDir</cite>: Directory in which the command runs</p></li>
+<li><p><cite>env</cite>: Environment variables</p></li>
+</ul>
+</section>
+<section id="use-host-s-docker-environment">
+<h3><a class="toc-backref" href="#id58" role="doc-backlink">Use Host’s Docker Environment</a><a class="headerlink" href="#use-host-s-docker-environment" title="Permalink to this heading"></a></h3>
+<p>If Dagu itself runs in a container, you can still communicate with the host Docker:</p>
+<ol class="arabic simple">
+<li><p>Mount Docker socket and set the group ID, or</p></li>
+<li><p>Run a <cite>socat</cite> container:</p></li>
+</ol>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>run<span class="w"> </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span>-p<span class="w"> </span><span class="m">2376</span>:2375<span class="w"> </span>bobrik/socat<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>TCP4-LISTEN:2375,fork,reuseaddr<span class="w"> </span>UNIX-CONNECT:/var/run/docker.sock
+</pre></div>
+</div>
+<p>Then set <cite>DOCKER_HOST</cite>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">env</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">DOCKER_HOST</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tcp://host.docker.internal:2376&quot;</span>
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deno_hello_world</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docker</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;denoland/deno:latest&quot;</span>
+<span class="w">        </span><span class="nt">autoRemove</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run https://docs.deno.com/examples/scripts/hello_world.ts</span>
+</pre></div>
+</div>
+</section>
+<section id="http-executor">
+<h3><a class="toc-backref" href="#id59" role="doc-backlink">HTTP Executor</a><a class="headerlink" href="#http-executor" title="Permalink to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">http</span></code> executor can make arbitrary HTTP requests. This is handy for interacting with web services or APIs.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">send POST request</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">POST https://foo.bar.com</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">        </span><span class="nt">headers</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">Authorization</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Bearer</span><span class="nv"> </span><span class="s">$TOKEN&quot;</span>
+<span class="w">        </span><span class="nt">silent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">        </span><span class="nt">query</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;value&quot;</span>
+<span class="w">        </span><span class="nt">body</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;post</span><span class="nv"> </span><span class="s">body&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="mail-executor">
+<h3><a class="toc-backref" href="#id60" role="doc-backlink">Mail Executor</a><a class="headerlink" href="#mail-executor" title="Permalink to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">mail</span></code> executor sends email—useful for notifications or alerts.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">smtp</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;smtp.foo.bar&quot;</span>
+<span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;587&quot;</span>
+<span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;username&gt;&quot;</span>
+<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;password&gt;&quot;</span>
+
+<span class="nt">params</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RECIPIENT=XXX</span>
+
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step1</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mail</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">to</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;to address&gt;</span>
+<span class="w">        </span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;from address&gt;</span>
+<span class="w">        </span><span class="nt">subject</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Exciting</span><span class="nv"> </span><span class="s">New</span><span class="nv"> </span><span class="s">Features</span><span class="nv"> </span><span class="s">Now</span><span class="nv"> </span><span class="s">Available&quot;</span>
+<span class="w">        </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">          </span><span class="no">Hello [RECIPIENT],</span>
+
+<span class="w">          </span><span class="no">We hope you&#39;re enjoying your experience with MyApp!</span>
+<span class="w">          </span><span class="no">We&#39;re thrilled to announce that MyApp v2.0 is now available,</span>
+<span class="w">          </span><span class="no">and we&#39;ve added some fantastic new features based on</span>
+<span class="w">          </span><span class="no">your valuable feedback.</span>
+
+<span class="w">          </span><span class="no">Thank you for choosing MyApp and for your continued support.</span>
+
+<span class="w">          </span><span class="no">Best regards,</span>
+<span class="w">          </span><span class="no">The Team</span>
+</pre></div>
+</div>
+</section>
+<section id="ssh-executor">
+<h3><a class="toc-backref" href="#id61" role="doc-backlink">SSH Executor</a><a class="headerlink" href="#ssh-executor" title="Permalink to this heading"></a></h3>
+<p id="command-execution-over-ssh">Run commands on remote hosts via SSH.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step1</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ssh</span>
+<span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dagu</span>
+<span class="w">        </span><span class="nt">ip</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">XXX.XXX.XXX.XXX</span>
+<span class="w">        </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">22</span>
+<span class="w">        </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/Users/dagu/.ssh/private.pem</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/usr/sbin/ifconfig</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="json-executor">
+<h2><a class="toc-backref" href="#id62" role="doc-backlink">JSON Executor</a><a class="headerlink" href="#json-executor" title="Permalink to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">jq</span></code> executor can be used to transform, query, and format JSON.</p>
+<section id="querying-data">
+<h3><a class="toc-backref" href="#id63" role="doc-backlink">Querying data</a><a class="headerlink" href="#querying-data" title="Permalink to this heading"></a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run query</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jq</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;{(.id):</span><span class="nv"> </span><span class="s">.[&quot;10&quot;].b}&#39;</span>
+<span class="w">    </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">{&quot;id&quot;: &quot;sample&quot;, &quot;10&quot;: {&quot;b&quot;: 42}}</span>
+</pre></div>
+</div>
+<p>Expected Output:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;sample&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="formatting-json">
+<h3><a class="toc-backref" href="#id64" role="doc-backlink">Formatting JSON</a><a class="headerlink" href="#formatting-json" title="Permalink to this heading"></a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">format json</span>
+<span class="w">    </span><span class="nt">executor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jq</span>
+<span class="w">    </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">{&quot;id&quot;: &quot;sample&quot;, &quot;10&quot;: {&quot;b&quot;: 42}}</span>
+</pre></div>
+</div>
+<p>Output:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;10&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;b&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sample&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="special_env.html" class="btn btn-neutral float-left" title="Special Environment Variables" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="config.html" class="btn btn-neutral float-right" title="Configurations" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024 Yota Hamada.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
