@@ -878,7 +878,7 @@ steps:
 		require.NotContains(t, results, "Output for fail")
 
 		// Verify the failed execution has no output in results
-		require.Contains(t, results, `"status": "failed"`)
+		require.Contains(t, results, `"success": false`)
 		// Outputs array should only contain the successful output
 		outputsSection := results[strings.Index(results, `"outputs": [`):]
 		outputsEndIndex := strings.Index(outputsSection, `]`) + 1

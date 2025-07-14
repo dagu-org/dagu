@@ -344,4 +344,3 @@ steps:
 		require.NotEqual(t, scheduler.StatusSuccess, status.Status)
 	})
 }
-

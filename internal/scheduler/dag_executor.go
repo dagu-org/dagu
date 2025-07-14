@@ -215,7 +215,7 @@ func (e *DAGExecutor) dispatchToCoordinator(ctx context.Context, task *coordinat
 func (e *DAGExecutor) Close() error {
 	e.coordinatorClientMu.Lock()
 	defer e.coordinatorClientMu.Unlock()
-	
+
 	if e.coordinatorClient != nil {
 		err := e.coordinatorClient.Close()
 		e.coordinatorClient = nil
