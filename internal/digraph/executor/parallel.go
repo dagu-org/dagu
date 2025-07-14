@@ -26,11 +26,10 @@ type parallelExecutor struct {
 	env           Env
 
 	// Runtime state
-	distributedChildren map[string]bool         // Maps DAG run ID to distributed status
-	results             map[string]*ChildResult // Maps DAG run ID to result
-	errors              []error                 // Collects errors from failed executions
-	wg                  sync.WaitGroup          // Tracks running goroutines
-	cancelFunc          context.CancelFunc      // For canceling all child executions
+	results    map[string]*ChildResult // Maps DAG run ID to result
+	errors     []error                 // Collects errors from failed executions
+	wg         sync.WaitGroup          // Tracks running goroutines
+	cancelFunc context.CancelFunc      // For canceling all child executions
 }
 
 // ChildResult holds the result of a single child DAG execution
@@ -69,13 +68,12 @@ func newParallelExecutor(
 	}
 
 	return &parallelExecutor{
-		child:               child,
-		workDir:             dir,
-		maxConcurrent:       maxConcurrent,
-		env:                 GetEnv(ctx),
-		distributedChildren: make(map[string]bool),
-		results:             make(map[string]*ChildResult),
-		errors:              make([]error, 0),
+		child:         child,
+		workDir:       dir,
+		maxConcurrent: maxConcurrent,
+		env:           GetEnv(ctx),
+		results:       make(map[string]*ChildResult),
+		errors:        make([]error, 0),
 	}, nil
 }
 
@@ -196,13 +194,6 @@ func (e *parallelExecutor) SetStderr(out io.Writer) {
 
 // executeChild executes a single child DAG with the given parameters
 func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams) error {
-	// Store the command for distributed tracking if needed
-	if e.child.ShouldUseDistributedExecution() {
-		e.lock.Lock()
-		e.distributedChildren[runParams.RunID] = true
-		e.lock.Unlock()
-	}
-
 	// Use the new ExecuteWithResult API
 	result, err := e.child.ExecuteWithResult(ctx, runParams, e.workDir)
 
@@ -305,20 +296,7 @@ func (e *parallelExecutor) Kill(sig os.Signal) error {
 		e.cancelFunc()
 	}
 
-	// Request cancellation for distributed children
-	if len(e.distributedChildren) > 0 {
-		ctx := context.Background()
-		for dagRunID, isDistributed := range e.distributedChildren {
-			if isDistributed {
-				if err := e.env.DB.RequestChildCancel(ctx, dagRunID, e.env.RootDAGRun); err != nil {
-					logger.Error(ctx, "Failed to request child DAG cancellation",
-						"dagRunId", dagRunID, "err", err)
-				}
-			}
-		}
-	}
-
-	// For local processes, kill the child executor
+	// Kill all child processes (both local and distributed)
 	if e.child != nil {
 		return e.child.Kill(sig)
 	}

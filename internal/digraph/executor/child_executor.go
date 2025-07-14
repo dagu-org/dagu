@@ -34,8 +34,10 @@ type ChildDAGExecutor struct {
 	coordinatorClientFactory *client.Factory
 
 	// Process tracking for ALL executions
-	mu   sync.Mutex
-	cmds map[string]*exec.Cmd // runID -> cmd
+	mu              sync.Mutex
+	cmds            map[string]*exec.Cmd // runID -> cmd for local processes
+	distributedRuns map[string]bool      // runID -> true for distributed runs
+	env             Env                  // for DB access when cancelling distributed runs
 }
 
 // NewChildDAGExecutor creates a new ChildDAGExecutor.
@@ -62,6 +64,8 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 				tempFile:                 tempFile,
 				coordinatorClientFactory: env.CoordinatorClientFactory,
 				cmds:                     make(map[string]*exec.Cmd),
+				distributedRuns:          make(map[string]bool),
+				env:                      GetEnv(ctx),
 			}, nil
 		}
 	}
@@ -76,6 +80,8 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 		DAG:                      dag,
 		coordinatorClientFactory: env.CoordinatorClientFactory,
 		cmds:                     make(map[string]*exec.Cmd),
+		distributedRuns:          make(map[string]bool),
+		env:                      GetEnv(ctx),
 	}, nil
 }
 
@@ -219,6 +225,11 @@ func (e *ChildDAGExecutor) Cleanup(ctx context.Context) error {
 func (e *ChildDAGExecutor) Execute(ctx context.Context, runParams RunParams, workDir string, stdout io.Writer) error {
 	// Check if we should use distributed execution
 	if e.ShouldUseDistributedExecution() {
+		// Track distributed execution
+		e.mu.Lock()
+		e.distributedRuns[runParams.RunID] = true
+		e.mu.Unlock()
+		
 		return e.executeDistributed(ctx, runParams, stdout)
 	}
 
@@ -231,6 +242,11 @@ func (e *ChildDAGExecutor) Execute(ctx context.Context, runParams RunParams, wor
 func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunParams, workDir string) (*ChildResult, error) {
 	// Check if we should use distributed execution
 	if e.ShouldUseDistributedExecution() {
+		// Track distributed execution
+		e.mu.Lock()
+		e.distributedRuns[runParams.RunID] = true
+		e.mu.Unlock()
+		
 		return e.executeDistributedWithResult(ctx, runParams)
 	}
 
@@ -594,31 +610,53 @@ func getExitCode(success bool) int {
 	return 1
 }
 
-// Kill terminates all running child DAG processes
+// Kill terminates all running child DAG processes (both local and distributed)
 func (e *ChildDAGExecutor) Kill(sig os.Signal) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	var lastErr error
+	ctx := context.Background()
+	var errs []error
+
+	// Cancel distributed runs
+	for runID := range e.distributedRuns {
+		logger.Info(ctx, "Requesting cancellation for distributed child DAG",
+			"dag", e.DAG.Name,
+			"runId", runID,
+		)
+		if err := e.env.DB.RequestChildCancel(ctx, runID, e.env.RootDAGRun); err != nil {
+			logger.Error(ctx, "Failed to request child DAG cancellation",
+				"runId", runID,
+				"err", err,
+			)
+			errs = append(errs, err)
+		}
+	}
+
+	// Kill local processes
 	for runID, cmd := range e.cmds {
 		if cmd != nil && cmd.Process != nil {
-			logger.Info(context.Background(), "Killing child DAG process",
+			logger.Info(ctx, "Killing local child DAG process",
 				"dag", e.DAG.Name,
 				"runId", runID,
 				"pid", cmd.Process.Pid,
 				"signal", sig,
 			)
 			if err := killProcessGroup(cmd, sig); err != nil {
-				logger.Error(context.Background(), "Failed to kill process",
+				logger.Error(ctx, "Failed to kill process",
 					"runId", runID,
 					"err", err,
 				)
-				lastErr = err
+				errs = append(errs, err)
 			}
 		}
 	}
 
-	return lastErr
+	// Return the first error if any occurred
+	if len(errs) > 0 {
+		return errs[0]
+	}
+	return nil
 }
 
 // convertOutputsToMap converts string map to map[string]any

@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"os"
+	"os/exec"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -24,11 +25,25 @@ func TestDAGExecutor_Kill_Distributed(t *testing.T) {
 	}
 	_ = WithEnv(context.Background(), env)
 
+	// Create a child DAG with worker selector for distributed execution
+	childDAG := &digraph.DAG{
+		Name: "child-dag",
+		WorkerSelector: map[string]string{
+			"type": "test-worker",
+		},
+	}
+
+	// Create child executor with distributed run tracked
+	child := &ChildDAGExecutor{
+		DAG:             childDAG,
+		distributedRuns: map[string]bool{"child-run-id": true},
+		env:             env,
+		cmds:            make(map[string]*exec.Cmd),
+	}
+
 	// Create a DAG executor
 	executor := &dagExecutor{
-		isDistributed: true,
-		childDAGRunID: "child-run-id",
-		env:           env,
+		child: child,
 	}
 
 	// Set up expectation for RequestChildCancel
@@ -58,10 +73,22 @@ func TestDAGExecutor_Kill_NotDistributed(t *testing.T) {
 	}
 	_ = WithEnv(context.Background(), env)
 
-	// Create a DAG executor that's not distributed
+	// Create a child DAG without worker selector (local execution)
+	childDAG := &digraph.DAG{
+		Name: "child-dag",
+	}
+
+	// Create child executor without any distributed runs
+	child := &ChildDAGExecutor{
+		DAG:             childDAG,
+		distributedRuns: make(map[string]bool),
+		env:             env,
+		cmds:            make(map[string]*exec.Cmd),
+	}
+
+	// Create a DAG executor
 	executor := &dagExecutor{
-		isDistributed: false,
-		env:           env,
+		child: child,
 	}
 
 	// Call Kill
