@@ -183,7 +183,7 @@ func (d *DistributedExecutor) WaitForCompletionWithResult(ctx context.Context, d
 			childResult := &ChildResult{
 				RunID:    dagRunID,
 				Params:   result.Params,
-				Status:   getStatusString(result.Success),
+				Success:  result.Success,
 				Output:   convertOutputsToMap(result.Outputs),
 				Error:    getErrorString(result),
 				ExitCode: getExitCode(result.Success),
@@ -203,14 +203,6 @@ func (d *DistributedExecutor) getCoordinatorClient(ctx context.Context) (client.
 
 	// Build client from factory
 	return d.coordinatorClientFactory.Build(ctx)
-}
-
-// Helper functions to convert result status
-func getStatusString(success bool) string {
-	if success {
-		return "succeeded"
-	}
-	return "failed"
 }
 
 func getErrorString(result *digraph.Status) string {
@@ -238,4 +230,3 @@ func convertOutputsToMap(outputs map[string]string) map[string]any {
 	}
 	return result
 }
-

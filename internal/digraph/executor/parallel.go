@@ -39,7 +39,7 @@ type parallelExecutor struct {
 type ChildResult struct {
 	RunID    string         `json:"runId"`
 	Params   string         `json:"params"`
-	Status   string         `json:"status"`
+	Success  bool           `json:"success"`
 	Output   map[string]any `json:"output,omitempty"`
 	Error    string         `json:"error,omitempty"`
 	ExitCode int            `json:"exitCode"`
@@ -231,33 +231,25 @@ func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams
 			outputs[k] = v
 		}
 
-		// Determine status based on execution error
-		status := "succeeded"
-		if err != nil {
-			status = "failed"
-		}
+		// Determine success based on execution error
+		success := err == nil
 
 		e.results[runParams.RunID] = &ChildResult{
 			RunID:    runParams.RunID,
 			Params:   runParams.Params,
-			Status:   status,
+			Success:  success,
 			Output:   outputs,
 			ExitCode: cmd.ProcessState.ExitCode(),
 		}
 	} else {
 		// Even if we couldn't get the result, store what we know
-		status := "error"
-		if err == nil && resultErr != nil {
-			// Command succeeded but couldn't get result
-			status = "succeeded"
-		} else if err != nil {
-			status = "failed"
-		}
+		// Command succeeded if err is nil
+		success := err == nil
 
 		e.results[runParams.RunID] = &ChildResult{
 			RunID:    runParams.RunID,
 			Params:   runParams.Params,
-			Status:   status,
+			Success:  success,
 			Error:    fmt.Sprintf("execution error: %v, result error: %v", err, resultErr),
 			ExitCode: cmd.ProcessState.ExitCode(),
 		}
@@ -294,7 +286,7 @@ func (e *parallelExecutor) executeChildDistributed(ctx context.Context, runParam
 		e.results[runParams.RunID] = &ChildResult{
 			RunID:    runParams.RunID,
 			Params:   runParams.Params,
-			Status:   "failed",
+			Success:  false,
 			Error:    err.Error(),
 			ExitCode: 1,
 		}
@@ -338,7 +330,7 @@ func (e *parallelExecutor) outputResults(_ context.Context) error {
 			resultCopy := *result
 
 			// Clear output for failed executions
-			if result.Status != "succeeded" {
+			if !result.Success {
 				resultCopy.Output = nil
 			}
 
@@ -346,14 +338,13 @@ func (e *parallelExecutor) outputResults(_ context.Context) error {
 
 			// Add output to the outputs array
 			// Only include outputs from successful executions
-			if result.Status == "succeeded" && result.Output != nil {
+			if result.Success && result.Output != nil {
 				output.Outputs = append(output.Outputs, result.Output)
 			}
 
-			switch result.Status {
-			case "succeeded":
+			if result.Success {
 				output.Summary.Succeeded++
-			case "failed", "error":
+			} else {
 				output.Summary.Failed++
 			}
 
