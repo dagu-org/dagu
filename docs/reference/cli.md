@@ -247,7 +247,7 @@ dagu coordinator [options]
 
 **Options:**
 - `--coordinator.host` - Host address to bind (default: `127.0.0.1`)
-- `--coordinator.port` - Port number (default: `50051`)
+- `--coordinator.port` - Port number (default: `50055`)
 - `--coordinator.signing-key` - Signing key for authentication
 - `--coordinator.tls-cert` - Path to TLS certificate file
 - `--coordinator.tls-key` - Path to TLS key file
@@ -255,7 +255,7 @@ dagu coordinator [options]
 
 ```bash
 # Basic usage
-dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50051
+dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50055
 
 # With authentication
 dagu coordinator --coordinator.signing-key=mysecretkey
@@ -290,7 +290,7 @@ dagu worker [options]
 - `--worker.id` - Worker instance ID (default: `hostname@PID`)
 - `--worker.max-active-runs` - Maximum number of active runs (default: `100`)
 - `--worker.coordinator-host` - Coordinator gRPC server host (default: `127.0.0.1`)
-- `--worker.coordinator-port` - Coordinator gRPC server port (default: `50051`)
+- `--worker.coordinator-port` - Coordinator gRPC server port (default: `50055`)
 - `--worker.insecure` - Use insecure connection (h2c) instead of TLS (default: `true`)
 - `--worker.tls-cert` - Path to TLS certificate file for mutual TLS
 - `--worker.tls-key` - Path to TLS key file for mutual TLS

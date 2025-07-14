@@ -25,7 +25,7 @@ Flags:
   --worker.id string                       Worker instance ID (default: hostname@PID)
   --worker.max-active-runs int             Maximum number of active runs (default: 100)
   --worker.coordinator-host string         Coordinator gRPC server host (default: 127.0.0.1)
-  --worker.coordinator-port int            Coordinator gRPC server port (default: 50051)
+  --worker.coordinator-port int            Coordinator gRPC server port (default: 50055)
   --worker.insecure                        Use insecure connection (h2c) instead of TLS (default: true)
   --worker.tls-cert string                 Path to TLS certificate file for mutual TLS
   --worker.tls-key string                  Path to TLS key file for mutual TLS
@@ -36,7 +36,7 @@ Flags:
 Example:
   dagu worker
   dagu worker --worker.max-active-runs=50
-  dagu worker --worker.coordinator-host=coordinator.example.com --worker.coordinator-port=50051
+  dagu worker --worker.coordinator-host=coordinator.example.com --worker.coordinator-port=50055
   dagu worker --worker.id=worker-1 --worker.max-active-runs=200
   
   # Worker with labels for capability matching:

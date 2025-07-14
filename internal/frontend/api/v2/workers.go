@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
-	coordinatorclient "github.com/dagu-org/dagu/internal/coordinator/client"
 	"github.com/dagu-org/dagu/internal/logger"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"google.golang.org/grpc/codes"
@@ -30,16 +29,7 @@ func (a *API) GetWorkers(ctx context.Context, _ api.GetWorkersRequestObject) (ap
 	}
 
 	// Build coordinator client on demand
-	factory, ok := a.coordinatorClientFactory.(*coordinatorclient.Factory)
-	if !ok {
-		errors = append(errors, "Invalid coordinator client factory type")
-		return api.GetWorkers200JSONResponse{
-			Workers: workers,
-			Errors:  errors,
-		}, nil
-	}
-
-	coordinatorClient, err := factory.Build(ctx)
+	coordinatorClient, err := a.coordinatorClientFactory.Build(ctx)
 	if err != nil {
 		logger.Error(ctx, "Failed to build coordinator client", "err", err)
 		errors = append(errors, fmt.Sprintf("Failed to connect to coordinator: %v", err))

@@ -25,7 +25,7 @@ supports authentication via signing keys and TLS encryption.
 
 Flags:
   --coordinator.host string         Host address to bind the gRPC server to (default: 127.0.0.1)
-  --coordinator.port int            Port number for the gRPC server to listen on (default: 50051)
+  --coordinator.port int            Port number for the gRPC server to listen on (default: 50055)
   --coordinator.signing-key string  Signing key for coordinator authentication
   --coordinator.tls-cert string     Path to TLS certificate file for the coordinator server
   --coordinator.tls-key string      Path to TLS key file for the coordinator server
@@ -33,7 +33,7 @@ Flags:
 
 Example:
   # Basic usage
-  dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50051
+  dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50055
 
   # With authentication
   dagu coordinator --coordinator.signing-key=mysecretkey

@@ -47,7 +47,7 @@ The coordinator service is automatically started when you use `dagu start-all`:
 dagu start-all --host=0.0.0.0 --port=8080
 
 # Or start coordinator separately
-dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50051
+dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50055
 ```
 
 ### Step 2: Deploy Workers
@@ -131,7 +131,7 @@ Worker labels are key-value pairs that describe worker capabilities:
 # config.yaml
 coordinator:
   host: 0.0.0.0
-  port: 50051
+  port: 50055
   signingKey: "your-secret-key"
   tls:
     certFile: /path/to/server.crt
@@ -147,7 +147,7 @@ worker:
   id: "worker-gpu-01"  # Defaults to hostname@PID
   maxActiveRuns: 10
   coordinatorHost: coordinator.example.com
-  coordinatorPort: 50051
+  coordinatorPort: 50055
   labels:
     gpu: "true"
     memory: "64G"
@@ -164,7 +164,7 @@ worker:
 ```bash
 # Coordinator
 export DAGU_COORDINATOR_HOST=0.0.0.0
-export DAGU_COORDINATOR_PORT=50051
+export DAGU_COORDINATOR_PORT=50055
 export DAGU_COORDINATOR_SIGNING_KEY=secret
 
 # Worker
@@ -270,7 +270,7 @@ services:
     command: start-all --host=0.0.0.0
     ports:
       - "8080:8080"
-      - "50051:50051"
+      - "50055:50055"
     volumes:
       - ./dags:/etc/dagu/dags
       - ./data:/var/lib/dagu
@@ -281,7 +281,7 @@ services:
       worker
       --worker.labels=gpu=true,cuda=11.8
       --worker.coordinator-host=dagu-main
-      --worker.coordinator-port=50051
+      --worker.coordinator-port=50055
     deploy:
       replicas: 2
       resources:
@@ -295,7 +295,7 @@ services:
       worker
       --worker.labels=cpu-only=true,region=us-east-1
       --worker.coordinator-host=dagu-main
-      --worker.coordinator-port=50051
+      --worker.coordinator-port=50055
     deploy:
       replicas: 5
 ```
@@ -326,7 +326,7 @@ spec:
         ports:
         - containerPort: 8080
           name: web
-        - containerPort: 50051
+        - containerPort: 50055
           name: grpc
 
 ---
@@ -352,7 +352,7 @@ spec:
         args:
         - --worker.labels=gpu=true,node-type=gpu-node
         - --worker.coordinator-host=dagu-coordinator
-        - --worker.coordinator-port=50051
+        - --worker.coordinator-port=50055
         resources:
           limits:
             nvidia.com/gpu: 1
@@ -380,7 +380,7 @@ spec:
         args:
         - --worker.labels=cpu-optimized=true,region=us-east-1
         - --worker.coordinator-host=dagu-coordinator
-        - --worker.coordinator-port=50051
+        - --worker.coordinator-port=50055
 ```
 
 ## See Also

@@ -181,8 +181,9 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 		return nil, fmt.Errorf("failed to initialize DAG client: %w", err)
 	}
 
-	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, c.Config.Paths.Executable, c.Config.Global.WorkDir)
-	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore)
+	coordinatorClientFactory := c.NewCoordinatorClientFactory()
+	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, c.Config.Paths.Executable, c.Config.Global.WorkDir, coordinatorClientFactory)
+	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, coordinatorClientFactory)
 }
 
 // NewCoordinator creates a new Coordinator service instance.

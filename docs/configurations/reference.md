@@ -85,7 +85,7 @@ remoteNodes:
 # Coordinator (for distributed execution)
 coordinator:
   host: "127.0.0.1"       # Bind address
-  port: 50051             # gRPC port
+  port: 50055             # gRPC port
   signingKey: ""          # Authentication key
   tls:
     certFile: ""          # Server certificate
@@ -98,7 +98,7 @@ worker:
   maxActiveRuns: 100      # Max parallel task executions
   coordinator:
     host: "127.0.0.1"
-    port: 50051
+    port: 50055
   insecure: true          # Use h2c instead of TLS
   skipTLSVerify: false    # Skip cert verification
   labels:                 # Worker capabilities
@@ -161,7 +161,7 @@ All options support `DAGU_` prefix.
 
 ### Coordinator
 - `DAGU_COORDINATOR_HOST` - Coordinator bind address (default: `127.0.0.1`)
-- `DAGU_COORDINATOR_PORT` - Coordinator gRPC port (default: `50051`)
+- `DAGU_COORDINATOR_PORT` - Coordinator gRPC port (default: `50055`)
 - `DAGU_COORDINATOR_SIGNING_KEY` - Authentication signing key
 - `DAGU_COORDINATOR_TLS_CERT` - TLS certificate file path
 - `DAGU_COORDINATOR_TLS_KEY` - TLS key file path
@@ -171,7 +171,7 @@ All options support `DAGU_` prefix.
 - `DAGU_WORKER_ID` - Worker instance ID (default: `hostname@PID`)
 - `DAGU_WORKER_MAX_ACTIVE_RUNS` - Max concurrent task executions (default: `100`)
 - `DAGU_WORKER_COORDINATOR_HOST` - Coordinator host to connect to
-- `DAGU_WORKER_COORDINATOR_PORT` - Coordinator port (default: `50051`)
+- `DAGU_WORKER_COORDINATOR_PORT` - Coordinator port (default: `50055`)
 - `DAGU_WORKER_LABELS` - Worker labels (format: `key1=value1,key2=value2`)
 - `DAGU_WORKER_INSECURE` - Use insecure connection (default: `true`)
 - `DAGU_WORKER_TLS_CERT` - Client certificate for mTLS
@@ -351,7 +351,7 @@ port: 8080
 
 coordinator:
   host: 0.0.0.0
-  port: 50051
+  port: 50055
   signingKey: ${COORDINATOR_KEY}
   tls:
     certFile: /etc/dagu/tls/server.crt
@@ -362,7 +362,7 @@ worker:
   id: gpu-worker-01
   maxActiveRuns: 10
   coordinatorHost: coordinator.internal
-  coordinatorPort: 50051
+  coordinatorPort: 50055
   insecure: false
   labels:
     gpu: "true"

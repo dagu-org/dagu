@@ -470,7 +470,7 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 
 	// Coordinator settings
 	viper.SetDefault("coordinatorHost", "127.0.0.1")
-	viper.SetDefault("coordinatorPort", 50051)
+	viper.SetDefault("coordinatorPort", 50055)
 	viper.SetDefault("coordinatorSigningKey", "")
 	viper.SetDefault("coordinatorCertFile", "")
 	viper.SetDefault("coordinatorKeyFile", "")
@@ -479,7 +479,7 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	// Worker settings - nested structure
 	viper.SetDefault("worker.maxActiveRuns", 100)
 	viper.SetDefault("worker.coordinatorHost", "127.0.0.1")
-	viper.SetDefault("worker.coordinatorPort", 50051)
+	viper.SetDefault("worker.coordinatorPort", 50055)
 	viper.SetDefault("worker.insecure", true) // Insecure by default to match coordinator
 	viper.SetDefault("worker.skipTlsVerify", false)
 

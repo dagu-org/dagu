@@ -145,7 +145,7 @@ dagu server --dags=/path/to/directory
 dagu coordinator
 
 # Custom host and port
-dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50051
+dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50055
 
 # With authentication
 dagu coordinator --coordinator.signing-key=mysecretkey
@@ -169,7 +169,7 @@ dagu worker --worker.labels gpu=true,memory=64G,region=us-east-1
 # Connect to remote coordinator
 dagu worker \
   --worker.coordinator-host=coordinator.example.com \
-  --worker.coordinator-port=50051
+  --worker.coordinator-port=50055
 
 # With custom worker ID and concurrency
 dagu worker \

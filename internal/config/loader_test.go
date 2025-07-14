@@ -450,7 +450,7 @@ port: 8080
 		assert.Equal(t, "", cfg.Worker.ID) // No default ID
 		assert.Equal(t, 100, cfg.Worker.MaxActiveRuns)
 		assert.Equal(t, "127.0.0.1", cfg.Worker.CoordinatorHost)
-		assert.Equal(t, 50051, cfg.Worker.CoordinatorPort)
+		assert.Equal(t, 50055, cfg.Worker.CoordinatorPort)
 		assert.True(t, cfg.Worker.Insecure)
 		assert.False(t, cfg.Worker.SkipTLSVerify)
 		assert.Nil(t, cfg.Worker.TLS) // No TLS config by default

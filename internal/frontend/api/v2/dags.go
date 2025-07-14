@@ -209,7 +209,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 
 	var localDAGs []api.LocalDag
 	for _, localDAG := range dag.LocalDAGs {
-		localDAGs = append(localDAGs, toLocalDAG(localDAG.DAG))
+		localDAGs = append(localDAGs, toLocalDAG(localDAG))
 	}
 
 	// sort localDAGs by name
