@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -27,7 +26,6 @@ type parallelExecutor struct {
 	env           Env
 
 	// Runtime state
-	running             map[string]*exec.Cmd    // Maps DAG run ID to command
 	distributedChildren map[string]bool         // Maps DAG run ID to distributed status
 	results             map[string]*ChildResult // Maps DAG run ID to result
 	errors              []error                 // Collects errors from failed executions
@@ -75,7 +73,6 @@ func newParallelExecutor(
 		workDir:             dir,
 		maxConcurrent:       maxConcurrent,
 		env:                 GetEnv(ctx),
-		running:             make(map[string]*exec.Cmd),
 		distributedChildren: make(map[string]bool),
 		results:             make(map[string]*ChildResult),
 		errors:              make([]error, 0),
@@ -153,7 +150,27 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 
 	// Check if any executions failed
 	if len(e.errors) > 0 {
+		// Check if any error is due to context cancellation
+		for _, err := range e.errors {
+			if err == context.Canceled {
+				return fmt.Errorf("parallel execution cancelled")
+			}
+		}
 		return fmt.Errorf("parallel execution failed with %d errors: %v", len(e.errors), e.errors[0])
+	}
+
+	// Check if any child DAGs failed (even if they completed without execution errors)
+	e.lock.Lock()
+	failedCount := 0
+	for _, result := range e.results {
+		if !result.Success {
+			failedCount++
+		}
+	}
+	e.lock.Unlock()
+
+	if failedCount > 0 {
+		return fmt.Errorf("parallel execution failed: %d child dag(s) failed", failedCount)
 	}
 
 	return nil
@@ -179,110 +196,22 @@ func (e *parallelExecutor) SetStderr(out io.Writer) {
 
 // executeChild executes a single child DAG with the given parameters
 func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams) error {
-	// Check if we should use distributed execution
+	// Use the new ExecuteWithResult API
+	result, err := e.child.ExecuteWithResult(ctx, runParams, e.workDir)
+
+	// Store the command for distributed tracking if needed
 	if e.child.ShouldUseDistributedExecution() {
-		return e.executeChildDistributed(ctx, runParams)
+		e.lock.Lock()
+		e.distributedChildren[runParams.RunID] = true
+		e.lock.Unlock()
 	}
-
-	// Local execution path
-	cmd, err := e.child.BuildCommand(ctx, runParams, e.workDir)
-	if err != nil {
-		return err
-	}
-
-	// Create pipes for stdout/stderr capture
-	// We'll collect individual outputs for aggregation
-	cmd.Stdout = io.Discard // TODO: Capture individual outputs if needed
-	cmd.Stderr = io.Discard // TODO: Capture individual errors if needed
-
-	// Store the command for potential killing
-	e.lock.Lock()
-	e.running[runParams.RunID] = cmd
-	e.lock.Unlock()
-
-	logger.Info(ctx, "Executing child DAG locally",
-		"dagRunId", runParams.RunID,
-		"target", e.child.DAG.Name,
-		"params", runParams.Params,
-	)
-
-	// Start and wait for the command
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start child dag-run: %w", err)
-	}
-
-	err = cmd.Wait()
-
-	// Remove from running map
-	e.lock.Lock()
-	delete(e.running, runParams.RunID)
-	e.lock.Unlock()
-
-	// Get the result regardless of error
-	env := GetEnv(ctx)
-	result, resultErr := env.DB.GetChildDAGRunStatus(ctx, runParams.RunID, env.RootDAGRun)
 
 	// Store the result
 	e.lock.Lock()
-	if resultErr == nil && result != nil {
-		// Convert digraph.Status outputs to map[string]any
-		outputs := make(map[string]any)
-		for k, v := range result.Outputs {
-			outputs[k] = v
-		}
-
-		// Determine success based on execution error
-		success := err == nil
-
-		e.results[runParams.RunID] = &ChildResult{
-			RunID:    runParams.RunID,
-			Params:   runParams.Params,
-			Success:  success,
-			Output:   outputs,
-			ExitCode: cmd.ProcessState.ExitCode(),
-		}
-	} else {
-		// Even if we couldn't get the result, store what we know
-		// Command succeeded if err is nil
-		success := err == nil
-
-		e.results[runParams.RunID] = &ChildResult{
-			RunID:    runParams.RunID,
-			Params:   runParams.Params,
-			Success:  success,
-			Error:    fmt.Sprintf("execution error: %v, result error: %v", err, resultErr),
-			ExitCode: cmd.ProcessState.ExitCode(),
-		}
-	}
-	e.lock.Unlock()
-
-	if err != nil {
-		return fmt.Errorf("child dag-run failed: %w", err)
-	}
-
-	return nil
-}
-
-// executeChildDistributed executes a child DAG via coordinator
-func (e *parallelExecutor) executeChildDistributed(ctx context.Context, runParams RunParams) error {
-	// Mark as distributed
-	e.lock.Lock()
-	e.distributedChildren[runParams.RunID] = true
-	e.lock.Unlock()
-
-	// Create distributed executor
-	distExec := NewDistributedExecutor(ctx)
-
-	// Dispatch to coordinator
-	if err := distExec.DispatchToCoordinator(ctx, e.child, runParams); err != nil {
-		return fmt.Errorf("failed to dispatch child DAG: %w", err)
-	}
-
-	// Wait for completion and get result
-	result, err := distExec.WaitForCompletionWithResult(ctx, runParams.RunID)
-	if err != nil {
-		// Store error result
-		e.lock.Lock()
+	if result != nil {
+		e.results[runParams.RunID] = result
+	} else if err != nil {
+		// Create error result if execution failed
 		e.results[runParams.RunID] = &ChildResult{
 			RunID:    runParams.RunID,
 			Params:   runParams.Params,
@@ -290,16 +219,10 @@ func (e *parallelExecutor) executeChildDistributed(ctx context.Context, runParam
 			Error:    err.Error(),
 			ExitCode: 1,
 		}
-		e.lock.Unlock()
-		return err
 	}
-
-	// Store successful result
-	e.lock.Lock()
-	e.results[runParams.RunID] = result
 	e.lock.Unlock()
 
-	return nil
+	return err
 }
 
 // outputResults aggregates and outputs all child DAG results
@@ -395,10 +318,8 @@ func (e *parallelExecutor) Kill(sig os.Signal) error {
 		}
 	}
 
-	// Kill all running child processes
-	lastErr := killMultipleProcessGroups(e.running, sig)
-
-	return lastErr
+	// For local processes, the Kill logic is handled inside ChildDAGExecutor
+	return nil
 }
 
 func init() {

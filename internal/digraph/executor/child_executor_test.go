@@ -228,7 +228,7 @@ func TestBuildCommand(t *testing.T) {
 		Params: "param1=value1 param2=value2",
 	}
 
-	cmd, err := executor.BuildCommand(ctx, runParams, "/work/dir")
+	cmd, err := executor.buildCommand(ctx, runParams, "/work/dir")
 	require.NoError(t, err)
 	require.NotNil(t, cmd)
 
@@ -276,7 +276,7 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 		RunID: "", // Empty RunID
 	}
 
-	cmd, err := executor.BuildCommand(ctx, runParams, "/work/dir")
+	cmd, err := executor.buildCommand(ctx, runParams, "/work/dir")
 	assert.Error(t, err)
 	assert.Nil(t, cmd)
 	assert.Contains(t, err.Error(), "dag-run ID is not set")
@@ -309,7 +309,7 @@ func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 		RunID: "child-789",
 	}
 
-	cmd, err := executor.BuildCommand(ctx, runParams, "/work/dir")
+	cmd, err := executor.buildCommand(ctx, runParams, "/work/dir")
 	assert.Error(t, err)
 	assert.Nil(t, cmd)
 	assert.Contains(t, err.Error(), "root dag-run ID is not set")

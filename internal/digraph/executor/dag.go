@@ -2,11 +2,9 @@ package executor
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -22,7 +20,6 @@ type dagExecutor struct {
 	workDir       string
 	stdout        io.Writer
 	stderr        io.Writer
-	cmd           *exec.Cmd
 	runParams     RunParams
 	step          digraph.Step
 	isDistributed bool
@@ -68,78 +65,18 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 		}
 	}()
 
-	// Check if we should use distributed execution
+	// Execute using the simplified API
+	err := e.child.Execute(ctx, e.runParams, e.workDir, e.stdout)
+
+	// Track distributed execution state for Kill method
 	if e.child.ShouldUseDistributedExecution() {
-		logger.Info(ctx, "Worker selector specified for child DAG execution",
-			"dag", e.child.DAG.Name,
-			"workerSelector", e.step.WorkerSelector,
-		)
-
-		// Try distributed execution
-		err := e.runDistributed(ctx)
-		if err != nil {
-			// Distributed execution was requested but failed - return error
-			return fmt.Errorf("distributed execution failed for DAG %q: %w", e.child.DAG.Name, err)
-		}
-		// Distributed execution succeeded
-		return nil
-	}
-
-	e.lock.Lock()
-
-	cmd, err := e.child.BuildCommand(ctx, e.runParams, e.workDir)
-	if err != nil {
+		e.lock.Lock()
+		e.isDistributed = true
+		e.childDAGRunID = e.runParams.RunID
 		e.lock.Unlock()
-		return err
 	}
 
-	if e.stdout != nil {
-		cmd.Stdout = e.stdout
-	}
-	if e.stderr != nil {
-		cmd.Stderr = e.stderr
-	}
-
-	e.cmd = cmd
-
-	logger.Info(ctx, "Executing child DAG",
-		"dagRunId", e.runParams.RunID,
-		"target", e.child.DAG.Name,
-	)
-
-	err = cmd.Start()
-	e.lock.Unlock()
-
-	if err != nil {
-		return fmt.Errorf("failed to start child dag-run: %w", err)
-	}
-
-	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("child dag-run failed: %w", err)
-	}
-
-	// get results from the child dag-run
-	env := GetEnv(ctx)
-	result, err := env.DB.GetChildDAGRunStatus(ctx, e.runParams.RunID, env.RootDAGRun)
-	if err != nil {
-		return fmt.Errorf("failed to find result for the child dag-run %q: %w", e.runParams.RunID, err)
-	}
-
-	jsonData, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal outputs: %w", err)
-	}
-
-	// add a newline at the end of the JSON output
-	jsonData = append(jsonData, '\n')
-
-	if e.stdout != nil {
-		if _, err := e.stdout.Write(jsonData); err != nil {
-			return fmt.Errorf("failed to write outputs: %w", err)
-		}
-	}
-
-	return nil
+	return err
 }
 
 func (e *dagExecutor) SetParams(params RunParams) {
@@ -173,28 +110,8 @@ func (e *dagExecutor) Kill(sig os.Signal) error {
 		}
 	}
 
-	// Still kill local process if any
-	return killProcessGroup(e.cmd, sig)
-}
-
-// runDistributed attempts to execute the child DAG via the coordinator
-func (e *dagExecutor) runDistributed(ctx context.Context) error {
-	// Mark as distributed and store the child DAG run ID
-	e.lock.Lock()
-	e.isDistributed = true
-	e.childDAGRunID = e.runParams.RunID
-	e.lock.Unlock()
-
-	// Create distributed executor
-	distExec := NewDistributedExecutor(ctx)
-
-	// Dispatch to coordinator
-	if err := distExec.DispatchToCoordinator(ctx, e.child, e.runParams); err != nil {
-		return err
-	}
-
-	// Wait for distributed execution to complete
-	return distExec.WaitForCompletion(ctx, e.runParams.RunID, e.stdout)
+	// For local processes, the Kill logic is handled inside ChildDAGExecutor
+	return nil
 }
 
 func init() {
