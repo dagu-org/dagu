@@ -162,6 +162,32 @@ auth:
 	require.NoError(t, err)
 }
 
+func TestValidateConfig_OIDCError(t *testing.T) {
+	viper.Reset()
+	// Create a temporary config file where basic auth is enabled but username is missing.
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	configContent := `
+auth:
+  oidc:
+    clientId: "example-app"
+    clientSecret: "example-secret"
+    clientUrl: "http://127.0.0.1:8080"
+    issuer: "http://127.0.0.1:5556/dex"
+    scopes:
+      - openid
+      - profile
+      - email
+    whitelist:
+      - admin@example.com
+`
+	err := os.WriteFile(configFile, []byte(configContent), 0600)
+	require.NoError(t, err)
+
+	_, err = config.Load(config.WithConfigFile(configFile))
+	require.NoError(t, err)
+}
+
 func TestValidateConfig_TLSError(t *testing.T) {
 	viper.Reset()
 	// Create a config file with incomplete TLS settings.

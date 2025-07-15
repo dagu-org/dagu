@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	oidc "github.com/coreos/go-oidc"
+	"golang.org/x/oauth2"
 )
 
 // Options configures the authentication middleware.
@@ -13,6 +16,11 @@ type Options struct {
 	APITokenEnabled  bool
 	APIToken         string
 	BasicAuthEnabled bool
+	OIDCAuthEnabled  bool
+	OIDCProvider     *oidc.Provider
+	OIDCVerify       *oidc.IDTokenVerifier
+	OIDCConfig       *oauth2.Config
+	OIDCWhitelist    []string
 	Creds            map[string]string
 }
 
@@ -22,6 +30,7 @@ func DefaultOptions() Options {
 		Realm:            "Restricted",
 		APITokenEnabled:  false,
 		BasicAuthEnabled: false,
+		OIDCAuthEnabled:  false,
 	}
 }
 
@@ -30,7 +39,7 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// If no auth is enabled, skip authentication
-			if !opts.BasicAuthEnabled && !opts.APITokenEnabled {
+			if !opts.BasicAuthEnabled && !opts.APITokenEnabled && !opts.OIDCAuthEnabled {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -55,8 +64,22 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 				return
 			}
 
+			// Try OIDC Auth if enabled
+			if opts.OIDCAuthEnabled {
+				checkOIDCToken(next, opts.OIDCVerify, w, r)
+				return
+			}
+
 			// If API token auth was tried and failed, and basic auth is not enabled
 			requireBearerAuth(w, opts.Realm)
+		})
+	}
+}
+
+func OIDCMiddleware(opts Options) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			checkOIDCAuth(next, opts.OIDCProvider, opts.OIDCVerify, opts.OIDCConfig, opts.OIDCWhitelist, w, r)
 		})
 	}
 }
