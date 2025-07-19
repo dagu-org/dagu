@@ -160,6 +160,7 @@ type Definition struct {
 type authDef struct {
 	Basic *authBasicDef `mapstructure:"basic"`
 	Token *authTokenDef `mapstructure:"token"`
+	OIDC  *authOIDCDef  `mapstructure:"oidc"`
 }
 
 // authBasicDef represents the basic authentication configuration
@@ -173,6 +174,16 @@ type authBasicDef struct {
 type authTokenDef struct {
 	Enabled bool   `mapstructure:"enabled"`
 	Value   string `mapstructure:"value"`
+}
+
+type authOIDCDef struct {
+	Enabled      bool     `mapstructure:"enabled"`
+	ClientId     string   `mapstructure:"clientId"`
+	ClientSecret string   `mapstructure:"clientSecret"`
+	ClientUrl    string   `mapstructure:"clientUrl"`
+	Issuer       string   `mapstructure:"issuer"`
+	Scopes       []string `mapstructure:"scopes"`
+	Whitelist    []string `mapstructure:"whitelist"`
 }
 
 // PathsConfigDef represents the file system paths configuration.

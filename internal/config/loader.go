@@ -204,6 +204,14 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		if def.Auth.Token != nil {
 			cfg.Server.Auth.Token.Value = def.Auth.Token.Value
 		}
+		if def.Auth.OIDC != nil {
+			cfg.Server.Auth.OIDC.ClientId = def.Auth.OIDC.ClientId
+			cfg.Server.Auth.OIDC.ClientSecret = def.Auth.OIDC.ClientSecret
+			cfg.Server.Auth.OIDC.ClientUrl = def.Auth.OIDC.ClientUrl
+			cfg.Server.Auth.OIDC.Issuer = def.Auth.OIDC.Issuer
+			cfg.Server.Auth.OIDC.Scopes = def.Auth.OIDC.Scopes
+			cfg.Server.Auth.OIDC.Whitelist = def.Auth.OIDC.Whitelist
+		}
 	}
 
 	// Normalize the BasePath value for proper URL construction.
