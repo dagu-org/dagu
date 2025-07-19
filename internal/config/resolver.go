@@ -65,7 +65,6 @@ func (r *PathResolver) resolve(appHomeEnv, legacyPath string) {
 		r.setLegacyPaths()
 	// If the legacy path exists, warn and use it.
 	case fileutil.FileExists(legacyPath):
-		r.Warnings = append(r.Warnings, "Legacy path detected. Update configuration paths.")
 		r.Paths.ConfigDir = legacyPath
 		r.setLegacyPaths()
 	// Fallback to default XDG-based paths.
