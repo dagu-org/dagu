@@ -2,8 +2,6 @@ module github.com/dagu-org/dagu
 
 go 1.24.0
 
-toolchain go1.24.1
-
 require (
 	dario.cat/mergo v1.0.1
 	github.com/adrg/xdg v0.5.0
