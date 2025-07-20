@@ -113,6 +113,7 @@ const (
 	NodeStatusCancel
 	NodeStatusSuccess
 	NodeStatusSkipped
+	NodeStatusPartialSuccess
 )
 
 func (s NodeStatus) String() string {
@@ -127,6 +128,8 @@ func (s NodeStatus) String() string {
 		return "finished"
 	case NodeStatusSkipped:
 		return "skipped"
+	case NodeStatusPartialSuccess:
+		return "partial success"
 	case NodeStatusNone:
 		fallthrough
 	default:

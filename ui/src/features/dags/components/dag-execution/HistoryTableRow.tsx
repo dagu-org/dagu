@@ -55,6 +55,10 @@ function getStatusStyling(status: number) {
       bgColorClass = 'bg-blue-400 dark:bg-blue-500';
       borderColorClass = 'border-blue-500 dark:border-blue-600';
       break;
+    case NodeStatus.PartialSuccess: // partial success -> orange/amber
+      bgColorClass = 'bg-amber-500 dark:bg-amber-600';
+      borderColorClass = 'border-amber-600 dark:border-amber-700';
+      break;
     default: // Fallback to gray
       bgColorClass = 'bg-gray-500 dark:bg-gray-600';
       borderColorClass = 'border-gray-600 dark:border-gray-700';

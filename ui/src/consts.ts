@@ -20,4 +20,5 @@ export const nodeStatusColorMapping = {
   [NodeStatus.Cancelled]: statusColorMapping[Status.Cancelled],
   [NodeStatus.Success]: statusColorMapping[Status.Success],
   [NodeStatus.Skipped]: { backgroundColor: 'gray', color: 'white' },
+  [NodeStatus.PartialSuccess]: { backgroundColor: '#f59e0b', color: 'white' },
 };

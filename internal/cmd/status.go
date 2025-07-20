@@ -459,6 +459,8 @@ func formatNodeStatus(status scheduler.NodeStatus) string {
 		return color.YellowString("Cancelled")
 	case scheduler.NodeStatusSkipped:
 		return color.New(color.Faint).Sprint("Skipped")
+	case scheduler.NodeStatusPartialSuccess:
+		return color.YellowString("Partial Success")
 	case scheduler.NodeStatusNone:
 		return color.New(color.Faint).Sprint("Not Started")
 	default:

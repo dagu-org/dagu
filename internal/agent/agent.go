@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -883,7 +884,7 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error
 	return o.ds.GetDetails(ctx, name)
 }
 
-func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) (*digraph.Status, error) {
+func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) (digraph.RunStatus, error) {
 	childAttempt, err := o.drs.FindChildAttempt(ctx, rootDAGRun, dagRunID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find run for dag-run ID %s: %w", dagRunID, err)
@@ -907,10 +908,66 @@ func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, ro
 		}
 	}
 
-	return &digraph.Status{
-		Outputs:  outputVariables,
-		Name:     status.Name,
-		DAGRunID: status.DAGRunID,
-		Params:   status.Params,
+	return &dagRunStatus{
+		status:   status.Status,
+		outputs:  outputVariables,
+		name:     status.Name,
+		dagRunID: status.DAGRunID,
+		params:   status.Params,
 	}, nil
+}
+
+var _ digraph.RunStatus = &dagRunStatus{}
+
+type dagRunStatus struct {
+	// Name represents the name of the executed DAG.
+	name string
+	// DAGRunID is the ID of the dag-run.
+	dagRunID string
+	// Params is the parameters of the DAG.
+	params string
+	// Outputs is the outputs of the dag-run.
+	outputs map[string]string
+	// Status is the execution status of the dag-run.
+	status scheduler.Status
+}
+
+// Outputs implements digraph.RunStatus.
+func (d *dagRunStatus) Outputs() map[string]string {
+	if d.outputs == nil {
+		return nil
+	}
+	return maps.Clone(d.outputs)
+}
+
+// Success implements digraph.RunStatus.
+func (d *dagRunStatus) Success() bool {
+	switch d.status {
+	case scheduler.StatusSuccess, scheduler.StatusPartialSuccess:
+		return true
+	default:
+		return false
+	}
+}
+
+// StatusLabel implements digraph.RunStatus.
+func (d *dagRunStatus) StatusLabel() string {
+	return d.status.String()
+}
+
+// MarshalJSON implements json.Marshaler.
+func (d *dagRunStatus) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Name     string            `json:"name,omitempty"`
+		DAGRunID string            `json:"dagRunId,omitempty"`
+		Params   string            `json:"params,omitempty"`
+		Outputs  map[string]string `json:"outputs,omitempty"`
+		Status   scheduler.Status  `json:"status"`
+	}{
+		Name:     d.name,
+		DAGRunID: d.dagRunID,
+		Params:   d.params,
+		Outputs:  d.Outputs(),
+		Status:   d.status,
+	})
 }

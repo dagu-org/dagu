@@ -201,7 +201,9 @@ func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams
 		return fmt.Errorf("failed to start child dag-run: %w", err)
 	}
 
-	err = cmd.Wait()
+	if err := cmd.Wait(); err != nil {
+		logger.Error(ctx, "Child DAG execution finished with error", "runId", runParams.RunID, "er", err)
+	}
 
 	// Remove from running map
 	e.lock.Lock()
@@ -210,52 +212,32 @@ func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams
 
 	// Get the result regardless of error
 	env := GetEnv(ctx)
-	result, resultErr := env.DB.GetChildDAGRunStatus(ctx, runParams.RunID, env.RootDAGRun)
+	result, err := env.DB.GetChildDAGRunStatus(ctx, runParams.RunID, env.RootDAGRun)
+	if err != nil {
+		return fmt.Errorf("failed to find result for the child dag-run %q: %w", runParams.RunID, err)
+	}
 
 	// Store the result
 	e.lock.Lock()
-	if resultErr == nil && result != nil {
-		// Convert digraph.Status outputs to map[string]any
-		outputs := make(map[string]any)
-		for k, v := range result.Outputs {
-			outputs[k] = v
-		}
 
-		// Determine status based on execution error
-		status := "success"
-		if err != nil {
-			status = "failed"
-		}
-
-		e.results[runParams.RunID] = &ChildResult{
-			RunID:    runParams.RunID,
-			Params:   runParams.Params,
-			Status:   status,
-			Output:   outputs,
-			ExitCode: cmd.ProcessState.ExitCode(),
-		}
-	} else {
-		// Even if we couldn't get the result, store what we know
-		status := "error"
-		if err == nil && resultErr != nil {
-			// Command succeeded but couldn't get result
-			status = "success"
-		} else if err != nil {
-			status = "failed"
-		}
-
-		e.results[runParams.RunID] = &ChildResult{
-			RunID:    runParams.RunID,
-			Params:   runParams.Params,
-			Status:   status,
-			Error:    fmt.Sprintf("execution error: %v, result error: %v", err, resultErr),
-			ExitCode: cmd.ProcessState.ExitCode(),
-		}
+	// Convert digraph.Status outputs to map[string]any
+	outputs := make(map[string]any)
+	for k, v := range result.Outputs() {
+		outputs[k] = v
 	}
+
+	e.results[runParams.RunID] = &ChildResult{
+		RunID:    runParams.RunID,
+		Params:   runParams.Params,
+		Status:   result.StatusLabel(),
+		Output:   outputs,
+		ExitCode: cmd.ProcessState.ExitCode(),
+	}
+
 	e.lock.Unlock()
 
-	if err != nil {
-		return fmt.Errorf("child dag-run failed: %w", err)
+	if !result.Success() {
+		return fmt.Errorf("child DAG %s failed with status: %s", runParams.RunID, result.StatusLabel())
 	}
 
 	return nil
@@ -288,23 +270,18 @@ func (e *parallelExecutor) outputResults(_ context.Context) error {
 			// Create a copy of the result to potentially modify it
 			resultCopy := *result
 
-			// Clear output for failed executions
-			if result.Status != "success" {
-				resultCopy.Output = nil
-			}
-
 			output.Results = append(output.Results, resultCopy)
 
 			// Add output to the outputs array
 			// Only include outputs from successful executions
-			if result.Status == "success" && result.Output != nil {
+			if result.Output != nil {
 				output.Outputs = append(output.Outputs, result.Output)
 			}
 
 			switch result.Status {
-			case "success":
+			case "finished", "partial success":
 				output.Summary.Succeeded++
-			case "failed", "error":
+			default:
 				output.Summary.Failed++
 			}
 

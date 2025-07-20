@@ -548,6 +548,10 @@ func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 			ready = false
 			node.SetStatus(NodeStatusCancel)
 
+		case NodeStatusPartialSuccess:
+			// Partial success is treated like success for dependencies
+			continue
+
 		case NodeStatusNone, NodeStatusRunning:
 			ready = false
 
@@ -639,7 +643,7 @@ func (sc *Scheduler) isSucceed(g *ExecutionGraph) bool {
 	defer sc.mu.RUnlock()
 	for _, node := range g.nodes {
 		nodeStatus := node.State().Status
-		if nodeStatus == NodeStatusSuccess || nodeStatus == NodeStatusSkipped {
+		if nodeStatus == NodeStatusSuccess || nodeStatus == NodeStatusSkipped || nodeStatus == NodeStatusPartialSuccess {
 			continue
 		}
 		return false
@@ -677,6 +681,10 @@ func (sc *Scheduler) isPartialSuccess(ctx context.Context, g *ExecutionGraph) bo
 			if node.ShouldContinue(ctx) && !node.ShouldMarkSuccess(ctx) {
 				hasFailuresWithContinueOn = true
 			}
+		case NodeStatusPartialSuccess:
+			// Partial success at node level contributes to overall partial success
+			hasFailuresWithContinueOn = true
+			hasSuccessfulNodes = true
 		case NodeStatusNone, NodeStatusRunning, NodeStatusCancel, NodeStatusSkipped:
 			// These statuses don't affect partial success determination, but are needed for linter
 		}
@@ -805,6 +813,8 @@ func (sc *Scheduler) finishNode(node *Node, wg *sync.WaitGroup) {
 		sc.metrics.skippedNodes++
 	case NodeStatusCancel:
 		sc.metrics.canceledNodes++
+	case NodeStatusPartialSuccess:
+		sc.metrics.completedNodes++ // Count partial success as completed
 	case NodeStatusNone, NodeStatusRunning:
 		// Should not happen at this point
 	}
@@ -839,7 +849,7 @@ func (sc *Scheduler) handleNodeExecutionError(ctx context.Context, graph *Execut
 
 	status := node.State().Status
 	switch {
-	case status == NodeStatusSuccess || status == NodeStatusCancel:
+	case status == NodeStatusSuccess || status == NodeStatusCancel || status == NodeStatusPartialSuccess:
 		// do nothing
 
 	case sc.isTimeout(graph.startedAt):

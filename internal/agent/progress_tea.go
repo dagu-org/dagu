@@ -614,6 +614,8 @@ func (m ProgressModel) getStatusIcon(status scheduler.NodeStatus) string {
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("⚠")
 	case scheduler.NodeStatusSkipped:
 		return m.faintStyle.Render("⊘")
+	case scheduler.NodeStatusPartialSuccess:
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("◐")
 	default:
 		return m.faintStyle.Render("○")
 	}

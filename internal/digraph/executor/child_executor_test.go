@@ -12,27 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// MockDatabase is a mock implementation of digraph.Database
-type MockDatabase struct {
-	mock.Mock
-}
-
-func (m *MockDatabase) GetDAG(ctx context.Context, name string) (*digraph.DAG, error) {
-	args := m.Called(ctx, name)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*digraph.DAG), args.Error(1)
-}
-
-func (m *MockDatabase) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) (*digraph.Status, error) {
-	args := m.Called(ctx, dagRunID, rootDAGRun)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*digraph.Status), args.Error(1)
-}
-
 func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
 	// Create a context with environment
 	ctx := context.Background()
@@ -54,7 +33,7 @@ func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
 	}
 
 	// Set up the environment
-	mockDB := new(MockDatabase)
+	mockDB := new(mockDatabase)
 	env := Env{
 		Env: digraph.Env{
 			DAG:        parentDAG,
@@ -105,7 +84,7 @@ func TestNewChildDAGExecutor_RegularDAG(t *testing.T) {
 	}
 
 	// Set up the environment
-	mockDB := new(MockDatabase)
+	mockDB := new(mockDatabase)
 	env := Env{
 		Env: digraph.Env{
 			DAG:        parentDAG,
@@ -160,7 +139,7 @@ func TestNewChildDAGExecutor_NotFound(t *testing.T) {
 	}
 
 	// Set up the environment
-	mockDB := new(MockDatabase)
+	mockDB := new(mockDatabase)
 	env := Env{
 		Env: digraph.Env{
 			DAG:        parentDAG,
@@ -192,7 +171,7 @@ func TestBuildCommand(t *testing.T) {
 	ctx := context.Background()
 
 	// Set up the environment
-	mockDB := new(MockDatabase)
+	mockDB := new(mockDatabase)
 	env := Env{
 		Env: digraph.Env{
 			DAG:        &digraph.DAG{Name: "parent"},
@@ -246,7 +225,7 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 	ctx := context.Background()
 
 	// Set up the environment
-	mockDB := new(MockDatabase)
+	mockDB := new(mockDatabase)
 	env := Env{
 		Env: digraph.Env{
 			DAG:        &digraph.DAG{Name: "parent"},
@@ -280,7 +259,7 @@ func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 	ctx := context.Background()
 
 	// Set up the environment without RootDAGRun
-	mockDB := new(MockDatabase)
+	mockDB := new(mockDatabase)
 	env := Env{
 		Env: digraph.Env{
 			DAG: &digraph.DAG{Name: "parent"},
@@ -388,4 +367,25 @@ func TestExecutablePath(t *testing.T) {
 	path, err = executablePath()
 	assert.NoError(t, err)
 	assert.NotEmpty(t, path)
+}
+
+// mockDatabase is a mock implementation of digraph.Database
+type mockDatabase struct {
+	mock.Mock
+}
+
+func (m *mockDatabase) GetDAG(ctx context.Context, name string) (*digraph.DAG, error) {
+	args := m.Called(ctx, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*digraph.DAG), args.Error(1)
+}
+
+func (m *mockDatabase) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) (digraph.RunStatus, error) {
+	args := m.Called(ctx, dagRunID, rootDAGRun)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(digraph.RunStatus), args.Error(1)
 }

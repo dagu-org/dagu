@@ -2919,3 +2919,150 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 		assert.Contains(t, output, "${handler1.stdout}") // Should remain unresolved
 	})
 }
+
+func TestSchedulerPartialSuccess(t *testing.T) {
+	t.Run("NodeStatusPartialSuccess", func(t *testing.T) {
+		sc := setupScheduler(t)
+
+		// Create a graph where:
+		// - step1 succeeds
+		// - step2 fails but has continueOn.failure = true
+		// - step3 depends on step2 and succeeds
+		graph := sc.newGraph(t,
+			successStep("step1"),
+			newStep("step2",
+				withDepends("step1"),
+				withCommand("false"), // This will fail
+				withContinueOn(digraph.ContinueOn{
+					Failure: true,
+				}),
+			),
+			successStep("step3", "step2"),
+		)
+
+		// The overall DAG should complete with partial success
+		result := graph.Schedule(t, scheduler.StatusPartialSuccess)
+
+		// Verify individual node statuses
+		result.AssertNodeStatus(t, "step1", scheduler.NodeStatusSuccess)
+		result.AssertNodeStatus(t, "step2", scheduler.NodeStatusError)
+		result.AssertNodeStatus(t, "step3", scheduler.NodeStatusSuccess)
+	})
+
+	t.Run("NodeStatusPartialSuccessWithMarkSuccess", func(t *testing.T) {
+		sc := setupScheduler(t)
+
+		// Create a graph where:
+		// - step1 succeeds
+		// - step2 fails but has continueOn.failure = true and markSuccess = true
+		// - step3 depends on step2 and succeeds
+		graph := sc.newGraph(t,
+			successStep("step1"),
+			newStep("step2",
+				withDepends("step1"),
+				withCommand("false"), // This will fail
+				withContinueOn(digraph.ContinueOn{
+					Failure:     true,
+					MarkSuccess: true,
+				}),
+			),
+			successStep("step3", "step2"),
+		)
+
+		// When markSuccess is true, the overall DAG should complete with success
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+
+		// Verify individual node statuses
+		result.AssertNodeStatus(t, "step1", scheduler.NodeStatusSuccess)
+		result.AssertNodeStatus(t, "step2", scheduler.NodeStatusSuccess) // Marked as success
+		result.AssertNodeStatus(t, "step3", scheduler.NodeStatusSuccess)
+	})
+
+	t.Run("MultipleFailuresWithContinueOn", func(t *testing.T) {
+		sc := setupScheduler(t)
+
+		// Create a graph where multiple steps fail but have continueOn
+		graph := sc.newGraph(t,
+			newStep("step1",
+				withCommand("false"),
+				withContinueOn(digraph.ContinueOn{
+					Failure: true,
+				}),
+			),
+			newStep("step2",
+				withDepends("step1"),
+				withCommand("false"),
+				withContinueOn(digraph.ContinueOn{
+					Failure: true,
+				}),
+			),
+			successStep("step3", "step2"),
+		)
+
+		// The overall DAG should complete with partial success
+		result := graph.Schedule(t, scheduler.StatusPartialSuccess)
+
+		// Verify individual node statuses
+		result.AssertNodeStatus(t, "step1", scheduler.NodeStatusError)
+		result.AssertNodeStatus(t, "step2", scheduler.NodeStatusError)
+		result.AssertNodeStatus(t, "step3", scheduler.NodeStatusSuccess)
+	})
+
+	t.Run("NoSuccessfulStepsWithContinueOn", func(t *testing.T) {
+		sc := setupScheduler(t)
+
+		// Create a graph where all steps fail but have continueOn
+		// This should still be an error, not partial success,
+		// because partial success requires at least one successful step
+		graph := sc.newGraph(t,
+			newStep("step1",
+				withCommand("false"),
+				withContinueOn(digraph.ContinueOn{
+					Failure: true,
+				}),
+			),
+			newStep("step2",
+				withDepends("step1"),
+				withCommand("false"),
+				withContinueOn(digraph.ContinueOn{
+					Failure: true,
+				}),
+			),
+		)
+
+		// The overall DAG should complete with error since no steps succeeded
+		result := graph.Schedule(t, scheduler.StatusError)
+
+		// Verify individual node statuses
+		result.AssertNodeStatus(t, "step1", scheduler.NodeStatusError)
+		result.AssertNodeStatus(t, "step2", scheduler.NodeStatusError)
+	})
+
+	t.Run("FailureWithoutContinueOn", func(t *testing.T) {
+		sc := setupScheduler(t)
+
+		// Create a graph where a step fails without continueOn
+		// This should result in an error status, not partial success
+		graph := sc.newGraph(t,
+			successStep("step1"),
+			failStep("step2", "step1"),    // This will fail without continueOn
+			successStep("step3", "step1"), // This depends on step1, not step2
+		)
+
+		// The overall DAG should complete with error
+		result := graph.Schedule(t, scheduler.StatusError)
+
+		// Verify individual node statuses
+		result.AssertNodeStatus(t, "step1", scheduler.NodeStatusSuccess)
+		result.AssertNodeStatus(t, "step2", scheduler.NodeStatusError)
+		result.AssertNodeStatus(t, "step3", scheduler.NodeStatusSuccess)
+	})
+
+	t.Run("ChildDAGPartialSuccess", func(t *testing.T) {
+		// TODO: This test requires more complex setup with child DAGs
+		// For now, we're skipping it but it should be implemented
+		// to test that parent DAGs correctly handle child DAG partial success
+		t.Skip("Child DAG partial success test not yet implemented")
+	})
+
+}

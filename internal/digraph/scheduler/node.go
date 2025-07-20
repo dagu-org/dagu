@@ -176,6 +176,10 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 			return true
 		}
 
+	case NodeStatusPartialSuccess:
+		// Partial success is treated like success for continue on
+		return true
+
 	case NodeStatusNone:
 		fallthrough
 

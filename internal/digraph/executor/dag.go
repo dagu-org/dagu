@@ -91,15 +91,27 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to start child dag-run: %w", err)
 	}
 
-	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("child dag-run failed: %w", err)
-	}
+	// Wait for the command to complete
+	waitErr := cmd.Wait()
 
-	// get results from the child dag-run
+	// Always get the actual status from the child dag-run, regardless of exit code
 	env := GetEnv(ctx)
 	result, err := env.DB.GetChildDAGRunStatus(ctx, e.runParams.RunID, env.RootDAGRun)
 	if err != nil {
 		return fmt.Errorf("failed to find result for the child dag-run %q: %w", e.runParams.RunID, err)
+	}
+
+	if result.Success() {
+		if waitErr != nil {
+			logger.Warn(ctx, "Child DAG completed with exit code but no error",
+				"dagRunId", e.runParams.RunID,
+				"err", waitErr,
+			)
+		} else {
+			logger.Info(ctx, "Child DAG completed successfully", "dagRunId", e.runParams.RunID)
+		}
+	} else {
+		return fmt.Errorf("child dag-run failed with status: %s", result.StatusLabel())
 	}
 
 	jsonData, err := json.MarshalIndent(result, "", "  ")
