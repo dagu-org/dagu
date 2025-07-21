@@ -76,6 +76,18 @@ Dagu is designed for small teams of 1-3 people to easily manage complex workflow
 
 [Full changelog](https://docs.dagu.cloud/reference/changelog)
 
+## Use Cases
+
+Dagu is designed to orchestrate workflows across various domains, particularly those involving multi-step batch jobs and complex data dependencies. Example applications include:
+
+* AI/ML & Data Science - Automating machine learning workflows, including data ingestion, feature engineering, model training, validation, and deployment.
+* Geospatial & Environmental Analysis - Processing datasets from sources such as satellites (earth observation), aerial/terrestrial sensors, seismic surveys, and ground-based radar. Common uses include numerical weather prediction and natural resource management.
+* Finance & Trading - Implementing time-sensitive workflows for stock market analysis, quantitative modeling, risk assessment, and report generation.
+* Medical Imaging & Bioinformatics - Creating pipelines to process and analyze large volumes of medical scans (e.g., MRI, CT) or genomic data for clinical and research purposes.
+* Data Engineering (ETL/ELT) - Building, scheduling, and monitoring pipelines for moving and transforming data between systems like databases, data warehouses, and data lakes.
+* IoT & Edge Computing - Orchestrating workflows that collect, process, and analyze data from distributed IoT devices, sensors, and edge nodes.
+* Media & Content Processing - Automating workflows for video transcoding, image processing, and content delivery, including tasks like format conversion, compression, and metadata extraction.
+
 ## Features
 
 - [DAG definition](https://docs.dagu.cloud/writing-workflows/examples/) - Express complex dependencies in readable YAML
@@ -250,21 +262,6 @@ steps:
       - condition: "`date +%u`"
         expected: "re:[1-5]"  # Weekdays only
 ```
-
-## Use Cases
-
-- **Data Engineering** - ETL pipelines, data validation, warehouse loading
-- **Machine Learning** - Training pipelines, model deployment, experiment tracking
-- **DevOps** - CI/CD workflows, infrastructure automation, deployment orchestration
-- **Media Processing** - Video transcoding, image manipulation, content pipelines
-- **Business Automation** - Report generation, data synchronization, scheduled tasks
-
-## Roadmap
-
-- [ ] Run steps in a DAG across multiple machines (distributed execution)
-- [ ] Track artifacts by dropping files in `$DAGU_ARTIFACTS`
-- [ ] Pause executions for webhooks, approvals, or any event (human-in-the-loop, event-driven workflows)
-- [ ] Integrate with AI agents via MCP (Model Context Protocol)
 
 ## Building from Source
 
