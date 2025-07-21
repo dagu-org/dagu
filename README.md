@@ -49,30 +49,29 @@ Dagu is designed for small teams of 1-3 people to easily manage complex workflow
 
 **CLI Demo**: Create a simple DAG workflow and execute it using the command line interface.
 
-![Demo CLI](./assets/images/demo-cli.gif)
+![Demo CLI](./assets/images/demo-cli.webp)
 
 **Web UI Demo**: Create and manage workflows using the web interface, including real-time monitoring and control.
 
 [Docs on CLI](https://docs.dagu.cloud/overview/cli)
 
-![Demo Web UI](./assets/images/demo-web-ui.gif)
+![Demo Web UI](./assets/images/demo-web-ui.webp)
 
 [Docs on Web UI](https://docs.dagu.cloud/overview/web-ui)
 
 ## Recent Updates
 
-### v1.17.4
+### v1.18 (upcoming)
+- **OpenID Connect (OIDC) Support**: OpenID Connect authentication for secure access (implemented by [@Arvintian](https://github.com/Arvintian))
+- **Distributed Execution**: Run steps in a DAG across multiple machines (requested by Clément Doumouro)
+
+### v1.17
 - **OpenTelemetry Support (OTEL)**: Distributed tracing with W3C trace context propagation (requested by [@jeremydelattre59](https://github.com/jeremydelattre59))
 - **Windows Support (Beta)**: Initial PowerShell and cmd.exe compatibility - basic functionality works but may have limitations ([@pdoronila](https://github.com/pdoronila))
-- **Scheduler Refactoring**: Improved maintainability ([@thefishhat](https://github.com/thefishhat))
-
-### v1.17.0
 - **Hierarchical DAG**: Nested workflows with parameter passing
-- **Fan-out**: Run steps or nested workflows in parallel with different parameters
 - **Individual Step Retry**: Retry individual steps without re-running entire workflow ([@thefishhat](https://github.com/thefishhat))
 - **Repeat Policy Enhancement**: The 'while'/'until' modes are added to repeat policy setting ([@thefishhat](https://github.com/thefishhat))
-- **Queue Management**: Enqueue DAGs without running immediately to limit resource usage of the workflow ([@kriyanshii](https://github.com/kriyanshii))
-- **Docker Improvements**: Optimized docker image ([@jerry-yuan](https://github.com/jerry-yuan), [@vnghia](https://github.com/vnghia))
+- **Queueing functionality**: Enqueue DAGs without running immediately to limit resource usage of the workflow ([@kriyanshii](https://github.com/kriyanshii))
 
 [Full changelog](https://docs.dagu.cloud/reference/changelog)
 
@@ -300,9 +299,18 @@ make build
 make run
 ```
 
+## Acknowledgements
+
+- [@Arvintian](https://github.com/Arvintian) for implementing OpenID Connect (OIDC) support and HTTP executor
+- [@kriyanshii](https://github.com/kriyanshii) for implementing the distributed execution feature
+- [@pdoronila](https://github.com/pdoronila) for adding Windows support
+- [@thefishhat](https://github.com/thefishhat) for various improvements on the scheduler, retry policy, and more
+- [@arky](https://github.com/arky) for managing and improving the community, documentation, and examples
+- [@ghansham](https://github.com/ghansham) for providing valuable feedback and suggestions
+
 ## Contributing
 
-Contributions are welcome. See our [documentation](https://docs.dagu.cloud) for development setup.
+Any contributions are welcome! If you have ideas, suggestions, or improvements, please open an issue or submit a pull request.
 
 - [Discord Community](https://discord.gg/gpahPUjGRk)
 - [GitHub Issues](https://github.com/dagu-org/dagu/issues)
@@ -315,12 +323,8 @@ Contributions are welcome. See our [documentation](https://docs.dagu.cloud) for 
 
 ## Sponsors & Supporters
 
-<a href="https://github.com/Arvintian">
-  <img src="https://github.com/Arvintian.png" width="64" alt="@Arvintian"style="border-radius: 50%;"  />
-</a>
-<a href="https://github.com/yurivish">
-  <img src="https://github.com/yurivish.png" width="64" alt="@yurivish"style="border-radius: 50%;"  />
-</a>
+<a href="https://github.com/Arvintian"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FArvintian.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@Arvintian"></a>
+<a href="https://github.com/yurivish"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fyurivish.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@yurivish"></a>
 
 Thanks for supporting Dagu’s development! Join our supporters: [GitHub Sponsors](https://github.com/sponsors/dagu-org)
 
