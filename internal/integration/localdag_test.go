@@ -535,4 +535,102 @@ steps:
 		require.Contains(t, string(logContent), "Task1 processing with Setting up")
 		require.Contains(t, string(logContent), "Task2 processing with Setting up")
 	})
+	t.Run("PartialSuccessParallel", func(t *testing.T) {
+		// Create a DAG with parallel execution of local DAGs
+		yamlContent := `
+steps:
+  - name: parallel-tasks
+    run: worker-dag
+    parallel:
+      items:
+        - TASK_ID=1 TASK_NAME=alpha
+---
+
+name: worker-dag
+params:
+  - TASK_ID
+  - TASK_NAME
+steps:
+  - name: s1
+    command: exit 1
+    continueOn:
+      failure: true
+  
+  - name: s2
+    command: exit 0
+`
+		// Create temp dir for this test
+		tmpDir := t.TempDir()
+		testFile := filepath.Join(tmpDir, "partial-success.yaml")
+		err := os.WriteFile(testFile, []byte(yamlContent), 0644)
+		require.NoError(t, err)
+
+		// Setup test helper
+		th := test.Setup(t)
+
+		// Load the DAG directly
+		dag, err := digraph.Load(th.Context, testFile)
+		require.NoError(t, err)
+
+		// Create a DAG wrapper for test utilities
+		testDAG := test.DAG{
+			Helper: &th,
+			DAG:    dag,
+		}
+
+		// Run the DAG
+		agent := testDAG.Agent()
+		require.NoError(t, agent.Run(agent.Context))
+
+		// Verify successful completion
+		testDAG.AssertLatestStatus(t, status.PartialSuccess)
+	})
+
+	t.Run("PartialSuccessChildDAG", func(t *testing.T) {
+		// Create a DAG with parallel execution of local DAGs
+		yamlContent := `
+steps:
+  - name: parallel-tasks
+    run: worker-dag
+---
+
+name: worker-dag
+params:
+  - TASK_ID
+  - TASK_NAME
+steps:
+  - name: s1
+    command: exit 1
+    continueOn:
+      failure: true
+  
+  - name: s2
+    command: exit 0
+`
+		// Create temp dir for this test
+		tmpDir := t.TempDir()
+		testFile := filepath.Join(tmpDir, "partial-success.yaml")
+		err := os.WriteFile(testFile, []byte(yamlContent), 0644)
+		require.NoError(t, err)
+
+		// Setup test helper
+		th := test.Setup(t)
+
+		// Load the DAG directly
+		dag, err := digraph.Load(th.Context, testFile)
+		require.NoError(t, err)
+
+		// Create a DAG wrapper for test utilities
+		testDAG := test.DAG{
+			Helper: &th,
+			DAG:    dag,
+		}
+
+		// Run the DAG
+		agent := testDAG.Agent()
+		require.NoError(t, agent.Run(agent.Context))
+
+		// Verify successful completion
+		testDAG.AssertLatestStatus(t, status.PartialSuccess)
+	})
 }
